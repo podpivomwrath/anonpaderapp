@@ -1,0 +1,9 @@
+[
+  {
+    "id": "rusty_sword",
+    "name": "Ржавый меч",
+    "slot": "weapon",
+    "tier": "grey",
+    "base_stats": { "str": 1 }
+  }
+]

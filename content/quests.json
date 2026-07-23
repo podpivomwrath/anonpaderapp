@@ -1,0 +1,38 @@
+[
+  {
+    "code": "first_blood_ridge",
+    "region": "ridge",
+    "title": "Пепельные твари",
+    "progress_label": "Пепельные твари",
+    "target_count": 10,
+    "xp_reward": 500,
+    "gold_reward": 50
+  },
+  {
+    "code": "first_blood_woods",
+    "region": "woods",
+    "title": "Пепельные твари",
+    "progress_label": "Пепельные твари",
+    "target_count": 10,
+    "xp_reward": 500,
+    "gold_reward": 50
+  },
+  {
+    "code": "first_blood_docks",
+    "region": "docks",
+    "title": "Пепельные твари",
+    "progress_label": "Пепельные твари",
+    "target_count": 10,
+    "xp_reward": 500,
+    "gold_reward": 50
+  },
+  {
+    "code": "first_blood_scorched",
+    "region": "scorched",
+    "title": "Пепельные твари",
+    "progress_label": "Пепельные твари",
+    "target_count": 10,
+    "xp_reward": 500,
+    "gold_reward": 50
+  }
+]

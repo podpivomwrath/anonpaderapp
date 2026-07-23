@@ -1,0 +1,17 @@
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.env
+.claude/settings.local.json
+.claude/scheduled_tasks.lock
+.pytest_cache/
+*.egg-info/
+.idea/
+.vscode/
+.vkbottle/
+
+# miniapp (Node/Vite)
+miniapp/node_modules/
+miniapp/dist/
+miniapp/.env

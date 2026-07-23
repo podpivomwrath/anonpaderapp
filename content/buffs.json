@@ -1,0 +1,137 @@
+[
+  {
+    "id": "guardian_iron_skin",
+    "name": "Железная кожа",
+    "subclass": "guardian",
+    "category": "defense",
+    "description": "TODO: content — значения будут откалиброваны отдельно",
+    "stat_modifiers": {},
+    "duration_ticks": 1
+  },
+  {
+    "id": "guardian_bulwark",
+    "name": "Несокрушимость",
+    "subclass": "guardian",
+    "category": "defense",
+    "description": "Шанс полного блока входящего удара. Откалибровано патчем балансировки (было 15% в черновике).",
+    "stat_modifiers": { "full_block_chance": 0.25 },
+    "duration_ticks": 1
+  },
+  {
+    "id": "guardian_stalwart_shield",
+    "name": "Стойкий щит",
+    "subclass": "guardian",
+    "category": "defense",
+    "description": "TODO: content",
+    "stat_modifiers": {},
+    "duration_ticks": 1
+  },
+  {
+    "id": "guardian_heavy_hand",
+    "name": "Тяжёлая рука",
+    "subclass": "guardian",
+    "category": "damage",
+    "description": "Бонус к урону. Откалибровано патчем балансировки (+10% подтверждено рабочим).",
+    "stat_modifiers": { "damage_bonus": 0.10 },
+    "duration_ticks": 1
+  },
+  {
+    "id": "guardian_crushing_blow",
+    "name": "Сокрушающий удар",
+    "subclass": "guardian",
+    "category": "damage",
+    "description": "TODO: content",
+    "stat_modifiers": {},
+    "duration_ticks": 1
+  },
+  {
+    "id": "guardian_retribution",
+    "name": "Возмездие",
+    "subclass": "guardian",
+    "category": "damage",
+    "description": "Контрудар при блоке. Откалибровано патчем балансировки: 70% от обычного удара (было 50%).",
+    "stat_modifiers": { "counterstrike_mult": 0.70 },
+    "duration_ticks": 1
+  },
+  {
+    "id": "guardian_vital_block",
+    "name": "Живительный блок",
+    "subclass": "guardian",
+    "category": "defense",
+    "description": "Хил при успешном блоке. Откалибровано патчем балансировки: 8% от maxHP.",
+    "stat_modifiers": { "heal_on_block_pct_max_hp": 0.08 },
+    "duration_ticks": 1
+  },
+  {
+    "id": "guardian_passive_stamina",
+    "name": "Пассивная стойкость",
+    "subclass": "guardian",
+    "category": "defense",
+    "description": "Небольшой самохил каждый тик вне блока. Откалибровано патчем балансировки: 2.5% maxHP.",
+    "stat_modifiers": { "self_heal_per_tick_pct_max_hp": 0.025 },
+    "duration_ticks": 1
+  },
+  {
+    "id": "guardian_menace",
+    "name": "Угроза",
+    "subclass": "guardian",
+    "category": "control_utility",
+    "description": "TODO: content",
+    "stat_modifiers": {},
+    "duration_ticks": 1
+  },
+  {
+    "id": "guardian_steadfast_will",
+    "name": "Непреклонная воля",
+    "subclass": "guardian",
+    "category": "control_utility",
+    "description": "TODO: content",
+    "stat_modifiers": {},
+    "duration_ticks": 1
+  },
+  {
+    "id": "guardian_intercept",
+    "name": "Перехват",
+    "subclass": "guardian",
+    "category": "control_utility",
+    "description": "TODO: content",
+    "stat_modifiers": {},
+    "duration_ticks": 1
+  },
+  {
+    "id": "guardian_rally_banner",
+    "name": "Знамя сплочения",
+    "subclass": "guardian",
+    "category": "group_support",
+    "description": "TODO: content",
+    "stat_modifiers": {},
+    "duration_ticks": 1
+  },
+  {
+    "id": "guardian_shield_wall",
+    "name": "Стена щитов",
+    "subclass": "guardian",
+    "category": "group_support",
+    "description": "TODO: content",
+    "stat_modifiers": {},
+    "duration_ticks": 1
+  },
+  {
+    "id": "guardian_guardians_oath",
+    "name": "Клятва стража",
+    "subclass": "guardian",
+    "category": "group_support",
+    "description": "TODO: content",
+    "stat_modifiers": {},
+    "duration_ticks": 1
+  },
+  {
+    "id": "blood_knight_blood_rage",
+    "name": "Кровавая ярость",
+    "subclass": "blood_knight",
+    "category": "damage",
+    "description": "Бонус к урону. Откалибровано патчем балансировки: +5% (сильно урезано с +12% черновика). Пул остальных баффов подкласса — TODO: content.",
+    "stat_modifiers": { "damage_bonus": 0.05 },
+    "duration_ticks": 1
+  }
+]

@@ -1,0 +1,87 @@
+{
+  "_comment": "Базовые навыки классов (combat-patch-2): 3 на класс, доступны с 1 уровня, без маны, баланс через КД в ходах боя. Урон = базовый урон Атаки × multiplier. Тексты дословно. effect: null|stun|self_damage_buff|double_hit|guaranteed_crit|self_dodge_buff|target_vuln.",
+  "warrior": [
+    {
+      "id": "warrior_cleave",
+      "name": "Рассекающий удар",
+      "multiplier": 1.8,
+      "cd": 2,
+      "effect": null,
+      "flavor": "Широкий замах, вкладывающий всю массу тела в один разрез."
+    },
+    {
+      "id": "warrior_stagger",
+      "name": "Оглушающий натиск",
+      "multiplier": 1.2,
+      "cd": 4,
+      "effect": "stun",
+      "flavor": "Удар щитом или навершием — чтобы враг на миг забыл, где он."
+    },
+    {
+      "id": "warrior_warcry",
+      "name": "Боевой клич",
+      "multiplier": 0,
+      "cd": 5,
+      "effect": "self_damage_buff",
+      "effect_value": 0.3,
+      "effect_duration": 2,
+      "flavor": "Рёв, от которого стынет чужая кровь и вскипает своя."
+    }
+  ],
+  "rogue": [
+    {
+      "id": "rogue_double_stab",
+      "name": "Двойной укол",
+      "multiplier": 0.8,
+      "cd": 2,
+      "effect": "double_hit",
+      "flavor": "Два движения, слитые в одно. Второе — прежде чем упало первое."
+    },
+    {
+      "id": "rogue_shadow_dash",
+      "name": "Теневой рывок",
+      "multiplier": 1.3,
+      "cd": 4,
+      "effect": "guaranteed_crit",
+      "flavor": "Ты на миг перестаёшь быть там, где стоял."
+    },
+    {
+      "id": "rogue_smoke",
+      "name": "Дымовая завеса",
+      "multiplier": 0,
+      "cd": 5,
+      "effect": "self_dodge_buff",
+      "effect_value": 0.4,
+      "effect_duration": 2,
+      "flavor": "Горсть жгучего праха в воздух — и тебя уже не достать."
+    }
+  ],
+  "mage": [
+    {
+      "id": "mage_shard_volley",
+      "name": "Осколочный залп",
+      "multiplier": 1.75,
+      "cd": 2,
+      "effect": null,
+      "flavor": "Крошево Монолита срывается с ладони роем багровых игл."
+    },
+    {
+      "id": "mage_ice_bonds",
+      "name": "Ледяные оковы",
+      "multiplier": 1.0,
+      "cd": 4,
+      "effect": "stun",
+      "flavor": "Кровь врага на миг вспоминает, что она — вода."
+    },
+    {
+      "id": "mage_blood_seal",
+      "name": "Кровавая печать",
+      "multiplier": 0.9,
+      "cd": 4,
+      "effect": "target_vuln",
+      "effect_value": 0.25,
+      "effect_duration": 2,
+      "flavor": "Знак, вспыхивающий на коже жертвы. Метка для всего, что бьёт."
+    }
+  ]
+}
