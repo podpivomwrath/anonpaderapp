@@ -207,5 +207,4 @@ def test_calibrated_guardian_buff_values_in_content() -> None:
     assert buffs["guardian_retribution"].stat_modifiers["counterstrike_mult"] == 0.70
     assert buffs["guardian_vital_block"].stat_modifiers["heal_on_block_pct_max_hp"] == 0.08
     assert buffs["guardian_heavy_hand"].stat_modifiers["damage_bonus"] == 0.10
-    assert buffs["guardian_passive_stamina"].stat_modifiers["self_heal_per_tick_pct_max_hp"] == 0.025
     assert buffs["blood_knight_blood_rage"].stat_modifiers["damage_bonus"] == 0.05

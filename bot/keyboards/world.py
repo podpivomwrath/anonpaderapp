@@ -10,6 +10,7 @@
 from vkbottle import Keyboard, KeyboardButtonColor, OpenLink, Text
 
 from config import get_settings
+from game.combat import balance_config as bc
 from game.combat.base_skills import skills_for_class
 from game.content_loader import ExplorationEventDef
 
@@ -19,6 +20,9 @@ BTN_APPRAISER = "💰 Скупщик"
 BTN_GATE = "🚪 За ворота"
 BTN_REST = "🛏️ Отдых"
 BTN_CHARACTER = "🎭 Персонаж"
+BTN_INVENTORY = "🎒 Инвентарь"
+BTN_STATS = "📊 Характеристики"
+BTN_KEEPER = "📖 Хранитель Списков"
 
 
 def add_miniapp_button(kb: Keyboard) -> None:
@@ -46,7 +50,18 @@ def empty_keyboard() -> str:
     return Keyboard().get_json()
 
 
-def city_menu_keyboard() -> str:
+def waiting_keyboard() -> str:
+    """Клавиатура на время ожидания (переход/исследование/отдых/смерть):
+    без игровых кнопок, но с кнопкой мини-аппа — она нужна везде, кроме боя
+    (ux-patch-10)."""
+    kb = Keyboard(one_time=False)
+    add_miniapp_button(kb)
+    return kb.get_json()
+
+
+def city_menu_keyboard(character=None) -> str:
+    """character (патч 12) — при level>=30 добавляет кнопку Хранителя Списков
+    (выбор подкласса/испытания). None — легаси-вызовы без гейта (нет кнопки)."""
     kb = Keyboard(one_time=False)
     kb.add(Text(BTN_MENTOR), color=KeyboardButtonColor.PRIMARY)
     kb.add(Text(BTN_MARKET), color=KeyboardButtonColor.SECONDARY)
@@ -55,6 +70,12 @@ def city_menu_keyboard() -> str:
     kb.add(Text(BTN_REST), color=KeyboardButtonColor.SECONDARY)
     kb.row()
     kb.add(Text(BTN_APPRAISER), color=KeyboardButtonColor.SECONDARY)
+    kb.add(Text(BTN_INVENTORY), color=KeyboardButtonColor.SECONDARY)
+    kb.row()
+    kb.add(Text(BTN_STATS), color=KeyboardButtonColor.SECONDARY)
+    if character is not None and character.level >= bc.SUBCLASS_UNLOCK_MIN_LEVEL:
+        kb.row()
+        kb.add(Text(BTN_KEEPER), color=KeyboardButtonColor.SECONDARY)
     add_miniapp_button(kb)
     return kb.get_json()
 
@@ -72,6 +93,7 @@ def movement_keyboard() -> str:
     kb.row()
     kb.add(Text(BTN_EXPLORE), color=KeyboardButtonColor.POSITIVE)
     kb.add(Text(BTN_REST), color=KeyboardButtonColor.SECONDARY)
+    add_miniapp_button(kb)
     return kb.get_json()
 
 
@@ -83,6 +105,7 @@ def event_choice_keyboard(event: ExplorationEventDef) -> str:
     for idx, choice in enumerate(event.choices):
         kb.add(Text(choice.label, payload={"type": "event_choice", "event": event.id, "choice": idx}))
         kb.row()
+    add_miniapp_button(kb)
     return kb.get_json()
 
 

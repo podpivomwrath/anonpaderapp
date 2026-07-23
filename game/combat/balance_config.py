@@ -91,6 +91,10 @@ PRESET_REQUIRED_CATEGORIES = {"defense", "control_utility"}
 PRESET_CHANGE_COST_FARM = 500       # создание/изменение пресета; TODO: калибровка
 CLASS_RESET_COST_DONATE = 100       # полный ресет класса; TODO: калибровка
 
+# --- Подклассы и классовые испытания (патч 12) ---
+SUBCLASS_UNLOCK_COST = 20000         # золото за выбор подкласса на 30 ур. (первый крупный сток)
+SUBCLASS_UNLOCK_MIN_LEVEL = 30
+
 # --- Заточка и пробуждение ---
 ENCHANT_MAX_LEVEL = 20
 ENCHANT_SUCCESS_CHANCE = 0.5        # TODO: content (может зависеть от уровня заточки)

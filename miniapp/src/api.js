@@ -29,3 +29,7 @@ export function submitStats(increments) {
     body: JSON.stringify(increments),
   });
 }
+
+export function getTrials() {
+  return request('/trials');
+}

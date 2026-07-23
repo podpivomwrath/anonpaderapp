@@ -14,7 +14,7 @@ from bot.app_keys import SESSION_FACTORY_KEY
 from bot.miniapp_auth import VK_USER_ID_KEY
 from bot.onboarding_texts import REGION_TITLES
 from models import BaseClass, Character, User
-from services import derived_stats_service
+from services import derived_stats_service, item_service, trial_service
 
 STAT_FIELDS = {
     "str": "strength",
@@ -40,9 +40,9 @@ async def _load_character(session: AsyncSession, vk_user_id: int) -> Character |
     )
 
 
-def _character_payload(character: Character) -> dict:
+def _character_payload(character: Character, gear_bonus: dict[str, int] | None = None) -> dict:
     stats = character.stats
-    derived = derived_stats_service.compute(character, stats)
+    derived = derived_stats_service.compute(character, stats, gear_bonus)
     return {
         "name": character.name,
         "base_class": character.base_class,
@@ -77,7 +77,8 @@ async def handle_get_character(request: web.Request) -> web.Response:
         character = await _load_character(session, vk_user_id)
         if character is None:
             return web.json_response({"error": "character_not_found"}, status=404)
-        return web.json_response(_character_payload(character))
+        gear_bonus = await item_service.compute_gear_bonus(session, character.id)
+        return web.json_response(_character_payload(character, gear_bonus))
 
 
 async def handle_post_stats(request: web.Request) -> web.Response:
@@ -118,10 +119,43 @@ async def handle_post_stats(request: web.Request) -> web.Response:
             setattr(stats, attr, getattr(stats, attr) + amount)
         stats.unspent_points -= total
 
+        gear_bonus = await item_service.compute_gear_bonus(session, character.id)
         await session.commit()
-        return web.json_response(_character_payload(character))
+        return web.json_response(_character_payload(character, gear_bonus))
+
+
+async def handle_get_trials(request: web.Request) -> web.Response:
+    """Патч 12: вкладка «Испытания» — все баффы подкласса персонажа с
+    состоянием (открыт / прогресс). Пока подкласс не выбран — пустой список."""
+    vk_user_id = request[VK_USER_ID_KEY]
+    session_factory = request.app[SESSION_FACTORY_KEY]
+    async with session_factory() as session:
+        character = await _load_character(session, vk_user_id)
+        if character is None:
+            return web.json_response({"error": "character_not_found"}, status=404)
+        if character.subclass is None:
+            return web.json_response({"subclass": None, "trials": []})
+        states = await trial_service.get_trial_states(session, character)
+        return web.json_response(
+            {
+                "subclass": character.subclass,
+                "trials": [
+                    {
+                        "id": s.trial.id,
+                        "buff_id": s.trial.buff_id,
+                        "buff_name": s.buff_name,
+                        "unlocked": s.unlocked,
+                        "progress": s.progress,
+                        "target": s.target,
+                        "text": s.trial.text,
+                    }
+                    for s in states
+                ],
+            }
+        )
 
 
 def register_routes(app: web.Application) -> None:
     app.router.add_get("/api/miniapp/character", handle_get_character)
     app.router.add_post("/api/miniapp/stats", handle_post_stats)
+    app.router.add_get("/api/miniapp/trials", handle_get_trials)

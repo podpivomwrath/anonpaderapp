@@ -90,7 +90,11 @@ async def _resume(message: Message, state_str: str) -> None:
     state = RESTORE_STATES[state_str]
     await _dispenser.set(message.peer_id, state)
     if state == CreationState.NICKNAME_INPUT:
-        await message.answer(KEEPER["scene_awakening"], keyboard=empty_keyboard())
+        await message.answer(
+            KEEPER["scene_awakening"],
+            attachment=texts.scene_attachment("scene_awakening"),
+            keyboard=empty_keyboard(),
+        )
     elif state == CreationState.CLASS_SELECT:
         await message.answer(KEEPER["class_relisten"], keyboard=classes_keyboard())
     else:
@@ -109,7 +113,11 @@ async def handle_start(message: Message) -> None:
             await svc.begin_creation(db, user)
             await db.commit()
             await _dispenser.set(message.peer_id, CreationState.NICKNAME_INPUT)
-            await message.answer(KEEPER["scene_awakening"], keyboard=empty_keyboard())
+            await message.answer(
+                KEEPER["scene_awakening"],
+                attachment=texts.scene_attachment("scene_awakening"),
+                keyboard=empty_keyboard(),
+            )
             return
         if character.creation_state is None:
             await db.commit()
@@ -137,6 +145,7 @@ async def nickname_input(message: Message) -> None:
     await _dispenser.set(message.peer_id, CreationState.CLASS_SELECT)
     await message.answer(
         KEEPER["scene_blood_test"].format(nickname=nickname),
+        attachment=texts.scene_attachment("scene_blood_test"),
         keyboard=classes_keyboard(),
     )
 
@@ -187,7 +196,11 @@ async def class_confirm(message: Message) -> None:
         await db.commit()
     await _dispenser.set(message.peer_id, CreationState.REGION_SELECT)
     await message.answer(KEEPER["class_confirmed"])
-    await message.answer(KEEPER["scene_four_roads"], keyboard=regions_keyboard())
+    await message.answer(
+        KEEPER["scene_four_roads"],
+        attachment=texts.scene_attachment("scene_four_roads"),
+        keyboard=regions_keyboard(),
+    )
 
 
 @labeler.message(
@@ -224,7 +237,11 @@ async def region_view(message: Message) -> None:
     await _dispenser.set(
         message.peer_id, CreationState.REGION_CONFIRM, pending_region=region_id
     )
-    await message.answer(KEEPER["regions"][region_id], keyboard=region_view_keyboard())
+    await message.answer(
+        KEEPER["regions"][region_id],
+        attachment=texts.region_attachment(region_id),
+        keyboard=region_view_keyboard(),
+    )
 
 
 @labeler.message(state=CreationState.REGION_SELECT)
@@ -295,5 +312,5 @@ async def begin_journey(message: Message) -> None:
             return
         await message.answer(
             f"Ты в городе: {texts.REGION_TITLES[character.region]}",
-            keyboard=city_menu_keyboard(),
+            keyboard=city_menu_keyboard(character),
         )

@@ -64,7 +64,9 @@ async def client(settings, session_factory):
     await test_client.close()
 
 
-async def _make_character(session_factory, vk_id: int, **stat_overrides) -> Character:
+async def _make_character(
+    session_factory, vk_id: int, subclass: str | None = None, **stat_overrides
+) -> Character:
     async with session_factory() as session:
         user = User(vk_id=vk_id)
         session.add(user)
@@ -75,6 +77,7 @@ async def _make_character(session_factory, vk_id: int, **stat_overrides) -> Char
             base_class="warrior",
             level=5,
             region="ridge",
+            subclass=subclass,
         )
         session.add(character)
         await session.flush()
@@ -167,6 +170,42 @@ async def test_nothing_to_apply_rejected(client, session_factory) -> None:
     await _make_character(session_factory, vk_id=204)
     resp = await client.post("/api/miniapp/stats", params=_signed_query(204), json={})
     assert resp.status == 400
+
+
+# --- GET /api/miniapp/trials (патч 12) ---
+
+
+async def test_trials_empty_without_subclass(client, session_factory) -> None:
+    await _make_character(session_factory, vk_id=300)
+    resp = await client.get("/api/miniapp/trials", params=_signed_query(300))
+    assert resp.status == 200
+    data = await resp.json()
+    assert data == {"subclass": None, "trials": []}
+
+
+async def test_trials_lists_full_pool_with_progress(client, session_factory) -> None:
+    character = await _make_character(session_factory, vk_id=301, subclass="guardian")
+    async with session_factory() as session:
+        from game.combat.battle_report import BattleReport
+        from services import trial_service
+
+        db_character = await session.get(Character, character.id)
+        report = BattleReport(won=True, hp_min_pct=0.05, max_hp=100)  # survive_hp_floor 10%
+        await trial_service.record_battle(session, db_character, report)
+        await session.commit()
+
+    resp = await client.get("/api/miniapp/trials", params=_signed_query(301))
+    assert resp.status == 200
+    data = await resp.json()
+    assert data["subclass"] == "guardian"
+    assert len(data["trials"]) == 14
+    bulwark = next(t for t in data["trials"] if t["id"] == "guardian_bulwark")
+    assert bulwark["unlocked"] is True
+    assert bulwark["buff_name"] == "Несокрушимость"
+    other = next(t for t in data["trials"] if t["id"] == "guardian_command")
+    assert other["unlocked"] is False
+    assert other["progress"] == 0
+    assert other["target"] == 25
 
 
 # --- CORS ---

@@ -4,9 +4,39 @@
 дизайн-документа) — здесь только загрузка, кнопки и сборка финала.
 """
 
+from config import get_settings
 from game.content_loader import load_npc_texts
 
 KEEPER = load_npc_texts("list_keeper")["onboarding"]
+
+# --- Иллюстрации сцен онбординга (фото уже загружены в альбом группы VK) ---
+
+SCENE_PHOTO_IDS = {
+    "scene_awakening": "457239017",    # пробуждение / выбор имени
+    "scene_blood_test": "457239018",  # проверка крови / выбор класса
+    "scene_four_roads": "457239019",  # четыре дороги / выбор региона
+}
+
+REGION_PHOTO_IDS = {
+    "ridge": "457239020",     # Обетованный Кряж
+    "scorched": "457239022",  # Выжженный Предел
+    "docks": "457239023",     # Соляные Пристани
+    "woods": "457239024",     # Шепчущие Пущи
+}
+
+
+def _photo_attachment(photo_id: str) -> str:
+    return f"photo-{get_settings().vk_group_id}_{photo_id}"
+
+
+def scene_attachment(key: str) -> str | None:
+    photo_id = SCENE_PHOTO_IDS.get(key)
+    return _photo_attachment(photo_id) if photo_id else None
+
+
+def region_attachment(region: str) -> str | None:
+    photo_id = REGION_PHOTO_IDS.get(region)
+    return _photo_attachment(photo_id) if photo_id else None
 
 # --- Кнопки ---
 

@@ -12,6 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from game.combat import balance_config as bc
 from game.content_loader import BuffDef
 from models import Character, CharacterBuffPreset
+from services import trial_service
 from services.wallet_service import charge
 
 
@@ -20,11 +21,16 @@ class PresetValidationError(Exception):
 
 
 def validate_preset(
-    buff_ids: list[str], subclass_id: str | None, catalog: dict[str, BuffDef]
+    buff_ids: list[str],
+    subclass_id: str | None,
+    catalog: dict[str, BuffDef],
+    unlocked_buff_ids: set[str] | None = None,
 ) -> None:
-    """Правила валидации (п.7):
+    """Правила валидации (п.7, гейт баффов — патч 12):
     - 3-5 баффов, без дублей;
     - все баффы существуют и принадлежат пулу подкласса персонажа;
+    - каждый бафф подкласса должен быть открыт испытанием (unlocked_buff_ids=None
+      отключает эту проверку — используется прямыми юнит-тестами validate_preset);
     - минимум 1 бафф из категории обороны ИЛИ контроль/утилити
       (нельзя собрать чистый моно-урон пресет).
     """
@@ -44,6 +50,12 @@ def validate_preset(
             raise PresetValidationError(
                 f"Бафф {buff_id} принадлежит пулу другого подкласса"
             )
+        if (
+            buff.subclass is not None
+            and unlocked_buff_ids is not None
+            and buff_id not in unlocked_buff_ids
+        ):
+            raise PresetValidationError(f"Бафф {buff_id} ещё не открыт — пройди испытание")
         categories.add(buff.category)
 
     if not categories & bc.PRESET_REQUIRED_CATEGORIES:
@@ -61,7 +73,8 @@ async def save_preset(
     preset_id: int | None = None,
 ) -> CharacterBuffPreset:
     """Создание нового пресета или изменение состава — платно (уровень 2)."""
-    validate_preset(buff_ids, character.subclass, catalog)
+    unlocked = await trial_service.unlocked_buff_ids(db, character.id)
+    validate_preset(buff_ids, character.subclass, catalog, unlocked)
     await charge(db, character.id, "farm", bc.PRESET_CHANGE_COST_FARM)
 
     if preset_id is not None:

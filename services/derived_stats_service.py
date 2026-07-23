@@ -21,23 +21,31 @@ class DerivedStats:
     support_power: float
 
 
-def compute(character: Character, stats: CharacterStats) -> DerivedStats:
+def compute(
+    character: Character, stats: CharacterStats, gear_bonus: dict[str, int] | None = None
+) -> DerivedStats:
+    """gear_bonus (патч 11, блок 2) — сумма статов надетой экипировки
+    (services.item_service.gear_bonus), прибавляется к собственным статам ДО
+    расчёта формул. None/пусто — экипировка не учитывается (как раньше)."""
+    bonus = gear_bonus or {}
+    strength = stats.strength + bonus.get("str", 0)
+    agility = stats.agility + bonus.get("agi", 0)
+    intellect = stats.intellect + bonus.get("int", 0)
+    vitality = stats.vitality + bonus.get("vit", 0)
+    will = stats.will + bonus.get("wil", 0)
+
     tier = formulas.tier_for_level(character.level)
     tier_mult = formulas.tier_multiplier(tier)
 
     primary_stat = bc.PRIMARY_STAT_BY_CLASS[character.base_class]
-    primary_value = {
-        "str": stats.strength,
-        "agi": stats.agility,
-        "int": stats.intellect,
-    }[primary_stat]
+    primary_value = {"str": strength, "agi": agility, "int": intellect}[primary_stat]
     k_dmg = formulas.k_dmg_for(primary_stat)
 
     return DerivedStats(
-        max_hp=round(formulas.hp(character.level, stats.vitality, tier_mult)),
+        max_hp=round(formulas.hp(character.level, vitality, tier_mult)),
         damage=round(formulas.damage(tier_mult, primary_value, k_dmg), 1),
-        crit_chance=formulas.crit_chance(stats.agility),
-        mitigation=formulas.mitigation(stats.vitality),
-        control_resist=formulas.control_resist(stats.will),
-        support_power=formulas.support_power(stats.will),
+        crit_chance=formulas.crit_chance(agility),
+        mitigation=formulas.mitigation(vitality),
+        control_resist=formulas.control_resist(will),
+        support_power=formulas.support_power(will),
     )

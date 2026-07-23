@@ -15,6 +15,12 @@ class FakeChar:
     region: str = "ridge"
     level: int = 1
     experience: int = 0
+    current_hp: int | None = None
+
+
+@dataclass
+class FakeStats:
+    vitality: int = 15
 
 
 def test_xp_bar_format() -> None:
@@ -43,18 +49,32 @@ def test_xp_bar_max_level() -> None:
 
 def test_location_summary_structure() -> None:
     text = world_summary.location_summary(
-        FakeChar(level=3, experience=100), random.Random(1), farm_currency=340
+        FakeChar(level=3, experience=100), FakeStats(), random.Random(1), farm_currency=340
     )
     assert "📍 (49; 49)" in text          # координаты
-    assert "зона 1-15 ур." in text        # тип зоны
+    assert " · зона 1-15 ур." in text     # тип локации + зона
+    assert "❤️ Здоровье:" in text         # HP-бар (патч 10)
     assert "⚔️ Уровень: 3" in text        # уровень
     assert "✨ Опыт:" in text             # шкала опыта
     assert "💰 Золото: 340" in text       # баланс золота (патч 9)
     assert text.count("━━━━━━━━━━━━━━") == 2  # рамка вокруг блока стат
+    # порядок блока статуса: Здоровье -> Уровень -> Опыт -> Золото
+    hp_pos = text.index("❤️ Здоровье:")
+    level_pos = text.index("⚔️ Уровень:")
+    xp_pos = text.index("✨ Опыт:")
+    gold_pos = text.index("💰 Золото:")
+    assert hp_pos < level_pos < xp_pos < gold_pos
 
 
 def test_location_summary_has_description() -> None:
-    text = world_summary.location_summary(FakeChar(), random.Random(1), farm_currency=0)
+    text = world_summary.location_summary(FakeChar(), FakeStats(), random.Random(1), farm_currency=0)
     lines = text.splitlines()
     # вторая строка — вариативное описание локации (непустое, не координаты)
     assert lines[1] and not lines[1].startswith("📍")
+
+
+def test_location_summary_full_hp_shows_100_percent() -> None:
+    text = world_summary.location_summary(
+        FakeChar(current_hp=None), FakeStats(), random.Random(1), farm_currency=0
+    )
+    assert "100%" in text

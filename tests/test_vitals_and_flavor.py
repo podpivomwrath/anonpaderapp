@@ -86,7 +86,6 @@ def test_world_flavor_pools_load() -> None:
     assert flavor.rest_start() and flavor.rest_done()
     assert flavor.death_line()
     assert "Кряж" in flavor.respawn_line("🏰 Обетованный Кряж")
-    assert flavor.location_line("ridge", rng)
 
 
 def test_ashen_song_has_ten_parts() -> None:

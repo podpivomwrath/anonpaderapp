@@ -43,6 +43,11 @@ class TickResult:
     finished: bool = False
     winner_side: int | None = None
     draw: bool = False
+    # Патч 12 (классовые испытания): структурные данные хода для
+    # services/trial_service.py — не для отображения, только для трекинга.
+    hits: list[PendingHit] = field(default_factory=list)
+    actions: dict[int, DeclaredAction] = field(default_factory=dict)  # только "character"
+    control_landed_by: set[int] = field(default_factory=set)  # cid, успешно наложившие контроль в этот ход
 
 
 def _display_mode(session: CombatSessionState) -> str:
@@ -110,6 +115,18 @@ def resolve_tick(
         if action.type == ActionType.SKILL and base_skills.is_control_skill(action.skill_id):
             _run_offensive(ctx, cid, action, session, result)
             control_actors.add(cid)
+
+    # Успешно наложенный контроль (патч 12): новый FREEZE-эффект от одного из
+    # control_actors, которого не было на начало хода (см. preexisting_effects).
+    if control_actors:
+        for combatant in session.combatants.values():
+            for effect in combatant.effects:
+                if (
+                    effect.kind == EffectKind.FREEZE
+                    and id(effect) not in preexisting_effects
+                    and effect.source_id in control_actors
+                ):
+                    result.control_landed_by.add(effect.source_id)
 
     # --- Фаза 3: кто способен действовать (заморожен на старте ИЛИ получил контроль) ---
     def is_frozen(c: CombatantState) -> bool:
@@ -220,6 +237,14 @@ def resolve_tick(
         combatant.tick_cooldowns()
         control.tick_control(combatant, pvp)
         combatant.reset_transient()
+
+    # Патч 12: снимок хитов/действий этого хода для трекера испытаний
+    # (только персонажи — мобьи действия трекеру не интересны).
+    result.hits = list(ctx.hits)
+    result.actions = {
+        cid: action for cid, action in normalized.items()
+        if session.combatants[cid].kind == "character"
+    }
 
     # --- Смерти и исход ---
     result.deaths = [cid for cid in alive_before if not session.combatants[cid].alive]

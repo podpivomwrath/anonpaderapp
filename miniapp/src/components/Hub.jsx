@@ -3,11 +3,13 @@ import { Panel, PanelHeader, Tabbar, TabbarItem, Placeholder, Spinner, Div, Butt
 import { getCharacter } from '../api.js';
 import StatsTab from './StatsTab.jsx';
 import StubTab from './StubTab.jsx';
+import TrialsTab from './TrialsTab.jsx';
 
 const TABS = [
   { id: 'stats', label: 'Характеристики', icon: '📊' },
   { id: 'inventory', label: 'Инвентарь', icon: '🎒' },
   { id: 'presets', label: 'Пресеты', icon: '⚔️' },
+  { id: 'trials', label: 'Испытания', icon: '📖' },
   { id: 'exchange', label: 'Биржа', icon: '💱' },
 ];
 
@@ -78,6 +80,7 @@ export default function Hub() {
       {activeTab === 'presets' && (
         <StubTab text="Пути ещё не разветвились. Пресеты откроются с выбором подкласса." />
       )}
+      {activeTab === 'trials' && <TrialsTab />}
       {activeTab === 'exchange' && (
         <StubTab text="Торговцы душами ещё не открыли лавку. Скоро." />
       )}

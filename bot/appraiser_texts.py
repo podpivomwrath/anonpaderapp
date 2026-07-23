@@ -13,5 +13,9 @@ def appraiser_empty() -> str:
     return APPRAISER["empty"]
 
 
+def appraiser_gear_empty() -> str:
+    return APPRAISER["gear_empty"]
+
+
 def appraiser_sold(gold: int) -> str:
     return APPRAISER["sold"].format(gold=gold)

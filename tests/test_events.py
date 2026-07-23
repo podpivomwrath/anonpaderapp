@@ -167,17 +167,14 @@ async def test_outcome_combines_trophy_and_damage(db_session, character_at) -> N
     assert vitals_service.current_hp(character, stats) < full_hp
 
 
-async def test_outcome_song_is_guaranteed(db_session, character_at) -> None:
-    character = await character_at(50, 50)
+async def test_outcome_xp_big_grants_more_than_normal(db_session, character_at) -> None:
+    """ux-patch-10: "крупнее обычного" опыт — рискованный выбор (Пульсирующий
+    осколок / Коснуться, успех)."""
+    character = await character_at(50, 50, level=5)
     stats = await _stats(db_session, character)
-    outcome = EventOutcome(weight=100, text="", song=True)
-    result = await event_service.apply_outcome(db_session, character, stats, outcome, FixedRng(0.0))
-    assert result.text  # непустой обрывок Песни
-
-
-async def test_outcome_flavor_is_guaranteed(db_session, character_at) -> None:
-    character = await character_at(50, 50)
-    stats = await _stats(db_session, character)
-    outcome = EventOutcome(weight=100, text="", flavor=True)
-    result = await event_service.apply_outcome(db_session, character, stats, outcome, FixedRng(0.0))
-    assert result.text  # непустой (Песнь или замечание)
+    before = character.experience
+    outcome = EventOutcome(weight=100, text="Тепло растекается по венам.", xp_big=True)
+    await event_service.apply_outcome(db_session, character, stats, outcome, FixedRng(0.0))
+    expected = round(experience_service.xp_per_mob(5) * wc.EVENT_XP_FRACTION_BIG)
+    assert character.experience == before + expected
+    assert wc.EVENT_XP_FRACTION_BIG > wc.EVENT_XP_FRACTION  # действительно крупнее обычного

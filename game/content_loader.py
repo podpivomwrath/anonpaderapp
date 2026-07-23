@@ -124,16 +124,16 @@ def load_trophy_defs(content_dir: Path = CONTENT_DIR) -> list[TrophyDef]:
 
 
 class EventOutcome(BaseModel):
-    """Исход выбора в событии исследования (патч 9, блок 1). Эффекты
-    комбинируемы: напр. trophy=True И damage_max_pct>0 одновременно
-    (Пепельный алтарь: "трофей гарантированно + урон")."""
+    """Исход выбора в событии исследования (патч 9 блок 1, патч 10 блок 3).
+    Эффекты комбинируемы: напр. trophy=True И damage_max_pct>0 одновременно
+    (Пепельный алтарь: "трофей гарантированно + урон"). Пустых исходов
+    ("ничего не произошло") с патча 10 не бывает — только trophy/xp/damage/combat."""
 
     weight: float
     text: str = ""
     trophy: bool = False
     xp: bool = False
-    song: bool = False  # гарантированный обрывок Песни (не 50/50 с замечанием)
-    flavor: bool = False  # гарантированный обрывок Песни ИЛИ замечание (50/50)
+    xp_big: bool = False  # "крупнее обычного" опыт (EVENT_XP_FRACTION_BIG)
     damage_min_pct: float = 0.0
     damage_max_pct: float = 0.0
     combat: bool = False  # засада — переход в бой
@@ -157,6 +157,96 @@ def load_exploration_events(content_dir: Path = CONTENT_DIR) -> list[Exploration
     return [
         ExplorationEventDef(**raw)
         for raw in _load_json(content_dir / "events" / "exploration.json")
+    ]
+
+
+class LocationTypeDef(BaseModel):
+    """Тип локации (content/locations/types.json, патч 10, блок 4) — 4 на регион.
+    Тип клетки детерминирован по координатам (см. game/world/location_types.py):
+    одна и та же клетка всегда одного типа. `image` — задел под картинки, пока
+    всегда пусто."""
+
+    id: str
+    region: str
+    name: str
+    descriptions: list[str]
+    image: str | None = None
+
+
+def load_location_types(content_dir: Path = CONTENT_DIR) -> list[LocationTypeDef]:
+    return [LocationTypeDef(**raw) for raw in _load_json(content_dir / "locations" / "types.json")]
+
+
+class ItemBaseDef(BaseModel):
+    """Базовое название экипировки по слоту (content/items/bases.json,
+    патч 11). gender согласует суффикс редкости: m|f|pl."""
+
+    name: str
+    gender: str
+
+
+class ItemRaritySuffix(BaseModel):
+    m: str | None = None
+    f: str | None = None
+    pl: str | None = None
+    invariant: str | None = None  # легендарная: родительный падеж, ставится ПОСЛЕ базы
+
+
+class ItemRarityDef(BaseModel):
+    """Редкость базовой экипировки (content/items/rarities.json, патч 11) —
+    id ключом в JSON, тот же порядок градаций, что у трофеев (патч 9)."""
+
+    id: str = ""  # проставляется при загрузке (ключ словаря в JSON)
+    emoji: str
+    name: str
+    mult: float
+    suffix: ItemRaritySuffix
+
+
+def _load_json_dict(path: Path) -> dict:
+    with path.open(encoding="utf-8") as f:
+        return json.load(f)
+
+
+def load_item_bases(content_dir: Path = CONTENT_DIR) -> dict[str, list[ItemBaseDef]]:
+    """{slot: [базы]} из content/items/bases.json."""
+    raw = _load_json_dict(content_dir / "items" / "bases.json")
+    return {
+        slot: [ItemBaseDef(**b) for b in bases]
+        for slot, bases in raw.items()
+        if not slot.startswith("_")
+    }
+
+
+def load_item_rarities(content_dir: Path = CONTENT_DIR) -> dict[str, ItemRarityDef]:
+    """{rarity_id: определение} из content/items/rarities.json, в порядке файла
+    (от обычной к легендарной — важно для сортировки инвентаря/скупщика)."""
+    raw = _load_json_dict(content_dir / "items" / "rarities.json")
+    return {
+        rarity_id: ItemRarityDef(id=rarity_id, **data)
+        for rarity_id, data in raw.items()
+        if not rarity_id.startswith("_")
+    }
+
+
+class ClassTrialDef(BaseModel):
+    """Классовое испытание (content/quests/class_trials.json, патч 12):
+    условие открытия одного микробаффа подкласса. id испытания == id баффа
+    (связь 1:1 — каждое испытание открывает ровно один бафф).
+    condition_type/params — параметры для services/trial_service.py."""
+
+    id: str
+    buff_id: str
+    subclass: str
+    condition_type: str
+    params: dict = Field(default_factory=dict)
+    text: str = ""
+
+
+def load_class_trials(content_dir: Path = CONTENT_DIR) -> list[ClassTrialDef]:
+    return [
+        ClassTrialDef(**raw)
+        for raw in _load_json(content_dir / "quests" / "class_trials.json")
     ]
 
 

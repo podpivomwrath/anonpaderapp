@@ -10,9 +10,10 @@ from vkbottle import Bot
 
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
-from bot.handlers import LABELERS, onboarding
+from bot.handlers import LABELERS, list_keeper, onboarding
 from bot.handlers import combat as combat_handlers
 from bot.handlers import respawn as respawn_handlers
+from bot.handlers import stats_window as stats_window_handlers
 from bot.handlers import world as world_handlers
 from bot.webhook import WEBHOOK_PATH, create_app
 from config import Settings, get_settings
@@ -27,6 +28,7 @@ def create_bot(settings: Settings) -> Bot:
     for labeler in LABELERS:
         bot.labeler.load(labeler)
     onboarding.setup(bot)  # диспенсер состояний + восстановление FSM из БД
+    list_keeper.setup(bot)  # патч 12: FSM выбора подкласса + восстановление
     return bot
 
 
@@ -65,6 +67,7 @@ async def run() -> None:
     )
     tick_engine.start()
     combat_handlers.setup(tick_engine, bot.api)
+    stats_window_handlers.setup(bot.api)
 
     duel_engine = DuelEngine()
     duel_engine.start()

@@ -9,9 +9,14 @@ from models.base import Base
 class Item(Base):
     """Экземпляр предмета.
 
-    Прогрессия (п.9 дизайна): 1-59 — тиры по цвету с шансом дропа;
+    Базовая экипировка (патч 11): только статы, без прокачки — rarity/ilvl
+    определяют base_stats один раз при генерации (game/economy/item_gen.py).
+
+    Прогрессия (п.9 дизайна, БУДУЩЕЕ): 1-59 — тиры по цвету с шансом дропа;
     60+ — рейд-сеты каждые 10 уровней (крафт или 100%-дроп, без рандома).
-    Внутри окна предмет прокачивается заточкой (до +20) и пробуждением.
+    Внутри окна предмет прокачивается заточкой (до +20) и пробуждением —
+    tier/enchant_level/awakened/socketed_gem_id принадлежат ЭТОЙ будущей
+    системе, патч 11 их не трогает и не читает.
     """
 
     __tablename__ = "items"
@@ -20,6 +25,11 @@ class Item(Base):
     name: Mapped[str] = mapped_column(String(128))
     slot: Mapped[str] = mapped_column(String(32))
     base_stats: Mapped[dict] = mapped_column(JSON, default=dict)
+    # Редкость базовой экипировки (патч 11): common|uncommon|rare|epic|legendary.
+    # NULL — предмет будущей рейд-системы (заточка/пробуждение), не этого патча.
+    rarity: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    # Уровень моба, с которого выпал предмет (патч 11) — базис item_power.
+    ilvl: Mapped[int | None] = mapped_column(nullable=True)
     # Ключ из balance_config.TIER_MULTIPLIERS: grey|white|green|blue|epic|legendary
     tier: Mapped[str] = mapped_column(String(20), default="grey")
     enchant_level: Mapped[int] = mapped_column(default=0)

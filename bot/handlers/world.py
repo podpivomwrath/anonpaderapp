@@ -28,8 +28,12 @@ from models import CharacterStats
 from services import (
     death_service,
     event_service,
+    experience_service,
+    item_service,
     movement_service,
     quest_service,
+    trial_service,
+    trophy_service,
     vitals_service,
     wallet_service,
 )
@@ -76,9 +80,10 @@ async def _get_stats(db, character_id: int) -> CharacterStats:
     return await db.scalar(select(CharacterStats).where(CharacterStats.character_id == character_id))
 
 
-def _map_text(character, farm_currency: int) -> str:
-    """Единая сводка клетки: координаты/зона + описание + шкала опыта + золото."""
-    return location_summary(character, _rng, farm_currency)
+def _map_text(character, stats, farm_currency: int, gear_bonus: dict | None = None) -> str:
+    """Единая сводка клетки — ВСЕГДА самостоятельное сообщение (ux-patch-10)."""
+    vit_bonus = (gear_bonus or {}).get("vit", 0)
+    return location_summary(character, stats, _rng, farm_currency, vit_bonus)
 
 
 async def _check_still_dead(db, character, now: datetime) -> bool:
@@ -98,6 +103,8 @@ async def show_location(message: Message, db, character) -> None:
         return
 
     if movement_service.resolve_arrival(character, now):
+        if character.subclass is not None:
+            await trial_service.record_cell_moved(db, character)
         await db.commit()
 
     if movement_service.is_traveling(character, now):
@@ -112,12 +119,16 @@ async def show_location(message: Message, db, character) -> None:
     region = grid.city_region_at(character.pos_x, character.pos_y)
     if region is not None:
         await message.answer(
-            f"Ты в городе: {REGION_TITLES[region]}", keyboard=kb.city_menu_keyboard()
+            f"Ты в городе: {REGION_TITLES[region]}", keyboard=kb.city_menu_keyboard(character)
         )
         return
 
+    stats = await _get_stats(db, character.id)
     farm_currency = (await wallet_service.get_wallet(db, character.id)).farm_currency
-    await message.answer(_map_text(character, farm_currency), keyboard=kb.movement_keyboard())
+    gear_bonus = await item_service.compute_gear_bonus(db, character.id)
+    await message.answer(
+        _map_text(character, stats, farm_currency, gear_bonus), keyboard=kb.movement_keyboard()
+    )
 
 
 @labeler.message(text=[kb.BTN_GATE])
@@ -137,11 +148,14 @@ async def gate_exit(message: Message) -> None:
         character.pos_x, character.pos_y = grid.gate_exit_position(
             character.pos_x, character.pos_y
         )
+        stats = await _get_stats(db, character.id)
         farm_currency = (await wallet_service.get_wallet(db, character.id)).farm_currency
+        gear_bonus = await item_service.compute_gear_bonus(db, character.id)
         await db.commit()
+        # ux-patch-10 п.1: сводка локации — всегда отдельное сообщение
+        await message.answer("Ты выходишь за ворота.", keyboard=kb.waiting_keyboard())
         await message.answer(
-            f"Ты выходишь за ворота.\n{_map_text(character, farm_currency)}",
-            keyboard=kb.movement_keyboard(),
+            _map_text(character, stats, farm_currency, gear_bonus), keyboard=kb.movement_keyboard()
         )
 
 
@@ -181,7 +195,7 @@ async def explore(message: Message) -> None:
     fragment = flavor.explore_fragment(_rng)
     if fragment is not None:
         text += f"\n\n{fragment}"
-    await message.answer(text, keyboard=kb.empty_keyboard())
+    await message.answer(text, keyboard=kb.waiting_keyboard())
     _explore_scheduler.schedule(peer_id, delay)
 
 
@@ -189,8 +203,13 @@ async def handle_explore_done(peer_id: int) -> None:
     """Колбэк планировщика: исследование закончено — три исхода (патч 9, блок 1):
     ~40% бой, ~25% гарантированный флейвор, ~35% событие с выбором.
     Атмосферный фрагмент "иногда" уже показан внутри сообщения исследования
-    (ux-patch-5) — это отдельный, более ранний слой, не пересекается с исходом."""
+    (ux-patch-5) — это отдельный, более ранний слой, не пересекается с исходом.
+
+    Замечания-находки (ux-patch-10 п.3) в флейвор-исходе больше не бывают
+    пустыми — дают трофей или немного опыта."""
     _exploring.discard(peer_id)
+    pick: flavor.FlavorPick | None = None
+    reward_line: str | None = None
     async with get_session_factory()() as db:
         character = await onboarding_svc.get_character(db, peer_id)
         if character is None or character.creation_state is not None:
@@ -202,18 +221,40 @@ async def handle_explore_done(peer_id: int) -> None:
         if combat_handlers.has_active_encounter(peer_id):
             return
         stats = await _get_stats(db, character.id)
-        farm_currency = (await wallet_service.get_wallet(db, character.id)).farm_currency
 
-    roll = _rng.random()
-    if roll < wc.EXPLORE_COMBAT_CHANCE:
-        await combat_handlers.start_encounter(peer_id, character, stats)
+        roll = _rng.random()
+        if roll < wc.EXPLORE_COMBAT_CHANCE:
+            outcome_kind = "combat"
+        elif roll < wc.EXPLORE_COMBAT_CHANCE + wc.EXPLORE_FLAVOR_CHANCE:
+            outcome_kind = "flavor"
+            pick = flavor.song_or_remark_pick(_rng)
+            if pick.reward == "trophy":
+                drop = await trophy_service.grant_from_event(db, character, _rng)
+                reward_line = trophy_service.format_drop_line(drop)
+            elif pick.reward == "xp":
+                xp = round(experience_service.xp_per_mob(character.level) * wc.EVENT_XP_FRACTION)
+                experience_service.add_experience(character, stats, xp)
+            await db.commit()
+        else:
+            outcome_kind = "event"
+        farm_currency = (await wallet_service.get_wallet(db, character.id)).farm_currency
+        gear_bonus = await item_service.compute_gear_bonus(db, character.id)
+
+    if outcome_kind == "combat":
+        await combat_handlers.start_encounter(peer_id, character, stats, gear_bonus)
         return
 
-    if roll < wc.EXPLORE_COMBAT_CHANCE + wc.EXPLORE_FLAVOR_CHANCE:
-        fragment = flavor.song_or_remark(_rng)
-        text = f"{fragment}\n\n{_map_text(character, farm_currency)}"
+    if outcome_kind == "flavor":
+        narrative = pick.text
+        if reward_line:
+            narrative += f"\n\n{reward_line}"
+        # ux-patch-10 п.1: сводка локации — всегда отдельное сообщение
         await _bot_api.messages.send(
-            peer_id=peer_id, message=text, random_id=0, keyboard=kb.movement_keyboard()
+            peer_id=peer_id, message=narrative, random_id=0, keyboard=kb.waiting_keyboard()
+        )
+        await _bot_api.messages.send(
+            peer_id=peer_id, message=_map_text(character, stats, farm_currency, gear_bonus),
+            random_id=0, keyboard=kb.movement_keyboard(),
         )
         return
 
@@ -249,17 +290,25 @@ async def event_choice(message: Message) -> None:
             return
         stats = await _get_stats(db, character.id)
         outcome = event_service.pick_outcome(_rng, event.choices[choice_idx].outcomes)
-        result = await event_service.apply_outcome(db, character, stats, outcome, _rng)
+        choice_label = event.choices[choice_idx].label
+        choice_code = trial_service.EVENT_CHOICE_CODES.get(choice_label)
+        result = await event_service.apply_outcome(
+            db, character, stats, outcome, _rng, event_id=event.id, choice_code=choice_code
+        )
         farm_currency = (await wallet_service.get_wallet(db, character.id)).farm_currency
+        gear_bonus = await item_service.compute_gear_bonus(db, character.id)
         await db.commit()
 
     if result.is_combat:
         await message.answer(result.text)
-        await combat_handlers.start_encounter(peer_id, character, stats)
+        await combat_handlers.start_encounter(peer_id, character, stats, gear_bonus)
         return
 
-    text = f"{result.text}\n\n{_map_text(character, farm_currency)}"
-    await message.answer(text, keyboard=kb.movement_keyboard())
+    # ux-patch-10 п.1: сводка локации — всегда отдельное сообщение
+    await message.answer(result.text, keyboard=kb.waiting_keyboard())
+    await message.answer(
+        _map_text(character, stats, farm_currency, gear_bonus), keyboard=kb.movement_keyboard()
+    )
 
 
 # --- Отдых (combat-patch-2, п.3): вне боя, 8-12 сек, HP → полное ---
@@ -289,7 +338,7 @@ async def rest(message: Message) -> None:
     _resting.add(peer_id)
     delay = _rng.uniform(wc.REST_SECONDS_MIN, wc.REST_SECONDS_MAX)
     # отдых — кнопки убираем на время (чистка шума)
-    await message.answer(flavor.rest_start(), keyboard=kb.empty_keyboard())
+    await message.answer(flavor.rest_start(), keyboard=kb.waiting_keyboard())
     _rest_scheduler.schedule(peer_id, delay)
 
 
@@ -305,9 +354,11 @@ async def handle_rest_done(peer_id: int) -> None:
         if death_service.is_dead(character) or combat_handlers.has_active_encounter(peer_id):
             return
         vitals_service.restore_full(character)
+        if character.subclass is not None:
+            await trial_service.record_rest(db, character)
         await db.commit()
         region = grid.city_region_at(character.pos_x, character.pos_y)
-        keyboard = kb.city_menu_keyboard() if region is not None else kb.movement_keyboard()
+        keyboard = kb.city_menu_keyboard(character) if region is not None else kb.movement_keyboard()
     await _bot_api.messages.send(
         peer_id=peer_id, message=flavor.rest_done(), random_id=0, keyboard=keyboard
     )
@@ -333,6 +384,8 @@ async def move(message: Message) -> None:
             await message.answer("🛏️ Ты отдыхаешь. Дай себе минуту.")
             return
         if movement_service.resolve_arrival(character, now):
+            if character.subclass is not None:
+                await trial_service.record_cell_moved(db, character)
             await db.commit()
             await show_location(message, db, character)
             return
@@ -344,7 +397,7 @@ async def move(message: Message) -> None:
         movement_service.start_travel(character, dx, dy, now)
         await db.commit()
         # в пути — кнопки убираем, вернём по прибытии (чистка визуального шума)
-        await message.answer(flavor.travel_line(_rng), keyboard=kb.empty_keyboard())
+        await message.answer(flavor.travel_line(_rng), keyboard=kb.waiting_keyboard())
         _travel_scheduler.schedule(message.peer_id, wc.CELL_TRAVEL_SECONDS)
 
 
@@ -356,6 +409,8 @@ async def handle_arrival(peer_id: int) -> None:
             return
         if not movement_service.resolve_arrival(character):
             return  # игрок уже сам разрешил прибытие более ранним действием
+        if character.subclass is not None:
+            await trial_service.record_cell_moved(db, character)
         await db.commit()
         region = grid.city_region_at(character.pos_x, character.pos_y)
         if region is not None:
@@ -363,13 +418,14 @@ async def handle_arrival(peer_id: int) -> None:
                 peer_id=peer_id,
                 message=f"Ты выходишь к воротам: {REGION_TITLES[region]}",
                 random_id=0,
-                keyboard=kb.city_menu_keyboard(),
+                keyboard=kb.city_menu_keyboard(character),
             )
             return
+        stats = await _get_stats(db, character.id)
         farm_currency = (await wallet_service.get_wallet(db, character.id)).farm_currency
         await _bot_api.messages.send(
             peer_id=peer_id,
-            message=_map_text(character, farm_currency),
+            message=_map_text(character, stats, farm_currency),
             random_id=0,
             keyboard=kb.movement_keyboard(),
         )

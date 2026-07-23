@@ -30,6 +30,8 @@ class Character(Base):
     region: Mapped[str | None] = mapped_column(String(16), nullable=True)
     # Шаг FSM создания персонажа; NULL = создание завершено
     creation_state: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    # Шаг FSM сцены «Раскол пути» у Хранителя (патч 12); NULL = не в процессе
+    subclass_select_state: Mapped[str | None] = mapped_column(String(32), nullable=True)
 
     # Позиция на карте (сетка -50..50); NULL до завершения онбординга
     pos_x: Mapped[int | None] = mapped_column(nullable=True)

@@ -8,6 +8,7 @@ from models.economy import ExchangeOrder, PvpStakeTransfer, Wallet
 from models.enums import BaseClass, CombatStatus, CombatType, OrderDirection, QuestStatus, Region
 from models.item import Inventory, Item, ItemUpgradeHistory
 from models.quest import CharacterQuest, Quest
+from models.subclass_trial import CharacterTrialProgress, CharacterUnlockedBuff
 from models.trophy import CharacterTrophy
 from models.user import User
 
@@ -18,7 +19,9 @@ __all__ = [
     "CharacterBuffPreset",
     "CharacterQuest",
     "CharacterStats",
+    "CharacterTrialProgress",
     "CharacterTrophy",
+    "CharacterUnlockedBuff",
     "CombatParticipant",
     "CombatSession",
     "CombatStatus",

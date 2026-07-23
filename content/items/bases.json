@@ -1,0 +1,30 @@
+{
+  "_comment": "Базовые названия экипировки по слотам (патч 11, блок 2). gender: m|f|pl — для согласования с суффиксом редкости (см. rarities.json).",
+  "weapon": [
+    {"name": "Клинок", "gender": "m"},
+    {"name": "Тесак", "gender": "m"},
+    {"name": "Секира", "gender": "f"},
+    {"name": "Посох", "gender": "m"},
+    {"name": "Кинжал", "gender": "m"}
+  ],
+  "helmet": [
+    {"name": "Шлем", "gender": "m"},
+    {"name": "Капюшон", "gender": "m"},
+    {"name": "Венец", "gender": "m"}
+  ],
+  "armor": [
+    {"name": "Кираса", "gender": "f"},
+    {"name": "Панцирь", "gender": "m"},
+    {"name": "Роба", "gender": "f"}
+  ],
+  "legs": [
+    {"name": "Поножи", "gender": "pl"},
+    {"name": "Штаны", "gender": "pl"},
+    {"name": "Набедренники", "gender": "pl"}
+  ],
+  "boots": [
+    {"name": "Сапоги", "gender": "pl"},
+    {"name": "Поршни", "gender": "pl"},
+    {"name": "Ботфорты", "gender": "pl"}
+  ]
+}

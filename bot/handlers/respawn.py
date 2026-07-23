@@ -54,7 +54,7 @@ async def register_death(peer_id: int, respawn_at: datetime, xp_lost: int = 0) -
     now = datetime.now(timezone.utc)
     resp = await _bot_api.messages.send(
         peer_id=peer_id, message=_death_text(respawn_at, now, xp_lost), random_id=0,
-        keyboard=kb.empty_keyboard(),
+        keyboard=kb.waiting_keyboard(),
     )
     # vkbottle messages.send возвращает conversation_message_id (или message_id)
     try:

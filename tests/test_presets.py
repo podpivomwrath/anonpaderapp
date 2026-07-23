@@ -12,12 +12,19 @@ from services.preset_service import (
 )
 from services.respec_service import full_class_reset
 from services.wallet_service import NotEnoughCurrency, get_wallet
-from models import BaseClass, CharacterStats
+from models import BaseClass, CharacterStats, CharacterUnlockedBuff
 from sqlalchemy import select
 
 CATALOG = load_content().buffs
 
-OK_SET = ["guardian_heavy_hand", "guardian_iron_skin", "guardian_menace"]
+OK_SET = ["guardian_heavy_hand", "guardian_bulwark", "guardian_command"]
+
+
+async def _unlock(db_session, character, *buff_ids: str) -> None:
+    """Прямая разблокировка баффов в тестовой БД (в обход прохождения испытания)."""
+    for buff_id in buff_ids:
+        db_session.add(CharacterUnlockedBuff(character_id=character.id, buff_id=buff_id))
+    await db_session.flush()
 
 
 def test_valid_preset_passes() -> None:
@@ -37,13 +44,13 @@ def test_too_many_buffs() -> None:
 
 def test_mono_damage_preset_rejected() -> None:
     """Нельзя собрать чистый моно-урон без обороны/утилити."""
-    damage_only = ["guardian_heavy_hand", "guardian_crushing_blow", "guardian_retribution"]
+    damage_only = ["guardian_heavy_hand", "guardian_reflection", "guardian_retribution"]
     with pytest.raises(PresetValidationError):
         validate_preset(damage_only, "guardian", CATALOG)
 
 
 def test_defense_or_utility_satisfies_rule() -> None:
-    with_utility = ["guardian_heavy_hand", "guardian_crushing_blow", "guardian_menace"]
+    with_utility = ["guardian_heavy_hand", "guardian_reflection", "guardian_command"]
     validate_preset(with_utility, "guardian", CATALOG)  # не бросает
 
 
@@ -56,11 +63,12 @@ def test_unknown_and_foreign_buffs_rejected() -> None:
 
 def test_duplicates_rejected() -> None:
     with pytest.raises(PresetValidationError):
-        validate_preset(["guardian_iron_skin"] * 3, "guardian", CATALOG)
+        validate_preset(["guardian_bulwark"] * 3, "guardian", CATALOG)
 
 
 async def test_save_preset_charges_farm(db_session, make_character) -> None:
     character = await make_character(farm=bc.PRESET_CHANGE_COST_FARM + 100, subclass="guardian")
+    await _unlock(db_session, character, *OK_SET)
     preset = await save_preset(db_session, character, "Танк", OK_SET, CATALOG)
     wallet = await get_wallet(db_session, character.id)
     assert wallet.farm_currency == 100  # уровень 2 — платно
@@ -69,7 +77,15 @@ async def test_save_preset_charges_farm(db_session, make_character) -> None:
 
 async def test_save_preset_without_gold_fails(db_session, make_character) -> None:
     character = await make_character(farm=0, subclass="guardian")
+    await _unlock(db_session, character, *OK_SET)
     with pytest.raises(NotEnoughCurrency):
+        await save_preset(db_session, character, "Танк", OK_SET, CATALOG)
+
+
+async def test_save_preset_rejects_locked_buff(db_session, make_character) -> None:
+    """Патч 12: бафф подкласса нельзя вложить в пресет, пока испытание не пройдено."""
+    character = await make_character(farm=bc.PRESET_CHANGE_COST_FARM + 100, subclass="guardian")
+    with pytest.raises(PresetValidationError):
         await save_preset(db_session, character, "Танк", OK_SET, CATALOG)
 
 
@@ -77,12 +93,10 @@ async def test_switch_preset_is_free(db_session, make_character) -> None:
     character = await make_character(
         farm=bc.PRESET_CHANGE_COST_FARM * 2, subclass="guardian"
     )
+    second_set = ["guardian_heavy_hand", "guardian_reflection", "guardian_provoker_mark"]
+    await _unlock(db_session, character, *set(OK_SET) | set(second_set))
     p1 = await save_preset(db_session, character, "Танк", OK_SET, CATALOG)
-    p2 = await save_preset(
-        db_session, character, "ДД",
-        ["guardian_heavy_hand", "guardian_crushing_blow", "guardian_intercept"],
-        CATALOG,
-    )
+    p2 = await save_preset(db_session, character, "ДД", second_set, CATALOG)
     wallet_before = (await get_wallet(db_session, character.id)).farm_currency
 
     await switch_active_preset(db_session, character.id, p2.id)  # уровень 1 — бесплатно
