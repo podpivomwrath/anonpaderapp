@@ -20,7 +20,7 @@ from bot.handlers import stats_window
 from bot.keyboards import world as kb
 from bot.onboarding_texts import REGION_TITLES
 from bot.world_summary import location_summary
-from bot.world_texts import mentor_intro, mentor_praise
+from bot.world_texts import event_attachment, hub_attachment, mentor_intro, mentor_praise
 from game.combat import display
 from game.world import events as event_pool
 from game.world import flavor, grid
@@ -122,7 +122,9 @@ async def show_location(message: Message, db, character) -> None:
     region = grid.city_region_at(character.pos_x, character.pos_y)
     if region is not None:
         await message.answer(
-            f"Ты в городе: {REGION_TITLES[region]}", keyboard=kb.city_menu_keyboard(character)
+            f"Ты в городе: {REGION_TITLES[region]}",
+            attachment=hub_attachment(region),
+            keyboard=kb.city_menu_keyboard(character),
         )
         return
 
@@ -234,7 +236,8 @@ async def handle_explore_done(peer_id: int) -> None:
     _pending_events[peer_id] = event.id
     text = f"{event.title}\n\n{event.text}"
     await _bot_api.messages.send(
-        peer_id=peer_id, message=text, random_id=0, keyboard=kb.event_choice_keyboard(event)
+        peer_id=peer_id, message=text, random_id=0,
+        attachment=event_attachment(event.id), keyboard=kb.event_choice_keyboard(event),
     )
 
 

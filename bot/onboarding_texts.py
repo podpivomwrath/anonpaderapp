@@ -4,7 +4,7 @@
 дизайн-документа) — здесь только загрузка, кнопки и сборка финала.
 """
 
-from config import get_settings
+from bot.vk_media import photo_attachment
 from game.content_loader import load_npc_texts
 
 KEEPER = load_npc_texts("list_keeper")["onboarding"]
@@ -25,18 +25,14 @@ REGION_PHOTO_IDS = {
 }
 
 
-def _photo_attachment(photo_id: str) -> str:
-    return f"photo-{get_settings().vk_group_id}_{photo_id}"
-
-
 def scene_attachment(key: str) -> str | None:
     photo_id = SCENE_PHOTO_IDS.get(key)
-    return _photo_attachment(photo_id) if photo_id else None
+    return photo_attachment(photo_id) if photo_id else None
 
 
 def region_attachment(region: str) -> str | None:
     photo_id = REGION_PHOTO_IDS.get(region)
-    return _photo_attachment(photo_id) if photo_id else None
+    return photo_attachment(photo_id) if photo_id else None
 
 # --- Кнопки ---
 

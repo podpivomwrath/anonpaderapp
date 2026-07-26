@@ -23,6 +23,7 @@ from bot.keyboards.world import (
     waiting_keyboard,
 )
 from bot.onboarding_texts import REGION_TITLES
+from bot.vk_media import photo_attachment
 from game.combat import balance_config as bc
 from game.combat import display
 from game.combat.base_skills import BASE_SKILL_DEFS
@@ -67,6 +68,8 @@ PLAYER_ID = 1
 MOB_ID = 2
 
 FLEE_SUCCESS_CHANCE = 0.5
+
+VICTORY_PHOTO_ID = "457239033"  # иллюстрация победы над мобом (альбом группы VK)
 
 
 def setup(engine: TickEngine, bot_api) -> None:
@@ -256,7 +259,8 @@ async def on_battle_finished(session_id: int, result: TickResult) -> None:
             text += "\n\n" + world_flavor.levelup_line(new_level, _rng)
             text += f"\n{display.max_hp_delta_line(old_max_hp, new_max_hp)}"
         await _bot_api.messages.send(
-            peer_id=peer_id, message=text, random_id=0, keyboard=waiting_keyboard()
+            peer_id=peer_id, message=text, random_id=0,
+            attachment=photo_attachment(VICTORY_PHOTO_ID), keyboard=waiting_keyboard(),
         )
 
         # патч 14, ч.2.3: единая точка входа для левелапа — все источники опыта

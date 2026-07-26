@@ -16,6 +16,7 @@ from sqlalchemy import select
 
 from bot.keyboards import world as kb
 from bot.onboarding_texts import REGION_TITLES
+from bot.vk_media import photo_attachment
 from game.world import flavor
 from game.world import world_config as wc
 from models import Character, User
@@ -26,6 +27,8 @@ _bot_api = None
 _live_countdown = True
 # peer_id -> conversation_message_id сообщения о смерти (для edit-отсчёта)
 _death_message: dict[int, int] = {}
+
+DEATH_PHOTO_ID = "457239032"  # иллюстрация смерти игрока (альбом группы VK)
 
 
 def setup(bot_api, live_countdown: bool) -> None:
@@ -54,7 +57,7 @@ async def register_death(peer_id: int, respawn_at: datetime, xp_lost: int = 0) -
     now = datetime.now(timezone.utc)
     resp = await _bot_api.messages.send(
         peer_id=peer_id, message=_death_text(respawn_at, now, xp_lost), random_id=0,
-        keyboard=kb.waiting_keyboard(),
+        attachment=photo_attachment(DEATH_PHOTO_ID), keyboard=kb.waiting_keyboard(),
     )
     # vkbottle messages.send возвращает conversation_message_id (или message_id)
     try:
