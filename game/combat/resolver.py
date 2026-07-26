@@ -210,7 +210,7 @@ def resolve_tick(
         result.lines.append(
             combat_flavor.render_hit(
                 source, target,
-                amount=hit.amount, crit=hit.crit, missed=hit.missed, is_dot=hit.is_dot,
+                crit=hit.crit, missed=hit.missed, is_dot=hit.is_dot,
                 hp_before=hp_before[target.id], hp_after=target.current_hp,
                 max_hp=target.max_hp, rng=rng, mode=mode,
             )

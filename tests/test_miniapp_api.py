@@ -19,7 +19,16 @@ from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 from bot.app_keys import SESSION_FACTORY_KEY
 from bot.webhook import create_app
 from config import Settings
-from models import Base, Character, CharacterStats, User
+from models import (
+    Base,
+    Character,
+    CharacterStats,
+    CharacterUnlockedBuff,
+    Inventory,
+    Item,
+    User,
+    Wallet,
+)
 
 MINIAPP_SECRET = "test_miniapp_secret"
 
@@ -206,6 +215,167 @@ async def test_trials_lists_full_pool_with_progress(client, session_factory) -> 
     assert other["unlocked"] is False
     assert other["progress"] == 0
     assert other["target"] == 25
+
+
+# --- GET /api/miniapp/inventory + POST /api/miniapp/equip (патч 14, ч.2.1) ---
+
+
+async def _grant_item(session_factory, character_id: int, **overrides) -> int:
+    async with session_factory() as session:
+        defaults = dict(name="Тестовый клинок", slot="weapon", base_stats={"str": 5}, rarity="common", ilvl=10)
+        defaults.update(overrides)
+        item = Item(**defaults)
+        session.add(item)
+        await session.flush()
+        session.add(Inventory(character_id=character_id, item_id=item.id, equipped=False))
+        await session.commit()
+        return item.id
+
+
+async def test_inventory_lists_dropped_items(client, session_factory) -> None:
+    character = await _make_character(session_factory, vk_id=400)
+    await _grant_item(session_factory, character.id)
+    resp = await client.get("/api/miniapp/inventory", params=_signed_query(400))
+    assert resp.status == 200
+    data = await resp.json()
+    assert len(data["items"]) == 1
+    assert data["items"][0]["name"] == "Тестовый клинок"
+    assert data["items"][0]["equipped"] is False
+
+
+async def test_equip_marks_item_equipped(client, session_factory) -> None:
+    character = await _make_character(session_factory, vk_id=401)
+    item_id = await _grant_item(session_factory, character.id)
+    resp = await client.post("/api/miniapp/equip", params=_signed_query(401), json={"item_id": item_id})
+    assert resp.status == 200
+    data = await resp.json()
+    assert data["items"][0]["equipped"] is True
+
+
+async def test_equip_unknown_item_rejected(client, session_factory) -> None:
+    await _make_character(session_factory, vk_id=402)
+    resp = await client.post("/api/miniapp/equip", params=_signed_query(402), json={"item_id": 999})
+    assert resp.status == 400
+
+
+# --- Пресеты (патч 14, ч.3) ---
+
+
+async def _grant_gold(session_factory, character_id: int, amount: int) -> None:
+    async with session_factory() as session:
+        session.add(Wallet(character_id=character_id, farm_currency=amount))
+        await session.commit()
+
+
+async def _unlock_buffs(session_factory, character_id: int, *buff_ids: str) -> None:
+    async with session_factory() as session:
+        for buff_id in buff_ids:
+            session.add(CharacterUnlockedBuff(character_id=character_id, buff_id=buff_id))
+        await session.commit()
+
+
+async def test_presets_empty_without_subclass(client, session_factory) -> None:
+    await _make_character(session_factory, vk_id=500)
+    resp = await client.get("/api/miniapp/presets", params=_signed_query(500))
+    assert resp.status == 200
+    data = await resp.json()
+    assert data == {
+        "subclass": None, "preset_slots": 1, "next_slot_cost": None, "presets": [], "buffs": [],
+    }
+
+
+async def test_presets_lists_slots_and_subclass_catalog(client, session_factory) -> None:
+    character = await _make_character(session_factory, vk_id=501, subclass="guardian")
+    await _unlock_buffs(session_factory, character.id, "guardian_bulwark")
+    resp = await client.get("/api/miniapp/presets", params=_signed_query(501))
+    assert resp.status == 200
+    data = await resp.json()
+    assert data["subclass"] == "guardian"
+    assert data["preset_slots"] == 1
+    assert data["next_slot_cost"] == 5000  # PRESET_SLOT_COSTS[1]
+    assert data["presets"] == []
+    assert len(data["buffs"]) == 14  # весь пул подкласса, не только открытые
+    bulwark = next(b for b in data["buffs"] if b["id"] == "guardian_bulwark")
+    assert bulwark["unlocked"] is True
+    other = next(b for b in data["buffs"] if b["id"] == "guardian_command")
+    assert other["unlocked"] is False
+
+
+async def test_save_preset_creates_and_charges_gold(client, session_factory) -> None:
+    character = await _make_character(session_factory, vk_id=502, subclass="guardian")
+    await _grant_gold(session_factory, character.id, 1000)
+    await _unlock_buffs(
+        session_factory, character.id, "guardian_heavy_hand", "guardian_bulwark", "guardian_command"
+    )
+    resp = await client.post(
+        "/api/miniapp/presets", params=_signed_query(502),
+        json={"name": "Танк", "buff_ids": ["guardian_heavy_hand", "guardian_bulwark", "guardian_command"]},
+    )
+    assert resp.status == 200
+    data = await resp.json()
+    assert data["name"] == "Танк"
+
+    listing = await client.get("/api/miniapp/presets", params=_signed_query(502))
+    listing_data = await listing.json()
+    assert len(listing_data["presets"]) == 1
+
+
+async def test_save_preset_without_gold_rejected(client, session_factory) -> None:
+    character = await _make_character(session_factory, vk_id=503, subclass="guardian")
+    await _unlock_buffs(
+        session_factory, character.id, "guardian_heavy_hand", "guardian_bulwark", "guardian_command"
+    )
+    resp = await client.post(
+        "/api/miniapp/presets", params=_signed_query(503),
+        json={"name": "Танк", "buff_ids": ["guardian_heavy_hand", "guardian_bulwark", "guardian_command"]},
+    )
+    assert resp.status == 400
+    data = await resp.json()
+    assert data["error"] == "not_enough_gold"
+
+
+async def test_switch_preset_activates_target(client, session_factory) -> None:
+    character = await _make_character(session_factory, vk_id=504, subclass="guardian")
+    await _grant_gold(session_factory, character.id, 1000)
+    await _unlock_buffs(
+        session_factory, character.id, "guardian_heavy_hand", "guardian_bulwark", "guardian_command"
+    )
+    created = await client.post(
+        "/api/miniapp/presets", params=_signed_query(504),
+        json={"name": "Танк", "buff_ids": ["guardian_heavy_hand", "guardian_bulwark", "guardian_command"]},
+    )
+    preset_id = (await created.json())["id"]
+
+    resp = await client.post(
+        "/api/miniapp/presets/switch", params=_signed_query(504), json={"preset_id": preset_id}
+    )
+    assert resp.status == 200
+
+    listing = await client.get("/api/miniapp/presets", params=_signed_query(504))
+    listing_data = await listing.json()
+    assert listing_data["presets"][0]["is_active"] is True
+
+
+async def test_buy_preset_slot_increments_and_charges(client, session_factory) -> None:
+    character = await _make_character(session_factory, vk_id=505, subclass="guardian")
+    await _grant_gold(session_factory, character.id, 5000)
+    resp = await client.post("/api/miniapp/presets/buy_slot", params=_signed_query(505))
+    assert resp.status == 200
+    data = await resp.json()
+    assert data["preset_slots"] == 2
+
+    listing = await client.get("/api/miniapp/presets", params=_signed_query(505))
+    listing_data = await listing.json()
+    assert listing_data["preset_slots"] == 2
+    assert listing_data["next_slot_cost"] == 15000  # PRESET_SLOT_COSTS[2]
+
+
+async def test_buy_preset_slot_without_gold_rejected(client, session_factory) -> None:
+    await _make_character(session_factory, vk_id=506, subclass="guardian")
+    resp = await client.post("/api/miniapp/presets/buy_slot", params=_signed_query(506))
+    assert resp.status == 400
+    data = await resp.json()
+    assert data["error"] == "not_enough_gold"
 
 
 # --- CORS ---

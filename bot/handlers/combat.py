@@ -10,8 +10,9 @@ import random
 from vkbottle import BaseStateGroup  # noqa: F401  (совместимость импортов)
 from vkbottle.bot import BotLabeler, Message
 
+from bot import editable_message
 from bot.handlers import stats_window
-from bot.keyboards.items import item_choice_keyboard
+from bot.keyboards.items import item_choice_keyboard, no_keyboard
 from bot.keyboards.world import (
     BTN_ATTACK,
     BTN_FLEE,
@@ -26,6 +27,7 @@ from game.combat import balance_config as bc
 from game.combat import display
 from game.combat.base_skills import BASE_SKILL_DEFS
 from game.combat.battle_report import BattleTracker
+from game.combat import formulas
 from game.combat.resolver import TickResult
 from game.combat.session import (
     ActionType,
@@ -37,10 +39,9 @@ from game.combat.session import (
 )
 from game.combat.tick_engine import TickEngine
 from bot.world_summary import location_summary
-from game.world import encounters
+from game.world import encounters, grid
 from game.world import flavor as world_flavor
 from services import encounter_service, item_service, trial_service, trophy_service, vitals_service, wallet_service
-from services import stat_alloc_service as sas
 from services.db import get_session_factory
 
 labeler = BotLabeler()
@@ -115,10 +116,12 @@ def _render(state: CombatSessionState, lines: list[str]) -> str:
 
 
 async def start_encounter(
-    peer_id: int, character, char_stats, gear_bonus: dict[str, int] | None = None
+    peer_id: int, character, char_stats, gear_bonus: dict[str, int] | None = None,
+    buff_modifiers: dict[str, float] | None = None,
 ) -> None:
     """gear_bonus (патч 11, блок 2) — сумма статов надетой экипировки,
-    прибавляется к собственным статам ДО построения боевого участника."""
+    прибавляется к собственным статам ДО построения боевого участника.
+    buff_modifiers (патч 14, ч.3) — stat_modifiers активного пресета баффов."""
     bonus = gear_bonus or {}
     stats = Stats(
         strength=char_stats.strength + bonus.get("str", 0),
@@ -131,12 +134,14 @@ async def start_encounter(
     player = build_combatant(
         id=PLAYER_ID, side=0, kind="character", name=character.name,
         level=character.level, stats=stats, primary_stat=primary,
-        subclass_id=character.subclass,
+        subclass_id=character.subclass, buff_modifiers=buff_modifiers,
     )
     # HP переносится между боями (отдых/респавн лечат) — не всегда полное
     player.current_hp = vitals_service.current_hp(character, char_stats, bonus.get("vit", 0))
-    # уровень моба клампится под игрока в диапазон зоны (world-patch-1)
-    encounter = encounters.spawn_mob(MOB_ID, character.region, character.level, _rng)
+    # уровень моба клампится под игрока в диапазон зоны (world-patch-1);
+    # кольцо бестиария — по ТЕКУЩЕЙ клетке игрока, не по домашнему региону (патч 15)
+    dist = grid.chebyshev_distance(character.pos_x, character.pos_y)
+    encounter = encounters.spawn_mob(MOB_ID, character.region, character.level, dist, _rng)
     state = CombatSessionState(session_id=peer_id, mode=CombatMode.PVE)
     state.add(player)
     state.add(encounter.combatant)
@@ -232,6 +237,7 @@ async def on_battle_finished(session_id: int, result: TickResult) -> None:
         # ux-patch-10 п.1: итоги боя — отдельное сообщение, сводка локации —
         # ВСЕГДА отдельным вторым сообщением, с кнопками следующего действия.
         text = "🏆 Победа! Тварь оседает пеплом."
+        text += f"\n{display.xp_delta_line(outcome.xp_gained)}"
         drop_line = trophy_service.format_drop_line(outcome.trophies_gained)
         if drop_line is not None:
             text += f"\n{drop_line}"
@@ -239,17 +245,23 @@ async def on_battle_finished(session_id: int, result: TickResult) -> None:
             text += f"\n📜 {outcome.quest_label}: {outcome.quest_progress}/{outcome.quest_target}"
             if outcome.quest_ready:
                 text += "\nВозвращайся к наставнику."
-        # лорный левелап (может быть несколько уровней за раз)
+        # лорный левелап (может быть несколько уровней за раз) + рост макс. HP
         if levels > 0:
+            old_level = new_level - levels
+            old_tier = formulas.tier_for_level(old_level)
+            old_max_hp = round(
+                formulas.hp(old_level, stats.vitality + vit_bonus, formulas.tier_multiplier(old_tier))
+            )
+            new_max_hp = vitals_service.max_hp(character, stats, vit_bonus)
             text += "\n\n" + world_flavor.levelup_line(new_level, _rng)
+            text += f"\n{display.max_hp_delta_line(old_max_hp, new_max_hp)}"
         await _bot_api.messages.send(
             peer_id=peer_id, message=text, random_id=0, keyboard=waiting_keyboard()
         )
 
-        if levels > 0:
-            # патч 11, блок 1: окно распределения статов открывается автоматически;
-            # несколько левелапов подряд (следующий килл) обновят это же окно.
-            await stats_window.open_or_update_window(peer_id, sas.levelup_header(new_level))
+        # патч 14, ч.2.3: единая точка входа для левелапа — все источники опыта
+        # (килл, квест, событие) зовут одну и ту же notify_levelup.
+        await stats_window.notify_levelup(peer_id, levels, new_level)
 
         for buff_id in outcome.unlocked_buffs:
             # патч 12: испытание завершено — микробафф открыт навсегда
@@ -266,9 +278,9 @@ async def on_battle_finished(session_id: int, result: TickResult) -> None:
             _pending_item_choice[peer_id] = new_item.id
             announcement = item_service.format_drop_announcement(new_item)
             comparison = item_service.format_comparison(old_item, new_item)
-            await _bot_api.messages.send(
-                peer_id=peer_id, message=f"{announcement}\n\n{comparison}", random_id=0,
-                keyboard=item_choice_keyboard(new_item.id),
+            await editable_message.send_or_edit(
+                _bot_api, "item_choice", peer_id, f"{announcement}\n\n{comparison}",
+                item_choice_keyboard(new_item.id),
             )
             return
 
@@ -301,7 +313,7 @@ async def item_choice(message: Message) -> None:
     async with get_session_factory()() as db:
         from services.onboarding_service import get_character  # избегаем цикла импортов
         from sqlalchemy import select
-        from models import CharacterStats
+        from models import CharacterStats, Item
 
         character = await get_character(db, peer_id)
         if character is None:
@@ -310,16 +322,18 @@ async def item_choice(message: Message) -> None:
             select(CharacterStats).where(CharacterStats.character_id == character.id)
         )
         if action == "equip":
-            await item_service.equip_item(db, character.id, pending_item_id)
-            confirm_text = "Надето."
+            new_item = await db.get(Item, pending_item_id)
+            old_item = await item_service.equip_item(db, character.id, pending_item_id)
+            confirm_text = f"Надето. {item_service.stat_delta_line(old_item, new_item)}"
         else:
             confirm_text = "Убрано в инвентарь."
         farm_currency = (await wallet_service.get_wallet(db, character.id)).farm_currency
         vit_bonus = (await item_service.compute_gear_bonus(db, character.id)).get("vit", 0)
         await db.commit()
 
-    # ux-patch-10 п.1: сводка локации — всегда отдельное сообщение
-    await message.answer(confirm_text, keyboard=waiting_keyboard())
+    # патч 13, ч.1: окно сравнения редактируется в финальный вид на месте;
+    # ux-patch-10 п.1: сводка локации — всегда ОТДЕЛЬНОЕ следующее сообщение.
+    await editable_message.send_or_edit(_bot_api, "item_choice", peer_id, confirm_text, no_keyboard())
     await message.answer(
         location_summary(character, stats, _rng, farm_currency, vit_bonus),
         keyboard=movement_keyboard(),

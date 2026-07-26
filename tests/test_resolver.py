@@ -78,6 +78,69 @@ def test_guardian_block_reduces_incoming() -> None:
     assert blocked_damage == round(plain_damage * 0.5) or blocked_damage < plain_damage
 
 
+class AlwaysRollsRng(NoCritRng):
+    """Как NoCritRng (без крита), но .random() всегда 0.0 — гарантирует
+    срабатывание любых шанс-роллов (патч 14, ч.3: баффы активного пресета)."""
+
+    def random(self) -> float:
+        return 0.0
+
+
+def test_preset_full_block_chance_blocks_completely() -> None:
+    """Несокрушимость (full_block_chance): полный блок при удачном ролле."""
+    rng = AlwaysRollsRng()
+    guardian = combatant(1, side=0, subclass_id="guardian")
+    guardian.buff_modifiers = {"full_block_chance": 1.0}
+    enemy = combatant(2, side=1)
+    state = make_session(CombatMode.PVP_GROUP, guardian, enemy)
+    resolve_tick(state, {1: skill("guardian_block"), 2: attack(1)}, rng)
+    # compute_hit гарантирует минимум 1 урона (max(round(base), 1)) даже при
+    # полном блоке — это уже существующий инвариант движка, не баг теста.
+    assert guardian.current_hp == guardian.max_hp - 1
+
+
+def test_preset_heal_on_block_heals_self() -> None:
+    """Живительный блок (heal_on_block_pct_max_hp): самоисцеление при блоке."""
+    rng = NoCritRng()
+    guardian = combatant(1, side=0, subclass_id="guardian")
+    guardian.buff_modifiers = {"heal_on_block_pct_max_hp": 0.5}
+    guardian.current_hp = round(guardian.max_hp * 0.3)
+    enemy = combatant(2, side=1)
+    state = make_session(CombatMode.PVP_GROUP, guardian, enemy)
+    resolve_tick(state, {1: skill("guardian_block"), 2: DeclaredAction(type=ActionType.SKIP)}, rng)
+    assert guardian.current_hp > round(guardian.max_hp * 0.3)  # исцелился от блока
+
+
+def test_preset_counterstrike_hits_attacker_back() -> None:
+    """Возмездие (counterstrike_mult): блок наносит встречный удар."""
+    rng = NoCritRng()
+    guardian = combatant(1, side=0, subclass_id="guardian")
+    guardian.buff_modifiers = {"counterstrike_mult": 0.7}
+    enemy = combatant(2, side=1)
+    state = make_session(CombatMode.PVP_GROUP, guardian, enemy)
+    resolve_tick(state, {1: skill("guardian_block"), 2: DeclaredAction(type=ActionType.SKIP)}, rng)
+    assert enemy.current_hp < enemy.max_hp  # получил контрудар, хотя сам не атаковал
+
+
+def test_preset_damage_bonus_increases_outgoing_damage() -> None:
+    """Тяжёлая рука / Кровавая ярость (damage_bonus): множитель исходящего урона."""
+    rng = NoCritRng()
+    plain = combatant(1, side=0)
+    target1 = combatant(2, side=1)
+    state1 = make_session(CombatMode.PVP_GROUP, plain, target1)
+    resolve_tick(state1, {1: attack(2)}, rng)
+    plain_damage = target1.max_hp - target1.current_hp
+
+    buffed = combatant(1, side=0)
+    buffed.buff_modifiers = {"damage_bonus": 0.5}
+    target2 = combatant(2, side=1)
+    state2 = make_session(CombatMode.PVP_GROUP, buffed, target2)
+    resolve_tick(state2, {1: attack(2)}, rng)
+    buffed_damage = target2.max_hp - target2.current_hp
+
+    assert buffed_damage > plain_damage
+
+
 def test_guardian_group_shield_protects_same_tick() -> None:
     """Щит, поставленный этим же действием, поглощает урон этого тика."""
     rng = NoCritRng()

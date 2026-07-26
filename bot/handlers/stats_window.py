@@ -12,6 +12,7 @@
 from sqlalchemy import select
 from vkbottle.bot import BotLabeler, Message
 
+from bot import editable_message
 from bot.keyboards.stats_window import no_keyboard, stats_alloc_keyboard
 from bot.keyboards.world import BTN_STATS
 from models import CharacterStats
@@ -21,12 +22,12 @@ from services.db import get_session_factory
 
 labeler = BotLabeler()
 
+_NS = "stats_window"
+
 _bot_api = None
 
 # peer_id -> {stat: вложено в этой сессии}, НЕ пишется в БД до "Готово"
 _pending: dict[int, dict[str, int]] = {}
-# peer_id -> conversation_message_id открытого окна (для edit на месте)
-_window_message: dict[int, int] = {}
 # peer_id -> заголовок текущего окна (сохраняется между правками одного окна)
 _window_header: dict[int, str] = {}
 
@@ -44,29 +45,21 @@ async def _get_stats(db, character_id: int) -> CharacterStats:
 
 def _clear(peer_id: int) -> None:
     _pending.pop(peer_id, None)
-    _window_message.pop(peer_id, None)
     _window_header.pop(peer_id, None)
+    editable_message.clear(_NS, peer_id)
 
 
 async def _send_or_edit(peer_id: int, text: str, keyboard: str | None) -> None:
-    """Правит уже открытое окно на месте; если сообщение недоступно для правки
-    (истекло/удалено) — открывает новое взамен. Граница с внешним API —
-    сознательно широкий except (see также respawn.py)."""
-    existing = _window_message.get(peer_id)
-    if existing is not None:
-        try:
-            await _bot_api.messages.edit(
-                peer_id=peer_id, conversation_message_id=existing, message=text,
-                keyboard=keyboard,
-            )
-            return
-        except Exception:
-            _window_message.pop(peer_id, None)
-    resp = await _bot_api.messages.send(peer_id=peer_id, message=text, random_id=0, keyboard=keyboard)
-    try:
-        _window_message[peer_id] = int(resp)
-    except (TypeError, ValueError):
-        pass
+    await editable_message.send_or_edit(_bot_api, _NS, peer_id, text, keyboard)
+
+
+async def notify_levelup(peer_id: int, levels_gained: int, new_level: int) -> None:
+    """Единая точка входа для ЛЮБОГО источника опыта (патч 14, ч.2.3: килл,
+    квест, событие) — если начисление вызвало левелап, открывает/обновляет
+    окно распределения статов. Источники опыта не должны сами решать, звать
+    им это или нет — они просто передают сюда levels_gained/new_level."""
+    if levels_gained > 0:
+        await open_or_update_window(peer_id, sas.levelup_header(new_level))
 
 
 async def open_or_update_window(peer_id: int, header: str) -> None:
@@ -133,7 +126,7 @@ async def stat_alloc(message: Message) -> None:
 @labeler.message(payload_contains={"type": "stat_alloc_cancel"})
 async def stat_alloc_cancel(message: Message) -> None:
     peer_id = message.peer_id
-    if peer_id not in _window_message and peer_id not in _pending:
+    if peer_id not in _pending:
         return
     _pending[peer_id] = {}
 

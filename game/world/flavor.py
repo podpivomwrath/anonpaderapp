@@ -6,8 +6,10 @@
 
 import json
 import random
-from dataclasses import dataclass
 from pathlib import Path
+
+from game.combat import balance_config as bc
+from game.combat import display
 
 _CONTENT = Path(__file__).resolve().parent.parent.parent / "content" / "flavor"
 
@@ -50,60 +52,38 @@ def levelup_line(level: int, rng: random.Random) -> str:
 
 
 def death_penalty_line(xp: int) -> str:
-    return _SYSTEM["death_penalty"].format(xp=xp)
+    """Штраф опыта: доля добавлена патчем 13, ч.2 (бок о бок с абсолютным числом)."""
+    return f"{_SYSTEM['death_penalty']} {display.xp_penalty_line(xp, bc.DEATH_XP_PENALTY)}"
 
 
 def quest_reward_line(xp: int) -> str:
     return _SYSTEM["quest_reward"].format(xp=xp)
 
 
-@dataclass
-class FlavorPick:
-    """Выбранный фрагмент + признак награды (ux-patch-10 п.3: замечания-находки
-    больше не бывают чистым флейвором — reward None/"trophy"/"xp")."""
-
-    text: str
-    reward: str | None = None
-
-
-def song_pick(rng: random.Random) -> FlavorPick:
+def song_pick(rng: random.Random) -> str:
     part = rng.choice(_SONG["parts"])
-    return FlavorPick(text=f"{_SONG['label']}\n{part}")
+    return f"{_SONG['label']}\n{part}"
 
 
-def remark_pick(rng: random.Random) -> FlavorPick:
+def remark_pick(rng: random.Random) -> str:
+    """Чистое наблюдение без находки (патч 13, ч.3) — награды тут не бывает
+    в принципе, пул используется только как текст ожидания исследования."""
     entry = rng.choice(_REMARKS["remarks"])
-    return FlavorPick(text=f"{_REMARKS['label']} {entry['text']}", reward=entry.get("reward"))
+    return f"{_REMARKS['label']} {entry}"
 
 
-def song_or_remark_pick(rng: random.Random) -> FlavorPick:
-    """Гарантированный фрагмент: 50/50 Песнь или замечание (патч 9, блок 1)."""
+def song_or_remark(rng: random.Random) -> str:
+    """50/50 Песнь или замечание (патч 9, блок 1)."""
     if rng.random() < 0.5:
         return song_pick(rng)
     return remark_pick(rng)
 
 
-def song_line(rng: random.Random) -> str:
-    """Гарантированный обрывок Пепельной Песни (без варианта замечания)."""
-    return song_pick(rng).text
-
-
-def remark_line(rng: random.Random) -> str:
-    """Гарантированное замечание (без варианта Песни), без учёта награды —
-    для мест, где награда не применяется (напр. превью при клике «Исследовать»)."""
-    return remark_pick(rng).text
-
-
-def song_or_remark(rng: random.Random) -> str:
-    """Как song_or_remark_pick, но только текст (награда не учитывается)."""
-    return song_or_remark_pick(rng).text
-
-
 def explore_fragment(rng: random.Random) -> str | None:
     """С шансом EXPLORE_FRAGMENT_CHANCE — фрагмент (Песнь или замечание), иначе
-    None. Это превью ДО начала исследования — награды здесь не выдаются, даже
-    если случайно выпало замечание-находка; настоящая находка с наградой
-    происходит позже, в исходе исследования (см. bot/handlers/world.py)."""
+    None. Текст ожидания перед исходом исследования (патч 13, ч.3: единственное
+    место, где этот флейвор теперь встречается — самостоятельным исходом он
+    больше не бывает)."""
     if rng.random() >= EXPLORE_FRAGMENT_CHANCE:
         return None
     return song_or_remark(rng)

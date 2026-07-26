@@ -32,6 +32,9 @@ class Character(Base):
     creation_state: Mapped[str | None] = mapped_column(String(32), nullable=True)
     # Шаг FSM сцены «Раскол пути» у Хранителя (патч 12); NULL = не в процессе
     subclass_select_state: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    # Куплено слотов пресетов баффов (патч 14, ч.3): 1 — бесплатный стартовый,
+    # до 5 — остальные покупаются за золото (game.combat.balance_config.PRESET_SLOT_COSTS)
+    preset_slots: Mapped[int] = mapped_column(default=1)
 
     # Позиция на карте (сетка -50..50); NULL до завершения онбординга
     pos_x: Mapped[int | None] = mapped_column(nullable=True)

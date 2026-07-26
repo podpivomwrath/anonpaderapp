@@ -16,10 +16,12 @@ from sqlalchemy import select
 from vkbottle.bot import BotLabeler, Message
 
 from bot.handlers import combat as combat_handlers
+from bot.handlers import stats_window
 from bot.keyboards import world as kb
 from bot.onboarding_texts import REGION_TITLES
 from bot.world_summary import location_summary
 from bot.world_texts import mentor_intro, mentor_praise
+from game.combat import display
 from game.world import events as event_pool
 from game.world import flavor, grid
 from game.world import world_config as wc
@@ -31,6 +33,7 @@ from services import (
     experience_service,
     item_service,
     movement_service,
+    preset_service,
     quest_service,
     trial_service,
     trophy_service,
@@ -200,16 +203,12 @@ async def explore(message: Message) -> None:
 
 
 async def handle_explore_done(peer_id: int) -> None:
-    """Колбэк планировщика: исследование закончено — три исхода (патч 9, блок 1):
-    ~40% бой, ~25% гарантированный флейвор, ~35% событие с выбором.
-    Атмосферный фрагмент "иногда" уже показан внутри сообщения исследования
-    (ux-patch-5) — это отдельный, более ранний слой, не пересекается с исходом.
-
-    Замечания-находки (ux-patch-10 п.3) в флейвор-исходе больше не бывают
-    пустыми — дают трофей или немного опыта."""
+    """Колбэк планировщика: исследование закончено — два исхода (патч 13, ч.3):
+    50% бой, 50% событие с выбором (событие всегда даёт результат, патч 10).
+    Флейвор (Песнь/замечания) больше не бывает самостоятельным исходом — он
+    остался только внутри сообщения ожидания "Ты осматриваешься..." (patch-5),
+    которое уже показано раньше и не пересекается с этим исходом."""
     _exploring.discard(peer_id)
-    pick: flavor.FlavorPick | None = None
-    reward_line: str | None = None
     async with get_session_factory()() as db:
         character = await onboarding_svc.get_character(db, peer_id)
         if character is None or character.creation_state is not None:
@@ -222,40 +221,13 @@ async def handle_explore_done(peer_id: int) -> None:
             return
         stats = await _get_stats(db, character.id)
 
-        roll = _rng.random()
-        if roll < wc.EXPLORE_COMBAT_CHANCE:
-            outcome_kind = "combat"
-        elif roll < wc.EXPLORE_COMBAT_CHANCE + wc.EXPLORE_FLAVOR_CHANCE:
-            outcome_kind = "flavor"
-            pick = flavor.song_or_remark_pick(_rng)
-            if pick.reward == "trophy":
-                drop = await trophy_service.grant_from_event(db, character, _rng)
-                reward_line = trophy_service.format_drop_line(drop)
-            elif pick.reward == "xp":
-                xp = round(experience_service.xp_per_mob(character.level) * wc.EVENT_XP_FRACTION)
-                experience_service.add_experience(character, stats, xp)
-            await db.commit()
-        else:
-            outcome_kind = "event"
+        outcome_kind = "combat" if _rng.random() < wc.EXPLORE_COMBAT_CHANCE else "event"
         farm_currency = (await wallet_service.get_wallet(db, character.id)).farm_currency
         gear_bonus = await item_service.compute_gear_bonus(db, character.id)
+        buff_modifiers = await preset_service.resolve_active_modifiers(db, character)
 
     if outcome_kind == "combat":
-        await combat_handlers.start_encounter(peer_id, character, stats, gear_bonus)
-        return
-
-    if outcome_kind == "flavor":
-        narrative = pick.text
-        if reward_line:
-            narrative += f"\n\n{reward_line}"
-        # ux-patch-10 п.1: сводка локации — всегда отдельное сообщение
-        await _bot_api.messages.send(
-            peer_id=peer_id, message=narrative, random_id=0, keyboard=kb.waiting_keyboard()
-        )
-        await _bot_api.messages.send(
-            peer_id=peer_id, message=_map_text(character, stats, farm_currency, gear_bonus),
-            random_id=0, keyboard=kb.movement_keyboard(),
-        )
+        await combat_handlers.start_encounter(peer_id, character, stats, gear_bonus, buff_modifiers)
         return
 
     event = event_pool.random_event(_rng)
@@ -297,15 +269,18 @@ async def event_choice(message: Message) -> None:
         )
         farm_currency = (await wallet_service.get_wallet(db, character.id)).farm_currency
         gear_bonus = await item_service.compute_gear_bonus(db, character.id)
+        buff_modifiers = await preset_service.resolve_active_modifiers(db, character)
         await db.commit()
 
     if result.is_combat:
         await message.answer(result.text)
-        await combat_handlers.start_encounter(peer_id, character, stats, gear_bonus)
+        await combat_handlers.start_encounter(peer_id, character, stats, gear_bonus, buff_modifiers)
         return
 
     # ux-patch-10 п.1: сводка локации — всегда отдельное сообщение
     await message.answer(result.text, keyboard=kb.waiting_keyboard())
+    # патч 14, ч.2.3: событие — тоже источник опыта, левелап не должен теряться
+    await stats_window.notify_levelup(peer_id, result.levels_gained, result.new_level)
     await message.answer(
         _map_text(character, stats, farm_currency, gear_bonus), keyboard=kb.movement_keyboard()
     )
@@ -353,15 +328,18 @@ async def handle_rest_done(peer_id: int) -> None:
             return
         if death_service.is_dead(character) or combat_handlers.has_active_encounter(peer_id):
             return
+        stats = await _get_stats(db, character.id)
+        vit_bonus = (await item_service.compute_gear_bonus(db, character.id)).get("vit", 0)
+        max_hp = vitals_service.max_hp(character, stats, vit_bonus)
+        hp_before = vitals_service.current_hp(character, stats, vit_bonus)
         vitals_service.restore_full(character)
         if character.subclass is not None:
             await trial_service.record_rest(db, character)
         await db.commit()
         region = grid.city_region_at(character.pos_x, character.pos_y)
         keyboard = kb.city_menu_keyboard(character) if region is not None else kb.movement_keyboard()
-    await _bot_api.messages.send(
-        peer_id=peer_id, message=flavor.rest_done(), random_id=0, keyboard=keyboard
-    )
+    text = f"{flavor.rest_done()}\n{display.hp_delta_line(hp_before, max_hp, max_hp)}"
+    await _bot_api.messages.send(peer_id=peer_id, message=text, random_id=0, keyboard=keyboard)
 
 
 @labeler.message(text=list(DIRECTIONS))
@@ -458,7 +436,6 @@ async def talk_to_mentor(message: Message) -> None:
 
         if progress.status == "ready":
             result = await quest_service.turn_in(db, character)
-            level = character.level
             await db.commit()
             text = mentor_praise(region)
             if result is not None and result.xp_reward > 0:
@@ -466,6 +443,9 @@ async def talk_to_mentor(message: Message) -> None:
                 if result.levels_gained > 0:
                     text += "\n" + flavor.levelup_line(result.new_level, _rng)
             await message.answer(text)
+            # патч 14, ч.2.3: квест — тоже источник опыта, левелап не должен теряться
+            if result is not None:
+                await stats_window.notify_levelup(message.peer_id, result.levels_gained, result.new_level)
             return
 
         if progress.status == "completed":

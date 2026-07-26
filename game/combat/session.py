@@ -84,6 +84,9 @@ class CombatantState:
     max_hp: int
     current_hp: int
     subclass_id: str | None = None
+    # Мерж stat_modifiers всех баффов активного пресета (патч 14, ч.3) — читается
+    # умениями подкласса по имени ключа (full_block_chance, damage_bonus, ...).
+    buff_modifiers: dict[str, float] = field(default_factory=dict)
 
     # Однотиковые защитные состояния (сбрасываются после резолва тика /
     # в дуэли — в начале собственного хода)
@@ -159,6 +162,7 @@ def build_combatant(
     primary_stat: str,
     subclass_id: str | None = None,
     tier: str | None = None,
+    buff_modifiers: dict[str, float] | None = None,
 ) -> CombatantState:
     """Собирает участника, считая HP/тир по формулам v2."""
     tier = tier or formulas.tier_for_level(level)
@@ -175,6 +179,7 @@ def build_combatant(
         max_hp=max_hp,
         current_hp=max_hp,
         subclass_id=subclass_id,
+        buff_modifiers=buff_modifiers or {},
     )
 
 

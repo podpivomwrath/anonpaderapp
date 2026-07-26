@@ -6,6 +6,8 @@ from game.combat import balance_config as bc
 from game.content_loader import load_content
 from services.preset_service import (
     PresetValidationError,
+    buy_preset_slot,
+    next_slot_cost,
     save_preset,
     switch_active_preset,
     validate_preset,
@@ -93,6 +95,7 @@ async def test_switch_preset_is_free(db_session, make_character) -> None:
     character = await make_character(
         farm=bc.PRESET_CHANGE_COST_FARM * 2, subclass="guardian"
     )
+    character.preset_slots = 2  # патч 14: второй пресет требует купленный слот
     second_set = ["guardian_heavy_hand", "guardian_reflection", "guardian_provoker_mark"]
     await _unlock(db_session, character, *set(OK_SET) | set(second_set))
     p1 = await save_preset(db_session, character, "Танк", OK_SET, CATALOG)
@@ -105,6 +108,43 @@ async def test_switch_preset_is_free(db_session, make_character) -> None:
 
     await switch_active_preset(db_session, character.id, p1.id)
     assert p1.is_active and not p2.is_active
+
+
+async def test_second_preset_without_bought_slot_fails(db_session, make_character) -> None:
+    """Патч 14, ч.3: стартовый слот — один; второй пресет требует купленный слот."""
+    character = await make_character(farm=bc.PRESET_CHANGE_COST_FARM * 5, subclass="guardian")
+    second_set = ["guardian_heavy_hand", "guardian_reflection", "guardian_provoker_mark"]
+    await _unlock(db_session, character, *set(OK_SET) | set(second_set))
+    await save_preset(db_session, character, "Танк", OK_SET, CATALOG)
+    with pytest.raises(PresetValidationError):
+        await save_preset(db_session, character, "ДД", second_set, CATALOG)
+
+
+def test_next_slot_cost_matches_config() -> None:
+    assert next_slot_cost(1) == bc.PRESET_SLOT_COSTS[1]
+    assert next_slot_cost(0) == bc.PRESET_SLOT_COSTS[0]
+
+
+def test_next_slot_cost_raises_at_max() -> None:
+    with pytest.raises(PresetValidationError):
+        next_slot_cost(len(bc.PRESET_SLOT_COSTS))
+
+
+async def test_buy_preset_slot_charges_and_increments(db_session, make_character) -> None:
+    cost = bc.PRESET_SLOT_COSTS[1]
+    character = await make_character(farm=cost + 50)
+    assert character.preset_slots == 1
+    await buy_preset_slot(db_session, character)
+    assert character.preset_slots == 2
+    wallet = await get_wallet(db_session, character.id)
+    assert wallet.farm_currency == 50
+
+
+async def test_buy_preset_slot_without_gold_fails(db_session, make_character) -> None:
+    character = await make_character(farm=0)
+    with pytest.raises(NotEnoughCurrency):
+        await buy_preset_slot(db_session, character)
+    assert character.preset_slots == 1  # не изменилось
 
 
 async def test_full_class_reset(db_session, make_character) -> None:

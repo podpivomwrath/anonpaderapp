@@ -26,7 +26,6 @@ def render_hit(
     attacker: CombatantState,
     target: CombatantState,
     *,
-    amount: int,
     crit: bool,
     missed: bool,
     is_dot: bool,
@@ -36,7 +35,8 @@ def render_hit(
     rng: random.Random,
     mode: str = display.MODE_PVP,
 ) -> str:
-    """Одна атмосферная строка боя: шаблон + число урона + процент HP цели."""
+    """Одна атмосферная строка боя: шаблон + единая числовая скобка (патч 13,
+    ч.2) — число урона больше не встраивается в текст шаблона."""
     by_player = attacker.kind == "character"
 
     if missed:
@@ -44,16 +44,14 @@ def render_hit(
         return _pick(rng, pool)
 
     if is_dot:
-        text = _pick(rng, "dot").format(dmg=amount)
+        text = _pick(rng, "dot")
     elif by_player:
-        text = _pick(rng, "player_crit" if crit else "player_hit").format(dmg=amount)
+        text = _pick(rng, "player_crit" if crit else "player_hit")
     else:
-        text = _pick(rng, "mob_crit" if crit else "mob_hit").format(dmg=amount)
+        text = _pick(rng, "mob_crit" if crit else "mob_hit")
 
-    before = display.hp_percent(hp_before, max_hp, mode)
-    after = display.hp_percent(hp_after, max_hp, mode)
-    # Урон по мобу — показываем его HP; урон по игроку — тоже (кратко)
-    return f"{text} ({target.name}: {before} → {after})"
+    delta_line = display.hp_delta_line(hp_before, hp_after, max_hp, mode)
+    return f"{text} {delta_line}"
 
 
 def control_line(rng: random.Random) -> str:

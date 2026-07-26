@@ -1,24 +1,29 @@
-"""Спавн PvE-встреч стартового кольца.
+"""Спавн PvE-встреч по кольцам карты (патч 15: все 5 колец, не только стартовое).
 
 Уровень моба клампится под игрока в диапазон зоны (world-patch-1):
   mob_level = clamp(player_level, zone_min, zone_max)
-Мобы и флейвор — из content/mobs/starter_ring.json (все порождения раскола).
-"""
+Мобы и флейвор — из content/mobs/*.json (все порождения раскола).
+
+Кольцо выбирается по ТЕКУЩЕМУ положению игрока (dist до Монолита), не по его
+домашнему региону — регион влияет только на тематику мобов (кроме центра,
+dist 0-2, где мобы общие для всех регионов, ключ "any")."""
 
 import random
 from dataclasses import dataclass
 
 from game.combat.session import CombatantState, Stats, build_combatant
-from game.content_loader import StarterRingMob, load_starter_ring
+from game.content_loader import StarterRingMob, load_bestiary
+from game.world import grid
+from game.world import world_config as wc
 
-_starter_ring: dict[str, list[StarterRingMob]] | None = None
+_bestiary: dict[str, list[StarterRingMob]] | None = None
 
 
 def _region_mobs(region: str) -> list[StarterRingMob]:
-    global _starter_ring
-    if _starter_ring is None:
-        _starter_ring = load_starter_ring()
-    return _starter_ring[region]
+    global _bestiary
+    if _bestiary is None:
+        _bestiary = load_bestiary()
+    return _bestiary.get(region, [])
 
 
 def balanced_mob_stats(level: int) -> Stats:
@@ -49,11 +54,17 @@ class Encounter:
 
 
 def spawn_mob(
-    participant_id: int, region: str, player_level: int, rng: random.Random
+    participant_id: int, region: str, player_level: int, dist: int, rng: random.Random
 ) -> Encounter:
-    """Урон моба завязан на STR-эквивалент (K_dmg=2), как у Воина/Мага.
+    """dist (патч 15) — расстояние Чебышёва до Монолита ТЕКУЩЕЙ клетки игрока:
+    определяет, какое кольцо бестиария используется (не домашний регион).
+    Урон моба завязан на STR-эквивалент (K_dmg=2), как у Воина/Мага.
     Возвращает участника боя + флейвор-текст для показа перед боем."""
-    mob = rng.choice(_region_mobs(region))
+    zone = grid.zone_level_range(dist)
+    center_lo, center_hi, _ = wc.ZONE_TABLE[-1]
+    pool_region = "any" if center_lo <= dist <= center_hi else region
+    candidates = [m for m in _region_mobs(pool_region) if (m.zone_min, m.zone_max) == zone]
+    mob = rng.choice(candidates)
     level = mob_level_for_player(player_level, mob)
     combatant = build_combatant(
         id=participant_id,

@@ -17,29 +17,30 @@ const STAT_DEFS = [
 
 const DERIVED_DEFS = [
   { key: 'max_hp', clientKey: 'maxHp', label: 'Макс. HP', format: (v) => Math.round(v) },
-  { key: 'damage', clientKey: 'damage', label: 'Урон', format: (v) => (v + EPS).toFixed(1) },
+  { key: 'damage', clientKey: 'damage', label: '⚔️ Урон', format: (v) => (v + EPS).toFixed(1) },
   {
     key: 'crit_chance',
     clientKey: 'critChance',
-    label: 'Шанс крита',
+    label: '💥 Шанс крита',
     format: (v) => `${(v * 100 + EPS).toFixed(1)}%`,
   },
   {
+    // патч 14, ч.2.2: «Митигация» переименована в понятное «Снижение урона»
     key: 'mitigation',
     clientKey: 'mitigation',
-    label: 'Митигация',
+    label: '🛡️ Снижение урона',
     format: (v) => `${(v * 100 + EPS).toFixed(1)}%`,
   },
   {
     key: 'control_resist',
     clientKey: 'controlResist',
-    label: 'Резист контроля',
+    label: '🧿 Сопротивление контролю',
     format: (v) => `${(v * 100 + EPS).toFixed(1)}%`,
   },
   {
     key: 'support_power',
     clientKey: 'supportPower',
-    label: 'Сила саппорта',
+    label: '✨ Сила поддержки',
     format: (v) => (v + EPS).toFixed(2),
   },
 ];

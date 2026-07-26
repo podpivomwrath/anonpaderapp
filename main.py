@@ -11,7 +11,10 @@ from vkbottle import Bot
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
 from bot.handlers import LABELERS, list_keeper, onboarding
+from bot.handlers import appraiser as appraiser_handlers
 from bot.handlers import combat as combat_handlers
+from bot.handlers import inventory as inventory_handlers
+from bot.handlers import presets as presets_handlers
 from bot.handlers import respawn as respawn_handlers
 from bot.handlers import stats_window as stats_window_handlers
 from bot.handlers import world as world_handlers
@@ -68,6 +71,9 @@ async def run() -> None:
     tick_engine.start()
     combat_handlers.setup(tick_engine, bot.api)
     stats_window_handlers.setup(bot.api)
+    appraiser_handlers.setup(bot.api)
+    inventory_handlers.setup(bot.api)
+    presets_handlers.setup(bot.api)
 
     duel_engine = DuelEngine()
     duel_engine.start()

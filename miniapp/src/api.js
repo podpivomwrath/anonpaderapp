@@ -33,3 +33,39 @@ export function submitStats(increments) {
 export function getTrials() {
   return request('/trials');
 }
+
+export function getInventory() {
+  return request('/inventory');
+}
+
+export function equipItem(itemId) {
+  return request('/equip', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ item_id: itemId }),
+  });
+}
+
+export function getPresets() {
+  return request('/presets');
+}
+
+export function savePreset(name, buffIds, presetId) {
+  return request('/presets', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name, buff_ids: buffIds, preset_id: presetId ?? null }),
+  });
+}
+
+export function switchPreset(presetId) {
+  return request('/presets/switch', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ preset_id: presetId }),
+  });
+}
+
+export function buyPresetSlot() {
+  return request('/presets/buy_slot', { method: 'POST' });
+}

@@ -63,16 +63,16 @@ def test_combat_flavor_pools_render() -> None:
     player = combatant(1, side=0, kind="character")
     mob = combatant(2, side=1, kind="mob")
 
-    # удар игрока по мобу — атмосферная строка с числом урона и HP%
+    # удар игрока по мобу — атмосферная строка с единой числовой скобкой (патч 13, ч.2)
     line = combat_flavor.render_hit(
-        player, mob, amount=25, crit=False, missed=False, is_dot=False,
+        player, mob, crit=False, missed=False, is_dot=False,
         hp_before=100, hp_after=75, max_hp=100, rng=rng,
     )
-    assert "25" in line and "%" in line
+    assert "-25 HP" in line and "%" in line
 
     # промах
     miss = combat_flavor.render_hit(
-        player, mob, amount=0, crit=False, missed=True, is_dot=False,
+        player, mob, crit=False, missed=True, is_dot=False,
         hp_before=100, hp_after=100, max_hp=100, rng=rng,
     )
     assert "%" not in miss  # промах без процентов

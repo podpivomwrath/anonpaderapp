@@ -1,11 +1,11 @@
-"""Спавн PvE-встреч стартового кольца: clamp уровня под игрока, флейвор."""
+"""Спавн PvE-встреч по кольцам карты (патч 15: все 5 колец, выбор по dist)."""
 
 import random
 
 import pytest
 
 from game.world import encounters
-from game.content_loader import load_starter_ring
+from game.content_loader import load_bestiary, load_starter_ring
 
 
 def test_balanced_mob_stats_pool_matches_level() -> None:
@@ -25,6 +25,17 @@ def test_starter_ring_loads_three_mobs_per_region() -> None:
             assert mob.flavor  # флейвор-текст присутствует
             assert mob.region == region
             assert (mob.zone_min, mob.zone_max) == (1, 15)
+
+
+def test_bestiary_merges_all_rings_per_region() -> None:
+    bestiary = load_bestiary()
+    assert set(bestiary) == {"ridge", "woods", "docks", "scorched", "any"}
+    for region in ("ridge", "woods", "docks", "scorched"):
+        assert len(bestiary[region]) == 12  # 4 кольца × 3 моба
+        zones = {(m.zone_min, m.zone_max) for m in bestiary[region]}
+        assert zones == {(1, 15), (16, 30), (31, 45), (46, 60)}
+    assert len(bestiary["any"]) == 4
+    assert all((m.zone_min, m.zone_max) == (60, 100) for m in bestiary["any"])
 
 
 @pytest.mark.parametrize(
@@ -51,7 +62,7 @@ def test_mob_level_respects_zone_floor() -> None:
 def test_spawn_mob_returns_encounter_with_flavor() -> None:
     rng = random.Random(1)
     for region in ("ridge", "woods", "docks", "scorched"):
-        enc = encounters.spawn_mob(2, region, player_level=5, rng=rng)
+        enc = encounters.spawn_mob(2, region, player_level=5, dist=45, rng=rng)
         assert enc.combatant.kind == "mob"
         assert enc.combatant.side == 1
         assert enc.combatant.tier == "grey"  # уровни 1-15 → серый тир
@@ -61,15 +72,46 @@ def test_spawn_mob_returns_encounter_with_flavor() -> None:
 
 def test_spawn_mob_level_matches_clamped_player_level() -> None:
     rng = random.Random(1)
-    enc = encounters.spawn_mob(2, "ridge", player_level=8, rng=rng)
+    enc = encounters.spawn_mob(2, "ridge", player_level=8, dist=45, rng=rng)
     assert enc.combatant.level == 8  # внутри зоны 1-15
-    enc_high = encounters.spawn_mob(2, "ridge", player_level=99, rng=rng)
-    assert enc_high.combatant.level == 15  # потолок зоны
+    enc_high = encounters.spawn_mob(2, "ridge", player_level=99, dist=45, rng=rng)
+    assert enc_high.combatant.level == 15  # потолок зоны (dist 45 => кольцо 1-15)
 
 
 def test_spawn_mob_picks_from_region_pool() -> None:
     rng = random.Random(42)
     ring = load_starter_ring()
     ridge_names = {m.name for m in ring["ridge"]}
-    got = {encounters.spawn_mob(2, "ridge", 5, rng).combatant.name for _ in range(30)}
+    got = {encounters.spawn_mob(2, "ridge", 5, dist=45, rng=rng).combatant.name for _ in range(30)}
     assert got <= ridge_names
+
+
+def test_spawn_mob_picks_from_current_ring_not_home_region_pool() -> None:
+    """dist=30 -> кольцо 16-30 (ZONE_TABLE: dist 25-39), патч 15: моб приходит
+    из соответствующего файла бестиария, даже если игрок 5 уровня (уровень
+    клампится ВВЕРХ до 16)."""
+    rng = random.Random(7)
+    bestiary = load_bestiary()
+    ring16_30_names = {m.name for m in bestiary["ridge"] if (m.zone_min, m.zone_max) == (16, 30)}
+    enc = encounters.spawn_mob(2, "ridge", player_level=5, dist=30, rng=rng)
+    assert enc.combatant.name in ring16_30_names
+    assert enc.combatant.level == 16  # clamp вверх — зашёл рано
+
+
+def test_spawn_mob_low_level_player_in_high_ring_clamps_to_ring_floor() -> None:
+    """Патч 15, техзаметки: игрок 5 уровня, зашедший в кольцо 46-60 (dist 3-11),
+    должен встретить моба 46 уровня (нижняя граница), а не своего уровня."""
+    rng = random.Random(11)
+    enc = encounters.spawn_mob(2, "ridge", player_level=5, dist=7, rng=rng)
+    assert enc.combatant.level == 46
+
+
+def test_spawn_mob_center_uses_any_region_regardless_of_home_region() -> None:
+    """dist=1 (центр, кольцо 60+) — мобы общие, регион игрока не важен."""
+    rng = random.Random(3)
+    bestiary = load_bestiary()
+    center_names = {m.name for m in bestiary["any"]}
+    for region in ("ridge", "woods", "docks", "scorched"):
+        enc = encounters.spawn_mob(2, region, player_level=70, dist=1, rng=rng)
+        assert enc.combatant.name in center_names
+        assert enc.combatant.level == 70

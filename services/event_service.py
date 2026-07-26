@@ -10,6 +10,7 @@ from dataclasses import dataclass
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from game.combat import display
 from game.content_loader import EventOutcome
 from game.world import world_config as wc
 from models import Character, CharacterStats
@@ -32,6 +33,8 @@ def pick_outcome(rng: random.Random, outcomes: list[EventOutcome]) -> EventOutco
 class OutcomeResult:
     text: str
     is_combat: bool = False
+    levels_gained: int = 0
+    new_level: int = 1
 
 
 async def apply_outcome(
@@ -63,10 +66,14 @@ async def apply_outcome(
         if character.subclass is not None:
             await trial_service.record_trophies(db, character, drop)
 
+    levels_gained = 0
+    new_level = character.level
     if outcome.xp or outcome.xp_big:
         fraction = wc.EVENT_XP_FRACTION_BIG if outcome.xp_big else wc.EVENT_XP_FRACTION
         xp = round(experience_service.xp_per_mob(character.level) * fraction)
-        experience_service.add_experience(character, stats, xp)
+        levelup = experience_service.add_experience(character, stats, xp)
+        levels_gained, new_level = levelup.levels_gained, levelup.new_level
+        lines.append(display.xp_delta_line(xp))
 
     if outcome.damage_max_pct > 0:
         vit_bonus = (await item_service.compute_gear_bonus(db, character.id)).get("vit", 0)
@@ -76,5 +83,8 @@ async def apply_outcome(
         dmg = round(max_hp * pct)
         new_hp = max(1, current - dmg)  # событие вне боя не убивает
         vitals_service.set_hp(character, stats, new_hp, vit_bonus)
+        lines.append(display.hp_delta_line(current, new_hp, max_hp))
 
-    return OutcomeResult("\n\n".join(line for line in lines if line))
+    return OutcomeResult(
+        "\n\n".join(line for line in lines if line), levels_gained=levels_gained, new_level=new_level,
+    )

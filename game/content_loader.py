@@ -54,9 +54,8 @@ class StarterRingMob(BaseModel):
     zone_max: int
 
 
-def load_starter_ring(content_dir: Path = CONTENT_DIR) -> dict[str, list[StarterRingMob]]:
-    """Возвращает {region: [мобы]} из content/mobs/starter_ring.json."""
-    with (content_dir / "mobs" / "starter_ring.json").open(encoding="utf-8") as f:
+def _load_mob_file(filename: str, content_dir: Path) -> dict[str, list[StarterRingMob]]:
+    with (content_dir / "mobs" / filename).open(encoding="utf-8") as f:
         raw = json.load(f)
     result: dict[str, list[StarterRingMob]] = {}
     for region, mobs in raw.items():
@@ -64,6 +63,26 @@ def load_starter_ring(content_dir: Path = CONTENT_DIR) -> dict[str, list[Starter
             continue
         result[region] = [StarterRingMob(region=region, **m) for m in mobs]
     return result
+
+
+def load_starter_ring(content_dir: Path = CONTENT_DIR) -> dict[str, list[StarterRingMob]]:
+    """Возвращает {region: [мобы]} из content/mobs/starter_ring.json (кольцо 1-15)."""
+    return _load_mob_file("starter_ring.json", content_dir)
+
+
+_MOB_FILES = (
+    "starter_ring.json", "ring_16_30.json", "ring_31_45.json", "ring_46_60.json", "ring_center.json",
+)
+
+
+def load_bestiary(content_dir: Path = CONTENT_DIR) -> dict[str, list[StarterRingMob]]:
+    """Все кольца карты (патч 15): мержит мобов всех content/mobs/*.json по
+    региону (+ отдельный ключ "any" для общих мобов центра)."""
+    merged: dict[str, list[StarterRingMob]] = {}
+    for filename in _MOB_FILES:
+        for region, mobs in _load_mob_file(filename, content_dir).items():
+            merged.setdefault(region, []).extend(mobs)
+    return merged
 
 
 class QuestDef(BaseModel):

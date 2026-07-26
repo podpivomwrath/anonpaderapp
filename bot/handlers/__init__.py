@@ -12,10 +12,11 @@ from bot.handlers.fallback import labeler as fallback_labeler
 from bot.handlers.inventory import labeler as inventory_labeler
 from bot.handlers.list_keeper import labeler as list_keeper_labeler
 from bot.handlers.onboarding import labeler as onboarding_labeler
+from bot.handlers.presets import labeler as presets_labeler
 from bot.handlers.stats_window import labeler as stats_window_labeler
 from bot.handlers.world import labeler as world_labeler
 
 LABELERS = [
     onboarding_labeler, world_labeler, combat_labeler, appraiser_labeler, inventory_labeler,
-    list_keeper_labeler, stats_window_labeler, basic_labeler, fallback_labeler,
+    list_keeper_labeler, presets_labeler, stats_window_labeler, basic_labeler, fallback_labeler,
 ]

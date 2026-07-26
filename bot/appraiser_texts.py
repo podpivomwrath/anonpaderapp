@@ -1,5 +1,6 @@
 """Тексты скупщика трофеев (content/npc/appraiser.json, патч 9 блок 3)."""
 
+from game.combat import display
 from game.content_loader import load_npc_texts
 
 APPRAISER = load_npc_texts("appraiser")
@@ -17,5 +18,6 @@ def appraiser_gear_empty() -> str:
     return APPRAISER["gear_empty"]
 
 
-def appraiser_sold(gold: int) -> str:
-    return APPRAISER["sold"].format(gold=gold)
+def appraiser_sold(gold: int, total: int) -> str:
+    """Патч 13, ч.2: сумма сделки + новый баланс единой числовой скобкой."""
+    return f"{APPRAISER['sold']} {display.gold_delta_line(gold, total)}"

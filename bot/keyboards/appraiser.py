@@ -1,4 +1,7 @@
-"""Клавиатуры скупщика: трофеи (патч 9) + снаряжение (патч 11, блок 2)."""
+"""Клавиатуры скупщика: трофеи (патч 9) + снаряжение (патч 11, блок 2).
+
+INLINE (патч 13, ч.1) — окно скупщика редактируется на месте при поштучной
+продаже, не плодит новых сообщений (см. bot/handlers/appraiser.py)."""
 
 from vkbottle import Keyboard, KeyboardButtonColor, Text
 
@@ -10,8 +13,13 @@ SELL_ALL_ID = "all"
 BTN_SELL_GEAR = "🗡️ Продать снаряжение"
 
 
+def no_keyboard() -> str:
+    """Снять инлайн-кнопки с уже отредактированного сообщения (окно закрыто)."""
+    return Keyboard(inline=True).get_json()
+
+
 def appraiser_keyboard(stock: list[tuple[TrophyDef, int]]) -> str:
-    kb = Keyboard(one_time=False)
+    kb = Keyboard(inline=True)
     if stock:
         total = sum(d.sell_price * count for d, count in stock)
         kb.add(
@@ -34,7 +42,7 @@ def appraiser_keyboard(stock: list[tuple[TrophyDef, int]]) -> str:
 
 def sell_gear_keyboard(items: list[tuple[Item, int]]) -> str:
     """items — (предмет, цена) НЕ надетых предметов инвентаря."""
-    kb = Keyboard(one_time=False)
+    kb = Keyboard(inline=True)
     for item, price in items:
         kb.add(
             Text(f"Продать {item.name} — {price} зол.", payload={"type": "sell_item", "item": item.id}),

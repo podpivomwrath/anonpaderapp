@@ -12,7 +12,7 @@
 from game.classes.base import Role, SubclassDef, register
 from game.combat import balance_config as bc
 from game.combat.session import CombatMode, Effect, EffectKind
-from game.combat.skills import SkillContext, defensive_skill
+from game.combat.skills import PendingHeal, SkillContext, compute_hit, defensive_skill
 
 GUARDIAN = register(
     SubclassDef(
@@ -29,9 +29,35 @@ GUARDIAN = register(
 
 @defensive_skill("guardian_block")
 def block(ctx: SkillContext) -> None:
-    """Блок: снижает входящий урон этого тика."""
-    ctx.actor.block_reduction = max(ctx.actor.block_reduction, bc.GUARDIAN_BLOCK_REDUCTION)
-    ctx.lines.append(f"{ctx.actor.name} поднимает щит (блок) 🛡")
+    """Блок: снижает входящий урон этого тика. Микробаффы активного пресета
+    (патч 14, ч.3) добавляют: шанс ПОЛНОГО блока (Несокрушимость), самоисцеление
+    при блоке (Живительный блок), контрудар (Возмездие)."""
+    actor = ctx.actor
+    full_block_chance = actor.buff_modifiers.get("full_block_chance", 0.0)
+    if full_block_chance > 0 and ctx.rng.random() < full_block_chance:
+        actor.block_reduction = 1.0
+        ctx.lines.append(f"{actor.name} блокирует удар ПОЛНОСТЬЮ 🛡✨")
+    else:
+        actor.block_reduction = max(actor.block_reduction, bc.GUARDIAN_BLOCK_REDUCTION)
+        ctx.lines.append(f"{actor.name} поднимает щит (блок) 🛡")
+
+    heal_pct = actor.buff_modifiers.get("heal_on_block_pct_max_hp", 0.0)
+    if heal_pct > 0:
+        ctx.heals.append(
+            PendingHeal(
+                source_id=actor.id, target_id=actor.id,
+                amount=round(actor.max_hp * heal_pct), label="исцеляется от блока",
+            )
+        )
+
+    counterstrike_mult = actor.buff_modifiers.get("counterstrike_mult", 0.0)
+    if counterstrike_mult > 0:
+        enemies = ctx.session.alive_enemies_of(actor)
+        if enemies:
+            target = ctx.rng.choice(enemies)
+            ctx.hits.append(
+                compute_hit(actor, target, ctx.rng, label="контратакует", multiplier=counterstrike_mult)
+            )
 
 
 @defensive_skill("guardian_provoke")

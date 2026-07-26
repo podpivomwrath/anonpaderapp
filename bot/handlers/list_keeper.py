@@ -24,9 +24,11 @@ from bot.keyboards.list_keeper import (
 )
 from bot.keyboards.world import BTN_KEEPER, city_menu_keyboard
 from game.classes.base import REGISTRY
+from game.combat import balance_config as bc
+from game.combat import display
 from game.content_loader import load_npc_texts
 from services import onboarding_service as onboarding_svc
-from services import subclass_service, trial_service
+from services import subclass_service, trial_service, wallet_service
 from services.db import get_session_factory
 from services.wallet_service import NotEnoughCurrency
 
@@ -153,12 +155,14 @@ async def offer_pay(message: Message) -> None:
             await message.answer(KEEPER["not_enough_gold"], keyboard=offer_keyboard())
             return
         await _set_select_state(db, character, STATE_PATH_SELECT)
+        total = (await wallet_service.get_wallet(db, character.id)).farm_currency
         await db.commit()
         base_class = character.base_class
 
     titles = [s.title for s in subclass_service.paths_for(base_class)]
     await _dispenser.set(peer_id, SubclassSelectState.PATH_SELECT)
-    await message.answer(KEEPER["path_intro"], keyboard=paths_keyboard(titles))
+    payment_line = display.gold_delta_line(-bc.SUBCLASS_UNLOCK_COST, total)
+    await message.answer(f"{payment_line}\n\n{KEEPER['path_intro']}", keyboard=paths_keyboard(titles))
 
 
 @labeler.message(state=SubclassSelectState.OFFER, text=[BTN_LEAVE])

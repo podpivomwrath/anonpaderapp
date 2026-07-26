@@ -23,6 +23,7 @@ BTN_CHARACTER = "🎭 Персонаж"
 BTN_INVENTORY = "🎒 Инвентарь"
 BTN_STATS = "📊 Характеристики"
 BTN_KEEPER = "📖 Хранитель Списков"
+BTN_PRESETS = "⚔️ Пресеты"
 
 
 def add_miniapp_button(kb: Keyboard) -> None:
@@ -61,7 +62,8 @@ def waiting_keyboard() -> str:
 
 def city_menu_keyboard(character=None) -> str:
     """character (патч 12) — при level>=30 добавляет кнопку Хранителя Списков
-    (выбор подкласса/испытания). None — легаси-вызовы без гейта (нет кнопки)."""
+    (выбор подкласса/испытания); при выбранном подклассе (патч 14, ч.3) —
+    кнопку [⚔️ Пресеты]. None — легаси-вызовы без гейта (нет кнопок)."""
     kb = Keyboard(one_time=False)
     kb.add(Text(BTN_MENTOR), color=KeyboardButtonColor.PRIMARY)
     kb.add(Text(BTN_MARKET), color=KeyboardButtonColor.SECONDARY)
@@ -76,6 +78,9 @@ def city_menu_keyboard(character=None) -> str:
     if character is not None and character.level >= bc.SUBCLASS_UNLOCK_MIN_LEVEL:
         kb.row()
         kb.add(Text(BTN_KEEPER), color=KeyboardButtonColor.SECONDARY)
+    if character is not None and character.subclass is not None:
+        kb.row()
+        kb.add(Text(BTN_PRESETS), color=KeyboardButtonColor.SECONDARY)
     add_miniapp_button(kb)
     return kb.get_json()
 

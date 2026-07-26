@@ -36,6 +36,7 @@ STAT_LABELS = {
     "vit": "❤️ Выносливость",
     "wil": "✨ Воля",
 }
+STAT_NAMES = {"str": "Сила", "agi": "Ловкость", "int": "Интеллект", "vit": "Выносливость", "wil": "Воля"}
 
 _bases: dict[str, list[ItemBaseDef]] | None = None
 _rarities: dict[str, ItemRarityDef] | None = None
@@ -222,6 +223,21 @@ def _arrow(before: int, after: int) -> str:
     if after < before:
         return "↓"
     return "="
+
+
+def stat_delta_line(old_item: Item | None, new_item: Item | None) -> str:
+    """Компактная дельта статов для подтверждения экипировки (патч 13, ч.2):
+    `(Сила +3, Выносливость +1)`. Показывает только изменившиеся статы."""
+    old_stats = old_item.base_stats if old_item is not None else {}
+    new_stats = new_item.base_stats if new_item is not None else {}
+    parts = []
+    for key in STAT_ORDER:
+        delta = new_stats.get(key, 0) - old_stats.get(key, 0)
+        if delta != 0:
+            parts.append(f"{STAT_NAMES[key]} {delta:+d}")
+    if not parts:
+        return "(без изменений)"
+    return f"({', '.join(parts)})"
 
 
 def format_comparison(old_item: Item | None, new_item: Item) -> str:

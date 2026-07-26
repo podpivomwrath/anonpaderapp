@@ -31,7 +31,7 @@ export default function TrialsTab() {
   if (!data.subclass) {
     return (
       <Placeholder icon={<div style={{ fontSize: 48 }}>📖</div>}>
-        Путь ещё не выбран. Хранитель Списков предложит «Раскол пути» с 30 уровня — за золото, в городе.
+        Твоя Метка ещё не обрела форму. Возвращайся, когда кровь потребует имени.
       </Placeholder>
     );
   }

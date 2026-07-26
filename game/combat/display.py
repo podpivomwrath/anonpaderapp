@@ -48,6 +48,35 @@ def health_bar(current: float, maximum: float, mode: str = MODE_PVP) -> str:
     return BAR_FILLED * filled + BAR_EMPTY * (BAR_WIDTH - filled) + " " + hp_percent(current, maximum, mode)
 
 
+def hp_delta_line(hp_before: float, hp_after: float, max_hp: float, mode: str = MODE_PVP) -> str:
+    """Единая числовая скобка для любого изменения HP (патч 13, ч.2):
+    `(-34 HP · 82% → 68%)` / `(+142 HP · 61% → 100%)`. Используется и в бою,
+    и в событиях/отдыхе — единообразие важнее, чем принадлежность модулю."""
+    delta = round(hp_after - hp_before)
+    before = hp_percent(hp_before, max_hp, mode)
+    after = hp_percent(hp_after, max_hp, mode)
+    return f"({delta:+d} HP · {before} → {after})"
+
+
+def xp_delta_line(xp: int) -> str:
+    return f"(+{xp} опыта)"
+
+
+def xp_penalty_line(xp: int, fraction: float) -> str:
+    """Штраф опыта: абсолютное число + доля текущего уровня (патч 13, ч.2)."""
+    pct = round(fraction * 100)
+    return f"(-{xp} опыта · {pct}%)"
+
+
+def gold_delta_line(amount: int, total: int) -> str:
+    sign = "+" if amount >= 0 else "-"
+    return f"({sign}{abs(amount)} золота · всего {total})"
+
+
+def max_hp_delta_line(before: int, after: int) -> str:
+    return f"(Макс. здоровье: {before} → {after})"
+
+
 def action_line(
     actor_name: str,
     verb: str,
@@ -60,16 +89,8 @@ def action_line(
 ) -> str:
     """Лог действия: разовый эффект + итоговое состояние.
 
-    Пример: `Ты наносишь удар → Волк: -14% (68% → 54%)`
+    Пример (патч 13, ч.2 — единый формат с hp_delta_line):
+    `Ты наносишь удар → Волк: (-140 HP · 68% → 54%)`
     """
-    before = hp_percent(hp_before, max_hp, mode)
-    after = hp_percent(hp_after, max_hp, mode)
-    if max_hp > 0:
-        delta_value = (hp_after - hp_before) / max_hp * 100
-    else:
-        delta_value = 0.0
-    if mode == MODE_PVE_RAID:
-        delta = f"{delta_value:+.1f}%"
-    else:
-        delta = f"{round(delta_value):+d}%"
-    return f"{actor_name} {verb} → {target_name}: {delta} ({before} → {after}){suffix}"
+    delta_line = hp_delta_line(hp_before, hp_after, max_hp, mode)
+    return f"{actor_name} {verb} → {target_name}: {delta_line}{suffix}"

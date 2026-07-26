@@ -64,6 +64,22 @@ def validate_preset(
         )
 
 
+def next_slot_cost(current_slots: int) -> int:
+    """Цена покупки СЛЕДУЮЩЕГО слота пресета (патч 14, ч.3)."""
+    if current_slots >= len(bc.PRESET_SLOT_COSTS):
+        raise PresetValidationError("Все слоты пресетов уже куплены")
+    return bc.PRESET_SLOT_COSTS[current_slots]
+
+
+async def buy_preset_slot(db: AsyncSession, character: Character) -> Character:
+    """Покупка дополнительного слота пресета за золото — растущая цена."""
+    cost = next_slot_cost(character.preset_slots)
+    await charge(db, character.id, "farm", cost)
+    character.preset_slots += 1
+    await db.flush()
+    return character
+
+
 async def save_preset(
     db: AsyncSession,
     character: Character,
@@ -72,9 +88,26 @@ async def save_preset(
     catalog: dict[str, BuffDef],
     preset_id: int | None = None,
 ) -> CharacterBuffPreset:
-    """Создание нового пресета или изменение состава — платно (уровень 2)."""
+    """Создание нового пресета или изменение состава — платно (уровень 2).
+    Новый пресет нельзя создать сверх купленных слотов (патч 14, ч.3)."""
     unlocked = await trial_service.unlocked_buff_ids(db, character.id)
     validate_preset(buff_ids, character.subclass, catalog, unlocked)
+
+    if preset_id is None:
+        existing_count = len(
+            (
+                await db.scalars(
+                    select(CharacterBuffPreset).where(
+                        CharacterBuffPreset.character_id == character.id
+                    )
+                )
+            ).all()
+        )
+        if existing_count >= character.preset_slots:
+            raise PresetValidationError(
+                "Нет свободных слотов пресетов — купи ещё один в разделе «Персонаж»"
+            )
+
     await charge(db, character.id, "farm", bc.PRESET_CHANGE_COST_FARM)
 
     if preset_id is not None:
@@ -90,6 +123,39 @@ async def save_preset(
         db.add(preset)
     await db.flush()
     return preset
+
+
+async def get_active_preset(db: AsyncSession, character_id: int) -> CharacterBuffPreset | None:
+    return await db.scalar(
+        select(CharacterBuffPreset).where(
+            CharacterBuffPreset.character_id == character_id,
+            CharacterBuffPreset.is_active.is_(True),
+        )
+    )
+
+
+def resolve_buff_modifiers(buff_ids: list[str], catalog: dict[str, BuffDef]) -> dict[str, float]:
+    """Мерж stat_modifiers всех баффов активного пресета в один словарь
+    (патч 14, ч.3) — подаётся в build_combatant аналогично gear_bonus (патч 11)."""
+    merged: dict[str, float] = {}
+    for buff_id in buff_ids:
+        buff = catalog.get(buff_id)
+        if buff is not None:
+            merged.update(buff.stat_modifiers)
+    return merged
+
+
+async def resolve_active_modifiers(db: AsyncSession, character: Character) -> dict[str, float]:
+    """Шорткат: активный пресет персонажа → смерженные stat_modifiers
+    (патч 14, ч.3). Пусто, если подкласс не выбран или пресет не активирован."""
+    if character.subclass is None:
+        return {}
+    active = await get_active_preset(db, character.id)
+    if active is None:
+        return {}
+    from game.content_loader import load_content
+
+    return resolve_buff_modifiers(active.buff_ids, load_content().buffs)
 
 
 async def switch_active_preset(

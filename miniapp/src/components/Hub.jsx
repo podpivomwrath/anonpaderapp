@@ -1,15 +1,15 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Panel, PanelHeader, Tabbar, TabbarItem, Placeholder, Spinner, Div, Button } from '@vkontakte/vkui';
 import { getCharacter } from '../api.js';
-import StatsTab from './StatsTab.jsx';
+import CharacterTab from './CharacterTab.jsx';
+import InventoryTab from './InventoryTab.jsx';
 import StubTab from './StubTab.jsx';
-import TrialsTab from './TrialsTab.jsx';
 
+// Патч 14, ч.1: было 5 вкладок (Характеристики/Инвентарь/Пресеты/Испытания/
+// Биржа) — Характеристики+Пресеты+Испытания объединены в «Персонаж».
 const TABS = [
-  { id: 'stats', label: 'Характеристики', icon: '📊' },
+  { id: 'character', label: 'Персонаж', icon: '🎭' },
   { id: 'inventory', label: 'Инвентарь', icon: '🎒' },
-  { id: 'presets', label: 'Пресеты', icon: '⚔️' },
-  { id: 'trials', label: 'Испытания', icon: '📖' },
   { id: 'exchange', label: 'Биржа', icon: '💱' },
 ];
 
@@ -73,14 +73,10 @@ export default function Hub() {
         </p>
       </div>
 
-      {activeTab === 'stats' && <StatsTab character={character} onCharacterUpdate={setCharacter} />}
-      {activeTab === 'inventory' && (
-        <StubTab text="Твоя сумка пока пуста. Скоро здесь появится снаряжение." />
+      {activeTab === 'character' && (
+        <CharacterTab character={character} onCharacterUpdate={setCharacter} />
       )}
-      {activeTab === 'presets' && (
-        <StubTab text="Пути ещё не разветвились. Пресеты откроются с выбором подкласса." />
-      )}
-      {activeTab === 'trials' && <TrialsTab />}
+      {activeTab === 'inventory' && <InventoryTab />}
       {activeTab === 'exchange' && (
         <StubTab text="Торговцы душами ещё не открыли лавку. Скоро." />
       )}
