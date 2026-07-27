@@ -39,6 +39,12 @@ def try_apply_control(
     rng: random.Random,
     pvp: bool,
 ) -> ControlResult:
+    # Ясность крови (патч 16) — иммунитет от эликсира, работает в ОБОИХ режимах,
+    # проверяется раньше DR/резиста: профилактика, а не спасение от уже
+    # наложенного контроля.
+    if target.has_effect(EffectKind.CONTROL_IMMUNE):
+        return ControlResult(applied=False, immune=True)
+
     # DR-иммунитет проверяется только в PvP
     if pvp and target.control_immune_turns > 0:
         return ControlResult(applied=False, immune=True)

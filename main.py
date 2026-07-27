@@ -13,6 +13,7 @@ from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from bot.handlers import LABELERS, list_keeper, onboarding
 from bot.handlers import appraiser as appraiser_handlers
 from bot.handlers import combat as combat_handlers
+from bot.handlers import elixir_shop as elixir_shop_handlers
 from bot.handlers import inventory as inventory_handlers
 from bot.handlers import presets as presets_handlers
 from bot.handlers import respawn as respawn_handlers
@@ -74,6 +75,7 @@ async def run() -> None:
     appraiser_handlers.setup(bot.api)
     inventory_handlers.setup(bot.api)
     presets_handlers.setup(bot.api)
+    elixir_shop_handlers.setup(bot.api)
 
     duel_engine = DuelEngine()
     duel_engine.start()

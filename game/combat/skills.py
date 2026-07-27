@@ -93,10 +93,12 @@ DODGE_CAP = 0.95  # даже с баффом остаётся шанс попа�
 
 def outgoing_multiplier(actor: CombatantState, target: CombatantState) -> float:
     """Модификаторы исходящего урона: Ослабление, Боевой клич, PvP-провокация,
-    damage_bonus активного пресета (патч 14, ч.3 — напр. Тяжёлая рука/Кровавая ярость)."""
+    damage_bonus активного пресета (патч 14, ч.3 — напр. Тяжёлая рука/Кровавая ярость),
+    Пепельная лихорадка (патч 16 — эскалирующий бонус, value обновляется по ходам)."""
     mult = 1.0 - min(actor.effect_total(EffectKind.WEAKEN), 0.9)
     mult *= 1.0 + actor.effect_total(EffectKind.DAMAGE_BUFF)  # Боевой клич +30%
     mult *= 1.0 + actor.buff_modifiers.get("damage_bonus", 0.0)
+    mult *= 1.0 + actor.effect_total(EffectKind.ASHEN_FEVER)
     for effect in actor.effects_of(EffectKind.PROVOKE_PVP):
         if target.id != effect.source_id:
             mult *= 1.0 - effect.value
@@ -138,6 +140,9 @@ def compute_hit(
     base *= 1.0 + target.effect_total(EffectKind.VULNERABILITY)
     base *= 1.0 - effective_mitigation(target)
     base *= 1.0 - target.block_reduction
+    # Осколочная кровь (патч 16): фикс. бонус урона за удар, НЕ от статов —
+    # добавляется ПОСЛЕ всех множителей, не масштабируется крит/митигацией.
+    base += actor.effect_total(EffectKind.FLAT_DAMAGE_BONUS)
     return PendingHit(
         source_id=actor.id,
         target_id=target.id,

@@ -12,6 +12,7 @@ from vkbottle.bot import BotLabeler, Message
 
 from bot import editable_message
 from bot.handlers import stats_window
+from bot.keyboards.combat_items import combat_items_keyboard
 from bot.keyboards.items import item_choice_keyboard, no_keyboard
 from bot.keyboards.world import (
     BTN_ATTACK,
@@ -26,6 +27,7 @@ from bot.onboarding_texts import REGION_TITLES
 from bot.vk_media import photo_attachment
 from game.combat import balance_config as bc
 from game.combat import display
+from game.combat import elixir_effects
 from game.combat.base_skills import BASE_SKILL_DEFS
 from game.combat.battle_report import BattleTracker
 from game.combat import formulas
@@ -35,14 +37,25 @@ from game.combat.session import (
     CombatMode,
     CombatSessionState,
     DeclaredAction,
+    EffectKind,
     Stats,
     build_combatant,
 )
 from game.combat.tick_engine import TickEngine
 from bot.world_summary import location_summary
+from game.economy import elixir_config as ec
 from game.world import encounters, grid
 from game.world import flavor as world_flavor
-from services import encounter_service, item_service, trial_service, trophy_service, vitals_service, wallet_service
+from services import (
+    elixir_service,
+    encounter_service,
+    item_service,
+    trial_service,
+    trophy_service,
+    vitals_service,
+    wallet_service,
+)
+from services import onboarding_service as onboarding_svc
 from services.db import get_session_factory
 
 labeler = BotLabeler()
@@ -385,9 +398,91 @@ async def use_skill(message: Message) -> None:
 
 @labeler.message(text=[BTN_ITEM])
 async def use_item(message: Message) -> None:
-    if not has_active_encounter(message.peer_id):
+    """Патч 16: список зелий/эликсиров с количеством. Под контролем — кнопка
+    недоступна (ход и так пропускается); лимит эликсиров за бой — боевые
+    просто не показываются в списке, с пояснением."""
+    peer_id = message.peer_id
+    if not has_active_encounter(peer_id):
         return
-    await message.answer("🎒 В сумке пусто.")
+    state = _engine.sessions[peer_id]
+    player = state.combatants[PLAYER_ID]
+    if player.has_effect(EffectKind.FREEZE):
+        await message.answer("Скован — не до зелий сейчас. ❄️")
+        return
+
+    async with get_session_factory()() as db:
+        character = await onboarding_svc.get_character(db, peer_id)
+        if character is None:
+            return
+        stock = await elixir_service.get_stock(db, character.id)
+
+    if not stock:
+        await message.answer("🎒 В сумке пусто.")
+        return
+
+    limit_reached = player.combat_elixirs_used >= ec.ELIXIR_PER_BATTLE_LIMIT
+    visible = [(d, count) for d, count in stock if d.category == "heal" or not limit_reached]
+    text = "🎒 Что использовать?"
+    if limit_reached and any(d.category == "combat" for d, _ in stock):
+        text += "\n\nБольше твоё тело не выдержит за один бой — боевые эликсиры недоступны."
+    await editable_message.send_or_edit(
+        _bot_api, "combat_item", peer_id, text, combat_items_keyboard(visible)
+    )
+
+
+@labeler.message(payload_contains={"type": "use_item"})
+async def use_combat_item(message: Message) -> None:
+    peer_id = message.peer_id
+    if not has_active_encounter(peer_id):
+        return
+    payload = message.get_payload_json() or {}
+    elixir_id = payload.get("id")
+    elixir = elixir_service.elixir_def(elixir_id) if isinstance(elixir_id, str) else None
+    if elixir is None:
+        return
+
+    state = _engine.sessions[peer_id]
+    player = state.combatants[PLAYER_ID]
+    if player.has_effect(EffectKind.FREEZE):
+        await message.answer("Скован — не до зелий сейчас. ❄️")
+        return
+    if elixir.category == "combat" and player.combat_elixirs_used >= ec.ELIXIR_PER_BATTLE_LIMIT:
+        await message.answer("Больше твоё тело не выдержит за один бой.")
+        return
+
+    async with get_session_factory()() as db:
+        character = await onboarding_svc.get_character(db, peer_id)
+        if character is None:
+            return
+        consumed = await elixir_service.consume(db, character.id, elixir_id)
+        await db.commit()
+    if not consumed:
+        await message.answer("Этого зелья больше нет в сумке.")
+        return
+
+    await editable_message.send_or_edit(
+        _bot_api, "combat_item", peer_id, f"Использовано: {elixir.emoji} {elixir.name}.", no_keyboard()
+    )
+
+    if elixir.category == "heal":
+        # Лечебное зелье (патч 16) — тратит ход, как обычное действие
+        try:
+            await _engine.declare_action(
+                peer_id, PLAYER_ID,
+                DeclaredAction(type=ActionType.ITEM, item_id=elixir_id, target_id=PLAYER_ID),
+            )
+        except (KeyError, ValueError):
+            pass
+        return
+
+    # Боевой эликсир (патч 16) — бесплатное действие: эффект накладывается
+    # СРАЗУ, ход не тратится, игрок продолжает как обычно (атака/навык).
+    line = elixir_effects.apply_combat_elixir(player, elixir_id)
+    player.combat_elixirs_used += 1
+    await _bot_api.messages.send(
+        peer_id=peer_id, message=f"{line}\n\n{_render(state, [])}", random_id=0,
+        keyboard=_combat_kb(state, peer_id),
+    )
 
 
 @labeler.message(text=[BTN_FLEE])

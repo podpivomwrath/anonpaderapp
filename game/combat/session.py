@@ -21,6 +21,7 @@ class CombatMode(StrEnum):
 class ActionType(StrEnum):
     ATTACK = "attack"
     SKILL = "skill"
+    ITEM = "item"  # патч 16: лечебное зелье — тратит ход, как атака/навык
     SKIP = "skip"
 
 
@@ -33,6 +34,13 @@ class EffectKind(StrEnum):
     MARK = "mark"                  # стаки «Метки добычи» Клинка теней
     DAMAGE_BUFF = "damage_buff"    # исходящий урон * (1 + value) — Боевой клич
     DODGE = "dodge"                # шанс полного уклонения от входящего удара — Дымовая завеса
+    # --- Боевые эликсиры (патч 16) ---
+    ASHEN_FEVER = "ashen_fever"          # эскалирующий исходящий урон + самоурон 5%/ход
+    LAST_BREATH = "last_breath"          # спасение от смертельного урона (1 раз)
+    BLOOD_REFLECT = "blood_reflect"      # value — доля полученного урона, отражаемая атакующему
+    CONTROL_IMMUNE = "control_immune"    # иммунитет к контролю (оба режима боя)
+    SHIELD_POOL = "shield_pool"          # персистентный щит (value — остаток поглощения)
+    FLAT_DAMAGE_BONUS = "flat_damage_bonus"  # фикс. бонус урона за удар (не от статов)
 
 
 class DeclaredAction(BaseModel):
@@ -41,6 +49,7 @@ class DeclaredAction(BaseModel):
     type: ActionType = ActionType.SKIP
     target_id: int | None = None
     skill_id: str | None = None
+    item_id: str | None = None  # патч 16: id лечебного зелья при type=ITEM
     payload: dict = Field(default_factory=dict)
 
 
@@ -106,6 +115,9 @@ class CombatantState:
     control_streak: int = 0            # подряд пропущенных из-за контроля ходов
     control_immune_turns: int = 0      # осталось ходов иммунитета к контролю
     skipped_by_control_this_turn: bool = False  # transient: пропустил ход из-за контроля
+
+    # --- Боевые эликсиры (патч 16): лимит 2 за бой, считается на весь бой ---
+    combat_elixirs_used: int = 0
 
     @property
     def alive(self) -> bool:

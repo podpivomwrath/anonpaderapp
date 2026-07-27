@@ -142,6 +142,24 @@ def load_trophy_defs(content_dir: Path = CONTENT_DIR) -> list[TrophyDef]:
     return [TrophyDef(**raw) for raw in _load_json(content_dir / "trophies.json")]
 
 
+class ElixirDef(BaseModel):
+    """Зелье/эликсир (content/items/elixirs.json, патч 16) — каталог (имя/эмодзи/
+    описание); цены и числовые эффекты — в game/economy/elixir_config.py."""
+
+    id: str
+    name: str
+    emoji: str
+    category: str  # "heal" | "combat"
+    description: str = ""
+
+
+def load_elixirs(content_dir: Path = CONTENT_DIR) -> dict[str, ElixirDef]:
+    return {
+        raw["id"]: ElixirDef(**raw)
+        for raw in _load_json(content_dir / "items" / "elixirs.json")
+    }
+
+
 class EventOutcome(BaseModel):
     """Исход выбора в событии исследования (патч 9 блок 1, патч 10 блок 3).
     Эффекты комбинируемы: напр. trophy=True И damage_max_pct>0 одновременно

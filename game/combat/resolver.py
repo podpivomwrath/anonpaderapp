@@ -34,6 +34,44 @@ from game.combat.skills import (
     SkillContext,
     compute_hit,
 )
+from game.economy import elixir_config as ec
+
+# Эффекты боевых эликсиров (патч 16) — "бесплатное действие": накладываются
+# МИМО объявления хода, поэтому обязаны срабатывать/тикать НЕМЕДЛЕННО (как
+# FREEZE), а не с хода после наложения — иначе "N ходов" на деле длилось бы
+# N+1. DODGE НЕ входит — его переиспользует Дымовая завеса (обычный навык
+# с обычной семантикой отложенного тика), трогать нельзя.
+_IMMEDIATE_EFFECT_KINDS = {
+    EffectKind.FREEZE,
+    EffectKind.ASHEN_FEVER,
+    EffectKind.LAST_BREATH,
+    EffectKind.BLOOD_REFLECT,
+    EffectKind.CONTROL_IMMUNE,
+    EffectKind.SHIELD_POOL,
+    EffectKind.FLAT_DAMAGE_BONUS,
+}
+
+
+def _consume_heal_item(ctx: SkillContext, item_id: str | None) -> None:
+    """Лечебное зелье (патч 16): тратит ход, как атака/навык."""
+    pct = ec.HEAL_PCT.get(item_id) if item_id else None
+    if pct is None:
+        return
+    actor = ctx.actor
+    amount = round(actor.max_hp * pct)
+    ctx.heals.append(
+        PendingHeal(source_id=actor.id, target_id=actor.id, amount=amount, label="пьёт зелье")
+    )
+
+
+def _apply_last_breath_guard(combatant: CombatantState, result: "TickResult") -> None:
+    """Последний вздох (патч 16): если HP<=0 и эффект активен — спасение
+    на 1 HP, один раз, эффект снимается."""
+    if combatant.current_hp > 0 or not combatant.has_effect(EffectKind.LAST_BREATH):
+        return
+    combatant.effects = [e for e in combatant.effects if e.kind != EffectKind.LAST_BREATH]
+    combatant.current_hp = 1
+    result.lines.append(f"✨ Последний вздох удерживает {combatant.name} на грани (1 HP)")
 
 
 @dataclass
@@ -59,6 +97,8 @@ def _run_offensive(ctx: SkillContext, cid: int, action: DeclaredAction, session,
     ctx.action = action
     if action.type == ActionType.ATTACK:
         OFFENSIVE_SKILLS["attack"](ctx)
+    elif action.type == ActionType.ITEM:
+        _consume_heal_item(ctx, action.item_id)
     elif action.type == ActionType.SKILL and action.skill_id in OFFENSIVE_SKILLS:
         OFFENSIVE_SKILLS[action.skill_id](ctx)
     elif action.type == ActionType.SKILL and action.skill_id not in DEFENSIVE_SKILLS:
@@ -184,6 +224,7 @@ def resolve_tick(
     # --- Одновременное применение: net-дельта по каждому участнику ---
     damage_taken: dict[int, int] = {}
     heal_taken: dict[int, int] = {}
+    reflect_hits: list[PendingHit] = []
     for hit in ctx.hits:
         target = session.combatants[hit.target_id]
         amount = hit.amount
@@ -193,7 +234,31 @@ def resolve_tick(
             amount -= absorbed
             if absorbed:
                 result.lines.append(f"Щит {target.name} поглощает {absorbed} урона 🛡")
+        # Второе сердце (патч 16): персистентный щит на несколько ходов,
+        # отдельный от однотикового target.shield (групповой щит стража).
+        shield_pool = target.effects_of(EffectKind.SHIELD_POOL)
+        if shield_pool and amount > 0:
+            pool = shield_pool[0]
+            pool_absorbed = min(int(pool.value), amount)
+            pool.value -= pool_absorbed
+            amount -= pool_absorbed
+            if pool_absorbed:
+                result.lines.append(f"🛡️ Второе сердце {target.name} поглощает {pool_absorbed} урона")
+        # Кровь за кровь (патч 16): доля полученного урона возвращается атакующему
+        reflect_pct = target.effect_total(EffectKind.BLOOD_REFLECT)
+        if reflect_pct > 0 and amount > 0 and hit.source_id != target.id:
+            attacker = session.combatants.get(hit.source_id)
+            if attacker is not None and attacker.alive:
+                reflect_hits.append(
+                    PendingHit(
+                        source_id=target.id, target_id=attacker.id,
+                        amount=max(round(amount * reflect_pct), 1), label="шипы",
+                    )
+                )
         damage_taken[hit.target_id] = damage_taken.get(hit.target_id, 0) + amount
+    ctx.hits.extend(reflect_hits)
+    for hit in reflect_hits:
+        damage_taken[hit.target_id] = damage_taken.get(hit.target_id, 0) + hit.amount
     for heal in ctx.heals:
         heal_taken[heal.target_id] = heal_taken.get(heal.target_id, 0) + heal.amount
 
@@ -201,6 +266,7 @@ def resolve_tick(
         combatant = session.combatants[cid]
         delta = heal_taken.get(cid, 0) - damage_taken.get(cid, 0)
         combatant.current_hp = min(combatant.current_hp + delta, combatant.max_hp)
+        _apply_last_breath_guard(combatant, result)
 
     # --- Строки лога (атмосферные шаблоны + итоговое состояние после хода) ---
     result.lines.extend(ctx.lines)
@@ -228,11 +294,40 @@ def resolve_tick(
     # --- Тик длительностей, КД, контроля; очистка однотиковых состояний ---
     pvp = session.mode != CombatMode.PVE  # DR-стрик считаем только в PvP
     for combatant in session.combatants.values():
+        # Пепельная лихорадка (патч 16): самоурон + эскалация КАЖДЫЙ активный
+        # ход, включая ход применения (эликсир — бесплатное действие).
+        for effect in combatant.effects_of(EffectKind.ASHEN_FEVER):
+            if not combatant.alive:
+                continue
+            before_hp = combatant.current_hp
+            self_dmg = max(round(combatant.max_hp * ec.ASHEN_FEVER_SELF_DAMAGE_PCT_MAX_HP), 1)
+            combatant.current_hp -= self_dmg
+            _apply_last_breath_guard(combatant, result)
+            result.lines.append(
+                f"🔥 Пепельная лихорадка жжёт {combatant.name} "
+                f"{display.hp_delta_line(before_hp, combatant.current_hp, combatant.max_hp)}"
+            )
+            step = round(effect.value / ec.ASHEN_FEVER_DAMAGE_BONUS_STEP)
+            effect.value = ec.ASHEN_FEVER_DAMAGE_BONUS_STEP * (step + 1)
+
         for effect in combatant.effects:
-            # FREEZE тикает всегда (контроль потребляется в тот же ход);
+            # Немедленные эффекты (FREEZE, эликсиры-патч16) тикают всегда;
             # прочие свежие эффекты не тикают в ход наложения
-            if id(effect) in preexisting_effects or effect.kind == EffectKind.FREEZE:
+            if id(effect) in preexisting_effects or effect.kind in _IMMEDIATE_EFFECT_KINDS:
                 effect.remaining_ticks -= 1
+
+        # Второе сердце (патч 16): щит не пробит за отведённые ходы — остаток лечит
+        for effect in combatant.effects_of(EffectKind.SHIELD_POOL):
+            if effect.remaining_ticks <= 0 and effect.value > 0 and combatant.alive:
+                heal = round(effect.value)
+                before_hp = combatant.current_hp
+                combatant.current_hp = min(combatant.current_hp + heal, combatant.max_hp)
+                result.lines.append(
+                    f"🛡️ Второе сердце {combatant.name} обращается в исцеление "
+                    f"{display.hp_delta_line(before_hp, combatant.current_hp, combatant.max_hp)}"
+                )
+                effect.value = 0
+
         combatant.effects = [e for e in combatant.effects if e.remaining_ticks > 0]
         combatant.tick_cooldowns()
         control.tick_control(combatant, pvp)
