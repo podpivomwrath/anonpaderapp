@@ -27,10 +27,6 @@ def city_region_at(x: int, y: int) -> str | None:
     return None
 
 
-def _sign(value: int) -> int:
-    return (value > 0) - (value < 0)
-
-
-def gate_exit_position(x: int, y: int) -> tuple[int, int]:
-    """Клетка на выходе за ворота — один шаг к центру от города."""
-    return clamp(x - _sign(x)), clamp(y - _sign(y))
+def in_bounds(x: int, y: int) -> bool:
+    """Клетка (x;y) — в пределах сетки -50..50 по обеим осям (патч 17)."""
+    return wc.BOUNDS_MIN <= x <= wc.BOUNDS_MAX and wc.BOUNDS_MIN <= y <= wc.BOUNDS_MAX

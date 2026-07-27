@@ -9,10 +9,12 @@
 
 from vkbottle import Keyboard, KeyboardButtonColor, OpenLink, Text
 
+from bot.onboarding_texts import REGION_TITLES
 from config import get_settings
 from game.combat import balance_config as bc
 from game.combat.base_skills import skills_for_class
 from game.content_loader import ExplorationEventDef
+from game.world import grid
 
 BTN_MENTOR = "🧙 Наставник"
 BTN_MARKET = "🏪 Рынок"
@@ -87,20 +89,82 @@ def city_menu_keyboard(character=None) -> str:
     return kb.get_json()
 
 
-def movement_keyboard() -> str:
+# dx,dy по сторонам компаса (патч 17: подписи и границы зависят от позиции)
+_DIRECTION_DELTAS = {
+    BTN_UP: (0, 1),
+    BTN_DOWN: (0, -1),
+    BTN_LEFT: (-1, 0),
+    BTN_RIGHT: (1, 0),
+}
+
+# Все тексты, которые может нести кнопка движения (стрелка ИЛИ название
+# города) — для регистрации хендлера, фактическое направление резолвится
+# по текущей позиции через resolve_direction().
+MOVEMENT_TEXTS = list(_DIRECTION_DELTAS) + list(REGION_TITLES.values())
+
+
+def _direction_label(x: int, y: int, dx: int, dy: int, arrow: str) -> str | None:
+    """Подпись кнопки направления от (x;y): None — за границей сетки (кнопку
+    не показываем), название города — если соседняя клетка ведёт в город,
+    иначе обычная стрелка."""
+    nx, ny = x + dx, y + dy
+    if not grid.in_bounds(nx, ny):
+        return None
+    region = grid.city_region_at(nx, ny)
+    return REGION_TITLES[region] if region is not None else arrow
+
+
+def resolve_direction(x: int, y: int, text: str) -> tuple[int, int] | None:
+    """Обратный маппинг: текст нажатой кнопки → (dx;dy) для позиции (x;y).
+    None — кнопка больше не соответствует текущей позиции (устаревшая
+    клавиатура) либо ушла бы за границу."""
+    for arrow, (dx, dy) in _DIRECTION_DELTAS.items():
+        if _direction_label(x, y, dx, dy, arrow) == text:
+            return dx, dy
+    return None
+
+
+def movement_keyboard(pos_x: int, pos_y: int) -> str:
     """Карта: D-pad из стрелок (циферблатная раскладка 12/3/6/9 часов) +
-    исследование и отдых. Вход в город — автоматически при прибытии."""
+    исследование и отдых. Вход в город — автоматически при прибытии.
+
+    Патч 17: направления за пределами сетки (-50..50) не показываются;
+    направление, ведущее на клетку города, подписывается названием города
+    вместо стрелки."""
+    up = _direction_label(pos_x, pos_y, *_DIRECTION_DELTAS[BTN_UP], BTN_UP)
+    down = _direction_label(pos_x, pos_y, *_DIRECTION_DELTAS[BTN_DOWN], BTN_DOWN)
+    left = _direction_label(pos_x, pos_y, *_DIRECTION_DELTAS[BTN_LEFT], BTN_LEFT)
+    right = _direction_label(pos_x, pos_y, *_DIRECTION_DELTAS[BTN_RIGHT], BTN_RIGHT)
+
     kb = Keyboard(one_time=False)
-    kb.add(Text(BTN_UP), color=KeyboardButtonColor.SECONDARY)
-    kb.row()
-    kb.add(Text(BTN_LEFT), color=KeyboardButtonColor.SECONDARY)
-    kb.add(Text(BTN_RIGHT), color=KeyboardButtonColor.SECONDARY)
-    kb.row()
-    kb.add(Text(BTN_DOWN), color=KeyboardButtonColor.SECONDARY)
-    kb.row()
+    if up is not None:
+        kb.add(Text(up), color=KeyboardButtonColor.SECONDARY)
+        kb.row()
+    if left is not None or right is not None:
+        if left is not None:
+            kb.add(Text(left), color=KeyboardButtonColor.SECONDARY)
+        if right is not None:
+            kb.add(Text(right), color=KeyboardButtonColor.SECONDARY)
+        kb.row()
+    if down is not None:
+        kb.add(Text(down), color=KeyboardButtonColor.SECONDARY)
+        kb.row()
     kb.add(Text(BTN_EXPLORE), color=KeyboardButtonColor.POSITIVE)
     kb.add(Text(BTN_REST), color=KeyboardButtonColor.SECONDARY)
     add_miniapp_button(kb)
+    return kb.get_json()
+
+
+def gate_direction_keyboard(pos_x: int, pos_y: int) -> str:
+    """Выбор направления при выходе из города (патч 17, п.2): только
+    направления, остающиеся в пределах сетки (из угловых городов — ровно 2)."""
+    kb = Keyboard(inline=True)
+    for arrow, (dx, dy) in _DIRECTION_DELTAS.items():
+        nx, ny = pos_x + dx, pos_y + dy
+        if not grid.in_bounds(nx, ny):
+            continue
+        kb.add(Text(arrow, payload={"type": "gate_dir", "dx": dx, "dy": dy}), color=KeyboardButtonColor.SECONDARY)
+        kb.row()
     return kb.get_json()
 
 

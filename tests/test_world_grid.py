@@ -37,11 +37,12 @@ def test_city_region_at() -> None:
     assert grid.city_region_at(49, 50) is None
 
 
-def test_gate_exit_position_steps_toward_center() -> None:
-    assert grid.gate_exit_position(50, 50) == (49, 49)
-    assert grid.gate_exit_position(-50, 50) == (-49, 49)
-    assert grid.gate_exit_position(50, -50) == (49, -49)
-    assert grid.gate_exit_position(-50, -50) == (-49, -49)
+def test_in_bounds() -> None:
+    assert grid.in_bounds(50, 50) is True
+    assert grid.in_bounds(-50, -50) is True
+    assert grid.in_bounds(51, 0) is False
+    assert grid.in_bounds(0, -51) is False
+    assert grid.in_bounds(0, 0) is True
 
 
 def test_clamp_respects_bounds() -> None:

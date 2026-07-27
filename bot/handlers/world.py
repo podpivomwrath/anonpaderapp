@@ -58,12 +58,6 @@ _resting: set[int] = set()
 # peer_id -> id события с выбором, ожидающего ответа (патч 9, блок 1)
 _pending_events: dict[int, str] = {}
 
-DIRECTIONS = {
-    kb.BTN_UP: (0, 1),
-    kb.BTN_DOWN: (0, -1),
-    kb.BTN_LEFT: (-1, 0),
-    kb.BTN_RIGHT: (1, 0),
-}
 
 
 def setup(
@@ -132,7 +126,8 @@ async def show_location(message: Message, db, character) -> None:
     farm_currency = (await wallet_service.get_wallet(db, character.id)).farm_currency
     gear_bonus = await item_service.compute_gear_bonus(db, character.id)
     await message.answer(
-        _map_text(character, stats, farm_currency, gear_bonus), keyboard=kb.movement_keyboard()
+        _map_text(character, stats, farm_currency, gear_bonus),
+        keyboard=kb.movement_keyboard(character.pos_x, character.pos_y),
     )
 
 
@@ -148,11 +143,35 @@ async def gate_exit(message: Message) -> None:
             return
         region = grid.city_region_at(character.pos_x, character.pos_y)
         if region is None:
-            await message.answer("Ты уже за городом.", keyboard=kb.movement_keyboard())
+            await message.answer(
+                "Ты уже за городом.",
+                keyboard=kb.movement_keyboard(character.pos_x, character.pos_y),
+            )
             return
-        character.pos_x, character.pos_y = grid.gate_exit_position(
-            character.pos_x, character.pos_y
+        await message.answer(
+            "Куда направишься?",
+            keyboard=kb.gate_direction_keyboard(character.pos_x, character.pos_y),
         )
+
+
+@labeler.message(payload_contains={"type": "gate_dir"})
+async def gate_exit_direction(message: Message) -> None:
+    """Ответ на выбор направления при выходе из города (патч 17, п.2)."""
+    payload = message.get_payload_json() or {}
+    dx, dy = payload.get("dx"), payload.get("dy")
+    if not isinstance(dx, int) or not isinstance(dy, int):
+        return
+    async with get_session_factory()() as db:
+        character = await onboarding_svc.get_character(db, message.from_id)
+        if character is None or character.creation_state is not None:
+            return
+        region = grid.city_region_at(character.pos_x, character.pos_y)
+        if region is None:
+            return  # уже вышел раньше — устаревшая клавиатура
+        nx, ny = character.pos_x + dx, character.pos_y + dy
+        if not grid.in_bounds(nx, ny):
+            return  # защитная проверка на случай устаревшей клавиатуры
+        character.pos_x, character.pos_y = nx, ny
         stats = await _get_stats(db, character.id)
         farm_currency = (await wallet_service.get_wallet(db, character.id)).farm_currency
         gear_bonus = await item_service.compute_gear_bonus(db, character.id)
@@ -160,7 +179,8 @@ async def gate_exit(message: Message) -> None:
         # ux-patch-10 п.1: сводка локации — всегда отдельное сообщение
         await message.answer("Ты выходишь за ворота.", keyboard=kb.waiting_keyboard())
         await message.answer(
-            _map_text(character, stats, farm_currency, gear_bonus), keyboard=kb.movement_keyboard()
+            _map_text(character, stats, farm_currency, gear_bonus),
+            keyboard=kb.movement_keyboard(character.pos_x, character.pos_y),
         )
 
 
@@ -285,7 +305,8 @@ async def event_choice(message: Message) -> None:
     # патч 14, ч.2.3: событие — тоже источник опыта, левелап не должен теряться
     await stats_window.notify_levelup(peer_id, result.levels_gained, result.new_level)
     await message.answer(
-        _map_text(character, stats, farm_currency, gear_bonus), keyboard=kb.movement_keyboard()
+        _map_text(character, stats, farm_currency, gear_bonus),
+        keyboard=kb.movement_keyboard(character.pos_x, character.pos_y),
     )
 
 
@@ -340,12 +361,16 @@ async def handle_rest_done(peer_id: int) -> None:
             await trial_service.record_rest(db, character)
         await db.commit()
         region = grid.city_region_at(character.pos_x, character.pos_y)
-        keyboard = kb.city_menu_keyboard(character) if region is not None else kb.movement_keyboard()
+        keyboard = (
+            kb.city_menu_keyboard(character)
+            if region is not None
+            else kb.movement_keyboard(character.pos_x, character.pos_y)
+        )
     text = f"{flavor.rest_done()}\n{display.hp_delta_line(hp_before, max_hp, max_hp)}"
     await _bot_api.messages.send(peer_id=peer_id, message=text, random_id=0, keyboard=keyboard)
 
 
-@labeler.message(text=list(DIRECTIONS))
+@labeler.message(text=kb.MOVEMENT_TEXTS)
 async def move(message: Message) -> None:
     async with get_session_factory()() as db:
         character = await onboarding_svc.get_character(db, message.from_id)
@@ -374,7 +399,10 @@ async def move(message: Message) -> None:
             left = movement_service.remaining_seconds(character, now)
             await message.answer(f"🚶 В пути... осталось ~{left:.0f} сек.")
             return
-        dx, dy = DIRECTIONS[message.text]
+        direction = kb.resolve_direction(character.pos_x, character.pos_y, message.text)
+        if direction is None:
+            return  # устаревшая клавиатура — кнопка больше не подходит к позиции
+        dx, dy = direction
         movement_service.start_travel(character, dx, dy, now)
         await db.commit()
         # в пути — кнопки убираем, вернём по прибытии (чистка визуального шума)
@@ -399,6 +427,7 @@ async def handle_arrival(peer_id: int) -> None:
                 peer_id=peer_id,
                 message=f"Ты выходишь к воротам: {REGION_TITLES[region]}",
                 random_id=0,
+                attachment=hub_attachment(region),
                 keyboard=kb.city_menu_keyboard(character),
             )
             return
@@ -408,7 +437,7 @@ async def handle_arrival(peer_id: int) -> None:
             peer_id=peer_id,
             message=_map_text(character, stats, farm_currency),
             random_id=0,
-            keyboard=kb.movement_keyboard(),
+            keyboard=kb.movement_keyboard(character.pos_x, character.pos_y),
         )
 
 

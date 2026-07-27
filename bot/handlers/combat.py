@@ -95,6 +95,15 @@ def has_active_encounter(peer_id: int) -> bool:
     return peer_id in _engine.sessions
 
 
+async def _get_position(peer_id: int) -> tuple[int, int]:
+    """Текущая позиция игрока — для клавиатуры карты после побега (патч 17)."""
+    from services.onboarding_service import get_character
+
+    async with get_session_factory()() as db:
+        character = await get_character(db, peer_id)
+    return (character.pos_x, character.pos_y) if character is not None else (0, 0)
+
+
 async def _persist_hp(peer_id: int, hp: int) -> None:
     """Сохранить текущее HP игрока в БД (после боя/побега)."""
     from sqlalchemy import select
@@ -273,7 +282,8 @@ async def on_battle_finished(session_id: int, result: TickResult) -> None:
             text += f"\n{display.max_hp_delta_line(old_max_hp, new_max_hp)}"
         await _bot_api.messages.send(
             peer_id=peer_id, message=text, random_id=0,
-            attachment=photo_attachment(VICTORY_PHOTO_ID), keyboard=waiting_keyboard(),
+            attachment=photo_attachment(VICTORY_PHOTO_ID),
+            keyboard=waiting_keyboard(),
         )
 
         # патч 14, ч.2.3: единая точка входа для левелапа — все источники опыта
@@ -304,7 +314,7 @@ async def on_battle_finished(session_id: int, result: TickResult) -> None:
         await _bot_api.messages.send(
             peer_id=peer_id,
             message=location_summary(character, stats, _rng, farm_currency, vit_bonus),
-            random_id=0, keyboard=movement_keyboard(),
+            random_id=0, keyboard=movement_keyboard(character.pos_x, character.pos_y),
         )
     elif on_defeat_hook is not None:
         # смерть: убрать кнопки, атмосферный текст (+ штраф опыта); респавн — автоматически
@@ -353,7 +363,7 @@ async def item_choice(message: Message) -> None:
     await editable_message.send_or_edit(_bot_api, "item_choice", peer_id, confirm_text, no_keyboard())
     await message.answer(
         location_summary(character, stats, _rng, farm_currency, vit_bonus),
-        keyboard=movement_keyboard(),
+        keyboard=movement_keyboard(character.pos_x, character.pos_y),
     )
 
 
@@ -497,8 +507,9 @@ async def flee(message: Message) -> None:
         _encounter_class.pop(peer_id, None)
         _last_player_hp.pop(peer_id, None)
         await _persist_hp(peer_id, hp)
+        pos_x, pos_y = await _get_position(peer_id)
         await message.answer("🏃 Ты срываешься прочь — и темнота глотает твой след.",
-                             keyboard=movement_keyboard())
+                             keyboard=movement_keyboard(pos_x, pos_y))
         return
     await message.answer("🏃 Уйти не вышло — оно снова между тобой и спасением.")
     try:
