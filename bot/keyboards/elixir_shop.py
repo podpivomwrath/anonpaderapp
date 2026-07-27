@@ -9,14 +9,19 @@ from game.economy import elixir_config as ec
 
 
 def shop_keyboard(elixirs: list[ElixirDef]) -> str:
+    """2 кнопки в ряд — при полном каталоге (10 эликсиров) 1-в-ряд превышает
+    лимит VK на число рядов клавиатуры (ошибка 911 "too much rows")."""
     kb = Keyboard(inline=True)
-    for elixir in elixirs:
+    for idx, elixir in enumerate(elixirs):
         price = ec.ELIXIR_PRICES.get(elixir.id, 0)
         label = f"{elixir.emoji} {elixir.name} — {price} зол."
         kb.add(
             Text(label, payload={"type": "buy_elixir", "id": elixir.id}),
             color=KeyboardButtonColor.SECONDARY,
         )
+        if idx % 2 == 1:
+            kb.row()
+    if len(elixirs) % 2 == 1:
         kb.row()
     add_miniapp_button(kb)
     return kb.get_json()
