@@ -1,16 +1,19 @@
 """Клавиатура лавки зелий (патч 16). INLINE — окно редактируется на месте
-при покупке (патч 13, ч.1), как у скупщика трофеев."""
+при покупке (патч 13, ч.1), как у скупщика трофеев.
+
+VK ограничивает inline-клавиатуру 6 рядами И 10 кнопками суммарно (жёстче,
+чем обычная reply-клавиатура: 10 рядов × 40 кнопок) — полный каталог из 10
+эликсиров уже занимает весь лимит, поэтому кнопку мини-аппа сюда добавить
+нельзя (ошибка 911 "too much buttons")."""
 
 from vkbottle import Keyboard, KeyboardButtonColor, Text
 
-from bot.keyboards.world import add_miniapp_button
 from game.content_loader import ElixirDef
 from game.economy import elixir_config as ec
 
 
 def shop_keyboard(elixirs: list[ElixirDef]) -> str:
-    """2 кнопки в ряд — при полном каталоге (10 эликсиров) 1-в-ряд превышает
-    лимит VK на число рядов клавиатуры (ошибка 911 "too much rows")."""
+    """2 кнопки в ряд, без кнопки мини-аппа (см. лимит выше)."""
     kb = Keyboard(inline=True)
     for idx, elixir in enumerate(elixirs):
         price = ec.ELIXIR_PRICES.get(elixir.id, 0)
@@ -23,5 +26,4 @@ def shop_keyboard(elixirs: list[ElixirDef]) -> str:
             kb.row()
     if len(elixirs) % 2 == 1:
         kb.row()
-    add_miniapp_button(kb)
     return kb.get_json()
