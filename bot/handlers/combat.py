@@ -50,6 +50,8 @@ from services import (
     elixir_service,
     encounter_service,
     item_service,
+    preset_service,
+    story_service,
     trial_service,
     trophy_service,
     vitals_service,
@@ -74,6 +76,8 @@ _encounter_mob_level: dict[int, int] = {}
 _pending_item_choice: dict[int, int] = {}
 # peer_id -> сводка текущего боя для трекера классовых испытаний (патч 12)
 _battle_trackers: dict[int, BattleTracker] = {}
+# peer_id -> (quest_id, оставшихся боёв в цепочке) для сюжетных встреч (патч 18)
+_story_encounter: dict[int, tuple[str, int]] = {}
 # колбэк смерти игрока (world.on_player_defeat): убрать кнопки, текст, запустить респавн
 on_defeat_hook = None
 
@@ -143,10 +147,13 @@ def _render(state: CombatSessionState, lines: list[str]) -> str:
 async def start_encounter(
     peer_id: int, character, char_stats, gear_bonus: dict[str, int] | None = None,
     buff_modifiers: dict[str, float] | None = None,
+    forced_encounter: encounters.Encounter | None = None,
 ) -> None:
     """gear_bonus (патч 11, блок 2) — сумма статов надетой экипировки,
     прибавляется к собственным статам ДО построения боевого участника.
-    buff_modifiers (патч 14, ч.3) — stat_modifiers активного пресета баффов."""
+    buff_modifiers (патч 14, ч.3) — stat_modifiers активного пресета баффов.
+    forced_encounter (патч 18) — сюжетный named-враг вместо случайного спавна
+    (см. start_story_encounter); обычный поток вызывает без этого аргумента."""
     bonus = gear_bonus or {}
     stats = Stats(
         strength=char_stats.strength + bonus.get("str", 0),
@@ -163,10 +170,13 @@ async def start_encounter(
     )
     # HP переносится между боями (отдых/респавн лечат) — не всегда полное
     player.current_hp = vitals_service.current_hp(character, char_stats, bonus.get("vit", 0))
-    # уровень моба клампится под игрока в диапазон зоны (world-patch-1);
-    # кольцо бестиария — по ТЕКУЩЕЙ клетке игрока, не по домашнему региону (патч 15)
-    dist = grid.chebyshev_distance(character.pos_x, character.pos_y)
-    encounter = encounters.spawn_mob(MOB_ID, character.region, character.level, dist, _rng)
+    if forced_encounter is not None:
+        encounter = forced_encounter
+    else:
+        # уровень моба клампится под игрока в диапазон зоны (world-patch-1);
+        # кольцо бестиария — по ТЕКУЩЕЙ клетке игрока, не по домашнему региону (патч 15)
+        dist = grid.chebyshev_distance(character.pos_x, character.pos_y)
+        encounter = encounters.spawn_mob(MOB_ID, character.region, character.level, dist, _rng)
     state = CombatSessionState(session_id=peer_id, mode=CombatMode.PVE)
     state.add(player)
     state.add(encounter.combatant)
@@ -197,6 +207,22 @@ async def start_encounter(
     )
 
 
+async def start_story_encounter(
+    peer_id: int, character, char_stats, gear_bonus, buff_modifiers,
+    quest_id: str, chain_remaining: int, encounter: encounters.Encounter,
+) -> None:
+    """Сюжетный бой (патч 18): named-враг (или рядовой преследователь на
+    промежуточном шаге цепочки — квест 2.2 «Свидетель») вместо случайного
+    спавна. on_battle_finished завершит квест (story_service.mark_ready)
+    при победе в ПОСЛЕДНЕМ бою цепочки (chain_remaining, отсчёт с этого боя,
+    доходит до 1); поражение просто сбрасывает цепочку — квест остаётся
+    активным, триггер можно вызвать заново."""
+    _story_encounter[peer_id] = (quest_id, chain_remaining)
+    await start_encounter(
+        peer_id, character, char_stats, gear_bonus, buff_modifiers, forced_encounter=encounter
+    )
+
+
 async def on_tick_resolved(session_id: int, tick: int, result: TickResult) -> None:
     state = _engine.sessions.get(session_id)
     if state is None:
@@ -221,6 +247,7 @@ async def on_battle_finished(session_id: int, result: TickResult) -> None:
     mob_level = _encounter_mob_level.pop(peer_id, 1)
     final_hp = _last_player_hp.pop(peer_id, None)
     tracker = _battle_trackers.pop(peer_id, None)
+    story_state = _story_encounter.pop(peer_id, None)  # (quest_id, остаток цепочки), патч 18
     battle_report = tracker.finalize(result.winner_side == 0) if tracker is not None else None
     sf = get_session_factory()
     async with sf() as db:
@@ -234,7 +261,8 @@ async def on_battle_finished(session_id: int, result: TickResult) -> None:
         stats = await db.scalar(
             select(CharacterStats).where(CharacterStats.character_id == character.id)
         )
-        vit_bonus = (await item_service.compute_gear_bonus(db, character.id)).get("vit", 0)
+        gear_bonus = await item_service.compute_gear_bonus(db, character.id)
+        vit_bonus = gear_bonus.get("vit", 0)
 
         if result.winner_side == 0:  # игрок выиграл — сохраняем остаток HP
             if final_hp is not None:
@@ -249,14 +277,35 @@ async def on_battle_finished(session_id: int, result: TickResult) -> None:
                 equipped = await item_service.get_equipped(db, character.id)
                 old_item = equipped[outcome.item_dropped.slot]
             farm_currency = (await wallet_service.get_wallet(db, character.id)).farm_currency
+            if story_state is not None and story_state[1] <= 1:
+                # последний бой цепочки (или обычный одиночный сюжетный бой) —
+                # цель достигнута, ждём разговора с наставником
+                await story_service.mark_ready(db, character, story_state[0])
             await db.commit()
             new_level = outcome.new_level
             levels = outcome.levels_gained
+            buff_modifiers = await preset_service.resolve_active_modifiers(db, character)
         else:  # моб выиграл или ничья — смерть игрока (авто-респавн по таймеру)
             defeat = await encounter_service.resolve_defeat(db, character)
             await db.commit()
             respawn_at = character.respawn_at
             xp_lost = defeat.xp_lost
+
+    if result.winner_side == 0 and story_state is not None and story_state[1] > 1:
+        # эскорт (патч 18, квест «Свидетель»): ещё не последний бой цепочки —
+        # короткое продолжение, СРАЗУ следующий бой, без сводки локации/итогов
+        quest_id, remaining = story_state
+        await _bot_api.messages.send(
+            peer_id=peer_id,
+            message="Один повержен — но погоня не отступает. Ещё один бросается наперерез.",
+            random_id=0,
+        )
+        dist = grid.chebyshev_distance(character.pos_x, character.pos_y)
+        next_encounter = encounters.spawn_mob(MOB_ID, character.region, character.level, dist, _rng)
+        await start_story_encounter(
+            peer_id, character, stats, gear_bonus, buff_modifiers, quest_id, remaining - 1, next_encounter,
+        )
+        return
 
     if result.winner_side == 0:
         # ux-patch-10 п.1: итоги боя — отдельное сообщение, сводка локации —

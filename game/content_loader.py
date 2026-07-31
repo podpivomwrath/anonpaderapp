@@ -287,6 +287,71 @@ def load_class_trials(content_dir: Path = CONTENT_DIR) -> list[ClassTrialDef]:
     ]
 
 
+class StoryNamedEnemyDef(BaseModel):
+    """Named-враг сюжетной сцены (патч 18) — обычный моб по формуле силы,
+    но с уникальным именем/флейвором и множителем к статам (не босс)."""
+
+    name: str
+    flavor: str = ""
+    stat_mult: float | None = None  # None → game.economy.story_config.NAMED_ENEMY_STAT_MULT_DEFAULT
+
+
+class StoryQuestDef(BaseModel):
+    """Шаг региональной сюжетной линии (content/story/<region>.json).
+
+    kind:
+      - "first_quest"   — существующий квест «убей 10» (services/quest_service.py),
+                          встроенный в сюжет как квест 1.1; transition_text
+                          добавляется к похвале наставника при завершении.
+      - "travel_combat" — зона-цель на карте (target_x/y + radius из конфига);
+                          по прибытии — arrival_text (+ бой с named_enemy, если
+                          задан); chain_length>1 — серия боёв подряд (патч 18,
+                          квест 2.2 «Свидетель»), без города между ними;
+                          return_text — при возврате к наставнику после победы.
+      - "city_scene"    — разрешается сразу в разговоре с наставником, без
+                          похода на карту (assign_text — цельная сцена).
+      - "subclass_gate" — сюжет ставится на паузу до выбора подкласса
+                          (патч 12); продолжается автоматически хуком в
+                          bot/handlers/list_keeper.py после выбора пути.
+    """
+
+    id: str
+    kind: str
+    title: str
+    assign_text: str = ""
+    target_x: int | None = None
+    target_y: int | None = None
+    target_label: str = ""
+    direction_hint: str = ""
+    arrival_text: str = ""
+    named_enemy: StoryNamedEnemyDef | None = None
+    chain_length: int = 1
+    return_text: str = ""
+    transition_text: str = ""
+    xp_reward: int = 0
+    gold_reward: int = 0
+
+
+class StoryActDef(BaseModel):
+    act: int
+    title: str
+    level_min: int
+    level_max: int
+    quests: list[StoryQuestDef]
+
+
+class StoryLineDef(BaseModel):
+    """Региональная сюжетная линия целиком (content/story/<region>.json)."""
+
+    region: str
+    acts: list[StoryActDef]
+
+
+def load_story_line(region: str, content_dir: Path = CONTENT_DIR) -> StoryLineDef:
+    raw = _load_json_dict(content_dir / "story" / f"{region}.json")
+    return StoryLineDef(**raw)
+
+
 class GameContent(BaseModel):
     mobs: dict[str, MobDef]
     items: dict[str, ItemDef]

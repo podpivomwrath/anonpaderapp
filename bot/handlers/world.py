@@ -22,7 +22,8 @@ from bot.onboarding_texts import REGION_TITLES
 from bot.world_summary import location_summary
 from bot.world_texts import event_attachment, hub_attachment, mentor_intro, mentor_praise
 from game.combat import display
-from game.world import events as event_pool
+from game.economy import story_config as sc
+from game.world import encounters, events as event_pool
 from game.world import flavor, grid
 from game.world import world_config as wc
 from game.world.scheduler import PeerScheduler
@@ -35,6 +36,7 @@ from services import (
     movement_service,
     preset_service,
     quest_service,
+    story_service,
     trial_service,
     trophy_service,
     vitals_service,
@@ -90,6 +92,37 @@ async def _check_still_dead(db, character, now: datetime) -> bool:
     return death_service.is_dead(character, now)
 
 
+async def _maybe_trigger_story(peer_id: int, db, character, stats) -> bool:
+    """Патч 18: игрок вошёл в радиус цели активного сюжетного шага — показать
+    сцену прибытия и начать сюжетный бой (если задан named_enemy) вместо
+    обычной сводки клетки. True — триггер сработал, вызывающий не должен
+    показывать обычную карту в этом ответе."""
+    quest = await story_service.check_zone_trigger(db, character)
+    if quest is None:
+        return False
+    if quest.arrival_text:
+        await _bot_api.messages.send(
+            peer_id=peer_id, message=story_service.format_text(quest.arrival_text, character), random_id=0
+        )
+    if quest.named_enemy is not None:
+        gear_bonus = await item_service.compute_gear_bonus(db, character.id)
+        buff_modifiers = await preset_service.resolve_active_modifiers(db, character)
+        mult = quest.named_enemy.stat_mult or sc.NAMED_ENEMY_STAT_MULT_DEFAULT
+        encounter = encounters.spawn_named_enemy(
+            combat_handlers.MOB_ID, quest.named_enemy.name, quest.named_enemy.flavor,
+            character.level, mult,
+        )
+        await combat_handlers.start_story_encounter(
+            peer_id, character, stats, gear_bonus, buff_modifiers,
+            quest.id, quest.chain_length, encounter,
+        )
+    else:
+        # сцена без боя — цель считается достигнутой сразу
+        await story_service.mark_ready(db, character, quest.id)
+        await db.commit()
+    return True
+
+
 async def show_location(message: Message, db, character) -> None:
     """Показывает текущий контекст персонажа: город / клетка карты / в пути / мёртв."""
     now = datetime.now(timezone.utc)
@@ -123,6 +156,9 @@ async def show_location(message: Message, db, character) -> None:
         return
 
     stats = await _get_stats(db, character.id)
+    if await _maybe_trigger_story(message.peer_id, db, character, stats):
+        return
+
     farm_currency = (await wallet_service.get_wallet(db, character.id)).farm_currency
     gear_bonus = await item_service.compute_gear_bonus(db, character.id)
     await message.answer(
@@ -432,6 +468,8 @@ async def handle_arrival(peer_id: int) -> None:
             )
             return
         stats = await _get_stats(db, character.id)
+        if await _maybe_trigger_story(peer_id, db, character, stats):
+            return
         farm_currency = (await wallet_service.get_wallet(db, character.id)).farm_currency
         await _bot_api.messages.send(
             peer_id=peer_id,
@@ -468,12 +506,17 @@ async def talk_to_mentor(message: Message) -> None:
 
         if progress.status == "ready":
             result = await quest_service.turn_in(db, character)
+            # патч 18: квест 1.1 — начало сюжета; продвигаем указатель за него
+            # и добавляем текст-переход (Сера бросает флягу и т.д.)
+            transition_text = await story_service.advance_after_first_quest(db, character)
             await db.commit()
             text = mentor_praise(region)
             if result is not None and result.xp_reward > 0:
                 text += "\n\n" + flavor.quest_reward_line(result.xp_reward)
                 if result.levels_gained > 0:
                     text += "\n" + flavor.levelup_line(result.new_level, _rng)
+            if transition_text:
+                text += "\n\n" + transition_text
             await message.answer(text)
             # патч 14, ч.2.3: квест — тоже источник опыта, левелап не должен теряться
             if result is not None:
@@ -481,7 +524,18 @@ async def talk_to_mentor(message: Message) -> None:
             return
 
         if progress.status == "completed":
-            await message.answer("— У меня для тебя пока больше ничего нет. Возвращайся позже.")
+            # патч 18: квест 1.1 закрыт — дальше сюжет ведёт story_service
+            stats = await _get_stats(db, character.id)
+            story_result = await story_service.visit_mentor(db, character, stats)
+            await db.commit()
+            if story_result is None:
+                await message.answer("— У меня для тебя пока больше ничего нет. Возвращайся позже.")
+                return
+            await message.answer(story_result.text)
+            if story_result.levels_gained > 0:
+                await stats_window.notify_levelup(
+                    message.peer_id, story_result.levels_gained, story_result.new_level
+                )
             return
 
         # активен, но ещё не выполнен
@@ -494,3 +548,14 @@ async def talk_to_mentor(message: Message) -> None:
 @labeler.message(text=[kb.BTN_MARKET])
 async def visit_market(message: Message) -> None:
     await message.answer("Торговцы раскладывают товар. Скоро здесь можно будет торговать.")
+
+
+@labeler.message(text=["/квест", "/quest"])
+async def quest_reminder(message: Message) -> None:
+    """Патч 18: напоминание текущей сюжетной цели."""
+    async with get_session_factory()() as db:
+        character = await onboarding_svc.get_character(db, message.from_id)
+        if character is None or character.creation_state is not None:
+            return
+        text = await story_service.quest_reminder_text(db, character)
+    await message.answer(text)

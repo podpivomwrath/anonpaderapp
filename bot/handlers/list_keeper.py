@@ -7,6 +7,7 @@ CONFIRM-подшаг при восстановлении откатываетс�
 в памяти диспенсера).
 """
 
+from sqlalchemy import select
 from vkbottle import BaseMiddleware, BaseStateGroup
 from vkbottle.bot import BotLabeler, Message
 
@@ -27,8 +28,9 @@ from game.classes.base import REGISTRY
 from game.combat import balance_config as bc
 from game.combat import display
 from game.content_loader import load_npc_texts
+from models import CharacterStats
 from services import onboarding_service as onboarding_svc
-from services import subclass_service, trial_service, wallet_service
+from services import story_service, subclass_service, trial_service, wallet_service
 from services.db import get_session_factory
 from services.wallet_service import NotEnoughCurrency
 
@@ -236,11 +238,19 @@ async def path_confirm(message: Message) -> None:
             return
         subclass_service.apply_subclass(character, subclass_id)
         await _set_select_state(db, character, None)
+        # патч 18: если сюжет стоял на паузе на subclass_gate-квесте — продвигаем
+        stats = await db.scalar(
+            select(CharacterStats).where(CharacterStats.character_id == character.id)
+        )
+        story_reward_text = await story_service.advance_past_subclass_gate(db, character, stats)
         await db.commit()
         title = next(s.title for s in REGISTRY.values() if s.id == subclass_id)
 
     await _dispenser.delete(peer_id)
-    await message.answer(KEEPER["confirmed"].format(subclass=title))
+    text = KEEPER["confirmed"].format(subclass=title)
+    if story_reward_text:
+        text += f"\n\n{story_reward_text}"
+    await message.answer(text)
     await _send_trials(peer_id, character)
 
 

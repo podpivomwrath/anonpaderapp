@@ -76,3 +76,24 @@ def spawn_mob(
         primary_stat="str",
     )
     return Encounter(combatant=combatant, flavor=mob.flavor)
+
+
+def spawn_named_enemy(
+    participant_id: int, name: str, flavor: str, level: int, stat_mult: float
+) -> Encounter:
+    """Именной сюжетный враг (патч 18) — та же balanced_mob_stats, что и у
+    обычного моба, но с уникальным именем/флейвором и множителем к статам
+    (НЕ босс — просто усилен, см. game/economy/story_config.py)."""
+    base = balanced_mob_stats(level)
+    scaled = Stats(
+        strength=round(base.strength * stat_mult),
+        agility=round(base.agility * stat_mult),
+        intellect=round(base.intellect * stat_mult),
+        vitality=round(base.vitality * stat_mult),
+        will=round(base.will * stat_mult),
+    )
+    combatant = build_combatant(
+        id=participant_id, side=1, kind="mob", name=name, level=level,
+        stats=scaled, primary_stat="str",
+    )
+    return Encounter(combatant=combatant, flavor=flavor)
