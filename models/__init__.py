@@ -8,6 +8,7 @@ from models.consumable import CharacterConsumable
 from models.economy import ExchangeOrder, PvpStakeTransfer, Wallet
 from models.enums import BaseClass, CombatStatus, CombatType, OrderDirection, QuestStatus, Region
 from models.item import Inventory, Item, ItemUpgradeHistory
+from models.pvp import PvpBattle
 from models.quest import CharacterQuest, Quest
 from models.story import CharacterStoryProgress
 from models.subclass_trial import CharacterTrialProgress, CharacterUnlockedBuff
@@ -35,6 +36,7 @@ __all__ = [
     "Item",
     "ItemUpgradeHistory",
     "OrderDirection",
+    "PvpBattle",
     "PvpStakeTransfer",
     "Quest",
     "QuestStatus",

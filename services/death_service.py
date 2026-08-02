@@ -21,6 +21,13 @@ def apply_death(character: Character, now: datetime | None = None) -> int:
     return penalty
 
 
+def apply_pvp_death(character: Character, now: datetime | None = None) -> None:
+    """Поражение в открытом PvP (патч 22): таймер респавна как при обычной
+    смерти, но БЕЗ штрафа опыта — цена поражения уже уплачена трофеями."""
+    now = now or datetime.now(timezone.utc)
+    character.respawn_at = now + timedelta(minutes=respawn_time_minutes(character.level))
+
+
 def is_dead(character: Character, now: datetime | None = None) -> bool:
     """Персонаж мёртв, пока не наступил respawn_at."""
     if character.respawn_at is None:

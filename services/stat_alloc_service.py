@@ -49,12 +49,22 @@ def render_window(header: str, unspent: int, char_stats: dict[str, int], pending
     return "\n".join(lines)
 
 
-def render_readonly(header: str, char_stats: dict[str, int]) -> str:
-    """unspent_points = 0 — только текущие статы, без кнопок вложения."""
+def render_readonly(
+    header: str, char_stats: dict[str, int],
+    pvp_wins: int | None = None, pvp_losses: int | None = None,
+) -> str:
+    """unspent_points = 0 — только текущие статы, без кнопок вложения.
+
+    pvp_wins/pvp_losses (патч 22) — добавляет строку "⚔️ PvP: N побед · M
+    поражений" под статами, если переданы (None — не показывать вовсе,
+    для вызовов, где профиль ни при чём)."""
     lines = [header, ""]
     for key in STAT_ORDER:
         emoji, name = STAT_META[key]
         lines.append(f"{emoji} {name}: {char_stats[key]}")
+    if pvp_wins is not None and pvp_losses is not None:
+        lines.append("")
+        lines.append(f"⚔️ PvP: {pvp_wins} побед · {pvp_losses} поражений")
     return "\n".join(lines)
 
 

@@ -556,6 +556,20 @@ async def use_combat_item(message: Message) -> None:
     )
 
 
+async def interrupt_for_pvp(peer_id: int) -> None:
+    """Прерывает активный PvE-бой без наград/штрафа — жертву атаковали в
+    открытом PvP (патч 22, п.3). HP на момент прерывания сохраняется в БД
+    (тем же путём, что и обычный побег)."""
+    if not has_active_encounter(peer_id):
+        return
+    hp = _engine.sessions[peer_id].combatants[PLAYER_ID].current_hp
+    _engine.abort_session(peer_id)
+    _encounter_class.pop(peer_id, None)
+    _last_player_hp.pop(peer_id, None)
+    _battle_trackers.pop(peer_id, None)
+    await _persist_hp(peer_id, hp)
+
+
 @labeler.message(text=[BTN_FLEE])
 async def flee(message: Message) -> None:
     peer_id = message.peer_id

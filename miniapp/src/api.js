@@ -69,3 +69,7 @@ export function switchPreset(presetId) {
 export function buyPresetSlot() {
   return request('/presets/buy_slot', { method: 'POST' });
 }
+
+export function getPvpLeaderboard() {
+  return request('/pvp_leaderboard');
+}

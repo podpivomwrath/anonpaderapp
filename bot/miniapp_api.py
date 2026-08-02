@@ -15,7 +15,7 @@ from bot.miniapp_auth import VK_USER_ID_KEY
 from bot.onboarding_texts import REGION_TITLES
 from game.content_loader import load_content
 from models import BaseClass, Character, CharacterBuffPreset, User
-from services import derived_stats_service, item_service, preset_service, trial_service
+from services import derived_stats_service, item_service, preset_service, pvp_service, trial_service
 from services.preset_service import PresetValidationError
 from services.wallet_service import NotEnoughCurrency
 
@@ -154,6 +154,27 @@ async def handle_get_trials(request: web.Request) -> web.Response:
                     }
                     for s in states
                 ],
+            }
+        )
+
+
+async def handle_get_pvp_leaderboard(request: web.Request) -> web.Response:
+    """Патч 22: топ-10 по PvP-победам + место игрока, если он вне десятки."""
+    vk_user_id = request[VK_USER_ID_KEY]
+    session_factory = request.app[SESSION_FACTORY_KEY]
+    async with session_factory() as session:
+        character = await _load_character(session, vk_user_id)
+        if character is None:
+            return web.json_response({"error": "character_not_found"}, status=404)
+        entries = await pvp_service.leaderboard(session, limit=10)
+        rank = await pvp_service.rank_of(session, character)
+        return web.json_response(
+            {
+                "top": [
+                    {"rank": e.rank, "name": e.name, "wins": e.wins, "losses": e.losses}
+                    for e in entries
+                ],
+                "you": {"rank": rank, "wins": character.pvp_wins, "losses": character.pvp_losses},
             }
         )
 
@@ -353,3 +374,4 @@ def register_routes(app: web.Application) -> None:
     app.router.add_post("/api/miniapp/presets", handle_post_presets)
     app.router.add_post("/api/miniapp/presets/switch", handle_post_preset_switch)
     app.router.add_post("/api/miniapp/presets/buy_slot", handle_post_preset_buy_slot)
+    app.router.add_get("/api/miniapp/pvp_leaderboard", handle_get_pvp_leaderboard)

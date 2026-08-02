@@ -78,7 +78,9 @@ async def open_or_update_window(peer_id: int, header: str) -> None:
     if unspent <= 0:
         _clear(peer_id)
         await _bot_api.messages.send(
-            peer_id=peer_id, message=sas.render_readonly(header, char_stats), random_id=0
+            peer_id=peer_id,
+            message=sas.render_readonly(header, char_stats, character.pvp_wins, character.pvp_losses),
+            random_id=0,
         )
         return
 
@@ -141,7 +143,8 @@ async def stat_alloc_cancel(message: Message) -> None:
     header = _window_header.get(peer_id, "📊 Характеристики")
     if unspent <= 0:
         _clear(peer_id)
-        await _send_or_edit(peer_id, sas.render_readonly(header, char_stats), no_keyboard())
+        text = sas.render_readonly(header, char_stats, character.pvp_wins, character.pvp_losses)
+        await _send_or_edit(peer_id, text, no_keyboard())
         return
     text = sas.render_window(header, unspent, char_stats, {})
     await _send_or_edit(peer_id, text, stats_alloc_keyboard())
@@ -160,8 +163,10 @@ async def stat_alloc_done(message: Message) -> None:
                 return
             stats = await _get_stats(db, character.id)
             char_stats = sas.snapshot(stats)
+            pvp_wins, pvp_losses = character.pvp_wins, character.pvp_losses
         _clear(peer_id)
-        await _send_or_edit(peer_id, sas.render_readonly(header, char_stats), no_keyboard())
+        text = sas.render_readonly(header, char_stats, pvp_wins, pvp_losses)
+        await _send_or_edit(peer_id, text, no_keyboard())
         return
 
     async with get_session_factory()() as db:

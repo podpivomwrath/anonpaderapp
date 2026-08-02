@@ -16,6 +16,7 @@ from sqlalchemy import select
 
 from bot.keyboards import world as kb
 from bot.onboarding_texts import REGION_TITLES
+from bot.pvp_texts import PVP_RESPAWN_LORE
 from bot.vk_media import photo_attachment
 from game.world import flavor
 from game.world import world_config as wc
@@ -27,6 +28,14 @@ _bot_api = None
 _live_countdown = True
 # peer_id -> conversation_message_id сообщения о смерти (для edit-отсчёта)
 _death_message: dict[int, int] = {}
+# peer_id -> ждёт PvP-лорную фразу возрождения вместо обычной (патч 22) —
+# PvP-поражение не показывает счётчик смерти в реальном времени, само
+# сообщение о поражении шлёт bot/handlers/pvp.py, а не register_death.
+_pvp_death_pending: set[int] = set()
+
+
+def register_pvp_death(peer_id: int) -> None:
+    _pvp_death_pending.add(peer_id)
 
 DEATH_PHOTO_ID = "457239032"  # иллюстрация смерти игрока (альбом группы VK)
 
@@ -95,9 +104,14 @@ async def scan() -> None:
 
     for peer_id, region in to_revive:
         _death_message.pop(peer_id, None)
+        if peer_id in _pvp_death_pending:
+            _pvp_death_pending.discard(peer_id)
+            text = PVP_RESPAWN_LORE.format(city=REGION_TITLES[region])
+        else:
+            text = flavor.respawn_line(REGION_TITLES[region])
         await _bot_api.messages.send(
             peer_id=peer_id,
-            message=flavor.respawn_line(REGION_TITLES[region]),
+            message=text,
             random_id=0,
             keyboard=kb.city_menu_keyboard(),
         )

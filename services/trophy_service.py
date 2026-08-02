@@ -113,6 +113,60 @@ async def sell_one(db: AsyncSession, character: Character, trophy_id: str) -> in
     return total
 
 
+async def transfer_all(db: AsyncSession, loser_id: int, winner_id: int) -> dict[str, int]:
+    """Переносит ВЕСЬ стек трофеев проигравшего победителю (дуэль, патч 22).
+    Возвращает перенесённый набор {trophy_id: count} для сообщения."""
+    stock = await get_stock(db, loser_id)
+    moved = {d.id: count for d, count in stock}
+    for trophy_id, count in moved.items():
+        row = await _get_row(db, loser_id, trophy_id)
+        row.count = 0
+        await _add(db, winner_id, trophy_id, count)
+    if moved:
+        await db.flush()
+    return moved
+
+
+async def split_among(
+    db: AsyncSession, victim_id: int, shares: dict[int, float]
+) -> dict[int, dict[str, int]]:
+    """Делит весь стек трофеев жертвы между несколькими персонажами
+    пропорционально shares (нанесённый урон — необязательно нормированные к 1
+    доли, нормализуются здесь). Остаток от округления — тому, у кого доля
+    больше (топ-дамагер). Патч 22, массовый бой.
+
+    Пустой shares (никто из выживших не бил жертву напрямую) — трофеи
+    остаются у жертвы, переноса нет. Возвращает {character_id: {trophy_id:
+    count}} для сообщений — только непустые доли."""
+    if not shares:
+        return {}
+    total_share = sum(shares.values())
+    if total_share <= 0:
+        return {}
+    stock = await get_stock(db, victim_id)
+    if not stock:
+        return {}
+    top_id = max(shares, key=lambda cid: shares[cid])
+    result: dict[int, dict[str, int]] = {}
+    for trophy_def, count in stock:
+        allocated: dict[int, int] = {}
+        remaining = count
+        for cid, share in shares.items():
+            portion = int(count * share / total_share)
+            allocated[cid] = portion
+            remaining -= portion
+        allocated[top_id] += remaining  # остаток округления — топ-дамагеру
+        row = await _get_row(db, victim_id, trophy_def.id)
+        row.count = 0
+        for cid, amount in allocated.items():
+            if amount <= 0:
+                continue
+            await _add(db, cid, trophy_def.id, amount)
+            result.setdefault(cid, {})[trophy_def.id] = amount
+    await db.flush()
+    return result
+
+
 def format_drop_line(drop: dict[str, int]) -> str | None:
     """'С твари осыпается: 🟣 Кровяной осколок, ⚪ Пепельная крошка ×2.'
 

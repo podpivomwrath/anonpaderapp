@@ -36,6 +36,10 @@ class Character(Base):
     # до 5 — остальные покупаются за золото (game.combat.balance_config.PRESET_SLOT_COSTS)
     preset_slots: Mapped[int] = mapped_column(default=1)
 
+    # PvP-статистика (патч 22) — победы/поражения в открытом PvP на карте
+    pvp_wins: Mapped[int] = mapped_column(default=0)
+    pvp_losses: Mapped[int] = mapped_column(default=0)
+
     # Позиция на карте (сетка -50..50); NULL до завершения онбординга
     pos_x: Mapped[int | None] = mapped_column(nullable=True)
     pos_y: Mapped[int | None] = mapped_column(nullable=True)
@@ -90,5 +94,7 @@ class CharacterBuffPreset(Base):
 
 # Никнейм уникален без учёта регистра ("Vasya" и "vasya" — конфликт)
 Index("uq_characters_name_lower", func.lower(Character.name), unique=True)
+# Патч 22: быстрая выборка топа PvP (ORDER BY pvp_wins DESC)
+Index("ix_characters_pvp_wins", Character.pvp_wins.desc())
 
 from models.user import User  # noqa: E402

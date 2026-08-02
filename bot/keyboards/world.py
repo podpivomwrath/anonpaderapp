@@ -44,6 +44,7 @@ BTN_DOWN = "⬇️"
 BTN_LEFT = "⬅️"
 BTN_RIGHT = "➡️"
 BTN_EXPLORE = "🔍 Исследовать"
+BTN_LOOK_AROUND = "👁 Осмотреться"  # патч 22: кто ещё на клетке
 
 BTN_ATTACK = "🗡️ Атака"
 BTN_ITEM = "🎒 Предмет"
@@ -154,6 +155,8 @@ def movement_keyboard(pos_x: int, pos_y: int) -> str:
         kb.row()
     kb.add(Text(BTN_EXPLORE), color=KeyboardButtonColor.POSITIVE)
     kb.add(Text(BTN_REST), color=KeyboardButtonColor.SECONDARY)
+    kb.row()
+    kb.add(Text(BTN_LOOK_AROUND), color=KeyboardButtonColor.SECONDARY)
     add_miniapp_button(kb)
     return kb.get_json()
 

@@ -72,6 +72,14 @@ async def get_character(db: AsyncSession, vk_id: int) -> Character | None:
     )
 
 
+async def vk_id_for_character(db: AsyncSession, character_id: int) -> int | None:
+    """Обратный поиск (патч 22: сообщения PvP жертве/присоединившимся по их
+    ЛС, не только инициатору) — vk_id владельца персонажа по character.id."""
+    return await db.scalar(
+        select(User.vk_id).join(Character, Character.user_id == User.id).where(Character.id == character_id)
+    )
+
+
 async def begin_creation(db: AsyncSession, user: User) -> Character:
     """Создаёт заготовку персонажа.
 

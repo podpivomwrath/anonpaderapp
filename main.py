@@ -16,13 +16,14 @@ from bot.handlers import combat as combat_handlers
 from bot.handlers import elixir_shop as elixir_shop_handlers
 from bot.handlers import inventory as inventory_handlers
 from bot.handlers import presets as presets_handlers
+from bot.handlers import pvp as pvp_handlers
 from bot.handlers import respawn as respawn_handlers
 from bot.handlers import stats_window as stats_window_handlers
 from bot.handlers import world as world_handlers
 from bot.webhook import WEBHOOK_PATH, create_app
 from config import Settings, get_settings
 from game.combat.duel_engine import DuelEngine
-from game.combat.tick_engine import RedisActionStore, TickEngine
+from game.combat.tick_engine import InMemoryActionStore, RedisActionStore, TickEngine
 from game.world.scheduler import PeerScheduler
 from services.db import dispose_engine
 
@@ -77,8 +78,25 @@ async def run() -> None:
     presets_handlers.setup(bot.api)
     elixir_shop_handlers.setup(bot.api)
 
-    duel_engine = DuelEngine()
+    # Открытое PvP (патч 22): дуэль (последовательные ходы) + массовый бой
+    # (одновременный резолв) — ОТДЕЛЬНЫЕ движки от PvE tick_engine выше:
+    # там PLAYER_ID=1/MOB_ID=2 фиксированы под одного игрока и одного моба,
+    # здесь комбатанты — реальные character.id, участников может быть много.
+    # Реестр боёв (bot/handlers/pvp.py) целиком в памяти — как и у duel_engine,
+    # поэтому массовому PvP тоже достаточно InMemoryActionStore, без Redis.
+    duel_engine = DuelEngine(
+        on_turn_resolved=pvp_handlers.on_duel_turn_resolved,
+        on_duel_finished=pvp_handlers.on_duel_finished,
+    )
     duel_engine.start()
+
+    pvp_tick_engine = TickEngine(
+        InMemoryActionStore(),
+        on_tick_resolved=pvp_handlers.on_mass_tick_resolved,
+        on_battle_finished=pvp_handlers.on_mass_battle_finished,
+    )
+    pvp_tick_engine.start()
+    pvp_handlers.setup(duel_engine, pvp_tick_engine, bot.api)
 
     travel_scheduler = PeerScheduler(world_handlers.handle_arrival, job_prefix="travel")
     travel_scheduler.start()
@@ -119,6 +137,7 @@ async def run() -> None:
         explore_scheduler.shutdown()
         travel_scheduler.shutdown()
         duel_engine.shutdown()
+        pvp_tick_engine.shutdown()
         tick_engine.shutdown()
         await runner.cleanup()
         await redis.aclose()
