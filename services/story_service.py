@@ -18,18 +18,34 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from game.combat import display
-from game.content_loader import StoryActDef, StoryLineDef, StoryQuestDef, load_story_line
+from game.content_loader import StoryLineDef, StoryQuestDef, load_story_line
 from game.economy import story_config as sc
 from game.world import grid
 from models import Character, CharacterStats, CharacterStoryProgress
-from services import experience_service, wallet_service
+from services import experience_service, quest_service, wallet_service
 
 _lines: dict[str, StoryLineDef] = {}
 
-LEVEL_GATE_TEXT = (
-    "— Рано, — коротко бросает наставник, окинув тебя взглядом. "
-    "— Окрепни. Возвращайся, когда время придёт."
+FALLBACK_NO_QUESTS_TEXT = (
+    "📜 Никто не ждёт от тебя ничего. Пепельные Земли не дают поручений — "
+    "здесь каждый идёт своей дорогой."
 )
+
+_DIR_WORDS = {
+    (1, 0): "восток", (-1, 0): "запад", (0, 1): "север", (0, -1): "юг",
+    (1, 1): "северо-восток", (-1, 1): "северо-запад",
+    (1, -1): "юго-восток", (-1, -1): "юго-запад",
+}
+
+
+def compass_direction(px: int, py: int, tx: int, ty: int) -> str:
+    """Направление словом от (px;py) к (tx;ty) — патч 21, пп. 4-5."""
+    dx, dy = tx - px, ty - py
+    if dx == 0 and dy == 0:
+        return "ты уже на месте"
+    sx = (dx > 0) - (dx < 0)
+    sy = (dy > 0) - (dy < 0)
+    return f"на {_DIR_WORDS[(sx, sy)]}"
 
 
 def get_line(region: str) -> StoryLineDef:
@@ -51,10 +67,6 @@ def _find(line: StoryLineDef, quest_id: str) -> tuple[int, StoryQuestDef] | None
     return None
 
 
-def _act_def(line: StoryLineDef, act_no: int) -> StoryActDef:
-    return next(a for a in line.acts if a.act == act_no)
-
-
 def _next(line: StoryLineDef, quest_id: str) -> tuple[int, StoryQuestDef] | None:
     flat = _flatten(line)
     for idx, (_, quest) in enumerate(flat):
@@ -73,9 +85,10 @@ def format_text(text: str, character: Character) -> str:
 def _format_assign(quest: StoryQuestDef, character: Character) -> str:
     text = format_text(quest.assign_text, character)
     if quest.target_x is not None and quest.target_y is not None:
-        text += f"\n\n📍 Ориентир: ({quest.target_x};{quest.target_y}) — {quest.target_label}"
-        if quest.direction_hint:
-            text += f"\n➡️ {quest.direction_hint}"
+        direction = compass_direction(character.pos_x, character.pos_y, quest.target_x, quest.target_y)
+        text += (
+            f"\n\n📍 Ориентир: ({quest.target_x};{quest.target_y}) — {quest.target_label} · {direction}"
+        )
     return text
 
 
@@ -115,6 +128,7 @@ async def _advance_pointer(
         row.act = act_no
         row.quest_step = quest.id
         row.status = "active"
+        row.quest_seen = False  # патч 21: новый шаг ещё не показан — пометка/пинг
     await db.flush()
 
 
@@ -184,16 +198,14 @@ async def visit_mentor(
     found = _find(line, row.quest_step)
     if found is None:
         return None
-    act_no, quest = found
+    _, quest = found
     if quest.kind == "first_quest":
         return None
 
-    act = _act_def(line, act_no)
-    if row.status == "active" and character.level < act.level_min:
-        return StoryTurnResult(text=LEVEL_GATE_TEXT)
-
     if quest.kind == "subclass_gate":
         if character.subclass is None:
+            row.quest_seen = True
+            await db.flush()
             return StoryTurnResult(text=format_text(quest.assign_text, character))
         # Подкласс уже выбран, но хук в list_keeper почему-то не продвинул
         # (гонка/рестарт бота между шагами) — подстраховка, продвигаем здесь.
@@ -216,6 +228,8 @@ async def visit_mentor(
             ret = format_text(quest.return_text, character)
             text = f"{ret}\n\n{reward_text}" if reward_text else ret
             return StoryTurnResult(text, levelup.levels_gained, levelup.new_level, row.completed)
+        row.quest_seen = True
+        await db.flush()
         return StoryTurnResult(text=_format_assign(quest, character))
 
     return None
@@ -249,6 +263,7 @@ async def mark_ready(db: AsyncSession, character: Character, quest_id: str) -> N
     if row is None or row.quest_step != quest_id:
         return  # устарело (уже продвинуто иначе) — молча игнорируем
     row.status = "ready"
+    row.quest_seen = False  # патч 21: сдача требует нового визита — пометка/пинг снова
     await db.flush()
 
 
@@ -272,28 +287,62 @@ async def advance_past_subclass_gate(
     return reward_text  # текст сцены уже был показан игроку раньше (assign_text)
 
 
-async def quest_reminder_text(db: AsyncSession, character: Character) -> str:
-    """Текст для команды /квест — напоминание текущей сюжетной цели."""
-    row = await _get_progress(db, character.id, character.region)
-    if row is None or row.quest_step is None:
-        if row is not None and row.completed:
-            return "Сюжетная линия региона пройдена — жди новых вестей."
-        return "Сюжетный квест ещё не начат — поговори с наставником в городе."
-    if row.completed:
-        return "Сюжетная линия региона пройдена — жди новых вестей."
-    line = get_line(character.region)
-    found = _find(line, row.quest_step)
-    if found is None:
-        return "Сюжетный квест ещё не начат — поговори с наставником в городе."
-    _, quest = found
+async def mentor_badge_active(db: AsyncSession, character: Character) -> bool:
+    """Пометка [🧙 Наставник ❗] (патч 21) — есть что взять или что сдать."""
+    quest = await current_quest_def(db, character)
+    if quest is None:
+        return False  # линия региона пройдена целиком
     if quest.kind == "first_quest":
-        return "Текущая цель — экзамен наставника. Загляни к нему за подробностями."
-    if quest.kind == "subclass_gate":
-        return f"{quest.title}: путь Раскола открыт — поговори с Хранителем Списков."
-    if quest.kind == "city_scene":
-        return f"{quest.title}: наставник ждёт разговора."
+        peek = await quest_service.peek_progress(db, character)
+        if peek is None:
+            return False
+        return peek.status is None or peek.status == "ready"
+    row = await get_progress(db, character)
     if quest.kind == "travel_combat":
+        return row.status == "ready" or not row.quest_seen
+    return not row.quest_seen  # city_scene / subclass_gate
+
+
+async def quest_summary_line(db: AsyncSession, character: Character) -> str | None:
+    """Строка активного сюжетного квеста для сводки локации (патч 21, п.4):
+    '📜 [Название] → (x;y) · направление' / '📜 [Название] → вернуться в город'.
+    None — показывать нечего (первый квест — легаси, не отображается тут;
+    либо линия региона пройдена целиком)."""
+    quest = await current_quest_def(db, character)
+    if quest is None or quest.kind == "first_quest":
+        return None
+    if quest.kind == "travel_combat":
+        row = await get_progress(db, character)
         if row.status == "ready":
-            return f"{quest.title}: цель достигнута — возвращайся к наставнику."
+            return f"📜 {quest.title} → вернуться к наставнику"
+        direction = compass_direction(character.pos_x, character.pos_y, quest.target_x, quest.target_y)
+        return f"📜 {quest.title} → ({quest.target_x}; {quest.target_y}) · {direction}"
+    return f"📜 {quest.title} → вернуться в город"
+
+
+async def quest_reminder_text(db: AsyncSession, character: Character, mentor_name: str) -> str:
+    """Текст команды /квест (патч 21, п.5)."""
+    quest = await current_quest_def(db, character)
+    if quest is None:
+        return FALLBACK_NO_QUESTS_TEXT
+
+    if quest.kind == "first_quest":
+        peek = await quest_service.peek_progress(db, character)
+        if peek is None or peek.status is None:
+            return f"У тебя нет активного задания. {mentor_name} ждёт тебя в городе."
+        if peek.status == "ready":
+            return f"📜 {peek.title}: цель достигнута — возвращайся к {mentor_name}."
+        return f"📜 {peek.title}: {peek.progress_label} {peek.progress}/{peek.target_count}."
+
+    if quest.kind == "travel_combat":
+        row = await get_progress(db, character)
+        if row.status == "ready":
+            return f"📜 {quest.title}: цель достигнута — возвращайся к {mentor_name}."
         return _format_assign(quest, character)
-    return quest.title
+
+    if quest.kind == "subclass_gate":
+        if character.subclass is None:
+            return format_text(quest.assign_text, character)
+        return f"У тебя нет активного задания. {mentor_name} ждёт тебя в городе."
+
+    return format_text(quest.assign_text, character)  # city_scene

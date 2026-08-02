@@ -34,13 +34,18 @@ def xp_bar(level: int, experience: int) -> str:
 
 
 def location_summary(
-    character, stats, rng: random.Random, farm_currency: int, vit_bonus: int = 0
+    character, stats, rng: random.Random, farm_currency: int, vit_bonus: int = 0,
+    quest_line: str | None = None,
 ) -> str:
     """Сводка клетки: координаты/тип локации/зона, вариативное описание, HP,
-    уровень, шкала опыта, золото (патч 9 блок 3, патч 10 блоки 2/4).
+    уровень, шкала опыта, золото (патч 9 блок 3, патч 10 блоки 2/4), активный
+    сюжетный квест (патч 21, п.4).
 
     vit_bonus (патч 11, блок 2) — VIT надетой экипировки, чтобы HP-бар совпадал
-    с максимумом, который реально используется в бою."""
+    с максимумом, который реально используется в бою.
+    quest_line (патч 21) — готовая строка "📜 ..." (services.story_service.
+    quest_summary_line) или None, если активного сюжетного квеста нет —
+    тогда строка не показывается вовсе."""
     x, y = character.pos_x, character.pos_y
     loc_type = location_types.location_type_at(x, y)
     lo, hi = grid.zone_level_range(grid.chebyshev_distance(x, y))
@@ -49,6 +54,7 @@ def location_summary(
     max_hp = vitals_service.max_hp(character, stats, vit_bonus)
     current_hp = vitals_service.current_hp(character, stats, vit_bonus)
     hp_line = f"❤️ Здоровье: {display.health_bar(current_hp, max_hp)}"
+    quest_block = f"{quest_line}\n" if quest_line else ""
     return (
         f"{zone_line}\n{description}\n\n"
         f"{_SEP}\n"
@@ -56,5 +62,6 @@ def location_summary(
         f"⚔️ Уровень: {character.level}\n"
         f"{xp_bar(character.level, character.experience)}\n"
         f"💰 Золото: {farm_currency}\n"
+        f"{quest_block}"
         f"{_SEP}"
     )

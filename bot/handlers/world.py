@@ -20,7 +20,7 @@ from bot.handlers import stats_window
 from bot.keyboards import world as kb
 from bot.onboarding_texts import REGION_TITLES
 from bot.world_summary import location_summary
-from bot.world_texts import event_attachment, hub_attachment, mentor_intro, mentor_praise
+from bot.world_texts import event_attachment, hub_attachment, mentor_intro, mentor_name, mentor_praise
 from game.combat import display
 from game.economy import story_config as sc
 from game.world import encounters, events as event_pool
@@ -79,10 +79,13 @@ async def _get_stats(db, character_id: int) -> CharacterStats:
     return await db.scalar(select(CharacterStats).where(CharacterStats.character_id == character_id))
 
 
-def _map_text(character, stats, farm_currency: int, gear_bonus: dict | None = None) -> str:
+def _map_text(
+    character, stats, farm_currency: int, gear_bonus: dict | None = None,
+    quest_line: str | None = None,
+) -> str:
     """Единая сводка клетки — ВСЕГДА самостоятельное сообщение (ux-patch-10)."""
     vit_bonus = (gear_bonus or {}).get("vit", 0)
-    return location_summary(character, stats, _rng, farm_currency, vit_bonus)
+    return location_summary(character, stats, _rng, farm_currency, vit_bonus, quest_line)
 
 
 async def _check_still_dead(db, character, now: datetime) -> bool:
@@ -120,6 +123,12 @@ async def _maybe_trigger_story(peer_id: int, db, character, stats) -> bool:
         # сцена без боя — цель считается достигнутой сразу
         await story_service.mark_ready(db, character, quest.id)
         await db.commit()
+        # патч 21, п.1: игрок не в разговоре с наставником — пингуем сами
+        await _bot_api.messages.send(
+            peer_id=peer_id,
+            message=f"📜 {mentor_name(character.region)} ждёт тебя в городе.",
+            random_id=0,
+        )
     return True
 
 
@@ -148,10 +157,11 @@ async def show_location(message: Message, db, character) -> None:
 
     region = grid.city_region_at(character.pos_x, character.pos_y)
     if region is not None:
+        mentor_badge = region == character.region and await story_service.mentor_badge_active(db, character)
         await message.answer(
             f"Ты в городе: {REGION_TITLES[region]}",
             attachment=hub_attachment(region),
-            keyboard=kb.city_menu_keyboard(character),
+            keyboard=kb.city_menu_keyboard(character, mentor_badge),
         )
         return
 
@@ -161,8 +171,9 @@ async def show_location(message: Message, db, character) -> None:
 
     farm_currency = (await wallet_service.get_wallet(db, character.id)).farm_currency
     gear_bonus = await item_service.compute_gear_bonus(db, character.id)
+    quest_line = await story_service.quest_summary_line(db, character)
     await message.answer(
-        _map_text(character, stats, farm_currency, gear_bonus),
+        _map_text(character, stats, farm_currency, gear_bonus, quest_line),
         keyboard=kb.movement_keyboard(character.pos_x, character.pos_y),
     )
 
@@ -211,11 +222,12 @@ async def gate_exit_direction(message: Message) -> None:
         stats = await _get_stats(db, character.id)
         farm_currency = (await wallet_service.get_wallet(db, character.id)).farm_currency
         gear_bonus = await item_service.compute_gear_bonus(db, character.id)
+        quest_line = await story_service.quest_summary_line(db, character)
         await db.commit()
         # ux-patch-10 п.1: сводка локации — всегда отдельное сообщение
         await message.answer("Ты выходишь за ворота.", keyboard=kb.waiting_keyboard())
         await message.answer(
-            _map_text(character, stats, farm_currency, gear_bonus),
+            _map_text(character, stats, farm_currency, gear_bonus, quest_line),
             keyboard=kb.movement_keyboard(character.pos_x, character.pos_y),
         )
 
@@ -329,6 +341,7 @@ async def event_choice(message: Message) -> None:
         farm_currency = (await wallet_service.get_wallet(db, character.id)).farm_currency
         gear_bonus = await item_service.compute_gear_bonus(db, character.id)
         buff_modifiers = await preset_service.resolve_active_modifiers(db, character)
+        quest_line = await story_service.quest_summary_line(db, character)
         await db.commit()
 
     if result.is_combat:
@@ -341,7 +354,7 @@ async def event_choice(message: Message) -> None:
     # патч 14, ч.2.3: событие — тоже источник опыта, левелап не должен теряться
     await stats_window.notify_levelup(peer_id, result.levels_gained, result.new_level)
     await message.answer(
-        _map_text(character, stats, farm_currency, gear_bonus),
+        _map_text(character, stats, farm_currency, gear_bonus, quest_line),
         keyboard=kb.movement_keyboard(character.pos_x, character.pos_y),
     )
 
@@ -397,11 +410,11 @@ async def handle_rest_done(peer_id: int) -> None:
             await trial_service.record_rest(db, character)
         await db.commit()
         region = grid.city_region_at(character.pos_x, character.pos_y)
-        keyboard = (
-            kb.city_menu_keyboard(character)
-            if region is not None
-            else kb.movement_keyboard(character.pos_x, character.pos_y)
-        )
+        if region is not None:
+            mentor_badge = region == character.region and await story_service.mentor_badge_active(db, character)
+            keyboard = kb.city_menu_keyboard(character, mentor_badge)
+        else:
+            keyboard = kb.movement_keyboard(character.pos_x, character.pos_y)
     text = f"{flavor.rest_done()}\n{display.hp_delta_line(hp_before, max_hp, max_hp)}"
     await _bot_api.messages.send(peer_id=peer_id, message=text, random_id=0, keyboard=keyboard)
 
@@ -459,27 +472,29 @@ async def handle_arrival(peer_id: int) -> None:
         await db.commit()
         region = grid.city_region_at(character.pos_x, character.pos_y)
         if region is not None:
+            mentor_badge = region == character.region and await story_service.mentor_badge_active(db, character)
             await _bot_api.messages.send(
                 peer_id=peer_id,
                 message=f"Ты выходишь к воротам: {REGION_TITLES[region]}",
                 random_id=0,
                 attachment=hub_attachment(region),
-                keyboard=kb.city_menu_keyboard(character),
+                keyboard=kb.city_menu_keyboard(character, mentor_badge),
             )
             return
         stats = await _get_stats(db, character.id)
         if await _maybe_trigger_story(peer_id, db, character, stats):
             return
         farm_currency = (await wallet_service.get_wallet(db, character.id)).farm_currency
+        quest_line = await story_service.quest_summary_line(db, character)
         await _bot_api.messages.send(
             peer_id=peer_id,
-            message=_map_text(character, stats, farm_currency),
+            message=_map_text(character, stats, farm_currency, quest_line=quest_line),
             random_id=0,
             keyboard=kb.movement_keyboard(character.pos_x, character.pos_y),
         )
 
 
-@labeler.message(text=[kb.BTN_MENTOR])
+@labeler.message(text=[kb.BTN_MENTOR, kb.BTN_MENTOR_BADGE])
 async def talk_to_mentor(message: Message) -> None:
     async with get_session_factory()() as db:
         character = await onboarding_svc.get_character(db, message.from_id)
@@ -552,10 +567,10 @@ async def visit_market(message: Message) -> None:
 
 @labeler.message(text=["/квест", "/quest"])
 async def quest_reminder(message: Message) -> None:
-    """Патч 18: напоминание текущей сюжетной цели."""
+    """Напоминание текущей сюжетной цели (патч 18, п.5 патча 21)."""
     async with get_session_factory()() as db:
         character = await onboarding_svc.get_character(db, message.from_id)
         if character is None or character.creation_state is not None:
             return
-        text = await story_service.quest_reminder_text(db, character)
+        text = await story_service.quest_reminder_text(db, character, mentor_name(character.region))
     await message.answer(text)

@@ -25,6 +25,7 @@ from bot.keyboards.world import (
 )
 from bot.onboarding_texts import REGION_TITLES
 from bot.vk_media import photo_attachment
+from bot.world_texts import mentor_name
 from game.combat import balance_config as bc
 from game.combat import display
 from game.combat import elixir_effects
@@ -277,7 +278,8 @@ async def on_battle_finished(session_id: int, result: TickResult) -> None:
                 equipped = await item_service.get_equipped(db, character.id)
                 old_item = equipped[outcome.item_dropped.slot]
             farm_currency = (await wallet_service.get_wallet(db, character.id)).farm_currency
-            if story_state is not None and story_state[1] <= 1:
+            quest_ready_now = story_state is not None and story_state[1] <= 1
+            if quest_ready_now:
                 # последний бой цепочки (или обычный одиночный сюжетный бой) —
                 # цель достигнута, ждём разговора с наставником
                 await story_service.mark_ready(db, character, story_state[0])
@@ -285,6 +287,7 @@ async def on_battle_finished(session_id: int, result: TickResult) -> None:
             new_level = outcome.new_level
             levels = outcome.levels_gained
             buff_modifiers = await preset_service.resolve_active_modifiers(db, character)
+            quest_line = await story_service.quest_summary_line(db, character)
         else:  # моб выиграл или ничья — смерть игрока (авто-респавн по таймеру)
             defeat = await encounter_service.resolve_defeat(db, character)
             await db.commit()
@@ -347,6 +350,14 @@ async def on_battle_finished(session_id: int, result: TickResult) -> None:
                 random_id=0,
             )
 
+        if quest_ready_now:
+            # патч 21, п.1: игрок не в разговоре с наставником — пингуем сами
+            await _bot_api.messages.send(
+                peer_id=peer_id,
+                message=f"📜 {mentor_name(character.region)} ждёт тебя в городе.",
+                random_id=0,
+            )
+
         if outcome.item_dropped is not None:
             # ux-patch-11: окно сравнения — сводка локации откладывается до
             # решения игрока (Надеть/В инвентарь), как event_choice в патче 9.
@@ -362,7 +373,7 @@ async def on_battle_finished(session_id: int, result: TickResult) -> None:
 
         await _bot_api.messages.send(
             peer_id=peer_id,
-            message=location_summary(character, stats, _rng, farm_currency, vit_bonus),
+            message=location_summary(character, stats, _rng, farm_currency, vit_bonus, quest_line),
             random_id=0, keyboard=movement_keyboard(character.pos_x, character.pos_y),
         )
     elif on_defeat_hook is not None:
@@ -405,13 +416,14 @@ async def item_choice(message: Message) -> None:
             confirm_text = "Убрано в инвентарь."
         farm_currency = (await wallet_service.get_wallet(db, character.id)).farm_currency
         vit_bonus = (await item_service.compute_gear_bonus(db, character.id)).get("vit", 0)
+        quest_line = await story_service.quest_summary_line(db, character)
         await db.commit()
 
     # патч 13, ч.1: окно сравнения редактируется в финальный вид на месте;
     # ux-patch-10 п.1: сводка локации — всегда ОТДЕЛЬНОЕ следующее сообщение.
     await editable_message.send_or_edit(_bot_api, "item_choice", peer_id, confirm_text, no_keyboard())
     await message.answer(
-        location_summary(character, stats, _rng, farm_currency, vit_bonus),
+        location_summary(character, stats, _rng, farm_currency, vit_bonus, quest_line),
         keyboard=movement_keyboard(character.pos_x, character.pos_y),
     )
 

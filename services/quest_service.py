@@ -50,6 +50,32 @@ async def _get_character_quest(
     )
 
 
+@dataclass
+class QuestPeek:
+    """Только чтение — status=None означает «квест ещё не взят» (эквивалент
+    is_new), без побочного эффекта создания записи (патч 21: пометка
+    наставника/команда /квест не должны сами «принимать» квест за игрока)."""
+
+    title: str
+    progress_label: str
+    target_count: int
+    progress: int
+    status: str | None = None
+
+
+async def peek_progress(db: AsyncSession, character: Character) -> QuestPeek | None:
+    """Как get_or_assign, но НЕ создаёт CharacterQuest, если его ещё нет."""
+    quest = await _get_quest_def(db, character.region)
+    if quest is None:
+        return None
+    cq = await _get_character_quest(db, character.id, quest.id)
+    return QuestPeek(
+        title=quest.title, progress_label=quest.progress_label, target_count=quest.target_count,
+        progress=cq.progress if cq is not None else 0,
+        status=cq.status if cq is not None else None,
+    )
+
+
 async def get_or_assign(db: AsyncSession, character: Character) -> QuestProgress | None:
     """Назначает квест региона при первом обращении к своему наставнику."""
     quest = await _get_quest_def(db, character.region)

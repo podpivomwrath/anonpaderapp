@@ -90,13 +90,17 @@ async def _set_progress(db_session, character, quest_step: str, act: int, status
     return row
 
 
-async def test_travel_combat_active_shows_target_marker(db_session, make_character) -> None:
-    character = await make_character(region="ridge", level=20)
+async def test_travel_combat_active_shows_target_marker(db_session, character_at) -> None:
+    character = await character_at(0, 0, region="ridge", level=20)
     await _set_progress(db_session, character, "ridge_1_2", act=1, status="active")
     stats = await db_session.get(CharacterStats, character.id)
     result = await story_service.visit_mentor(db_session, character, stats)
     assert "(40;46)" in result.text
     assert "Осыпающиеся террасы" in result.text
+
+    # патч 21: показанный (не резолвящий) визит помечает шаг увиденным
+    row = await story_service.get_progress(db_session, character)
+    assert row.quest_seen is True
 
 
 async def test_travel_combat_ready_grants_reward_and_advances(db_session, make_character) -> None:
@@ -123,17 +127,16 @@ async def test_city_scene_resolves_in_one_visit(db_session, make_character) -> N
     assert quest.id == "ridge_2_1"
 
 
-async def test_level_gate_blocks_new_act_but_keeps_progress(db_session, make_character) -> None:
-    character = await make_character(region="ridge", level=1)
+async def test_no_level_gate_travel_combat_available_regardless_of_level(
+    db_session, character_at
+) -> None:
+    """Патч 21, п.3: уровневые ворота убраны — акт 2 доступен с 1 уровня."""
+    character = await character_at(0, 0, region="ridge", level=1)
     await _set_progress(db_session, character, "ridge_2_1", act=2, status="active")
     stats = await db_session.get(CharacterStats, character.id)
     result = await story_service.visit_mentor(db_session, character, stats)
-    assert result.text == story_service.LEVEL_GATE_TEXT
-
-    # прогресс не откатился и не продвинулся
-    row = await story_service.get_progress(db_session, character)
-    assert row.quest_step == "ridge_2_1"
-    assert row.status == "active"
+    assert "(30;35)" in result.text
+    assert "Забытый редут" in result.text
 
 
 async def test_region_completed_after_last_quest(db_session, make_character) -> None:
@@ -233,27 +236,134 @@ async def test_visit_mentor_subclass_gate_waits_without_subclass(db_session, mak
     quest = await story_service.current_quest_def(db_session, character)
     assert quest.id == "ridge_3_2"  # без подкласса не продвигается
 
+    row = await story_service.get_progress(db_session, character)
+    assert row.quest_seen is True
+
 
 # --- /квест — quest_reminder_text ---
 
 
 async def test_quest_reminder_before_any_progress(db_session, make_character) -> None:
-    """quest_reminder_text не создаёт прогресс сам (в отличие от current_quest_def) —
-    до первого разговора с наставником просто отправляет туда же."""
+    """Патч 21, п.5: первый квест ещё не взят — «нет активного, наставник ждёт»."""
     character = await make_character(region="ridge")
-    text = await story_service.quest_reminder_text(db_session, character)
-    assert "поговори с наставником" in text.lower()
+    text = await story_service.quest_reminder_text(db_session, character, "Сера Вейга")
+    assert "нет активного задания" in text.lower()
+    assert "Сера Вейга" in text
 
 
-async def test_quest_reminder_on_first_quest(db_session, make_character) -> None:
+async def test_quest_reminder_on_first_quest(db_session, make_character, seed_quests) -> None:
+    from services import quest_service
+
     character = await make_character(region="ridge")
-    await story_service.current_quest_def(db_session, character)  # создаёт прогресс (ridge_1_1)
-    text = await story_service.quest_reminder_text(db_session, character)
-    assert "экзамен" in text.lower()
+    await quest_service.get_or_assign(db_session, character)  # квест реально взят
+    text = await story_service.quest_reminder_text(db_session, character, "Сера Вейга")
+    assert "пепельные твари" in text.lower()  # progress_label квеста ridge из content/quests.json
 
 
 async def test_quest_reminder_ready_travel_combat(db_session, make_character) -> None:
     character = await make_character(region="ridge", level=20)
     await _set_progress(db_session, character, "ridge_1_2", act=1, status="ready")
-    text = await story_service.quest_reminder_text(db_session, character)
-    assert "возвращайся к наставнику" in text.lower()
+    text = await story_service.quest_reminder_text(db_session, character, "Сера Вейга")
+    assert "цель достигнута" in text.lower()
+    assert "Сера Вейга" in text
+
+
+# --- compass_direction (патч 21, пп. 4-5) ---
+
+
+@pytest.mark.parametrize(
+    "px,py,tx,ty,expected",
+    [
+        (0, 0, 0, 5, "на север"),
+        (0, 0, 0, -5, "на юг"),
+        (0, 0, 5, 0, "на восток"),
+        (0, 0, -5, 0, "на запад"),
+        (0, 0, 5, 5, "на северо-восток"),
+        (0, 0, -5, 5, "на северо-запад"),
+        (0, 0, 5, -5, "на юго-восток"),
+        (0, 0, -5, -5, "на юго-запад"),
+        (3, 3, 3, 3, "ты уже на месте"),
+    ],
+)
+def test_compass_direction(px, py, tx, ty, expected) -> None:
+    assert story_service.compass_direction(px, py, tx, ty) == expected
+
+
+# --- mentor_badge_active (патч 21, п.2) ---
+
+
+async def test_mentor_badge_true_when_first_quest_not_taken(db_session, make_character, seed_quests) -> None:
+    character = await make_character(region="ridge")
+    assert await story_service.mentor_badge_active(db_session, character) is True
+
+
+async def test_mentor_badge_first_quest_active_and_ready(db_session, make_character, seed_quests) -> None:
+    from services import quest_service
+
+    character = await make_character(region="ridge")
+    await quest_service.get_or_assign(db_session, character)  # взят → активен
+    assert await story_service.mentor_badge_active(db_session, character) is False
+
+    progress = await quest_service.record_kill(db_session, character)
+    for _ in range(9):
+        progress = await quest_service.record_kill(db_session, character)
+    assert progress.status == "ready"
+    assert await story_service.mentor_badge_active(db_session, character) is True
+
+
+async def test_mentor_badge_travel_combat_states(db_session, character_at) -> None:
+    character = await character_at(0, 0, region="ridge", level=20)
+    await _set_progress(db_session, character, "ridge_1_2", act=1, status="active")
+    assert await story_service.mentor_badge_active(db_session, character) is True  # свежий, не показан
+
+    stats = await db_session.get(CharacterStats, character.id)
+    await story_service.visit_mentor(db_session, character, stats)  # показали assign
+    assert await story_service.mentor_badge_active(db_session, character) is False
+
+    await story_service.mark_ready(db_session, character, "ridge_1_2")
+    assert await story_service.mentor_badge_active(db_session, character) is True  # сдача
+
+
+async def test_mentor_badge_false_after_region_completed(db_session, make_character) -> None:
+    character = await make_character(region="ridge", level=60)
+    await _set_progress(db_session, character, "ridge_5_2", act=5, status="active")
+    stats = await db_session.get(CharacterStats, character.id)
+    await story_service.visit_mentor(db_session, character, stats)  # резолвит и завершает линию
+    assert await story_service.mentor_badge_active(db_session, character) is False
+
+
+# --- quest_summary_line (патч 21, п.4) ---
+
+
+async def test_quest_summary_line_none_for_first_quest(db_session, make_character) -> None:
+    character = await make_character(region="ridge")
+    assert await story_service.quest_summary_line(db_session, character) is None
+
+
+async def test_quest_summary_line_travel_combat_active(db_session, character_at) -> None:
+    character = await character_at(0, 0, region="ridge", level=20)
+    await _set_progress(db_session, character, "ridge_1_2", act=1, status="active")
+    line = await story_service.quest_summary_line(db_session, character)
+    assert line == "📜 Пропавший патруль → (40; 46) · на северо-восток"
+
+
+async def test_quest_summary_line_travel_combat_ready(db_session, make_character) -> None:
+    character = await make_character(region="ridge", level=20)
+    await _set_progress(db_session, character, "ridge_1_2", act=1, status="ready")
+    line = await story_service.quest_summary_line(db_session, character)
+    assert line == "📜 Пропавший патруль → вернуться к наставнику"
+
+
+async def test_quest_summary_line_city_scene(db_session, make_character) -> None:
+    character = await make_character(region="ridge", level=20)
+    await _set_progress(db_session, character, "ridge_1_3", act=1, status="active")
+    line = await story_service.quest_summary_line(db_session, character)
+    assert line == "📜 Молчание казармы → вернуться в город"
+
+
+async def test_quest_summary_line_none_after_region_completed(db_session, make_character) -> None:
+    character = await make_character(region="ridge", level=60)
+    row = await _set_progress(db_session, character, "ridge_5_2", act=5, status="active")
+    row.completed = True
+    await db_session.flush()
+    assert await story_service.quest_summary_line(db_session, character) is None

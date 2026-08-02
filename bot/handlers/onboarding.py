@@ -29,6 +29,7 @@ from bot.keyboards.onboarding import (
 )
 from bot.keyboards.world import city_menu_keyboard
 from services import onboarding_service as svc
+from services import story_service
 from services.db import get_session_factory
 
 # Мир (город/карта) подключается ПОСЛЕ создания персонажа — импорт handler-модуля,
@@ -310,7 +311,8 @@ async def begin_journey(message: Message) -> None:
         character = await svc.get_character(db, message.from_id)
         if character is None or character.region is None:
             return
+        mentor_badge = await story_service.mentor_badge_active(db, character)
         await message.answer(
             f"Ты в городе: {texts.REGION_TITLES[character.region]}",
-            keyboard=city_menu_keyboard(character),
+            keyboard=city_menu_keyboard(character, mentor_badge),
         )

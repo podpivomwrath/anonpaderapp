@@ -24,6 +24,7 @@ from bot.keyboards.list_keeper import (
     paths_keyboard,
 )
 from bot.keyboards.world import BTN_KEEPER, city_menu_keyboard
+from bot.world_texts import mentor_name
 from game.classes.base import REGISTRY
 from game.combat import balance_config as bc
 from game.combat import display
@@ -96,6 +97,7 @@ async def _send_trials(peer_id: int, character) -> None:
         if character is None:
             return
         states = await trial_service.get_trial_states(db, character)
+        mentor_badge = await story_service.mentor_badge_active(db, character)
 
     remaining = [s for s in states if not s.unlocked]
     opened = [s for s in states if s.unlocked]
@@ -115,7 +117,9 @@ async def _send_trials(peer_id: int, character) -> None:
             for s in opened:
                 lines.append(KEEPER["trial_entry_open"].format(buff_name=s.buff_name))
         text = "\n".join(lines)
-    await _bot_api.messages.send(peer_id=peer_id, message=text, random_id=0, keyboard=city_menu_keyboard(character))
+    await _bot_api.messages.send(
+        peer_id=peer_id, message=text, random_id=0, keyboard=city_menu_keyboard(character, mentor_badge)
+    )
 
 
 @labeler.message(text=[BTN_KEEPER])
@@ -174,9 +178,13 @@ async def offer_leave(message: Message) -> None:
         if character is None:
             return
         await _set_select_state(db, character, None)
+        mentor_badge = await story_service.mentor_badge_active(db, character)
         await db.commit()
     await _dispenser.delete(message.peer_id)
-    await message.answer("Хорошо. Возвращайся, когда будешь готов.", keyboard=city_menu_keyboard(character))
+    await message.answer(
+        "Хорошо. Возвращайся, когда будешь готов.",
+        keyboard=city_menu_keyboard(character, mentor_badge),
+    )
 
 
 @labeler.message(state=SubclassSelectState.OFFER)
@@ -251,6 +259,10 @@ async def path_confirm(message: Message) -> None:
     if story_reward_text:
         text += f"\n\n{story_reward_text}"
     await message.answer(text)
+    if story_reward_text:
+        # патч 21, п.1: сюжет продвинулся (акт 4 открыт) — игрок сейчас у
+        # Хранителя, не у наставника, поэтому пингуем сами
+        await message.answer(f"📜 {mentor_name(character.region)} ждёт тебя в городе.")
     await _send_trials(peer_id, character)
 
 
