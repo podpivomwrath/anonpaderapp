@@ -30,6 +30,10 @@ def trophy_defs_ordered() -> list[TrophyDef]:
     return list(_defs().values())
 
 
+def trophy_def(trophy_id: str) -> TrophyDef | None:
+    return _defs().get(trophy_id)
+
+
 async def _get_row(db: AsyncSession, character_id: int, trophy_id: str) -> CharacterTrophy | None:
     return await db.scalar(
         select(CharacterTrophy).where(
@@ -71,6 +75,15 @@ async def grant_from_event(
     """Событие исследования — та же таблица, всегда 1 бросок."""
     drop = loot.roll_drop(rng, 1)
     return await _grant(db, character.id, drop)
+
+
+async def grant_specific(db: AsyncSession, character_id: int, trophy_id: str, amount: int) -> None:
+    """Начисляет N конкретной градации напрямую, в обход обычного дропа
+    (награды вроде Пепельного ларца, патч 24)."""
+    if amount <= 0:
+        return
+    await _add(db, character_id, trophy_id, amount)
+    await db.flush()
 
 
 async def get_stock(db: AsyncSession, character_id: int) -> list[tuple[TrophyDef, int]]:

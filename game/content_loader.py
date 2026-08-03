@@ -374,6 +374,37 @@ def load_daily_quests(content_dir: Path = CONTENT_DIR) -> list[DailyQuestDef]:
     ]
 
 
+class LootboxRewardPart(BaseModel):
+    """Один компонент награды Пепельного ларца (патч 24). Варианты внутри
+    градации — список СПИСКОВ частей: обычно 1 часть, иногда комбо (напр.
+    трофей + эликсир у 🟠). type: gold|gems|elixir|elixir_random_combat|trophy."""
+
+    type: str
+    trophy_id: str | None = None
+    elixir_id: str | None = None
+    min: int = 0
+    max: int = 0
+
+
+class LootboxGradeDef(BaseModel):
+    """Градация Пепельного ларца (content/lootbox/ashen_chest.json, патч 24).
+    chance — базовая вероятность (сумма по всем градациям = 1.0); буст от
+    длины стрика — game.economy.lootbox_config."""
+
+    id: str
+    emoji: str
+    name: str
+    chance: float
+    options: list[list[LootboxRewardPart]]
+
+
+def load_lootbox_grades(content_dir: Path = CONTENT_DIR) -> list[LootboxGradeDef]:
+    return [
+        LootboxGradeDef(**raw)
+        for raw in _load_json(content_dir / "lootbox" / "ashen_chest.json")
+    ]
+
+
 class GameContent(BaseModel):
     mobs: dict[str, MobDef]
     items: dict[str, ItemDef]

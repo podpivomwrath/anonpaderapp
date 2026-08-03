@@ -1,0 +1,61 @@
+[
+  {
+    "id": "dusty",
+    "emoji": "⚪",
+    "name": "Пыльный",
+    "chance": 0.55,
+    "options": [
+      [{"type": "gold", "min": 200, "max": 500}],
+      [{"type": "elixir", "elixir_id": "heal_small", "min": 2, "max": 3}],
+      [{"type": "trophy", "trophy_id": "ash_dust", "min": 3, "max": 5}]
+    ]
+  },
+  {
+    "id": "dim",
+    "emoji": "🔵",
+    "name": "Тусклый",
+    "chance": 0.28,
+    "options": [
+      [{"type": "gold", "min": 800, "max": 1500}],
+      [{"type": "elixir", "elixir_id": "heal_medium", "min": 2, "max": 3}],
+      [{"type": "trophy", "trophy_id": "taint_clot", "min": 2, "max": 4}],
+      [{"type": "elixir_random_combat", "min": 1, "max": 1}]
+    ]
+  },
+  {
+    "id": "crimson",
+    "emoji": "🟣",
+    "name": "Багровый",
+    "chance": 0.12,
+    "options": [
+      [{"type": "gold", "min": 2500, "max": 4000}],
+      [{"type": "elixir_random_combat", "min": 2, "max": 3}],
+      [{"type": "trophy", "trophy_id": "blood_shard", "min": 2, "max": 3}],
+      [{"type": "gems", "min": 5, "max": 10}]
+    ]
+  },
+  {
+    "id": "searing",
+    "emoji": "🟠",
+    "name": "Раскалённый",
+    "chance": 0.045,
+    "options": [
+      [{"type": "gold", "min": 8000, "max": 12000}],
+      [{"type": "gems", "min": 25, "max": 50}],
+      [
+        {"type": "trophy", "trophy_id": "heart_spike", "min": 1, "max": 2},
+        {"type": "elixir_random_combat", "min": 1, "max": 1}
+      ]
+    ]
+  },
+  {
+    "id": "tear",
+    "emoji": "🟡",
+    "name": "Слеза",
+    "chance": 0.005,
+    "options": [
+      [{"type": "gems", "min": 250, "max": 250}],
+      [{"type": "trophy", "trophy_id": "monolith_tear", "min": 1, "max": 1}]
+    ]
+  }
+]

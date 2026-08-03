@@ -57,33 +57,63 @@ function StoryTab({ story }) {
   );
 }
 
+function LootboxSection({ dailies }) {
+  return (
+    <Group header={<Header>🗃️ Пепельные ларцы</Header>}>
+      {dailies.lootbox_grades.map((g) => {
+        const count = dailies.lootbox_counts[g.id] || 0;
+        if (!count) return null;
+        return (
+          <div className="stat-row" key={g.id}>
+            <span className="stat-row__label">
+              {g.emoji} {g.name}
+            </span>
+            <span className="stat-row__value">{count} раз</span>
+          </div>
+        );
+      })}
+      {dailies.lootbox_history.length === 0 && <Div style={{ opacity: 0.8 }}>Ларцов пока не было.</Div>}
+      {dailies.lootbox_history.map((h, idx) => (
+        <Div key={idx} style={{ opacity: 0.85 }}>
+          <p style={{ marginBottom: 0 }}>
+            {h.emoji} {h.name}: {h.reward_summary}
+          </p>
+        </Div>
+      ))}
+    </Group>
+  );
+}
+
 function DailyQuestsTab({ dailies }) {
   const hours = Math.floor(dailies.seconds_until_reset / 3600);
   const minutes = Math.floor((dailies.seconds_until_reset % 3600) / 60);
   return (
-    <Group header={<Header>🗓️ Ежедневные задания</Header>}>
-      {dailies.quests.map((q) => (
-        <div className="stat-row" key={q.id}>
-          <span className="stat-row__label">
-            {q.completed ? '✅' : '▫️'} {q.title}: {q.progress_label}
-          </span>
-          <span className="stat-row__value">
-            {q.progress}/{q.target}
-          </span>
-        </div>
-      ))}
-      <Div>
-        <p>🔥 Стрик ежедневок: {dailies.daily_streak} дней</p>
-        {dailies.next_milestone_day && (
+    <>
+      <Group header={<Header>🗓️ Ежедневные задания</Header>}>
+        {dailies.quests.map((q) => (
+          <div className="stat-row" key={q.id}>
+            <span className="stat-row__label">
+              {q.completed ? '✅' : '▫️'} {q.title}: {q.progress_label}
+            </span>
+            <span className="stat-row__value">
+              {q.progress}/{q.target}
+            </span>
+          </div>
+        ))}
+        <Div>
+          <p>🔥 Стрик ежедневок: {dailies.daily_streak} дней</p>
+          {dailies.next_milestone_day && (
+            <p style={{ opacity: 0.8 }}>
+              Следующий рубеж: день {dailies.next_milestone_day} — {rewardText(dailies.next_milestone_reward)}
+            </p>
+          )}
           <p style={{ opacity: 0.8 }}>
-            Следующий рубеж: день {dailies.next_milestone_day} — {rewardText(dailies.next_milestone_reward)}
+            ⏳ До сброса дня: {hours}ч {minutes}м
           </p>
-        )}
-        <p style={{ opacity: 0.8 }}>
-          ⏳ До сброса дня: {hours}ч {minutes}м
-        </p>
-      </Div>
-    </Group>
+        </Div>
+      </Group>
+      <LootboxSection dailies={dailies} />
+    </>
   );
 }
 

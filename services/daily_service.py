@@ -19,8 +19,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from game.content_loader import DailyQuestDef, load_daily_quests
 from game.economy import dailies_config as dc
+from game.economy import lootbox_config as lc
 from models import Character, CharacterDaily, CharacterStats, CharacterTitle
-from services import elixir_service, experience_service, trophy_service, wallet_service
+from services import elixir_service, experience_service, lootbox_service, trophy_service, wallet_service
 
 _TZ = ZoneInfo(dc.DAILY_RESET_TZ)
 _rng = random.Random()
@@ -236,18 +237,34 @@ async def _finish(
     if not completions:
         return DailyProgressResult()
     today = today_msk()
-    notice = None
+    notice_parts: list[str] = []
     if character.last_daily_completed_date != today:
         character.last_daily_completed_date = today
         character.daily_streak += 1
+
+        # Патч 24: 1 Пепельный ларец за КАЖДЫЙ день стрика ежедневок,
+        # открывается сразу — не продаётся ни за что (см. lootbox_config.py).
+        chest = await lootbox_service.open_chest(db, character, character.daily_streak, _rng)
+        chest_text = (
+            f"🗃️ Ты находишь Пепельный ларец. День стрика: {character.daily_streak}\n\n"
+            f"Крышка поддаётся...\n\n"
+            f"{chest.grade.emoji} {chest.grade.name.upper()} ЛАРЕЦ\n"
+            f"Получено: {', '.join(chest.lines)}"
+        )
+        flourish = lc.GRADE_FLOURISH.get(chest.grade.id)
+        if flourish:
+            chest_text += f"\n\n{flourish}"
+        notice_parts.append(chest_text)
+
         milestone = dc.STREAK_MILESTONES.get(character.daily_streak)
         if milestone is not None:
             reward_lines = await _grant_reward(db, character, milestone)
-            notice = (
+            notice_parts.append(
                 f"🔥 Стрик ежедневок: {character.daily_streak} дней!\n"
                 f"Получено: {', '.join(reward_lines)}"
             )
     await db.flush()
+    notice = "\n\n".join(notice_parts) if notice_parts else None
     return DailyProgressResult(completed=completions, streak_notice=notice)
 
 

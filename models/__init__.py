@@ -9,6 +9,7 @@ from models.dailies import CharacterDaily, CharacterTitle
 from models.economy import ExchangeOrder, PvpStakeTransfer, Wallet
 from models.enums import BaseClass, CombatStatus, CombatType, OrderDirection, QuestStatus, Region
 from models.item import Inventory, Item, ItemUpgradeHistory
+from models.lootbox import CharacterLootbox
 from models.pvp import PvpBattle
 from models.quest import CharacterQuest, Quest
 from models.story import CharacterStoryProgress
@@ -23,6 +24,7 @@ __all__ = [
     "CharacterBuffPreset",
     "CharacterConsumable",
     "CharacterDaily",
+    "CharacterLootbox",
     "CharacterQuest",
     "CharacterStats",
     "CharacterStoryProgress",

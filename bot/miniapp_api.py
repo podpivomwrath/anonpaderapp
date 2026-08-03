@@ -19,6 +19,7 @@ from services import (
     daily_service,
     derived_stats_service,
     item_service,
+    lootbox_service,
     preset_service,
     pvp_service,
     quest_service,
@@ -250,6 +251,8 @@ async def handle_get_dailies(request: web.Request) -> web.Response:
         story = await _story_payload(session, character)
         overview = await daily_service.get_dailies_overview(session, character)
         login_state = await daily_service.get_login_state(session, character)
+        lootbox_history = await lootbox_service.recent_history(session, character.id, limit=10)
+        lootbox_counts = await lootbox_service.grade_counts(session, character.id)
         return web.json_response(
             {
                 "story": story,
@@ -266,6 +269,19 @@ async def handle_get_dailies(request: web.Request) -> web.Response:
                     "next_milestone_day": overview.next_milestone_day,
                     "next_milestone_reward": overview.next_milestone_reward,
                     "seconds_until_reset": overview.seconds_until_reset,
+                    "lootbox_history": [
+                        {
+                            "grade": h.grade, "emoji": h.emoji, "name": h.name,
+                            "reward_summary": h.reward_summary,
+                            "opened_at": h.opened_at.isoformat() if h.opened_at else None,
+                        }
+                        for h in lootbox_history
+                    ],
+                    "lootbox_counts": lootbox_counts,
+                    "lootbox_grades": [
+                        {"id": g.id, "emoji": g.emoji, "name": g.name}
+                        for g in lootbox_service.grade_catalog()
+                    ],
                 },
                 "login": {
                     "login_streak": login_state.login_streak,
