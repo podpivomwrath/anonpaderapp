@@ -1,0 +1,24 @@
+# SITE_ADDRESS приходит из docker-compose.prod.yml (переменная DOMAIN из .env,
+# по умолчанию — голый IP сервера). Пока DOMAIN пуст, Caddy обслуживает адрес
+# как IP-литерал и НЕ пытается получить сертификат Let's Encrypt (ACME не
+# выпускает сертификаты на IP) — просто отдаёт HTTP. Как только DOMAIN
+# заполнится доменным именем, автоматический HTTPS включится сам, без правок
+# этого файла.
+{$SITE_ADDRESS} {
+	encode gzip
+
+	# API бота и вебхук VK — всегда на bot:8080, статику не отдаём под этими путями
+	@backend path /api/miniapp/* /vk/callback /health
+	handle @backend {
+		reverse_proxy bot:8080
+	}
+
+	# Статика мини-аппа (собрана на этапе сборки этого образа, см. Dockerfile.caddy).
+	# Если мини-апп хостится отдельно (напр. Vercel), этот блок просто не используется —
+	# VK Mini App всё равно откроет внешний VITE_API_BASE_URL.
+	handle {
+		root * /srv/miniapp
+		try_files {path} /index.html
+		file_server
+	}
+}

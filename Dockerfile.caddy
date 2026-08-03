@@ -1,0 +1,22 @@
+# Один образ = статика мини-аппа (собранная из miniapp/) + Caddy, который её
+# раздаёт и одновременно проксирует API бота. Мини-апп можно и не собирать
+# сюда — если хостите его отдельно (напр. Vercel), просто не открывайте IP/
+# домен как ссылку мини-аппа в VK, а укажите внешний URL.
+
+# --- Этап 1: сборка статики мини-аппа ---
+FROM node:20-alpine AS miniapp-build
+WORKDIR /app
+COPY miniapp/package*.json ./
+RUN npm ci
+COPY miniapp/ .
+# Абсолютный URL бэкенда, который увидит собранный фронтенд (см. miniapp/.env.example).
+# Если пусто — фронтенд будет ходить по относительным путям /api/miniapp/*,
+# что и нужно, когда Caddy отдаёт и статику, и проксирует API с одного домена/IP.
+ARG VITE_API_BASE_URL=
+ENV VITE_API_BASE_URL=$VITE_API_BASE_URL
+RUN npm run build
+
+# --- Этап 2: Caddy + собранная статика ---
+FROM caddy:2-alpine
+COPY Caddyfile /etc/caddy/Caddyfile
+COPY --from=miniapp-build /app/dist /srv/miniapp

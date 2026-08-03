@@ -1,0 +1,34 @@
+name: Deploy to VPS
+
+# Автоматический деплой — ВТОРОЙ этап (см. DEPLOY.md). Сначала должен
+# надёжно работать ручной деплой (docker compose build/up на сервере),
+# и только потом стоит включать этот workflow.
+#
+# Нужные GitHub Secrets (Settings -> Secrets and variables -> Actions):
+#   DEPLOY_HOST        186.246.12.136
+#   DEPLOY_USER        пользователь с sudo/docker (см. scripts/server-setup.sh)
+#   DEPLOY_SSH_KEY      приватный SSH-ключ (соответствующий authorized_keys на сервере)
+#   DEPLOY_PATH         путь к проекту на сервере, напр. /home/deploy/pines
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch: {}
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.DEPLOY_HOST }}
+          username: ${{ secrets.DEPLOY_USER }}
+          key: ${{ secrets.DEPLOY_SSH_KEY }}
+          script: |
+            set -e
+            cd "${{ secrets.DEPLOY_PATH }}"
+            git pull origin main
+            docker compose -f docker-compose.prod.yml build
+            docker compose -f docker-compose.prod.yml up -d
+            docker compose -f docker-compose.prod.yml exec -T bot alembic upgrade head

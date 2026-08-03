@@ -1,0 +1,26 @@
+.git
+.gitignore
+.gitattributes
+.venv
+venv
+__pycache__
+*.py[cod]
+.pytest_cache
+.idea
+.vscode
+.claude
+.vkbottle
+
+.env
+.env.*
+!.env.example
+
+# Фронтенд собирается отдельным образом (Dockerfile.caddy) — боту не нужен
+miniapp/node_modules
+miniapp/dist
+miniapp
+
+tests
+sim.js
+README.md
+DEPLOY.md

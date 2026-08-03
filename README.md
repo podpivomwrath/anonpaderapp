@@ -32,6 +32,8 @@ python main.py
 
 Сервер поднимется на `http://0.0.0.0:8080`, вебхук — `POST /vk/callback`, health-check — `GET /health`.
 
+Для развёртывания на боевом сервере (Docker Compose, Caddy, бэкапы) — см. [DEPLOY.md](DEPLOY.md).
+
 ## Настройка Callback API в VK
 
 1. Создай сообщество (или используй существующее) → **Управление → Настройки → Работа с API**.

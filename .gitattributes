@@ -1,0 +1,4 @@
+# Шелл-скрипты должны попадать на Linux (Docker/VPS) с LF — иначе шебанг
+# "#!/bin/sh" ломается CRLF-концами строк при чекауте на Windows.
+*.sh text eol=lf
+Dockerfile* text eol=lf

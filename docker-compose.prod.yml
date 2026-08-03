@@ -1,0 +1,83 @@
+# Прод-стек для VPS. НЕ путать с docker-compose.yml в корне — тот только
+# для локальной разработки (Postgres+Redis, порты наружу, дефолтные креды
+# mmo/mmo) и остаётся нетронутым.
+#
+# Запуск: docker compose -f docker-compose.prod.yml up -d --build
+# (см. DEPLOY.md для полной инструкции)
+
+services:
+  bot:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      # Собираются из POSTGRES_*/.env — единый источник правды для пароля БД,
+      # чтобы не дублировать его отдельно в DATABASE_URL.
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      REDIS_URL: redis://redis:6379/0
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request as u; u.urlopen('http://localhost:8080/health', timeout=3)"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    # Порт наружу НЕ пробрасываем — доступ только из docker-сети.
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    volumes:
+      - redisdata:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    # Порт наружу НЕ пробрасываем.
+
+  caddy:
+    build:
+      context: .
+      dockerfile: Dockerfile.caddy
+      args:
+        VITE_API_BASE_URL: ${MINIAPP_API_BASE_URL:-}
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      # Домен ещё не подключён — по умолчанию работаем по IP (см. Caddyfile).
+      SITE_ADDRESS: ${DOMAIN:-186.246.12.136}
+    volumes:
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - bot
+
+volumes:
+  pgdata:
+  redisdata:
+  caddy_data:
+  caddy_config:

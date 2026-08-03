@@ -1,7 +1,9 @@
 """Дев-утилита: полный вайп персонажей (users НЕ трогаем — vk_id остаются).
 
 Запуск: python scripts/wipe.py
-Требует подтверждения — ввести "YES" в консоли.
+Требует ALLOW_WIPE=true в окружении (защита прода — на боевом сервере эта
+переменная намеренно не задаётся, см. DEPLOY.md) И подтверждения — ввести
+"YES" в консоли.
 
 Порядок удаления учитывает FK без ON DELETE CASCADE:
   - pvp_stake_transfers, combat_participants, exchange_orders ссылаются на
@@ -17,10 +19,15 @@ item_upgrade_history не трогаем — item_id уходит в NULL (ondel
 """
 
 import asyncio
+import os
 import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+
+from dotenv import load_dotenv  # noqa: E402
+
+load_dotenv()
 
 from sqlalchemy import delete  # noqa: E402
 
@@ -52,6 +59,12 @@ async def wipe() -> None:
 
 
 def main() -> None:
+    if os.environ.get("ALLOW_WIPE") != "true":
+        print(
+            "Вайп заблокирован: нет ALLOW_WIPE=true в окружении. "
+            "Это защита прод-базы — см. DEPLOY.md."
+        )
+        return
     answer = input('Полный вайп персонажей (users останутся). Введи "YES" для подтверждения: ')
     if answer.strip() != "YES":
         print("Отменено.")
