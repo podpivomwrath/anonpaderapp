@@ -90,5 +90,8 @@ async def miniapp_cors_middleware(
 
     response.headers["Access-Control-Allow-Origin"] = origin
     response.headers["Access-Control-Allow-Methods"] = "GET, POST, OPTIONS"
-    response.headers["Access-Control-Allow-Headers"] = "Content-Type"
+    # ngrok-skip-browser-warning (патч альфа-теста, см. miniapp/src/api.js) —
+    # без него бесплатный ngrok-туннель возвращает межстраничную заглушку
+    # вместо ответа на preflight, и браузер режет запрос ещё до отправки.
+    response.headers["Access-Control-Allow-Headers"] = "Content-Type, ngrok-skip-browser-warning"
     return response
