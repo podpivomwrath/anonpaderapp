@@ -33,9 +33,14 @@ def xp_bar(level: int, experience: int) -> str:
     return f"✨ Опыт: {bar} {_thousands(experience)} / {_thousands(need)} ({percent}%)"
 
 
+def wallet_line(farm_currency: int, donate_currency: int) -> str:
+    """Патч 23: золото + Пепельные самоцветы (донат-валюта) в одной строке."""
+    return f"💰 Золото: {farm_currency} · 💎 Самоцветы: {donate_currency}"
+
+
 def location_summary(
     character, stats, rng: random.Random, farm_currency: int, vit_bonus: int = 0,
-    quest_line: str | None = None,
+    quest_line: str | None = None, donate_currency: int = 0,
 ) -> str:
     """Сводка клетки: координаты/тип локации/зона, вариативное описание, HP,
     уровень, шкала опыта, золото (патч 9 блок 3, патч 10 блоки 2/4), активный
@@ -61,7 +66,7 @@ def location_summary(
         f"{hp_line}\n"
         f"⚔️ Уровень: {character.level}\n"
         f"{xp_bar(character.level, character.experience)}\n"
-        f"💰 Золото: {farm_currency}\n"
+        f"{wallet_line(farm_currency, donate_currency)}\n"
         f"{quest_block}"
         f"{_SEP}"
     )

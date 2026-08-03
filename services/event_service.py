@@ -6,7 +6,7 @@
 """
 
 import random
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -14,7 +14,7 @@ from game.combat import display
 from game.content_loader import EventOutcome
 from game.world import world_config as wc
 from models import Character, CharacterStats
-from services import experience_service, item_service, trial_service, trophy_service, vitals_service
+from services import daily_service, experience_service, item_service, trial_service, trophy_service, vitals_service
 
 
 def pick_outcome(rng: random.Random, outcomes: list[EventOutcome]) -> EventOutcome:
@@ -35,6 +35,8 @@ class OutcomeResult:
     is_combat: bool = False
     levels_gained: int = 0
     new_level: int = 1
+    daily_completed: list = field(default_factory=list)  # daily_service.DailyCompletion
+    daily_streak_notice: str | None = None
 
 
 async def apply_outcome(
@@ -54,9 +56,15 @@ async def apply_outcome(
         return OutcomeResult(outcome.text, is_combat=True)
 
     lines = [outcome.text] if outcome.text else []
+    daily_completed = []
+    daily_streak_notice = None
 
     if character.subclass is not None and event_id is not None and choice_code is not None:
         await trial_service.record_event_choice(db, character, event_id, choice_code)
+    if event_id is not None and choice_code is not None:
+        progress = await daily_service.record_event_choice(db, character)
+        daily_completed += progress.completed
+        daily_streak_notice = daily_streak_notice or progress.streak_notice
 
     if outcome.trophy:
         drop = await trophy_service.grant_from_event(db, character, rng)
@@ -65,6 +73,9 @@ async def apply_outcome(
             lines.append(drop_line)
         if character.subclass is not None:
             await trial_service.record_trophies(db, character, drop)
+        progress = await daily_service.record_trophies(db, character, drop)
+        daily_completed += progress.completed
+        daily_streak_notice = daily_streak_notice or progress.streak_notice
 
     levels_gained = 0
     new_level = character.level
@@ -87,4 +98,5 @@ async def apply_outcome(
 
     return OutcomeResult(
         "\n\n".join(line for line in lines if line), levels_gained=levels_gained, new_level=new_level,
+        daily_completed=daily_completed, daily_streak_notice=daily_streak_notice,
     )

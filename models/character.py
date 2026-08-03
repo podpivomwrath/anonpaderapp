@@ -1,6 +1,6 @@
-from datetime import datetime
+from datetime import date, datetime
 
-from sqlalchemy import JSON, BigInteger, Boolean, DateTime, ForeignKey, Index, String, func
+from sqlalchemy import JSON, BigInteger, Boolean, Date, DateTime, ForeignKey, Index, String, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from models.base import Base
@@ -39,6 +39,19 @@ class Character(Base):
     # PvP-статистика (патч 22) — победы/поражения в открытом PvP на карте
     pvp_wins: Mapped[int] = mapped_column(default=0)
     pvp_losses: Mapped[int] = mapped_column(default=0)
+
+    # Стрики и ежедневный цикл (патч 23) — даты в московской зоне (см.
+    # game.economy.dailies_config.DAILY_RESET_TZ), не UTC.
+    login_streak: Mapped[int] = mapped_column(default=0)
+    daily_streak: Mapped[int] = mapped_column(default=0)
+    last_login_date: Mapped[date | None] = mapped_column(Date, nullable=True)
+    last_daily_completed_date: Mapped[date | None] = mapped_column(Date, nullable=True)
+    # Позиция в 14-дневном цикле наград за вход (1..14); не сбрасывается при
+    # обнулении login_streak — обнуляется только сам цикл (день 15 = день 1).
+    login_cycle_day: Mapped[int] = mapped_column(default=0)
+    # id разблокированного титула из character_titles, выбранного активным
+    # для отображения рядом с ником; NULL — титул не показывается.
+    active_title_id: Mapped[str | None] = mapped_column(String(32), nullable=True)
 
     # Позиция на карте (сетка -50..50); NULL до завершения онбординга
     pos_x: Mapped[int | None] = mapped_column(nullable=True)

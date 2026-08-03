@@ -6,7 +6,7 @@
 
 from vkbottle.bot import BotLabeler, Message
 
-from bot import editable_message
+from bot import dailies_texts, editable_message
 from bot.appraiser_texts import (
     appraiser_empty,
     appraiser_gear_empty,
@@ -22,7 +22,7 @@ from bot.keyboards.appraiser import (
 )
 from bot.keyboards.world import BTN_APPRAISER
 from game.world import grid
-from services import item_service
+from services import daily_service, item_service
 from services import onboarding_service as onboarding_svc
 from services import trophy_service
 from services import wallet_service
@@ -81,6 +81,7 @@ async def sell_trophies(message: Message) -> None:
             gold = await trophy_service.sell_all(db, character)
         else:
             gold = await trophy_service.sell_one(db, character, trophy_id)
+        daily_progress = await daily_service.record_sell_gold(db, character, gold)
         total = (await wallet_service.get_wallet(db, character.id)).farm_currency
         await db.commit()
         stock = await trophy_service.get_stock(db, character.id)
@@ -97,6 +98,10 @@ async def sell_trophies(message: Message) -> None:
         )
         text = f"{appraiser_sold(gold, total)}\n\n{lines}"
     await editable_message.send_or_edit(_bot_api, _NS, peer_id, text, appraiser_keyboard(stock))
+
+    daily_notice = dailies_texts.progress_notice(daily_progress)
+    if daily_notice:
+        await _bot_api.messages.send(peer_id=peer_id, message=daily_notice, random_id=0)
 
 
 @labeler.message(text=[BTN_SELL_GEAR])

@@ -11,6 +11,7 @@ from game.combat.battle_report import BattleReport
 from game.combat.formulas import respawn_time_minutes
 from models import Character, CharacterStats, Item
 from services import (
+    daily_service,
     death_service,
     experience_service,
     item_service,
@@ -32,6 +33,8 @@ class VictoryOutcome:
     trophies_gained: dict[str, int] = field(default_factory=dict)
     item_dropped: Item | None = None  # патч 11, блок 2 — независимая от трофеев таблица
     unlocked_buffs: list[str] = field(default_factory=list)  # патч 12 — id баффов, открытых этим боем
+    daily_completed: list = field(default_factory=list)  # патч 23 — daily_service.DailyCompletion
+    daily_streak_notice: str | None = None  # патч 23 — текст рубежа стрика ежедневок, если сработал
 
 
 async def resolve_victory(
@@ -58,16 +61,26 @@ async def resolve_victory(
         if battle_report is not None:
             unlocked += await trial_service.record_battle(db, character, battle_report)
 
+    daily_completed = []
+    daily_streak_notice = None
+    daily_progress = await daily_service.record_trophies(db, character, trophies)
+    daily_completed += daily_progress.completed
+    daily_streak_notice = daily_streak_notice or daily_progress.streak_notice
+    if battle_report is not None:
+        daily_progress = await daily_service.record_battle(db, character, battle_report)
+        daily_completed += daily_progress.completed
+        daily_streak_notice = daily_streak_notice or daily_progress.streak_notice
+
     progress = await quest_service.record_kill(db, character)
     if progress is None:
         return VictoryOutcome(
             xp, levelup.levels_gained, levelup.new_level, None, None, None, False,
-            trophies, item, unlocked,
+            trophies, item, unlocked, daily_completed, daily_streak_notice,
         )
     return VictoryOutcome(
         xp, levelup.levels_gained, levelup.new_level,
         progress.progress_label, progress.progress, progress.target_count,
-        progress.status == "ready", trophies, item, unlocked,
+        progress.status == "ready", trophies, item, unlocked, daily_completed, daily_streak_notice,
     )
 
 
@@ -87,4 +100,5 @@ async def resolve_defeat(db: AsyncSession, character: Character) -> DefeatOutcom
     character.travel_arrives_at = None
     if character.subclass is not None:
         await trial_service.record_defeat(db, character)
+    await daily_service.record_defeat(db, character)
     return DefeatOutcome(minutes, xp_lost)

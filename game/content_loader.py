@@ -352,6 +352,28 @@ def load_story_line(region: str, content_dir: Path = CONTENT_DIR) -> StoryLineDe
     return StoryLineDef(**raw)
 
 
+class DailyQuestDef(BaseModel):
+    """Ежедневное задание (content/quests/dailies.json, патч 23) — пул, из
+    которого каждый день выбираются 3 случайных. base_target масштабируется
+    по уровню игрока (game.economy.dailies_config.scaled_target); условие
+    прогресса — services/daily_service.py (condition_type/params)."""
+
+    id: str
+    title: str
+    progress_label: str
+    condition_type: str
+    base_target: int
+    min_level: int = 1
+    params: dict = Field(default_factory=dict)
+
+
+def load_daily_quests(content_dir: Path = CONTENT_DIR) -> list[DailyQuestDef]:
+    return [
+        DailyQuestDef(**raw)
+        for raw in _load_json(content_dir / "quests" / "dailies.json")
+    ]
+
+
 class GameContent(BaseModel):
     mobs: dict[str, MobDef]
     items: dict[str, ItemDef]

@@ -15,6 +15,7 @@ from datetime import datetime, timezone
 from sqlalchemy import select
 from vkbottle.bot import BotLabeler, Message
 
+from bot import dailies_texts
 from bot.handlers import combat as combat_handlers
 from bot.handlers import stats_window
 from bot.keyboards import world as kb
@@ -29,6 +30,7 @@ from game.world import world_config as wc
 from game.world.scheduler import PeerScheduler
 from models import CharacterStats
 from services import (
+    daily_service,
     death_service,
     event_service,
     experience_service,
@@ -81,11 +83,23 @@ async def _get_stats(db, character_id: int) -> CharacterStats:
 
 def _map_text(
     character, stats, farm_currency: int, gear_bonus: dict | None = None,
-    quest_line: str | None = None,
+    quest_line: str | None = None, donate_currency: int = 0,
 ) -> str:
     """Единая сводка клетки — ВСЕГДА самостоятельное сообщение (ux-patch-10)."""
     vit_bonus = (gear_bonus or {}).get("vit", 0)
-    return location_summary(character, stats, _rng, farm_currency, vit_bonus, quest_line)
+    return location_summary(character, stats, _rng, farm_currency, vit_bonus, quest_line, donate_currency)
+
+
+async def _deliver_daily_notice(peer_id: int, character) -> None:
+    """Патч 23: доставка уведомления о сбросе дня/стрике/награде за вход,
+    отложенного в onboarding_service.get_character (транзиентный атрибут,
+    не персистентный — читаем и сразу гасим)."""
+    notice = getattr(character, "_daily_notice", None)
+    if notice is None:
+        return
+    character._daily_notice = None
+    for line in notice.lines:
+        await _bot_api.messages.send(peer_id=peer_id, message=line, random_id=0)
 
 
 async def _check_still_dead(db, character, now: datetime) -> bool:
@@ -134,6 +148,7 @@ async def _maybe_trigger_story(peer_id: int, db, character, stats) -> bool:
 
 async def show_location(message: Message, db, character) -> None:
     """Показывает текущий контекст персонажа: город / клетка карты / в пути / мёртв."""
+    await _deliver_daily_notice(message.peer_id, character)
     now = datetime.now(timezone.utc)
 
     if await _check_still_dead(db, character, now):
@@ -144,6 +159,7 @@ async def show_location(message: Message, db, character) -> None:
     if movement_service.resolve_arrival(character, now):
         if character.subclass is not None:
             await trial_service.record_cell_moved(db, character)
+        await daily_service.record_cell_moved(db, character)
         await db.commit()
 
     if movement_service.is_traveling(character, now):
@@ -169,11 +185,12 @@ async def show_location(message: Message, db, character) -> None:
     if await _maybe_trigger_story(message.peer_id, db, character, stats):
         return
 
-    farm_currency = (await wallet_service.get_wallet(db, character.id)).farm_currency
+    wallet = await wallet_service.get_wallet(db, character.id)
+    farm_currency, donate_currency = wallet.farm_currency, wallet.donate_currency
     gear_bonus = await item_service.compute_gear_bonus(db, character.id)
     quest_line = await story_service.quest_summary_line(db, character)
     await message.answer(
-        _map_text(character, stats, farm_currency, gear_bonus, quest_line),
+        _map_text(character, stats, farm_currency, gear_bonus, quest_line, donate_currency),
         keyboard=kb.movement_keyboard(character.pos_x, character.pos_y),
     )
 
@@ -220,14 +237,16 @@ async def gate_exit_direction(message: Message) -> None:
             return  # защитная проверка на случай устаревшей клавиатуры
         character.pos_x, character.pos_y = nx, ny
         stats = await _get_stats(db, character.id)
-        farm_currency = (await wallet_service.get_wallet(db, character.id)).farm_currency
+        wallet = await wallet_service.get_wallet(db, character.id)
+        farm_currency, donate_currency = wallet.farm_currency, wallet.donate_currency
         gear_bonus = await item_service.compute_gear_bonus(db, character.id)
         quest_line = await story_service.quest_summary_line(db, character)
         await db.commit()
+        await _deliver_daily_notice(message.peer_id, character)
         # ux-patch-10 п.1: сводка локации — всегда отдельное сообщение
         await message.answer("Ты выходишь за ворота.", keyboard=kb.waiting_keyboard())
         await message.answer(
-            _map_text(character, stats, farm_currency, gear_bonus, quest_line),
+            _map_text(character, stats, farm_currency, gear_bonus, quest_line, donate_currency),
             keyboard=kb.movement_keyboard(character.pos_x, character.pos_y),
         )
 
@@ -292,9 +311,18 @@ async def handle_explore_done(peer_id: int) -> None:
         stats = await _get_stats(db, character.id)
 
         outcome_kind = "combat" if _rng.random() < wc.EXPLORE_COMBAT_CHANCE else "event"
-        farm_currency = (await wallet_service.get_wallet(db, character.id)).farm_currency
+        daily_progress = await daily_service.record_exploration(db, character)
+        await db.commit()
+        wallet = await wallet_service.get_wallet(db, character.id)
+        farm_currency, donate_currency = wallet.farm_currency, wallet.donate_currency
         gear_bonus = await item_service.compute_gear_bonus(db, character.id)
         buff_modifiers = await preset_service.resolve_active_modifiers(db, character)
+
+    notice = dailies_texts.progress_notice(daily_progress)
+    if notice:
+        await _bot_api.messages.send(peer_id=peer_id, message=notice, random_id=0)
+    for c in daily_progress.completed:
+        await stats_window.notify_levelup(peer_id, c.levels_gained, c.new_level)
 
     if outcome_kind == "combat":
         await combat_handlers.start_encounter(peer_id, character, stats, gear_bonus, buff_modifiers)
@@ -338,7 +366,8 @@ async def event_choice(message: Message) -> None:
         result = await event_service.apply_outcome(
             db, character, stats, outcome, _rng, event_id=event.id, choice_code=choice_code
         )
-        farm_currency = (await wallet_service.get_wallet(db, character.id)).farm_currency
+        wallet = await wallet_service.get_wallet(db, character.id)
+        farm_currency, donate_currency = wallet.farm_currency, wallet.donate_currency
         gear_bonus = await item_service.compute_gear_bonus(db, character.id)
         buff_modifiers = await preset_service.resolve_active_modifiers(db, character)
         quest_line = await story_service.quest_summary_line(db, character)
@@ -353,8 +382,13 @@ async def event_choice(message: Message) -> None:
     await message.answer(result.text, keyboard=kb.waiting_keyboard())
     # патч 14, ч.2.3: событие — тоже источник опыта, левелап не должен теряться
     await stats_window.notify_levelup(peer_id, result.levels_gained, result.new_level)
+    daily_notice = dailies_texts.progress_notice_from(result.daily_completed, result.daily_streak_notice)
+    if daily_notice:
+        await message.answer(daily_notice)
+    for c in result.daily_completed:
+        await stats_window.notify_levelup(peer_id, c.levels_gained, c.new_level)
     await message.answer(
-        _map_text(character, stats, farm_currency, gear_bonus, quest_line),
+        _map_text(character, stats, farm_currency, gear_bonus, quest_line, donate_currency),
         keyboard=kb.movement_keyboard(character.pos_x, character.pos_y),
     )
 
@@ -408,6 +442,7 @@ async def handle_rest_done(peer_id: int) -> None:
         vitals_service.restore_full(character)
         if character.subclass is not None:
             await trial_service.record_rest(db, character)
+        await daily_service.record_rest(db, character)
         await db.commit()
         region = grid.city_region_at(character.pos_x, character.pos_y)
         if region is not None:
@@ -415,6 +450,7 @@ async def handle_rest_done(peer_id: int) -> None:
             keyboard = kb.city_menu_keyboard(character, mentor_badge)
         else:
             keyboard = kb.movement_keyboard(character.pos_x, character.pos_y)
+    await _deliver_daily_notice(peer_id, character)
     text = f"{flavor.rest_done()}\n{display.hp_delta_line(hp_before, max_hp, max_hp)}"
     await _bot_api.messages.send(peer_id=peer_id, message=text, random_id=0, keyboard=keyboard)
 
@@ -441,6 +477,7 @@ async def move(message: Message) -> None:
         if movement_service.resolve_arrival(character, now):
             if character.subclass is not None:
                 await trial_service.record_cell_moved(db, character)
+            await daily_service.record_cell_moved(db, character)
             await db.commit()
             await show_location(message, db, character)
             return
@@ -469,7 +506,9 @@ async def handle_arrival(peer_id: int) -> None:
             return  # игрок уже сам разрешил прибытие более ранним действием
         if character.subclass is not None:
             await trial_service.record_cell_moved(db, character)
+        await daily_service.record_cell_moved(db, character)
         await db.commit()
+        await _deliver_daily_notice(peer_id, character)
         region = grid.city_region_at(character.pos_x, character.pos_y)
         if region is not None:
             mentor_badge = region == character.region and await story_service.mentor_badge_active(db, character)
@@ -484,11 +523,12 @@ async def handle_arrival(peer_id: int) -> None:
         stats = await _get_stats(db, character.id)
         if await _maybe_trigger_story(peer_id, db, character, stats):
             return
-        farm_currency = (await wallet_service.get_wallet(db, character.id)).farm_currency
+        wallet = await wallet_service.get_wallet(db, character.id)
+        farm_currency, donate_currency = wallet.farm_currency, wallet.donate_currency
         quest_line = await story_service.quest_summary_line(db, character)
         await _bot_api.messages.send(
             peer_id=peer_id,
-            message=_map_text(character, stats, farm_currency, quest_line=quest_line),
+            message=_map_text(character, stats, farm_currency, quest_line=quest_line, donate_currency=donate_currency),
             random_id=0,
             keyboard=kb.movement_keyboard(character.pos_x, character.pos_y),
         )

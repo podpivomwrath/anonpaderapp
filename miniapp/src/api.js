@@ -73,3 +73,7 @@ export function buyPresetSlot() {
 export function getPvpLeaderboard() {
   return request('/pvp_leaderboard');
 }
+
+export function getDailies() {
+  return request('/dailies');
+}

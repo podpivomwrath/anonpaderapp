@@ -1,0 +1,87 @@
+[
+  {
+    "id": "hunt",
+    "title": "Охота",
+    "progress_label": "Убить врагов",
+    "condition_type": "kill_any",
+    "base_target": 20
+  },
+  {
+    "id": "deeper_ash",
+    "title": "Глубже в пепел",
+    "progress_label": "Убить врагов в кольце своего уровня или ближе к центру",
+    "condition_type": "kill_deep_ring",
+    "base_target": 10
+  },
+  {
+    "id": "collector",
+    "title": "Собиратель",
+    "progress_label": "Собрать трофеев (любой градации)",
+    "condition_type": "trophy_any",
+    "base_target": 15
+  },
+  {
+    "id": "diligent",
+    "title": "Старательный",
+    "progress_label": "Собрать трофеев градации 🔵 или выше",
+    "condition_type": "trophy_rare",
+    "base_target": 5
+  },
+  {
+    "id": "wanderer",
+    "title": "Странник",
+    "progress_label": "Пройти клеток карты",
+    "condition_type": "cells_moved",
+    "base_target": 30
+  },
+  {
+    "id": "explorer",
+    "title": "Исследователь",
+    "progress_label": "Провести исследований",
+    "condition_type": "explorations",
+    "base_target": 8
+  },
+  {
+    "id": "curious",
+    "title": "Любопытный",
+    "progress_label": "Пройти событий с выбором",
+    "condition_type": "event_choices",
+    "base_target": 5
+  },
+  {
+    "id": "fence",
+    "title": "Барыга",
+    "progress_label": "Продать Иргалу трофеев на золото",
+    "condition_type": "sell_gold",
+    "base_target": 500
+  },
+  {
+    "id": "blood_trial",
+    "title": "Испытание крови",
+    "progress_label": "Победить врагов, используя только навыки",
+    "condition_type": "skill_only_win",
+    "base_target": 5
+  },
+  {
+    "id": "endurance",
+    "title": "Выносливость",
+    "progress_label": "Убить врагов подряд без отдыха",
+    "condition_type": "kill_streak_no_rest",
+    "base_target": 8
+  },
+  {
+    "id": "marked_hunter",
+    "title": "Охотник на Меченых",
+    "progress_label": "Победить в PvP-боях",
+    "condition_type": "pvp_win",
+    "base_target": 3,
+    "min_level": 15
+  },
+  {
+    "id": "survivor",
+    "title": "Уцелевший",
+    "progress_label": "Выжить в боях, опустившись ниже 25% здоровья",
+    "condition_type": "low_hp_survive",
+    "base_target": 3
+  }
+]

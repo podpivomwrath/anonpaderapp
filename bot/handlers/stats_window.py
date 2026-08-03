@@ -16,6 +16,7 @@ from bot import editable_message
 from bot.keyboards.stats_window import no_keyboard, stats_alloc_keyboard
 from bot.keyboards.world import BTN_STATS
 from models import CharacterStats
+from services import daily_service
 from services import onboarding_service as onboarding_svc
 from services import stat_alloc_service as sas
 from services.db import get_session_factory
@@ -79,7 +80,9 @@ async def open_or_update_window(peer_id: int, header: str) -> None:
         _clear(peer_id)
         await _bot_api.messages.send(
             peer_id=peer_id,
-            message=sas.render_readonly(header, char_stats, character.pvp_wins, character.pvp_losses),
+            message=sas.render_readonly(
+                header, char_stats, character.pvp_wins, character.pvp_losses, daily_service.title_name(character),
+            ),
             random_id=0,
         )
         return
@@ -143,7 +146,9 @@ async def stat_alloc_cancel(message: Message) -> None:
     header = _window_header.get(peer_id, "📊 Характеристики")
     if unspent <= 0:
         _clear(peer_id)
-        text = sas.render_readonly(header, char_stats, character.pvp_wins, character.pvp_losses)
+        text = sas.render_readonly(
+            header, char_stats, character.pvp_wins, character.pvp_losses, daily_service.title_name(character),
+        )
         await _send_or_edit(peer_id, text, no_keyboard())
         return
     text = sas.render_window(header, unspent, char_stats, {})
@@ -164,8 +169,9 @@ async def stat_alloc_done(message: Message) -> None:
             stats = await _get_stats(db, character.id)
             char_stats = sas.snapshot(stats)
             pvp_wins, pvp_losses = character.pvp_wins, character.pvp_losses
+            title = daily_service.title_name(character)
         _clear(peer_id)
-        text = sas.render_readonly(header, char_stats, pvp_wins, pvp_losses)
+        text = sas.render_readonly(header, char_stats, pvp_wins, pvp_losses, title)
         await _send_or_edit(peer_id, text, no_keyboard())
         return
 

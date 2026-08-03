@@ -28,6 +28,7 @@ BTN_STATS = "📊 Характеристики"
 BTN_KEEPER = "📖 Хранитель Списков"
 BTN_PRESETS = "⚔️ Пресеты"
 BTN_ELIXIR_SHOP = "⚗️ Лавка зелий"
+BTN_DAILIES = "📜 Задания"
 
 
 def add_miniapp_button(kb: Keyboard) -> None:
@@ -83,6 +84,8 @@ def city_menu_keyboard(character=None, mentor_badge: bool = False) -> str:
     kb.row()
     kb.add(Text(BTN_STATS), color=KeyboardButtonColor.SECONDARY)
     kb.add(Text(BTN_ELIXIR_SHOP), color=KeyboardButtonColor.SECONDARY)
+    kb.row()
+    kb.add(Text(BTN_DAILIES), color=KeyboardButtonColor.SECONDARY)
     if character is not None and character.level >= bc.SUBCLASS_UNLOCK_MIN_LEVEL:
         kb.row()
         kb.add(Text(BTN_KEEPER), color=KeyboardButtonColor.SECONDARY)

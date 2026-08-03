@@ -15,9 +15,18 @@ from bot.miniapp_auth import VK_USER_ID_KEY
 from bot.onboarding_texts import REGION_TITLES
 from game.content_loader import load_content
 from models import BaseClass, Character, CharacterBuffPreset, User
-from services import derived_stats_service, item_service, preset_service, pvp_service, trial_service
+from services import (
+    daily_service,
+    derived_stats_service,
+    item_service,
+    preset_service,
+    pvp_service,
+    quest_service,
+    story_service,
+    trial_service,
+)
 from services.preset_service import PresetValidationError
-from services.wallet_service import NotEnoughCurrency
+from services.wallet_service import NotEnoughCurrency, get_wallet
 
 STAT_FIELDS = {
     "str": "strength",
@@ -43,17 +52,22 @@ async def _load_character(session: AsyncSession, vk_user_id: int) -> Character |
     )
 
 
-def _character_payload(character: Character, gear_bonus: dict[str, int] | None = None) -> dict:
+def _character_payload(
+    character: Character, gear_bonus: dict[str, int] | None = None, wallet=None,
+) -> dict:
     stats = character.stats
     derived = derived_stats_service.compute(character, stats, gear_bonus)
     return {
         "name": character.name,
+        "title": daily_service.title_name(character),
         "base_class": character.base_class,
         "base_class_title": CLASS_TITLES.get(character.base_class, character.base_class),
         "subclass": character.subclass,
         "region": character.region,
         "region_title": REGION_TITLES.get(character.region, "—") if character.region else "—",
         "level": character.level,
+        "farm_currency": wallet.farm_currency if wallet is not None else None,
+        "donate_currency": wallet.donate_currency if wallet is not None else None,
         "stats": {
             "str": stats.strength,
             "agi": stats.agility,
@@ -81,7 +95,9 @@ async def handle_get_character(request: web.Request) -> web.Response:
         if character is None:
             return web.json_response({"error": "character_not_found"}, status=404)
         gear_bonus = await item_service.compute_gear_bonus(session, character.id)
-        return web.json_response(_character_payload(character, gear_bonus))
+        wallet = await get_wallet(session, character.id)
+        await session.commit()
+        return web.json_response(_character_payload(character, gear_bonus, wallet))
 
 
 async def handle_post_stats(request: web.Request) -> web.Response:
@@ -123,8 +139,9 @@ async def handle_post_stats(request: web.Request) -> web.Response:
         stats.unspent_points -= total
 
         gear_bonus = await item_service.compute_gear_bonus(session, character.id)
+        wallet = await get_wallet(session, character.id)
         await session.commit()
-        return web.json_response(_character_payload(character, gear_bonus))
+        return web.json_response(_character_payload(character, gear_bonus, wallet))
 
 
 async def handle_get_trials(request: web.Request) -> web.Response:
@@ -171,10 +188,93 @@ async def handle_get_pvp_leaderboard(request: web.Request) -> web.Response:
         return web.json_response(
             {
                 "top": [
-                    {"rank": e.rank, "name": e.name, "wins": e.wins, "losses": e.losses}
+                    {"rank": e.rank, "name": e.name, "wins": e.wins, "losses": e.losses, "title": e.title}
                     for e in entries
                 ],
                 "you": {"rank": rank, "wins": character.pvp_wins, "losses": character.pvp_losses},
+            }
+        )
+
+
+async def _story_payload(session: AsyncSession, character: Character) -> dict:
+    """Патч 23: секция «Сюжет» вкладки «Задания» — текущий активный квест
+    (первый региональный квест «убей 10» читается через quest_service, как в
+    bot/handlers/world.py::quest_reminder_text — та же логика, структурировано
+    для JSON) + список пройденных актов региона."""
+    row = await story_service.get_progress(session, character)
+    line = story_service.get_line(character.region)
+    passed_acts = [
+        {"act": act.act, "title": act.title}
+        for act in line.acts
+        if row is not None and (row.completed or act.act < row.act)
+    ]
+    quest = await story_service.current_quest_def(session, character)
+    if quest is None:
+        return {"active_quest": None, "passed_acts": passed_acts}
+
+    if quest.kind == "first_quest":
+        peek = await quest_service.peek_progress(session, character)
+        active_quest = None
+        if peek is not None and peek.status != "completed":
+            active_quest = {
+                "title": peek.title,
+                "text": f"{peek.progress_label}: {peek.progress}/{peek.target_count}",
+                "target": None,
+                "ready": peek.status == "ready",
+            }
+        return {"active_quest": active_quest, "passed_acts": passed_acts}
+
+    target = None
+    if quest.target_x is not None and quest.target_y is not None:
+        target = {"x": quest.target_x, "y": quest.target_y, "label": quest.target_label}
+    ready = row is not None and row.status == "ready"
+    return {
+        "active_quest": {
+            "title": quest.title,
+            "text": story_service.format_text(quest.assign_text, character),
+            "target": target,
+            "ready": ready,
+        },
+        "passed_acts": passed_acts,
+    }
+
+
+async def handle_get_dailies(request: web.Request) -> web.Response:
+    """Патч 23: вкладка «Задания» — три секции (Сюжет/Ежедневные/Вход)."""
+    vk_user_id = request[VK_USER_ID_KEY]
+    session_factory = request.app[SESSION_FACTORY_KEY]
+    async with session_factory() as session:
+        character = await _load_character(session, vk_user_id)
+        if character is None:
+            return web.json_response({"error": "character_not_found"}, status=404)
+        story = await _story_payload(session, character)
+        overview = await daily_service.get_dailies_overview(session, character)
+        login_state = await daily_service.get_login_state(session, character)
+        return web.json_response(
+            {
+                "story": story,
+                "dailies": {
+                    "quests": [
+                        {
+                            "id": q.quest_id, "title": q.title, "progress_label": q.progress_label,
+                            "progress": q.progress, "target": q.target, "completed": q.completed,
+                            "xp_reward": q.xp_reward, "gold_reward": q.gold_reward,
+                        }
+                        for q in overview.quests
+                    ],
+                    "daily_streak": overview.daily_streak,
+                    "next_milestone_day": overview.next_milestone_day,
+                    "next_milestone_reward": overview.next_milestone_reward,
+                    "seconds_until_reset": overview.seconds_until_reset,
+                },
+                "login": {
+                    "login_streak": login_state.login_streak,
+                    "cycle_day": login_state.cycle_day,
+                    "cycle_length": login_state.cycle_length,
+                    "today_reward": login_state.today_reward,
+                    "claimed_today": login_state.claimed_today,
+                    "rewards": login_state.rewards,
+                },
             }
         )
 
@@ -375,3 +475,4 @@ def register_routes(app: web.Application) -> None:
     app.router.add_post("/api/miniapp/presets/switch", handle_post_preset_switch)
     app.router.add_post("/api/miniapp/presets/buy_slot", handle_post_preset_buy_slot)
     app.router.add_get("/api/miniapp/pvp_leaderboard", handle_get_pvp_leaderboard)
+    app.router.add_get("/api/miniapp/dailies", handle_get_dailies)

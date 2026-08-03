@@ -17,6 +17,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from game.combat import balance_config as bc
 from game.world import world_config as wc
 from models import Character, CharacterStats, User, Wallet
+from services import daily_service
 
 BANNED_WORDS_PATH = Path(__file__).resolve().parent.parent / "content" / "banned_words.txt"
 
@@ -64,12 +65,23 @@ async def get_or_create_user(db: AsyncSession, vk_id: int) -> User:
 
 
 async def get_character(db: AsyncSession, vk_id: int) -> Character | None:
-    """Персонаж игрока, включая незавершённого (в процессе создания)."""
-    return await db.scalar(
+    """Персонаж игрока, включая незавершённого (в процессе создания).
+
+    Патч 23: единая точка входа для ЛЮБОГО действия игрока (используется
+    всеми хендлерами) — здесь же, идемпотентно, проверяются стрики/сброс дня.
+    Уведомление (если что-то произошло) кладётся во временный атрибут
+    character._daily_notice — не персистентный, читается bot/handlers/world.py
+    при следующем показе карты/города и там же удаляется."""
+    character = await db.scalar(
         select(Character)
         .join(User, User.id == Character.user_id)
         .where(User.vk_id == vk_id)
     )
+    if character is not None and character.creation_state is None:
+        notice = await daily_service.ensure_day_rollover(db, character)
+        if notice is not None:
+            character._daily_notice = notice
+    return character
 
 
 async def vk_id_for_character(db: AsyncSession, character_id: int) -> int | None:

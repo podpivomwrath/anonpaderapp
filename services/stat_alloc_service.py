@@ -51,14 +51,16 @@ def render_window(header: str, unspent: int, char_stats: dict[str, int], pending
 
 def render_readonly(
     header: str, char_stats: dict[str, int],
-    pvp_wins: int | None = None, pvp_losses: int | None = None,
+    pvp_wins: int | None = None, pvp_losses: int | None = None, title: str | None = None,
 ) -> str:
     """unspent_points = 0 — только текущие статы, без кнопок вложения.
 
     pvp_wins/pvp_losses (патч 22) — добавляет строку "⚔️ PvP: N побед · M
     поражений" под статами, если переданы (None — не показывать вовсе,
-    для вызовов, где профиль ни при чём)."""
-    lines = [header, ""]
+    для вызовов, где профиль ни при чём). title (патч 23) — активный титул,
+    показывается рядом с заголовком, если задан."""
+    header_line = f"{header} «{title}»" if title else header
+    lines = [header_line, ""]
     for key in STAT_ORDER:
         emoji, name = STAT_META[key]
         lines.append(f"{emoji} {name}: {char_stats[key]}")

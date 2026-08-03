@@ -10,7 +10,7 @@ import random
 from vkbottle import BaseStateGroup  # noqa: F401  (совместимость импортов)
 from vkbottle.bot import BotLabeler, Message
 
-from bot import editable_message
+from bot import dailies_texts, editable_message
 from bot.handlers import stats_window
 from bot.keyboards.combat_items import combat_items_keyboard
 from bot.keyboards.items import item_choice_keyboard, no_keyboard
@@ -277,7 +277,8 @@ async def on_battle_finished(session_id: int, result: TickResult) -> None:
                 # grant_from_kill только добавил новый в инвентарь, не экипировал)
                 equipped = await item_service.get_equipped(db, character.id)
                 old_item = equipped[outcome.item_dropped.slot]
-            farm_currency = (await wallet_service.get_wallet(db, character.id)).farm_currency
+            wallet = await wallet_service.get_wallet(db, character.id)
+            farm_currency, donate_currency = wallet.farm_currency, wallet.donate_currency
             quest_ready_now = story_state is not None and story_state[1] <= 1
             if quest_ready_now:
                 # последний бой цепочки (или обычный одиночный сюжетный бой) —
@@ -350,6 +351,12 @@ async def on_battle_finished(session_id: int, result: TickResult) -> None:
                 random_id=0,
             )
 
+        daily_notice = dailies_texts.progress_notice_from(outcome.daily_completed, outcome.daily_streak_notice)
+        if daily_notice:
+            await _bot_api.messages.send(peer_id=peer_id, message=daily_notice, random_id=0)
+        for c in outcome.daily_completed:
+            await stats_window.notify_levelup(peer_id, c.levels_gained, c.new_level)
+
         if quest_ready_now:
             # патч 21, п.1: игрок не в разговоре с наставником — пингуем сами
             await _bot_api.messages.send(
@@ -373,7 +380,7 @@ async def on_battle_finished(session_id: int, result: TickResult) -> None:
 
         await _bot_api.messages.send(
             peer_id=peer_id,
-            message=location_summary(character, stats, _rng, farm_currency, vit_bonus, quest_line),
+            message=location_summary(character, stats, _rng, farm_currency, vit_bonus, quest_line, donate_currency),
             random_id=0, keyboard=movement_keyboard(character.pos_x, character.pos_y),
         )
     elif on_defeat_hook is not None:
@@ -414,7 +421,8 @@ async def item_choice(message: Message) -> None:
             confirm_text = f"Надето. {item_service.stat_delta_line(old_item, new_item)}"
         else:
             confirm_text = "Убрано в инвентарь."
-        farm_currency = (await wallet_service.get_wallet(db, character.id)).farm_currency
+        wallet = await wallet_service.get_wallet(db, character.id)
+        farm_currency, donate_currency = wallet.farm_currency, wallet.donate_currency
         vit_bonus = (await item_service.compute_gear_bonus(db, character.id)).get("vit", 0)
         quest_line = await story_service.quest_summary_line(db, character)
         await db.commit()
@@ -423,7 +431,7 @@ async def item_choice(message: Message) -> None:
     # ux-patch-10 п.1: сводка локации — всегда ОТДЕЛЬНОЕ следующее сообщение.
     await editable_message.send_or_edit(_bot_api, "item_choice", peer_id, confirm_text, no_keyboard())
     await message.answer(
-        location_summary(character, stats, _rng, farm_currency, vit_bonus, quest_line),
+        location_summary(character, stats, _rng, farm_currency, vit_bonus, quest_line, donate_currency),
         keyboard=movement_keyboard(character.pos_x, character.pos_y),
     )
 

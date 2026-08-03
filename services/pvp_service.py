@@ -11,6 +11,7 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from game.classes.base import REGISTRY
+from game.economy import dailies_config as dc
 from game.economy import pvp_config as pc
 from models import Character, PvpBattle
 from services import death_service
@@ -81,22 +82,28 @@ class LeaderboardEntry:
     name: str
     wins: int
     losses: int
+    title: str | None = None
 
 
 async def leaderboard(db: AsyncSession, limit: int = 10) -> list[LeaderboardEntry]:
     """Топ-10 (или limit) по победам, при равенстве — по меньшему числу
-    поражений (патч 22, п.7)."""
+    поражений (патч 22, п.7). title (патч 23) — активный титул, если задан."""
     rows = (
         await db.execute(
-            select(Character.name, Character.pvp_wins, Character.pvp_losses)
+            select(
+                Character.name, Character.pvp_wins, Character.pvp_losses, Character.active_title_id,
+            )
             .where(Character.creation_state.is_(None))
             .order_by(Character.pvp_wins.desc(), Character.pvp_losses.asc())
             .limit(limit)
         )
     ).all()
     return [
-        LeaderboardEntry(rank=i, name=name, wins=wins, losses=losses)
-        for i, (name, wins, losses) in enumerate(rows, start=1)
+        LeaderboardEntry(
+            rank=i, name=name, wins=wins, losses=losses,
+            title=dc.TITLE_NAMES.get(title_id) if title_id else None,
+        )
+        for i, (name, wins, losses, title_id) in enumerate(rows, start=1)
     ]
 
 

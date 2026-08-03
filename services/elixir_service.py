@@ -60,6 +60,19 @@ async def buy(db: AsyncSession, character: Character, elixir_id: str) -> None:
     await db.flush()
 
 
+async def grant(db: AsyncSession, character_id: int, elixir_id: str, amount: int = 1) -> None:
+    """Начисляет N штук без списания золота (награды — патч 23: стрики,
+    цикл входа)."""
+    if amount <= 0:
+        return
+    row = await _get_row(db, character_id, elixir_id)
+    if row is None:
+        row = CharacterConsumable(character_id=character_id, elixir_id=elixir_id, count=0)
+        db.add(row)
+    row.count += amount
+    await db.flush()
+
+
 async def get_stock(db: AsyncSession, character_id: int) -> list[tuple[ElixirDef, int]]:
     """Только виды с count > 0, в порядке content/items/elixirs.json."""
     rows = (

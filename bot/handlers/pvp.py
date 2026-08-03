@@ -24,8 +24,10 @@ from datetime import datetime, timezone
 from sqlalchemy import select
 from vkbottle.bot import BotLabeler, Message
 
+from bot import dailies_texts
 from bot.handlers import combat as combat_handlers
 from bot.handlers import respawn as respawn_handlers
+from bot.handlers import stats_window
 from bot.keyboards import world as kb
 from bot.keyboards.pvp import (
     BTN_PVP_ATTACK,
@@ -52,7 +54,7 @@ from game.combat.skills import DEFENSIVE_SKILLS
 from game.combat.tick_engine import TickEngine
 from game.world import grid
 from models import Character, CharacterStats
-from services import death_service, item_service, preset_service, pvp_service, trophy_service
+from services import daily_service, death_service, item_service, preset_service, pvp_service, trophy_service
 from services import onboarding_service as onboarding_svc
 from services.db import get_session_factory
 
@@ -197,7 +199,9 @@ async def _scene_at(db, character: Character) -> tuple[list[Character], list[tup
 
 
 def _class_line(c: Character) -> str:
-    return f"{c.name} · {c.level} ур. · {pvp_service.class_title(c)}"
+    title = daily_service.title_name(c)
+    name = f"{c.name} «{title}»" if title else c.name
+    return f"{name} · {c.level} ур. · {pvp_service.class_title(c)}"
 
 
 def _battle_scene_line(battle: Battle) -> str:
@@ -282,7 +286,8 @@ async def leaderboard_command(message: Message) -> None:
 
     lines = ["🏆 ЛУЧШИЕ ИЗ МЕЧЕНЫХ", ""]
     for entry in entries:
-        lines.append(f"{entry.rank}. {entry.name} — {entry.wins} побед / {entry.losses} поражений")
+        name = f"{entry.name} «{entry.title}»" if entry.title else entry.name
+        lines.append(f"{entry.rank}. {name} — {entry.wins} побед / {entry.losses} поражений")
     if rank > len(entries):
         lines.append("—")
         lines.append(f"Ты: {rank} место — {character.pvp_wins} / {character.pvp_losses}")
@@ -645,6 +650,7 @@ async def _finish_duel(battle: Battle, winner_cid: int, loser_cid: int) -> None:
         death_service.apply_pvp_death(loser)
         respawn_handlers.register_pvp_death(loser_p.peer_id)
         await pvp_service.log_battle(db, "duel", [winner_cid, loser_cid], [winner_cid])
+        daily_progress = await daily_service.record_pvp_win(db, winner)
         winner_pos = (winner.pos_x, winner.pos_y)
         await db.commit()
 
@@ -655,10 +661,15 @@ async def _finish_duel(battle: Battle, winner_cid: int, loser_cid: int) -> None:
         line = _format_transfer_line(moved)
         if line:
             win_text += f"\n\n{line}"
+    daily_notice = dailies_texts.progress_notice(daily_progress)
+    if daily_notice:
+        win_text += f"\n\n{daily_notice}"
     await _bot_api.messages.send(
         peer_id=winner_p.peer_id, message=win_text, random_id=0,
         keyboard=kb.movement_keyboard(*winner_pos),
     )
+    for c in daily_progress.completed:
+        await stats_window.notify_levelup(winner_p.peer_id, c.levels_gained, c.new_level)
     await _bot_api.messages.send(
         peer_id=loser_p.peer_id,
         message=f"☠ Тебя побеждает {winner_p.name}. Ты уходишь во тьму.",
@@ -724,11 +735,13 @@ async def on_mass_battle_finished(session_id: int, result: TickResult) -> None:
                 characters[cid] = character
 
         winner_ids: list[int] = []
+        daily_progress_by_cid: dict[int, object] = {}
         if not result.draw:
             winner_ids = list(survivor_ids)
             for cid in winner_ids:
                 if cid in characters:
                     pvp_service.record_win(characters[cid])
+                    daily_progress_by_cid[cid] = await daily_service.record_pvp_win(db, characters[cid])
             for cid in dead_ids:
                 if cid in characters:
                     pvp_service.record_loss(characters[cid])
@@ -765,11 +778,18 @@ async def on_mass_battle_finished(session_id: int, result: TickResult) -> None:
             lines = transfer_lines.get(cid, [])
             if lines:
                 text += "\n\n" + "\n".join(lines)
+            daily_progress = daily_progress_by_cid.get(cid)
+            daily_notice = dailies_texts.progress_notice(daily_progress) if daily_progress else None
+            if daily_notice:
+                text += f"\n\n{daily_notice}"
             pos = positions.get(cid, (0, 0))
             await _bot_api.messages.send(
                 peer_id=participant.peer_id, message=text, random_id=0,
                 keyboard=kb.movement_keyboard(*pos),
             )
+            if daily_progress:
+                for c in daily_progress.completed:
+                    await stats_window.notify_levelup(participant.peer_id, c.levels_gained, c.new_level)
         elif cid in dead_ids:
             await _bot_api.messages.send(
                 peer_id=participant.peer_id,
