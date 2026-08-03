@@ -188,11 +188,20 @@ def resolve_tick(
         _run_offensive(ctx, cid, action, session, result)
 
     # --- Фаза 4b: ходы мобов (замороженные контролем этого хода пропускают) ---
+    # Патч 25, п.3: в PvE моб, которого хиты этого хода уже опускают до 0 HP,
+    # не наносит ответный урон — мёртвый не бьёт. В PvP правила резолва не
+    # меняются (взаимное уничтожение — валидный исход).
+    pending_damage: dict[int, int] = {}
+    if session.mode == CombatMode.PVE:
+        for hit in ctx.hits:
+            pending_damage[hit.target_id] = pending_damage.get(hit.target_id, 0) + hit.amount
     for mob in [c for c in session.combatants.values() if c.kind == "mob" and c.alive]:
         if is_frozen(mob):
             mob.skipped_by_control_this_turn = True  # пропуск из-за контроля (стрик DR)
             result.lines.append(f"{mob.name} скован — ход потерян ❄️")
             continue
+        if session.mode == CombatMode.PVE and pending_damage.get(mob.id, 0) >= mob.current_hp:
+            continue  # уже мёртв по итогам этого хода — не бьёт (патч 25, п.3)
         target = None
         if mob.taunted_by is not None:
             taunter = session.combatants.get(mob.taunted_by)

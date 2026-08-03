@@ -90,6 +90,39 @@ async def grant_from_kill(
     return item
 
 
+async def grant_random_item(
+    db: AsyncSession, character: Character, ilvl: int, rng: random.Random
+) -> Item:
+    """Гарантированный ролл предмета (редкость по обычным весам, БЕЗ внешнего
+    ITEM_DROP_CHANCE) — для источников со своим гейтом выше по стеку (напр.
+    горстка пепла, патч 25, п.4: сам ~2% шанс уже сыгран вызывающим кодом)."""
+    roll = rng.random()
+    cumulative = 0.0
+    rarity_id = None
+    for rid, chance in ic.ITEM_RARITY_CHANCES.items():
+        cumulative += chance
+        if roll < cumulative:
+            rarity_id = rid
+            break
+    if rarity_id is None:
+        rarity_id = next(iter(ic.ITEM_RARITY_CHANCES))
+    slot = item_gen.roll_slot(rng)
+    primary_stat = bc.PRIMARY_STAT_BY_CLASS[character.base_class]
+    generated = item_gen.generate_item(
+        rng, ilvl=ilvl, slot=slot, rarity_id=rarity_id,
+        primary_stat=primary_stat, bases=bases(), rarities=rarities(),
+    )
+    item = Item(
+        name=generated.name, slot=generated.slot, base_stats=generated.base_stats,
+        rarity=generated.rarity, ilvl=generated.ilvl,
+    )
+    db.add(item)
+    await db.flush()
+    db.add(Inventory(character_id=character.id, item_id=item.id, equipped=False))
+    await db.flush()
+    return item
+
+
 async def get_equipped(db: AsyncSession, character_id: int) -> dict[str, Item | None]:
     """{slot: надетый предмет или None} — все 5 слотов, даже пустые."""
     rows = (

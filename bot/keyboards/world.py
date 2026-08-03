@@ -9,6 +9,7 @@
 
 from vkbottle import Keyboard, KeyboardButtonColor, OpenLink, Text
 
+from bot import ash_handful_state
 from bot.onboarding_texts import REGION_TITLES
 from config import get_settings
 from game.combat import balance_config as bc
@@ -46,6 +47,8 @@ BTN_LEFT = "⬅️"
 BTN_RIGHT = "➡️"
 BTN_EXPLORE = "🔍 Исследовать"
 BTN_LOOK_AROUND = "👁 Осмотреться"  # патч 22: кто ещё на клетке
+BTN_ASH_HANDFUL = "🌫 Горстка пепла"  # патч 25, п.4: одноразовая находка
+BTN_MOUNT = "🐎 Маунт"  # патч 25, п.7
 
 BTN_ATTACK = "🗡️ Атака"
 BTN_ITEM = "🎒 Предмет"
@@ -66,12 +69,13 @@ def waiting_keyboard() -> str:
     return kb.get_json()
 
 
-def city_menu_keyboard(character=None, mentor_badge: bool = False) -> str:
+def city_menu_keyboard(character=None, mentor_badge: bool = False, has_mount: bool = False) -> str:
     """character (патч 12) — при level>=30 добавляет кнопку Хранителя Списков
     (выбор подкласса/испытания); при выбранном подклассе (патч 14, ч.3) —
     кнопку [⚔️ Пресеты]. None — легаси-вызовы без гейта (нет кнопок).
     mentor_badge (патч 21) — есть невзятый/несданный сюжетный квест: кнопка
-    наставника показывается с ❗ (см. BTN_MENTOR_BADGE)."""
+    наставника показывается с ❗ (см. BTN_MENTOR_BADGE).
+    has_mount (патч 25, п.7) — есть хотя бы один маунт, доступен и в городе."""
     kb = Keyboard(one_time=False)
     kb.add(Text(BTN_MENTOR_BADGE if mentor_badge else BTN_MENTOR), color=KeyboardButtonColor.PRIMARY)
     kb.add(Text(BTN_MARKET), color=KeyboardButtonColor.SECONDARY)
@@ -92,6 +96,9 @@ def city_menu_keyboard(character=None, mentor_badge: bool = False) -> str:
     if character is not None and character.subclass is not None:
         kb.row()
         kb.add(Text(BTN_PRESETS), color=KeyboardButtonColor.SECONDARY)
+    if has_mount:
+        kb.row()
+        kb.add(Text(BTN_MOUNT), color=KeyboardButtonColor.SECONDARY)
     add_miniapp_button(kb)
     return kb.get_json()
 
@@ -131,13 +138,22 @@ def resolve_direction(x: int, y: int, text: str) -> tuple[int, int] | None:
     return None
 
 
-def movement_keyboard(pos_x: int, pos_y: int) -> str:
-    """Карта: D-pad из стрелок (циферблатная раскладка 12/3/6/9 часов) +
-    исследование и отдых. Вход в город — автоматически при прибытии.
+def movement_keyboard(
+    pos_x: int, pos_y: int, peer_id: int | None = None, has_mount: bool = False,
+) -> str:
+    """Карта (патч 25, п.1: компактная раскладка): крест перемещения с
+    Исследовать в центре, часто используемые Отдых/Осмотреться сразу под
+    ним, редкие/условные (Горстка пепла/Маунт) — отдельными рядами только
+    когда актуальны, справочное (мини-апп) — внизу отдельно. Вход в город —
+    автоматически при прибытии.
 
     Патч 17: направления за пределами сетки (-50..50) не показываются;
     направление, ведущее на клетку города, подписывается названием города
-    вместо стрелки."""
+    вместо стрелки, компоновка перестраивается под доступные направления.
+
+    peer_id (патч 25, п.4) — если задан и для игрока есть несобранная
+    горстка пепла, добавляет её кнопку. has_mount (патч 25, п.7) — есть хотя
+    бы один маунт, показывает кнопку выбора."""
     up = _direction_label(pos_x, pos_y, *_DIRECTION_DELTAS[BTN_UP], BTN_UP)
     down = _direction_label(pos_x, pos_y, *_DIRECTION_DELTAS[BTN_DOWN], BTN_DOWN)
     left = _direction_label(pos_x, pos_y, *_DIRECTION_DELTAS[BTN_LEFT], BTN_LEFT)
@@ -147,20 +163,37 @@ def movement_keyboard(pos_x: int, pos_y: int) -> str:
     if up is not None:
         kb.add(Text(up), color=KeyboardButtonColor.SECONDARY)
         kb.row()
-    if left is not None or right is not None:
-        if left is not None:
-            kb.add(Text(left), color=KeyboardButtonColor.SECONDARY)
-        if right is not None:
-            kb.add(Text(right), color=KeyboardButtonColor.SECONDARY)
-        kb.row()
+    if left is not None:
+        kb.add(Text(left), color=KeyboardButtonColor.SECONDARY)
+    kb.add(Text(BTN_EXPLORE), color=KeyboardButtonColor.POSITIVE)
+    if right is not None:
+        kb.add(Text(right), color=KeyboardButtonColor.SECONDARY)
+    kb.row()
     if down is not None:
         kb.add(Text(down), color=KeyboardButtonColor.SECONDARY)
         kb.row()
-    kb.add(Text(BTN_EXPLORE), color=KeyboardButtonColor.POSITIVE)
     kb.add(Text(BTN_REST), color=KeyboardButtonColor.SECONDARY)
-    kb.row()
     kb.add(Text(BTN_LOOK_AROUND), color=KeyboardButtonColor.SECONDARY)
+    if has_mount:
+        kb.row()
+        kb.add(Text(BTN_MOUNT), color=KeyboardButtonColor.SECONDARY)
+    if peer_id is not None and ash_handful_state.is_pending(peer_id):
+        kb.row()
+        kb.add(Text(BTN_ASH_HANDFUL), color=KeyboardButtonColor.SECONDARY)
     add_miniapp_button(kb)
+    return kb.get_json()
+
+
+BTN_CONTINUE_TRAVEL = "🐎 Продолжить путь"  # патч 25, п.7
+
+
+def continue_travel_keyboard(travel_id: int) -> str:
+    """Кнопка продолжения пути после победы над нападением (патч 25, п.7)."""
+    kb = Keyboard(inline=True)
+    kb.add(
+        Text(BTN_CONTINUE_TRAVEL, payload={"type": "continue_travel", "travel": travel_id}),
+        color=KeyboardButtonColor.POSITIVE,
+    )
     return kb.get_json()
 
 
@@ -177,13 +210,23 @@ def gate_direction_keyboard(pos_x: int, pos_y: int) -> str:
     return kb.get_json()
 
 
-def event_choice_keyboard(event: ExplorationEventDef) -> str:
+BTN_READ_SONG = "📜 Прочесть Пепельную Песнь"  # патч 25, п.6
+
+
+def event_choice_keyboard(event: ExplorationEventDef, song_extra: bool = False) -> str:
     """Кнопки события исследования (патч 9, блок 1): payload несёт id события +
     индекс выбора, чтобы устаревшие нажатия после уже разрешённого события
-    отличались и игнорировались хендлером."""
+    отличались и игнорировались хендлером.
+
+    song_extra (патч 25, п.6) — у Пепельного алтаря, если Песнь собрана
+    полностью и ещё не прочитана, добавляет доп. кнопку с ОТДЕЛЬНЫМ типом
+    payload (не event_choice) — прочтение не участвует в обычном ролле исходов."""
     kb = Keyboard(one_time=False)
     for idx, choice in enumerate(event.choices):
         kb.add(Text(choice.label, payload={"type": "event_choice", "event": event.id, "choice": idx}))
+        kb.row()
+    if song_extra:
+        kb.add(Text(BTN_READ_SONG, payload={"type": "read_song"}))
         kb.row()
     add_miniapp_button(kb)
     return kb.get_json()

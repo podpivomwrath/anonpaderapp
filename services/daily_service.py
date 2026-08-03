@@ -20,8 +20,15 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from game.content_loader import DailyQuestDef, load_daily_quests
 from game.economy import dailies_config as dc
 from game.economy import lootbox_config as lc
-from models import Character, CharacterDaily, CharacterStats, CharacterTitle
-from services import elixir_service, experience_service, lootbox_service, trophy_service, wallet_service
+from models import Character, CharacterDaily, CharacterStats
+from services import (
+    elixir_service,
+    experience_service,
+    lootbox_service,
+    title_service,
+    trophy_service,
+    wallet_service,
+)
 
 _TZ = ZoneInfo(dc.DAILY_RESET_TZ)
 _rng = random.Random()
@@ -84,27 +91,13 @@ async def _grant_reward(db: AsyncSession, character: Character, reward: dict) ->
             await elixir_service.grant(db, character.id, elixir_id, 2)
             lines.append(f"{edef.emoji} {edef.name} ×2")
     if "title" in reward:
-        await _unlock_title(db, character, reward["title"])
-        lines.append(f"титул «{dc.TITLE_NAMES.get(reward['title'], reward['title'])}»")
+        await title_service.unlock(db, character, reward["title"])
+        lines.append(f"титул «{title_service.name_of(reward['title'])}»")
     return lines
 
 
-async def _unlock_title(db: AsyncSession, character: Character, title_id: str) -> None:
-    existing = await db.scalar(
-        select(CharacterTitle).where(
-            CharacterTitle.character_id == character.id, CharacterTitle.title_id == title_id,
-        )
-    )
-    if existing is None:
-        db.add(CharacterTitle(character_id=character.id, title_id=title_id))
-    if character.active_title_id is None:
-        character.active_title_id = title_id
-
-
 def title_name(character: Character) -> str | None:
-    if character.active_title_id is None:
-        return None
-    return dc.TITLE_NAMES.get(character.active_title_id)
+    return title_service.active_title_name(character)
 
 
 # --- Назначение ежедневок ---

@@ -34,6 +34,15 @@ def remaining_seconds(character: Character, now: datetime | None = None) -> floa
     return max((character.travel_arrives_at - now).total_seconds(), 0.0)
 
 
+def cancel_travel(character: Character) -> None:
+    """Принудительно отменяет поездку (патч 25, п.5: /застрял) — персонаж
+    остаётся там, где уже был (pos_x/y не менялись во время пути), путь к
+    цели просто не завершается."""
+    character.travel_target_x = None
+    character.travel_target_y = None
+    character.travel_arrives_at = None
+
+
 def resolve_arrival(character: Character, now: datetime | None = None) -> bool:
     """Применяет прибытие, если время в пути истекло. True — применено."""
     if character.travel_arrives_at is None:

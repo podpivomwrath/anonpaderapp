@@ -15,6 +15,7 @@ from bot.handlers import appraiser as appraiser_handlers
 from bot.handlers import combat as combat_handlers
 from bot.handlers import elixir_shop as elixir_shop_handlers
 from bot.handlers import inventory as inventory_handlers
+from bot.handlers import mounts as mounts_handlers
 from bot.handlers import presets as presets_handlers
 from bot.handlers import pvp as pvp_handlers
 from bot.handlers import respawn as respawn_handlers
@@ -24,6 +25,7 @@ from bot.webhook import WEBHOOK_PATH, create_app
 from config import Settings, get_settings
 from game.combat.duel_engine import DuelEngine
 from game.combat.tick_engine import InMemoryActionStore, RedisActionStore, TickEngine
+from game.economy import mount_config as mc
 from game.world.scheduler import PeerScheduler
 from services.db import dispose_engine
 
@@ -34,6 +36,7 @@ def create_bot(settings: Settings) -> Bot:
         bot.labeler.load(labeler)
     onboarding.setup(bot)  # диспенсер состояний + восстановление FSM из БД
     list_keeper.setup(bot)  # патч 12: FSM выбора подкласса + восстановление
+    mounts_handlers.setup(bot, bot.api, settings.respawn_live_countdown)  # патч 25, п.7: FSM координат
     return bot
 
 
@@ -115,6 +118,15 @@ async def run() -> None:
     )
     respawn_scheduler.start()
 
+    # Маунты (патч 25, п.7): нападения/прибытия/live-отсчёт — свой job,
+    # интервал из game/economy/mount_config.py (игровая тонкая настройка, не
+    # деплой-параметр окружения, поэтому не в Settings).
+    mount_scheduler = AsyncIOScheduler()
+    mount_scheduler.add_job(
+        mounts_handlers.scan, "interval", seconds=mc.TRAVEL_COUNTDOWN_UPDATE_SECONDS, id="mount_scan",
+    )
+    mount_scheduler.start()
+
     # Callback API события маршрутизируются в vkbottle тем же путём,
     # каким их скармливает polling: bot.router.route(raw_event, api).
     app = create_app(settings, route_event=lambda event: bot.router.route(event, bot.api))
@@ -132,6 +144,7 @@ async def run() -> None:
         else:
             await asyncio.Event().wait()  # события приходят в вебхук
     finally:
+        mount_scheduler.shutdown(wait=False)
         respawn_scheduler.shutdown(wait=False)
         rest_scheduler.shutdown()
         explore_scheduler.shutdown()

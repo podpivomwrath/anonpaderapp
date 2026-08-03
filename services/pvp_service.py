@@ -11,10 +11,9 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from game.classes.base import REGISTRY
-from game.economy import dailies_config as dc
 from game.economy import pvp_config as pc
 from models import Character, PvpBattle
-from services import death_service
+from services import death_service, title_service
 
 BASE_CLASS_TITLES = {"warrior": "Воин", "rogue": "Разбойник", "mage": "Маг"}
 
@@ -101,7 +100,7 @@ async def leaderboard(db: AsyncSession, limit: int = 10) -> list[LeaderboardEntr
     return [
         LeaderboardEntry(
             rank=i, name=name, wins=wins, losses=losses,
-            title=dc.TITLE_NAMES.get(title_id) if title_id else None,
+            title=title_service.name_of(title_id) if title_id else None,
         )
         for i, (name, wins, losses, title_id) in enumerate(rows, start=1)
     ]

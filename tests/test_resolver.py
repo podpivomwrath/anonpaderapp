@@ -58,6 +58,18 @@ def test_winner_side() -> None:
     assert result.winner_side == 0
 
 
+def test_pve_dead_mob_does_not_counterattack() -> None:
+    """Патч 25, п.3: моб, убитый хитом этого же хода, не бьёт в ответ (PvE)."""
+    player = combatant(1, side=0)
+    mob = combatant(2, side=1, kind="mob")
+    mob.current_hp = 1
+    state = make_session(CombatMode.PVE, player, mob)
+    result = resolve_tick(state, {1: attack(2)}, NoCritRng())
+    assert not mob.alive
+    assert player.current_hp == player.max_hp
+    assert result.finished and result.winner_side == 0
+
+
 def test_guardian_block_reduces_incoming() -> None:
     """Блок — реактивная защита в этот же тик."""
     rng = NoCritRng()

@@ -9,12 +9,21 @@ Leaf-модуль: импортируется и world.py, и combat.py, сам 
 
 import random
 
+from bot.vk_media import photo_attachment
 from game.combat import balance_config as bc
 from game.combat import display
 from game.world import grid, location_types
 from services import experience_service, vitals_service
 
 _SEP = "━━━━━━━━━━━━━━"
+
+
+def location_attachment(character) -> str | None:
+    """Фото типа локации (патч 25, п.8) — прикладывается к КАЖДОЙ сводке
+    клетки, не только при первом входе. None, если у типа локации пока нет
+    картинки (часть типов ещё без фото — это ожидаемо, не падаем)."""
+    loc_type = location_types.location_type_at(character.pos_x, character.pos_y)
+    return photo_attachment(loc_type.image) if loc_type.image else None
 
 
 def _thousands(n: int) -> str:

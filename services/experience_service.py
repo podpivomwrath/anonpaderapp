@@ -50,6 +50,8 @@ def add_experience(character: Character, stats: CharacterStats, amount: int) -> 
         levels += 1
     if character.level >= bc.MAX_LEVEL:
         character.experience = 0  # на потолке опыт не копится
+    if levels > 0:
+        character.current_hp = None  # патч 25, п.2: левелап лечит до полного HP
     return LevelUp(levels_gained=levels, new_level=character.level)
 
 

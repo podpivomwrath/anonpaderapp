@@ -57,6 +57,18 @@ function StoryTab({ story }) {
   );
 }
 
+function SongSection({ song }) {
+  return (
+    <Group header={<Header>🩶 Пепельная Песнь {song.read ? '(прочитана)' : song.complete ? '(собрана)' : ''}</Header>}>
+      {song.fragments.map((f) => (
+        <Div key={f.index} style={{ opacity: f.seen ? 1 : 0.5 }}>
+          <p style={{ marginBottom: 0 }}>{f.seen ? f.text : '???'}</p>
+        </Div>
+      ))}
+    </Group>
+  );
+}
+
 function LootboxSection({ dailies }) {
   return (
     <Group header={<Header>🗃️ Пепельные ларцы</Header>}>
@@ -188,7 +200,12 @@ export default function DailiesTab() {
           </TabsItem>
         ))}
       </Tabs>
-      {section === 'story' && <StoryTab story={data.story} />}
+      {section === 'story' && (
+        <>
+          <StoryTab story={data.story} />
+          <SongSection song={data.song} />
+        </>
+      )}
       {section === 'dailies' && <DailyQuestsTab dailies={data.dailies} />}
       {section === 'login' && <LoginCycleTab login={data.login} />}
     </>

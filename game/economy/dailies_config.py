@@ -50,10 +50,8 @@ STREAK_MILESTONES: dict[int, dict] = {
     224: {"gems": 400},
     365: {"gems": 1000, "title": "relentless"},
 }
-
-TITLE_NAMES = {
-    "relentless": "Неотступный",
-}
+# Имена титулов ("relentless" -> "Неотступный" и т.д.) — services/title_service.py
+# (единый источник, титулы приходят из разных механик, не только стрика).
 
 # --- Награды 14-дневного цикла входа (патч 23, п.5) ---
 # elixir — (elixir_id, count); gold — золото.

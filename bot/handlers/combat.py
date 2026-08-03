@@ -10,7 +10,7 @@ import random
 from vkbottle import BaseStateGroup  # noqa: F401  (совместимость импортов)
 from vkbottle.bot import BotLabeler, Message
 
-from bot import dailies_texts, editable_message
+from bot import ash_handful_state, dailies_texts, editable_message
 from bot.handlers import stats_window
 from bot.keyboards.combat_items import combat_items_keyboard
 from bot.keyboards.items import item_choice_keyboard, no_keyboard
@@ -43,14 +43,16 @@ from game.combat.session import (
     build_combatant,
 )
 from game.combat.tick_engine import TickEngine
-from bot.world_summary import location_summary
+from bot.world_summary import location_attachment, location_summary
 from game.economy import elixir_config as ec
 from game.world import encounters, grid
 from game.world import flavor as world_flavor
 from services import (
+    ash_service,
     elixir_service,
     encounter_service,
     item_service,
+    mount_service,
     preset_service,
     story_service,
     trial_service,
@@ -79,6 +81,8 @@ _pending_item_choice: dict[int, int] = {}
 _battle_trackers: dict[int, BattleTracker] = {}
 # peer_id -> (quest_id, оставшихся боёв в цепочке) для сюжетных встреч (патч 18)
 _story_encounter: dict[int, tuple[str, int]] = {}
+# peer_id -> id mount_travels для боя-нападения в пути на маунте (патч 25, п.7)
+_mount_ambush: dict[int, int] = {}
 # колбэк смерти игрока (world.on_player_defeat): убрать кнопки, текст, запустить респавн
 on_defeat_hook = None
 
@@ -100,13 +104,17 @@ def has_active_encounter(peer_id: int) -> bool:
     return peer_id in _engine.sessions
 
 
-async def _get_position(peer_id: int) -> tuple[int, int]:
-    """Текущая позиция игрока — для клавиатуры карты после побега (патч 17)."""
+async def _get_position(peer_id: int) -> tuple[int, int, bool]:
+    """Текущая позиция игрока (+ владение маунтом) — для клавиатуры карты
+    после побега (патч 17; has_mount — патч 25, п.7)."""
     from services.onboarding_service import get_character
 
     async with get_session_factory()() as db:
         character = await get_character(db, peer_id)
-    return (character.pos_x, character.pos_y) if character is not None else (0, 0)
+        if character is None:
+            return (0, 0, False)
+        has_mount = await mount_service.has_any_mount(db, character.id)
+        return (character.pos_x, character.pos_y, has_mount)
 
 
 async def _persist_hp(peer_id: int, hp: int) -> None:
@@ -133,6 +141,14 @@ def _combat_kb(state: CombatSessionState, peer_id: int) -> str:
     base_class = _encounter_class.get(peer_id, "warrior")
     player = state.combatants[PLAYER_ID]
     return combat_keyboard(base_class, player.cooldowns)
+
+
+def rebuild_keyboard(peer_id: int) -> str | None:
+    """Патч 25: актуальная боевая клавиатура для игрока в PvE-бою — для
+    /клавиатура. None — peer_id не в бою."""
+    if not has_active_encounter(peer_id):
+        return None
+    return _combat_kb(_engine.sessions[peer_id], peer_id)
 
 
 def _render(state: CombatSessionState, lines: list[str]) -> str:
@@ -224,6 +240,20 @@ async def start_story_encounter(
     )
 
 
+async def start_mount_ambush_encounter(
+    peer_id: int, character, char_stats, gear_bonus, buff_modifiers,
+    travel_id: int, encounter: encounters.Encounter,
+) -> None:
+    """Нападение в пути на маунте (патч 25, п.7): моб по зоне НАЗНАЧЕНИЯ (см.
+    вызывающий код — bot/handlers/mounts.py). Победа — предложение продолжить
+    путь (оставшееся время сохраняется, услуга не в счёт дороги); поражение —
+    обычная смерть ДОПОЛНИТЕЛЬНО отменяет поездку."""
+    _mount_ambush[peer_id] = travel_id
+    await start_encounter(
+        peer_id, character, char_stats, gear_bonus, buff_modifiers, forced_encounter=encounter
+    )
+
+
 async def on_tick_resolved(session_id: int, tick: int, result: TickResult) -> None:
     state = _engine.sessions.get(session_id)
     if state is None:
@@ -249,6 +279,7 @@ async def on_battle_finished(session_id: int, result: TickResult) -> None:
     final_hp = _last_player_hp.pop(peer_id, None)
     tracker = _battle_trackers.pop(peer_id, None)
     story_state = _story_encounter.pop(peer_id, None)  # (quest_id, остаток цепочки), патч 18
+    travel_id = _mount_ambush.pop(peer_id, None)  # бой-нападение в пути на маунте, патч 25 п.7
     battle_report = tracker.finalize(result.winner_side == 0) if tracker is not None else None
     sf = get_session_factory()
     async with sf() as db:
@@ -264,6 +295,7 @@ async def on_battle_finished(session_id: int, result: TickResult) -> None:
         )
         gear_bonus = await item_service.compute_gear_bonus(db, character.id)
         vit_bonus = gear_bonus.get("vit", 0)
+        has_mount = await mount_service.has_any_mount(db, character.id)
 
         if result.winner_side == 0:  # игрок выиграл — сохраняем остаток HP
             if final_hp is not None:
@@ -365,6 +397,22 @@ async def on_battle_finished(session_id: int, result: TickResult) -> None:
                 random_id=0,
             )
 
+        if travel_id is not None:
+            # патч 25, п.7: бой-нападение в пути на маунте — не сводка карты
+            # (персонаж физически "в дороге"), а предложение продолжить путь.
+            # Предмет (если выпал) просто уже в инвентаре — без интерактивного
+            # окна сравнения, чтобы не плодить развилки посреди поездки.
+            if outcome.item_dropped is not None:
+                await _bot_api.messages.send(
+                    peer_id=peer_id,
+                    message=item_service.format_drop_announcement(outcome.item_dropped),
+                    random_id=0,
+                )
+            from bot.handlers import mounts as mount_handlers  # избегаем цикла импортов
+
+            await mount_handlers.offer_continue(peer_id, travel_id)
+            return
+
         if outcome.item_dropped is not None:
             # ux-patch-11: окно сравнения — сводка локации откладывается до
             # решения игрока (Надеть/В инвентарь), как event_choice в патче 9.
@@ -378,14 +426,27 @@ async def on_battle_finished(session_id: int, result: TickResult) -> None:
             )
             return
 
+        if ash_service.roll_appears(_rng):
+            ash_handful_state.mark(peer_id)
         await _bot_api.messages.send(
             peer_id=peer_id,
             message=location_summary(character, stats, _rng, farm_currency, vit_bonus, quest_line, donate_currency),
-            random_id=0, keyboard=movement_keyboard(character.pos_x, character.pos_y),
+            random_id=0, attachment=location_attachment(character),
+            keyboard=movement_keyboard(character.pos_x, character.pos_y, peer_id, has_mount=has_mount),
         )
     elif on_defeat_hook is not None:
         # смерть: убрать кнопки, атмосферный текст (+ штраф опыта); респавн — автоматически
         await on_defeat_hook(peer_id, respawn_at, xp_lost)
+        if travel_id is not None:
+            # патч 25, п.7: смерть в бою нападения отменяет поездку
+            from models import MountTravel
+            from services import mount_service
+
+            async with get_session_factory()() as db:
+                travel = await db.get(MountTravel, travel_id)
+                if travel is not None:
+                    await mount_service.cancel_travel(db, travel)
+                    await db.commit()
 
 
 @labeler.message(payload_contains={"type": "item_choice"})
@@ -425,14 +486,18 @@ async def item_choice(message: Message) -> None:
         farm_currency, donate_currency = wallet.farm_currency, wallet.donate_currency
         vit_bonus = (await item_service.compute_gear_bonus(db, character.id)).get("vit", 0)
         quest_line = await story_service.quest_summary_line(db, character)
+        has_mount = await mount_service.has_any_mount(db, character.id)
         await db.commit()
 
     # патч 13, ч.1: окно сравнения редактируется в финальный вид на месте;
     # ux-patch-10 п.1: сводка локации — всегда ОТДЕЛЬНОЕ следующее сообщение.
     await editable_message.send_or_edit(_bot_api, "item_choice", peer_id, confirm_text, no_keyboard())
+    if ash_service.roll_appears(_rng):
+        ash_handful_state.mark(peer_id)
     await message.answer(
         location_summary(character, stats, _rng, farm_currency, vit_bonus, quest_line, donate_currency),
-        keyboard=movement_keyboard(character.pos_x, character.pos_y),
+        attachment=location_attachment(character),
+        keyboard=movement_keyboard(character.pos_x, character.pos_y, peer_id, has_mount=has_mount),
     )
 
 
@@ -564,6 +629,13 @@ async def use_combat_item(message: Message) -> None:
     )
 
 
+def pop_mount_ambush(peer_id: int) -> int | None:
+    """Патч 25, п.7: снять привязку прерванного боя к поездке на маунте —
+    используется /застрял, иначе mount_travels навсегда зависнет в статусе
+    ambushed (interrupt_for_pvp не проходит through on_battle_finished)."""
+    return _mount_ambush.pop(peer_id, None)
+
+
 async def interrupt_for_pvp(peer_id: int) -> None:
     """Прерывает активный PvE-бой без наград/штрафа — жертву атаковали в
     открытом PvP (патч 22, п.3). HP на момент прерывания сохраняется в БД
@@ -590,9 +662,9 @@ async def flee(message: Message) -> None:
         _encounter_class.pop(peer_id, None)
         _last_player_hp.pop(peer_id, None)
         await _persist_hp(peer_id, hp)
-        pos_x, pos_y = await _get_position(peer_id)
+        pos_x, pos_y, has_mount = await _get_position(peer_id)
         await message.answer("🏃 Ты срываешься прочь — и темнота глотает твой след.",
-                             keyboard=movement_keyboard(pos_x, pos_y))
+                             keyboard=movement_keyboard(pos_x, pos_y, peer_id, has_mount=has_mount))
         return
     await message.answer("🏃 Уйти не вышло — оно снова между тобой и спасением.")
     try:

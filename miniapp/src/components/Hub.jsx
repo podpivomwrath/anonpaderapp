@@ -84,14 +84,16 @@ export default function Hub() {
         )}
       </div>
 
-      {activeTab === 'character' && (
-        <CharacterTab character={character} onCharacterUpdate={setCharacter} />
-      )}
-      {activeTab === 'dailies' && <DailiesTab />}
-      {activeTab === 'inventory' && <InventoryTab />}
-      {activeTab === 'exchange' && (
-        <StubTab text="Торговцы душами ещё не открыли лавку. Скоро." />
-      )}
+      <div className="hub-content">
+        {activeTab === 'character' && (
+          <CharacterTab character={character} onCharacterUpdate={setCharacter} />
+        )}
+        {activeTab === 'dailies' && <DailiesTab />}
+        {activeTab === 'inventory' && <InventoryTab />}
+        {activeTab === 'exchange' && (
+          <StubTab text="Торговцы душами ещё не открыли лавку. Скоро." />
+        )}
+      </div>
 
       <Tabbar>
         {TABS.map((tab) => (

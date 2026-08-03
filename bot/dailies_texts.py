@@ -1,7 +1,6 @@
 """Тексты уведомлений ежедневных заданий и наград за вход (патч 23)."""
 
-from game.economy import dailies_config as dc
-from services import elixir_service
+from services import elixir_service, title_service
 from services.daily_service import DailiesOverview, DailyProgressResult, LoginCycleState
 
 
@@ -37,7 +36,7 @@ def _reward_preview(reward: dict) -> str:
     if "elixirs_random_combat" in reward:
         parts.append(f"{reward['elixirs_random_combat']} случайных боевых эликсира (по 2 шт. каждого)")
     if "title" in reward:
-        parts.append(f"титул «{dc.TITLE_NAMES.get(reward['title'], reward['title'])}»")
+        parts.append(f"титул «{title_service.name_of(reward['title'])}»")
     return ", ".join(parts)
 
 

@@ -58,6 +58,18 @@ def test_resolve_arrival_only_after_time_elapsed() -> None:
     assert char.travel_arrives_at is None  # состояние в пути очищено
 
 
+def test_cancel_travel_clears_target_and_keeps_position() -> None:
+    """Патч 25, п.5: /застрял отменяет поездку — позиция не меняется."""
+    character = FakeCharacter(pos_x=1, pos_y=1)
+    svc.start_travel(character, 1, 0, NOW)
+    svc.cancel_travel(character)
+    assert character.travel_target_x is None
+    assert character.travel_target_y is None
+    assert character.travel_arrives_at is None
+    assert (character.pos_x, character.pos_y) == (1, 1)
+    assert not svc.is_traveling(character, NOW)
+
+
 def test_resolve_arrival_false_when_not_traveling() -> None:
     char = FakeCharacter(pos_x=5, pos_y=5)
     assert not svc.resolve_arrival(char, now=NOW)

@@ -54,7 +54,9 @@ from game.combat.skills import DEFENSIVE_SKILLS
 from game.combat.tick_engine import TickEngine
 from game.world import grid
 from models import Character, CharacterStats
-from services import daily_service, death_service, item_service, preset_service, pvp_service, trophy_service
+from services import (
+    daily_service, death_service, item_service, mount_service, preset_service, pvp_service, trophy_service,
+)
 from services import onboarding_service as onboarding_svc
 from services.db import get_session_factory
 
@@ -103,6 +105,34 @@ def setup(duel_engine: DuelEngine, mass_engine: TickEngine, bot_api) -> None:
 
 def has_active_battle(peer_id: int) -> bool:
     return peer_id in _peer_battle
+
+
+def rebuild_keyboard(peer_id: int) -> str | None:
+    """Патч 25: актуальная боевая клавиатура для игрока в PvP-бою, без
+    прерывания боя — общая для /клавиатура и PvP-ветки /застрял (там бой
+    НЕ прерывается, только пересобирается клавиатура — защита от абьюза).
+    None — peer_id ни в какой активной PvP-битве."""
+    battle_id = _peer_battle.get(peer_id)
+    if battle_id is None:
+        return None
+    battle = _battles.get(battle_id)
+    if battle is None:
+        return None
+    participant = next((p for p in battle.participants.values() if p.peer_id == peer_id), None)
+    if participant is None:
+        return None
+    if battle.battle_type == "duel":
+        duel = _duel_engine.duels.get(battle_id) if _duel_engine else None
+        combatant = duel.combatants.get(participant.character_id) if duel else None
+    else:
+        session = _mass_engine.sessions.get(battle_id) if _mass_engine else None
+        combatant = (
+            session.combatants.get(participant.character_id) if session
+            else battle.last_combatants.get(participant.character_id)
+        )
+    if combatant is None or not combatant.alive:
+        return pvp_waiting_keyboard()
+    return pvp_combat_keyboard(participant.base_class, combatant.cooldowns)
 
 
 def _new_battle_id() -> int:
@@ -652,6 +682,7 @@ async def _finish_duel(battle: Battle, winner_cid: int, loser_cid: int) -> None:
         await pvp_service.log_battle(db, "duel", [winner_cid, loser_cid], [winner_cid])
         daily_progress = await daily_service.record_pvp_win(db, winner)
         winner_pos = (winner.pos_x, winner.pos_y)
+        winner_has_mount = await mount_service.has_any_mount(db, winner.id)
         await db.commit()
 
     win_text = f"🏆 Ты побеждаешь {loser_p.name}!"
@@ -666,7 +697,7 @@ async def _finish_duel(battle: Battle, winner_cid: int, loser_cid: int) -> None:
         win_text += f"\n\n{daily_notice}"
     await _bot_api.messages.send(
         peer_id=winner_p.peer_id, message=win_text, random_id=0,
-        keyboard=kb.movement_keyboard(*winner_pos),
+        keyboard=kb.movement_keyboard(*winner_pos, winner_p.peer_id, has_mount=winner_has_mount),
     )
     for c in daily_progress.completed:
         await stats_window.notify_levelup(winner_p.peer_id, c.levels_gained, c.new_level)
@@ -769,6 +800,9 @@ async def on_mass_battle_finished(session_id: int, result: TickResult) -> None:
             respawn_handlers.register_pvp_death(battle.participants[victim_cid].peer_id)
 
         await pvp_service.log_battle(db, "mass", list(battle.participants), winner_ids)
+        has_mount_by_cid = {
+            cid: await mount_service.has_any_mount(db, cid) for cid in survivor_ids if cid in characters
+        }
         await db.commit()
         positions = {cid: (c.pos_x, c.pos_y) for cid, c in characters.items()}
 
@@ -785,7 +819,9 @@ async def on_mass_battle_finished(session_id: int, result: TickResult) -> None:
             pos = positions.get(cid, (0, 0))
             await _bot_api.messages.send(
                 peer_id=participant.peer_id, message=text, random_id=0,
-                keyboard=kb.movement_keyboard(*pos),
+                keyboard=kb.movement_keyboard(
+                    *pos, participant.peer_id, has_mount=has_mount_by_cid.get(cid, False)
+                ),
             )
             if daily_progress:
                 for c in daily_progress.completed:

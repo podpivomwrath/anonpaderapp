@@ -168,6 +168,24 @@ async def test_grant_from_kill_none_when_rng_never_drops(db_session, character_a
     assert await item_service.get_inventory(db_session, character.id) == []
 
 
+async def test_grant_random_item_ignores_item_drop_chance(db_session, character_at) -> None:
+    """Патч 25, п.4: горстка пепла — свой (внешний) шанс, ITEM_DROP_CHANCE
+    (~12%) не должен ещё раз резать вероятность — здесь предмет ГАРАНТИРОВАН."""
+    character = await character_at(50, 50, base_class="warrior")
+
+    class NeverDropRng(random.Random):
+        def random(self) -> float:
+            return 0.999  # не выпал бы вообще через grant_from_kill
+
+        def choice(self, seq):
+            return seq[0]
+
+    item = await item_service.grant_random_item(db_session, character, ilvl=20, rng=NeverDropRng())
+    assert item is not None
+    inventory = await item_service.get_inventory(db_session, character.id)
+    assert len(inventory) == 1 and inventory[0][1] is False
+
+
 async def test_equip_item_swaps_old_out(db_session, character_at) -> None:
     character = await character_at(50, 50, base_class="warrior")
     first = await item_service.grant_from_kill(db_session, character, 20, FixedRng(0.0))

@@ -15,30 +15,33 @@ from datetime import datetime, timezone
 from sqlalchemy import select
 from vkbottle.bot import BotLabeler, Message
 
-from bot import dailies_texts
+from bot import ash_handful_state, dailies_texts
 from bot.handlers import combat as combat_handlers
+from bot.handlers import pvp as pvp_handlers
 from bot.handlers import stats_window
 from bot.keyboards import world as kb
 from bot.onboarding_texts import REGION_TITLES
-from bot.vk_media import photo_attachment
-from bot.world_summary import location_summary
+from bot.world_summary import location_attachment, location_summary
 from bot.world_texts import event_attachment, hub_attachment, mentor_intro, mentor_name, mentor_praise
 from game.combat import display
 from game.economy import story_config as sc
 from game.world import encounters, events as event_pool
-from game.world import flavor, grid, location_types
+from game.world import flavor, grid
 from game.world import world_config as wc
 from game.world.scheduler import PeerScheduler
-from models import CharacterStats
+from models import CharacterStats, MountTravel
 from services import (
+    ash_service,
     daily_service,
     death_service,
     event_service,
     experience_service,
     item_service,
+    mount_service,
     movement_service,
     preset_service,
     quest_service,
+    song_service,
     story_service,
     trial_service,
     trophy_service,
@@ -89,13 +92,6 @@ def _map_text(
     """Единая сводка клетки — ВСЕГДА самостоятельное сообщение (ux-patch-10)."""
     vit_bonus = (gear_bonus or {}).get("vit", 0)
     return location_summary(character, stats, _rng, farm_currency, vit_bonus, quest_line, donate_currency)
-
-
-def _location_attachment(character) -> str | None:
-    """Фото типа локации (патч 25), если контент задал image — иначе None
-    (без вложения, как раньше — часть типов ещё без картинки)."""
-    loc_type = location_types.location_type_at(character.pos_x, character.pos_y)
-    return photo_attachment(loc_type.image) if loc_type.image else None
 
 
 async def _deliver_daily_notice(peer_id: int, character) -> None:
@@ -179,13 +175,14 @@ async def show_location(message: Message, db, character) -> None:
         await message.answer("⚔️ Ты в бою — реши его исход.")
         return
 
+    has_mount = await mount_service.has_any_mount(db, character.id)
     region = grid.city_region_at(character.pos_x, character.pos_y)
     if region is not None:
         mentor_badge = region == character.region and await story_service.mentor_badge_active(db, character)
         await message.answer(
             f"Ты в городе: {REGION_TITLES[region]}",
             attachment=hub_attachment(region),
-            keyboard=kb.city_menu_keyboard(character, mentor_badge),
+            keyboard=kb.city_menu_keyboard(character, mentor_badge, has_mount=has_mount),
         )
         return
 
@@ -199,8 +196,8 @@ async def show_location(message: Message, db, character) -> None:
     quest_line = await story_service.quest_summary_line(db, character)
     await message.answer(
         _map_text(character, stats, farm_currency, gear_bonus, quest_line, donate_currency),
-        attachment=_location_attachment(character),
-        keyboard=kb.movement_keyboard(character.pos_x, character.pos_y),
+        attachment=location_attachment(character),
+        keyboard=kb.movement_keyboard(character.pos_x, character.pos_y, message.peer_id, has_mount=has_mount),
     )
 
 
@@ -216,9 +213,10 @@ async def gate_exit(message: Message) -> None:
             return
         region = grid.city_region_at(character.pos_x, character.pos_y)
         if region is None:
+            has_mount = await mount_service.has_any_mount(db, character.id)
             await message.answer(
                 "Ты уже за городом.",
-                keyboard=kb.movement_keyboard(character.pos_x, character.pos_y),
+                keyboard=kb.movement_keyboard(character.pos_x, character.pos_y, message.peer_id, has_mount=has_mount),
             )
             return
         await message.answer(
@@ -250,15 +248,19 @@ async def gate_exit_direction(message: Message) -> None:
         farm_currency, donate_currency = wallet.farm_currency, wallet.donate_currency
         gear_bonus = await item_service.compute_gear_bonus(db, character.id)
         quest_line = await story_service.quest_summary_line(db, character)
+        has_mount = await mount_service.has_any_mount(db, character.id)
         await db.commit()
         await _deliver_daily_notice(message.peer_id, character)
         # ux-patch-10 п.1: сводка локации — всегда отдельное сообщение
         await message.answer("Ты выходишь за ворота.", keyboard=kb.waiting_keyboard())
         await message.answer(
             _map_text(character, stats, farm_currency, gear_bonus, quest_line, donate_currency),
-            attachment=_location_attachment(character),
-            keyboard=kb.movement_keyboard(character.pos_x, character.pos_y),
+            attachment=location_attachment(character),
+            keyboard=kb.movement_keyboard(character.pos_x, character.pos_y, message.peer_id, has_mount=has_mount),
         )
+
+
+ASH_BURNED_LINE = "Пепел разнесло ветром."
 
 
 @labeler.message(text=[kb.BTN_EXPLORE])
@@ -289,16 +291,65 @@ async def explore(message: Message) -> None:
             await message.answer("В городе безопасно. Исследовать можно только за воротами.")
             return
 
+        # ux-patch-5: обрывок Песни / событие — ВНУТРЬ сообщения исследования
+        # (~50%), отдельным сообщением больше не шлём.
+        fragment = flavor.explore_fragment(_rng)
+        if fragment is not None and fragment.song_index is not None:
+            # патч 25, п.6: отмечаем обрывок увиденным для прогресса Песни
+            await song_service.record_seen(db, character, fragment.song_index)
+            await db.commit()
+
+    # патч 25, п.4: несобранная горстка пепла сгорает при новом исследовании
+    ash_burned = ash_handful_state.clear(peer_id)
     _exploring.add(peer_id)
     delay = _rng.uniform(wc.EXPLORE_SECONDS_MIN, wc.EXPLORE_SECONDS_MAX)
-    # ux-patch-5: обрывок Песни / событие — ВНУТРЬ сообщения исследования (~50%),
-    # отдельным сообщением больше не шлём. Кнопки убираем до появления моба.
+    # Кнопки убираем до появления моба.
     text = "🔍 Ты осматриваешься вокруг..."
-    fragment = flavor.explore_fragment(_rng)
+    if ash_burned:
+        text = f"{ASH_BURNED_LINE}\n\n{text}"
     if fragment is not None:
-        text += f"\n\n{fragment}"
+        text += f"\n\n{fragment.text}"
     await message.answer(text, keyboard=kb.waiting_keyboard())
     _explore_scheduler.schedule(peer_id, delay)
+
+
+@labeler.message(text=[kb.BTN_ASH_HANDFUL])
+async def collect_ash_handful(message: Message) -> None:
+    """Патч 25, п.4: сбор одноразовой находки — устаревшая кнопка (уже
+    собрано/сгорело при следующем «Исследовать») молча игнорируется."""
+    peer_id = message.peer_id
+    if not ash_handful_state.is_pending(peer_id):
+        return
+    async with get_session_factory()() as db:
+        character = await onboarding_svc.get_character(db, message.from_id)
+        if character is None or character.creation_state is not None:
+            return
+        stats = await _get_stats(db, character.id)
+        result = await ash_service.collect(db, character, stats, _rng)
+        ash_handful_state.clear(peer_id)
+        wallet = await wallet_service.get_wallet(db, character.id)
+        farm_currency, donate_currency = wallet.farm_currency, wallet.donate_currency
+        gear_bonus = await item_service.compute_gear_bonus(db, character.id)
+        quest_line = await story_service.quest_summary_line(db, character)
+        has_mount = await mount_service.has_any_mount(db, character.id)
+        await db.commit()
+
+    text = (
+        "У ног — горстка пепла, слишком плотная для простой золы. В ней что-то есть.\n\n"
+        + display.xp_delta_line(result.xp)
+    )
+    drop_line = trophy_service.format_drop_line(result.trophies)
+    if drop_line is not None:
+        text += f"\n{drop_line}"
+    if result.item is not None:
+        text += f"\n\n{item_service.format_drop_announcement(result.item)}"
+    await message.answer(text, keyboard=kb.waiting_keyboard())
+    await stats_window.notify_levelup(peer_id, result.levels_gained, result.new_level)
+    await message.answer(
+        _map_text(character, stats, farm_currency, gear_bonus, quest_line, donate_currency),
+        attachment=location_attachment(character),
+        keyboard=kb.movement_keyboard(character.pos_x, character.pos_y, peer_id, has_mount=has_mount),
+    )
 
 
 async def handle_explore_done(peer_id: int) -> None:
@@ -328,6 +379,14 @@ async def handle_explore_done(peer_id: int) -> None:
         gear_bonus = await item_service.compute_gear_bonus(db, character.id)
         buff_modifiers = await preset_service.resolve_active_modifiers(db, character)
 
+        event = None
+        song_can_read = False
+        if outcome_kind == "event":
+            event = event_pool.random_event(_rng)
+            if event.id == "ash_altar":
+                # патч 25, п.6: доп. выбор «Прочесть Песнь», только если собрана
+                song_can_read = await song_service.can_read(db, character.id)
+
     notice = dailies_texts.progress_notice(daily_progress)
     if notice:
         await _bot_api.messages.send(peer_id=peer_id, message=notice, random_id=0)
@@ -338,12 +397,12 @@ async def handle_explore_done(peer_id: int) -> None:
         await combat_handlers.start_encounter(peer_id, character, stats, gear_bonus, buff_modifiers)
         return
 
-    event = event_pool.random_event(_rng)
     _pending_events[peer_id] = event.id
     text = f"{event.title}\n\n{event.text}"
     await _bot_api.messages.send(
         peer_id=peer_id, message=text, random_id=0,
-        attachment=event_attachment(event.id), keyboard=kb.event_choice_keyboard(event),
+        attachment=event_attachment(event.id),
+        keyboard=kb.event_choice_keyboard(event, song_extra=song_can_read),
     )
 
 
@@ -381,6 +440,7 @@ async def event_choice(message: Message) -> None:
         gear_bonus = await item_service.compute_gear_bonus(db, character.id)
         buff_modifiers = await preset_service.resolve_active_modifiers(db, character)
         quest_line = await story_service.quest_summary_line(db, character)
+        has_mount = await mount_service.has_any_mount(db, character.id)
         await db.commit()
 
     if result.is_combat:
@@ -397,10 +457,53 @@ async def event_choice(message: Message) -> None:
         await message.answer(daily_notice)
     for c in result.daily_completed:
         await stats_window.notify_levelup(peer_id, c.levels_gained, c.new_level)
+    if ash_service.roll_appears(_rng):
+        ash_handful_state.mark(peer_id)
     await message.answer(
         _map_text(character, stats, farm_currency, gear_bonus, quest_line, donate_currency),
-        attachment=_location_attachment(character),
-        keyboard=kb.movement_keyboard(character.pos_x, character.pos_y),
+        attachment=location_attachment(character),
+        keyboard=kb.movement_keyboard(character.pos_x, character.pos_y, peer_id, has_mount=has_mount),
+    )
+
+
+SONG_READ_SCENE = (
+    "Ты произносишь Песнь целиком — впервые за много лет она звучит от начала до конца.\n\n"
+    "Пепел вокруг алтаря приходит в движение. Он поднимается столбом, уплотняется, обретает "
+    "форму — и на месте золы стоит конь, сотканный из пепла и багрового света. Он не дышит. "
+    "Он просто ждёт.\n\n"
+    "Списки пополнились новой строкой. Не именем — званием."
+)
+
+
+@labeler.message(payload_contains={"type": "read_song"})
+async def read_song(message: Message) -> None:
+    """Патч 25, п.6: доп. выбор у Пепельного алтаря — только если Песнь
+    собрана полностью и ещё не прочитана (устаревшее нажатие игнорируется)."""
+    peer_id = message.peer_id
+    pending_event_id = _pending_events.get(peer_id)
+    if pending_event_id != "ash_altar":
+        return
+    _pending_events.pop(peer_id, None)
+
+    async with get_session_factory()() as db:
+        character = await onboarding_svc.get_character(db, peer_id)
+        if character is None or character.creation_state is not None:
+            return
+        if not await song_service.can_read(db, character.id):
+            return
+        await song_service.read_song(db, character)
+        stats = await _get_stats(db, character.id)
+        wallet = await wallet_service.get_wallet(db, character.id)
+        farm_currency, donate_currency = wallet.farm_currency, wallet.donate_currency
+        gear_bonus = await item_service.compute_gear_bonus(db, character.id)
+        quest_line = await story_service.quest_summary_line(db, character)
+        await db.commit()
+
+    await message.answer(SONG_READ_SCENE, keyboard=kb.waiting_keyboard())
+    await message.answer(
+        _map_text(character, stats, farm_currency, gear_bonus, quest_line, donate_currency),
+        attachment=location_attachment(character),
+        keyboard=kb.movement_keyboard(character.pos_x, character.pos_y, peer_id, has_mount=True),
     )
 
 
@@ -454,13 +557,14 @@ async def handle_rest_done(peer_id: int) -> None:
         if character.subclass is not None:
             await trial_service.record_rest(db, character)
         await daily_service.record_rest(db, character)
+        has_mount = await mount_service.has_any_mount(db, character.id)
         await db.commit()
         region = grid.city_region_at(character.pos_x, character.pos_y)
         if region is not None:
             mentor_badge = region == character.region and await story_service.mentor_badge_active(db, character)
-            keyboard = kb.city_menu_keyboard(character, mentor_badge)
+            keyboard = kb.city_menu_keyboard(character, mentor_badge, has_mount=has_mount)
         else:
-            keyboard = kb.movement_keyboard(character.pos_x, character.pos_y)
+            keyboard = kb.movement_keyboard(character.pos_x, character.pos_y, peer_id, has_mount=has_mount)
     await _deliver_daily_notice(peer_id, character)
     text = f"{flavor.rest_done()}\n{display.hp_delta_line(hp_before, max_hp, max_hp)}"
     await _bot_api.messages.send(peer_id=peer_id, message=text, random_id=0, keyboard=keyboard)
@@ -518,6 +622,7 @@ async def handle_arrival(peer_id: int) -> None:
         if character.subclass is not None:
             await trial_service.record_cell_moved(db, character)
         await daily_service.record_cell_moved(db, character)
+        has_mount = await mount_service.has_any_mount(db, character.id)
         await db.commit()
         await _deliver_daily_notice(peer_id, character)
         region = grid.city_region_at(character.pos_x, character.pos_y)
@@ -528,7 +633,7 @@ async def handle_arrival(peer_id: int) -> None:
                 message=f"Ты выходишь к воротам: {REGION_TITLES[region]}",
                 random_id=0,
                 attachment=hub_attachment(region),
-                keyboard=kb.city_menu_keyboard(character, mentor_badge),
+                keyboard=kb.city_menu_keyboard(character, mentor_badge, has_mount=has_mount),
             )
             return
         stats = await _get_stats(db, character.id)
@@ -541,8 +646,8 @@ async def handle_arrival(peer_id: int) -> None:
             peer_id=peer_id,
             message=_map_text(character, stats, farm_currency, quest_line=quest_line, donate_currency=donate_currency),
             random_id=0,
-            attachment=_location_attachment(character),
-            keyboard=kb.movement_keyboard(character.pos_x, character.pos_y),
+            attachment=location_attachment(character),
+            keyboard=kb.movement_keyboard(character.pos_x, character.pos_y, peer_id, has_mount=has_mount),
         )
 
 
@@ -626,3 +731,83 @@ async def quest_reminder(message: Message) -> None:
             return
         text = await story_service.quest_reminder_text(db, character, mentor_name(character.region))
     await message.answer(text)
+
+
+STUCK_LINE = "Ты встряхиваешься и приходишь в себя."
+
+
+def is_busy(peer_id: int) -> bool:
+    """Патч 25, п.7: занят исследованием/отдыхом — используется мунтами,
+    чтобы не начинать поездку поверх незавершённого действия."""
+    return peer_id in _exploring or peer_id in _resting
+
+
+async def _current_keyboard(db, character, peer_id: int, now: datetime) -> str:
+    """Патч 25, п.5: клавиатура под текущее состояние игрока — общая для
+    /клавиатура и финала /застрял. Порядок проверок = приоритет состояний."""
+    pvp_kb = pvp_handlers.rebuild_keyboard(peer_id)
+    if pvp_kb is not None:
+        return pvp_kb
+    combat_kb = combat_handlers.rebuild_keyboard(peer_id)
+    if combat_kb is not None:
+        return combat_kb
+    if peer_id in _exploring or peer_id in _resting or movement_service.is_traveling(character, now):
+        return kb.waiting_keyboard()
+    if await mount_service.active_travel(db, character.id) is not None:
+        return kb.waiting_keyboard()
+    if await _check_still_dead(db, character, now):
+        return kb.waiting_keyboard()
+    has_mount = await mount_service.has_any_mount(db, character.id)
+    region = grid.city_region_at(character.pos_x, character.pos_y)
+    if region is not None:
+        mentor_badge = region == character.region and await story_service.mentor_badge_active(db, character)
+        return kb.city_menu_keyboard(character, mentor_badge, has_mount=has_mount)
+    return kb.movement_keyboard(character.pos_x, character.pos_y, peer_id, has_mount=has_mount)
+
+
+@labeler.message(text=["/клавиатура", "/keyboard"])
+async def keyboard_command(message: Message) -> None:
+    """Патч 25, п.5: пересобрать и прислать актуальную клавиатуру, ничего не
+    прерывая — работает всегда, включая PvP."""
+    async with get_session_factory()() as db:
+        character = await onboarding_svc.get_character(db, message.from_id)
+        if character is None or character.creation_state is not None:
+            return
+        now = datetime.now(timezone.utc)
+        keyboard = await _current_keyboard(db, character, message.peer_id, now)
+    await message.answer("Обновляю клавиатуру.", keyboard=keyboard)
+
+
+@labeler.message(text=["/застрял", "/stuck"])
+async def stuck_command(message: Message) -> None:
+    """Патч 25, п.5: аварийный выход из зависшей активности. PvP НЕ прерывает
+    (защита от абьюза) — там только пересобирает боевую клавиатуру."""
+    peer_id = message.peer_id
+    async with get_session_factory()() as db:
+        character = await onboarding_svc.get_character(db, message.from_id)
+        if character is None or character.creation_state is not None:
+            return
+        pvp_kb = pvp_handlers.rebuild_keyboard(peer_id)
+        if pvp_kb is not None:
+            await message.answer(STUCK_LINE, keyboard=pvp_kb)
+            return
+        if combat_handlers.has_active_encounter(peer_id):
+            # безнаградный/безштрафной аборт — тот же путь, что и прерывание PvE открытым PvP
+            await combat_handlers.interrupt_for_pvp(peer_id)
+            travel_id = combat_handlers.pop_mount_ambush(peer_id)
+            if travel_id is not None:
+                # бой-нападение прерван вручную — поездка не должна зависнуть в ambushed
+                travel = await db.get(MountTravel, travel_id)
+                if travel is not None:
+                    await mount_service.cancel_travel(db, travel)
+        _exploring.discard(peer_id)
+        _resting.discard(peer_id)
+        now = datetime.now(timezone.utc)
+        if movement_service.is_traveling(character, now):
+            movement_service.cancel_travel(character)
+        active_mount_travel = await mount_service.active_travel(db, character.id)
+        if active_mount_travel is not None and active_mount_travel.status == "traveling":
+            await mount_service.cancel_travel(db, active_mount_travel)
+        await db.commit()
+        keyboard = await _current_keyboard(db, character, peer_id, now)
+    await message.answer(STUCK_LINE, keyboard=keyboard)

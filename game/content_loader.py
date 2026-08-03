@@ -405,6 +405,23 @@ def load_lootbox_grades(content_dir: Path = CONTENT_DIR) -> list[LootboxGradeDef
     ]
 
 
+class MountDef(BaseModel):
+    """Маунт (content/mounts/mounts.json, патч 25, п.7). rarity — ключ в
+    game.economy.mount_config (сек/клетка, шанс нападения)."""
+
+    id: str
+    name: str
+    rarity: str
+    flavor: str = ""
+
+
+def load_mounts(content_dir: Path = CONTENT_DIR) -> dict[str, MountDef]:
+    return {
+        raw["id"]: MountDef(**raw)
+        for raw in _load_json(content_dir / "mounts" / "mounts.json")
+    }
+
+
 class GameContent(BaseModel):
     mobs: dict[str, MobDef]
     items: dict[str, ItemDef]

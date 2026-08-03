@@ -125,7 +125,9 @@ async def test_record_battle_completes_kill_any_and_grants_reward(db_session, ma
     assert len(result.completed) == 1
     assert result.completed[0].quest_title == "Охота"
     wallet = await wallet_service.get_wallet(db_session, character.id)
-    assert wallet.farm_currency == result.completed[0].gold
+    # >=, не ==: первое выполненное задание за день = первый день стрика ->
+    # Пепельный ларец (патч 24) тоже открывается и может добавить своё золото.
+    assert wallet.farm_currency >= result.completed[0].gold
     assert character.experience == result.completed[0].xp
     assert row.completed is True
 

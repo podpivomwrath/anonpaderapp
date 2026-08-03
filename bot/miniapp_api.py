@@ -23,6 +23,7 @@ from services import (
     preset_service,
     pvp_service,
     quest_service,
+    song_service,
     story_service,
     trial_service,
 )
@@ -253,9 +254,20 @@ async def handle_get_dailies(request: web.Request) -> web.Response:
         login_state = await daily_service.get_login_state(session, character)
         lootbox_history = await lootbox_service.recent_history(session, character.id, limit=10)
         lootbox_counts = await lootbox_service.grade_counts(session, character.id)
+        song_fragments = await song_service.fragments_display(session, character.id)
+        song_complete = await song_service.is_complete(session, character.id)
+        song_read = await song_service.already_read(session, character.id)
         return web.json_response(
             {
                 "story": story,
+                "song": {
+                    "fragments": [
+                        {"index": f.index, "seen": f.seen, "text": f.text}
+                        for f in song_fragments
+                    ],
+                    "complete": song_complete,
+                    "read": song_read,
+                },
                 "dailies": {
                     "quests": [
                         {
