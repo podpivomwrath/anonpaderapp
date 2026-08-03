@@ -20,12 +20,13 @@ from bot.handlers import combat as combat_handlers
 from bot.handlers import stats_window
 from bot.keyboards import world as kb
 from bot.onboarding_texts import REGION_TITLES
+from bot.vk_media import photo_attachment
 from bot.world_summary import location_summary
 from bot.world_texts import event_attachment, hub_attachment, mentor_intro, mentor_name, mentor_praise
 from game.combat import display
 from game.economy import story_config as sc
 from game.world import encounters, events as event_pool
-from game.world import flavor, grid
+from game.world import flavor, grid, location_types
 from game.world import world_config as wc
 from game.world.scheduler import PeerScheduler
 from models import CharacterStats
@@ -88,6 +89,13 @@ def _map_text(
     """Единая сводка клетки — ВСЕГДА самостоятельное сообщение (ux-patch-10)."""
     vit_bonus = (gear_bonus or {}).get("vit", 0)
     return location_summary(character, stats, _rng, farm_currency, vit_bonus, quest_line, donate_currency)
+
+
+def _location_attachment(character) -> str | None:
+    """Фото типа локации (патч 25), если контент задал image — иначе None
+    (без вложения, как раньше — часть типов ещё без картинки)."""
+    loc_type = location_types.location_type_at(character.pos_x, character.pos_y)
+    return photo_attachment(loc_type.image) if loc_type.image else None
 
 
 async def _deliver_daily_notice(peer_id: int, character) -> None:
@@ -191,6 +199,7 @@ async def show_location(message: Message, db, character) -> None:
     quest_line = await story_service.quest_summary_line(db, character)
     await message.answer(
         _map_text(character, stats, farm_currency, gear_bonus, quest_line, donate_currency),
+        attachment=_location_attachment(character),
         keyboard=kb.movement_keyboard(character.pos_x, character.pos_y),
     )
 
@@ -247,6 +256,7 @@ async def gate_exit_direction(message: Message) -> None:
         await message.answer("Ты выходишь за ворота.", keyboard=kb.waiting_keyboard())
         await message.answer(
             _map_text(character, stats, farm_currency, gear_bonus, quest_line, donate_currency),
+            attachment=_location_attachment(character),
             keyboard=kb.movement_keyboard(character.pos_x, character.pos_y),
         )
 
@@ -389,6 +399,7 @@ async def event_choice(message: Message) -> None:
         await stats_window.notify_levelup(peer_id, c.levels_gained, c.new_level)
     await message.answer(
         _map_text(character, stats, farm_currency, gear_bonus, quest_line, donate_currency),
+        attachment=_location_attachment(character),
         keyboard=kb.movement_keyboard(character.pos_x, character.pos_y),
     )
 
@@ -530,6 +541,7 @@ async def handle_arrival(peer_id: int) -> None:
             peer_id=peer_id,
             message=_map_text(character, stats, farm_currency, quest_line=quest_line, donate_currency=donate_currency),
             random_id=0,
+            attachment=_location_attachment(character),
             keyboard=kb.movement_keyboard(character.pos_x, character.pos_y),
         )
 

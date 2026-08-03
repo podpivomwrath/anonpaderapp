@@ -36,7 +36,15 @@ def test_type_matches_cell_region() -> None:
     assert t2.region == "docks"
 
 
-def test_type_has_description_pool_and_image_placeholder() -> None:
+def test_type_has_description_pool() -> None:
     for t in load_location_types():
         assert len(t.descriptions) >= 2
-        assert t.image is None
+
+
+def test_some_types_have_photo_images() -> None:
+    """Патч 25: первые 5 типов получили реальные фото; остальные пока без
+    картинки — image остаётся None, это ожидаемо, не заглушка."""
+    with_image = {t.id for t in load_location_types() if t.image is not None}
+    assert with_image == {
+        "ridge_terraces", "ridge_redoubt", "ridge_mines", "ridge_pass", "woods_thicket",
+    }
