@@ -10,7 +10,13 @@ const LAUNCH_PARAMS = window.location.search; // включает ведущий
 
 async function request(path, options) {
   const url = `${API_BASE}/api/miniapp${path}${LAUNCH_PARAMS}`;
-  const res = await fetch(url, options);
+  // ngrok-skip-browser-warning: без него бесплатный ngrok-туннель (альфа-тест,
+  // см. README) отдаёт HTML-заглушку вместо JSON на первый запрос из вебвью.
+  // Безвредно для любого другого хостинга — заголовок просто игнорируется.
+  const res = await fetch(url, {
+    ...options,
+    headers: { 'ngrok-skip-browser-warning': 'true', ...(options?.headers || {}) },
+  });
   const data = await res.json().catch(() => ({ error: 'bad_response' }));
   if (!res.ok) {
     throw new Error(data.error || `http_${res.status}`);
