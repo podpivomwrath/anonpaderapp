@@ -1,0 +1,28 @@
+# Переопределяет корневой .dockerignore для сборки ИМЕННО Dockerfile.caddy —
+# тому, в отличие от Dockerfile бота, папка miniapp/ нужна (там собирается
+# статика), поэтому здесь её НЕ исключаем.
+.git
+.gitignore
+.gitattributes
+.venv
+venv
+__pycache__
+*.py[cod]
+.pytest_cache
+.idea
+.vscode
+.claude
+.vkbottle
+
+.env
+.env.*
+!.env.example
+!miniapp/.env.example
+
+miniapp/node_modules
+miniapp/dist
+
+tests
+sim.js
+README.md
+DEPLOY.md
