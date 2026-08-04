@@ -440,7 +440,6 @@ async def on_battle_finished(session_id: int, result: TickResult) -> None:
         if travel_id is not None:
             # патч 25, п.7: смерть в бою нападения отменяет поездку
             from models import MountTravel
-            from services import mount_service
 
             async with get_session_factory()() as db:
                 travel = await db.get(MountTravel, travel_id)
