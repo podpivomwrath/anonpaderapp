@@ -1,5 +1,6 @@
 """Одновременный резолв тика: фазы, таунт, щиты, заморозка, ничья."""
 
+from game.combat import formulas
 from game.combat.resolver import resolve_tick
 from game.combat.session import (
     ActionType,
@@ -68,6 +69,45 @@ def test_pve_dead_mob_does_not_counterattack() -> None:
     assert not mob.alive
     assert player.current_hp == player.max_hp
     assert result.finished and result.winner_side == 0
+
+
+def test_pve_level_diff_reduces_damage_dealt_to_higher_mob() -> None:
+    """Патч 26: урон по мобу выше уровнем игрока срезается (mob_taken_mult).
+    Оба моба level 1..15 — один тир (grey), чтобы не путать с tier_mult."""
+    player_a = combatant(1, side=0, level=1)
+    mob_a = combatant(2, side=1, kind="mob", level=1)  # diff=0
+    resolve_tick(make_session(CombatMode.PVE, player_a, mob_a), {1: attack(2)}, NoCritRng())
+    baseline_dmg = mob_a.max_hp - mob_a.current_hp
+
+    player_b = combatant(1, side=0, level=1)
+    mob_b = combatant(2, side=1, kind="mob", level=15)  # diff=14, тот же тир (grey)
+    resolve_tick(make_session(CombatMode.PVE, player_b, mob_b), {1: attack(2)}, NoCritRng())
+    reduced_dmg = mob_b.max_hp - mob_b.current_hp
+
+    _, taken_mult = formulas.level_diff_modifiers(15, 1)
+    assert reduced_dmg == max(round(baseline_dmg * taken_mult), 1)
+
+
+def test_pve_level_diff_increases_damage_dealt_by_higher_mob() -> None:
+    """Патч 26: моб выше уровнем игрока бьёт сильнее (mob_damage_mult)."""
+    player_a = combatant(1, side=0, level=1)
+    mob_a = combatant(2, side=1, kind="mob", level=1)
+    resolve_tick(
+        make_session(CombatMode.PVE, player_a, mob_a),
+        {1: DeclaredAction(type=ActionType.SKIP)}, NoCritRng(),
+    )
+    baseline_dmg = player_a.max_hp - player_a.current_hp
+
+    player_b = combatant(1, side=0, level=1)
+    mob_b = combatant(2, side=1, kind="mob", level=15)
+    resolve_tick(
+        make_session(CombatMode.PVE, player_b, mob_b),
+        {1: DeclaredAction(type=ActionType.SKIP)}, NoCritRng(),
+    )
+    boosted_dmg = player_b.max_hp - player_b.current_hp
+
+    dmg_mult, _ = formulas.level_diff_modifiers(15, 1)
+    assert boosted_dmg == max(round(baseline_dmg * dmg_mult), 1)
 
 
 def test_guardian_block_reduces_incoming() -> None:

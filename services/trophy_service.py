@@ -97,12 +97,13 @@ async def get_stock(db: AsyncSession, character_id: int) -> list[tuple[TrophyDef
     return [(d, counts[d.id]) for d in trophy_defs_ordered() if d.id in counts]
 
 
-async def sell_all(db: AsyncSession, character: Character) -> int:
-    """Продаёт весь стек всех градаций разом; возвращает вырученное золото."""
+async def sell_all(db: AsyncSession, character: Character, price_multiplier: float = 1.0) -> int:
+    """Продаёт весь стек всех градаций разом; возвращает вырученное золото.
+    price_multiplier (патч 26) — наценка чужака у скупщика в чужом городе."""
     stock = await get_stock(db, character.id)
     if not stock:
         return 0
-    total = sum(d.sell_price * count for d, count in stock)
+    total = round(sum(d.sell_price * count for d, count in stock) * price_multiplier)
     for d, _count in stock:
         row = await _get_row(db, character.id, d.id)
         row.count = 0
@@ -111,15 +112,18 @@ async def sell_all(db: AsyncSession, character: Character) -> int:
     return total
 
 
-async def sell_one(db: AsyncSession, character: Character, trophy_id: str) -> int:
-    """Продаёт весь стек ОДНОЙ градации; возвращает вырученное золото (0, если пусто)."""
+async def sell_one(
+    db: AsyncSession, character: Character, trophy_id: str, price_multiplier: float = 1.0
+) -> int:
+    """Продаёт весь стек ОДНОЙ градации; возвращает вырученное золото (0, если пусто).
+    price_multiplier (патч 26) — наценка чужака у скупщика в чужом городе."""
     row = await _get_row(db, character.id, trophy_id)
     if row is None or row.count <= 0:
         return 0
     trophy_def = _defs().get(trophy_id)
     if trophy_def is None:
         return 0
-    total = trophy_def.sell_price * row.count
+    total = round(trophy_def.sell_price * row.count * price_multiplier)
     row.count = 0
     await wallet_service.deposit(db, character.id, "farm", total)
     await db.flush()

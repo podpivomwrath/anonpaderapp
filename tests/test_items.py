@@ -229,6 +229,18 @@ async def test_sell_item_credits_gold_and_removes_item(db_session, character_at)
     assert await item_service.get_inventory(db_session, character.id) == []
 
 
+async def test_sell_item_applies_price_multiplier(db_session, character_at) -> None:
+    """Патч 26: наценка чужака у скупщика в чужом городе (FOREIGN_CITY_PRICE_PENALTY)."""
+    character = await character_at(50, 50, farm=0)
+    item = await item_service.grant_from_kill(db_session, character, 20, FixedRng(0.0))
+    full_price = item_service.sell_price(item)
+    discounted_price = item_service.sell_price(item, 0.7)
+    assert discounted_price < full_price
+
+    gold = await item_service.sell_item(db_session, character, item.id, price_multiplier=0.7)
+    assert gold == discounted_price
+
+
 async def test_sell_item_equipped_rejected(db_session, character_at) -> None:
     character = await character_at(50, 50, farm=0)
     item = await item_service.grant_from_kill(db_session, character, 20, FixedRng(0.0))

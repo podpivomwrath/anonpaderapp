@@ -58,6 +58,23 @@ def support_power(wil: int) -> float:
     return bc.SUPPORT_POWER_PER_WIL * wil  # без потолка
 
 
+def level_diff_modifiers(mob_level: int, player_level: int) -> tuple[float, float]:
+    """Патч 26: моб выше уровнем бьёт сильнее и получает меньше урона.
+    Возвращает (mob_damage_mult, mob_taken_mult); (1.0, 1.0), если моб не выше."""
+    diff = mob_level - player_level
+    if diff <= 0:
+        return 1.0, 1.0
+    mob_damage_mult = min(1 + bc.LVL_DIFF_DMG_BONUS * diff, bc.LVL_DIFF_DMG_CAP)
+    mob_taken_mult = max(1 - bc.LVL_DIFF_DEF_BONUS * diff, bc.LVL_DIFF_DEF_FLOOR)
+    return mob_damage_mult, mob_taken_mult
+
+
+def mob_ring_multiplier(zone_min: int, zone_max: int) -> float:
+    """Патч 26: множитель статов моба по глубине кольца — ключ MOB_RING_MULTIPLIERS
+    сопоставляется с диапазоном зоны (game.world.world_config.ZONE_TABLE)."""
+    return bc.MOB_RING_MULTIPLIERS.get((zone_min, zone_max), 1.0)
+
+
 def respawn_time_minutes(level: int) -> float:
     """1 мин на 1 ур. → RESPAWN_MAX_MINUTES на MAX_LEVEL, линейно."""
     span = bc.RESPAWN_MAX_MINUTES - bc.RESPAWN_MIN_MINUTES

@@ -25,7 +25,7 @@ from bot.handlers import pvp as pvp_handlers
 from bot.handlers import world as world_handlers
 from bot.keyboards import world as kb
 from bot.onboarding_texts import REGION_TITLES
-from bot.world_texts import hub_attachment
+from bot.world_texts import foreign_city_entry_text, hub_attachment
 from bot.world_summary import location_attachment, location_summary
 from game.world import encounters, grid
 from game.world import world_config as wc
@@ -294,11 +294,13 @@ async def scan() -> None:
             quest_line = await story_service.quest_summary_line(db, character)
             region = grid.city_region_at(travel.to_x, travel.to_y)
             mentor_badge = False
+            is_foreign = False
             if region is not None:
-                mentor_badge = region == character.region and await story_service.mentor_badge_active(db, character)
+                is_foreign = region != character.region
+                mentor_badge = not is_foreign and await story_service.mentor_badge_active(db, character)
             arrivals.append(
                 (peer_id, character, stats, wallet.farm_currency, wallet.donate_currency,
-                 quest_line, gear_bonus, region, mentor_badge)
+                 quest_line, gear_bonus, region, mentor_badge, is_foreign)
             )
 
         if _live_countdown:
@@ -320,15 +322,20 @@ async def scan() -> None:
             peer_id, character, stats, gear_bonus, buff_modifiers, travel_id, encounter,
         )
 
-    for peer_id, character, stats, farm_currency, donate_currency, quest_line, gear_bonus, region, mentor_badge in arrivals:
+    for (peer_id, character, stats, farm_currency, donate_currency, quest_line, gear_bonus,
+         region, mentor_badge, is_foreign) in arrivals:
         _travel_message.pop(peer_id, None)
         if region is not None:
+            text = (
+                foreign_city_entry_text(REGION_TITLES[region]) if is_foreign
+                else f"🐎 Ты прибываешь к воротам: {REGION_TITLES[region]}"
+            )
             await _bot_api.messages.send(
                 peer_id=peer_id,
-                message=f"🐎 Ты прибываешь к воротам: {REGION_TITLES[region]}",
+                message=text,
                 random_id=0,
                 attachment=hub_attachment(region),
-                keyboard=kb.city_menu_keyboard(character, mentor_badge, has_mount=True),
+                keyboard=kb.city_menu_keyboard(character, mentor_badge, has_mount=True, is_foreign=is_foreign),
             )
             continue
         vit_bonus = gear_bonus.get("vit", 0)

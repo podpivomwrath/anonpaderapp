@@ -7,6 +7,7 @@ from vkbottle.bot import BotLabeler, Message
 
 from bot import editable_message
 from bot.elixir_texts import shop_bought, shop_intro, shop_not_enough_gold
+from bot.world_texts import FOREIGN_NPC_REJECTION
 from bot.keyboards.elixir_shop import shop_keyboard
 from bot.keyboards.world import BTN_ELIXIR_SHOP
 from game.world import grid
@@ -49,8 +50,12 @@ async def open_shop(message: Message) -> None:
         character = await onboarding_svc.get_character(db, message.from_id)
         if character is None or character.creation_state is not None:
             return
-        if grid.city_region_at(character.pos_x, character.pos_y) is None:
+        region = grid.city_region_at(character.pos_x, character.pos_y)
+        if region is None:
             return  # лавка только в городе
+        if region != character.region:
+            await message.answer(FOREIGN_NPC_REJECTION)  # патч 26: чужой город
+            return
         counts = await _owned_counts(db, character.id)
 
     await editable_message.send_or_edit(

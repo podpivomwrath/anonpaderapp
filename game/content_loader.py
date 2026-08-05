@@ -44,6 +44,9 @@ class StarterRingMob(BaseModel):
 
     Флейвор-текст показывается игроку при встрече ПЕРЕД боем. zone_min/max —
     диапазон уровней зоны, в который клампится уровень моба под игрока.
+    primary_stat (патч 26) — основной боевой стат по теме моба (str/agi/int),
+    определяет и специализацию распределения статов, и формулу урона;
+    по умолчанию str, если не задан в контенте.
     """
 
     id: str
@@ -52,6 +55,7 @@ class StarterRingMob(BaseModel):
     region: str
     zone_min: int
     zone_max: int
+    primary_stat: str = "str"
 
 
 def _load_mob_file(filename: str, content_dir: Path) -> dict[str, list[StarterRingMob]]:

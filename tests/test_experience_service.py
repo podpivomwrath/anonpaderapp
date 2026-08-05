@@ -2,6 +2,8 @@
 
 from dataclasses import dataclass
 
+import pytest
+
 from game.combat import balance_config as bc
 from services import experience_service as svc
 
@@ -41,6 +43,31 @@ def test_plateau_kink_at_50() -> None:
 def test_xp_per_mob_formula() -> None:
     assert svc.xp_per_mob(1) == bc.XP_MOB_FLAT + bc.XP_MOB_PER_LEVEL
     assert svc.xp_per_mob(10) == bc.XP_MOB_FLAT + bc.XP_MOB_PER_LEVEL * 10
+
+
+# --- Патч 26: опыт за разницу уровней ---
+
+
+def test_mob_xp_level_diff_multiplier_no_bonus_at_or_below_player_level() -> None:
+    assert svc.mob_xp_level_diff_multiplier(7, 7) == 1.0
+    assert svc.mob_xp_level_diff_multiplier(3, 7) == 1.0
+
+
+def test_mob_xp_level_diff_multiplier_scales_and_caps() -> None:
+    assert svc.mob_xp_level_diff_multiplier(16, 7) == pytest.approx(1 + 0.08 * 9)
+    assert svc.mob_xp_level_diff_multiplier(100, 1) == bc.XP_LEVEL_DIFF_CAP
+
+
+def test_xp_for_kill_applies_multiplier() -> None:
+    xp, mult = svc.xp_for_kill(16, 7)
+    assert mult == pytest.approx(1 + 0.08 * 9)
+    assert xp == int(svc.xp_per_mob(16) * mult)
+
+
+def test_xp_for_kill_no_bonus_own_level() -> None:
+    xp, mult = svc.xp_for_kill(7, 7)
+    assert mult == 1.0
+    assert xp == svc.xp_per_mob(7)
 
 
 # --- Левелап ---

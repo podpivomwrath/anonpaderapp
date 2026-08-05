@@ -193,16 +193,19 @@ async def equip_item(db: AsyncSession, character_id: int, item_id: int) -> Item 
     return old_item
 
 
-def sell_price(item: Item) -> int:
+def sell_price(item: Item, price_multiplier: float = 1.0) -> int:
     """Цена скупщика: item_power * 3 * rarity_mult (только для отображения —
-    сама продажа заново считает то же самое в sell_item)."""
+    сама продажа заново считает то же самое в sell_item). price_multiplier
+    (патч 26) — наценка чужака у скупщика в чужом городе."""
     if item.rarity is None:
         return 0
     mult = rarity_def(item.rarity).mult
-    return math.floor(item_power(item) * ic.SELL_PRICE_MULT * mult)
+    return math.floor(item_power(item) * ic.SELL_PRICE_MULT * mult * price_multiplier)
 
 
-async def sell_item(db: AsyncSession, character: Character, item_id: int) -> int:
+async def sell_item(
+    db: AsyncSession, character: Character, item_id: int, price_multiplier: float = 1.0
+) -> int:
     """Продаёт ОДИН предмет скупщику (цена = item_power*3*rarity_mult). Надетые
     и чужие/несуществующие предметы продать нельзя (0 золота, ничего не меняется)."""
     row = await get_inventory_entry(db, character.id, item_id)
@@ -211,7 +214,7 @@ async def sell_item(db: AsyncSession, character: Character, item_id: int) -> int
     item = await db.get(Item, item_id)
     if item is None or item.rarity is None:
         return 0
-    gold = sell_price(item)
+    gold = sell_price(item, price_multiplier)
     await db.delete(row)
     await db.delete(item)
     await wallet_service.deposit(db, character.id, "farm", gold)

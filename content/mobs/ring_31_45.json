@@ -6,21 +6,24 @@
       "name": "Капитан пепельной стражи",
       "flavor": "Он командует отрядом, которого нет уже полвека. И отряд всё ещё отвечает.",
       "zone_min": 31,
-      "zone_max": 45
+      "zone_max": 45,
+      "primary_stat": "str"
     },
     {
       "id": "stone_devourer",
       "name": "Скальный пожиратель",
       "flavor": "Оно проходит сквозь камень, как сквозь воду, и выныривает под ногами.",
       "zone_min": 31,
-      "zone_max": 45
+      "zone_max": 45,
+      "primary_stat": "str"
     },
     {
       "id": "murder_hole_choir",
       "name": "Хор бойниц",
       "flavor": "Десятки голов, вросших в стену крепости. Они кричат по очереди, и от этого крошится кладка.",
       "zone_min": 31,
-      "zone_max": 45
+      "zone_max": 45,
+      "primary_stat": "int"
     }
   ],
   "woods": [
@@ -29,21 +32,24 @@
       "name": "Венценосный олень",
       "flavor": "Рога проросли сквозь череп и продолжают расти. К ним привязаны тела.",
       "zone_min": 31,
-      "zone_max": 45
+      "zone_max": 45,
+      "primary_stat": "agi"
     },
     {
       "id": "quiet_hunter",
       "name": "Тихий охотник",
       "flavor": "Ты не услышишь его шагов. Лес глушит их — лес на его стороне.",
       "zone_min": 31,
-      "zone_max": 45
+      "zone_max": 45,
+      "primary_stat": "agi"
     },
     {
       "id": "rotting_druid",
       "name": "Гниющий друид",
       "flavor": "Он заключил договор первым. Лес выполнил свою часть слишком буквально.",
       "zone_min": 31,
-      "zone_max": 45
+      "zone_max": 45,
+      "primary_stat": "int"
     }
   ],
   "docks": [
@@ -52,21 +58,24 @@
       "name": "Боцман Сухого Дна",
       "flavor": "Он до сих пор считает команду по головам. Головы лежат отдельно.",
       "zone_min": 31,
-      "zone_max": 45
+      "zone_max": 45,
+      "primary_stat": "str"
     },
     {
       "id": "mast_hanged",
       "name": "Мачтовый висельник",
       "flavor": "Его вздёрнули на рее за мятеж. Верёвка сгнила. Он — нет.",
       "zone_min": 31,
-      "zone_max": 45
+      "zone_max": 45,
+      "primary_stat": "int"
     },
     {
       "id": "salt_widow",
       "name": "Соляная вдова",
       "flavor": "Она ждёт корабль, который затонул. Каждого встречного проверяет — не муж ли.",
       "zone_min": 31,
-      "zone_max": 45
+      "zone_max": 45,
+      "primary_stat": "agi"
     }
   ],
   "scorched": [
@@ -75,21 +84,24 @@
       "name": "Жрец Первого Огня",
       "flavor": "Он поджёг себя добровольно и не заметил разницы.",
       "zone_min": 31,
-      "zone_max": 45
+      "zone_max": 45,
+      "primary_stat": "int"
     },
     {
       "id": "ash_whirl",
       "name": "Пепельный вихрь",
       "flavor": "Столб пепла, в котором мелькают лица. Иногда знакомые.",
       "zone_min": 31,
-      "zone_max": 45
+      "zone_max": 45,
+      "primary_stat": "agi"
     },
     {
       "id": "the_promised",
       "name": "Обетованный",
       "flavor": "Он поклялся не уходить, пока столица не отстроится. Столицы нет. Он остался.",
       "zone_min": 31,
-      "zone_max": 45
+      "zone_max": 45,
+      "primary_stat": "int"
     }
   ]
 }

@@ -45,3 +45,35 @@ def test_respawn_time() -> None:
     # линейность: середина диапазона
     mid = formulas.respawn_time_minutes(50)
     assert 15.0 < mid < 16.0
+
+
+# --- Патч 26: модификатор разницы уровней ---
+
+
+def test_level_diff_modifiers_no_bonus_when_mob_not_higher() -> None:
+    assert formulas.level_diff_modifiers(10, 10) == (1.0, 1.0)
+    assert formulas.level_diff_modifiers(5, 10) == (1.0, 1.0)  # игрок выше — без модификаторов
+
+
+def test_level_diff_modifiers_scale_with_diff() -> None:
+    dmg_mult, taken_mult = formulas.level_diff_modifiers(16, 7)  # diff=9
+    assert dmg_mult == pytest.approx(1 + 0.08 * 9)
+    assert taken_mult == pytest.approx(1 - 0.05 * 9)
+
+
+def test_level_diff_modifiers_respect_caps() -> None:
+    dmg_mult, taken_mult = formulas.level_diff_modifiers(100, 1)  # diff=99, огромный
+    assert dmg_mult == 3.0    # потолок LVL_DIFF_DMG_CAP
+    assert taken_mult == 0.25  # пол LVL_DIFF_DEF_FLOOR
+
+
+def test_mob_ring_multiplier_known_ranges() -> None:
+    assert formulas.mob_ring_multiplier(1, 15) == 1.0
+    assert formulas.mob_ring_multiplier(16, 30) == 1.15
+    assert formulas.mob_ring_multiplier(31, 45) == 1.3
+    assert formulas.mob_ring_multiplier(46, 60) == 1.45
+    assert formulas.mob_ring_multiplier(60, 100) == 1.6
+
+
+def test_mob_ring_multiplier_unknown_range_defaults_to_one() -> None:
+    assert formulas.mob_ring_multiplier(0, 0) == 1.0

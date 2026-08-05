@@ -17,7 +17,7 @@ from dataclasses import dataclass, field
 
 import game.classes  # noqa: F401  — регистрация умений подклассов
 import game.combat.base_skills as base_skills  # регистрация базовых навыков + метаданные
-from game.combat import combat_flavor, control, display
+from game.combat import combat_flavor, control, display, formulas
 from game.combat.session import (
     ActionType,
     CombatantState,
@@ -229,6 +229,24 @@ def resolve_tick(
                     is_dot=True,
                 )
             )
+
+    # --- Патч 26: модификатор разницы уровней — моб выше уровнем бьёт сильнее
+    # и получает меньше урона (в обратную сторону модификаторов нет). Считаем
+    # по фактическим участникам каждого хита — корректно и для группового PvE.
+    if session.mode == CombatMode.PVE:
+        for hit in ctx.hits:
+            if hit.amount <= 0:
+                continue
+            source = session.combatants.get(hit.source_id)
+            target = session.combatants.get(hit.target_id)
+            if source is None or target is None:
+                continue
+            if source.kind == "mob" and target.kind == "character":
+                dmg_mult, _ = formulas.level_diff_modifiers(source.level, target.level)
+                hit.amount = max(round(hit.amount * dmg_mult), 1)
+            elif target.kind == "mob" and source.kind == "character":
+                _, taken_mult = formulas.level_diff_modifiers(target.level, source.level)
+                hit.amount = max(round(hit.amount * taken_mult), 1)
 
     # --- Одновременное применение: net-дельта по каждому участнику ---
     damage_taken: dict[int, int] = {}

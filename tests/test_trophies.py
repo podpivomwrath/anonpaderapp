@@ -136,6 +136,16 @@ async def test_sell_all_credits_gold_and_clears_stock(db_session, character_at) 
     assert await trophy_service.get_stock(db_session, character.id) == []
 
 
+async def test_sell_all_applies_price_multiplier(db_session, character_at) -> None:
+    """Патч 26: наценка чужака у скупщика в чужом городе."""
+    character = await character_at(50, 50, farm=0)
+    await _seed_trophy(db_session, character.id, "ash_dust", 3)     # 3*2=6
+    await _seed_trophy(db_session, character.id, "taint_clot", 2)   # 2*15=30
+
+    gold = await trophy_service.sell_all(db_session, character, price_multiplier=0.7)
+    assert gold == round(36 * 0.7)
+
+
 async def test_sell_all_empty_stock_returns_zero(db_session, character_at) -> None:
     character = await character_at(50, 50)
     assert await trophy_service.sell_all(db_session, character) == 0
@@ -151,6 +161,14 @@ async def test_sell_one_only_sells_that_grade(db_session, character_at) -> None:
 
     stock = await trophy_service.get_stock(db_session, character.id)
     assert [d.id for d, _ in stock] == ["blood_shard"]  # ash_dust продан, остальное цело
+
+
+async def test_sell_one_applies_price_multiplier(db_session, character_at) -> None:
+    character = await character_at(50, 50, farm=0)
+    await _seed_trophy(db_session, character.id, "ash_dust", 3)  # 3*2=6
+
+    gold = await trophy_service.sell_one(db_session, character, "ash_dust", price_multiplier=0.7)
+    assert gold == round(6 * 0.7)
 
 
 async def test_sell_one_nothing_to_sell_returns_zero(db_session, character_at) -> None:

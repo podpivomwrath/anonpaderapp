@@ -24,11 +24,12 @@ from bot.keyboards.list_keeper import (
     paths_keyboard,
 )
 from bot.keyboards.world import BTN_KEEPER, city_menu_keyboard
-from bot.world_texts import mentor_name
+from bot.world_texts import FOREIGN_NPC_REJECTION, mentor_name
 from game.classes.base import REGISTRY
 from game.combat import balance_config as bc
 from game.combat import display
 from game.content_loader import load_npc_texts
+from game.world import grid
 from models import CharacterStats
 from services import onboarding_service as onboarding_svc
 from services import story_service, subclass_service, trial_service, wallet_service
@@ -129,6 +130,10 @@ async def open_keeper(message: Message) -> None:
     async with get_session_factory()() as db:
         character = await onboarding_svc.get_character(db, message.from_id)
         if character is None or character.creation_state is not None:
+            return
+        region = grid.city_region_at(character.pos_x, character.pos_y)
+        if region is not None and region != character.region:
+            await message.answer(FOREIGN_NPC_REJECTION)  # патч 26: чужой город
             return
         if character.subclass is not None:
             has_subclass = True

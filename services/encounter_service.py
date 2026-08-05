@@ -24,6 +24,7 @@ from services import (
 @dataclass
 class VictoryOutcome:
     xp_gained: int
+    xp_multiplier: float
     levels_gained: int
     new_level: int
     quest_label: str | None
@@ -50,7 +51,7 @@ async def resolve_victory(
     stats = await db.scalar(
         select(CharacterStats).where(CharacterStats.character_id == character.id)
     )
-    xp = experience_service.xp_per_mob(mob_level)
+    xp, xp_mult = experience_service.xp_for_kill(mob_level, character.level)
     levelup = experience_service.add_experience(character, stats, xp)
     trophies = await trophy_service.grant_from_kill(db, character, rng)
     item = await item_service.grant_from_kill(db, character, mob_level, rng)
@@ -74,11 +75,11 @@ async def resolve_victory(
     progress = await quest_service.record_kill(db, character)
     if progress is None:
         return VictoryOutcome(
-            xp, levelup.levels_gained, levelup.new_level, None, None, None, False,
+            xp, xp_mult, levelup.levels_gained, levelup.new_level, None, None, None, False,
             trophies, item, unlocked, daily_completed, daily_streak_notice,
         )
     return VictoryOutcome(
-        xp, levelup.levels_gained, levelup.new_level,
+        xp, xp_mult, levelup.levels_gained, levelup.new_level,
         progress.progress_label, progress.progress, progress.target_count,
         progress.status == "ready", trophies, item, unlocked, daily_completed, daily_streak_notice,
     )

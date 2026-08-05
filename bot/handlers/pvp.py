@@ -340,7 +340,9 @@ async def attack_command(message: Message, target: str) -> None:
         if await _still_dead(db, character):
             await message.answer("☠ Сначала очнись.")
             return
-        if grid.city_region_at(character.pos_x, character.pos_y) is not None:
+        region = grid.city_region_at(character.pos_x, character.pos_y)
+        if region is not None and region == character.region:
+            # патч 26: свой город — мирная зона; чужой — не защищает
             await message.answer("В городе драться нельзя — мирная зона.")
             return
 

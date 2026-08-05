@@ -58,7 +58,11 @@ def hp_delta_line(hp_before: float, hp_after: float, max_hp: float, mode: str = 
     return f"({delta:+d} HP · {before} → {after})"
 
 
-def xp_delta_line(xp: int) -> str:
+def xp_delta_line(xp: int, mult: float = 1.0) -> str:
+    """mult (патч 26) — бонус за убийство моба выше уровнем, показывается,
+    только если больше 1 (иначе просто число опыта, как раньше)."""
+    if mult > 1.0:
+        return f"(+{xp} опыта · ×{mult:.1f} за опасность)"
     return f"(+{xp} опыта)"
 
 

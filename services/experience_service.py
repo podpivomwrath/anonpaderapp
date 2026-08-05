@@ -24,6 +24,24 @@ def xp_per_mob(mob_level: int) -> int:
     return bc.XP_MOB_FLAT + bc.XP_MOB_PER_LEVEL * mob_level
 
 
+def mob_xp_level_diff_multiplier(mob_level: int, player_level: int) -> float:
+    """Патч 26: бонус опыта за убийство моба выше уровнем — риск = награда.
+    Симметричен по форме level_diff_modifiers (game.combat.formulas), но
+    отдельные константы: калибровка урона и опыта не обязана совпадать."""
+    diff = mob_level - player_level
+    if diff <= 0:
+        return 1.0
+    return min(1 + bc.XP_LEVEL_DIFF_BONUS * diff, bc.XP_LEVEL_DIFF_CAP)
+
+
+def xp_for_kill(mob_level: int, player_level: int) -> tuple[int, float]:
+    """Опыт за убийство КОНКРЕТНОГО моба с учётом разницы уровней.
+    Возвращает (итоговый опыт, множитель) — множитель нужен вызывающему коду
+    только для текста «×N за опасность» (показывается, если > 1)."""
+    mult = mob_xp_level_diff_multiplier(mob_level, player_level)
+    return int(xp_per_mob(mob_level) * mult), mult
+
+
 @dataclass
 class LevelUp:
     levels_gained: int

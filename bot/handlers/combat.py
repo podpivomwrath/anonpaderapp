@@ -347,7 +347,7 @@ async def on_battle_finished(session_id: int, result: TickResult) -> None:
         # ux-patch-10 п.1: итоги боя — отдельное сообщение, сводка локации —
         # ВСЕГДА отдельным вторым сообщением, с кнопками следующего действия.
         text = "🏆 Победа! Тварь оседает пеплом."
-        text += f"\n{display.xp_delta_line(outcome.xp_gained)}"
+        text += f"\n{display.xp_delta_line(outcome.xp_gained, outcome.xp_multiplier)}"
         drop_line = trophy_service.format_drop_line(outcome.trophies_gained)
         if drop_line is not None:
             text += f"\n{drop_line}"

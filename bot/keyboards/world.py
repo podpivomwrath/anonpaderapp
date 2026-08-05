@@ -69,17 +69,24 @@ def waiting_keyboard() -> str:
     return kb.get_json()
 
 
-def city_menu_keyboard(character=None, mentor_badge: bool = False, has_mount: bool = False) -> str:
+def city_menu_keyboard(
+    character=None, mentor_badge: bool = False, has_mount: bool = False, is_foreign: bool = False,
+) -> str:
     """character (патч 12) — при level>=30 добавляет кнопку Хранителя Списков
     (выбор подкласса/испытания); при выбранном подклассе (патч 14, ч.3) —
     кнопку [⚔️ Пресеты]. None — легаси-вызовы без гейта (нет кнопок).
     mentor_badge (патч 21) — есть невзятый/несданный сюжетный квест: кнопка
     наставника показывается с ❗ (см. BTN_MENTOR_BADGE).
-    has_mount (патч 25, п.7) — есть хотя бы один маунт, доступен и в городе."""
+    has_mount (патч 25, п.7) — есть хотя бы один маунт, доступен и в городе.
+    is_foreign (патч 26) — чужой город: Наставник/Хранитель/Лавка/Рынок
+    недоступны (только Скупщик среди NPC — с наценкой, см. bot/handlers/appraiser.py);
+    личные меню (Инвентарь/Характеристики/Задания/Пресеты/Маунт/Ворота/Отдых)
+    работают как обычно."""
     kb = Keyboard(one_time=False)
-    kb.add(Text(BTN_MENTOR_BADGE if mentor_badge else BTN_MENTOR), color=KeyboardButtonColor.PRIMARY)
-    kb.add(Text(BTN_MARKET), color=KeyboardButtonColor.SECONDARY)
-    kb.row()
+    if not is_foreign:
+        kb.add(Text(BTN_MENTOR_BADGE if mentor_badge else BTN_MENTOR), color=KeyboardButtonColor.PRIMARY)
+        kb.add(Text(BTN_MARKET), color=KeyboardButtonColor.SECONDARY)
+        kb.row()
     kb.add(Text(BTN_GATE), color=KeyboardButtonColor.POSITIVE)
     kb.add(Text(BTN_REST), color=KeyboardButtonColor.SECONDARY)
     kb.row()
@@ -87,10 +94,11 @@ def city_menu_keyboard(character=None, mentor_badge: bool = False, has_mount: bo
     kb.add(Text(BTN_INVENTORY), color=KeyboardButtonColor.SECONDARY)
     kb.row()
     kb.add(Text(BTN_STATS), color=KeyboardButtonColor.SECONDARY)
-    kb.add(Text(BTN_ELIXIR_SHOP), color=KeyboardButtonColor.SECONDARY)
+    if not is_foreign:
+        kb.add(Text(BTN_ELIXIR_SHOP), color=KeyboardButtonColor.SECONDARY)
     kb.row()
     kb.add(Text(BTN_DAILIES), color=KeyboardButtonColor.SECONDARY)
-    if character is not None and character.level >= bc.SUBCLASS_UNLOCK_MIN_LEVEL:
+    if not is_foreign and character is not None and character.level >= bc.SUBCLASS_UNLOCK_MIN_LEVEL:
         kb.row()
         kb.add(Text(BTN_KEEPER), color=KeyboardButtonColor.SECONDARY)
     if character is not None and character.subclass is not None:

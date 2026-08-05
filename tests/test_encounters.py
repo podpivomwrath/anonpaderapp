@@ -9,11 +9,33 @@ from game.content_loader import load_bestiary, load_starter_ring
 
 
 def test_balanced_mob_stats_pool_matches_level() -> None:
+    """Патч 26: распределение специализировано, независимое округление 5
+    бакетов даёт сумму НЕ строго равную пулу — допуск в несколько очков."""
     for level in (1, 5, 15):
         stats = encounters.balanced_mob_stats(level)
         pool = 75 + 3 * level
         total = stats.strength + stats.agility + stats.intellect + stats.vitality + stats.will
-        assert total == pool
+        assert abs(total - pool) <= 3
+
+
+def test_balanced_mob_stats_specializes_primary_stat() -> None:
+    """Патч 26: основной боевой стат получает ~45% бюджета, VIT — ~30%,
+    остальные два боевых — по крохам (~8.33% каждый)."""
+    stats = encounters.balanced_mob_stats(16, primary_stat="agi")
+    pool = 75 + 3 * 16
+    assert stats.agility == round(pool * 0.45)
+    assert stats.vitality == round(pool * 0.30)
+    assert stats.strength == round(pool * 0.0833)
+    assert stats.intellect == round(pool * 0.0833)
+    assert stats.will == round(pool * 0.0833)
+    assert stats.agility > stats.strength
+    assert stats.agility > stats.intellect
+
+
+def test_balanced_mob_stats_defaults_to_str_primary() -> None:
+    stats = encounters.balanced_mob_stats(10)
+    pool = 75 + 3 * 10
+    assert stats.strength == round(pool * 0.45)
 
 
 def test_starter_ring_loads_three_mobs_per_region() -> None:
@@ -104,6 +126,34 @@ def test_spawn_mob_low_level_player_in_high_ring_clamps_to_ring_floor() -> None:
     rng = random.Random(11)
     enc = encounters.spawn_mob(2, "ridge", player_level=5, dist=7, rng=rng)
     assert enc.combatant.level == 46
+
+
+def test_spawn_mob_uses_content_primary_stat() -> None:
+    """Патч 26: primary_stat боевого участника берётся из бестиария (не всегда
+    STR), а не хардкодится."""
+    rng = random.Random(1)
+    ring = load_starter_ring()
+    by_id = {m.id: m for mobs in ring.values() for m in mobs}
+    for _ in range(20):
+        enc = encounters.spawn_mob(2, "ridge", player_level=5, dist=45, rng=rng)
+        mob_def = next(m for m in by_id.values() if m.name == enc.combatant.name)
+        assert enc.combatant.primary_stat == mob_def.primary_stat
+
+
+_STAT_FIELD = {"str": "strength", "agi": "agility", "int": "intellect"}
+
+
+def test_spawn_mob_applies_base_and_ring_multiplier() -> None:
+    """Патч 26: статы моба = специализированный пул × MOB_BASE_MULTIPLIER ×
+    множитель кольца (кольцо 1-15 -> ×1.0, значит только базовый множитель)."""
+    from game.combat import balance_config as bc
+
+    rng = random.Random(1)
+    enc = encounters.spawn_mob(2, "ridge", player_level=8, dist=45, rng=rng)
+    field = _STAT_FIELD[enc.combatant.primary_stat]
+    raw = encounters.balanced_mob_stats(8, enc.combatant.primary_stat)
+    expected = round(getattr(raw, field) * bc.MOB_BASE_MULTIPLIER * 1.0)
+    assert getattr(enc.combatant.stats, field) == expected
 
 
 def test_spawn_mob_center_uses_any_region_regardless_of_home_region() -> None:

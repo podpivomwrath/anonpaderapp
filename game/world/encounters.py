@@ -11,6 +11,8 @@ dist 0-2, где мобы общие для всех регионов, ключ 
 import random
 from dataclasses import dataclass
 
+from game.combat import balance_config as bc
+from game.combat import formulas
 from game.combat.session import CombatantState, Stats, build_combatant
 from game.content_loader import StarterRingMob, load_bestiary
 from game.world import grid
@@ -26,18 +28,35 @@ def _region_mobs(region: str) -> list[StarterRingMob]:
     return _bestiary.get(region, [])
 
 
-def balanced_mob_stats(level: int) -> Stats:
-    """«Средний сбалансированный» моб: пул очков поровну между статами
-    (та же идея, что и balancedStats в историческом sim.js-прототипе)."""
+def balanced_mob_stats(level: int, primary_stat: str = "str") -> Stats:
+    """Специализированное распределение статов моба (патч 26): основной
+    боевой стат (STR/AGI/INT по теме моба из бестиария) забирает львиную
+    долю бюджета, VIT — живучесть, остальные три статы — по крохам
+    (MOB_STAT_ALLOCATION). Раньше бюджет размазывался поровну — из-за этого
+    моб вдвое выше уровнем не был опаснее игрока со специализированными
+    статами (см. патч 26, диагноз)."""
     pool = 75 + 3 * level
-    base = pool // 5
-    remainder = pool - base * 5
+    primary_val = round(pool * bc.MOB_STAT_ALLOCATION["primary"])
+    vit_val = round(pool * bc.MOB_STAT_ALLOCATION["vit"])
+    other_val = round(pool * bc.MOB_STAT_ALLOCATION["other"])
+    by_key = {"str": other_val, "agi": other_val, "int": other_val, "wil": other_val}
+    by_key[primary_stat] = primary_val
     return Stats(
-        strength=base,
-        agility=base,
-        intellect=base,
-        vitality=base + remainder,  # остаток — в живучесть
-        will=base,
+        strength=by_key["str"],
+        agility=by_key["agi"],
+        intellect=by_key["int"],
+        vitality=vit_val,
+        will=by_key["wil"],
+    )
+
+
+def _scale_stats(stats: Stats, mult: float) -> Stats:
+    return Stats(
+        strength=round(stats.strength * mult),
+        agility=round(stats.agility * mult),
+        intellect=round(stats.intellect * mult),
+        vitality=round(stats.vitality * mult),
+        will=round(stats.will * mult),
     )
 
 
@@ -66,14 +85,20 @@ def spawn_mob(
     candidates = [m for m in _region_mobs(pool_region) if (m.zone_min, m.zone_max) == zone]
     mob = rng.choice(candidates)
     level = mob_level_for_player(player_level, mob)
+    # Патч 26: базовый множитель (компенсирует экипировку/навыки игрока) ×
+    # множитель глубины кольца — применяется к итоговым статам моба.
+    ring_mult = formulas.mob_ring_multiplier(*zone)
+    stats = _scale_stats(
+        balanced_mob_stats(level, mob.primary_stat), bc.MOB_BASE_MULTIPLIER * ring_mult
+    )
     combatant = build_combatant(
         id=participant_id,
         side=1,
         kind="mob",
         name=mob.name,
         level=level,
-        stats=balanced_mob_stats(level),
-        primary_stat="str",
+        stats=stats,
+        primary_stat=mob.primary_stat,
     )
     return Encounter(combatant=combatant, flavor=mob.flavor)
 

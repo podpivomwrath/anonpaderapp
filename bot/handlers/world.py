@@ -22,7 +22,15 @@ from bot.handlers import stats_window
 from bot.keyboards import world as kb
 from bot.onboarding_texts import REGION_TITLES
 from bot.world_summary import location_attachment, location_summary
-from bot.world_texts import event_attachment, hub_attachment, mentor_intro, mentor_name, mentor_praise
+from bot.world_texts import (
+    FOREIGN_NPC_REJECTION,
+    event_attachment,
+    foreign_city_entry_text,
+    hub_attachment,
+    mentor_intro,
+    mentor_name,
+    mentor_praise,
+)
 from game.combat import display
 from game.economy import story_config as sc
 from game.world import encounters, events as event_pool
@@ -178,11 +186,13 @@ async def show_location(message: Message, db, character) -> None:
     has_mount = await mount_service.has_any_mount(db, character.id)
     region = grid.city_region_at(character.pos_x, character.pos_y)
     if region is not None:
-        mentor_badge = region == character.region and await story_service.mentor_badge_active(db, character)
+        is_foreign = region != character.region
+        mentor_badge = not is_foreign and await story_service.mentor_badge_active(db, character)
+        text = foreign_city_entry_text(REGION_TITLES[region]) if is_foreign else f"Ты в городе: {REGION_TITLES[region]}"
         await message.answer(
-            f"Ты в городе: {REGION_TITLES[region]}",
+            text,
             attachment=hub_attachment(region),
-            keyboard=kb.city_menu_keyboard(character, mentor_badge, has_mount=has_mount),
+            keyboard=kb.city_menu_keyboard(character, mentor_badge, has_mount=has_mount, is_foreign=is_foreign),
         )
         return
 
@@ -561,8 +571,9 @@ async def handle_rest_done(peer_id: int) -> None:
         await db.commit()
         region = grid.city_region_at(character.pos_x, character.pos_y)
         if region is not None:
-            mentor_badge = region == character.region and await story_service.mentor_badge_active(db, character)
-            keyboard = kb.city_menu_keyboard(character, mentor_badge, has_mount=has_mount)
+            is_foreign = region != character.region
+            mentor_badge = not is_foreign and await story_service.mentor_badge_active(db, character)
+            keyboard = kb.city_menu_keyboard(character, mentor_badge, has_mount=has_mount, is_foreign=is_foreign)
         else:
             keyboard = kb.movement_keyboard(character.pos_x, character.pos_y, peer_id, has_mount=has_mount)
     await _deliver_daily_notice(peer_id, character)
@@ -627,13 +638,18 @@ async def handle_arrival(peer_id: int) -> None:
         await _deliver_daily_notice(peer_id, character)
         region = grid.city_region_at(character.pos_x, character.pos_y)
         if region is not None:
-            mentor_badge = region == character.region and await story_service.mentor_badge_active(db, character)
+            is_foreign = region != character.region
+            mentor_badge = not is_foreign and await story_service.mentor_badge_active(db, character)
+            text = (
+                foreign_city_entry_text(REGION_TITLES[region]) if is_foreign
+                else f"Ты выходишь к воротам: {REGION_TITLES[region]}"
+            )
             await _bot_api.messages.send(
                 peer_id=peer_id,
-                message=f"Ты выходишь к воротам: {REGION_TITLES[region]}",
+                message=text,
                 random_id=0,
                 attachment=hub_attachment(region),
-                keyboard=kb.city_menu_keyboard(character, mentor_badge, has_mount=has_mount),
+                keyboard=kb.city_menu_keyboard(character, mentor_badge, has_mount=has_mount, is_foreign=is_foreign),
             )
             return
         stats = await _get_stats(db, character.id)
@@ -662,8 +678,8 @@ async def talk_to_mentor(message: Message) -> None:
             return  # наставник только в городе
 
         if region != character.region:
-            # чужой регион: только флейвор, квест не назначаем и не принимаем
-            await message.answer(mentor_intro(region))
+            # патч 26: чужой город — наставник недоступен вовсе
+            await message.answer(FOREIGN_NPC_REJECTION)
             return
 
         progress = await quest_service.get_or_assign(db, character)
@@ -719,6 +735,15 @@ async def talk_to_mentor(message: Message) -> None:
 
 @labeler.message(text=[kb.BTN_MARKET])
 async def visit_market(message: Message) -> None:
+    async with get_session_factory()() as db:
+        character = await onboarding_svc.get_character(db, message.from_id)
+        if character is None or character.creation_state is not None:
+            return
+        region = grid.city_region_at(character.pos_x, character.pos_y)
+        if region is not None and region != character.region:
+            # патч 26: рынок недоступен в чужом городе
+            await message.answer(FOREIGN_NPC_REJECTION)
+            return
     await message.answer("Торговцы раскладывают товар. Скоро здесь можно будет торговать.")
 
 
@@ -760,8 +785,9 @@ async def _current_keyboard(db, character, peer_id: int, now: datetime) -> str:
     has_mount = await mount_service.has_any_mount(db, character.id)
     region = grid.city_region_at(character.pos_x, character.pos_y)
     if region is not None:
-        mentor_badge = region == character.region and await story_service.mentor_badge_active(db, character)
-        return kb.city_menu_keyboard(character, mentor_badge, has_mount=has_mount)
+        is_foreign = region != character.region
+        mentor_badge = not is_foreign and await story_service.mentor_badge_active(db, character)
+        return kb.city_menu_keyboard(character, mentor_badge, has_mount=has_mount, is_foreign=is_foreign)
     return kb.movement_keyboard(character.pos_x, character.pos_y, peer_id, has_mount=has_mount)
 
 
