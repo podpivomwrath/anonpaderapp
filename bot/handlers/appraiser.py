@@ -8,6 +8,7 @@ from vkbottle.bot import BotLabeler, Message
 
 from bot import dailies_texts, editable_message
 from bot.appraiser_texts import (
+    appraiser_attachment,
     appraiser_empty,
     appraiser_gear_empty,
     appraiser_intro,
@@ -69,6 +70,7 @@ async def open_appraiser(message: Message) -> None:
         await editable_message.send_or_edit(
             _bot_api, _NS, peer_id,
             f"{_intro(mult)}\n\n{appraiser_empty()}", appraiser_keyboard(stock),
+            attachment=appraiser_attachment(),
         )
         return
 
@@ -77,6 +79,7 @@ async def open_appraiser(message: Message) -> None:
     )
     await editable_message.send_or_edit(
         _bot_api, _NS, peer_id, f"{_intro(mult)}\n\n{lines}", appraiser_keyboard(stock),
+        attachment=appraiser_attachment(),
     )
 
 
@@ -103,7 +106,10 @@ async def sell_trophies(message: Message) -> None:
         stock = await trophy_service.get_stock(db, character.id)
 
     if gold <= 0:
-        await editable_message.send_or_edit(_bot_api, _NS, peer_id, appraiser_empty(), appraiser_keyboard(stock))
+        await editable_message.send_or_edit(
+            _bot_api, _NS, peer_id, appraiser_empty(), appraiser_keyboard(stock),
+            attachment=appraiser_attachment(),
+        )
         return
 
     if not stock:
@@ -113,7 +119,9 @@ async def sell_trophies(message: Message) -> None:
             f"{d.emoji} {d.name} ×{count} — {round(d.sell_price * mult) * count} зол." for d, count in stock
         )
         text = f"{appraiser_sold(gold, total)}\n\n{lines}"
-    await editable_message.send_or_edit(_bot_api, _NS, peer_id, text, appraiser_keyboard(stock))
+    await editable_message.send_or_edit(
+        _bot_api, _NS, peer_id, text, appraiser_keyboard(stock), attachment=appraiser_attachment(),
+    )
 
     daily_notice = dailies_texts.progress_notice(daily_progress)
     if daily_notice:

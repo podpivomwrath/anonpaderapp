@@ -13,7 +13,10 @@ def clear(namespace: str, peer_id: int) -> None:
     _tracked.pop((namespace, peer_id), None)
 
 
-async def send_or_edit(bot_api, namespace: str, peer_id: int, text: str, keyboard: str | None) -> None:
+async def send_or_edit(
+    bot_api, namespace: str, peer_id: int, text: str, keyboard: str | None,
+    attachment: str | None = None,
+) -> None:
     """Правит уже открытое окно этого namespace на месте; если сообщение
     недоступно для правки (истекло/удалено) — открывает новое взамен.
     Граница с внешним API — сознательно широкий except (см. также respawn.py)."""
@@ -23,12 +26,14 @@ async def send_or_edit(bot_api, namespace: str, peer_id: int, text: str, keyboar
         try:
             await bot_api.messages.edit(
                 peer_id=peer_id, conversation_message_id=existing, message=text,
-                keyboard=keyboard,
+                keyboard=keyboard, attachment=attachment,
             )
             return
         except Exception:
             _tracked.pop(key, None)
-    resp = await bot_api.messages.send(peer_id=peer_id, message=text, random_id=0, keyboard=keyboard)
+    resp = await bot_api.messages.send(
+        peer_id=peer_id, message=text, random_id=0, keyboard=keyboard, attachment=attachment,
+    )
     try:
         _tracked[key] = int(resp)
     except (TypeError, ValueError):

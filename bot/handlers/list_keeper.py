@@ -24,6 +24,7 @@ from bot.keyboards.list_keeper import (
     paths_keyboard,
 )
 from bot.keyboards.world import BTN_KEEPER, city_menu_keyboard
+from bot.vk_media import photo_attachment
 from bot.world_texts import FOREIGN_NPC_REJECTION, mentor_name
 from game.classes.base import REGISTRY
 from game.combat import balance_config as bc
@@ -41,7 +42,9 @@ labeler = BotLabeler()
 _bot_api = None
 _dispenser = None  # bot.state_dispenser, устанавливается в setup()
 
-KEEPER = load_npc_texts("list_keeper")["subclass_select"]
+_KEEPER_NPC = load_npc_texts("list_keeper")
+KEEPER = _KEEPER_NPC["subclass_select"]
+KEEPER_ATTACHMENT = photo_attachment(_KEEPER_NPC["image"]) if _KEEPER_NPC.get("image") else None
 
 STATE_OFFER = "subclass_offer"
 STATE_PATH_SELECT = "subclass_path_select"
@@ -119,7 +122,8 @@ async def _send_trials(peer_id: int, character) -> None:
                 lines.append(KEEPER["trial_entry_open"].format(buff_name=s.buff_name))
         text = "\n".join(lines)
     await _bot_api.messages.send(
-        peer_id=peer_id, message=text, random_id=0, keyboard=city_menu_keyboard(character, mentor_badge)
+        peer_id=peer_id, message=text, random_id=0,
+        keyboard=city_menu_keyboard(character, mentor_badge), attachment=KEEPER_ATTACHMENT,
     )
 
 
@@ -145,7 +149,8 @@ async def open_keeper(message: Message) -> None:
             await db.commit()
             await _dispenser.set(peer_id, SubclassSelectState.OFFER)
             await message.answer(
-                KEEPER["offer"].format(nickname=character.name), keyboard=offer_keyboard()
+                KEEPER["offer"].format(nickname=character.name), keyboard=offer_keyboard(),
+                attachment=KEEPER_ATTACHMENT,
             )
             return
 

@@ -7,7 +7,8 @@
       "flavor": "Он командует отрядом, которого нет уже полвека. И отряд всё ещё отвечает.",
       "zone_min": 31,
       "zone_max": 45,
-      "primary_stat": "str"
+      "primary_stat": "str",
+      "image": "457239087"
     },
     {
       "id": "stone_devourer",
@@ -15,7 +16,8 @@
       "flavor": "Оно проходит сквозь камень, как сквозь воду, и выныривает под ногами.",
       "zone_min": 31,
       "zone_max": 45,
-      "primary_stat": "str"
+      "primary_stat": "str",
+      "image": "457239088"
     },
     {
       "id": "murder_hole_choir",
@@ -23,7 +25,8 @@
       "flavor": "Десятки голов, вросших в стену крепости. Они кричат по очереди, и от этого крошится кладка.",
       "zone_min": 31,
       "zone_max": 45,
-      "primary_stat": "int"
+      "primary_stat": "int",
+      "image": "457239083"
     }
   ],
   "woods": [
@@ -33,7 +36,8 @@
       "flavor": "Рога проросли сквозь череп и продолжают расти. К ним привязаны тела.",
       "zone_min": 31,
       "zone_max": 45,
-      "primary_stat": "agi"
+      "primary_stat": "agi",
+      "image": "457239098"
     },
     {
       "id": "quiet_hunter",
@@ -41,7 +45,8 @@
       "flavor": "Ты не услышишь его шагов. Лес глушит их — лес на его стороне.",
       "zone_min": 31,
       "zone_max": 45,
-      "primary_stat": "agi"
+      "primary_stat": "agi",
+      "image": "457239099"
     },
     {
       "id": "rotting_druid",
@@ -49,7 +54,8 @@
       "flavor": "Он заключил договор первым. Лес выполнил свою часть слишком буквально.",
       "zone_min": 31,
       "zone_max": 45,
-      "primary_stat": "int"
+      "primary_stat": "int",
+      "image": "457239100"
     }
   ],
   "docks": [
@@ -59,7 +65,8 @@
       "flavor": "Он до сих пор считает команду по головам. Головы лежат отдельно.",
       "zone_min": 31,
       "zone_max": 45,
-      "primary_stat": "str"
+      "primary_stat": "str",
+      "image": "457239109"
     },
     {
       "id": "mast_hanged",
@@ -67,7 +74,8 @@
       "flavor": "Его вздёрнули на рее за мятеж. Верёвка сгнила. Он — нет.",
       "zone_min": 31,
       "zone_max": 45,
-      "primary_stat": "int"
+      "primary_stat": "int",
+      "image": "457239110"
     },
     {
       "id": "salt_widow",
@@ -75,7 +83,8 @@
       "flavor": "Она ждёт корабль, который затонул. Каждого встречного проверяет — не муж ли.",
       "zone_min": 31,
       "zone_max": 45,
-      "primary_stat": "agi"
+      "primary_stat": "agi",
+      "image": "457239111"
     }
   ],
   "scorched": [
@@ -85,7 +94,8 @@
       "flavor": "Он поджёг себя добровольно и не заметил разницы.",
       "zone_min": 31,
       "zone_max": 45,
-      "primary_stat": "int"
+      "primary_stat": "int",
+      "image": "457239121"
     },
     {
       "id": "ash_whirl",
@@ -93,7 +103,8 @@
       "flavor": "Столб пепла, в котором мелькают лица. Иногда знакомые.",
       "zone_min": 31,
       "zone_max": 45,
-      "primary_stat": "agi"
+      "primary_stat": "agi",
+      "image": "457239122"
     },
     {
       "id": "the_promised",
@@ -101,7 +112,8 @@
       "flavor": "Он поклялся не уходить, пока столица не отстроится. Столицы нет. Он остался.",
       "zone_min": 31,
       "zone_max": 45,
-      "primary_stat": "int"
+      "primary_stat": "int",
+      "image": "457239123"
     }
   ]
 }

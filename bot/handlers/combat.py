@@ -217,6 +217,7 @@ async def start_encounter(
         peer_id=peer_id,
         message=f"⚠️ {encounter.combatant.name}\n\n{encounter.flavor}",
         random_id=0,
+        attachment=photo_attachment(encounter.image) if encounter.image else None,
     )
     await _bot_api.messages.send(
         peer_id=peer_id, message=_render(state, []), random_id=0,

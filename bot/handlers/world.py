@@ -28,6 +28,7 @@ from bot.world_texts import (
     event_attachment,
     foreign_city_entry_text,
     hub_attachment,
+    mentor_attachment,
     mentor_intro,
     mentor_name,
     mentor_praise,
@@ -690,7 +691,7 @@ async def talk_to_mentor(message: Message) -> None:
 
         if progress.is_new:
             await db.commit()
-            await message.answer(mentor_intro(region))
+            await message.answer(mentor_intro(region), attachment=mentor_attachment(region))
             return
 
         if progress.status == "ready":

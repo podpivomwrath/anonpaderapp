@@ -6,7 +6,7 @@
 from vkbottle.bot import BotLabeler, Message
 
 from bot import editable_message
-from bot.elixir_texts import shop_bought, shop_intro, shop_not_enough_gold
+from bot.elixir_texts import shop_attachment, shop_bought, shop_intro, shop_not_enough_gold
 from bot.world_texts import FOREIGN_NPC_REJECTION
 from bot.keyboards.elixir_shop import shop_keyboard
 from bot.keyboards.world import BTN_ELIXIR_SHOP
@@ -61,6 +61,7 @@ async def open_shop(message: Message) -> None:
     await editable_message.send_or_edit(
         _bot_api, _NS, peer_id, _catalog_text(counts),
         shop_keyboard(elixir_service.elixir_defs_ordered()),
+        attachment=shop_attachment(),
     )
 
 
@@ -83,7 +84,8 @@ async def buy_elixir(message: Message) -> None:
             counts = await _owned_counts(db, character.id)
             text = f"{shop_not_enough_gold()}\n\n{_catalog_text(counts)}"
             await editable_message.send_or_edit(
-                _bot_api, _NS, peer_id, text, shop_keyboard(elixir_service.elixir_defs_ordered())
+                _bot_api, _NS, peer_id, text, shop_keyboard(elixir_service.elixir_defs_ordered()),
+                attachment=shop_attachment(),
             )
             return
         total = (await wallet_service.get_wallet(db, character.id)).farm_currency
@@ -93,5 +95,6 @@ async def buy_elixir(message: Message) -> None:
     confirm = shop_bought(elixir.name, elixir_service.price(elixir_id), total)
     text = f"{confirm}\n\n{_catalog_text(counts)}"
     await editable_message.send_or_edit(
-        _bot_api, _NS, peer_id, text, shop_keyboard(elixir_service.elixir_defs_ordered())
+        _bot_api, _NS, peer_id, text, shop_keyboard(elixir_service.elixir_defs_ordered()),
+        attachment=shop_attachment(),
     )

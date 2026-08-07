@@ -18,6 +18,11 @@ def mentor_name(region: str) -> str:
     return MENTORS[region]["name"]
 
 
+def mentor_attachment(region: str) -> str | None:
+    photo_id = MENTORS[region].get("image")
+    return photo_attachment(photo_id) if photo_id else None
+
+
 # --- Патч 26: чужие города — доступен только скупщик, PvP разрешено ---
 
 

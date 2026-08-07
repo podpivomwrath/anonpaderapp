@@ -56,6 +56,9 @@ class StarterRingMob(BaseModel):
     zone_min: int
     zone_max: int
     primary_stat: str = "str"
+    # ID фото альбома сообщества ВК (без owner_id) — см. bot/vk_media.py::photo_attachment.
+    # None — картинки для этого моба ещё нет, показываем бой без вложения.
+    image: str | None = None
 
 
 def _load_mob_file(filename: str, content_dir: Path) -> dict[str, list[StarterRingMob]]:

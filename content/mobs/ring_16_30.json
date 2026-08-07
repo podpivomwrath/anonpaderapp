@@ -7,7 +7,8 @@
       "flavor": "Тварь, обглодавшая шахтёров до костей и переварившая породу вместе с ними. Из пасти сыплется руда.",
       "zone_min": 16,
       "zone_max": 30,
-      "primary_stat": "str"
+      "primary_stat": "str",
+      "image": "457239084"
     },
     {
       "id": "faceless_standard_bearer",
@@ -15,7 +16,8 @@
       "flavor": "Он всё ещё несёт штандарт Ордена. Лица под шлемом нет — только гладкая кость.",
       "zone_min": 16,
       "zone_max": 30,
-      "primary_stat": "str"
+      "primary_stat": "str",
+      "image": "457239085"
     },
     {
       "id": "shard_golem",
@@ -23,7 +25,8 @@
       "flavor": "Груда камня, скреплённая багровыми жилами. Каждый шаг оставляет трещины.",
       "zone_min": 16,
       "zone_max": 30,
-      "primary_stat": "str"
+      "primary_stat": "str",
+      "image": "457239086"
     }
   ],
   "woods": [
@@ -33,7 +36,8 @@
       "flavor": "Оно шьёт себе новую шкуру из тех, кого встретило. Швы ещё свежие.",
       "zone_min": 16,
       "zone_max": 30,
-      "primary_stat": "agi"
+      "primary_stat": "agi",
+      "image": "457239095"
     },
     {
       "id": "weeper",
@@ -41,7 +45,8 @@
       "flavor": "Он рыдает голосом ребёнка, пока не подойдёшь ближе. Тогда рыдать начинаешь ты.",
       "zone_min": 16,
       "zone_max": 30,
-      "primary_stat": "int"
+      "primary_stat": "int",
+      "image": "457239096"
     },
     {
       "id": "root_mother",
@@ -49,7 +54,8 @@
       "flavor": "Ком корней, что-то выносивший внутри себя. Оно уже шевелится.",
       "zone_min": 16,
       "zone_max": 30,
-      "primary_stat": "int"
+      "primary_stat": "int",
+      "image": "457239097"
     }
   ],
   "docks": [
@@ -59,7 +65,8 @@
       "flavor": "Раздутый утопленник, проросший изнутри кристаллами. Лопается, если ударить сильно.",
       "zone_min": 16,
       "zone_max": 30,
-      "primary_stat": "str"
+      "primary_stat": "str",
+      "image": "457239131"
     },
     {
       "id": "hookhand",
@@ -67,7 +74,8 @@
       "flavor": "Абордажник с крюком вместо кисти. Крюк вживлён глубже, чем требовалось.",
       "zone_min": 16,
       "zone_max": 30,
-      "primary_stat": "agi"
+      "primary_stat": "agi",
+      "image": "457239107"
     },
     {
       "id": "flask_swarm",
@@ -75,7 +83,8 @@
       "flavor": "Рой стеклянных осколков от разбитых фонарей, движимый чем-то внутри роя.",
       "zone_min": 16,
       "zone_max": 30,
-      "primary_stat": "agi"
+      "primary_stat": "agi",
+      "image": "457239108"
     }
   ],
   "scorched": [
@@ -85,7 +94,8 @@
       "flavor": "Он гонит перед собой стадо обугленных. Хлыст у него из спёкшегося стекла.",
       "zone_min": 16,
       "zone_max": 30,
-      "primary_stat": "int"
+      "primary_stat": "int",
+      "image": "457239118"
     },
     {
       "id": "embercoal",
@@ -93,7 +103,8 @@
       "flavor": "Обгоревший дочерна, но всё ещё горящий изнутри. Тянет к тебе руки — согреться.",
       "zone_min": 16,
       "zone_max": 30,
-      "primary_stat": "str"
+      "primary_stat": "str",
+      "image": "457239119"
     },
     {
       "id": "glassblower",
@@ -101,7 +112,8 @@
       "flavor": "Он выдувает фигуры из расплавленного песка. Внутри каждой кто-то есть.",
       "zone_min": 16,
       "zone_max": 30,
-      "primary_stat": "agi"
+      "primary_stat": "agi",
+      "image": "457239120"
     }
   ]
 }

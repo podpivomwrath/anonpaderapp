@@ -72,6 +72,7 @@ def mob_level_for_player(player_level: int, mob: StarterRingMob) -> int:
 class Encounter:
     combatant: CombatantState
     flavor: str
+    image: str | None = None
 
 
 def spawn_mob(
@@ -101,7 +102,7 @@ def spawn_mob(
         stats=stats,
         primary_stat=mob.primary_stat,
     )
-    return Encounter(combatant=combatant, flavor=mob.flavor)
+    return Encounter(combatant=combatant, flavor=mob.flavor, image=mob.image)
 
 
 def spawn_named_enemy(
