@@ -106,3 +106,215 @@ body,
 .hub-content {
   padding-bottom: 96px;
 }
+
+/* --- Патч 29: карта мира --- */
+
+.map-tab {
+  padding: 8px 8px 0;
+}
+
+.map-viewport {
+  position: relative;
+  overflow: hidden;
+  height: 60vh;
+  max-height: 520px;
+  min-height: 320px;
+  border-radius: 8px;
+  background: #1a1414;
+  /* touch-action: none — иначе браузер перехватывает свайп/щипок как нативный
+     скролл/зум страницы, конфликтуя с нашим pointer-based драгом. */
+  touch-action: none;
+  user-select: none;
+  cursor: grab;
+}
+
+.map-cell {
+  position: absolute;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+}
+
+.map-cell__symbol {
+  color: rgba(255, 255, 255, 0.88);
+  text-shadow: 0 0 3px rgba(0, 0, 0, 0.8);
+  pointer-events: none;
+}
+
+.map-marker {
+  position: absolute;
+  pointer-events: none;
+  box-sizing: border-box;
+}
+
+.map-marker--player {
+  border: 2px solid #ffe066;
+  border-radius: 50%;
+  animation: map-pulse 1.6s ease-in-out infinite;
+}
+
+.map-marker--quest {
+  border: 2px dashed #f2d9dc;
+  border-radius: 50%;
+}
+
+@keyframes map-pulse {
+  0%, 100% { opacity: 1; transform: scale(0.85); }
+  50% { opacity: 0.5; transform: scale(1.15); }
+}
+
+.map-tooltip {
+  position: absolute;
+  z-index: 5;
+  min-width: 160px;
+  padding: 8px 10px;
+  border-radius: 6px;
+  background: rgba(20, 12, 12, 0.95);
+  border: 1px solid #c81e3a55;
+  color: #f2d9dc;
+  pointer-events: none;
+}
+
+.map-tooltip__coords {
+  margin: 0 0 2px;
+  font-weight: 600;
+}
+
+.map-tooltip__line {
+  margin: 0;
+  font-size: 12px;
+  opacity: 0.9;
+}
+
+.map-controls {
+  position: absolute;
+  right: 8px;
+  top: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  z-index: 4;
+}
+
+.map-controls__btn {
+  width: 32px;
+  height: 32px;
+  border-radius: 6px;
+  background: rgba(20, 12, 12, 0.85);
+  color: #f2d9dc;
+  font-size: 16px;
+}
+
+.map-travel-banner {
+  position: absolute;
+  left: 8px;
+  top: 8px;
+  z-index: 4;
+  padding: 6px 10px;
+  border-radius: 6px;
+  background: rgba(20, 12, 12, 0.85);
+  color: #f2d9dc;
+  font-size: 12px;
+}
+
+.map-toast {
+  margin-top: 8px;
+  padding: 8px 12px;
+  border-radius: 6px;
+  background: #3a0a12;
+  color: #f2d9dc;
+  font-size: 13px;
+  text-align: center;
+}
+
+.map-card {
+  position: relative;
+  margin-top: 8px;
+  padding: 12px 14px;
+  border-radius: 8px;
+  background: var(--vkui--color_background_secondary);
+}
+
+.map-card__close {
+  position: absolute;
+  right: 10px;
+  top: 10px;
+  border: none;
+  background: none;
+  font-size: 16px;
+  opacity: 0.6;
+  cursor: pointer;
+}
+
+.map-card__coords {
+  margin: 0 0 4px;
+  font-weight: 600;
+  font-size: 16px;
+}
+
+.map-card__line {
+  margin: 0 0 2px;
+  font-size: 13px;
+  opacity: 0.9;
+}
+
+.map-card__badges {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin: 8px 0;
+}
+
+.map-card__badge {
+  padding: 2px 8px;
+  border-radius: 10px;
+  background: #c81e3a33;
+  font-size: 11px;
+}
+
+.map-card__action {
+  margin-top: 8px;
+}
+
+.map-card__hint {
+  margin: 6px 0 0;
+  font-size: 12px;
+  opacity: 0.7;
+}
+
+.map-card__mounts {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.map-card__mount-option {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 10px;
+  border-radius: 6px;
+  border: 1px solid var(--vkui--color_separator_primary);
+  background: none;
+  color: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.map-card__mount-meta {
+  font-size: 11px;
+  opacity: 0.7;
+}
+
+.map-card__confirm {
+  margin-top: 8px;
+}
+
+.map-card__confirm-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+}

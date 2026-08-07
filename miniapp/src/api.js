@@ -122,3 +122,17 @@ export function setAdminBugReportStatus(reportId, status) {
     body: JSON.stringify({ status }),
   });
 }
+
+// --- Карта (патч 29) ---
+
+export function getMapState() {
+  return request('/map/state');
+}
+
+export function sendMountFromMap(mountId, x, y) {
+  return request('/map/send_mount', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ mount_id: mountId, x, y }),
+  });
+}

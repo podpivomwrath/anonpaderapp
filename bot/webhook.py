@@ -15,6 +15,7 @@ from bot.app_keys import ROUTE_EVENT_KEY, SESSION_FACTORY_KEY, SETTINGS_KEY, Rou
 from bot.miniapp_admin_api import register_routes as register_miniapp_admin_routes
 from bot.miniapp_api import register_routes as register_miniapp_routes
 from bot.miniapp_auth import miniapp_auth_middleware, miniapp_cors_middleware
+from bot.miniapp_map_api import register_routes as register_miniapp_map_routes
 from config import Settings
 from services.db import get_session_factory
 
@@ -67,4 +68,5 @@ def create_app(settings: Settings, route_event: RouteEvent) -> web.Application:
     app.router.add_get("/health", handle_health)
     register_miniapp_routes(app)
     register_miniapp_admin_routes(app)
+    register_miniapp_map_routes(app)
     return app
