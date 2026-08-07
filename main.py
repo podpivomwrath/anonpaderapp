@@ -24,6 +24,7 @@ from bot.handlers import stats_window as stats_window_handlers
 from bot.handlers import world as world_handlers
 from bot.webhook import WEBHOOK_PATH, create_app
 from config import Settings, get_settings
+from game.combat import balance_config as bc
 from game.combat.duel_engine import DuelEngine
 from game.combat.tick_engine import InMemoryActionStore, RedisActionStore, TickEngine
 from game.economy import mount_config as mc
@@ -93,6 +94,7 @@ async def run() -> None:
     duel_engine = DuelEngine(
         on_turn_resolved=pvp_handlers.on_duel_turn_resolved,
         on_duel_finished=pvp_handlers.on_duel_finished,
+        max_turns=bc.PVP_MAX_TURNS,
     )
     duel_engine.start()
 
@@ -100,6 +102,7 @@ async def run() -> None:
         InMemoryActionStore(),
         on_tick_resolved=pvp_handlers.on_mass_tick_resolved,
         on_battle_finished=pvp_handlers.on_mass_battle_finished,
+        max_turns=bc.PVP_MAX_TURNS,
     )
     pvp_tick_engine.start()
     pvp_handlers.setup(duel_engine, pvp_tick_engine, bot.api)
@@ -132,7 +135,7 @@ async def run() -> None:
 
     # Callback API события маршрутизируются в vkbottle тем же путём,
     # каким их скармливает polling: bot.router.route(raw_event, api).
-    app = create_app(settings, route_event=lambda event: bot.router.route(event, bot.api))
+    app = create_app(settings, route_event=lambda event: bot.router.route(event, bot.api), redis=redis)
 
     runner = web.AppRunner(app)
     await runner.setup()

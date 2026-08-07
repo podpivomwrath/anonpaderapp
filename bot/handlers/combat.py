@@ -528,7 +528,9 @@ async def use_skill(message: Message) -> None:
     if player.is_on_cooldown(skill_id):
         # нажатие на навык в КД — без траты хода
         cd = player.cooldowns.get(skill_id, 0)
-        await message.answer(f"⏳ Навык ещё не готов (КД {cd}).")
+        # Патч 30, баг 2: бой всё ещё активен — без клавиатуры здесь игрок
+        # остаётся без кнопок до конца боя.
+        await message.answer(f"⏳ Навык ещё не готов (КД {cd}).", keyboard=_combat_kb(state, message.peer_id))
         return
     try:
         await _engine.declare_action(
@@ -550,7 +552,8 @@ async def use_item(message: Message) -> None:
     state = _engine.sessions[peer_id]
     player = state.combatants[PLAYER_ID]
     if player.has_effect(EffectKind.FREEZE):
-        await message.answer("Скован — не до зелий сейчас. ❄️")
+        # Патч 30, баг 2: бой активен — без клавиатуры игрок теряет кнопки.
+        await message.answer("Скован — не до зелий сейчас. ❄️", keyboard=_combat_kb(state, peer_id))
         return
 
     async with get_session_factory()() as db:
@@ -560,7 +563,7 @@ async def use_item(message: Message) -> None:
         stock = await elixir_service.get_stock(db, character.id)
 
     if not stock:
-        await message.answer("🎒 В сумке пусто.")
+        await message.answer("🎒 В сумке пусто.", keyboard=_combat_kb(state, peer_id))
         return
 
     limit_reached = player.combat_elixirs_used >= ec.ELIXIR_PER_BATTLE_LIMIT
@@ -587,10 +590,11 @@ async def use_combat_item(message: Message) -> None:
     state = _engine.sessions[peer_id]
     player = state.combatants[PLAYER_ID]
     if player.has_effect(EffectKind.FREEZE):
-        await message.answer("Скован — не до зелий сейчас. ❄️")
+        # Патч 30, баг 2: бой активен — без клавиатуры игрок теряет кнопки.
+        await message.answer("Скован — не до зелий сейчас. ❄️", keyboard=_combat_kb(state, peer_id))
         return
     if elixir.category == "combat" and player.combat_elixirs_used >= ec.ELIXIR_PER_BATTLE_LIMIT:
-        await message.answer("Больше твоё тело не выдержит за один бой.")
+        await message.answer("Больше твоё тело не выдержит за один бой.", keyboard=_combat_kb(state, peer_id))
         return
 
     async with get_session_factory()() as db:
@@ -600,7 +604,7 @@ async def use_combat_item(message: Message) -> None:
         consumed = await elixir_service.consume(db, character.id, elixir_id)
         await db.commit()
     if not consumed:
-        await message.answer("Этого зелья больше нет в сумке.")
+        await message.answer("Этого зелья больше нет в сумке.", keyboard=_combat_kb(state, peer_id))
         return
 
     await editable_message.send_or_edit(
@@ -620,10 +624,13 @@ async def use_combat_item(message: Message) -> None:
 
     # Боевой эликсир (патч 16) — бесплатное действие: эффект накладывается
     # СРАЗУ, ход не тратится, игрок продолжает как обычно (атака/навык).
+    # Патч 30, баг 2, исправление 2: явно указываем, что ход ещё не сделан —
+    # иначе игрок может решить, что бой завис (клавиатура-то есть, но неясно,
+    # ждётся ли от него ещё действие).
     line = elixir_effects.apply_combat_elixir(player, elixir_id)
     player.combat_elixirs_used += 1
     await _bot_api.messages.send(
-        peer_id=peer_id, message=f"{line}\n\n{_render(state, [])}", random_id=0,
+        peer_id=peer_id, message=f"{line} Твой ход.\n\n{_render(state, [])}", random_id=0,
         keyboard=_combat_kb(state, peer_id),
     )
 
@@ -665,7 +672,12 @@ async def flee(message: Message) -> None:
         await message.answer("🏃 Ты срываешься прочь — и темнота глотает твой след.",
                              keyboard=movement_keyboard(pos_x, pos_y, peer_id, has_mount=has_mount))
         return
-    await message.answer("🏃 Уйти не вышло — оно снова между тобой и спасением.")
+    # Патч 30, баг 2: бой продолжается — без клавиатуры игрок теряет кнопки
+    # до того, как declare_action(SKIP) ниже вызовет резолв следующего хода.
+    await message.answer(
+        "🏃 Уйти не вышло — оно снова между тобой и спасением.",
+        keyboard=_combat_kb(_engine.sessions[peer_id], peer_id),
+    )
     try:
         await _engine.declare_action(
             message.peer_id, PLAYER_ID, DeclaredAction(type=ActionType.SKIP)

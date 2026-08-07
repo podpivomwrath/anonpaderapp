@@ -16,6 +16,7 @@ from sqlalchemy import select
 from vkbottle.bot import BotLabeler, Message
 
 from bot import ash_handful_state, dailies_texts
+from bot.battle_keyboard import active_battle_keyboard
 from bot.handlers import combat as combat_handlers
 from bot.handlers import pvp as pvp_handlers
 from bot.handlers import stats_window
@@ -755,7 +756,8 @@ async def quest_reminder(message: Message) -> None:
         if character is None or character.creation_state is not None:
             return
         text = await story_service.quest_reminder_text(db, character, mentor_name(character.region))
-    await message.answer(text)
+    # Патч 30, баг 2: справочная команда не должна стирать боевую клавиатуру.
+    await message.answer(text, keyboard=active_battle_keyboard(message.peer_id))
 
 
 STUCK_LINE = "Ты встряхиваешься и приходишь в себя."

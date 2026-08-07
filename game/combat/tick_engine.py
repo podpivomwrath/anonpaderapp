@@ -93,6 +93,7 @@ class TickEngine:
         scheduler: AsyncIOScheduler | None = None,
         on_tick_resolved: TickResolvedCallback | None = None,
         on_battle_finished: BattleFinishedCallback | None = None,
+        max_turns: int | None = None,
     ) -> None:
         self.store = store
         self.pvp_window_seconds = pvp_window_seconds
@@ -100,6 +101,10 @@ class TickEngine:
         self.scheduler = scheduler or AsyncIOScheduler()
         self.on_tick_resolved = on_tick_resolved
         self.on_battle_finished = on_battle_finished
+        # Патч 30: лимит ходов PvP (принудительная ничья) — задаётся ТОЛЬКО
+        # для экземпляра, обслуживающего групповой PvP (main.py). PvE-движок
+        # конструируется с max_turns=None: моб не может «переждать» бой.
+        self.max_turns = max_turns
         self.sessions: dict[int, CombatSessionState] = {}
         self._resolve_locks: dict[int, asyncio.Lock] = {}
 
@@ -198,6 +203,16 @@ class TickEngine:
             actions = {pid: DeclaredAction(**data) for pid, data in raw.items()}
             tick = state.tick_number
             result = resolve_tick(state, actions, self.rng)
+
+            if not result.finished and self.max_turns is not None:
+                if tick >= self.max_turns:
+                    # Патч 30: лимит ходов группового PvP — принудительная ничья.
+                    result.finished, result.draw, result.draw_reason = True, True, "turn_limit"
+                    result.lines.append(bc.PVP_DRAW_TURN_LIMIT_TEXT)
+                else:
+                    remaining = self.max_turns - tick
+                    if remaining <= bc.PVP_MAX_TURNS_WARNING_AT:
+                        result.lines.append(f"⏳ Ходов до исхода: {remaining}")
 
             logger.info("Сессия {}: тик {} разрешён одновременно", session_id, tick)
             for line in result.lines:

@@ -21,6 +21,10 @@ def attack(target_id: int) -> DeclaredAction:
     return DeclaredAction(type=ActionType.ATTACK, target_id=target_id)
 
 
+def skip() -> DeclaredAction:
+    return DeclaredAction(type=ActionType.SKIP)
+
+
 class Recorder:
     def __init__(self) -> None:
         self.ticks: list[tuple[int, int, TickResult]] = []
@@ -125,6 +129,58 @@ async def test_battle_finishes_and_session_removed(recorder: Recorder) -> None:
     _, result = recorder.finished[0]
     assert result.winner_side == 0
     assert 1 not in engine.sessions  # сессия удалена
+
+
+async def test_pvp_group_turn_limit_forces_draw(recorder: Recorder) -> None:
+    """Патч 30: max_turns применяется ТОЛЬКО когда задан (групповой PvP,
+    main.py конструирует PvE-движок с max_turns=None) — по достижении лимита
+    принудительная ничья, даже если оба живы (иначе пассивный/живучий бой
+    длится бесконечно)."""
+    engine = TickEngine(
+        InMemoryActionStore(), pvp_window_seconds=3600, rng=NoCritRng(),
+        on_tick_resolved=recorder.on_tick, on_battle_finished=recorder.on_finish,
+        max_turns=2,
+    )
+    a = combatant(1, side=0)
+    b = combatant(2, side=1)
+    state = make_state(CombatMode.PVP_GROUP, a, b)
+    engine.start()
+    try:
+        engine.start_session(state)
+        await engine.declare_action(1, 1, skip())
+        await engine.declare_action(1, 2, skip())  # тик 1
+        await engine.declare_action(1, 1, skip())
+        await engine.declare_action(1, 2, skip())  # тик 2 — лимит достигнут
+    finally:
+        engine.shutdown()
+
+    assert recorder.finished
+    _, result = recorder.finished[0]
+    assert result.finished and result.draw and result.draw_reason == "turn_limit"
+    assert result.winner_side is None
+    assert a.alive and b.alive
+    assert 1 not in engine.sessions
+
+
+async def test_pve_ignores_turn_limit(recorder: Recorder) -> None:
+    """max_turns не задан для PvE-движка (main.py) — здесь имитируем это
+    явно: даже без max_turns бой не обрывается принудительно после N тиков,
+    ждём естественного исхода (моб не может «переждать»)."""
+    engine = TickEngine(
+        InMemoryActionStore(), rng=NoCritRng(),
+        on_tick_resolved=recorder.on_tick, on_battle_finished=recorder.on_finish,
+        max_turns=None,
+    )
+    p = combatant(1, side=0, vitality=999999)
+    wolf = combatant(2, side=1, kind="mob", name="Волк", vitality=999999)
+    state = make_state(CombatMode.PVE, p, wolf)
+    engine.start_session(state)
+
+    for _ in range(5):
+        await engine.declare_action(1, 1, attack(2))
+
+    assert not recorder.finished
+    assert 1 in engine.sessions
 
 
 async def test_duel_mode_rejected(recorder: Recorder) -> None:

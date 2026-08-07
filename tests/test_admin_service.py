@@ -259,3 +259,27 @@ async def test_set_bug_report_status_updates(db_session, make_character) -> None
 
 async def test_set_bug_report_status_missing_returns_none(db_session) -> None:
     assert await admin_service.set_bug_report_status(db_session, 999999, "closed") is None
+
+
+async def test_duplicate_bug_report_finds_identical_recent_text(db_session, make_character) -> None:
+    character = await make_character()
+    await admin_service.create_bug_report(db_session, character.id, "не работает кнопка", {})
+    since = datetime.now(timezone.utc) - timedelta(seconds=30)
+    dup = await admin_service.duplicate_bug_report(db_session, character.id, "не работает кнопка", since)
+    assert dup is not None
+
+
+async def test_duplicate_bug_report_ignores_different_text(db_session, make_character) -> None:
+    character = await make_character()
+    await admin_service.create_bug_report(db_session, character.id, "не работает кнопка", {})
+    since = datetime.now(timezone.utc) - timedelta(seconds=30)
+    dup = await admin_service.duplicate_bug_report(db_session, character.id, "другой текст", since)
+    assert dup is None
+
+
+async def test_duplicate_bug_report_ignores_too_old(db_session, make_character) -> None:
+    character = await make_character()
+    await admin_service.create_bug_report(db_session, character.id, "текст", {})
+    since_future = datetime.now(timezone.utc) + timedelta(hours=1)
+    dup = await admin_service.duplicate_bug_report(db_session, character.id, "текст", since_future)
+    assert dup is None

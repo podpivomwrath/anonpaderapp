@@ -17,6 +17,14 @@ def block() -> DeclaredAction:
     return DeclaredAction(type=ActionType.SKILL, skill_id="guardian_block")
 
 
+def skip() -> DeclaredAction:
+    return DeclaredAction(type=ActionType.SKIP)
+
+
+def heal_item(item_id: str, target_id: int) -> DeclaredAction:
+    return DeclaredAction(type=ActionType.ITEM, item_id=item_id, target_id=target_id)
+
+
 def make_engine(**kwargs) -> DuelEngine:
     return DuelEngine(rng=NoCritRng(), **kwargs)
 
@@ -98,6 +106,80 @@ async def test_win_finishes_duel() -> None:
         assert result.finished and result.winner_id == 1
         assert finished and finished[0].winner_id == 1
         assert 10 not in engine.duels
+    finally:
+        engine.shutdown()
+
+
+async def test_heal_item_restores_hp_and_consumes_turn() -> None:
+    """Патч 30, баг 3, п.3: ActionType.ITEM раньше не обрабатывался вообще
+    внутри duel_engine._apply_action — зелье молча пропадало без эффекта
+    (падало в ветку "TODO: content"). Теперь лечит и тратит ход, как атака."""
+    engine = make_engine()
+    engine.start()
+    try:
+        a = combatant(1, side=0)
+        b = combatant(2, side=1)
+        a.current_hp = round(a.max_hp * 0.5)
+        first = engine.start_duel(10, a, b)
+        assert first == 1
+
+        result = await engine.act(10, 1, heal_item("heal_medium", 1))
+        assert a.current_hp > round(a.max_hp * 0.5)  # heal_medium = +55% max_hp
+        assert any("пьёт зелье" in line or "→" in line for line in result.lines)
+        # ход перешёл ко второму — зелье потратило ход, как обычное действие
+        assert engine.duels[10].current_actor_id == 2
+    finally:
+        engine.shutdown()
+
+
+async def test_turn_limit_forces_draw() -> None:
+    """Патч 30: оба игрока просто пропускают ходы (никто не умирает) — по
+    достижении max_turns бой обязан завершиться ничьей, а не длиться вечно."""
+    finished: list[DuelResult] = []
+
+    async def on_finish(session_id: int, result: DuelResult) -> None:
+        finished.append(result)
+
+    engine = make_engine(on_duel_finished=on_finish, max_turns=3)
+    engine.start()
+    try:
+        a = combatant(1, side=0)
+        b = combatant(2, side=1)
+        first = engine.start_duel(10, a, b)
+        assert first == 1  # NoCritRng.shuffle сохраняет порядок -> order = (1, 2)
+
+        await engine.act(10, 1, skip())  # ход 1
+        await engine.act(10, 2, skip())  # ход 2
+        result = await engine.act(10, 1, skip())  # ход 3 — лимит достигнут
+
+        assert result.finished and result.draw and result.draw_reason == "turn_limit"
+        assert result.winner_id is None
+        assert finished and finished[0].draw_reason == "turn_limit"
+        assert 10 not in engine.duels
+        assert a.alive and b.alive  # ничья по лимиту — оба живы, не взаимное истощение
+    finally:
+        engine.shutdown()
+
+
+async def test_turn_limit_warning_appears_from_threshold() -> None:
+    """С (max_turns - PVP_MAX_TURNS_WARNING_AT)-го хода игроки должны видеть,
+    сколько ходов осталось — иначе внезапная ничья выглядит как баг."""
+    engine = make_engine(max_turns=20)
+    engine.start()
+    try:
+        a = combatant(1, side=0)
+        b = combatant(2, side=1)
+        engine.start_duel(10, a, b)
+
+        result = None
+        for _ in range(14):  # ходы 1..14 — до предупреждения (20-14=6 > 5)
+            actor = engine.duels[10].current_actor_id
+            result = await engine.act(10, actor, skip())
+            assert not any("Ходов до исхода" in line for line in result.lines)
+
+        actor = engine.duels[10].current_actor_id
+        result = await engine.act(10, actor, skip())  # ход 15: 20-15=5 <= 5
+        assert any("Ходов до исхода: 5" in line for line in result.lines)
     finally:
         engine.shutdown()
 

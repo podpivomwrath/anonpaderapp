@@ -12,6 +12,9 @@ RouteEvent = Callable[[dict], Awaitable[None]]
 
 SETTINGS_KEY = web.AppKey("settings", Settings)
 ROUTE_EVENT_KEY: web.AppKey[RouteEvent] = web.AppKey("route_event")
+# Патч 30: дедупликация событий VK Callback API по event_id (см. bot/webhook.py).
+# Опционален — тесты и локальный dev без Redis просто не дедуплицируют.
+REDIS_KEY: web.AppKey = web.AppKey("callback_redis")
 # Хранится сам sessionmaker (не функция-геттер) — тесты могут подменить его
 # на sqlite-фабрику до старта TestServer.
 SESSION_FACTORY_KEY: web.AppKey[async_sessionmaker[AsyncSession]] = web.AppKey(

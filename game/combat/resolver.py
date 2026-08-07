@@ -81,6 +81,10 @@ class TickResult:
     finished: bool = False
     winner_side: int | None = None
     draw: bool = False
+    # Патч 30: различает ничью "оба легли" (draw_reason=None) от принудительной
+    # ничьи по лимиту ходов (только PVP_GROUP — см. TickEngine.max_turns) —
+    # у них разный лорный текст в bot/handlers/pvp.py.
+    draw_reason: str | None = None
     # Патч 12 (классовые испытания): структурные данные хода для
     # services/trial_service.py — не для отображения, только для трекинга.
     hits: list[PendingHit] = field(default_factory=list)

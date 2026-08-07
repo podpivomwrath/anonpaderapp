@@ -28,8 +28,9 @@ from game.combat.session import (
     DeclaredAction,
     EffectKind,
 )
-from game.combat.skills import DEFENSIVE_SKILLS, OFFENSIVE_SKILLS, SkillContext, compute_hit
+from game.combat.skills import DEFENSIVE_SKILLS, OFFENSIVE_SKILLS, PendingHeal, SkillContext, compute_hit
 from game.combat.session import CombatMode, CombatSessionState
+from game.economy import elixir_config as ec
 
 
 @dataclass
@@ -38,6 +39,9 @@ class DuelResult:
     finished: bool = False
     winner_id: int | None = None
     draw: bool = False
+    # Патч 30: различает ничью "взаимное истощение" (draw_reason=None) от
+    # принудительной ничьи по лимиту ходов — у них разный лорный текст.
+    draw_reason: str | None = None
 
 
 @dataclass
@@ -75,12 +79,14 @@ class DuelEngine:
         scheduler: AsyncIOScheduler | None = None,
         on_turn_resolved: TurnResolvedCallback | None = None,
         on_duel_finished: DuelFinishedCallback | None = None,
+        max_turns: int | None = None,
     ) -> None:
         self.turn_seconds = turn_seconds
         self.rng = rng or random.Random()
         self.scheduler = scheduler or AsyncIOScheduler()
         self.on_turn_resolved = on_turn_resolved
         self.on_duel_finished = on_duel_finished
+        self.max_turns = max_turns
         self.duels: dict[int, DuelState] = {}
 
     def start(self) -> None:
@@ -200,6 +206,14 @@ class DuelEngine:
             result.finished = True
             result.winner_id = alive[0].id
             result.lines.append(f"🏆 Победитель дуэли: {alive[0].name}")
+        elif self.max_turns is not None and turn >= self.max_turns:
+            # Патч 30: лимит ходов — принудительная ничья, никто не проиграл.
+            result.finished, result.draw, result.draw_reason = True, True, "turn_limit"
+            result.lines.append(bc.PVP_DRAW_TURN_LIMIT_TEXT)
+        elif self.max_turns is not None:
+            remaining = self.max_turns - turn
+            if remaining <= bc.PVP_MAX_TURNS_WARNING_AT:
+                result.lines.append(f"⏳ Ходов до исхода: {remaining}")
 
         if self.on_turn_resolved is not None:
             await self.on_turn_resolved(state.session_id, turn, result)
@@ -227,6 +241,17 @@ class DuelEngine:
         if action.type == ActionType.SKILL and action.skill_id in DEFENSIVE_SKILLS:
             # защита сохраняется до начала следующего хода актёра
             DEFENSIVE_SKILLS[action.skill_id](ctx)
+        elif action.type == ActionType.ITEM:
+            # Патч 30, баг 3, п.3: лечебное зелье в PvP-дуэли — тратит ход,
+            # как обычное действие (те же правила, что в PvE, патч 16).
+            # Раньше ActionType.ITEM здесь не обрабатывался ВООБЩЕ — падал в
+            # ветку "TODO: content" ниже, зелье молча пропадало без эффекта.
+            pct = ec.HEAL_PCT.get(action.item_id) if action.item_id else None
+            if pct is not None:
+                amount = round(actor.max_hp * pct)
+                ctx.heals.append(
+                    PendingHeal(source_id=actor.id, target_id=actor.id, amount=amount, label="пьёт зелье")
+                )
         elif action.type == ActionType.ATTACK or (
             action.type == ActionType.SKILL and action.skill_id in OFFENSIVE_SKILLS
         ):

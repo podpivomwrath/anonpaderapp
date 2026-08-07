@@ -295,3 +295,40 @@ def test_character_id_for_peer() -> None:
     battle.participants[7] = pvp_handlers.Participant(7, 555, "Кто-то", "warrior", "Воин")
     assert pvp_handlers._character_id_for_peer(battle, 555) == 7
     assert pvp_handlers._character_id_for_peer(battle, 999) is None
+
+
+class _FakeMessages:
+    async def send(self, **kwargs) -> int:
+        return 1
+
+
+class _FakeBotApi:
+    messages = _FakeMessages()
+
+
+async def test_start_forced_duel_assigns_distinct_sides(db_session, character_at, monkeypatch) -> None:
+    """Патч 30, регрессия бага 3: _build_combatant_for всегда возвращает
+    side=0 — без явного разведения сторон в _start_forced_duel оба
+    комбатанта дуэли оставались на стороне 0, из-за чего
+    _default_enemy_target никогда не находил цель и ЛЮБОЕ атакующее
+    действие молча отбрасывалось раньше вызова duel_engine.act (ходы при
+    этом продолжали идти по таймеру — отсюда "счётчик растёт, действовать
+    нельзя")."""
+    import bot.handlers.combat as combat_handlers
+
+    class _FakeCombatEngine:
+        sessions: dict = {}
+
+    monkeypatch.setattr(pvp_handlers, "_bot_api", _FakeBotApi())
+    monkeypatch.setattr(combat_handlers, "_engine", _FakeCombatEngine())
+    attacker = await character_at(5, 5, region="ridge")
+    victim = await character_at(5, 5, region="ridge")
+
+    await pvp_handlers._start_forced_duel(db_session, attacker, 111, victim, 222)
+
+    battle_id = pvp_handlers._peer_battle[111]
+    duel = pvp_handlers._duel_engine.duels[battle_id]
+    assert duel.combatants[attacker.id].side != duel.combatants[victim.id].side
+
+    target = pvp_handlers._default_enemy_target(battle_id, pvp_handlers._battles[battle_id], attacker.id)
+    assert target == victim.id

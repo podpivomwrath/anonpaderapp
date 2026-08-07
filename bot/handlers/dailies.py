@@ -6,6 +6,7 @@
 from vkbottle.bot import BotLabeler, Message
 
 from bot import dailies_texts
+from bot.battle_keyboard import active_battle_keyboard
 from bot.keyboards.world import BTN_DAILIES
 from services import daily_service
 from services import onboarding_service as onboarding_svc
@@ -21,4 +22,8 @@ async def show_dailies(message: Message) -> None:
         if character is None or character.creation_state is not None:
             return
         overview = await daily_service.get_dailies_overview(db, character)
-    await message.answer(dailies_texts.dailies_overview_text(overview))
+    # Патч 30, баг 2: справочная команда не должна стирать боевую клавиатуру.
+    await message.answer(
+        dailies_texts.dailies_overview_text(overview),
+        keyboard=active_battle_keyboard(message.peer_id),
+    )

@@ -3,6 +3,7 @@
 from vkbottle import Keyboard
 from vkbottle.bot import BotLabeler, Message
 
+from bot.battle_keyboard import active_battle_keyboard
 from bot.keyboards.world import add_miniapp_button
 from services.db import get_session_factory
 from services.user_service import get_profile_text
@@ -19,6 +20,13 @@ async def handle_profile(message: Message) -> None:
         await message.answer(
             "Персонаж не найден или создание не завершено. Напиши /start."
         )
+        return
+
+    # Патч 30, баг 2: справочная команда не должна стирать боевую клавиатуру,
+    # если игрок сейчас в PvE/PvP-бою.
+    battle_kb = active_battle_keyboard(message.peer_id)
+    if battle_kb is not None:
+        await message.answer(text, keyboard=battle_kb)
         return
 
     # Клавиатуру шлём только если мини-апп настроен — иначе пустая

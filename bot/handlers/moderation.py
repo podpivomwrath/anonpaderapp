@@ -12,6 +12,7 @@ from sqlalchemy import select
 from vkbottle import BaseMiddleware
 from vkbottle.bot import BotLabeler, Message
 
+from bot.battle_keyboard import active_battle_keyboard
 from bot.handlers import world as world_handlers
 from bot.onboarding_texts import REGION_TITLES
 from config import get_settings
@@ -129,26 +130,38 @@ async def bug_report_with_text(message: Message, text: str) -> None:
 
 @labeler.message(text=["/баг", "/bug"])
 async def bug_report_no_text(message: Message) -> None:
-    await message.answer(BUG_ASK_TEXT)
+    # Патч 30, баг 2: справочные команды не должны стирать боевую клавиатуру.
+    await message.answer(BUG_ASK_TEXT, keyboard=active_battle_keyboard(message.peer_id))
 
 
 async def _handle_bug_report(message: Message, text: str) -> None:
+    peer_id = message.peer_id
     if not text:
-        await message.answer(BUG_ASK_TEXT)
+        await message.answer(BUG_ASK_TEXT, keyboard=active_battle_keyboard(peer_id))
         return
     async with get_session_factory()() as db:
         character = await onboarding_svc.get_character(db, message.from_id)
         if character is None or character.creation_state is not None:
             return
         settings = get_settings()
-        since = datetime.now(timezone.utc) - timedelta(hours=1)
-        recent = await admin_service.bug_reports_since(db, character.id, since)
+        since_limit = datetime.now(timezone.utc) - timedelta(hours=1)
+        recent = await admin_service.bug_reports_since(db, character.id, since_limit)
         if recent >= settings.bug_report_max_per_hour:
             await db.commit()
-            await message.answer(BUG_RATE_LIMITED)
+            await message.answer(BUG_RATE_LIMITED, keyboard=active_battle_keyboard(peer_id))
             return
 
-        snapshot = await _build_snapshot(db, character, message.peer_id)
+        # Патч 30, баг 1, исправление 3: тот же текст от того же игрока за
+        # последние 30 сек — не плодим вторую запись (ретрай VK/двойной тап),
+        # но подтверждение всё равно отправляем как обычно.
+        since_dup = datetime.now(timezone.utc) - timedelta(seconds=30)
+        duplicate = await admin_service.duplicate_bug_report(db, character.id, text, since_dup)
+        if duplicate is not None:
+            await db.commit()
+            await message.answer(BUG_CONFIRM, keyboard=active_battle_keyboard(peer_id))
+            return
+
+        snapshot = await _build_snapshot(db, character, peer_id)
         snapshot["vk_id"] = message.from_id
         report = await admin_service.create_bug_report(db, character.id, text, snapshot)
         await db.commit()
@@ -163,4 +176,4 @@ async def _handle_bug_report(message: Message, text: str) -> None:
             from loguru import logger
             logger.exception("Не удалось отправить репорт бага #{} администратору", report_id)
 
-    await message.answer(BUG_CONFIRM)
+    await message.answer(BUG_CONFIRM, keyboard=active_battle_keyboard(peer_id))

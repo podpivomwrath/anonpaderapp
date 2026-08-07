@@ -527,6 +527,26 @@ async def bug_reports_since(db: AsyncSession, character_id: int, since: datetime
     ) or 0
 
 
+async def duplicate_bug_report(
+    db: AsyncSession, character_id: int, text: str, since: datetime
+) -> BugReport | None:
+    """Патч 30, баг 1, исправление 3: репорт с ИДЕНТИЧНЫМ текстом от того же
+    игрока за последние `since` — защита от дублей при ретрае VK Callback API
+    (дедупликация по event_id уже есть на уровне webhook, это доп. рубеж на
+    случай, если игрок ДЕЙСТВИТЕЛЬНО отправил одно и то же сообщение дважды
+    вручную за короткое время)."""
+    return await db.scalar(
+        select(BugReport)
+        .where(
+            BugReport.character_id == character_id,
+            BugReport.text == text,
+            BugReport.created_at >= since,
+        )
+        .order_by(BugReport.created_at.desc())
+        .limit(1)
+    )
+
+
 async def list_bug_reports(db: AsyncSession, status: str | None = None, limit: int = 50) -> list[BugReport]:
     stmt = select(BugReport).order_by(BugReport.created_at.desc()).limit(limit)
     if status is not None:

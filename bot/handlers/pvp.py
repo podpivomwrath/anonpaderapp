@@ -24,20 +24,23 @@ from datetime import datetime, timezone
 from sqlalchemy import select
 from vkbottle.bot import BotLabeler, Message
 
-from bot import dailies_texts
+from bot import dailies_texts, editable_message
 from bot.handlers import combat as combat_handlers
 from bot.handlers import respawn as respawn_handlers
 from bot.handlers import stats_window
 from bot.keyboards import world as kb
+from bot.keyboards.items import no_keyboard
 from bot.keyboards.pvp import (
     BTN_PVP_ATTACK,
+    BTN_PVP_ITEM,
     join_side_keyboard,
     pvp_combat_keyboard,
+    pvp_items_keyboard,
     pvp_waiting_keyboard,
 )
 from bot.pvp_texts import ALONE_ON_CELL, NOTHING_TO_TAKE
 from game.combat import balance_config as bc
-from game.combat import display
+from game.combat import display, elixir_effects
 from game.combat.base_skills import BASE_SKILL_DEFS
 from game.combat.duel_engine import DuelEngine, DuelResult, DuelState
 from game.combat.resolver import TickResult
@@ -47,16 +50,18 @@ from game.combat.session import (
     CombatSessionState,
     CombatantState,
     DeclaredAction,
+    EffectKind,
     Stats,
     build_combatant,
 )
 from game.combat.skills import DEFENSIVE_SKILLS
 from game.combat.tick_engine import TickEngine
+from game.economy import elixir_config as ec
 from game.world import grid
 from models import Character, CharacterStats
 from services import (
-    admin_service, daily_service, death_service, item_service, mount_service, preset_service, pvp_service,
-    trophy_service,
+    admin_service, daily_service, death_service, elixir_service, item_service, mount_service, preset_service,
+    pvp_service, trophy_service,
 )
 from services import onboarding_service as onboarding_svc
 from services.db import get_session_factory
@@ -379,6 +384,15 @@ async def _start_forced_duel(
 
     attacker_combatant = await _build_combatant_for(db, attacker)
     victim_combatant = await _build_combatant_for(db, victim)
+    # Патч 30, баг 3: _build_combatant_for всегда ставит side=0 — без явного
+    # разведения сторон здесь оба комбатанта дуэли остаются на стороне 0, и
+    # _default_enemy_target (фильтр "side != моей") ни для кого не находит
+    # цель, из-за чего ЛЮБОЕ атакующее действие молча отбрасывается ДО
+    # вызова duel_engine.act. Ходы при этом всё равно идут по таймеру
+    # (_on_timeout не проверяет наличие цели) — отсюда "счётчик растёт, но
+    # никто не может походить".
+    attacker_combatant.side = 0
+    victim_combatant.side = 1
 
     session_id = _new_battle_id()
     battle = Battle(
@@ -562,7 +576,10 @@ async def pvp_skill(message: Message) -> None:
     combatant = _live_state(battle_id, battle).get(cid)
     if combatant is not None and combatant.is_on_cooldown(skill_id):
         cd = combatant.cooldowns.get(skill_id, 0)
-        await message.answer(f"⏳ Навык ещё не готов (КД {cd}).")
+        # Патч 30, баг 2: бой активен — без клавиатуры игрок теряет кнопки.
+        participant = battle.participants.get(cid)
+        keyboard = pvp_combat_keyboard(participant.base_class, combatant.cooldowns) if participant else None
+        await message.answer(f"⏳ Навык ещё не готов (КД {cd}).", keyboard=keyboard)
         return
     await _pvp_action(message, DeclaredAction(type=ActionType.SKILL, skill_id=skill_id))
 
@@ -607,6 +624,130 @@ def _default_enemy_target(battle_id: int, battle: Battle, cid: int) -> int | Non
     if not enemies:
         return None
     return _rng.choice(enemies)
+
+
+# --- Предметы в бою (патч 30, баг 3, п.3): зелья/эликсиры работают в PvP по
+# тем же правилам, что и в PvE (патч 16) — лечебные тратят ход, боевые
+# эликсиры бесплатны с лимитом ELIXIR_PER_BATTLE_LIMIT/бой, недоступны под
+# контролем. Payload {"type": "pvp_use_item"} НАМЕРЕННО отличается от PvE
+# {"type": "use_item"} — см. докстринг bot/keyboards/pvp.py. ---
+
+
+def _battle_board_text(battle_id: int, battle: Battle, lines: list[str]) -> str:
+    if battle.battle_type == "duel":
+        duel = _duel_engine.duels.get(battle_id)
+        return _render_duel(duel, lines, finished=False) if duel is not None else "\n".join(lines)
+    session = _mass_engine.sessions.get(battle_id)
+    return _render_mass(session, lines) if session is not None else "\n".join(lines)
+
+
+@labeler.message(text=[BTN_PVP_ITEM])
+async def pvp_open_items(message: Message) -> None:
+    peer_id = message.peer_id
+    battle_id = _peer_battle.get(peer_id)
+    if battle_id is None:
+        return
+    battle = _battles.get(battle_id)
+    if battle is None:
+        return
+    cid = _character_id_for_peer(battle, peer_id)
+    if cid is None:
+        return
+    combatant = _live_state(battle_id, battle).get(cid)
+    participant = battle.participants.get(cid)
+    if combatant is None or participant is None:
+        return
+    battle_kb = pvp_combat_keyboard(participant.base_class, combatant.cooldowns)
+    if combatant.has_effect(EffectKind.FREEZE):
+        await message.answer("Скован — не до зелий сейчас. ❄️", keyboard=battle_kb)
+        return
+
+    async with get_session_factory()() as db:
+        character = await onboarding_svc.get_character(db, peer_id)
+        if character is None:
+            return
+        stock = await elixir_service.get_stock(db, character.id)
+
+    if not stock:
+        await message.answer("🎒 В сумке пусто.", keyboard=battle_kb)
+        return
+
+    limit_reached = combatant.combat_elixirs_used >= ec.ELIXIR_PER_BATTLE_LIMIT
+    visible = [(d, count) for d, count in stock if d.category == "heal" or not limit_reached]
+    text = "🎒 Что использовать?"
+    if limit_reached and any(d.category == "combat" for d, _ in stock):
+        text += "\n\nБольше твоё тело не выдержит за один бой — боевые эликсиры недоступны."
+    await editable_message.send_or_edit(
+        _bot_api, "pvp_combat_item", peer_id, text, pvp_items_keyboard(visible)
+    )
+
+
+@labeler.message(payload_contains={"type": "pvp_use_item"})
+async def pvp_use_item(message: Message) -> None:
+    peer_id = message.peer_id
+    battle_id = _peer_battle.get(peer_id)
+    if battle_id is None:
+        return
+    battle = _battles.get(battle_id)
+    if battle is None:
+        return
+    cid = _character_id_for_peer(battle, peer_id)
+    if cid is None:
+        return
+    payload = message.get_payload_json() or {}
+    elixir_id = payload.get("id")
+    elixir = elixir_service.elixir_def(elixir_id) if isinstance(elixir_id, str) else None
+    if elixir is None:
+        return
+
+    combatant = _live_state(battle_id, battle).get(cid)
+    participant = battle.participants.get(cid)
+    if combatant is None or participant is None:
+        return
+    battle_kb = pvp_combat_keyboard(participant.base_class, combatant.cooldowns)
+    if combatant.has_effect(EffectKind.FREEZE):
+        await message.answer("Скован — не до зелий сейчас. ❄️", keyboard=battle_kb)
+        return
+    if elixir.category == "combat" and combatant.combat_elixirs_used >= ec.ELIXIR_PER_BATTLE_LIMIT:
+        await message.answer("Больше твоё тело не выдержит за один бой.", keyboard=battle_kb)
+        return
+
+    async with get_session_factory()() as db:
+        character = await onboarding_svc.get_character(db, peer_id)
+        if character is None:
+            return
+        consumed = await elixir_service.consume(db, character.id, elixir_id)
+        await db.commit()
+    if not consumed:
+        await message.answer("Этого зелья больше нет в сумке.", keyboard=battle_kb)
+        return
+
+    await editable_message.send_or_edit(
+        _bot_api, "pvp_combat_item", peer_id, f"Использовано: {elixir.emoji} {elixir.name}.", no_keyboard()
+    )
+
+    if elixir.category == "heal":
+        # Лечебное зелье — тратит ход, как обычное действие (см. _pvp_action:
+        # здесь НЕ вызываем его напрямую — цель для ITEM всегда сам актёр,
+        # а _pvp_action всегда подставляет ВРАЖЕСКУЮ цель для не-defensive).
+        action = DeclaredAction(type=ActionType.ITEM, item_id=elixir_id, target_id=cid)
+        try:
+            if battle.battle_type == "duel":
+                await _duel_engine.act(battle_id, cid, action)
+            else:
+                await _mass_engine.declare_action(battle_id, cid, action)
+        except (KeyError, ValueError):
+            pass
+        return
+
+    # Боевой эликсир — бесплатное действие: эффект сразу, ход не тратится.
+    line = elixir_effects.apply_combat_elixir(combatant, elixir_id)
+    combatant.combat_elixirs_used += 1
+    text = f"{line} Твой ход.\n\n{_battle_board_text(battle_id, battle, [])}"
+    await _bot_api.messages.send(
+        peer_id=peer_id, message=text, random_id=0,
+        keyboard=pvp_combat_keyboard(participant.base_class, combatant.cooldowns),
+    )
 
 
 # --- Колбэки дуэльного движка ---
@@ -654,11 +795,14 @@ async def on_duel_finished(session_id: int, result: DuelResult) -> None:
         async with get_session_factory()() as db:
             await pvp_service.log_battle(db, "duel", list(battle.participants), [])
             await db.commit()
+        # Патч 30: лимит ходов — отдельный лорный текст от "взаимного истощения".
+        draw_text = (
+            bc.PVP_DRAW_TURN_LIMIT_TEXT if result.draw_reason == "turn_limit"
+            else "🤝 Ничья: взаимное истощение. Трофеи остаются при каждом."
+        )
         for p in battle.participants.values():
             await _bot_api.messages.send(
-                peer_id=p.peer_id,
-                message="🤝 Ничья: взаимное истощение. Трофеи остаются при каждом.",
-                random_id=0, keyboard=kb.waiting_keyboard(),
+                peer_id=p.peer_id, message=draw_text, random_id=0, keyboard=kb.waiting_keyboard(),
             )
         return
 
@@ -811,8 +955,26 @@ async def on_mass_battle_finished(session_id: int, result: TickResult) -> None:
         await db.commit()
         positions = {cid: (c.pos_x, c.pos_y) for cid, c in characters.items()}
 
+    # Патч 30: ничья (взаимное истощение ИЛИ лимит ходов) — раньше этот случай
+    # никак не отличался от обычного финала, и выжившие получали "ты
+    # победил", даже когда бой на самом деле закончился вничью.
+    draw_text = (
+        bc.PVP_DRAW_TURN_LIMIT_TEXT if result.draw_reason == "turn_limit"
+        else "🤝 Ничья: взаимное истощение. Трофеи остаются при каждом."
+    )
     for cid, participant in battle.participants.items():
-        if cid in survivor_ids:
+        if result.draw:
+            if cid in survivor_ids:
+                pos = positions.get(cid, (0, 0))
+                keyboard = kb.movement_keyboard(
+                    *pos, participant.peer_id, has_mount=has_mount_by_cid.get(cid, False)
+                )
+            else:
+                keyboard = kb.waiting_keyboard()
+            await _bot_api.messages.send(
+                peer_id=participant.peer_id, message=draw_text, random_id=0, keyboard=keyboard,
+            )
+        elif cid in survivor_ids:
             text = "🏆 Бой окончен — твоя сторона побеждает!"
             lines = transfer_lines.get(cid, [])
             if lines:
