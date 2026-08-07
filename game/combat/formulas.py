@@ -75,6 +75,13 @@ def mob_ring_multiplier(zone_min: int, zone_max: int) -> float:
     return bc.MOB_RING_MULTIPLIERS.get((zone_min, zone_max), 1.0)
 
 
+def mob_ring_damage_multiplier(zone_min: int, zone_max: int) -> float:
+    """Патч 28: на урон кольцо действует вполовину слабее, чем на HP — иначе
+    глубокие зоны становятся не только «мясистее», но и мгновенно смертельными."""
+    full = mob_ring_multiplier(zone_min, zone_max)
+    return 1 + (full - 1) * 0.5
+
+
 def respawn_time_minutes(level: int) -> float:
     """1 мин на 1 ур. → RESPAWN_MAX_MINUTES на MAX_LEVEL, линейно."""
     span = bc.RESPAWN_MAX_MINUTES - bc.RESPAWN_MIN_MINUTES

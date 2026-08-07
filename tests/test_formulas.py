@@ -77,3 +77,12 @@ def test_mob_ring_multiplier_known_ranges() -> None:
 
 def test_mob_ring_multiplier_unknown_range_defaults_to_one() -> None:
     assert formulas.mob_ring_multiplier(0, 0) == 1.0
+
+
+def test_mob_ring_damage_multiplier_is_halved() -> None:
+    """Патч 28: урон получает только половину надбавки кольца над 1.0."""
+    assert formulas.mob_ring_damage_multiplier(1, 15) == 1.0
+    assert formulas.mob_ring_damage_multiplier(16, 30) == pytest.approx(1.075)
+    assert formulas.mob_ring_damage_multiplier(31, 45) == pytest.approx(1.15)
+    assert formulas.mob_ring_damage_multiplier(46, 60) == pytest.approx(1.225)
+    assert formulas.mob_ring_damage_multiplier(60, 100) == pytest.approx(1.3)

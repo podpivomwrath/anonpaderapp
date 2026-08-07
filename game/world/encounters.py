@@ -50,13 +50,15 @@ def balanced_mob_stats(level: int, primary_stat: str = "str") -> Stats:
     )
 
 
-def _scale_stats(stats: Stats, mult: float) -> Stats:
+def _scale_stats_split(stats: Stats, hp_mult: float, dmg_mult: float) -> Stats:
+    """Патч 28: VIT (длина боя) и остальные статы (опасность/урон) масштабируются
+    раздельными множителями — см. MOB_HP_MULTIPLIER/MOB_DAMAGE_MULTIPLIER."""
     return Stats(
-        strength=round(stats.strength * mult),
-        agility=round(stats.agility * mult),
-        intellect=round(stats.intellect * mult),
-        vitality=round(stats.vitality * mult),
-        will=round(stats.will * mult),
+        strength=round(stats.strength * dmg_mult),
+        agility=round(stats.agility * dmg_mult),
+        intellect=round(stats.intellect * dmg_mult),
+        vitality=round(stats.vitality * hp_mult),
+        will=round(stats.will * dmg_mult),
     )
 
 
@@ -85,12 +87,11 @@ def spawn_mob(
     candidates = [m for m in _region_mobs(pool_region) if (m.zone_min, m.zone_max) == zone]
     mob = rng.choice(candidates)
     level = mob_level_for_player(player_level, mob)
-    # Патч 26: базовый множитель (компенсирует экипировку/навыки игрока) ×
-    # множитель глубины кольца — применяется к итоговым статам моба.
-    ring_mult = formulas.mob_ring_multiplier(*zone)
-    stats = _scale_stats(
-        balanced_mob_stats(level, mob.primary_stat), bc.MOB_BASE_MULTIPLIER * ring_mult
-    )
+    # Патч 28: раздельные множители — HP (длина боя) получает кольцо целиком,
+    # урон (опасность) — вполовину слабее (см. balance_config.py).
+    hp_mult = bc.MOB_HP_MULTIPLIER * formulas.mob_ring_multiplier(*zone)
+    dmg_mult = bc.MOB_DAMAGE_MULTIPLIER * formulas.mob_ring_damage_multiplier(*zone)
+    stats = _scale_stats_split(balanced_mob_stats(level, mob.primary_stat), hp_mult, dmg_mult)
     combatant = build_combatant(
         id=participant_id,
         side=1,

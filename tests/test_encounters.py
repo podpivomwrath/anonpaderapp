@@ -19,15 +19,15 @@ def test_balanced_mob_stats_pool_matches_level() -> None:
 
 
 def test_balanced_mob_stats_specializes_primary_stat() -> None:
-    """Патч 26: основной боевой стат получает ~45% бюджета, VIT — ~30%,
-    остальные два боевых — по крохам (~8.33% каждый)."""
+    """Патч 28: основной боевой стат получает ~38% бюджета (было 45% в патче
+    26 — перебор), VIT — ~32%, остальные два боевых — по 10% каждый."""
     stats = encounters.balanced_mob_stats(16, primary_stat="agi")
     pool = 75 + 3 * 16
-    assert stats.agility == round(pool * 0.45)
-    assert stats.vitality == round(pool * 0.30)
-    assert stats.strength == round(pool * 0.0833)
-    assert stats.intellect == round(pool * 0.0833)
-    assert stats.will == round(pool * 0.0833)
+    assert stats.agility == round(pool * 0.38)
+    assert stats.vitality == round(pool * 0.32)
+    assert stats.strength == round(pool * 0.10)
+    assert stats.intellect == round(pool * 0.10)
+    assert stats.will == round(pool * 0.10)
     assert stats.agility > stats.strength
     assert stats.agility > stats.intellect
 
@@ -35,7 +35,7 @@ def test_balanced_mob_stats_specializes_primary_stat() -> None:
 def test_balanced_mob_stats_defaults_to_str_primary() -> None:
     stats = encounters.balanced_mob_stats(10)
     pool = 75 + 3 * 10
-    assert stats.strength == round(pool * 0.45)
+    assert stats.strength == round(pool * 0.38)
 
 
 def test_starter_ring_loads_three_mobs_per_region() -> None:
@@ -143,17 +143,47 @@ def test_spawn_mob_uses_content_primary_stat() -> None:
 _STAT_FIELD = {"str": "strength", "agi": "agility", "int": "intellect"}
 
 
-def test_spawn_mob_applies_base_and_ring_multiplier() -> None:
-    """Патч 26: статы моба = специализированный пул × MOB_BASE_MULTIPLIER ×
-    множитель кольца (кольцо 1-15 -> ×1.0, значит только базовый множитель)."""
+def test_spawn_mob_applies_damage_multiplier_to_primary_stat() -> None:
+    """Патч 28: боевые статы (в т.ч. основной) масштабируются MOB_DAMAGE_MULTIPLIER
+    × кольцо-вполовину (кольцо 1-15 -> ×1.0, значит только базовый множитель)."""
     from game.combat import balance_config as bc
 
     rng = random.Random(1)
     enc = encounters.spawn_mob(2, "ridge", player_level=8, dist=45, rng=rng)
     field = _STAT_FIELD[enc.combatant.primary_stat]
     raw = encounters.balanced_mob_stats(8, enc.combatant.primary_stat)
-    expected = round(getattr(raw, field) * bc.MOB_BASE_MULTIPLIER * 1.0)
+    expected = round(getattr(raw, field) * bc.MOB_DAMAGE_MULTIPLIER * 1.0)
     assert getattr(enc.combatant.stats, field) == expected
+
+
+def test_spawn_mob_applies_hp_multiplier_to_vitality() -> None:
+    """Патч 28: VIT масштабируется отдельным MOB_HP_MULTIPLIER (кольцо целиком,
+    без деления пополам, в отличие от боевых статов)."""
+    from game.combat import balance_config as bc
+
+    rng = random.Random(1)
+    enc = encounters.spawn_mob(2, "ridge", player_level=8, dist=45, rng=rng)
+    raw = encounters.balanced_mob_stats(8, enc.combatant.primary_stat)
+    expected = round(raw.vitality * bc.MOB_HP_MULTIPLIER * 1.0)
+    assert enc.combatant.stats.vitality == expected
+
+
+def test_spawn_mob_ring_multiplier_is_halved_for_damage() -> None:
+    """Патч 28: в кольце 16-30 (×1.15) VIT получает множитель целиком, а
+    боевые статы — только половину надбавки (1 + 0.15*0.5 = 1.075)."""
+    from game.combat import balance_config as bc
+
+    rng = random.Random(5)
+    enc = encounters.spawn_mob(2, "ridge", player_level=20, dist=30, rng=rng)  # кольцо 16-30
+    field = _STAT_FIELD[enc.combatant.primary_stat]
+    raw = encounters.balanced_mob_stats(enc.combatant.level, enc.combatant.primary_stat)
+
+    ring_mult = bc.MOB_RING_MULTIPLIERS[(16, 30)]
+    expected_vit = round(raw.vitality * bc.MOB_HP_MULTIPLIER * ring_mult)
+    expected_dmg_stat = round(getattr(raw, field) * bc.MOB_DAMAGE_MULTIPLIER * (1 + (ring_mult - 1) * 0.5))
+
+    assert enc.combatant.stats.vitality == expected_vit
+    assert getattr(enc.combatant.stats, field) == expected_dmg_stat
 
 
 def test_spawn_mob_center_uses_any_region_regardless_of_home_region() -> None:
