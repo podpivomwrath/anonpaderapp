@@ -83,3 +83,42 @@ export function getPvpLeaderboard() {
 export function getDailies() {
   return request('/dailies');
 }
+
+// --- Админка (патч 27) — доступна, только если character.is_admin; сервер
+// перепроверяет права на каждом из этих вызовов независимо (403 иначе). ---
+
+export function getAdminOverview() {
+  return request('/admin/overview');
+}
+
+export function searchAdminPlayers(query) {
+  return request(`/admin/search?q=${encodeURIComponent(query)}`);
+}
+
+export function getAdminPlayer(characterId) {
+  return request(`/admin/player/${characterId}`);
+}
+
+export function postAdminAction(characterId, action, params = {}) {
+  return request(`/admin/player/${characterId}/action`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ action, ...params }),
+  });
+}
+
+export function getAdminJournal(limit = 50, offset = 0) {
+  return request(`/admin/journal?limit=${limit}&offset=${offset}`);
+}
+
+export function getAdminBugReports(status) {
+  return request(`/admin/bug_reports${status ? `?status=${status}` : ''}`);
+}
+
+export function setAdminBugReportStatus(reportId, status) {
+  return request(`/admin/bug_reports/${reportId}/status`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ status }),
+  });
+}

@@ -10,9 +10,10 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from bot.app_keys import SESSION_FACTORY_KEY
+from bot.app_keys import SESSION_FACTORY_KEY, SETTINGS_KEY
 from bot.miniapp_auth import VK_USER_ID_KEY
 from bot.onboarding_texts import REGION_TITLES
+from config import Settings
 from game.content_loader import load_content
 from models import BaseClass, Character, CharacterBuffPreset, User
 from services import (
@@ -55,12 +56,13 @@ async def _load_character(session: AsyncSession, vk_user_id: int) -> Character |
 
 
 def _character_payload(
-    character: Character, gear_bonus: dict[str, int] | None = None, wallet=None,
+    character: Character, gear_bonus: dict[str, int] | None = None, wallet=None, is_admin: bool = False,
 ) -> dict:
     stats = character.stats
     derived = derived_stats_service.compute(character, stats, gear_bonus)
     return {
         "name": character.name,
+        "is_admin": is_admin,
         "title": daily_service.title_name(character),
         "base_class": character.base_class,
         "base_class_title": CLASS_TITLES.get(character.base_class, character.base_class),
@@ -89,6 +91,14 @@ def _character_payload(
     }
 
 
+def _is_admin(request: web.Request, vk_user_id: int) -> bool:
+    """Только для видимости вкладки на фронтенде — НЕ источник прав. Каждый
+    /api/miniapp/admin/* эндпоинт (bot/miniapp_admin_api.py) перепроверяет
+    vk_id самостоятельно, этот флаг обмануть бесполезно."""
+    settings: Settings = request.app[SETTINGS_KEY]
+    return bool(settings.admin_vk_id) and vk_user_id == settings.admin_vk_id
+
+
 async def handle_get_character(request: web.Request) -> web.Response:
     vk_user_id = request[VK_USER_ID_KEY]
     session_factory = request.app[SESSION_FACTORY_KEY]
@@ -99,7 +109,9 @@ async def handle_get_character(request: web.Request) -> web.Response:
         gear_bonus = await item_service.compute_gear_bonus(session, character.id)
         wallet = await get_wallet(session, character.id)
         await session.commit()
-        return web.json_response(_character_payload(character, gear_bonus, wallet))
+        return web.json_response(
+            _character_payload(character, gear_bonus, wallet, _is_admin(request, vk_user_id))
+        )
 
 
 async def handle_post_stats(request: web.Request) -> web.Response:
@@ -143,7 +155,9 @@ async def handle_post_stats(request: web.Request) -> web.Response:
         gear_bonus = await item_service.compute_gear_bonus(session, character.id)
         wallet = await get_wallet(session, character.id)
         await session.commit()
-        return web.json_response(_character_payload(character, gear_bonus, wallet))
+        return web.json_response(
+            _character_payload(character, gear_bonus, wallet, _is_admin(request, vk_user_id))
+        )
 
 
 async def handle_get_trials(request: web.Request) -> web.Response:

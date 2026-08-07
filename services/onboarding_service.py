@@ -81,6 +81,7 @@ async def get_character(db: AsyncSession, vk_id: int) -> Character | None:
         notice = await daily_service.ensure_day_rollover(db, character)
         if notice is not None:
             character._daily_notice = notice
+        character.last_active_at = datetime.now(timezone.utc)
     return character
 
 

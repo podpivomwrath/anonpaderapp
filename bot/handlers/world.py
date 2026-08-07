@@ -804,6 +804,49 @@ async def keyboard_command(message: Message) -> None:
     await message.answer("Обновляю клавиатуру.", keyboard=keyboard)
 
 
+def activity_state(peer_id: int) -> str:
+    """Грубая текстовая метка активности по in-memory состоянию — для /баг
+    снапшота и админки (патч 27, части 2.3 и 3). Перемещение/поездка на
+    маунте не отсюда — это в Character/MountTravel, проверяются вызывающим."""
+    if combat_handlers.has_active_encounter(peer_id):
+        return "в бою"
+    if pvp_handlers.rebuild_keyboard(peer_id) is not None:
+        return "в PvP-бою"
+    if peer_id in _exploring:
+        return "в исследовании"
+    if peer_id in _resting:
+        return "отдыхает"
+    return "в городе/на карте"
+
+
+async def force_unstick(db, character, peer_id: int) -> bool:
+    """Аварийный выход из зависшей активности (патч 25, п.5). Общая логика
+    /застрял и админского «Сбросить активности» (патч 27, п.2.3) — PvP НЕ
+    прерывает (защита от абьюза), там только позволяет пересобрать боевую
+    клавиатуру у вызывающего. Возвращает True, если PvP-бой активен (вызывающий
+    должен сам обработать это отдельно — здесь для админа PvP не трогаем)."""
+    if pvp_handlers.rebuild_keyboard(peer_id) is not None:
+        return True
+    if combat_handlers.has_active_encounter(peer_id):
+        # безнаградный/безштрафной аборт — тот же путь, что и прерывание PvE открытым PvP
+        await combat_handlers.interrupt_for_pvp(peer_id)
+        travel_id = combat_handlers.pop_mount_ambush(peer_id)
+        if travel_id is not None:
+            # бой-нападение прерван вручную — поездка не должна зависнуть в ambushed
+            travel = await db.get(MountTravel, travel_id)
+            if travel is not None:
+                await mount_service.cancel_travel(db, travel)
+    _exploring.discard(peer_id)
+    _resting.discard(peer_id)
+    now = datetime.now(timezone.utc)
+    if movement_service.is_traveling(character, now):
+        movement_service.cancel_travel(character)
+    active_mount_travel = await mount_service.active_travel(db, character.id)
+    if active_mount_travel is not None and active_mount_travel.status == "traveling":
+        await mount_service.cancel_travel(db, active_mount_travel)
+    return False
+
+
 @labeler.message(text=["/застрял", "/stuck"])
 async def stuck_command(message: Message) -> None:
     """Патч 25, п.5: аварийный выход из зависшей активности. PvP НЕ прерывает
@@ -813,27 +856,10 @@ async def stuck_command(message: Message) -> None:
         character = await onboarding_svc.get_character(db, message.from_id)
         if character is None or character.creation_state is not None:
             return
-        pvp_kb = pvp_handlers.rebuild_keyboard(peer_id)
-        if pvp_kb is not None:
-            await message.answer(STUCK_LINE, keyboard=pvp_kb)
+        if await force_unstick(db, character, peer_id):
+            await message.answer(STUCK_LINE, keyboard=pvp_handlers.rebuild_keyboard(peer_id))
             return
-        if combat_handlers.has_active_encounter(peer_id):
-            # безнаградный/безштрафной аборт — тот же путь, что и прерывание PvE открытым PvP
-            await combat_handlers.interrupt_for_pvp(peer_id)
-            travel_id = combat_handlers.pop_mount_ambush(peer_id)
-            if travel_id is not None:
-                # бой-нападение прерван вручную — поездка не должна зависнуть в ambushed
-                travel = await db.get(MountTravel, travel_id)
-                if travel is not None:
-                    await mount_service.cancel_travel(db, travel)
-        _exploring.discard(peer_id)
-        _resting.discard(peer_id)
         now = datetime.now(timezone.utc)
-        if movement_service.is_traveling(character, now):
-            movement_service.cancel_travel(character)
-        active_mount_travel = await mount_service.active_travel(db, character.id)
-        if active_mount_travel is not None and active_mount_travel.status == "traveling":
-            await mount_service.cancel_travel(db, active_mount_travel)
         await db.commit()
         keyboard = await _current_keyboard(db, character, peer_id, now)
     await message.answer(STUCK_LINE, keyboard=keyboard)

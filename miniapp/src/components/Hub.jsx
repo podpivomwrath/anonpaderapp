@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Panel, PanelHeader, Tabbar, TabbarItem, Placeholder, Spinner, Div, Button } from '@vkontakte/vkui';
 import { getCharacter } from '../api.js';
+import AdminTab from './AdminTab.jsx';
 import CharacterTab from './CharacterTab.jsx';
 import DailiesTab from './DailiesTab.jsx';
 import InventoryTab from './InventoryTab.jsx';
@@ -9,6 +10,9 @@ import StubTab from './StubTab.jsx';
 // Патч 14, ч.1: было 5 вкладок (Характеристики/Инвентарь/Пресеты/Испытания/
 // Биржа) — Характеристики+Пресеты+Испытания объединены в «Персонаж».
 // Патч 23: + «Задания» (сюжет/ежедневки/вход).
+// Патч 27: + «Админ» — добавляется в TABS условно, только когда
+// character.is_admin (сервер уже подтвердил права); это ТОЛЬКО видимость,
+// реальная защита — на каждом /api/miniapp/admin/* эндпоинте отдельно.
 const TABS = [
   { id: 'character', label: 'Персонаж', icon: '🎭' },
   { id: 'dailies', label: 'Задания', icon: '📜' },
@@ -93,10 +97,11 @@ export default function Hub() {
         {activeTab === 'exchange' && (
           <StubTab text="Торговцы душами ещё не открыли лавку. Скоро." />
         )}
+        {activeTab === 'admin' && character.is_admin && <AdminTab />}
       </div>
 
       <Tabbar>
-        {TABS.map((tab) => (
+        {(character.is_admin ? [...TABS, { id: 'admin', label: 'Админ', icon: '🛡️' }] : TABS).map((tab) => (
           <TabbarItem
             key={tab.id}
             selected={activeTab === tab.id}

@@ -55,7 +55,8 @@ from game.combat.tick_engine import TickEngine
 from game.world import grid
 from models import Character, CharacterStats
 from services import (
-    daily_service, death_service, item_service, mount_service, preset_service, pvp_service, trophy_service,
+    admin_service, daily_service, death_service, item_service, mount_service, preset_service, pvp_service,
+    trophy_service,
 )
 from services import onboarding_service as onboarding_svc
 from services.db import get_session_factory
@@ -680,6 +681,7 @@ async def _finish_duel(battle: Battle, winner_cid: int, loser_cid: int) -> None:
         no_reward = pvp_service.no_reward_for_kill(winner.level, loser.level)
         moved = {} if no_reward else await trophy_service.transfer_all(db, loser.id, winner.id)
         death_service.apply_pvp_death(loser)
+        await admin_service.log_death(db, loser, "pvp")
         respawn_handlers.register_pvp_death(loser_p.peer_id)
         await pvp_service.log_battle(db, "duel", [winner_cid, loser_cid], [winner_cid])
         daily_progress = await daily_service.record_pvp_win(db, winner)
@@ -799,6 +801,7 @@ async def on_mass_battle_finished(session_id: int, result: TickResult) -> None:
                 if line:
                     transfer_lines.setdefault(winner_cid, []).append(f"{victim.name}: {line}")
             death_service.apply_pvp_death(victim)
+            await admin_service.log_death(db, victim, "pvp")
             respawn_handlers.register_pvp_death(battle.participants[victim_cid].peer_id)
 
         await pvp_service.log_battle(db, "mass", list(battle.participants), winner_ids)

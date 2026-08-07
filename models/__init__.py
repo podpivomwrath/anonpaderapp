@@ -1,6 +1,7 @@
 """SQLAlchemy-модели. Все импортируются здесь, чтобы Base.metadata была полной
 (это важно для Alembic autogenerate)."""
 
+from models.admin import AdminAction, BugReport, CharacterDeath
 from models.base import Base
 from models.character import Character, CharacterBuffPreset, CharacterStats
 from models.combat import CombatParticipant, CombatSession
@@ -20,12 +21,15 @@ from models.trophy import CharacterTrophy
 from models.user import User
 
 __all__ = [
+    "AdminAction",
     "Base",
     "BaseClass",
+    "BugReport",
     "Character",
     "CharacterBuffPreset",
     "CharacterConsumable",
     "CharacterDaily",
+    "CharacterDeath",
     "CharacterLootbox",
     "CharacterMount",
     "CharacterQuest",

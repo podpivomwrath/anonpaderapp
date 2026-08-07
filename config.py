@@ -65,6 +65,13 @@ class Settings(BaseSettings):
     # от имени приложения (Service Token), сохранён про запас.
     vk_service_key: str = Field(default="", description="Сервисный ключ приложения VK (Service Token)")
 
+    # --- Админка (патч 27) ---
+    # Единственный администратор — сверяется с verified vk_id на каждом запросе.
+    # 0 (пусто) означает "админки нет ни у кого" — намеренно безопасный дефолт.
+    admin_vk_id: int = Field(default=0, description="vk_id единственного администратора")
+    # /баг — защита от спама: не больше N репортов от игрока в час.
+    bug_report_max_per_hour: int = Field(default=5, description="Лимит /баг репортов в час на игрока")
+
     log_level: str = "INFO"
 
 

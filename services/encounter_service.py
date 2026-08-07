@@ -11,6 +11,7 @@ from game.combat.battle_report import BattleReport
 from game.combat.formulas import respawn_time_minutes
 from models import Character, CharacterStats, Item
 from services import (
+    admin_service,
     daily_service,
     death_service,
     experience_service,
@@ -102,4 +103,5 @@ async def resolve_defeat(db: AsyncSession, character: Character) -> DefeatOutcom
     if character.subclass is not None:
         await trial_service.record_defeat(db, character)
     await daily_service.record_defeat(db, character)
+    await admin_service.log_death(db, character, "pve")
     return DefeatOutcome(minutes, xp_lost)

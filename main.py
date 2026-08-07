@@ -15,6 +15,7 @@ from bot.handlers import appraiser as appraiser_handlers
 from bot.handlers import combat as combat_handlers
 from bot.handlers import elixir_shop as elixir_shop_handlers
 from bot.handlers import inventory as inventory_handlers
+from bot.handlers import moderation as moderation_handlers
 from bot.handlers import mounts as mounts_handlers
 from bot.handlers import presets as presets_handlers
 from bot.handlers import pvp as pvp_handlers
@@ -34,6 +35,7 @@ def create_bot(settings: Settings) -> Bot:
     bot = Bot(token=settings.vk_token)
     for labeler in LABELERS:
         bot.labeler.load(labeler)
+    moderation_handlers.setup_middleware(bot)  # патч 27: бан-гейт РАНЬШЕ всех остальных middleware
     onboarding.setup(bot)  # диспенсер состояний + восстановление FSM из БД
     list_keeper.setup(bot)  # патч 12: FSM выбора подкласса + восстановление
     mounts_handlers.setup(bot, bot.api, settings.respawn_live_countdown)  # патч 25, п.7: FSM координат
@@ -80,6 +82,7 @@ async def run() -> None:
     inventory_handlers.setup(bot.api)
     presets_handlers.setup(bot.api)
     elixir_shop_handlers.setup(bot.api)
+    moderation_handlers.setup(bot.api)  # патч 27: ЛС администратору с /баг-репортами
 
     # Открытое PvP (патч 22): дуэль (последовательные ходы) + массовый бой
     # (одновременный резолв) — ОТДЕЛЬНЫЕ движки от PvE tick_engine выше:

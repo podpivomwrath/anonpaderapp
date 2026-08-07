@@ -12,6 +12,7 @@ from aiohttp import web
 from loguru import logger
 
 from bot.app_keys import ROUTE_EVENT_KEY, SESSION_FACTORY_KEY, SETTINGS_KEY, RouteEvent
+from bot.miniapp_admin_api import register_routes as register_miniapp_admin_routes
 from bot.miniapp_api import register_routes as register_miniapp_routes
 from bot.miniapp_auth import miniapp_auth_middleware, miniapp_cors_middleware
 from config import Settings
@@ -65,4 +66,5 @@ def create_app(settings: Settings, route_event: RouteEvent) -> web.Application:
     app.router.add_post(WEBHOOK_PATH, handle_callback)
     app.router.add_get("/health", handle_health)
     register_miniapp_routes(app)
+    register_miniapp_admin_routes(app)
     return app

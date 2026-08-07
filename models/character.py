@@ -64,6 +64,15 @@ class Character(Base):
         DateTime(timezone=True), nullable=True
     )
 
+    # Последняя активность (патч 27) — обновляется в onboarding_service.get_character
+    # на каждом обращении завершённого персонажа; для метрик удержания в админке.
+    last_active_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+    # Бан администратором (патч 27). banned_until = NULL и is_banned = True — бан бессрочный.
+    is_banned: Mapped[bool] = mapped_column(Boolean, default=False)
+    ban_reason: Mapped[str | None] = mapped_column(String(256), nullable=True)
+    banned_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
     user: Mapped["User"] = relationship(back_populates="characters")
     stats: Mapped["CharacterStats"] = relationship(
         back_populates="character", uselist=False, cascade="all, delete-orphan"
