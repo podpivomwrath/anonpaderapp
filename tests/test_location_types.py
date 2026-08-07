@@ -41,10 +41,9 @@ def test_type_has_description_pool() -> None:
         assert len(t.descriptions) >= 2
 
 
-def test_some_types_have_photo_images() -> None:
-    """Патч 25: первые 5 типов получили реальные фото; остальные пока без
-    картинки — image остаётся None, это ожидаемо, не заглушка."""
-    with_image = {t.id for t in load_location_types() if t.image is not None}
-    assert with_image == {
-        "ridge_terraces", "ridge_redoubt", "ridge_mines", "ridge_pass", "woods_thicket",
-    }
+def test_all_types_have_photo_images() -> None:
+    """Патч 25: первые 5 типов получили реальные фото; патч 31 («картинки»)
+    добавил фото для остальных 11 — теперь все 16 типов локаций с image."""
+    types = load_location_types()
+    assert all(t.image is not None for t in types)
+    assert len(types) == 16

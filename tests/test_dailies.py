@@ -2,6 +2,8 @@
 
 from datetime import datetime, timedelta, timezone
 
+import pytest
+
 from game.combat.battle_report import BattleReport
 from game.economy import dailies_config as dc
 from models import Character, CharacterDaily
@@ -25,6 +27,27 @@ async def _add_quest(db, character: Character, quest_id: str, progress: int = 0)
     db.add(row)
     await db.flush()
     return row
+
+
+def test_daily_reward_xp_scales_as_share_of_xp_to_next() -> None:
+    """Патч 31, п.3: опыт за ежедневку — доля xp_to_next(level), а не
+    xp_per_mob(level) — раньше линейный рост xp_per_mob против почти
+    квадратичного xp_to_next (XP_EXP=1.95) обесценивал ежедневки к концу игры."""
+    from services.experience_service import xp_to_next
+
+    for level in (1, 10, 50, 90):
+        xp, gold = dc.daily_reward(level)
+        assert xp == int(xp_to_next(level) * dc.DAILY_XP_SHARE)
+        assert gold == dc.DAILY_GOLD_BASE + dc.DAILY_GOLD_PER_LEVEL * level
+
+
+def test_daily_reward_xp_share_consistent_across_levels() -> None:
+    """Доля прогресса до след. уровня, которую даёт одна ежедневка, должна
+    быть одинаковой на низком и высоком уровне (это и есть цель патча)."""
+    from services.experience_service import xp_to_next
+
+    shares = {level: dc.daily_reward(level)[0] / xp_to_next(level) for level in (5, 55)}
+    assert shares[5] == pytest.approx(shares[55], rel=0.01)
 
 
 async def test_first_rollover_sets_streak_to_1_and_assigns_dailies(db_session, make_character) -> None:

@@ -617,6 +617,15 @@ async def move(message: Message) -> None:
         if direction is None:
             return  # устаревшая клавиатура — кнопка больше не подходит к позиции
         dx, dy = direction
+        if not grid.in_bounds(character.pos_x + dx, character.pos_y + dy):
+            # Патч 31, п.7: за границей карты (-50..50) — лорный отказ вместо
+            # движения, позиция и клавиатура не меняются.
+            has_mount = await mount_service.has_any_mount(db, character.id)
+            await message.answer(
+                flavor.world_edge_line(_rng),
+                keyboard=kb.movement_keyboard(character.pos_x, character.pos_y, message.peer_id, has_mount=has_mount),
+            )
+            return
         movement_service.start_travel(character, dx, dy, now)
         await db.commit()
         # в пути — кнопки убираем, вернём по прибытии (чистка визуального шума)

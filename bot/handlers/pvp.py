@@ -100,6 +100,12 @@ _battles: dict[int, Battle] = {}
 _peer_battle: dict[int, int] = {}
 # peer_id -> battle_id, ждём выбора стороны (текстом "1"/"2") для этого боя
 _pending_join_prompt: dict[int, int] = {}
+# Патч 31, п.6: battle_id -> character_id'ы, уже объявившие действие в ТЕКУЩЕМ
+# (ещё не резолвленном) окне группового PvP — клавиатура убирается у них до
+# следующего тика. Отдельно от game.combat.tick_engine.ActionStore (тот же
+# набор, но целиком в памяти этого процесса) — нужен только для решения
+# «показывать ли боевые кнопки», не участвует в самом резолве хода.
+_declared_this_tick: dict[int, set[int]] = {}
 
 
 def setup(duel_engine: DuelEngine, mass_engine: TickEngine, bot_api) -> None:
@@ -117,7 +123,13 @@ def rebuild_keyboard(peer_id: int) -> str | None:
     """Патч 25: актуальная боевая клавиатура для игрока в PvP-бою, без
     прерывания боя — общая для /клавиатура и PvP-ветки /застрял (там бой
     НЕ прерывается, только пересобирается клавиатура — защита от абьюза).
-    None — peer_id ни в какой активной PvP-битве."""
+    None — peer_id ни в какой активной PvP-битве.
+
+    Патч 31, п.6: боевые кнопки — ТОЛЬКО тому, чей сейчас ход. В дуэли это
+    duel.current_actor_id (здесь читается ВНЕ колбэка резолва хода, поэтому
+    не имеет проблемы устаревания значения, описанной в _render_duel); в
+    групповом бою — все, кто ещё не объявил действие в текущем окне
+    (_declared_this_tick)."""
     battle_id = _peer_battle.get(peer_id)
     if battle_id is None:
         return None
@@ -130,14 +142,20 @@ def rebuild_keyboard(peer_id: int) -> str | None:
     if battle.battle_type == "duel":
         duel = _duel_engine.duels.get(battle_id) if _duel_engine else None
         combatant = duel.combatants.get(participant.character_id) if duel else None
+        if combatant is None or not combatant.alive:
+            return pvp_waiting_keyboard()
+        if duel is not None and participant.character_id != duel.current_actor_id:
+            return pvp_waiting_keyboard()
     else:
         session = _mass_engine.sessions.get(battle_id) if _mass_engine else None
         combatant = (
             session.combatants.get(participant.character_id) if session
             else battle.last_combatants.get(participant.character_id)
         )
-    if combatant is None or not combatant.alive:
-        return pvp_waiting_keyboard()
+        if combatant is None or not combatant.alive:
+            return pvp_waiting_keyboard()
+        if participant.character_id in _declared_this_tick.get(battle_id, set()):
+            return pvp_waiting_keyboard()
     return pvp_combat_keyboard(participant.base_class, combatant.cooldowns)
 
 
@@ -411,28 +429,44 @@ async def _start_forced_duel(
     first_id = _duel_engine.start_duel(session_id, attacker_combatant, victim_combatant)
     duel = _duel_engine.duels[session_id]
     intro = f"⚔️ {attacker.name} нападает на {victim.name}! Первым ходит {duel.combatants[first_id].name}."
+    board = _render_duel(duel, [], finished=False)
 
+    # Патч 31, п.6: боевая клавиатура — только тому, кто ходит первым;
+    # второй игрок ждёт с убранными кнопками, чтобы не жать их вне очереди.
     for cid, participant in battle.participants.items():
         combatant = duel.combatants[cid]
+        if cid == first_id:
+            text = f"{board}\n\n▶️ Твой ход!"
+            keyboard = pvp_combat_keyboard(participant.base_class, combatant.cooldowns)
+        else:
+            text = f"{board}\n\n⏳ Ход противника. Ожидание..."
+            keyboard = pvp_waiting_keyboard()
         await _bot_api.messages.send(
-            peer_id=participant.peer_id,
-            message=f"{intro}\n\n{_render_duel(duel, [], finished=False)}",
-            random_id=0,
-            keyboard=pvp_combat_keyboard(participant.base_class, combatant.cooldowns),
+            peer_id=participant.peer_id, message=f"{intro}\n\n{text}", random_id=0, keyboard=keyboard,
         )
 
 
-def _render_duel(duel: DuelState, lines: list[str], finished: bool) -> str:
+def _render_duel(
+    duel: DuelState, lines: list[str], finished: bool, next_actor_id: int | None = None,
+) -> str:
     """finished — явно передаётся вызывающим (DuelResult.finished), а не
     читается из duel.finished: в колбэке on_turn_resolved этот флаг движок
     выставляет только ПОСЛЕ вызова колбэка, так что на последнем ходу
-    duel.finished ещё False, даже когда бой уже фактически завершён."""
+    duel.finished ещё False, даже когда бой уже фактически завершён.
+
+    next_actor_id — та же история (патч 31, п.6): duel.current_actor_id
+    внутри on_duel_turn_resolved ещё указывает на актёра ТОЛЬКО ЧТО
+    завершившегося хода — turn_number движок инкрементирует уже ПОСЛЕ
+    колбэка. Вызывающий, знающий реального следующего актёра, передаёт его
+    явно; на живых вызовах вне колбэка (старт дуэли, /клавиатура) — None,
+    тогда используется duel.current_actor_id как есть (там он корректен)."""
     a_id, b_id = duel.order
     a, b = duel.combatants[a_id], duel.combatants[b_id]
     header = f"⚔️ ДУЭЛЬ — ход {duel.turn_number}"
     a_line = f"{a.name}: {display.health_bar(a.current_hp, a.max_hp)}"
     b_line = f"{b.name}: {display.health_bar(b.current_hp, b.max_hp)}"
-    turn_line = "" if finished else f"Ходит: {duel.combatants[duel.current_actor_id].name}"
+    actor_id = next_actor_id if next_actor_id is not None else duel.current_actor_id
+    turn_line = "" if finished else f"Ходит: {duel.combatants[actor_id].name}"
     log = " ".join(lines) if lines else "Бой начался."
     parts = [header, a_line, b_line]
     if turn_line:
@@ -609,10 +643,28 @@ async def _pvp_action(message: Message, action: DeclaredAction) -> None:
         except (KeyError, ValueError):
             pass
         return
+
+    # Патч 31, п.6: в групповом PvP клавиатура убирается сразу после
+    # объявления действия, до резолва окна — иначе игрок мог жать кнопки
+    # повторно, не понимая, что действие уже принято.
+    _declared_this_tick.setdefault(battle_id, set()).add(cid)
     try:
         await _mass_engine.declare_action(battle_id, cid, action)
     except (KeyError, ValueError):
-        pass
+        _declared_this_tick.get(battle_id, set()).discard(cid)
+        return
+    # Если declare_action резолвнул тик досрочно (все объявили), on_mass_tick_resolved
+    # уже очистил _declared_this_tick[battle_id] и разослал новую клавиатуру —
+    # отдельное подтверждение здесь было бы лишним/устаревшим сообщением.
+    if cid in _declared_this_tick.get(battle_id, set()):
+        participant = battle.participants.get(cid)
+        if participant is not None:
+            await _bot_api.messages.send(
+                peer_id=participant.peer_id,
+                message="✅ Действие принято. Ожидание остальных...",
+                random_id=0,
+                keyboard=pvp_waiting_keyboard(),
+            )
 
 
 def _default_enemy_target(battle_id: int, battle: Battle, cid: int) -> int | None:
@@ -762,19 +814,26 @@ async def on_duel_turn_resolved(session_id: int, turn: int, result: DuelResult) 
     if battle is None:
         return
     duel = _duel_engine.duels.get(session_id)
+    # Патч 31, п.6: следующий актёр — order[turn_number % 2], НЕ
+    # duel.current_actor_id (см. докстринг _render_duel выше — тот всё ещё
+    # указывает на актёра только что резолвленного хода в этой точке).
+    next_actor_id = duel.order[duel.turn_number % 2] if duel is not None else None
 
     for p in battle.participants.values():
         combatant = duel.combatants.get(p.character_id) if duel is not None else None
         text = (
-            _render_duel(duel, result.lines, finished=result.finished)
+            _render_duel(duel, result.lines, finished=result.finished, next_actor_id=next_actor_id)
             if duel is not None
             else "\n".join(result.lines)
         )
-        keyboard = (
-            pvp_combat_keyboard(p.base_class, combatant.cooldowns)
-            if combatant is not None
-            else kb.waiting_keyboard()
-        )
+        if result.finished or combatant is None:
+            keyboard = kb.waiting_keyboard()
+        elif p.character_id == next_actor_id:
+            text += "\n\n▶️ Твой ход!"
+            keyboard = pvp_combat_keyboard(p.base_class, combatant.cooldowns)
+        else:
+            text += "\n\n⏳ Ход противника. Ожидание..."
+            keyboard = pvp_waiting_keyboard()
         await _bot_api.messages.send(peer_id=p.peer_id, message=text, random_id=0, keyboard=keyboard)
 
     if result.finished:
@@ -874,6 +933,8 @@ async def on_mass_tick_resolved(session_id: int, tick: int, result: TickResult) 
     battle = _battles.get(session_id)
     if battle is None:
         return
+    # Патч 31, п.6: новое окно открылось — все живые снова могут объявлять.
+    _declared_this_tick.pop(session_id, None)
     for hit in result.hits:
         if hit.source_id == hit.target_id:
             continue
@@ -897,6 +958,7 @@ async def on_mass_tick_resolved(session_id: int, tick: int, result: TickResult) 
 
 async def on_mass_battle_finished(session_id: int, result: TickResult) -> None:
     battle = _battles.pop(session_id, None)
+    _declared_this_tick.pop(session_id, None)
     if battle is None:
         return
     for p in battle.participants.values():

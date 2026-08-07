@@ -19,19 +19,24 @@ def scaled_target(base_target: int, level: int) -> int:
     return max(base_target, round(base_target * (1 + (level - 1) * TARGET_LEVEL_SCALE)))
 
 
-# --- Награда за одно выполненное задание (опыт + золото), масштабируется по
-# уровню — ежедневки не должны быть выгоднее обычного фарма (патч 23, п.3):
-# опыт — небольшая доля от xp_per_mob(level) за одно задание, а не за килл.
-DAILY_XP_MOB_FRACTION = 0.5
+# --- Награда за одно выполненное задание (опыт + золото) — патч 31, п.3:
+# опыт больше НЕ привязан к xp_per_mob(level) (тот растёт линейно, а
+# xp_to_next — почти квадратично, XP_EXP=1.95 — поэтому на высоких уровнях
+# фиксированная доля от одного моба стремилась к нулю относительно полосы
+# опыта, и ежедневки теряли смысл). Вместо этого — доля от xp_to_next(level):
+# одна ежедневка = DAILY_XP_SHARE полосы опыта до след. уровня НЕЗАВИСИМО от
+# уровня, три — примерно 3×DAILY_XP_SHARE. Золото по-прежнему растёт линейно
+# от уровня — мягче, чем опыт (экономика чувствительнее к вливаниям золота).
+DAILY_XP_SHARE = 0.15
 DAILY_GOLD_BASE = 30
 DAILY_GOLD_PER_LEVEL = 6
 
 
 def daily_reward(level: int) -> tuple[int, int]:
     """(xp, gold) за одно выполненное ежедневное задание."""
-    from services.experience_service import xp_per_mob
+    from services.experience_service import xp_to_next
 
-    xp = round(xp_per_mob(level) * DAILY_XP_MOB_FRACTION)
+    xp = int(xp_to_next(level) * DAILY_XP_SHARE)
     gold = DAILY_GOLD_BASE + DAILY_GOLD_PER_LEVEL * level
     return xp, gold
 

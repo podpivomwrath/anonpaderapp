@@ -13,7 +13,7 @@ _resolve_target), либо не трогают БД вовсе (форматир
 import pytest
 
 from bot.handlers import pvp as pvp_handlers
-from game.combat.duel_engine import DuelEngine
+from game.combat.duel_engine import DuelEngine, DuelState
 from game.combat.session import CombatMode, CombatSessionState
 from game.combat.tick_engine import InMemoryActionStore, TickEngine
 from models import CharacterTrophy
@@ -181,6 +181,7 @@ def _reset_pvp_module():
     pvp_handlers._battles.clear()
     pvp_handlers._peer_battle.clear()
     pvp_handlers._pending_join_prompt.clear()
+    pvp_handlers._declared_this_tick.clear()
     duel_engine = DuelEngine()
     mass_engine = TickEngine(InMemoryActionStore())
     pvp_handlers.setup(duel_engine, mass_engine, bot_api=None)
@@ -188,6 +189,7 @@ def _reset_pvp_module():
     pvp_handlers._battles.clear()
     pvp_handlers._peer_battle.clear()
     pvp_handlers._pending_join_prompt.clear()
+    pvp_handlers._declared_this_tick.clear()
 
 
 def _make_battle(battle_type: str, location: tuple[int, int]) -> pvp_handlers.Battle:
@@ -256,6 +258,64 @@ def test_format_transfer_line_orders_expensive_first() -> None:
     assert line is not None
     assert line.startswith("Забираешь трофеи:")
     assert "Кровяной осколок" in line and "Пепельная крошка" in line
+
+
+# --- Патч 31, п.6: клавиатура только у ходящего игрока ---
+
+
+def test_render_duel_turn_line_uses_explicit_next_actor_override() -> None:
+    """Регрессия: duel.current_actor_id внутри on_duel_turn_resolved ещё
+    указывает на актёра ТОЛЬКО ЧТО завершившегося хода (turn_number движок
+    инкрементирует ПОСЛЕ колбэка) — без явного override «Ходит:» показывал бы
+    неверное имя. next_actor_id=None (вызов вне колбэка) сохраняет старое
+    поведение — используется duel.current_actor_id как есть."""
+    a = combatant(1, side=0, name="Атакующий")
+    b = combatant(2, side=1, name="Защитник")
+    duel = DuelState(session_id=-1, combatants={1: a, 2: b}, order=(1, 2), turn_number=1)
+
+    text_live = pvp_handlers._render_duel(duel, [], finished=False)
+    assert "Ходит: Атакующий" in text_live  # order[0] = текущий актёр хода 1
+
+    text_after_turn = pvp_handlers._render_duel(duel, [], finished=False, next_actor_id=2)
+    assert "Ходит: Защитник" in text_after_turn
+
+
+def test_rebuild_keyboard_duel_only_current_actor_gets_combat_kb() -> None:
+    a = combatant(1, side=0, name="Атакующий")
+    b = combatant(2, side=1, name="Защитник")
+    duel = DuelState(session_id=-1, combatants={1: a, 2: b}, order=(1, 2), turn_number=1)
+    pvp_handlers._duel_engine.duels[-1] = duel
+
+    battle = _make_battle("duel", (0, 0))
+    battle.participants = {
+        1: pvp_handlers.Participant(1, 111, "Атакующий", "warrior", "Воин"),
+        2: pvp_handlers.Participant(2, 222, "Защитник", "warrior", "Воин"),
+    }
+    pvp_handlers._battles[-1] = battle
+    pvp_handlers._peer_battle[111] = -1
+    pvp_handlers._peer_battle[222] = -1
+
+    kb_active = pvp_handlers.rebuild_keyboard(111)
+    kb_waiting = pvp_handlers.rebuild_keyboard(222)
+    assert kb_active != kb_waiting
+    assert kb_waiting == pvp_handlers.pvp_waiting_keyboard()
+
+
+def test_rebuild_keyboard_mass_hides_after_declaring() -> None:
+    session = CombatSessionState(session_id=-7, mode=CombatMode.PVP_GROUP)
+    me = combatant(1, side=0, name="Я")
+    session.add(me)
+    pvp_handlers._mass_engine.sessions[-7] = session
+
+    battle = _make_battle("mass", (0, 0))
+    battle.participants = {1: pvp_handlers.Participant(1, 111, "Я", "warrior", "Воин")}
+    pvp_handlers._battles[-7] = battle
+    pvp_handlers._peer_battle[111] = -7
+
+    assert pvp_handlers.rebuild_keyboard(111) != pvp_handlers.pvp_waiting_keyboard()
+
+    pvp_handlers._declared_this_tick[-7] = {1}
+    assert pvp_handlers.rebuild_keyboard(111) == pvp_handlers.pvp_waiting_keyboard()
 
 
 def test_format_transfer_line_empty_is_none() -> None:

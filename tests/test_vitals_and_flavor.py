@@ -88,6 +88,15 @@ def test_world_flavor_pools_load() -> None:
     assert "Кряж" in flavor.respawn_line("🏰 Обетованный Кряж")
 
 
+def test_world_edge_line_pool_loads() -> None:
+    """Патч 31, п.7: лорный отказ у границы карты (content/flavor/world_edge.json)."""
+    from game.world import flavor
+
+    rng = random.Random(1)
+    line = flavor.world_edge_line(rng)
+    assert isinstance(line, str) and line
+
+
 def test_ashen_song_has_ten_parts() -> None:
     import json
     from pathlib import Path

@@ -32,9 +32,11 @@ def _labels(kb_json: str) -> list[str]:
     return [btn["action"]["label"] for row in kb["buttons"] for btn in row]
 
 
-def test_movement_keyboard_hides_direction_leading_out_of_bounds() -> None:
+def test_movement_keyboard_keeps_direction_leading_out_of_bounds() -> None:
+    """Патч 31, п.7: кнопка направления за границу больше не скрывается —
+    раскладка не должна «прыгать» (см. докстринг movement_keyboard)."""
     labels = _labels(movement_keyboard(wc.BOUNDS_MAX, 0))
-    assert BTN_RIGHT not in labels
+    assert BTN_RIGHT in labels
     assert BTN_UP in labels and BTN_DOWN in labels and BTN_LEFT in labels
 
 
@@ -43,7 +45,7 @@ def test_movement_keyboard_shows_city_name_instead_of_arrow() -> None:
     labels = _labels(movement_keyboard(49, 50))
     assert REGION_TITLES["ridge"] in labels
     assert BTN_RIGHT not in labels
-    assert BTN_UP not in labels  # (49;51) — за границей (BOUNDS_MAX=50)
+    assert BTN_UP in labels  # (49;51) — за границей (BOUNDS_MAX=50), но кнопка на месте
     assert BTN_DOWN in labels and BTN_LEFT in labels
 
 
@@ -51,8 +53,11 @@ def test_resolve_direction_matches_city_label() -> None:
     assert resolve_direction(49, 50, REGION_TITLES["ridge"]) == (1, 0)
 
 
-def test_resolve_direction_none_for_out_of_bounds_arrow() -> None:
-    assert resolve_direction(wc.BOUNDS_MAX, 0, BTN_RIGHT) is None
+def test_resolve_direction_resolves_out_of_bounds_arrow() -> None:
+    """Патч 31, п.7: resolve_direction больше не блокирует по границе —
+    легальность хода теперь проверяет bot/handlers/world.py::move через
+    grid.in_bounds после резолва направления."""
+    assert resolve_direction(wc.BOUNDS_MAX, 0, BTN_RIGHT) == (1, 0)
 
 
 def test_resolve_direction_none_for_stale_city_label_far_from_city() -> None:

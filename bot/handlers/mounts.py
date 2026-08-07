@@ -163,13 +163,23 @@ async def coord_input(message: Message) -> None:
         travel = await mount_service.start_travel(db, character, mount_id, to_x, to_y, _rng, now)
         cells = max(abs(to_x - character.pos_x), abs(to_y - character.pos_y))
         seconds = mount_service.seconds_per_cell(mount_id) * cells
-        ambush_pct = round(mount_service.ambush_chance(mount_id) * 100)
         await db.commit()
 
     await _dispenser.delete(peer_id)
+    await notify_travel_started(peer_id, to_x, to_y, seconds, mount_service.ambush_chance(mount_id))
+
+
+async def notify_travel_started(peer_id: int, to_x: int, to_y: int, seconds: float, ambush_chance: float) -> None:
+    """Сообщение о начале пути на маунте + клавиатура ожидания — общая точка
+    для обоих способов отправки маунта (патч 31, фикс 1): из чата (coord_input
+    выше) и с карты мини-аппа (bot/miniapp_map_api.py::handle_post_send_mount,
+    который раньше не слал в чат ничего вообще — MountTravel создавался
+    молча, игрок не понимал, что путь начался, и старая клавиатура оставалась)."""
+    if _bot_api is None:
+        return
     text = (
         f"🐎 Путь начат: ({to_x}; {to_y}), {_format_seconds(seconds)}.\n"
-        f"Шанс нападения в пути: {ambush_pct}%."
+        f"Шанс нападения в пути: {round(ambush_chance * 100)}%."
     )
     resp = await _bot_api.messages.send(peer_id=peer_id, message=text, random_id=0, keyboard=kb.waiting_keyboard())
     try:

@@ -16,6 +16,7 @@ from aiohttp.test_utils import TestClient, TestServer
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
 import bot.handlers.combat as combat_handlers
+import bot.handlers.mounts as mounts_handlers
 from bot.app_keys import SESSION_FACTORY_KEY
 from bot.webhook import create_app
 from config import Settings
@@ -23,6 +24,30 @@ from models import Base, Character, CharacterMount, CharacterStats, MountTravel,
 
 MINIAPP_SECRET = "test_miniapp_secret"
 PLAYER_VK_ID = 777
+
+
+class _FakeMessages:
+    def __init__(self) -> None:
+        self.sent: list[dict] = []
+
+    async def send(self, **kwargs) -> int:
+        self.sent.append(kwargs)
+        return len(self.sent)
+
+
+class _FakeBotApi:
+    def __init__(self) -> None:
+        self.messages = _FakeMessages()
+
+
+@pytest.fixture(autouse=True)
+def _fake_mounts_bot_api(monkeypatch):
+    """Патч 31, фикс 1: send_mount с карты теперь шлёт то же чат-уведомление,
+    что и отправка из чата (bot/handlers/mounts.py::notify_travel_started) —
+    без bot_api эта функция раньше была no-op (см. её докстринг)."""
+    fake = _FakeBotApi()
+    monkeypatch.setattr(mounts_handlers, "_bot_api", fake)
+    return fake
 
 
 def _sign(params: dict[str, str], secret: str) -> str:
@@ -203,7 +228,7 @@ async def test_send_mount_rejects_same_cell(client, session_factory) -> None:
     assert data["error"] == "already_there"
 
 
-async def test_send_mount_starts_travel(client, session_factory) -> None:
+async def test_send_mount_starts_travel(client, session_factory, _fake_mounts_bot_api) -> None:
     character = await _make_player(session_factory)
     async with session_factory() as db:
         db.add(CharacterMount(character_id=character.id, mount_id="ashen_steed"))
@@ -223,6 +248,15 @@ async def test_send_mount_starts_travel(client, session_factory) -> None:
         travel = await db.get(MountTravel, data["travel_id"])
         assert travel.status == "traveling"
         assert (travel.to_x, travel.to_y) == (10, 0)
+
+    # Патч 31, фикс 1: игрок должен получить в чат то же сообщение о начале
+    # пути, что и при отправке из чата — раньше send_mount с карты создавал
+    # MountTravel полностью молча.
+    assert len(_fake_mounts_bot_api.messages.sent) == 1
+    sent = _fake_mounts_bot_api.messages.sent[0]
+    assert sent["peer_id"] == PLAYER_VK_ID
+    assert "Путь начат" in sent["message"]
+    assert sent["keyboard"] is not None
 
 
 async def test_send_mount_rejects_second_travel(client, session_factory) -> None:

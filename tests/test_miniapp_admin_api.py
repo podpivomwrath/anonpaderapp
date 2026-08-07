@@ -16,6 +16,7 @@ import pytest
 from aiohttp.test_utils import TestClient, TestServer
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
+import bot.handlers.combat as combat_handlers
 from bot.app_keys import SESSION_FACTORY_KEY
 from bot.webhook import create_app
 from config import Settings
@@ -25,6 +26,18 @@ from services import admin_service
 MINIAPP_SECRET = "test_miniapp_secret"
 ADMIN_VK_ID = 106468413
 PLAYER_VK_ID = 555
+
+
+class _FakeEngine:
+    sessions: dict = {}
+
+
+@pytest.fixture(autouse=True)
+def _fake_combat_engine(monkeypatch):
+    """Патч 31, п.5: карточка игрока теперь читает has_active_encounter
+    (требует инициализированный _engine, живой только внутри main.create_bot)
+    — тот же фейк, что и tests/test_map_api.py."""
+    monkeypatch.setattr(combat_handlers, "_engine", _FakeEngine())
 
 
 def _sign(params: dict[str, str], secret: str) -> str:
@@ -143,6 +156,45 @@ async def test_player_card_ok(client, session_factory) -> None:
     data = await resp.json()
     assert data["vk_id"] == PLAYER_VK_ID
     assert data["gold"] == 10
+
+
+async def test_player_card_has_full_diagnostic_data(client, session_factory) -> None:
+    """Патч 31, п.5: карточка должна нести производные статы, ресурсы
+    (эликсиры/маунты по всем градациям), прогрессию контента и живые
+    in-memory флаги состояния — не только базовую идентификацию."""
+    cid = await _make_player(session_factory)
+    resp = await client.get(f"/api/miniapp/admin/player/{cid}", params=_signed_query(ADMIN_VK_ID))
+    data = await resp.json()
+
+    assert data["derived"]["max_hp"] > 0
+    assert data["xp_to_next"] > 0
+    assert data["foot_travel"] is None
+    assert data["mount_travel"] is None
+    assert isinstance(data["trophies"], dict) and len(data["trophies"]) == 5  # все градации, включая 0
+    assert data["elixirs"] == []
+    assert data["mounts"] == []
+    assert data["active_preset"] is None
+    assert data["song_progress"] == {"seen": 0, "total": 10, "complete": False}
+    assert data["trial_progress"] == {"unlocked": 0, "total": 0}  # без подкласса
+    assert isinstance(data["dailies_today"], list)
+    assert data["recent_admin_actions"] == []
+    assert data["in_combat"] is False
+    assert data["in_pvp"] is False
+    assert data["busy"] is False
+    assert data["in_city"] is False  # (0,0) — не совпадает ни с одним CITY_COORDS
+
+
+async def test_player_card_recent_admin_actions_reflects_journal(client, session_factory) -> None:
+    cid = await _make_player(session_factory)
+    async with session_factory() as db:
+        await admin_service.log_action(db, ADMIN_VK_ID, "grant_currency", cid, note="test")
+        await db.commit()
+
+    resp = await client.get(f"/api/miniapp/admin/player/{cid}", params=_signed_query(ADMIN_VK_ID))
+    data = await resp.json()
+    assert len(data["recent_admin_actions"]) == 1
+    assert data["recent_admin_actions"][0]["action_type"] == "grant_currency"
+    assert data["recent_admin_actions"][0]["note"] == "test"
 
 
 # --- Действия ---

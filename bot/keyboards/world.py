@@ -125,13 +125,18 @@ _DIRECTION_DELTAS = {
 MOVEMENT_TEXTS = list(_DIRECTION_DELTAS) + list(REGION_TITLES.values())
 
 
-def _direction_label(x: int, y: int, dx: int, dy: int, arrow: str) -> str | None:
-    """Подпись кнопки направления от (x;y): None — за границей сетки (кнопку
-    не показываем), название города — если соседняя клетка ведёт в город,
-    иначе обычная стрелка."""
+def _direction_label(x: int, y: int, dx: int, dy: int, arrow: str) -> str:
+    """Подпись кнопки направления от (x;y): название города — если соседняя
+    клетка В ГРАНИЦАХ карты и ведёт в город, иначе обычная стрелка.
+
+    Патч 31, п.7: кнопка направления, ведущего за границу сетки (-50..50),
+    больше НЕ скрывается (раньше это дёргало раскладку — кнопки прыгали по
+    позициям) — за границей просто остаётся обычная стрелка; сам запрет
+    движения проверяется отдельно в bot/handlers/world.py::move по факту
+    нажатия, лорным отказом, а не убранной кнопкой."""
     nx, ny = x + dx, y + dy
     if not grid.in_bounds(nx, ny):
-        return None
+        return arrow
     region = grid.city_region_at(nx, ny)
     return REGION_TITLES[region] if region is not None else arrow
 
@@ -139,7 +144,9 @@ def _direction_label(x: int, y: int, dx: int, dy: int, arrow: str) -> str | None
 def resolve_direction(x: int, y: int, text: str) -> tuple[int, int] | None:
     """Обратный маппинг: текст нажатой кнопки → (dx;dy) для позиции (x;y).
     None — кнопка больше не соответствует текущей позиции (устаревшая
-    клавиатура) либо ушла бы за границу."""
+    клавиатура, например была нажата подпись города, из которого игрок уже
+    ушёл). Направление за границей карты теперь резолвится как обычно —
+    легальность самого хода проверяет вызывающий (grid.in_bounds)."""
     for arrow, (dx, dy) in _DIRECTION_DELTAS.items():
         if _direction_label(x, y, dx, dy, arrow) == text:
             return dx, dy
@@ -161,25 +168,25 @@ def movement_keyboard(
 
     peer_id (патч 25, п.4) — если задан и для игрока есть несобранная
     горстка пепла, добавляет её кнопку. has_mount (патч 25, п.7) — есть хотя
-    бы один маунт, показывает кнопку выбора."""
+    бы один маунт, показывает кнопку выбора.
+
+    Патч 31, п.7: все 4 направления теперь ВСЕГДА на месте (раньше кнопка,
+    ведущая за границу карты, убиралась целиком — раскладка «прыгала», игрок
+    промахивался мимо съехавших кнопок)."""
     up = _direction_label(pos_x, pos_y, *_DIRECTION_DELTAS[BTN_UP], BTN_UP)
     down = _direction_label(pos_x, pos_y, *_DIRECTION_DELTAS[BTN_DOWN], BTN_DOWN)
     left = _direction_label(pos_x, pos_y, *_DIRECTION_DELTAS[BTN_LEFT], BTN_LEFT)
     right = _direction_label(pos_x, pos_y, *_DIRECTION_DELTAS[BTN_RIGHT], BTN_RIGHT)
 
     kb = Keyboard(one_time=False)
-    if up is not None:
-        kb.add(Text(up), color=KeyboardButtonColor.SECONDARY)
-        kb.row()
-    if left is not None:
-        kb.add(Text(left), color=KeyboardButtonColor.SECONDARY)
-    kb.add(Text(BTN_EXPLORE), color=KeyboardButtonColor.POSITIVE)
-    if right is not None:
-        kb.add(Text(right), color=KeyboardButtonColor.SECONDARY)
+    kb.add(Text(up), color=KeyboardButtonColor.SECONDARY)
     kb.row()
-    if down is not None:
-        kb.add(Text(down), color=KeyboardButtonColor.SECONDARY)
-        kb.row()
+    kb.add(Text(left), color=KeyboardButtonColor.SECONDARY)
+    kb.add(Text(BTN_EXPLORE), color=KeyboardButtonColor.POSITIVE)
+    kb.add(Text(right), color=KeyboardButtonColor.SECONDARY)
+    kb.row()
+    kb.add(Text(down), color=KeyboardButtonColor.SECONDARY)
+    kb.row()
     kb.add(Text(BTN_REST), color=KeyboardButtonColor.SECONDARY)
     kb.add(Text(BTN_LOOK_AROUND), color=KeyboardButtonColor.SECONDARY)
     if has_mount:

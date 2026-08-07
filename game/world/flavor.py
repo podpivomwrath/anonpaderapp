@@ -23,6 +23,7 @@ def _load(name: str) -> dict:
 _SYSTEM = _load("system.json")
 _SONG = _load("ashen_song.json")
 _REMARKS = _load("remarks.json")
+_WORLD_EDGE = _load("world_edge.json")
 
 # Шанс показать атмосферный фрагмент перед мобом при исследовании (~50%)
 EXPLORE_FRAGMENT_CHANCE = 0.5
@@ -30,6 +31,12 @@ EXPLORE_FRAGMENT_CHANCE = 0.5
 
 def travel_line(rng: random.Random) -> str:
     return rng.choice(_SYSTEM["travel"])
+
+
+def world_edge_line(rng: random.Random) -> str:
+    """Патч 31, п.7: попытка шагнуть за границу карты (-50..50) — лорный
+    отказ вместо тихого игнора, позиция игрока не меняется."""
+    return rng.choice(_WORLD_EDGE["lines"])
 
 
 def rest_start() -> str:

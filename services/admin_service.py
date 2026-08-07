@@ -34,11 +34,19 @@ from models import (
     Wallet,
 )
 from services import (
+    daily_service,
     death_service,
+    derived_stats_service,
+    elixir_service,
     experience_service,
     item_service,
     movement_service,
     mount_service,
+    preset_service,
+    song_service,
+    story_service,
+    title_service,
+    trial_service,
     trophy_service,
     vitals_service,
     wallet_service,
@@ -280,13 +288,17 @@ async def search_characters(db: AsyncSession, query: str, limit: int = 20) -> li
 
 
 async def player_card(db: AsyncSession, character_id: int) -> dict | None:
+    """Патч 31, п.5: полная диагностическая карточка — всё, что нужно
+    администратору для разбора конкретного игрока в одном ответе (детали
+    группирует фронтенд, bot/miniapp_admin_api.py добавляет сверху только
+    живые in-memory флаги «в бою/PvP/занят», которых нет в БД)."""
     character = await db.get(Character, character_id)
     if character is None:
         return None
     user = await db.get(User, character.user_id)
     stats = await db.scalar(select(CharacterStats).where(CharacterStats.character_id == character_id))
     wallet = await wallet_service.get_wallet(db, character_id)
-    trophies = await trophy_service.get_stock(db, character_id)
+    trophy_stock = {t.id: count for t, count in await trophy_service.get_stock(db, character_id)}
     inventory = await item_service.get_inventory(db, character_id)
     story_rows = (
         await db.execute(select(CharacterStoryProgress).where(CharacterStoryProgress.character_id == character_id))
@@ -297,16 +309,27 @@ async def player_card(db: AsyncSession, character_id: int) -> dict | None:
     titles = (
         await db.execute(select(CharacterTitle.title_id).where(CharacterTitle.character_id == character_id))
     ).scalars().all()
-    mounts = (
-        await db.execute(select(CharacterMount.mount_id).where(CharacterMount.character_id == character_id))
-    ).scalars().all()
+
+    gear_bonus = await item_service.compute_gear_bonus(db, character_id)
+    derived = derived_stats_service.compute(character, stats, gear_bonus) if stats is not None else None
+    elixirs = await elixir_service.get_stock(db, character_id)
+    owned_mounts = await mount_service.owned_mounts(db, character_id)
+    mount_travel = await mount_service.active_travel(db, character_id)
+    active_preset = await preset_service.get_active_preset(db, character_id)
+    song_progress = await song_service.get_progress(db, character_id)
+    trial_states = await trial_service.get_trial_states(db, character) if character.subclass else []
+    dailies = await daily_service.get_dailies_overview(db, character)
+    quest_line = await story_service.quest_summary_line(db, character) if character.region else None
+    recent_actions = await action_journal(db, limit=10, target_character_id=character_id)
 
     return {
         "id": character.id,
         "vk_id": user.vk_id if user is not None else None,
         "name": character.name,
+        "title": title_service.active_title_name(character),
         "level": character.level,
         "experience": character.experience,
+        "xp_to_next": experience_service.xp_to_next(character.level),
         "base_class": character.base_class,
         "subclass": character.subclass,
         "class_title": class_title(character),
@@ -315,24 +338,66 @@ async def player_card(db: AsyncSession, character_id: int) -> dict | None:
         "pos_y": character.pos_y,
         "is_dead": death_service.is_dead(character),
         "respawn_at": character.respawn_at.isoformat() if character.respawn_at else None,
+        "foot_travel": {
+            "to_x": character.travel_target_x, "to_y": character.travel_target_y,
+            "remaining_seconds": movement_service.remaining_seconds(character),
+        } if movement_service.is_traveling(character) else None,
+        "mount_travel": {
+            "mount_id": mount_travel.mount_id, "to_x": mount_travel.to_x, "to_y": mount_travel.to_y,
+            "status": mount_travel.status, "remaining_seconds": mount_service.remaining_seconds(mount_travel),
+        } if mount_travel is not None else None,
         "stats": {
             "str": stats.strength, "agi": stats.agility, "int": stats.intellect,
             "vit": stats.vitality, "wil": stats.will, "unspent_points": stats.unspent_points,
         } if stats is not None else None,
+        "derived": {
+            "max_hp": derived.max_hp,
+            "current_hp": vitals_service.current_hp(character, stats, gear_bonus.get("vit", 0)),
+            "damage": derived.damage,
+            "crit_chance": derived.crit_chance,
+            "mitigation": derived.mitigation,
+            "control_resist": derived.control_resist,
+            "support_power": derived.support_power,
+        } if derived is not None else None,
         "gold": wallet.farm_currency,
         "gems": wallet.donate_currency,
-        "trophies": {t.id: count for t, count in trophies},
+        "trophies": {
+            d.id: trophy_stock.get(d.id, 0) for d in trophy_service.trophy_defs_ordered()
+        },
         "inventory": [
-            {"id": item.id, "name": item.name, "slot": item.slot, "rarity": item.rarity, "ilvl": item.ilvl, "equipped": equipped}
+            {
+                "id": item.id, "name": item.name, "slot": item.slot, "rarity": item.rarity,
+                "ilvl": item.ilvl, "equipped": equipped, "stats": item.base_stats,
+            }
             for item, equipped in inventory
+        ],
+        "elixirs": [
+            {"id": d.id, "name": d.name, "emoji": d.emoji, "count": count} for d, count in elixirs
+        ],
+        "mounts": [
+            {"mount_id": m.mount_id, "name": m.name, "rarity": m.rarity, "emoji": m.emoji}
+            for m in owned_mounts
         ],
         "story_progress": [
             {"region": row.region, "act": row.act, "quest_step": row.quest_step, "status": row.status, "completed": row.completed}
             for row in story_rows
         ],
+        "current_quest": quest_line,
         "unlocked_buffs": list(unlocked_buffs),
         "titles": list(titles),
-        "mounts": list(mounts),
+        "active_preset": {"name": active_preset.name, "buff_ids": active_preset.buff_ids} if active_preset is not None else None,
+        "song_progress": {
+            "seen": len(song_progress.seen), "total": song_progress.total, "complete": song_progress.complete,
+        },
+        "trial_progress": {
+            "unlocked": sum(1 for s in trial_states if s.unlocked), "total": len(trial_states),
+        },
+        "dailies_today": [
+            {
+                "title": q.title, "progress": q.progress, "target": q.target, "completed": q.completed,
+            }
+            for q in dailies.quests
+        ],
         "pvp_wins": character.pvp_wins,
         "pvp_losses": character.pvp_losses,
         "login_streak": character.login_streak,
@@ -342,6 +407,12 @@ async def player_card(db: AsyncSession, character_id: int) -> dict | None:
         "banned_until": character.banned_until.isoformat() if character.banned_until else None,
         "created_at": user.created_at.isoformat() if user is not None else None,
         "last_active_at": character.last_active_at.isoformat() if character.last_active_at else None,
+        "recent_admin_actions": [
+            {
+                "action_type": a.action_type, "note": a.note, "created_at": a.created_at.isoformat(),
+            }
+            for a in recent_actions
+        ],
     }
 
 
@@ -497,15 +568,13 @@ def is_ban_active(character: Character, now: datetime | None = None) -> bool:
 # --- Журнал действий (2.4) ---
 
 
-async def action_journal(db: AsyncSession, limit: int = 50, offset: int = 0) -> list[AdminAction]:
-    rows = (
-        await db.execute(
-            select(AdminAction)
-            .order_by(AdminAction.created_at.desc(), AdminAction.id.desc())
-            .limit(limit)
-            .offset(offset)
-        )
-    ).scalars().all()
+async def action_journal(
+    db: AsyncSession, limit: int = 50, offset: int = 0, target_character_id: int | None = None,
+) -> list[AdminAction]:
+    query = select(AdminAction).order_by(AdminAction.created_at.desc(), AdminAction.id.desc())
+    if target_character_id is not None:
+        query = query.where(AdminAction.target_character_id == target_character_id)
+    rows = (await db.execute(query.limit(limit).offset(offset))).scalars().all()
     return list(rows)
 
 

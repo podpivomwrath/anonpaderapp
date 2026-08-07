@@ -4,18 +4,21 @@ import {
 } from '@vkontakte/vkui';
 import {
   getAdminOverview, searchAdminPlayers, getAdminPlayer, postAdminAction, getAdminJournal,
-  getAdminBugReports, setAdminBugReportStatus,
 } from '../api.js';
 
 // Патч 27, ч.2: вкладка «Админ» — видна только если character.is_admin
 // (сервер сам это подтвердил в /character); но КАЖДЫЙ вызов ниже сервер
 // перепроверяет заново (403 при несовпадении vk_id) — эта вкладка не
 // является источником прав, только удобство отображения.
+//
+// Патч 31, п.4: раздел «Баги» убран из интерфейса — репорты приходят в ЛС
+// администратору от бота, этого достаточно. Таблица bug_reports и её API
+// (bot/miniapp_admin_api.py, api.js::getAdminBugReports/setAdminBugReportStatus)
+// не тронуты — данные продолжают сохраняться для истории.
 const SECTIONS = [
   { id: 'overview', label: 'Обзор' },
   { id: 'player', label: 'Игрок' },
   { id: 'journal', label: 'Журнал' },
-  { id: 'bugs', label: 'Баги' },
 ];
 
 function StatRow({ label, value }) {
@@ -219,27 +222,64 @@ function ActionForm({ playerId, onDone }) {
   );
 }
 
+// Патч 31, п.5: человеко-читаемый статус игрока — приоритет так же, как в
+// игре (мёртв/бой перебивают перемещение, перемещение перебивает "в городе").
+function statusLabel(card) {
+  if (card.is_dead) return '☠ Мёртв';
+  if (card.in_combat) return '⚔️ В бою (PvE)';
+  if (card.in_pvp) return '⚔️ В PvP-бою';
+  if (card.mount_travel) return `🐎 В пути на маунте → (${card.mount_travel.to_x}; ${card.mount_travel.to_y})`;
+  if (card.foot_travel) return `🚶 В пути пешком → (${card.foot_travel.to_x}; ${card.foot_travel.to_y})`;
+  if (card.busy) return '⏳ Занят (исследование/отдых)';
+  if (card.in_city) return '🏙 В городе';
+  return '🗺 На карте';
+}
+
 function PlayerCard({ card, onRefresh }) {
   return (
     <>
-      <Group header={<Header>{card.name} (vk_id {card.vk_id})</Header>}>
-        <StatRow label="Уровень" value={`${card.level} (опыт ${card.experience})`} />
-        <StatRow label="Класс" value={card.class_title} />
-        <StatRow label="Регион" value={card.region || '—'} />
-        <StatRow label="Позиция" value={`(${card.pos_x}; ${card.pos_y})`} />
-        <StatRow label="Статус" value={card.is_dead ? '☠ Мёртв' : '💚 Жив'} />
-        <StatRow label="Золото / Самоцветы" value={`${card.gold} / ${card.gems}`} />
-        <StatRow label="Свободных очков" value={card.stats?.unspent_points ?? '—'} />
-        <StatRow label="PvP" value={`${card.pvp_wins} побед / ${card.pvp_losses} поражений`} />
-        <StatRow label="Стрики (вход/ежедневки)" value={`${card.login_streak} / ${card.daily_streak}`} />
+      <Group header={<Header>{card.name}{card.title ? ` «${card.title}»` : ''} (vk_id {card.vk_id})</Header>}>
+        <StatRow label="Ник" value={card.name} />
+        <StatRow label="vk_id" value={card.vk_id ?? '—'} />
         <StatRow label="Создан" value={card.created_at ? new Date(card.created_at).toLocaleString('ru') : '—'} />
         <StatRow label="Последняя активность" value={card.last_active_at ? new Date(card.last_active_at).toLocaleString('ru') : '—'} />
-        <StatRow label="Бан" value={card.is_banned ? `🚫 ${card.ban_reason || 'без причины'}` : 'нет'} />
+        <StatRow label="Титул" value={card.title || '—'} />
       </Group>
-      <Group header={<Header>Трофеи и предметы</Header>}>
+
+      <Group header={<Header>Прогресс</Header>}>
+        <StatRow label="Уровень" value={`${card.level} (опыт ${card.experience} / ${card.xp_to_next})`} />
+        <StatRow label="Класс" value={`${card.class_title}${card.subclass ? ` (${card.subclass})` : ''}`} />
+        <StatRow label="Регион" value={card.region || '—'} />
+        <StatRow label="Позиция" value={`(${card.pos_x}; ${card.pos_y})`} />
+        <StatRow label="Состояние" value={statusLabel(card)} />
+      </Group>
+
+      {card.stats && (
+        <Group header={<Header>Характеристики</Header>}>
+          <StatRow label="СИЛ / ЛОВ / ИНТ / ВЫН / ВОЛ" value={`${card.stats.str} / ${card.stats.agi} / ${card.stats.int} / ${card.stats.vit} / ${card.stats.wil}`} />
+          <StatRow label="Свободных очков" value={card.stats.unspent_points} />
+          {card.derived && (
+            <>
+              <StatRow label="HP (текущее / макс.)" value={`${card.derived.current_hp} / ${card.derived.max_hp}`} />
+              <StatRow label="Урон" value={card.derived.damage} />
+              <StatRow label="Шанс крита" value={`${Math.round(card.derived.crit_chance * 100)}%`} />
+              <StatRow label="Снижение урона" value={`${Math.round(card.derived.mitigation * 100)}%`} />
+              <StatRow label="Сопротивление контролю" value={`${Math.round(card.derived.control_resist * 100)}%`} />
+              <StatRow label="Сила поддержки" value={card.derived.support_power} />
+            </>
+          )}
+        </Group>
+      )}
+
+      <Group header={<Header>Ресурсы</Header>}>
+        <StatRow label="Золото / Самоцветы" value={`${card.gold} / ${card.gems}`} />
         {Object.entries(card.trophies).map(([id, count]) => (
-          <StatRow key={id} label={id} value={count} />
+          <StatRow key={id} label={`Трофей: ${id}`} value={count} />
         ))}
+      </Group>
+
+      <Group header={<Header>Снаряжение</Header>}>
+        {card.inventory.length === 0 && <Div style={{ opacity: 0.7 }}>Инвентарь пуст.</Div>}
         {card.inventory.map((item) => (
           <StatRow
             key={item.id}
@@ -247,7 +287,59 @@ function PlayerCard({ card, onRefresh }) {
             value={`ур. ${item.ilvl}`}
           />
         ))}
+        {card.elixirs.length === 0 && <Div style={{ opacity: 0.7 }}>Зелий и эликсиров нет.</Div>}
+        {card.elixirs.map((e) => (
+          <StatRow key={e.id} label={`${e.emoji} ${e.name}`} value={`×${e.count}`} />
+        ))}
       </Group>
+
+      <Group header={<Header>Маунты</Header>}>
+        {card.mounts.length === 0 && <Div style={{ opacity: 0.7 }}>Маунтов нет.</Div>}
+        {card.mounts.map((m) => (
+          <StatRow key={m.mount_id} label={`${m.emoji} ${m.name}`} value={m.rarity} />
+        ))}
+        {card.mount_travel && (
+          <StatRow
+            label="Активный путь"
+            value={`(${card.mount_travel.to_x}; ${card.mount_travel.to_y}) · осталось ${Math.round(card.mount_travel.remaining_seconds)} сек.`}
+          />
+        )}
+      </Group>
+
+      <Group header={<Header>Прогрессия контента</Header>}>
+        <StatRow label="Текущий квест" value={card.current_quest || '—'} />
+        {card.story_progress.map((s) => (
+          <StatRow key={s.region} label={`Сюжет: ${s.region}`} value={`акт ${s.act}, шаг ${s.quest_step ?? '—'} (${s.status})`} />
+        ))}
+        <StatRow label="Микробаффы" value={`${card.trial_progress.unlocked} / ${card.trial_progress.total}`} />
+        <StatRow
+          label="Активный пресет"
+          value={card.active_preset ? `${card.active_preset.name} (${card.active_preset.buff_ids.length} баффов)` : '—'}
+        />
+        <StatRow label="Пепельная Песнь" value={`${card.song_progress.seen} / ${card.song_progress.total}${card.song_progress.complete ? ' ✅' : ''}`} />
+      </Group>
+
+      <Group header={<Header>Активность</Header>}>
+        <StatRow label="Стрики (вход/ежедневки)" value={`${card.login_streak} / ${card.daily_streak}`} />
+        <StatRow label="PvP" value={`${card.pvp_wins} побед / ${card.pvp_losses} поражений`} />
+        {card.dailies_today.length === 0 && <Div style={{ opacity: 0.7 }}>Ежедневки на сегодня не назначены.</Div>}
+        {card.dailies_today.map((q) => (
+          <StatRow key={q.title} label={`${q.completed ? '✅ ' : ''}${q.title}`} value={`${q.progress} / ${q.target}`} />
+        ))}
+      </Group>
+
+      <Group header={<Header>Служебное</Header>}>
+        <StatRow label="Бан" value={card.is_banned ? `🚫 ${card.ban_reason || 'без причины'}${card.banned_until ? ` до ${new Date(card.banned_until).toLocaleString('ru')}` : ' (навсегда)'}` : 'нет'} />
+        {card.recent_admin_actions.length === 0 && <Div style={{ opacity: 0.7 }}>Действий администратора не было.</Div>}
+        {card.recent_admin_actions.map((a, i) => (
+          <StatRow
+            key={i}
+            label={`${a.action_type} · ${new Date(a.created_at).toLocaleString('ru')}`}
+            value={a.note || '—'}
+          />
+        ))}
+      </Group>
+
       <ActionForm playerId={card.id} onDone={onRefresh} />
     </>
   );
@@ -331,55 +423,6 @@ function JournalSection() {
   );
 }
 
-function BugsSection() {
-  const [reports, setReports] = useState(null);
-  const [status, setStatus] = useState('loading');
-  const [filter, setFilter] = useState('new');
-
-  const load = (statusFilter) => {
-    setStatus('loading');
-    getAdminBugReports(statusFilter || undefined)
-      .then((res) => { setReports(res.reports); setStatus('ready'); })
-      .catch(() => setStatus('error'));
-  };
-
-  useEffect(() => { load(filter); }, [filter]);
-
-  const close = async (id) => {
-    await setAdminBugReportStatus(id, 'closed');
-    load(filter);
-  };
-
-  return (
-    <>
-      <FormItem top="Фильтр">
-        <Select
-          value={filter}
-          onChange={(e) => setFilter(e.target.value)}
-          options={[
-            { value: 'new', label: 'Новые' },
-            { value: 'in_progress', label: 'В работе' },
-            { value: 'closed', label: 'Закрытые' },
-          ]}
-        />
-      </FormItem>
-      {status === 'loading' && <Div style={{ display: 'flex', justifyContent: 'center', paddingTop: 24 }}><Spinner size="l" /></Div>}
-      {status === 'ready' && reports.length === 0 && <Placeholder>Репортов нет.</Placeholder>}
-      {status === 'ready' && reports.map((r) => (
-        <Group header={<Header>Репорт #{r.id}</Header>} key={r.id}>
-          <Div>
-            <p style={{ marginBottom: 4 }}>{r.snapshot.name} (ур. {r.snapshot.level}) · {new Date(r.created_at).toLocaleString('ru')}</p>
-            <p style={{ marginBottom: 8 }}>{r.text}</p>
-            {r.status !== 'closed' && (
-              <Button size="m" onClick={() => close(r.id)}>Закрыть</Button>
-            )}
-          </Div>
-        </Group>
-      ))}
-    </>
-  );
-}
-
 export default function AdminTab() {
   const [section, setSection] = useState('overview');
 
@@ -395,7 +438,6 @@ export default function AdminTab() {
       {section === 'overview' && <OverviewSection />}
       {section === 'player' && <PlayerSection />}
       {section === 'journal' && <JournalSection />}
-      {section === 'bugs' && <BugsSection />}
     </>
   );
 }

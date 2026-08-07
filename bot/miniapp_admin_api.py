@@ -10,9 +10,12 @@ import random
 from aiohttp import web
 
 from bot.app_keys import SESSION_FACTORY_KEY, SETTINGS_KEY
+from bot.handlers import combat as combat_handlers
+from bot.handlers import pvp as pvp_handlers
 from bot.handlers import world as world_handlers
 from bot.miniapp_auth import VK_USER_ID_KEY
 from config import Settings
+from game.world import grid
 from models import Character
 from services import admin_service
 from services import onboarding_service as onboarding_svc
@@ -79,7 +82,17 @@ async def handle_get_player(request: web.Request) -> web.Response:
         card = await admin_service.player_card(db, character_id)
         if card is None:
             return web.json_response({"error": "not_found"}, status=404)
-        return web.json_response(card)
+
+    # Патч 31, п.5: живые in-memory флаги (бой/PvP/занятость), которых нет в
+    # БД — считаются здесь, а не в services/admin_service.py, тем же способом,
+    # что и bot/miniapp_map_api.py::_blocked_reason (сервисный слой намеренно
+    # не импортирует bot/handlers/*, см. докстринг admin_service.py).
+    vk_id = card.get("vk_id")
+    card["in_combat"] = vk_id is not None and combat_handlers.has_active_encounter(vk_id)
+    card["in_pvp"] = vk_id is not None and pvp_handlers.has_active_battle(vk_id)
+    card["busy"] = vk_id is not None and world_handlers.is_busy(vk_id)
+    card["in_city"] = grid.city_region_at(card["pos_x"], card["pos_y"]) is not None
+    return web.json_response(card)
 
 
 CONFIRM_REQUIRED = {"ban", "set_level", "reset_stats"}

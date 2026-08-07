@@ -15,6 +15,7 @@ from sqlalchemy import select
 
 from bot.app_keys import SESSION_FACTORY_KEY
 from bot.handlers import combat as combat_handlers
+from bot.handlers import mounts as mounts_handlers
 from bot.handlers import pvp as pvp_handlers
 from bot.handlers import world as world_handlers
 from bot.miniapp_auth import VK_USER_ID_KEY
@@ -160,13 +161,21 @@ async def handle_post_send_mount(request: web.Request) -> web.Response:
         await db.commit()
 
         cells = max(abs(x - character.pos_x), abs(y - character.pos_y))
-        return web.json_response(
-            {
-                "travel_id": travel.id, "to_x": x, "to_y": y,
-                "seconds": mount_service.seconds_per_cell(mount_id) * cells,
-                "ambush_chance": mount_service.ambush_chance(mount_id),
-            }
-        )
+        seconds = mount_service.seconds_per_cell(mount_id) * cells
+        ambush_chance = mount_service.ambush_chance(mount_id)
+
+    # Та же нотификация, что и при отправке из чата (bot/handlers/mounts.py::
+    # coord_input) — сообщение в чат + замена клавиатуры на "в пути" (патч 31,
+    # фикс 1: раньше отправка с карты создавала MountTravel молча).
+    await mounts_handlers.notify_travel_started(vk_user_id, x, y, seconds, ambush_chance)
+
+    return web.json_response(
+        {
+            "travel_id": travel.id, "to_x": x, "to_y": y,
+            "seconds": seconds,
+            "ambush_chance": ambush_chance,
+        }
+    )
 
 
 def register_routes(app: web.Application) -> None:
