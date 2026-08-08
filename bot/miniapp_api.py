@@ -80,6 +80,11 @@ def _character_payload(
             "wil": stats.will,
         },
         "unspent_points": stats.unspent_points,
+        # Патч 32, баг 1: экипировка нужна фронтенду ОТДЕЛЬНО от derived — живой
+        # предпросмотр (miniapp/src/formulas.js) пересчитывает derived сам при
+        # вложении очка и без этого поля считал бы "после" без бонусов
+        # экипировки, расходясь с "до" (derived ниже, который её уже учитывает).
+        "gear_bonus": gear_bonus or {},
         "derived": {
             "max_hp": derived.max_hp,
             "damage": derived.damage,

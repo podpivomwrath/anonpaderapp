@@ -29,6 +29,7 @@ from bot.world_texts import foreign_city_entry_text, hub_attachment
 from bot.world_summary import location_attachment, location_summary
 from game.world import encounters, grid
 from game.world import world_config as wc
+from game.world.location_types import region_for
 from models import Character, CharacterStats, User
 from services import (
     item_service,
@@ -282,8 +283,11 @@ async def scan() -> None:
             gear_bonus = await item_service.compute_gear_bonus(db, character.id)
             buff_modifiers = await preset_service.resolve_active_modifiers(db, character)
             dist = grid.chebyshev_distance(travel.to_x, travel.to_y)
+            # Патч 32, баг 4: регион — по клетке нападения (куда едет маунт),
+            # не по домашнему региону игрока (см. bot/handlers/combat.py).
+            cell_region = region_for(travel.to_x, travel.to_y)
             encounter = encounters.spawn_mob(
-                combat_handlers.MOB_ID, character.region, character.level, dist, _rng
+                combat_handlers.MOB_ID, cell_region, character.level, dist, _rng
             )
             ambush_starts.append((peer_id, character, stats, gear_bonus, buff_modifiers, travel.id, encounter))
 

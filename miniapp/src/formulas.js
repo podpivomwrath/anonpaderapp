@@ -46,18 +46,30 @@ export function tierForLevel(level) {
   return 'legendary';
 }
 
-export function computeDerived({ level, baseClass, stats }) {
+// gearBonus (патч 32, баг 1) — сумма статов надетой экипировки
+// (services/item_service.py::gear_bonus, приходит с сервером как
+// character.gear_bonus), прибавляется к статам ДО расчёта формул — как и на
+// сервере (services/derived_stats_service.py::compute). Без этого "до"
+// (derived с сервера, уже учитывает экипировку) и "после" (этот предпросмотр)
+// расходились у любого игрока с надетыми вещами.
+export function computeDerived({ level, baseClass, stats, gearBonus = {} }) {
   const tierMult = TIER_MULTIPLIERS[tierForLevel(level)];
   const primaryStat = PRIMARY_STAT_BY_CLASS[baseClass] ?? 'str';
-  const primaryValue = stats[primaryStat] ?? 0;
+
+  const str = stats.str + (gearBonus.str ?? 0);
+  const agi = stats.agi + (gearBonus.agi ?? 0);
+  const int_ = stats.int + (gearBonus.int ?? 0);
+  const vit = stats.vit + (gearBonus.vit ?? 0);
+  const wil = stats.wil + (gearBonus.wil ?? 0);
+  const primaryValue = { str, agi, int: int_ }[primaryStat] ?? 0;
   const kDmg = K_DMG[primaryStat];
 
-  const maxHp = Math.round(HP_BASE + HP_PER_LEVEL * level + HP_PER_VIT * stats.vit + HP_PER_TIER * tierMult);
+  const maxHp = Math.round(HP_BASE + HP_PER_LEVEL * level + HP_PER_VIT * vit + HP_PER_TIER * tierMult);
   const damage = Math.round((WEAPON_BASE_PER_TIER * tierMult + kDmg * primaryValue) * 10) / 10;
-  const critChance = Math.min(CRIT_PER_AGI * stats.agi, CRIT_CAP);
-  const mitigation = Math.min(MITIGATION_PER_VIT * stats.vit, MITIGATION_CAP);
-  const controlResist = Math.min(CONTROL_RESIST_PER_WIL * stats.wil, CONTROL_RESIST_CAP);
-  const supportPower = SUPPORT_POWER_PER_WIL * stats.wil;
+  const critChance = Math.min(CRIT_PER_AGI * agi, CRIT_CAP);
+  const mitigation = Math.min(MITIGATION_PER_VIT * vit, MITIGATION_CAP);
+  const controlResist = Math.min(CONTROL_RESIST_PER_WIL * wil, CONTROL_RESIST_CAP);
+  const supportPower = SUPPORT_POWER_PER_WIL * wil;
 
   return { maxHp, damage, critChance, mitigation, controlResist, supportPower };
 }

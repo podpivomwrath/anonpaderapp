@@ -132,6 +132,25 @@ async def test_outcome_trophy_grants_and_appends_drop_line(db_session, character
     assert "С твари осыпается: ⚪ Пепельная крошка." in result.text
 
 
+async def test_outcome_trophy_uses_event_specific_source_text(db_session, character_at) -> None:
+    """Патч 32, ч.2: текст трофея зависит от event_id, не общий боевой шаблон
+    "с твари" — раньше шкатулка/путник/алтарь все показывали одну и ту же
+    боевую фразу, будто добыт трофей с моба."""
+    character = await character_at(0, 0)
+
+    class AlwaysAshRng(random.Random):
+        def random(self) -> float:
+            return 0.0
+
+    stats = await _stats(db_session, character)
+    outcome = EventOutcome(weight=100, text="Крышка поддаётся.", trophy=True)
+    result = await event_service.apply_outcome(
+        db_session, character, stats, outcome, AlwaysAshRng(), event_id="dead_box",
+    )
+    assert "В шкатулке лежит:" in result.text
+    assert "твари" not in result.text
+
+
 async def test_outcome_damage_reduces_hp_but_never_kills(db_session, character_at) -> None:
     character = await character_at(50, 50, level=5)
     stats = await _stats(db_session, character)

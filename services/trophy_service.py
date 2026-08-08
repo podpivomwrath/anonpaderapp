@@ -184,8 +184,26 @@ async def split_among(
     return result
 
 
-def format_drop_line(drop: dict[str, int]) -> str | None:
+# Патч 32, ч.2: текст получения трофея обязан соответствовать РЕАЛЬНОМУ
+# источнику — раньше единая фраза "С твари осыпается" использовалась и для
+# находок вне боя (шкатулка, горстка пепла, алтарь, NPC), что выглядело так,
+# будто игра называет предмет/событие "тварью". Ключ source — либо "mob"
+# (бой, по умолчанию), либо id источника вне боя; неизвестный id → нейтральный
+# фолбэк "Ты находишь". Правило на будущее: не добавлять сюда новый источник
+# без своей строки — общий шаблон здесь намеренно не переиспользуется молча.
+DROP_SOURCE_PREFIXES: dict[str, str] = {
+    "mob": "С твари осыпается",
+    "ash_handful": "В пепле находится",
+    "dead_box": "В шкатулке лежит",
+    "monolith_shard": "Среди осколков лежит",
+    "wounded_wanderer": "Он вкладывает тебе в ладонь",
+    "ash_altar": "Среди подношений",
+}
+
+
+def format_drop_line(drop: dict[str, int], source: str = "mob") -> str | None:
     """'С твари осыпается: 🟣 Кровяной осколок, ⚪ Пепельная крошка ×2.'
+    (или другая формулировка по source — см. DROP_SOURCE_PREFIXES).
 
     Порядок — от дорогих к дешёвым (самое ценное на видном месте)."""
     if not drop:
@@ -197,4 +215,5 @@ def format_drop_line(drop: dict[str, int]) -> str | None:
             continue
         suffix = f" ×{amount}" if amount > 1 else ""
         parts.append(f"{trophy_def.emoji} {trophy_def.name}{suffix}")
-    return "С твари осыпается: " + ", ".join(parts) + "."
+    prefix = DROP_SOURCE_PREFIXES.get(source, "Ты находишь")
+    return f"{prefix}: " + ", ".join(parts) + "."

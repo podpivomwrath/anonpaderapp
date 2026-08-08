@@ -40,10 +40,15 @@ def appraiser_keyboard(stock: list[tuple[TrophyDef, int]]) -> str:
     return kb.get_json()
 
 
+# Патч 32, баг 5: тот же лимит VK (10 строк на клавиатуру), что и у
+# инвентаря — см. bot/keyboards/items.py::INVENTORY_KEYBOARD_MAX_ITEMS.
+SELL_GEAR_KEYBOARD_MAX_ITEMS = 9
+
+
 def sell_gear_keyboard(items: list[tuple[Item, int]]) -> str:
     """items — (предмет, цена) НЕ надетых предметов инвентаря."""
     kb = Keyboard(inline=True)
-    for item, price in items:
+    for item, price in items[:SELL_GEAR_KEYBOARD_MAX_ITEMS]:
         kb.add(
             Text(f"Продать {item.name} — {price} зол.", payload={"type": "sell_item", "item": item.id}),
             color=KeyboardButtonColor.SECONDARY,

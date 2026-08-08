@@ -36,11 +36,21 @@ def item_choice_keyboard(item_id: int) -> str:
 
 BTN_BACK = "← Назад"
 
+# Патч 32, баг 5: VK ограничивает клавиатуру 10 строками — при одной кнопке
+# на предмет инвентарь без накопленного лимита у активного игрока (трофеи не
+# продаются автоматически, предметы просто копятся) рано или поздно превышал
+# лимит, VK отклонял messages.send/.edit целиком, и кнопка «Инвентарь» на
+# вид работала (сообщение с клавиатурой уже было показано раньше), а на
+# нажатие переставала отвечать вовсе — ошибка API падала за пределами
+# перехватываемого в editable_message.send_or_edit. Одна строка остаётся под
+# кнопку мини-аппа (add_miniapp_button ниже), где полный список без лимита.
+INVENTORY_KEYBOARD_MAX_ITEMS = 9
+
 
 def inventory_keyboard(items: list[tuple[Item, bool]]) -> str:
     """Список предметов инвентаря — тап по предмету открывает сравнение с надетым."""
     kb = Keyboard(inline=True)
-    for item, equipped in items:
+    for item, equipped in items[:INVENTORY_KEYBOARD_MAX_ITEMS]:
         label = f"{item.name}{' (надето)' if equipped else ''}"
         kb.add(
             Text(label, payload={"type": "inventory_item", "item": item.id}),

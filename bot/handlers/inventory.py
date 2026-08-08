@@ -6,7 +6,7 @@
 from vkbottle.bot import BotLabeler, Message
 
 from bot import editable_message
-from bot.keyboards.items import inventory_keyboard, item_view_keyboard, no_keyboard
+from bot.keyboards.items import INVENTORY_KEYBOARD_MAX_ITEMS, inventory_keyboard, item_view_keyboard, no_keyboard
 from bot.keyboards.world import BTN_INVENTORY
 from game.world import grid
 from models import Item
@@ -45,7 +45,15 @@ async def _render_list(db, character) -> tuple[str, list[tuple[Item, bool]]]:
             f"{rarity.emoji} {item.name} — {slot_title}, ур. {item.ilvl}{suffix}\n"
             f"{_stats_line(item)}"
         )
-    return "🎒 Инвентарь:\n\n" + "\n\n".join(lines), items
+    text = "🎒 Инвентарь:\n\n" + "\n\n".join(lines)
+    if len(items) > INVENTORY_KEYBOARD_MAX_ITEMS:
+        # Патч 32, баг 5: клавиатура показывает только первые N (лимит VK на
+        # строки) — уточняем, что остальное не потеряно, просто не влезло сюда.
+        text += (
+            f"\n\n…и ещё {len(items) - INVENTORY_KEYBOARD_MAX_ITEMS} предмет(а/ов). "
+            "Полный список и надевание — в мини-аппе."
+        )
+    return text, items
 
 
 @labeler.message(text=[BTN_INVENTORY])

@@ -350,7 +350,7 @@ async def collect_ash_handful(message: Message) -> None:
         "У ног — горстка пепла, слишком плотная для простой золы. В ней что-то есть.\n\n"
         + display.xp_delta_line(result.xp)
     )
-    drop_line = trophy_service.format_drop_line(result.trophies)
+    drop_line = trophy_service.format_drop_line(result.trophies, source="ash_handful")
     if drop_line is not None:
         text += f"\n{drop_line}"
     if result.item is not None:

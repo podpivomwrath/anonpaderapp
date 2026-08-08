@@ -256,6 +256,13 @@ def resolve_tick(
     damage_taken: dict[int, int] = {}
     heal_taken: dict[int, int] = {}
     reflect_hits: list[PendingHit] = []
+    # Патч 32, баг 2/3: фактически поглощённый урон КАЖДОГО хита (после щита/
+    # пула) — по id(hit), для прогрессивного hp_before/hp_after в логе ниже.
+    # Раньше лог всех хитов по одной цели в этот ход показывал ОДИН и тот же
+    # (общий hp_before хода → итоговый current_hp) переход — второй удар
+    # «Двойного укола» выглядел так, будто не наносил урона, хотя фактически
+    # урон суммировался в damage_taken корректно.
+    applied_by_hit: dict[int, int] = {}
     for hit in ctx.hits:
         target = session.combatants[hit.target_id]
         amount = hit.amount
@@ -286,9 +293,11 @@ def resolve_tick(
                         amount=max(round(amount * reflect_pct), 1), label="шипы",
                     )
                 )
+        applied_by_hit[id(hit)] = amount
         damage_taken[hit.target_id] = damage_taken.get(hit.target_id, 0) + amount
     ctx.hits.extend(reflect_hits)
     for hit in reflect_hits:
+        applied_by_hit[id(hit)] = hit.amount
         damage_taken[hit.target_id] = damage_taken.get(hit.target_id, 0) + hit.amount
     for heal in ctx.heals:
         heal_taken[heal.target_id] = heal_taken.get(heal.target_id, 0) + heal.amount
@@ -299,19 +308,37 @@ def resolve_tick(
         combatant.current_hp = min(combatant.current_hp + delta, combatant.max_hp)
         _apply_last_breath_guard(combatant, result)
 
-    # --- Строки лога (атмосферные шаблоны + итоговое состояние после хода) ---
+    # --- Строки лога: PvE — атмосферные шаблоны (combat_flavor.render_hit);
+    # групповой PvP — строгий нейтральный формат без "твари" (патч 32, ч.2,
+    # render_pvp_hit) — оба участника combatant.kind=="character", render_hit
+    # не отличит игрока от игрока сам, поэтому ветвим здесь по session.mode. ---
     result.lines.extend(ctx.lines)
+    is_pvp = session.mode == CombatMode.PVP_GROUP
+    running_hp = dict(hp_before)
     for hit in ctx.hits:
         source = session.combatants[hit.source_id]
         target = session.combatants[hit.target_id]
-        result.lines.append(
-            combat_flavor.render_hit(
-                source, target,
-                crit=hit.crit, missed=hit.missed, is_dot=hit.is_dot,
-                hp_before=hp_before[target.id], hp_after=target.current_hp,
-                max_hp=target.max_hp, rng=rng, mode=mode,
+        h_before = running_hp[target.id]
+        applied = applied_by_hit.get(id(hit), hit.amount)
+        h_after = h_before - applied
+        running_hp[target.id] = h_after
+        if is_pvp:
+            result.lines.append(
+                combat_flavor.render_pvp_hit(
+                    source.name, target.name,
+                    label=hit.label, amount=applied, crit=hit.crit, missed=hit.missed, is_dot=hit.is_dot,
+                    hp_before=h_before, hp_after=h_after, max_hp=target.max_hp, mode=mode,
+                )
             )
-        )
+        else:
+            result.lines.append(
+                combat_flavor.render_hit(
+                    source, target,
+                    crit=hit.crit, missed=hit.missed, is_dot=hit.is_dot,
+                    hp_before=h_before, hp_after=h_after,
+                    max_hp=target.max_hp, rng=rng, mode=mode,
+                )
+            )
     for heal in ctx.heals:
         source = session.combatants[heal.source_id]
         target = session.combatants[heal.target_id]

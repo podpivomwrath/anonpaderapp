@@ -47,6 +47,7 @@ from bot.world_summary import location_attachment, location_summary
 from game.economy import elixir_config as ec
 from game.world import encounters, grid
 from game.world import flavor as world_flavor
+from game.world.location_types import region_for
 from services import (
     ash_service,
     elixir_service,
@@ -191,9 +192,14 @@ async def start_encounter(
         encounter = forced_encounter
     else:
         # уровень моба клампится под игрока в диапазон зоны (world-patch-1);
-        # кольцо бестиария — по ТЕКУЩЕЙ клетке игрока, не по домашнему региону (патч 15)
+        # кольцо бестиария — по ТЕКУЩЕЙ клетке игрока, не по домашнему региону
+        # (патч 15). Патч 32, баг 4: регион ТОЖЕ должен быть по клетке — раньше
+        # здесь ошибочно передавался character.region (домашний регион), из-за
+        # чего в чужой четверти карты всегда спавнились мобы родного региона
+        # игрока (кроме центра, там пул "any" и так общий).
         dist = grid.chebyshev_distance(character.pos_x, character.pos_y)
-        encounter = encounters.spawn_mob(MOB_ID, character.region, character.level, dist, _rng)
+        cell_region = region_for(character.pos_x, character.pos_y)
+        encounter = encounters.spawn_mob(MOB_ID, cell_region, character.level, dist, _rng)
     state = CombatSessionState(session_id=peer_id, mode=CombatMode.PVE)
     state.add(player)
     state.add(encounter.combatant)
@@ -338,7 +344,8 @@ async def on_battle_finished(session_id: int, result: TickResult) -> None:
             random_id=0,
         )
         dist = grid.chebyshev_distance(character.pos_x, character.pos_y)
-        next_encounter = encounters.spawn_mob(MOB_ID, character.region, character.level, dist, _rng)
+        cell_region = region_for(character.pos_x, character.pos_y)
+        next_encounter = encounters.spawn_mob(MOB_ID, cell_region, character.level, dist, _rng)
         await start_story_encounter(
             peer_id, character, stats, gear_bonus, buff_modifiers, quest_id, remaining - 1, next_encounter,
         )

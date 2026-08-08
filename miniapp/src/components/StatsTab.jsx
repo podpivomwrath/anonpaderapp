@@ -68,8 +68,11 @@ export default function StatsTab({ character, onCharacterUpdate }) {
   );
 
   const previewDerived = useMemo(
-    () => computeDerived({ level: character.level, baseClass: character.base_class, stats: previewStats }),
-    [character.level, character.base_class, previewStats],
+    () => computeDerived({
+      level: character.level, baseClass: character.base_class, stats: previewStats,
+      gearBonus: character.gear_bonus,
+    }),
+    [character.level, character.base_class, previewStats, character.gear_bonus],
   );
 
   function increment(key) {

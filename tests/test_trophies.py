@@ -183,3 +183,43 @@ def test_format_drop_line_orders_rare_first() -> None:
 
 def test_format_drop_line_empty_is_none() -> None:
     assert trophy_service.format_drop_line({}) is None
+
+
+# --- Патч 32, ч.2: текст трофея по РЕАЛЬНОМУ источнику, не боевой шаблон
+# "с твари" для находок вне боя (шкатулка/осколок/путник/алтарь/пепел). ---
+
+
+def test_format_drop_line_defaults_to_mob_source() -> None:
+    line = trophy_service.format_drop_line({"ash_dust": 1})
+    assert line.startswith("С твари осыпается:")
+
+
+def test_format_drop_line_ash_handful_source() -> None:
+    line = trophy_service.format_drop_line({"ash_dust": 1}, source="ash_handful")
+    assert line.startswith("В пепле находится:")
+
+
+def test_format_drop_line_dead_box_source() -> None:
+    line = trophy_service.format_drop_line({"ash_dust": 2}, source="dead_box")
+    assert line.startswith("В шкатулке лежит:")
+
+
+def test_format_drop_line_wounded_wanderer_source() -> None:
+    line = trophy_service.format_drop_line({"ash_dust": 1}, source="wounded_wanderer")
+    assert line.startswith("Он вкладывает тебе в ладонь:")
+
+
+def test_format_drop_line_ash_altar_source() -> None:
+    line = trophy_service.format_drop_line({"ash_dust": 3}, source="ash_altar")
+    assert line.startswith("Среди подношений:")
+
+
+def test_format_drop_line_monolith_shard_source() -> None:
+    line = trophy_service.format_drop_line({"ash_dust": 1}, source="monolith_shard")
+    assert line.startswith("Среди осколков лежит:")
+
+
+def test_format_drop_line_unknown_source_falls_back_neutral() -> None:
+    line = trophy_service.format_drop_line({"ash_dust": 1}, source="something_new")
+    assert line.startswith("Ты находишь:")
+    assert "твари" not in line

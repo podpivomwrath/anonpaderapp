@@ -63,14 +63,64 @@ def test_cleave_multiplier_180() -> None:
 
 
 def test_double_stab_two_hits() -> None:
+    """Патч 32, баг 2/3: регрессия — второй удар «Двойного укола» реально
+    наносит урон (суммарный урон ≈ 2× одного удара 80%) И лог показывает ДВЕ
+    разные строки перехода HP, а не одну и ту же дважды (раньше обе строки
+    рендерились от общего hp_before хода к общему итоговому HP — второй удар
+    выглядел так, будто ничего не изменил, хотя урон фактически суммировался)."""
     rng = NoCritRng()
-    a = combatant(1, side=0, agility=100)  # rogue primary agi
+    a1 = combatant(1, side=0, agility=100)
+    a1.primary_stat = "agi"
+    b1 = combatant(2, side=1, vitality=500)
+    s1 = make_session(a1, b1)
+    resolve_tick(s1, {1: attack(2)}, rng)
+    single_hit = b1.max_hp - b1.current_hp
+
+    a2 = combatant(3, side=0, agility=100)
+    a2.primary_stat = "agi"
+    b2 = combatant(4, side=1, vitality=500)
+    s2 = make_session(a2, b2)
+    result = resolve_tick(s2, {3: skill("rogue_double_stab", 4)}, rng)
+    double_damage = b2.max_hp - b2.current_hp
+
+    # 2 удара по 80% каждый = 160% одного обычного удара (без крита, NoCritRng)
+    assert double_damage == round(single_hit * 1.6)
+
+    hit_lines = [ln for ln in result.lines if "%" in ln]
+    assert len(hit_lines) == 2
+    assert hit_lines[0] != hit_lines[1]  # разные проценты HP, не дубль
+
+
+def test_double_stab_hits_crit_independently() -> None:
+    """Патч 32, баг 3: каждый из двух ударов проходит СВОЮ проверку крита —
+    один может критовать, а другой нет, в любой комбинации."""
+
+    class _AlternatingCritRng(random.Random):
+        """Первый .random() < crit_chance (крит), второй >= (не крит) —
+        compute_hit не откатывает к dodge-ролу, т.к. у бойцов нет DODGE."""
+
+        def __init__(self) -> None:
+            super().__init__()
+            self._calls = 0
+
+        def random(self) -> float:
+            self._calls += 1
+            return 0.1 if self._calls == 1 else 0.9
+
+        def choice(self, seq):
+            return seq[0]
+
+    rng = _AlternatingCritRng()
+    a = combatant(1, side=0, agility=100)  # crit_chance = min(0.003*100, 0.6) = 0.3
     a.primary_stat = "agi"
     b = combatant(2, side=1, vitality=500)
     state = make_session(a, b)
-    resolve_tick(state, {1: skill("rogue_double_stab", 2)}, rng)
-    # два удара по 80% — суммарно ~160% одного обычного (грубая проверка > 1 удара)
-    assert b.current_hp < b.max_hp
+    result = resolve_tick(state, {1: skill("rogue_double_stab", 2)}, rng)
+
+    hits = [h for h in result.hits if h.target_id == 2]
+    assert len(hits) == 2
+    assert [h.crit for h in hits] == [True, False]  # независимый ролл на каждый удар
+    assert hits[0].amount != hits[1].amount  # крит-удар весомее не-крит-удара
 
 
 def test_shadow_dash_guaranteed_crit() -> None:
@@ -89,6 +139,37 @@ def test_shadow_dash_guaranteed_crit() -> None:
     dash = b2.max_hp - b2.current_hp
     # 130% × крит(1.5) = 195% против 100% обычного
     assert dash > plain
+
+
+def test_pvp_hit_log_uses_strict_format_no_pve_flavor() -> None:
+    """Патч 32, ч.2: групповой PvP (оба combatant.kind=="character") тоже не
+    должен использовать PvE-пул render_hit ("Тварь отшатывается!" и т.п.) —
+    строгий формат "Ник использует Способность на Ник — N урона. (Ник: A%→B%)"."""
+    rng = NoCritRng()
+    a = combatant(1, side=0, name="Гримм")
+    b = combatant(2, side=1, name="Тень_В_Ночи")
+    state = make_session(a, b)
+    result = resolve_tick(state, {1: attack(2)}, rng)
+
+    hit_line = next(ln for ln in result.lines if "урона" in ln)
+    assert hit_line.startswith("Гримм атакует Тень_В_Ночи — ")
+    assert "(Тень_В_Ночи:" in hit_line
+    for banned in ("тварь", "Тварь", "оно", "существо"):
+        assert banned not in hit_line
+
+
+def test_pvp_control_log_names_target_not_creature() -> None:
+    """Патч 32, ч.2: контроль в PvP называет цель по нику, не "Тварь застывает"."""
+    rng = NoCritRng()
+    a = combatant(1, side=0, name="Мирэль", intellect=100)
+    a.primary_stat = "int"
+    b = combatant(2, side=1, name="Валгар", will=0)  # will=0 — резист/DR не мешают
+    state = make_session(a, b)
+    result = resolve_tick(state, {1: skill("mage_ice_bonds", 2)}, rng)
+
+    assert "Валгар скован." in result.lines
+    for banned in ("Тварь", "тварь"):
+        assert not any(banned in ln for ln in result.lines)
 
 
 # --- Эффекты контроля ---

@@ -66,6 +66,26 @@ async def test_second_player_sees_result_immediately() -> None:
         engine.shutdown()
 
 
+async def test_duel_log_uses_strict_pvp_format_no_pve_flavor() -> None:
+    """Патч 32, ч.2: дуэль — PvP, лог обязан быть строгим (ник — глагол —
+    урон), без атмосферных PvE-шаблонов и без "тварь"/"оно"/"существо" —
+    цель дуэли всегда другой игрок."""
+    engine = make_engine()
+    engine.start()
+    try:
+        a = combatant(1, side=0, name="Валгар")
+        b = combatant(2, side=1, name="Мирэль")
+        engine.start_duel(10, a, b)
+        result = await engine.act(10, 1, attack(2))
+        hit_line = next(ln for ln in result.lines if "урона" in ln)
+        assert hit_line.startswith("Валгар атакует Мирэль — ")
+        assert "(Мирэль:" in hit_line and "%" in hit_line
+        for banned in ("тварь", "Тварь", "оно бьёт", "существо"):
+            assert banned not in hit_line
+    finally:
+        engine.shutdown()
+
+
 async def test_timeout_skips_turn_without_penalty() -> None:
     turns: list[DuelResult] = []
 

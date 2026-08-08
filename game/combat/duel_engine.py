@@ -21,7 +21,7 @@ from apscheduler.triggers.date import DateTrigger
 from loguru import logger
 
 from game.combat import balance_config as bc
-from game.combat import control, display
+from game.combat import combat_flavor, control, display
 from game.combat.session import (
     ActionType,
     CombatantState,
@@ -266,11 +266,18 @@ class DuelEngine:
                 f"{actor.name}: умение «{action.skill_id}» ещё не реализовано (TODO: content)"
             )
 
-        # Ход резолвится СРАЗУ — противник увидит результат перед своим ходом
+        # Ход резолвится СРАЗУ — противник увидит результат перед своим ходом.
+        # Патч 32, ч.2: дуэль — тоже PvP, строгий формат без образности
+        # (combat_flavor.render_pvp_hit), никакого «уходит от удара — мимо»/
+        # атмосферных PvE-шаблонов.
         for hit in ctx.hits:
             target = state.combatants[hit.target_id]
             if hit.missed:
-                result.lines.append(f"{target.name} уходит от удара — мимо.")
+                result.lines.append(combat_flavor.render_pvp_hit(
+                    actor.name, target.name, label=hit.label, amount=0, crit=False,
+                    missed=True, is_dot=False, hp_before=target.current_hp,
+                    hp_after=target.current_hp, max_hp=target.max_hp,
+                ))
                 continue
             before = target.current_hp
             amount = hit.amount
@@ -281,14 +288,11 @@ class DuelEngine:
                 if absorbed:
                     result.lines.append(f"Щит {target.name} поглощает {absorbed} урона 🛡")
             target.current_hp -= amount
-            result.lines.append(
-                display.action_line(
-                    actor.name, hit.label, target.name,
-                    before, target.current_hp, target.max_hp,
-                    display.MODE_PVP,  # дуэль — PvP: целые проценты
-                    suffix=" (крит!)" if hit.crit else "",
-                )
-            )
+            result.lines.append(combat_flavor.render_pvp_hit(
+                actor.name, target.name, label=hit.label, amount=amount, crit=hit.crit,
+                missed=False, is_dot=hit.is_dot, hp_before=before, hp_after=target.current_hp,
+                max_hp=target.max_hp,
+            ))
         for heal in ctx.heals:
             target = state.combatants[heal.target_id]
             before = target.current_hp

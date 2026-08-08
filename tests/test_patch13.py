@@ -1,7 +1,13 @@
 """Патч 13: редактируемые окна (ч.1), единый формат чисел (ч.2), убранный
 флейвор-исход исследования (ч.3)."""
 
+import json
+
+import bot.keyboards.world as world_kb
 from bot import editable_message
+from bot.keyboards.appraiser import SELL_GEAR_KEYBOARD_MAX_ITEMS, sell_gear_keyboard
+from bot.keyboards.items import INVENTORY_KEYBOARD_MAX_ITEMS, inventory_keyboard
+from config import Settings
 from game.combat import display
 from game.world import flavor, world_config as wc
 from models import Item
@@ -22,15 +28,20 @@ class _FakeMessages:
 
     async def send(self, **kwargs) -> int:
         self._outer.send_calls.append(kwargs)
+        # Патч 32, баг 5: первая попытка send (с клавиатурой) может упасть,
+        # напр. VK отверг клавиатуру целиком — превышен лимит строк.
+        if self._outer.send_raises_with_keyboard and kwargs.get("keyboard") is not None:
+            raise RuntimeError("клавиатура отклонена VK")
         self._outer.next_id += 1
         return self._outer.next_id
 
 
 class FakeBotApi:
-    def __init__(self, edit_raises: bool = False) -> None:
+    def __init__(self, edit_raises: bool = False, send_raises_with_keyboard: bool = False) -> None:
         self.edit_calls: list[dict] = []
         self.send_calls: list[dict] = []
         self.edit_raises = edit_raises
+        self.send_raises_with_keyboard = send_raises_with_keyboard
         self.next_id = 100
         self.messages = _FakeMessages(self)
 
@@ -62,6 +73,18 @@ async def test_send_or_edit_falls_back_to_send_when_edit_fails() -> None:
     editable_message.clear("ns3", 1)
 
 
+async def test_send_or_edit_falls_back_without_keyboard_when_send_rejects_it() -> None:
+    """Патч 32, баг 5: если VK отклоняет саму отправку с клавиатурой (напр.
+    превышен лимит строк), игрок раньше не получал вообще НИЧЕГО — кнопка
+    выглядела нерабочей без единого сообщения об ошибке."""
+    api = FakeBotApi(send_raises_with_keyboard=True)
+    await editable_message.send_or_edit(api, "ns5", 1, "текст", "перегруженная kb")
+    assert len(api.send_calls) == 2  # первая с клавиатурой упала, вторая без — прошла
+    assert api.send_calls[0]["keyboard"] == "перегруженная kb"
+    assert "keyboard" not in api.send_calls[1]
+    editable_message.clear("ns5", 1)
+
+
 async def test_clear_forces_new_message_next_time() -> None:
     api = FakeBotApi()
     await editable_message.send_or_edit(api, "ns4", 1, "текст 1", "kb")
@@ -81,6 +104,35 @@ async def test_namespaces_are_independent_per_peer() -> None:
     assert len(api.edit_calls) == 0
     editable_message.clear("a", 1)
     editable_message.clear("b", 1)
+
+
+# --- Патч 32, баг 5: клавиатуры инвентаря/продажи снаряжения не превышают
+# лимит VK на строки (10) — раньше при накопленных предметах messages.send/
+# .edit падал с отклонённой клавиатурой и игрок не получал вообще ничего. ---
+
+
+def _kb_rows(kb_json: str) -> list[list[dict]]:
+    return json.loads(kb_json)["buttons"]
+
+
+def test_inventory_keyboard_caps_rows_at_vk_limit(monkeypatch) -> None:
+    monkeypatch.setattr(world_kb, "get_settings", lambda: Settings(_env_file=None))
+    items = [
+        (Item(id=i, name=f"Предмет {i}", slot="weapon", base_stats={}), False) for i in range(20)
+    ]
+    rows = _kb_rows(inventory_keyboard(items))
+    assert len(rows) <= 10
+    assert len(rows) == INVENTORY_KEYBOARD_MAX_ITEMS  # без миниаппа (URL не задан) — без +1 строки
+
+
+def test_sell_gear_keyboard_caps_rows_at_vk_limit(monkeypatch) -> None:
+    monkeypatch.setattr(world_kb, "get_settings", lambda: Settings(_env_file=None))
+    items = [
+        (Item(id=i, name=f"Предмет {i}", slot="weapon", base_stats={}), 10) for i in range(20)
+    ]
+    rows = _kb_rows(sell_gear_keyboard(items))
+    assert len(rows) <= 10
+    assert len(rows) == SELL_GEAR_KEYBOARD_MAX_ITEMS
 
 
 # --- ч.2: единый формат числовых дельт ---

@@ -68,7 +68,9 @@ async def apply_outcome(
 
     if outcome.trophy:
         drop = await trophy_service.grant_from_event(db, character, rng)
-        drop_line = trophy_service.format_drop_line(drop)
+        # Патч 32, ч.2: формулировка получения — по конкретному событию
+        # (шкатулка/осколок/путник/алтарь), не общий боевой шаблон "с твари".
+        drop_line = trophy_service.format_drop_line(drop, source=event_id or "mob")
         if drop_line:
             lines.append(drop_line)
         if character.subclass is not None:

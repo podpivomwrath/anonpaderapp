@@ -47,7 +47,25 @@ def _make_handler(skill: BaseSkillDef):
                 res = control.try_apply_control(
                     target, base_duration=1, source_id=actor.id, rng=ctx.rng, pvp=pvp
                 )
-                if res.immune:
+                # Патч 32, ч.2: те же атмосферные пулы, что и обычный бой с
+                # мобом ("Тварь застывает...") нельзя переиспользовать здесь —
+                # в PvP/дуэли цель контроля почти всегда игрок. Строгий текст
+                # с именем цели вместо случайного образного шаблона.
+                if pvp:
+                    if res.immune:
+                        ctx.lines.append(combat_flavor.pvp_control_blocked_line(target.name))
+                    elif res.resisted:
+                        ctx.lines.append(combat_flavor.pvp_control_resisted_line(target.name))
+                    else:
+                        ctx.lines.append(combat_flavor.pvp_control_line(target.name))
+                        if res.reduced:
+                            ctx.lines.append(combat_flavor.pvp_control_reduced_line(target.name))
+                        if res.immunity_granted:
+                            from game.combat import balance_config as bc
+                            ctx.lines.append(
+                                combat_flavor.pvp_control_immune_line(target.name, bc.CC_IMMUNITY_DURATION)
+                            )
+                elif res.immune:
                     ctx.lines.append(combat_flavor.control_blocked_line(ctx.rng))
                 elif res.resisted:
                     ctx.lines.append(combat_flavor.control_resisted_line(ctx.rng))

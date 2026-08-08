@@ -131,6 +131,34 @@ async def test_wrong_secret_rejected(client, session_factory) -> None:
     assert resp.status == 403
 
 
+async def test_character_derived_and_gear_bonus_include_equipped_gear(client, session_factory) -> None:
+    """Патч 32, баг 1: derived (от сервера) уже учитывает экипировку, а
+    gear_bonus отдаётся отдельным полем — живой предпросмотр на фронтенде
+    (miniapp/src/formulas.js) без него считал "после" без бонусов экипировки,
+    расходясь с "до" (derived) у игрока с надетыми вещами."""
+    character = await _make_character(session_factory, vk_id=500, strength=10)
+    async with session_factory() as session:
+        item = Item(name="Меч силы", slot="weapon", base_stats={"str": 20}, rarity="common", ilvl=10)
+        session.add(item)
+        await session.flush()
+        session.add(Inventory(character_id=character.id, item_id=item.id, equipped=True))
+        await session.commit()
+
+    resp = await client.get("/api/miniapp/character", params=_signed_query(500))
+    data = await resp.json()
+    assert data["gear_bonus"] == {"str": 20}
+    assert data["stats"]["str"] == 10  # базовый стат — без экипировки
+    # derived.damage считается от strength+gear_bonus (воин, K_DMG=2.0) — без
+    # экипировки было бы заметно меньше, чем с +20 к силе.
+    from services.derived_stats_service import compute as compute_derived
+    from models import CharacterStats
+
+    async with session_factory() as session:
+        stats = await session.get(CharacterStats, character.id)
+    without_gear = compute_derived(character, stats, None)
+    assert data["derived"]["damage"] > without_gear.damage
+
+
 async def test_character_not_found(client) -> None:
     resp = await client.get("/api/miniapp/character", params=_signed_query(999))
     assert resp.status == 404
