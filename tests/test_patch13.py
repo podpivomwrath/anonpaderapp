@@ -28,8 +28,12 @@ class _FakeMessages:
 
     async def send(self, **kwargs) -> int:
         self._outer.send_calls.append(kwargs)
-        # Патч 32, баг 5: первая попытка send (с клавиатурой) может упасть,
-        # напр. VK отверг клавиатуру целиком — превышен лимит строк.
+        # Патч 33, баг 1: два НЕЗАВИСИМЫХ режима отказа VK — битый attachment
+        # (напр. неверный photo_id) не должен ронять клавиатуру, а отклонённая
+        # целиком клавиатура (патч 32, баг 5 — лимит строк) не должна зависеть
+        # от attachment.
+        if self._outer.send_raises_with_attachment and kwargs.get("attachment") is not None:
+            raise RuntimeError("attachment отклонён VK")
         if self._outer.send_raises_with_keyboard and kwargs.get("keyboard") is not None:
             raise RuntimeError("клавиатура отклонена VK")
         self._outer.next_id += 1
@@ -37,11 +41,15 @@ class _FakeMessages:
 
 
 class FakeBotApi:
-    def __init__(self, edit_raises: bool = False, send_raises_with_keyboard: bool = False) -> None:
+    def __init__(
+        self, edit_raises: bool = False, send_raises_with_keyboard: bool = False,
+        send_raises_with_attachment: bool = False,
+    ) -> None:
         self.edit_calls: list[dict] = []
         self.send_calls: list[dict] = []
         self.edit_raises = edit_raises
         self.send_raises_with_keyboard = send_raises_with_keyboard
+        self.send_raises_with_attachment = send_raises_with_attachment
         self.next_id = 100
         self.messages = _FakeMessages(self)
 
@@ -76,13 +84,30 @@ async def test_send_or_edit_falls_back_to_send_when_edit_fails() -> None:
 async def test_send_or_edit_falls_back_without_keyboard_when_send_rejects_it() -> None:
     """Патч 32, баг 5: если VK отклоняет саму отправку с клавиатурой (напр.
     превышен лимит строк), игрок раньше не получал вообще НИЧЕГО — кнопка
-    выглядела нерабочей без единого сообщения об ошибке."""
+    выглядела нерабочей без единого сообщения об ошибке. Клавиатура отклонена
+    независимо от attachment — фолбэк без attachment (патч 33) тоже не
+    помогает, доходим до голого текста третьей попыткой."""
     api = FakeBotApi(send_raises_with_keyboard=True)
     await editable_message.send_or_edit(api, "ns5", 1, "текст", "перегруженная kb")
-    assert len(api.send_calls) == 2  # первая с клавиатурой упала, вторая без — прошла
+    assert len(api.send_calls) == 3
     assert api.send_calls[0]["keyboard"] == "перегруженная kb"
-    assert "keyboard" not in api.send_calls[1]
+    assert api.send_calls[1]["keyboard"] == "перегруженная kb"  # без attachment — тоже упало
+    assert "keyboard" not in api.send_calls[2]
     editable_message.clear("ns5", 1)
+
+
+async def test_send_or_edit_falls_back_without_attachment_keeps_keyboard() -> None:
+    """Патч 33, баг 1: битый attachment (напр. неверный photo_id скупщика)
+    НЕ должен ронять клавиатуру продажи заодно с картинкой — раньше единый
+    фолбэк (патч 32) убирал и то, и другое при любом отказе VK, из-за чего
+    игрок терял кнопки продажи только потому, что не загрузилась картинка."""
+    api = FakeBotApi(send_raises_with_attachment=True)
+    await editable_message.send_or_edit(api, "ns6", 1, "текст", "kb", attachment="photo-1_2")
+    assert len(api.send_calls) == 2  # первая с attachment упала, вторая без — но с клавиатурой
+    assert api.send_calls[0]["attachment"] == "photo-1_2"
+    assert api.send_calls[1]["keyboard"] == "kb"
+    assert "attachment" not in api.send_calls[1]
+    editable_message.clear("ns6", 1)
 
 
 async def test_clear_forces_new_message_next_time() -> None:

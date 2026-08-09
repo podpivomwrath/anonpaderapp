@@ -2,6 +2,7 @@
 фабрики участников боя."""
 
 import random
+from datetime import datetime, timezone
 
 import pytest
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
@@ -49,6 +50,11 @@ def make_character(db_session):
             level=level,
             experience=experience,
             region=region,
+            # Патч 33, ч.3: last_active_at питает pvp_service.is_afk — тестовый
+            # персонаж по умолчанию "только что действовал", иначе он AFK и
+            # незаметен для PvP-тестов, которые этого не ожидают. Тесты самого
+            # AFK-поведения выставляют это поле явно (см. test_pvp.py).
+            last_active_at=datetime.now(timezone.utc),
         )
         db_session.add(character)
         await db_session.flush()

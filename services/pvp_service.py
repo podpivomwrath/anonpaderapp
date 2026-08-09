@@ -5,7 +5,7 @@ bot/handlers/pvp.py + game/combat/duel_engine.py + game/combat/tick_engine.py;
 """
 
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -16,6 +16,20 @@ from models import Character, PvpBattle
 from services import death_service, title_service
 
 BASE_CLASS_TITLES = {"warrior": "Воин", "rogue": "Разбойник", "mage": "Маг"}
+
+
+def is_afk(character: Character, now: datetime | None = None) -> bool:
+    """Патч 33, ч.3: защита от фарма — цель без действий дольше
+    AFK_TIMEOUT_MINUTES "гаснет" (не видна в «Осмотреться», недоступна для
+    /напасть). last_active_at обновляется в
+    services/onboarding_service.py::get_character на КАЖДОЕ действие ЛЮБОГО
+    игрока (та же метка, что и в админ-панели, патч 27) — отдельного поля
+    заводить не пришлось. None (ещё ни разу не отмечен активным) считается
+    AFK — безопасный дефолт."""
+    if character.last_active_at is None:
+        return True
+    now = now or datetime.now(timezone.utc)
+    return (now - character.last_active_at) >= timedelta(minutes=pc.AFK_TIMEOUT_MINUTES)
 
 
 def class_title(character: Character) -> str:

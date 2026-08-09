@@ -38,7 +38,7 @@ from bot.keyboards.pvp import (
     pvp_items_keyboard,
     pvp_waiting_keyboard,
 )
-from bot.pvp_texts import ALONE_ON_CELL, NOTHING_TO_TAKE
+from bot.pvp_texts import AFK_TARGET_TEXT, ALONE_ON_CELL, CITY_NO_PVP_TEXT, NOTHING_TO_TAKE
 from game.combat import balance_config as bc
 from game.combat import display, elixir_effects
 from game.combat.base_skills import BASE_SKILL_DEFS
@@ -248,8 +248,28 @@ async def _scene_at(db, character: Character) -> tuple[list[Character], list[tup
     others = await pvp_service.others_at(db, character)
     battles = _battles_at(character.pos_x, character.pos_y)
     busy_ids = {cid for _, b in battles for cid in b.participants}
-    solo = [c for c in others if c.id not in busy_ids]
+    # Патч 33, ч.3: AFK (нет действий AFK_TIMEOUT_MINUTES) исключён из
+    # «Осмотреться»/нумерации целей — уже идущий бой это НЕ трогает (busy_ids
+    # выше — отдельная причина, AFK-статус там не проверяется намеренно).
+    solo = [c for c in others if c.id not in busy_ids and not pvp_service.is_afk(c)]
     return solo, battles
+
+
+async def _afk_target_named(db, character: Character, target: str) -> bool:
+    """True — target (по имени; числа никогда не указывают на AFK — они не
+    нумеруются вовсе) совпадает с игроком на клетке, который сейчас AFK.
+    Только чтобы attack_command показал отдельный лорный текст вместо
+    общего "нет такой цели" (патч 33, ч.3)."""
+    if target.isdigit():
+        return False
+    others = await pvp_service.others_at(db, character)
+    battles = _battles_at(character.pos_x, character.pos_y)
+    busy_ids = {cid for _, b in battles for cid in b.participants}
+    lowered = target.lower()
+    return any(
+        c.id not in busy_ids and pvp_service.is_afk(c) and c.name.lower() == lowered
+        for c in others
+    )
 
 
 def _class_line(c: Character) -> str:
@@ -324,6 +344,11 @@ async def look_around(message: Message) -> None:
         if await _still_dead(db, character):
             await message.answer("☠ Сначала очнись.")
             return
+        # Патч 33, ч.2: города полностью мирные — кнопка и так не показывается
+        # в городской клавиатуре (bot/keyboards/world.py::city_menu_keyboard),
+        # это защита от устаревшей клавиатуры.
+        if grid.city_region_at(character.pos_x, character.pos_y) is not None:
+            return
         solo, battles = await _scene_at(db, character)
     await message.answer(_scene_text(solo, battles))
 
@@ -364,15 +389,18 @@ async def attack_command(message: Message, target: str) -> None:
         if await _still_dead(db, character):
             await message.answer("☠ Сначала очнись.")
             return
-        region = grid.city_region_at(character.pos_x, character.pos_y)
-        if region is not None and region == character.region:
-            # патч 26: свой город — мирная зона; чужой — не защищает
-            await message.answer("В городе драться нельзя — мирная зона.")
+        # Патч 33, ч.2: PvP запрещено во ВСЕХ городах — и в своём, и в чужом
+        # (отменяет патч 26, где чужой город был ареной без защиты).
+        if grid.city_region_at(character.pos_x, character.pos_y) is not None:
+            await message.answer(CITY_NO_PVP_TEXT)
             return
 
         victim, battle_entry = await _resolve_target(db, character, target)
         if victim is None and battle_entry is None:
-            await message.answer("Здесь нет такой цели.")
+            if await _afk_target_named(db, character, target):
+                await message.answer(AFK_TARGET_TEXT)
+            else:
+                await message.answer("Здесь нет такой цели.")
             return
 
         if battle_entry is not None:

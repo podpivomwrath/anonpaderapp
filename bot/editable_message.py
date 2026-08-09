@@ -31,16 +31,24 @@ async def send_or_edit(
             return
         except Exception:
             _tracked.pop(key, None)
+    # Патч 33, баг 1: деградация СТУПЕНЧАТАЯ, не "всё или ничего". Патч 32
+    # добавлял фолбэк без клавиатуры на случай отказа VK (напр. лимит строк) —
+    # но он срабатывал и тогда, когда ломалась ТОЛЬКО картинка (напр. битый
+    # photo_id скупщика, см. bot/appraiser_texts.py), и тогда игрок вместе с
+    # картинкой терял ещё и кнопки продажи безо всякой связи с ними. Теперь
+    # сначала пробуем без attachment (клавиатура остаётся), и только если
+    # ПРОБЛЕМА В САМОЙ КЛАВИАТУРЕ — падаем до голого текста.
     try:
         resp = await bot_api.messages.send(
             peer_id=peer_id, message=text, random_id=0, keyboard=keyboard, attachment=attachment,
         )
     except Exception:
-        # Патч 32, баг 5: если ДАЖЕ обычная отправка падает (напр. VK отверг
-        # клавиатуру целиком — превышен лимит строк), игрок раньше не получал
-        # вообще ничего — кнопка выглядела нерабочей без единого сообщения об
-        # ошибке. Фолбэк без клавиатуры почти наверняка пройдёт.
-        resp = await bot_api.messages.send(peer_id=peer_id, message=text, random_id=0)
+        try:
+            resp = await bot_api.messages.send(
+                peer_id=peer_id, message=text, random_id=0, keyboard=keyboard,
+            )
+        except Exception:
+            resp = await bot_api.messages.send(peer_id=peer_id, message=text, random_id=0)
     try:
         _tracked[key] = int(resp)
     except (TypeError, ValueError):

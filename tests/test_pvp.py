@@ -55,6 +55,126 @@ async def test_others_at_excludes_dead(db_session, character_at) -> None:
     assert dead.id not in {c.id for c in others}
 
 
+# --- Патч 33, ч.3: защита от фарма AFK ---
+
+
+def test_is_afk_true_when_never_active() -> None:
+    from models import Character
+
+    character = Character(user_id=1, name="x", base_class="warrior")
+    assert pvp_service.is_afk(character) is True
+
+
+def test_is_afk_false_when_recently_active() -> None:
+    from datetime import datetime, timezone
+
+    from models import Character
+
+    character = Character(
+        user_id=1, name="x", base_class="warrior", last_active_at=datetime.now(timezone.utc),
+    )
+    assert pvp_service.is_afk(character) is False
+
+
+def test_is_afk_true_after_timeout() -> None:
+    from datetime import datetime, timedelta, timezone
+
+    from game.economy import pvp_config as pc
+    from models import Character
+
+    now = datetime.now(timezone.utc)
+    character = Character(
+        user_id=1, name="x", base_class="warrior",
+        last_active_at=now - timedelta(minutes=pc.AFK_TIMEOUT_MINUTES + 1),
+    )
+    assert pvp_service.is_afk(character, now=now) is True
+
+
+def test_is_afk_false_just_under_timeout() -> None:
+    from datetime import datetime, timedelta, timezone
+
+    from game.economy import pvp_config as pc
+    from models import Character
+
+    now = datetime.now(timezone.utc)
+    character = Character(
+        user_id=1, name="x", base_class="warrior",
+        last_active_at=now - timedelta(minutes=pc.AFK_TIMEOUT_MINUTES - 1),
+    )
+    assert pvp_service.is_afk(character, now=now) is False
+
+
+async def test_scene_at_excludes_afk_player(db_session, character_at) -> None:
+    from datetime import datetime, timedelta, timezone
+
+    me = await character_at(6, 6, region="ridge")
+    afk = await character_at(6, 6, region="ridge")
+    afk.last_active_at = datetime.now(timezone.utc) - timedelta(hours=1)
+    active = await character_at(6, 6, region="ridge")
+
+    solo, _ = await pvp_handlers._scene_at(db_session, me)
+    solo_ids = {c.id for c in solo}
+    assert afk.id not in solo_ids
+    assert active.id in solo_ids
+
+
+async def test_scene_at_afk_does_not_affect_ongoing_battle_listing(db_session, character_at) -> None:
+    """AFK не даёт защиты в уже идущем бою (патч 33, ч.3) — participant,
+    ставший AFK во время боя, остаётся в списке боёв (busy_ids-фильтр
+    независим от AFK-статуса)."""
+    from datetime import datetime, timedelta, timezone
+
+    me = await character_at(7, 7, region="ridge")
+    fighter_a = await character_at(7, 7, region="ridge")
+    fighter_b = await character_at(7, 7, region="ridge")
+    fighter_a.last_active_at = datetime.now(timezone.utc) - timedelta(hours=1)
+
+    battle = _make_battle("duel", (7, 7))
+    battle.participants[fighter_a.id] = pvp_handlers._participant(fighter_a, peer_id=111)
+    battle.participants[fighter_b.id] = pvp_handlers._participant(fighter_b, peer_id=222)
+    battle.side_of = {fighter_a.id: 0, fighter_b.id: 1}
+    pvp_handlers._battles[-1] = battle
+
+    solo, battles = await pvp_handlers._scene_at(db_session, me)
+    assert len(battles) == 1
+    assert battles[0][1] is battle
+
+
+async def test_afk_target_named_true_for_afk_player(db_session, character_at) -> None:
+    from datetime import datetime, timedelta, timezone
+
+    me = await character_at(8, 8, region="ridge")
+    afk = await character_at(8, 8, region="ridge")
+    afk.name = "Пропавший"
+    afk.last_active_at = datetime.now(timezone.utc) - timedelta(hours=1)
+
+    assert await pvp_handlers._afk_target_named(db_session, me, "пропавший") is True
+    assert await pvp_handlers._afk_target_named(db_session, me, "Пропавший") is True
+
+
+async def test_afk_target_named_false_for_nonexistent_or_numeric(db_session, character_at) -> None:
+    me = await character_at(9, 9, region="ridge")
+    assert await pvp_handlers._afk_target_named(db_session, me, "НикогоТакого") is False
+    assert await pvp_handlers._afk_target_named(db_session, me, "5") is False
+
+
+async def test_resolve_target_misses_afk_player_by_number_or_name(db_session, character_at) -> None:
+    """AFK-игрок не нумеруется вовсе и не резолвится по имени через
+    _resolve_target — это подтверждает attack_command's сообщение об AFK,
+    а не "нашёл цель"."""
+    from datetime import datetime, timedelta, timezone
+
+    me = await character_at(10, 10, region="ridge")
+    afk = await character_at(10, 10, region="ridge")
+    afk.name = "Тень"
+    afk.last_active_at = datetime.now(timezone.utc) - timedelta(hours=1)
+
+    victim, battle = await pvp_handlers._resolve_target(db_session, me, "1")
+    assert victim is None and battle is None
+    victim2, battle2 = await pvp_handlers._resolve_target(db_session, me, "тень")
+    assert victim2 is None and battle2 is None
+
+
 def test_no_reward_for_kill_threshold() -> None:
     assert pvp_service.no_reward_for_kill(winner_level=20, victim_level=9) is True
     assert pvp_service.no_reward_for_kill(winner_level=20, victim_level=10) is False
