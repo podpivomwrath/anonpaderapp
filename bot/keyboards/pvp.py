@@ -20,6 +20,7 @@ BTN_PVP_ATTACK = "🗡️ Атаковать"
 # Патч 30, баг 3, п.3: у PvE "🎒 Предмет" (bot/keyboards/world.py) — намеренно
 # ДРУГОЙ текст здесь же, по той же причине, что и BTN_PVP_ATTACK выше.
 BTN_PVP_ITEM = "🎒 Предметы"
+BTN_PVP_TARGET = "🎯 Цель"  # патч 38 — только массовый PvP, не дуэль (см. show_target)
 
 
 def join_side_keyboard(session_id: int) -> str:
@@ -34,11 +35,13 @@ def join_side_keyboard(session_id: int) -> str:
     return kb.get_json()
 
 
-def pvp_combat_keyboard(base_class: str, cooldowns: dict[str, int]) -> str:
+def pvp_combat_keyboard(base_class: str, cooldowns: dict[str, int], show_target: bool = False) -> str:
     """Как combat_keyboard (PvE), но БЕЗ побега (патч 22 — бой навязан,
     сбежать из уже идущей встречи нельзя). Патч 30: предметы ДОБАВЛЕНЫ —
     раньше их не было вовсе, хотя патч 16 (зелья/эликсиры) не делал для
-    PvP исключения."""
+    PvP исключения. show_target (патч 38) — кнопка [🎯 Цель] только для
+    массового боя (2+ противников есть смысл выбирать); в дуэли 1×1
+    противник ровно один, выбор не нужен."""
     kb = Keyboard(one_time=False)
     kb.add(Text(BTN_PVP_ATTACK), color=KeyboardButtonColor.POSITIVE)
     kb.row()
@@ -47,6 +50,9 @@ def pvp_combat_keyboard(base_class: str, cooldowns: dict[str, int]) -> str:
         label = skill.name if cd <= 0 else f"{skill.name} (КД {cd})"
         color = KeyboardButtonColor.PRIMARY if cd <= 0 else KeyboardButtonColor.SECONDARY
         kb.add(Text(label, payload={"type": "pvp_skill", "id": skill.id}), color=color)
+        kb.row()
+    if show_target:
+        kb.add(Text(BTN_PVP_TARGET), color=KeyboardButtonColor.SECONDARY)
         kb.row()
     kb.add(Text(BTN_PVP_ITEM), color=KeyboardButtonColor.SECONDARY)
     return kb.get_json()
@@ -67,6 +73,22 @@ def pvp_items_keyboard(stock: list[tuple[ElixirDef, int]]) -> str:
             kb.row()
     if len(stock) % 2 == 1:
         kb.row()
+    return kb.get_json()
+
+
+def pvp_target_keyboard(enemy_ids: list[int]) -> str:
+    """Выбор цели в массовом PvP (патч 38) — по кнопке на противника
+    (нумерация как в тексте списка) + [← Назад] последней строкой (по
+    форме экранов патча 37 — сам character.screen сюда не подключаем: бой
+    уже подчиняется отдельному правилу приоритета боевой клавиатуры, см.
+    services/screen_service.py и docstring bot/handlers/world.py::_current_keyboard).
+    Инлайн и через editable_message — как и pvp_items_keyboard выше, тот же
+    приём "временная подпанель поверх боевой клавиатуры", не отдельный экран."""
+    kb = Keyboard(inline=True)
+    for i, cid in enumerate(enemy_ids, start=1):
+        kb.add(Text(str(i), payload={"type": "pvp_target_pick", "target": cid}), color=KeyboardButtonColor.SECONDARY)
+    kb.row()
+    kb.add(Text("← Назад", payload={"type": "pvp_target_back"}), color=KeyboardButtonColor.SECONDARY)
     return kb.get_json()
 
 

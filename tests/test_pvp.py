@@ -486,6 +486,206 @@ class _FakeBotApi:
     messages = _FakeMessages()
 
 
+# --- Патч 38: выбор цели в массовом PvP — чистые хелперы (не трогают БД) ---
+
+
+def test_enemies_of_returns_only_living_enemies_in_session_order() -> None:
+    battle = _make_battle("mass", (0, 0))
+    session = CombatSessionState(session_id=-10, mode=CombatMode.PVP_GROUP)
+    me = combatant(1, side=0)
+    e1 = combatant(2, side=1, name="Первый")
+    e2 = combatant(3, side=1, name="Второй")
+    dead_enemy = combatant(4, side=1, name="Мёртвый")
+    dead_enemy.current_hp = 0
+    ally = combatant(5, side=0, name="Союзник")
+    for c in (me, e1, e2, dead_enemy, ally):
+        session.add(c)
+    pvp_handlers._mass_engine.sessions[-10] = session
+    battle.battle_type = "mass"
+
+    assert pvp_handlers._enemies_of(-10, battle, 1) == [2, 3]
+
+
+def test_init_target_sets_first_enemy() -> None:
+    battle = _make_battle("mass", (0, 0))
+    session = CombatSessionState(session_id=-11, mode=CombatMode.PVP_GROUP)
+    me = combatant(1, side=0)
+    e1 = combatant(2, side=1)
+    session.add(me)
+    session.add(e1)
+    pvp_handlers._mass_engine.sessions[-11] = session
+    battle.battle_type = "mass"
+
+    pvp_handlers._chosen_target.pop(1, None)
+    pvp_handlers._init_target(-11, battle, 1)
+    assert pvp_handlers._chosen_target[1] == 2
+
+
+def test_init_target_noop_without_enemies() -> None:
+    battle = _make_battle("mass", (0, 0))
+    session = CombatSessionState(session_id=-12, mode=CombatMode.PVP_GROUP)
+    me = combatant(1, side=0)
+    session.add(me)
+    pvp_handlers._mass_engine.sessions[-12] = session
+    battle.battle_type = "mass"
+
+    pvp_handlers._chosen_target.pop(1, None)
+    pvp_handlers._init_target(-12, battle, 1)
+    assert 1 not in pvp_handlers._chosen_target
+
+
+def test_resolve_chosen_target_returns_chosen_when_alive() -> None:
+    battle = _make_battle("mass", (0, 0))
+    session = CombatSessionState(session_id=-13, mode=CombatMode.PVP_GROUP)
+    me = combatant(1, side=0)
+    e1 = combatant(2, side=1)
+    e2 = combatant(3, side=1)
+    for c in (me, e1, e2):
+        session.add(c)
+    pvp_handlers._mass_engine.sessions[-13] = session
+    battle.battle_type = "mass"
+
+    pvp_handlers._chosen_target[1] = 3
+    assert pvp_handlers._resolve_chosen_target(-13, battle, 1) == 3
+
+
+def test_resolve_chosen_target_falls_back_when_target_dead() -> None:
+    """Регрессия: если по какой-то причине _chosen_target не успел
+    переключиться (гонка колбэков), действие не должно молча упасть в
+    никуда — фолбэк на живого врага, как раньше делал _default_enemy_target."""
+    battle = _make_battle("mass", (0, 0))
+    session = CombatSessionState(session_id=-14, mode=CombatMode.PVP_GROUP)
+    me = combatant(1, side=0)
+    dead = combatant(2, side=1)
+    dead.current_hp = 0
+    alive = combatant(3, side=1)
+    for c in (me, dead, alive):
+        session.add(c)
+    pvp_handlers._mass_engine.sessions[-14] = session
+    battle.battle_type = "mass"
+
+    pvp_handlers._chosen_target[1] = 2  # мёртвая цель
+    target = pvp_handlers._resolve_chosen_target(-14, battle, 1)
+    assert target == 3
+    assert pvp_handlers._chosen_target[1] == 3  # закешировался новый выбор
+
+
+def test_target_line_formats_name_and_hp_percent() -> None:
+    battle = _make_battle("mass", (0, 0))
+    session = CombatSessionState(session_id=-15, mode=CombatMode.PVP_GROUP)
+    me = combatant(1, side=0)
+    enemy = combatant(2, side=1, name="Мирэль")
+    enemy.current_hp = round(enemy.max_hp * 0.41)
+    session.add(me)
+    session.add(enemy)
+    pvp_handlers._mass_engine.sessions[-15] = session
+    battle.battle_type = "mass"
+
+    pvp_handlers._chosen_target[1] = 2
+    assert pvp_handlers._target_line(-15, battle, 1) == "🎯 Цель: Мирэль (41% HP)"
+
+
+def test_target_line_empty_without_a_target() -> None:
+    battle = _make_battle("mass", (0, 0))
+    session = CombatSessionState(session_id=-16, mode=CombatMode.PVP_GROUP)
+    session.add(combatant(1, side=0))
+    pvp_handlers._mass_engine.sessions[-16] = session
+    battle.battle_type = "mass"
+
+    pvp_handlers._chosen_target.pop(1, None)
+    assert pvp_handlers._target_line(-16, battle, 1) == ""
+
+
+# --- Патч 38: смена цели — бесплатное действие, не тратит ход ---
+
+
+async def test_pick_target_does_not_touch_declared_this_tick(db_session, character_at, monkeypatch) -> None:
+    monkeypatch.setattr(pvp_handlers, "_bot_api", _FakeBotApi())
+    me = await character_at(5, 5, region="ridge")
+    enemy = await character_at(5, 5, region="ridge")
+
+    session = CombatSessionState(session_id=-17, mode=CombatMode.PVP_GROUP)
+    me_c = combatant(me.id, side=0, name=me.name)
+    e1 = combatant(enemy.id, side=1, name="Первый")
+    e2 = combatant(enemy.id + 1000, side=1, name="Второй")
+    for c in (me_c, e1, e2):
+        session.add(c)
+    pvp_handlers._mass_engine.sessions[-17] = session
+
+    battle = _make_battle("mass", (5, 5))
+    battle.participants = {
+        me.id: pvp_handlers.Participant(me.id, 111, me.name, me.base_class, "Воин"),
+        e1.id: pvp_handlers.Participant(e1.id, 222, "Первый", "warrior", "Воин"),
+        e2.id: pvp_handlers.Participant(e2.id, 333, "Второй", "warrior", "Воин"),
+    }
+    pvp_handlers._battles[-17] = battle
+    pvp_handlers._peer_battle[111] = -17
+
+    class _FakeMessage:
+        peer_id = 111
+        from_id = 111
+
+        def get_payload_json(self):
+            return {"type": "pvp_target_pick", "target": e2.id}
+
+    await pvp_handlers.pvp_pick_target(_FakeMessage())
+
+    assert pvp_handlers._chosen_target[me.id] == e2.id
+    assert me.id not in pvp_handlers._declared_this_tick.get(-17, set())
+
+
+# --- Патч 38: автопереключение цели при её гибели + уведомление ---
+
+
+async def test_on_mass_tick_resolved_switches_target_when_it_dies(db_session, character_at, monkeypatch) -> None:
+    from game.combat.resolver import TickResult
+
+    sent: list[dict] = []
+
+    class _RecordingMessages:
+        async def send(self, **kwargs) -> int:
+            sent.append(kwargs)
+            return 1
+
+    class _RecordingBotApi:
+        messages = _RecordingMessages()
+
+    monkeypatch.setattr(pvp_handlers, "_bot_api", _RecordingBotApi())
+
+    me = await character_at(6, 6, region="ridge")
+    dying_enemy = await character_at(6, 6, region="ridge")
+    surviving_enemy = await character_at(6, 6, region="ridge")
+
+    session = CombatSessionState(session_id=-18, mode=CombatMode.PVP_GROUP)
+    me_c = combatant(me.id, side=0, name=me.name)
+    dead_c = combatant(dying_enemy.id, side=1, name="Мирэль")
+    dead_c.current_hp = 0
+    alive_c = combatant(surviving_enemy.id, side=1, name="Валгар")
+    for c in (me_c, dead_c, alive_c):
+        session.add(c)
+    pvp_handlers._mass_engine.sessions[-18] = session
+
+    battle = _make_battle("mass", (6, 6))
+    battle.participants = {
+        me.id: pvp_handlers.Participant(me.id, 111, me.name, me.base_class, "Воин"),
+        dying_enemy.id: pvp_handlers.Participant(dying_enemy.id, 222, "Мирэль", "mage", "Элементалист"),
+        surviving_enemy.id: pvp_handlers.Participant(surviving_enemy.id, 333, "Валгар", "warrior", "Воин"),
+    }
+    pvp_handlers._battles[-18] = battle
+    pvp_handlers._peer_battle[111] = -18
+    pvp_handlers._peer_battle[222] = -18
+    pvp_handlers._peer_battle[333] = -18
+    pvp_handlers._chosen_target[me.id] = dying_enemy.id  # цель — та, что сейчас погибнет
+
+    result = TickResult(lines=["бой продолжается"], deaths=[dying_enemy.id])
+    await pvp_handlers.on_mass_tick_resolved(-18, 1, result)
+
+    assert pvp_handlers._chosen_target[me.id] == surviving_enemy.id  # переключилась на живого
+    my_message = next(m for m in sent if m["peer_id"] == 111)
+    assert "Мирэль падает. Новая цель: Валгар." in my_message["message"]
+    assert "🎯 Цель: Валгар" in my_message["message"]
+
+
 async def test_start_forced_duel_assigns_distinct_sides(db_session, character_at, monkeypatch) -> None:
     """Патч 30, регрессия бага 3: _build_combatant_for всегда возвращает
     side=0 — без явного разведения сторон в _start_forced_duel оба

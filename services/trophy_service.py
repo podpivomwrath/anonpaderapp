@@ -72,8 +72,11 @@ async def grant_from_kill(
 async def grant_from_event(
     db: AsyncSession, character: Character, rng: random.Random
 ) -> dict[str, int]:
-    """Событие исследования — та же таблица, всегда 1 бросок."""
-    drop = loot.roll_drop(rng, 1)
+    """Событие исследования (и горстка пепла, services/ash_service.py) —
+    трофей ГАРАНТИРОВАН (патч 38): бросок без исхода «ничего», иначе
+    "гарантированная" награда в ~31% случаев оказывалась пустой, что
+    нарушает правило патча 10 о недопустимости пустых исходов события."""
+    drop = loot.roll_guaranteed_drop(rng, 1)
     return await _grant(db, character.id, drop)
 
 

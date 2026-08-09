@@ -8,6 +8,7 @@
 import random
 from dataclasses import dataclass, field
 
+from loguru import logger
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from game.combat import display
@@ -67,6 +68,8 @@ async def apply_outcome(
         daily_completed += progress.completed
         daily_streak_notice = daily_streak_notice or progress.streak_notice
 
+    reward_added = False
+
     if outcome.trophy:
         drop = await trophy_service.grant_from_event(db, character, rng)
         # Патч 32, ч.2: формулировка получения — по конкретному событию
@@ -74,6 +77,7 @@ async def apply_outcome(
         drop_line = trophy_service.format_drop_line(drop, source=event_id or "mob")
         if drop_line:
             lines.append(drop_line)
+            reward_added = True
         if character.subclass is not None:
             await trial_service.record_trophies(db, character, drop)
         progress = await daily_service.record_trophies(db, character, drop)
@@ -89,6 +93,7 @@ async def apply_outcome(
         levelup = experience_service.add_experience(character, stats, xp)
         levels_gained, new_level = levelup.levels_gained, levelup.new_level
         lines.append(display.xp_delta_line(xp))
+        reward_added = True
 
     if outcome.damage_max_pct > 0:
         vit_bonus = (await item_service.compute_gear_bonus(db, character.id)).get("vit", 0)
@@ -99,6 +104,23 @@ async def apply_outcome(
         new_hp = max(1, current - dmg)  # событие вне боя не убивает
         vitals_service.set_hp(character, stats, new_hp, vit_bonus)
         lines.append(display.hp_delta_line(current, new_hp, max_hp))
+        reward_added = True
+
+    if not reward_added:
+        # Патч 38: защитная сетка — исход не сформировал ни одного видимого
+        # результата (контентная ошибка: ни trophy/xp/xp_big/damage не
+        # объявлены, либо один из них не смог начислиться) — игрок не должен
+        # уходить с пустыми руками из-за бага, но это ДОЛЖНО попасть в лог.
+        logger.error(
+            "Событие без результата — выдана аварийная минимальная награда: "
+            "event_id={} choice_code={} outcome_weight={} outcome_text={!r}",
+            event_id, choice_code, outcome.weight, outcome.text,
+        )
+        zone_level = grid.mob_level_at(character.pos_x, character.pos_y, character.level)
+        xp = experience_service.event_xp(zone_level, character.level, wc.EVENT_XP_SAFE)
+        levelup = experience_service.add_experience(character, stats, xp)
+        levels_gained, new_level = levelup.levels_gained, levelup.new_level
+        lines.append(display.xp_delta_line(xp))
 
     return OutcomeResult(
         "\n\n".join(line for line in lines if line), levels_gained=levels_gained, new_level=new_level,

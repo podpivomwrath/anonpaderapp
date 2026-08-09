@@ -90,12 +90,17 @@ def test_pick_outcome_three_way_split() -> None:
 # --- apply_outcome: эффекты ---
 
 
-async def test_outcome_nothing_returns_text_unchanged(db_session, character_at) -> None:
+async def test_outcome_without_reward_flags_gets_safety_net_not_silence(db_session, character_at) -> None:
+    """Патч 38: раньше исход без единого флага (trophy/xp/xp_big/damage)
+    молча возвращал исходный текст без последствий — теперь это ловится
+    защитной сеткой (см. test_outcome_without_any_reward_flag_falls_back_to_minimum_xp
+    выше) и всегда добавляет минимальную награду опыта, а не тишину."""
     character = await character_at(50, 50)
     stats = await _stats(db_session, character)
     outcome = EventOutcome(weight=100, text="Ты не трогаешь чужую смерть.")
     result = await event_service.apply_outcome(db_session, character, stats, outcome, FixedRng(0.0))
-    assert result.text == "Ты не трогаешь чужую смерть."
+    assert result.text.startswith("Ты не трогаешь чужую смерть.")
+    assert "опыта" in result.text
     assert result.is_combat is False
 
 
@@ -217,3 +222,42 @@ async def test_outcome_xp_big_grants_more_than_normal(db_session, character_at) 
     expected = experience_service.event_xp(5, 5, wc.EVENT_XP_RISKY)
     assert character.experience == before + expected
     assert wc.EVENT_XP_RISKY > wc.EVENT_XP_SAFE  # действительно крупнее обычного
+
+
+# --- Патч 38: гарантированный трофей — реальный контент, ни одного пустого исхода ---
+
+
+async def test_dead_box_open_never_empty_across_many_rolls(db_session, character_at) -> None:
+    """Regression: "Шкатулка мертвеца" / "Вскрыть" (weight=60, trophy=True) —
+    раньше в ~31% случаев обрывалась без строки о находке (roll_once даёт
+    None). Прогоняем много раз подряд разными roll'ами RNG — ни одного
+    пустого текста, как того требует чеклист патча (10-15 раз подряд)."""
+    character = await character_at(50, 50, level=10)
+    stats = await _stats(db_session, character)
+    events = load_exploration_events()
+    dead_box = next(e for e in events if e.id == "dead_box")
+    open_choice = next(c for c in dead_box.choices if c.label == "Вскрыть")
+    trophy_outcome = next(o for o in open_choice.outcomes if o.trophy)
+
+    rng = random.Random(42)
+    for _ in range(200):
+        result = await event_service.apply_outcome(
+            db_session, character, stats, trophy_outcome, rng, event_id="dead_box",
+        )
+        assert result.text.strip()
+        assert "В шкатулке лежит:" in result.text
+
+
+async def test_outcome_without_any_reward_flag_falls_back_to_minimum_xp(db_session, character_at) -> None:
+    """Патч 38, защитная сетка: контентная ошибка (исход без trophy/xp/
+    xp_big/damage) не должна оставить игрока ни с чем — минимум опыта
+    начисляется автоматически."""
+    character = await character_at(50, 50, level=5)
+    stats = await _stats(db_session, character)
+    before = character.experience
+    broken_outcome = EventOutcome(weight=100, text="")  # ни одного флага награды
+
+    result = await event_service.apply_outcome(db_session, character, stats, broken_outcome, FixedRng(0.0))
+
+    assert result.text.strip()
+    assert character.experience > before

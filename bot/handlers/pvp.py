@@ -33,9 +33,11 @@ from bot.keyboards.items import no_keyboard
 from bot.keyboards.pvp import (
     BTN_PVP_ATTACK,
     BTN_PVP_ITEM,
+    BTN_PVP_TARGET,
     join_side_keyboard,
     pvp_combat_keyboard,
     pvp_items_keyboard,
+    pvp_target_keyboard,
     pvp_waiting_keyboard,
 )
 from bot.pvp_texts import AFK_TARGET_TEXT, ALONE_ON_CELL, CITY_NO_PVP_TEXT, NOTHING_TO_TAKE
@@ -106,6 +108,10 @@ _pending_join_prompt: dict[int, int] = {}
 # набор, но целиком в памяти этого процесса) — нужен только для решения
 # «показывать ли боевые кнопки», не участвует в самом резолве хода.
 _declared_this_tick: dict[int, set[int]] = {}
+# Патч 38: character_id -> character_id выбранной цели, только в массовом
+# PvP (дуэль — противник ровно один, выбор не нужен). Смена цели — бесплатное
+# действие, не завязано на _declared_this_tick/TickEngine ни в каком виде.
+_chosen_target: dict[int, int] = {}
 
 
 def setup(duel_engine: DuelEngine, mass_engine: TickEngine, bot_api) -> None:
@@ -156,7 +162,8 @@ def rebuild_keyboard(peer_id: int) -> str | None:
             return pvp_waiting_keyboard()
         if participant.character_id in _declared_this_tick.get(battle_id, set()):
             return pvp_waiting_keyboard()
-    return pvp_combat_keyboard(participant.base_class, combatant.cooldowns)
+    show_target = battle.battle_type == "mass"
+    return pvp_combat_keyboard(participant.base_class, combatant.cooldowns, show_target=show_target)
 
 
 def _new_battle_id() -> int:
@@ -564,9 +571,13 @@ async def _handle_join_choice(message: Message, battle_id, side) -> None:
         return
 
     _join_mass_battle_now(battle_id, battle, participant, combatant)
+    _init_target(battle_id, battle, participant.character_id)  # патч 38: автоцель при входе
+    target_line = _target_line(battle_id, battle, participant.character_id)
+    text = f"⚔️ Ты вступаешь в бой на стороне {side}!"
+    if target_line:
+        text += f"\n{target_line}"
     await message.answer(
-        f"⚔️ Ты вступаешь в бой на стороне {side}!",
-        keyboard=pvp_combat_keyboard(participant.base_class, {}),
+        text, keyboard=pvp_combat_keyboard(participant.base_class, {}, show_target=True),
     )
 
 
@@ -606,13 +617,22 @@ async def _convert_duel_to_mass(session_id: int, battle: Battle) -> None:
     battle.last_combatants = dict(state.combatants)
     _mass_engine.start_session(state)
 
+    # Патч 38: с этого момента возможен выбор цели — каждому участнику
+    # назначается автоцель (первый противник из списка).
+    for cid in battle.participants:
+        _init_target(session_id, battle, cid)
+
     for p in battle.participants.values():
+        target_line = _target_line(session_id, battle, p.character_id)
+        board = "⚔️ В бой вступает третий! Теперь это массовая схватка — все стороны действуют " \
+            "одновременно, ход — 1 минута.\n\n" + _render_mass(state, [])
+        if target_line:
+            board += f"\n{target_line}"
         await _bot_api.messages.send(
             peer_id=p.peer_id,
-            message="⚔️ В бой вступает третий! Теперь это массовая схватка — все стороны действуют "
-            "одновременно, ход — 1 минута.\n\n" + _render_mass(state, []),
+            message=board,
             random_id=0,
-            keyboard=pvp_combat_keyboard(p.base_class, state.combatants[p.character_id].cooldowns),
+            keyboard=pvp_combat_keyboard(p.base_class, state.combatants[p.character_id].cooldowns, show_target=True),
         )
 
 
@@ -645,7 +665,10 @@ async def pvp_skill(message: Message) -> None:
         cd = combatant.cooldowns.get(skill_id, 0)
         # Патч 30, баг 2: бой активен — без клавиатуры игрок теряет кнопки.
         participant = battle.participants.get(cid)
-        keyboard = pvp_combat_keyboard(participant.base_class, combatant.cooldowns) if participant else None
+        keyboard = (
+            pvp_combat_keyboard(participant.base_class, combatant.cooldowns, show_target=battle.battle_type == "mass")
+            if participant else None
+        )
         await message.answer(f"⏳ Навык ещё не готов (КД {cd}).", keyboard=keyboard)
         return
     await _pvp_action(message, DeclaredAction(type=ActionType.SKILL, skill_id=skill_id))
@@ -665,7 +688,13 @@ async def _pvp_action(message: Message, action: DeclaredAction) -> None:
 
     is_defensive = action.type == ActionType.SKILL and action.skill_id in DEFENSIVE_SKILLS
     if not is_defensive:
-        target = _default_enemy_target(battle_id, battle, cid)
+        # Патч 38: в массовом бою действие бьёт по ВЫБРАННОЙ игроком цели
+        # (см. pvp_pick_target/_chosen_target), не по случайной; в дуэли
+        # выбора нет — противник ровно один.
+        target = (
+            _resolve_chosen_target(battle_id, battle, cid) if battle.battle_type == "mass"
+            else _default_enemy_target(battle_id, battle, cid)
+        )
         if target is None:
             return
         action = action.model_copy(update={"target_id": target})
@@ -711,11 +740,49 @@ def _default_enemy_target(battle_id: int, battle: Battle, cid: int) -> int | Non
     return _rng.choice(enemies)
 
 
-# --- Предметы в бою (патч 30, баг 3, п.3): зелья/эликсиры работают в PvP по
-# тем же правилам, что и в PvE (патч 16) — лечебные тратят ход, боевые
-# эликсиры бесплатны с лимитом ELIXIR_PER_BATTLE_LIMIT/бой, недоступны под
-# контролем. Payload {"type": "pvp_use_item"} НАМЕРЕННО отличается от PvE
-# {"type": "use_item"} — см. докстринг bot/keyboards/pvp.py. ---
+def _enemies_of(battle_id: int, battle: Battle, cid: int) -> list[int]:
+    """Живые враги cid, в порядке появления в бою (патч 38: тот же порядок,
+    что видит игрок в списке выбора цели и что использует автоцель)."""
+    combatants = _live_state(battle_id, battle)
+    me = combatants.get(cid)
+    if me is None:
+        return []
+    return [c.id for c in combatants.values() if c.side != me.side and c.alive]
+
+
+def _init_target(battle_id: int, battle: Battle, cid: int) -> None:
+    """Патч 38: цель назначается автоматически при входе в массовый бой —
+    первый противник из списка (порядок появления в CombatSessionState)."""
+    enemies = _enemies_of(battle_id, battle, cid)
+    if enemies:
+        _chosen_target[cid] = enemies[0]
+
+
+def _resolve_chosen_target(battle_id: int, battle: Battle, cid: int) -> int | None:
+    """Патч 38: выбранная игроком цель, если она ещё жива, иначе (защитный
+    фолбэк — не должно случаться в норме, автопереключение уже происходит в
+    on_mass_tick_resolved при гибели цели) обычный случайный враг."""
+    combatants = _live_state(battle_id, battle)
+    target_id = _chosen_target.get(cid)
+    target = combatants.get(target_id) if target_id is not None else None
+    if target is not None and target.alive:
+        return target_id
+    fallback = _default_enemy_target(battle_id, battle, cid)
+    if fallback is not None:
+        _chosen_target[cid] = fallback
+    return fallback
+
+
+def _target_line(battle_id: int, battle: Battle, cid: int) -> str:
+    """Патч 38: «🎯 Цель: Мирэль (41% HP)» — показывается каждому участнику
+    массового боя в его личную копию боевого сообщения."""
+    combatants = _live_state(battle_id, battle)
+    target_id = _chosen_target.get(cid)
+    target = combatants.get(target_id) if target_id is not None else None
+    if target is None or not target.alive:
+        return ""
+    hp_pct = round(100 * target.current_hp / target.max_hp) if target.max_hp else 0
+    return f"🎯 Цель: {target.name} ({hp_pct}% HP)"
 
 
 def _battle_board_text(battle_id: int, battle: Battle, lines: list[str]) -> str:
@@ -724,6 +791,117 @@ def _battle_board_text(battle_id: int, battle: Battle, lines: list[str]) -> str:
         return _render_duel(duel, lines, finished=False) if duel is not None else "\n".join(lines)
     session = _mass_engine.sessions.get(battle_id)
     return _render_mass(session, lines) if session is not None else "\n".join(lines)
+
+
+# --- Выбор цели в массовом PvP (патч 38): бесплатное действие, не тратит
+# ход и не занимает окно объявления действия (см. _pvp_action/_declared_this_tick
+# — pvp_pick_target их вообще не трогает). Инлайн-подпанель через
+# editable_message поверх боевой клавиатуры — тот же приём, что и у
+# pvp_open_items/pvp_use_item ниже. Не показывается в дуэли (см. show_target
+# в bot/keyboards/pvp.py::pvp_combat_keyboard) — противник там ровно один. ---
+
+
+@labeler.message(text=[BTN_PVP_TARGET])
+async def pvp_open_target(message: Message) -> None:
+    peer_id = message.peer_id
+    battle_id = _peer_battle.get(peer_id)
+    if battle_id is None:
+        return
+    battle = _battles.get(battle_id)
+    if battle is None or battle.battle_type != "mass":
+        return  # устаревшая клавиатура (дуэль/бой уже закончился) — молча игнорируем
+    cid = _character_id_for_peer(battle, peer_id)
+    if cid is None:
+        return
+    enemy_ids = _enemies_of(battle_id, battle, cid)
+    if not enemy_ids:
+        return
+
+    combatants = _live_state(battle_id, battle)
+    current_id = _chosen_target.get(cid)
+    lines = ["🎯 Выбор цели", ""]
+    for i, enemy_id in enumerate(enemy_ids, start=1):
+        enemy = combatants[enemy_id]
+        p = battle.participants.get(enemy_id)
+        class_title = p.class_title if p is not None else ""
+        hp_pct = round(100 * enemy.current_hp / enemy.max_hp) if enemy.max_hp else 0
+        lines.append(f"{i}. {enemy.name} · {enemy.level} ур. · {class_title} · {hp_pct}% HP")
+    lines.append("")
+    current = combatants.get(current_id) if current_id is not None else None
+    lines.append(f"Текущая цель: {current.name if current is not None else '—'}")
+
+    await editable_message.send_or_edit(
+        _bot_api, "pvp_target", peer_id, "\n".join(lines), pvp_target_keyboard(enemy_ids),
+    )
+
+
+@labeler.message(payload_contains={"type": "pvp_target_pick"})
+async def pvp_pick_target(message: Message) -> None:
+    peer_id = message.peer_id
+    payload = message.get_payload_json() or {}
+    target_cid = payload.get("target")
+    if not isinstance(target_cid, int):
+        return
+    battle_id = _peer_battle.get(peer_id)
+    if battle_id is None:
+        return
+    battle = _battles.get(battle_id)
+    if battle is None or battle.battle_type != "mass":
+        return
+    cid = _character_id_for_peer(battle, peer_id)
+    if cid is None:
+        return
+
+    combatants = _live_state(battle_id, battle)
+    me = combatants.get(cid)
+    target = combatants.get(target_cid)
+    if me is None or target is None or target.side == me.side or not target.alive:
+        return  # устаревший список (цель погибла/номер сместился) — молча игнорируем
+
+    _chosen_target[cid] = target_cid
+    participant = battle.participants.get(cid)
+    if participant is None:
+        return
+    await editable_message.send_or_edit(
+        _bot_api, "pvp_target", peer_id, f"🎯 Новая цель: {target.name}.", no_keyboard(),
+    )
+    board = f"🎯 Цель: {target.name}.\n\n{_battle_board_text(battle_id, battle, [])}"
+    await _bot_api.messages.send(
+        peer_id=peer_id, message=board, random_id=0,
+        keyboard=pvp_combat_keyboard(participant.base_class, me.cooldowns, show_target=True),
+    )
+
+
+@labeler.message(payload_contains={"type": "pvp_target_back"})
+async def pvp_target_back(message: Message) -> None:
+    peer_id = message.peer_id
+    battle_id = _peer_battle.get(peer_id)
+    if battle_id is None:
+        return
+    battle = _battles.get(battle_id)
+    if battle is None:
+        return
+    cid = _character_id_for_peer(battle, peer_id)
+    if cid is None:
+        return
+    combatant = _live_state(battle_id, battle).get(cid)
+    participant = battle.participants.get(cid)
+    if combatant is None or participant is None:
+        return
+    await editable_message.send_or_edit(_bot_api, "pvp_target", peer_id, "Возврат в бой.", no_keyboard())
+    await _bot_api.messages.send(
+        peer_id=peer_id, message=_battle_board_text(battle_id, battle, []), random_id=0,
+        keyboard=pvp_combat_keyboard(
+            participant.base_class, combatant.cooldowns, show_target=battle.battle_type == "mass",
+        ),
+    )
+
+
+# --- Предметы в бою (патч 30, баг 3, п.3): зелья/эликсиры работают в PvP по
+# тем же правилам, что и в PvE (патч 16) — лечебные тратят ход, боевые
+# эликсиры бесплатны с лимитом ELIXIR_PER_BATTLE_LIMIT/бой, недоступны под
+# контролем. Payload {"type": "pvp_use_item"} НАМЕРЕННО отличается от PvE
+# {"type": "use_item"} — см. докстринг bot/keyboards/pvp.py. ---
 
 
 @labeler.message(text=[BTN_PVP_ITEM])
@@ -742,7 +920,7 @@ async def pvp_open_items(message: Message) -> None:
     participant = battle.participants.get(cid)
     if combatant is None or participant is None:
         return
-    battle_kb = pvp_combat_keyboard(participant.base_class, combatant.cooldowns)
+    battle_kb = pvp_combat_keyboard(participant.base_class, combatant.cooldowns, show_target=battle.battle_type == "mass")
     if combatant.has_effect(EffectKind.FREEZE):
         await message.answer("Скован — не до зелий сейчас. ❄️", keyboard=battle_kb)
         return
@@ -789,7 +967,7 @@ async def pvp_use_item(message: Message) -> None:
     participant = battle.participants.get(cid)
     if combatant is None or participant is None:
         return
-    battle_kb = pvp_combat_keyboard(participant.base_class, combatant.cooldowns)
+    battle_kb = pvp_combat_keyboard(participant.base_class, combatant.cooldowns, show_target=battle.battle_type == "mass")
     if combatant.has_effect(EffectKind.FREEZE):
         await message.answer("Скован — не до зелий сейчас. ❄️", keyboard=battle_kb)
         return
@@ -979,14 +1157,45 @@ async def on_mass_tick_resolved(session_id: int, tick: int, result: TickResult) 
         battle.last_combatants = dict(session.combatants)
     text = _render_mass(session, result.lines) if session is not None else "\n".join(result.lines)
 
+    # Патч 38: у кого цель погибла в этот тик — автопереключение на первого
+    # живого противника + личное уведомление (не в общий боевой лог, у
+    # каждого своя цель, значит и уведомление у каждого своё).
+    switch_notices: dict[int, str] = {}
+    if result.deaths:
+        dead_names = {cid: c.name for cid, c in battle.last_combatants.items() if cid in result.deaths}
+        dead_set = set(result.deaths)
+        for cid, target_cid in list(_chosen_target.items()):
+            if target_cid not in dead_set or cid not in battle.participants:
+                continue
+            me = battle.last_combatants.get(cid)
+            if me is None or not me.alive:
+                continue
+            enemies = _enemies_of(session_id, battle, cid)
+            dead_name = dead_names.get(target_cid, "Цель")
+            if enemies:
+                _chosen_target[cid] = enemies[0]
+                new_name = battle.last_combatants[enemies[0]].name
+                switch_notices[cid] = f"{dead_name} падает. Новая цель: {new_name}."
+            else:
+                _chosen_target.pop(cid, None)  # бой вот-вот завершится (сторона добита)
+
     for cid, participant in battle.participants.items():
         combatant = battle.last_combatants.get(cid)
         keyboard = (
-            pvp_combat_keyboard(participant.base_class, combatant.cooldowns)
+            pvp_combat_keyboard(participant.base_class, combatant.cooldowns, show_target=True)
             if combatant is not None and combatant.alive
             else pvp_waiting_keyboard()
         )
-        await _bot_api.messages.send(peer_id=participant.peer_id, message=text, random_id=0, keyboard=keyboard)
+        personal_text = text
+        notice = switch_notices.get(cid)
+        if notice:
+            personal_text = f"{notice}\n\n{personal_text}"
+        target_line = _target_line(session_id, battle, cid)
+        if target_line:
+            personal_text = f"{personal_text}\n{target_line}"
+        await _bot_api.messages.send(
+            peer_id=participant.peer_id, message=personal_text, random_id=0, keyboard=keyboard,
+        )
 
 
 async def on_mass_battle_finished(session_id: int, result: TickResult) -> None:
@@ -996,6 +1205,7 @@ async def on_mass_battle_finished(session_id: int, result: TickResult) -> None:
         return
     for p in battle.participants.values():
         _peer_battle.pop(p.peer_id, None)
+        _chosen_target.pop(p.character_id, None)
 
     combatants = battle.last_combatants
     dead_ids = [cid for cid in battle.participants if cid in combatants and not combatants[cid].alive]

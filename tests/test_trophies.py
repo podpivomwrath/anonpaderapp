@@ -67,6 +67,61 @@ def test_chance_sum_leaves_room_for_nothing() -> None:
     assert 0 < total < 1  # обязателен шанс "ничего"
 
 
+# --- Патч 38: гарантированный бросок — без исхода "ничего" ---
+
+
+def test_roll_guaranteed_trophy_never_none() -> None:
+    """Тот же roll ~0.99, который у roll_once даёт None (за пределами ~68.85%
+    суммы шансов), у гарантированного броска ОБЯЗАН вернуть градацию —
+    таблица нормализована на свою полную сумму."""
+    class FixedRng(random.Random):
+        def __init__(self, value: float) -> None:
+            self._value = value
+
+        def random(self) -> float:
+            return self._value
+
+    assert loot.roll_guaranteed_trophy(FixedRng(0.99)) is not None
+    assert loot.roll_guaranteed_trophy(FixedRng(0.999999)) is not None
+    # экстремум распределения — самая дорогая градация на самом верху шкалы
+    assert loot.roll_guaranteed_trophy(FixedRng(0.999999)) == "monolith_tear"
+
+
+def test_roll_guaranteed_trophy_normalizes_proportionally() -> None:
+    """Первая градация (ash_dust, 45% из необрезанных шансов) должна занимать
+    ~45/68.85 ≈ 65.4% нормализованной шкалы — совпадает с числами патча."""
+    total = sum(lc.TROPHY_ROLL_CHANCES.values())
+    boundary = lc.TROPHY_ROLL_CHANCES["ash_dust"] / total
+
+    class FixedRng(random.Random):
+        def __init__(self, value: float) -> None:
+            self._value = value
+
+        def random(self) -> float:
+            return self._value
+
+    assert loot.roll_guaranteed_trophy(FixedRng(boundary - 0.001)) == "ash_dust"
+    assert loot.roll_guaranteed_trophy(FixedRng(boundary + 0.001)) == "taint_clot"
+    assert round(boundary, 3) == round(0.654, 3)
+
+
+def test_roll_guaranteed_drop_never_empty_across_many_rolls() -> None:
+    rng = random.Random(1234)
+    for _ in range(500):
+        drop = loot.roll_guaranteed_drop(rng, rolls=1)
+        assert drop
+        assert sum(drop.values()) == 1
+
+
+def test_roll_guaranteed_drop_counts_multiple_rolls() -> None:
+    class AlwaysAshRng(random.Random):
+        def random(self) -> float:
+            return 0.0
+
+    drop = loot.roll_guaranteed_drop(AlwaysAshRng(), rolls=5)
+    assert drop == {"ash_dust": 5}
+
+
 # --- services/trophy_service.py: работа с БД (character_at — см. conftest.py) ---
 
 
@@ -105,6 +160,16 @@ async def test_grant_from_event_always_one_roll(db_session, character_at) -> Non
     character = await character_at(0, 0)  # иначе было бы 5 бросков с боя
     drop = await trophy_service.grant_from_event(db_session, character, AlwaysAshRng())
     assert drop == {"ash_dust": 1}
+
+
+async def test_grant_from_event_never_empty_even_with_high_roll(db_session, character_at) -> None:
+    """Патч 38: regression — с roll_once этот же RNG (0.999) дал бы {} в
+    ~31% случаев, что при "гарантированной" награде события/горстки пепла
+    нарушало правило патча 10 о недопустимости пустых исходов."""
+    character = await character_at(0, 0)
+    drop = await trophy_service.grant_from_event(db_session, character, NeverDropRng())
+    assert drop  # НЕ пусто
+    assert sum(drop.values()) == 1
 
 
 async def test_grant_nothing_when_rng_never_hits(db_session, character_at) -> None:

@@ -37,3 +37,30 @@ def roll_drop(rng: random.Random, rolls: int) -> dict[str, int]:
         if trophy_id is not None:
             result[trophy_id] = result.get(trophy_id, 0) + 1
     return result
+
+
+def roll_guaranteed_trophy(rng: random.Random) -> str:
+    """Один бросок БЕЗ исхода «ничего» (патч 38) — веса нормализуются
+    пропорционально их сумме (~0.6885), так что бросок ВСЕГДА возвращает
+    градацию. Для наград, обещанных гарантированно (события, горстка пепла):
+    таблица дропа с мобов (roll_once/roll_drop) намеренно допускает пустой
+    исход по дизайну — там его трогать нельзя, это другая ситуация."""
+    total = sum(lc.TROPHY_ROLL_CHANCES.values())
+    roll = rng.random() * total
+    cumulative = 0.0
+    trophy_id = None
+    for trophy_id, chance in lc.TROPHY_ROLL_CHANCES.items():
+        cumulative += chance
+        if roll < cumulative:
+            return trophy_id
+    return trophy_id  # защита от погрешности округления с плавающей точкой
+
+
+def roll_guaranteed_drop(rng: random.Random, rolls: int) -> dict[str, int]:
+    """`rolls` гарантированных бросков (см. roll_guaranteed_trophy) — итоговый
+    словарь никогда не пуст при rolls > 0."""
+    result: dict[str, int] = {}
+    for _ in range(rolls):
+        trophy_id = roll_guaranteed_trophy(rng)
+        result[trophy_id] = result.get(trophy_id, 0) + 1
+    return result
