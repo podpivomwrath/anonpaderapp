@@ -19,6 +19,7 @@ from game.world import grid
 from game.world import world_config as wc
 
 _bestiary: dict[str, list[StarterRingMob]] | None = None
+_mob_by_id: dict[str, StarterRingMob] | None = None
 
 
 def _region_mobs(region: str) -> list[StarterRingMob]:
@@ -26,6 +27,20 @@ def _region_mobs(region: str) -> list[StarterRingMob]:
     if _bestiary is None:
         _bestiary = load_bestiary()
     return _bestiary.get(region, [])
+
+
+def base_mob_image(base_mob_id: str | None) -> str | None:
+    """Патч 36: картинка базового моба бестиария по id — источник для
+    named-врагов без собственной картинки (см. StoryNamedEnemyDef).
+    None и неизвестный id — без картинки, не падать (вызывающий уже это
+    ожидает: photo_attachment(...) if encounter.image else None)."""
+    global _mob_by_id
+    if base_mob_id is None:
+        return None
+    if _mob_by_id is None:
+        _mob_by_id = {m.id: m for mobs in load_bestiary().values() for m in mobs}
+    mob = _mob_by_id.get(base_mob_id)
+    return mob.image if mob is not None else None
 
 
 def balanced_mob_stats(level: int, primary_stat: str = "str") -> Stats:
@@ -106,11 +121,14 @@ def spawn_mob(
 
 
 def spawn_named_enemy(
-    participant_id: int, name: str, flavor: str, level: int, stat_mult: float
+    participant_id: int, name: str, flavor: str, level: int, stat_mult: float,
+    image: str | None = None,
 ) -> Encounter:
     """Именной сюжетный враг (патч 18) — та же balanced_mob_stats, что и у
     обычного моба, но с уникальным именем/флейвором и множителем к статам
-    (НЕ босс — просто усилен, см. game/economy/story_config.py)."""
+    (НЕ босс — просто усилен, см. game/economy/story_config.py).
+    image (патч 36) — своя картинка named-врага или картинка базового моба
+    (см. base_mob_image), резолвится вызывающим (bot/handlers/world.py)."""
     base = balanced_mob_stats(level)
     scaled = Stats(
         strength=round(base.strength * stat_mult),
@@ -123,4 +141,4 @@ def spawn_named_enemy(
         id=participant_id, side=1, kind="mob", name=name, level=level,
         stats=scaled, primary_stat="str",
     )
-    return Encounter(combatant=combatant, flavor=flavor)
+    return Encounter(combatant=combatant, flavor=flavor, image=image)

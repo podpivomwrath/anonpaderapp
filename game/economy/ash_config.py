@@ -7,5 +7,7 @@ ASH_HANDFUL_CHANCE = 0.20
 # Очень редкий шанс предмета экипировки в награде за сбор.
 ASH_ITEM_CHANCE = 0.02
 
-# Опыт за сбор — небольшая доля от опыта за моба текущего уровня.
-ASH_XP_FRACTION = 0.15
+# Опыт за сбор — доля от опыта за моба УРОВНЯ ЗОНЫ клетки сбора, не уровня
+# игрока (патч 36) — см. services/experience_service.py::event_xp,
+# game/world/grid.py::mob_level_at.
+EVENT_XP_ASH = 0.4

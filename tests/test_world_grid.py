@@ -49,3 +49,19 @@ def test_clamp_respects_bounds() -> None:
     assert grid.clamp(51) == wc.BOUNDS_MAX
     assert grid.clamp(-51) == wc.BOUNDS_MIN
     assert grid.clamp(10) == 10
+
+
+# --- mob_level_at (патч 36): уровень квестового моба/события — по клетке ---
+
+
+def test_mob_level_at_clamps_into_zone() -> None:
+    assert grid.mob_level_at(50, 50, player_level=60) == 15  # дальнее кольцо, потолок 15
+    assert grid.mob_level_at(50, 50, player_level=1) == 1  # внутри зоны — как есть
+    assert grid.mob_level_at(2, 2, player_level=1) == 60  # у Монолита — пол зоны 60
+
+
+def test_mob_level_at_matches_zone_level_range() -> None:
+    for dist in (0, 5, 20, 35, 48):
+        zone_min, zone_max = grid.zone_level_range(dist)
+        assert grid.mob_level_at(dist, 0, player_level=1) == zone_min
+        assert grid.mob_level_at(dist, 0, player_level=999) == zone_max

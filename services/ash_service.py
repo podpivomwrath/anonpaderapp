@@ -9,6 +9,7 @@ from dataclasses import dataclass
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from game.economy import ash_config as ac
+from game.world import grid
 from models import Character, CharacterStats, Item
 from services import experience_service, item_service, trophy_service
 
@@ -29,7 +30,8 @@ class AshCollectResult:
 async def collect(
     db: AsyncSession, character: Character, stats: CharacterStats, rng: random.Random,
 ) -> AshCollectResult:
-    xp = round(experience_service.xp_per_mob(character.level) * ac.ASH_XP_FRACTION)
+    zone_level = grid.mob_level_at(character.pos_x, character.pos_y, character.level)
+    xp = experience_service.event_xp(zone_level, character.level, ac.EVENT_XP_ASH)
     levelup = experience_service.add_experience(character, stats, xp)
     trophies = await trophy_service.grant_from_event(db, character, rng)  # 1 бросок
     item = None

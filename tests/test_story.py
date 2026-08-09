@@ -32,6 +32,40 @@ def test_exactly_one_subclass_gate_per_line(region: str) -> None:
     assert len(gates) == 1
 
 
+# --- Патч 36: named-враги — base_mob_id должен резолвиться в реальную картинку ---
+
+
+def _all_named_enemies():
+    for region in ("ridge", "woods", "docks", "scorched"):
+        line = load_story_line(region)
+        for act in line.acts:
+            for quest in act.quests:
+                if quest.named_enemy is not None:
+                    yield region, quest.named_enemy
+
+
+def test_named_enemy_base_mob_id_always_resolves_to_a_real_image() -> None:
+    """Не защита от опечаток вслепую: если base_mob_id задан, он ОБЯЗАН
+    указывать на существующего в бестиарии моба с картинкой — иначе это
+    молчаливая опечатка в контенте, а не осознанное отсутствие картинки."""
+    from game.world import encounters
+
+    for region, enemy in _all_named_enemies():
+        if enemy.base_mob_id is not None:
+            image = encounters.base_mob_image(enemy.base_mob_id)
+            assert image, f"{region}/{enemy.name}: base_mob_id={enemy.base_mob_id!r} без картинки"
+
+
+def test_named_enemy_image_resolution_does_not_crash_without_either() -> None:
+    """Патч 36: ни своей картинки, ни base_mob_id — не падать, просто без
+    картинки (см. bot/handlers/world.py::_maybe_trigger_story)."""
+    from game.world import encounters
+
+    for _region, enemy in _all_named_enemies():
+        image = enemy.image or encounters.base_mob_image(enemy.base_mob_id)
+        assert image is None or isinstance(image, str)
+
+
 # --- format_text: подстановка {nickname} ---
 
 

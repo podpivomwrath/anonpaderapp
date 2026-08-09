@@ -70,6 +70,17 @@ def test_xp_for_kill_no_bonus_own_level() -> None:
     assert xp == svc.xp_per_mob(7)
 
 
+def test_event_xp_is_share_of_xp_for_kill() -> None:
+    """Патч 36: опыт события — доля от xp_for_kill(zone_level, player_level),
+    включая множитель за разницу уровней (не от xp_per_mob(player_level))."""
+    base, _ = svc.xp_for_kill(16, 7)
+    assert svc.event_xp(16, 7, 0.5) == round(base * 0.5)
+
+
+def test_event_xp_zero_share_is_zero() -> None:
+    assert svc.event_xp(10, 10, 0.0) == 0
+
+
 # --- Левелап ---
 
 

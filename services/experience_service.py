@@ -42,6 +42,16 @@ def xp_for_kill(mob_level: int, player_level: int) -> tuple[int, float]:
     return int(xp_per_mob(mob_level) * mult), mult
 
 
+def event_xp(zone_level: int, player_level: int, share: float) -> int:
+    """Опыт с небоевого события/находки (патч 36) — доля от опыта, который
+    дал бы обычный моб УРОВНЯ ЗОНЫ (не уровня игрока) на этой клетке,
+    включая множитель за разницу уровней патча 26 (тот же xp_for_kill, что
+    и у настоящего убийства) — заход в опасную зону вознаграждается и через
+    события, не только через бой. zone_level — game.world.grid.mob_level_at."""
+    base, _ = xp_for_kill(zone_level, player_level)
+    return round(base * share)
+
+
 @dataclass
 class LevelUp:
     levels_gained: int

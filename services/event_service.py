@@ -12,6 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from game.combat import display
 from game.content_loader import EventOutcome
+from game.world import grid
 from game.world import world_config as wc
 from models import Character, CharacterStats
 from services import daily_service, experience_service, item_service, trial_service, trophy_service, vitals_service
@@ -82,8 +83,9 @@ async def apply_outcome(
     levels_gained = 0
     new_level = character.level
     if outcome.xp or outcome.xp_big:
-        fraction = wc.EVENT_XP_FRACTION_BIG if outcome.xp_big else wc.EVENT_XP_FRACTION
-        xp = round(experience_service.xp_per_mob(character.level) * fraction)
+        share = wc.EVENT_XP_RISKY if outcome.xp_big else wc.EVENT_XP_SAFE
+        zone_level = grid.mob_level_at(character.pos_x, character.pos_y, character.level)
+        xp = experience_service.event_xp(zone_level, character.level, share)
         levelup = experience_service.add_experience(character, stats, xp)
         levels_gained, new_level = levelup.levels_gained, levelup.new_level
         lines.append(display.xp_delta_line(xp))

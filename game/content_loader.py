@@ -177,7 +177,7 @@ class EventOutcome(BaseModel):
     text: str = ""
     trophy: bool = False
     xp: bool = False
-    xp_big: bool = False  # "крупнее обычного" опыт (EVENT_XP_FRACTION_BIG)
+    xp_big: bool = False  # "крупнее обычного" опыт — рискованный выбор (EVENT_XP_RISKY)
     damage_min_pct: float = 0.0
     damage_max_pct: float = 0.0
     combat: bool = False  # засада — переход в бой
@@ -315,11 +315,19 @@ def load_class_trials(content_dir: Path = CONTENT_DIR) -> list[ClassTrialDef]:
 
 class StoryNamedEnemyDef(BaseModel):
     """Named-враг сюжетной сцены (патч 18) — обычный моб по формуле силы,
-    но с уникальным именем/флейвором и множителем к статам (не босс)."""
+    но с уникальным именем/флейвором и множителем к статам (не босс).
+
+    Патч 36: картинка — сначала своя (image), иначе унаследованная от
+    базового моба бестиария (base_mob_id). Общее правило: любая производная
+    сущность (усиленный моб, сюжетная версия, будущие элиты/боссы) наследует
+    визуал и флейвор базовой, если своих не задано — не требовать картинку
+    для каждого варианта контента вручную."""
 
     name: str
     flavor: str = ""
     stat_mult: float | None = None  # None → game.economy.story_config.NAMED_ENEMY_STAT_MULT_DEFAULT
+    image: str | None = None
+    base_mob_id: str | None = None  # id из content/mobs/*.json — источник картинки, если своей нет
 
 
 class StoryQuestDef(BaseModel):

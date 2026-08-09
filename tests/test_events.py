@@ -109,13 +109,33 @@ async def test_outcome_combat_flag_short_circuits(db_session, character_at) -> N
 
 
 async def test_outcome_xp_grants_fraction_of_mob_xp(db_session, character_at) -> None:
+    """(50;50) — dist 50, зона 1-15; уровень 5 внутри зоны, зона-уровень == 5,
+    поэтому численно совпадает со старой формулой по character.level."""
     character = await character_at(50, 50, level=5)
     stats = await _stats(db_session, character)
     before = character.experience
     outcome = EventOutcome(weight=100, text="Тепло растекается по венам.", xp=True)
     await event_service.apply_outcome(db_session, character, stats, outcome, FixedRng(0.0))
-    expected = round(experience_service.xp_per_mob(5) * wc.EVENT_XP_FRACTION)
+    expected = experience_service.event_xp(5, 5, wc.EVENT_XP_SAFE)
     assert character.experience == before + expected
+
+
+async def test_outcome_xp_scales_by_zone_not_player_level(db_session, character_at) -> None:
+    """Патч 36: то же событие на клетке у Монолита (зона 60) даёт заметно
+    больше опыта высокоуровневому игроку, чем на дальнем кольце (зона 1-15) —
+    раньше опыт зависел только от character.level, разница в зоне роли не играла."""
+    far_ring = await character_at(50, 50, level=30)  # dist 50 → зона 1-15 → клампится до 15
+    near_center = await character_at(2, 2, level=30)  # dist 2 → зона 60-60
+    far_stats = await _stats(db_session, far_ring)
+    near_stats = await _stats(db_session, near_center)
+    outcome = EventOutcome(weight=100, text="Тепло растекается по венам.", xp=True)
+
+    await event_service.apply_outcome(db_session, far_ring, far_stats, outcome, FixedRng(0.0))
+    await event_service.apply_outcome(db_session, near_center, near_stats, outcome, FixedRng(0.0))
+
+    assert far_ring.experience < near_center.experience
+    assert far_ring.experience == experience_service.event_xp(15, 30, wc.EVENT_XP_SAFE)
+    assert near_center.experience == experience_service.event_xp(60, 30, wc.EVENT_XP_SAFE)
 
 
 async def test_outcome_trophy_grants_and_appends_drop_line(db_session, character_at) -> None:
@@ -194,6 +214,6 @@ async def test_outcome_xp_big_grants_more_than_normal(db_session, character_at) 
     before = character.experience
     outcome = EventOutcome(weight=100, text="Тепло растекается по венам.", xp_big=True)
     await event_service.apply_outcome(db_session, character, stats, outcome, FixedRng(0.0))
-    expected = round(experience_service.xp_per_mob(5) * wc.EVENT_XP_FRACTION_BIG)
+    expected = experience_service.event_xp(5, 5, wc.EVENT_XP_RISKY)
     assert character.experience == before + expected
-    assert wc.EVENT_XP_FRACTION_BIG > wc.EVENT_XP_FRACTION  # действительно крупнее обычного
+    assert wc.EVENT_XP_RISKY > wc.EVENT_XP_SAFE  # действительно крупнее обычного

@@ -82,6 +82,30 @@ def test_mob_level_respects_zone_floor() -> None:
     assert encounters.mob_level_for_player(60, FakeMob) == 45
 
 
+# --- Патч 36: named-враги наследуют картинку базового моба ---
+
+
+def test_base_mob_image_resolves_known_id() -> None:
+    bestiary = load_bestiary()
+    known = next(m for mobs in bestiary.values() for m in mobs if m.image)
+    assert encounters.base_mob_image(known.id) == known.image
+
+
+def test_base_mob_image_none_for_missing_or_unknown_id() -> None:
+    assert encounters.base_mob_image(None) is None
+    assert encounters.base_mob_image("does_not_exist") is None
+
+
+def test_spawn_named_enemy_carries_explicit_image() -> None:
+    enc = encounters.spawn_named_enemy(2, "Тестовый враг", "флейвор", 10, 1.3, image="12345")
+    assert enc.image == "12345"
+
+
+def test_spawn_named_enemy_image_defaults_to_none() -> None:
+    enc = encounters.spawn_named_enemy(2, "Тестовый враг", "флейвор", 10, 1.3)
+    assert enc.image is None
+
+
 def test_spawn_mob_returns_encounter_with_flavor() -> None:
     rng = random.Random(1)
     for region in ("ridge", "woods", "docks", "scorched"):

@@ -143,9 +143,17 @@ async def _maybe_trigger_story(peer_id: int, db, character, stats) -> bool:
         gear_bonus = await item_service.compute_gear_bonus(db, character.id)
         buff_modifiers = await preset_service.resolve_active_modifiers(db, character)
         mult = quest.named_enemy.stat_mult or sc.NAMED_ENEMY_STAT_MULT_DEFAULT
+        # Патч 36: уровень квестового врага — по клетке цели (как у обычных
+        # мобов), не напрямую по уровню игрока — раньше сильно прокачанный
+        # игрок, вернувшийся за старым сюжетным шагом, получал named-врага
+        # своего текущего уровня вместо уровня, уместного для той локации.
+        target_x = quest.target_x if quest.target_x is not None else character.pos_x
+        target_y = quest.target_y if quest.target_y is not None else character.pos_y
+        level = grid.mob_level_at(target_x, target_y, character.level)
+        image = quest.named_enemy.image or encounters.base_mob_image(quest.named_enemy.base_mob_id)
         encounter = encounters.spawn_named_enemy(
             combat_handlers.MOB_ID, quest.named_enemy.name, quest.named_enemy.flavor,
-            character.level, mult,
+            level, mult, image=image,
         )
         await combat_handlers.start_story_encounter(
             peer_id, character, stats, gear_bonus, buff_modifiers,
