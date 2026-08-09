@@ -56,7 +56,10 @@ def block(ctx: SkillContext) -> None:
         if enemies:
             target = ctx.rng.choice(enemies)
             ctx.hits.append(
-                compute_hit(actor, target, ctx.rng, label="контратакует", multiplier=counterstrike_mult)
+                compute_hit(
+                    actor, target, ctx.rng, label="контратакует",
+                    multiplier=counterstrike_mult, is_ability=True,
+                )
             )
 
 

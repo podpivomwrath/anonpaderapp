@@ -30,12 +30,18 @@ def _make_handler(skill: BaseSkillDef):
         if skill.effect == "double_hit":
             # два отдельных удара, крит считается для каждого независимо
             if target is not None:
-                ctx.hits.append(compute_hit(actor, target, ctx.rng, skill.name, skill.multiplier))
-                ctx.hits.append(compute_hit(actor, target, ctx.rng, skill.name, skill.multiplier))
+                ctx.hits.append(
+                    compute_hit(actor, target, ctx.rng, skill.name, skill.multiplier, is_ability=True)
+                )
+                ctx.hits.append(
+                    compute_hit(actor, target, ctx.rng, skill.name, skill.multiplier, is_ability=True)
+                )
         elif skill.multiplier > 0 and target is not None:
             force_crit = skill.effect == "guaranteed_crit"
             ctx.hits.append(
-                compute_hit(actor, target, ctx.rng, skill.name, skill.multiplier, force_crit)
+                compute_hit(
+                    actor, target, ctx.rng, skill.name, skill.multiplier, force_crit, is_ability=True,
+                )
             )
 
         # --- Эффекты ---

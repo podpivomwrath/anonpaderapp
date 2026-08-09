@@ -78,6 +78,57 @@ def test_combat_flavor_pools_render() -> None:
     assert "%" not in miss  # промах без процентов
 
 
+def test_pve_miss_pools_match_attacker_not_reader(monkeypatch) -> None:
+    """Патч 34, ч.1: с появлением стат-уворота у мобов "player_miss" (игрок
+    бьёт, МОБ увернулся) стал реально достижим в игре — раньше содержал
+    2-е лицо ("Ты уходишь в сторону"), будто уворачивается читатель/игрок,
+    хотя уворачивается его цель. Теперь пул описывает уворачивающуюся тварь."""
+    from game.combat import combat_flavor
+    from tests.conftest import combatant
+
+    rng = random.Random(1)
+    player = combatant(1, side=0, kind="character")
+    mob = combatant(2, side=1, kind="mob")
+
+    # игрок бьёт, МОБ уворачивается — текст должен описывать тварь, не "Ты"
+    player_miss = combat_flavor.render_hit(
+        player, mob, crit=False, missed=True, is_dot=False,
+        hp_before=100, hp_after=100, max_hp=100, rng=rng,
+    )
+    assert "Тварь" in player_miss or "Она" in player_miss
+
+    # моб бьёт, ИГРОК уворачивается — второе лицо ("Ты") уместно
+    mob_miss = combat_flavor.render_hit(
+        mob, player, crit=False, missed=True, is_dot=False,
+        hp_before=100, hp_after=100, max_hp=100, rng=rng,
+    )
+    assert "Ты" in mob_miss or "тебя" in mob_miss
+
+
+def test_render_pvp_hit_strict_format_no_flavor() -> None:
+    from game.combat import combat_flavor
+
+    line = combat_flavor.render_pvp_hit(
+        "Валгар", "Мирэль", label="Рассекающий удар", amount=184, crit=False,
+        missed=False, is_dot=False, hp_before=72, hp_after=58, max_hp=100,
+    )
+    assert line == "Валгар использует Рассекающий удар на Мирэль — 184 урона. (Мирэль: 72% → 58%)"
+
+    crit_line = combat_flavor.render_pvp_hit(
+        "Гримм", "Тень_В_Ночи", label="бьёт", amount=143, crit=True,
+        missed=False, is_dot=False, hp_before=100, hp_after=57, max_hp=100,
+    )
+    assert crit_line.startswith("Гримм атакует Тень_В_Ночи — 143 урона (крит!).")
+
+    miss_line = combat_flavor.render_pvp_hit(
+        "Мирэль", "Валгар", label="Ледяные оковы", amount=0, crit=False,
+        missed=True, is_dot=False, hp_before=50, hp_after=50, max_hp=100,
+    )
+    assert miss_line == "Валгар уклоняется от способности «Ледяные оковы» игрока Мирэль."
+    for banned in ("тварь", "Тварь", "оно", "существо"):
+        assert banned not in line and banned not in crit_line and banned not in miss_line
+
+
 def test_world_flavor_pools_load() -> None:
     from game.world import flavor
 

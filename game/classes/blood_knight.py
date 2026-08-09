@@ -28,7 +28,7 @@ def lifesteal_strike(ctx: SkillContext) -> None:
     target = ctx.resolve_target()
     if target is None:
         return
-    hit = compute_hit(ctx.actor, target, ctx.rng, label="рубит с лайфстилом")
+    hit = compute_hit(ctx.actor, target, ctx.rng, label="рубит с лайфстилом", is_ability=True)
     ctx.hits.append(hit)
 
     ratio = bc.BLOOD_KNIGHT_LIFESTEAL_BASE

@@ -88,9 +88,6 @@ def offensive_skill(skill_id: str) -> Callable[[SkillHandler], SkillHandler]:
 # --- Расчёт удара (общий для tick_engine и duel_engine) ---
 
 
-DODGE_CAP = 0.95  # даже с баффом остаётся шанс попасть
-
-
 def outgoing_multiplier(actor: CombatantState, target: CombatantState) -> float:
     """Модификаторы исходящего урона: Ослабление, Боевой клич, PvP-провокация,
     damage_bonus активного пресета (патч 14, ч.3 — напр. Тяжёлая рука/Кровавая ярость),
@@ -118,12 +115,24 @@ def compute_hit(
     label: str = "бьёт",
     multiplier: float = 1.0,
     force_crit: bool = False,
+    is_ability: bool = False,
 ) -> PendingHit:
     """Расчёт удара. multiplier — множитель урона навыка (Атака = 1.0);
-    force_crit — гарантированный крит (Теневой рывок)."""
-    # Уклонение цели (Дымовая завеса) — полностью гасит удар
-    dodge = min(target.effect_total(EffectKind.DODGE), DODGE_CAP)
-    if dodge > 0 and rng.random() < dodge:
+    force_crit — гарантированный крит (Теневой рывок); is_ability (патч 34,
+    ч.1) — True для любого навыка/способности (уворот от них — четверть
+    уворота от обычных атак), False для базовой атаки/укуса моба.
+
+    Уклонение цели: базовый стат-уворот от AGI (formulas.dodge_chance/
+    ability_dodge_chance) + внешние источники (Дымовая завеса и т.п.,
+    EffectKind.DODGE — эликсиры/микробаффы) складываются АДДИТИВНО, общий
+    потолок DODGE_HARD_CAP (не DODGE_STAT_CAP — тот лимитирует только вклад
+    самого стата)."""
+    stat_dodge = (
+        formulas.ability_dodge_chance(target.stats.agility) if is_ability
+        else formulas.dodge_chance(target.stats.agility)
+    )
+    total_dodge = min(stat_dodge + target.effect_total(EffectKind.DODGE), bc.DODGE_HARD_CAP)
+    if total_dodge > 0 and rng.random() < total_dodge:
         return PendingHit(
             source_id=actor.id, target_id=target.id, amount=0, label=label, missed=True
         )

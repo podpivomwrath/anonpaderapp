@@ -1,0 +1,13 @@
+{
+  "_comment": "Патч 34, ч.3: тестовые предметы — ТОЛЬКО через админ-панель (services/admin_service.py::grant_admin_weapon), не выпадают ни из одного обычного источника (нет ссылок отсюда в game/economy/item_gen.py), не продаются (Item.admin_only=True, см. services/item_service.py::sell_item).",
+  "weapons": [
+    {
+      "id": "guardian_quill",
+      "name": "Перо Хранителя",
+      "slot": "weapon",
+      "rarity": "admin",
+      "stats": {"str": 1000, "agi": 1000, "int": 1000, "vit": 1000, "wil": 1000},
+      "flavor": "Им вписывают имена в Списки. Им же их вычёркивают."
+    }
+  ]
+}

@@ -48,12 +48,15 @@ def test_guardian_full_block_chance_negates_almost_all_damage() -> None:
     а не сам transient-флаг после тика). Сравниваем с базовым блоком без баффа."""
     rng = AlwaysLowRng()
 
-    plain_guardian = combatant(1, side=0, subclass_id="guardian")
+    # agility=0 — патч 34, ч.1: AlwaysLowRng теперь ТАКЖЕ гарантированно
+    # триггерит новый стат-уворот от Ловкости; тест проверяет block_reduction,
+    # не уворот, поэтому у цели атаки его не должно быть вовсе.
+    plain_guardian = combatant(1, side=0, subclass_id="guardian", agility=0)
     plain_mob = combatant(2, side=1, kind="mob")
     resolve_tick(make_session(plain_guardian, plain_mob), {1: skill("guardian_block", 2)}, rng)
     plain_loss = plain_guardian.max_hp - plain_guardian.current_hp
 
-    full_guardian = combatant(3, side=0, subclass_id="guardian")
+    full_guardian = combatant(3, side=0, subclass_id="guardian", agility=0)
     full_guardian.buff_modifiers = {"full_block_chance": 1.0}
     full_mob = combatant(4, side=1, kind="mob")
     resolve_tick(make_session(full_guardian, full_mob), {3: skill("guardian_block", 4)}, rng)
@@ -79,7 +82,9 @@ def test_guardian_counterstrike_hits_enemy() -> None:
     rng = AlwaysLowRng()
     guardian = combatant(1, side=0, subclass_id="guardian")
     guardian.buff_modifiers = {"counterstrike_mult": 0.7}
-    mob = combatant(2, side=1, kind="mob")
+    # agility=0 (патч 34, ч.1) — иначе AlwaysLowRng гарантированно уводит моба
+    # от контрудара новым стат-уворотом, тест не про уворот.
+    mob = combatant(2, side=1, kind="mob", agility=0)
     mob_hp_before = mob.current_hp
     session = make_session(guardian, mob)
 

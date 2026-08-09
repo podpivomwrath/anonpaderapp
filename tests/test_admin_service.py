@@ -135,6 +135,62 @@ async def test_grant_item_adds_to_inventory(db_session, make_character) -> None:
     assert any(i.id == item.id for i, _equipped in inventory)
 
 
+# --- Патч 34, ч.3: тестовые предметы админки — только себе ---
+
+
+async def _vk_id_of(db_session, character: Character) -> int:
+    return await db_session.scalar(select(User.vk_id).where(User.id == character.user_id))
+
+
+async def test_grant_admin_mount_grants_to_self(db_session, make_character) -> None:
+    from game.economy import mount_config as mc
+    from services import mount_service
+
+    character = await make_character()
+    admin_vk_id = await _vk_id_of(db_session, character)
+    await admin_service.grant_admin_mount(db_session, admin_vk_id, character)
+    owned = await mount_service.owned_mounts(db_session, character.id)
+    assert any(m.mount_id == mc.ADMIN_MOUNT_ID for m in owned)
+
+
+async def test_grant_admin_mount_rejects_other_player(db_session, make_character) -> None:
+    character = await make_character()
+    with pytest.raises(admin_service.NotSelfTarget):
+        await admin_service.grant_admin_mount(db_session, 999999, character)
+
+
+async def test_grant_admin_weapon_grants_fixed_stats_to_self(db_session, make_character) -> None:
+    character = await make_character()
+    admin_vk_id = await _vk_id_of(db_session, character)
+    item = await admin_service.grant_admin_weapon(db_session, admin_vk_id, character)
+    assert item.name == "Перо Хранителя"
+    assert item.slot == "weapon"
+    assert item.base_stats == {"str": 1000, "agi": 1000, "int": 1000, "vit": 1000, "wil": 1000}
+    assert item.admin_only is True
+    inventory = await item_service.get_inventory(db_session, character.id)
+    assert any(i.id == item.id for i, _equipped in inventory)
+
+
+async def test_grant_admin_weapon_rejects_other_player(db_session, make_character) -> None:
+    character = await make_character()
+    with pytest.raises(admin_service.NotSelfTarget):
+        await admin_service.grant_admin_weapon(db_session, 999999, character)
+
+
+async def test_grant_admin_weapon_is_not_sellable(db_session, make_character) -> None:
+    """admin_only=True — sell_item отказывает (0 золота), даже если бы игрок
+    как-то до него добрался (напр. через будущий обмен/трейд)."""
+    character = await make_character()
+    admin_vk_id = await _vk_id_of(db_session, character)
+    item = await admin_service.grant_admin_weapon(db_session, admin_vk_id, character)
+    gold = await item_service.sell_item(db_session, character, item.id)
+    assert gold == 0
+    assert item_service.sell_price(item) == 0
+    # предмет остаётся в инвентаре — продажа не состоялась
+    inventory = await item_service.get_inventory(db_session, character.id)
+    assert any(i.id == item.id for i, _equipped in inventory)
+
+
 async def test_set_level_resets_experience_and_heals(db_session, make_character) -> None:
     character = await make_character(level=5, experience=999)
     character.current_hp = 1

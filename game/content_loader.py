@@ -273,6 +273,25 @@ def load_item_rarities(content_dir: Path = CONTENT_DIR) -> dict[str, ItemRarityD
     }
 
 
+class AdminWeaponDef(BaseModel):
+    """Тестовый предмет админки (патч 34, ч.3, content/items/admin_items.json)
+    — ФИКСИРОВАННЫЕ статы, не через item_gen.generate_item (та процедурная
+    система про него ничего не знает — только так и гарантируется, что он
+    не может выпасть из обычного дропа)."""
+
+    id: str
+    name: str
+    slot: str
+    rarity: str
+    stats: dict[str, int]
+    flavor: str
+
+
+def load_admin_weapons(content_dir: Path = CONTENT_DIR) -> list[AdminWeaponDef]:
+    raw = _load_json_dict(content_dir / "items" / "admin_items.json")
+    return [AdminWeaponDef(**w) for w in raw.get("weapons", [])]
+
+
 class ClassTrialDef(BaseModel):
     """Классовое испытание (content/quests/class_trials.json, патч 12):
     условие открытия одного микробаффа подкласса. id испытания == id баффа

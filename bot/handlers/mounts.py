@@ -163,7 +163,7 @@ async def coord_input(message: Message) -> None:
             return
         travel = await mount_service.start_travel(db, character, mount_id, to_x, to_y, _rng, now)
         cells = max(abs(to_x - character.pos_x), abs(to_y - character.pos_y))
-        seconds = mount_service.seconds_per_cell(mount_id) * cells
+        seconds = mount_service.total_travel_seconds(mount_id, cells)
         await db.commit()
 
     await _dispenser.delete(peer_id)

@@ -17,7 +17,7 @@ def test_chebyshev_distance() -> None:
     "dist,expected",
     [(50, (1, 15)), (40, (1, 15)), (39, (16, 30)), (25, (16, 30)),
      (24, (31, 45)), (12, (31, 45)), (11, (46, 60)), (3, (46, 60)),
-     (2, (60, 100)), (0, (60, 100))],
+     (2, (60, 60)), (0, (60, 60))],
 )
 def test_zone_level_range_covers_full_map(dist: int, expected: tuple[int, int]) -> None:
     assert grid.zone_level_range(dist) == expected

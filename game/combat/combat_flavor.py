@@ -109,9 +109,12 @@ def render_pvp_hit(
     mode: str = display.MODE_PVP,
 ) -> str:
     """`[Ник] использует [Способность] на [Ник цели] — X урона. (Ник цели: A% → B%)`
-    Промах — `[Ник] уклоняется от атаки [Ник].`, крит — суффикс `(крит!)`."""
+    Промах (патч 34, ч.1: уворот от Ловкости) —
+    `[Ник цели] уклоняется от [способности] игрока [Ник]`, для обычной атаки —
+    `...уклоняется от атаки игрока [Ник].`; крит — суффикс `(крит!)`."""
     if missed:
-        return f"{target_name} уклоняется от атаки {attacker_name}."
+        what = "атаки" if label == "бьёт" else f"способности «{label}»"
+        return f"{target_name} уклоняется от {what} игрока {attacker_name}."
     pct_before = display.hp_percent(hp_before, max_hp, mode)
     pct_after = display.hp_percent(hp_after, max_hp, mode)
     crit_suffix = " (крит!)" if crit else ""

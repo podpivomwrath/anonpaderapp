@@ -58,6 +58,19 @@ def support_power(wil: int) -> float:
     return bc.SUPPORT_POWER_PER_WIL * wil  # без потолка
 
 
+def dodge_chance(agi: int) -> float:
+    """Шанс полностью избежать урона от обычной атаки (патч 34, ч.1). Потолок
+    ТОЛЬКО от стата (DODGE_STAT_CAP) — внешние источники складываются поверх
+    отдельно, см. game/combat/skills.py::compute_hit."""
+    return min(bc.DODGE_PER_AGI * agi, bc.DODGE_STAT_CAP)
+
+
+def ability_dodge_chance(agi: int) -> float:
+    """Шанс уклониться от способности — доля (ABILITY_DODGE_RATIO) от уворота
+    против обычных атак."""
+    return dodge_chance(agi) * bc.ABILITY_DODGE_RATIO
+
+
 def level_diff_modifiers(mob_level: int, player_level: int) -> tuple[float, float]:
     """Патч 26: моб выше уровнем бьёт сильнее и получает меньше урона.
     Возвращает (mob_damage_mult, mob_taken_mult); (1.0, 1.0), если моб не выше."""

@@ -40,7 +40,7 @@ def blood_pact(ctx: SkillContext) -> None:
     if target is None:
         return
 
-    hit = compute_hit(ctx.actor, target, ctx.rng, label="поражает тьмой")
+    hit = compute_hit(ctx.actor, target, ctx.rng, label="поражает тьмой", is_ability=True)
     hit.amount = max(round(hit.amount * bc.DARK_MYSTIC_PACT_MULT), 1)
     ctx.hits.append(hit)
 

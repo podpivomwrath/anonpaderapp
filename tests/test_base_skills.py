@@ -113,7 +113,10 @@ def test_double_stab_hits_crit_independently() -> None:
     rng = _AlternatingCritRng()
     a = combatant(1, side=0, agility=100)  # crit_chance = min(0.003*100, 0.6) = 0.3
     a.primary_stat = "agi"
-    b = combatant(2, side=1, vitality=500)
+    # agility=0 (патч 34, ч.1) — иначе цель роллит СВОЙ стат-уворот ПЕРЕД
+    # критом каждого удара, сдвигая последовательность вызовов rng.random()
+    # и ломая предположение теста "1-й вызов — крит, 2-й — не крит".
+    b = combatant(2, side=1, vitality=500, agility=0)
     state = make_session(a, b)
     result = resolve_tick(state, {1: skill("rogue_double_stab", 2)}, rng)
 

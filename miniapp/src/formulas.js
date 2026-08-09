@@ -35,6 +35,11 @@ const CONTROL_RESIST_CAP = 0.75;
 
 const SUPPORT_POWER_PER_WIL = 0.005;
 
+// Уворот от Ловкости (патч 34, ч.1).
+const DODGE_PER_AGI = 0.00297;
+const DODGE_STAT_CAP = 0.6;
+const ABILITY_DODGE_RATIO = 0.25;
+
 export const PRIMARY_STAT_BY_CLASS = { warrior: 'str', rogue: 'agi', mage: 'int' };
 
 export function tierForLevel(level) {
@@ -70,6 +75,11 @@ export function computeDerived({ level, baseClass, stats, gearBonus = {} }) {
   const mitigation = Math.min(MITIGATION_PER_VIT * vit, MITIGATION_CAP);
   const controlResist = Math.min(CONTROL_RESIST_PER_WIL * wil, CONTROL_RESIST_CAP);
   const supportPower = SUPPORT_POWER_PER_WIL * wil;
+  const dodgeChance = Math.min(DODGE_PER_AGI * agi, DODGE_STAT_CAP);
+  const abilityDodgeChance = dodgeChance * ABILITY_DODGE_RATIO;
 
-  return { maxHp, damage, critChance, mitigation, controlResist, supportPower };
+  return {
+    maxHp, damage, critChance, mitigation, controlResist, supportPower,
+    dodgeChance, abilityDodgeChance,
+  };
 }

@@ -141,7 +141,7 @@ async def open_sell_gear(message: Message) -> None:
         mult = _price_multiplier(character, region)
         items = await item_service.get_inventory(db, character.id)
         sellable = [
-            (item, item_service.sell_price(item, mult)) for item, equipped in items if not equipped
+            (item, item_service.sell_price(item, mult)) for item, equipped in items if not equipped and not item.admin_only
         ]
 
     if not sellable:
@@ -174,7 +174,7 @@ async def sell_gear(message: Message) -> None:
         await db.commit()
         items = await item_service.get_inventory(db, character.id)
         sellable = [
-            (item, item_service.sell_price(item, mult)) for item, equipped in items if not equipped
+            (item, item_service.sell_price(item, mult)) for item, equipped in items if not equipped and not item.admin_only
         ]
 
     if gold <= 0:

@@ -19,6 +19,8 @@ class DerivedStats:
     mitigation: float
     control_resist: float
     support_power: float
+    dodge_chance: float
+    ability_dodge_chance: float
 
 
 def compute(
@@ -48,4 +50,6 @@ def compute(
         mitigation=formulas.mitigation(vitality),
         control_resist=formulas.control_resist(will),
         support_power=formulas.support_power(will),
+        dodge_chance=formulas.dodge_chance(agility),
+        ability_dodge_chance=formulas.ability_dodge_chance(agility),
     )

@@ -223,6 +223,70 @@ def test_ashen_haze_grants_dodge_chance() -> None:
     assert hit.missed is True
 
 
+# --- Патч 34, ч.1: уворот от Ловкости, складывается с внешними источниками ---
+
+
+def test_stat_dodge_alone_can_trigger_on_basic_attack() -> None:
+    """agility=202 (кап чистого AGI-билда) даёт ~60% уворота от атак — без
+    единого внешнего источника, только от стата."""
+    attacker = combatant(1, side=0)
+    target = combatant(2, side=1, agility=202)
+    hit = compute_hit(attacker, target, _AlwaysDodgeRng())
+    assert hit.missed is True
+
+
+def test_stat_dodge_zero_agility_never_triggers_alone() -> None:
+    class _NeverDodgeRng(random.Random):
+        def random(self) -> float:
+            return 0.999
+
+    attacker = combatant(1, side=0)
+    target = combatant(2, side=1, agility=0, vitality=500)
+    hit = compute_hit(attacker, target, _NeverDodgeRng())
+    assert hit.missed is False
+
+
+def test_ability_dodge_uses_quarter_chance_not_full() -> None:
+    """is_ability=True — уворот 25% от обычного; ролл, который сработал бы
+    для атаки, не обязан сработать для способности."""
+    from game.combat import balance_config as bc
+    from game.combat import formulas
+
+    class _FixedRng(random.Random):
+        def __init__(self, value: float) -> None:
+            super().__init__()
+            self.value = value
+
+        def random(self) -> float:
+            return self.value
+
+    attacker = combatant(1, side=0)
+    target = combatant(2, side=1, agility=202)  # dodge_chance ~0.6, ability ~0.15
+    # ролл между ability-порогом и полным порогом: попадает под атаку, но НЕ под способность
+    roll = (formulas.ability_dodge_chance(202) + formulas.dodge_chance(202)) / 2
+    hit_attack = compute_hit(attacker, target, _FixedRng(roll), is_ability=False)
+    hit_ability = compute_hit(attacker, target, _FixedRng(roll), is_ability=True)
+    assert hit_attack.missed is True
+    assert hit_ability.missed is False
+
+
+def test_external_dodge_stacks_additively_with_stat_dodge_and_caps_at_100() -> None:
+    """Патч 34, ч.1: Пепельный морок (80%) + базовый стат-уворот способны в
+    сумме дать 100% — итог ограничен DODGE_HARD_CAP, не обрезается ниже."""
+    from game.combat import balance_config as bc
+
+    attacker = combatant(1, side=0)
+    target = combatant(2, side=1, agility=202)  # ~60% от стата
+    elixir_effects.apply_combat_elixir(target, "ashen_haze")  # +ASHEN_HAZE_DODGE_CHANCE (80%)
+
+    class _JustUnderCapRng(random.Random):
+        def random(self) -> float:
+            return bc.DODGE_HARD_CAP - 0.001  # почти 100%, но меньше — должен увернуться
+
+    hit = compute_hit(attacker, target, _JustUnderCapRng())
+    assert hit.missed is True
+
+
 # --- ⚡ Осколочная кровь ---
 
 

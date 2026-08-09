@@ -131,7 +131,11 @@ function ActionForm({ playerId, onDone }) {
       const updated = await postAdminAction(playerId, action, params);
       onDone(updated);
     } catch (e) {
-      setError(e.message || 'Ошибка');
+      // Патч 34, ч.3: тестовые предметы — только себе (services/admin_service.py::NotSelfTarget).
+      const message = e.message === 'self_only'
+        ? 'Тестовые предметы можно выдать только себе.'
+        : e.message || 'Ошибка';
+      setError(message);
     } finally {
       setBusy(false);
     }
@@ -148,6 +152,8 @@ function ActionForm({ playerId, onDone }) {
             { value: 'grant_xp', label: 'Выдать опыт' },
             { value: 'grant_trophy', label: 'Выдать трофей' },
             { value: 'grant_item', label: 'Выдать случайный предмет' },
+            { value: 'grant_admin_mount', label: '🛠 Выдать тестовый маунт (себе)' },
+            { value: 'grant_admin_weapon', label: '🛠 Выдать тестовое оружие (себе)' },
             { value: 'set_level', label: 'Изменить уровень' },
             { value: 'teleport', label: 'Телепорт' },
             { value: 'restore_hp', label: 'Восстановить HP + снять респавн' },
@@ -247,7 +253,7 @@ function PlayerCard({ card, onRefresh }) {
       </Group>
 
       <Group header={<Header>Прогресс</Header>}>
-        <StatRow label="Уровень" value={`${card.level} (опыт ${card.experience} / ${card.xp_to_next})`} />
+        <StatRow label="Уровень" value={`${card.level} (опыт ${card.xp_to_next == null ? 'МАКС' : `${card.experience} / ${card.xp_to_next}`})`} />
         <StatRow label="Класс" value={`${card.class_title}${card.subclass ? ` (${card.subclass})` : ''}`} />
         <StatRow label="Регион" value={card.region || '—'} />
         <StatRow label="Позиция" value={`(${card.pos_x}; ${card.pos_y})`} />
@@ -266,6 +272,10 @@ function PlayerCard({ card, onRefresh }) {
               <StatRow label="Снижение урона" value={`${Math.round(card.derived.mitigation * 100)}%`} />
               <StatRow label="Сопротивление контролю" value={`${Math.round(card.derived.control_resist * 100)}%`} />
               <StatRow label="Сила поддержки" value={card.derived.support_power} />
+              <StatRow
+                label="Уклонение"
+                value={`${Math.round(card.derived.dodge_chance * 100)}% (от способностей: ${Math.round(card.derived.ability_dodge_chance * 100)}%)`}
+              />
             </>
           )}
         </Group>
@@ -347,27 +357,36 @@ function PlayerCard({ card, onRefresh }) {
 
 function PlayerSection() {
   const [query, setQuery] = useState('');
-  const [results, setResults] = useState([]);
+  const [results, setResults] = useState(null); // null — поиска ещё не было
   const [card, setCard] = useState(null);
   const [status, setStatus] = useState('idle');
+  const [errorMsg, setErrorMsg] = useState(null);
 
   const search = async () => {
     setStatus('loading');
+    setErrorMsg(null);
+    setCard(null);
     try {
       const res = await searchAdminPlayers(query);
       setResults(res.results);
       setStatus('ready');
-    } catch {
+    } catch (e) {
+      // Патч 34, ч.2: ошибка запроса (403/сеть/что угодно) раньше молча
+      // проглатывалась — экран выглядел так же, как "ничего не нашли".
+      setResults(null);
+      setErrorMsg(e.message || 'Не удалось выполнить поиск');
       setStatus('error');
     }
   };
 
   const openCard = async (id) => {
     setStatus('loading');
+    setErrorMsg(null);
     try {
       setCard(await getAdminPlayer(id));
       setStatus('ready');
-    } catch {
+    } catch (e) {
+      setErrorMsg(e.message || 'Не удалось загрузить карточку игрока');
       setStatus('error');
     }
   };
@@ -376,12 +395,25 @@ function PlayerSection() {
     <>
       <Group header={<Header>Поиск (ник или vk_id)</Header>}>
         <FormItem>
-          <Input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Валгар или 123456789" />
+          <Input
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            onKeyDown={(e) => { if (e.key === 'Enter') search(); }}
+            placeholder="Валгар или 123456789"
+          />
         </FormItem>
         <Div>
-          <Button size="l" stretched onClick={search} loading={status === 'loading'}>Найти</Button>
+          <Button size="l" stretched onClick={search} loading={status === 'loading'} disabled={!query.trim()}>
+            Найти
+          </Button>
         </Div>
-        {results.map((r) => (
+        {errorMsg && (
+          <Div style={{ color: 'var(--vkui--color_text_negative)' }}>{errorMsg}</Div>
+        )}
+        {status === 'ready' && results && results.length === 0 && (
+          <Div style={{ opacity: 0.7 }}>Игрок не найден.</Div>
+        )}
+        {results && results.map((r) => (
           <div className="stat-row" key={r.id} onClick={() => openCard(r.id)} style={{ cursor: 'pointer' }}>
             <span className="stat-row__label">
               {r.is_banned ? '🚫 ' : ''}{r.name} (vk_id {r.vk_id})

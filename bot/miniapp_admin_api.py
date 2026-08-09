@@ -177,10 +177,17 @@ async def handle_post_action(request: web.Request) -> web.Response:
                 await admin_service.ban(db, admin_vk_id, character, reason.strip())
             elif action == "unban":
                 await admin_service.unban(db, admin_vk_id, character)
+            elif action == "grant_admin_mount":
+                await admin_service.grant_admin_mount(db, admin_vk_id, character)
+            elif action == "grant_admin_weapon":
+                await admin_service.grant_admin_weapon(db, admin_vk_id, character)
             else:
                 return web.json_response({"error": "unknown_action"}, status=400)
         except ValueError:
             return web.json_response({"error": "out_of_bounds"}, status=400)
+        except admin_service.NotSelfTarget:
+            # Патч 34, ч.3: тестовые предметы — только себе.
+            return web.json_response({"error": "self_only"}, status=400)
 
         await db.commit()
         card = await admin_service.player_card(db, character_id)

@@ -65,6 +65,44 @@ async def test_start_travel_computes_duration_from_rarity_pace(db_session, chara
     assert travel.status == "traveling"
 
 
+# --- Патч 34, ч.3: «Пепельный вестник» — фиксированное время НА ВЕСЬ путь ---
+
+
+def test_admin_mount_is_service_rarity_with_zero_ambush() -> None:
+    from game.economy import mount_config as mc
+
+    d = mount_service.mount_def(mc.ADMIN_MOUNT_ID)
+    assert d is not None
+    assert d.rarity == "admin"
+    assert mount_service.ambush_chance(mc.ADMIN_MOUNT_ID) == 0.0
+
+
+def test_total_travel_seconds_fixed_for_admin_mount_regardless_of_distance() -> None:
+    from game.economy import mount_config as mc
+
+    assert mount_service.total_travel_seconds(mc.ADMIN_MOUNT_ID, cells=1) == 3.0
+    assert mount_service.total_travel_seconds(mc.ADMIN_MOUNT_ID, cells=100) == 3.0
+    assert mount_service.total_travel_seconds(mc.ADMIN_MOUNT_ID, cells=0) == 3.0
+
+
+def test_total_travel_seconds_scales_normally_for_regular_mount() -> None:
+    assert mount_service.total_travel_seconds("ashen_steed", cells=4) == 28.0
+
+
+async def test_start_travel_admin_mount_arrives_in_three_seconds_any_distance(
+    db_session, character_at,
+) -> None:
+    from game.economy import mount_config as mc
+
+    character = await character_at(0, 0, level=10)
+    travel = await mount_service.start_travel(
+        db_session, character, mc.ADMIN_MOUNT_ID, 50, -50, AlwaysAmbush(), now=NOW,
+    )
+    assert travel.arrives_at == NOW + timedelta(seconds=3.0)
+    assert travel.ambush_at is None  # 0% нападение — даже с "всегда роллящим" rng
+    assert travel.ambush_done is True
+
+
 async def test_start_travel_zero_distance_never_ambushes(db_session, character_at) -> None:
     character = await character_at(5, 5, level=10)
     travel = await mount_service.start_travel(

@@ -44,7 +44,7 @@ def venom(ctx: SkillContext) -> None:
     if target is None:
         return
 
-    hit = compute_hit(ctx.actor, target, ctx.rng, label="жалит")
+    hit = compute_hit(ctx.actor, target, ctx.rng, label="жалит", is_ability=True)
     hit.amount = max(round(hit.amount * bc.POISONER_DIRECT_MULT), 1)
     ctx.hits.append(hit)
 

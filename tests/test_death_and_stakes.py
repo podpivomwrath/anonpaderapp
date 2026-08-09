@@ -18,9 +18,9 @@ async def test_death_costs_experience_and_time(db_session, make_character) -> No
 
 
 async def test_respawn_time_scales_with_level(db_session, make_character) -> None:
-    character = await make_character(level=100)
+    character = await make_character(level=bc.MAX_LEVEL)
     apply_death(character, now=NOW)
-    assert character.respawn_at == NOW + timedelta(minutes=30)  # 30 мин на 100 ур.
+    assert character.respawn_at == NOW + timedelta(minutes=30)  # 30 мин на MAX_LEVEL
 
 
 async def test_dead_then_respawn(db_session, make_character) -> None:

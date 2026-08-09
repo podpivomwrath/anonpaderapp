@@ -109,13 +109,22 @@ async def active_travel(db: AsyncSession, character_id: int) -> MountTravel | No
     )
 
 
+def total_travel_seconds(mount_id: str, cells: int) -> float:
+    """Патч 34, ч.3: «Пепельный вестник» (ADMIN_MOUNT_ID) — фиксированное
+    время НА ВЕСЬ путь (ADMIN_MOUNT_TRAVEL_SECONDS), а не за клетку, вне
+    зависимости от расстояния. Остальные маунты — как раньше."""
+    if mount_id == mc.ADMIN_MOUNT_ID:
+        return mc.ADMIN_MOUNT_TRAVEL_SECONDS
+    return cells * seconds_per_cell(mount_id)
+
+
 async def start_travel(
     db: AsyncSession, character: Character, mount_id: str, to_x: int, to_y: int,
     rng: random.Random, now: datetime | None = None,
 ) -> MountTravel:
     now = now or datetime.now(timezone.utc)
     cells = max(abs(to_x - character.pos_x), abs(to_y - character.pos_y))
-    seconds = cells * seconds_per_cell(mount_id)
+    seconds = total_travel_seconds(mount_id, cells)
     arrives_at = now + timedelta(seconds=seconds)
 
     ambush_at = None

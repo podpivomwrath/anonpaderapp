@@ -141,7 +141,9 @@ class AlwaysRollsRng(NoCritRng):
 def test_preset_full_block_chance_blocks_completely() -> None:
     """Несокрушимость (full_block_chance): полный блок при удачном ролле."""
     rng = AlwaysRollsRng()
-    guardian = combatant(1, side=0, subclass_id="guardian")
+    # agility=0 (патч 34, ч.1) — иначе AlwaysRollsRng гарантированно уводит
+    # гвардиана от атаки новым стат-уворотом раньше, чем сработает блок.
+    guardian = combatant(1, side=0, subclass_id="guardian", agility=0)
     guardian.buff_modifiers = {"full_block_chance": 1.0}
     enemy = combatant(2, side=1)
     state = make_session(CombatMode.PVP_GROUP, guardian, enemy)

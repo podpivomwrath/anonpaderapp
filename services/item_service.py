@@ -197,7 +197,7 @@ def sell_price(item: Item, price_multiplier: float = 1.0) -> int:
     """Цена скупщика: item_power * 3 * rarity_mult (только для отображения —
     сама продажа заново считает то же самое в sell_item). price_multiplier
     (патч 26) — наценка чужака у скупщика в чужом городе."""
-    if item.rarity is None:
+    if item.rarity is None or item.admin_only:
         return 0
     mult = rarity_def(item.rarity).mult
     return math.floor(item_power(item) * ic.SELL_PRICE_MULT * mult * price_multiplier)
@@ -212,7 +212,7 @@ async def sell_item(
     if row is None or row.equipped:
         return 0
     item = await db.get(Item, item_id)
-    if item is None or item.rarity is None:
+    if item is None or item.rarity is None or item.admin_only:
         return 0
     gold = sell_price(item, price_multiplier)
     await db.delete(row)

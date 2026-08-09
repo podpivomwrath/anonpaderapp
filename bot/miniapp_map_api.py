@@ -161,7 +161,7 @@ async def handle_post_send_mount(request: web.Request) -> web.Response:
         await db.commit()
 
         cells = max(abs(x - character.pos_x), abs(y - character.pos_y))
-        seconds = mount_service.seconds_per_cell(mount_id) * cells
+        seconds = mount_service.total_travel_seconds(mount_id, cells)
         ambush_chance = mount_service.ambush_chance(mount_id)
 
     # Та же нотификация, что и при отправке из чата (bot/handlers/mounts.py::

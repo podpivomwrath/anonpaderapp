@@ -4,6 +4,7 @@ import random
 
 import pytest
 
+from game.combat import balance_config as bc
 from game.world import encounters
 from game.content_loader import load_bestiary, load_starter_ring
 
@@ -57,7 +58,7 @@ def test_bestiary_merges_all_rings_per_region() -> None:
         zones = {(m.zone_min, m.zone_max) for m in bestiary[region]}
         assert zones == {(1, 15), (16, 30), (31, 45), (46, 60)}
     assert len(bestiary["any"]) == 4
-    assert all((m.zone_min, m.zone_max) == (60, 100) for m in bestiary["any"])
+    assert all((m.zone_min, m.zone_max) == (bc.MAX_LEVEL, bc.MAX_LEVEL) for m in bestiary["any"])
 
 
 @pytest.mark.parametrize(
@@ -187,11 +188,11 @@ def test_spawn_mob_ring_multiplier_is_halved_for_damage() -> None:
 
 
 def test_spawn_mob_center_uses_any_region_regardless_of_home_region() -> None:
-    """dist=1 (центр, кольцо 60+) — мобы общие, регион игрока не важен."""
+    """dist=1 (центр, кольцо == MAX_LEVEL) — мобы общие, регион игрока не важен."""
     rng = random.Random(3)
     bestiary = load_bestiary()
     center_names = {m.name for m in bestiary["any"]}
     for region in ("ridge", "woods", "docks", "scorched"):
-        enc = encounters.spawn_mob(2, region, player_level=70, dist=1, rng=rng)
+        enc = encounters.spawn_mob(2, region, player_level=bc.MAX_LEVEL, dist=1, rng=rng)
         assert enc.combatant.name in center_names
-        assert enc.combatant.level == 70
+        assert enc.combatant.level == bc.MAX_LEVEL

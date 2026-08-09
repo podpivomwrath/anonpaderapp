@@ -92,6 +92,8 @@ def _character_payload(
             "mitigation": derived.mitigation,
             "control_resist": derived.control_resist,
             "support_power": derived.support_power,
+            "dodge_chance": derived.dodge_chance,
+            "ability_dodge_chance": derived.ability_dodge_chance,
         },
     }
 

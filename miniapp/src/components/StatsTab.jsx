@@ -45,6 +45,12 @@ const DERIVED_DEFS = [
   },
 ];
 
+// Патч 34, ч.1: уворот — составная строка (от атак + от способностей вместе),
+// генерическому DERIVED_DEFS не подходит (там один ключ = одно значение).
+function formatDodge(dodge, abilityDodge) {
+  return `${(dodge * 100 + EPS).toFixed(1)}% (от способностей: ${(abilityDodge * 100 + EPS).toFixed(1)}%)`;
+}
+
 const EMPTY_PENDING = { str: 0, agi: 0, int: 0, vit: 0, wil: 0 };
 
 export default function StatsTab({ character, onCharacterUpdate }) {
@@ -144,6 +150,19 @@ export default function StatsTab({ character, onCharacterUpdate }) {
             </div>
           );
         })}
+        {(() => {
+          const before = formatDodge(character.derived.dodge_chance, character.derived.ability_dodge_chance);
+          const after = formatDodge(previewDerived.dodgeChance, previewDerived.abilityDodgeChance);
+          const changed = totalPending > 0 && before !== after;
+          return (
+            <div className="stat-row">
+              <span className="stat-row__label">🌀 Уклонение</span>
+              <span className={changed ? 'derived-delta derived-delta--changed' : 'derived-delta'}>
+                {changed ? `${before} → ${after}` : before}
+              </span>
+            </div>
+          );
+        })()}
       </Group>
 
       {errorMsg && (

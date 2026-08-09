@@ -2,6 +2,7 @@
 
 import pytest
 
+from game.combat import balance_config as bc
 from game.combat import formulas
 
 
@@ -39,11 +40,36 @@ def test_caps() -> None:
     assert formulas.support_power(300) == pytest.approx(1.5)  # без потолка
 
 
+# --- Патч 34, ч.1: уворот от Ловкости ---
+
+
+def test_dodge_chance_matches_patch_table() -> None:
+    # значения из таблицы патча (dodge-admin-patch-34.md)
+    assert formulas.dodge_chance(10) == pytest.approx(0.0297, abs=1e-4)   # 3.0%
+    assert formulas.dodge_chance(25) == pytest.approx(0.0743, abs=1e-4)   # 7.4%
+    assert formulas.dodge_chance(34) == pytest.approx(0.101, abs=1e-3)    # 10.1%
+    assert formulas.dodge_chance(112) == pytest.approx(0.333, abs=1e-3)   # 33.3%
+    assert formulas.dodge_chance(52) == pytest.approx(0.154, abs=1e-3)    # 15.4%
+
+
+def test_dodge_chance_caps_at_pure_agi_build_level_60() -> None:
+    # 25 стартовых + 3*(60-1)=177 очков за уровни = 202 AGI — практически на
+    # капе (0.00297*202=59.994% — округление шага, не ровно 60%, см. патч).
+    assert formulas.dodge_chance(202) == pytest.approx(0.60, abs=1e-3)
+    assert formulas.dodge_chance(1000) == bc.DODGE_STAT_CAP  # выше капа не растёт
+
+
+def test_ability_dodge_is_quarter_of_attack_dodge() -> None:
+    for agi in (10, 25, 52, 202):
+        assert formulas.ability_dodge_chance(agi) == pytest.approx(formulas.dodge_chance(agi) * 0.25)
+    assert formulas.ability_dodge_chance(202) == pytest.approx(0.15, abs=1e-3)  # ~кап 60% * 0.25
+
+
 def test_respawn_time() -> None:
     assert formulas.respawn_time_minutes(1) == pytest.approx(1.0)
-    assert formulas.respawn_time_minutes(100) == pytest.approx(30.0)
+    assert formulas.respawn_time_minutes(bc.MAX_LEVEL) == pytest.approx(30.0)
     # линейность: середина диапазона
-    mid = formulas.respawn_time_minutes(50)
+    mid = formulas.respawn_time_minutes((1 + bc.MAX_LEVEL) / 2)
     assert 15.0 < mid < 16.0
 
 

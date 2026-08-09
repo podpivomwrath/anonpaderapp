@@ -16,6 +16,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from game.classes.base import REGISTRY
 from game.combat import balance_config as bc
+from game.content_loader import load_admin_weapons
+from game.economy import mount_config as mc
 from game.world import grid
 from models import (
     AdminAction,
@@ -28,6 +30,7 @@ from models import (
     CharacterTitle,
     CharacterTrophy,
     CharacterUnlockedBuff,
+    Inventory,
     Item,
     PvpBattle,
     User,
@@ -329,7 +332,12 @@ async def player_card(db: AsyncSession, character_id: int) -> dict | None:
         "title": title_service.active_title_name(character),
         "level": character.level,
         "experience": character.experience,
-        "xp_to_next": experience_service.xp_to_next(character.level),
+        # Патч 34, ч.0: на потолке уровня xp_to_next(MAX_LEVEL) не имеет
+        # смысла (левелапа больше не будет) — явный None вместо большого
+        # бессмысленного числа, фронтенд показывает "МАКС".
+        "xp_to_next": (
+            experience_service.xp_to_next(character.level) if character.level < bc.MAX_LEVEL else None
+        ),
         "base_class": character.base_class,
         "subclass": character.subclass,
         "class_title": class_title(character),
@@ -358,6 +366,8 @@ async def player_card(db: AsyncSession, character_id: int) -> dict | None:
             "mitigation": derived.mitigation,
             "control_resist": derived.control_resist,
             "support_power": derived.support_power,
+            "dodge_chance": derived.dodge_chance,
+            "ability_dodge_chance": derived.ability_dodge_chance,
         } if derived is not None else None,
         "gold": wallet.farm_currency,
         "gems": wallet.donate_currency,
@@ -476,6 +486,45 @@ async def grant_item(
     await log_action(
         db, admin_vk_id, "grant_item", character.id,
         new_value={"item_id": item.id, "name": item.name, "slot": item.slot, "rarity": item.rarity},
+    )
+    return item
+
+
+class NotSelfTarget(Exception):
+    """Патч 34, ч.3: тестовые предметы админки — только себе. Случайная
+    выдача другому игроку сломала бы ему баланс/экономику."""
+
+
+async def _require_self(db: AsyncSession, admin_vk_id: int, character: Character) -> None:
+    target_vk_id = await db.scalar(select(User.vk_id).where(User.id == character.user_id))
+    if target_vk_id != admin_vk_id:
+        raise NotSelfTarget
+
+
+async def grant_admin_mount(db: AsyncSession, admin_vk_id: int, character: Character) -> None:
+    """«Пепельный вестник» (патч 34, ч.3) — служебный маунт, 3 сек. на весь
+    путь, 0% нападение. Только себе — см. _require_self."""
+    await _require_self(db, admin_vk_id, character)
+    await mount_service.grant(db, character, mc.ADMIN_MOUNT_ID)
+    await log_action(db, admin_vk_id, "grant_admin_mount", character.id, note=mc.ADMIN_MOUNT_ID)
+
+
+async def grant_admin_weapon(db: AsyncSession, admin_vk_id: int, character: Character) -> Item:
+    """«Перо Хранителя» (патч 34, ч.3) — +1000 к каждому стату, служебная
+    редкость (не продаётся — Item.admin_only). Только себе."""
+    await _require_self(db, admin_vk_id, character)
+    weapon_def = load_admin_weapons()[0]
+    item = Item(
+        name=weapon_def.name, slot=weapon_def.slot, base_stats=dict(weapon_def.stats),
+        rarity=weapon_def.rarity, ilvl=None, admin_only=True,
+    )
+    db.add(item)
+    await db.flush()
+    db.add(Inventory(character_id=character.id, item_id=item.id, equipped=False))
+    await db.flush()
+    await log_action(
+        db, admin_vk_id, "grant_admin_weapon", character.id,
+        new_value={"item_id": item.id, "name": item.name},
     )
     return item
 
