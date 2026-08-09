@@ -8,8 +8,20 @@
 const API_BASE = import.meta.env.VITE_API_BASE_URL || '';
 const LAUNCH_PARAMS = window.location.search; // включает ведущий "?" либо пуст
 
+function buildUrl(path) {
+  // Патч 34, ч.2, доп. фикс: слепая конкатенация path + LAUNCH_PARAMS ломалась,
+  // если path уже нёс свой "?" (searchAdminPlayers/getAdminJournal) — получалось
+  // "...?q=X?vk_user_id=...", браузер считает query-строкой только часть ДО
+  // второго "?", vk_user_id пропадал из распарсенных параметров целиком, и
+  // подпись launch-параметров на сервере переставала сходиться (invalid_signature).
+  if (!LAUNCH_PARAMS) return `${API_BASE}/api/miniapp${path}`;
+  const launchQuery = LAUNCH_PARAMS.slice(1); // без ведущего "?"
+  const separator = path.includes('?') ? '&' : '?';
+  return `${API_BASE}/api/miniapp${path}${separator}${launchQuery}`;
+}
+
 async function request(path, options) {
-  const url = `${API_BASE}/api/miniapp${path}${LAUNCH_PARAMS}`;
+  const url = buildUrl(path);
   // ngrok-skip-browser-warning: без него бесплатный ngrok-туннель (альфа-тест,
   // см. README) отдаёт HTML-заглушку вместо JSON на первый запрос из вебвью.
   // Безвредно для любого другого хостинга — заголовок просто игнорируется.
