@@ -203,6 +203,71 @@ def sell_price(item: Item, price_multiplier: float = 1.0) -> int:
     return math.floor(item_power(item) * ic.SELL_PRICE_MULT * mult * price_multiplier)
 
 
+def group_sellable_by_rarity(
+    sellable: list[tuple[Item, int]],
+) -> list[tuple[ItemRarityDef, list[Item], int]]:
+    """(редкость, предметы, суммарная цена) по каждой редкости, присутствующей
+    в sellable — патч 35: основной экран продажи группирует по редкости вместо
+    предмета на строку (список игрока мог разрастись до нечитаемой стены).
+    Порядок — как в rarities() (common → ... → legendary); отсутствующие
+    редкости не попадают в результат вовсе."""
+    by_rarity: dict[str, list[tuple[Item, int]]] = {}
+    for item, price in sellable:
+        by_rarity.setdefault(item.rarity, []).append((item, price))
+    groups = []
+    for rarity_id, rdef in rarities().items():
+        entries = by_rarity.get(rarity_id)
+        if not entries:
+            continue
+        groups.append((rdef, [item for item, _ in entries], sum(price for _, price in entries)))
+    return groups
+
+
+def stronger_than_equipped(
+    items: list[Item], equipped: dict[str, Item | None]
+) -> list[tuple[Item, int]]:
+    """Патч 35: предметы из items, которые сильнее (по item_power) надетого в
+    том же слоте — защита от случайной продажи оптом. Пустой слот сравнивать
+    не с чем, такие предметы в предупреждение не попадают."""
+    result = []
+    for item in items:
+        current = equipped.get(item.slot)
+        if current is None:
+            continue
+        delta = item_power(item) - item_power(current)
+        if delta > 0:
+            result.append((item, delta))
+    return result
+
+
+async def sell_by_rarity(
+    db: AsyncSession, character: Character, rarity_id: str, price_multiplier: float = 1.0
+) -> int:
+    """Продаёт скупщику все непроданные предметы данной редкости разом (патч 35).
+    Надетые и служебные предметы уже исключены sell_item поштучно."""
+    items = await get_inventory(db, character.id)
+    targets = [
+        item for item, equipped in items
+        if not equipped and not item.admin_only and item.rarity == rarity_id
+    ]
+    total = 0
+    for item in targets:
+        total += await sell_item(db, character, item.id, price_multiplier)
+    return total
+
+
+async def sell_all_gear(
+    db: AsyncSession, character: Character, price_multiplier: float = 1.0
+) -> int:
+    """Продаёт скупщику всё непроданное снаряжение разом (патч 35)."""
+    items = await get_inventory(db, character.id)
+    targets = [item for item, equipped in items if not equipped and not item.admin_only]
+    total = 0
+    for item in targets:
+        total += await sell_item(db, character, item.id, price_multiplier)
+    return total
+
+
 async def sell_item(
     db: AsyncSession, character: Character, item_id: int, price_multiplier: float = 1.0
 ) -> int:

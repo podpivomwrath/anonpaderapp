@@ -284,6 +284,11 @@ def _battle_scene_line(battle: Battle) -> str:
     return f"⚔️ Бой: {' и '.join(side0)} vs {' и '.join(side1)}"
 
 
+# Патч 35, аудит: список игроков на клетке — ТЕКСТ, без единой инлайн-кнопки
+# (цель называют числом/именем через attack_command), поэтому лимит клавиатуры
+# VK тут не при чём даже на людной клетке. Длина сообщения теоретически растёт
+# с числом игроков на клетке, но лимит VK на текст (4096 симв.) недостижим на
+# практике при разумной плотности игроков.
 def _scene_text(solo: list[Character], battles: list[tuple[int, Battle]]) -> str:
     if not solo and not battles:
         return ALONE_ON_CELL

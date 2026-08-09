@@ -7,7 +7,7 @@ from sqlalchemy import select
 from game.content_loader import load_item_bases, load_item_rarities
 from game.economy import item_config as ic
 from game.economy import item_gen
-from models import CharacterStats
+from models import CharacterStats, Inventory, Item
 from services import derived_stats_service, item_service, wallet_service
 
 
@@ -258,6 +258,96 @@ async def test_sell_item_equipped_rejected(db_session, character_at) -> None:
 async def test_sell_item_unknown_or_foreign_rejected(db_session, character_at) -> None:
     character = await character_at(50, 50)
     assert await item_service.sell_item(db_session, character, 999999) == 0
+
+
+# --- Патч 35: группировка по редкости + продажа оптом ---
+
+
+async def _add_item(db_session, character, *, slot, rarity, ilvl, stats, equipped=False) -> Item:
+    item = Item(name=f"{rarity}-{slot}", slot=slot, base_stats=stats, rarity=rarity, ilvl=ilvl)
+    db_session.add(item)
+    await db_session.flush()
+    db_session.add(Inventory(character_id=character.id, item_id=item.id, equipped=equipped))
+    await db_session.flush()
+    return item
+
+
+async def test_group_sellable_by_rarity_groups_and_orders_by_catalog(db_session, character_at) -> None:
+    character = await character_at(50, 50, farm=0)
+    a = await _add_item(db_session, character, slot="weapon", rarity="common", ilvl=10, stats={"str": 2})
+    b = await _add_item(db_session, character, slot="helmet", rarity="common", ilvl=10, stats={"str": 2})
+    await _add_item(db_session, character, slot="armor", rarity="rare", ilvl=10, stats={"str": 5})
+
+    items = await item_service.get_inventory(db_session, character.id)
+    sellable = [(item, item_service.sell_price(item)) for item, equipped in items if not equipped]
+    groups = item_service.group_sellable_by_rarity(sellable)
+
+    assert [g[0].id for g in groups] == ["common", "rare"]  # порядок каталога, не появления
+    common_group = groups[0]
+    assert {i.id for i in common_group[1]} == {a.id, b.id}
+    assert common_group[2] == sum(item_service.sell_price(i) for i in (a, b))
+
+
+def test_group_sellable_by_rarity_empty_input() -> None:
+    assert item_service.group_sellable_by_rarity([]) == []
+
+
+async def test_sell_by_rarity_sells_only_matching_rarity(db_session, character_at) -> None:
+    character = await character_at(50, 50, farm=0)
+    common = await _add_item(db_session, character, slot="weapon", rarity="common", ilvl=10, stats={"str": 2})
+    rare = await _add_item(db_session, character, slot="helmet", rarity="rare", ilvl=10, stats={"str": 5})
+    expected = item_service.sell_price(common)
+
+    gold = await item_service.sell_by_rarity(db_session, character, "common")
+    assert gold == expected
+
+    remaining = await item_service.get_inventory(db_session, character.id)
+    assert [item.id for item, _ in remaining] == [rare.id]
+
+
+async def test_sell_by_rarity_skips_equipped_and_admin_only(db_session, character_at) -> None:
+    character = await character_at(50, 50, farm=0)
+    equipped_item = await _add_item(
+        db_session, character, slot="weapon", rarity="common", ilvl=10, stats={"str": 2}, equipped=True,
+    )
+    sellable_item = await _add_item(db_session, character, slot="helmet", rarity="common", ilvl=10, stats={"str": 2})
+
+    gold = await item_service.sell_by_rarity(db_session, character, "common")
+    assert gold == item_service.sell_price(sellable_item)
+
+    remaining = await item_service.get_inventory(db_session, character.id)
+    assert [item.id for item, _ in remaining] == [equipped_item.id]
+
+
+async def test_sell_all_gear_sells_every_unequipped_item(db_session, character_at) -> None:
+    character = await character_at(50, 50, farm=0)
+    a = await _add_item(db_session, character, slot="weapon", rarity="common", ilvl=10, stats={"str": 2})
+    b = await _add_item(db_session, character, slot="helmet", rarity="rare", ilvl=10, stats={"str": 5})
+    equipped_item = await _add_item(
+        db_session, character, slot="armor", rarity="common", ilvl=10, stats={"str": 2}, equipped=True,
+    )
+
+    gold = await item_service.sell_all_gear(db_session, character)
+    assert gold == item_service.sell_price(a) + item_service.sell_price(b)
+
+    remaining = await item_service.get_inventory(db_session, character.id)
+    assert [item.id for item, _ in remaining] == [equipped_item.id]
+
+
+def test_stronger_than_equipped_flags_only_items_beating_same_slot() -> None:
+    weaker = Item(id=1, name="X", slot="weapon", base_stats={"str": 1})
+    stronger = Item(id=2, name="Y", slot="weapon", base_stats={"str": 10})
+    other_slot = Item(id=3, name="Z", slot="helmet", base_stats={"str": 10})
+    equipped_weapon = Item(id=4, name="W", slot="weapon", base_stats={"str": 5})
+    equipped = {"weapon": equipped_weapon, "helmet": None, "armor": None, "legs": None, "boots": None}
+
+    result = item_service.stronger_than_equipped([weaker, stronger, other_slot], equipped)
+    assert [(item.id, delta) for item, delta in result] == [(2, 5)]  # 10 - 5
+
+
+def test_stronger_than_equipped_empty_slot_never_warns() -> None:
+    item = Item(id=1, name="X", slot="weapon", base_stats={"str": 10})
+    assert item_service.stronger_than_equipped([item], {"weapon": None}) == []
 
 
 def test_format_comparison_empty_slot_shows_dash_and_full_gain() -> None:

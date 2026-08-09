@@ -5,7 +5,6 @@ import json
 
 import bot.keyboards.world as world_kb
 from bot import editable_message
-from bot.keyboards.appraiser import SELL_GEAR_KEYBOARD_MAX_ITEMS, sell_gear_keyboard
 from bot.keyboards.items import INVENTORY_KEYBOARD_MAX_ITEMS, inventory_keyboard
 from config import Settings
 from game.combat import display
@@ -148,16 +147,6 @@ def test_inventory_keyboard_caps_rows_at_vk_limit(monkeypatch) -> None:
     rows = _kb_rows(inventory_keyboard(items))
     assert len(rows) <= 10
     assert len(rows) == INVENTORY_KEYBOARD_MAX_ITEMS  # без миниаппа (URL не задан) — без +1 строки
-
-
-def test_sell_gear_keyboard_caps_rows_at_vk_limit(monkeypatch) -> None:
-    monkeypatch.setattr(world_kb, "get_settings", lambda: Settings(_env_file=None))
-    items = [
-        (Item(id=i, name=f"Предмет {i}", slot="weapon", base_stats={}), 10) for i in range(20)
-    ]
-    rows = _kb_rows(sell_gear_keyboard(items))
-    assert len(rows) <= 10
-    assert len(rows) == SELL_GEAR_KEYBOARD_MAX_ITEMS
 
 
 # --- ч.2: единый формат числовых дельт ---
