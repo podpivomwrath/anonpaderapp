@@ -1,11 +1,12 @@
 """Регресс: клавиатуры с полным набором эликсиров не должны превышать лимиты
-VK для INLINE-клавиатур (ошибка 911 "Keyboard format is invalid") —
-обнаружено при живой проверке лавки зелий (патч 16/17).
+VK (ошибка 911 "Keyboard format is invalid") — обнаружено при живой проверке
+лавки зелий (патч 16/17).
 
-Инлайн-клавиатуры VK ограничены жёстче обычных reply-клавиатур: максимум
-6 рядов И максимум 10 кнопок суммарно (а не 10 рядов × 40 кнопок, как у
-reply-клавиатуры) — поэтому полный каталог из 10 эликсиров уже занимает
-весь лимит и не оставляет места для кнопки мини-аппа."""
+combat_items_keyboard — INLINE (модальный выбор предмета в бою, патч 37 не
+трогает): жёстче лимит — максимум 6 рядов И максимум 10 кнопок суммарно.
+
+shop_keyboard — ОБЫЧНАЯ reply-клавиатура (патч 37: лавка — отдельный экран,
+не inline поверх города) — лимит мягче: 10 рядов × 40 кнопок суммарно."""
 
 import json
 
@@ -19,6 +20,8 @@ from game.content_loader import load_elixirs
 
 VK_INLINE_MAX_ROWS = 6
 VK_INLINE_MAX_BUTTONS = 10
+VK_REPLY_MAX_ROWS = 10
+VK_REPLY_MAX_BUTTONS = 40
 
 
 @pytest.fixture(autouse=True)
@@ -37,10 +40,19 @@ def _assert_within_inline_limits(kb_json: str) -> None:
     assert total_buttons <= VK_INLINE_MAX_BUTTONS
 
 
-def test_shop_keyboard_full_catalog_stays_within_inline_limits() -> None:
+def _assert_within_reply_limits(kb_json: str) -> None:
+    rows = _rows(kb_json)
+    assert len(rows) <= VK_REPLY_MAX_ROWS
+    total_buttons = sum(len(row) for row in rows)
+    assert total_buttons <= VK_REPLY_MAX_BUTTONS
+
+
+def test_shop_keyboard_full_catalog_stays_within_reply_limits_and_is_not_inline() -> None:
     elixirs = list(load_elixirs().values())
     assert len(elixirs) == 10  # весь каталог патча 16 — уже под завязку
-    _assert_within_inline_limits(shop_keyboard(elixirs))
+    kb_json = shop_keyboard(elixirs)
+    assert json.loads(kb_json)["inline"] is False
+    _assert_within_reply_limits(kb_json)
 
 
 def test_combat_items_keyboard_full_stock_stays_within_inline_limits() -> None:

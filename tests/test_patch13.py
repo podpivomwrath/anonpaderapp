@@ -146,7 +146,8 @@ def test_inventory_keyboard_caps_rows_at_vk_limit(monkeypatch) -> None:
     ]
     rows = _kb_rows(inventory_keyboard(items))
     assert len(rows) <= 10
-    assert len(rows) == INVENTORY_KEYBOARD_MAX_ITEMS  # без миниаппа (URL не задан) — без +1 строки
+    # Патч 37: без миниаппа (URL не задан) — предметы + [← Назад] последней строкой.
+    assert len(rows) == INVENTORY_KEYBOARD_MAX_ITEMS + 1
 
 
 # --- ч.2: единый формат числовых дельт ---

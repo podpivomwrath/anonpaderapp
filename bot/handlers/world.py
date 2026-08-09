@@ -17,7 +17,10 @@ from vkbottle.bot import BotLabeler, Message
 
 from bot import ash_handful_state, dailies_texts
 from bot.battle_keyboard import active_battle_keyboard
+from bot.handlers import appraiser as appraiser_handlers
 from bot.handlers import combat as combat_handlers
+from bot.handlers import elixir_shop as elixir_shop_handlers
+from bot.handlers import inventory as inventory_handlers
 from bot.handlers import pvp as pvp_handlers
 from bot.handlers import stats_window
 from bot.keyboards import world as kb
@@ -51,6 +54,7 @@ from services import (
     movement_service,
     preset_service,
     quest_service,
+    screen_service,
     song_service,
     story_service,
     trial_service,
@@ -255,6 +259,9 @@ async def gate_exit_direction(message: Message) -> None:
         if not grid.in_bounds(nx, ny):
             return  # защитная проверка на случай устаревшей клавиатуры
         character.pos_x, character.pos_y = nx, ny
+        # Патч 37: покинутые за воротами экраны (скупщик/лавка/инвентарь)
+        # существуют только в городе — сбрасываем, чтобы не застрять на них.
+        await screen_service.set_screen(db, character, None)
         stats = await _get_stats(db, character.id)
         wallet = await wallet_service.get_wallet(db, character.id)
         farm_currency, donate_currency = wallet.farm_currency, wallet.donate_currency
@@ -779,9 +786,36 @@ def is_busy(peer_id: int) -> bool:
     return peer_id in _exploring or peer_id in _resting
 
 
+# Патч 37: рестроители клавиатуры+текста вложенных экранов, по имени
+# character.screen — общая точка для /клавиатура и восстановления после
+# рестарта бота. Каждый модуль сам решает, относится ли к нему текущий
+# экран (None, если нет) — см. их rebuild().
+_SCREEN_REBUILDERS = (
+    appraiser_handlers.rebuild,
+    elixir_shop_handlers.rebuild,
+    inventory_handlers.rebuild,
+)
+
+
+async def _screen_keyboard(db, character) -> str | None:
+    """Патч 37: если персонаж на вложенном экране (скупщик/лавка/инвентарь и
+    т.п.) — его СОБСТВЕННАЯ клавиатура, а не корневая городская/карточная."""
+    if character.screen is None:
+        return None
+    for rebuild in _SCREEN_REBUILDERS:
+        result = await rebuild(db, character)
+        if result is not None:
+            _, keyboard = result
+            return keyboard
+    return None
+
+
 async def _current_keyboard(db, character, peer_id: int, now: datetime) -> str:
     """Патч 25, п.5: клавиатура под текущее состояние игрока — общая для
-    /клавиатура и финала /застрял. Порядок проверок = приоритет состояний."""
+    /клавиатура и финала /застрял. Порядок проверок = приоритет состояний.
+    Патч 37: вложенный экран (character.screen) — ниже приоритетом, чем
+    бой/перемещение/смерть, поэтому бой всегда перебивает сохранённый экран
+    скупщика/лавки/инвентаря, как и раньше (правило патча 30 не отменяется)."""
     pvp_kb = pvp_handlers.rebuild_keyboard(peer_id)
     if pvp_kb is not None:
         return pvp_kb
@@ -794,6 +828,9 @@ async def _current_keyboard(db, character, peer_id: int, now: datetime) -> str:
         return kb.waiting_keyboard()
     if await _check_still_dead(db, character, now):
         return kb.waiting_keyboard()
+    screen_kb = await _screen_keyboard(db, character)
+    if screen_kb is not None:
+        return screen_kb
     has_mount = await mount_service.has_any_mount(db, character.id)
     region = grid.city_region_at(character.pos_x, character.pos_y)
     if region is not None:
@@ -837,6 +874,10 @@ async def force_unstick(db, character, peer_id: int) -> bool:
     прерывает (защита от абьюза), там только позволяет пересобрать боевую
     клавиатуру у вызывающего. Возвращает True, если PvP-бой активен (вызывающий
     должен сам обработать это отдельно — здесь для админа PvP не трогаем)."""
+    # Патч 37: /застрял всегда возвращает на корневой экран (город/карта) —
+    # даже если PvP не даёт прервать сам бой, застрявший вложенный экран
+    # (скупщик/лавка/инвентарь) сбрасывается.
+    await screen_service.set_screen(db, character, None)
     if pvp_handlers.rebuild_keyboard(peer_id) is not None:
         return True
     if combat_handlers.has_active_encounter(peer_id):
@@ -869,6 +910,7 @@ async def stuck_command(message: Message) -> None:
         if character is None or character.creation_state is not None:
             return
         if await force_unstick(db, character, peer_id):
+            await db.commit()  # патч 37: сброс character.screen должен сохраниться и в PvP-ветке
             await message.answer(STUCK_LINE, keyboard=pvp_handlers.rebuild_keyboard(peer_id))
             return
         now = datetime.now(timezone.utc)

@@ -2,7 +2,17 @@
 Один NPC во всех городах.
 
 Патч 13, ч.1: окно скупщика — ОДНО сообщение, редактируется на месте при
-каждой продаже (поштучно), вместо каскада новых сообщений."""
+каждой продаже (поштучно), вместо каскада новых сообщений.
+
+Патч 37: скупщик — дерево экранов (services/screen_service.py), не одно окно.
+Раньше клавиатура скупщика была INLINE и накапливалась ПОВЕРХ городской
+reply-клавиатуры, которая так и оставалась висеть внизу — при достаточном
+числе кнопок (патч 35 это частично лечило группировкой) экран всё равно
+визуально ломался, а корень проблемы был в том, что клавиатура принадлежала
+сообщению, а не экрану. Теперь вход к скупщику показывает ОБЫЧНУЮ (не inline)
+клавиатуру из 2 действий + назад, которая ЦЕЛИКОМ заменяет городскую; у
+каждого вложенного экрана — свой [← Назад], character.screen хранит текущий
+экран (переживает рестарт бота, см. bot/handlers/world.py::_current_keyboard)."""
 
 from vkbottle.bot import BotLabeler, Message
 
@@ -15,11 +25,10 @@ from bot.appraiser_texts import (
     appraiser_sold,
 )
 from bot.keyboards.appraiser import (
-    BTN_SELL_GEAR,
     GEAR_DETAIL_PAGE_SIZE,
     SELL_ALL_ID,
-    appraiser_keyboard,
-    no_keyboard,
+    appraiser_root_keyboard,
+    appraiser_trophies_keyboard,
     sell_confirm_keyboard,
     sell_gear_detail_keyboard,
     sell_gear_main_keyboard,
@@ -28,7 +37,7 @@ from bot.keyboards.world import BTN_APPRAISER
 from bot.world_texts import FOREIGN_APPRAISER_INTRO_SUFFIX
 from game.combat import balance_config as bc
 from game.world import grid
-from services import daily_service, item_service
+from services import daily_service, item_service, screen_service
 from services import onboarding_service as onboarding_svc
 from services import trophy_service
 from services import wallet_service
@@ -56,18 +65,10 @@ def _intro(price_multiplier: float) -> str:
     return appraiser_intro() + (FOREIGN_APPRAISER_INTRO_SUFFIX if price_multiplier < 1.0 else "")
 
 
-async def _render_appraiser_main(db, character, mult: float) -> str:
-    stock = await trophy_service.get_stock(db, character.id)
-    if not stock:
-        return f"{_intro(mult)}\n\n{appraiser_empty()}"
-    lines = "\n".join(
-        f"{d.emoji} {d.name} ×{count} — {round(d.sell_price * mult) * count} зол." for d, count in stock
-    )
-    return f"{_intro(mult)}\n\n{lines}"
-
-
 @labeler.message(text=[BTN_APPRAISER])
 async def open_appraiser(message: Message) -> None:
+    """Патч 37: корневой экран скупщика — просто выбор «трофеи / снаряжение»,
+    больше не вываливает список трофеев сразу (это теперь appraiser_trophies)."""
     peer_id = message.peer_id
     async with get_session_factory()() as db:
         character = await onboarding_svc.get_character(db, message.from_id)
@@ -77,32 +78,81 @@ async def open_appraiser(message: Message) -> None:
         if region is None:
             return  # скупщик только в городе
         mult = _price_multiplier(character, region)
-        text = await _render_appraiser_main(db, character, mult)
-        stock = await trophy_service.get_stock(db, character.id)
+        await screen_service.set_screen(db, character, "appraiser")
+        await db.commit()
 
     await editable_message.send_or_edit(
-        _bot_api, _NS, peer_id, text, appraiser_keyboard(stock), attachment=appraiser_attachment(),
+        _bot_api, _NS, peer_id, _intro(mult), appraiser_root_keyboard(), attachment=appraiser_attachment(),
     )
 
 
-@labeler.message(payload_contains={"type": "gear_back"})
-async def gear_back(message: Message) -> None:
-    """Патч 35: «← Назад» с основного экрана продажи снаряжения — к трофеям."""
+@labeler.message(payload_contains={"type": "appraiser_root"})
+async def appraiser_root(message: Message) -> None:
+    peer_id = message.peer_id
+    async with get_session_factory()() as db:
+        character = await onboarding_svc.get_character(db, message.from_id)
+        if character is None or character.creation_state is not None:
+            return
+        mult = _price_multiplier(character, grid.city_region_at(character.pos_x, character.pos_y))
+        await screen_service.set_screen(db, character, "appraiser")
+        await db.commit()
+
+    await editable_message.send_or_edit(
+        _bot_api, _NS, peer_id, _intro(mult), appraiser_root_keyboard(), attachment=appraiser_attachment(),
+    )
+
+
+@labeler.message(payload_contains={"type": "appraiser_back"})
+async def appraiser_back(message: Message) -> None:
+    """Патч 37: выход из скупщика целиком — обратно к городской клавиатуре."""
+    from bot.keyboards.world import city_menu_keyboard
+    from services import mount_service, story_service
+
     peer_id = message.peer_id
     async with get_session_factory()() as db:
         character = await onboarding_svc.get_character(db, message.from_id)
         if character is None or character.creation_state is not None:
             return
         region = grid.city_region_at(character.pos_x, character.pos_y)
+        await screen_service.set_screen(db, character, None)
+        await db.commit()
         if region is None:
             return
-        mult = _price_multiplier(character, region)
-        text = await _render_appraiser_main(db, character, mult)
-        stock = await trophy_service.get_stock(db, character.id)
+        has_mount = await mount_service.has_any_mount(db, character.id)
+        is_foreign = region != character.region
+        mentor_badge = not is_foreign and await story_service.mentor_badge_active(db, character)
 
-    await editable_message.send_or_edit(
-        _bot_api, _NS, peer_id, text, appraiser_keyboard(stock), attachment=appraiser_attachment(),
-    )
+    keyboard = city_menu_keyboard(character, mentor_badge, has_mount=has_mount, is_foreign=is_foreign)
+    await editable_message.send_or_edit(_bot_api, _NS, peer_id, "До встречи.", keyboard)
+
+
+async def _render_trophies(db, character, mult: float, prefix: str = "") -> tuple[str, str]:
+    stock = await trophy_service.get_stock(db, character.id)
+    if not stock:
+        text = appraiser_empty()
+    else:
+        lines = "\n".join(
+            f"{d.emoji} {d.name} ×{count} — {round(d.sell_price * mult) * count} зол." for d, count in stock
+        )
+        text = lines
+    if prefix:
+        text = f"{prefix}\n\n{text}"
+    return text, appraiser_trophies_keyboard(stock)
+
+
+@labeler.message(payload_contains={"type": "appraiser_trophies"})
+async def appraiser_trophies(message: Message) -> None:
+    peer_id = message.peer_id
+    async with get_session_factory()() as db:
+        character = await onboarding_svc.get_character(db, message.from_id)
+        if character is None or character.creation_state is not None:
+            return
+        mult = _price_multiplier(character, grid.city_region_at(character.pos_x, character.pos_y))
+        await screen_service.set_screen(db, character, "appraiser_trophies")
+        await db.commit()
+        text, kb = await _render_trophies(db, character, mult)
+
+    await editable_message.send_or_edit(_bot_api, _NS, peer_id, text, kb, attachment=appraiser_attachment())
 
 
 @labeler.message(payload_contains={"type": "sell_trophies"})
@@ -125,29 +175,16 @@ async def sell_trophies(message: Message) -> None:
         daily_progress = await daily_service.record_sell_gold(db, character, gold)
         total = (await wallet_service.get_wallet(db, character.id)).farm_currency
         await db.commit()
-        stock = await trophy_service.get_stock(db, character.id)
-
-    if gold <= 0:
-        await editable_message.send_or_edit(
-            _bot_api, _NS, peer_id, appraiser_empty(), appraiser_keyboard(stock),
-            attachment=appraiser_attachment(),
+        text, kb = await _render_trophies(
+            db, character, mult, prefix=appraiser_sold(gold, total) if gold > 0 else "",
         )
-        return
 
-    if not stock:
-        text = f"{appraiser_sold(gold, total)}\n\n{appraiser_empty()}"
-    else:
-        lines = "\n".join(
-            f"{d.emoji} {d.name} ×{count} — {round(d.sell_price * mult) * count} зол." for d, count in stock
-        )
-        text = f"{appraiser_sold(gold, total)}\n\n{lines}"
-    await editable_message.send_or_edit(
-        _bot_api, _NS, peer_id, text, appraiser_keyboard(stock), attachment=appraiser_attachment(),
-    )
+    await editable_message.send_or_edit(_bot_api, _NS, peer_id, text, kb, attachment=appraiser_attachment())
 
-    daily_notice = dailies_texts.progress_notice(daily_progress)
-    if daily_notice:
-        await _bot_api.messages.send(peer_id=peer_id, message=daily_notice, random_id=0)
+    if gold > 0:
+        daily_notice = dailies_texts.progress_notice(daily_progress)
+        if daily_notice:
+            await _bot_api.messages.send(peer_id=peer_id, message=daily_notice, random_id=0)
 
 
 def _sellable(items: list[tuple], mult: float) -> list[tuple]:
@@ -166,32 +203,32 @@ def _warning_lines(warnings: list[tuple]) -> str:
 
 
 async def _render_gear_main(db, character, mult: float, prefix: str = "") -> tuple[str, str]:
-    """Патч 35: основной экран продажи снаряжения — сгруппирован по редкости
+    """Патч 35/37: экран продажи снаряжения — сгруппирован по редкости
     (до 5 строк) вместо предмета на строку/кнопку."""
     items = await item_service.get_inventory(db, character.id)
     sellable = _sellable(items, mult)
     groups = item_service.group_sellable_by_rarity(sellable)
     if not groups:
         text = appraiser_gear_empty()
-        return (f"{prefix}\n\n{text}" if prefix else text), no_keyboard()
+        return (f"{prefix}\n\n{text}" if prefix else text), sell_gear_main_keyboard([], 0)
 
     grand_total = sum(total for _, _, total in groups)
     lines = "\n".join(
         f"{rdef.emoji} {rdef.name} — {len(gitems)} шт. · {total} зол." for rdef, gitems, total in groups
     )
-    text = f"🎒 Продать снаряжение\n\n{lines}"
+    text = f"🗡 Продать снаряжение\n\n{lines}"
     if prefix:
         text = f"{prefix}\n\n{text}"
     return text, sell_gear_main_keyboard(groups, grand_total)
 
 
 async def _render_gear_detail(db, character, mult: float, page: int, prefix: str = "") -> tuple[str, str]:
-    """Патч 35: подробный режим «По предметам» — постранично, показывает уровень."""
+    """Патч 35/37: подробный режим «По предметам» — постранично, показывает уровень."""
     items = await item_service.get_inventory(db, character.id)
     sellable = _sellable(items, mult)
     if not sellable:
         text = appraiser_gear_empty()
-        return (f"{prefix}\n\n{text}" if prefix else text), no_keyboard()
+        return (f"{prefix}\n\n{text}" if prefix else text), sell_gear_detail_keyboard([], 1, 1)
 
     total_pages = (len(sellable) + GEAR_DETAIL_PAGE_SIZE - 1) // GEAR_DETAIL_PAGE_SIZE
     page = max(1, min(page, total_pages))
@@ -235,30 +272,19 @@ async def _sell_now(peer_id: int, from_id: int, rarity_id: str | None) -> None:
             await _bot_api.messages.send(peer_id=peer_id, message=daily_notice, random_id=0)
 
 
-@labeler.message(text=[BTN_SELL_GEAR])
-async def open_sell_gear(message: Message) -> None:
-    peer_id = message.peer_id
-    async with get_session_factory()() as db:
-        character = await onboarding_svc.get_character(db, message.from_id)
-        if character is None or character.creation_state is not None:
-            return
-        region = grid.city_region_at(character.pos_x, character.pos_y)
-        if region is None:
-            return
-        mult = _price_multiplier(character, region)
-        text, kb = await _render_gear_main(db, character, mult)
-
-    await editable_message.send_or_edit(_bot_api, _NS, peer_id, text, kb)
-
-
-@labeler.message(payload_contains={"type": "gear_back_main"})
-async def gear_back_main(message: Message) -> None:
+@labeler.message(payload_contains={"type": "appraiser_gear"})
+async def appraiser_gear(message: Message) -> None:
+    """Экран продажи снаряжения — открытие из корня скупщика, ОТМЕНА
+    предупреждения и «Назад» из подробного режима ведут сюда же (патч 37:
+    единая точка «показать актуальный экран снаряжения»)."""
     peer_id = message.peer_id
     async with get_session_factory()() as db:
         character = await onboarding_svc.get_character(db, message.from_id)
         if character is None or character.creation_state is not None:
             return
         mult = _price_multiplier(character, grid.city_region_at(character.pos_x, character.pos_y))
+        await screen_service.set_screen(db, character, "appraiser_gear")
+        await db.commit()
         text, kb = await _render_gear_main(db, character, mult)
 
     await editable_message.send_or_edit(_bot_api, _NS, peer_id, text, kb)
@@ -277,6 +303,8 @@ async def gear_detail(message: Message) -> None:
         if character is None or character.creation_state is not None:
             return
         mult = _price_multiplier(character, grid.city_region_at(character.pos_x, character.pos_y))
+        await screen_service.set_screen(db, character, "appraiser_gear_detail")
+        await db.commit()
         text, kb = await _render_gear_detail(db, character, mult, page)
 
     await editable_message.send_or_edit(_bot_api, _NS, peer_id, text, kb)
@@ -387,3 +415,19 @@ async def sell_gear_item(message: Message) -> None:
         daily_notice = dailies_texts.progress_notice(daily_progress)
         if daily_notice:
             await _bot_api.messages.send(peer_id=peer_id, message=daily_notice, random_id=0)
+
+
+async def rebuild(db, character) -> tuple[str, str] | None:
+    """Патч 37: перестроить текст+клавиатуру ТЕКУЩЕГО экрана скупщика для
+    /клавиатура и восстановления после рестарта бота (bot/handlers/world.py).
+    None — character.screen не принадлежит этому модулю."""
+    mult = _price_multiplier(character, grid.city_region_at(character.pos_x, character.pos_y))
+    if character.screen == "appraiser":
+        return _intro(mult), appraiser_root_keyboard()
+    if character.screen == "appraiser_trophies":
+        return await _render_trophies(db, character, mult)
+    if character.screen == "appraiser_gear":
+        return await _render_gear_main(db, character, mult)
+    if character.screen == "appraiser_gear_detail":
+        return await _render_gear_detail(db, character, mult, page=1)
+    return None

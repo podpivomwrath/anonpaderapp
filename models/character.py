@@ -73,6 +73,12 @@ class Character(Base):
     ban_reason: Mapped[str | None] = mapped_column(String(256), nullable=True)
     banned_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
+    # Патч 37: текущий ВЛОЖЕННЫЙ экран (скупщик/лавка/инвентарь и т.п.) — клавиатура
+    # принадлежит экрану, а не сообщению. NULL = корневой экран (город/карта/бой),
+    # его клавиатуру строит bot/handlers/world.py::_current_keyboard как раньше.
+    # Переживает рестарт бота и /клавиатура (см. services/screen_service.py).
+    screen: Mapped[str | None] = mapped_column(String(32), nullable=True)
+
     user: Mapped["User"] = relationship(back_populates="characters")
     stats: Mapped["CharacterStats"] = relationship(
         back_populates="character", uselist=False, cascade="all, delete-orphan"

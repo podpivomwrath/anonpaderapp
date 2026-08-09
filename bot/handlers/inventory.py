@@ -1,16 +1,23 @@
 """Инвентарь экипировки (патч 11, блок 2): список, карточка предмета, надевание.
 
 Патч 13, ч.1: весь просмотр — ОДНО сообщение, редактируется на месте (список
-→ карточка → назад → надеть), вместо каскада новых сообщений."""
+→ карточка → назад → надеть), вместо каскада новых сообщений.
+
+Патч 37: инвентарь — отдельный ЭКРАН (services/screen_service.py). Клавиатура
+списка ОБЫЧНАЯ (не inline) и заменяет городскую целиком (не накапливается
+поверх неё), с явным [← Назад] даже на пустой сумке — раньше пустой инвентарь
+вовсе снимал клавиатуру (no_keyboard()), и деться было некуда, кроме как
+нажать другую городскую кнопку (которая на самом деле оставалась видна, т.к.
+клавиатура была inline) — теперь этой скрытой городской клавиатуры не будет."""
 
 from vkbottle.bot import BotLabeler, Message
 
 from bot import editable_message
-from bot.keyboards.items import INVENTORY_KEYBOARD_MAX_ITEMS, inventory_keyboard, item_view_keyboard, no_keyboard
+from bot.keyboards.items import INVENTORY_KEYBOARD_MAX_ITEMS, inventory_keyboard, item_view_keyboard
 from bot.keyboards.world import BTN_INVENTORY
 from game.world import grid
 from models import Item
-from services import item_service
+from services import item_service, screen_service
 from services import onboarding_service as onboarding_svc
 from services.db import get_session_factory
 
@@ -69,11 +76,10 @@ async def open_inventory(message: Message) -> None:
             return
         if grid.city_region_at(character.pos_x, character.pos_y) is None:
             return  # инвентарь только в городе
+        await screen_service.set_screen(db, character, "inventory")
+        await db.commit()
         text, items = await _render_list(db, character)
 
-    if not items:
-        await editable_message.send_or_edit(_bot_api, _NS, peer_id, text, no_keyboard())
-        return
     await editable_message.send_or_edit(_bot_api, _NS, peer_id, text, inventory_keyboard(items))
 
 
@@ -118,10 +124,31 @@ async def back_to_list(message: Message) -> None:
             return
         text, items = await _render_list(db, character)
 
-    if not items:
-        await editable_message.send_or_edit(_bot_api, _NS, peer_id, text, no_keyboard())
-        return
     await editable_message.send_or_edit(_bot_api, _NS, peer_id, text, inventory_keyboard(items))
+
+
+@labeler.message(payload_contains={"type": "inventory_root_back"})
+async def inventory_root_back(message: Message) -> None:
+    """Патч 37: выход из инвентаря целиком — обратно к городской клавиатуре."""
+    from bot.keyboards.world import city_menu_keyboard
+    from services import mount_service, story_service
+
+    peer_id = message.peer_id
+    async with get_session_factory()() as db:
+        character = await onboarding_svc.get_character(db, message.from_id)
+        if character is None or character.creation_state is not None:
+            return
+        region = grid.city_region_at(character.pos_x, character.pos_y)
+        await screen_service.set_screen(db, character, None)
+        await db.commit()
+        if region is None:
+            return
+        has_mount = await mount_service.has_any_mount(db, character.id)
+        is_foreign = region != character.region
+        mentor_badge = not is_foreign and await story_service.mentor_badge_active(db, character)
+
+    keyboard = city_menu_keyboard(character, mentor_badge, has_mount=has_mount, is_foreign=is_foreign)
+    await editable_message.send_or_edit(_bot_api, _NS, peer_id, "Сумка закрыта.", keyboard)
 
 
 @labeler.message(payload_contains={"type": "inventory_equip"})
@@ -146,5 +173,13 @@ async def equip_from_inventory(message: Message) -> None:
 
     delta_line = item_service.stat_delta_line(old_item, new_item)
     full_text = f"Надето. {delta_line}\n\n{text}"
-    keyboard = inventory_keyboard(items) if items else no_keyboard()
-    await editable_message.send_or_edit(_bot_api, _NS, peer_id, full_text, keyboard)
+    await editable_message.send_or_edit(_bot_api, _NS, peer_id, full_text, inventory_keyboard(items))
+
+
+async def rebuild(db, character) -> tuple[str, str] | None:
+    """Патч 37: перестроить текст+клавиатуру инвентаря для /клавиатура и
+    восстановления после рестарта бота (bot/handlers/world.py)."""
+    if character.screen != "inventory":
+        return None
+    text, items = await _render_list(db, character)
+    return text, inventory_keyboard(items)

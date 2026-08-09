@@ -1,7 +1,10 @@
 """Лавка зелий — Матушка Синель (патч 16). Один NPC во всех городах.
 
 Окно — ОДНО сообщение, редактируется на месте при покупке (патч 13, ч.1),
-как у скупщика трофеев."""
+как у скупщика трофеев.
+
+Патч 37: лавка — отдельный ЭКРАН (services/screen_service.py); клавиатура
+теперь заменяет городскую целиком, есть [← Назад]."""
 
 from vkbottle.bot import BotLabeler, Message
 
@@ -11,7 +14,7 @@ from bot.world_texts import FOREIGN_NPC_REJECTION
 from bot.keyboards.elixir_shop import shop_keyboard
 from bot.keyboards.world import BTN_ELIXIR_SHOP
 from game.world import grid
-from services import elixir_service
+from services import elixir_service, screen_service
 from services import onboarding_service as onboarding_svc
 from services import wallet_service
 from services.db import get_session_factory
@@ -56,6 +59,8 @@ async def open_shop(message: Message) -> None:
         if region != character.region:
             await message.answer(FOREIGN_NPC_REJECTION)  # патч 26: чужой город
             return
+        await screen_service.set_screen(db, character, "elixir_shop")
+        await db.commit()
         counts = await _owned_counts(db, character.id)
 
     await editable_message.send_or_edit(
@@ -63,6 +68,30 @@ async def open_shop(message: Message) -> None:
         shop_keyboard(elixir_service.elixir_defs_ordered()),
         attachment=shop_attachment(),
     )
+
+
+@labeler.message(payload_contains={"type": "elixir_shop_back"})
+async def shop_back(message: Message) -> None:
+    """Патч 37: выход из лавки целиком — обратно к городской клавиатуре."""
+    from bot.keyboards.world import city_menu_keyboard
+    from services import mount_service, story_service
+
+    peer_id = message.peer_id
+    async with get_session_factory()() as db:
+        character = await onboarding_svc.get_character(db, message.from_id)
+        if character is None or character.creation_state is not None:
+            return
+        region = grid.city_region_at(character.pos_x, character.pos_y)
+        await screen_service.set_screen(db, character, None)
+        await db.commit()
+        if region is None:
+            return
+        has_mount = await mount_service.has_any_mount(db, character.id)
+        is_foreign = region != character.region
+        mentor_badge = not is_foreign and await story_service.mentor_badge_active(db, character)
+
+    keyboard = city_menu_keyboard(character, mentor_badge, has_mount=has_mount, is_foreign=is_foreign)
+    await editable_message.send_or_edit(_bot_api, _NS, peer_id, "Матушка Синель кивает на прощание.", keyboard)
 
 
 @labeler.message(payload_contains={"type": "buy_elixir"})
@@ -98,3 +127,12 @@ async def buy_elixir(message: Message) -> None:
         _bot_api, _NS, peer_id, text, shop_keyboard(elixir_service.elixir_defs_ordered()),
         attachment=shop_attachment(),
     )
+
+
+async def rebuild(db, character) -> tuple[str, str] | None:
+    """Патч 37: перестроить текст+клавиатуру лавки для /клавиатура и
+    восстановления после рестарта бота (bot/handlers/world.py)."""
+    if character.screen != "elixir_shop":
+        return None
+    counts = await _owned_counts(db, character.id)
+    return _catalog_text(counts), shop_keyboard(elixir_service.elixir_defs_ordered())
