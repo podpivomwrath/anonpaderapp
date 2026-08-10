@@ -876,18 +876,30 @@ def activity_state(peer_id: int) -> str:
     return "в городе/на карте"
 
 
-async def force_unstick(db, character, peer_id: int) -> bool:
+async def force_unstick(db, character, peer_id: int, *, admin_override: bool = False) -> bool:
     """Аварийный выход из зависшей активности (патч 25, п.5). Общая логика
-    /застрял и админского «Сбросить активности» (патч 27, п.2.3) — PvP НЕ
-    прерывает (защита от абьюза), там только позволяет пересобрать боевую
-    клавиатуру у вызывающего. Возвращает True, если PvP-бой активен (вызывающий
-    должен сам обработать это отдельно — здесь для админа PvP не трогаем)."""
+    /застрял и админского «Сбросить активности» — по умолчанию (admin_override=
+    False, игрок сам себе жмёт /застрял) PvP НЕ прерывает (защита от абьюза),
+    там только позволяет пересобрать боевую клавиатуру у вызывающего и
+    возвращает True — вызывающий должен сам обработать этот случай отдельно,
+    остальные состояния ниже в этом случае НЕ трогаются.
+
+    admin_override=True (патч 39: bot/miniapp_admin_api.py, только с
+    админ-панели) — снимает ВСЕ состояния без исключений, PvP включая: боец
+    помечается погибшим в своём бою (pvp_handlers.force_defeat), а не
+    блокирует сброс остального, как раньше (был баг — PvP-ветка делала
+    ранний return ДО перемещения/маунта/исследования/отдыха, так что если
+    что-то из этого тоже зависло одновременно с PvP, сброс не долечивал
+    ничего). Возвращает False в этом режиме всегда — вызывающий не должен
+    дополнительно ветвиться на PvP."""
     # Патч 37: /застрял всегда возвращает на корневой экран (город/карта) —
     # даже если PvP не даёт прервать сам бой, застрявший вложенный экран
     # (скупщик/лавка/инвентарь) сбрасывается.
     await screen_service.set_screen(db, character, None)
     if pvp_handlers.rebuild_keyboard(peer_id) is not None:
-        return True
+        if not admin_override:
+            return True
+        pvp_handlers.force_defeat(peer_id)
     if combat_handlers.has_active_encounter(peer_id):
         # безнаградный/безштрафной аборт — тот же путь, что и прерывание PvE открытым PvP
         await combat_handlers.interrupt_for_pvp(peer_id)
@@ -902,8 +914,13 @@ async def force_unstick(db, character, peer_id: int) -> bool:
     now = datetime.now(timezone.utc)
     if movement_service.is_traveling(character, now):
         movement_service.cancel_travel(character)
+    # Патч 39: отменяем ЛЮБОЙ активный статус маунт-поездки, не только
+    # "traveling" — active_travel() возвращает и "ambushed" (нападение в
+    # пути, чей бой потерян/прерван), а тот раньше не снимался ВООБЩЕ НИЧЕМ
+    # (ни этой функцией, ни admin_service.reset_activity_db) — см. живой
+    # баг игрока 24815750/char 15: кнопка маунта была заблокирована навсегда.
     active_mount_travel = await mount_service.active_travel(db, character.id)
-    if active_mount_travel is not None and active_mount_travel.status == "traveling":
+    if active_mount_travel is not None:
         await mount_service.cancel_travel(db, active_mount_travel)
     return False
 

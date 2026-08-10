@@ -5,6 +5,7 @@ bot/handlers/world.py::_screen_keyboard/_current_keyboard."""
 import json
 
 import bot.handlers.appraiser as appraiser_handlers
+import bot.handlers.combat as combat_handlers
 import bot.handlers.elixir_shop as elixir_shop_handlers
 import bot.handlers.inventory as inventory_handlers
 import bot.handlers.world as world_handlers
@@ -65,7 +66,15 @@ async def test_world_screen_keyboard_dispatches_to_owning_module(db_session, cha
     assert kb is not None
 
 
-async def test_force_unstick_resets_screen_to_root(db_session, character_at) -> None:
+async def test_force_unstick_resets_screen_to_root(db_session, character_at, monkeypatch) -> None:
+    """combat_handlers.has_active_encounter reads a module-level PvE engine
+    (None outside a running bot process) — stub it so force_unstick's
+    unconditional encounter check doesn't blow up in isolation."""
+    class _FakeEngine:
+        sessions: dict = {}
+
+    monkeypatch.setattr(combat_handlers, "_engine", _FakeEngine())
+
     character = await character_at(50, 50)
     character.screen = "appraiser_gear"
     await world_handlers.force_unstick(db_session, character, peer_id=999999)

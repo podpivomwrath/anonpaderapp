@@ -125,6 +125,31 @@ def has_active_battle(peer_id: int) -> bool:
     return peer_id in _peer_battle
 
 
+def force_defeat(peer_id: int) -> bool:
+    """Патч 39: админский экстренный сброс (bot/handlers/world.py::force_unstick,
+    admin_override=True) — помечает бойца peer_id погибшим в ЕГО текущем
+    PvP-бою (current_hp=0), не трогая структуры battle/session напрямую.
+    Дуэльный или тиковый движок сам разрешит исход обычным путём на
+    следующем ходу/тике (немедленно, если раньше действует соперник, иначе
+    по истечении таймера хода) — вся логика смерти/наград/уведомлений уже
+    существует и рассчитана именно на такое естественное угасание бойца,
+    так что здесь ничего резолвить вручную не нужно. False — peer_id не в бою."""
+    battle_id = _peer_battle.get(peer_id)
+    if battle_id is None:
+        return False
+    battle = _battles.get(battle_id)
+    if battle is None:
+        return False
+    cid = _character_id_for_peer(battle, peer_id)
+    if cid is None:
+        return False
+    combatant = _live_state(battle_id, battle).get(cid)
+    if combatant is None or not combatant.alive:
+        return False
+    combatant.current_hp = 0
+    return True
+
+
 def rebuild_keyboard(peer_id: int) -> str | None:
     """Патч 25: актуальная боевая клавиатура для игрока в PvP-бою, без
     прерывания боя — общая для /клавиатура и PvP-ветки /застрял (там бой

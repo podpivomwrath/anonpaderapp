@@ -19,6 +19,7 @@ from game.combat import balance_config as bc
 from game.content_loader import load_admin_weapons
 from game.economy import mount_config as mc
 from game.world import grid
+from game.world import world_config as wc
 from models import (
     AdminAction,
     BugReport,
@@ -550,14 +551,30 @@ async def restore_hp(db: AsyncSession, admin_vk_id: int, character: Character) -
 
 
 async def reset_activity_db(db: AsyncSession, character: Character) -> None:
-    """DB-часть сброса активности — отмена перемещения/поездки на маунте.
-    Боевую/исследовательскую in-memory часть доделывает bot/miniapp_api.py
-    (см. модульный докстринг) через bot.handlers.world.force_unstick."""
+    """DB-часть админского сброса активности — отмена перемещения/поездки на
+    маунте (ЛЮБОЙ активный статус — "traveling" И "ambushed", см. баг ниже) +
+    телепорт в родной город. Боевую/исследовательскую in-memory часть
+    доделывает bot/miniapp_api.py (см. модульный докстринг) через
+    bot.handlers.world.force_unstick(..., admin_override=True).
+
+    Живой баг (2026-08-09, игрок 24815750/char 15): нападение в пути на
+    маунте (MountTravel.status="ambushed") никогда не разрешилось (бой
+    потерян/прерван), а старая проверка cancel_travel'ила только
+    status=="traveling" — active_travel() же считает "ambushed" активным
+    статусом наравне с "traveling" (см. mount_service.py), так что кнопка
+    маунта продолжала утверждать "ты уже в пути" НАВСЕГДА, и ни /застрял,
+    ни этот сброс её не снимали. Теперь отменяем В ЛЮБОМ случае, когда
+    active_travel() вообще что-то вернул — тот уже сам знает, что считать
+    активным."""
     if movement_service.is_traveling(character):
         movement_service.cancel_travel(character)
     active_mount_travel = await mount_service.active_travel(db, character.id)
-    if active_mount_travel is not None and active_mount_travel.status == "traveling":
+    if active_mount_travel is not None:
         await mount_service.cancel_travel(db, active_mount_travel)
+    if character.region is not None:
+        home = wc.CITY_COORDS.get(character.region)
+        if home is not None:
+            character.pos_x, character.pos_y = home
 
 
 async def log_reset_activity(db: AsyncSession, admin_vk_id: int, character: Character) -> None:

@@ -163,9 +163,13 @@ async def handle_post_action(request: web.Request) -> web.Response:
             elif action == "restore_hp":
                 await admin_service.restore_hp(db, admin_vk_id, character)
             elif action == "reset_activity":
+                # Патч 39: admin_override=True — снимает ВСЕ состояния (в т.ч.
+                # PvP) без ранних выходов и телепортирует в родной город, а
+                # не просто прерывает первое найденное "событие" (см.
+                # докстринг force_unstick и reset_activity_db).
                 peer_id = await onboarding_svc.vk_id_for_character(db, character.id)
                 if peer_id is not None:
-                    await world_handlers.force_unstick(db, character, peer_id)
+                    await world_handlers.force_unstick(db, character, peer_id, admin_override=True)
                 await admin_service.reset_activity_db(db, character)
                 await admin_service.log_reset_activity(db, admin_vk_id, character)
             elif action == "reset_stats":

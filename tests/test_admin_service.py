@@ -239,6 +239,48 @@ async def test_reset_activity_db_cancels_movement(db_session, character_at) -> N
     assert not movement_service.is_traveling(character)
 
 
+async def test_reset_activity_db_cancels_ambushed_mount_travel(db_session, character_at) -> None:
+    """Живой баг (2026-08-09, игрок 24815750/char 15): нападение в пути на
+    маунте (MountTravel.status="ambushed") никогда не разрешилось, а старая
+    проверка cancel_travel'ила только status=="traveling" — active_travel()
+    же считает "ambushed" активным статусом наравне с "traveling", так что
+    кнопка маунта утверждала "ты уже в пути" НАВСЕГДА и сброс её не снимал."""
+    from models import MountTravel
+    from services import mount_service
+
+    character = await character_at(-32, -34, region="scorched")
+    now = datetime.now(timezone.utc)
+    travel = MountTravel(
+        character_id=character.id, mount_id="ashen_steed",
+        from_x=-50, from_y=-49, to_x=-32, to_y=-34,
+        started_at=now, arrives_at=now + timedelta(minutes=2),
+        ambush_at=now, ambush_done=True, status="ambushed",
+    )
+    db_session.add(travel)
+    await db_session.flush()
+
+    assert await mount_service.active_travel(db_session, character.id) is not None
+
+    await admin_service.reset_activity_db(db_session, character)
+
+    assert await mount_service.active_travel(db_session, character.id) is None
+    assert travel.status == "cancelled"
+
+
+async def test_reset_activity_db_teleports_to_home_city(db_session, character_at) -> None:
+    from game.world import world_config as wc
+
+    character = await character_at(-32, -34, region="scorched")
+    await admin_service.reset_activity_db(db_session, character)
+    assert (character.pos_x, character.pos_y) == wc.CITY_COORDS["scorched"]
+
+
+async def test_reset_activity_db_no_teleport_without_region(db_session, character_at) -> None:
+    character = await character_at(5, 5)  # region=None (онбординг не завершён/легаси)
+    await admin_service.reset_activity_db(db_session, character)
+    assert (character.pos_x, character.pos_y) == (5, 5)
+
+
 async def test_reset_stats_returns_to_starting_allocation(db_session, make_character) -> None:
     character = await make_character(base_class="warrior")
     stats = await db_session.scalar(select(CharacterStats).where(CharacterStats.character_id == character.id))

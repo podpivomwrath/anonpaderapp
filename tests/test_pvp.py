@@ -470,6 +470,83 @@ def test_default_enemy_target_picks_alive_opponent() -> None:
     assert target == 2  # только живой враг доступен
 
 
+# --- Патч 39: force_defeat — админский экстренный выход из PvP ---
+
+
+def test_force_defeat_marks_combatant_dead_and_returns_true() -> None:
+    battle = _make_battle("mass", (0, 0))
+    session = CombatSessionState(session_id=-20, mode=CombatMode.PVP_GROUP)
+    me = combatant(1, side=0)
+    enemy = combatant(2, side=1)
+    session.add(me)
+    session.add(enemy)
+    pvp_handlers._mass_engine.sessions[-20] = session
+    battle.participants = {1: pvp_handlers.Participant(1, 111, "Я", "warrior", "Воин")}
+    pvp_handlers._battles[-20] = battle
+    pvp_handlers._peer_battle[111] = -20
+
+    assert pvp_handlers.force_defeat(111) is True
+    assert session.combatants[1].current_hp == 0
+    assert session.combatants[1].alive is False
+
+
+def test_force_defeat_false_when_not_in_battle() -> None:
+    assert pvp_handlers.force_defeat(999999) is False
+
+
+def test_force_defeat_false_when_already_dead() -> None:
+    battle = _make_battle("mass", (0, 0))
+    session = CombatSessionState(session_id=-21, mode=CombatMode.PVP_GROUP)
+    me = combatant(1, side=0)
+    me.current_hp = 0
+    session.add(me)
+    pvp_handlers._mass_engine.sessions[-21] = session
+    battle.participants = {1: pvp_handlers.Participant(1, 111, "Я", "warrior", "Воин")}
+    pvp_handlers._battles[-21] = battle
+    pvp_handlers._peer_battle[111] = -21
+
+    assert pvp_handlers.force_defeat(111) is False
+
+
+async def test_force_unstick_admin_override_defeats_pvp_and_still_resets_rest(
+    db_session, character_at, monkeypatch,
+) -> None:
+    """Патч 39, regression: раньше активный PvP-бой обрывал force_unstick
+    РАНЬШЕ, чем очищались explore/rest/движение/маунт — если игрок каким-то
+    образом застрял ОДНОВРЕМЕННО в PvP и, скажем, в "исследовании", админский
+    сброс не долечивал вторую часть вовсе. admin_override=True обязан
+    доводить сброс до конца независимо от PvP."""
+    import bot.handlers.combat as combat_handlers
+    import bot.handlers.world as world_handlers
+
+    class _FakeEngine:
+        sessions: dict = {}
+
+    monkeypatch.setattr(combat_handlers, "_engine", _FakeEngine())
+
+    character = await character_at(0, 0)
+    peer_id = 424242
+
+    battle = pvp_handlers.Battle(battle_type="mass", location=(0, 0))
+    session = CombatSessionState(session_id=-30, mode=CombatMode.PVP_GROUP)
+    me = combatant(character.id, side=0)
+    enemy = combatant(character.id + 1, side=1)
+    session.add(me)
+    session.add(enemy)
+    pvp_handlers._mass_engine.sessions[-30] = session
+    battle.participants = {character.id: pvp_handlers.Participant(character.id, peer_id, character.name, "warrior", "Воин")}
+    pvp_handlers._battles[-30] = battle
+    pvp_handlers._peer_battle[peer_id] = -30
+
+    world_handlers._exploring.add(peer_id)
+
+    result = await world_handlers.force_unstick(db_session, character, peer_id, admin_override=True)
+
+    assert result is False  # не ветвится отдельно на PvP в админском режиме
+    assert session.combatants[character.id].alive is False  # PvP-боец "погиб"
+    assert peer_id not in world_handlers._exploring  # и остальное всё равно снято
+
+
 def test_character_id_for_peer() -> None:
     battle = _make_battle("duel", (0, 0))
     battle.participants[7] = pvp_handlers.Participant(7, 555, "Кто-то", "warrior", "Воин")
