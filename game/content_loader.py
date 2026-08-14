@@ -133,6 +133,32 @@ def load_base_skills(content_dir: Path = CONTENT_DIR) -> dict[str, list[BaseSkil
     }
 
 
+class SubclassSkillDef(BaseModel):
+    """Навык подкласса (content/skills/subclass_skills.json, патч 39, ч.3):
+    заменяет базовые навыки класса после выбора подкласса на 30 ур."""
+
+    id: str
+    name: str
+    subclass_id: str
+    multiplier: float
+    cd: int
+    effect: str | None = None
+    effect_value: float = 0.0
+    effect_duration: int = 0
+    flavor: str = ""
+
+
+def load_subclass_skills(content_dir: Path = CONTENT_DIR) -> dict[str, list[SubclassSkillDef]]:
+    """{subclass_id: [навыки]} из content/skills/subclass_skills.json."""
+    with (content_dir / "skills" / "subclass_skills.json").open(encoding="utf-8") as f:
+        raw = json.load(f)
+    defs = [SubclassSkillDef(**s) for k, s in raw.items() if not k.startswith("_")]
+    by_subclass: dict[str, list[SubclassSkillDef]] = {}
+    for skill in defs:
+        by_subclass.setdefault(skill.subclass_id, []).append(skill)
+    return by_subclass
+
+
 class TrophyDef(BaseModel):
     """Градация трофея (content/trophies.json, патч 9) — стакающийся ресурс,
     не отдельные предметы."""

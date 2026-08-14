@@ -28,13 +28,16 @@ from bot.onboarding_texts import REGION_TITLES
 from bot.world_summary import location_attachment, location_summary
 from bot.world_texts import (
     FOREIGN_NPC_REJECTION,
+    city_square_text,
     event_attachment,
     foreign_city_entry_text,
     hub_attachment,
+    market_quarter_text,
     mentor_attachment,
     mentor_intro,
     mentor_name,
     mentor_praise,
+    tavern_text,
 )
 from game.combat import display
 from game.economy import story_config as sc
@@ -172,6 +175,27 @@ async def _maybe_trigger_story(peer_id: int, db, character, stats) -> bool:
     return True
 
 
+async def _render_city_screen(db, character, screen: str | None) -> tuple[str, str] | None:
+    """Патч 39: город разбит на кварталы (Главная площадь = screen None,
+    "tavern", "market_quarter") — единый рендер и для входа/навигации, и для
+    восстановления (/клавиатура, рестарт бота, см. _screen_keyboard ниже).
+    None — персонаж сейчас не в городе (эти экраны существуют только там).
+    Таверна недоступна в чужом городе (патч 26/39) — откатываемся на площадь
+    вместо того, чтобы падать в пустой экран."""
+    region = grid.city_region_at(character.pos_x, character.pos_y)
+    if region is None:
+        return None
+    is_foreign = region != character.region
+    if screen == "tavern" and not is_foreign:
+        return tavern_text(region), kb.tavern_keyboard(character)
+    if screen == "market_quarter":
+        return market_quarter_text(region, is_foreign), kb.market_quarter_keyboard(is_foreign)
+    has_mount = await mount_service.has_any_mount(db, character.id)
+    mentor_badge = not is_foreign and await story_service.mentor_badge_active(db, character)
+    text = foreign_city_entry_text(REGION_TITLES[region]) if is_foreign else city_square_text(region)
+    return text, kb.city_square_keyboard(character, mentor_badge, has_mount=has_mount, is_foreign=is_foreign)
+
+
 async def show_location(message: Message, db, character) -> None:
     """Показывает текущий контекст персонажа: город / клетка карты / в пути / мёртв."""
     await _deliver_daily_notice(message.peer_id, character)
@@ -197,19 +221,16 @@ async def show_location(message: Message, db, character) -> None:
         await message.answer("⚔️ Ты в бою — реши его исход.")
         return
 
-    has_mount = await mount_service.has_any_mount(db, character.id)
     region = grid.city_region_at(character.pos_x, character.pos_y)
     if region is not None:
-        is_foreign = region != character.region
-        mentor_badge = not is_foreign and await story_service.mentor_badge_active(db, character)
-        text = foreign_city_entry_text(REGION_TITLES[region]) if is_foreign else f"Ты в городе: {REGION_TITLES[region]}"
-        await message.answer(
-            text,
-            attachment=hub_attachment(region),
-            keyboard=kb.city_menu_keyboard(character, mentor_badge, has_mount=has_mount, is_foreign=is_foreign),
-        )
+        # Патч 39: show_location — всегда "свежий" показ города, корневой
+        # экран (Главная площадь), а не сохранённый квартал.
+        await screen_service.set_screen(db, character, None)
+        text, keyboard = await _render_city_screen(db, character, None)
+        await message.answer(text, attachment=hub_attachment(region), keyboard=keyboard)
         return
 
+    has_mount = await mount_service.has_any_mount(db, character.id)
     stats = await _get_stats(db, character.id)
     if await _maybe_trigger_story(message.peer_id, db, character, stats):
         return
@@ -588,9 +609,9 @@ async def handle_rest_done(peer_id: int) -> None:
         await db.commit()
         region = grid.city_region_at(character.pos_x, character.pos_y)
         if region is not None:
-            is_foreign = region != character.region
-            mentor_badge = not is_foreign and await story_service.mentor_badge_active(db, character)
-            keyboard = kb.city_menu_keyboard(character, mentor_badge, has_mount=has_mount, is_foreign=is_foreign)
+            # Патч 39: отдых начинается из Таверны — после него возвращаемся
+            # туда же (character.screen), а не сбрасываем на площадь.
+            _, keyboard = await _render_city_screen(db, character, character.screen)
         else:
             keyboard = kb.movement_keyboard(character.pos_x, character.pos_y, peer_id, has_mount=has_mount)
     await _deliver_daily_notice(peer_id, character)
@@ -659,25 +680,18 @@ async def handle_arrival(peer_id: int) -> None:
         if character.subclass is not None:
             await trial_service.record_cell_moved(db, character)
         await daily_service.record_cell_moved(db, character)
-        has_mount = await mount_service.has_any_mount(db, character.id)
         await db.commit()
         await _deliver_daily_notice(peer_id, character)
         region = grid.city_region_at(character.pos_x, character.pos_y)
         if region is not None:
-            is_foreign = region != character.region
-            mentor_badge = not is_foreign and await story_service.mentor_badge_active(db, character)
-            text = (
-                foreign_city_entry_text(REGION_TITLES[region]) if is_foreign
-                else f"Ты выходишь к воротам: {REGION_TITLES[region]}"
-            )
+            # Патч 39: прибытие в город — всегда корневой экран (площадь).
+            await screen_service.set_screen(db, character, None)
+            text, keyboard = await _render_city_screen(db, character, None)
             await _bot_api.messages.send(
-                peer_id=peer_id,
-                message=text,
-                random_id=0,
-                attachment=hub_attachment(region),
-                keyboard=kb.city_menu_keyboard(character, mentor_badge, has_mount=has_mount, is_foreign=is_foreign),
+                peer_id=peer_id, message=text, random_id=0, attachment=hub_attachment(region), keyboard=keyboard,
             )
             return
+        has_mount = await mount_service.has_any_mount(db, character.id)
         stats = await _get_stats(db, character.id)
         if await _maybe_trigger_story(peer_id, db, character, stats):
             return
@@ -773,6 +787,61 @@ async def visit_market(message: Message) -> None:
     await message.answer("Торговцы раскладывают товар. Скоро здесь можно будет торговать.")
 
 
+# --- Патч 39: кварталы города — переходы между Площадью/Таверной/Торговым квартаром ---
+
+
+@labeler.message(text=[kb.BTN_TAVERN])
+async def open_tavern(message: Message) -> None:
+    async with get_session_factory()() as db:
+        character = await onboarding_svc.get_character(db, message.from_id)
+        if character is None or character.creation_state is not None:
+            return
+        region = grid.city_region_at(character.pos_x, character.pos_y)
+        if region is None:
+            return  # таверна только в городе
+        if region != character.region:
+            # Таверна — не для чужаков (в отличие от Торгового квартала), в
+            # отличие от старого личного меню (Отдых/Характеристики и т.п.
+            # раньше работали и в чужом городе — патч 39 сознательно это
+            # ужесточает: см. текст патча, часть 2).
+            await message.answer(FOREIGN_NPC_REJECTION)
+            return
+        await screen_service.set_screen(db, character, "tavern")
+        await db.commit()
+        text, keyboard = await _render_city_screen(db, character, "tavern")
+    await message.answer(text, keyboard=keyboard)
+
+
+@labeler.message(text=[kb.BTN_MARKET_QUARTER])
+async def open_market_quarter(message: Message) -> None:
+    async with get_session_factory()() as db:
+        character = await onboarding_svc.get_character(db, message.from_id)
+        if character is None or character.creation_state is not None:
+            return
+        region = grid.city_region_at(character.pos_x, character.pos_y)
+        if region is None:
+            return  # торговый квартал только в городе
+        await screen_service.set_screen(db, character, "market_quarter")
+        await db.commit()
+        text, keyboard = await _render_city_screen(db, character, "market_quarter")
+    await message.answer(text, keyboard=keyboard)
+
+
+@labeler.message(text=[kb.BTN_SQUARE_BACK])
+async def back_to_square(message: Message) -> None:
+    async with get_session_factory()() as db:
+        character = await onboarding_svc.get_character(db, message.from_id)
+        if character is None or character.creation_state is not None:
+            return
+        region = grid.city_region_at(character.pos_x, character.pos_y)
+        if region is None:
+            return
+        await screen_service.set_screen(db, character, None)
+        await db.commit()
+        text, keyboard = await _render_city_screen(db, character, None)
+    await message.answer(text, attachment=hub_attachment(region), keyboard=keyboard)
+
+
 @labeler.message(text=["/квест", "/quest"])
 async def quest_reminder(message: Message) -> None:
     """Напоминание текущей сюжетной цели (патч 18, п.5 патча 21)."""
@@ -807,9 +876,15 @@ _SCREEN_REBUILDERS = (
 
 async def _screen_keyboard(db, character) -> str | None:
     """Патч 37: если персонаж на вложенном экране (скупщик/лавка/инвентарь и
-    т.п.) — его СОБСТВЕННАЯ клавиатура, а не корневая городская/карточная."""
+    т.п.) — его СОБСТВЕННАЯ клавиатура, а не корневая городская/карточная.
+    Патч 39: "tavern"/"market_quarter" — кварталы города, тоже вложенные
+    экраны, но живут прямо в этом модуле (не отдельный handler-файл), см.
+    _render_city_screen."""
     if character.screen is None:
         return None
+    if character.screen in ("tavern", "market_quarter"):
+        result = await _render_city_screen(db, character, character.screen)
+        return result[1] if result is not None else None
     for rebuild in _SCREEN_REBUILDERS:
         result = await rebuild(db, character)
         if result is not None:
@@ -839,12 +914,11 @@ async def _current_keyboard(db, character, peer_id: int, now: datetime) -> str:
     screen_kb = await _screen_keyboard(db, character)
     if screen_kb is not None:
         return screen_kb
-    has_mount = await mount_service.has_any_mount(db, character.id)
     region = grid.city_region_at(character.pos_x, character.pos_y)
     if region is not None:
-        is_foreign = region != character.region
-        mentor_badge = not is_foreign and await story_service.mentor_badge_active(db, character)
-        return kb.city_menu_keyboard(character, mentor_badge, has_mount=has_mount, is_foreign=is_foreign)
+        _, keyboard = await _render_city_screen(db, character, character.screen)
+        return keyboard
+    has_mount = await mount_service.has_any_mount(db, character.id)
     return kb.movement_keyboard(character.pos_x, character.pos_y, peer_id, has_mount=has_mount)
 
 

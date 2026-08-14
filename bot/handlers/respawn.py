@@ -21,7 +21,7 @@ from bot.vk_media import photo_attachment
 from game.world import flavor
 from game.world import world_config as wc
 from models import Character, User
-from services import death_service, vitals_service
+from services import death_service, screen_service, vitals_service
 from services.db import get_session_factory
 
 _bot_api = None
@@ -97,6 +97,8 @@ async def scan() -> None:
                 death_service.respawn_if_ready(character, now)
                 vitals_service.restore_full(character)
                 character.pos_x, character.pos_y = wc.CITY_COORDS[character.region]
+                # Патч 39: возрождение — всегда корневой экран (площадь).
+                await screen_service.set_screen(db, character, None)
                 to_revive.append((vk_id, character.region))
             else:
                 to_update.append((vk_id, character.respawn_at))
@@ -113,7 +115,7 @@ async def scan() -> None:
             peer_id=peer_id,
             message=text,
             random_id=0,
-            keyboard=kb.city_menu_keyboard(),
+            keyboard=kb.city_square_keyboard(),
         )
 
     if _live_countdown:

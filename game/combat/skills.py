@@ -148,7 +148,9 @@ def compute_hit(
     base *= outgoing_multiplier(actor, target)
     base *= 1.0 + target.effect_total(EffectKind.VULNERABILITY)
     base *= 1.0 - effective_mitigation(target)
-    base *= 1.0 - target.block_reduction
+    # Глухая оборона (патч 39) — многоходовый блок, не суммируется с однотиковым
+    # block_reduction (напр. Живительный блок пресета), берём максимум.
+    base *= 1.0 - max(target.block_reduction, target.effect_total(EffectKind.BLOCK_STANCE))
     # Осколочная кровь (патч 16): фикс. бонус урона за удар, НЕ от статов —
     # добавляется ПОСЛЕ всех множителей, не масштабируется крит/митигацией.
     base += actor.effect_total(EffectKind.FLAT_DAMAGE_BONUS)

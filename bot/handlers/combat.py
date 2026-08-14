@@ -30,6 +30,7 @@ from game.combat import balance_config as bc
 from game.combat import display
 from game.combat import elixir_effects
 from game.combat.base_skills import BASE_SKILL_DEFS
+from game.combat.subclass_skills import SUBCLASS_SKILL_DEFS
 from game.combat.battle_report import BattleTracker
 from game.combat import formulas
 from game.combat.resolver import TickResult
@@ -141,7 +142,7 @@ async def _persist_hp(peer_id: int, hp: int) -> None:
 def _combat_kb(state: CombatSessionState, peer_id: int) -> str:
     base_class = _encounter_class.get(peer_id, "warrior")
     player = state.combatants[PLAYER_ID]
-    return combat_keyboard(base_class, player.cooldowns)
+    return combat_keyboard(base_class, player.cooldowns, subclass_id=player.subclass_id)
 
 
 def rebuild_keyboard(peer_id: int) -> str | None:
@@ -529,7 +530,7 @@ async def use_skill(message: Message) -> None:
         return
     payload = message.get_payload_json() or {}
     skill_id = payload.get("id")
-    if skill_id not in BASE_SKILL_DEFS:
+    if skill_id not in BASE_SKILL_DEFS and skill_id not in SUBCLASS_SKILL_DEFS:
         return
     state = _engine.sessions[message.peer_id]
     player = state.combatants[PLAYER_ID]

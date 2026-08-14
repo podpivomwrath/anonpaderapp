@@ -23,7 +23,7 @@ from bot.keyboards.list_keeper import (
     path_view_keyboard,
     paths_keyboard,
 )
-from bot.keyboards.world import BTN_KEEPER, city_menu_keyboard
+from bot.keyboards.world import BTN_KEEPER, tavern_keyboard
 from bot.vk_media import photo_attachment
 from bot.world_texts import FOREIGN_NPC_REJECTION, mentor_name
 from game.classes.base import REGISTRY
@@ -33,7 +33,7 @@ from game.content_loader import load_npc_texts
 from game.world import grid
 from models import CharacterStats
 from services import onboarding_service as onboarding_svc
-from services import story_service, subclass_service, trial_service, wallet_service
+from services import screen_service, story_service, subclass_service, trial_service, wallet_service
 from services.db import get_session_factory
 from services.wallet_service import NotEnoughCurrency
 
@@ -101,7 +101,10 @@ async def _send_trials(peer_id: int, character) -> None:
         if character is None:
             return
         states = await trial_service.get_trial_states(db, character)
-        mentor_badge = await story_service.mentor_badge_active(db, character)
+        # Патч 39: Хранитель Списков живёт в Таверне — назад из его окна
+        # возвращает туда, не сразу на площадь.
+        await screen_service.set_screen(db, character, "tavern")
+        await db.commit()
 
     remaining = [s for s in states if not s.unlocked]
     opened = [s for s in states if s.unlocked]
@@ -123,7 +126,7 @@ async def _send_trials(peer_id: int, character) -> None:
         text = "\n".join(lines)
     await _bot_api.messages.send(
         peer_id=peer_id, message=text, random_id=0,
-        keyboard=city_menu_keyboard(character, mentor_badge), attachment=KEEPER_ATTACHMENT,
+        keyboard=tavern_keyboard(character), attachment=KEEPER_ATTACHMENT,
     )
 
 
@@ -188,12 +191,12 @@ async def offer_leave(message: Message) -> None:
         if character is None:
             return
         await _set_select_state(db, character, None)
-        mentor_badge = await story_service.mentor_badge_active(db, character)
+        await screen_service.set_screen(db, character, "tavern")
         await db.commit()
     await _dispenser.delete(message.peer_id)
     await message.answer(
         "Хорошо. Возвращайся, когда будешь готов.",
-        keyboard=city_menu_keyboard(character, mentor_badge),
+        keyboard=tavern_keyboard(character),
     )
 
 

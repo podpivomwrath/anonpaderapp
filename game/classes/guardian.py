@@ -1,18 +1,24 @@
 """Страж (Guardian) — Воин, естественная роль: Танк (дотягивается до Саппорта).
 
-РЕФЕРЕНСНЫЙ подкласс: полностью реализован, остальные 5 — по этой же структуре.
-
-Механики (без позиционирования, тиковая боёвка):
-  - Блок — реактивная защита, срезает входящий урон в этот же тик;
-  - Провокация — PvE: жёсткий форс цели мобов (мобы ходят после игроков);
-    PvP: дебаф «урон по другим целям снижен, если враг не бил провоцирующего»;
-  - Групповой щит — часть защиты уходит союзнику с наименьшим % HP.
+Кит патча 39, ч.3 (content/skills/subclass_skills.json):
+  - Удар щитом — урон + Провокация (PvE: форс цели мобов; PvP: дебаф урона
+    противника по другим целям);
+  - Глухая оборона — многоходовый блок (EffectKind.BLOCK_STANCE) + самолечение
+    за срезанные удары (EffectKind.BLOCK_HEAL, резолвится в resolver.py);
+    ТАКЖЕ сохраняет интеграцию с микробаффами активного пресета (патч 14, ч.3:
+    full_block_chance/heal_on_block_pct_max_hp/counterstrike_mult) — это
+    отдельная, всё ещё активная фича, не часть контента подкласса;
+  - Каменная хватка — урон + оглушение, дженерик-навык (effect="stun" в JSON,
+    регистрируется автоматически в game/combat/subclass_skills.py);
+  - Несокрушимый — потолок входящего урона за удар (EffectKind.DAMAGE_CAP,
+    резолвится в resolver.py).
 """
 
 from game.classes.base import Role, SubclassDef, register
 from game.combat import balance_config as bc
 from game.combat.session import CombatMode, Effect, EffectKind
 from game.combat.skills import PendingHeal, SkillContext, compute_hit, defensive_skill
+from game.combat.subclass_skills import SUBCLASS_SKILL_DEFS
 
 GUARDIAN = register(
     SubclassDef(
@@ -22,24 +28,63 @@ GUARDIAN = register(
         primary_stat="str",
         natural_role=Role.TANK,
         flexible_roles=(Role.SUPPORT,),
-        skills=("attack", "guardian_block", "guardian_provoke", "guardian_group_shield"),
+        skills=("attack", "guardian_shield_bash", "guardian_block", "guardian_stonegrip", "guardian_unbreakable"),
     )
 )
+
+_BLOCK = SUBCLASS_SKILL_DEFS["guardian_block"]
+_UNBREAKABLE = SUBCLASS_SKILL_DEFS["guardian_unbreakable"]
+
+
+@defensive_skill("guardian_shield_bash")
+def shield_bash(ctx: SkillContext) -> None:
+    """Удар щитом: 130% урона + Провокация на 2 хода (PvE — форс цели мобов,
+    PvP — дебаф урона противника по остальным целям). ЗАЩИТНЫЙ навык (не
+    зависит от фазы атаки моба — провокация должна успеть подействовать в
+    этот же ход)."""
+    skill = SUBCLASS_SKILL_DEFS["guardian_shield_bash"]
+    actor = ctx.actor
+    actor.cooldowns[skill.id] = skill.cd
+    target = ctx.resolve_target()
+    if target is not None:
+        ctx.hits.append(compute_hit(actor, target, ctx.rng, skill.name, skill.multiplier, is_ability=True))
+
+    enemies = ctx.session.alive_enemies_of(actor)
+    if ctx.session.mode == CombatMode.PVE:
+        for enemy in enemies:
+            if enemy.kind == "mob":
+                enemy.taunted_by = actor.id
+        ctx.lines.append(f"{actor.name} провоцирует врагов — цели мобов форсированы!")
+    else:
+        for enemy in enemies:
+            enemy.effects.append(
+                Effect(
+                    kind=EffectKind.PROVOKE_PVP,
+                    value=bc.PROVOKE_PVP_DAMAGE_REDUCTION,
+                    remaining_ticks=bc.PROVOKE_PVP_DURATION_TICKS,
+                    source_id=actor.id,
+                )
+            )
+        ctx.lines.append(f"{actor.name} провоцирует: урон противников по другим целям снижен")
 
 
 @defensive_skill("guardian_block")
 def block(ctx: SkillContext) -> None:
-    """Блок: снижает входящий урон этого тика. Микробаффы активного пресета
-    (патч 14, ч.3) добавляют: шанс ПОЛНОГО блока (Несокрушимость), самоисцеление
-    при блоке (Живительный блок), контрудар (Возмездие)."""
+    """Глухая оборона: без урона, 2 хода снижения урона + самолечение за
+    срезанные удары. Микробаффы активного пресета (патч 14, ч.3) добавляют:
+    шанс ПОЛНОГО блока (Несокрушимость), самоисцеление при блоке (Живительный
+    блок), контрудар (Возмездие) — читаются из buff_modifiers как и раньше."""
     actor = ctx.actor
+    actor.cooldowns[_BLOCK.id] = _BLOCK.cd
+
     full_block_chance = actor.buff_modifiers.get("full_block_chance", 0.0)
     if full_block_chance > 0 and ctx.rng.random() < full_block_chance:
         actor.block_reduction = 1.0
         ctx.lines.append(f"{actor.name} блокирует удар ПОЛНОСТЬЮ 🛡✨")
     else:
-        actor.block_reduction = max(actor.block_reduction, bc.GUARDIAN_BLOCK_REDUCTION)
-        ctx.lines.append(f"{actor.name} поднимает щит (блок) 🛡")
+        actor.apply_effect(EffectKind.BLOCK_STANCE, _BLOCK.effect_value, _BLOCK.effect_duration, actor.id)
+        ctx.lines.append(f"{actor.name} уходит в глухую оборону 🛡")
+    actor.apply_effect(EffectKind.BLOCK_HEAL, bc.GUARDIAN_BLOCK_HEAL_PCT, _BLOCK.effect_duration, actor.id)
 
     heal_pct = actor.buff_modifiers.get("heal_on_block_pct_max_hp", 0.0)
     if heal_pct > 0:
@@ -63,38 +108,10 @@ def block(ctx: SkillContext) -> None:
             )
 
 
-@defensive_skill("guardian_provoke")
-def provoke(ctx: SkillContext) -> None:
-    """Провокация: PvE — форс цели мобов, PvP — дебаф на урон по другим целям."""
-    enemies = ctx.session.alive_enemies_of(ctx.actor)
-    if ctx.session.mode == CombatMode.PVE:
-        for enemy in enemies:
-            if enemy.kind == "mob":
-                enemy.taunted_by = ctx.actor.id
-        ctx.lines.append(f"{ctx.actor.name} провоцирует врагов — цели мобов форсированы!")
-    else:
-        for enemy in enemies:
-            enemy.effects.append(
-                Effect(
-                    kind=EffectKind.PROVOKE_PVP,
-                    value=bc.PROVOKE_PVP_DAMAGE_REDUCTION,
-                    remaining_ticks=bc.PROVOKE_PVP_DURATION_TICKS,
-                    source_id=ctx.actor.id,
-                )
-            )
-        ctx.lines.append(
-            f"{ctx.actor.name} провоцирует: урон противников по другим целям снижен"
-        )
-
-
-@defensive_skill("guardian_group_shield")
-def group_shield(ctx: SkillContext) -> None:
-    """Групповой щит: часть защиты уходит союзнику с наименьшим % HP."""
-    allies = ctx.session.alive_allies_of(ctx.actor)
-    target = min(allies, key=lambda c: c.current_hp / c.max_hp) if allies else ctx.actor
-    absorb = round(ctx.actor.stats.vitality * bc.GUARDIAN_SHIELD_PER_VIT)
-    target.shield += absorb
-    if target.id != ctx.actor.id:
-        # отдал часть своей защиты — штраф к собственной митигации в этот тик
-        ctx.actor.mitigation_penalty = bc.GUARDIAN_SHIELD_SELF_PENALTY
-    ctx.lines.append(f"{ctx.actor.name} накрывает щитом {target.name} (+{absorb} поглощения)")
+@defensive_skill("guardian_unbreakable")
+def unbreakable(ctx: SkillContext) -> None:
+    """Несокрушимый: без урона, 3 хода потолок входящего урона за удар."""
+    actor = ctx.actor
+    actor.cooldowns[_UNBREAKABLE.id] = _UNBREAKABLE.cd
+    actor.apply_effect(EffectKind.DAMAGE_CAP, _UNBREAKABLE.effect_value, _UNBREAKABLE.effect_duration, actor.id)
+    ctx.lines.append(f"{actor.name} застывает несокрушимой глыбой")

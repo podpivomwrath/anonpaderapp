@@ -17,6 +17,7 @@ from dataclasses import dataclass, field
 
 import game.classes  # noqa: F401  — регистрация умений подклассов
 import game.combat.base_skills as base_skills  # регистрация базовых навыков + метаданные
+import game.combat.subclass_skills as subclass_skills  # регистрация навыков подклассов + метаданные
 from game.combat import combat_flavor, control, display, formulas
 from game.combat.session import (
     ActionType,
@@ -156,7 +157,10 @@ def resolve_tick(
     for cid, action in normalized.items():
         if cid in frozen_at_start:
             continue
-        if action.type == ActionType.SKILL and base_skills.is_control_skill(action.skill_id):
+        if action.type == ActionType.SKILL and (
+            base_skills.is_control_skill(action.skill_id)
+            or subclass_skills.is_control_skill(action.skill_id)
+        ):
             _run_offensive(ctx, cid, action, session, result)
             control_actors.add(cid)
 
@@ -266,6 +270,24 @@ def resolve_tick(
     for hit in ctx.hits:
         target = session.combatants[hit.target_id]
         amount = hit.amount
+        # Несокрушимый (патч 39): входящий урон за удар не может превышать
+        # value*maxHP, применяется ДО щитов (щит гасит то, что осталось).
+        damage_cap = target.effect_total(EffectKind.DAMAGE_CAP)
+        if damage_cap > 0 and amount > 0:
+            amount = min(amount, max(round(target.max_hp * damage_cap), 1))
+        # Глухая оборона (патч 39): лечит цель за каждый удар, срезанный блоком
+        # (block_reduction/BLOCK_STANCE уже применены в compute_hit — здесь
+        # только считаем факт "удар пришёлся по блокирующей стойке").
+        block_stance = target.effect_total(EffectKind.BLOCK_STANCE)
+        if block_stance > 0 and amount > 0:
+            block_heal_pct = target.effect_total(EffectKind.BLOCK_HEAL)
+            if block_heal_pct > 0:
+                ctx.heals.append(
+                    PendingHeal(
+                        source_id=target.id, target_id=target.id,
+                        amount=round(target.max_hp * block_heal_pct), label="исцеляется от блока",
+                    )
+                )
         if target.shield > 0:
             absorbed = min(target.shield, amount)
             target.shield -= absorbed

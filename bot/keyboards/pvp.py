@@ -13,7 +13,7 @@ payload {"type":"skill"} из bot/handlers/combat.py) — vkbottle диспет�
 from vkbottle import Keyboard, KeyboardButtonColor, Text
 
 from bot.keyboards.world import add_miniapp_button
-from game.combat.base_skills import skills_for_class
+from game.combat.base_skills import skills_for_character
 from game.content_loader import ElixirDef
 
 BTN_PVP_ATTACK = "🗡️ Атаковать"
@@ -35,17 +35,21 @@ def join_side_keyboard(session_id: int) -> str:
     return kb.get_json()
 
 
-def pvp_combat_keyboard(base_class: str, cooldowns: dict[str, int], show_target: bool = False) -> str:
+def pvp_combat_keyboard(
+    base_class: str, cooldowns: dict[str, int], show_target: bool = False,
+    subclass_id: str | None = None,
+) -> str:
     """Как combat_keyboard (PvE), но БЕЗ побега (патч 22 — бой навязан,
     сбежать из уже идущей встречи нельзя). Патч 30: предметы ДОБАВЛЕНЫ —
     раньше их не было вовсе, хотя патч 16 (зелья/эликсиры) не делал для
     PvP исключения. show_target (патч 38) — кнопка [🎯 Цель] только для
     массового боя (2+ противников есть смысл выбирать); в дуэли 1×1
-    противник ровно один, выбор не нужен."""
+    противник ровно один, выбор не нужен. subclass_id (патч 39, ч.3) —
+    после выбора подкласса навыки класса ЗАМЕНЯЮТСЯ навыками подкласса."""
     kb = Keyboard(one_time=False)
     kb.add(Text(BTN_PVP_ATTACK), color=KeyboardButtonColor.POSITIVE)
     kb.row()
-    for skill in skills_for_class(base_class):
+    for skill in skills_for_character(base_class, subclass_id):
         cd = cooldowns.get(skill.id, 0)
         label = skill.name if cd <= 0 else f"{skill.name} (КД {cd})"
         color = KeyboardButtonColor.PRIMARY if cd <= 0 else KeyboardButtonColor.SECONDARY

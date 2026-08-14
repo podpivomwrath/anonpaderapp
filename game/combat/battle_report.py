@@ -73,9 +73,11 @@ class BattleTracker:
                     self._elements_seen.add(ELEMENT_SKILLS[skill_id])
                     if len(self._elements_seen) == 3:
                         r.all_elements_used = True
-                from game.combat.base_skills import BASE_SKILL_DEFS  # избегаем цикла импортов
+                # избегаем цикла импортов
+                from game.combat.base_skills import BASE_SKILL_DEFS
+                from game.combat.subclass_skills import SUBCLASS_SKILL_DEFS
 
-                skill_def = BASE_SKILL_DEFS.get(skill_id)
+                skill_def = BASE_SKILL_DEFS.get(skill_id) or SUBCLASS_SKILL_DEFS.get(skill_id)
                 if skill_def is not None and skill_def.effect in DEBUFF_SKILL_EFFECTS:
                     r.debuff_skill_used = True
                 if self._last_was_skill and self._last_skill_id is not None and self._last_skill_id != skill_id:

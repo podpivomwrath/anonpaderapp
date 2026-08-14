@@ -1,4 +1,6 @@
-"""Патч 37: экран персонажа — клавиатура принадлежит экрану, не сообщению."""
+"""Патч 37/39: экран персонажа — клавиатура принадлежит экрану, не сообщению.
+Патч 39: город разбит на кварталы — скупщик/лавка/инвентарь переехали из
+корня в "market_quarter"."""
 
 from services import screen_service
 
@@ -8,12 +10,14 @@ def test_parent_of_root_is_none() -> None:
 
 
 def test_parent_of_known_screens() -> None:
-    assert screen_service.parent_of("appraiser") is None
+    assert screen_service.parent_of("appraiser") == "market_quarter"
     assert screen_service.parent_of("appraiser_trophies") == "appraiser"
     assert screen_service.parent_of("appraiser_gear") == "appraiser"
     assert screen_service.parent_of("appraiser_gear_detail") == "appraiser_gear"
-    assert screen_service.parent_of("elixir_shop") is None
-    assert screen_service.parent_of("inventory") is None
+    assert screen_service.parent_of("elixir_shop") == "market_quarter"
+    assert screen_service.parent_of("inventory") == "market_quarter"
+    assert screen_service.parent_of("tavern") is None
+    assert screen_service.parent_of("market_quarter") is None
 
 
 def test_parent_of_unknown_screen_is_root() -> None:

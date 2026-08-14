@@ -20,6 +20,10 @@ def shop_not_enough_gold() -> str:
     return ELIXIR_SHOP["not_enough_gold"]
 
 
-def shop_bought(name: str, gold: int, total: int) -> str:
-    """Патч 13, ч.2: подтверждение покупки + сумма + новый баланс."""
-    return f"{ELIXIR_SHOP['bought']}\n{name}. {display.gold_delta_line(-gold, total)}"
+def shop_bought_bulk(name: str, qty: int, gold_spent: int, total_gold: int, new_count: int) -> str:
+    """Патч 39, ч.4: подтверждение покупки нескольких штук разом — сумма,
+    новый баланс, новое количество в сумке."""
+    return (
+        f"{ELIXIR_SHOP['bought']}\n{name} ×{qty}. {display.gold_delta_line(-gold_spent, total_gold)}\n"
+        f"В сумке теперь: {new_count}."
+    )

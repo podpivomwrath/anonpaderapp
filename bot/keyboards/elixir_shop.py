@@ -5,7 +5,11 @@
 ОБЫЧНАЯ (не inline) и заменяет городскую целиком, [← Назад] последней
 кнопкой. Обычная (не inline) клавиатура ограничена 10 рядами × 40 кнопками
 (мягче inline-лимита в 6×10) — полный каталог из 10 эликсиров по 2 в ряд
-(5 строк) + [← Назад] с запасом укладывается."""
+(5 строк) + [← Назад] с запасом укладывается.
+
+Патч 39, ч.4: нажатие на позицию каталога больше НЕ покупает сразу — открывает
+экран выбора количества (×1/×5/×10/×25, game/economy/elixir_config.py) для
+ЭТОГО зелья; недоступные по золоту количества скрыты полностью."""
 
 from vkbottle import Keyboard, KeyboardButtonColor, Text
 
@@ -17,13 +21,14 @@ BTN_BACK = "← Назад"
 
 
 def shop_keyboard(elixirs: list[ElixirDef]) -> str:
-    """2 кнопки в ряд + мини-апп + назад последней строкой."""
+    """2 кнопки в ряд + мини-апп + назад последней строкой. Каждая ведёт на
+    экран выбора количества, не покупает напрямую."""
     kb = Keyboard(one_time=False)
     for idx, elixir in enumerate(elixirs):
         price = ec.ELIXIR_PRICES.get(elixir.id, 0)
         label = f"{elixir.emoji} {elixir.name} — {price} зол."
         kb.add(
-            Text(label, payload={"type": "buy_elixir", "id": elixir.id}),
+            Text(label, payload={"type": "elixir_shop_select", "id": elixir.id}),
             color=KeyboardButtonColor.SECONDARY,
         )
         if idx % 2 == 1:
@@ -33,4 +38,23 @@ def shop_keyboard(elixirs: list[ElixirDef]) -> str:
     add_miniapp_button(kb)
     kb.row()
     kb.add(Text(BTN_BACK, payload={"type": "elixir_shop_back"}), color=KeyboardButtonColor.SECONDARY)
+    return kb.get_json()
+
+
+def elixir_quantity_keyboard(elixir: ElixirDef, farm_currency: int) -> str:
+    """Экран количества для ОДНОГО зелья: кнопка на каждое доступное по
+    золоту количество из SHOP_BULK_QUANTITIES, [← Назад] к каталогу."""
+    kb = Keyboard(one_time=False)
+    unit_price = ec.ELIXIR_PRICES.get(elixir.id, 0)
+    for qty in ec.SHOP_BULK_QUANTITIES:
+        total = unit_price * qty
+        if total > farm_currency:
+            continue
+        label = f"×{qty} — {total} зол."
+        kb.add(
+            Text(label, payload={"type": "buy_elixir_qty", "id": elixir.id, "qty": qty}),
+            color=KeyboardButtonColor.POSITIVE,
+        )
+        kb.row()
+    kb.add(Text(BTN_BACK, payload={"type": "elixir_shop_item_back"}), color=KeyboardButtonColor.SECONDARY)
     return kb.get_json()

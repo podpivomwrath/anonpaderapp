@@ -68,6 +68,30 @@ async def test_buy_without_gold_raises(db_session, make_character) -> None:
         await elixir_service.buy(db_session, character, "last_breath")
 
 
+async def test_buy_bulk_charges_once_and_stacks_qty(db_session, make_character) -> None:
+    """Патч 39, ч.4: массовая покупка — одно списание золота на весь объём."""
+    character = await make_character(farm=1000)
+    spent = await elixir_service.buy_bulk(db_session, character, "heal_small", 5)
+    assert spent == 5 * ec.ELIXIR_PRICES["heal_small"]
+    wallet = await wallet_service.get_wallet(db_session, character.id)
+    assert wallet.farm_currency == 1000 - spent
+    row = await db_session.scalar(
+        select(CharacterConsumable).where(
+            CharacterConsumable.character_id == character.id,
+            CharacterConsumable.elixir_id == "heal_small",
+        )
+    )
+    assert row.count == 5
+
+
+async def test_buy_bulk_without_enough_gold_raises_and_charges_nothing(db_session, make_character) -> None:
+    character = await make_character(farm=100)
+    with pytest.raises(NotEnoughCurrency):
+        await elixir_service.buy_bulk(db_session, character, "heal_small", 25)
+    wallet = await wallet_service.get_wallet(db_session, character.id)
+    assert wallet.farm_currency == 100  # ничего не списано при отказе
+
+
 async def test_get_stock_only_positive_counts(db_session, make_character) -> None:
     character = await make_character(farm=1000)
     await elixir_service.buy(db_session, character, "heal_small")

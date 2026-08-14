@@ -47,17 +47,24 @@ async def _get_row(
     )
 
 
-async def buy(db: AsyncSession, character: Character, elixir_id: str) -> None:
-    """Покупка одной штуки — списывает золото (wallet_service.charge кидает
-    NotEnoughCurrency, если не хватает), +1 к стеку."""
-    cost = price(elixir_id)
+async def buy_bulk(db: AsyncSession, character: Character, elixir_id: str, qty: int = 1) -> int:
+    """Покупка N штук разом (патч 39, ч.4) — списывает золото ОДНИМ платежом
+    (wallet_service.charge кидает NotEnoughCurrency, если не хватает), +qty к
+    стеку. Возвращает потраченное золото."""
+    cost = price(elixir_id) * qty
     await wallet_service.charge(db, character.id, "farm", cost)
     row = await _get_row(db, character.id, elixir_id)
     if row is None:
         row = CharacterConsumable(character_id=character.id, elixir_id=elixir_id, count=0)
         db.add(row)
-    row.count += 1
+    row.count += qty
     await db.flush()
+    return cost
+
+
+async def buy(db: AsyncSession, character: Character, elixir_id: str) -> None:
+    """Покупка одной штуки — см. buy_bulk."""
+    await buy_bulk(db, character, elixir_id, 1)
 
 
 async def grant(db: AsyncSession, character_id: int, elixir_id: str, amount: int = 1) -> None:

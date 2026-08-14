@@ -195,23 +195,16 @@ def test_preset_damage_bonus_increases_outgoing_damage() -> None:
     assert buffed_damage > plain_damage
 
 
-def test_guardian_group_shield_protects_same_tick() -> None:
-    """Щит, поставленный этим же действием, поглощает урон этого тика."""
+def test_guardian_unbreakable_caps_incoming_damage() -> None:
+    """Несокрушимый: входящий урон за удар не может превышать value*maxHP."""
     rng = NoCritRng()
-    guardian = combatant(1, side=0, subclass_id="guardian", vitality=100)
-    ally = combatant(2, side=0)
-    ally.current_hp = ally.max_hp // 2  # наименьший % HP — цель щита
-    enemy = combatant(3, side=1)
-    state = make_session(CombatMode.PVP_GROUP, guardian, ally, enemy)
+    guardian = combatant(1, side=0, subclass_id="guardian", vitality=10)
+    enemy = combatant(2, side=1, strength=500)  # огромный урон без капа
+    state = make_session(CombatMode.PVP_GROUP, guardian, enemy)
 
-    hp_before = ally.current_hp
-    result = resolve_tick(
-        state, {1: skill("guardian_group_shield"), 3: attack(2)}, rng
-    )
-    absorbed_line = [l for l in result.lines if "поглощает" in l]
-    assert absorbed_line, result.lines
-    # урон по союзнику полностью съеден щитом (100 VIT * 1.0 >= урон врага)
-    assert ally.current_hp == hp_before
+    resolve_tick(state, {1: skill("guardian_unbreakable"), 2: attack(1)}, rng)
+    taken = guardian.max_hp - guardian.current_hp
+    assert taken <= round(guardian.max_hp * 0.15) + 1  # +1: округление
 
 
 def test_taunt_forces_mob_target_in_pve() -> None:
@@ -222,16 +215,15 @@ def test_taunt_forces_mob_target_in_pve() -> None:
     wolf = combatant(3, side=1, kind="mob", name="Волк")
     state = make_session(CombatMode.PVE, ally, guardian, wolf)
 
-    resolve_tick(state, {2: skill("guardian_provoke")}, rng)
+    resolve_tick(state, {2: skill("guardian_shield_bash", 3)}, rng)
     assert ally.current_hp == ally.max_hp          # союзника не тронули
     assert guardian.current_hp < guardian.max_hp   # волк форсирован на стража
 
 
 def test_provoke_in_pvp_is_debuff_not_force() -> None:
-    """PvP-провокация не форсит цель, а снижает урон врага по другим целям.
-
-    Обе стороны действуют вслепую в одно окно: провокация (фаза защиты)
-    применяется раньше вражеской атаки (фаза урона) того же тика.
+    """PvP-провокация (Удар щитом) не форсит цель, а снижает урон врага по
+    другим целям. Обе стороны действуют вслепую в одно окно: провокация
+    (защитная фаза) применяется раньше вражеской атаки того же тика.
     """
     rng = NoCritRng()
 
@@ -247,7 +239,7 @@ def test_provoke_in_pvp_is_debuff_not_force() -> None:
     ally = combatant(2, side=0)
     enemy = combatant(3, side=1)
     state = make_session(CombatMode.PVP_GROUP, guardian, ally, enemy)
-    resolve_tick(state, {1: skill("guardian_provoke"), 3: attack(2)}, rng)
+    resolve_tick(state, {1: skill("guardian_shield_bash", 3), 3: attack(2)}, rng)
     reduced = ally.max_hp - ally.current_hp
 
     assert reduced < baseline
@@ -255,7 +247,7 @@ def test_provoke_in_pvp_is_debuff_not_force() -> None:
     guardian2 = combatant(4, side=0, subclass_id="guardian")
     enemy2 = combatant(5, side=1)
     state2 = make_session(CombatMode.PVP_GROUP, guardian2, enemy2)
-    resolve_tick(state2, {4: skill("guardian_provoke"), 5: attack(4)}, rng)
+    resolve_tick(state2, {4: skill("guardian_shield_bash", 5), 5: attack(4)}, rng)
     assert guardian2.max_hp - guardian2.current_hp == baseline
 
 

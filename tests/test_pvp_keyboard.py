@@ -25,6 +25,15 @@ def test_combat_keyboard_has_attack_skills_and_item_button() -> None:
     assert BTN_PVP_ITEM in labels
 
 
+def test_combat_keyboard_uses_subclass_skills_when_present() -> None:
+    """Патч 39, ч.3: после выбора подкласса навыки класса ЗАМЕНЯЮТСЯ навыками подкласса."""
+    base_labels = _labels(pvp_combat_keyboard("warrior", {}))
+    sub_labels = _labels(pvp_combat_keyboard("warrior", {}, subclass_id="guardian"))
+    assert "Удар щитом" in sub_labels
+    assert "Глухая оборона" in sub_labels
+    assert not (sub_labels & base_labels - {BTN_PVP_ATTACK, BTN_PVP_ITEM})
+
+
 def test_combat_keyboard_item_text_differs_from_pve() -> None:
     """Патч 30: если бы текст совпадал с PvE, vkbottle навсегда перехватывал
     бы нажатие в combat.py (зарегистрирован раньше pvp.py) — см. докстринг

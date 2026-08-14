@@ -35,6 +35,7 @@ from services import (
     item_service,
     mount_service,
     preset_service,
+    screen_service,
     story_service,
     wallet_service,
 )
@@ -314,6 +315,9 @@ async def scan() -> None:
             mentor_badge = False
             is_foreign = False
             if region is not None:
+                # Патч 39: прибытие в город на маунте — всегда корневой экран
+                # (площадь), а не сохранённый квартал.
+                await screen_service.set_screen(db, character, None)
                 is_foreign = region != character.region
                 mentor_badge = not is_foreign and await story_service.mentor_badge_active(db, character)
             arrivals.append(
@@ -353,7 +357,7 @@ async def scan() -> None:
                 message=text,
                 random_id=0,
                 attachment=hub_attachment(region),
-                keyboard=kb.city_menu_keyboard(character, mentor_badge, has_mount=True, is_foreign=is_foreign),
+                keyboard=kb.city_square_keyboard(character, mentor_badge, has_mount=True, is_foreign=is_foreign),
             )
             continue
         vit_bonus = gear_bonus.get("vit", 0)

@@ -9,9 +9,9 @@
 from vkbottle.bot import BotLabeler, Message
 
 from bot import editable_message
-from bot.elixir_texts import shop_attachment, shop_bought, shop_intro, shop_not_enough_gold
+from bot.elixir_texts import shop_attachment, shop_bought_bulk, shop_intro, shop_not_enough_gold
 from bot.world_texts import FOREIGN_NPC_REJECTION
-from bot.keyboards.elixir_shop import shop_keyboard
+from bot.keyboards.elixir_shop import elixir_quantity_keyboard, shop_keyboard
 from bot.keyboards.world import BTN_ELIXIR_SHOP
 from game.world import grid
 from services import elixir_service, screen_service
@@ -72,9 +72,9 @@ async def open_shop(message: Message) -> None:
 
 @labeler.message(payload_contains={"type": "elixir_shop_back"})
 async def shop_back(message: Message) -> None:
-    """Патч 37: выход из лавки целиком — обратно к городской клавиатуре."""
-    from bot.keyboards.world import city_menu_keyboard
-    from services import mount_service, story_service
+    """Патч 39: выход из лавки целиком — обратно в Торговый квартал."""
+    from bot.keyboards.world import market_quarter_keyboard
+    from bot.world_texts import market_quarter_text
 
     peer_id = message.peer_id
     async with get_session_factory()() as db:
@@ -82,20 +82,23 @@ async def shop_back(message: Message) -> None:
         if character is None or character.creation_state is not None:
             return
         region = grid.city_region_at(character.pos_x, character.pos_y)
-        await screen_service.set_screen(db, character, None)
-        await db.commit()
         if region is None:
+            await screen_service.set_screen(db, character, None)
+            await db.commit()
             return
-        has_mount = await mount_service.has_any_mount(db, character.id)
+        await screen_service.set_screen(db, character, "market_quarter")
+        await db.commit()
         is_foreign = region != character.region
-        mentor_badge = not is_foreign and await story_service.mentor_badge_active(db, character)
 
-    keyboard = city_menu_keyboard(character, mentor_badge, has_mount=has_mount, is_foreign=is_foreign)
-    await editable_message.send_or_edit(_bot_api, _NS, peer_id, "Матушка Синель кивает на прощание.", keyboard)
+    text = market_quarter_text(region, is_foreign)
+    keyboard = market_quarter_keyboard(is_foreign)
+    await editable_message.send_or_edit(_bot_api, _NS, peer_id, text, keyboard)
 
 
-@labeler.message(payload_contains={"type": "buy_elixir"})
-async def buy_elixir(message: Message) -> None:
+@labeler.message(payload_contains={"type": "elixir_shop_select"})
+async def elixir_shop_select(message: Message) -> None:
+    """Патч 39, ч.4: выбор зелья в каталоге открывает экран количества
+    (×1/×5/×10/×25) — недоступные по золоту суммы скрыты."""
     peer_id = message.peer_id
     payload = message.get_payload_json() or {}
     elixir_id = payload.get("id")
@@ -107,8 +110,57 @@ async def buy_elixir(message: Message) -> None:
         character = await onboarding_svc.get_character(db, message.from_id)
         if character is None or character.creation_state is not None:
             return
+        farm_currency = (await wallet_service.get_wallet(db, character.id)).farm_currency
+        price = elixir_service.price(elixir_id)
+        if price > farm_currency:
+            counts = await _owned_counts(db, character.id)
+            text = f"{shop_not_enough_gold()}\n\n{_catalog_text(counts)}"
+            await editable_message.send_or_edit(
+                _bot_api, _NS, peer_id, text, shop_keyboard(elixir_service.elixir_defs_ordered()),
+                attachment=shop_attachment(),
+            )
+            return
+
+    text = f"{elixir.emoji} {elixir.name} — {price} зол. за штуку.\nСколько взять?"
+    await editable_message.send_or_edit(
+        _bot_api, _NS, peer_id, text, elixir_quantity_keyboard(elixir, farm_currency),
+        attachment=shop_attachment(),
+    )
+
+
+@labeler.message(payload_contains={"type": "elixir_shop_item_back"})
+async def elixir_shop_item_back(message: Message) -> None:
+    """Возврат из экрана количества в каталог (экран лавки не меняется)."""
+    peer_id = message.peer_id
+    async with get_session_factory()() as db:
+        character = await onboarding_svc.get_character(db, message.from_id)
+        if character is None or character.creation_state is not None:
+            return
+        counts = await _owned_counts(db, character.id)
+
+    await editable_message.send_or_edit(
+        _bot_api, _NS, peer_id, _catalog_text(counts),
+        shop_keyboard(elixir_service.elixir_defs_ordered()),
+        attachment=shop_attachment(),
+    )
+
+
+@labeler.message(payload_contains={"type": "buy_elixir_qty"})
+async def buy_elixir_qty(message: Message) -> None:
+    peer_id = message.peer_id
+    payload = message.get_payload_json() or {}
+    elixir_id = payload.get("id")
+    qty = payload.get("qty")
+    elixir = elixir_service.elixir_def(elixir_id) if isinstance(elixir_id, str) else None
+    if elixir is None or not isinstance(qty, int) or qty <= 0:
+        return
+
+    async with get_session_factory()() as db:
+        character = await onboarding_svc.get_character(db, message.from_id)
+        if character is None or character.creation_state is not None:
+            return
         try:
-            await elixir_service.buy(db, character, elixir_id)
+            spent = await elixir_service.buy_bulk(db, character, elixir_id, qty)
         except NotEnoughCurrency:
             counts = await _owned_counts(db, character.id)
             text = f"{shop_not_enough_gold()}\n\n{_catalog_text(counts)}"
@@ -121,7 +173,8 @@ async def buy_elixir(message: Message) -> None:
         await db.commit()
         counts = await _owned_counts(db, character.id)
 
-    confirm = shop_bought(elixir.name, elixir_service.price(elixir_id), total)
+    new_count = counts.get(elixir_id, 0)
+    confirm = shop_bought_bulk(elixir.name, qty, spent, total, new_count)
     text = f"{confirm}\n\n{_catalog_text(counts)}"
     await editable_message.send_or_edit(
         _bot_api, _NS, peer_id, text, shop_keyboard(elixir_service.elixir_defs_ordered()),

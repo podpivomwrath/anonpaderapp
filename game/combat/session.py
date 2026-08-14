@@ -41,6 +41,12 @@ class EffectKind(StrEnum):
     CONTROL_IMMUNE = "control_immune"    # иммунитет к контролю (оба режима боя)
     SHIELD_POOL = "shield_pool"          # персистентный щит (value — остаток поглощения)
     FLAT_DAMAGE_BONUS = "flat_damage_bonus"  # фикс. бонус урона за удар (не от статов)
+    # --- Патч 39: навыки подклассов ---
+    DAMAGE_CAP = "damage_cap"      # входящий урон за удар не может превышать value*maxHP (Несокрушимый)
+    BLOOD_SEAL = "blood_seal"      # цель отмечена: лайфстил источника с неё удвоен (Кровавая печать)
+    BLOCK_HEAL = "block_heal"      # value — доля maxHP, лечащая актёра за каждый СРЕЗАННЫЙ блоком удар
+    BLOCK_STANCE = "block_stance"  # многоходовый блок (Глухая оборона) — снижение урона, в отличие
+                                    # от однотикового block_reduction держится effect_duration ходов
 
 
 class DeclaredAction(BaseModel):
@@ -135,6 +141,9 @@ class CombatantState:
 
     def effects_of(self, kind: EffectKind) -> list[Effect]:
         return [e for e in self.effects if e.kind == kind]
+
+    def effect_from(self, kind: EffectKind, source_id: int) -> Effect | None:
+        return next((e for e in self.effects if e.kind == kind and e.source_id == source_id), None)
 
     def apply_effect(
         self, kind: EffectKind, value: float, duration: int, source_id: int

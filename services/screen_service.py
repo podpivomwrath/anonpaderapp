@@ -21,13 +21,21 @@ from models import Character
 
 # Родитель каждого вложенного экрана — куда ведёт [← Назад]. None (в т.ч.
 # отсутствие в словаре) — родитель корневой (город/карта/бой).
+#
+# Патч 39: город разбит на кварталы (Главная площадь — корневой экран,
+# Таверна/Торговый квартал — под ней) — скупщик/лавка/инвентарь переехали
+# из корня в Торговый квартал, Хранитель Списков логически живёт в Таверне
+# (сам экран Хранителя — отдельная FSM в list_keeper.py, не через эту
+# таблицу, но кнопка «Назад» оттуда ведёт в тот же tavern).
 PARENT: dict[str, str | None] = {
-    "appraiser": None,
+    "appraiser": "market_quarter",
     "appraiser_trophies": "appraiser",
     "appraiser_gear": "appraiser",
     "appraiser_gear_detail": "appraiser_gear",
-    "elixir_shop": None,
-    "inventory": None,
+    "elixir_shop": "market_quarter",
+    "inventory": "market_quarter",
+    "tavern": None,
+    "market_quarter": None,
 }
 
 

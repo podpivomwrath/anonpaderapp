@@ -39,6 +39,18 @@ def _setup(api) -> TickEngine:
     return engine
 
 
+def test_pve_combat_keyboard_uses_subclass_skills_when_present() -> None:
+    """Патч 39, ч.3: PvE-клавиатура тоже переключается на навыки подкласса."""
+    from bot.keyboards.world import combat_keyboard
+
+    base_labels = json.loads(combat_keyboard("warrior", {})).get("buttons")
+    base_labels = {btn["action"]["label"] for row in base_labels for btn in row}
+    sub_kb = json.loads(combat_keyboard("warrior", {}, subclass_id="guardian"))
+    sub_labels = {btn["action"]["label"] for row in sub_kb["buttons"] for btn in row}
+    assert "Удар щитом" in sub_labels
+    assert "Каменная хватка" in sub_labels
+
+
 async def test_active_tick_has_combat_keyboard() -> None:
     api = _CaptureApi()
     engine = _setup(api)

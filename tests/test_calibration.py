@@ -35,13 +35,13 @@ def attack(target_id: int) -> DeclaredAction:
     return DeclaredAction(type=ActionType.ATTACK, target_id=target_id)
 
 
-# --- Кровавый рыцарь: лайфстил ---
+# --- Кровавый рыцарь: лайфстил (патч 39, ч.3 — content/skills/subclass_skills.json) ---
 
 
-def test_lifesteal_heals_9_percent_of_damage() -> None:
+def test_lifesteal_heals_25_percent_of_damage() -> None:
     rng = NoCritRng()
     knight = combatant(1, side=0, subclass_id="blood_knight")
-    knight.current_hp -= 100  # есть что лечить, но HP выше 50%
+    knight.current_hp -= 100  # есть что лечить
     enemy = combatant(2, side=1, vitality=500)  # жирный — переживёт удар
     state = make_session(knight, enemy)
     hp_before = knight.current_hp
@@ -49,28 +49,13 @@ def test_lifesteal_heals_9_percent_of_damage() -> None:
     resolve_tick(state, {1: skill("blood_knight_lifesteal_strike", 2)}, rng)
     damage_dealt = enemy.max_hp - enemy.current_hp
     healed = knight.current_hp - hp_before
-    assert healed == round(damage_dealt * bc.BLOOD_KNIGHT_LIFESTEAL_BASE)
-
-
-def test_lifesteal_bonus_below_half_hp() -> None:
-    rng = NoCritRng()
-    knight = combatant(1, side=0, subclass_id="blood_knight")
-    knight.current_hp = knight.max_hp // 3  # ниже 50%
-    enemy = combatant(2, side=1, vitality=500)
-    state = make_session(knight, enemy)
-    hp_before = knight.current_hp
-
-    resolve_tick(state, {1: skill("blood_knight_lifesteal_strike", 2)}, rng)
-    damage_dealt = enemy.max_hp - enemy.current_hp
-    healed = knight.current_hp - hp_before
-    expected_ratio = bc.BLOOD_KNIGHT_LIFESTEAL_BASE + bc.BLOOD_KNIGHT_LIFESTEAL_LOW_HP_BONUS
-    assert healed == round(damage_dealt * expected_ratio)
+    assert healed == round(damage_dealt * 0.25)
 
 
 def test_lifesteal_capped_at_8_percent_max_hp() -> None:
     """Кап обязателен: без него лайфстил бесконтрольно скейлится."""
     rng = NoCritRng()
-    # гигантский урон: высокий уровень + куча STR (12% от урона должно упереться в кап)
+    # гигантский урон: высокий уровень + куча STR (25% от урона должно упереться в кап)
     knight = combatant(1, side=0, subclass_id="blood_knight", level=100, strength=2000)
     knight.current_hp = knight.max_hp // 3
     enemy = combatant(2, side=1, level=100, vitality=500)
@@ -80,6 +65,25 @@ def test_lifesteal_capped_at_8_percent_max_hp() -> None:
     resolve_tick(state, {1: skill("blood_knight_lifesteal_strike", 2)}, rng)
     healed = knight.current_hp - hp_before
     assert healed == round(knight.max_hp * bc.BLOOD_KNIGHT_HEAL_CAP_PER_TICK)
+
+
+def test_blood_seal_doubles_lifesteal_on_marked_target() -> None:
+    """Кровавая печать: лайфстил ЛЮБОЙ последующей атаки рыцаря по цели удвоен."""
+    rng = NoCritRng()
+    knight = combatant(1, side=0, subclass_id="blood_knight")
+    knight.current_hp = round(knight.max_hp * 0.7)  # есть что лечить, но жив
+    enemy = combatant(2, side=1, vitality=500)
+    state = make_session(knight, enemy)
+
+    resolve_tick(state, {1: skill("blood_knight_blood_seal", 2)}, rng)
+    assert enemy.has_effect(EffectKind.BLOOD_SEAL)
+
+    hp_before_hp = knight.current_hp
+    enemy_hp_before = enemy.current_hp
+    resolve_tick(state, {1: skill("blood_knight_lifesteal_strike", 2)}, rng)
+    damage_dealt = enemy_hp_before - enemy.current_hp
+    healed = knight.current_hp - hp_before_hp
+    assert healed == round(damage_dealt * 0.5)  # 0.25 удвоено печатью
 
 
 # --- Отравитель: яд ---
@@ -130,42 +134,7 @@ def test_poison_stacks_capped() -> None:
     assert dots[0].stacks == bc.POISONER_MAX_STACKS
 
 
-def test_poison_direct_hit_has_090_penalty() -> None:
-    rng = NoCritRng()
-    # эталон: обычная атака
-    a1 = combatant(1, side=0, subclass_id="poisoner")
-    b1 = combatant(2, side=1, vitality=500)
-    s1 = make_session(a1, b1)
-    resolve_tick(s1, {1: attack(2)}, rng)
-    plain = b1.max_hp - b1.current_hp
-
-    a2 = combatant(3, side=0, subclass_id="poisoner")
-    b2 = combatant(4, side=1, vitality=500)
-    s2 = make_session(a2, b2)
-    resolve_tick(s2, {3: skill("poisoner_venom", 4)}, rng)
-    poisoned_hit = b2.max_hp - b2.current_hp
-
-    assert poisoned_hit == round(plain * bc.POISONER_DIRECT_MULT)
-
-
-# --- Тёмный мистик: Кровавый пакт ---
-
-
-def test_blood_pact_damage_is_076_of_attack() -> None:
-    rng = NoCritRng()
-    a1 = combatant(1, side=0, subclass_id="dark_mystic")
-    b1 = combatant(2, side=1, vitality=500)
-    s1 = make_session(a1, b1)
-    resolve_tick(s1, {1: attack(2)}, rng)
-    plain = b1.max_hp - b1.current_hp
-
-    a2 = combatant(3, side=0, subclass_id="dark_mystic")
-    b2 = combatant(4, side=1, vitality=500)
-    s2 = make_session(a2, b2)
-    resolve_tick(s2, {3: skill("dark_mystic_blood_pact", 4)}, rng)
-    pact = b2.max_hp - b2.current_hp
-
-    assert pact == round(plain * bc.DARK_MYSTIC_PACT_MULT)
+# --- Тёмный мистик: Кровавый пакт (патч 39, ч.3) ---
 
 
 def test_blood_pact_heals_lowest_hp_ally() -> None:
@@ -181,8 +150,7 @@ def test_blood_pact_heals_lowest_hp_ally() -> None:
     resolve_tick(state, {1: skill("dark_mystic_blood_pact", 4)}, rng)
 
     damage = enemy.max_hp - enemy.current_hp
-    conversion = 0.005 * 100 * bc.DARK_MYSTIC_HEAL_CONVERSION_COEF + bc.DARK_MYSTIC_HEAL_CONVERSION_BASE
-    assert wounded_ally.current_hp - hp_before == round(damage * conversion)
+    assert wounded_ally.current_hp - hp_before == round(damage * 0.7)
     assert healthy_ally.current_hp == healthy_ally.max_hp  # хил ушёл раненому
 
 

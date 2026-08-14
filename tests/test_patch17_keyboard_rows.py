@@ -14,7 +14,8 @@ import pytest
 
 import bot.keyboards.world as world_kb
 from bot.keyboards.combat_items import combat_items_keyboard
-from bot.keyboards.elixir_shop import shop_keyboard
+from bot.keyboards.elixir_shop import elixir_quantity_keyboard, shop_keyboard
+from game.economy import elixir_config as ec
 from config import Settings
 from game.content_loader import load_elixirs
 
@@ -58,3 +59,34 @@ def test_shop_keyboard_full_catalog_stays_within_reply_limits_and_is_not_inline(
 def test_combat_items_keyboard_full_stock_stays_within_inline_limits() -> None:
     stock = [(d, 1) for d in load_elixirs().values()]
     _assert_within_inline_limits(combat_items_keyboard(stock))
+
+
+# --- Патч 39, ч.4: экран выбора количества при покупке зелья ---
+
+
+def test_quantity_keyboard_hides_unaffordable_amounts() -> None:
+    elixir = load_elixirs()["heal_small"]
+    price = ec.ELIXIR_PRICES["heal_small"]
+    # хватает ровно на ×1 и ×5, но не на ×10/×25
+    kb_json = elixir_quantity_keyboard(elixir, farm_currency=price * 5)
+    labels = {btn["action"]["label"] for row in _rows(kb_json) for btn in row}
+    assert any(label.startswith("×1 ") for label in labels)
+    assert any(label.startswith("×5 ") for label in labels)
+    assert not any(label.startswith("×10 ") for label in labels)
+    assert not any(label.startswith("×25 ") for label in labels)
+
+
+def test_quantity_keyboard_shows_all_amounts_when_rich() -> None:
+    elixir = load_elixirs()["heal_small"]
+    price = ec.ELIXIR_PRICES["heal_small"]
+    kb_json = elixir_quantity_keyboard(elixir, farm_currency=price * 25)
+    labels = {btn["action"]["label"] for row in _rows(kb_json) for btn in row}
+    for qty in ec.SHOP_BULK_QUANTITIES:
+        assert any(label.startswith(f"×{qty} ") for label in labels)
+
+
+def test_quantity_keyboard_back_button_present_even_when_poor() -> None:
+    elixir = load_elixirs()["heal_small"]
+    kb_json = elixir_quantity_keyboard(elixir, farm_currency=0)
+    labels = {btn["action"]["label"] for row in _rows(kb_json) for btn in row}
+    assert "← Назад" in labels

@@ -44,6 +44,7 @@ from bot.pvp_texts import AFK_TARGET_TEXT, ALONE_ON_CELL, CITY_NO_PVP_TEXT, NOTH
 from game.combat import balance_config as bc
 from game.combat import display, elixir_effects
 from game.combat.base_skills import BASE_SKILL_DEFS
+from game.combat.subclass_skills import SUBCLASS_SKILL_DEFS
 from game.combat.duel_engine import DuelEngine, DuelResult, DuelState
 from game.combat.resolver import TickResult
 from game.combat.session import (
@@ -188,7 +189,7 @@ def rebuild_keyboard(peer_id: int) -> str | None:
         if participant.character_id in _declared_this_tick.get(battle_id, set()):
             return pvp_waiting_keyboard()
     show_target = battle.battle_type == "mass"
-    return pvp_combat_keyboard(participant.base_class, combatant.cooldowns, show_target=show_target)
+    return pvp_combat_keyboard(participant.base_class, combatant.cooldowns, subclass_id=combatant.subclass_id, show_target=show_target)
 
 
 def _new_battle_id() -> int:
@@ -382,8 +383,8 @@ async def look_around(message: Message) -> None:
             await message.answer("☠ Сначала очнись.")
             return
         # Патч 33, ч.2: города полностью мирные — кнопка и так не показывается
-        # в городской клавиатуре (bot/keyboards/world.py::city_menu_keyboard),
-        # это защита от устаревшей клавиатуры.
+        # в городских клавиатурах (bot/keyboards/world.py), это защита от
+        # устаревшей клавиатуры.
         if grid.city_region_at(character.pos_x, character.pos_y) is not None:
             return
         solo, battles = await _scene_at(db, character)
@@ -502,7 +503,7 @@ async def _start_forced_duel(
         combatant = duel.combatants[cid]
         if cid == first_id:
             text = f"{board}\n\n▶️ Твой ход!"
-            keyboard = pvp_combat_keyboard(participant.base_class, combatant.cooldowns)
+            keyboard = pvp_combat_keyboard(participant.base_class, combatant.cooldowns, subclass_id=combatant.subclass_id)
         else:
             text = f"{board}\n\n⏳ Ход противника. Ожидание..."
             keyboard = pvp_waiting_keyboard()
@@ -602,7 +603,9 @@ async def _handle_join_choice(message: Message, battle_id, side) -> None:
     if target_line:
         text += f"\n{target_line}"
     await message.answer(
-        text, keyboard=pvp_combat_keyboard(participant.base_class, {}, show_target=True),
+        text, keyboard=pvp_combat_keyboard(
+            participant.base_class, {}, show_target=True, subclass_id=combatant.subclass_id,
+        ),
     )
 
 
@@ -657,7 +660,7 @@ async def _convert_duel_to_mass(session_id: int, battle: Battle) -> None:
             peer_id=p.peer_id,
             message=board,
             random_id=0,
-            keyboard=pvp_combat_keyboard(p.base_class, state.combatants[p.character_id].cooldowns, show_target=True),
+            keyboard=pvp_combat_keyboard(p.base_class, state.combatants[p.character_id].cooldowns, subclass_id=state.combatants[p.character_id].subclass_id, show_target=True),
         )
 
 
@@ -673,7 +676,7 @@ async def pvp_attack(message: Message) -> None:
 async def pvp_skill(message: Message) -> None:
     payload = message.get_payload_json() or {}
     skill_id = payload.get("id")
-    if skill_id not in BASE_SKILL_DEFS:
+    if skill_id not in BASE_SKILL_DEFS and skill_id not in SUBCLASS_SKILL_DEFS:
         return
     peer_id = message.peer_id
     battle_id = _peer_battle.get(peer_id)
@@ -691,7 +694,7 @@ async def pvp_skill(message: Message) -> None:
         # Патч 30, баг 2: бой активен — без клавиатуры игрок теряет кнопки.
         participant = battle.participants.get(cid)
         keyboard = (
-            pvp_combat_keyboard(participant.base_class, combatant.cooldowns, show_target=battle.battle_type == "mass")
+            pvp_combat_keyboard(participant.base_class, combatant.cooldowns, subclass_id=combatant.subclass_id, show_target=battle.battle_type == "mass")
             if participant else None
         )
         await message.answer(f"⏳ Навык ещё не готов (КД {cd}).", keyboard=keyboard)
@@ -893,7 +896,7 @@ async def pvp_pick_target(message: Message) -> None:
     board = f"🎯 Цель: {target.name}.\n\n{_battle_board_text(battle_id, battle, [])}"
     await _bot_api.messages.send(
         peer_id=peer_id, message=board, random_id=0,
-        keyboard=pvp_combat_keyboard(participant.base_class, me.cooldowns, show_target=True),
+        keyboard=pvp_combat_keyboard(participant.base_class, me.cooldowns, subclass_id=me.subclass_id, show_target=True),
     )
 
 
@@ -918,6 +921,7 @@ async def pvp_target_back(message: Message) -> None:
         peer_id=peer_id, message=_battle_board_text(battle_id, battle, []), random_id=0,
         keyboard=pvp_combat_keyboard(
             participant.base_class, combatant.cooldowns, show_target=battle.battle_type == "mass",
+            subclass_id=combatant.subclass_id,
         ),
     )
 
@@ -945,7 +949,7 @@ async def pvp_open_items(message: Message) -> None:
     participant = battle.participants.get(cid)
     if combatant is None or participant is None:
         return
-    battle_kb = pvp_combat_keyboard(participant.base_class, combatant.cooldowns, show_target=battle.battle_type == "mass")
+    battle_kb = pvp_combat_keyboard(participant.base_class, combatant.cooldowns, subclass_id=combatant.subclass_id, show_target=battle.battle_type == "mass")
     if combatant.has_effect(EffectKind.FREEZE):
         await message.answer("Скован — не до зелий сейчас. ❄️", keyboard=battle_kb)
         return
@@ -992,7 +996,7 @@ async def pvp_use_item(message: Message) -> None:
     participant = battle.participants.get(cid)
     if combatant is None or participant is None:
         return
-    battle_kb = pvp_combat_keyboard(participant.base_class, combatant.cooldowns, show_target=battle.battle_type == "mass")
+    battle_kb = pvp_combat_keyboard(participant.base_class, combatant.cooldowns, subclass_id=combatant.subclass_id, show_target=battle.battle_type == "mass")
     if combatant.has_effect(EffectKind.FREEZE):
         await message.answer("Скован — не до зелий сейчас. ❄️", keyboard=battle_kb)
         return
@@ -1034,7 +1038,7 @@ async def pvp_use_item(message: Message) -> None:
     text = f"{line} Твой ход.\n\n{_battle_board_text(battle_id, battle, [])}"
     await _bot_api.messages.send(
         peer_id=peer_id, message=text, random_id=0,
-        keyboard=pvp_combat_keyboard(participant.base_class, combatant.cooldowns),
+        keyboard=pvp_combat_keyboard(participant.base_class, combatant.cooldowns, subclass_id=combatant.subclass_id),
     )
 
 
@@ -1066,7 +1070,7 @@ async def on_duel_turn_resolved(session_id: int, turn: int, result: DuelResult) 
             keyboard = kb.waiting_keyboard()
         elif p.character_id == next_actor_id:
             text += "\n\n▶️ Твой ход!"
-            keyboard = pvp_combat_keyboard(p.base_class, combatant.cooldowns)
+            keyboard = pvp_combat_keyboard(p.base_class, combatant.cooldowns, subclass_id=combatant.subclass_id)
         else:
             text += "\n\n⏳ Ход противника. Ожидание..."
             keyboard = pvp_waiting_keyboard()
@@ -1207,7 +1211,7 @@ async def on_mass_tick_resolved(session_id: int, tick: int, result: TickResult) 
     for cid, participant in battle.participants.items():
         combatant = battle.last_combatants.get(cid)
         keyboard = (
-            pvp_combat_keyboard(participant.base_class, combatant.cooldowns, show_target=True)
+            pvp_combat_keyboard(participant.base_class, combatant.cooldowns, subclass_id=combatant.subclass_id, show_target=True)
             if combatant is not None and combatant.alive
             else pvp_waiting_keyboard()
         )

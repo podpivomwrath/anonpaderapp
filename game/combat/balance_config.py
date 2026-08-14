@@ -174,12 +174,12 @@ EXCHANGE_PRICE_STEP = 5             # ЛИНЕЙНЫЙ шаг цены за бл
 EXCHANGE_SPREAD = 15                # фикс. спред: sell = buy - spread (round-trip убыточен)
 EXCHANGE_MIN_SELL_PRICE = 1
 
-# --- Механики подклассов (плейсхолдеры; TODO: content) ---
-GUARDIAN_BLOCK_REDUCTION = 0.5          # Блок: снижение входящего урона в этот тик
-GUARDIAN_SHIELD_PER_VIT = 1.0           # Групповой щит: поглощение = VIT * коэф.
-GUARDIAN_SHIELD_SELF_PENALTY = 0.5      # часть своей защиты уходит: митигация стража * (1-эта доля)
+# --- Механики подклассов ---
 PROVOKE_PVP_DAMAGE_REDUCTION = 0.30     # PvP-провокация: урон по другим целям -30%
-PROVOKE_PVP_DURATION_TICKS = 1
+PROVOKE_PVP_DURATION_TICKS = 2          # Удар щитом (патч 39): провокация держится 2 хода
+GUARDIAN_BLOCK_HEAL_PCT = 0.04          # Глухая оборона: хил % maxHP за каждый срезанный блоком удар
+SHADOW_BLADE_MARK_MAX_STACKS = 5        # Метка добычи: максимум стаков
+SHADOW_BLADE_MARK_DURATION = 5          # ходов до истечения стака (обновляется при новом применении)
 
 # --- Откалиброванные значения (патч балансировки, 5 итераций симуляции) ---
 # Стартовые ориентиры для реальных баффов, НЕ финальные игровые числа.
@@ -196,21 +196,17 @@ GUARDIAN_PASSIVE_SUSTAIN_PER_TICK = 0.025   # Пассивная стойкос�
 
 # Кровавый рыцарь
 BLOOD_KNIGHT_RAGE_DAMAGE_BONUS = 0.05       # Кровавая ярость (урезано с +12%)
-BLOOD_KNIGHT_LIFESTEAL_BASE = 0.09          # Ненасытность: % от нанесённого урона
-BLOOD_KNIGHT_LIFESTEAL_LOW_HP_BONUS = 0.03  # доп. при HP ниже порога
-BLOOD_KNIGHT_LIFESTEAL_LOW_HP_THRESHOLD = 0.5
 # ОБЯЗАТЕЛЬНЫЙ кап: иначе лайфстил бесконтрольно скейлится с уроном на высоких уровнях
-BLOOD_KNIGHT_HEAL_CAP_PER_TICK = 0.08       # % от maxHP за тик
+BLOOD_KNIGHT_HEAL_CAP_PER_TICK = 0.08       # % от maxHP за тик — общий кап для всех навыков лайфстила
+BLOOD_KNIGHT_CRIMSON_FEAST_HP_COST = 0.15   # Багровый пир: доля ТЕКУЩЕГО HP, платится за навык
 
 # Отравитель — сила яда ОБЯЗАНА масштабироваться от статов (иначе класс
 # математически нежизнеспособен независимо от текста способностей)
 POISONER_POISON_WIL_COEF = 0.60             # вклад WIL в силу яда (на стак)
 POISONER_POISON_AGI_COEF = 0.40             # вклад AGI
 POISONER_MAX_STACKS = 3                     # тик-урон = сила яда / макс. стаки
-POISONER_DIRECT_MULT = 0.90                 # штраф прямого урона за упор в дебаффы
 POISONER_POISON_DURATION_TICKS = 3          # TODO: content — длительность не калибровалась
 
-# Тёмный мистик (Кровавый пакт)
-DARK_MYSTIC_PACT_MULT = 0.76                # прямой урон от обычного удара
-DARK_MYSTIC_HEAL_CONVERSION_COEF = 1.75     # конверсия: support_power(WIL) * коэф + база
-DARK_MYSTIC_HEAL_CONVERSION_BASE = 0.33
+# Тёмный мистик
+DARK_MYSTIC_WARD_SHIELD_COEF = 2.0          # Оберег: поглощение = support_power(WIL) * коэф
+DARK_MYSTIC_CIRCLE_HP_COST = 0.20           # Круг тьмы: доля ТЕКУЩЕГО HP, платится за навык

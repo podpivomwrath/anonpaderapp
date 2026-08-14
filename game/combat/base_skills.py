@@ -110,6 +110,16 @@ def skills_for_class(base_class: str) -> list[BaseSkillDef]:
     return BASE_SKILLS_BY_CLASS.get(base_class, [])
 
 
+def skills_for_character(base_class: str, subclass_id: str | None):
+    """Навыки подкласса ЗАМЕНЯЮТ базовые классовые после выбора подкласса (30 ур)."""
+    if subclass_id is not None:
+        from game.combat.subclass_skills import skills_for_subclass
+        subclass_skills = skills_for_subclass(subclass_id)
+        if subclass_skills:
+            return subclass_skills
+    return skills_for_class(base_class)
+
+
 # Навыки, накладывающие контроль (пропуск хода) — для порядка фаз в резолвере
 CONTROL_SKILL_IDS: set[str] = {s.id for s in BASE_SKILL_DEFS.values() if s.effect == "stun"}
 

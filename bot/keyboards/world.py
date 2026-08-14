@@ -13,13 +13,13 @@ from bot import ash_handful_state
 from bot.onboarding_texts import REGION_TITLES
 from config import get_settings
 from game.combat import balance_config as bc
-from game.combat.base_skills import skills_for_class
+from game.combat.base_skills import skills_for_character
 from game.content_loader import ExplorationEventDef
 from game.world import grid
 
 BTN_MENTOR = "🧙 Наставник"
 BTN_MENTOR_BADGE = f"{BTN_MENTOR} ❗"  # патч 21: есть что взять/сдать у наставника
-BTN_MARKET = "🏪 Рынок"
+BTN_MARKET = "🏬 Рынок"  # патч 39: 🏬 — отличать от 🏪 «Торговый квартал» (сам квартал)
 BTN_APPRAISER = "💰 Скупщик"
 BTN_GATE = "🚪 За ворота"
 BTN_REST = "🛏️ Отдых"
@@ -30,6 +30,11 @@ BTN_KEEPER = "📖 Хранитель Списков"
 BTN_PRESETS = "⚔️ Пресеты"
 BTN_ELIXIR_SHOP = "⚗️ Лавка зелий"
 BTN_DAILIES = "📜 Задания"
+# Патч 39: кварталы города — см. city_square_keyboard/tavern_keyboard/
+# market_quarter_keyboard ниже.
+BTN_TAVERN = "🍺 Таверна"
+BTN_MARKET_QUARTER = "🏪 Торговый квартал"
+BTN_SQUARE_BACK = "← Главная площадь"
 
 
 def add_miniapp_button(kb: Keyboard) -> None:
@@ -69,45 +74,77 @@ def waiting_keyboard() -> str:
     return kb.get_json()
 
 
-def city_menu_keyboard(
+def city_square_keyboard(
     character=None, mentor_badge: bool = False, has_mount: bool = False, is_foreign: bool = False,
 ) -> str:
-    """character (патч 12) — при level>=30 добавляет кнопку Хранителя Списков
-    (выбор подкласса/испытания); при выбранном подклассе (патч 14, ч.3) —
-    кнопку [⚔️ Пресеты]. None — легаси-вызовы без гейта (нет кнопок).
-    mentor_badge (патч 21) — есть невзятый/несданный сюжетный квест: кнопка
-    наставника показывается с ❗ (см. BTN_MENTOR_BADGE).
-    has_mount (патч 25, п.7) — есть хотя бы один маунт, доступен и в городе.
-    is_foreign (патч 26) — чужой город: Наставник/Хранитель/Лавка/Рынок
-    недоступны (только Скупщик среди NPC — с наценкой, см. bot/handlers/appraiser.py);
-    личные меню (Инвентарь/Характеристики/Задания/Пресеты/Маунт/Ворота/Отдых)
-    работают как обычно."""
+    """Патч 39: Главная площадь — корневой городской экран, куда игрок
+    попадает при входе в город и при возрождении. Заменил монолитный
+    city_menu_keyboard (10+ кнопок, часть не помещалась в лимит VK) —
+    Таверна/Торговый квартал теперь СВОИ экраны (см. tavern_keyboard/
+    market_quarter_keyboard), сюда попадает только то, что относится к
+    самой площади: NPC-наставник, транспорт, выход, входы в кварталы.
+
+    is_foreign (патч 26/39) — чужой город: Наставник и Таверна целиком
+    недоступны (только Торговый квартал со скупщиком, с наценкой) — попытка
+    зайти в Таверну извне отбивается отдельным отказом (bot/handlers/world.py)."""
     kb = Keyboard(one_time=False)
     if not is_foreign:
         kb.add(Text(BTN_MENTOR_BADGE if mentor_badge else BTN_MENTOR), color=KeyboardButtonColor.PRIMARY)
-        kb.add(Text(BTN_MARKET), color=KeyboardButtonColor.SECONDARY)
+        kb.row()
+    if has_mount:
+        kb.add(Text(BTN_MOUNT), color=KeyboardButtonColor.SECONDARY)
         kb.row()
     kb.add(Text(BTN_GATE), color=KeyboardButtonColor.POSITIVE)
+    kb.row()
+    if not is_foreign:
+        kb.add(Text(BTN_TAVERN), color=KeyboardButtonColor.SECONDARY)
+    kb.add(Text(BTN_MARKET_QUARTER), color=KeyboardButtonColor.SECONDARY)
+    add_miniapp_button(kb)
+    return kb.get_json()
+
+
+def tavern_keyboard(character=None) -> str:
+    """Патч 39: Таверна — личные меню (отдых/статы/задания) + условные
+    (Хранитель Списков с 30 уровня, Пресеты после выбора подкласса — кнопки
+    НЕ показываются вовсе, если недоступны, не серые). Только в родном
+    городе — недоступна в чужом (см. city_square_keyboard)."""
+    kb = Keyboard(one_time=False)
     kb.add(Text(BTN_REST), color=KeyboardButtonColor.SECONDARY)
     kb.row()
-    kb.add(Text(BTN_APPRAISER), color=KeyboardButtonColor.SECONDARY)
-    kb.add(Text(BTN_INVENTORY), color=KeyboardButtonColor.SECONDARY)
-    kb.row()
     kb.add(Text(BTN_STATS), color=KeyboardButtonColor.SECONDARY)
-    if not is_foreign:
-        kb.add(Text(BTN_ELIXIR_SHOP), color=KeyboardButtonColor.SECONDARY)
     kb.row()
     kb.add(Text(BTN_DAILIES), color=KeyboardButtonColor.SECONDARY)
-    if not is_foreign and character is not None and character.level >= bc.SUBCLASS_UNLOCK_MIN_LEVEL:
+    if character is not None and character.level >= bc.SUBCLASS_UNLOCK_MIN_LEVEL:
         kb.row()
         kb.add(Text(BTN_KEEPER), color=KeyboardButtonColor.SECONDARY)
     if character is not None and character.subclass is not None:
         kb.row()
         kb.add(Text(BTN_PRESETS), color=KeyboardButtonColor.SECONDARY)
-    if has_mount:
-        kb.row()
-        kb.add(Text(BTN_MOUNT), color=KeyboardButtonColor.SECONDARY)
     add_miniapp_button(kb)
+    kb.row()
+    kb.add(Text(BTN_SQUARE_BACK), color=KeyboardButtonColor.SECONDARY)
+    return kb.get_json()
+
+
+def market_quarter_keyboard(is_foreign: bool = False) -> str:
+    """Патч 39: Торговый квартал — Скупщик доступен ВСЕГДА (в чужом городе —
+    с наценкой, см. bot/handlers/appraiser.py), Лавка зелий и Рынок — NPC,
+    недоступны чужаку (та же логика, что была у city_menu_keyboard); Инвентарь
+    — личное имущество, доступно всегда."""
+    kb = Keyboard(one_time=False)
+    kb.add(Text(BTN_APPRAISER), color=KeyboardButtonColor.SECONDARY)
+    kb.row()
+    if not is_foreign:
+        kb.add(Text(BTN_ELIXIR_SHOP), color=KeyboardButtonColor.SECONDARY)
+        kb.row()
+    kb.add(Text(BTN_INVENTORY), color=KeyboardButtonColor.SECONDARY)
+    kb.row()
+    if not is_foreign:
+        kb.add(Text(BTN_MARKET), color=KeyboardButtonColor.SECONDARY)
+        kb.row()
+    add_miniapp_button(kb)
+    kb.row()
+    kb.add(Text(BTN_SQUARE_BACK), color=KeyboardButtonColor.SECONDARY)
     return kb.get_json()
 
 
@@ -247,14 +284,15 @@ def event_choice_keyboard(event: ExplorationEventDef, song_extra: bool = False) 
     return kb.get_json()
 
 
-def combat_keyboard(base_class: str, cooldowns: dict[str, int]) -> str:
-    """Боевая клавиатура: Атака + до 3 навыков класса (с КД-счётчиком) + Предмет + Побег.
+def combat_keyboard(base_class: str, cooldowns: dict[str, int], subclass_id: str | None = None) -> str:
+    """Боевая клавиатура: Атака + навыки класса/подкласса (с КД-счётчиком) + Предмет + Побег.
     Навык на КД показывается с остатком, но остаётся нажимаемым — обработчик ответит
-    «не готов» без траты хода."""
+    «не готов» без траты хода. subclass_id (патч 39, ч.3) — после выбора подкласса
+    навыки класса ЗАМЕНЯЮТСЯ навыками подкласса."""
     kb = Keyboard(one_time=False)
     kb.add(Text(BTN_ATTACK), color=KeyboardButtonColor.POSITIVE)
     kb.row()
-    for skill in skills_for_class(base_class):
+    for skill in skills_for_character(base_class, subclass_id):
         cd = cooldowns.get(skill.id, 0)
         label = skill.name if cd <= 0 else f"{skill.name} (КД {cd})"
         color = KeyboardButtonColor.PRIMARY if cd <= 0 else KeyboardButtonColor.SECONDARY

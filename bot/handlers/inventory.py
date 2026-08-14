@@ -129,9 +129,9 @@ async def back_to_list(message: Message) -> None:
 
 @labeler.message(payload_contains={"type": "inventory_root_back"})
 async def inventory_root_back(message: Message) -> None:
-    """Патч 37: выход из инвентаря целиком — обратно к городской клавиатуре."""
-    from bot.keyboards.world import city_menu_keyboard
-    from services import mount_service, story_service
+    """Патч 39: выход из инвентаря целиком — обратно в Торговый квартал."""
+    from bot.keyboards.world import market_quarter_keyboard
+    from bot.world_texts import market_quarter_text
 
     peer_id = message.peer_id
     async with get_session_factory()() as db:
@@ -139,16 +139,17 @@ async def inventory_root_back(message: Message) -> None:
         if character is None or character.creation_state is not None:
             return
         region = grid.city_region_at(character.pos_x, character.pos_y)
-        await screen_service.set_screen(db, character, None)
-        await db.commit()
         if region is None:
+            await screen_service.set_screen(db, character, None)
+            await db.commit()
             return
-        has_mount = await mount_service.has_any_mount(db, character.id)
+        await screen_service.set_screen(db, character, "market_quarter")
+        await db.commit()
         is_foreign = region != character.region
-        mentor_badge = not is_foreign and await story_service.mentor_badge_active(db, character)
 
-    keyboard = city_menu_keyboard(character, mentor_badge, has_mount=has_mount, is_foreign=is_foreign)
-    await editable_message.send_or_edit(_bot_api, _NS, peer_id, "Сумка закрыта.", keyboard)
+    text = market_quarter_text(region, is_foreign)
+    keyboard = market_quarter_keyboard(is_foreign)
+    await editable_message.send_or_edit(_bot_api, _NS, peer_id, text, keyboard)
 
 
 @labeler.message(payload_contains={"type": "inventory_equip"})
