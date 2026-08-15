@@ -5,7 +5,7 @@ import json
 
 import bot.keyboards.world as world_kb
 from bot import editable_message
-from bot.keyboards.items import INVENTORY_KEYBOARD_MAX_ITEMS, inventory_keyboard
+from bot.keyboards.items import inventory_keyboard
 from config import Settings
 from game.combat import display
 from game.world import flavor, world_config as wc
@@ -140,14 +140,43 @@ def _kb_rows(kb_json: str) -> list[list[dict]]:
 
 
 def test_inventory_keyboard_caps_rows_at_vk_limit(monkeypatch) -> None:
+    """Патч 41: инвентарь — настоящая пагинация (6/стр., 2 в ряд), а не
+    жёсткий срез в один длинный столбик — при любом размере инвентаря
+    страница остаётся короткой."""
     monkeypatch.setattr(world_kb, "get_settings", lambda: Settings(_env_file=None))
     items = [
         (Item(id=i, name=f"Предмет {i}", slot="weapon", base_stats={}), False) for i in range(20)
     ]
     rows = _kb_rows(inventory_keyboard(items))
     assert len(rows) <= 10
-    # Патч 37: без миниаппа (URL не задан) — предметы + [← Назад] последней строкой.
-    assert len(rows) == INVENTORY_KEYBOARD_MAX_ITEMS + 1
+    # 6 предметов/стр. по 2 в ряд = 3 ряда + [Стр. →] + [← Назад].
+    assert len(rows) == 5
+
+
+def test_inventory_keyboard_pagination_pages_through_items(monkeypatch) -> None:
+    monkeypatch.setattr(world_kb, "get_settings", lambda: Settings(_env_file=None))
+    items = [
+        (Item(id=i, name=f"Предмет {i}", slot="weapon", base_stats={}), False) for i in range(20)
+    ]
+
+    page1 = json.loads(inventory_keyboard(items, page=1))
+    labels_p1 = {b["action"]["label"] for row in page1["buttons"] for b in row}
+    assert "Предмет 0" in labels_p1
+    assert "Предмет 6" not in labels_p1
+    assert "Стр. →" in labels_p1
+    assert "← Стр." not in labels_p1
+
+    page2 = json.loads(inventory_keyboard(items, page=2))
+    labels_p2 = {b["action"]["label"] for row in page2["buttons"] for b in row}
+    assert "Предмет 6" in labels_p2
+    assert "Предмет 0" not in labels_p2
+    assert "← Стр." in labels_p2
+    assert "Стр. →" in labels_p2
+
+    last_page = json.loads(inventory_keyboard(items, page=99))  # за пределами — клампится
+    labels_last = {b["action"]["label"] for row in last_page["buttons"] for b in row}
+    assert "Предмет 19" in labels_last
+    assert "Стр. →" not in labels_last
 
 
 # --- ч.2: единый формат числовых дельт ---

@@ -11,12 +11,13 @@ item_choice_keyboard — окно сравнения при дропе — ос�
 
 from vkbottle import Keyboard, KeyboardButtonColor, Text
 
+from bot.keyboards.layout import add_paired
 from bot.keyboards.world import add_miniapp_button
 from models import Item
 
 BTN_EQUIP = "Надеть"
 BTN_KEEP = "В инвентарь"
-BTN_SELL_GEAR = "🎒 Продать снаряжение"
+BTN_SELL_GEAR = "🎒 Снаряжение"  # патч 41: было "Продать снаряжение"
 
 
 def no_keyboard() -> str:
@@ -42,28 +43,40 @@ def item_choice_keyboard(item_id: int) -> str:
 
 BTN_BACK = "← Назад"
 
-# Патч 32, баг 5: VK ограничивает клавиатуру 10 строками — при одной кнопке
-# на предмет инвентарь без накопленного лимита у активного игрока (трофеи не
-# продаются автоматически, предметы просто копятся) рано или поздно превышал
-# лимит, VK отклонял messages.send/.edit целиком, и кнопка «Инвентарь» на
-# вид работала (сообщение с клавиатурой уже было показано раньше), а на
-# нажатие переставала отвечать вовсе — ошибка API падала за пределами
-# перехватываемого в editable_message.send_or_edit. Одна строка остаётся под
-# кнопку мини-аппа (add_miniapp_button ниже), где полный список без лимита.
-INVENTORY_KEYBOARD_MAX_ITEMS = 9
+# Патч 32, баг 5 / патч 41: VK ограничивает клавиатуру 10 строками — при
+# одной кнопке на предмет инвентарь без накопленного лимита у активного
+# игрока рано или поздно превышал лимит и ронял messages.send/.edit целиком.
+# Патч 41 меняет фикс с "жёсткий срез, остальное только в мини-аппе" на
+# настоящую пагинацию (как sell_gear_detail_keyboard у скупщика) — по 2
+# кнопки в ряд, 6 предметов на страницу, никто не теряется из вида в чате.
+INVENTORY_PAGE_SIZE = 6
 
 
-def inventory_keyboard(items: list[tuple[Item, bool]]) -> str:
+def inventory_keyboard(items: list[tuple[Item, bool]], page: int = 1) -> str:
     """Список предметов инвентаря — тап по предмету открывает сравнение с
-    надетым. Патч 37: [← Назад] последней кнопкой — выход из экрана в город."""
+    надетым. Патч 37: [← Назад] последней кнопкой — выход из экрана в город.
+    Патч 41: постранично (INVENTORY_PAGE_SIZE/стр.), по 2 кнопки в ряд."""
+    total_pages = max((len(items) + INVENTORY_PAGE_SIZE - 1) // INVENTORY_PAGE_SIZE, 1)
+    page = max(1, min(page, total_pages))
+    page_items = items[(page - 1) * INVENTORY_PAGE_SIZE : page * INVENTORY_PAGE_SIZE]
+
     kb = Keyboard(one_time=False)
-    for item, equipped in items[:INVENTORY_KEYBOARD_MAX_ITEMS]:
-        label = f"{item.name}{' (надето)' if equipped else ''}"
-        kb.add(
-            Text(label, payload={"type": "inventory_item", "item": item.id}),
-            color=KeyboardButtonColor.PRIMARY if equipped else KeyboardButtonColor.SECONDARY,
+    add_paired(kb, [
+        (
+            f"{item.name}{' (надето)' if equipped else ''}",
+            KeyboardButtonColor.PRIMARY if equipped else KeyboardButtonColor.SECONDARY,
+            {"type": "inventory_item", "item": item.id},
         )
+        for item, equipped in page_items
+    ])
+
+    if page > 1:
+        kb.add(Text("← Стр.", payload={"type": "inventory_page", "page": page - 1}), color=KeyboardButtonColor.PRIMARY)
+    if page < total_pages:
+        kb.add(Text("Стр. →", payload={"type": "inventory_page", "page": page + 1}), color=KeyboardButtonColor.PRIMARY)
+    if page > 1 or page < total_pages:
         kb.row()
+
     add_miniapp_button(kb)
     kb.row()
     kb.add(Text(BTN_BACK, payload={"type": "inventory_root_back"}), color=KeyboardButtonColor.SECONDARY)

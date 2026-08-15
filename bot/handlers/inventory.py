@@ -13,7 +13,7 @@
 from vkbottle.bot import BotLabeler, Message
 
 from bot import editable_message
-from bot.keyboards.items import INVENTORY_KEYBOARD_MAX_ITEMS, inventory_keyboard, item_view_keyboard
+from bot.keyboards.items import INVENTORY_PAGE_SIZE, inventory_keyboard, item_view_keyboard
 from bot.keyboards.world import BTN_INVENTORY
 from game.world import grid
 from models import Item
@@ -53,17 +53,11 @@ async def _render_list(db, character) -> tuple[str, list[tuple[Item, bool]]]:
             f"{_stats_line(item)}"
         )
     text = "🎒 Инвентарь:\n\n" + "\n\n".join(lines)
-    if len(items) > INVENTORY_KEYBOARD_MAX_ITEMS:
-        # Патч 32, баг 5: клавиатура показывает только первые N (лимит VK на
-        # строки) — уточняем, что остальное не потеряно, просто не влезло сюда.
-        # Патч 35, аудит: экран НЕ ломается ни при каком размере инвентаря
-        # (жёсткий срез на INVENTORY_KEYBOARD_MAX_ITEMS), в отличие от старого
-        # скупщика (см. bot/handlers/appraiser.py) — здесь достаточно, полная
-        # группировка/пагинация не требуется, пока это просто просмотр+редирект.
-        text += (
-            f"\n\n…и ещё {len(items) - INVENTORY_KEYBOARD_MAX_ITEMS} предмет(а/ов). "
-            "Полный список и надевание — в мини-аппе."
-        )
+    if len(items) > INVENTORY_PAGE_SIZE:
+        # Патч 41: клавиатура теперь настоящая пагинация (inventory_keyboard),
+        # текстовое резюме по-прежнему показывает всё разом — уточняем, что
+        # кнопки предметов идут постранично.
+        text += "\n\nКнопки — постранично, [Стр. →] внизу открывает следующую."
     return text, items
 
 
@@ -113,6 +107,25 @@ async def view_item(message: Message) -> None:
     await editable_message.send_or_edit(
         _bot_api, _NS, peer_id, text, item_view_keyboard(item_id, entry.equipped),
     )
+
+
+@labeler.message(payload_contains={"type": "inventory_page"})
+async def inventory_page(message: Message) -> None:
+    """Патч 41: пагинация списка инвентаря — переключение страницы кнопками
+    [← Стр.]/[Стр. →], текст остаётся тем же (полный список), меняются
+    только кнопки предметов на клавиатуре."""
+    peer_id = message.peer_id
+    payload = message.get_payload_json() or {}
+    page = payload.get("page")
+    if not isinstance(page, int):
+        return
+    async with get_session_factory()() as db:
+        character = await onboarding_svc.get_character(db, message.from_id)
+        if character is None or character.creation_state is not None:
+            return
+        text, items = await _render_list(db, character)
+
+    await editable_message.send_or_edit(_bot_api, _NS, peer_id, text, inventory_keyboard(items, page))
 
 
 @labeler.message(payload_contains={"type": "inventory_back"})

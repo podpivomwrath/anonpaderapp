@@ -18,13 +18,14 @@
 
 from vkbottle import Keyboard, KeyboardButtonColor, Text
 
+from bot.keyboards.layout import add_paired
 from bot.keyboards.world import add_miniapp_button
 from game.content_loader import ItemRarityDef, TrophyDef
 from models import Item
 
 SELL_ALL_ID = "all"
-BTN_TROPHIES = "🧿 Продать трофеи"
-BTN_SELL_GEAR = "🗡 Продать снаряжение"
+BTN_TROPHIES = "🧿 Трофеи"  # патч 41: было "Продать трофеи"
+BTN_SELL_GEAR = "🗡 Снаряжение"  # патч 41: было "Продать снаряжение"
 BTN_GEAR_DETAIL = "📋 По предметам"
 BTN_BACK = "← Назад"
 
@@ -41,12 +42,13 @@ def no_keyboard() -> str:
 
 def appraiser_root_keyboard() -> str:
     """Патч 37: корневой экран скупщика — всего 2 действия + назад, вместо
-    того чтобы сразу вываливать список трофеев поверх городской клавиатуры."""
+    того чтобы сразу вываливать список трофеев поверх городской клавиатуры.
+    Патч 41: 2 действия — уже одна строка при паре."""
     kb = Keyboard(one_time=False)
-    kb.add(Text(BTN_TROPHIES, payload={"type": "appraiser_trophies"}), color=KeyboardButtonColor.SECONDARY)
-    kb.row()
-    kb.add(Text(BTN_SELL_GEAR, payload={"type": "appraiser_gear"}), color=KeyboardButtonColor.SECONDARY)
-    kb.row()
+    add_paired(kb, [
+        (BTN_TROPHIES, KeyboardButtonColor.SECONDARY, {"type": "appraiser_trophies"}),
+        (BTN_SELL_GEAR, KeyboardButtonColor.SECONDARY, {"type": "appraiser_gear"}),
+    ])
     add_miniapp_button(kb)
     kb.row()
     kb.add(Text(BTN_BACK, payload={"type": "appraiser_back"}), color=KeyboardButtonColor.SECONDARY)
@@ -54,6 +56,8 @@ def appraiser_root_keyboard() -> str:
 
 
 def appraiser_trophies_keyboard(stock: list[tuple[TrophyDef, int]]) -> str:
+    """Патч 41: «Продать всё» — во всю ширину (главное действие), остальные
+    градации трофеев — по 2 в ряд."""
     kb = Keyboard(one_time=False)
     if stock:
         total = sum(d.sell_price * count for d, count in stock)
@@ -62,14 +66,13 @@ def appraiser_trophies_keyboard(stock: list[tuple[TrophyDef, int]]) -> str:
             color=KeyboardButtonColor.POSITIVE,
         )
         kb.row()
-        for trophy_def, count in stock:
-            price = trophy_def.sell_price * count
-            label = f"Продать {trophy_def.emoji} ×{count} — {price} зол."
-            kb.add(
-                Text(label, payload={"type": "sell_trophies", "id": trophy_def.id}),
-                color=KeyboardButtonColor.SECONDARY,
-            )
-            kb.row()
+        items = [
+            (f"Продать {trophy_def.emoji} ×{count} — {price} зол.", KeyboardButtonColor.SECONDARY,
+             {"type": "sell_trophies", "id": trophy_def.id})
+            for trophy_def, count in stock
+            for price in [trophy_def.sell_price * count]
+        ]
+        add_paired(kb, items)
     add_miniapp_button(kb)
     kb.row()
     kb.add(Text(BTN_BACK, payload={"type": "appraiser_root"}), color=KeyboardButtonColor.SECONDARY)
@@ -81,7 +84,8 @@ def sell_gear_main_keyboard(
 ) -> str:
     """Основной экран продажи снаряжения (патч 35/37) — до 5 кнопок продажи (по
     одной на присутствующую редкость) + «Продать всё» + подробный режим +
-    назад, вместо одной кнопки на предмет и вместо инлайн-наложения на город."""
+    назад, вместо одной кнопки на предмет и вместо инлайн-наложения на город.
+    Патч 41: редкости — по 2 в ряд, «Продать всё» остаётся главным действием."""
     kb = Keyboard(one_time=False)
     if groups:
         kb.add(
@@ -89,15 +93,13 @@ def sell_gear_main_keyboard(
             color=KeyboardButtonColor.POSITIVE,
         )
         kb.row()
-        for rdef, items, total in groups:
-            label = f"Продать {rdef.emoji} ×{len(items)} — {total} зол."
-            kb.add(
-                Text(label, payload={"type": "sell_rarity", "rarity": rdef.id}),
-                color=KeyboardButtonColor.SECONDARY,
-            )
-            kb.row()
-        kb.add(Text(BTN_GEAR_DETAIL, payload={"type": "gear_detail", "page": 1}), color=KeyboardButtonColor.SECONDARY)
-        kb.row()
+        items = [
+            (f"Продать {rdef.emoji} ×{len(items_)} — {total} зол.", KeyboardButtonColor.SECONDARY,
+             {"type": "sell_rarity", "rarity": rdef.id})
+            for rdef, items_, total in groups
+        ]
+        items.append((BTN_GEAR_DETAIL, KeyboardButtonColor.SECONDARY, {"type": "gear_detail", "page": 1}))
+        add_paired(kb, items)
     add_miniapp_button(kb)
     kb.row()
     kb.add(Text(BTN_BACK, payload={"type": "appraiser_root"}), color=KeyboardButtonColor.SECONDARY)
@@ -106,11 +108,13 @@ def sell_gear_main_keyboard(
 
 def sell_gear_detail_keyboard(page_items: list[Item], page: int, total_pages: int) -> str:
     """Подробный режим (патч 35/37): нумерованные кнопки продажи по позиции на
-    странице + пагинация + назад к основному экрану снаряжения."""
+    странице + пагинация + назад к основному экрану снаряжения.
+    Патч 41: позиции — по 2 в ряд вместо столбика."""
     kb = Keyboard(one_time=False)
-    for i, item in enumerate(page_items, start=1):
-        kb.add(Text(str(i), payload={"type": "sell_item", "item": item.id, "page": page}), color=KeyboardButtonColor.SECONDARY)
-        kb.row()
+    add_paired(kb, [
+        (str(i), KeyboardButtonColor.SECONDARY, {"type": "sell_item", "item": item.id, "page": page})
+        for i, item in enumerate(page_items, start=1)
+    ])
 
     if page > 1:
         kb.add(Text("← Стр.", payload={"type": "gear_detail", "page": page - 1}), color=KeyboardButtonColor.PRIMARY)

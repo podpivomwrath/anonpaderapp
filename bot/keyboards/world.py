@@ -10,6 +10,7 @@
 from vkbottle import Keyboard, KeyboardButtonColor, OpenLink, Text
 
 from bot import ash_handful_state
+from bot.keyboards.layout import add_paired
 from bot.onboarding_texts import REGION_TITLES
 from config import get_settings
 from game.combat import balance_config as bc
@@ -23,18 +24,18 @@ BTN_MARKET = "🏬 Рынок"  # патч 39: 🏬 — отличать от �
 BTN_APPRAISER = "💰 Скупщик"
 BTN_GATE = "🚪 За ворота"
 BTN_REST = "🛏️ Отдых"
-BTN_CHARACTER = "🎭 Персонаж"
+BTN_CHARACTER = "🎭 Персонаж ↗"  # патч 41: стрелка — явная метка "уводит в мини-апп"
 BTN_INVENTORY = "🎒 Инвентарь"
-BTN_STATS = "📊 Характеристики"
-BTN_KEEPER = "📖 Хранитель Списков"
+BTN_STATS = "📊 Статы"  # патч 41: было "Характеристики" — резалось многоточием
+BTN_KEEPER = "📖 Хранитель"  # патч 41: было "Хранитель Списков"
 BTN_PRESETS = "⚔️ Пресеты"
-BTN_ELIXIR_SHOP = "⚗️ Лавка зелий"
+BTN_ELIXIR_SHOP = "⚗️ Лавка"  # патч 41: было "Лавка зелий"
 BTN_DAILIES = "📜 Задания"
 # Патч 39: кварталы города — см. city_square_keyboard/tavern_keyboard/
 # market_quarter_keyboard ниже.
 BTN_TAVERN = "🍺 Таверна"
-BTN_MARKET_QUARTER = "🏪 Торговый квартал"
-BTN_SQUARE_BACK = "← Главная площадь"
+BTN_MARKET_QUARTER = "🏪 Торговый"  # патч 41: было "Торговый квартал" — резалось
+BTN_SQUARE_BACK = "← Площадь"  # патч 41: было "← Главная площадь"
 
 
 def add_miniapp_button(kb: Keyboard) -> None:
@@ -86,19 +87,20 @@ def city_square_keyboard(
 
     is_foreign (патч 26/39) — чужой город: Наставник и Таверна целиком
     недоступны (только Торговый квартал со скупщиком, с наценкой) — попытка
-    зайти в Таверну извне отбивается отдельным отказом (bot/handlers/world.py)."""
+    зайти в Таверну извне отбивается отдельным отказом (bot/handlers/world.py).
+
+    Патч 41: 2 колонки вместо столбика — до 3 рядов кнопок вместо 4-5."""
     kb = Keyboard(one_time=False)
+    items: list[tuple[str, KeyboardButtonColor, dict | None]] = []
     if not is_foreign:
-        kb.add(Text(BTN_MENTOR_BADGE if mentor_badge else BTN_MENTOR), color=KeyboardButtonColor.PRIMARY)
-        kb.row()
+        items.append((BTN_MENTOR_BADGE if mentor_badge else BTN_MENTOR, KeyboardButtonColor.PRIMARY, None))
     if has_mount:
-        kb.add(Text(BTN_MOUNT), color=KeyboardButtonColor.SECONDARY)
-        kb.row()
-    kb.add(Text(BTN_GATE), color=KeyboardButtonColor.POSITIVE)
-    kb.row()
+        items.append((BTN_MOUNT, KeyboardButtonColor.SECONDARY, None))
+    items.append((BTN_GATE, KeyboardButtonColor.POSITIVE, None))
     if not is_foreign:
-        kb.add(Text(BTN_TAVERN), color=KeyboardButtonColor.SECONDARY)
-    kb.add(Text(BTN_MARKET_QUARTER), color=KeyboardButtonColor.SECONDARY)
+        items.append((BTN_TAVERN, KeyboardButtonColor.SECONDARY, None))
+    items.append((BTN_MARKET_QUARTER, KeyboardButtonColor.SECONDARY, None))
+    add_paired(kb, items)
     add_miniapp_button(kb)
     return kb.get_json()
 
@@ -107,19 +109,20 @@ def tavern_keyboard(character=None) -> str:
     """Патч 39: Таверна — личные меню (отдых/статы/задания) + условные
     (Хранитель Списков с 30 уровня, Пресеты после выбора подкласса — кнопки
     НЕ показываются вовсе, если недоступны, не серые). Только в родном
-    городе — недоступна в чужом (см. city_square_keyboard)."""
+    городе — недоступна в чужом (см. city_square_keyboard).
+
+    Патч 41: 2 колонки — до 3 рядов вместо 5, [← Назад] отдельной строкой."""
     kb = Keyboard(one_time=False)
-    kb.add(Text(BTN_REST), color=KeyboardButtonColor.SECONDARY)
-    kb.row()
-    kb.add(Text(BTN_STATS), color=KeyboardButtonColor.SECONDARY)
-    kb.row()
-    kb.add(Text(BTN_DAILIES), color=KeyboardButtonColor.SECONDARY)
+    items: list[tuple[str, KeyboardButtonColor, dict | None]] = [
+        (BTN_REST, KeyboardButtonColor.SECONDARY, None),
+        (BTN_STATS, KeyboardButtonColor.SECONDARY, None),
+        (BTN_DAILIES, KeyboardButtonColor.SECONDARY, None),
+    ]
     if character is not None and character.level >= bc.SUBCLASS_UNLOCK_MIN_LEVEL:
-        kb.row()
-        kb.add(Text(BTN_KEEPER), color=KeyboardButtonColor.SECONDARY)
+        items.append((BTN_KEEPER, KeyboardButtonColor.SECONDARY, None))
     if character is not None and character.subclass is not None:
-        kb.row()
-        kb.add(Text(BTN_PRESETS), color=KeyboardButtonColor.SECONDARY)
+        items.append((BTN_PRESETS, KeyboardButtonColor.SECONDARY, None))
+    add_paired(kb, items)
     add_miniapp_button(kb)
     kb.row()
     kb.add(Text(BTN_SQUARE_BACK), color=KeyboardButtonColor.SECONDARY)
@@ -130,18 +133,18 @@ def market_quarter_keyboard(is_foreign: bool = False) -> str:
     """Патч 39: Торговый квартал — Скупщик доступен ВСЕГДА (в чужом городе —
     с наценкой, см. bot/handlers/appraiser.py), Лавка зелий и Рынок — NPC,
     недоступны чужаку (та же логика, что была у city_menu_keyboard); Инвентарь
-    — личное имущество, доступно всегда."""
+    — личное имущество, доступно всегда.
+
+    Патч 41: 2 колонки — ровно как в мокапе патча (Скупщик/Лавка, Инвентарь/
+    Рынок), до 2 рядов вместо 4."""
     kb = Keyboard(one_time=False)
-    kb.add(Text(BTN_APPRAISER), color=KeyboardButtonColor.SECONDARY)
-    kb.row()
+    items: list[tuple[str, KeyboardButtonColor, dict | None]] = [(BTN_APPRAISER, KeyboardButtonColor.SECONDARY, None)]
     if not is_foreign:
-        kb.add(Text(BTN_ELIXIR_SHOP), color=KeyboardButtonColor.SECONDARY)
-        kb.row()
-    kb.add(Text(BTN_INVENTORY), color=KeyboardButtonColor.SECONDARY)
-    kb.row()
+        items.append((BTN_ELIXIR_SHOP, KeyboardButtonColor.SECONDARY, None))
+    items.append((BTN_INVENTORY, KeyboardButtonColor.SECONDARY, None))
     if not is_foreign:
-        kb.add(Text(BTN_MARKET), color=KeyboardButtonColor.SECONDARY)
-        kb.row()
+        items.append((BTN_MARKET, KeyboardButtonColor.SECONDARY, None))
+    add_paired(kb, items)
     add_miniapp_button(kb)
     kb.row()
     kb.add(Text(BTN_SQUARE_BACK), color=KeyboardButtonColor.SECONDARY)
@@ -226,12 +229,14 @@ def movement_keyboard(
     kb.row()
     kb.add(Text(BTN_REST), color=KeyboardButtonColor.SECONDARY)
     kb.add(Text(BTN_LOOK_AROUND), color=KeyboardButtonColor.SECONDARY)
+    # Патч 41: Маунт и Горстка пепла делят ряд (были отдельными рядами) —
+    # экран не растёт вверх даже когда оба условия активны разом.
+    extras: list[tuple[str, KeyboardButtonColor, dict | None]] = []
     if has_mount:
-        kb.row()
-        kb.add(Text(BTN_MOUNT), color=KeyboardButtonColor.SECONDARY)
+        extras.append((BTN_MOUNT, KeyboardButtonColor.SECONDARY, None))
     if peer_id is not None and ash_handful_state.is_pending(peer_id):
-        kb.row()
-        kb.add(Text(BTN_ASH_HANDFUL), color=KeyboardButtonColor.SECONDARY)
+        extras.append((BTN_ASH_HANDFUL, KeyboardButtonColor.SECONDARY, None))
+    add_paired(kb, extras)
     add_miniapp_button(kb)
     return kb.get_json()
 
@@ -288,16 +293,21 @@ def combat_keyboard(base_class: str, cooldowns: dict[str, int], subclass_id: str
     """Боевая клавиатура: Атака + навыки класса/подкласса (с КД-счётчиком) + Предмет + Побег.
     Навык на КД показывается с остатком, но остаётся нажимаемым — обработчик ответит
     «не готов» без траты хода. subclass_id (патч 39, ч.3) — после выбора подкласса
-    навыки класса ЗАМЕНЯЮТСЯ навыками подкласса."""
+    навыки класса ЗАМЕНЯЮТСЯ навыками подкласса.
+
+    Патч 41: 2 колонки (Атака+навык1 / навык2+навык3 / навык4+Предмет /
+    Побег) — до 4 подкласса-навыков + Атака + Предмет + Побег укладываются в
+    4 ряда вместо 6-7."""
     kb = Keyboard(one_time=False)
-    kb.add(Text(BTN_ATTACK), color=KeyboardButtonColor.POSITIVE)
-    kb.row()
+    items: list[tuple[str, KeyboardButtonColor, dict | None]] = [
+        (BTN_ATTACK, KeyboardButtonColor.POSITIVE, None)
+    ]
     for skill in skills_for_character(base_class, subclass_id):
         cd = cooldowns.get(skill.id, 0)
         label = skill.name if cd <= 0 else f"{skill.name} (КД {cd})"
         color = KeyboardButtonColor.PRIMARY if cd <= 0 else KeyboardButtonColor.SECONDARY
-        kb.add(Text(label, payload={"type": "skill", "id": skill.id}), color=color)
-        kb.row()
-    kb.add(Text(BTN_ITEM), color=KeyboardButtonColor.SECONDARY)
-    kb.add(Text(BTN_FLEE), color=KeyboardButtonColor.NEGATIVE)
+        items.append((label, color, {"type": "skill", "id": skill.id}))
+    items.append((BTN_ITEM, KeyboardButtonColor.SECONDARY, None))
+    items.append((BTN_FLEE, KeyboardButtonColor.NEGATIVE, None))
+    add_paired(kb, items)
     return kb.get_json()

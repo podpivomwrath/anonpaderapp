@@ -13,6 +13,7 @@
 
 from vkbottle import Keyboard, KeyboardButtonColor, Text
 
+from bot.keyboards.layout import add_paired
 from bot.keyboards.world import add_miniapp_button
 from game.content_loader import ElixirDef
 from game.economy import elixir_config as ec
@@ -46,15 +47,12 @@ def elixir_quantity_keyboard(elixir: ElixirDef, farm_currency: int) -> str:
     золоту количество из SHOP_BULK_QUANTITIES, [← Назад] к каталогу."""
     kb = Keyboard(one_time=False)
     unit_price = ec.ELIXIR_PRICES.get(elixir.id, 0)
+    items: list[tuple[str, KeyboardButtonColor, dict | None]] = []
     for qty in ec.SHOP_BULK_QUANTITIES:
         total = unit_price * qty
         if total > farm_currency:
             continue
-        label = f"×{qty} — {total} зол."
-        kb.add(
-            Text(label, payload={"type": "buy_elixir_qty", "id": elixir.id, "qty": qty}),
-            color=KeyboardButtonColor.POSITIVE,
-        )
-        kb.row()
+        items.append((f"×{qty} — {total} зол.", KeyboardButtonColor.POSITIVE, {"type": "buy_elixir_qty", "id": elixir.id, "qty": qty}))
+    add_paired(kb, items)
     kb.add(Text(BTN_BACK, payload={"type": "elixir_shop_item_back"}), color=KeyboardButtonColor.SECONDARY)
     return kb.get_json()

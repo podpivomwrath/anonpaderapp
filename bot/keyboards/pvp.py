@@ -12,9 +12,14 @@ payload {"type":"skill"} из bot/handlers/combat.py) — vkbottle диспет�
 
 from vkbottle import Keyboard, KeyboardButtonColor, Text
 
+from bot.keyboards.layout import add_paired
 from bot.keyboards.world import add_miniapp_button
 from game.combat.base_skills import skills_for_character
 from game.content_loader import ElixirDef
+
+# Патч 41: сколько целей помещается в один ряд инлайн-клавиатуры выбора цели
+# без переполнения экрана — свыше этого пришлось бы пагинировать.
+_TARGET_ROW_WIDTH = 5
 
 BTN_PVP_ATTACK = "🗡️ Атаковать"
 # Патч 30, баг 3, п.3: у PvE "🎒 Предмет" (bot/keyboards/world.py) — намеренно
@@ -45,20 +50,22 @@ def pvp_combat_keyboard(
     PvP исключения. show_target (патч 38) — кнопка [🎯 Цель] только для
     массового боя (2+ противников есть смысл выбирать); в дуэли 1×1
     противник ровно один, выбор не нужен. subclass_id (патч 39, ч.3) —
-    после выбора подкласса навыки класса ЗАМЕНЯЮТСЯ навыками подкласса."""
+    после выбора подкласса навыки класса ЗАМЕНЯЮТСЯ навыками подкласса.
+
+    Патч 41: 2 колонки — та же раскладка, что у PvE combat_keyboard."""
     kb = Keyboard(one_time=False)
-    kb.add(Text(BTN_PVP_ATTACK), color=KeyboardButtonColor.POSITIVE)
-    kb.row()
+    items: list[tuple[str, KeyboardButtonColor, dict | None]] = [
+        (BTN_PVP_ATTACK, KeyboardButtonColor.POSITIVE, None)
+    ]
     for skill in skills_for_character(base_class, subclass_id):
         cd = cooldowns.get(skill.id, 0)
         label = skill.name if cd <= 0 else f"{skill.name} (КД {cd})"
         color = KeyboardButtonColor.PRIMARY if cd <= 0 else KeyboardButtonColor.SECONDARY
-        kb.add(Text(label, payload={"type": "pvp_skill", "id": skill.id}), color=color)
-        kb.row()
+        items.append((label, color, {"type": "pvp_skill", "id": skill.id}))
     if show_target:
-        kb.add(Text(BTN_PVP_TARGET), color=KeyboardButtonColor.SECONDARY)
-        kb.row()
-    kb.add(Text(BTN_PVP_ITEM), color=KeyboardButtonColor.SECONDARY)
+        items.append((BTN_PVP_TARGET, KeyboardButtonColor.SECONDARY, None))
+    items.append((BTN_PVP_ITEM, KeyboardButtonColor.SECONDARY, None))
+    add_paired(kb, items)
     return kb.get_json()
 
 
@@ -87,11 +94,17 @@ def pvp_target_keyboard(enemy_ids: list[int]) -> str:
     уже подчиняется отдельному правилу приоритета боевой клавиатуры, см.
     services/screen_service.py и docstring bot/handlers/world.py::_current_keyboard).
     Инлайн и через editable_message — как и pvp_items_keyboard выше, тот же
-    приём "временная подпанель поверх боевой клавиатуры", не отдельный экран."""
+    приём "временная подпанель поверх боевой клавиатуры", не отдельный экран.
+
+    Патч 41: цели переносятся по _TARGET_ROW_WIDTH в ряд — при 5+ противниках
+    список раньше растягивался в одну длинную строку."""
     kb = Keyboard(inline=True)
     for i, cid in enumerate(enemy_ids, start=1):
         kb.add(Text(str(i), payload={"type": "pvp_target_pick", "target": cid}), color=KeyboardButtonColor.SECONDARY)
-    kb.row()
+        if i % _TARGET_ROW_WIDTH == 0:
+            kb.row()
+    if len(enemy_ids) % _TARGET_ROW_WIDTH != 0:
+        kb.row()
     kb.add(Text("← Назад", payload={"type": "pvp_target_back"}), color=KeyboardButtonColor.SECONDARY)
     return kb.get_json()
 
