@@ -161,6 +161,25 @@ def test_pvp_hit_log_uses_strict_format_no_pve_flavor() -> None:
         assert banned not in hit_line
 
 
+def test_pve_hit_log_uses_same_strict_format_as_pvp() -> None:
+    """Патч 43, ч.1: образность убрана из пошагового лога ПОВСЕМЕСТНО — PvE
+    теперь использует тот же краткий формат, что и PvP (был введён патчем 32
+    только для PvP-веток)."""
+    rng = NoCritRng()
+    player = combatant(1, side=0, name="Валгар", strength=100)
+    mob = combatant(2, side=1, kind="mob", name="Волк", vitality=500)
+    state = CombatSessionState(session_id=1, mode=CombatMode.PVE)
+    state.add(player)
+    state.add(mob)
+    result = resolve_tick(state, {1: attack(2)}, rng)
+
+    hit_line = next(ln for ln in result.lines if "урона" in ln)
+    assert hit_line.startswith("Валгар атакует Волк — ")
+    assert "(Волк:" in hit_line
+    for banned in ("тварь", "Тварь", "оно", "существо"):
+        assert banned not in hit_line
+
+
 def test_pvp_control_log_names_target_not_creature() -> None:
     """Патч 32, ч.2: контроль в PvP называет цель по нику, не "Тварь застывает"."""
     rng = NoCritRng()

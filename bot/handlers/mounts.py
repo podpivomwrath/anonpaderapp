@@ -76,9 +76,11 @@ async def _stats(db, character_id: int) -> CharacterStats:
 
 
 def _format_seconds(seconds: float) -> str:
+    """Без завершающей точки — её ставит вызывающий текст (иначе на стыке
+    получается двойная точка: «~3.6 мин..», патч 43)."""
     if seconds >= 60:
-        return f"~{seconds / 60:.1f} мин."
-    return f"~{seconds:.0f} сек."
+        return f"~{seconds / 60:.1f} мин"
+    return f"~{seconds:.0f} сек"
 
 
 async def _blocked_reason(db, character, peer_id: int, now: datetime) -> str | None:
@@ -204,7 +206,7 @@ async def notify_travel_started(peer_id: int, to_x: int, to_y: int, seconds: flo
 
 def _travel_text(travel, now: datetime) -> str:
     left = mount_service.remaining_seconds(travel, now)
-    return f"🐎 В пути... осталось {_format_seconds(left)}"
+    return f"🐎 В пути... осталось {_format_seconds(left)}."
 
 
 async def offer_continue(peer_id: int, travel_id: int) -> None:

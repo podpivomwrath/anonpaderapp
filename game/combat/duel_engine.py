@@ -267,13 +267,12 @@ class DuelEngine:
             )
 
         # Ход резолвится СРАЗУ — противник увидит результат перед своим ходом.
-        # Патч 32, ч.2: дуэль — тоже PvP, строгий формат без образности
-        # (combat_flavor.render_pvp_hit), никакого «уходит от удара — мимо»/
-        # атмосферных PvE-шаблонов.
+        # Единый краткий формат лога (патч 43, ч.1) — combat_flavor.render_hit,
+        # без образности.
         for hit in ctx.hits:
             target = state.combatants[hit.target_id]
             if hit.missed:
-                result.lines.append(combat_flavor.render_pvp_hit(
+                result.lines.append(combat_flavor.render_hit(
                     actor.name, target.name, label=hit.label, amount=0, crit=False,
                     missed=True, is_dot=False, hp_before=target.current_hp,
                     hp_after=target.current_hp, max_hp=target.max_hp,
@@ -288,7 +287,7 @@ class DuelEngine:
                 if absorbed:
                     result.lines.append(f"Щит {target.name} поглощает {absorbed} урона 🛡")
             target.current_hp -= amount
-            result.lines.append(combat_flavor.render_pvp_hit(
+            result.lines.append(combat_flavor.render_hit(
                 actor.name, target.name, label=hit.label, amount=amount, crit=hit.crit,
                 missed=False, is_dot=hit.is_dot, hp_before=before, hp_after=target.current_hp,
                 max_hp=target.max_hp,

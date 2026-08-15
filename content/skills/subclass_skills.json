@@ -1,5 +1,5 @@
 {
-  "_comment": "Навыки подклассов (патч 39, ч.3): 4 на подкласс, заменяют базовые навыки класса после выбора подкласса (30 ур). Урон = базовый урон Атаки × multiplier. effect: null|custom|stun|target_vuln|self_dodge_buff|self_damage_cap. effect=custom — бespoke Python-хендлер в game/classes/<subclass>.py (НЕ регистрируется дженериком).",
+  "_comment": "Навыки подклассов (патч 39, ч.3): 4 на подкласс, заменяют базовые навыки класса после выбора подкласса (30 ур). Урон = базовый урон Атаки × multiplier. effect: null|custom|stun|target_vuln|self_dodge_buff|self_damage_cap. effect=custom — самописный Python-хендлер в game/classes/<subclass>.py (НЕ регистрируется дженериком).",
 
   "guardian_shield_bash": {
     "id": "guardian_shield_bash", "name": "Удар щитом", "subclass_id": "guardian",

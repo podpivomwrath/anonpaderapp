@@ -330,12 +330,10 @@ def resolve_tick(
         combatant.current_hp = min(combatant.current_hp + delta, combatant.max_hp)
         _apply_last_breath_guard(combatant, result)
 
-    # --- Строки лога: PvE — атмосферные шаблоны (combat_flavor.render_hit);
-    # групповой PvP — строгий нейтральный формат без "твари" (патч 32, ч.2,
-    # render_pvp_hit) — оба участника combatant.kind=="character", render_hit
-    # не отличит игрока от игрока сам, поэтому ветвим здесь по session.mode. ---
+    # --- Строки лога: единый краткий формат везде — PvE, PvP, рейды (патч 43,
+    # ч.1) — образность убрана из пошагового лога, режим влияет только на
+    # точность % (display.MODE_PVE_RAID — один знак после запятой). ---
     result.lines.extend(ctx.lines)
-    is_pvp = session.mode == CombatMode.PVP_GROUP
     running_hp = dict(hp_before)
     for hit in ctx.hits:
         source = session.combatants[hit.source_id]
@@ -344,23 +342,13 @@ def resolve_tick(
         applied = applied_by_hit.get(id(hit), hit.amount)
         h_after = h_before - applied
         running_hp[target.id] = h_after
-        if is_pvp:
-            result.lines.append(
-                combat_flavor.render_pvp_hit(
-                    source.name, target.name,
-                    label=hit.label, amount=applied, crit=hit.crit, missed=hit.missed, is_dot=hit.is_dot,
-                    hp_before=h_before, hp_after=h_after, max_hp=target.max_hp, mode=mode,
-                )
+        result.lines.append(
+            combat_flavor.render_hit(
+                source.name, target.name,
+                label=hit.label, amount=applied, crit=hit.crit, missed=hit.missed, is_dot=hit.is_dot,
+                hp_before=h_before, hp_after=h_after, max_hp=target.max_hp, mode=mode,
             )
-        else:
-            result.lines.append(
-                combat_flavor.render_hit(
-                    source, target,
-                    crit=hit.crit, missed=hit.missed, is_dot=hit.is_dot,
-                    hp_before=h_before, hp_after=h_after,
-                    max_hp=target.max_hp, rng=rng, mode=mode,
-                )
-            )
+        )
     for heal in ctx.heals:
         source = session.combatants[heal.source_id]
         target = session.combatants[heal.target_id]

@@ -37,32 +37,19 @@ def _make_handler(skill: SubclassSkillDef):
                 res = control.try_apply_control(
                     target, base_duration=1, source_id=actor.id, rng=ctx.rng, pvp=pvp
                 )
-                if pvp:
-                    if res.immune:
-                        ctx.lines.append(combat_flavor.pvp_control_blocked_line(target.name))
-                    elif res.resisted:
-                        ctx.lines.append(combat_flavor.pvp_control_resisted_line(target.name))
-                    else:
-                        ctx.lines.append(combat_flavor.pvp_control_line(target.name))
-                        if res.reduced:
-                            ctx.lines.append(combat_flavor.pvp_control_reduced_line(target.name))
-                        if res.immunity_granted:
-                            from game.combat import balance_config as bc
-                            ctx.lines.append(
-                                combat_flavor.pvp_control_immune_line(target.name, bc.CC_IMMUNITY_DURATION)
-                            )
-                elif res.immune:
-                    ctx.lines.append(combat_flavor.control_blocked_line(ctx.rng))
+                # Единый краткий текст независимо от режима (патч 43, ч.1).
+                if res.immune:
+                    ctx.lines.append(combat_flavor.control_blocked_line(target.name))
                 elif res.resisted:
-                    ctx.lines.append(combat_flavor.control_resisted_line(ctx.rng))
+                    ctx.lines.append(combat_flavor.control_resisted_line(target.name))
                 else:
-                    ctx.lines.append(combat_flavor.control_line(ctx.rng))
+                    ctx.lines.append(combat_flavor.control_line(target.name))
                     if res.reduced:
-                        ctx.lines.append(combat_flavor.control_reduced_line(ctx.rng))
+                        ctx.lines.append(combat_flavor.control_reduced_line(target.name))
                     if res.immunity_granted:
                         from game.combat import balance_config as bc
                         ctx.lines.append(
-                            combat_flavor.control_immune_line(ctx.rng, bc.CC_IMMUNITY_DURATION)
+                            combat_flavor.control_immune_line(target.name, bc.CC_IMMUNITY_DURATION)
                         )
         elif skill.effect == "self_dodge_buff":
             actor.apply_effect(

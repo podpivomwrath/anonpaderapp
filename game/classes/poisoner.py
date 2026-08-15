@@ -87,19 +87,12 @@ def disrupt(ctx: SkillContext) -> None:
     if ctx.rng.random() < skill.effect_value:
         pvp = ctx.session.mode != CombatMode.PVE
         res = control.try_apply_control(target, base_duration=1, source_id=actor.id, rng=ctx.rng, pvp=pvp)
-        if pvp:
-            if res.immune:
-                ctx.lines.append(combat_flavor.pvp_control_blocked_line(target.name))
-            elif res.resisted:
-                ctx.lines.append(combat_flavor.pvp_control_resisted_line(target.name))
-            else:
-                ctx.lines.append(combat_flavor.pvp_control_line(target.name))
-        elif res.immune:
-            ctx.lines.append(combat_flavor.control_blocked_line(ctx.rng))
+        if res.immune:
+            ctx.lines.append(combat_flavor.control_blocked_line(target.name))
         elif res.resisted:
-            ctx.lines.append(combat_flavor.control_resisted_line(ctx.rng))
+            ctx.lines.append(combat_flavor.control_resisted_line(target.name))
         else:
-            ctx.lines.append(combat_flavor.control_line(ctx.rng))
+            ctx.lines.append(combat_flavor.control_line(target.name))
 
 
 @offensive_skill("poisoner_toxic_burst")

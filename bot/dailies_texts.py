@@ -27,7 +27,7 @@ def _reward_preview(reward: dict) -> str:
     if "gold" in reward:
         parts.append(f"{reward['gold']} золота")
     if "gems" in reward:
-        parts.append(f"💎 {reward['gems']} самоцветов")
+        parts.append(f"💎 {reward['gems']} Пепельных самоцветов")
     if "elixir" in reward:
         elixir_id, count = reward["elixir"]
         edef = elixir_service.elixir_def(elixir_id)
