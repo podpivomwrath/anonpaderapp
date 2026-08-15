@@ -25,6 +25,7 @@ from sqlalchemy import select
 from vkbottle.bot import BotLabeler, Message
 
 from bot import dailies_texts, editable_message
+from bot.dispatch_rules import TEXT_ONLY
 from bot.handlers import combat as combat_handlers
 from bot.handlers import respawn as respawn_handlers
 from bot.handlers import stats_window
@@ -551,8 +552,13 @@ async def join_via_button(message: Message) -> None:
     await _handle_join_choice(message, payload.get("session_id"), payload.get("side"))
 
 
-@labeler.message(text=["1", "2"])
+@labeler.message(TEXT_ONLY, text=["1", "2"])
 async def join_via_text(message: Message) -> None:
+    """Патч 42: TEXT_ONLY обязателен — "1"/"2" это ТАКЖЕ подписи кнопок в
+    других экранах (скупщик "По предметам", выбор цели в масс-PvP). Без
+    фильтра на payload это правило перехватывало нажатия ТЕХ кнопок (текст
+    совпадал), даже когда игрок не ждёт выбора стороны — глушило их payload-
+    обработчик целиком (баг-репорт #17: «1»/«2» не работали у скупщика)."""
     peer_id = message.peer_id
     battle_id = _pending_join_prompt.get(peer_id)
     if battle_id is None:

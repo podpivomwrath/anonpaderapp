@@ -19,8 +19,8 @@ from datetime import datetime, timezone
 from loguru import logger
 from vkbottle import BaseStateGroup
 from vkbottle.bot import BotLabeler, Message
-from vkbottle.dispatch.rules.base import FuncRule
 
+from bot.dispatch_rules import TEXT_ONLY
 from bot.handlers import combat as combat_handlers
 from bot.handlers import pvp as pvp_handlers
 from bot.handlers import world as world_handlers
@@ -56,14 +56,6 @@ _travel_message: dict[int, int] = {}
 _pending_continue: dict[int, int] = {}
 
 _COORD_RE = re.compile(r"^\s*(-?\d+)\s*[:;]\s*(-?\d+)\s*$")
-
-# Патч 40, баг 2: состояние ожидания ввода (координаты/никнейм/любой другой
-# FSM-текст) обязано реагировать ТОЛЬКО на текстовые сообщения — нажатие
-# кнопки (payload) должно проходить к своему payload-обработчику, даже если
-# формально игрок сейчас "в состоянии ввода". Без этого фильтра state-правило
-# vkbottle перехватывает ЛЮБОЕ сообщение (кнопки — тоже сообщения) и глушит
-# остальные хендлеры (напр. «Продолжить путь» после победы над засадой).
-_TEXT_ONLY = FuncRule(lambda m: m.payload is None)
 
 
 class MountCoordState(BaseStateGroup):
@@ -142,7 +134,7 @@ async def open_mounts(message: Message) -> None:
     )
 
 
-@labeler.message(_TEXT_ONLY, state=MountCoordState.COORD_INPUT)
+@labeler.message(TEXT_ONLY, state=MountCoordState.COORD_INPUT)
 async def coord_input(message: Message) -> None:
     peer_id = message.peer_id
     mount_id = (message.state_peer.payload.get("mount_id") if message.state_peer else None)
