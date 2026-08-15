@@ -19,6 +19,7 @@ from datetime import datetime, timezone
 from loguru import logger
 from vkbottle import BaseStateGroup
 from vkbottle.bot import BotLabeler, Message
+from vkbottle.dispatch.rules.base import FuncRule
 
 from bot.handlers import combat as combat_handlers
 from bot.handlers import pvp as pvp_handlers
@@ -55,6 +56,14 @@ _travel_message: dict[int, int] = {}
 _pending_continue: dict[int, int] = {}
 
 _COORD_RE = re.compile(r"^\s*(-?\d+)\s*[:;]\s*(-?\d+)\s*$")
+
+# Патч 40, баг 2: состояние ожидания ввода (координаты/никнейм/любой другой
+# FSM-текст) обязано реагировать ТОЛЬКО на текстовые сообщения — нажатие
+# кнопки (payload) должно проходить к своему payload-обработчику, даже если
+# формально игрок сейчас "в состоянии ввода". Без этого фильтра state-правило
+# vkbottle перехватывает ЛЮБОЕ сообщение (кнопки — тоже сообщения) и глушит
+# остальные хендлеры (напр. «Продолжить путь» после победы над засадой).
+_TEXT_ONLY = FuncRule(lambda m: m.payload is None)
 
 
 class MountCoordState(BaseStateGroup):
@@ -133,7 +142,7 @@ async def open_mounts(message: Message) -> None:
     )
 
 
-@labeler.message(state=MountCoordState.COORD_INPUT)
+@labeler.message(_TEXT_ONLY, state=MountCoordState.COORD_INPUT)
 async def coord_input(message: Message) -> None:
     peer_id = message.peer_id
     mount_id = (message.state_peer.payload.get("mount_id") if message.state_peer else None)
@@ -180,7 +189,14 @@ async def notify_travel_started(peer_id: int, to_x: int, to_y: int, seconds: flo
     для обоих способов отправки маунта (патч 31, фикс 1): из чата (coord_input
     выше) и с карты мини-аппа (bot/miniapp_map_api.py::handle_post_send_mount,
     который раньше не слал в чат ничего вообще — MountTravel создавался
-    молча, игрок не понимал, что путь начался, и старая клавиатура оставалась)."""
+    молча, игрок не понимал, что путь начался, и старая клавиатура оставалась).
+
+    Патч 40, баг 2, п.1: поездка НАЧАЛАСЬ — состояние ожидания координат не
+    должно её пережить. coord_input снимает его на своём пути, но отправка
+    с карты идёт мимо coord_input вообще — снимаем здесь, в общей точке, не
+    завязываясь на то, каким способом маунт был отправлен."""
+    if _dispenser is not None:
+        await _dispenser.delete(peer_id)
     if _bot_api is None:
         return
     text = (
@@ -220,11 +236,30 @@ async def offer_continue(peer_id: int, travel_id: int) -> None:
     )
 
 
+async def _recover_stranded(peer_id: int) -> None:
+    """Патч 40, баг 2, доп.: «Продолжить путь» нажата, а данных о поездке
+    нет — не оставлять игрока висеть без кнопок, вернуть на текущую клетку
+    обычной клавиатурой карты."""
+    async with get_session_factory()() as db:
+        character = await onboarding_svc.get_character(db, peer_id)
+        if character is None:
+            return
+        has_mount = await mount_service.has_any_mount(db, character.id)
+        pos = (character.pos_x, character.pos_y)
+    await _bot_api.messages.send(
+        peer_id=peer_id,
+        message="Путь прерван — продолжать нечего. Ты остаёшься на месте.",
+        random_id=0,
+        keyboard=kb.movement_keyboard(*pos, peer_id, has_mount=has_mount),
+    )
+
+
 @labeler.message(payload_contains={"type": "continue_travel"})
 async def continue_travel(message: Message) -> None:
     peer_id = message.peer_id
     pending_id = _pending_continue.get(peer_id)
     if pending_id is None:
+        await _recover_stranded(peer_id)
         return
     payload = message.get_payload_json() or {}
     if payload.get("travel") != pending_id:
@@ -236,6 +271,7 @@ async def continue_travel(message: Message) -> None:
     async with get_session_factory()() as db:
         travel = await db.get(MountTravel, pending_id)
         if travel is None:
+            await _recover_stranded(peer_id)
             return
         await mount_service.resume_travel(db, travel)
         await db.commit()

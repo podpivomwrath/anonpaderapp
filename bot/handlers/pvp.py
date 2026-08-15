@@ -1091,17 +1091,42 @@ async def on_duel_finished(session_id: int, result: DuelResult) -> None:
         _peer_battle.pop(p.peer_id, None)
 
     if result.draw or result.winner_id is None:
+        # Патч 40, баг 1: ничья по лимиту ходов оставляла ОБОИХ живых дуэлянтов
+        # с kb.waiting_keyboard() навсегда — она рассчитана как ВРЕМЕННАЯ,
+        # исправляется либо respawn-сканом (для мёртвых), либо следующим
+        # сообщением (тут его не было). "Взаимное истощение" (draw_reason=None)
+        # — оба реально погибли, но смерть никогда не применялась: respawn-скан
+        # их тоже не подхватывал, зависали на 0 HP без таймера навсегда.
+        is_turn_limit = result.draw_reason == "turn_limit"
+        positions: dict[int, tuple[int, int]] = {}
+        has_mount_by_cid: dict[int, bool] = {}
         async with get_session_factory()() as db:
             await pvp_service.log_battle(db, "duel", list(battle.participants), [])
+            for cid in battle.participants:
+                character = await db.get(Character, cid)
+                if character is None:
+                    continue
+                if is_turn_limit:
+                    positions[cid] = (character.pos_x, character.pos_y)
+                    has_mount_by_cid[cid] = await mount_service.has_any_mount(db, cid)
+                else:
+                    death_service.apply_pvp_death(character)
+                    await admin_service.log_death(db, character, "pvp")
+                    respawn_handlers.register_pvp_death(battle.participants[cid].peer_id)
             await db.commit()
         # Патч 30: лимит ходов — отдельный лорный текст от "взаимного истощения".
         draw_text = (
-            bc.PVP_DRAW_TURN_LIMIT_TEXT if result.draw_reason == "turn_limit"
+            bc.PVP_DRAW_TURN_LIMIT_TEXT if is_turn_limit
             else "🤝 Ничья: взаимное истощение. Трофеи остаются при каждом."
         )
-        for p in battle.participants.values():
+        for cid, p in battle.participants.items():
+            if is_turn_limit:
+                pos = positions.get(cid, (0, 0))
+                keyboard = kb.movement_keyboard(*pos, p.peer_id, has_mount=has_mount_by_cid.get(cid, False))
+            else:
+                keyboard = kb.waiting_keyboard()  # смерть зарегистрирована — respawn-скан подхватит
             await _bot_api.messages.send(
-                peer_id=p.peer_id, message=draw_text, random_id=0, keyboard=kb.waiting_keyboard(),
+                peer_id=p.peer_id, message=draw_text, random_id=0, keyboard=keyboard,
             )
         return
 
