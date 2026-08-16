@@ -12,11 +12,20 @@ from loguru import logger
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from game.combat import display
+from bot import raid_key_texts
 from game.content_loader import EventOutcome
 from game.world import grid
 from game.world import world_config as wc
 from models import Character, CharacterStats
-from services import daily_service, experience_service, item_service, trial_service, trophy_service, vitals_service
+from services import (
+    daily_service,
+    experience_service,
+    item_service,
+    raid_key_service,
+    trial_service,
+    trophy_service,
+    vitals_service,
+)
 
 
 def pick_outcome(rng: random.Random, outcomes: list[EventOutcome]) -> EventOutcome:
@@ -39,6 +48,7 @@ class OutcomeResult:
     new_level: int = 1
     daily_completed: list = field(default_factory=list)  # daily_service.DailyCompletion
     daily_streak_notice: str | None = None
+    raid_key_dropped: bool = False  # патч 45, ч.4 — Ключ Монолита
 
 
 async def apply_outcome(
@@ -62,11 +72,25 @@ async def apply_outcome(
     daily_streak_notice = None
 
     if character.subclass is not None and event_id is not None and choice_code is not None:
+        # trial_service.EVENT_CHOICE_CODES — узкий словарь ТОЛЬКО для конкретных
+        # испытаний подклассов ("Помочь"/"Помолиться"/"Осквернить"); намеренно
+        # не покрывает все варианты выбора всех событий.
         await trial_service.record_event_choice(db, character, event_id, choice_code)
-    if event_id is not None and choice_code is not None:
+    if event_id is not None:
+        # Патч 45, ч.3 (репорт #19): ежедневка «Любопытный» засчитывается по
+        # самому ФАКТУ выбора в любом событии — раньше здесь ошибочно стояло
+        # то же условие choice_code is not None, что и для испытаний выше,
+        # из-за чего варианты вне узкого словаря trial_service (Пройти мимо,
+        # Вскрыть, Оставить, Коснуться, Отколоть кусок и т.д.) не засчитывались.
         progress = await daily_service.record_event_choice(db, character)
         daily_completed += progress.completed
         daily_streak_notice = daily_streak_notice or progress.streak_notice
+
+    # Патч 45, ч.4: Ключ Монолита падает независимым броском с ЛЮБОГО
+    # источника лута, не только там, где outcome.trophy — проверяем всегда.
+    raid_key_dropped = await raid_key_service.maybe_grant(db, character, rng)
+    if raid_key_dropped:
+        lines.append(raid_key_texts.raid_key_drop_line())
 
     reward_added = False
 
@@ -125,4 +149,5 @@ async def apply_outcome(
     return OutcomeResult(
         "\n\n".join(line for line in lines if line), levels_gained=levels_gained, new_level=new_level,
         daily_completed=daily_completed, daily_streak_notice=daily_streak_notice,
+        raid_key_dropped=raid_key_dropped,
     )

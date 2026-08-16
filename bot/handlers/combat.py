@@ -10,7 +10,7 @@ import random
 from vkbottle import BaseStateGroup  # noqa: F401  (совместимость импортов)
 from vkbottle.bot import BotLabeler, Message
 
-from bot import ash_handful_state, dailies_texts, editable_message
+from bot import ash_handful_state, dailies_texts, editable_message, raid_key_texts
 from bot.handlers import stats_window
 from bot.keyboards.combat_items import combat_items_keyboard
 from bot.keyboards.items import item_choice_keyboard, no_keyboard
@@ -360,6 +360,8 @@ async def on_battle_finished(session_id: int, result: TickResult) -> None:
         drop_line = trophy_service.format_drop_line(outcome.trophies_gained)
         if drop_line is not None:
             text += f"\n{drop_line}"
+        if outcome.raid_key_dropped:
+            text += f"\n{raid_key_texts.raid_key_drop_line()}"
         if outcome.quest_progress is not None:
             text += f"\n📜 {outcome.quest_label}: {outcome.quest_progress}/{outcome.quest_target}"
             if outcome.quest_ready:

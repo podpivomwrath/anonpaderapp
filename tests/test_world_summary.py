@@ -16,6 +16,7 @@ class FakeChar:
     level: int = 1
     experience: int = 0
     current_hp: int | None = None
+    raid_keys: int = 0
 
 
 @dataclass

@@ -9,6 +9,7 @@ Leaf-модуль: импортируется и world.py, и combat.py, сам 
 
 import random
 
+from bot import raid_key_texts
 from bot.vk_media import photo_attachment
 from game.combat import balance_config as bc
 from game.combat import display
@@ -69,6 +70,10 @@ def location_summary(
     current_hp = vitals_service.current_hp(character, stats, vit_bonus)
     hp_line = f"❤️ Здоровье: {display.health_bar(current_hp, max_hp)}"
     quest_block = f"{quest_line}\n" if quest_line else ""
+    key_block = (
+        f"{raid_key_texts.raid_key_inventory_line(character.raid_keys)}\n"
+        if character.raid_keys > 0 else ""
+    )
     return (
         f"{zone_line}\n{description}\n\n"
         f"{_SEP}\n"
@@ -76,6 +81,7 @@ def location_summary(
         f"⚔️ Уровень: {character.level}\n"
         f"{xp_bar(character.level, character.experience)}\n"
         f"{wallet_line(farm_currency, donate_currency)}\n"
+        f"{key_block}"
         f"{quest_block}"
         f"{_SEP}"
     )

@@ -35,11 +35,12 @@ def attack(target_id: int) -> DeclaredAction:
     return DeclaredAction(type=ActionType.ATTACK, target_id=target_id)
 
 
-# --- Кровавый рыцарь: лайфстил (патч 39, ч.3; урезано патчем 44 — см.
-# content/skills/subclass_skills.json / game/combat/balance_config.py) ---
+# --- Кровавый рыцарь: лайфстил (патч 39, ч.3; урезано патчем 44, вектор
+# нерфа сменён на урон патчем 45, ч.2 — см. content/skills/subclass_skills.json
+# / game/combat/balance_config.py) ---
 
 
-def test_lifesteal_heals_12_percent_of_damage() -> None:
+def test_lifesteal_heals_20_percent_of_damage() -> None:
     rng = NoCritRng()
     knight = combatant(1, side=0, subclass_id="blood_knight")
     knight.current_hp -= 100  # есть что лечить
@@ -50,7 +51,7 @@ def test_lifesteal_heals_12_percent_of_damage() -> None:
     resolve_tick(state, {1: skill("blood_knight_lifesteal_strike", 2)}, rng)
     damage_dealt = enemy.max_hp - enemy.current_hp
     healed = knight.current_hp - hp_before
-    assert healed == round(damage_dealt * 0.12)
+    assert healed == round(damage_dealt * 0.2)
 
 
 def test_lifesteal_capped_at_10_percent_max_hp() -> None:
@@ -71,7 +72,7 @@ def test_lifesteal_capped_at_10_percent_max_hp() -> None:
 
 def test_blood_seal_boosts_lifesteal_on_marked_target() -> None:
     """Кровавая печать: лайфстил последующей атаки рыцаря по цели усилен
-    BLOOD_KNIGHT_BLOOD_SEAL_MULT (патч 44: было x2, стало x1.5)."""
+    BLOOD_KNIGHT_BLOOD_SEAL_MULT (патч 44: x2 -> x1.5; патч 45, ч.2: x1.5 -> x1.75)."""
     rng = NoCritRng()
     knight = combatant(1, side=0, subclass_id="blood_knight")
     knight.current_hp = round(knight.max_hp * 0.7)  # есть что лечить, но жив
@@ -86,8 +87,29 @@ def test_blood_seal_boosts_lifesteal_on_marked_target() -> None:
     resolve_tick(state, {1: skill("blood_knight_lifesteal_strike", 2)}, rng)
     damage_dealt = enemy_hp_before - enemy.current_hp
     healed = knight.current_hp - hp_before_hp
-    expected = min(round(damage_dealt * 0.12 * bc.BLOOD_KNIGHT_BLOOD_SEAL_MULT), round(knight.max_hp * bc.BLOOD_KNIGHT_HEAL_CAP_PER_TURN))
+    expected = min(round(damage_dealt * 0.2 * bc.BLOOD_KNIGHT_BLOOD_SEAL_MULT), round(knight.max_hp * bc.BLOOD_KNIGHT_HEAL_CAP_PER_TURN))
     assert healed == expected
+
+
+def test_crimson_feast_heal_log_shows_isolated_positive_heal() -> None:
+    """Патч 45, ч.1 (баг-репорт): себестоимость HP Багрового пира (прямая
+    мутация current_hp ДО применения хилов/хитов хода) не должна попадать в
+    дельту лога лечения — раньше строка "восполняет кровью" сравнивала HP на
+    старте хода с итоговым HP, показывая знак себестоимости пополам с хилом
+    ("-11 HP" при капнутом положительном лечении). Берём актёра почти на
+    полном HP — себестоимость (15% ТЕКУЩЕГО) там заведомо больше капа
+    лечения (10% МАКСИМУМА), так что итоговый HP актёра всё равно падает, но
+    строка лога обязана показывать положительную (или ровно капнутую) дельту
+    лечения, а не общий отрицательный результат хода."""
+    rng = NoCritRng()
+    knight = combatant(1, side=0, subclass_id="blood_knight", level=100, strength=2000)
+    enemy = combatant(2, side=1, level=100, vitality=500)
+    state = make_session(knight, enemy)
+
+    result = resolve_tick(state, {1: skill("blood_knight_crimson_feast", 2)}, rng)
+    heal_line = next(line for line in result.lines if "восполняет кровью" in line)
+    cap = round(knight.max_hp * bc.BLOOD_KNIGHT_HEAL_CAP_PER_TURN)
+    assert f"+{cap} HP" in heal_line  # ровно капнутое лечение, без знака себестоимости
 
 
 # --- Отравитель: яд ---

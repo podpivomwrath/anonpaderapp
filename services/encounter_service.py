@@ -17,6 +17,7 @@ from services import (
     experience_service,
     item_service,
     quest_service,
+    raid_key_service,
     trial_service,
     trophy_service,
 )
@@ -37,6 +38,7 @@ class VictoryOutcome:
     unlocked_buffs: list[str] = field(default_factory=list)  # патч 12 — id баффов, открытых этим боем
     daily_completed: list = field(default_factory=list)  # патч 23 — daily_service.DailyCompletion
     daily_streak_notice: str | None = None  # патч 23 — текст рубежа стрика ежедневок, если сработал
+    raid_key_dropped: bool = False  # патч 45, ч.4 — Ключ Монолита
 
 
 async def resolve_victory(
@@ -56,6 +58,7 @@ async def resolve_victory(
     levelup = experience_service.add_experience(character, stats, xp)
     trophies = await trophy_service.grant_from_kill(db, character, rng)
     item = await item_service.grant_from_kill(db, character, mob_level, rng)
+    raid_key_dropped = await raid_key_service.maybe_grant(db, character, rng)
 
     unlocked: list[str] = []
     if character.subclass is not None:
@@ -77,12 +80,13 @@ async def resolve_victory(
     if progress is None:
         return VictoryOutcome(
             xp, xp_mult, levelup.levels_gained, levelup.new_level, None, None, None, False,
-            trophies, item, unlocked, daily_completed, daily_streak_notice,
+            trophies, item, unlocked, daily_completed, daily_streak_notice, raid_key_dropped,
         )
     return VictoryOutcome(
         xp, xp_mult, levelup.levels_gained, levelup.new_level,
         progress.progress_label, progress.progress, progress.target_count,
         progress.status == "ready", trophies, item, unlocked, daily_completed, daily_streak_notice,
+        raid_key_dropped,
     )
 
 

@@ -4,10 +4,11 @@
 HP), Кровавая печать (метка цели — усиливает лайфстил ЛЮБОЙ последующей атаки
 рыцаря по ней на 3 хода), Багровый пир (себестоимость HP, крупный бурст+хил).
 
-Патч 44: значения лечения урезаны (были 25-60% нанесённого, рабочий диапазон
-по раннему балансировочному прогону — 9-11%), общий кап BLOOD_KNIGHT_HEAL_CAP_PER_TURN
-применяется теперь ко ВСЕМ навыкам лайфстила (раньше — только к Кровопуску) —
-без этого лечение бесконтрольно растёт вместе с уроном на высоком снаряжении.
+Патч 44: срезано только лечение — 87% PvP-винрейт без единого проигрышного
+матчапа. Сломало идентичность подкласса (сустейн-ДД перестал восстанавливаться).
+Патч 45, ч.2: вектор нерфа сменён на урон (множители снижены до уровня Клинка
+теней), лайфстил частично возвращён — кап BLOOD_KNIGHT_HEAL_CAP_PER_TURN
+(единый на все 4 навыка лайфстила, патч 44) остаётся в силе.
 """
 
 from game.classes.base import Role, SubclassDef, register
@@ -43,6 +44,7 @@ def _lifesteal_heal(ctx: SkillContext, hit, ratio: float) -> None:
         ratio *= bc.BLOOD_KNIGHT_BLOOD_SEAL_MULT
     heal = round(hit.amount * ratio)
     heal = min(heal, round(actor.max_hp * bc.BLOOD_KNIGHT_HEAL_CAP_PER_TURN))
+    heal = max(heal, 0)  # страховка (патч 45, ч.1) — лечение не может быть отрицательным
     if heal > 0:
         ctx.heals.append(
             PendingHeal(source_id=actor.id, target_id=actor.id, amount=heal, label="восполняет кровью")
@@ -51,7 +53,7 @@ def _lifesteal_heal(ctx: SkillContext, hit, ratio: float) -> None:
 
 @offensive_skill("blood_knight_lifesteal_strike")
 def lifesteal_strike(ctx: SkillContext) -> None:
-    """Кровопуск: 145% урона, лечит на 12% нанесённого (капается — самый
+    """Кровопуск: 115% урона, лечит на 20% нанесённого (капается — самый
     частый навык кита, cd2)."""
     skill = SUBCLASS_SKILL_DEFS["blood_knight_lifesteal_strike"]
     actor = ctx.actor
@@ -66,7 +68,7 @@ def lifesteal_strike(ctx: SkillContext) -> None:
 
 @offensive_skill("blood_knight_harvest")
 def harvest(ctx: SkillContext) -> None:
-    """Жатва: 190% урона. Если HP актёра ниже 50% — лечит на 18% нанесённого."""
+    """Жатва: 150% урона. Если HP актёра ниже 50% — лечит на 30% нанесённого."""
     skill = SUBCLASS_SKILL_DEFS["blood_knight_harvest"]
     actor = ctx.actor
     actor.cooldowns[skill.id] = skill.cd
@@ -81,7 +83,7 @@ def harvest(ctx: SkillContext) -> None:
 
 @offensive_skill("blood_knight_blood_seal")
 def blood_seal(ctx: SkillContext) -> None:
-    """Кровавая печать: 100% урона, метит цель на 3 хода — все последующие
+    """Кровавая печать: 85% урона, метит цель на 3 хода — все последующие
     атаки рыцаря по ней лечат в BLOOD_KNIGHT_BLOOD_SEAL_MULT раз сильнее."""
     skill = SUBCLASS_SKILL_DEFS["blood_knight_blood_seal"]
     actor = ctx.actor
@@ -96,7 +98,7 @@ def blood_seal(ctx: SkillContext) -> None:
 
 @offensive_skill("blood_knight_crimson_feast")
 def crimson_feast(ctx: SkillContext) -> None:
-    """Багровый пир: тратит 15% текущего HP, 260% урона, лечит на 30% нанесённого."""
+    """Багровый пир: тратит 15% текущего HP, 200% урона, лечит на 45% нанесённого."""
     skill = SUBCLASS_SKILL_DEFS["blood_knight_crimson_feast"]
     actor = ctx.actor
     actor.cooldowns[skill.id] = skill.cd

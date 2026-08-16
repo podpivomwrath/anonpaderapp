@@ -90,6 +90,39 @@ def test_pick_outcome_three_way_split() -> None:
 # --- apply_outcome: эффекты ---
 
 
+async def test_daily_curious_progresses_on_any_choice_label(db_session, character_at) -> None:
+    """Патч 45, ч.3 (репорт #19): ежедневка «Любопытный» (quest_id="curious",
+    condition_type="event_choices") раньше засчитывалась только при choice_code
+    из trial_service.EVENT_CHOICE_CODES ("Помочь"/"Помолиться"/"Осквернить") —
+    узкого словаря для классовых испытаний, ошибочно переиспользованного как
+    гейт для ежедневки. Варианты вне этого словаря (здесь — "Пройти мимо",
+    choice_code=None) обязаны засчитываться тоже: сигнал идёт по факту
+    любого выбора в любом событии."""
+    from models import CharacterDaily
+    from services import daily_service
+
+    character = await character_at(50, 50)
+    stats = await _stats(db_session, character)
+    db_session.add(CharacterDaily(
+        character_id=character.id, quest_id="curious", progress=0, completed=False,
+        date=daily_service.today_msk(),
+    ))
+    await db_session.flush()
+
+    outcome = EventOutcome(weight=100, text="Ты проходишь мимо.", xp=True)
+    await event_service.apply_outcome(
+        db_session, character, stats, outcome, FixedRng(0.0),
+        event_id="wounded_wanderer", choice_code=None,  # "Пройти мимо" — не в EVENT_CHOICE_CODES
+    )
+
+    row = await db_session.scalar(
+        select(CharacterDaily).where(
+            CharacterDaily.character_id == character.id, CharacterDaily.quest_id == "curious",
+        )
+    )
+    assert row.progress == 1
+
+
 async def test_outcome_without_reward_flags_gets_safety_net_not_silence(db_session, character_at) -> None:
     """Патч 38: раньше исход без единого флага (trophy/xp/xp_big/damage)
     молча возвращал исходный текст без последствий — теперь это ловится

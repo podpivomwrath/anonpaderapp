@@ -15,7 +15,7 @@ from datetime import datetime, timezone
 from sqlalchemy import select
 from vkbottle.bot import BotLabeler, Message
 
-from bot import ash_handful_state, dailies_texts
+from bot import ash_handful_state, dailies_texts, raid_key_texts
 from bot.battle_keyboard import active_battle_keyboard
 from bot.handlers import appraiser as appraiser_handlers
 from bot.handlers import combat as combat_handlers
@@ -391,6 +391,8 @@ async def collect_ash_handful(message: Message) -> None:
         text += f"\n{drop_line}"
     if result.item is not None:
         text += f"\n\n{item_service.format_drop_announcement(result.item)}"
+    if result.raid_key_dropped:
+        text += f"\n{raid_key_texts.raid_key_drop_line()}"
     await message.answer(text, keyboard=kb.waiting_keyboard())
     await stats_window.notify_levelup(peer_id, result.levels_gained, result.new_level)
     await message.answer(
@@ -933,6 +935,20 @@ async def keyboard_command(message: Message) -> None:
         now = datetime.now(timezone.utc)
         keyboard = await _current_keyboard(db, character, message.peer_id, now)
     await message.answer("Обновляю клавиатуру.", keyboard=keyboard)
+
+
+@labeler.message(text=["/ключ"])
+async def raid_key_command(message: Message) -> None:
+    """Патч 45, ч.4: осмотреть Ключ Монолита — пока без функционала, только
+    флейвор-текст."""
+    async with get_session_factory()() as db:
+        character = await onboarding_svc.get_character(db, message.from_id)
+        if character is None or character.creation_state is not None:
+            return
+        if character.raid_keys <= 0:
+            await message.answer("У тебя нет Ключа Монолита.")
+            return
+        await message.answer(raid_key_texts.RAID_KEY_USE_TEXT)
 
 
 def activity_state(peer_id: int) -> str:

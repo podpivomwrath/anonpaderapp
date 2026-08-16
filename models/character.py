@@ -79,6 +79,13 @@ class Character(Base):
     # Переживает рестарт бота и /клавиатура (см. services/screen_service.py).
     screen: Mapped[str | None] = mapped_column(String(32), nullable=True)
 
+    # Патч 45, ч.4: Ключ Монолита — задел под будущий рейд, пока без
+    # функционала. Единственный вид ключа — счётчик прямо на персонаже, не
+    # отдельная таблица (см. game/economy/raid_key_config.py — кап 2).
+    # Намеренно НЕ трогается trophy_service (transfer_all/split_among/sell_all)
+    # — не теряется в PvP, не продаётся скупщику, просто другая колонка.
+    raid_keys: Mapped[int] = mapped_column(default=0)
+
     user: Mapped["User"] = relationship(back_populates="characters")
     stats: Mapped["CharacterStats"] = relationship(
         back_populates="character", uselist=False, cascade="all, delete-orphan"

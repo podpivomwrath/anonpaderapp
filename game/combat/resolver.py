@@ -256,6 +256,15 @@ def resolve_tick(
                 _, taken_mult = formulas.level_diff_modifiers(target.level, source.level)
                 hit.amount = max(round(hit.amount * taken_mult), 1)
 
+    # Патч 45, ч.1: снимок ПОСЛЕ прямых самомутаций хода (себестоимость HP у
+    # Багрового пира/Круга тьмы — actor.current_hp меняется РАНЬШЕ, внутри
+    # хендлера навыка, в обход damage_taken/heal_taken) — иначе лог лечения
+    # ниже сравнивал бы hp_before СО СТАРТА ХОДА с итоговым HP и показывал бы
+    # хилу знак себестоимости пополам с ней ("восполняет кровью: -11 HP" на
+    # деле означало "заплатил 22, вылечил 11, кап отрезал остальное" — само
+    # лечение было положительным и капалось верно, просто лог показывал не то).
+    hp_before_apply = {c.id: c.current_hp for c in session.combatants.values()}
+
     # --- Одновременное применение: net-дельта по каждому участнику ---
     damage_taken: dict[int, int] = {}
     heal_taken: dict[int, int] = {}
@@ -334,7 +343,7 @@ def resolve_tick(
     # ч.1) — образность убрана из пошагового лога, режим влияет только на
     # точность % (display.MODE_PVE_RAID — один знак после запятой). ---
     result.lines.extend(ctx.lines)
-    running_hp = dict(hp_before)
+    running_hp = dict(hp_before_apply)
     for hit in ctx.hits:
         source = session.combatants[hit.source_id]
         target = session.combatants[hit.target_id]
@@ -352,10 +361,13 @@ def resolve_tick(
     for heal in ctx.heals:
         source = session.combatants[heal.source_id]
         target = session.combatants[heal.target_id]
+        h_before = running_hp[target.id]
+        h_after = min(h_before + heal.amount, target.max_hp)
+        running_hp[target.id] = h_after
         result.lines.append(
             display.action_line(
                 source.name, heal.label, target.name,
-                hp_before[target.id], target.current_hp, target.max_hp, mode,
+                h_before, h_after, target.max_hp, mode,
             )
         )
 

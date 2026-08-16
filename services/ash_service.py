@@ -11,7 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from game.economy import ash_config as ac
 from game.world import grid
 from models import Character, CharacterStats, Item
-from services import experience_service, item_service, trophy_service
+from services import experience_service, item_service, raid_key_service, trophy_service
 
 
 def roll_appears(rng: random.Random) -> bool:
@@ -25,6 +25,7 @@ class AshCollectResult:
     item: Item | None
     levels_gained: int
     new_level: int
+    raid_key_dropped: bool = False  # патч 45, ч.4 — Ключ Монолита
 
 
 async def collect(
@@ -37,7 +38,9 @@ async def collect(
     item = None
     if rng.random() < ac.ASH_ITEM_CHANCE:
         item = await item_service.grant_random_item(db, character, character.level, rng)
+    raid_key_dropped = await raid_key_service.maybe_grant(db, character, rng)
     return AshCollectResult(
         xp=xp, trophies=trophies, item=item,
         levels_gained=levelup.levels_gained, new_level=levelup.new_level,
+        raid_key_dropped=raid_key_dropped,
     )

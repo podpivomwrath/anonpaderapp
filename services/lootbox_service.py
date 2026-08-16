@@ -17,8 +17,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from game.content_loader import LootboxGradeDef, LootboxRewardPart, load_lootbox_grades
 from game.economy import dailies_config as dc
 from game.economy import lootbox_config as lc
+from bot import raid_key_texts
 from models import Character, CharacterLootbox
-from services import elixir_service, trophy_service, wallet_service
+from services import elixir_service, raid_key_service, trophy_service, wallet_service
 
 _grades: list[LootboxGradeDef] | None = None
 
@@ -111,6 +112,8 @@ async def open_chest(
     grade = roll_grade(rng, daily_streak)
     option = rng.choice(grade.options)
     lines = [await _apply_part(db, character, part, rng) for part in option]
+    if await raid_key_service.maybe_grant(db, character, rng):
+        lines.append(raid_key_texts.RAID_KEY_NAME)
     db.add(
         CharacterLootbox(character_id=character.id, grade=grade.id, reward_summary="; ".join(lines))
     )
