@@ -28,7 +28,14 @@ from game.combat.session import (
     DeclaredAction,
     EffectKind,
 )
-from game.combat.skills import DEFENSIVE_SKILLS, OFFENSIVE_SKILLS, PendingHeal, SkillContext, compute_hit
+from game.combat.skills import (
+    DEFENSIVE_SKILLS,
+    OFFENSIVE_SKILLS,
+    PendingHeal,
+    SkillContext,
+    compute_hit,
+    tick_overload,
+)
 from game.combat.session import CombatMode, CombatSessionState
 from game.economy import elixir_config as ec
 
@@ -195,6 +202,7 @@ class DuelEngine:
             effect.remaining_ticks -= 1
         actor.effects = [e for e in actor.effects if e.remaining_ticks > 0]
         actor.tick_cooldowns()
+        tick_overload(actor)
         control.tick_control(actor, pvp=True)  # дуэль — всегда PvP
 
         # Исход: последовательные ходы, но взаимное истощение возможно

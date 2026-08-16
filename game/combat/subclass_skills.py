@@ -9,7 +9,13 @@ effect=null/stun/target_vuln/self_dodge_buff регистрируются ЗДЕ
 
 from game.combat import combat_flavor, control
 from game.combat.session import CombatMode, EffectKind
-from game.combat.skills import SkillContext, compute_hit, offensive_skill
+from game.combat.skills import (
+    SkillContext,
+    compute_hit,
+    offensive_skill,
+    register_element_use,
+    set_cooldown,
+)
 from game.content_loader import SubclassSkillDef, load_subclass_skills
 
 SUBCLASS_SKILLS_BY_ID: dict[str, list[SubclassSkillDef]] = load_subclass_skills()
@@ -23,7 +29,8 @@ _GENERIC_EFFECTS = {None, "stun", "target_vuln", "self_dodge_buff"}
 def _make_handler(skill: SubclassSkillDef):
     def handler(ctx: SkillContext) -> None:
         actor = ctx.actor
-        actor.cooldowns[skill.id] = skill.cd
+        set_cooldown(actor, skill.id, skill.cd, ctx.rng)
+        register_element_use(actor, skill.id)
         target = ctx.resolve_target()
 
         if skill.multiplier > 0 and target is not None:

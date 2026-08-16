@@ -68,6 +68,58 @@ SkillHandler = Callable[[SkillContext], None]
 DEFENSIVE_SKILLS: dict[str, SkillHandler] = {}
 OFFENSIVE_SKILLS: dict[str, SkillHandler] = {}
 
+# Патч 46, ч.1: id элементальных умений Элементалиста → тег стихии, для
+# «Стихийного потока» (см. register_element_use). Дублирует
+# game.combat.battle_report.ELEMENT_SKILLS (тот — для трекера испытаний,
+# этот — для боевого эффекта; независимые системы, держим раздельно).
+ELEMENT_SKILL_TAGS = {
+    "elementalist_fire": "fire",
+    "elementalist_ice": "ice",
+    "elementalist_lightning": "lightning",
+}
+
+
+def set_cooldown(actor: CombatantState, skill_id: str, cd: int, rng: random.Random) -> None:
+    """Кулдаун навыка — с учётом микробаффов Элементалиста «Экономия» (шанс
+    не уйти на КД) и «Перегрузка» (раз в N ходов следующий навык не уходит
+    на КД). Для всех остальных актёров buff_modifiers не содержит этих
+    ключей — поведение не отличается от прямого actor.cooldowns[skill_id] = cd."""
+    chance = actor.buff_modifiers.get("no_cooldown_chance", 0.0)
+    if chance > 0 and rng.random() < chance:
+        return
+    if actor.overload_ready:
+        actor.overload_ready = False
+        return
+    actor.cooldowns[skill_id] = cd
+
+
+def register_element_use(actor: CombatantState, skill_id: str) -> None:
+    """«Стихийный поток» (патч 46, ч.1): 3 разные стихии подряд — следующее
+    действие усилено на elemental_flow_bonus. Нет-оп без этого ключа в
+    buff_modifiers (актёр не слотнул бафф) или для неэлементального умения."""
+    bonus = actor.buff_modifiers.get("elemental_flow_bonus", 0.0)
+    if bonus <= 0:
+        return
+    element = ELEMENT_SKILL_TAGS.get(skill_id)
+    if element is None:
+        return
+    actor.recent_elements = (actor.recent_elements + [element])[-3:]
+    if len(actor.recent_elements) == 3 and len(set(actor.recent_elements)) == 3:
+        actor.apply_effect(EffectKind.ELEMENTAL_FLOW, bonus, 1, actor.id)
+        actor.recent_elements = []
+
+
+def tick_overload(actor: CombatantState) -> None:
+    """Перегрузка (патч 46, ч.1): раз в OVERLOAD_INTERVAL_TURNS ходов —
+    следующий навык не уходит на КД. Вызывать раз за ход актёра, вместе с
+    tick_cooldowns (резолвер/дуэль). Нет-оп без overload_active в buff_modifiers."""
+    if actor.buff_modifiers.get("overload_active", 0.0) <= 0:
+        return
+    actor.overload_turn_counter += 1
+    if actor.overload_turn_counter >= bc.ELEMENTALIST_OVERLOAD_INTERVAL_TURNS:
+        actor.overload_turn_counter = 0
+        actor.overload_ready = True
+
 
 def defensive_skill(skill_id: str) -> Callable[[SkillHandler], SkillHandler]:
     def wrap(fn: SkillHandler) -> SkillHandler:
@@ -96,6 +148,7 @@ def outgoing_multiplier(actor: CombatantState, target: CombatantState) -> float:
     mult *= 1.0 + actor.effect_total(EffectKind.DAMAGE_BUFF)  # Боевой клич +30%
     mult *= 1.0 + actor.buff_modifiers.get("damage_bonus", 0.0)
     mult *= 1.0 + actor.effect_total(EffectKind.ASHEN_FEVER)
+    mult *= 1.0 + actor.effect_total(EffectKind.ELEMENTAL_FLOW)  # Стихийный поток (патч 46, ч.1)
     for effect in actor.effects_of(EffectKind.PROVOKE_PVP):
         if target.id != effect.source_id:
             mult *= 1.0 - effect.value

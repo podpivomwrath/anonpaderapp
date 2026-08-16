@@ -34,6 +34,7 @@ from game.combat.skills import (
     PendingHit,
     SkillContext,
     compute_hit,
+    tick_overload,
 )
 from game.economy import elixir_config as ec
 
@@ -410,6 +411,7 @@ def resolve_tick(
 
         combatant.effects = [e for e in combatant.effects if e.remaining_ticks > 0]
         combatant.tick_cooldowns()
+        tick_overload(combatant)
         control.tick_control(combatant, pvp)
         combatant.reset_transient()
 

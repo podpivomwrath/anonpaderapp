@@ -66,9 +66,9 @@
   { "id": "elementalist_chain_lightning", "name": "Цепная молния", "subclass": "elementalist", "category": "damage", "description": "TODO: content", "stat_modifiers": {}, "duration_ticks": 1 },
   { "id": "elementalist_firestorm", "name": "Огненный дождь", "subclass": "elementalist", "category": "damage", "description": "TODO: content", "stat_modifiers": {}, "duration_ticks": 1 },
   { "id": "elementalist_ice_field", "name": "Ледяное поле", "subclass": "elementalist", "category": "control_utility", "description": "TODO: content", "stat_modifiers": {}, "duration_ticks": 1 },
-  { "id": "elementalist_thrift", "name": "Экономия", "subclass": "elementalist", "category": "control_utility", "description": "TODO: content", "stat_modifiers": {}, "duration_ticks": 1 },
-  { "id": "elementalist_overload", "name": "Перегрузка", "subclass": "elementalist", "category": "damage", "description": "TODO: content", "stat_modifiers": {}, "duration_ticks": 1 },
-  { "id": "elementalist_elemental_flow", "name": "Стихийный поток", "subclass": "elementalist", "category": "damage", "description": "TODO: content", "stat_modifiers": {}, "duration_ticks": 1 },
+  { "id": "elementalist_thrift", "name": "Экономия", "subclass": "elementalist", "category": "control_utility", "description": "Патч 46: переписано с несуществующего расхода ресурса на кулдауны. Шанс 20%, что применённый навык не уходит на перезарядку.", "stat_modifiers": { "no_cooldown_chance": 0.20 }, "duration_ticks": 1 },
+  { "id": "elementalist_overload", "name": "Перегрузка", "subclass": "elementalist", "category": "damage", "description": "Патч 46: переписано с несуществующего расхода ресурса на кулдауны. Раз в 6 ходов следующий применённый навык не уходит на перезарядку.", "stat_modifiers": { "overload_active": 1.0 }, "duration_ticks": 1 },
+  { "id": "elementalist_elemental_flow", "name": "Стихийный поток", "subclass": "elementalist", "category": "damage", "description": "При использовании 3 разных стихийных умений подряд следующее действие усилено на 20%.", "stat_modifiers": { "elemental_flow_bonus": 0.20 }, "duration_ticks": 1 },
 
   { "id": "dark_mystic_blood_bond", "name": "Кровавая связь", "subclass": "dark_mystic", "category": "damage", "description": "TODO: content", "stat_modifiers": {}, "duration_ticks": 1 },
   { "id": "dark_mystic_dark_resonance", "name": "Тёмный резонанс", "subclass": "dark_mystic", "category": "defense", "description": "TODO: content", "stat_modifiers": {}, "duration_ticks": 1 },

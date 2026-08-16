@@ -221,3 +221,11 @@ POISONER_POISON_DURATION_TICKS = 3          # TODO: content — длительн
 # Тёмный мистик
 DARK_MYSTIC_WARD_SHIELD_COEF = 2.0          # Оберег: поглощение = support_power(WIL) * коэф
 DARK_MYSTIC_CIRCLE_HP_COST = 0.20           # Круг тьмы: доля ТЕКУЩЕГО HP, платится за навык
+
+# Элементалист — микробаффы «Экономия»/«Перегрузка» (патч 46, ч.1): раньше
+# описаны как экономия несуществующего ресурса (маны в игре нет, только КД) —
+# переписаны на шанс/интервал НЕ уйти на кулдаун. См. game/combat/skills.py::
+# set_cooldown, register_element_use.
+ELEMENTALIST_ECONOMY_NO_COOLDOWN_CHANCE = 0.20  # Экономия: шанс не уйти на КД
+ELEMENTALIST_OVERLOAD_INTERVAL_TURNS = 6        # Перегрузка: раз в N ходов — не уйти на КД
+ELEMENTALIST_ELEMENTAL_FLOW_BONUS = 0.20        # Стихийный поток: бонус к след. действию

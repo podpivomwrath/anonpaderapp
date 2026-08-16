@@ -9,7 +9,13 @@
 
 from game.classes.base import Role, SubclassDef, register
 from game.combat.session import EffectKind
-from game.combat.skills import SkillContext, compute_hit, offensive_skill
+from game.combat.skills import (
+    SkillContext,
+    compute_hit,
+    offensive_skill,
+    register_element_use,
+    set_cooldown,
+)
 from game.combat.subclass_skills import SUBCLASS_SKILL_DEFS
 
 ELEMENTALIST = register(
@@ -34,7 +40,8 @@ def fire_whip(ctx: SkillContext) -> None:
     доля от урона этого удара)."""
     skill = SUBCLASS_SKILL_DEFS["elementalist_fire"]
     actor = ctx.actor
-    actor.cooldowns[skill.id] = skill.cd
+    set_cooldown(actor, skill.id, skill.cd, ctx.rng)
+    register_element_use(actor, skill.id)
     target = ctx.resolve_target()
     if target is None:
         return
@@ -50,7 +57,8 @@ def chain_lightning(ctx: SkillContext) -> None:
     """Цепь молний: 115% урона основной цели, 60% от этого — ещё двум противникам."""
     skill = SUBCLASS_SKILL_DEFS["elementalist_lightning"]
     actor = ctx.actor
-    actor.cooldowns[skill.id] = skill.cd
+    set_cooldown(actor, skill.id, skill.cd, ctx.rng)
+    register_element_use(actor, skill.id)
     target = ctx.resolve_target()
     if target is None:
         return
@@ -70,7 +78,7 @@ def convergence(ctx: SkillContext) -> None:
     +60% урона; цель заморожена — гарантированный крит."""
     skill = SUBCLASS_SKILL_DEFS["elementalist_convergence"]
     actor = ctx.actor
-    actor.cooldowns[skill.id] = skill.cd
+    set_cooldown(actor, skill.id, skill.cd, ctx.rng)
     target = ctx.resolve_target()
     if target is None:
         return

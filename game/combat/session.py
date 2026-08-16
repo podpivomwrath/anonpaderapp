@@ -47,6 +47,8 @@ class EffectKind(StrEnum):
     BLOCK_HEAL = "block_heal"      # value — доля maxHP, лечащая актёра за каждый СРЕЗАННЫЙ блоком удар
     BLOCK_STANCE = "block_stance"  # многоходовый блок (Глухая оборона) — снижение урона, в отличие
                                     # от однотикового block_reduction держится effect_duration ходов
+    # --- Патч 46, ч.1: Элементалист, «Стихийный поток» ---
+    ELEMENTAL_FLOW = "elemental_flow"  # исходящий урон * (1 + value), 1 ход — 3 разные стихии подряд
 
 
 class DeclaredAction(BaseModel):
@@ -124,6 +126,15 @@ class CombatantState:
 
     # --- Боевые эликсиры (патч 16): лимит 2 за бой, считается на весь бой ---
     combat_elixirs_used: int = 0
+
+    # --- Патч 46, ч.1: Элементалист, «Перегрузка»/«Стихийный поток» ---
+    # Перегрузка: ходов накоплено с последнего срабатывания / готов ли пропуск КД
+    # следующего навыка. Считается только если у актёра есть overload_active
+    # в buff_modifiers (см. game/combat/skills.py::set_cooldown).
+    overload_turn_counter: int = 0
+    overload_ready: bool = False
+    # Стихийный поток: последние (до 3) применённые элементальные умения подряд
+    recent_elements: list[str] = field(default_factory=list)
 
     @property
     def alive(self) -> bool:

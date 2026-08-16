@@ -202,3 +202,97 @@ def test_calibrated_guardian_buff_values_in_content() -> None:
     assert buffs["guardian_vital_block"].stat_modifiers["heal_on_block_pct_max_hp"] == 0.08
     assert buffs["guardian_heavy_hand"].stat_modifiers["damage_bonus"] == 0.10
     assert buffs["blood_knight_blood_rage"].stat_modifiers["damage_bonus"] == 0.05
+
+
+# --- Элементалист: «Экономия»/«Перегрузка»/«Стихийный поток» (патч 46, ч.1) ---
+# Переписаны с несуществующего расхода ресурса (маны нет, только КД) на
+# реальные механики кулдауна/бонуса урона.
+
+
+def test_thrift_full_chance_skips_cooldown() -> None:
+    rng = NoCritRng()
+    caster = combatant(1, side=0, subclass_id="elementalist")
+    caster.buff_modifiers["no_cooldown_chance"] = 1.0
+    enemy = combatant(2, side=1, vitality=500)
+    state = make_session(caster, enemy)
+
+    resolve_tick(state, {1: skill("elementalist_fire", 2)}, rng)
+    assert not caster.is_on_cooldown("elementalist_fire")
+
+
+def test_thrift_zero_chance_sets_cooldown_normally() -> None:
+    rng = NoCritRng()
+    caster = combatant(1, side=0, subclass_id="elementalist")
+    enemy = combatant(2, side=1, vitality=500)
+    state = make_session(caster, enemy)
+
+    resolve_tick(state, {1: skill("elementalist_fire", 2)}, rng)
+    assert caster.is_on_cooldown("elementalist_fire")
+
+
+def test_overload_skips_cooldown_every_interval_turns() -> None:
+    rng = NoCritRng()
+    caster = combatant(1, side=0, subclass_id="elementalist")
+    caster.buff_modifiers["overload_active"] = 1.0
+    enemy = combatant(2, side=1, vitality=5000, level=1)
+    state = make_session(caster, enemy)
+
+    for _ in range(bc.ELEMENTALIST_OVERLOAD_INTERVAL_TURNS):
+        resolve_tick(state, {1: attack(2)}, rng)
+    assert caster.overload_ready
+
+    resolve_tick(state, {1: skill("elementalist_fire", 2)}, rng)
+    assert not caster.is_on_cooldown("elementalist_fire")
+    assert not caster.overload_ready
+
+
+def test_overload_inactive_without_buff() -> None:
+    rng = NoCritRng()
+    caster = combatant(1, side=0, subclass_id="elementalist")
+    enemy = combatant(2, side=1, vitality=5000, level=1)
+    state = make_session(caster, enemy)
+
+    for _ in range(bc.ELEMENTALIST_OVERLOAD_INTERVAL_TURNS):
+        resolve_tick(state, {1: attack(2)}, rng)
+    assert not caster.overload_ready
+
+
+def test_elemental_flow_triggers_on_three_distinct_elements() -> None:
+    rng = NoCritRng()
+    caster = combatant(1, side=0, subclass_id="elementalist", intellect=100)
+    caster.buff_modifiers["elemental_flow_bonus"] = 0.20
+    enemy = combatant(2, side=1, vitality=5000, level=1)
+    state = make_session(caster, enemy)
+
+    resolve_tick(state, {1: skill("elementalist_fire", 2)}, rng)
+    assert not caster.has_effect(EffectKind.ELEMENTAL_FLOW)
+    resolve_tick(state, {1: skill("elementalist_ice", 2)}, rng)
+    assert not caster.has_effect(EffectKind.ELEMENTAL_FLOW)
+    resolve_tick(state, {1: skill("elementalist_lightning", 2)}, rng)
+    assert caster.has_effect(EffectKind.ELEMENTAL_FLOW)
+    assert caster.effect_total(EffectKind.ELEMENTAL_FLOW) == 0.20
+    assert caster.recent_elements == []  # цепь потрачена
+
+
+def test_elemental_flow_repeated_element_resets_streak() -> None:
+    rng = NoCritRng()
+    caster = combatant(1, side=0, subclass_id="elementalist", intellect=100)
+    caster.buff_modifiers["elemental_flow_bonus"] = 0.20
+    enemy = combatant(2, side=1, vitality=5000, level=1)
+    state = make_session(caster, enemy)
+
+    resolve_tick(state, {1: skill("elementalist_fire", 2)}, rng)
+    resolve_tick(state, {1: skill("elementalist_fire", 2)}, rng)  # повтор — не считается
+    resolve_tick(state, {1: skill("elementalist_ice", 2)}, rng)
+    resolve_tick(state, {1: skill("elementalist_lightning", 2)}, rng)
+    assert caster.has_effect(EffectKind.ELEMENTAL_FLOW)
+
+
+# --- Контент: калиброванные значения микробаффов Элементалиста ---
+
+
+def test_calibrated_elementalist_buff_values_in_content() -> None:
+    buffs = load_content().buffs
+    assert buffs["elementalist_thrift"].stat_modifiers["no_cooldown_chance"] == bc.ELEMENTALIST_ECONOMY_NO_COOLDOWN_CHANCE
+    assert buffs["elementalist_overload"].stat_modifiers["overload_active"] == 1.0
+    assert buffs["elementalist_elemental_flow"].stat_modifiers["elemental_flow_bonus"] == bc.ELEMENTALIST_ELEMENTAL_FLOW_BONUS
