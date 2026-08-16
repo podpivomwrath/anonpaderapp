@@ -27,13 +27,13 @@
   "blood_knight_lifesteal_strike": {
     "id": "blood_knight_lifesteal_strike", "name": "Кровопуск", "subclass_id": "blood_knight",
     "multiplier": 1.45, "cd": 2, "effect": "custom",
-    "effect_value": 0.25,
+    "effect_value": 0.12,
     "flavor": "Клинок уходит глубоко и возвращается тёплым."
   },
   "blood_knight_harvest": {
     "id": "blood_knight_harvest", "name": "Жатва", "subclass_id": "blood_knight",
     "multiplier": 1.9, "cd": 3, "effect": "custom",
-    "effect_value": 0.4,
+    "effect_value": 0.18,
     "flavor": "Чем меньше в тебе крови, тем жаднее клинок."
   },
   "blood_knight_blood_seal": {
@@ -45,7 +45,7 @@
   "blood_knight_crimson_feast": {
     "id": "blood_knight_crimson_feast", "name": "Багровый пир", "subclass_id": "blood_knight",
     "multiplier": 2.6, "cd": 5, "effect": "custom",
-    "effect_value": 0.6,
+    "effect_value": 0.3,
     "flavor": "Ты платишь своей кровью вперёд — и забираешь с процентами."
   },
 

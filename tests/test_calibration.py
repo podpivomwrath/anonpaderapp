@@ -35,10 +35,11 @@ def attack(target_id: int) -> DeclaredAction:
     return DeclaredAction(type=ActionType.ATTACK, target_id=target_id)
 
 
-# --- Кровавый рыцарь: лайфстил (патч 39, ч.3 — content/skills/subclass_skills.json) ---
+# --- Кровавый рыцарь: лайфстил (патч 39, ч.3; урезано патчем 44 — см.
+# content/skills/subclass_skills.json / game/combat/balance_config.py) ---
 
 
-def test_lifesteal_heals_25_percent_of_damage() -> None:
+def test_lifesteal_heals_12_percent_of_damage() -> None:
     rng = NoCritRng()
     knight = combatant(1, side=0, subclass_id="blood_knight")
     knight.current_hp -= 100  # есть что лечить
@@ -49,13 +50,14 @@ def test_lifesteal_heals_25_percent_of_damage() -> None:
     resolve_tick(state, {1: skill("blood_knight_lifesteal_strike", 2)}, rng)
     damage_dealt = enemy.max_hp - enemy.current_hp
     healed = knight.current_hp - hp_before
-    assert healed == round(damage_dealt * 0.25)
+    assert healed == round(damage_dealt * 0.12)
 
 
-def test_lifesteal_capped_at_8_percent_max_hp() -> None:
-    """Кап обязателен: без него лайфстил бесконтрольно скейлится."""
+def test_lifesteal_capped_at_10_percent_max_hp() -> None:
+    """Кап обязателен: без него лайфстил бесконтрольно скейлится (патч 44:
+    общий кап для ВСЕХ навыков лайфстила, не только Кровопуска)."""
     rng = NoCritRng()
-    # гигантский урон: высокий уровень + куча STR (25% от урона должно упереться в кап)
+    # гигантский урон: высокий уровень + куча STR — лайфстил должен упереться в кап
     knight = combatant(1, side=0, subclass_id="blood_knight", level=100, strength=2000)
     knight.current_hp = knight.max_hp // 3
     enemy = combatant(2, side=1, level=100, vitality=500)
@@ -64,11 +66,12 @@ def test_lifesteal_capped_at_8_percent_max_hp() -> None:
 
     resolve_tick(state, {1: skill("blood_knight_lifesteal_strike", 2)}, rng)
     healed = knight.current_hp - hp_before
-    assert healed == round(knight.max_hp * bc.BLOOD_KNIGHT_HEAL_CAP_PER_TICK)
+    assert healed == round(knight.max_hp * bc.BLOOD_KNIGHT_HEAL_CAP_PER_TURN)
 
 
-def test_blood_seal_doubles_lifesteal_on_marked_target() -> None:
-    """Кровавая печать: лайфстил ЛЮБОЙ последующей атаки рыцаря по цели удвоен."""
+def test_blood_seal_boosts_lifesteal_on_marked_target() -> None:
+    """Кровавая печать: лайфстил последующей атаки рыцаря по цели усилен
+    BLOOD_KNIGHT_BLOOD_SEAL_MULT (патч 44: было x2, стало x1.5)."""
     rng = NoCritRng()
     knight = combatant(1, side=0, subclass_id="blood_knight")
     knight.current_hp = round(knight.max_hp * 0.7)  # есть что лечить, но жив
@@ -83,7 +86,8 @@ def test_blood_seal_doubles_lifesteal_on_marked_target() -> None:
     resolve_tick(state, {1: skill("blood_knight_lifesteal_strike", 2)}, rng)
     damage_dealt = enemy_hp_before - enemy.current_hp
     healed = knight.current_hp - hp_before_hp
-    assert healed == round(damage_dealt * 0.5)  # 0.25 удвоено печатью
+    expected = min(round(damage_dealt * 0.12 * bc.BLOOD_KNIGHT_BLOOD_SEAL_MULT), round(knight.max_hp * bc.BLOOD_KNIGHT_HEAL_CAP_PER_TURN))
+    assert healed == expected
 
 
 # --- Отравитель: яд ---
