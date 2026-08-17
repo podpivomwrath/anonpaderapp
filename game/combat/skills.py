@@ -149,6 +149,11 @@ def outgoing_multiplier(actor: CombatantState, target: CombatantState) -> float:
     mult *= 1.0 + actor.buff_modifiers.get("damage_bonus", 0.0)
     mult *= 1.0 + actor.effect_total(EffectKind.ASHEN_FEVER)
     mult *= 1.0 + actor.effect_total(EffectKind.ELEMENTAL_FLOW)  # Стихийный поток (патч 46, ч.1)
+    # Кровавый рыцарь, «Безрассудность»/«Общий пир» (патч 47, ч.2) — отдельные
+    # ключи от damage_bonus: слияние stat_modifiers пресета — dict.update, два
+    # баффа на один ключ перезаписали бы друг друга, а не сложились.
+    mult *= 1.0 + actor.buff_modifiers.get("reckless_damage_bonus", 0.0)
+    mult *= 1.0 + actor.buff_modifiers.get("group_damage_bonus", 0.0)
     for effect in actor.effects_of(EffectKind.PROVOKE_PVP):
         if target.id != effect.source_id:
             mult *= 1.0 - effect.value
@@ -198,9 +203,17 @@ def compute_hit(
     crit = True if force_crit else rng.random() < formulas.crit_chance(actor.stats.agility)
     if crit:
         base *= bc.CRIT_MULTIPLIER
+        # Кровавый рыцарь, «Стойкий к боли» (патч 47, ч.2): свой крит-урон не
+        # трогает, только входящий по себе.
+        base *= 1.0 - target.buff_modifiers.get("crit_damage_taken_reduction", 0.0)
     base *= outgoing_multiplier(actor, target)
     base *= 1.0 + target.effect_total(EffectKind.VULNERABILITY)
     base *= 1.0 - effective_mitigation(target)
+    # Кровавый рыцарь, «Кровавый доспех»/«Второе дыхание» (патч 47, ч.2) —
+    # безусловное и низко-HP-условное снижение входящего урона.
+    base *= 1.0 - target.buff_modifiers.get("incoming_damage_reduction", 0.0)
+    if target.current_hp < target.max_hp * bc.BLOOD_KNIGHT_SECOND_WIND_HP_THRESHOLD:
+        base *= 1.0 - target.buff_modifiers.get("low_hp_damage_reduction", 0.0)
     # Глухая оборона (патч 39) — многоходовый блок, не суммируется с однотиковым
     # block_reduction (напр. Живительный блок пресета), берём максимум.
     base *= 1.0 - max(target.block_reduction, target.effect_total(EffectKind.BLOCK_STANCE))

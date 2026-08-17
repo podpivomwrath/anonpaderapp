@@ -237,3 +237,24 @@ ELEMENTALIST_NUMBNESS_FREEZE_BONUS_TURNS = 1    # Оцепенение: +1 хо�
 ELEMENTALIST_DEEP_FREEZE_CHANCE_BONUS = 0.15    # Глубокая заморозка: +15% шанс наложить контроль
 POISONER_LINGERING_POISON_BONUS_TURNS = 1       # Затяжной яд: +1 ход к длительности яда
 GUARDIAN_UNYIELDING_PROVOKE_BONUS_TURNS = 1     # Несгибаемый: +1 ход к длительности Провокации
+
+# Кровавый рыцарь — весь остальной пул микробаффов (патч 47, ч.2): по жалобе
+# игрока пул оказался заглушками почти целиком (11 из 12, кроме Кровавой
+# ярости). Значения — консервативные стартовые ориентиры (тот же порядок
+# величины, что и у уже откалиброванных баффов выше), НЕ финальные — подкласс
+# только что нерфили дважды (патчи 44-45), микробаффы опциональны (слот
+# пресета + испытание), но легко могут сдвинуть винрейт при первом реальном
+# использовании игроками — следующий баланс-прогон должен их учитывать.
+BLOOD_KNIGHT_THIRST_LOW_HP_LIFESTEAL_BONUS = 0.08     # Жажда: +8pp лайфстила при HP<50%
+BLOOD_KNIGHT_VEIN_RUPTURE_CRIT_LIFESTEAL_BONUS = 0.08  # Разрыв вен: +8pp лайфстила по крит-удару
+BLOOD_KNIGHT_RECKLESSNESS_DAMAGE_BONUS = 0.06          # Безрассудность: +6% урона (свой ключ, не damage_bonus)
+BLOOD_KNIGHT_INSATIABLE_LIFESTEAL_BONUS = 0.05         # Ненасытность: +5pp лайфстила безусловно
+BLOOD_KNIGHT_ETERNAL_HUNGER_HEAL_CAP_BONUS = 0.03      # Вечный голод: +3pp к капу лечения за ход
+BLOOD_KNIGHT_SECOND_WIND_HP_THRESHOLD = 0.30           # Второе дыхание: порог "низкого HP"
+BLOOD_KNIGHT_SECOND_WIND_DAMAGE_REDUCTION = 0.10       # Второе дыхание: -10% входящего урона ниже порога
+BLOOD_KNIGHT_BLOOD_ARMOR_DAMAGE_REDUCTION = 0.05       # Кровавый доспех: -5% входящего урона безусловно
+BLOOD_KNIGHT_PAIN_RESISTANT_CRIT_REDUCTION = 0.15      # Стойкий к боли: -15% урона от кримов по себе
+BLOOD_KNIGHT_FEAST_CRIMSON_HEAL_BONUS = 0.10           # Пиршество: +10pp лечения от Багрового пира
+BLOOD_KNIGHT_SHARED_THIRST_ALLY_HEAL_PCT = 0.30        # Разделённая жажда: доля лайфстила — самому раненому союзнику
+BLOOD_KNIGHT_BLOOD_PACT_COST_REDUCTION = 0.20          # Кровавый пакт: -20% себестоимости Багрового пира
+BLOOD_KNIGHT_SHARED_FEAST_GROUP_DAMAGE_BONUS = 0.05    # Общий пир: +5% урона, пока жив хотя бы 1 союзник

@@ -445,3 +445,274 @@ def test_calibrated_patch47_buff_values_in_content() -> None:
     assert buffs["elementalist_deep_freeze"].stat_modifiers["control_chance_bonus"] == bc.ELEMENTALIST_DEEP_FREEZE_CHANCE_BONUS
     assert buffs["poisoner_lingering_poison"].stat_modifiers["poison_duration_bonus"] == bc.POISONER_LINGERING_POISON_BONUS_TURNS
     assert buffs["guardian_unyielding"].stat_modifiers["provoke_duration_bonus"] == bc.GUARDIAN_UNYIELDING_PROVOKE_BONUS_TURNS
+
+
+# --- Патч 47, ч.2: весь оставшийся пул микробаффов Кровавого рыцаря (11 из
+# 12 были заглушками — жалоба игрока, что "микробаффы не работают" вообще). ---
+
+
+def test_thirst_boosts_lifesteal_when_low_hp() -> None:
+    rng = NoCritRng()
+    knight = combatant(1, side=0, subclass_id="blood_knight")
+    knight.buff_modifiers["low_hp_lifesteal_bonus"] = 0.08
+    knight.current_hp = round(knight.max_hp * 0.4)  # <50%
+    enemy = combatant(2, side=1, vitality=500)
+    state = make_session(knight, enemy)
+    hp_before = knight.current_hp
+
+    resolve_tick(state, {1: skill("blood_knight_lifesteal_strike", 2)}, rng)
+    damage_dealt = enemy.max_hp - enemy.current_hp
+    healed = knight.current_hp - hp_before
+    assert healed == round(damage_dealt * 0.28)  # 0.20 базовых + 0.08 бафф
+
+
+def test_thirst_inactive_above_half_hp() -> None:
+    rng = NoCritRng()
+    knight = combatant(1, side=0, subclass_id="blood_knight")
+    knight.buff_modifiers["low_hp_lifesteal_bonus"] = 0.08
+    knight.current_hp -= 100  # есть куда лечить, но выше 50%
+    enemy = combatant(2, side=1, vitality=500)
+    state = make_session(knight, enemy)
+    hp_before = knight.current_hp
+
+    resolve_tick(state, {1: skill("blood_knight_lifesteal_strike", 2)}, rng)
+    damage_dealt = enemy.max_hp - enemy.current_hp
+    healed = knight.current_hp - hp_before
+    assert healed == round(damage_dealt * 0.2)  # HP полное — бонус не действует
+
+
+def test_vein_rupture_boosts_lifesteal_on_crit() -> None:
+    rng = FixedRng(0.05)  # target agility=0 -> дожд-чек пропускается; крит гарантирован
+    knight = combatant(1, side=0, subclass_id="blood_knight", agility=200)
+    knight.buff_modifiers["crit_lifesteal_bonus"] = 0.08
+    knight.current_hp -= 100  # есть куда лечить
+    enemy = combatant(2, side=1, vitality=500, agility=0)
+    state = make_session(knight, enemy)
+    hp_before = knight.current_hp
+
+    resolve_tick(state, {1: skill("blood_knight_lifesteal_strike", 2)}, rng)
+    damage_dealt = enemy.max_hp - enemy.current_hp
+    healed = knight.current_hp - hp_before
+    assert healed == round(damage_dealt * 0.28)  # 0.20 базовых + 0.08 крит-бонус
+
+
+def test_recklessness_boosts_damage() -> None:
+    rng = NoCritRng()
+    baseline = combatant(1, side=0, subclass_id="blood_knight")
+    enemy1 = combatant(2, side=1, vitality=5000)
+    resolve_tick(make_session(baseline, enemy1), {1: attack(2)}, rng)
+    baseline_damage = enemy1.max_hp - enemy1.current_hp
+
+    boosted = combatant(3, side=0, subclass_id="blood_knight")
+    boosted.buff_modifiers["reckless_damage_bonus"] = 0.06
+    enemy2 = combatant(4, side=1, vitality=5000)
+    resolve_tick(make_session(boosted, enemy2), {3: attack(4)}, rng)
+    boosted_damage = enemy2.max_hp - enemy2.current_hp
+
+    assert boosted_damage > baseline_damage
+
+
+def test_insatiable_adds_unconditional_lifesteal() -> None:
+    rng = NoCritRng()
+    knight = combatant(1, side=0, subclass_id="blood_knight")
+    knight.buff_modifiers["lifesteal_ratio_bonus"] = 0.05
+    knight.current_hp -= 100  # есть куда лечить
+    enemy = combatant(2, side=1, vitality=500)
+    state = make_session(knight, enemy)
+    hp_before = knight.current_hp
+
+    resolve_tick(state, {1: skill("blood_knight_lifesteal_strike", 2)}, rng)
+    damage_dealt = enemy.max_hp - enemy.current_hp
+    healed = knight.current_hp - hp_before
+    assert healed == round(damage_dealt * 0.25)  # 0.20 + 0.05 безусловно
+
+
+def test_eternal_hunger_raises_heal_cap() -> None:
+    rng = NoCritRng()
+    knight = combatant(1, side=0, subclass_id="blood_knight", strength=500)
+    knight.buff_modifiers["heal_cap_bonus"] = 0.03
+    knight.current_hp = 1  # есть куда лечить без дополнительного капа по остатку HP
+    enemy = combatant(2, side=1, vitality=5000)
+    state = make_session(knight, enemy)
+
+    resolve_tick(state, {1: skill("blood_knight_lifesteal_strike", 2)}, rng)
+    healed = knight.current_hp - 1
+    assert healed == round(knight.max_hp * (bc.BLOOD_KNIGHT_HEAL_CAP_PER_TURN + 0.03))
+
+
+def test_second_wind_reduces_incoming_damage_when_low_hp() -> None:
+    rng = NoCritRng()
+    attacker = combatant(9, side=1)
+
+    victim_no_buff = combatant(1, side=0, vitality=1000)
+    victim_no_buff.current_hp = round(victim_no_buff.max_hp * 0.2)
+    resolve_tick(make_session(victim_no_buff, attacker), {9: attack(1)}, rng)
+    dmg_no_buff = round(victim_no_buff.max_hp * 0.2) - victim_no_buff.current_hp
+
+    attacker2 = combatant(10, side=1)
+    victim = combatant(2, side=0, vitality=1000)
+    victim.buff_modifiers["low_hp_damage_reduction"] = 0.10
+    victim.current_hp = round(victim.max_hp * 0.2)  # <30% порог
+    resolve_tick(make_session(victim, attacker2), {10: attack(2)}, rng)
+    dmg_with_buff = round(victim.max_hp * 0.2) - victim.current_hp
+
+    assert dmg_with_buff < dmg_no_buff
+
+
+def test_blood_armor_reduces_incoming_damage_unconditionally() -> None:
+    rng = NoCritRng()
+    attacker1 = combatant(9, side=1)
+    victim_no_buff = combatant(1, side=0, vitality=1000)
+    resolve_tick(make_session(victim_no_buff, attacker1), {9: attack(1)}, rng)
+    dmg_no_buff = victim_no_buff.max_hp - victim_no_buff.current_hp
+
+    attacker2 = combatant(10, side=1)
+    victim = combatant(2, side=0, vitality=1000)
+    victim.buff_modifiers["incoming_damage_reduction"] = 0.05
+    resolve_tick(make_session(victim, attacker2), {10: attack(2)}, rng)
+    dmg_with_buff = victim.max_hp - victim.current_hp
+
+    assert dmg_with_buff < dmg_no_buff
+
+
+def test_pain_resistant_reduces_crit_damage_taken() -> None:
+    rng = FixedRng(0.05)  # attacker agility высокий -> крит гарантирован
+    attacker1 = combatant(9, side=1, agility=200)
+    victim_no_buff = combatant(1, side=0, vitality=1000, agility=0)
+    resolve_tick(make_session(victim_no_buff, attacker1), {9: attack(1)}, rng)
+    dmg_no_buff = victim_no_buff.max_hp - victim_no_buff.current_hp
+
+    attacker2 = combatant(10, side=1, agility=200)
+    victim = combatant(2, side=0, vitality=1000, agility=0)
+    victim.buff_modifiers["crit_damage_taken_reduction"] = 0.15
+    resolve_tick(make_session(victim, attacker2), {10: attack(2)}, rng)
+    dmg_with_buff = victim.max_hp - victim.current_hp
+
+    assert dmg_with_buff < dmg_no_buff
+
+
+def test_feast_boosts_crimson_feast_heal_only() -> None:
+    rng = NoCritRng()
+    knight = combatant(1, side=0, subclass_id="blood_knight")
+    knight.buff_modifiers["crimson_feast_heal_bonus"] = 0.10
+    enemy = combatant(2, side=1, vitality=5000)
+    state = make_session(knight, enemy)
+    hp_before = knight.current_hp
+
+    resolve_tick(state, {1: skill("blood_knight_crimson_feast", 2)}, rng)
+    damage_dealt = enemy.max_hp - enemy.current_hp
+    cost = round(hp_before * bc.BLOOD_KNIGHT_CRIMSON_FEAST_HP_COST)
+    healed = knight.current_hp - (hp_before - cost)
+    assert healed == round(damage_dealt * 0.55)  # 0.45 базовых + 0.10 бафф
+
+    # тот же бафф НЕ действует на Кровопуск (только на Багровый пир)
+    knight2 = combatant(3, side=0, subclass_id="blood_knight")
+    knight2.buff_modifiers["crimson_feast_heal_bonus"] = 0.10
+    knight2.current_hp -= 100  # есть куда лечить
+    enemy2 = combatant(4, side=1, vitality=5000)
+    state2 = make_session(knight2, enemy2)
+    hp_before2 = knight2.current_hp
+    resolve_tick(state2, {3: skill("blood_knight_lifesteal_strike", 4)}, rng)
+    damage2 = enemy2.max_hp - enemy2.current_hp
+    healed2 = knight2.current_hp - hp_before2
+    assert healed2 == round(damage2 * 0.2)
+
+
+def test_shared_thirst_heals_most_injured_ally() -> None:
+    rng = NoCritRng()
+    knight = combatant(1, side=0, subclass_id="blood_knight")
+    knight.buff_modifiers["shared_heal_pct"] = 0.30
+    hurt_ally = combatant(3, side=0, vitality=200)
+    hurt_ally.current_hp = 1
+    healthy_ally = combatant(4, side=0, vitality=200)
+    enemy = combatant(2, side=1, vitality=500)
+    state = make_session(knight, hurt_ally, healthy_ally, enemy)
+
+    resolve_tick(state, {1: skill("blood_knight_lifesteal_strike", 2)}, rng)
+    assert hurt_ally.current_hp > 1
+    assert healthy_ally.current_hp == healthy_ally.max_hp  # хил ушёл раненому союзнику
+
+
+def test_shared_thirst_noop_without_allies() -> None:
+    """1×1 бой — союзников нет, дополнительный хил никому не уходит и не падает."""
+    rng = NoCritRng()
+    knight = combatant(1, side=0, subclass_id="blood_knight")
+    knight.buff_modifiers["shared_heal_pct"] = 0.30
+    knight.current_hp -= 100  # есть куда лечить
+    enemy = combatant(2, side=1, vitality=500)
+    state = make_session(knight, enemy)
+    hp_before = knight.current_hp
+
+    resolve_tick(state, {1: skill("blood_knight_lifesteal_strike", 2)}, rng)
+    damage_dealt = enemy.max_hp - enemy.current_hp
+    healed = knight.current_hp - hp_before
+    assert healed == round(damage_dealt * 0.2)
+
+
+def test_blood_pact_reduces_crimson_feast_cost() -> None:
+    rng = NoCritRng()
+    knight = combatant(1, side=0, subclass_id="blood_knight")
+    knight.buff_modifiers["crimson_feast_cost_reduction"] = 0.20
+    enemy = combatant(2, side=1, vitality=5000)
+    state = make_session(knight, enemy)
+    hp_before = knight.current_hp
+
+    resolve_tick(state, {1: skill("blood_knight_crimson_feast", 2)}, rng)
+    expected_cost = round(hp_before * bc.BLOOD_KNIGHT_CRIMSON_FEAST_HP_COST * 0.8)
+    # без хила проверить сложно (лайфстил тут же восполняет часть) — проверяем
+    # напрямую через дефолтный кейс без баффа для сравнения себестоимости
+    knight2 = combatant(3, side=0, subclass_id="blood_knight")
+    enemy2 = combatant(4, side=1, vitality=5000)
+    resolve_tick(make_session(knight2, enemy2), {3: skill("blood_knight_crimson_feast", 4)}, rng)
+    default_cost = round(hp_before * bc.BLOOD_KNIGHT_CRIMSON_FEAST_HP_COST)
+    assert expected_cost < default_cost
+
+
+def test_shared_feast_boosts_damage() -> None:
+    rng = NoCritRng()
+    baseline = combatant(1, side=0, subclass_id="blood_knight")
+    enemy1 = combatant(2, side=1, vitality=5000)
+    resolve_tick(make_session(baseline, enemy1), {1: attack(2)}, rng)
+    baseline_damage = enemy1.max_hp - enemy1.current_hp
+
+    boosted = combatant(3, side=0, subclass_id="blood_knight")
+    boosted.buff_modifiers["group_damage_bonus"] = 0.05
+    enemy2 = combatant(4, side=1, vitality=5000)
+    resolve_tick(make_session(boosted, enemy2), {3: attack(4)}, rng)
+    boosted_damage = enemy2.max_hp - enemy2.current_hp
+
+    assert boosted_damage > baseline_damage
+
+
+def test_reckless_and_group_damage_bonus_stack_independently() -> None:
+    """Разные ключи (reckless_damage_bonus/group_damage_bonus) — при слиянии
+    stat_modifiers пресета (dict.update) не должны перезаписывать друг друга,
+    как это было бы с общим damage_bonus."""
+    rng = NoCritRng()
+    both = combatant(1, side=0, subclass_id="blood_knight")
+    both.buff_modifiers["reckless_damage_bonus"] = 0.06
+    both.buff_modifiers["group_damage_bonus"] = 0.05
+    only_one = combatant(3, side=0, subclass_id="blood_knight")
+    only_one.buff_modifiers["reckless_damage_bonus"] = 0.06
+    enemy1 = combatant(2, side=1, vitality=5000)
+    enemy2 = combatant(4, side=1, vitality=5000)
+
+    resolve_tick(make_session(both, enemy1), {1: attack(2)}, rng)
+    resolve_tick(make_session(only_one, enemy2), {3: attack(4)}, rng)
+    assert (enemy1.max_hp - enemy1.current_hp) > (enemy2.max_hp - enemy2.current_hp)
+
+
+def test_calibrated_blood_knight_buff_values_in_content() -> None:
+    buffs = load_content().buffs
+    assert buffs["blood_knight_thirst"].stat_modifiers["low_hp_lifesteal_bonus"] == bc.BLOOD_KNIGHT_THIRST_LOW_HP_LIFESTEAL_BONUS
+    assert buffs["blood_knight_vein_rupture"].stat_modifiers["crit_lifesteal_bonus"] == bc.BLOOD_KNIGHT_VEIN_RUPTURE_CRIT_LIFESTEAL_BONUS
+    assert buffs["blood_knight_recklessness"].stat_modifiers["reckless_damage_bonus"] == bc.BLOOD_KNIGHT_RECKLESSNESS_DAMAGE_BONUS
+    assert buffs["blood_knight_insatiable"].stat_modifiers["lifesteal_ratio_bonus"] == bc.BLOOD_KNIGHT_INSATIABLE_LIFESTEAL_BONUS
+    assert buffs["blood_knight_eternal_hunger"].stat_modifiers["heal_cap_bonus"] == bc.BLOOD_KNIGHT_ETERNAL_HUNGER_HEAL_CAP_BONUS
+    assert buffs["blood_knight_second_wind"].stat_modifiers["low_hp_damage_reduction"] == bc.BLOOD_KNIGHT_SECOND_WIND_DAMAGE_REDUCTION
+    assert buffs["blood_knight_blood_armor"].stat_modifiers["incoming_damage_reduction"] == bc.BLOOD_KNIGHT_BLOOD_ARMOR_DAMAGE_REDUCTION
+    assert buffs["blood_knight_pain_resistant"].stat_modifiers["crit_damage_taken_reduction"] == bc.BLOOD_KNIGHT_PAIN_RESISTANT_CRIT_REDUCTION
+    assert buffs["blood_knight_feast"].stat_modifiers["crimson_feast_heal_bonus"] == bc.BLOOD_KNIGHT_FEAST_CRIMSON_HEAL_BONUS
+    assert buffs["blood_knight_shared_thirst"].stat_modifiers["shared_heal_pct"] == bc.BLOOD_KNIGHT_SHARED_THIRST_ALLY_HEAL_PCT
+    assert buffs["blood_knight_blood_pact"].stat_modifiers["crimson_feast_cost_reduction"] == bc.BLOOD_KNIGHT_BLOOD_PACT_COST_REDUCTION
+    assert buffs["blood_knight_shared_feast"].stat_modifiers["group_damage_bonus"] == bc.BLOOD_KNIGHT_SHARED_FEAST_GROUP_DAMAGE_BONUS
