@@ -37,6 +37,10 @@ class BuffDef(BaseModel):
     description: str = ""
     stat_modifiers: dict[str, float] = Field(default_factory=dict)
     duration_ticks: int = 1
+    # Патч 48: честная пометка — бафф реально влияет на бой (True) или ещё
+    # заглушка (False, дефолт). Игрок видит "⚙️ в разработке" во вкладке
+    # «Испытания», пока флаг не станет True для этого id.
+    implemented: bool = False
 
 
 class StarterRingMob(BaseModel):

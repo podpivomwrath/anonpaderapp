@@ -244,6 +244,13 @@ async def test_trials_lists_full_pool_with_progress(client, session_factory) -> 
     assert other["progress"] == 0
     assert other["target"] == 25
 
+    # Патч 48: описание/категория/статус реализации микробаффа.
+    assert bulwark["implemented"] is True
+    assert bulwark["category"] == "Оборона"
+    assert "25%" in bulwark["description"]
+    assert other["implemented"] is False
+    assert other["description"] == ""
+
 
 # --- GET /api/miniapp/inventory + POST /api/miniapp/equip (патч 14, ч.2.1) ---
 

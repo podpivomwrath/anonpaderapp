@@ -15,6 +15,7 @@ from bot.miniapp_auth import VK_USER_ID_KEY
 from bot.onboarding_texts import REGION_TITLES
 from config import Settings
 from game.content_loader import load_content
+from game.economy import buff_descriptions
 from models import BaseClass, Character, CharacterBuffPreset, User
 from services import (
     daily_service,
@@ -179,6 +180,7 @@ async def handle_get_trials(request: web.Request) -> web.Response:
         if character.subclass is None:
             return web.json_response({"subclass": None, "trials": []})
         states = await trial_service.get_trial_states(session, character)
+        catalog = load_content().buffs
         return web.json_response(
             {
                 "subclass": character.subclass,
@@ -191,6 +193,13 @@ async def handle_get_trials(request: web.Request) -> web.Response:
                         "progress": s.progress,
                         "target": s.target,
                         "text": s.trial.text,
+                        # Патч 48: описание микробаффа для раскрывающейся панели —
+                        # генерируется из тех же значений, что читает бой (сухие
+                        # цифры, без лора); implemented=false → фронт показывает
+                        # "в разработке" вместо описания.
+                        "category": buff_descriptions.category_label(catalog[s.trial.buff_id].category),
+                        "implemented": catalog[s.trial.buff_id].implemented,
+                        "description": buff_descriptions.describe(catalog[s.trial.buff_id]),
                     }
                     for s in states
                 ],
