@@ -40,6 +40,7 @@ from bot.world_texts import (
     tavern_text,
 )
 from game.combat import display
+from game.economy import premium_config as pc
 from game.economy import story_config as sc
 from game.world import encounters, events as event_pool
 from game.world import flavor, grid
@@ -55,6 +56,7 @@ from services import (
     item_service,
     mount_service,
     movement_service,
+    premium_service,
     preset_service,
     quest_service,
     screen_service,
@@ -582,7 +584,11 @@ async def rest(message: Message) -> None:
             return
 
     _resting.add(peer_id)
-    delay = _rng.uniform(wc.REST_SECONDS_MIN, wc.REST_SECONDS_MAX)
+    # Патч 50: Метка Хранителя — отдых вдвое быстрее.
+    if premium_service.is_premium(character):
+        delay = _rng.uniform(pc.REST_SECONDS_MIN, pc.REST_SECONDS_MAX)
+    else:
+        delay = _rng.uniform(wc.REST_SECONDS_MIN, wc.REST_SECONDS_MAX)
     # отдых — кнопки убираем на время (чистка шума)
     await message.answer(flavor.rest_start(), keyboard=kb.waiting_keyboard())
     _rest_scheduler.schedule(peer_id, delay)

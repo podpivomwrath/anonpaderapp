@@ -135,6 +135,28 @@ export function setAdminBugReportStatus(reportId, status) {
   });
 }
 
+// --- Промокоды (патч 50) ---
+
+export function getAdminPromoCodes() {
+  return request('/admin/promo_codes');
+}
+
+export function createAdminPromoCode(params) {
+  return request('/admin/promo_codes', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(params),
+  });
+}
+
+export function deleteAdminPromoCode(promoId) {
+  return request(`/admin/promo_codes/${promoId}`, { method: 'DELETE' });
+}
+
+export function getAdminPromoCodeActivations(promoId) {
+  return request(`/admin/promo_codes/${promoId}/activations`);
+}
+
 // --- Карта (патч 29) ---
 
 export function getMapState() {

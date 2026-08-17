@@ -15,8 +15,9 @@ from game.combat import balance_config as bc
 from game.content_loader import ItemBaseDef, ItemRarityDef, load_item_bases, load_item_rarities
 from game.economy import item_config as ic
 from game.economy import item_gen
+from game.economy import premium_config as pc
 from models import Character, Inventory, Item
-from services import wallet_service
+from services import premium_service, wallet_service
 
 SLOTS = ic.SLOTS
 
@@ -73,6 +74,8 @@ async def grant_from_kill(
     rarity_id = item_gen.roll_rarity(rng)
     if rarity_id is None:
         return None
+    if premium_service.is_premium(character):
+        rarity_id = item_gen.maybe_upgrade_rarity(rarity_id, rarities(), rng, pc.PREMIUM_RARITY_UPGRADE_CHANCE)
     slot = item_gen.roll_slot(rng)
     primary_stat = bc.PRIMARY_STAT_BY_CLASS[character.base_class]
     generated = item_gen.generate_item(
@@ -106,6 +109,8 @@ async def grant_random_item(
             break
     if rarity_id is None:
         rarity_id = next(iter(ic.ITEM_RARITY_CHANCES))
+    if premium_service.is_premium(character):
+        rarity_id = item_gen.maybe_upgrade_rarity(rarity_id, rarities(), rng, pc.PREMIUM_RARITY_UPGRADE_CHANCE)
     slot = item_gen.roll_slot(rng)
     primary_stat = bc.PRIMARY_STAT_BY_CLASS[character.base_class]
     generated = item_gen.generate_item(

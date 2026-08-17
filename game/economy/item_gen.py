@@ -54,6 +54,23 @@ def roll_slot(rng: random.Random) -> str:
     return rng.choice(ic.SLOTS)
 
 
+def maybe_upgrade_rarity(
+    rarity_id: str, rarities: dict[str, ItemRarityDef], rng: random.Random, chance: float,
+) -> str:
+    """Метка Хранителя (патч 50): один бросок ПОСЛЕ определения базовой
+    редкости — не каскадом (одна проверка, не цепочка повышений). Потолок —
+    последняя редкость в rarities (легендарная) остаётся легендарной.
+    rarities — тот же порядок insertion, что и в services/item_service.py
+    (common → ... → legendary), используется для поиска "следующей ступени"."""
+    if rng.random() >= chance:
+        return rarity_id
+    ids = list(rarities.keys())
+    idx = ids.index(rarity_id)
+    if idx + 1 >= len(ids):
+        return rarity_id
+    return ids[idx + 1]
+
+
 def build_name(base: ItemBaseDef, rarity: ItemRarityDef) -> str:
     """Легендарная — суффикс ПОСЛЕ базы, родительный падеж ("Кираса Монолита").
     Остальные — суффикс-прилагательное ПЕРЕД базой ("Кровавый клинок")."""

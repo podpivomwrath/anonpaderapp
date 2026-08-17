@@ -6,6 +6,7 @@
 что вкладка скрыта на фронтенде — см. safe-rollout секцию патча."""
 
 import random
+from datetime import datetime, timezone
 
 from aiohttp import web
 
@@ -17,7 +18,7 @@ from bot.miniapp_auth import VK_USER_ID_KEY
 from config import Settings
 from game.world import grid
 from models import Character
-from services import admin_service
+from services import admin_service, promo_service
 from services import onboarding_service as onboarding_svc
 
 _rng = random.Random()
@@ -266,6 +267,114 @@ async def handle_post_bug_report_status(request: web.Request) -> web.Response:
         return web.json_response({"id": report.id, "status": report.status})
 
 
+# --- Промокоды (патч 50) ---
+
+
+def _promo_code_json(overview) -> dict:
+    return {
+        "id": overview.id,
+        "code": overview.code,
+        "rewards": overview.rewards,
+        "max_activations": overview.max_activations,
+        "one_per_player": overview.one_per_player,
+        "expires_at": overview.expires_at.isoformat() if overview.expires_at else None,
+        "created_at": overview.created_at.isoformat() if overview.created_at else None,
+        "activation_count": overview.activation_count,
+    }
+
+
+async def handle_get_promo_codes(request: web.Request) -> web.Response:
+    if not _is_admin(request):
+        return _forbidden()
+    session_factory = request.app[SESSION_FACTORY_KEY]
+    async with session_factory() as db:
+        codes = await promo_service.list_codes(db)
+        return web.json_response({"codes": [_promo_code_json(c) for c in codes]})
+
+
+async def handle_post_promo_codes(request: web.Request) -> web.Response:
+    if not _is_admin(request):
+        return _forbidden()
+    try:
+        body = await request.json()
+    except Exception:
+        return web.json_response({"error": "bad_request"}, status=400)
+    if not isinstance(body, dict):
+        return web.json_response({"error": "bad_request"}, status=400)
+
+    code = body.get("code")
+    rewards = body.get("rewards")
+    max_activations = body.get("max_activations")
+    one_per_player = body.get("one_per_player", True)
+    expires_at_raw = body.get("expires_at")
+    if not isinstance(code, str) or not isinstance(rewards, list):
+        return web.json_response({"error": "bad_request"}, status=400)
+    if max_activations is not None and not isinstance(max_activations, int):
+        return web.json_response({"error": "bad_request"}, status=400)
+    expires_at = None
+    if expires_at_raw:
+        try:
+            expires_at = datetime.fromisoformat(expires_at_raw)
+            if expires_at.tzinfo is None:
+                expires_at = expires_at.replace(tzinfo=timezone.utc)
+        except ValueError:
+            return web.json_response({"error": "bad_request"}, status=400)
+
+    settings: Settings = request.app[SETTINGS_KEY]
+    session_factory = request.app[SESSION_FACTORY_KEY]
+    async with session_factory() as db:
+        try:
+            promo = await promo_service.create_code(
+                db, settings.admin_vk_id, code, rewards, max_activations, bool(one_per_player), expires_at,
+            )
+        except promo_service.PromoValidationError as exc:
+            return web.json_response({"error": str(exc)}, status=400)
+        await db.commit()
+        codes = await promo_service.list_codes(db)
+        created = next((c for c in codes if c.id == promo.id), None)
+        return web.json_response(_promo_code_json(created) if created else {"id": promo.id})
+
+
+async def handle_delete_promo_code(request: web.Request) -> web.Response:
+    if not _is_admin(request):
+        return _forbidden()
+    try:
+        promo_id = int(request.match_info["id"])
+    except ValueError:
+        return web.json_response({"error": "bad_request"}, status=400)
+    settings: Settings = request.app[SETTINGS_KEY]
+    session_factory = request.app[SESSION_FACTORY_KEY]
+    async with session_factory() as db:
+        deleted = await promo_service.delete_code(db, settings.admin_vk_id, promo_id)
+        if not deleted:
+            return web.json_response({"error": "not_found"}, status=404)
+        await db.commit()
+        return web.json_response({"deleted": True})
+
+
+async def handle_get_promo_code_activations(request: web.Request) -> web.Response:
+    if not _is_admin(request):
+        return _forbidden()
+    try:
+        promo_id = int(request.match_info["id"])
+    except ValueError:
+        return web.json_response({"error": "bad_request"}, status=400)
+    session_factory = request.app[SESSION_FACTORY_KEY]
+    async with session_factory() as db:
+        entries = await promo_service.code_activations(db, promo_id)
+        return web.json_response(
+            {
+                "activations": [
+                    {
+                        "character_id": e.character_id, "character_name": e.character_name,
+                        "activated_at": e.activated_at.isoformat(),
+                    }
+                    for e in entries
+                ]
+            }
+        )
+
+
 def register_routes(app: web.Application) -> None:
     app.router.add_get("/api/miniapp/admin/overview", handle_get_overview)
     app.router.add_get("/api/miniapp/admin/search", handle_get_search)
@@ -274,3 +383,7 @@ def register_routes(app: web.Application) -> None:
     app.router.add_get("/api/miniapp/admin/journal", handle_get_journal)
     app.router.add_get("/api/miniapp/admin/bug_reports", handle_get_bug_reports)
     app.router.add_post("/api/miniapp/admin/bug_reports/{id}/status", handle_post_bug_report_status)
+    app.router.add_get("/api/miniapp/admin/promo_codes", handle_get_promo_codes)
+    app.router.add_post("/api/miniapp/admin/promo_codes", handle_post_promo_codes)
+    app.router.add_delete("/api/miniapp/admin/promo_codes/{id}", handle_delete_promo_code)
+    app.router.add_get("/api/miniapp/admin/promo_codes/{id}/activations", handle_get_promo_code_activations)

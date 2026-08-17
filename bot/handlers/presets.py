@@ -95,7 +95,7 @@ async def switch_preset_button(message: Message) -> None:
         if character is None or character.creation_state is not None:
             return
         try:
-            await preset_service.switch_active_preset(db, character.id, preset_id)
+            await preset_service.switch_active_preset(db, character, preset_id)
         except PresetValidationError:
             return
         await db.commit()
@@ -128,7 +128,7 @@ async def switch_preset_command(message: Message, n: int) -> None:
 
         target = presets[n - 1]
         try:
-            await preset_service.switch_active_preset(db, character.id, target.id)
+            await preset_service.switch_active_preset(db, character, target.id)
         except PresetValidationError:
             await message.answer(f"Пресет {n} пуст. Собери его в разделе «Персонаж».")
             return

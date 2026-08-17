@@ -12,6 +12,7 @@ from services import experience_service as svc
 class FakeCharacter:
     level: int = 1
     experience: int = 0
+    premium_until: object = None
 
 
 @dataclass

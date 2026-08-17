@@ -96,15 +96,18 @@ class LeaderboardEntry:
     wins: int
     losses: int
     title: str | None = None
+    premium: bool = False  # патч 50: Метка Хранителя — бейдж 💠 в топе
 
 
 async def leaderboard(db: AsyncSession, limit: int = 10) -> list[LeaderboardEntry]:
     """Топ-10 (или limit) по победам, при равенстве — по меньшему числу
     поражений (патч 22, п.7). title (патч 23) — активный титул, если задан."""
+    now = datetime.now(timezone.utc)
     rows = (
         await db.execute(
             select(
-                Character.name, Character.pvp_wins, Character.pvp_losses, Character.active_title_id,
+                Character.name, Character.pvp_wins, Character.pvp_losses,
+                Character.active_title_id, Character.premium_until,
             )
             .where(Character.creation_state.is_(None))
             .order_by(Character.pvp_wins.desc(), Character.pvp_losses.asc())
@@ -115,8 +118,9 @@ async def leaderboard(db: AsyncSession, limit: int = 10) -> list[LeaderboardEntr
         LeaderboardEntry(
             rank=i, name=name, wins=wins, losses=losses,
             title=title_service.name_of(title_id) if title_id else None,
+            premium=premium_until is not None and premium_until > now,
         )
-        for i, (name, wins, losses, title_id) in enumerate(rows, start=1)
+        for i, (name, wins, losses, title_id, premium_until) in enumerate(rows, start=1)
     ]
 
 

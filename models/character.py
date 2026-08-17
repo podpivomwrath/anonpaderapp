@@ -86,6 +86,18 @@ class Character(Base):
     # — не теряется в PvP, не продаётся скупщику, просто другая колонка.
     raid_keys: Mapped[int] = mapped_column(default=0)
 
+    # Патч 50: Метка Хранителя (премиум-подписка). NULL/в прошлом — не активна.
+    # Не продаётся нигде — выдаётся ТОЛЬКО промокодом. Срок СУММИРУЕТСЯ при
+    # повторной активации (services/premium_service.py::extend). Единая
+    # проверка — services/premium_service.py::is_premium, не дублировать.
+    premium_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    # Идемпотентность разовых уведомлений об истечении (патч 50) — сбрасываются
+    # в extend() при каждом продлении, чтобы уведомления сработали заново на
+    # следующий срок. Доставка — тот же механизм, что character._daily_notice
+    # (services/onboarding_service.py::get_character), не отдельный канал.
+    premium_warn_sent: Mapped[bool] = mapped_column(Boolean, default=False)
+    premium_expire_notified: Mapped[bool] = mapped_column(Boolean, default=False)
+
     user: Mapped["User"] = relationship(back_populates="characters")
     stats: Mapped["CharacterStats"] = relationship(
         back_populates="character", uselist=False, cascade="all, delete-orphan"

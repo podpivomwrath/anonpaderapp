@@ -12,6 +12,7 @@ from models.enums import BaseClass, CombatStatus, CombatType, OrderDirection, Qu
 from models.item import Inventory, Item, ItemUpgradeHistory
 from models.lootbox import CharacterLootbox
 from models.mount import CharacterMount, MountTravel
+from models.promo import PromoActivation, PromoCode
 from models.pvp import PvpBattle
 from models.quest import CharacterQuest, Quest
 from models.song import CharacterSongFragment
@@ -50,6 +51,8 @@ __all__ = [
     "ItemUpgradeHistory",
     "MountTravel",
     "OrderDirection",
+    "PromoActivation",
+    "PromoCode",
     "PvpBattle",
     "PvpStakeTransfer",
     "Quest",

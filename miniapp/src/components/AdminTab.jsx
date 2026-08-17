@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react';
 import {
-  Tabs, TabsItem, Group, Header, Div, Spinner, Placeholder, Button, Input, FormItem, Select, Textarea,
+  Tabs, TabsItem, Group, Header, Div, Spinner, Placeholder, Button, Input, FormItem, Select, Textarea, Checkbox,
 } from '@vkontakte/vkui';
 import {
   getAdminOverview, searchAdminPlayers, getAdminPlayer, postAdminAction, getAdminJournal,
+  getAdminPromoCodes, createAdminPromoCode, deleteAdminPromoCode, getAdminPromoCodeActivations,
 } from '../api.js';
 
 // Патч 27, ч.2: вкладка «Админ» — видна только если character.is_admin
@@ -19,6 +20,7 @@ const SECTIONS = [
   { id: 'overview', label: 'Обзор' },
   { id: 'player', label: 'Игрок' },
   { id: 'journal', label: 'Журнал' },
+  { id: 'promo', label: '🎟 Промокоды' },
 ];
 
 function StatRow({ label, value }) {
@@ -244,12 +246,16 @@ function statusLabel(card) {
 function PlayerCard({ card, onRefresh }) {
   return (
     <>
-      <Group header={<Header>{card.name}{card.title ? ` «${card.title}»` : ''} (vk_id {card.vk_id})</Header>}>
+      <Group header={<Header>{card.is_premium ? '💠 ' : ''}{card.name}{card.title ? ` «${card.title}»` : ''} (vk_id {card.vk_id})</Header>}>
         <StatRow label="Ник" value={card.name} />
         <StatRow label="vk_id" value={card.vk_id ?? '—'} />
         <StatRow label="Создан" value={card.created_at ? new Date(card.created_at).toLocaleString('ru') : '—'} />
         <StatRow label="Последняя активность" value={card.last_active_at ? new Date(card.last_active_at).toLocaleString('ru') : '—'} />
         <StatRow label="Титул" value={card.title || '—'} />
+        <StatRow
+          label="💠 Метка Хранителя"
+          value={card.premium_until ? `до ${new Date(card.premium_until).toLocaleString('ru')}${card.is_premium ? '' : ' (истекла)'}` : 'нет'}
+        />
       </Group>
 
       <Group header={<Header>Прогресс</Header>}>
@@ -455,6 +461,247 @@ function JournalSection() {
   );
 }
 
+// Патч 50: типы наград промокода — поля зависят от типа (см.
+// services/promo_service.py::_apply_reward — те же ключи один в один).
+const REWARD_TYPE_OPTIONS = [
+  { value: 'gold', label: '💰 Золото' },
+  { value: 'gems', label: '💎 Самоцветы' },
+  { value: 'xp', label: '✨ Опыт' },
+  { value: 'trophy', label: 'Трофей' },
+  { value: 'elixir', label: 'Зелье/эликсир' },
+  { value: 'raid_keys', label: '🗝 Ключи Монолита' },
+  { value: 'premium', label: '💠 Метка Хранителя' },
+  { value: 'mount', label: '🐎 Маунт' },
+];
+
+function emptyReward() {
+  return { type: 'gold', amount: '', trophy_id: '', elixir_id: '', days: 30, mount_id: '' };
+}
+
+function rewardToPayload(r) {
+  if (r.type === 'gold' || r.type === 'gems' || r.type === 'xp' || r.type === 'raid_keys') {
+    return { type: r.type, amount: parseInt(r.amount, 10) || 0 };
+  }
+  if (r.type === 'trophy') {
+    return { type: 'trophy', trophy_id: r.trophy_id, amount: parseInt(r.amount, 10) || 0 };
+  }
+  if (r.type === 'elixir') {
+    return { type: 'elixir', elixir_id: r.elixir_id, amount: parseInt(r.amount, 10) || 0 };
+  }
+  if (r.type === 'premium') {
+    return { type: 'premium', days: parseInt(r.days, 10) || 0 };
+  }
+  if (r.type === 'mount') {
+    return { type: 'mount', mount_id: r.mount_id };
+  }
+  return { type: r.type };
+}
+
+function rewardSummary(r) {
+  if (r.type === 'gold') return `💰 ${r.amount ?? 0} золота`;
+  if (r.type === 'gems') return `💎 ${r.amount ?? 0} самоцветов`;
+  if (r.type === 'xp') return `✨ ${r.amount ?? 0} опыта`;
+  if (r.type === 'raid_keys') return `🗝 ${r.amount ?? 0} ключей`;
+  if (r.type === 'trophy') return `Трофей ${r.trophy_id || '?'} ×${r.amount ?? 0}`;
+  if (r.type === 'elixir') return `Зелье ${r.elixir_id || '?'} ×${r.amount ?? 0}`;
+  if (r.type === 'premium') return `💠 Премиум на ${r.days} дн.`;
+  if (r.type === 'mount') return `🐎 ${r.mount_id || '?'}`;
+  return r.type;
+}
+
+function RewardRow({ reward, onChange, onRemove }) {
+  const set = (key) => (e) => onChange({ ...reward, [key]: e.target.value });
+  return (
+    <Div style={{ borderBottom: '1px solid var(--vkui--color_separator_primary)', paddingBottom: 8 }}>
+      <FormItem top="Тип награды">
+        <Select value={reward.type} onChange={set('type')} options={REWARD_TYPE_OPTIONS} />
+      </FormItem>
+      {(reward.type === 'gold' || reward.type === 'gems' || reward.type === 'xp' || reward.type === 'raid_keys') && (
+        <FormItem top="Количество">
+          <Input type="number" value={reward.amount} onChange={set('amount')} />
+        </FormItem>
+      )}
+      {reward.type === 'trophy' && (
+        <>
+          <FormItem top="ID трофея"><Input value={reward.trophy_id} onChange={set('trophy_id')} placeholder="ash_dust" /></FormItem>
+          <FormItem top="Количество"><Input type="number" value={reward.amount} onChange={set('amount')} /></FormItem>
+        </>
+      )}
+      {reward.type === 'elixir' && (
+        <>
+          <FormItem top="ID эликсира"><Input value={reward.elixir_id} onChange={set('elixir_id')} placeholder="heal_small" /></FormItem>
+          <FormItem top="Количество"><Input type="number" value={reward.amount} onChange={set('amount')} /></FormItem>
+        </>
+      )}
+      {reward.type === 'premium' && (
+        <FormItem top="Срок">
+          <Select value={String(reward.days)} onChange={set('days')} options={[
+            { value: '3', label: '3 дня' }, { value: '7', label: '7 дней' }, { value: '30', label: '30 дней' },
+          ]} />
+        </FormItem>
+      )}
+      {reward.type === 'mount' && (
+        <FormItem top="ID маунта"><Input value={reward.mount_id} onChange={set('mount_id')} /></FormItem>
+      )}
+      <Button mode="tertiary" size="s" onClick={onRemove}>Убрать эту награду</Button>
+    </Div>
+  );
+}
+
+function PromoCreateForm({ onCreated }) {
+  const [code, setCode] = useState('');
+  const [rewards, setRewards] = useState([emptyReward()]);
+  const [maxActivations, setMaxActivations] = useState('');
+  const [onePerPlayer, setOnePerPlayer] = useState(true);
+  const [expiresAt, setExpiresAt] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState(null);
+
+  const updateReward = (i, next) => setRewards((rs) => rs.map((r, idx) => (idx === i ? next : r)));
+  const removeReward = (i) => setRewards((rs) => rs.filter((_, idx) => idx !== i));
+  const addReward = () => setRewards((rs) => [...rs, emptyReward()]);
+
+  const submit = async () => {
+    setBusy(true);
+    setError(null);
+    try {
+      await createAdminPromoCode({
+        code,
+        rewards: rewards.map(rewardToPayload),
+        max_activations: maxActivations ? parseInt(maxActivations, 10) : null,
+        one_per_player: onePerPlayer,
+        expires_at: expiresAt || null,
+      });
+      setCode('');
+      setRewards([emptyReward()]);
+      setMaxActivations('');
+      setExpiresAt('');
+      onCreated();
+    } catch (e) {
+      setError(e.message || 'Не удалось создать код');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <Group header={<Header>Новый промокод</Header>}>
+      <FormItem top="Код">
+        <Input value={code} onChange={(e) => setCode(e.target.value)} placeholder="MONOLITH2026" />
+      </FormItem>
+      <FormItem top="Лимит активаций (пусто — без лимита)">
+        <Input type="number" value={maxActivations} onChange={(e) => setMaxActivations(e.target.value)} />
+      </FormItem>
+      <FormItem>
+        <Checkbox checked={onePerPlayer} onChange={(e) => setOnePerPlayer(e.target.checked)}>
+          Одна активация на игрока
+        </Checkbox>
+      </FormItem>
+      <FormItem top="Действует до (пусто — бессрочно)">
+        <Input type="datetime-local" value={expiresAt} onChange={(e) => setExpiresAt(e.target.value)} />
+      </FormItem>
+
+      <Div style={{ opacity: 0.7, paddingBottom: 0 }}>Награды:</Div>
+      {rewards.map((r, i) => (
+        <RewardRow key={i} reward={r} onChange={(next) => updateReward(i, next)} onRemove={() => removeReward(i)} />
+      ))}
+      <Div>
+        <Button mode="secondary" size="s" onClick={addReward}>+ Добавить награду</Button>
+      </Div>
+
+      {error && <Div style={{ color: 'var(--vkui--color_text_negative)' }}>{error}</Div>}
+      <Div>
+        <Button size="l" stretched loading={busy} onClick={submit} disabled={!code.trim() || rewards.length === 0}>
+          Создать код
+        </Button>
+      </Div>
+    </Group>
+  );
+}
+
+function PromoCodeRow({ promo, onDeleted }) {
+  const [expanded, setExpanded] = useState(false);
+  const [activations, setActivations] = useState(null);
+  const [busy, setBusy] = useState(false);
+
+  const toggle = async () => {
+    if (!expanded && activations === null) {
+      const res = await getAdminPromoCodeActivations(promo.id);
+      setActivations(res.activations);
+    }
+    setExpanded((v) => !v);
+  };
+
+  const remove = async () => {
+    setBusy(true);
+    try {
+      await deleteAdminPromoCode(promo.id);
+      onDeleted();
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const limitLabel = promo.max_activations == null
+    ? `${promo.activation_count} активаций`
+    : `${promo.activation_count} / ${promo.max_activations}`;
+
+  return (
+    <Div style={{ borderBottom: '1px solid var(--vkui--color_separator_primary)', paddingBottom: 8 }}>
+      <div className="stat-row" style={{ cursor: 'pointer', padding: 0 }} onClick={toggle}>
+        <span className="stat-row__label">{promo.code}</span>
+        <span className="stat-row__value">{limitLabel}</span>
+      </div>
+      <p style={{ opacity: 0.7, fontSize: 13, margin: '4px 0' }}>
+        {promo.rewards.map(rewardSummary).join(', ')}
+      </p>
+      <p style={{ opacity: 0.7, fontSize: 13, margin: '4px 0' }}>
+        {promo.one_per_player ? 'Одна активация на игрока' : 'Можно активировать многократно'}
+        {promo.expires_at ? ` · до ${new Date(promo.expires_at).toLocaleString('ru')}` : ' · бессрочно'}
+      </p>
+      {expanded && (
+        <div style={{ paddingLeft: 8 }}>
+          {activations && activations.length === 0 && <Div style={{ opacity: 0.7 }}>Пока никто не активировал.</Div>}
+          {activations && activations.map((a, i) => (
+            <p key={i} style={{ fontSize: 13, margin: '2px 0' }}>
+              {a.character_name} · {new Date(a.activated_at).toLocaleString('ru')}
+            </p>
+          ))}
+        </div>
+      )}
+      <Button mode="tertiary" size="s" loading={busy} onClick={remove}>Удалить код</Button>
+    </Div>
+  );
+}
+
+function PromoSection() {
+  const [codes, setCodes] = useState(null);
+  const [status, setStatus] = useState('loading');
+
+  const load = () => {
+    setStatus('loading');
+    getAdminPromoCodes()
+      .then((res) => { setCodes(res.codes); setStatus('ready'); })
+      .catch(() => setStatus('error'));
+  };
+
+  useEffect(load, []);
+
+  return (
+    <>
+      <PromoCreateForm onCreated={load} />
+      <Group header={<Header>Существующие коды</Header>}>
+        {status === 'loading' && <Div style={{ display: 'flex', justifyContent: 'center', paddingTop: 24 }}><Spinner size="l" /></Div>}
+        {status === 'error' && <Placeholder>Не удалось загрузить коды.</Placeholder>}
+        {status === 'ready' && codes.length === 0 && <Div style={{ opacity: 0.7 }}>Пока нет ни одного кода.</Div>}
+        {status === 'ready' && codes.map((c) => (
+          <PromoCodeRow key={c.id} promo={c} onDeleted={load} />
+        ))}
+      </Group>
+    </>
+  );
+}
+
 export default function AdminTab() {
   const [section, setSection] = useState('overview');
 
@@ -470,6 +717,7 @@ export default function AdminTab() {
       {section === 'overview' && <OverviewSection />}
       {section === 'player' && <PlayerSection />}
       {section === 'journal' && <JournalSection />}
+      {section === 'promo' && <PromoSection />}
     </>
   );
 }

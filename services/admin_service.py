@@ -46,6 +46,7 @@ from services import (
     item_service,
     movement_service,
     mount_service,
+    premium_service,
     preset_service,
     song_service,
     story_service,
@@ -416,6 +417,8 @@ async def player_card(db: AsyncSession, character_id: int) -> dict | None:
         "is_banned": character.is_banned,
         "ban_reason": character.ban_reason,
         "banned_until": character.banned_until.isoformat() if character.banned_until else None,
+        "premium_until": character.premium_until.isoformat() if character.premium_until else None,
+        "is_premium": premium_service.is_premium(character),
         "created_at": user.created_at.isoformat() if user is not None else None,
         "last_active_at": character.last_active_at.isoformat() if character.last_active_at else None,
         "recent_admin_actions": [
@@ -460,7 +463,9 @@ async def grant_trophy(db: AsyncSession, admin_vk_id: int, character: Character,
 async def grant_xp(db: AsyncSession, admin_vk_id: int, character: Character, amount: int) -> experience_service.LevelUp:
     stats = await db.scalar(select(CharacterStats).where(CharacterStats.character_id == character.id))
     before = {"level": character.level, "experience": character.experience}
-    result = experience_service.add_experience(character, stats, amount)
+    # apply_premium=False (патч 50): админ явно задаёт число — премиум-
+    # множитель здесь неуместен, в отличие от игровых источников опыта.
+    result = experience_service.add_experience(character, stats, amount, apply_premium=False)
     after = {"level": character.level, "experience": character.experience}
     await log_action(
         db, admin_vk_id, "grant_xp", character.id, old_value=before, new_value=after, note=f"amount={amount}"

@@ -22,7 +22,9 @@ from services import (
     derived_stats_service,
     item_service,
     lootbox_service,
+    premium_service,
     preset_service,
+    promo_service,
     pvp_service,
     quest_service,
     song_service,
@@ -220,10 +222,16 @@ async def handle_get_pvp_leaderboard(request: web.Request) -> web.Response:
         return web.json_response(
             {
                 "top": [
-                    {"rank": e.rank, "name": e.name, "wins": e.wins, "losses": e.losses, "title": e.title}
+                    {
+                        "rank": e.rank, "name": e.name, "wins": e.wins, "losses": e.losses,
+                        "title": e.title, "premium": e.premium,
+                    }
                     for e in entries
                 ],
-                "you": {"rank": rank, "wins": character.pvp_wins, "losses": character.pvp_losses},
+                "you": {
+                    "rank": rank, "wins": character.pvp_wins, "losses": character.pvp_losses,
+                    "premium": premium_service.is_premium(character),
+                },
             }
         )
 
@@ -498,7 +506,7 @@ async def handle_post_preset_switch(request: web.Request) -> web.Response:
         if character is None:
             return web.json_response({"error": "character_not_found"}, status=404)
         try:
-            await preset_service.switch_active_preset(session, character.id, preset_id)
+            await preset_service.switch_active_preset(session, character, preset_id)
         except PresetValidationError as exc:
             return web.json_response({"error": str(exc)}, status=400)
         await session.commit()

@@ -8,7 +8,9 @@ character.experience = опыт, накопленный В ТЕКУЩЕМ уро
 from dataclasses import dataclass
 
 from game.combat import balance_config as bc
+from game.economy import premium_config as pc
 from models import Character, CharacterStats
+from services import premium_service
 
 
 def xp_to_next(level: int) -> int:
@@ -58,13 +60,23 @@ class LevelUp:
     new_level: int
 
 
-def add_experience(character: Character, stats: CharacterStats, amount: int) -> LevelUp:
+def add_experience(
+    character: Character, stats: CharacterStats, amount: int, apply_premium: bool = True,
+) -> LevelUp:
     """Начисляет опыт в текущий уровень, обрабатывает левелап(ы) в цикле.
 
     При левелапе: +1 уровень, +STAT_POINTS_PER_LEVEL очков в unspent_points
     (тратятся позже через мини-апп). max HP пересчитывается автоматически
     (vitals_service берёт формулу от level/vit), current_hp остаётся как есть.
+
+    apply_premium (патч 50) — единая точка бонуса +50% опыта Метки Хранителя,
+    ЕДИНСТВЕННАЯ функция начисления опыта в игре, поэтому бонус срабатывает
+    на всех источниках автоматически. apply_premium=False — для админской
+    ручной выдачи опыта (services/admin_service.py::grant_xp) — админ явно
+    задаёт число, премиум-множитель тут неуместен.
     """
+    if apply_premium and amount > 0 and premium_service.is_premium(character):
+        amount = round(amount * pc.PREMIUM_XP_MULTIPLIER)
     if amount > 0:
         character.experience += amount
     levels = 0

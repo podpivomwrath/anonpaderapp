@@ -25,6 +25,7 @@ from services import (
     elixir_service,
     experience_service,
     lootbox_service,
+    premium_service,
     title_service,
     trophy_service,
     wallet_service,
@@ -112,7 +113,9 @@ async def _assign_new_dailies(db: AsyncSession, character: Character, today: dat
     if already:
         return
     pool = _eligible_pool(character)
-    chosen = _rng.sample(pool, min(dc.DAILY_QUEST_COUNT, len(pool)))
+    # Патч 50: Метка Хранителя — 5 заданий вместо 3.
+    count = dc.DAILY_QUEST_COUNT_PREMIUM if premium_service.is_premium(character) else dc.DAILY_QUEST_COUNT
+    chosen = _rng.sample(pool, min(count, len(pool)))
     for qdef in chosen:
         db.add(CharacterDaily(character_id=character.id, quest_id=qdef.id, progress=0, completed=False, date=today))
     await db.flush()

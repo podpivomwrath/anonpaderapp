@@ -11,8 +11,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from game.combat import balance_config as bc
 from game.content_loader import BuffDef
+from game.economy import premium_config as pc
 from models import Character, CharacterBuffPreset
-from services import trial_service
+from services import premium_service, trial_service
 from services.wallet_service import charge
 
 
@@ -64,6 +65,16 @@ def validate_preset(
         )
 
 
+def effective_preset_slots(character: Character) -> int:
+    """Патч 50: купленные слоты (character.preset_slots) + бонусный слот
+    Метки Хранителя, пока она активна. Не мутирует preset_slots — бонус
+    просто не учитывается, когда премиум истёк (пресеты сверх купленного
+    лимита остаются сохранёнными, но недоступными для сохранения/переключения,
+    см. save_preset/switch_active_preset)."""
+    bonus = pc.PRESET_SLOT_BONUS if premium_service.is_premium(character) else 0
+    return character.preset_slots + bonus
+
+
 def next_slot_cost(current_slots: int) -> int:
     """Цена покупки СЛЕДУЮЩЕГО слота пресета (патч 14, ч.3)."""
     if current_slots >= len(bc.PRESET_SLOT_COSTS):
@@ -103,7 +114,7 @@ async def save_preset(
                 )
             ).all()
         )
-        if existing_count >= character.preset_slots:
+        if existing_count >= effective_preset_slots(character):
             raise PresetValidationError(
                 "Нет свободных слотов пресетов — купи ещё один в разделе «Персонаж»"
             )
@@ -159,19 +170,30 @@ async def resolve_active_modifiers(db: AsyncSession, character: Character) -> di
 
 
 async def switch_active_preset(
-    db: AsyncSession, character_id: int, preset_id: int
+    db: AsyncSession, character: Character, preset_id: int
 ) -> CharacterBuffPreset:
-    """Переключение между сохранёнными пресетами — бесплатно (уровень 1)."""
+    """Переключение между сохранёнными пресетами — бесплатно (уровень 1).
+
+    Патч 50: если премиум истёк, а пресетов сохранено больше, чем действующий
+    (без бонуса) лимит слотов — "лишние" (по порядку создания, id) не
+    удаляются, но переключиться на них нельзя, пока премиум не продлён.
+    Уже АКТИВНЫЙ пресет продолжает действовать в бою независимо от этого —
+    правило касается только смены активного, не отбирает уже включённый."""
     presets = (
         await db.scalars(
-            select(CharacterBuffPreset).where(
-                CharacterBuffPreset.character_id == character_id
-            )
+            select(CharacterBuffPreset)
+            .where(CharacterBuffPreset.character_id == character.id)
+            .order_by(CharacterBuffPreset.id)
         )
     ).all()
     target = next((p for p in presets if p.id == preset_id), None)
     if target is None:
         raise PresetValidationError("Пресет не найден")
+    slot_index = presets.index(target)
+    if slot_index >= effective_preset_slots(character):
+        raise PresetValidationError(
+            "Этот пресет вне доступных слотов — продли Метку Хранителя или купи слот"
+        )
     for preset in presets:
         preset.is_active = preset.id == preset_id
     return target

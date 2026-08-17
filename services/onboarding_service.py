@@ -17,7 +17,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from game.combat import balance_config as bc
 from game.world import world_config as wc
 from models import Character, CharacterStats, User, Wallet
-from services import daily_service
+from services import daily_service, premium_service
 
 BANNED_WORDS_PATH = Path(__file__).resolve().parent.parent / "content" / "banned_words.txt"
 
@@ -79,6 +79,11 @@ async def get_character(db: AsyncSession, vk_id: int) -> Character | None:
     )
     if character is not None and character.creation_state is None:
         notice = await daily_service.ensure_day_rollover(db, character)
+        premium_line = premium_service.check_expiry_notice(character)
+        if premium_line is not None:
+            if notice is None:
+                notice = daily_service.DayRolloverNotice()
+            notice.lines.append(premium_line)
         if notice is not None:
             character._daily_notice = notice
         character.last_active_at = datetime.now(timezone.utc)

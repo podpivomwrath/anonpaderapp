@@ -35,7 +35,7 @@ export default function PvpLeaderboardTab() {
       {data.top.map((e) => (
         <div className="stat-row" key={e.rank}>
           <span className="stat-row__label">
-            {e.rank}. {e.name}
+            {e.rank}. {e.premium && '💠 '}{e.name}
           </span>
           <span className="stat-row__value">
             {e.wins} / {e.losses}
@@ -44,7 +44,7 @@ export default function PvpLeaderboardTab() {
       ))}
       {!inTop && (
         <div className="stat-row" style={{ opacity: 0.8, borderTop: '1px solid var(--vkui--color_separator_primary)' }}>
-          <span className="stat-row__label">Ты: {data.you.rank} место</span>
+          <span className="stat-row__label">Ты: {data.you.premium && '💠 '}{data.you.rank} место</span>
           <span className="stat-row__value">
             {data.you.wins} / {data.you.losses}
           </span>

@@ -17,6 +17,7 @@ from bot.handlers.moderation import labeler as moderation_labeler
 from bot.handlers.mounts import labeler as mounts_labeler
 from bot.handlers.onboarding import labeler as onboarding_labeler
 from bot.handlers.presets import labeler as presets_labeler
+from bot.handlers.promo import labeler as promo_labeler
 from bot.handlers.pvp import labeler as pvp_labeler
 from bot.handlers.stats_window import labeler as stats_window_labeler
 from bot.handlers.world import labeler as world_labeler
@@ -25,5 +26,10 @@ LABELERS = [
     onboarding_labeler, world_labeler, combat_labeler, pvp_labeler, appraiser_labeler,
     inventory_labeler, list_keeper_labeler, presets_labeler, elixir_shop_labeler,
     dailies_labeler, mounts_labeler, stats_window_labeler, moderation_labeler, basic_labeler,
+    # Патч 50: промокоды — TEXT_ONLY, без state/payload гейта, поэтому
+    # регистрируется ПОСЛЕ всех более специфичных обработчиков (координаты
+    # маунта, никнейм, PvP "1"/"2" и т.д.) — те гарантированно успевают
+    # забрать своё раньше. Строго ПЕРЕД fallback (тот ловит вообще всё).
+    promo_labeler,
     fallback_labeler,
 ]

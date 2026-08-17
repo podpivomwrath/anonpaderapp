@@ -61,11 +61,12 @@ from game.combat.session import (
 from game.combat.skills import DEFENSIVE_SKILLS
 from game.combat.tick_engine import TickEngine
 from game.economy import elixir_config as ec
+from game.economy import premium_config as pc
 from game.world import grid
 from models import Character, CharacterStats
 from services import (
-    admin_service, daily_service, death_service, elixir_service, item_service, mount_service, preset_service,
-    pvp_service, trophy_service,
+    admin_service, daily_service, death_service, elixir_service, item_service, mount_service, premium_service,
+    preset_service, pvp_service, trophy_service,
 )
 from services import onboarding_service as onboarding_svc
 from services.db import get_session_factory
@@ -308,7 +309,7 @@ async def _afk_target_named(db, character: Character, target: str) -> bool:
 
 def _class_line(c: Character) -> str:
     title = daily_service.title_name(c)
-    name = f"{c.name} «{title}»" if title else c.name
+    name = f"{premium_service.badge(c)}{c.name} «{title}»" if title else f"{premium_service.badge(c)}{c.name}"
     return f"{name} · {c.level} ур. · {pvp_service.class_title(c)}"
 
 
@@ -404,7 +405,8 @@ async def leaderboard_command(message: Message) -> None:
 
     lines = ["🏆 ЛУЧШИЕ ИЗ МЕЧЕНЫХ", ""]
     for entry in entries:
-        name = f"{entry.name} «{entry.title}»" if entry.title else entry.name
+        badge = pc.PREMIUM_BADGE + " " if entry.premium else ""
+        name = f"{badge}{entry.name} «{entry.title}»" if entry.title else f"{badge}{entry.name}"
         lines.append(f"{entry.rank}. {name} — {entry.wins} побед / {entry.losses} поражений")
     if rank > len(entries):
         lines.append("—")

@@ -9,7 +9,7 @@ from sqlalchemy.orm import selectinload
 
 from bot.onboarding_texts import REGION_TITLES
 from models import BaseClass, Character, User
-from services import wallet_service
+from services import premium_service, wallet_service
 
 CLASS_TITLES = {
     BaseClass.WARRIOR: "Воин",
@@ -33,7 +33,7 @@ async def get_profile_text(session: AsyncSession, vk_id: int) -> str | None:
     title = CLASS_TITLES.get(character.base_class, character.base_class)
     region = REGION_TITLES.get(character.region, "—") if character.region else "—"
     return (
-        f"📜 {character.name}\n"
+        f"📜 {premium_service.badge(character)}{character.name}\n"
         f"Класс: {title}{f' ({character.subclass})' if character.subclass else ''}\n"
         f"Регион: {region}\n"
         f"Уровень: {character.level} (опыт: {character.experience})\n"

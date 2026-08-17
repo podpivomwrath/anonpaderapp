@@ -102,11 +102,11 @@ async def test_switch_preset_is_free(db_session, make_character) -> None:
     p2 = await save_preset(db_session, character, "ДД", second_set, CATALOG)
     wallet_before = (await get_wallet(db_session, character.id)).farm_currency
 
-    await switch_active_preset(db_session, character.id, p2.id)  # уровень 1 — бесплатно
+    await switch_active_preset(db_session, character, p2.id)  # уровень 1 — бесплатно
     assert (await get_wallet(db_session, character.id)).farm_currency == wallet_before
     assert p2.is_active and not p1.is_active
 
-    await switch_active_preset(db_session, character.id, p1.id)
+    await switch_active_preset(db_session, character, p1.id)
     assert p1.is_active and not p2.is_active
 
 
