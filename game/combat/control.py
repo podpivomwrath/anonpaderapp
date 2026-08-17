@@ -38,7 +38,11 @@ def try_apply_control(
     source_id: int,
     rng: random.Random,
     pvp: bool,
+    duration_bonus: int = 0,
+    chance_bonus: float = 0.0,
 ) -> ControlResult:
+    """duration_bonus/chance_bonus (патч 47) — микробаффы «Оцепенение»/«Глубокая
+    заморозка» Элементалиста; 0 для всех остальных источников контроля."""
     # Ясность крови (патч 16) — иммунитет от эликсира, работает в ОБОИХ режимах,
     # проверяется раньше DR/резиста: профилактика, а не спасение от уже
     # наложенного контроля.
@@ -49,8 +53,11 @@ def try_apply_control(
     if pvp and target.control_immune_turns > 0:
         return ControlResult(applied=False, immune=True)
 
-    # Резист Воли — в обоих режимах
-    if rng.random() < formulas.control_resist(target.stats.will):
+    base_duration += duration_bonus
+
+    # Резист Воли — в обоих режимах; chance_bonus снижает эффективный резист
+    resist = max(formulas.control_resist(target.stats.will) - chance_bonus, 0.0)
+    if rng.random() < resist:
         return ControlResult(applied=False, resisted=True)
 
     # PvE: контроль всегда проходит полной длительностью, DR не трогаем

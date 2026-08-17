@@ -51,7 +51,10 @@ def render_hit(
 
 
 def control_line(target_name: str) -> str:
-    return f"{target_name} скован."
+    # Патч 47, баг 3: причастие «скован/скована» требует согласования по роду
+    # мишени (игрок/игрок-а, моб мужского/женского/среднего имени) — шаблон
+    # переписан на существительное+глагол, род не нужен.
+    return f"{target_name} теряет ход ❄️"
 
 
 def control_resisted_line(target_name: str) -> str:
@@ -67,4 +70,6 @@ def control_immune_line(target_name: str, turns: int) -> str:
 
 
 def control_blocked_line(target_name: str) -> str:
-    return f"{target_name} уже недавно был под контролем — новый не наложен."
+    # Патч 47, баг 3: «был под контролем» — гендерное прошедшее время, заменено
+    # на настоящее без согласования по роду.
+    return f"{target_name} уже под контролем — новый эффект не наложен."

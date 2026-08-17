@@ -56,12 +56,14 @@ def shield_bash(ctx: SkillContext) -> None:
                 enemy.taunted_by = actor.id
         ctx.lines.append(f"{actor.name} провоцирует врагов — цели мобов форсированы!")
     else:
+        # Патч 47: «Несгибаемый» — +provoke_duration_bonus ходов; 0 без баффа.
+        duration = bc.PROVOKE_PVP_DURATION_TICKS + int(actor.buff_modifiers.get("provoke_duration_bonus", 0))
         for enemy in enemies:
             enemy.effects.append(
                 Effect(
                     kind=EffectKind.PROVOKE_PVP,
                     value=bc.PROVOKE_PVP_DAMAGE_REDUCTION,
-                    remaining_ticks=bc.PROVOKE_PVP_DURATION_TICKS,
+                    remaining_ticks=duration,
                     source_id=actor.id,
                 )
             )

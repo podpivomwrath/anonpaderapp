@@ -41,8 +41,13 @@ def _make_handler(skill: SubclassSkillDef):
         if skill.effect == "stun":
             if target is not None:
                 pvp = ctx.session.mode != CombatMode.PVE
+                # Патч 47: Элементалист — «Оцепенение» (+ход к заморозке),
+                # «Глубокая заморозка» (+шанс). 0 у всех остальных подклассов.
+                duration_bonus = int(actor.buff_modifiers.get("freeze_duration_bonus", 0))
+                chance_bonus = actor.buff_modifiers.get("control_chance_bonus", 0.0)
                 res = control.try_apply_control(
-                    target, base_duration=1, source_id=actor.id, rng=ctx.rng, pvp=pvp
+                    target, base_duration=1, source_id=actor.id, rng=ctx.rng, pvp=pvp,
+                    duration_bonus=duration_bonus, chance_bonus=chance_bonus,
                 )
                 # Единый краткий текст независимо от режима (патч 43, ч.1).
                 if res.immune:

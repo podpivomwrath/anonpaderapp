@@ -191,7 +191,11 @@ class DuelEngine:
         elif actor.has_effect(EffectKind.FREEZE):
             # пропуск ИЗ-ЗА контроля — засчитывается в стрик DR (control-patch-8)
             actor.skipped_by_control_this_turn = True
-            result.lines.append(f"{actor.name} заморожен и пропускает ход ❄️")
+            # Патч 47, баг 3: «заморожен» — гендерное причастие, заменено на
+            # безродовую формулировку. Здесь (в отличие от резолвера) это
+            # СОБСТВЕННЫЙ ход актёра на СЛЕДУЮЩЕЙ реплике дуэли — не дубль
+            # control_line, который прозвучал в ходе того, кто наложил контроль.
+            result.lines.append(f"{actor.name} теряет ход ❄️")
         elif action.type == ActionType.SKIP:
             result.lines.append(f"{actor.name} пропускает ход")
         else:

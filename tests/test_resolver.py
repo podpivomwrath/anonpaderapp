@@ -259,7 +259,7 @@ def test_freeze_skips_action() -> None:
     state = make_session(CombatMode.PVP_GROUP, a, b)
     result = resolve_tick(state, {1: attack(2)}, rng)
     assert b.current_hp == b.max_hp  # атака не состоялась
-    assert any("скован" in line for line in result.lines)
+    assert any("теряет ход" in line for line in result.lines)
     assert not a.has_effect(EffectKind.FREEZE)  # эффект оттикал
 
 

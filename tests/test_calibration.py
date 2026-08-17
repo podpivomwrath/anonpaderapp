@@ -296,3 +296,152 @@ def test_calibrated_elementalist_buff_values_in_content() -> None:
     assert buffs["elementalist_thrift"].stat_modifiers["no_cooldown_chance"] == bc.ELEMENTALIST_ECONOMY_NO_COOLDOWN_CHANCE
     assert buffs["elementalist_overload"].stat_modifiers["overload_active"] == 1.0
     assert buffs["elementalist_elemental_flow"].stat_modifiers["elemental_flow_bonus"] == bc.ELEMENTALIST_ELEMENTAL_FLOW_BONUS
+
+
+# --- Патч 47: «Оцепенение»/«Глубокая заморозка»/«Затяжной яд»/«Несгибаемый» —
+# ещё 4 микробаффа-заглушки, не действовавшие в бою. Плюс баг 2 (дубль строки
+# "ход потерян") и баг 3 (согласование рода в шаблонах) — регрессии ниже.
+
+
+class AlwaysRollsRng(NoCritRng):
+    """Как NoCritRng, но .random() всегда 0.0 — гарантирует срабатывание любых
+    чанс-роллов (контроль landing, отсутствие резиста)."""
+
+    def random(self) -> float:
+        return 0.0
+
+
+class FixedRng(NoCritRng):
+    def __init__(self, value: float) -> None:
+        self._value = value
+
+    def random(self) -> float:
+        return self._value
+
+
+def test_numbness_extends_freeze_past_same_tick_decay() -> None:
+    rng = AlwaysRollsRng()
+    caster = combatant(1, side=0, subclass_id="elementalist", intellect=100)
+    caster.buff_modifiers["freeze_duration_bonus"] = 1
+    enemy = combatant(2, side=1, kind="mob", will=0)
+    state = make_session(caster, enemy)
+
+    resolve_tick(state, {1: skill("elementalist_ice", 2)}, rng)
+    # FREEZE — немедленный эффект, декрементится В ТОТ ЖЕ ход (1 без баффа
+    # истёк бы сразу); +1 от «Оцепенения» должен пережить этот тик.
+    assert enemy.has_effect(EffectKind.FREEZE)
+
+
+def test_without_numbness_freeze_consumed_same_tick() -> None:
+    rng = AlwaysRollsRng()
+    caster = combatant(1, side=0, subclass_id="elementalist", intellect=100)
+    enemy = combatant(2, side=1, kind="mob", will=0)
+    state = make_session(caster, enemy)
+
+    resolve_tick(state, {1: skill("elementalist_ice", 2)}, rng)
+    assert not enemy.has_effect(EffectKind.FREEZE)
+
+
+def test_deep_freeze_reduces_effective_resist_chance() -> None:
+    from game.combat import control, formulas
+
+    target = combatant(2, side=1, will=200)
+    base_resist = formulas.control_resist(target.stats.will)
+    assert base_resist > 0.15  # иначе тест не показателен
+
+    roll = base_resist - 0.05  # без бонуса резист сработал бы (roll < resist)
+    res_without = control.try_apply_control(
+        target, base_duration=1, source_id=1, rng=FixedRng(roll), pvp=False
+    )
+    assert res_without.resisted
+
+    res_with = control.try_apply_control(
+        target, base_duration=1, source_id=1, rng=FixedRng(roll), pvp=False, chance_bonus=0.15
+    )
+    assert res_with.applied
+
+
+def test_lingering_poison_extends_dot_duration() -> None:
+    rng = NoCritRng()
+    toxin = combatant(1, side=0, subclass_id="poisoner")
+    toxin.buff_modifiers["poison_duration_bonus"] = 1
+    enemy = combatant(2, side=1, vitality=500)
+    state = make_session(toxin, enemy)
+
+    resolve_tick(state, {1: skill("poisoner_venom", 2)}, rng)
+    dot = enemy.effect_from(EffectKind.DOT, toxin.id)
+    assert dot is not None
+    assert dot.remaining_ticks == bc.POISONER_POISON_DURATION_TICKS + 1
+
+
+def test_unyielding_extends_provoke_duration() -> None:
+    rng = NoCritRng()
+    guardian = combatant(1, side=0, subclass_id="guardian")
+    guardian.buff_modifiers["provoke_duration_bonus"] = 1
+    enemy = combatant(2, side=1)
+    state = make_session(guardian, enemy)
+
+    resolve_tick(state, {1: skill("guardian_shield_bash", 2)}, rng)
+    effect = enemy.effect_from(EffectKind.PROVOKE_PVP, guardian.id)
+    assert effect is not None
+    assert effect.remaining_ticks == bc.PROVOKE_PVP_DURATION_TICKS + 1
+
+
+def test_control_landing_message_not_duplicated_same_tick() -> None:
+    """Патч 47, баг 2: контроль, наложенный и потреблённый в ОДИН тик, раньше
+    печатал и control_line («X скован»), и резолверную «X скован — ход
+    потерян» — одно и то же дважды. Должна остаться одна строка."""
+    rng = AlwaysRollsRng()
+    caster = combatant(1, side=0, subclass_id="elementalist", intellect=100)
+    enemy = combatant(2, side=1, kind="mob", will=0)
+    state = make_session(caster, enemy)
+
+    result = resolve_tick(state, {1: skill("elementalist_ice", 2)}, rng)
+    lost_turn_lines = [ln for ln in result.lines if "теряет ход" in ln]
+    assert len(lost_turn_lines) == 1
+
+
+def test_lingering_freeze_still_announces_lost_turn_next_tick() -> None:
+    """Многоходовая заморозка (лингер С НАЧАЛА хода, без свежего control_line
+    в этот тик) обязана по-прежнему показывать «теряет ход» — баг 2 не должен
+    заодно убить легитимное сообщение."""
+    rng = AlwaysRollsRng()
+    caster = combatant(1, side=0, subclass_id="elementalist", intellect=100)
+    caster.buff_modifiers["freeze_duration_bonus"] = 1
+    enemy = combatant(2, side=1, kind="mob", will=0)
+    state = make_session(caster, enemy)
+
+    resolve_tick(state, {1: skill("elementalist_ice", 2)}, rng)
+    assert enemy.has_effect(EffectKind.FREEZE)
+    result2 = resolve_tick(state, {1: attack(2)}, rng)
+    assert any("теряет ход" in ln for ln in result2.lines)
+
+
+def test_control_lines_are_gender_neutral() -> None:
+    """Патч 47, баг 3: шаблоны не должны содержать согласуемые по роду
+    причастия («скован(а)», «заморожен(а)», «был/была под контролем»)."""
+    from game.combat import combat_flavor
+
+    assert "скован" not in combat_flavor.control_line("Тест")
+    assert "был" not in combat_flavor.control_blocked_line("Тест")
+
+
+def test_poison_line_is_gender_neutral() -> None:
+    rng = NoCritRng()
+    toxin = combatant(1, side=0, subclass_id="poisoner")
+    enemy = combatant(2, side=1, vitality=500)
+    state = make_session(toxin, enemy)
+    result = resolve_tick(state, {1: skill("poisoner_venom", 2)}, rng)
+    assert any("под действием яда" in ln for ln in result.lines)
+    assert not any("отравлен" in ln for ln in result.lines)
+
+
+# --- Контент: калиброванные значения микробаффов патча 47 ---
+
+
+def test_calibrated_patch47_buff_values_in_content() -> None:
+    buffs = load_content().buffs
+    assert buffs["elementalist_numbness"].stat_modifiers["freeze_duration_bonus"] == bc.ELEMENTALIST_NUMBNESS_FREEZE_BONUS_TURNS
+    assert buffs["elementalist_deep_freeze"].stat_modifiers["control_chance_bonus"] == bc.ELEMENTALIST_DEEP_FREEZE_CHANCE_BONUS
+    assert buffs["poisoner_lingering_poison"].stat_modifiers["poison_duration_bonus"] == bc.POISONER_LINGERING_POISON_BONUS_TURNS
+    assert buffs["guardian_unyielding"].stat_modifiers["provoke_duration_bonus"] == bc.GUARDIAN_UNYIELDING_PROVOKE_BONUS_TURNS

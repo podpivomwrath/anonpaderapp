@@ -189,7 +189,12 @@ def resolve_tick(
         if cid in frozen_at_start or is_frozen(combatant):
             # пропуск ИЗ-ЗА контроля — засчитывается в стрик DR (control-patch-8)
             combatant.skipped_by_control_this_turn = True
-            result.lines.append(f"{combatant.name} скован — ход потерян ❄️")
+            # Патч 47, баг 2: если контроль наложен ИМЕННО в этот ход (не было на
+            # старте), combat_flavor.control_line уже сообщил об этом в фазе 2 —
+            # вторая строка здесь дублировала бы её. Показываем только для
+            # многоходового «лингера» (заморожен ещё С НАЧАЛА этого хода).
+            if cid in frozen_at_start:
+                result.lines.append(f"{combatant.name} теряет ход ❄️")
             continue
         if action.type == ActionType.SKIP:
             result.lines.append(f"{combatant.name} медлит и пропускает ход")
@@ -207,7 +212,9 @@ def resolve_tick(
     for mob in [c for c in session.combatants.values() if c.kind == "mob" and c.alive]:
         if is_frozen(mob):
             mob.skipped_by_control_this_turn = True  # пропуск из-за контроля (стрик DR)
-            result.lines.append(f"{mob.name} скован — ход потерян ❄️")
+            # Патч 47, баг 2: см. комментарий у фазы 4a — не дублировать control_line.
+            if mob.id in frozen_at_start:
+                result.lines.append(f"{mob.name} теряет ход ❄️")
             continue
         if session.mode == CombatMode.PVE and pending_damage.get(mob.id, 0) >= mob.current_hp:
             continue  # уже мёртв по итогам этого хода — не бьёт (патч 25, п.3)

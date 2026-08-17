@@ -57,17 +57,19 @@ def venom(ctx: SkillContext) -> None:
     ctx.hits.append(compute_hit(actor, target, ctx.rng, skill.name, skill.multiplier, is_ability=True))
 
     per_stack = poison_tick_damage_per_stack(actor.stats.will, actor.stats.agility)
+    # Патч 47: «Затяжной яд» — +duration_bonus ходов к длительности; 0 без баффа.
+    duration = bc.POISONER_POISON_DURATION_TICKS + int(actor.buff_modifiers.get("poison_duration_bonus", 0))
     existing = target.effect_from(EffectKind.DOT, actor.id)
     if existing is not None:
         existing.stacks = min(existing.stacks + 1, bc.POISONER_MAX_STACKS)
         existing.value = per_stack
-        existing.remaining_ticks = bc.POISONER_POISON_DURATION_TICKS
+        existing.remaining_ticks = duration
     else:
         target.effects.append(
-            Effect(kind=EffectKind.DOT, value=per_stack, remaining_ticks=bc.POISONER_POISON_DURATION_TICKS,
+            Effect(kind=EffectKind.DOT, value=per_stack, remaining_ticks=duration,
                    source_id=actor.id, stacks=1)
         )
-    ctx.lines.append(f"{target.name} отравлен ({actor.name}) ☠")
+    ctx.lines.append(f"{target.name} под действием яда ({actor.name}) ☠")
 
 
 @offensive_skill("poisoner_disrupt")

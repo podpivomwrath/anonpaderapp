@@ -137,7 +137,7 @@ def test_disrupt_applies_weaken_and_can_control() -> None:
     result = resolve_tick(state, {1: skill("poisoner_disrupt", 2)}, rng)
     assert enemy.effect_total(EffectKind.WEAKEN) > 0
     # с AlwaysRollsRng и WIL=0 контроль обязан сработать (шанс 60% + резист 0)
-    assert any("скован" in line or "пропускает" in line for line in result.lines) or enemy.has_effect(EffectKind.FREEZE)
+    assert any("теряет ход" in line or "пропускает" in line for line in result.lines) or enemy.has_effect(EffectKind.FREEZE)
 
 
 def test_toxic_burst_scales_with_poison_and_clears_stacks() -> None:

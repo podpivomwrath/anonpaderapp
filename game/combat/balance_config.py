@@ -229,3 +229,11 @@ DARK_MYSTIC_CIRCLE_HP_COST = 0.20           # Круг тьмы: доля ТЕК
 ELEMENTALIST_ECONOMY_NO_COOLDOWN_CHANCE = 0.20  # Экономия: шанс не уйти на КД
 ELEMENTALIST_OVERLOAD_INTERVAL_TURNS = 6        # Перегрузка: раз в N ходов — не уйти на КД
 ELEMENTALIST_ELEMENTAL_FLOW_BONUS = 0.20        # Стихийный поток: бонус к след. действию
+
+# Патч 47: ещё 4 микробаффа-заглушки, о нерабочести которых сообщили игроки —
+# реализованы по той же схеме (значения в конфиг, buff_modifiers-ключ в
+# content/buffs.json, движок читает ключ по умолчанию 0/0.0 для всех).
+ELEMENTALIST_NUMBNESS_FREEZE_BONUS_TURNS = 1    # Оцепенение: +1 ход к длительности заморозки
+ELEMENTALIST_DEEP_FREEZE_CHANCE_BONUS = 0.15    # Глубокая заморозка: +15% шанс наложить контроль
+POISONER_LINGERING_POISON_BONUS_TURNS = 1       # Затяжной яд: +1 ход к длительности яда
+GUARDIAN_UNYIELDING_PROVOKE_BONUS_TURNS = 1     # Несгибаемый: +1 ход к длительности Провокации

@@ -189,7 +189,7 @@ def test_pvp_control_log_names_target_not_creature() -> None:
     state = make_session(a, b)
     result = resolve_tick(state, {1: skill("mage_ice_bonds", 2)}, rng)
 
-    assert "Валгар скован." in result.lines
+    assert "Валгар теряет ход ❄️" in result.lines
     for banned in ("Тварь", "тварь"):
         assert not any(banned in ln for ln in result.lines)
 
