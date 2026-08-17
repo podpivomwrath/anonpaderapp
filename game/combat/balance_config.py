@@ -33,6 +33,11 @@ XP_MOB_FLAT = 15               # опыт за моба: XP_MOB_FLAT + XP_MOB_PE
 XP_MOB_PER_LEVEL = 6
 DEATH_XP_PENALTY = 0.20        # доля опыта ТЕКУЩЕГО уровня, теряемая при смерти
 
+# Базовая длительность любого контроля (оглушение/заморозка) до модификаторов —
+# используется и движком (control.try_apply_control base_duration), и текстами
+# описаний баффов, продлевающих контроль (единый источник, патч 49).
+CONTROL_BASE_DURATION_TICKS = 1
+
 # --- Защита от чейн-контроля (diminishing returns) ---
 CC_STREAK_REDUCE_AT = 3         # с какого подряд-контроля резать длительность
 CC_STREAK_REDUCE_FACTOR = 0.5   # во сколько резать длительность
@@ -258,3 +263,16 @@ BLOOD_KNIGHT_FEAST_CRIMSON_HEAL_BONUS = 0.10           # Пиршество: +10
 BLOOD_KNIGHT_SHARED_THIRST_ALLY_HEAL_PCT = 0.30        # Разделённая жажда: доля лайфстила — самому раненому союзнику
 BLOOD_KNIGHT_BLOOD_PACT_COST_REDUCTION = 0.20          # Кровавый пакт: -20% себестоимости Багрового пира
 BLOOD_KNIGHT_SHARED_FEAST_GROUP_DAMAGE_BONUS = 0.05    # Общий пир: +5% урона, пока жив хотя бы 1 союзник
+
+# Элементалист — оставшийся пул микробаффов (патч 49, ч.2): закрываем подкласс
+# полностью, первый в очереди после патча 46-47. «Всеобщая стихия» и
+# специализированные (Пламенная/Ледяная мощь, Мощь бури) НЕ складываются на
+# одном навыке — см. game/combat/skills.py::element_damage_multiplier (max, не сумма).
+ELEMENTALIST_FLAME_POWER_BONUS = 0.15           # Пламенная мощь: урон огненных навыков
+ELEMENTALIST_FROST_POWER_BONUS = 0.15           # Ледяная мощь: урон ледяных навыков
+ELEMENTALIST_STORM_POWER_BONUS = 0.15           # Мощь бури: урон навыков молнии
+ELEMENTALIST_UNIVERSAL_ELEMENT_BONUS = 0.08     # Всеобщая стихия: урон ВСЕХ стихийных навыков
+ELEMENTALIST_HEAT_SHOCK_RESIST_DOWN = 0.10      # Тепловой шок: -сопротивление контролю при снятии Горения, 1 ход
+ELEMENTALIST_CHAIN_LIGHTNING_EXTRA_TARGETS = 1  # Цепная молния: +1 доп. цель (было 2, станет 3)
+ELEMENTALIST_FIRESTORM_SPREAD_PCT = 0.50        # Огненный дождь: Горение соседям — доля силы; неск. целей
+ELEMENTALIST_ICE_FIELD_CHILL_PCT = 0.10         # Ледяное поле: -сопротивление контролю соседям, 1 ход; неск. целей

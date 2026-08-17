@@ -55,8 +55,11 @@ def try_apply_control(
 
     base_duration += duration_bonus
 
-    # Резист Воли — в обоих режимах; chance_bonus снижает эффективный резист
-    resist = max(formulas.control_resist(target.stats.will) - chance_bonus, 0.0)
+    # Резист Воли — в обоих режимах; chance_bonus (баффы кастера) и
+    # CONTROL_RESIST_DOWN (эффект НА цели — «Тепловой шок»/«Ледяное поле»,
+    # патч 49) оба снижают эффективный резист.
+    resist_down = target.effect_total(EffectKind.CONTROL_RESIST_DOWN)
+    resist = max(formulas.control_resist(target.stats.will) - chance_bonus - resist_down, 0.0)
     if rng.random() < resist:
         return ControlResult(applied=False, resisted=True)
 

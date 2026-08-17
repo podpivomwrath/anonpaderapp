@@ -12,6 +12,7 @@ from game.combat.session import EffectKind
 from game.combat.skills import (
     SkillContext,
     compute_hit,
+    element_damage_multiplier,
     offensive_skill,
     register_element_use,
     set_cooldown,
@@ -45,11 +46,21 @@ def fire_whip(ctx: SkillContext) -> None:
     target = ctx.resolve_target()
     if target is None:
         return
-    hit = compute_hit(actor, target, ctx.rng, skill.name, skill.multiplier, is_ability=True)
+    multiplier = skill.multiplier * element_damage_multiplier(actor, "fire")
+    hit = compute_hit(actor, target, ctx.rng, skill.name, multiplier, is_ability=True)
     ctx.hits.append(hit)
     burn_value = max(hit.amount * skill.effect_value, 1.0)
     target.apply_effect(EffectKind.DOT, burn_value, skill.effect_duration, actor.id)
     ctx.lines.append(f"{target.name} охвачен пламенем 🔥")
+
+    # Патч 49, ч.2: «Огненный дождь» — Горение распространяется на других
+    # живых противников с пониженной силой; нет-оп в бою 1×1 (нет "соседей").
+    spread_pct = actor.buff_modifiers.get("burn_spread_pct", 0.0)
+    if spread_pct > 0:
+        others = [e for e in ctx.session.alive_enemies_of(actor) if e.id != target.id]
+        for other in others:
+            other.apply_effect(EffectKind.DOT, burn_value * spread_pct, skill.effect_duration, actor.id)
+            ctx.lines.append(f"{other.name} охвачен перекинувшимся пламенем 🔥")
 
 
 @offensive_skill("elementalist_lightning")
@@ -62,13 +73,16 @@ def chain_lightning(ctx: SkillContext) -> None:
     target = ctx.resolve_target()
     if target is None:
         return
-    ctx.hits.append(compute_hit(actor, target, ctx.rng, skill.name, skill.multiplier, is_ability=True))
+    multiplier = skill.multiplier * element_damage_multiplier(actor, "lightning")
+    ctx.hits.append(compute_hit(actor, target, ctx.rng, skill.name, multiplier, is_ability=True))
 
+    # Патч 49, ч.2: «Цепная молния» — на 1 дополнительную цель.
+    extra_targets = 2 + int(actor.buff_modifiers.get("chain_lightning_extra_targets", 0))
     others = [e for e in ctx.session.alive_enemies_of(actor) if e.id != target.id]
     ctx.rng.shuffle(others)
-    for extra in others[:2]:
+    for extra in others[:extra_targets]:
         ctx.hits.append(
-            compute_hit(actor, extra, ctx.rng, skill.name, skill.multiplier * skill.effect_value, is_ability=True)
+            compute_hit(actor, extra, ctx.rng, skill.name, multiplier * skill.effect_value, is_ability=True)
         )
 
 
@@ -82,7 +96,7 @@ def convergence(ctx: SkillContext) -> None:
     target = ctx.resolve_target()
     if target is None:
         return
-    multiplier = skill.multiplier
+    multiplier = skill.multiplier * element_damage_multiplier(actor, None)
     if target.effect_from(EffectKind.DOT, actor.id) is not None:
         multiplier *= 1.0 + skill.effect_value
     force_crit = target.has_effect(EffectKind.FREEZE)

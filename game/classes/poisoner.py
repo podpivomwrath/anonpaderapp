@@ -88,7 +88,9 @@ def disrupt(ctx: SkillContext) -> None:
 
     if ctx.rng.random() < skill.effect_value:
         pvp = ctx.session.mode != CombatMode.PVE
-        res = control.try_apply_control(target, base_duration=1, source_id=actor.id, rng=ctx.rng, pvp=pvp)
+        res = control.try_apply_control(
+            target, base_duration=bc.CONTROL_BASE_DURATION_TICKS, source_id=actor.id, rng=ctx.rng, pvp=pvp,
+        )
         if res.immune:
             ctx.lines.append(combat_flavor.control_blocked_line(target.name))
         elif res.resisted:

@@ -8,6 +8,7 @@
 Баффы/дебаффы non-stacking (apply_effect обновляет длительность, не суммирует).
 """
 
+from game.combat import balance_config as bc
 from game.combat import combat_flavor, control
 from game.combat.session import CombatMode, EffectKind
 from game.combat.skills import SkillContext, compute_hit, offensive_skill
@@ -51,7 +52,7 @@ def _make_handler(skill: BaseSkillDef):
                 # до действий целей); резист WIL — оба режима, DR — только PvP
                 pvp = ctx.session.mode != CombatMode.PVE
                 res = control.try_apply_control(
-                    target, base_duration=1, source_id=actor.id, rng=ctx.rng, pvp=pvp
+                    target, base_duration=bc.CONTROL_BASE_DURATION_TICKS, source_id=actor.id, rng=ctx.rng, pvp=pvp
                 )
                 # Единый краткий текст независимо от режима (патч 43, ч.1).
                 if res.immune:
@@ -63,7 +64,6 @@ def _make_handler(skill: BaseSkillDef):
                     if res.reduced:
                         ctx.lines.append(combat_flavor.control_reduced_line(target.name))
                     if res.immunity_granted:
-                        from game.combat import balance_config as bc
                         ctx.lines.append(
                             combat_flavor.control_immune_line(target.name, bc.CC_IMMUNITY_DURATION)
                         )

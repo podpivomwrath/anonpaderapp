@@ -7,11 +7,14 @@ effect=null/stun/target_vuln/self_dodge_buff регистрируются ЗДЕ
 импорте этого модуля (см. game/classes/__init__.py); дженерик такие id пропускает.
 """
 
+from game.combat import balance_config as bc
 from game.combat import combat_flavor, control
 from game.combat.session import CombatMode, EffectKind
 from game.combat.skills import (
+    ELEMENT_SKILL_TAGS,
     SkillContext,
     compute_hit,
+    element_damage_multiplier,
     offensive_skill,
     register_element_use,
     set_cooldown,
@@ -34,8 +37,12 @@ def _make_handler(skill: SubclassSkillDef):
         target = ctx.resolve_target()
 
         if skill.multiplier > 0 and target is not None:
+            # Патч 49, ч.2: элементальный бонус урона (Ледяная мощь/Всеобщая
+            # стихия) — для generic-навыков это только Ледяные оковы (elementalist_ice).
+            element = ELEMENT_SKILL_TAGS.get(skill.id)
+            multiplier = skill.multiplier * element_damage_multiplier(actor, element)
             ctx.hits.append(
-                compute_hit(actor, target, ctx.rng, skill.name, skill.multiplier, is_ability=True)
+                compute_hit(actor, target, ctx.rng, skill.name, multiplier, is_ability=True)
             )
 
         if skill.effect == "stun":
@@ -46,9 +53,20 @@ def _make_handler(skill: SubclassSkillDef):
                 duration_bonus = int(actor.buff_modifiers.get("freeze_duration_bonus", 0))
                 chance_bonus = actor.buff_modifiers.get("control_chance_bonus", 0.0)
                 res = control.try_apply_control(
-                    target, base_duration=1, source_id=actor.id, rng=ctx.rng, pvp=pvp,
+                    target, base_duration=bc.CONTROL_BASE_DURATION_TICKS, source_id=actor.id, rng=ctx.rng, pvp=pvp,
                     duration_bonus=duration_bonus, chance_bonus=chance_bonus,
                 )
+                # Патч 49: «Ледяное поле» — заморозка основной цели слегка чилит
+                # соседних (только при нескольких противниках — иначе нет-оп).
+                # Интерпретация неоднозначной формулировки "снижение скорости
+                # накопления стаков" — у Элементалиста нет своей системы стаков,
+                # поэтому применяем к сопротивлению контролю (тот же дебафф-
+                # эффект, что и «Тепловой шок»), а не изобретаем новую систему.
+                ice_field_bonus = actor.buff_modifiers.get("ice_field_chill_pct", 0.0)
+                if res.applied and ice_field_bonus > 0:
+                    others = [e for e in ctx.session.alive_enemies_of(actor) if e.id != target.id]
+                    for other in others:
+                        other.apply_effect(EffectKind.CONTROL_RESIST_DOWN, ice_field_bonus, 1, actor.id)
                 # Единый краткий текст независимо от режима (патч 43, ч.1).
                 if res.immune:
                     ctx.lines.append(combat_flavor.control_blocked_line(target.name))
@@ -59,7 +77,6 @@ def _make_handler(skill: SubclassSkillDef):
                     if res.reduced:
                         ctx.lines.append(combat_flavor.control_reduced_line(target.name))
                     if res.immunity_granted:
-                        from game.combat import balance_config as bc
                         ctx.lines.append(
                             combat_flavor.control_immune_line(target.name, bc.CC_IMMUNITY_DURATION)
                         )

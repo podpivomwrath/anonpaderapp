@@ -716,3 +716,174 @@ def test_calibrated_blood_knight_buff_values_in_content() -> None:
     assert buffs["blood_knight_shared_thirst"].stat_modifiers["shared_heal_pct"] == bc.BLOOD_KNIGHT_SHARED_THIRST_ALLY_HEAL_PCT
     assert buffs["blood_knight_blood_pact"].stat_modifiers["crimson_feast_cost_reduction"] == bc.BLOOD_KNIGHT_BLOOD_PACT_COST_REDUCTION
     assert buffs["blood_knight_shared_feast"].stat_modifiers["group_damage_bonus"] == bc.BLOOD_KNIGHT_SHARED_FEAST_GROUP_DAMAGE_BONUS
+
+
+# --- Патч 49, ч.2: весь оставшийся пул микробаффов Элементалиста (8 из 13
+# были заглушками — Пламенная/Ледяная мощь, Мощь бури, Всеобщая стихия,
+# Тепловой шок, Цепная молния, Огненный дождь, Ледяное поле). ---
+
+
+def test_flame_power_boosts_fire_damage() -> None:
+    rng = NoCritRng()
+    baseline = combatant(1, side=0, subclass_id="elementalist", intellect=100)
+    enemy1 = combatant(2, side=1, vitality=5000)
+    resolve_tick(make_session(baseline, enemy1), {1: skill("elementalist_fire", 2)}, rng)
+    baseline_damage = enemy1.max_hp - enemy1.current_hp
+
+    boosted = combatant(3, side=0, subclass_id="elementalist", intellect=100)
+    boosted.buff_modifiers["fire_damage_bonus"] = bc.ELEMENTALIST_FLAME_POWER_BONUS
+    enemy2 = combatant(4, side=1, vitality=5000)
+    resolve_tick(make_session(boosted, enemy2), {3: skill("elementalist_fire", 4)}, rng)
+    boosted_damage = enemy2.max_hp - enemy2.current_hp
+
+    assert boosted_damage > baseline_damage
+
+
+def test_universal_element_and_specific_bonus_do_not_stack() -> None:
+    """Больший из двух модификаторов — не сумма (иначе связка всех четырёх
+    даёт +53% сразу, что патч явно запрещает)."""
+    rng = NoCritRng()
+    specific_only = combatant(1, side=0, subclass_id="elementalist", intellect=100)
+    specific_only.buff_modifiers["fire_damage_bonus"] = bc.ELEMENTALIST_FLAME_POWER_BONUS
+    enemy1 = combatant(2, side=1, vitality=5000)
+    resolve_tick(make_session(specific_only, enemy1), {1: skill("elementalist_fire", 2)}, rng)
+    dmg_specific = enemy1.max_hp - enemy1.current_hp
+
+    both = combatant(3, side=0, subclass_id="elementalist", intellect=100)
+    both.buff_modifiers["fire_damage_bonus"] = bc.ELEMENTALIST_FLAME_POWER_BONUS
+    both.buff_modifiers["all_elements_damage_bonus"] = bc.ELEMENTALIST_UNIVERSAL_ELEMENT_BONUS
+    enemy2 = combatant(4, side=1, vitality=5000)
+    resolve_tick(make_session(both, enemy2), {3: skill("elementalist_fire", 4)}, rng)
+    dmg_both = enemy2.max_hp - enemy2.current_hp
+
+    assert dmg_both == dmg_specific
+
+
+def test_chain_lightning_extra_target() -> None:
+    rng = NoCritRng()
+    caster = combatant(1, side=0, subclass_id="elementalist", intellect=100)
+    caster.buff_modifiers["chain_lightning_extra_targets"] = bc.ELEMENTALIST_CHAIN_LIGHTNING_EXTRA_TARGETS
+    main = combatant(2, side=1, vitality=5000)
+    e3 = combatant(3, side=1, vitality=5000)
+    e4 = combatant(4, side=1, vitality=5000)
+    e5 = combatant(5, side=1, vitality=5000)
+    state = make_session(caster, main, e3, e4, e5)
+    resolve_tick(state, {1: skill("elementalist_lightning", 2)}, rng)
+    hit_count = sum(1 for e in (main, e3, e4, e5) if e.current_hp < e.max_hp)
+    assert hit_count == 4  # основная + 3 доп. (без баффа было бы 3 = основная + 2)
+
+
+def test_chain_lightning_default_hits_two_extra_targets() -> None:
+    rng = NoCritRng()
+    caster = combatant(1, side=0, subclass_id="elementalist", intellect=100)
+    main = combatant(2, side=1, vitality=5000)
+    e3 = combatant(3, side=1, vitality=5000)
+    e4 = combatant(4, side=1, vitality=5000)
+    e5 = combatant(5, side=1, vitality=5000)
+    state = make_session(caster, main, e3, e4, e5)
+    resolve_tick(state, {1: skill("elementalist_lightning", 2)}, rng)
+    hit_count = sum(1 for e in (main, e3, e4, e5) if e.current_hp < e.max_hp)
+    assert hit_count == 3
+
+
+def test_heat_shock_reduces_resist_on_burn_expiry() -> None:
+    rng = NoCritRng()
+    caster = combatant(1, side=0, subclass_id="elementalist", intellect=100)
+    caster.buff_modifiers["burn_expire_resist_down"] = bc.ELEMENTALIST_HEAT_SHOCK_RESIST_DOWN
+    enemy = combatant(2, side=1, vitality=5000, level=1)
+    state = make_session(caster, enemy)
+
+    resolve_tick(state, {1: skill("elementalist_fire", 2)}, rng)
+    assert enemy.effect_from(EffectKind.DOT, caster.id) is not None
+    assert not enemy.has_effect(EffectKind.CONTROL_RESIST_DOWN)
+
+    from game.combat.subclass_skills import SUBCLASS_SKILL_DEFS
+    duration = SUBCLASS_SKILL_DEFS["elementalist_fire"].effect_duration
+    for _ in range(duration):
+        resolve_tick(state, {1: attack(2)}, rng)
+
+    assert enemy.effect_from(EffectKind.DOT, caster.id) is None  # Горение истекло
+    assert enemy.has_effect(EffectKind.CONTROL_RESIST_DOWN)
+
+
+def test_heat_shock_inactive_without_buff() -> None:
+    rng = NoCritRng()
+    caster = combatant(1, side=0, subclass_id="elementalist", intellect=100)
+    enemy = combatant(2, side=1, vitality=5000, level=1)
+    state = make_session(caster, enemy)
+    resolve_tick(state, {1: skill("elementalist_fire", 2)}, rng)
+
+    from game.combat.subclass_skills import SUBCLASS_SKILL_DEFS
+    duration = SUBCLASS_SKILL_DEFS["elementalist_fire"].effect_duration
+    for _ in range(duration):
+        resolve_tick(state, {1: attack(2)}, rng)
+    assert not enemy.has_effect(EffectKind.CONTROL_RESIST_DOWN)
+
+
+def test_firestorm_spreads_burn_to_other_enemies() -> None:
+    rng = NoCritRng()
+    caster = combatant(1, side=0, subclass_id="elementalist", intellect=100)
+    caster.buff_modifiers["burn_spread_pct"] = bc.ELEMENTALIST_FIRESTORM_SPREAD_PCT
+    main = combatant(2, side=1, vitality=5000)
+    other = combatant(3, side=1, vitality=5000)
+    state = make_session(caster, main, other)
+    resolve_tick(state, {1: skill("elementalist_fire", 2)}, rng)
+
+    main_dot = main.effect_from(EffectKind.DOT, caster.id)
+    other_dot = other.effect_from(EffectKind.DOT, caster.id)
+    assert main_dot is not None and other_dot is not None
+    assert other_dot.value == main_dot.value * bc.ELEMENTALIST_FIRESTORM_SPREAD_PCT
+
+
+def test_firestorm_inactive_without_buff() -> None:
+    rng = NoCritRng()
+    caster = combatant(1, side=0, subclass_id="elementalist", intellect=100)
+    main = combatant(2, side=1, vitality=5000)
+    other = combatant(3, side=1, vitality=5000)
+    state = make_session(caster, main, other)
+    resolve_tick(state, {1: skill("elementalist_fire", 2)}, rng)
+    assert other.effect_from(EffectKind.DOT, caster.id) is None
+
+
+def test_ice_field_chills_other_enemies_on_freeze() -> None:
+    rng = AlwaysRollsRng()
+    caster = combatant(1, side=0, subclass_id="elementalist", intellect=100)
+    caster.buff_modifiers["ice_field_chill_pct"] = bc.ELEMENTALIST_ICE_FIELD_CHILL_PCT
+    main = combatant(2, side=1, kind="mob", will=0)
+    other = combatant(3, side=1, kind="mob", will=0)
+    state = make_session(caster, main, other)
+    result = resolve_tick(state, {1: skill("elementalist_ice", 2)}, rng)
+
+    # FREEZE — немедленный эффект, потребляется в тот же ход (см. docstring
+    # resolver.py); landing подтверждаем по логу, не по остаточному состоянию.
+    assert any("теряет ход" in ln for ln in result.lines)
+    assert not main.has_effect(EffectKind.CONTROL_RESIST_DOWN)  # дебафф — соседям, не основной цели
+    assert other.has_effect(EffectKind.CONTROL_RESIST_DOWN)
+
+
+def test_ice_field_inactive_without_buff() -> None:
+    rng = AlwaysRollsRng()
+    caster = combatant(1, side=0, subclass_id="elementalist", intellect=100)
+    main = combatant(2, side=1, kind="mob", will=0)
+    other = combatant(3, side=1, kind="mob", will=0)
+    state = make_session(caster, main, other)
+    resolve_tick(state, {1: skill("elementalist_ice", 2)}, rng)
+    assert not other.has_effect(EffectKind.CONTROL_RESIST_DOWN)
+
+
+def test_calibrated_elementalist_remaining_buff_values_in_content() -> None:
+    buffs = load_content().buffs
+    assert buffs["elementalist_flame_power"].stat_modifiers["fire_damage_bonus"] == bc.ELEMENTALIST_FLAME_POWER_BONUS
+    assert buffs["elementalist_frost_power"].stat_modifiers["ice_damage_bonus"] == bc.ELEMENTALIST_FROST_POWER_BONUS
+    assert buffs["elementalist_storm_power"].stat_modifiers["lightning_damage_bonus"] == bc.ELEMENTALIST_STORM_POWER_BONUS
+    assert buffs["elementalist_universal_element"].stat_modifiers["all_elements_damage_bonus"] == bc.ELEMENTALIST_UNIVERSAL_ELEMENT_BONUS
+    assert buffs["elementalist_heat_shock"].stat_modifiers["burn_expire_resist_down"] == bc.ELEMENTALIST_HEAT_SHOCK_RESIST_DOWN
+    assert buffs["elementalist_chain_lightning"].stat_modifiers["chain_lightning_extra_targets"] == bc.ELEMENTALIST_CHAIN_LIGHTNING_EXTRA_TARGETS
+    assert buffs["elementalist_firestorm"].stat_modifiers["burn_spread_pct"] == bc.ELEMENTALIST_FIRESTORM_SPREAD_PCT
+    assert buffs["elementalist_ice_field"].stat_modifiers["ice_field_chill_pct"] == bc.ELEMENTALIST_ICE_FIELD_CHILL_PCT
+    for buff_id in (
+        "elementalist_flame_power", "elementalist_frost_power", "elementalist_storm_power",
+        "elementalist_universal_element", "elementalist_heat_shock", "elementalist_chain_lightning",
+        "elementalist_firestorm", "elementalist_ice_field",
+    ):
+        assert buffs[buff_id].implemented is True, buff_id

@@ -109,6 +109,16 @@ def register_element_use(actor: CombatantState, skill_id: str) -> None:
         actor.recent_elements = []
 
 
+def element_damage_multiplier(actor: CombatantState, element: str | None) -> float:
+    """Патч 49, ч.2: Элементалист — «Пламенная/Ледяная мощь/Мощь бури» (бонус
+    урона своей стихии) и «Всеобщая стихия» (бонус всем стихийным навыкам) НЕ
+    складываются на одном навыке — берётся больший (иначе связка из всех
+    четырёх даёт +53% разом, что и было явно запрещено патчем)."""
+    all_bonus = actor.buff_modifiers.get("all_elements_damage_bonus", 0.0)
+    specific_bonus = actor.buff_modifiers.get(f"{element}_damage_bonus", 0.0) if element else 0.0
+    return 1.0 + max(all_bonus, specific_bonus)
+
+
 def tick_overload(actor: CombatantState) -> None:
     """Перегрузка (патч 46, ч.1): раз в OVERLOAD_INTERVAL_TURNS ходов —
     следующий навык не уходит на КД. Вызывать раз за ход актёра, вместе с

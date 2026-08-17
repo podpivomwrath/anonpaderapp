@@ -204,6 +204,16 @@ class DuelEngine:
         # Эффекты, кулдауны и контроль актёра тикают в конце его собственного хода
         for effect in actor.effects:
             effect.remaining_ticks -= 1
+        # Элементалист, «Тепловой шок» (патч 49, ч.2) — см. комментарий в resolver.py.
+        for effect in actor.effects_of(EffectKind.DOT):
+            if effect.remaining_ticks > 0:
+                continue
+            source = state.combatants.get(effect.source_id)
+            if source is None:
+                continue
+            heat_shock_bonus = source.buff_modifiers.get("burn_expire_resist_down", 0.0)
+            if heat_shock_bonus > 0:
+                actor.apply_effect(EffectKind.CONTROL_RESIST_DOWN, heat_shock_bonus, 1, source.id)
         actor.effects = [e for e in actor.effects if e.remaining_ticks > 0]
         actor.tick_cooldowns()
         tick_overload(actor)

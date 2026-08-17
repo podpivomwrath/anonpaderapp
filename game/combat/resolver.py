@@ -416,6 +416,20 @@ def resolve_tick(
                 )
                 effect.value = 0
 
+        # Элементалист, «Тепловой шок» (патч 49, ч.2): именно в момент, когда
+        # Горение (ДоТ) истекает на этой цели, сопротивление контролю цели
+        # снижается на 1 ход. Проверяем ДО фильтрации — remaining_ticks уже
+        # продекрементирован выше для немедленных/старых эффектов.
+        for effect in combatant.effects_of(EffectKind.DOT):
+            if effect.remaining_ticks > 0:
+                continue
+            source = session.combatants.get(effect.source_id)
+            if source is None:
+                continue
+            heat_shock_bonus = source.buff_modifiers.get("burn_expire_resist_down", 0.0)
+            if heat_shock_bonus > 0:
+                combatant.apply_effect(EffectKind.CONTROL_RESIST_DOWN, heat_shock_bonus, 1, source.id)
+
         combatant.effects = [e for e in combatant.effects if e.remaining_ticks > 0]
         combatant.tick_cooldowns()
         tick_overload(combatant)

@@ -49,6 +49,8 @@ class EffectKind(StrEnum):
                                     # от однотикового block_reduction держится effect_duration ходов
     # --- Патч 46, ч.1: Элементалист, «Стихийный поток» ---
     ELEMENTAL_FLOW = "elemental_flow"  # исходящий урон * (1 + value), 1 ход — 3 разные стихии подряд
+    # --- Патч 49, ч.2: Элементалист, «Тепловой шок»/«Ледяное поле» ---
+    CONTROL_RESIST_DOWN = "control_resist_down"  # value — доля, вычитаемая из сопротивления контролю цели
 
 
 class DeclaredAction(BaseModel):
