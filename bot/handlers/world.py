@@ -371,12 +371,29 @@ async def explore(message: Message) -> None:
                     return
                 notice = f"👥 {character.name} готов к исследованию ({len(queue.ready)}/{len(queue.cohort)})."
                 if not group_explore_service.is_ready_to_start(queue):
+                    other_peer_ids = []
                     for m in cohort:
                         if m.id == character.id:
                             continue
                         their_peer_id = await onboarding_svc.vk_id_for_character(db, m.id)
                         if their_peer_id is not None:
+                            other_peer_ids.append(their_peer_id)
+                    await db.commit()
+                    # Патч 51, ч.3, фикс: рассылка остальным участникам кохорта
+                    # раньше шла ВНУТРИ открытой транзакции вперемешку с БД-
+                    # чтениями — если сеть к VK зависала на любом шаге, транзакция
+                    # (уже "грязная" из-за get_character's last_active_at) висела
+                    # бесконечно (idle in transaction), блокируя всех остальных
+                    # игроков на UPDATE characters.last_active_at (см. инцидент
+                    # после деплоя патча 51). Явно закрываем сессию ДО сетевых
+                    # вызовов — соединение возвращается в пул немедленно, а не
+                    # когда/если завершатся все messages.send.
+                    await db.close()
+                    for their_peer_id in other_peer_ids:
+                        try:
                             await _bot_api.messages.send(peer_id=their_peer_id, message=notice, random_id=0)
+                        except Exception:
+                            pass
                     await message.answer(notice, keyboard=group_ready_keyboard())
                     return
                 # Все участники на клетке готовы — только бои в групповом
@@ -386,6 +403,7 @@ async def explore(message: Message) -> None:
                 region = region_for(character.pos_x, character.pos_y)
                 dist = grid.chebyshev_distance(character.pos_x, character.pos_y)
                 await db.commit()
+                await db.close()  # см. комментарий выше — та же причина
                 await group_combat_handlers.start_group_encounter(
                     snapshot.id, inputs, region, dist, _rng,
                 )
