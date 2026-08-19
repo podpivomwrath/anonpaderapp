@@ -79,3 +79,20 @@ def test_location_summary_full_hp_shows_100_percent() -> None:
         FakeChar(current_hp=None), FakeStats(), random.Random(1), farm_currency=0
     )
     assert "100%" in text
+
+
+# --- Блок группы (патч 51, ч.2) ---
+
+
+def test_location_summary_without_group_block_omits_section() -> None:
+    text = world_summary.location_summary(FakeChar(), FakeStats(), random.Random(1), farm_currency=0)
+    assert "👥 ГРУППА" not in text
+
+
+def test_location_summary_with_group_block_includes_it() -> None:
+    text = world_summary.location_summary(
+        FakeChar(), FakeStats(), random.Random(1), farm_currency=0,
+        group_block="👥 ГРУППА\n👑 Лидер · 10 ур. · ▰▰▰▰▰▰▰▰▰▰ 100% · (0; 0)",
+    )
+    assert "👥 ГРУППА" in text
+    assert text.rstrip().endswith("(0; 0)")

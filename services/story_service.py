@@ -22,7 +22,7 @@ from game.content_loader import StoryLineDef, StoryQuestDef, load_story_line
 from game.economy import story_config as sc
 from game.world import grid
 from models import Character, CharacterStats, CharacterStoryProgress
-from services import experience_service, quest_service, wallet_service
+from services import experience_service, group_service, quest_service, wallet_service
 
 _lines: dict[str, StoryLineDef] = {}
 
@@ -134,15 +134,18 @@ async def _advance_pointer(
 
 async def _grant(
     db: AsyncSession, character: Character, stats: CharacterStats, quest: StoryQuestDef
-) -> tuple[str, experience_service.LevelUp]:
+) -> tuple[str, experience_service.LevelUp, "group_service.LevelGapKick | None"]:
     levelup = experience_service.add_experience(character, stats, quest.xp_reward)
+    group_kick = None
+    if levelup.levels_gained > 0:
+        group_kick = await group_service.enforce_level_gap(db, character)
     lines = []
     if quest.xp_reward:
-        lines.append(display.xp_delta_line(quest.xp_reward))
+        lines.append(display.xp_delta_line(levelup.xp_awarded, premium=levelup.premium_applied))
     if quest.gold_reward:
         wallet = await wallet_service.deposit(db, character.id, "farm", quest.gold_reward)
         lines.append(display.gold_delta_line(quest.gold_reward, wallet.farm_currency))
-    return "\n".join(lines), levelup
+    return "\n".join(lines), levelup, group_kick
 
 
 @dataclass
@@ -151,6 +154,7 @@ class StoryTurnResult:
     levels_gained: int = 0
     new_level: int = 1
     region_completed: bool = False
+    group_kick: "group_service.LevelGapKick | None" = None  # патч 51, ч.2
 
 
 async def get_progress(db: AsyncSession, character: Character) -> CharacterStoryProgress | None:
@@ -209,25 +213,25 @@ async def visit_mentor(
             return StoryTurnResult(text=format_text(quest.assign_text, character))
         # Подкласс уже выбран, но хук в list_keeper почему-то не продвинул
         # (гонка/рестарт бота между шагами) — подстраховка, продвигаем здесь.
-        reward_text, levelup = await _grant(db, character, stats, quest)
+        reward_text, levelup, group_kick = await _grant(db, character, stats, quest)
         await _advance_pointer(db, row, line, quest.id)
         text = f"{format_text(quest.assign_text, character)}\n\n{reward_text}".strip()
-        return StoryTurnResult(text, levelup.levels_gained, levelup.new_level, row.completed)
+        return StoryTurnResult(text, levelup.levels_gained, levelup.new_level, row.completed, group_kick)
 
     if quest.kind == "city_scene":
-        reward_text, levelup = await _grant(db, character, stats, quest)
+        reward_text, levelup, group_kick = await _grant(db, character, stats, quest)
         await _advance_pointer(db, row, line, quest.id)
         assign = format_text(quest.assign_text, character)
         text = f"{assign}\n\n{reward_text}" if reward_text else assign
-        return StoryTurnResult(text, levelup.levels_gained, levelup.new_level, row.completed)
+        return StoryTurnResult(text, levelup.levels_gained, levelup.new_level, row.completed, group_kick)
 
     if quest.kind == "travel_combat":
         if row.status == "ready":
-            reward_text, levelup = await _grant(db, character, stats, quest)
+            reward_text, levelup, group_kick = await _grant(db, character, stats, quest)
             await _advance_pointer(db, row, line, quest.id)
             ret = format_text(quest.return_text, character)
             text = f"{ret}\n\n{reward_text}" if reward_text else ret
-            return StoryTurnResult(text, levelup.levels_gained, levelup.new_level, row.completed)
+            return StoryTurnResult(text, levelup.levels_gained, levelup.new_level, row.completed, group_kick)
         row.quest_seen = True
         await db.flush()
         return StoryTurnResult(text=_format_assign(quest, character))
@@ -282,7 +286,11 @@ async def advance_past_subclass_gate(
     if found is None or found[1].kind != "subclass_gate":
         return ""
     quest = found[1]
-    reward_text, _levelup = await _grant(db, character, stats, quest)
+    # group_kick здесь не пробрасывается наверх (узкий хук без доступа к
+    # peer_id вызывающего) — реалистично недостижимо: левелап на этом шаге
+    # сюжета требует лишь что игрок ТОЛЬКО ЧТО выбрал подкласс, крайне редкое
+    # сочетание с "уже состоит в группе с разрывом ровно на грани лимита".
+    reward_text, _levelup, _group_kick = await _grant(db, character, stats, quest)
     await _advance_pointer(db, row, line, quest.id)
     return reward_text  # текст сцены уже был показан игроку раньше (assign_text)
 

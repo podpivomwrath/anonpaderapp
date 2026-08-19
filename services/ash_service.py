@@ -11,7 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from game.economy import ash_config as ac
 from game.world import grid
 from models import Character, CharacterStats, Item
-from services import experience_service, item_service, raid_key_service, trophy_service
+from services import experience_service, group_service, item_service, raid_key_service, trophy_service
 
 
 def roll_appears(rng: random.Random) -> bool:
@@ -20,12 +20,14 @@ def roll_appears(rng: random.Random) -> bool:
 
 @dataclass
 class AshCollectResult:
-    xp: int
+    xp: int  # патч 51, ч.1: фактически начисленный опыт (после премиум-множителя)
     trophies: dict[str, int]
     item: Item | None
     levels_gained: int
     new_level: int
     raid_key_dropped: bool = False  # патч 45, ч.4 — Ключ Монолита
+    xp_premium_applied: bool = False  # патч 51, ч.1
+    group_kick: "group_service.LevelGapKick | None" = None  # патч 51, ч.2
 
 
 async def collect(
@@ -34,13 +36,17 @@ async def collect(
     zone_level = grid.mob_level_at(character.pos_x, character.pos_y, character.level)
     xp = experience_service.event_xp(zone_level, character.level, ac.EVENT_XP_ASH)
     levelup = experience_service.add_experience(character, stats, xp)
+    group_kick = None
+    if levelup.levels_gained > 0:
+        group_kick = await group_service.enforce_level_gap(db, character)
     trophies = await trophy_service.grant_from_event(db, character, rng)  # 1 бросок
     item = None
     if rng.random() < ac.ASH_ITEM_CHANCE:
         item = await item_service.grant_random_item(db, character, character.level, rng)
     raid_key_dropped = await raid_key_service.maybe_grant(db, character, rng)
     return AshCollectResult(
-        xp=xp, trophies=trophies, item=item,
+        xp=levelup.xp_awarded, trophies=trophies, item=item,
         levels_gained=levelup.levels_gained, new_level=levelup.new_level,
-        raid_key_dropped=raid_key_dropped,
+        raid_key_dropped=raid_key_dropped, xp_premium_applied=levelup.premium_applied,
+        group_kick=group_kick,
     )

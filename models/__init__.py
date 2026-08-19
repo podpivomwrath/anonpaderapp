@@ -9,6 +9,7 @@ from models.consumable import CharacterConsumable
 from models.dailies import CharacterDaily, CharacterTitle
 from models.economy import ExchangeOrder, PvpStakeTransfer, Wallet
 from models.enums import BaseClass, CombatStatus, CombatType, OrderDirection, QuestStatus, Region
+from models.group import Group, GroupInvite, GroupMember
 from models.item import Inventory, Item, ItemUpgradeHistory
 from models.lootbox import CharacterLootbox
 from models.mount import CharacterMount, MountTravel
@@ -46,6 +47,9 @@ __all__ = [
     "CombatStatus",
     "CombatType",
     "ExchangeOrder",
+    "Group",
+    "GroupInvite",
+    "GroupMember",
     "Inventory",
     "Item",
     "ItemUpgradeHistory",

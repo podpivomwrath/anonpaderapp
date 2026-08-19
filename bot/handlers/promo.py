@@ -15,12 +15,19 @@ import re
 from vkbottle.bot import BotLabeler, Message
 from vkbottle.dispatch.rules.base import FuncRule
 
+from bot import group_texts
 from bot.dispatch_rules import TEXT_ONLY
 from services import onboarding_service as onboarding_svc
 from services import promo_service
 from services.db import get_session_factory
 
 labeler = BotLabeler()
+_bot_api = None
+
+
+def setup(bot_api) -> None:
+    global _bot_api
+    _bot_api = bot_api
 
 # Длина/алфавит — как у промокодов вида MONOLITH2026: буквы (оба алфавита),
 # цифры, дефис/подчёркивание. Явно БЕЗ ":" (координаты маунта X:Y) и без
@@ -37,8 +44,12 @@ def _render(outcome: promo_service.ActivationOutcome) -> str:
     if outcome.status != "success":
         return promo_service.STATUS_TEXTS[outcome.status]
     if not outcome.lines:
-        return "Код принят, но наград в нём не оказалось."
-    return "🎟 Код принят! Получено:\n" + "\n".join(outcome.lines)
+        text = "Код принят, но наград в нём не оказалось."
+    else:
+        text = "🎟 Код принят! Получено:\n" + "\n".join(outcome.lines)
+    if outcome.group_kick is not None:
+        text += f"\n\n{group_texts.level_gap_kick_self_line()}"
+    return text
 
 
 @labeler.message(TEXT_ONLY, FuncRule(_looks_like_code))
@@ -53,3 +64,4 @@ async def try_activate_promo(message: Message) -> None:
             return  # не совпало ни с одним кодом — не наше сообщение, оставляем как есть
         await db.commit()
     await message.answer(_render(outcome))
+    await group_texts.notify_group_kick(_bot_api, outcome.group_kick)

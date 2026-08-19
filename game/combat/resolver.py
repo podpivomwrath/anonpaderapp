@@ -18,6 +18,7 @@ from dataclasses import dataclass, field
 import game.classes  # noqa: F401  — регистрация умений подклассов
 import game.combat.base_skills as base_skills  # регистрация базовых навыков + метаданные
 import game.combat.subclass_skills as subclass_skills  # регистрация навыков подклассов + метаданные
+from game.combat import balance_config as bc
 from game.combat import combat_flavor, control, display, formulas
 from game.combat.session import (
     ActionType,
@@ -54,6 +55,23 @@ _IMMEDIATE_EFFECT_KINDS = {
 }
 
 
+def _choose_mob_target(session: CombatSessionState, mob: CombatantState, rng: random.Random) -> CombatantState | None:
+    """Провокация (taunted_by) форсит жёстко — проверяется вызывающим до
+    обращения сюда. Иначе — случайный живой враг; в групповом PvE (is_raid)
+    Страж с повышенной пассивной агрессией притягивает удары чаще
+    (GROUP_PVE_GUARDIAN_AGGRO_WEIGHT), обычный PvE/PvP — равновероятно."""
+    enemies = session.alive_enemies_of(mob)
+    if not enemies:
+        return None
+    if not session.is_raid:
+        return rng.choice(enemies)
+    weights = [
+        bc.GROUP_PVE_GUARDIAN_AGGRO_WEIGHT if e.subclass_id == "guardian" else 1.0
+        for e in enemies
+    ]
+    return rng.choices(enemies, weights=weights, k=1)[0]
+
+
 def _consume_heal_item(ctx: SkillContext, item_id: str | None) -> None:
     """Лечебное зелье (патч 16): тратит ход, как атака/навык."""
     pct = ec.HEAL_PCT.get(item_id) if item_id else None
@@ -77,6 +95,41 @@ def _apply_last_breath_guard(combatant: CombatantState, result: "TickResult") ->
 
 
 @dataclass
+class RenderedHit:
+    """Патч 51, ч.5: структурный снимок урона/лечения для нового формата
+    боевого лога (game/combat/battle_log.py) — тот же удар, что уже попал в
+    result.lines как готовая строка, но с исходными полями (сторона, hp
+    до/после), достаточными чтобы собрать раздел «своя сторона»/«противник»
+    без парсинга текста."""
+
+    source_id: int
+    target_id: int
+    source_side: int
+    target_side: int
+    label: str
+    amount: int
+    crit: bool
+    missed: bool
+    is_dot: bool
+    hp_before: int
+    hp_after: int
+    max_hp: int
+
+
+@dataclass
+class RenderedHeal:
+    source_id: int
+    target_id: int
+    source_side: int
+    target_side: int
+    label: str
+    amount: int
+    hp_before: int
+    hp_after: int
+    max_hp: int
+
+
+@dataclass
 class TickResult:
     lines: list[str] = field(default_factory=list)
     deaths: list[int] = field(default_factory=list)
@@ -92,6 +145,19 @@ class TickResult:
     hits: list[PendingHit] = field(default_factory=list)
     actions: dict[int, DeclaredAction] = field(default_factory=dict)  # только "character"
     control_landed_by: set[int] = field(default_factory=set)  # cid, успешно наложившие контроль в этот ход
+    # Патч 51, ч.5: структурные версии hit/heal-строк лога — см. RenderedHit/
+    # RenderedHeal выше. lines[len(prelude_line_count):...] по-прежнему несёт
+    # готовый текст (обратная совместимость и уже существующие тесты), эти
+    # два списка — ДОПОЛНИТЕЛЬНЫЙ параллельный канал для нового рендера.
+    hit_renders: list[RenderedHit] = field(default_factory=list)
+    heal_renders: list[RenderedHeal] = field(default_factory=list)
+    # Число строк в result.lines ДО hit/heal-рендеров этого хода (control/баф
+    # эффекты фазы 1-2, ctx.lines) — граница для game/combat/battle_log.py:
+    # lines[:prelude_line_count] и lines[prelude_line_count+len(hit_renders)+
+    # len(heal_renders):] — "прочие" строки (не hit/heal), идут в свой раздел
+    # по эвристике имени комбатанта; средний срез дублирует hit_renders/
+    # heal_renders текстом и рендером не используется напрямую.
+    prelude_line_count: int = 0
 
 
 def _display_mode(session: CombatSessionState) -> str:
@@ -224,8 +290,7 @@ def resolve_tick(
             if taunter is not None and taunter.alive:
                 target = taunter
         if target is None:
-            enemies = session.alive_enemies_of(mob)
-            target = rng.choice(enemies) if enemies else None
+            target = _choose_mob_target(session, mob, rng)
         if target is not None:
             ctx.hits.append(compute_hit(mob, target, rng, label="кусает"))
 
@@ -351,6 +416,7 @@ def resolve_tick(
     # ч.1) — образность убрана из пошагового лога, режим влияет только на
     # точность % (display.MODE_PVE_RAID — один знак после запятой). ---
     result.lines.extend(ctx.lines)
+    result.prelude_line_count = len(result.lines)  # патч 51, ч.5: граница для game/combat/battle_log.py
     running_hp = dict(hp_before_apply)
     for hit in ctx.hits:
         source = session.combatants[hit.source_id]
@@ -366,6 +432,13 @@ def resolve_tick(
                 hp_before=h_before, hp_after=h_after, max_hp=target.max_hp, mode=mode,
             )
         )
+        result.hit_renders.append(
+            RenderedHit(
+                source_id=source.id, target_id=target.id, source_side=source.side, target_side=target.side,
+                label=hit.label, amount=applied, crit=hit.crit, missed=hit.missed, is_dot=hit.is_dot,
+                hp_before=h_before, hp_after=h_after, max_hp=target.max_hp,
+            )
+        )
     for heal in ctx.heals:
         source = session.combatants[heal.source_id]
         target = session.combatants[heal.target_id]
@@ -376,6 +449,12 @@ def resolve_tick(
             display.action_line(
                 source.name, heal.label, target.name,
                 h_before, h_after, target.max_hp, mode,
+            )
+        )
+        result.heal_renders.append(
+            RenderedHeal(
+                source_id=source.id, target_id=target.id, source_side=source.side, target_side=target.side,
+                label=heal.label, amount=heal.amount, hp_before=h_before, hp_after=h_after, max_hp=target.max_hp,
             )
         )
 

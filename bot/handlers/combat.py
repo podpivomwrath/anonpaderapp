@@ -10,7 +10,7 @@ import random
 from vkbottle import BaseStateGroup  # noqa: F401  (совместимость импортов)
 from vkbottle.bot import BotLabeler, Message
 
-from bot import ash_handful_state, dailies_texts, editable_message, raid_key_texts
+from bot import ash_handful_state, dailies_texts, editable_message, group_texts, raid_key_texts
 from bot.handlers import stats_window
 from bot.keyboards.combat_items import combat_items_keyboard
 from bot.keyboards.items import item_choice_keyboard, no_keyboard
@@ -28,7 +28,7 @@ from bot.vk_media import photo_attachment
 from bot.world_texts import mentor_name
 from game.combat import balance_config as bc
 from game.combat import display
-from game.combat import elixir_effects
+from game.combat import battle_log, elixir_effects
 from game.combat.base_skills import BASE_SKILL_DEFS
 from game.combat.subclass_skills import SUBCLASS_SKILL_DEFS
 from game.combat.battle_report import BattleTracker
@@ -153,14 +153,13 @@ def rebuild_keyboard(peer_id: int) -> str | None:
     return _combat_kb(_engine.sessions[peer_id], peer_id)
 
 
-def _render(state: CombatSessionState, lines: list[str]) -> str:
-    player = state.combatants[PLAYER_ID]
-    mob = state.combatants[MOB_ID]
-    header = f"⚔️ БОЙ — ход {state.tick_number}"
-    mob_line = f"{mob.name}: {display.health_bar(mob.current_hp, mob.max_hp)}"
-    player_line = f"Ты: {display.health_bar(player.current_hp, player.max_hp)} [{player.name}]"
-    log = " ".join(lines) if lines else "Перед тобой враг. Действуй."
-    return f"{header}\n{mob_line}\n{player_line}\n\n{log}"
+def _render(state: CombatSessionState, result: TickResult | None = None) -> str:
+    """Патч 51, ч.5: единый формат лога с разделами "своя сторона"/
+    "противник" — тот же рендер, что и групповой PvE (game/combat/battle_log.py),
+    просто в соло-бою в каждом разделе ровно по одной строке. result=None —
+    доска ДО первого хода (открытие боя/после использования предмета без
+    резолва тика) — пустой TickResult даёт "Без изменений." в обоих разделах."""
+    return battle_log.render_tick(state, result or TickResult(), viewer_side=0)
 
 
 async def start_encounter(
@@ -227,7 +226,7 @@ async def start_encounter(
         attachment=photo_attachment(encounter.image) if encounter.image else None,
     )
     await _bot_api.messages.send(
-        peer_id=peer_id, message=_render(state, []), random_id=0,
+        peer_id=peer_id, message=_render(state), random_id=0,
         keyboard=_combat_kb(state, peer_id),
     )
 
@@ -275,7 +274,7 @@ async def on_tick_resolved(session_id: int, tick: int, result: TickResult) -> No
     # клавиатурой пришлёт on_battle_finished) — иначе кнопки боя мелькают.
     keyboard = empty_keyboard() if result.finished else _combat_kb(state, session_id)
     await _bot_api.messages.send(
-        peer_id=session_id, message=_render(state, result.lines), random_id=0,
+        peer_id=session_id, message=_render(state, result), random_id=0,
         keyboard=keyboard,
     )
 
@@ -329,6 +328,7 @@ async def on_battle_finished(session_id: int, result: TickResult) -> None:
             levels = outcome.levels_gained
             buff_modifiers = await preset_service.resolve_active_modifiers(db, character)
             quest_line = await story_service.quest_summary_line(db, character)
+            group_block = await group_texts.group_summary_block(db, character.id)
         else:  # моб выиграл или ничья — смерть игрока (авто-респавн по таймеру)
             defeat = await encounter_service.resolve_defeat(db, character)
             await db.commit()
@@ -356,7 +356,7 @@ async def on_battle_finished(session_id: int, result: TickResult) -> None:
         # ux-patch-10 п.1: итоги боя — отдельное сообщение, сводка локации —
         # ВСЕГДА отдельным вторым сообщением, с кнопками следующего действия.
         text = "🏆 Победа! Тварь оседает пеплом."
-        text += f"\n{display.xp_delta_line(outcome.xp_gained, outcome.xp_multiplier)}"
+        text += f"\n{display.xp_delta_line(outcome.xp_gained, outcome.xp_multiplier, outcome.xp_premium_applied)}"
         drop_line = trophy_service.format_drop_line(outcome.trophies_gained)
         if drop_line is not None:
             text += f"\n{drop_line}"
@@ -366,6 +366,8 @@ async def on_battle_finished(session_id: int, result: TickResult) -> None:
             text += f"\n📜 {outcome.quest_label}: {outcome.quest_progress}/{outcome.quest_target}"
             if outcome.quest_ready:
                 text += "\nВозвращайся к наставнику."
+        if outcome.group_kick is not None and outcome.group_kick.kicked_character_id == character.id:
+            text += f"\n\n{group_texts.level_gap_kick_self_line()}"
         # лорный левелап (может быть несколько уровней за раз) + рост макс. HP
         if levels > 0:
             old_level = new_level - levels
@@ -385,6 +387,7 @@ async def on_battle_finished(session_id: int, result: TickResult) -> None:
         # патч 14, ч.2.3: единая точка входа для левелапа — все источники опыта
         # (килл, квест, событие) зовут одну и ту же notify_levelup.
         await stats_window.notify_levelup(peer_id, levels, new_level)
+        await group_texts.notify_group_kick(_bot_api, outcome.group_kick)
 
         for buff_id in outcome.unlocked_buffs:
             # патч 12: испытание завершено — микробафф открыт навсегда
@@ -399,6 +402,7 @@ async def on_battle_finished(session_id: int, result: TickResult) -> None:
             await _bot_api.messages.send(peer_id=peer_id, message=daily_notice, random_id=0)
         for c in outcome.daily_completed:
             await stats_window.notify_levelup(peer_id, c.levels_gained, c.new_level)
+            await group_texts.notify_group_kick(_bot_api, c.group_kick)
 
         if quest_ready_now:
             # патч 21, п.1: игрок не в разговоре с наставником — пингуем сами
@@ -441,7 +445,9 @@ async def on_battle_finished(session_id: int, result: TickResult) -> None:
             ash_handful_state.mark(peer_id)
         await _bot_api.messages.send(
             peer_id=peer_id,
-            message=location_summary(character, stats, _rng, farm_currency, vit_bonus, quest_line, donate_currency),
+            message=location_summary(
+                character, stats, _rng, farm_currency, vit_bonus, quest_line, donate_currency, group_block,
+            ),
             random_id=0, attachment=location_attachment(character),
             keyboard=movement_keyboard(character.pos_x, character.pos_y, peer_id, has_mount=has_mount),
         )
@@ -496,6 +502,7 @@ async def item_choice(message: Message) -> None:
         farm_currency, donate_currency = wallet.farm_currency, wallet.donate_currency
         vit_bonus = (await item_service.compute_gear_bonus(db, character.id)).get("vit", 0)
         quest_line = await story_service.quest_summary_line(db, character)
+        group_block = await group_texts.group_summary_block(db, character.id)
         has_mount = await mount_service.has_any_mount(db, character.id)
         await db.commit()
 
@@ -505,7 +512,7 @@ async def item_choice(message: Message) -> None:
     if ash_service.roll_appears(_rng):
         ash_handful_state.mark(peer_id)
     await message.answer(
-        location_summary(character, stats, _rng, farm_currency, vit_bonus, quest_line, donate_currency),
+        location_summary(character, stats, _rng, farm_currency, vit_bonus, quest_line, donate_currency, group_block),
         attachment=location_attachment(character),
         keyboard=movement_keyboard(character.pos_x, character.pos_y, peer_id, has_mount=has_mount),
     )
@@ -641,7 +648,7 @@ async def use_combat_item(message: Message) -> None:
     line = elixir_effects.apply_combat_elixir(player, elixir_id)
     player.combat_elixirs_used += 1
     await _bot_api.messages.send(
-        peer_id=peer_id, message=f"{line} Твой ход.\n\n{_render(state, [])}", random_id=0,
+        peer_id=peer_id, message=f"{line} Твой ход.\n\n{_render(state)}", random_id=0,
         keyboard=_combat_kb(state, peer_id),
     )
 

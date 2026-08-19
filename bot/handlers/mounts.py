@@ -20,6 +20,7 @@ from loguru import logger
 from vkbottle import BaseStateGroup
 from vkbottle.bot import BotLabeler, Message
 
+from bot import group_texts
 from bot.dispatch_rules import TEXT_ONLY
 from bot.handlers import combat as combat_handlers
 from bot.handlers import pvp as pvp_handlers
@@ -341,6 +342,7 @@ async def scan() -> None:
             wallet = await wallet_service.get_wallet(db, character.id)
             gear_bonus = await item_service.compute_gear_bonus(db, character.id)
             quest_line = await story_service.quest_summary_line(db, character)
+            group_block = await group_texts.group_summary_block(db, character.id)
             region = grid.city_region_at(travel.to_x, travel.to_y)
             mentor_badge = False
             is_foreign = False
@@ -352,7 +354,7 @@ async def scan() -> None:
                 mentor_badge = not is_foreign and await story_service.mentor_badge_active(db, character)
             arrivals.append(
                 (peer_id, character, stats, wallet.farm_currency, wallet.donate_currency,
-                 quest_line, gear_bonus, region, mentor_badge, is_foreign)
+                 quest_line, gear_bonus, region, mentor_badge, is_foreign, group_block)
             )
 
         if _live_countdown:
@@ -375,7 +377,7 @@ async def scan() -> None:
         )
 
     for (peer_id, character, stats, farm_currency, donate_currency, quest_line, gear_bonus,
-         region, mentor_badge, is_foreign) in arrivals:
+         region, mentor_badge, is_foreign, group_block) in arrivals:
         _travel_message.pop(peer_id, None)
         if region is not None:
             text = (
@@ -392,7 +394,7 @@ async def scan() -> None:
             continue
         vit_bonus = gear_bonus.get("vit", 0)
         text = "🐎 Ты прибываешь на место.\n\n" + location_summary(
-            character, stats, _rng, farm_currency, vit_bonus, quest_line, donate_currency
+            character, stats, _rng, farm_currency, vit_bonus, quest_line, donate_currency, group_block,
         )
         await _bot_api.messages.send(
             peer_id=peer_id, message=text, random_id=0,

@@ -58,6 +58,8 @@ def event_xp(zone_level: int, player_level: int, share: float) -> int:
 class LevelUp:
     levels_gained: int
     new_level: int
+    xp_awarded: int = 0
+    premium_applied: bool = False
 
 
 def add_experience(
@@ -74,8 +76,15 @@ def add_experience(
     на всех источниках автоматически. apply_premium=False — для админской
     ручной выдачи опыта (services/admin_service.py::grant_xp) — админ явно
     задаёт число, премиум-множитель тут неуместен.
+
+    LevelUp.xp_awarded (патч 51, ч.1) — ФАКТИЧЕСКИ начисленное число (после
+    премиум-множителя). Вызывающий код должен показывать игроку именно его,
+    не исходный `amount` — иначе премиум-бонус применяется, но не виден в
+    чате (баг патча 51). LevelUp.premium_applied — был ли бонус применён,
+    для пометки "💠 +50%" в тексте.
     """
-    if apply_premium and amount > 0 and premium_service.is_premium(character):
+    premium_applied = apply_premium and amount > 0 and premium_service.is_premium(character)
+    if premium_applied:
         amount = round(amount * pc.PREMIUM_XP_MULTIPLIER)
     if amount > 0:
         character.experience += amount
@@ -92,7 +101,10 @@ def add_experience(
         character.experience = 0  # на потолке опыт не копится
     if levels > 0:
         character.current_hp = None  # патч 25, п.2: левелап лечит до полного HP
-    return LevelUp(levels_gained=levels, new_level=character.level)
+    return LevelUp(
+        levels_gained=levels, new_level=character.level,
+        xp_awarded=max(amount, 0), premium_applied=premium_applied,
+    )
 
 
 def apply_death_penalty(character: Character) -> int:

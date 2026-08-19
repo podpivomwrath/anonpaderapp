@@ -58,12 +58,20 @@ def hp_delta_line(hp_before: float, hp_after: float, max_hp: float, mode: str = 
     return f"({delta:+d} HP · {before} → {after})"
 
 
-def xp_delta_line(xp: int, mult: float = 1.0) -> str:
+def xp_delta_line(xp: int, mult: float = 1.0, premium: bool = False) -> str:
     """mult (патч 26) — бонус за убийство моба выше уровнем, показывается,
-    только если больше 1 (иначе просто число опыта, как раньше)."""
+    только если больше 1 (иначе просто число опыта, как раньше).
+    premium (патч 51, ч.1) — был ли применён бонус +50% Метки Хранителя;
+    xp здесь ДОЛЖЕН быть уже итоговым (после премиум-множителя) —
+    см. services/experience_service.py::LevelUp.xp_awarded. Пометка
+    показывается, только если бонус реально применён."""
+    parts = [f"+{xp} опыта"]
     if mult > 1.0:
-        return f"(+{xp} опыта · ×{mult:.1f} за опасность)"
-    return f"(+{xp} опыта)"
+        parts.append(f"×{mult:.1f} за опасность")
+    line = " · ".join(parts)
+    if premium:
+        line += " (💠 +50%)"
+    return f"({line})"
 
 
 def xp_penalty_line(xp: int, fraction: float) -> str:

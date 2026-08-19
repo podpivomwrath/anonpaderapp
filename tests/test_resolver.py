@@ -1,7 +1,10 @@
 """Одновременный резолв тика: фазы, таунт, щиты, заморозка, ничья."""
 
+import random
+
+from game.combat import balance_config as bc
 from game.combat import formulas
-from game.combat.resolver import resolve_tick
+from game.combat.resolver import _choose_mob_target, resolve_tick
 from game.combat.session import (
     ActionType,
     CombatMode,
@@ -272,3 +275,43 @@ def test_dot_ticks_damage() -> None:
     resolve_tick(state, {}, rng)
     assert b.current_hp == b.max_hp - 25
     assert b.has_effect(EffectKind.DOT)  # остался 1 тик
+
+
+def test_choose_mob_target_equal_weight_outside_group_pve() -> None:
+    """Вне группового PvE (is_raid=False) — равновероятный выбор, Страж не
+    выделяется (совпадает со старым поведением до патча 51, ч.4)."""
+    guardian = combatant(1, side=0, subclass_id="guardian")
+    ally = combatant(2, side=0)
+    mob = combatant(3, side=1, kind="mob")
+    state = make_session(CombatMode.PVE, guardian, ally, mob)
+    counts = {guardian.id: 0, ally.id: 0}
+    rng = random.Random(42)
+    for _ in range(2000):
+        target = _choose_mob_target(state, mob, rng)
+        counts[target.id] += 1
+    ratio = counts[guardian.id] / counts[ally.id]
+    assert 0.85 < ratio < 1.15  # примерно 50/50
+
+
+def test_choose_mob_target_guardian_pulls_more_aggro_in_group_pve() -> None:
+    """Групповой PvE (is_raid=True) — Страж притягивает удары мобов чаще
+    (GROUP_PVE_GUARDIAN_AGGRO_WEIGHT), Провокация форсит отдельно (taunted_by,
+    не через эту функцию — см. test_taunt_forces_mob_target_in_pve)."""
+    guardian = combatant(1, side=0, subclass_id="guardian")
+    ally = combatant(2, side=0)
+    mob = combatant(3, side=1, kind="mob")
+    state = make_session(CombatMode.PVE, guardian, ally, mob)
+    state.is_raid = True
+    counts = {guardian.id: 0, ally.id: 0}
+    rng = random.Random(42)
+    for _ in range(2000):
+        target = _choose_mob_target(state, mob, rng)
+        counts[target.id] += 1
+    ratio = counts[guardian.id] / counts[ally.id]
+    assert abs(ratio - bc.GROUP_PVE_GUARDIAN_AGGRO_WEIGHT) < 0.3
+
+
+def test_choose_mob_target_no_enemies_returns_none() -> None:
+    mob = combatant(1, side=1, kind="mob")
+    state = make_session(CombatMode.PVE, mob)
+    assert _choose_mob_target(state, mob, random.Random(1)) is None

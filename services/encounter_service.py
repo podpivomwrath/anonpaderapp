@@ -15,6 +15,7 @@ from services import (
     daily_service,
     death_service,
     experience_service,
+    group_service,
     item_service,
     quest_service,
     raid_key_service,
@@ -25,7 +26,7 @@ from services import (
 
 @dataclass
 class VictoryOutcome:
-    xp_gained: int
+    xp_gained: int  # патч 51, ч.1: ФАКТИЧЕСКИ начисленный опыт (после премиум-множителя)
     xp_multiplier: float
     levels_gained: int
     new_level: int
@@ -39,6 +40,8 @@ class VictoryOutcome:
     daily_completed: list = field(default_factory=list)  # патч 23 — daily_service.DailyCompletion
     daily_streak_notice: str | None = None  # патч 23 — текст рубежа стрика ежедневок, если сработал
     raid_key_dropped: bool = False  # патч 45, ч.4 — Ключ Монолита
+    xp_premium_applied: bool = False  # патч 51, ч.1 — был ли применён бонус +50% Метки Хранителя
+    group_kick: "group_service.LevelGapKick | None" = None  # патч 51, ч.2 — исключён из группы левелапом
 
 
 async def resolve_victory(
@@ -56,6 +59,9 @@ async def resolve_victory(
     )
     xp, xp_mult = experience_service.xp_for_kill(mob_level, character.level)
     levelup = experience_service.add_experience(character, stats, xp)
+    group_kick = None
+    if levelup.levels_gained > 0:
+        group_kick = await group_service.enforce_level_gap(db, character)
     trophies = await trophy_service.grant_from_kill(db, character, rng)
     item = await item_service.grant_from_kill(db, character, mob_level, rng)
     raid_key_dropped = await raid_key_service.maybe_grant(db, character, rng)
@@ -79,14 +85,20 @@ async def resolve_victory(
     progress = await quest_service.record_kill(db, character)
     if progress is None:
         return VictoryOutcome(
-            xp, xp_mult, levelup.levels_gained, levelup.new_level, None, None, None, False,
-            trophies, item, unlocked, daily_completed, daily_streak_notice, raid_key_dropped,
+            xp_gained=levelup.xp_awarded, xp_multiplier=xp_mult, xp_premium_applied=levelup.premium_applied,
+            levels_gained=levelup.levels_gained, new_level=levelup.new_level,
+            quest_label=None, quest_progress=None, quest_target=None, quest_ready=False,
+            trophies_gained=trophies, item_dropped=item, unlocked_buffs=unlocked,
+            daily_completed=daily_completed, daily_streak_notice=daily_streak_notice,
+            raid_key_dropped=raid_key_dropped, group_kick=group_kick,
         )
     return VictoryOutcome(
-        xp, xp_mult, levelup.levels_gained, levelup.new_level,
-        progress.progress_label, progress.progress, progress.target_count,
-        progress.status == "ready", trophies, item, unlocked, daily_completed, daily_streak_notice,
-        raid_key_dropped,
+        xp_gained=levelup.xp_awarded, xp_multiplier=xp_mult, xp_premium_applied=levelup.premium_applied,
+        levels_gained=levelup.levels_gained, new_level=levelup.new_level,
+        quest_label=progress.progress_label, quest_progress=progress.progress, quest_target=progress.target_count,
+        quest_ready=progress.status == "ready", trophies_gained=trophies, item_dropped=item,
+        unlocked_buffs=unlocked, daily_completed=daily_completed, daily_streak_notice=daily_streak_notice,
+        raid_key_dropped=raid_key_dropped, group_kick=group_kick,
     )
 
 

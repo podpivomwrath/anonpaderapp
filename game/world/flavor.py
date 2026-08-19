@@ -65,8 +65,13 @@ def death_penalty_line(xp: int) -> str:
     return f"{_SYSTEM['death_penalty']} {display.xp_penalty_line(xp, bc.DEATH_XP_PENALTY)}"
 
 
-def quest_reward_line(xp: int) -> str:
-    return _SYSTEM["quest_reward"].format(xp=xp)
+def quest_reward_line(xp: int, premium: bool = False) -> str:
+    """premium (патч 51, ч.1) — был ли применён бонус +50% Метки Хранителя;
+    xp должен быть уже итоговым (после множителя)."""
+    line = _SYSTEM["quest_reward"].format(xp=xp)
+    if premium:
+        line += " 💠 +50%"
+    return line
 
 
 def song_part_count() -> int:

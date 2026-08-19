@@ -24,6 +24,7 @@ from models import Character, CharacterDaily, CharacterStats
 from services import (
     elixir_service,
     experience_service,
+    group_service,
     lootbox_service,
     premium_service,
     title_service,
@@ -192,10 +193,12 @@ async def _active_dailies(db: AsyncSession, character: Character) -> list[Charac
 @dataclass
 class DailyCompletion:
     quest_title: str
-    xp: int
+    xp: int  # патч 51, ч.1: фактически начисленный опыт (после премиум-множителя)
     gold: int
     levels_gained: int
     new_level: int
+    xp_premium_applied: bool = False  # патч 51, ч.1
+    group_kick: "group_service.LevelGapKick | None" = None  # патч 51, ч.2
 
 
 @dataclass
@@ -220,10 +223,14 @@ async def _apply_delta(
     xp, gold = dc.daily_reward(character.level)
     stats = await db.scalar(select(CharacterStats).where(CharacterStats.character_id == character.id))
     levelup = experience_service.add_experience(character, stats, xp)
+    group_kick = None
+    if levelup.levels_gained > 0:
+        group_kick = await group_service.enforce_level_gap(db, character)
     await wallet_service.deposit(db, character.id, "farm", gold)
     return DailyCompletion(
-        quest_title=qdef.title, xp=xp, gold=gold,
+        quest_title=qdef.title, xp=levelup.xp_awarded, gold=gold,
         levels_gained=levelup.levels_gained, new_level=levelup.new_level,
+        xp_premium_applied=levelup.premium_applied, group_kick=group_kick,
     )
 
 

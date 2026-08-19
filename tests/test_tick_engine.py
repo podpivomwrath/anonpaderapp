@@ -190,6 +190,55 @@ async def test_duel_mode_rejected(recorder: Recorder) -> None:
         engine.start_session(state)
 
 
+async def test_group_pve_uses_timer_like_pvp(recorder: Recorder) -> None:
+    """Патч 51, ч.4: групповой PvE (session.is_raid=True) идёт по таймеру
+    хода, как групповой PvP — не походивший вовремя участник пропускает ход,
+    бой при этом не заканчивается (моб жив, второй игрок продолжает)."""
+    engine = TickEngine(
+        InMemoryActionStore(), rng=NoCritRng(),
+        on_tick_resolved=recorder.on_tick, on_battle_finished=recorder.on_finish,
+        max_turns=None, group_pve_window_seconds=0.3,
+    )
+    p1 = combatant(1, side=0)
+    p2 = combatant(2, side=0)
+    wolf = combatant(3, side=1, kind="mob", name="Волк", vitality=999999)
+    state = make_state(CombatMode.PVE, p1, p2, wolf)
+    state.is_raid = True
+    engine.start()
+    try:
+        engine.start_session(state)
+        await engine.declare_action(1, 1, attack(3))  # p2 молчит
+        await asyncio.wait_for(recorder.tick_event.wait(), timeout=5)
+    finally:
+        engine.shutdown()
+
+    assert len(recorder.ticks) == 1
+    _, _, result = recorder.ticks[0]
+    assert any("пропускает" in line for line in result.lines)
+    assert wolf.current_hp < wolf.max_hp  # p1 успел ударить
+    assert 1 in engine.sessions  # бой продолжается
+
+
+async def test_solo_pve_raid_flag_false_has_no_timer(recorder: Recorder) -> None:
+    """is_raid по умолчанию False (соло PvE) — таймер группового PvE не
+    применяется, даже если group_pve_window_seconds задан коротким."""
+    engine = TickEngine(
+        InMemoryActionStore(), rng=NoCritRng(),
+        on_tick_resolved=recorder.on_tick, on_battle_finished=recorder.on_finish,
+        max_turns=None, group_pve_window_seconds=0.05,
+    )
+    p = combatant(1, side=0)
+    wolf = combatant(2, side=1, kind="mob", name="Волк", vitality=999999)
+    state = make_state(CombatMode.PVE, p, wolf)
+    engine.start()
+    try:
+        engine.start_session(state)
+        await asyncio.sleep(0.3)  # дольше окна группового PvE — таймера тут нет
+        assert recorder.ticks == []  # никто не резолвил ход без объявления
+    finally:
+        engine.shutdown()
+
+
 async def test_dead_player_cannot_declare(recorder: Recorder) -> None:
     engine = make_engine(recorder)
     a = combatant(1, side=0)

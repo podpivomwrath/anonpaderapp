@@ -18,6 +18,7 @@ from services import (
     admin_service,
     elixir_service,
     experience_service,
+    group_service,
     mount_service,
     premium_service,
     trophy_service,
@@ -137,6 +138,7 @@ async def code_activations(db: AsyncSession, promo_code_id: int) -> list[PromoAc
 class ActivationOutcome:
     status: str  # "success" | "already_used" | "limit_reached" | "expired"
     lines: list[str] = field(default_factory=list)  # только для "success"
+    group_kick: "group_service.LevelGapKick | None" = None  # патч 51, ч.2 (награда xp)
 
 
 STATUS_TEXTS = {
@@ -146,76 +148,83 @@ STATUS_TEXTS = {
 }
 
 
-async def _apply_reward(db: AsyncSession, character: Character, reward: dict) -> str | None:
-    """Одна позиция награды → строка для игрока, либо None (не начислено —
-    сама строка с объяснением уже добавлена внутри для пограничных случаев)."""
+async def _apply_reward(
+    db: AsyncSession, character: Character, reward: dict,
+) -> tuple[str | None, "group_service.LevelGapKick | None"]:
+    """Одна позиция награды → (строка для игрока, исключение из группы
+    левелапом — только для type="xp"). None-строка — не начислено (сама
+    строка с объяснением уже добавлена внутри для пограничных случаев)."""
     rtype = reward.get("type")
     if rtype == "gold":
         amount = int(reward.get("amount", 0))
         if amount <= 0:
-            return None
+            return None, None
         await wallet_service.deposit(db, character.id, "farm", amount)
-        return f"{amount} золота"
+        return f"{amount} золота", None
     if rtype == "gems":
         amount = int(reward.get("amount", 0))
         if amount <= 0:
-            return None
+            return None, None
         await wallet_service.deposit(db, character.id, "donate", amount)
-        return f"💎 {amount} Пепельных самоцветов"
+        return f"💎 {amount} Пепельных самоцветов", None
     if rtype == "xp":
         amount = int(reward.get("amount", 0))
         if amount <= 0:
-            return None
+            return None, None
         if character.level >= bc.MAX_LEVEL:
-            return "Опыт не начислен — достигнут максимальный уровень."
+            return "Опыт не начислен — достигнут максимальный уровень.", None
         stats = await db.scalar(select(CharacterStats).where(CharacterStats.character_id == character.id))
-        experience_service.add_experience(character, stats, amount)
-        return f"{amount} опыта"
+        levelup = experience_service.add_experience(character, stats, amount)
+        group_kick = None
+        if levelup.levels_gained > 0:
+            group_kick = await group_service.enforce_level_gap(db, character)
+        premium_mark = " (💠 +50%)" if levelup.premium_applied else ""
+        return f"{levelup.xp_awarded} опыта{premium_mark}", group_kick
     if rtype == "trophy":
         trophy_id = reward.get("trophy_id")
         amount = int(reward.get("amount", 0))
         if not trophy_id or amount <= 0:
-            return None
+            return None, None
         tdef = trophy_service.trophy_def(trophy_id)
         await trophy_service.grant_specific(db, character.id, trophy_id, amount)
         name = f"{tdef.emoji} {tdef.name}" if tdef is not None else trophy_id
-        return f"{name} ×{amount}"
+        return f"{name} ×{amount}", None
     if rtype == "elixir":
         elixir_id = reward.get("elixir_id")
         amount = int(reward.get("amount", 0))
         if not elixir_id or amount <= 0:
-            return None
+            return None, None
         edef = elixir_service.elixir_def(elixir_id)
         await elixir_service.grant(db, character.id, elixir_id, amount)
         name = f"{edef.emoji} {edef.name}" if edef is not None else elixir_id
-        return f"{name} ×{amount}"
+        return f"{name} ×{amount}", None
     if rtype == "raid_keys":
         amount = int(reward.get("amount", 0))
         if amount <= 0:
-            return None
+            return None, None
         cap = rc.RAID_KEY_CAP_PREMIUM if premium_service.is_premium(character) else rc.RAID_KEY_CAP
         room = max(cap - character.raid_keys, 0)
         granted = min(amount, room)
         if granted > 0:
             character.raid_keys += granted
         if granted < amount:
-            return f"Ключей Монолита выдано: {granted} из {amount} (достигнут лимит {cap})."
-        return f"🗝 Ключ Монолита ×{granted}"
+            return f"Ключей Монолита выдано: {granted} из {amount} (достигнут лимит {cap}).", None
+        return f"🗝 Ключ Монолита ×{granted}", None
     if rtype == "premium":
         days = int(reward.get("days", 0))
         if days <= 0:
-            return None
+            return None, None
         premium_service.extend(character, days)
-        return f"💠 Метка Хранителя на {days} дн."
+        return f"💠 Метка Хранителя на {days} дн.", None
     if rtype == "mount":
         mount_id = reward.get("mount_id")
         if not mount_id:
-            return None
+            return None, None
         d = mount_service.mount_def(mount_id)
         granted = await mount_service.grant(db, character, mount_id)
         name = d.name if d is not None else mount_id
-        return f"🐎 {name}" if granted else f"🐎 {name} (уже был)"
-    return None
+        return (f"🐎 {name}" if granted else f"🐎 {name} (уже был)"), None
+    return None, None
 
 
 async def activate_code(db: AsyncSession, character: Character, raw_text: str) -> ActivationOutcome | None:
@@ -249,11 +258,13 @@ async def activate_code(db: AsyncSession, character: Character, raw_text: str) -
             return ActivationOutcome(status="already_used")
 
     lines: list[str] = []
+    group_kick = None
     for reward in promo.rewards:
-        line = await _apply_reward(db, character, reward)
+        line, kick = await _apply_reward(db, character, reward)
         if line is not None:
             lines.append(line)
+        group_kick = kick or group_kick
 
     db.add(PromoActivation(promo_code_id=promo.id, character_id=character.id))
     await db.flush()
-    return ActivationOutcome(status="success", lines=lines)
+    return ActivationOutcome(status="success", lines=lines, group_kick=group_kick)

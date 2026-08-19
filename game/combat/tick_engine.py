@@ -94,9 +94,15 @@ class TickEngine:
         on_tick_resolved: TickResolvedCallback | None = None,
         on_battle_finished: BattleFinishedCallback | None = None,
         max_turns: int | None = None,
+        group_pve_window_seconds: float | None = None,
     ) -> None:
         self.store = store
         self.pvp_window_seconds = pvp_window_seconds
+        # Патч 51, ч.4: групповой PvE (session.is_raid=True) — тоже таймер
+        # хода 1 минута, как групповой PvP (не походил — пропуск, без
+        # вылета из боя). Соло PvE (is_raid=False) остаётся БЕЗ таймера —
+        # моба не с кем координировать, спешить некуда.
+        self.group_pve_window_seconds = group_pve_window_seconds or bc.PVP_GROUP_TURN_SECONDS
         self.rng = rng or random.Random()
         self.scheduler = scheduler or AsyncIOScheduler()
         self.on_tick_resolved = on_tick_resolved
@@ -142,8 +148,15 @@ class TickEngine:
 
     def _open_tick(self, state: CombatSessionState) -> None:
         state.tick_number += 1
+        # Патч 51, ч.4: групповой PvE (is_raid) идёт по таймеру, как групповой
+        # PvP — соло PvE (is_raid=False) остаётся без таймера (см. __init__).
+        window = None
         if state.mode == CombatMode.PVP_GROUP:
-            resolve_at = datetime.now(timezone.utc) + timedelta(seconds=self.pvp_window_seconds)
+            window = self.pvp_window_seconds
+        elif state.mode == CombatMode.PVE and state.is_raid:
+            window = self.group_pve_window_seconds
+        if window is not None:
+            resolve_at = datetime.now(timezone.utc) + timedelta(seconds=window)
             self.scheduler.add_job(
                 self._resolve,
                 trigger=DateTrigger(run_date=resolve_at),
@@ -153,14 +166,15 @@ class TickEngine:
                 misfire_grace_time=30,
             )
             logger.info(
-                "Сессия {}: тик {} (PvP) — окно до {:%H:%M:%S}, не успевшие пропустят ход",
+                "Сессия {}: тик {} ({}) — окно до {:%H:%M:%S}, не успевшие пропустят ход",
                 state.session_id,
                 state.tick_number,
+                state.mode,
                 resolve_at,
             )
         else:
             logger.info(
-                "Сессия {}: тик {} (PvE) — ждём действия всех живых игроков (без таймера)",
+                "Сессия {}: тик {} (PvE соло) — ждём действия игрока (без таймера)",
                 state.session_id,
                 state.tick_number,
             )

@@ -14,10 +14,13 @@ from bot.handlers import LABELERS, list_keeper, onboarding
 from bot.handlers import appraiser as appraiser_handlers
 from bot.handlers import combat as combat_handlers
 from bot.handlers import elixir_shop as elixir_shop_handlers
+from bot.handlers import group as group_handlers
+from bot.handlers import group_combat as group_combat_handlers
 from bot.handlers import inventory as inventory_handlers
 from bot.handlers import moderation as moderation_handlers
 from bot.handlers import mounts as mounts_handlers
 from bot.handlers import presets as presets_handlers
+from bot.handlers import promo as promo_handlers
 from bot.handlers import pvp as pvp_handlers
 from bot.handlers import respawn as respawn_handlers
 from bot.handlers import stats_window as stats_window_handlers
@@ -83,6 +86,8 @@ async def run() -> None:
     inventory_handlers.setup(bot.api)
     presets_handlers.setup(bot.api)
     elixir_shop_handlers.setup(bot.api)
+    group_handlers.setup(bot.api)
+    promo_handlers.setup(bot.api)
     moderation_handlers.setup(bot.api)  # патч 27: ЛС администратору с /баг-репортами
 
     # Открытое PvP (патч 22): дуэль (последовательные ходы) + массовый бой
@@ -106,6 +111,19 @@ async def run() -> None:
     )
     pvp_tick_engine.start()
     pvp_handlers.setup(duel_engine, pvp_tick_engine, bot.api)
+
+    # Патч 51, ч.4: групповой PvE — ОТДЕЛЬНЫЙ экземпляр TickEngine от соло
+    # tick_engine (тот держит один колбэк-пару, session_id=peer_id; здесь
+    # session_id — свой отрицательный счётчик, как у pvp_tick_engine выше).
+    # is_raid=True выставляется в самой сессии (bot/handlers/group_combat.py),
+    # он же включает таймер хода 1 минута через group_pve_window_seconds.
+    group_pve_tick_engine = TickEngine(
+        InMemoryActionStore(),
+        on_tick_resolved=group_combat_handlers.on_group_tick_resolved,
+        on_battle_finished=group_combat_handlers.on_group_battle_finished,
+    )
+    group_pve_tick_engine.start()
+    group_combat_handlers.setup(group_pve_tick_engine, bot.api)
 
     travel_scheduler = PeerScheduler(world_handlers.handle_arrival, job_prefix="travel")
     travel_scheduler.start()
@@ -157,6 +175,7 @@ async def run() -> None:
         travel_scheduler.shutdown()
         duel_engine.shutdown()
         pvp_tick_engine.shutdown()
+        group_pve_tick_engine.shutdown()
         tick_engine.shutdown()
         await runner.cleanup()
         await redis.aclose()

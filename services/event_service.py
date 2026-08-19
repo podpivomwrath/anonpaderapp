@@ -20,6 +20,7 @@ from models import Character, CharacterStats
 from services import (
     daily_service,
     experience_service,
+    group_service,
     item_service,
     raid_key_service,
     trial_service,
@@ -49,6 +50,7 @@ class OutcomeResult:
     daily_completed: list = field(default_factory=list)  # daily_service.DailyCompletion
     daily_streak_notice: str | None = None
     raid_key_dropped: bool = False  # патч 45, ч.4 — Ключ Монолита
+    group_kick: "group_service.LevelGapKick | None" = None  # патч 51, ч.2
 
 
 async def apply_outcome(
@@ -110,13 +112,16 @@ async def apply_outcome(
 
     levels_gained = 0
     new_level = character.level
+    group_kick = None
     if outcome.xp or outcome.xp_big:
         share = wc.EVENT_XP_RISKY if outcome.xp_big else wc.EVENT_XP_SAFE
         zone_level = grid.mob_level_at(character.pos_x, character.pos_y, character.level)
         xp = experience_service.event_xp(zone_level, character.level, share)
         levelup = experience_service.add_experience(character, stats, xp)
         levels_gained, new_level = levelup.levels_gained, levelup.new_level
-        lines.append(display.xp_delta_line(xp))
+        if levels_gained > 0:
+            group_kick = await group_service.enforce_level_gap(db, character)
+        lines.append(display.xp_delta_line(levelup.xp_awarded, premium=levelup.premium_applied))
         reward_added = True
 
     if outcome.damage_max_pct > 0:
@@ -144,10 +149,12 @@ async def apply_outcome(
         xp = experience_service.event_xp(zone_level, character.level, wc.EVENT_XP_SAFE)
         levelup = experience_service.add_experience(character, stats, xp)
         levels_gained, new_level = levelup.levels_gained, levelup.new_level
-        lines.append(display.xp_delta_line(xp))
+        if levels_gained > 0:
+            group_kick = await group_service.enforce_level_gap(db, character)
+        lines.append(display.xp_delta_line(levelup.xp_awarded, premium=levelup.premium_applied))
 
     return OutcomeResult(
         "\n\n".join(line for line in lines if line), levels_gained=levels_gained, new_level=new_level,
         daily_completed=daily_completed, daily_streak_notice=daily_streak_notice,
-        raid_key_dropped=raid_key_dropped,
+        raid_key_dropped=raid_key_dropped, group_kick=group_kick,
     )

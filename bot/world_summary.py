@@ -50,7 +50,7 @@ def wallet_line(farm_currency: int, donate_currency: int) -> str:
 
 def location_summary(
     character, stats, rng: random.Random, farm_currency: int, vit_bonus: int = 0,
-    quest_line: str | None = None, donate_currency: int = 0,
+    quest_line: str | None = None, donate_currency: int = 0, group_block: str | None = None,
 ) -> str:
     """Сводка клетки: координаты/тип локации/зона, вариативное описание, HP,
     уровень, шкала опыта, золото (патч 9 блок 3, патч 10 блоки 2/4), активный
@@ -60,7 +60,10 @@ def location_summary(
     с максимумом, который реально используется в бою.
     quest_line (патч 21) — готовая строка "📜 ..." (services.story_service.
     quest_summary_line) или None, если активного сюжетного квеста нет —
-    тогда строка не показывается вовсе."""
+    тогда строка не показывается вовсе.
+    group_block (патч 51, ч.2) — готовый блок "👥 ГРУППА\n..." (bot.group_texts.
+    group_summary_block) или None, если персонаж не в группе — тогда блок не
+    выводится вовсе."""
     x, y = character.pos_x, character.pos_y
     loc_type = location_types.location_type_at(x, y)
     lo, hi = grid.zone_level_range(grid.chebyshev_distance(x, y))
@@ -74,6 +77,7 @@ def location_summary(
         f"{raid_key_texts.raid_key_inventory_line(character.raid_keys)}\n"
         if character.raid_keys > 0 else ""
     )
+    group_suffix = "\n\n" + group_block if group_block else ""
     return (
         f"{zone_line}\n{description}\n\n"
         f"{_SEP}\n"
@@ -84,4 +88,5 @@ def location_summary(
         f"{key_block}"
         f"{quest_block}"
         f"{_SEP}"
+        f"{group_suffix}"
     )

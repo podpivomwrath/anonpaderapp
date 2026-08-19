@@ -10,7 +10,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from models import Character, CharacterQuest, CharacterStats, Quest, QuestStatus
-from services import experience_service
+from services import experience_service, group_service
 
 
 @dataclass
@@ -29,10 +29,12 @@ class TurnInResult:
     """Квест закрыт. Опыт начислен (крупный разовый); золото — хук на будущее,
     пока не капает (progression-patch-4)."""
 
-    xp_reward: int = 0
+    xp_reward: int = 0  # патч 51, ч.1: фактически начисленный опыт (после премиум-множителя)
     gold_reward: int = 0
     levels_gained: int = 0
     new_level: int = 1
+    xp_premium_applied: bool = False
+    group_kick: "group_service.LevelGapKick | None" = None  # патч 51, ч.2
 
 
 async def _get_quest_def(db: AsyncSession, region: str) -> Quest | None:
@@ -142,12 +144,17 @@ async def turn_in(db: AsyncSession, character: Character) -> TurnInResult | None
         select(CharacterStats).where(CharacterStats.character_id == character.id)
     )
     levelup = experience_service.add_experience(character, stats, quest.xp_reward)
+    group_kick = None
+    if levelup.levels_gained > 0:
+        group_kick = await group_service.enforce_level_gap(db, character)
     # золото пока не капает — хук на будущее (quest.gold_reward НЕ начисляем)
     cq.status = QuestStatus.COMPLETED
     await db.flush()
     return TurnInResult(
-        xp_reward=quest.xp_reward,
+        xp_reward=levelup.xp_awarded,
         gold_reward=0,
         levels_gained=levelup.levels_gained,
         new_level=levelup.new_level,
+        xp_premium_applied=levelup.premium_applied,
+        group_kick=group_kick,
     )

@@ -20,6 +20,12 @@ from game.combat import display
 _VERB_LABELS = {"бьёт", "кусает", "контратакует"}
 
 
+def is_basic_attack_label(label: str) -> bool:
+    """Патч 51, ч.5 (game/combat/battle_log.py) — метка обычной атаки
+    (не название навыка), та же граница, что использует render_hit ниже."""
+    return label in _VERB_LABELS
+
+
 def render_hit(
     source_name: str,
     target_name: str,

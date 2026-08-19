@@ -11,6 +11,8 @@ from bot.handlers.combat import labeler as combat_labeler
 from bot.handlers.dailies import labeler as dailies_labeler
 from bot.handlers.elixir_shop import labeler as elixir_shop_labeler
 from bot.handlers.fallback import labeler as fallback_labeler
+from bot.handlers.group import labeler as group_labeler
+from bot.handlers.group_combat import labeler as group_combat_labeler
 from bot.handlers.inventory import labeler as inventory_labeler
 from bot.handlers.list_keeper import labeler as list_keeper_labeler
 from bot.handlers.moderation import labeler as moderation_labeler
@@ -23,9 +25,15 @@ from bot.handlers.stats_window import labeler as stats_window_labeler
 from bot.handlers.world import labeler as world_labeler
 
 LABELERS = [
-    onboarding_labeler, world_labeler, combat_labeler, pvp_labeler, appraiser_labeler,
+    onboarding_labeler, world_labeler, combat_labeler, group_combat_labeler, pvp_labeler, appraiser_labeler,
     inventory_labeler, list_keeper_labeler, presets_labeler, elixir_shop_labeler,
     dailies_labeler, mounts_labeler, stats_window_labeler, moderation_labeler, basic_labeler,
+    # Патч 51, ч.2: группы — команды конкретные ("пригласить <ник>", "/выйти",
+    # "/выгнать <ник>"), но одиночное слово "пригласить" (приглашение
+    # пересылкой) технически проходит под тот же regex, что и промокод —
+    # регистрируется СТРОГО ДО promo_labeler, чтобы угадавший совпадение
+    # промокод не перехватил приглашение.
+    group_labeler,
     # Патч 50: промокоды — TEXT_ONLY, без state/payload гейта, поэтому
     # регистрируется ПОСЛЕ всех более специфичных обработчиков (координаты
     # маунта, никнейм, PvP "1"/"2" и т.д.) — те гарантированно успевают
