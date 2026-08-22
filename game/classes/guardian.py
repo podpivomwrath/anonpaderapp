@@ -16,7 +16,7 @@
 
 from game.classes.base import Role, SubclassDef, register
 from game.combat import balance_config as bc
-from game.combat.session import CombatMode, Effect, EffectKind
+from game.combat.session import CombatMode, EffectKind
 from game.combat.skills import PendingHeal, SkillContext, compute_hit, defensive_skill
 from game.combat.subclass_skills import SUBCLASS_SKILL_DEFS
 
@@ -58,15 +58,14 @@ def shield_bash(ctx: SkillContext) -> None:
     else:
         # Патч 47: «Несгибаемый» — +provoke_duration_bonus ходов; 0 без баффа.
         duration = bc.PROVOKE_PVP_DURATION_TICKS + int(actor.buff_modifiers.get("provoke_duration_bonus", 0))
+        # Патч 52, баг 1: apply_effect (не прямой .effects.append) — повторный
+        # Удар щитом по уже спровоцированному врагу ОБНОВЛЯЕТ длительность, а
+        # не добавляет ВТОРОЙ PROVOKE_PVP-эффект. Раньше прямой append копил
+        # независимые эффекты от одного источника, и game/combat/skills.py::
+        # outgoing_multiplier перемножал снижение урона за КАЖДЫЙ — двойная
+        # провокация давала -51% вместо -30%.
         for enemy in enemies:
-            enemy.effects.append(
-                Effect(
-                    kind=EffectKind.PROVOKE_PVP,
-                    value=bc.PROVOKE_PVP_DAMAGE_REDUCTION,
-                    remaining_ticks=duration,
-                    source_id=actor.id,
-                )
-            )
+            enemy.apply_effect(EffectKind.PROVOKE_PVP, bc.PROVOKE_PVP_DAMAGE_REDUCTION, duration, actor.id)
         ctx.lines.append(f"{actor.name} провоцирует: урон противников по другим целям снижен")
 
 

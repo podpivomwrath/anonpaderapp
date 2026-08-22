@@ -63,7 +63,10 @@ def venom(ctx: SkillContext) -> None:
     if existing is not None:
         existing.stacks = min(existing.stacks + 1, bc.POISONER_MAX_STACKS)
         existing.value = per_stack
-        existing.remaining_ticks = duration
+        # Патч 52, баг 1: длительность ОБНОВЛЯЕТСЯ до полной, не суммируется —
+        # max() вместо прямого присваивания защищает от отката длительности
+        # вниз, если пересчитанная duration вдруг окажется меньше остатка.
+        existing.remaining_ticks = max(existing.remaining_ticks, duration)
     else:
         target.effects.append(
             Effect(kind=EffectKind.DOT, value=per_stack, remaining_ticks=duration,
@@ -95,8 +98,8 @@ def disrupt(ctx: SkillContext) -> None:
             ctx.lines.append(combat_flavor.control_blocked_line(target.name))
         elif res.resisted:
             ctx.lines.append(combat_flavor.control_resisted_line(target.name))
-        else:
-            ctx.lines.append(combat_flavor.control_line(target.name))
+        # Патч 52, баг 1: успешное наложение — «теряет ход» не печатается
+        # здесь, единственное место теперь резолвер (game/combat/resolver.py).
 
 
 @offensive_skill("poisoner_toxic_burst")

@@ -60,7 +60,11 @@ def _make_handler(skill: BaseSkillDef):
                 elif res.resisted:
                     ctx.lines.append(combat_flavor.control_resisted_line(target.name))
                 else:
-                    ctx.lines.append(combat_flavor.control_line(target.name))
+                    # Патч 52, баг 1: «теряет ход» больше НЕ печатается здесь —
+                    # единственное место теперь резолвер (game/combat/resolver.py,
+                    # фаза 4a/4b), где определяется, что боец не может
+                    # действовать. Печать здесь дублировала бы её при повторном
+                    # наложении контроля на уже замороженную цель.
                     if res.reduced:
                         ctx.lines.append(combat_flavor.control_reduced_line(target.name))
                     if res.immunity_granted:

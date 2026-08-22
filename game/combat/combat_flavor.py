@@ -56,13 +56,6 @@ def render_hit(
     return f"{source_name} {verb} — {amount} урона{crit_suffix}. {delta}"
 
 
-def control_line(target_name: str) -> str:
-    # Патч 47, баг 3: причастие «скован/скована» требует согласования по роду
-    # мишени (игрок/игрок-а, моб мужского/женского/среднего имени) — шаблон
-    # переписан на существительное+глагол, род не нужен.
-    return f"{target_name} теряет ход ❄️"
-
-
 def control_resisted_line(target_name: str) -> str:
     return f"{target_name} сопротивляется контролю."
 

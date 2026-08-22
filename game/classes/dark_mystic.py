@@ -11,7 +11,7 @@ HP, массовое исцеление союзников (вне группы 
 from game.classes.base import Role, SubclassDef, register
 from game.combat import balance_config as bc
 from game.combat import formulas
-from game.combat.session import Effect, EffectKind
+from game.combat.session import EffectKind
 from game.combat.skills import PendingHeal, SkillContext, compute_hit, offensive_skill
 from game.combat.subclass_skills import SUBCLASS_SKILL_DEFS
 
@@ -63,9 +63,7 @@ def ward(ctx: SkillContext) -> None:
     actor.cooldowns[skill.id] = skill.cd
     ward_target = _lowest_hp_ally_or_self(ctx)
     absorb = round(formulas.support_power(actor.stats.will) * bc.DARK_MYSTIC_WARD_SHIELD_COEF)
-    ward_target.effects.append(
-        Effect(kind=EffectKind.SHIELD_POOL, value=absorb, remaining_ticks=skill.effect_duration, source_id=actor.id)
-    )
+    ward_target.apply_effect(EffectKind.SHIELD_POOL, absorb, skill.effect_duration, actor.id)
     ctx.lines.append(f"{actor.name} накрывает {ward_target.name} Оберегом (+{absorb} поглощения)")
 
 

@@ -4,8 +4,9 @@ import asyncio
 
 import pytest
 
+from game.combat import elixir_effects
 from game.combat.duel_engine import DuelEngine, DuelResult
-from game.combat.session import ActionType, DeclaredAction
+from game.combat.session import ActionType, DeclaredAction, EffectKind
 from tests.conftest import NoCritRng, combatant
 
 
@@ -226,5 +227,75 @@ async def test_block_protects_until_own_next_turn() -> None:
         blocked_damage = a2.max_hp - a2.current_hp
 
         assert blocked_damage < plain_damage
+    finally:
+        engine.shutdown()
+
+
+async def test_second_heart_shield_pool_absorbs_damage_in_duel() -> None:
+    """Патч 52, баг 2: «Второе сердце» (SHIELD_POOL) списывался из инвентаря,
+    но урон в дуэли раньше шёл напрямую в HP — эффект не учитывался вовсе
+    (только в резолвере группового/PvE боя)."""
+    engine = make_engine()
+    engine.start()
+    try:
+        a = combatant(1, side=0)
+        b = combatant(2, side=1)
+        engine.start_duel(10, a, b)  # NoCritRng.shuffle сохраняет порядок — первым всегда 1
+        elixir_effects.apply_combat_elixir(a, "second_heart")
+        assert a.has_effect(EffectKind.SHIELD_POOL)
+
+        await engine.act(10, 1, skip())
+        await engine.act(10, 2, attack(1))  # ход b — атакует a под щитом
+        plain = combatant(3, side=0)
+        enemy2 = combatant(4, side=1)
+        engine.start_duel(20, plain, enemy2)
+        await engine.act(20, 3, skip())
+        await engine.act(20, 4, attack(3))
+        unshielded_damage = plain.max_hp - plain.current_hp
+
+        shielded_damage = a.max_hp - a.current_hp
+        assert shielded_damage < unshielded_damage
+    finally:
+        engine.shutdown()
+
+
+async def test_blood_for_blood_reflects_damage_in_duel() -> None:
+    """Патч 52, баг 2: «Кровь за кровь» (BLOOD_REFLECT) раньше нигде не
+    читался в duel_engine — атакующий не получал урон в ответ в дуэли."""
+    engine = make_engine()
+    engine.start()
+    try:
+        a = combatant(1, side=0)
+        b = combatant(2, side=1)
+        engine.start_duel(10, a, b)
+        elixir_effects.apply_combat_elixir(a, "blood_for_blood")
+        assert a.has_effect(EffectKind.BLOOD_REFLECT)
+
+        await engine.act(10, 1, skip())
+        await engine.act(10, 2, attack(1))  # b атакует a — a защищён шипами
+        assert b.current_hp < b.max_hp  # атакующий получил урон в ответ
+    finally:
+        engine.shutdown()
+
+
+async def test_last_breath_saves_from_lethal_hit_in_duel() -> None:
+    """Патч 52, баг 2: «Последний вздох» (LAST_BREATH) не проверялся вовсе в
+    duel_engine — смертельный удар убивал, несмотря на активный эликсир."""
+    engine = make_engine()
+    engine.start()
+    try:
+        a = combatant(1, side=0)
+        b = combatant(2, side=1)
+        a.current_hp = 1
+        engine.start_duel(10, a, b)
+        elixir_effects.apply_combat_elixir(a, "last_breath")
+        assert a.has_effect(EffectKind.LAST_BREATH)
+
+        await engine.act(10, 1, skip())
+        result = await engine.act(10, 2, attack(1))
+        assert a.current_hp == 1
+        assert a.alive
+        assert not a.has_effect(EffectKind.LAST_BREATH)  # одноразовый — снят
+        assert any("Последний вздох" in line for line in result.lines)
     finally:
         engine.shutdown()

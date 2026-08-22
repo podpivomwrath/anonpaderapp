@@ -255,12 +255,17 @@ def resolve_tick(
         if cid in frozen_at_start or is_frozen(combatant):
             # пропуск ИЗ-ЗА контроля — засчитывается в стрик DR (control-patch-8)
             combatant.skipped_by_control_this_turn = True
-            # Патч 47, баг 2: если контроль наложен ИМЕННО в этот ход (не было на
-            # старте), combat_flavor.control_line уже сообщил об этом в фазе 2 —
-            # вторая строка здесь дублировала бы её. Показываем только для
-            # многоходового «лингера» (заморожен ещё С НАЧАЛА этого хода).
-            if cid in frozen_at_start:
-                result.lines.append(f"{combatant.name} теряет ход ❄️")
+            # Патч 52, баг 1: единственное место, где печатается «теряет ход» —
+            # здесь, где резолвер УЖЕ определил, что боец не может действовать.
+            # Раньше это же сообщение дублировал combat_flavor.control_line в
+            # обработчике наложения контроля (base_skills.py/subclass_skills.py/
+            # poisoner.py) — из-за проверки "только для лингера" (frozen_at_start)
+            # дубль казался устранённым для СВЕЖЕЙ заморозки, но проявлялся при
+            # ПОВТОРНОМ наложении контроля на УЖЕ замороженную цель (обновление
+            # длительности): control_line печатал строку в фазе 2, а эта ветка —
+            # ещё раз, т.к. цель была frozen_at_start. Теперь control_line вообще
+            # не печатает «теряет ход» — только эта строка, ровно один раз.
+            result.lines.append(f"{combatant.name} теряет ход ❄️")
             continue
         if action.type == ActionType.SKIP:
             result.lines.append(f"{combatant.name} медлит и пропускает ход")
@@ -278,9 +283,9 @@ def resolve_tick(
     for mob in [c for c in session.combatants.values() if c.kind == "mob" and c.alive]:
         if is_frozen(mob):
             mob.skipped_by_control_this_turn = True  # пропуск из-за контроля (стрик DR)
-            # Патч 47, баг 2: см. комментарий у фазы 4a — не дублировать control_line.
-            if mob.id in frozen_at_start:
-                result.lines.append(f"{mob.name} теряет ход ❄️")
+            # Патч 52, баг 1: см. комментарий у фазы 4a — единственное место
+            # вывода «теряет ход», без исключения для лингера/свежей заморозки.
+            result.lines.append(f"{mob.name} теряет ход ❄️")
             continue
         if session.mode == CombatMode.PVE and pending_damage.get(mob.id, 0) >= mob.current_hp:
             continue  # уже мёртв по итогам этого хода — не бьёт (патч 25, п.3)

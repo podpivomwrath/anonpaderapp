@@ -40,6 +40,16 @@ from game.combat.session import CombatMode, CombatSessionState
 from game.economy import elixir_config as ec
 
 
+def _apply_last_breath_guard(combatant: CombatantState, result: "DuelResult") -> None:
+    """Последний вздох (патч 16, зеркало resolver.py::_apply_last_breath_guard —
+    патч 52, баг 2: в дуэли этой проверки не было вовсе, эликсир не спасал)."""
+    if combatant.current_hp > 0 or not combatant.has_effect(EffectKind.LAST_BREATH):
+        return
+    combatant.effects = [e for e in combatant.effects if e.kind != EffectKind.LAST_BREATH]
+    combatant.current_hp = 1
+    result.lines.append(f"✨ Последний вздох удерживает {combatant.name} на грани (1 HP)")
+
+
 @dataclass
 class DuelResult:
     lines: list[str] = field(default_factory=list)
@@ -308,12 +318,38 @@ class DuelEngine:
                 amount -= absorbed
                 if absorbed:
                     result.lines.append(f"Щит {target.name} поглощает {absorbed} урона 🛡")
+            # Патч 52, баг 2: Второе сердце (SHIELD_POOL) — персистентный щит на
+            # несколько ходов, ОТДЕЛЬНЫЙ от однотикового target.shield выше.
+            # Раньше здесь не учитывался вовсе (только в резолвере) — эликсир
+            # списывался из инвентаря, но не давал эффекта в дуэли.
+            shield_pool = target.effects_of(EffectKind.SHIELD_POOL)
+            if shield_pool and amount > 0:
+                pool = shield_pool[0]
+                pool_absorbed = min(int(pool.value), amount)
+                pool.value -= pool_absorbed
+                amount -= pool_absorbed
+                if pool_absorbed:
+                    result.lines.append(f"🛡️ Второе сердце {target.name} поглощает {pool_absorbed} урона")
             target.current_hp -= amount
             result.lines.append(combat_flavor.render_hit(
                 actor.name, target.name, label=hit.label, amount=amount, crit=hit.crit,
                 missed=False, is_dot=hit.is_dot, hp_before=before, hp_after=target.current_hp,
                 max_hp=target.max_hp,
             ))
+            _apply_last_breath_guard(target, result)
+            # Патч 52, баг 2: Кровь за кровь (BLOOD_REFLECT) — раньше не
+            # читалось здесь вовсе, эликсир не давал эффекта в дуэли.
+            reflect_pct = target.effect_total(EffectKind.BLOOD_REFLECT)
+            if reflect_pct > 0 and amount > 0 and actor.id != target.id and actor.alive:
+                reflect_amount = max(round(amount * reflect_pct), 1)
+                actor_before = actor.current_hp
+                actor.current_hp -= reflect_amount
+                result.lines.append(combat_flavor.render_hit(
+                    target.name, actor.name, label="шипы", amount=reflect_amount, crit=False,
+                    missed=False, is_dot=False, hp_before=actor_before, hp_after=actor.current_hp,
+                    max_hp=actor.max_hp,
+                ))
+                _apply_last_breath_guard(actor, result)
         for heal in ctx.heals:
             target = state.combatants[heal.target_id]
             before = target.current_hp

@@ -42,7 +42,9 @@ def marked_strike(ctx: SkillContext) -> None:
     existing = target.effect_from(EffectKind.MARK, actor.id)
     if existing is not None:
         existing.stacks = min(existing.stacks + 1, bc.SHADOW_BLADE_MARK_MAX_STACKS)
-        existing.remaining_ticks = bc.SHADOW_BLADE_MARK_DURATION
+        # Патч 52, баг 1: длительность ОБНОВЛЯЕТСЯ до полной, не суммируется —
+        # max(), не прямое присваивание (см. game/classes/poisoner.py).
+        existing.remaining_ticks = max(existing.remaining_ticks, bc.SHADOW_BLADE_MARK_DURATION)
     else:
         target.effects.append(
             Effect(kind=EffectKind.MARK, value=1.0, remaining_ticks=bc.SHADOW_BLADE_MARK_DURATION,
