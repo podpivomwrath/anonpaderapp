@@ -289,6 +289,14 @@ def resolve_tick(
             continue
         if session.mode == CombatMode.PVE and pending_damage.get(mob.id, 0) >= mob.current_hp:
             continue  # уже мёртв по итогам этого хода — не бьёт (патч 25, п.3)
+        if mob.scripted_hit is not None:
+            # Патч 53: рейд-босс с собственным сценарием хода (ротация
+            # атак/фазы) — заменяет стандартное "кусает" целиком. Может
+            # вернуть несколько ударов (напр. "Работа с материалом" — по
+            # всем игрокам) или пустой список (ход без атаки — босс
+            # "готовит инструмент").
+            ctx.hits.extend(mob.scripted_hit(mob, session, rng))
+            continue
         target = None
         if mob.taunted_by is not None:
             taunter = session.combatants.get(mob.taunted_by)

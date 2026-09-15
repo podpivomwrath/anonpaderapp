@@ -12,12 +12,24 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from game.combat import balance_config as bc
-from game.content_loader import ItemBaseDef, ItemRarityDef, load_item_bases, load_item_rarities
+from game.content_loader import (
+    ItemBaseDef,
+    ItemRarityDef,
+    UniqueItemDef,
+    load_item_bases,
+    load_item_rarities,
+    load_unique_items,
+)
 from game.economy import item_config as ic
 from game.economy import item_gen
 from game.economy import premium_config as pc
 from models import Character, Inventory, Item
 from services import premium_service, wallet_service
+
+# Патч 53: единственная редкость, которую эта система не создаёт сама
+# (см. content/items/rarities.json._comment) — Скальпель Хирурга и любые
+# будущие рейд-уникумы выдаются в обход item_gen (grant_unique_item ниже).
+UNIQUE_RARITY_ID = "unique"
 
 SLOTS = ic.SLOTS
 
@@ -41,6 +53,7 @@ STAT_NAMES = {"str": "Сила", "agi": "Ловкость", "int": "Интелл
 
 _bases: dict[str, list[ItemBaseDef]] | None = None
 _rarities: dict[str, ItemRarityDef] | None = None
+_unique_items: dict[str, UniqueItemDef] | None = None
 
 
 def bases() -> dict[str, list[ItemBaseDef]]:
@@ -48,6 +61,13 @@ def bases() -> dict[str, list[ItemBaseDef]]:
     if _bases is None:
         _bases = load_item_bases()
     return _bases
+
+
+def unique_items() -> dict[str, UniqueItemDef]:
+    global _unique_items
+    if _unique_items is None:
+        _unique_items = load_unique_items()
+    return _unique_items
 
 
 def rarities() -> dict[str, ItemRarityDef]:
@@ -128,6 +148,33 @@ async def grant_random_item(
     return item
 
 
+async def grant_unique_item(db: AsyncSession, character: Character, unique_id: str) -> Item:
+    """Выдаёт конкретный уникальный предмет (патч 53, content/items/
+    unique_items.json) — в обход item_gen целиком, как admin_service.
+    grant_admin_weapon. 100% power идёт в ОСНОВНОЙ стат класса получателя
+    (Сила/Ловкость/Интеллект), как у обычного оружия. Дубликаты не
+    ограничены — предмет выдаётся всегда, даже если такой уже есть
+    (задел на будущий крафт, см. текст патча)."""
+    unique_def = unique_items()[unique_id]
+    primary_stat = bc.PRIMARY_STAT_BY_CLASS[character.base_class]
+    item = Item(
+        name=unique_def.name, slot=unique_def.slot,
+        base_stats={primary_stat: unique_def.power}, rarity=UNIQUE_RARITY_ID, ilvl=None,
+    )
+    db.add(item)
+    await db.flush()
+    db.add(Inventory(character_id=character.id, item_id=item.id, equipped=False))
+    await db.flush()
+    return item
+
+
+def is_unsellable(item: Item) -> bool:
+    """Служебные (admin_only) и уникальные (патч 53) предметы скупщик не
+    принимает никогда — единая точка проверки для sell_price/sell_item/
+    sell_by_rarity/sell_all_gear."""
+    return item.admin_only or item.rarity in (None, UNIQUE_RARITY_ID)
+
+
 async def get_equipped(db: AsyncSession, character_id: int) -> dict[str, Item | None]:
     """{slot: надетый предмет или None} — все 5 слотов, даже пустые."""
     rows = (
@@ -202,7 +249,7 @@ def sell_price(item: Item, price_multiplier: float = 1.0) -> int:
     """Цена скупщика: item_power * 3 * rarity_mult (только для отображения —
     сама продажа заново считает то же самое в sell_item). price_multiplier
     (патч 26) — наценка чужака у скупщика в чужом городе."""
-    if item.rarity is None or item.admin_only:
+    if is_unsellable(item):
         return 0
     mult = rarity_def(item.rarity).mult
     return math.floor(item_power(item) * ic.SELL_PRICE_MULT * mult * price_multiplier)
@@ -253,7 +300,7 @@ async def sell_by_rarity(
     items = await get_inventory(db, character.id)
     targets = [
         item for item, equipped in items
-        if not equipped and not item.admin_only and item.rarity == rarity_id
+        if not equipped and not is_unsellable(item) and item.rarity == rarity_id
     ]
     total = 0
     for item in targets:
@@ -266,7 +313,7 @@ async def sell_all_gear(
 ) -> int:
     """Продаёт скупщику всё непроданное снаряжение разом (патч 35)."""
     items = await get_inventory(db, character.id)
-    targets = [item for item, equipped in items if not equipped and not item.admin_only]
+    targets = [item for item, equipped in items if not equipped and not is_unsellable(item)]
     total = 0
     for item in targets:
         total += await sell_item(db, character, item.id, price_multiplier)
@@ -282,7 +329,7 @@ async def sell_item(
     if row is None or row.equipped:
         return 0
     item = await db.get(Item, item_id)
-    if item is None or item.rarity is None or item.admin_only:
+    if item is None or is_unsellable(item):
         return 0
     gold = sell_price(item, price_multiplier)
     await db.delete(row)

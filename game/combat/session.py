@@ -5,11 +5,15 @@ CombatantState/CombatSessionState — рабочие объекты tick_engine 
 
 from dataclasses import dataclass, field
 from enum import StrEnum
+from typing import TYPE_CHECKING, Callable
 
 from pydantic import BaseModel, Field
 
 from game.combat import balance_config as bc
 from game.combat import formulas
+
+if TYPE_CHECKING:
+    from game.combat.skills import PendingHit
 
 
 class CombatMode(StrEnum):
@@ -137,6 +141,14 @@ class CombatantState:
     overload_ready: bool = False
     # Стихийный поток: последние (до 3) применённые элементальные умения подряд
     recent_elements: list[str] = field(default_factory=list)
+
+    # Патч 53: скриптованный ход рейд-босса — если задан, резолвер (фаза 4b)
+    # вызывает ЕГО вместо стандартного "кусает" compute_hit(mob, target).
+    # None у ВСЕХ обычных мобов/персонажей — поведение резолвера не меняется
+    # ни для одного существующего боя (PvE/PvP), это ЧИСТОЕ расширение.
+    # Не персистится нигде — как и весь CombatantState, живёт только в
+    # памяти на время конкретного рейд-боя (game/combat/raid_bosses.py).
+    scripted_hit: "Callable[[CombatantState, CombatSessionState, object], list[PendingHit]] | None" = None
 
     @property
     def alive(self) -> bool:

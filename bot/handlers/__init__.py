@@ -21,6 +21,8 @@ from bot.handlers.onboarding import labeler as onboarding_labeler
 from bot.handlers.presets import labeler as presets_labeler
 from bot.handlers.promo import labeler as promo_labeler
 from bot.handlers.pvp import labeler as pvp_labeler
+from bot.handlers.raid import labeler as raid_labeler
+from bot.handlers.raid_combat import labeler as raid_combat_labeler
 from bot.handlers.stats_window import labeler as stats_window_labeler
 from bot.handlers.world import labeler as world_labeler
 
@@ -28,6 +30,8 @@ LABELERS = [
     onboarding_labeler, world_labeler, combat_labeler, group_combat_labeler, pvp_labeler, appraiser_labeler,
     inventory_labeler, list_keeper_labeler, presets_labeler, elixir_shop_labeler,
     dailies_labeler, mounts_labeler, stats_window_labeler, moderation_labeler, basic_labeler,
+    # Патч 53: рейд — до fallback/promo, как и остальные боевые/меню лейблеры.
+    raid_labeler, raid_combat_labeler,
     # Патч 51, ч.2: группы — команды конкретные ("пригласить <ник>", "/выйти",
     # "/выгнать <ник>"), но одиночное слово "пригласить" (приглашение
     # пересылкой) технически проходит под тот же regex, что и промокод —

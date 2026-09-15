@@ -322,6 +322,29 @@ def load_admin_weapons(content_dir: Path = CONTENT_DIR) -> list[AdminWeaponDef]:
     return [AdminWeaponDef(**w) for w in raw.get("weapons", [])]
 
 
+class UniqueItemDef(BaseModel):
+    """Уникальный предмет (патч 53, content/items/unique_items.json) —
+    ФИКСИРОВАННЫЕ статы, как AdminWeaponDef: не через item_gen.generate_item,
+    только явная выдача по id (services/raid_service.py). power — очки
+    основного стата класса получателя (100% в один стат, как у обычного
+    оружия) — фактический base_stats собирается в момент выдачи, не здесь."""
+
+    id: str = ""  # проставляется при загрузке (ключ словаря в JSON)
+    name: str
+    slot: str
+    power: int
+    flavor: str = ""
+
+
+def load_unique_items(content_dir: Path = CONTENT_DIR) -> dict[str, UniqueItemDef]:
+    raw = _load_json_dict(content_dir / "items" / "unique_items.json")
+    return {
+        item_id: UniqueItemDef(id=item_id, **data)
+        for item_id, data in raw.items()
+        if not item_id.startswith("_")
+    }
+
+
 class ClassTrialDef(BaseModel):
     """Классовое испытание (content/quests/class_trials.json, патч 12):
     условие открытия одного микробаффа подкласса. id испытания == id баффа

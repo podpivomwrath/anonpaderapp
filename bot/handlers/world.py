@@ -16,6 +16,7 @@ from sqlalchemy import select
 from vkbottle.bot import BotLabeler, Message
 
 from bot import ash_handful_state, dailies_texts, group_texts, raid_key_texts
+from bot import raid_texts
 from bot.battle_keyboard import active_battle_keyboard
 from bot.handlers import appraiser as appraiser_handlers
 from bot.handlers import combat as combat_handlers
@@ -23,7 +24,9 @@ from bot.handlers import elixir_shop as elixir_shop_handlers
 from bot.handlers import group_combat as group_combat_handlers
 from bot.handlers import inventory as inventory_handlers
 from bot.handlers import pvp as pvp_handlers
+from bot.handlers import raid_combat as raid_combat_handlers
 from bot.handlers import stats_window
+from bot.keyboards import raid as raid_kb
 from bot.keyboards import world as kb
 from bot.keyboards.group_explore import group_ready_keyboard
 from bot.onboarding_texts import REGION_TITLES
@@ -43,6 +46,7 @@ from bot.world_texts import (
 )
 from game.combat import display
 from game.economy import premium_config as pc
+from game.economy import raid_config as raid_cfg
 from game.economy import story_config as sc
 from game.world import encounters, events as event_pool
 from game.world import flavor, grid
@@ -64,6 +68,7 @@ from services import (
     premium_service,
     preset_service,
     quest_service,
+    raid_service,
     screen_service,
     song_service,
     story_service,
@@ -117,6 +122,24 @@ def _map_text(
     vit_bonus = (gear_bonus or {}).get("vit", 0)
     return location_summary(
         character, stats, _rng, farm_currency, vit_bonus, quest_line, donate_currency, group_block,
+    )
+
+
+async def _maybe_send_monolith_button(peer_id: int, character) -> None:
+    """Патч 53: на клетке Монолита (0;0) — лорный текст + кнопка «Прикоснуться»
+    ОТДЕЛЬНЫМ сообщением С ИНЛАЙН-клавиатурой (не заменяет нижнюю reply-
+    клавиатуру перемещения, которая осталась от только что отправленной
+    сводки локации — VK различает reply/inline клавиатуры на уровне
+    сообщения, см. bot/keyboards/raid.py::touch_monolith_keyboard).
+    Не показывается, если персонаж уже в рейде/лобби (устаревшая ситуация —
+    не должна произойти при обычном потоке, но не дублировать кнопку)."""
+    if (character.pos_x, character.pos_y) != raid_cfg.MONOLITH_COORDS:
+        return
+    if raid_combat_handlers.has_active_raid(character.id):
+        return
+    await _bot_api.messages.send(
+        peer_id=peer_id, message=raid_texts.MONOLITH_CALL_TEXT, random_id=0,
+        keyboard=raid_kb.touch_monolith_keyboard(),
     )
 
 
@@ -254,6 +277,7 @@ async def show_location(message: Message, db, character) -> None:
         attachment=location_attachment(character),
         keyboard=kb.movement_keyboard(character.pos_x, character.pos_y, message.peer_id, has_mount=has_mount),
     )
+    await _maybe_send_monolith_button(message.peer_id, character)
 
 
 @labeler.message(text=[kb.BTN_GATE])
@@ -317,6 +341,7 @@ async def gate_exit_direction(message: Message) -> None:
             attachment=location_attachment(character),
             keyboard=kb.movement_keyboard(character.pos_x, character.pos_y, message.peer_id, has_mount=has_mount),
         )
+        await _maybe_send_monolith_button(message.peer_id, character)
 
 
 ASH_BURNED_LINE = "Пепел разнесло ветром."
@@ -492,6 +517,7 @@ async def collect_ash_handful(message: Message) -> None:
         attachment=location_attachment(character),
         keyboard=kb.movement_keyboard(character.pos_x, character.pos_y, peer_id, has_mount=has_mount),
     )
+    await _maybe_send_monolith_button(peer_id, character)
 
 
 async def handle_explore_done(peer_id: int) -> None:
@@ -612,6 +638,7 @@ async def event_choice(message: Message) -> None:
         attachment=location_attachment(character),
         keyboard=kb.movement_keyboard(character.pos_x, character.pos_y, peer_id, has_mount=has_mount),
     )
+    await _maybe_send_monolith_button(peer_id, character)
 
 
 SONG_READ_SCENE = (
@@ -654,6 +681,7 @@ async def read_song(message: Message) -> None:
         attachment=location_attachment(character),
         keyboard=kb.movement_keyboard(character.pos_x, character.pos_y, peer_id, has_mount=True),
     )
+    await _maybe_send_monolith_button(peer_id, character)
 
 
 # --- Отдых (combat-patch-2, п.3): вне боя, 8-12 сек, HP → полное ---
@@ -767,6 +795,11 @@ async def move(message: Message) -> None:
                 keyboard=kb.movement_keyboard(character.pos_x, character.pos_y, message.peer_id, has_mount=has_mount),
             )
             return
+        # Патч 53: уходит с клетки Монолита — если состоял в рейд-лобби, это
+        # уменьшает знаменатель готовности (текст патча), тот же принцип, что
+        # и "вышел из группы" (см. services/group_service.py).
+        if (character.pos_x, character.pos_y) == raid_cfg.MONOLITH_COORDS:
+            await raid_service.leave_lobby_if_present(db, character.id)
         movement_service.start_travel(character, dx, dy, now)
         await db.commit()
         # в пути — кнопки убираем, вернём по прибытии (чистка визуального шума)
@@ -814,6 +847,7 @@ async def handle_arrival(peer_id: int) -> None:
             attachment=location_attachment(character),
             keyboard=kb.movement_keyboard(character.pos_x, character.pos_y, peer_id, has_mount=has_mount),
         )
+        await _maybe_send_monolith_button(peer_id, character)
 
 
 @labeler.message(text=[kb.BTN_MENTOR, kb.BTN_MENTOR_BADGE])
@@ -1004,6 +1038,8 @@ async def _screen_keyboard(db, character) -> str | None:
     if character.screen in ("tavern", "market_quarter"):
         result = await _render_city_screen(db, character, character.screen)
         return result[1] if result is not None else None
+    if character.screen == "raid_list":
+        return raid_kb.raid_list_keyboard()
     for rebuild in _SCREEN_REBUILDERS:
         result = await rebuild(db, character)
         if result is not None:

@@ -22,6 +22,8 @@ from bot.handlers import mounts as mounts_handlers
 from bot.handlers import presets as presets_handlers
 from bot.handlers import promo as promo_handlers
 from bot.handlers import pvp as pvp_handlers
+from bot.handlers import raid as raid_handlers
+from bot.handlers import raid_combat as raid_combat_handlers
 from bot.handlers import respawn as respawn_handlers
 from bot.handlers import stats_window as stats_window_handlers
 from bot.handlers import world as world_handlers
@@ -125,6 +127,20 @@ async def run() -> None:
     group_pve_tick_engine.start()
     group_combat_handlers.setup(group_pve_tick_engine, bot.api)
 
+    # Патч 53: рейд «Кукольный театр» — ОТДЕЛЬНЫЙ экземпляр TickEngine (как и
+    # групповой PvE выше), чтобы session_id-пространство (свой отрицательный
+    # счётчик в bot/handlers/raid_combat.py) гарантированно не пересекалось
+    # ни с чьим другим — отдельный движок делает это автоматическим, без
+    # ручного согласования диапазонов id между модулями.
+    raid_tick_engine = TickEngine(
+        InMemoryActionStore(),
+        on_tick_resolved=raid_combat_handlers.on_raid_tick_resolved,
+        on_battle_finished=raid_combat_handlers.on_raid_battle_finished,
+    )
+    raid_tick_engine.start()
+    raid_combat_handlers.setup(raid_tick_engine, bot.api)
+    raid_handlers.setup(bot.api)
+
     travel_scheduler = PeerScheduler(world_handlers.handle_arrival, job_prefix="travel")
     travel_scheduler.start()
     explore_scheduler = PeerScheduler(world_handlers.handle_explore_done, job_prefix="explore")
@@ -176,6 +192,7 @@ async def run() -> None:
         duel_engine.shutdown()
         pvp_tick_engine.shutdown()
         group_pve_tick_engine.shutdown()
+        raid_tick_engine.shutdown()
         tick_engine.shutdown()
         await runner.cleanup()
         await redis.aclose()

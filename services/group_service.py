@@ -256,6 +256,12 @@ async def leave_group(db: AsyncSession, character_id: int) -> LeaveResult:
     was_leader = group.leader_character_id == character_id
     await db.delete(membership)
     await db.flush()
+    # Патч 53: вышел из группы — знаменатель рейд-лобби уменьшается (текст
+    # патча). Локальный импорт — raid_service не нужен большинству вызывающих
+    # group_service, не тянуть его наверх без необходимости.
+    from services import raid_service
+
+    await raid_service.leave_lobby_if_present(db, character_id)
     return await _remove_member(db, group, character_id, was_leader)
 
 
@@ -277,6 +283,9 @@ async def kick_member(db: AsyncSession, leader: Character, target_character_id: 
         raise GroupError("Этого игрока нет в твоей группе.")
     await db.delete(target_membership)
     await db.flush()
+    from services import raid_service  # см. комментарий в leave_group
+
+    await raid_service.leave_lobby_if_present(db, target_character_id)
     return await _remove_member(db, group, target_character_id, was_leader=False)
 
 
