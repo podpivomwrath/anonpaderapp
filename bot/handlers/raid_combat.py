@@ -307,7 +307,12 @@ async def _broadcast_board(
 # --- Действия боя (атака/навык) ---
 
 
-@labeler.message(text=["⚔️ Ударить"])
+# Патч 54: раньше правило было `text=["⚔️ Ударить"]` — дословно подпись
+# группового PvE, чей лейблер зарегистрирован РАНЬШЕ (bot/handlers/__init__.py),
+# поэтому нажатие перехватывал group_attack, не находил группового боя и молча
+# выходил: обычная атака в рейде не работала вовсе. Теперь диспетчеризация по
+# уникальному payload, а подпись — из общего реестра (bot/keyboards/combat_modes.py).
+@labeler.message(payload_contains={"type": "raid_attack"})
 async def raid_attack(message: Message) -> None:
     await _raid_action(message, DeclaredAction(type=ActionType.ATTACK))
 

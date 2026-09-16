@@ -12,6 +12,7 @@ payload {"type":"skill"} из bot/handlers/combat.py) — vkbottle диспет�
 
 from vkbottle import Keyboard, KeyboardButtonColor, Text
 
+from bot.keyboards import combat_modes
 from bot.keyboards.layout import add_paired
 from bot.keyboards.world import add_miniapp_button
 from game.combat.base_skills import skills_for_character
@@ -21,11 +22,18 @@ from game.content_loader import ElixirDef
 # без переполнения экрана — свыше этого пришлось бы пагинировать.
 _TARGET_ROW_WIDTH = 5
 
-BTN_PVP_ATTACK = "🗡️ Атаковать"
+# Патч 54: сами значения — в bot/keyboards/combat_modes.py, единым реестром
+# на все боевые режимы (там же объяснено, почему уникальность подписей
+# критична и чем это проверяется).
+BTN_PVP_ATTACK = combat_modes.PVP.attack
 # Патч 30, баг 3, п.3: у PvE "🎒 Предмет" (bot/keyboards/world.py) — намеренно
 # ДРУГОЙ текст здесь же, по той же причине, что и BTN_PVP_ATTACK выше.
-BTN_PVP_ITEM = "🎒 Предметы"
-BTN_PVP_TARGET = "🎯 Цель"  # патч 38 — только массовый PvP, не дуэль (см. show_target)
+BTN_PVP_ITEM = combat_modes.PVP.item
+# Патч 38 — только массовый PvP, не дуэль (см. show_target).
+# Патч 54: значение переехало в bot/keyboards/combat_modes.py и СМЕНИЛОСЬ —
+# раньше здесь было «🎯 Цель», дословно как BTN_GROUP_TARGET, и групповой
+# PvE (зарегистрирован раньше в LABELERS) молча перехватывал эту кнопку.
+BTN_PVP_TARGET = combat_modes.PVP.target
 
 
 def join_side_keyboard(session_id: int) -> str:

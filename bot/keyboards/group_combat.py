@@ -9,14 +9,17 @@ pvp.py — BTN_PVP_ATTACK="🗡️ Атаковать", payload {"type":"pvp_ski
 
 from vkbottle import Keyboard, KeyboardButtonColor, Text
 
+from bot.keyboards import combat_modes
 from bot.keyboards.layout import add_paired
 from game.combat.base_skills import skills_for_character
 
 _TARGET_ROW_WIDTH = 5
 
-BTN_GROUP_ATTACK = "⚔️ Ударить"
-BTN_GROUP_ITEM = "🎒 Снаряжение"
-BTN_GROUP_TARGET = "🎯 Цель"
+# Патч 54: значения — в общем реестре bot/keyboards/combat_modes.py (там же
+# объяснено, почему уникальность подписей между режимами критична).
+BTN_GROUP_ATTACK = combat_modes.GROUP_PVE.attack
+BTN_GROUP_ITEM = combat_modes.GROUP_PVE.item
+BTN_GROUP_TARGET = combat_modes.GROUP_PVE.target
 
 
 def group_combat_keyboard(

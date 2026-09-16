@@ -7,11 +7,19 @@ bot/keyboards/group_combat.py — vkbottle диспетчерит по перв�
 
 from vkbottle import Keyboard, KeyboardButtonColor, Text
 
+from bot.keyboards import combat_modes
 from bot.keyboards.layout import add_paired
 from bot.raid_texts import BTN_PUPPET_THEATRE, BTN_RAID_BACK, BTN_RAID_CANCEL_READY, BTN_TOUCH_MONOLITH
 from game.combat.base_skills import skills_for_character
 
 _TARGET_ROW_WIDTH = 5
+_RAID = combat_modes.RAID
+
+# Публичные имена подписей рейда — чтобы обработчики (bot/handlers/
+# raid_combat.py) ссылались на константу, а не на строковый литерал.
+BTN_RAID_ATTACK = _RAID.attack
+BTN_RAID_ITEM = _RAID.item
+BTN_RAID_TARGET = _RAID.target
 
 
 def touch_monolith_keyboard() -> str:
@@ -41,17 +49,27 @@ def raid_lobby_keyboard(ready: bool = True) -> str:
 
 
 def raid_combat_keyboard(base_class: str, cooldowns: dict[str, int], subclass_id: str | None = None) -> str:
+    """Патч 54: подписи берутся из общего реестра combat_modes.RAID — до этого
+    были ДОСЛОВНЫМИ копиями группового PvE, и групповой обработчик (он раньше
+    в LABELERS) перехватывал все три кнопки: рейд был непроходим, работали
+    только навыки с уникальным payload.
+
+    Кнопка побега здесь отсутствует НАМЕРЕННО (combat_modes.RAID.escape is
+    None) — выйти из рейда нельзя, единственный выход — смерть всей группы
+    (патч 53)."""
     kb = Keyboard(one_time=False)
     items: list[tuple[str, KeyboardButtonColor, dict | None]] = [
-        ("⚔️ Ударить", KeyboardButtonColor.POSITIVE, None)
+        # Патч 54: у атаки теперь есть и payload — диспетчеризация по нему не
+        # зависит от подписи вовсе (второй рубеж, см. combat_modes).
+        (_RAID.attack, KeyboardButtonColor.POSITIVE, {"type": "raid_attack"})
     ]
     for skill in skills_for_character(base_class, subclass_id):
         cd = cooldowns.get(skill.id, 0)
         label = skill.name if cd <= 0 else f"{skill.name} (КД {cd})"
         color = KeyboardButtonColor.PRIMARY if cd <= 0 else KeyboardButtonColor.SECONDARY
-        items.append((label, color, {"type": "raid_skill", "id": skill.id}))
-    items.append(("🎯 Цель", KeyboardButtonColor.SECONDARY, {"type": "raid_open_target"}))
-    items.append(("🎒 Снаряжение", KeyboardButtonColor.SECONDARY, {"type": "raid_open_items"}))
+        items.append((label, color, {"type": _RAID.skill_payload, "id": skill.id}))
+    items.append((_RAID.target, KeyboardButtonColor.SECONDARY, {"type": "raid_open_target"}))
+    items.append((_RAID.item, KeyboardButtonColor.SECONDARY, {"type": "raid_open_items"}))
     add_paired(kb, items)
     return kb.get_json()
 

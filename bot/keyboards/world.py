@@ -10,6 +10,7 @@
 from vkbottle import Keyboard, KeyboardButtonColor, OpenLink, Text
 
 from bot import ash_handful_state
+from bot.keyboards import combat_modes
 from bot.keyboards.layout import add_paired
 from bot.onboarding_texts import REGION_TITLES
 from config import get_settings
@@ -56,9 +57,11 @@ BTN_LOOK_AROUND = "👁 Осмотреться"  # патч 22: кто ещё н
 BTN_ASH_HANDFUL = "🌫 Горстка пепла"  # патч 25, п.4: одноразовая находка
 BTN_MOUNT = "🐎 Маунт"  # патч 25, п.7
 
-BTN_ATTACK = "🗡️ Атака"
-BTN_ITEM = "🎒 Предмет"
-BTN_FLEE = "🏃 Побег"
+# Патч 54: значения — в общем реестре bot/keyboards/combat_modes.py (там же
+# объяснено, почему уникальность подписей между режимами критична).
+BTN_ATTACK = combat_modes.SOLO_PVE.attack
+BTN_ITEM = combat_modes.SOLO_PVE.item
+BTN_FLEE = combat_modes.SOLO_PVE.escape
 
 
 def empty_keyboard() -> str:
