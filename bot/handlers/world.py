@@ -17,7 +17,8 @@ from vkbottle.bot import BotLabeler, Message
 
 from bot import ash_handful_state, dailies_texts, group_texts, raid_key_texts
 from bot import raid_texts
-from bot.battle_keyboard import active_battle_keyboard
+from bot.battle_keyboard import active_battle_keyboard, in_any_battle
+from bot.activity import activity_action
 from bot.handlers import appraiser as appraiser_handlers
 from bot.handlers import combat as combat_handlers
 from bot.handlers import elixir_shop as elixir_shop_handlers
@@ -249,7 +250,7 @@ async def show_location(message: Message, db, character) -> None:
         await message.answer(f"🚶 В пути... осталось ~{left:.0f} сек.")
         return
 
-    if combat_handlers.has_active_encounter(message.peer_id):
+    if in_any_battle(message.peer_id):
         await message.answer("⚔️ Ты в бою — реши его исход.")
         return
 
@@ -348,6 +349,7 @@ ASH_BURNED_LINE = "Пепел разнесло ветром."
 
 
 @labeler.message(text=[kb.BTN_EXPLORE])
+@activity_action
 async def explore(message: Message) -> None:
     peer_id = message.peer_id
     async with get_session_factory()() as db:
@@ -358,7 +360,7 @@ async def explore(message: Message) -> None:
         if await _check_still_dead(db, character, now):
             await message.answer("☠ Сначала очнись.")
             return
-        if combat_handlers.has_active_encounter(peer_id):
+        if in_any_battle(peer_id):
             await message.answer("⚔️ Ты уже в бою.")
             return
         if peer_id in _exploring:
@@ -424,13 +426,10 @@ async def explore(message: Message) -> None:
                 # Все участники на клетке готовы — только бои в групповом
                 # исследовании (без событий/обрывков Песни/пепла, патч 51, ч.3).
                 group_explore_service.clear(snapshot.id)
-                inputs = await group_combat_handlers.build_member_inputs(db, cohort)
                 region = region_for(character.pos_x, character.pos_y)
                 dist = grid.chebyshev_distance(character.pos_x, character.pos_y)
-                await db.commit()
-                await db.close()  # см. комментарий выше — та же причина
-                await group_combat_handlers.start_group_encounter(
-                    snapshot.id, inputs, region, dist, _rng,
+                await group_combat_handlers.start_ready_group(
+                    db, snapshot.id, cohort, region, dist, _rng,
                 )
                 return
 
@@ -535,7 +534,7 @@ async def handle_explore_done(peer_id: int) -> None:
             return
         if grid.city_region_at(character.pos_x, character.pos_y) is not None:
             return  # успел вернуться в город
-        if combat_handlers.has_active_encounter(peer_id):
+        if in_any_battle(peer_id):
             return
         stats = await _get_stats(db, character.id)
 
@@ -688,6 +687,7 @@ async def read_song(message: Message) -> None:
 
 
 @labeler.message(text=[kb.BTN_REST])
+@activity_action
 async def rest(message: Message) -> None:
     peer_id = message.peer_id
     async with get_session_factory()() as db:
@@ -698,7 +698,7 @@ async def rest(message: Message) -> None:
         if await _check_still_dead(db, character, now):
             await message.answer("☠ Сначала очнись.")
             return
-        if combat_handlers.has_active_encounter(peer_id):
+        if in_any_battle(peer_id):
             await message.answer("В бою не отдохнёшь.")
             return
         if peer_id in _resting:
@@ -728,7 +728,7 @@ async def handle_rest_done(peer_id: int) -> None:
         character = await onboarding_svc.get_character(db, peer_id)
         if character is None or character.creation_state is not None:
             return
-        if death_service.is_dead(character) or combat_handlers.has_active_encounter(peer_id):
+        if death_service.is_dead(character) or in_any_battle(peer_id):
             return
         stats = await _get_stats(db, character.id)
         vit_bonus = (await item_service.compute_gear_bonus(db, character.id)).get("vit", 0)
@@ -753,6 +753,7 @@ async def handle_rest_done(peer_id: int) -> None:
 
 
 @labeler.message(text=kb.MOVEMENT_TEXTS)
+@activity_action
 async def move(message: Message) -> None:
     async with get_session_factory()() as db:
         character = await onboarding_svc.get_character(db, message.from_id)
@@ -762,7 +763,7 @@ async def move(message: Message) -> None:
         if await _check_still_dead(db, character, now):
             await message.answer("☠ Сначала очнись.")
             return
-        if combat_handlers.has_active_encounter(message.peer_id):
+        if in_any_battle(message.peer_id):
             await message.answer("Сначала разберись с боем.")
             return
         if message.peer_id in _exploring:
@@ -1054,12 +1055,9 @@ async def _current_keyboard(db, character, peer_id: int, now: datetime) -> str:
     Патч 37: вложенный экран (character.screen) — ниже приоритетом, чем
     бой/перемещение/смерть, поэтому бой всегда перебивает сохранённый экран
     скупщика/лавки/инвентаря, как и раньше (правило патча 30 не отменяется)."""
-    pvp_kb = pvp_handlers.rebuild_keyboard(peer_id)
-    if pvp_kb is not None:
-        return pvp_kb
-    combat_kb = combat_handlers.rebuild_keyboard(peer_id)
-    if combat_kb is not None:
-        return combat_kb
+    battle_kb = active_battle_keyboard(peer_id)
+    if battle_kb is not None:
+        return battle_kb
     if peer_id in _exploring or peer_id in _resting or movement_service.is_traveling(character, now):
         return kb.waiting_keyboard()
     if await mount_service.active_travel(db, character.id) is not None:
@@ -1108,7 +1106,7 @@ def activity_state(peer_id: int) -> str:
     """Грубая текстовая метка активности по in-memory состоянию — для /баг
     снапшота и админки (патч 27, части 2.3 и 3). Перемещение/поездка на
     маунте не отсюда — это в Character/MountTravel, проверяются вызывающим."""
-    if combat_handlers.has_active_encounter(peer_id):
+    if in_any_battle(peer_id):
         return "в бою"
     if pvp_handlers.rebuild_keyboard(peer_id) is not None:
         return "в PvP-бою"
@@ -1139,6 +1137,9 @@ async def force_unstick(db, character, peer_id: int, *, admin_override: bool = F
     # даже если PvP не даёт прервать сам бой, застрявший вложенный экран
     # (скупщик/лавка/инвентарь) сбрасывается.
     await screen_service.set_screen(db, character, None)
+    if (raid_combat_handlers.has_active_battle(peer_id)
+            or group_combat_handlers.has_active_group_battle(peer_id)):
+        return True  # restore the battle UI; never escape a raid via /stuck
     if pvp_handlers.rebuild_keyboard(peer_id) is not None:
         if not admin_override:
             return True
@@ -1179,7 +1180,7 @@ async def stuck_command(message: Message) -> None:
             return
         if await force_unstick(db, character, peer_id):
             await db.commit()  # патч 37: сброс character.screen должен сохраниться и в PvP-ветке
-            await message.answer(STUCK_LINE, keyboard=pvp_handlers.rebuild_keyboard(peer_id))
+            await message.answer(STUCK_LINE, keyboard=active_battle_keyboard(peer_id))
             return
         now = datetime.now(timezone.utc)
         await db.commit()

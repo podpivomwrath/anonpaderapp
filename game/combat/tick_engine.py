@@ -13,6 +13,7 @@
 import asyncio
 import json
 import random
+from uuid import uuid4
 from datetime import datetime, timedelta, timezone
 from typing import Awaitable, Callable, Protocol
 
@@ -33,11 +34,11 @@ BattleFinishedCallback = Callable[[int, TickResult], Awaitable[None]]
 class ActionStore(Protocol):
     """Хранилище объявленных действий текущего тика."""
 
-    async def declare(self, session_id: int, participant_id: int, action: dict) -> None: ...
+    async def declare(self, session_id: int | str, participant_id: int, action: dict) -> None: ...
 
-    async def declared_ids(self, session_id: int) -> set[int]: ...
+    async def declared_ids(self, session_id: int | str) -> set[int]: ...
 
-    async def pop_all(self, session_id: int) -> dict[int, dict]:
+    async def pop_all(self, session_id: int | str) -> dict[int, dict]:
         """Атомарно забрать и очистить все действия сессии."""
         ...
 
@@ -46,15 +47,15 @@ class InMemoryActionStore:
     """Для тестов и демо."""
 
     def __init__(self) -> None:
-        self._actions: dict[int, dict[int, dict]] = {}
+        self._actions: dict[int | str, dict[int, dict]] = {}
 
-    async def declare(self, session_id: int, participant_id: int, action: dict) -> None:
+    async def declare(self, session_id: int | str, participant_id: int, action: dict) -> None:
         self._actions.setdefault(session_id, {})[participant_id] = action
 
-    async def declared_ids(self, session_id: int) -> set[int]:
+    async def declared_ids(self, session_id: int | str) -> set[int]:
         return set(self._actions.get(session_id, {}))
 
-    async def pop_all(self, session_id: int) -> dict[int, dict]:
+    async def pop_all(self, session_id: int | str) -> dict[int, dict]:
         return self._actions.pop(session_id, {})
 
 
@@ -65,17 +66,20 @@ class RedisActionStore:
         self._redis = redis
 
     @staticmethod
-    def _key(session_id: int) -> str:
+    def _key(session_id: int | str) -> str:
         return f"combat:session:{session_id}:actions"
 
-    async def declare(self, session_id: int, participant_id: int, action: dict) -> None:
-        await self._redis.hset(self._key(session_id), str(participant_id), json.dumps(action))
+    async def declare(self, session_id: int | str, participant_id: int, action: dict) -> None:
+        async with self._redis.pipeline(transaction=True) as pipe:
+            pipe.hset(self._key(session_id), str(participant_id), json.dumps(action))
+            pipe.expire(self._key(session_id), 86400)
+            await pipe.execute()
 
-    async def declared_ids(self, session_id: int) -> set[int]:
+    async def declared_ids(self, session_id: int | str) -> set[int]:
         keys = await self._redis.hkeys(self._key(session_id))
         return {int(k) for k in keys}
 
-    async def pop_all(self, session_id: int) -> dict[int, dict]:
+    async def pop_all(self, session_id: int | str) -> dict[int, dict]:
         key = self._key(session_id)
         async with self._redis.pipeline(transaction=True) as pipe:
             pipe.hgetall(key)
@@ -113,6 +117,7 @@ class TickEngine:
         self.max_turns = max_turns
         self.sessions: dict[int, CombatSessionState] = {}
         self._resolve_locks: dict[int, asyncio.Lock] = {}
+        self._generations: dict[int, str] = {}
 
     # --- Жизненный цикл ---
 
@@ -129,12 +134,14 @@ class TickEngine:
         if state.mode not in (CombatMode.PVE, CombatMode.PVP_GROUP):
             raise ValueError("Тиковый движок обслуживает pve и pvp_group; дуэль — duel_engine")
         self.sessions[state.session_id] = state
+        self._generations[state.session_id] = uuid4().hex
         self._resolve_locks[state.session_id] = asyncio.Lock()
         self._open_tick(state)
 
     def abort_session(self, session_id: int) -> None:
         """Немедленно прерывает сессию без резолва тика и колбэков (побег из PvE)."""
         self.sessions.pop(session_id, None)
+        self._generations.pop(session_id, None)
         self._resolve_locks.pop(session_id, None)
         try:
             self.scheduler.remove_job(self._job_id(session_id))
@@ -145,6 +152,9 @@ class TickEngine:
 
     def _job_id(self, session_id: int) -> str:
         return f"combat:{session_id}:tick_timeout"
+
+    def _action_key(self, state: CombatSessionState) -> str:
+        return f"{state.session_id}:{self._generations[state.session_id]}:{state.tick_number}"
 
     def _open_tick(self, state: CombatSessionState) -> None:
         state.tick_number += 1
@@ -160,7 +170,7 @@ class TickEngine:
             self.scheduler.add_job(
                 self._resolve,
                 trigger=DateTrigger(run_date=resolve_at),
-                args=[state.session_id],
+                args=[state.session_id, state.tick_number, state],
                 id=self._job_id(state.session_id),
                 replace_existing=True,
                 misfire_grace_time=30,
@@ -185,35 +195,46 @@ class TickEngine:
         state = self.sessions.get(session_id)
         if state is None:
             raise KeyError(f"Сессия {session_id} не активна")
+        tick = state.tick_number
+        lock = self._resolve_locks[session_id]
         combatant = state.combatants.get(participant_id)
         if combatant is None or not combatant.alive or combatant.kind != "character":
             raise ValueError("Объявлять действия могут только живые игроки-участники")
 
-        await self.store.declare(session_id, participant_id, action.model_dump(mode="json"))
+        async with lock:
+            if self.sessions.get(session_id) is not state or state.tick_number != tick:
+                raise ValueError("Ход уже завершён")
+            key = self._action_key(state)
+            await self.store.declare(key, participant_id, action.model_dump(mode="json"))
+            declared = await self.store.declared_ids(key)
         logger.debug(
             "Сессия {}: {} объявил {}", session_id, combatant.name, action.type
         )
 
         # Общее правило PvP + условие PvE: все объявили — резолвим досрочно
-        declared = await self.store.declared_ids(session_id)
         if state.expected_declarers() <= declared:
-            await self._resolve(session_id)
+            await self._resolve(session_id, tick, state)
 
-    async def _resolve(self, session_id: int) -> None:
+    async def _resolve(
+        self, session_id: int, expected_tick: int | None = None,
+        expected_state: CombatSessionState | None = None,
+    ) -> None:
         state = self.sessions.get(session_id)
         if state is None:
             return  # уже разрешён (гонка таймера и досрочного резолва)
+        expected_state = expected_state or state
+        expected_tick = state.tick_number if expected_tick is None else expected_tick
         lock = self._resolve_locks[session_id]
         async with lock:
             state = self.sessions.get(session_id)
-            if state is None:
+            if state is not expected_state or state.tick_number != expected_tick:
                 return
             try:
                 self.scheduler.remove_job(self._job_id(session_id))
             except Exception:
                 pass  # PvE-режим или job уже отработал
 
-            raw = await self.store.pop_all(session_id)
+            raw = await self.store.pop_all(self._action_key(state))
             actions = {pid: DeclaredAction(**data) for pid, data in raw.items()}
             tick = state.tick_number
             result = resolve_tick(state, actions, self.rng)
@@ -235,8 +256,12 @@ class TickEngine:
             if self.on_tick_resolved is not None:
                 await self.on_tick_resolved(session_id, tick, result)
 
+            if self.sessions.get(session_id) is not state:
+                return  # callback aborted/replaced this battle (e.g. a scripted raid wipe)
+
             if result.finished:
                 self.sessions.pop(session_id, None)
+                self._generations.pop(session_id, None)
                 self._resolve_locks.pop(session_id, None)
                 logger.info(
                     "Сессия {}: бой окончен ({})",

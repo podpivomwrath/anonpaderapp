@@ -31,9 +31,12 @@ def raid_list_keyboard() -> str:
     return kb.get_json()
 
 
-def raid_lobby_keyboard() -> str:
+def raid_lobby_keyboard(ready: bool = True) -> str:
     kb = Keyboard(inline=True)
-    kb.add(Text(BTN_RAID_CANCEL_READY, payload={"type": "raid_cancel_ready"}), color=KeyboardButtonColor.SECONDARY)
+    if ready:
+        kb.add(Text(BTN_RAID_CANCEL_READY, payload={"type": "raid_cancel_ready"}), color=KeyboardButtonColor.SECONDARY)
+    else:
+        kb.add(Text("Готов", payload={"type": "raid_pick", "raid": "puppet_theatre"}), color=KeyboardButtonColor.POSITIVE)
     return kb.get_json()
 
 

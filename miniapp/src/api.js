@@ -31,7 +31,12 @@ async function request(path, options) {
   });
   const data = await res.json().catch(() => ({ error: 'bad_response' }));
   if (!res.ok) {
-    throw new Error(data.error || `http_${res.status}`);
+    const error = new Error(data.error || `http_${res.status}`);
+    error.details = data;
+    if (data.error === 'account_banned') {
+      window.dispatchEvent(new CustomEvent('account-banned', { detail: data }));
+    }
+    throw error;
   }
   return data;
 }

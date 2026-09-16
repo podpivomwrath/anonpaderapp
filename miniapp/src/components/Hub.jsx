@@ -23,12 +23,20 @@ const TABS = [
 ];
 
 export default function Hub() {
-  const [activeTab, setActiveTab] = useState('stats');
+  const [activeTab, setActiveTab] = useState('character');
   const [character, setCharacter] = useState(null);
   const [status, setStatus] = useState('loading'); // loading | ready | error
+  const [ban, setBan] = useState(null);
+
+  useEffect(() => {
+    const onBan = (event) => setBan(event.detail);
+    window.addEventListener('account-banned', onBan);
+    return () => window.removeEventListener('account-banned', onBan);
+  }, []);
 
   const load = useCallback(() => {
     setStatus('loading');
+    setBan(null);
     getCharacter()
       .then((data) => {
         setCharacter(data);
@@ -40,6 +48,22 @@ export default function Hub() {
   useEffect(() => {
     load();
   }, [load]);
+
+  useEffect(() => {
+    if (!TABS.some((tab) => tab.id === activeTab) && !(activeTab === 'admin' && character?.is_admin)) {
+      setActiveTab('character');
+    }
+  }, [activeTab, character?.is_admin]);
+
+  if (ban) {
+    return <Panel><PanelHeader>Монолит</PanelHeader><Placeholder
+      action={<Button onClick={load}>Проверить доступ</Button>}
+    >
+      Доступ заблокирован администратором.
+      {ban.reason && <p>Причина: {ban.reason}</p>}
+      <p>{ban.until ? `До: ${new Date(ban.until).toLocaleString('ru-RU')}` : 'Срок: бессрочно'}</p>
+    </Placeholder></Panel>;
+  }
 
   if (status === 'loading') {
     return (

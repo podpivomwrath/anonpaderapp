@@ -99,6 +99,24 @@ async def _make_character(
 # --- Подпись ---
 
 
+@pytest.mark.parametrize("duration", [None, 3600, -3600])
+async def test_ban_checked_for_signed_requests(client, session_factory, duration):
+    from datetime import datetime, timedelta, timezone
+    c = await _make_character(session_factory, vk_id=98765)
+    async with session_factory() as db:
+        c = await db.get(Character, c.id)
+        c.is_banned = True
+        c.ban_reason = "Test ban"
+        c.banned_until = None if duration is None else datetime.now(timezone.utc) + timedelta(seconds=duration)
+        await db.commit()
+    response = await client.post("/api/miniapp/stats", params=_signed_query(98765), json={"str": 1})
+    if duration is None or duration > 0:
+        assert response.status == 403
+        assert (await response.json())["error"] == "account_banned"
+    else:
+        assert response.status == 200
+
+
 async def test_valid_signature_returns_character(client, session_factory) -> None:
     await _make_character(session_factory, vk_id=111)
     resp = await client.get("/api/miniapp/character", params=_signed_query(111))

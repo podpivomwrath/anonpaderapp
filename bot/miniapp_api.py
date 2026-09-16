@@ -29,6 +29,7 @@ from services import (
     quest_service,
     song_service,
     story_service,
+    stat_alloc_service,
     trial_service,
 )
 from services.preset_service import PresetValidationError
@@ -152,15 +153,10 @@ async def handle_post_stats(request: web.Request) -> web.Response:
         stats = character.stats
         if total == 0:
             return web.json_response({"error": "nothing_to_apply"}, status=400)
-        if total > stats.unspent_points:
+        try:
+            await stat_alloc_service.allocate(session, stats, increments)
+        except stat_alloc_service.NotEnoughPoints:
             return web.json_response({"error": "not_enough_points"}, status=400)
-
-        for key, amount in increments.items():
-            if amount == 0:
-                continue
-            attr = STAT_FIELDS[key]
-            setattr(stats, attr, getattr(stats, attr) + amount)
-        stats.unspent_points -= total
 
         gear_bonus = await item_service.compute_gear_bonus(session, character.id)
         wallet = await get_wallet(session, character.id)

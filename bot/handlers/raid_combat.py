@@ -73,6 +73,7 @@ class RaidBattle:
     participants: dict[int, Participant]
     member_inputs: list[MemberCombatInput]
     rng: random.Random
+    run_id: int | None = None
     stage: int = 1
     mob_ids: set[int] = field(default_factory=set)
     last_combatants: dict[int, object] = field(default_factory=dict)
@@ -102,6 +103,24 @@ def setup(engine: TickEngine, bot_api) -> None:
 
 def has_active_raid(character_id: int) -> bool:
     return character_id in _character_in_raid
+
+
+def has_active_battle(peer_id: int) -> bool:
+    return peer_id in _peer_battle
+
+
+def rebuild_keyboard(peer_id: int) -> str | None:
+    battle_id = _peer_battle.get(peer_id)
+    battle = _battles.get(battle_id)
+    if battle is None:
+        return None
+    state = _engine.sessions.get(battle_id) if _engine else None
+    cid = _character_id_for_peer(battle, peer_id)
+    c = state.combatants.get(cid) if state else None
+    if c is None or not c.alive or cid in _declared_this_tick.get(battle_id, set()):
+        return kb.raid_waiting_keyboard()
+    p = battle.participants[cid]
+    return kb.raid_combat_keyboard(p.base_class, c.cooldowns, subclass_id=p.subclass_id)
 
 
 # --- Построение боевых участников (свежие каждый этап — как и групповой PvE) ---
@@ -170,7 +189,7 @@ _STAGE_LOOT_MULT = {1: rc.STAGE1_LOOT_MULT, 2: rc.STAGE2_LOOT_MULT, 3: rc.STAGE3
 _STAGE_LOOT_FLOOR = {1: "uncommon", 2: "rare", 3: "epic"}
 
 
-async def start_raid(group_id: int | None, member_inputs: list[MemberCombatInput], rng: random.Random) -> None:
+async def start_raid(group_id: int | None, member_inputs: list[MemberCombatInput], rng: random.Random, *, run_id: int | None = None) -> None:
     global _next_battle_id
     battle_id = _next_battle_id
     _next_battle_id -= 1
@@ -182,7 +201,7 @@ async def start_raid(group_id: int | None, member_inputs: list[MemberCombatInput
         )
         for m in member_inputs
     }
-    battle = RaidBattle(group_id=group_id, participants=participants, member_inputs=member_inputs, rng=rng)
+    battle = RaidBattle(group_id=group_id, participants=participants, member_inputs=member_inputs, rng=rng, run_id=run_id)
     _battles[battle_id] = battle
     for cid, p in participants.items():
         _peer_battle[p.peer_id] = battle_id
@@ -198,6 +217,19 @@ async def start_raid(group_id: int | None, member_inputs: list[MemberCombatInput
             random_id=0,
         )
     await _broadcast_board(battle_id, battle, None)
+
+
+def abort_run(run_id: int) -> None:
+    for battle_id, battle in list(_battles.items()):
+        if battle.run_id != run_id:
+            continue
+        _engine.abort_session(battle_id)
+        _battles.pop(battle_id, None)
+        _declared_this_tick.pop(battle_id, None)
+        for p in battle.participants.values():
+            _peer_battle.pop(p.peer_id, None)
+            _chosen_target.pop(p.character_id, None)
+            _character_in_raid.discard(p.character_id)
 
 
 def _live_state(battle_id: int, battle: RaidBattle) -> dict:
@@ -758,6 +790,8 @@ async def _grant_stage_clear_bonus(battle: RaidBattle) -> None:
             scalpel_winner = await db.get(Character, scalpel_winner.id)
             scalpel = await item_service.grant_unique_item(db, scalpel_winner, rc.RAID_UNIQUE_ITEM_ID)
             peer_id = battle.participants[scalpel_winner.id].peer_id
+            from services import raid_service
+            await raid_service.finish_run(db, battle.run_id)
             await db.commit()
         try:
             await _bot_api.messages.send(
@@ -807,6 +841,8 @@ async def _cleanup_and_return(session_id: int, battle: RaidBattle, text: str, *,
                 has_mount_by_cid[cid] = await mount_service.has_any_mount(db, cid)
             else:
                 defeats[cid] = (await encounter_service.resolve_defeat(db, character), character.respawn_at)
+        from services import raid_service
+        await raid_service.finish_run(db, battle.run_id)
         await db.commit()
 
     for cid, p in battle.participants.items():

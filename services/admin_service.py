@@ -633,7 +633,10 @@ def is_ban_active(character: Character, now: datetime | None = None) -> bool:
     if character.banned_until is None:
         return True
     now = now or datetime.now(timezone.utc)
-    return now < character.banned_until
+    until = character.banned_until
+    if until.tzinfo is None:
+        until = until.replace(tzinfo=timezone.utc)
+    return now < until
 
 
 # --- Журнал действий (2.4) ---

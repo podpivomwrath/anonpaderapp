@@ -5,6 +5,7 @@
 
 from dataclasses import dataclass
 
+from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from models import CharacterStats
@@ -85,6 +86,29 @@ class FinalizeResult:
     char_stats: dict[str, int]
 
 
+class NotEnoughPoints(ValueError):
+    pass
+
+
+async def allocate(db: AsyncSession, stats: CharacterStats, increments: dict[str, int]) -> None:
+    """Atomic budget check shared by chat and HTTP; caller owns the transaction."""
+    if any(k not in STAT_ATTR or type(v) is not int or v < 0 for k, v in increments.items()):
+        raise ValueError("invalid_increment")
+    total = sum(increments.values())
+    if total <= 0:
+        raise ValueError("nothing_to_apply")
+    values = {STAT_ATTR[k]: getattr(CharacterStats, STAT_ATTR[k]) + v for k, v in increments.items() if v}
+    values["unspent_points"] = CharacterStats.unspent_points - total
+    result = await db.execute(
+        update(CharacterStats)
+        .where(CharacterStats.character_id == stats.character_id, CharacterStats.unspent_points >= total)
+        .values(**values).execution_options(synchronize_session=False)
+    )
+    if result.rowcount != 1:
+        raise NotEnoughPoints("not_enough_points")
+    await db.refresh(stats)
+
+
 async def finalize(
     db: AsyncSession, stats: CharacterStats, pending: dict[str, int]
 ) -> FinalizeResult:
@@ -92,6 +116,10 @@ async def finalize(
     потратил часть очков в другом месте (мини-апп) параллельно с открытым
     окном в чате, применяет столько, сколько реально доступно (в порядке
     STAT_ORDER), а не всё запрошенное."""
+    stats = await db.scalar(
+        select(CharacterStats).where(CharacterStats.character_id == stats.character_id)
+        .with_for_update().execution_options(populate_existing=True)
+    )
     requested_total = sum(pending.values())
     budget = stats.unspent_points
     applied: dict[str, int] = {}
@@ -103,10 +131,8 @@ async def finalize(
         applied[key] = give
         budget -= give
 
-    for key, amount in applied.items():
-        attr = STAT_ATTR[key]
-        setattr(stats, attr, getattr(stats, attr) + amount)
     applied_total = sum(applied.values())
-    stats.unspent_points -= applied_total
+    if applied_total:
+        await allocate(db, stats, applied)
 
     return FinalizeResult(applied_total, requested_total, snapshot(stats))

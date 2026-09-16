@@ -118,6 +118,20 @@ def has_active_group_battle(peer_id: int) -> bool:
     return peer_id in _peer_battle
 
 
+def rebuild_keyboard(peer_id: int) -> str | None:
+    battle_id = _peer_battle.get(peer_id)
+    battle = _battles.get(battle_id)
+    if battle is None:
+        return None
+    state = _engine.sessions.get(battle_id) if _engine else None
+    cid = _character_id_for_peer(battle, peer_id)
+    c = state.combatants.get(cid) if state else None
+    if c is None or not c.alive or cid in _declared_this_tick.get(battle_id, set()):
+        return group_waiting_keyboard()
+    p = battle.participants[cid]
+    return group_combat_keyboard(p.base_class, c.cooldowns, subclass_id=p.subclass_id)
+
+
 async def build_member_inputs(db, members: list[Character]) -> list[MemberCombatInput]:
     """Собирает всё нужное для постройки боевых участников — вызывающий код
     (bot/handlers/group_explore.py) уже держит db-сессию открытой в момент
@@ -134,6 +148,24 @@ async def build_member_inputs(db, members: list[Character]) -> list[MemberCombat
             continue
         result.append(MemberCombatInput(character, stats, gear_bonus, buff_modifiers, peer_id))
     return result
+
+
+async def start_ready_group(db, group_id, members, region, dist, rng) -> None:
+    from bot.activity import transition, blocked_reason, ActivityBusy
+    peers = [await onboarding_svc.vk_id_for_character(db, c.id) for c in members]
+    if any(p is None for p in peers):
+        raise ActivityBusy("Один из участников недоступен.")
+    with transition(peers):
+        cell = (members[0].pos_x, members[0].pos_y)
+        for c, peer in zip(members, peers):
+            await db.refresh(c)
+            reason = await blocked_reason(db, c, peer)
+            if reason or (c.pos_x, c.pos_y) != cell:
+                raise ActivityBusy(reason or "Участники больше не на одной клетке.")
+        inputs = await build_member_inputs(db, members)
+        await db.commit()
+        await db.close()
+        await start_group_encounter(group_id, inputs, region, dist, rng)
 
 
 async def start_group_encounter(

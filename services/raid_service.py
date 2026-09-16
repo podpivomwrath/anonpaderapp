@@ -10,10 +10,10 @@ PresetValidationError)."""
 
 from dataclasses import dataclass
 
-from sqlalchemy import func, select
+from sqlalchemy import func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from models import Character, GroupMember, RaidLobby, RaidLobbyMember
+from models import Character, Group, GroupMember, RaidLobby, RaidLobbyMember, RaidRun
 
 
 class RaidError(Exception):
@@ -77,8 +77,16 @@ async def touch_monolith(
     либо создаёт лобби (если он первый), либо присоединяется/отмечается
     готовым к уже существующему (RaidError, если группа уже выбрала другой
     рейд, или персонаж уже состоит в каком-то лобби)."""
-    if await get_membership(db, character.id) is not None:
-        raise RaidError("Ты уже в очереди на рейд.")
+    if group_id is not None:
+        await db.scalar(select(Group).where(Group.id == group_id).with_for_update())
+    membership = await get_membership(db, character.id)
+    if membership is not None:
+        lobby = await lock_lobby(db, membership.lobby_id)
+        if lobby is None or lobby.status != "waiting" or lobby.raid_id != raid_id or lobby.group_id != group_id:
+            raise RaidError("Ты уже в очереди на другой рейд.")
+        membership.ready = True
+        await db.flush()
+        return await get_snapshot(db, lobby.id)
 
     lobby = await active_lobby_for_group(db, group_id) if group_id is not None else None
     if lobby is None:
@@ -103,6 +111,9 @@ async def cancel_readiness(db: AsyncSession, character_id: int) -> LobbySnapshot
     membership = await get_membership(db, character_id)
     if membership is None:
         return None
+    lobby = await lock_lobby(db, membership.lobby_id)
+    if lobby is None or lobby.status != "waiting":
+        return None
     membership.ready = False
     await db.flush()
     return await get_snapshot(db, membership.lobby_id)
@@ -116,6 +127,7 @@ async def leave_lobby_if_present(db: AsyncSession, character_id: int) -> LobbySn
     if membership is None:
         return None
     lobby_id = membership.lobby_id
+    lobby = await lock_lobby(db, lobby_id)
     await db.delete(membership)
     await db.flush()
     remaining = (
@@ -127,17 +139,69 @@ async def leave_lobby_if_present(db: AsyncSession, character_id: int) -> LobbySn
             await db.delete(lobby)
             await db.flush()
         return None
+    if lobby is not None and lobby.leader_character_id == character_id:
+        lobby.leader_character_id = min(remaining, key=lambda m: m.id).character_id
+        await db.flush()
     return await get_snapshot(db, lobby_id)
 
 
 def is_ready_to_start(snapshot: LobbySnapshot) -> bool:
     """Все члены денаминатора готовы — денаминатор берётся из фактического
     размера группы (или 1 для соло), см. get_snapshot."""
-    if not snapshot.members:
+    if snapshot.status != "waiting" or not snapshot.members:
         return False
     if len(snapshot.members) < snapshot.denominator:
         return False
     return all(ready for _, ready in snapshot.members)
+
+
+async def lock_lobby(db: AsyncSession, lobby_id: int) -> RaidLobby | None:
+    lobby = await db.get(RaidLobby, lobby_id)
+    if lobby is None:
+        return None
+    if lobby.group_id is not None:
+        await db.scalar(select(Group).where(Group.id == lobby.group_id).with_for_update())
+    return await db.scalar(
+        select(RaidLobby).where(RaidLobby.id == lobby_id).with_for_update()
+        .execution_options(populate_existing=True)
+    )
+
+
+async def record_run(db: AsyncSession, snapshot: LobbySnapshot) -> RaidRun:
+    run = RaidRun(leader_character_id=snapshot.leader_character_id, raid_id=snapshot.raid_id,
+                  members=[c.id for c, _ in snapshot.members], status="active")
+    db.add(run)
+    await db.flush()
+    return run
+
+
+async def finish_run(db: AsyncSession, run_id: int | None) -> None:
+    if run_id is not None:
+        await db.execute(update(RaidRun).where(RaidRun.id == run_id, RaidRun.status == "active")
+                         .values(status="finished"))
+
+
+async def recover_interrupted(db: AsyncSession, run_id: int | None = None) -> list[int]:
+    """Startup only (or failed start). Refund and receipt status commit together.
+
+    Compensation may exceed the normal drop cap: never discard a paid key.
+    Already awarded stage loot is deliberately retained.
+    """
+    query = select(RaidRun).where(RaidRun.status == "active").order_by(RaidRun.id).with_for_update()
+    if run_id is not None:
+        query = query.where(RaidRun.id == run_id)
+    affected = []
+    for run in (await db.scalars(query)).all():
+        await db.execute(update(Character).where(Character.id == run.leader_character_id)
+                         .values(raid_keys=Character.raid_keys + 1))
+        for cid in run.members:
+            character = await db.get(Character, cid)
+            if character is not None:
+                character.screen = None
+                affected.append(cid)
+        run.status = "interrupted"
+    await db.flush()
+    return affected
 
 
 async def start_lobby(db: AsyncSession, lobby_id: int) -> None:
@@ -161,6 +225,7 @@ async def dissolve_lobby(db: AsyncSession, lobby_id: int) -> None:
     ).all()
     for row in rows:
         await db.delete(row)
+    await db.flush()  # delete children before the parent's ON DELETE CASCADE
     lobby = await db.get(RaidLobby, lobby_id)
     if lobby is not None:
         await db.delete(lobby)

@@ -10,7 +10,7 @@
 
 from datetime import datetime
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, String, func
+from sqlalchemy import JSON, Boolean, DateTime, ForeignKey, String, func
 from sqlalchemy.orm import Mapped, mapped_column
 
 from models.base import Base
@@ -47,3 +47,14 @@ class RaidLobbyMember(Base):
         ForeignKey("characters.id", ondelete="CASCADE"), unique=True, index=True
     )
     ready: Mapped[bool] = mapped_column(Boolean, default=False)
+
+
+class RaidRun(Base):
+    """Durable key receipt. Active runs are interrupted/refunded at startup."""
+    __tablename__ = "raid_runs"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    leader_character_id: Mapped[int] = mapped_column(ForeignKey("characters.id", ondelete="CASCADE"))
+    raid_id: Mapped[str] = mapped_column(String(32))
+    members: Mapped[list] = mapped_column(JSON)  # character IDs; independent of group membership
+    status: Mapped[str] = mapped_column(String(16), default="active", index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())

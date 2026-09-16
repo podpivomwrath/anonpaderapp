@@ -16,7 +16,7 @@ from models.mount import CharacterMount, MountTravel
 from models.promo import PromoActivation, PromoCode
 from models.pvp import PvpBattle
 from models.quest import CharacterQuest, Quest
-from models.raid import RaidLobby, RaidLobbyMember
+from models.raid import RaidLobby, RaidLobbyMember, RaidRun
 from models.song import CharacterSongFragment
 from models.story import CharacterStoryProgress
 from models.subclass_trial import CharacterTrialProgress, CharacterUnlockedBuff
@@ -64,6 +64,7 @@ __all__ = [
     "QuestStatus",
     "RaidLobby",
     "RaidLobbyMember",
+    "RaidRun",
     "Region",
     "User",
     "Wallet",

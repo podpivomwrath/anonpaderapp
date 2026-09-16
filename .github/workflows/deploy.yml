@@ -29,6 +29,4 @@ jobs:
             set -e
             cd "${{ secrets.DEPLOY_PATH }}"
             git pull origin main
-            docker compose -f docker-compose.prod.yml build
-            docker compose -f docker-compose.prod.yml up -d
-            docker compose -f docker-compose.prod.yml exec -T bot alembic upgrade head
+            bash scripts/deploy-release.sh

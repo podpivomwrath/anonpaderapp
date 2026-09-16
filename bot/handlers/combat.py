@@ -103,7 +103,7 @@ def setup(engine: TickEngine, bot_api) -> None:
 
 
 def has_active_encounter(peer_id: int) -> bool:
-    return peer_id in _engine.sessions
+    return _engine is not None and peer_id in _engine.sessions
 
 
 async def _get_position(peer_id: int) -> tuple[int, int, bool]:

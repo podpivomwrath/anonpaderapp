@@ -4,6 +4,11 @@ raid_combat.py (этот модуль его не знает, только за�
 
 import random
 
+from loguru import logger
+from sqlalchemy import select
+from models import RaidLobby, RaidLobbyMember
+from bot.activity import activity_action, transition, blocked_reason, ActivityBusy
+
 from vkbottle.bot import BotLabeler, Message
 
 from bot import raid_texts as rt
@@ -45,10 +50,15 @@ async def _peer_ids_for(db, character_ids: list[int]) -> dict[int, int]:
 
 
 @labeler.message(payload_contains={"type": "raid_touch"})
+@activity_action
 async def touch_monolith(message: Message) -> None:
     async with get_session_factory()() as db:
         character = await onboarding_svc.get_character(db, message.from_id)
         if character is None or character.creation_state is not None:
+            return
+        reason = await blocked_reason(db, character, message.peer_id)
+        if reason:
+            await message.answer(reason)
             return
         if grid.chebyshev_distance(character.pos_x, character.pos_y) != 0:
             return  # устаревшая кнопка — уже не на (0;0)
@@ -81,6 +91,7 @@ async def raid_list_back_payload(message: Message) -> None:
 
 
 @labeler.message(payload_contains={"type": "raid_pick"})
+@activity_action
 async def pick_raid(message: Message) -> None:
     payload = message.get_payload_json() or {}
     raid_id = payload.get("raid")
@@ -89,6 +100,10 @@ async def pick_raid(message: Message) -> None:
     async with get_session_factory()() as db:
         character = await onboarding_svc.get_character(db, message.from_id)
         if character is None or character.creation_state is not None:
+            return
+        reason = await blocked_reason(db, character, message.peer_id)
+        if reason:
+            await message.answer(reason)
             return
         if grid.chebyshev_distance(character.pos_x, character.pos_y) != 0:
             await message.answer("Ты уже не у Монолита.")
@@ -121,14 +136,14 @@ async def pick_raid(message: Message) -> None:
         except Exception:
             pass
 
-    ready_count = sum(1 for _, r in snapshot.members if r)
-    await message.answer(rt.lobby_status_line(ready_count, snapshot.denominator), keyboard=kb.raid_lobby_keyboard())
+    await publish_lobby(snapshot)
 
     if ready:
         await _start_raid_from_lobby(snapshot.id)
 
 
 @labeler.message(payload_contains={"type": "raid_cancel_ready"})
+@activity_action
 async def cancel_ready(message: Message) -> None:
     async with get_session_factory()() as db:
         character = await onboarding_svc.get_character(db, message.from_id)
@@ -144,38 +159,98 @@ async def cancel_ready(message: Message) -> None:
             keyboard=movement_keyboard(character.pos_x, character.pos_y, message.peer_id, has_mount=has_mount),
         )
         return
-    ready_count = sum(1 for _, r in snapshot.members if r)
-    await message.answer(rt.lobby_status_line(ready_count, snapshot.denominator), keyboard=kb.raid_lobby_keyboard())
+    await publish_lobby(snapshot)
+
+
+_published: dict[int, tuple] = {}
+
+
+async def publish_lobby(snapshot) -> None:
+    signature = (snapshot.leader_character_id, snapshot.denominator,
+                 tuple((c.id, ready) for c, ready in snapshot.members))
+    if _published.get(snapshot.id) == signature:
+        return
+    leader = next((c for c, _ in snapshot.members if c.id == snapshot.leader_character_id), None)
+    text = rt.lobby_status_line(sum(r for _, r in snapshot.members), snapshot.denominator)
+    if leader:
+        text += f"\nЛидер: {leader.name}. Ключ будет списан у лидера."
+    async with get_session_factory()() as db:
+        peers = await _peer_ids_for(db, [c.id for c, _ in snapshot.members])
+    for c, ready in snapshot.members:
+        if c.id in peers:
+            try:
+                await _bot_api.messages.send(peer_id=peers[c.id], message=text, random_id=0,
+                                             keyboard=kb.raid_lobby_keyboard(ready))
+            except Exception:
+                logger.exception("Cannot notify raid lobby {}", snapshot.id)
+                return
+    _published[snapshot.id] = signature
+
+
+async def reconcile_lobbies() -> None:
+    """Also reacts to group exits/kicks and movement after their transactions commit."""
+    async with get_session_factory()() as db:
+        ids = list(await db.scalars(select(RaidLobby.id).where(RaidLobby.status == "waiting")))
+    for old in set(_published) - set(ids):
+        _published.pop(old, None)
+    for lobby_id in ids:
+        try:
+            async with get_session_factory()() as db:
+                snapshot = await rs.get_snapshot(db, lobby_id)
+            if snapshot is not None:
+                await publish_lobby(snapshot)
+                if rs.is_ready_to_start(snapshot):
+                    await _start_raid_from_lobby(lobby_id)
+        except ActivityBusy:
+            continue  # retry after the participant's current transition
+        except Exception:
+            logger.exception("Raid lobby reconciliation failed: {}", lobby_id)
 
 
 async def _start_raid_from_lobby(lobby_id: int) -> None:
     async with get_session_factory()() as db:
+        lobby = await rs.lock_lobby(db, lobby_id)
+        if lobby is None or lobby.status != "waiting":
+            return
         snapshot = await rs.get_snapshot(db, lobby_id)
         if snapshot is None or not rs.is_ready_to_start(snapshot):
             return
-        leader = next((c for c, _ in snapshot.members if c.id == snapshot.leader_character_id), None)
-        if leader is None:
-            return
-        ok = await rs.consume_key_and_start(db, leader)
-        if not ok:
+        peers = await _peer_ids_for(db, [c.id for c, _ in snapshot.members])
+        with transition(peers.values()):
+            for character, _ in snapshot.members:
+                peer = peers.get(character.id)
+                reason = await blocked_reason(db, character, peer) if peer is not None else "Игрок недоступен."
+                if reason or (character.pos_x, character.pos_y) != rc.MONOLITH_COORDS:
+                    await rs.cancel_readiness(db, character.id)
+                    await db.commit()
+                    return
+            leader = next((c for c, _ in snapshot.members if c.id == snapshot.leader_character_id), None)
+            if leader is None:
+                return
+            # Fresh locked character: keys may have changed since the snapshot was read.
+            await db.refresh(leader, with_for_update=True)
+            if not await rs.consume_key_and_start(db, leader):
+                await rs.dissolve_lobby(db, lobby_id)
+                await db.commit()
+                await db.close()
+                for cid, peer in peers.items():
+                    text = rt.NO_KEY_TEXT if cid == leader.id else "Рейд не начался — у лидера нет Ключа Монолита."
+                    try:
+                        await _bot_api.messages.send(peer_id=peer, message=text, random_id=0)
+                    except Exception:
+                        logger.exception("Cannot send no-key notice")
+                return
+            await rs.start_lobby(db, lobby_id)
+            run = await rs.record_run(db, snapshot)
+            inputs = await group_combat_handlers.build_member_inputs(db, [c for c, _ in snapshot.members])
             await rs.dissolve_lobby(db, lobby_id)
-            peer_ids = await _peer_ids_for(db, [c.id for c, _ in snapshot.members])
-            leader_id = leader.id
             await db.commit()
             await db.close()
-            for cid, peer_id in peer_ids.items():
-                text = rt.NO_KEY_TEXT if cid == leader_id else "Рейд не начался — у лидера не нашлось Ключа Монолита."
-                try:
-                    await _bot_api.messages.send(peer_id=peer_id, message=text, random_id=0)
-                except Exception:
-                    pass
-            return
-
-        await rs.start_lobby(db, lobby_id)
-        member_inputs = await group_combat_handlers.build_member_inputs(db, [c for c, _ in snapshot.members])
-        group_id = snapshot.group_id
-        await rs.dissolve_lobby(db, lobby_id)
-        await db.commit()
-        await db.close()
-
-    await raid_combat_handlers.start_raid(group_id, member_inputs, _rng)
+            try:
+                await raid_combat_handlers.start_raid(snapshot.group_id, inputs, _rng, run_id=run.id)
+            except Exception:
+                raid_combat_handlers.abort_run(run.id)
+                async with get_session_factory()() as recovery_db:
+                    await rs.recover_interrupted(recovery_db, run.id)
+                    await recovery_db.commit()
+                logger.exception("Raid start failed; key refunded: {}", run.id)

@@ -12,6 +12,9 @@ bot/handlers/respawn.py::scan: один общий job на всех игрок�
 состоянии COORD_INPUT, любой текст перехватывается этим хендлером.
 """
 
+from bot.activity import activity_action
+from bot.battle_keyboard import in_any_battle
+
 import random
 import re
 from datetime import datetime, timezone
@@ -93,7 +96,7 @@ async def _blocked_reason(db, character, peer_id: int, now: datetime) -> str | N
         return "☠ Сначала очнись."
     if pvp_handlers.has_active_battle(peer_id):
         return "Сначала разберись с открытым боем."
-    if combat_handlers.has_active_encounter(peer_id):
+    if in_any_battle(peer_id):
         return "В бою не до маунта."
     if world_handlers.is_busy(peer_id):
         return "Сначала закончи то, что начал."
@@ -138,6 +141,7 @@ async def open_mounts(message: Message) -> None:
 
 
 @labeler.message(TEXT_ONLY, state=MountCoordState.COORD_INPUT)
+@activity_action
 async def coord_input(message: Message) -> None:
     peer_id = message.peer_id
     mount_id = (message.state_peer.payload.get("mount_id") if message.state_peer else None)
@@ -250,6 +254,7 @@ async def _recover_stranded(peer_id: int) -> None:
 
 
 @labeler.message(payload_contains={"type": "continue_travel"})
+@activity_action
 async def continue_travel(message: Message) -> None:
     peer_id = message.peer_id
     pending_id = _pending_continue.get(peer_id)

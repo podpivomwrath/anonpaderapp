@@ -34,7 +34,8 @@ from game.combat.duel_engine import DuelEngine
 from game.combat.tick_engine import InMemoryActionStore, RedisActionStore, TickEngine
 from game.economy import mount_config as mc
 from game.world.scheduler import PeerScheduler
-from services.db import dispose_engine
+from services.db import dispose_engine, get_session_factory
+from services import raid_service
 
 
 def create_bot(settings: Settings) -> Bot:
@@ -72,7 +73,24 @@ async def run() -> None:
     if settings.bot_mode == "callback" and not settings.vk_confirmation_code:
         raise RuntimeError("Для режима callback нужен VK_CONFIRMATION_CODE (см. README).")
 
+    # Recover receipts before accepting any event or starting scheduled jobs.
+    async with get_session_factory()() as db:
+        recovered = await raid_service.recover_interrupted(db)
+        await db.commit()
+    if recovered:
+        logger.warning("Recovered interrupted raids for {} characters; keys refunded", len(recovered))
     bot = create_bot(settings)
+    if recovered:
+        async with get_session_factory()() as db:
+            peers = await raid_handlers._peer_ids_for(db, sorted(set(recovered)))
+        for peer in peers.values():
+            try:
+                await bot.api.messages.send(
+                    peer_id=peer, random_id=0,
+                    message="Рейд прерван перезапуском сервера. Ключ возвращён лидеру; полученные награды сохранены.",
+                )
+            except Exception:
+                logger.exception("Could not deliver raid recovery notice")
     redis = aioredis.from_url(settings.redis_url, decode_responses=True)
 
     tick_engine = TickEngine(
@@ -157,6 +175,8 @@ async def run() -> None:
         respawn_handlers.scan, "interval", seconds=settings.respawn_scan_seconds, id="respawn_scan"
     )
     respawn_scheduler.start()
+    respawn_scheduler.add_job(raid_handlers.reconcile_lobbies, "interval", seconds=3,
+                             id="raid_lobbies", max_instances=1, coalesce=True)
 
     # Маунты (патч 25, п.7): нападения/прибытия/live-отсчёт — свой job,
     # интервал из game/economy/mount_config.py (игровая тонкая настройка, не

@@ -18,6 +18,8 @@
 """
 
 import random
+from bot.activity import activity_action, transition, blocked_reason, ActivityBusy
+from bot.battle_keyboard import in_any_battle
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 
@@ -418,14 +420,19 @@ async def leaderboard_command(message: Message) -> None:
 
 
 @labeler.message(text=["/напасть <target>", "/attack <target>"])
+@activity_action
 async def attack_command(message: Message, target: str) -> None:
     peer_id = message.peer_id
-    if has_active_battle(peer_id):
+    if in_any_battle(peer_id):
         await message.answer("Ты уже дерёшься.")
         return
     async with get_session_factory()() as db:
         character = await onboarding_svc.get_character(db, message.from_id)
         if character is None or character.creation_state is not None:
+            return
+        reason = await blocked_reason(db, character, peer_id)
+        if reason:
+            await message.answer(reason)
             return
         if await _still_dead(db, character):
             await message.answer("☠ Сначала очнись.")
@@ -460,7 +467,21 @@ async def attack_command(message: Message, target: str) -> None:
         await _start_forced_duel(db, character, peer_id, victim, victim_peer_id)
 
 
-async def _start_forced_duel(
+async def _start_forced_duel(db, attacker, attacker_peer_id, victim, victim_peer_id) -> None:
+    from bot.handlers import group_combat, raid_combat
+    with transition([attacker_peer_id, victim_peer_id]):
+        if (raid_combat.has_active_battle(victim_peer_id)
+                or group_combat.has_active_group_battle(victim_peer_id)
+                or has_active_battle(victim_peer_id)):
+            raise ActivityBusy("Цель уже участвует в другом бою.")
+        await db.flush()
+        await db.refresh(victim)
+        if (victim.pos_x, victim.pos_y) != (attacker.pos_x, attacker.pos_y):
+            raise ActivityBusy("Цель уже ушла с этой клетки.")
+        await _start_forced_duel_impl(db, attacker, attacker_peer_id, victim, victim_peer_id)
+
+
+async def _start_forced_duel_impl(
     db, attacker: Character, attacker_peer_id: int, victim: Character, victim_peer_id: int
 ) -> None:
     if combat_handlers.has_active_encounter(victim_peer_id):
@@ -568,12 +589,13 @@ async def join_via_text(message: Message) -> None:
     await _handle_join_choice(message, battle_id, int(message.text))
 
 
+@activity_action
 async def _handle_join_choice(message: Message, battle_id, side) -> None:
     peer_id = message.peer_id
     if not isinstance(battle_id, int) or side not in (1, 2):
         return
     _pending_join_prompt.pop(peer_id, None)
-    if has_active_battle(peer_id):
+    if in_any_battle(peer_id):
         await message.answer("Ты уже дерёшься.")
         return
     battle = _battles.get(battle_id)
@@ -584,6 +606,10 @@ async def _handle_join_choice(message: Message, battle_id, side) -> None:
     async with get_session_factory()() as db:
         character = await onboarding_svc.get_character(db, message.from_id)
         if character is None or character.creation_state is not None:
+            return
+        reason = await blocked_reason(db, character, peer_id)
+        if reason:
+            await message.answer(reason)
             return
         if await _still_dead(db, character):
             await message.answer("☠ Сначала очнись.")

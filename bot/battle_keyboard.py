@@ -27,15 +27,19 @@ def active_battle_keyboard(peer_id: int) -> str | None:
     которого нет аварийного выхода."""
     from bot.handlers import combat as combat_handlers
     from bot.handlers import pvp as pvp_handlers
+    from bot.handlers import group_combat, raid_combat
 
-    kb = pvp_handlers.rebuild_keyboard(peer_id)
-    if kb is not None:
-        return kb
-    return combat_handlers.rebuild_keyboard(peer_id)
+    for handler in (raid_combat, group_combat, pvp_handlers, combat_handlers):
+        kb = handler.rebuild_keyboard(peer_id)
+        if kb is not None:
+            return kb
+    return None
 
 
 def in_any_battle(peer_id: int) -> bool:
     from bot.handlers import combat as combat_handlers
     from bot.handlers import pvp as pvp_handlers
+    from bot.handlers import group_combat, raid_combat
 
-    return pvp_handlers.has_active_battle(peer_id) or combat_handlers.has_active_encounter(peer_id)
+    return (raid_combat.has_active_battle(peer_id) or group_combat.has_active_group_battle(peer_id)
+            or pvp_handlers.has_active_battle(peer_id) or combat_handlers.has_active_encounter(peer_id))

@@ -19,7 +19,7 @@ from urllib.parse import urlencode
 from aiohttp import web
 from loguru import logger
 
-from bot.app_keys import SETTINGS_KEY
+from bot.app_keys import SETTINGS_KEY, SESSION_FACTORY_KEY
 from config import Settings
 
 VK_USER_ID_KEY: web.RequestKey[int] = web.RequestKey("vk_user_id")
@@ -68,6 +68,17 @@ async def miniapp_auth_middleware(
         return web.json_response({"error": "invalid_signature"}, status=403)
 
     request[VK_USER_ID_KEY] = vk_user_id
+    from sqlalchemy import select
+    from models import Character, User
+    from services.admin_service import is_ban_active
+
+    async with request.app[SESSION_FACTORY_KEY]() as db:
+        character = await db.scalar(select(Character).join(User).where(User.vk_id == vk_user_id))
+        if character is not None and is_ban_active(character):
+            return web.json_response({
+                "error": "account_banned", "reason": character.ban_reason,
+                "until": character.banned_until.isoformat() if character.banned_until else None,
+            }, status=403)
     return await handler(request)
 
 

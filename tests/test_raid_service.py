@@ -29,11 +29,12 @@ async def test_solo_touch_creates_lobby_ready_immediately(db_session, make_chara
     assert rs.is_ready_to_start(snapshot) is True
 
 
-async def test_cannot_touch_twice(db_session, make_character) -> None:
+async def test_touch_twice_is_idempotent(db_session, make_character) -> None:
     player = await make_character(level=60)
-    await rs.touch_monolith(db_session, player, rc.RAID_PUPPET_THEATRE_ID, group_id=None)
-    with pytest.raises(rs.RaidError):
-        await rs.touch_monolith(db_session, player, rc.RAID_PUPPET_THEATRE_ID, group_id=None)
+    first = await rs.touch_monolith(db_session, player, rc.RAID_PUPPET_THEATRE_ID, group_id=None)
+    second = await rs.touch_monolith(db_session, player, rc.RAID_PUPPET_THEATRE_ID, group_id=None)
+    assert second.id == first.id
+    assert len(second.members) == 1
 
 
 async def test_group_lobby_denominator_is_group_size(db_session, make_character) -> None:
