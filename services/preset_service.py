@@ -147,12 +147,20 @@ async def get_active_preset(db: AsyncSession, character_id: int) -> CharacterBuf
 
 def resolve_buff_modifiers(buff_ids: list[str], catalog: dict[str, BuffDef]) -> dict[str, float]:
     """Мерж stat_modifiers всех баффов активного пресета в один словарь
-    (патч 14, ч.3) — подаётся в build_combatant аналогично gear_bonus (патч 11)."""
+    (патч 14, ч.3) — подаётся в build_combatant аналогично gear_bonus (патч 11).
+
+    Патч 56, общее правило: модификаторы ОДНОГО типа НЕ складываются, берётся
+    БОЛЬШИЙ. Раньше здесь был dict.update, то есть побеждал последний бафф в
+    списке — при двух баффах с одним ключом результат зависел от порядка
+    пресета, и больший модификатор мог молча проиграть меньшему."""
     merged: dict[str, float] = {}
     for buff_id in buff_ids:
         buff = catalog.get(buff_id)
-        if buff is not None:
-            merged.update(buff.stat_modifiers)
+        if buff is None:
+            continue
+        for key, value in buff.stat_modifiers.items():
+            current = merged.get(key)
+            merged[key] = value if current is None else max(current, value)
     return merged
 
 

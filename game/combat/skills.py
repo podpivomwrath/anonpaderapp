@@ -17,6 +17,7 @@ from game.combat import balance_config as bc
 from game.combat import formulas
 from game.combat.session import (
     CombatantState,
+    Effect,
     CombatSessionState,
     DeclaredAction,
     EffectKind,
@@ -32,6 +33,7 @@ class PendingHit:
     label: str = "бьёт"
     missed: bool = False  # цель полностью уклонилась (Дымовая завеса)
     is_dot: bool = False  # периодический урон (яд/горение) — для атмосферного лога
+    blocked: int = 0      # патч 56: сколько урона срезал блок цели («Отражение» Стража)
 
 
 @dataclass
@@ -164,10 +166,30 @@ def outgoing_multiplier(actor: CombatantState, target: CombatantState) -> float:
     # баффа на один ключ перезаписали бы друг друга, а не сложились.
     mult *= 1.0 + actor.buff_modifiers.get("reckless_damage_bonus", 0.0)
     mult *= 1.0 + actor.buff_modifiers.get("group_damage_bonus", 0.0)
+    mult *= 1.0 + retribution_bonus(actor)  # Страж, «Возмездие» (патч 56)
+    # Клинок теней, «Одиночество охотника» (патч 56): бонус только когда
+    # Клинок дерётся один. Флаг ставит резолвер - здесь нет доступа к сессии.
+    if actor.buff_modifiers.get("solo_damage_bonus", 0.0) > 0 and not actor.has_allies:
+        mult *= 1.0 + actor.buff_modifiers["solo_damage_bonus"]
     for effect in actor.effects_of(EffectKind.PROVOKE_PVP):
         if target.id != effect.source_id:
             mult *= 1.0 - effect.value
     return max(mult, 0.0)
+
+
+def retribution_bonus(actor: CombatantState) -> float:
+    """Страж, «Возмездие» (патч 56): за каждые 10% maxHP, срезанные блоком за
+    последние GUARDIAN_RETRIBUTION_WINDOW_TURNS ходов, урон следующей атаки
+    растёт на per_10pct, но не выше cap. Без баффа - ровно 0.0."""
+    per_10pct = actor.buff_modifiers.get("retribution_damage_per_10pct", 0.0)
+    if per_10pct <= 0 or actor.max_hp <= 0:
+        return 0.0
+    blocked = sum(actor.blocked_recent)
+    if blocked <= 0:
+        return 0.0
+    tenths = (blocked / actor.max_hp) / 0.10
+    cap = actor.buff_modifiers.get("retribution_cap", bc.GUARDIAN_RETRIBUTION_CAP)
+    return min(tenths * per_10pct, cap)
 
 
 def effective_mitigation(target: CombatantState) -> float:
@@ -184,6 +206,7 @@ def compute_hit(
     multiplier: float = 1.0,
     force_crit: bool = False,
     is_ability: bool = False,
+    crit_multiplier: float | None = None,
 ) -> PendingHit:
     """Расчёт удара. multiplier — множитель урона навыка (Атака = 1.0);
     force_crit — гарантированный крит (Теневой рывок); is_ability (патч 34,
@@ -199,8 +222,31 @@ def compute_hit(
         formulas.ability_dodge_chance(target.stats.agility) if is_ability
         else formulas.dodge_chance(target.stats.agility)
     )
-    total_dodge = min(stat_dodge + target.effect_total(EffectKind.DODGE), bc.DODGE_HARD_CAP)
-    if total_dodge > 0 and rng.random() < total_dodge:
+    # Патч 56, Клинок теней: «Тень» (пассивный уворот), «Ускользание» (после
+    # удачного уворота по нему сложнее попасть в следующий ход), «Второй шанс»
+    # (раз в N ходов удар гарантированно мимо; флаг ставит резолвер).
+    extra_dodge = target.buff_modifiers.get("dodge_bonus", 0.0)
+    if target.dodged_last_tick:
+        extra_dodge += target.buff_modifiers.get("slip_away_bonus", 0.0)
+    total_dodge = min(
+        stat_dodge + target.effect_total(EffectKind.DODGE) + extra_dodge, bc.DODGE_HARD_CAP
+    )
+    if target.second_chance_active or (total_dodge > 0 and rng.random() < total_dodge):
+        target.second_chance_active = False
+        target.dodged_this_tick = True
+        # «Голод клинка»: каждый удачный уворот добавляет стак Метки добычи
+        # атакующему-жертве. Без баффа - нет-оп.
+        if target.buff_modifiers.get("mark_on_dodge", 0.0) > 0:
+            mark = actor.effect_from(EffectKind.MARK, target.id)
+            if mark is not None:
+                mark.stacks = min(mark.stacks + 1, bc.SHADOW_BLADE_MARK_MAX_STACKS)
+                mark.remaining_ticks = max(mark.remaining_ticks, bc.SHADOW_BLADE_MARK_DURATION)
+            else:
+                actor.effects.append(
+                    Effect(kind=EffectKind.MARK, value=1.0,
+                           remaining_ticks=bc.SHADOW_BLADE_MARK_DURATION,
+                           source_id=target.id, stacks=1)
+                )
         return PendingHit(
             source_id=actor.id, target_id=target.id, amount=0, label=label, missed=True
         )
@@ -210,9 +256,20 @@ def compute_hit(
         actor.stats.by_key(actor.primary_stat),
         formulas.k_dmg_for(actor.primary_stat),
     ) * multiplier
-    crit = True if force_crit else rng.random() < formulas.crit_chance(actor.stats.agility)
+    # Патч 56, Клинок теней: «Смертельная точность» (+шанс крита), «Передача
+    # метки» (союзники чаще критуют по помеченной цели), «Жажда крови»
+    # (следующий удар после крита критует гарантированно).
+    crit_chance = formulas.crit_chance(actor.stats.agility)
+    crit_chance += actor.buff_modifiers.get("crit_chance_bonus", 0.0)
+    if target.has_effect(EffectKind.MARK):
+        for mark in target.effects_of(EffectKind.MARK):
+            crit_chance += actor.buff_modifiers.get("mark_ally_crit_bonus", 0.0) if mark.source_id != actor.id else 0.0
+    crit = True if (force_crit or actor.guaranteed_crit_next) else rng.random() < crit_chance
+    if actor.guaranteed_crit_next:
+        actor.guaranteed_crit_next = False
     if crit:
-        base *= bc.CRIT_MULTIPLIER
+        actor.crit_this_tick = True
+        base *= crit_multiplier if crit_multiplier is not None else bc.CRIT_MULTIPLIER
         # Кровавый рыцарь, «Стойкий к боли» (патч 47, ч.2): свой крит-урон не
         # трогает, только входящий по себе.
         base *= 1.0 - target.buff_modifiers.get("crit_damage_taken_reduction", 0.0)
@@ -222,15 +279,27 @@ def compute_hit(
     # Кровавый рыцарь, «Кровавый доспех»/«Второе дыхание» (патч 47, ч.2) —
     # безусловное и низко-HP-условное снижение входящего урона.
     base *= 1.0 - target.buff_modifiers.get("incoming_damage_reduction", 0.0)
-    if target.current_hp < target.max_hp * bc.BLOOD_KNIGHT_SECOND_WIND_HP_THRESHOLD:
+    # Патч 56: порог низкого HP - ПАРАМЕТР БАФФА, а не общая константа. У
+    # Кровавого рыцаря он 40% (патч 47), у «Стойкости» Стража 30%; раньше
+    # здесь был жёстко зашит порог Кровавого рыцаря на оба подкласса.
+    low_hp_threshold = target.buff_modifiers.get(
+        "low_hp_damage_reduction_threshold", bc.BLOOD_KNIGHT_SECOND_WIND_HP_THRESHOLD
+    )
+    if target.current_hp < target.max_hp * low_hp_threshold:
         base *= 1.0 - target.buff_modifiers.get("low_hp_damage_reduction", 0.0)
     # Глухая оборона (патч 39) — многоходовый блок, не суммируется с однотиковым
     # block_reduction (напр. Живительный блок пресета), берём максимум.
+    before_block = base
     base *= 1.0 - max(target.block_reduction, target.effect_total(EffectKind.BLOCK_STANCE))
+    # Патч 56 (Страж): срезанное блоком нужно «Отражению» (вернуть долю
+    # атакующему в этот же ход, см. resolver) и «Возмездию» (накопление за окно).
+    blocked_amount = max(round(before_block - base), 0)
+    target.blocked_this_tick += blocked_amount
     # Осколочная кровь (патч 16): фикс. бонус урона за удар, НЕ от статов —
     # добавляется ПОСЛЕ всех множителей, не масштабируется крит/митигацией.
     base += actor.effect_total(EffectKind.FLAT_DAMAGE_BONUS)
     return PendingHit(
+        blocked=blocked_amount,
         source_id=actor.id,
         target_id=target.id,
         amount=max(round(base), 1),
@@ -246,3 +315,19 @@ def basic_attack(ctx: SkillContext) -> None:
     if target is None:
         return
     ctx.hits.append(compute_hit(ctx.actor, target, ctx.rng))
+    # Патч 56, Клинок теней, «Пометка добычи+»: обычная атака с шансом вешает
+    # стак Метки добычи. У остальных подклассов ключа нет - нет-оп.
+    actor = ctx.actor
+    chance = actor.buff_modifiers.get("mark_on_attack_chance", 0.0)
+    if chance > 0 and ctx.rng.random() < chance:
+        mark = target.effect_from(EffectKind.MARK, actor.id)
+        if mark is not None:
+            mark.stacks = min(mark.stacks + 1, bc.SHADOW_BLADE_MARK_MAX_STACKS)
+            mark.remaining_ticks = max(mark.remaining_ticks, bc.SHADOW_BLADE_MARK_DURATION)
+        else:
+            target.effects.append(
+                Effect(kind=EffectKind.MARK, value=1.0,
+                       remaining_ticks=bc.SHADOW_BLADE_MARK_DURATION,
+                       source_id=actor.id, stacks=1)
+            )
+        ctx.lines.append(f"{target.name} помечен добычей ({actor.name}) 🎯")

@@ -58,6 +58,9 @@ def shield_bash(ctx: SkillContext) -> None:
     else:
         # Патч 47: «Несгибаемый» — +provoke_duration_bonus ходов; 0 без баффа.
         duration = bc.PROVOKE_PVP_DURATION_TICKS + int(actor.buff_modifiers.get("provoke_duration_bonus", 0))
+        # Патч 56, «Клеймо провокатора»: противник, ударивший НЕ Стража, теряет
+        # ещё provoke_damage_bonus урона в этот ход. Без баффа - 0.0.
+        reduction = bc.PROVOKE_PVP_DAMAGE_REDUCTION + actor.buff_modifiers.get("provoke_damage_bonus", 0.0)
         # Патч 52, баг 1: apply_effect (не прямой .effects.append) — повторный
         # Удар щитом по уже спровоцированному врагу ОБНОВЛЯЕТ длительность, а
         # не добавляет ВТОРОЙ PROVOKE_PVP-эффект. Раньше прямой append копил
@@ -65,7 +68,7 @@ def shield_bash(ctx: SkillContext) -> None:
         # outgoing_multiplier перемножал снижение урона за КАЖДЫЙ — двойная
         # провокация давала -51% вместо -30%.
         for enemy in enemies:
-            enemy.apply_effect(EffectKind.PROVOKE_PVP, bc.PROVOKE_PVP_DAMAGE_REDUCTION, duration, actor.id)
+            enemy.apply_effect(EffectKind.PROVOKE_PVP, reduction, duration, actor.id)
         ctx.lines.append(f"{actor.name} провоцирует: урон противников по другим целям снижен")
 
 
@@ -78,8 +81,13 @@ def block(ctx: SkillContext) -> None:
     actor = ctx.actor
     actor.cooldowns[_BLOCK.id] = _BLOCK.cd
 
-    full_block_chance = actor.buff_modifiers.get("full_block_chance", 0.0)
-    if full_block_chance > 0 and ctx.rng.random() < full_block_chance:
+    # Патч 56, «Гарда»: доп. шанс полного блока против ударов по самому Стражу.
+    full_block_chance = (
+        actor.buff_modifiers.get("full_block_chance", 0.0)
+        + actor.buff_modifiers.get("guard_block_bonus", 0.0)
+    )
+    full_block = full_block_chance > 0 and ctx.rng.random() < full_block_chance
+    if full_block:
         actor.block_reduction = 1.0
         ctx.lines.append(f"{actor.name} блокирует удар ПОЛНОСТЬЮ 🛡✨")
     else:
@@ -96,8 +104,10 @@ def block(ctx: SkillContext) -> None:
             )
         )
 
+    # Патч 56, «Контрудар»: ответный удар ТОЛЬКО при полном блоке (раньше
+    # контратака срабатывала на любой уход в оборону).
     counterstrike_mult = actor.buff_modifiers.get("counterstrike_mult", 0.0)
-    if counterstrike_mult > 0:
+    if counterstrike_mult > 0 and full_block:
         enemies = ctx.session.alive_enemies_of(actor)
         if enemies:
             target = ctx.rng.choice(enemies)
@@ -107,6 +117,26 @@ def block(ctx: SkillContext) -> None:
                     multiplier=counterstrike_mult, is_ability=True,
                 )
             )
+
+    # Патч 56, групповые баффы: работают ТОЛЬКО когда рядом есть живые союзники
+    # (групповой PvE, рейд, массовый PvP). В соло-бою эффекта нет вовсе.
+    allies = ctx.session.alive_allies_of(actor)
+    if allies:
+        weakest = min(allies, key=lambda a: a.current_hp / a.max_hp if a.max_hp else 1.0)
+        share = actor.buff_modifiers.get("ally_shield_share_pct", 0.0)
+        if share > 0:
+            # «Щит соратника»: доля защиты Стража уходит союзнику с наименьшим % HP.
+            weakest.apply_effect(EffectKind.BLOCK_STANCE, _BLOCK.effect_value * share,
+                                 _BLOCK.effect_duration, actor.id)
+            ctx.lines.append(f"{actor.name} прикрывает щитом: {weakest.name}")
+        if actor.buff_modifiers.get("wall_cleanse", 0.0) > 0:
+            # «Стена»: снимает ОДИН дебафф с того же союзника.
+            debuffs = (EffectKind.WEAKEN, EffectKind.VULNERABILITY, EffectKind.DOT, EffectKind.FREEZE)
+            for index, effect in enumerate(weakest.effects):
+                if effect.kind in debuffs:
+                    del weakest.effects[index]
+                    ctx.lines.append(f"{actor.name} сбивает эффект с {weakest.name}")
+                    break
 
 
 @defensive_skill("guardian_unbreakable")

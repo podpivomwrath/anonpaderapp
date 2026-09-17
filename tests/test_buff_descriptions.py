@@ -6,9 +6,16 @@ from game.economy import buff_descriptions
 
 
 def test_unimplemented_buff_has_empty_description() -> None:
-    buffs = load_content().buffs
-    buff = buffs["guardian_sturdy_armor"]
-    assert buff.implemented is False
+    """Патч 56: проверяем контракт describe() на синтетическом баффе. Раньше
+    тест брал конкретный id из контента (guardian_sturdy_armor), но патч 56
+    реализует последние заглушки - привязка к «какому-нибудь нереализованному»
+    обречена ломаться по мере готовности пула."""
+    from game.content_loader import BuffDef
+
+    buff = BuffDef(
+        id="not_ready", name="Заглушка", subclass="guardian", category="defense",
+        description="", stat_modifiers={}, implemented=False,
+    )
     assert buff_descriptions.describe(buff) == ""
 
 

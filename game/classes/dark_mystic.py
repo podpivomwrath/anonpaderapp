@@ -36,6 +36,28 @@ def _lowest_hp_ally_or_self(ctx: SkillContext):
     return min(allies, key=lambda c: c.current_hp / c.max_hp) if allies else ctx.actor
 
 
+def _allies_by_hp(ctx: SkillContext) -> list:
+    """Живые союзники по возрастанию доли HP: «Разделённому пакту» нужен
+    ВТОРОЙ по тяжести раненый, «Кругу тьмы» - все сразу."""
+    return sorted(ctx.session.alive_allies_of(ctx.actor), key=lambda c: c.current_hp / c.max_hp)
+
+
+def _pay_hp(actor, pct: float) -> int:
+    """Плата собственным HP с учётом «Пакта крови+» (дешевле на долю)."""
+    reduction = actor.buff_modifiers.get("hp_cost_reduction", 0.0)
+    cost = round(actor.current_hp * pct * (1.0 - reduction))
+    actor.current_hp = max(actor.current_hp - cost, 1)
+    return cost
+
+
+def _edge_multiplier(actor) -> float:
+    """«Грань»: урон и лечение сильнее, пока мистик сам на низком HP."""
+    bonus = actor.buff_modifiers.get("edge_bonus", 0.0)
+    if bonus <= 0:
+        return 1.0
+    return 1.0 + bonus if actor.current_hp < actor.max_hp * bc.DARK_MYSTIC_EDGE_HP_THRESHOLD else 1.0
+
+
 @offensive_skill("dark_mystic_blood_pact")
 def blood_pact(ctx: SkillContext) -> None:
     """Кровавый пакт: 110% урона цели, 70% нанесённого — лечением союзнику с
@@ -46,11 +68,52 @@ def blood_pact(ctx: SkillContext) -> None:
     target = ctx.resolve_target()
     if target is None:
         return
-    hit = compute_hit(actor, target, ctx.rng, skill.name, skill.multiplier, is_ability=True)
+    # Патч 56: «Самоотречение» доплачивает своим HP ради усиления пакта,
+    # «Грань» усиливает урон и лечение на низком HP, «Тёмное вознаграждение»
+    # срабатывает, если предыдущий навык уже стоил мистику крови.
+    effect_mult = _edge_multiplier(actor)
+    self_denial = actor.buff_modifiers.get("self_denial", 0.0) > 0
+    if self_denial:
+        _pay_hp(actor, bc.DARK_MYSTIC_SELF_DENIAL_EXTRA_HP)
+        effect_mult *= 1.0 + bc.DARK_MYSTIC_SELF_DENIAL_BONUS
+    if actor.dark_reward_ready:
+        effect_mult *= 1.0 + actor.buff_modifiers.get("dark_reward_bonus", 0.0)
+        actor.dark_reward_ready = False
+
+    hit = compute_hit(actor, target, ctx.rng, skill.name, skill.multiplier * effect_mult, is_ability=True)
     ctx.hits.append(hit)
-    heal = max(round(hit.amount * skill.effect_value), 1)
+
     heal_target = _lowest_hp_ally_or_self(ctx)
+    # «Кровавая связь» и «Тёмный резонанс» поднимают долю урона, уходящую в лечение.
+    conversion = skill.effect_value + actor.buff_modifiers.get("pact_conversion_bonus", 0.0)
+    resonance = actor.buff_modifiers.get("resonance_bonus", 0.0)
+    if resonance > 0 and heal_target.current_hp < heal_target.max_hp * bc.DARK_MYSTIC_RESONANCE_HP_THRESHOLD:
+        conversion += resonance
+    heal = max(round(hit.amount * conversion), 1)
     ctx.heals.append(PendingHeal(source_id=actor.id, target_id=heal_target.id, amount=heal, label="исцеляет тьмой"))
+
+    ranked = _allies_by_hp(ctx)
+    # «Разделённый пакт»: доля лечения уходит ВТОРОМУ по тяжести раненому.
+    shared = actor.buff_modifiers.get("shared_pact_pct", 0.0)
+    if shared > 0 and len(ranked) >= 2:
+        ctx.heals.append(
+            PendingHeal(source_id=actor.id, target_id=ranked[1].id,
+                        amount=max(round(heal * shared), 1), label="делит пакт")
+        )
+    # «Круг тьмы» (бафф): раз в N ходов пакт лечит вдобавок всех союзников.
+    interval = int(actor.buff_modifiers.get("circle_interval", 0))
+    if interval and ranked and ctx.session.tick_number % interval == 0:
+        share = actor.buff_modifiers.get("circle_pct", bc.DARK_MYSTIC_CIRCLE_PCT)
+        for ally in ranked:
+            ctx.heals.append(
+                PendingHeal(source_id=actor.id, target_id=ally.id,
+                            amount=max(round(heal * share), 1), label="исцеляет кругом тьмы")
+            )
+
+    # Пакт с «Самоотречением» тоже стоил собственного HP - заряжаем награду
+    # уже ПОСЛЕ применения, чтобы этот же удар себя не усилил.
+    if self_denial and actor.buff_modifiers.get("dark_reward_bonus", 0.0) > 0:
+        actor.dark_reward_ready = True
 
 
 @offensive_skill("dark_mystic_ward")
@@ -61,10 +124,31 @@ def ward(ctx: SkillContext) -> None:
     skill = SUBCLASS_SKILL_DEFS["dark_mystic_ward"]
     actor = ctx.actor
     actor.cooldowns[skill.id] = skill.cd
+    # Патч 56: «Оберег крови» и «Стойкий оберег» увеличивают поглощение,
+    # второй платит за это лишним ходом перезарядки. «Передача оберега»
+    # разрешает накрывать союзника полной величиной.
     ward_target = _lowest_hp_ally_or_self(ctx)
-    absorb = round(formulas.support_power(actor.stats.will) * bc.DARK_MYSTIC_WARD_SHIELD_COEF)
+    steadfast = actor.buff_modifiers.get("ward_absorb_bonus", 0.0)
+    bonus = actor.buff_modifiers.get("ward_shield_bonus", 0.0) + steadfast
+    absorb = round(
+        actor.max_hp
+        * formulas.support_power(actor.stats.will)
+        * bc.DARK_MYSTIC_WARD_SHIELD_COEF
+        * (1.0 + bonus)
+    )
+    if steadfast > 0:
+        actor.cooldowns[skill.id] = skill.cd + bc.DARK_MYSTIC_STEADFAST_WARD_CD
     ward_target.apply_effect(EffectKind.SHIELD_POOL, absorb, skill.effect_duration, actor.id)
     ctx.lines.append(f"{actor.name} накрывает {ward_target.name} Оберегом (+{absorb} поглощения)")
+
+    # «Передача оберега»: тем же навыком накрывается и самый израненный союзник,
+    # полной величиной. Нужны живые союзники, иначе накрывать некого.
+    transfer = actor.buff_modifiers.get("ward_transfer", 0.0)
+    if transfer > 0:
+        extra = next((c for c in _allies_by_hp(ctx) if c.id != ward_target.id), None)
+        if extra is not None:
+            extra.apply_effect(EffectKind.SHIELD_POOL, absorb, skill.effect_duration, actor.id)
+            ctx.lines.append(f"{actor.name} передаёт Оберег: {extra.name} (+{absorb} поглощения)")
 
 
 @offensive_skill("dark_mystic_drain")
@@ -90,10 +174,18 @@ def circle_of_dark(ctx: SkillContext) -> None:
     skill = SUBCLASS_SKILL_DEFS["dark_mystic_circle"]
     actor = ctx.actor
     actor.cooldowns[skill.id] = skill.cd
-    cost = round(actor.current_hp * bc.DARK_MYSTIC_CIRCLE_HP_COST)
-    actor.current_hp = max(actor.current_hp - cost, 1)
+    _pay_hp(actor, bc.DARK_MYSTIC_CIRCLE_HP_COST)
+    # Патч 56: навык потратил собственное HP - «Тёмное вознаграждение» усилит
+    # следующий Кровавый пакт.
+    if actor.buff_modifiers.get("dark_reward_bonus", 0.0) > 0:
+        actor.dark_reward_ready = True
 
-    power = formulas.support_power(actor.stats.will) * skill.effect_value
+    # support_power(WIL) - ДОЛЯ, а не плоское число (см. formulas.py), поэтому
+    # и щит Оберега, и Круг тьмы считаются от максимума здоровья мистика.
+    power = (
+        actor.max_hp * formulas.support_power(actor.stats.will)
+        * skill.effect_value * _edge_multiplier(actor)
+    )
     allies = ctx.session.alive_allies_of(actor)
     if allies:
         for ally in allies:

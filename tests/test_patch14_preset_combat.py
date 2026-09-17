@@ -79,9 +79,12 @@ def test_guardian_heal_on_block_heals_self() -> None:
 
 
 def test_guardian_counterstrike_hits_enemy() -> None:
+    """Патч 56: «Контрудар» срабатывает ТОЛЬКО при ПОЛНОМ блоке, поэтому
+    здесь задан гарантированный полный блок (full_block_chance=1.0). Раньше
+    контратака шла с любого ухода в оборону."""
     rng = AlwaysLowRng()
     guardian = combatant(1, side=0, subclass_id="guardian")
-    guardian.buff_modifiers = {"counterstrike_mult": 0.7}
+    guardian.buff_modifiers = {"counterstrike_mult": 0.7, "full_block_chance": 1.0}
     # agility=0 (патч 34, ч.1) — иначе AlwaysLowRng гарантированно уводит моба
     # от контрудара новым стат-уворотом, тест не про уворот.
     mob = combatant(2, side=1, kind="mob", agility=0)

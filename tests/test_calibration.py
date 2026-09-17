@@ -199,7 +199,10 @@ def test_blood_pact_heals_self_without_allies() -> None:
 def test_calibrated_guardian_buff_values_in_content() -> None:
     buffs = load_content().buffs
     assert buffs["guardian_bulwark"].stat_modifiers["full_block_chance"] == 0.25
-    assert buffs["guardian_retribution"].stat_modifiers["counterstrike_mult"] == 0.70
+    # Патч 56: контратака переехала с «Возмездия» на «Контрудар» и привязана к
+    # ПОЛНОМУ блоку; у «Возмездия» теперь накопление урона за заблокированное.
+    assert buffs["guardian_counterattack"].stat_modifiers["counterstrike_mult"] == bc.GUARDIAN_COUNTERATTACK_MULT
+    assert buffs["guardian_retribution"].stat_modifiers["retribution_damage_per_10pct"] == bc.GUARDIAN_RETRIBUTION_PER_10PCT
     assert buffs["guardian_vital_block"].stat_modifiers["heal_on_block_pct_max_hp"] == 0.08
     assert buffs["guardian_heavy_hand"].stat_modifiers["damage_bonus"] == 0.10
     assert buffs["blood_knight_blood_rage"].stat_modifiers["damage_bonus"] == 0.05

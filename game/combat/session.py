@@ -142,6 +142,28 @@ class CombatantState:
     # Стихийный поток: последние (до 3) применённые элементальные умения подряд
     recent_elements: list[str] = field(default_factory=list)
 
+    # Патч 56 (Страж): сколько урона СРЕЗАНО блоком. blocked_this_tick -
+    # однотиковое (нужно «Отражению»: вернуть долю атакующему в этот же ход),
+    # blocked_recent - скользящее окно последних ходов для «Возмездия».
+    blocked_this_tick: int = 0
+    blocked_recent: list[int] = field(default_factory=list)
+
+    # Патч 56 (Клинок теней): память о прошлом ходе для «Ускользания»
+    # (уклонился - по нему сложнее попасть), «Жажды крови» (после крита
+    # следующая атака критует) и «Второго шанса» (раз в N ходов промах).
+    dodged_last_tick: bool = False
+    dodged_this_tick: bool = False
+    crit_this_tick: bool = False
+    guaranteed_crit_next: bool = False
+    bloodlust_ready_tick: int = 0
+    second_chance_active: bool = False
+    # Есть ли живые союзники: ставит резолвер в начале хода. Нужен там, где
+    # до сессии не дотянуться (compute_hit), и отделяет соло-бонусы от групповых.
+    has_allies: bool = False
+    # Патч 56 (Тёмный мистик): предыдущий навык потратил собственное HP,
+    # значит «Тёмное вознаграждение» усилит следующий Кровавый пакт.
+    dark_reward_ready: bool = False
+
     # Патч 53: скриптованный ход рейд-босса — если задан, резолвер (фаза 4b)
     # вызывает ЕГО вместо стандартного "кусает" compute_hit(mob, target).
     # None у ВСЕХ обычных мобов/персонажей — поведение резолвера не меняется
@@ -192,6 +214,7 @@ class CombatantState:
                 del self.cooldowns[skill_id]
 
     def reset_transient(self) -> None:
+        self.blocked_this_tick = 0
         self.shield = 0
         self.block_reduction = 0.0
         self.mitigation_penalty = 0.0

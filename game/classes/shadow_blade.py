@@ -65,7 +65,17 @@ def mark_harvest(ctx: SkillContext) -> None:
     mark = target.effect_from(EffectKind.MARK, actor.id)
     stacks = mark.stacks if mark is not None else 0
     multiplier = skill.multiplier + skill.effect_value * stacks
-    ctx.hits.append(compute_hit(actor, target, ctx.rng, skill.name, multiplier, is_ability=True))
+    # Патч 56, «Разделка»: если тратим достаточно стаков, крит бьёт сильнее.
+    carve_mult = actor.buff_modifiers.get("carve_crit_mult", 0.0)
+    crit_multiplier = (
+        carve_mult
+        if carve_mult > 0 and stacks >= bc.SHADOW_BLADE_CARVE_MIN_STACKS
+        else None
+    )
+    ctx.hits.append(
+        compute_hit(actor, target, ctx.rng, skill.name, multiplier, is_ability=True,
+                    crit_multiplier=crit_multiplier)
+    )
     if mark is not None:
         target.effects.remove(mark)
 

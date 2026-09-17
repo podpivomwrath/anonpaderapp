@@ -63,12 +63,83 @@ def _describe_guardian_vital_block(b: BuffDef) -> str:
     return f"Лечит на {_pct(bc.GUARDIAN_HEAL_ON_BLOCK)} от максимального HP при успешном блоке."
 
 
-def _describe_guardian_retribution(b: BuffDef) -> str:
-    return f"Контрудар при блоке наносит {_pct(bc.GUARDIAN_COUNTERSTRIKE_MULT)} от обычного удара."
 
 
 def _describe_guardian_heavy_hand(b: BuffDef) -> str:
     return f"Урон всеми навыками увеличен на {_pct(bc.GUARDIAN_HEAVY_HAND_BONUS)}."
+
+
+# --- Страж, микробаффы патча 56 ---
+
+
+def _describe_guardian_sturdy_armor(b: BuffDef) -> str:
+    return f"Входящий урон снижен на {_points(bc.GUARDIAN_STURDY_ARMOR_REDUCTION)}."
+
+
+def _describe_guardian_reflection(b: BuffDef) -> str:
+    return (
+        f"При полном блоке {_pct(bc.GUARDIAN_REFLECTION_PCT)} заблокированного урона "
+        "возвращается атакующему."
+    )
+
+
+def _describe_guardian_resilience(b: BuffDef) -> str:
+    return (
+        f"Пока здоровье ниже {_pct(bc.GUARDIAN_RESILIENCE_HP_THRESHOLD)}, входящий урон "
+        f"снижен дополнительно на {_points(bc.GUARDIAN_RESILIENCE_REDUCTION)}."
+    )
+
+
+def _describe_guardian_command(b: BuffDef) -> str:
+    return (
+        f"Мобы выбирают Стража целью на {_pct(bc.GUARDIAN_COMMAND_AGGRO_BONUS)} чаще. "
+        "Работает только в PvE и рейдах."
+    )
+
+
+def _describe_guardian_provoker_mark(b: BuffDef) -> str:
+    total = bc.PROVOKE_PVP_DAMAGE_REDUCTION + bc.GUARDIAN_PROVOKER_MARK_BONUS
+    return (
+        f"В PvP противник, ударивший не по Стражу, наносит на {_pct(total)} меньше урона "
+        f"вместо {_pct(bc.PROVOKE_PVP_DAMAGE_REDUCTION)}."
+    )
+
+
+def _describe_guardian_guard(b: BuffDef) -> str:
+    total = bc.GUARDIAN_BULWARK_FULL_BLOCK_CHANCE + bc.GUARDIAN_GUARD_BLOCK_BONUS
+    return (
+        f"Шанс полного блока вместе с Несокрушимостью: {_pct(total)} "
+        f"вместо {_pct(bc.GUARDIAN_BULWARK_FULL_BLOCK_CHANCE)}."
+    )
+
+
+def _describe_guardian_allys_shield(b: BuffDef) -> str:
+    return (
+        f"Союзник с наименьшим запасом здоровья получает {_pct(bc.GUARDIAN_ALLYS_SHIELD_SHARE)} "
+        "защиты Глухой обороны. Только в бою с союзниками, в одиночку эффекта нет."
+    )
+
+
+def _describe_guardian_wall(b: BuffDef) -> str:
+    return (
+        "Глухая оборона снимает один отрицательный эффект с союзника, у которого меньше "
+        "всего здоровья. Только в бою с союзниками, в одиночку эффекта нет."
+    )
+
+
+def _describe_guardian_counterattack(b: BuffDef) -> str:
+    return (
+        f"При полном блоке Страж бьёт в ответ с силой {_pct(bc.GUARDIAN_COUNTERATTACK_MULT)} "
+        "от обычной атаки."
+    )
+
+
+def _describe_guardian_retribution(b: BuffDef) -> str:
+    return (
+        f"За каждые 10% максимального здоровья, срезанные блоком за последние "
+        f"{_turns(bc.GUARDIAN_RETRIBUTION_WINDOW_TURNS)}, урон растёт на "
+        f"{_pct(bc.GUARDIAN_RETRIBUTION_PER_10PCT)}. Потолок: {_pct(bc.GUARDIAN_RETRIBUTION_CAP)}."
+    )
 
 
 def _describe_blood_knight_blood_rage(b: BuffDef) -> str:
@@ -141,6 +212,179 @@ def _describe_poisoner_lingering_poison(b: BuffDef) -> str:
     base = bc.POISONER_POISON_DURATION_TICKS
     total = base + bc.POISONER_LINGERING_POISON_BONUS_TURNS
     return f"Яд от Отравленного клинка держится {_turns(total)} вместо {_turns(base)}."
+
+
+# --- Отравитель, микробаффы патча 56 ---
+
+
+def _poisoner_base_vuln() -> float:
+    from game.combat.subclass_skills import SUBCLASS_SKILL_DEFS
+
+    return SUBCLASS_SKILL_DEFS["poisoner_decay"].effect_value
+
+
+def _poisoner_base_disrupt_chance() -> float:
+    from game.combat.subclass_skills import SUBCLASS_SKILL_DEFS
+
+    return SUBCLASS_SKILL_DEFS["poisoner_disrupt"].effect_value
+
+
+# --- Клинок теней, микробаффы патча 56 ---
+
+
+def _describe_shadow_blade_deadly_precision(b: BuffDef) -> str:
+    return f"Шанс крита увеличен на {_points(bc.SHADOW_BLADE_DEADLY_PRECISION_CRIT)}."
+
+
+def _describe_shadow_blade_carve(b: BuffDef) -> str:
+    return (
+        f"Если Жатва тратит {bc.SHADOW_BLADE_CARVE_MIN_STACKS} и больше стаков Метки, крит бьёт "
+        f"в {bc.SHADOW_BLADE_CARVE_CRIT_MULT} раза вместо {bc.CRIT_MULTIPLIER}."
+    )
+
+
+def _describe_shadow_blade_bloodlust(b: BuffDef) -> str:
+    return (
+        f"После крита следующий удар критует гарантированно. Не чаще раза в "
+        f"{_turns(bc.SHADOW_BLADE_BLOODLUST_COOLDOWN)}."
+    )
+
+
+def _describe_shadow_blade_mark_of_prey_plus(b: BuffDef) -> str:
+    return (
+        f"Обычная атака с шансом {_pct(bc.SHADOW_BLADE_MARK_ON_ATTACK_CHANCE)} добавляет стак "
+        f"Метки добычи. Максимум стаков: {bc.SHADOW_BLADE_MARK_MAX_STACKS}."
+    )
+
+
+def _describe_shadow_blade_shadow(b: BuffDef) -> str:
+    return f"Шанс уклонения увеличен на {_points(bc.SHADOW_BLADE_SHADOW_DODGE)}."
+
+
+def _describe_shadow_blade_slip_away(b: BuffDef) -> str:
+    return (
+        f"После удачного уворота следующий удар по Клинку теней имеет на "
+        f"{_points(bc.SHADOW_BLADE_SLIP_AWAY)} меньше шансов попасть."
+    )
+
+
+def _describe_shadow_blade_blade_dancer(b: BuffDef) -> str:
+    return f"Удачный уворот продлевает уже висящие Метки добычи до {_turns(bc.SHADOW_BLADE_MARK_DURATION)}."
+
+
+def _describe_shadow_blade_blade_hunger(b: BuffDef) -> str:
+    return "Каждый удачный уворот добавляет стак Метки добычи тому, кто промахнулся."
+
+
+def _describe_shadow_blade_hunters_solitude(b: BuffDef) -> str:
+    return (
+        f"Урон увеличен на {_pct(bc.SHADOW_BLADE_SOLO_DAMAGE)}, пока Клинок теней дерётся без "
+        "союзников."
+    )
+
+
+def _describe_shadow_blade_second_chance(b: BuffDef) -> str:
+    return (
+        f"Каждый {bc.SHADOW_BLADE_SECOND_CHANCE_INTERVAL}-й ход удар по Клинку теней "
+        "гарантированно проходит мимо."
+    )
+
+
+def _describe_shadow_blade_mark_passed_on(b: BuffDef) -> str:
+    return (
+        f"Союзники критуют по цели с Меткой добычи на {_points(bc.SHADOW_BLADE_ALLY_CRIT_ON_MARK)} "
+        "чаще. Только в бою с союзниками, в одиночку эффекта нет."
+    )
+
+
+def _describe_shadow_blade_inspiration(b: BuffDef) -> str:
+    return (
+        f"Добив цель с Меткой, союзники восстанавливают {_pct(bc.SHADOW_BLADE_INSPIRATION_HEAL)} "
+        f"максимального здоровья и получают {_pct(bc.SHADOW_BLADE_INSPIRATION_DAMAGE)} к урону на "
+        f"{_turns(bc.SHADOW_BLADE_INSPIRATION_TURNS)}. Только в бою с союзниками."
+    )
+
+
+def _describe_shadow_blade_hunting_mark(b: BuffDef) -> str:
+    return (
+        "Метка добычи и число её стаков видны союзникам в боевой сводке. Только в бою с "
+        "союзниками."
+    )
+
+
+def _describe_poisoner_toxic_blood(b: BuffDef) -> str:
+    base = _poisoner_base_vuln()
+    total = base + bc.POISONER_TOXIC_BLOOD_VULN_BONUS
+    return f"Уязвимость от Разложения: {_pct(total)} вместо {_pct(base)}."
+
+
+def _describe_poisoner_desiccation(b: BuffDef) -> str:
+    total = bc.POISONER_DISRUPT_WEAKEN + bc.POISONER_DESICCATION_WEAKEN_BONUS
+    return f"Ослабление от Дурманящего дротика: {_pct(total)} вместо {_pct(bc.POISONER_DISRUPT_WEAKEN)}."
+
+
+def _describe_poisoner_double_dose(b: BuffDef) -> str:
+    return (
+        f"Разложение с шансом {_pct(bc.POISONER_DOUBLE_DOSE_CHANCE)} накладывает разом и "
+        "Уязвимость, и Ослабление."
+    )
+
+
+def _describe_poisoner_corroding_toxin(b: BuffDef) -> str:
+    return f"Урон яда увеличен на {_pct(bc.POISONER_CORRODING_TOXIN_BONUS)}."
+
+
+def _describe_poisoner_necrosis(b: BuffDef) -> str:
+    total = bc.POISONER_NECROSIS_PER_STACK * bc.POISONER_MAX_STACKS
+    return (
+        f"Урон яда растёт на {_pct(bc.POISONER_NECROSIS_PER_STACK)} за каждый стак на цели: "
+        f"до {_pct(total)} при {bc.POISONER_MAX_STACKS} стаках."
+    )
+
+
+def _describe_poisoner_toxic_burst(b: BuffDef) -> str:
+    return (
+        f"Когда яд истекает, цель получает добавочный урон: "
+        f"{_pct(bc.POISONER_TOXIC_BURST_EXPIRE_PCT)} от урона этого яда."
+    )
+
+
+def _describe_poisoner_plague(b: BuffDef) -> str:
+    return (
+        "Если отравленный противник погибает, яд переходит на следующего с тем же числом "
+        "стаков. Нужен бой с несколькими противниками."
+    )
+
+
+def _describe_poisoner_epidemic(b: BuffDef) -> str:
+    return "Перешедший по Заразе яд сохраняет полную силу вместо половинной."
+
+
+def _describe_poisoner_venom_cloud(b: BuffDef) -> str:
+    return (
+        f"Каждый {bc.POISONER_VENOM_CLOUD_INTERVAL}-й ход Отравленный клинок накладывает стак "
+        "яда на всех противников. Нужен бой с несколькими противниками."
+    )
+
+
+def _describe_poisoner_hallucinogen(b: BuffDef) -> str:
+    base = _poisoner_base_disrupt_chance()
+    total = base + bc.POISONER_HALLUCINOGEN_BONUS
+    return f"Шанс сбить действие цели: {_pct(total)} вместо {_pct(base)}."
+
+
+def _describe_poisoner_paralytic(b: BuffDef) -> str:
+    return (
+        f"После удачного сбоя сопротивление контролю цели снижено на "
+        f"{_points(bc.POISONER_PARALYTIC_RESIST_DOWN)} на {_turns(1)}."
+    )
+
+
+def _describe_poisoner_toxicology(b: BuffDef) -> str:
+    return (
+        f"Яд проходит мимо {_pct(bc.POISONER_TOXICOLOGY_SHIELD_PIERCE)} щита цели. Митигацию "
+        "яд не задевает и без этого баффа."
+    )
 
 
 def _describe_elementalist_deep_freeze(b: BuffDef) -> str:
@@ -223,6 +467,107 @@ def _describe_elementalist_ice_field(b: BuffDef) -> str:
     )
 
 
+# --- Тёмный мистик, микробаффы патча 56 ---
+
+
+def _pact_conversion() -> float:
+    from game.combat.subclass_skills import SUBCLASS_SKILL_DEFS
+
+    return SUBCLASS_SKILL_DEFS["dark_mystic_blood_pact"].effect_value
+
+
+def _ward_cd() -> int:
+    from game.combat.subclass_skills import SUBCLASS_SKILL_DEFS
+
+    return SUBCLASS_SKILL_DEFS["dark_mystic_ward"].cd
+
+
+def _describe_dark_mystic_blood_bond(b: BuffDef) -> str:
+    base = _pact_conversion()
+    return (
+        f"Кровавый пакт обращает в лечение {_pct(base + bc.DARK_MYSTIC_BLOOD_BOND_BONUS)} "
+        f"нанесённого урона вместо {_pct(base)}."
+    )
+
+
+def _describe_dark_mystic_dark_resonance(b: BuffDef) -> str:
+    return (
+        f"Если у цели лечения меньше {_pct(bc.DARK_MYSTIC_RESONANCE_HP_THRESHOLD)} здоровья, "
+        f"Кровавый пакт обращает в лечение ещё на {_points(bc.DARK_MYSTIC_RESONANCE_BONUS)} больше."
+    )
+
+
+def _describe_dark_mystic_blood_pact_plus(b: BuffDef) -> str:
+    return (
+        f"Навыки, которые платят собственным здоровьем, стоят на "
+        f"{_pct(bc.DARK_MYSTIC_HP_COST_REDUCTION)} дешевле."
+    )
+
+
+def _describe_dark_mystic_self_denial(b: BuffDef) -> str:
+    return (
+        f"Кровавый пакт дополнительно тратит {_pct(bc.DARK_MYSTIC_SELF_DENIAL_EXTRA_HP)} текущего "
+        f"здоровья, но бьёт и лечит на {_pct(bc.DARK_MYSTIC_SELF_DENIAL_BONUS)} сильнее."
+    )
+
+
+def _describe_dark_mystic_dark_reward(b: BuffDef) -> str:
+    return (
+        f"После навыка, потратившего собственное здоровье, следующий Кровавый пакт сильнее на "
+        f"{_pct(bc.DARK_MYSTIC_DARK_REWARD_BONUS)}."
+    )
+
+
+def _describe_dark_mystic_edge(b: BuffDef) -> str:
+    return (
+        f"Пока собственного здоровья меньше {_pct(bc.DARK_MYSTIC_EDGE_HP_THRESHOLD)}, урон и "
+        f"лечение увеличены на {_pct(bc.DARK_MYSTIC_EDGE_BONUS)}."
+    )
+
+
+def _describe_dark_mystic_blood_ward(b: BuffDef) -> str:
+    return f"Щит Оберега больше на {_pct(bc.DARK_MYSTIC_WARD_SHIELD_BONUS)}."
+
+
+def _describe_dark_mystic_ward_passed_on(b: BuffDef) -> str:
+    return (
+        "Оберег накрывает вдобавок самого израненного союзника, полной величиной. "
+        "Только в бою с союзниками."
+    )
+
+
+def _describe_dark_mystic_steadfast_ward(b: BuffDef) -> str:
+    cd = _ward_cd()
+    return (
+        f"Оберег поглощает на {_pct(bc.DARK_MYSTIC_STEADFAST_WARD_BONUS)} больше урона, но "
+        f"перезаряжается {_turns(cd + bc.DARK_MYSTIC_STEADFAST_WARD_CD)} вместо {cd}."
+    )
+
+
+def _describe_dark_mystic_shared_pact(b: BuffDef) -> str:
+    return (
+        f"Второму по тяжести раненому союзнику достаётся ещё "
+        f"{_pct(bc.DARK_MYSTIC_SHARED_PACT_PCT)} лечения Кровавого пакта. "
+        "Только в бою с союзниками."
+    )
+
+
+def _describe_dark_mystic_circle_of_darkness(b: BuffDef) -> str:
+    return (
+        f"Каждый {bc.DARK_MYSTIC_CIRCLE_INTERVAL}-й ход Кровавый пакт дополнительно лечит всех "
+        f"союзников на {_pct(bc.DARK_MYSTIC_CIRCLE_PCT)} от основного лечения. "
+        "Только в бою с союзниками."
+    )
+
+
+def _describe_dark_mystic_echo(b: BuffDef) -> str:
+    return (
+        f"Лечение сверх максимума здоровья не пропадает: оно становится щитом следующему по "
+        f"низкому здоровью союзнику на {_turns(bc.DARK_MYSTIC_ECHO_DURATION)}. "
+        "Только в бою с союзниками."
+    )
+
+
 _GENERATORS = {
     "guardian_bulwark": _describe_guardian_bulwark,
     "guardian_unyielding": _describe_guardian_unyielding,
@@ -242,7 +587,53 @@ _GENERATORS = {
     "blood_knight_shared_thirst": _describe_blood_knight_shared_thirst,
     "blood_knight_blood_pact": _describe_blood_knight_blood_pact,
     "blood_knight_shared_feast": _describe_blood_knight_shared_feast,
+    "guardian_sturdy_armor": _describe_guardian_sturdy_armor,
+    "guardian_reflection": _describe_guardian_reflection,
+    "guardian_resilience": _describe_guardian_resilience,
+    "guardian_command": _describe_guardian_command,
+    "guardian_provoker_mark": _describe_guardian_provoker_mark,
+    "guardian_guard": _describe_guardian_guard,
+    "guardian_allys_shield": _describe_guardian_allys_shield,
+    "guardian_wall": _describe_guardian_wall,
+    "guardian_counterattack": _describe_guardian_counterattack,
     "poisoner_lingering_poison": _describe_poisoner_lingering_poison,
+    "shadow_blade_deadly_precision": _describe_shadow_blade_deadly_precision,
+    "shadow_blade_carve": _describe_shadow_blade_carve,
+    "shadow_blade_bloodlust": _describe_shadow_blade_bloodlust,
+    "shadow_blade_mark_of_prey_plus": _describe_shadow_blade_mark_of_prey_plus,
+    "shadow_blade_shadow": _describe_shadow_blade_shadow,
+    "shadow_blade_slip_away": _describe_shadow_blade_slip_away,
+    "shadow_blade_blade_dancer": _describe_shadow_blade_blade_dancer,
+    "shadow_blade_blade_hunger": _describe_shadow_blade_blade_hunger,
+    "shadow_blade_hunters_solitude": _describe_shadow_blade_hunters_solitude,
+    "shadow_blade_second_chance": _describe_shadow_blade_second_chance,
+    "shadow_blade_mark_passed_on": _describe_shadow_blade_mark_passed_on,
+    "shadow_blade_inspiration": _describe_shadow_blade_inspiration,
+    "shadow_blade_hunting_mark": _describe_shadow_blade_hunting_mark,
+    "poisoner_toxic_blood": _describe_poisoner_toxic_blood,
+    "poisoner_desiccation": _describe_poisoner_desiccation,
+    "poisoner_double_dose": _describe_poisoner_double_dose,
+    "poisoner_corroding_toxin": _describe_poisoner_corroding_toxin,
+    "poisoner_necrosis": _describe_poisoner_necrosis,
+    "poisoner_toxic_burst": _describe_poisoner_toxic_burst,
+    "poisoner_plague": _describe_poisoner_plague,
+    "poisoner_epidemic": _describe_poisoner_epidemic,
+    "poisoner_venom_cloud": _describe_poisoner_venom_cloud,
+    "poisoner_hallucinogen": _describe_poisoner_hallucinogen,
+    "poisoner_paralytic": _describe_poisoner_paralytic,
+    "poisoner_toxicology": _describe_poisoner_toxicology,
+    "dark_mystic_blood_bond": _describe_dark_mystic_blood_bond,
+    "dark_mystic_dark_resonance": _describe_dark_mystic_dark_resonance,
+    "dark_mystic_blood_pact_plus": _describe_dark_mystic_blood_pact_plus,
+    "dark_mystic_self_denial": _describe_dark_mystic_self_denial,
+    "dark_mystic_dark_reward": _describe_dark_mystic_dark_reward,
+    "dark_mystic_edge": _describe_dark_mystic_edge,
+    "dark_mystic_blood_ward": _describe_dark_mystic_blood_ward,
+    "dark_mystic_ward_passed_on": _describe_dark_mystic_ward_passed_on,
+    "dark_mystic_steadfast_ward": _describe_dark_mystic_steadfast_ward,
+    "dark_mystic_shared_pact": _describe_dark_mystic_shared_pact,
+    "dark_mystic_circle_of_darkness": _describe_dark_mystic_circle_of_darkness,
+    "dark_mystic_echo": _describe_dark_mystic_echo,
     "elementalist_deep_freeze": _describe_elementalist_deep_freeze,
     "elementalist_numbness": _describe_elementalist_numbness,
     "elementalist_thrift": _describe_elementalist_thrift,

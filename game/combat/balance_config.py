@@ -193,6 +193,21 @@ GUARDIAN_BLOCK_HEAL_PCT = 0.04          # Глухая оборона: хил % 
 SHADOW_BLADE_MARK_MAX_STACKS = 5        # Метка добычи: максимум стаков
 SHADOW_BLADE_MARK_DURATION = 5          # ходов до истечения стака (обновляется при новом применении)
 
+# --- Клинок теней, микробаффы патча 56 ---
+SHADOW_BLADE_DEADLY_PRECISION_CRIT = 0.12   # Смертельная точность: +шанс крита
+SHADOW_BLADE_CARVE_CRIT_MULT = 1.80         # Разделка: множитель крита при трате >=N стаков
+SHADOW_BLADE_CARVE_MIN_STACKS = 3           # ...сколько стаков нужно потратить
+SHADOW_BLADE_BLOODLUST_COOLDOWN = 6         # Жажда крови: не чаще раза в N ходов
+SHADOW_BLADE_MARK_ON_ATTACK_CHANCE = 0.25   # Пометка добычи+: шанс стака с обычной атаки
+SHADOW_BLADE_SHADOW_DODGE = 0.15            # Тень: +уклонение
+SHADOW_BLADE_SLIP_AWAY = 0.20               # Ускользание: -шанс попасть по нему после уворота
+SHADOW_BLADE_SOLO_DAMAGE = 0.10             # Одиночество охотника: +урон вне группы
+SHADOW_BLADE_SECOND_CHANCE_INTERVAL = 8     # Второй шанс: раз в N ходов гарантированный промах
+SHADOW_BLADE_ALLY_CRIT_ON_MARK = 0.10       # Передача метки: +крит союзникам по помеченной цели
+SHADOW_BLADE_INSPIRATION_HEAL = 0.10        # Воодушевление: хил союзникам % maxHP
+SHADOW_BLADE_INSPIRATION_DAMAGE = 0.08      # ...и бонус урона
+SHADOW_BLADE_INSPIRATION_TURNS = 2          # ...на сколько ходов
+
 # --- Откалиброванные значения (патч балансировки, 5 итераций симуляции) ---
 # Стартовые ориентиры для реальных баффов, НЕ финальные игровые числа.
 # Дизайн-решение: Страж и Тёмный мистик осознанно слабы в чистых дуэлях 1×1
@@ -234,6 +249,25 @@ POISONER_POISON_DURATION_TICKS = 3          # TODO: content — длительн
 DARK_MYSTIC_WARD_SHIELD_COEF = 2.0          # Оберег: поглощение = support_power(WIL) * коэф
 DARK_MYSTIC_CIRCLE_HP_COST = 0.20           # Круг тьмы: доля ТЕКУЩЕГО HP, платится за навык
 
+# --- Тёмный мистик, микробаффы патча 56 ---
+DARK_MYSTIC_BLOOD_BOND_BONUS = 0.15         # Кровавая связь: конверсия 0.70 -> 0.85
+DARK_MYSTIC_RESONANCE_BONUS = 0.15          # Тёмный резонанс: ещё +конверсия по раненой цели
+DARK_MYSTIC_RESONANCE_HP_THRESHOLD = 0.40   # ...порог HP цели лечения
+DARK_MYSTIC_HP_COST_REDUCTION = 0.20        # Пакт крови+: дешевле платить своим HP
+DARK_MYSTIC_SELF_DENIAL_EXTRA_HP = 0.10     # Самоотречение: доп. плата % текущего HP
+DARK_MYSTIC_SELF_DENIAL_BONUS = 0.50        # ...и насколько сильнее эффект
+DARK_MYSTIC_DARK_REWARD_BONUS = 0.25        # Тёмное вознаграждение: следующий пакт сильнее
+DARK_MYSTIC_EDGE_BONUS = 0.30               # Грань: +урон и лечение на низком HP
+DARK_MYSTIC_EDGE_HP_THRESHOLD = 0.25        # ...порог HP
+DARK_MYSTIC_WARD_SHIELD_BONUS = 0.30        # Оберег крови: +величина щита
+DARK_MYSTIC_STEADFAST_WARD_BONUS = 0.20     # Стойкий оберег: +поглощение
+DARK_MYSTIC_STEADFAST_WARD_CD = 1           # ...ценой +1 хода перезарядки
+DARK_MYSTIC_SHARED_PACT_PCT = 0.30          # Разделённый пакт: доля лечения второму союзнику
+DARK_MYSTIC_CIRCLE_INTERVAL = 5             # Круг тьмы (бафф): раз в N ходов пакт лечит всех
+DARK_MYSTIC_CIRCLE_PCT = 0.40               # ...силой доли от основного лечения
+DARK_MYSTIC_ECHO_PCT = 1.0                  # Отголосок: доля перелечивания, ставшая щитом
+DARK_MYSTIC_ECHO_DURATION = 2               # ...и сколько ходов этот щит держится
+
 # Элементалист — микробаффы «Экономия»/«Перегрузка» (патч 46, ч.1): раньше
 # описаны как экономия несуществующего ресурса (маны в игре нет, только КД) —
 # переписаны на шанс/интервал НЕ уйти на кулдаун. См. game/combat/skills.py::
@@ -248,7 +282,36 @@ ELEMENTALIST_ELEMENTAL_FLOW_BONUS = 0.20        # Стихийный поток:
 ELEMENTALIST_NUMBNESS_FREEZE_BONUS_TURNS = 1    # Оцепенение: +1 ход к длительности заморозки
 ELEMENTALIST_DEEP_FREEZE_CHANCE_BONUS = 0.15    # Глубокая заморозка: +15% шанс наложить контроль
 POISONER_LINGERING_POISON_BONUS_TURNS = 1       # Затяжной яд: +1 ход к длительности яда
+
+# --- Отравитель, микробаффы патча 56 (винрейт 27%: пул усилен относительно
+# первоначального черновика) ---
+POISONER_DISRUPT_WEAKEN = 0.25              # Дурманящий дротик: базовое Ослабление (было зашито в коде)
+POISONER_TOXIC_BLOOD_VULN_BONUS = 0.08      # Токсичная кровь: Уязвимость 0.20 -> 0.28
+POISONER_DESICCATION_WEAKEN_BONUS = 0.08    # Иссушение: Ослабление 0.25 -> 0.33
+POISONER_DOUBLE_DOSE_CHANCE = 0.25          # Двойная доза: шанс наложить оба дебаффа разом
+POISONER_CORRODING_TOXIN_BONUS = 0.25       # Разъедающий токсин: +урон яда
+POISONER_NECROSIS_PER_STACK = 0.08          # Некроз: +урон яда за каждый стак на цели
+POISONER_TOXIC_BURST_EXPIRE_PCT = 0.50      # Токсичный всплеск: доп. урон при истечении яда
+POISONER_VENOM_CLOUD_INTERVAL = 5           # Ядовитое облако: раз в N ходов яд на всех
+POISONER_HALLUCINOGEN_BONUS = 0.15          # Галлюциноген: шанс сбоя 0.60 -> 0.75
+POISONER_PARALYTIC_RESIST_DOWN = 0.15       # Паралитик: -сопротивление контролю после сбоя
+POISONER_TOXICOLOGY_SHIELD_PIERCE = 0.20    # Токсикология: доля щита, которую яд игнорирует
 GUARDIAN_UNYIELDING_PROVOKE_BONUS_TURNS = 1     # Несгибаемый: +1 ход к длительности Провокации
+
+# --- Страж, микробаффы патча 56 (винрейт 14%: кит специально конвертирует
+# защиту в урон и пользу, иначе в дуэли он ни во что не превращается) ---
+GUARDIAN_STURDY_ARMOR_REDUCTION = 0.08      # Крепкая броня: снижение входящего урона
+GUARDIAN_RESILIENCE_REDUCTION = 0.12        # Стойкость: доп. снижение урона при низком HP
+GUARDIAN_RESILIENCE_HP_THRESHOLD = 0.30     # ...порог HP для Стойкости
+GUARDIAN_REFLECTION_PCT = 0.25              # Отражение: доля заблокированного урона обратно атакующему
+GUARDIAN_COMMAND_AGGRO_BONUS = 0.40         # Приказ: +агро (только PvE/рейд)
+GUARDIAN_PROVOKER_MARK_BONUS = 0.15         # Клеймо провокатора: доп. снижение урона по чужим целям (PvP)
+GUARDIAN_GUARD_BLOCK_BONUS = 0.10           # Гарда: доп. шанс полного блока
+GUARDIAN_ALLYS_SHIELD_SHARE = 0.25          # Щит соратника: доля защиты союзнику с наименьшим % HP
+GUARDIAN_COUNTERATTACK_MULT = 0.50          # Контрудар: ответный удар при полном блоке
+GUARDIAN_RETRIBUTION_PER_10PCT = 0.08       # Возмездие: +урон за каждые 10% maxHP, заблокированные за окно
+GUARDIAN_RETRIBUTION_CAP = 0.25             # ...потолок бонуса
+GUARDIAN_RETRIBUTION_WINDOW_TURNS = 3       # ...окно учёта заблокированного
 
 # Кровавый рыцарь — весь остальной пул микробаффов (патч 47, ч.2): по жалобе
 # игрока пул оказался заглушками почти целиком (11 из 12, кроме Кровавой

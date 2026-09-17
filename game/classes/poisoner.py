@@ -74,6 +74,24 @@ def venom(ctx: SkillContext) -> None:
         )
     ctx.lines.append(f"{target.name} под действием яда ({actor.name}) ☠")
 
+    # Патч 56, «Ядовитое облако»: раз в N ходов тот же удар разносит по стаку
+    # яда на ВСЕХ противников. Нет-оп в дуэли: там противник всего один.
+    interval = int(actor.buff_modifiers.get("venom_cloud_interval", 0))
+    if interval > 0 and ctx.session.tick_number % interval == 0:
+        others = [e for e in ctx.session.alive_enemies_of(actor) if e.id != target.id]
+        for other in others:
+            existing_other = other.effect_from(EffectKind.DOT, actor.id)
+            if existing_other is not None:
+                existing_other.stacks = min(existing_other.stacks + 1, bc.POISONER_MAX_STACKS)
+                existing_other.remaining_ticks = max(existing_other.remaining_ticks, duration)
+            else:
+                other.effects.append(
+                    Effect(kind=EffectKind.DOT, value=per_stack, remaining_ticks=duration,
+                           source_id=actor.id, stacks=1)
+                )
+        if others:
+            ctx.lines.append(f"{actor.name} выпускает ядовитое облако ☠")
+
 
 @offensive_skill("poisoner_disrupt")
 def disrupt(ctx: SkillContext) -> None:
@@ -87,9 +105,13 @@ def disrupt(ctx: SkillContext) -> None:
         return
 
     ctx.hits.append(compute_hit(actor, target, ctx.rng, skill.name, skill.multiplier, is_ability=True))
-    target.apply_effect(EffectKind.WEAKEN, 0.25, 3, actor.id)
+    # Патч 56: «Иссушение» усиливает Ослабление (0.25 -> 0.33).
+    weaken = bc.POISONER_DISRUPT_WEAKEN + actor.buff_modifiers.get("weaken_bonus", 0.0)
+    target.apply_effect(EffectKind.WEAKEN, weaken, 3, actor.id)
 
-    if ctx.rng.random() < skill.effect_value:
+    # Патч 56: «Галлюциноген» поднимает шанс сбоя действия (0.60 -> 0.75).
+    disrupt_chance = skill.effect_value + actor.buff_modifiers.get("disrupt_chance_bonus", 0.0)
+    if ctx.rng.random() < disrupt_chance:
         pvp = ctx.session.mode != CombatMode.PVE
         res = control.try_apply_control(
             target, base_duration=bc.CONTROL_BASE_DURATION_TICKS, source_id=actor.id, rng=ctx.rng, pvp=pvp,
@@ -98,6 +120,12 @@ def disrupt(ctx: SkillContext) -> None:
             ctx.lines.append(combat_flavor.control_blocked_line(target.name))
         elif res.resisted:
             ctx.lines.append(combat_flavor.control_resisted_line(target.name))
+        else:
+            # Патч 56, «Паралитик»: удачный сбой роняет сопротивление контролю
+            # цели на 1 ход (тот же эффект, что «Тепловой шок» Элементалиста).
+            paralytic = actor.buff_modifiers.get("paralytic_resist_down", 0.0)
+            if paralytic > 0:
+                target.apply_effect(EffectKind.CONTROL_RESIST_DOWN, paralytic, 1, actor.id)
         # Патч 52, баг 1: успешное наложение — «теряет ход» не печатается
         # здесь, единственное место теперь резолвер (game/combat/resolver.py).
 

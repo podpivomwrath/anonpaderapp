@@ -14,7 +14,7 @@ game/combat/resolver.py::RenderedHit/RenderedHeal) для урона/лечен�
 
 from game.combat import combat_flavor, display
 from game.combat.resolver import RenderedHeal, RenderedHit, TickResult
-from game.combat.session import CombatSessionState
+from game.combat.session import CombatSessionState, EffectKind
 
 _SEP = "━━━━━━━━━━━━━━"
 
@@ -56,6 +56,23 @@ def _guess_side(session: CombatSessionState, line: str) -> int | None:
         if combatant.name in line:
             return combatant.side
     return None
+
+
+def _mark_suffix(session: CombatSessionState, target, viewer_side: int) -> str:
+    """Патч 56, «Клеймо охоты» Клинка теней: стаки Метки добычи видны не только
+    её владельцу, но и всей его стороне. Без баффа - пустая строка, сводка
+    выглядит ровно как раньше."""
+    watchers = [
+        c for c in session.combatants.values()
+        if c.side == viewer_side and c.alive and c.buff_modifiers.get("mark_visible_to_allies", 0.0) > 0
+    ]
+    if not watchers:
+        return ""
+    stacks = sum(
+        e.stacks for e in target.effects_of(EffectKind.MARK)
+        if any(e.source_id == w.id for w in watchers)
+    )
+    return f" - Метка добычи ×{stacks}" if stacks else ""
 
 
 def render_tick(session: CombatSessionState, result: TickResult, viewer_side: int = 0) -> str:
@@ -108,7 +125,8 @@ def render_tick(session: CombatSessionState, result: TickResult, viewer_side: in
     ]
     for c in session.combatants.values():
         if c.side != viewer_side and c.alive:
-            parts.append(f"{c.name}: {display.health_bar(c.current_hp, c.max_hp, mode)}")
+            bar = display.health_bar(c.current_hp, c.max_hp, mode)
+            parts.append(f"{c.name}: {bar}{_mark_suffix(session, c, viewer_side)}")
     parts.append(_SEP)
     for c in session.combatants.values():
         if c.side == viewer_side and c.alive:

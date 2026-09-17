@@ -169,10 +169,14 @@ def test_preset_heal_on_block_heals_self() -> None:
 
 
 def test_preset_counterstrike_hits_attacker_back() -> None:
-    """Возмездие (counterstrike_mult): блок наносит встречный удар."""
+    """Контрудар (counterstrike_mult): ПОЛНЫЙ блок наносит встречный удар.
+
+    Патч 56 привязал контратаку именно к полному блоку и перенёс её с
+    «Возмездия» на «Контрудар» - у «Возмездия» теперь своя механика
+    (накопление урона за заблокированное)."""
     rng = NoCritRng()
     guardian = combatant(1, side=0, subclass_id="guardian")
-    guardian.buff_modifiers = {"counterstrike_mult": 0.7}
+    guardian.buff_modifiers = {"counterstrike_mult": 0.7, "full_block_chance": 1.0}
     enemy = combatant(2, side=1)
     state = make_session(CombatMode.PVP_GROUP, guardian, enemy)
     resolve_tick(state, {1: skill("guardian_block"), 2: DeclaredAction(type=ActionType.SKIP)}, rng)

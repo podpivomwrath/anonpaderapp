@@ -88,8 +88,18 @@ def _make_handler(skill: SubclassSkillDef):
             )
         elif skill.effect == "target_vuln":
             if target is not None:
+                # Патч 56, Отравитель: «Токсичная кровь» усиливает Уязвимость,
+                # «Двойная доза» с шансом вешает ещё и Ослабление тем же
+                # применением. У прочих подклассов ключей нет - поведение не меняется.
+                vuln_bonus = actor.buff_modifiers.get("vulnerability_bonus", 0.0)
+                double_dose = actor.buff_modifiers.get("double_dose_chance", 0.0)
+                if double_dose > 0 and ctx.rng.random() < double_dose:
+                    weaken = bc.POISONER_DISRUPT_WEAKEN + actor.buff_modifiers.get("weaken_bonus", 0.0)
+                    target.apply_effect(EffectKind.WEAKEN, weaken, skill.effect_duration, actor.id)
+                    ctx.lines.append(f"{target.name}: двойная доза - ослабление вдобавок к уязвимости")
                 target.apply_effect(
-                    EffectKind.VULNERABILITY, skill.effect_value, skill.effect_duration, actor.id
+                    EffectKind.VULNERABILITY, skill.effect_value + vuln_bonus,
+                    skill.effect_duration, actor.id,
                 )
 
     return handler
