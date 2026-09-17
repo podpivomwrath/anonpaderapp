@@ -404,7 +404,7 @@ async def raid_open_target(message: Message) -> None:
         lines.append(f"{i}. {mob.name} · {hp_pct}% HP")
     lines.append("")
     current = combatants.get(current_id) if current_id is not None else None
-    lines.append(f"Текущая цель: {current.name if current is not None else '—'}")
+    lines.append(f"Текущая цель: {current.name if current is not None else '-'}")
     await editable_message.send_or_edit(
         _bot_api, "raid_target", peer_id, "\n".join(lines), kb.raid_target_keyboard(mob_ids),
     )
@@ -487,7 +487,7 @@ async def raid_open_items(message: Message) -> None:
         return
     battle_kb = kb.raid_combat_keyboard(p.base_class, combatant.cooldowns, subclass_id=p.subclass_id)
     if combatant.has_effect(EffectKind.FREEZE):
-        await message.answer("Скован — не до зелий сейчас. ❄️", keyboard=battle_kb)
+        await message.answer("Скован, не до зелий сейчас. ❄️", keyboard=battle_kb)
         return
 
     async with get_session_factory()() as db:
@@ -504,7 +504,7 @@ async def raid_open_items(message: Message) -> None:
     visible = [(d, count) for d, count in stock if d.category == "heal" or not limit_reached]
     text = "🎒 Что использовать?"
     if limit_reached and any(d.category == "combat" for d, _ in stock):
-        text += "\n\nБольше твоё тело не выдержит за один бой — боевые эликсиры недоступны."
+        text += "\n\nБольше твоё тело не выдержит за один бой - боевые эликсиры недоступны."
     await editable_message.send_or_edit(_bot_api, "raid_item", peer_id, text, kb.raid_items_keyboard(visible))
 
 
@@ -532,7 +532,7 @@ async def raid_use_item(message: Message) -> None:
         return
     battle_kb = kb.raid_combat_keyboard(p.base_class, combatant.cooldowns, subclass_id=p.subclass_id)
     if combatant.has_effect(EffectKind.FREEZE):
-        await message.answer("Скован — не до зелий сейчас. ❄️", keyboard=battle_kb)
+        await message.answer("Скован, не до зелий сейчас. ❄️", keyboard=battle_kb)
         return
     if elixir.category == "combat" and combatant.combat_elixirs_used >= ec.ELIXIR_PER_BATTLE_LIMIT:
         await message.answer("Больше твоё тело не выдержит за один бой.", keyboard=battle_kb)
@@ -619,15 +619,15 @@ async def on_raid_tick_resolved(session_id: int, tick: int, result: TickResult) 
             # проверяем результат ЭТОГО тика (control_landed_by).
             if ai.awaiting_interrupt:
                 if result.control_landed_by:
-                    extra_lines.append("Инструмент выбит из руки. Хирург отступает на шаг.")
+                    extra_lines.append(rt.SURGEON_INTERRUPTED_LINE)
                     ai.close_interrupt_window()
                 else:
                     victim_id = await _kill_random_survivor(session_id, battle)
                     if victim_id is not None:
                         victim_name = battle.participants.get(victim_id)
                         extra_lines.append(
-                            f"{rt.SURGEON_INTERRUPT_FAIL_DEATH_LINE} {victim_name.name if victim_name else ''}"
-                            f" падает замертво."
+                            f"{rt.SURGEON_INTERRUPT_FAIL_DEATH_LINE}"
+                            + (f" {victim_name.name} больше не встаёт." if victim_name else "")
                         )
                         scripted_death_ids.append(victim_id)
                     ai.close_interrupt_window()
@@ -653,7 +653,7 @@ async def on_raid_tick_resolved(session_id: int, tick: int, result: TickResult) 
                     dealt = (battle.surgeon_phase3_hp_at_start or surgeon.current_hp) - surgeon.current_hp
                     ai.phase3_turns_left = None
                     if dealt >= rc.SURGEON_PHASE3_DAMAGE_REQUIRED:
-                        extra_lines.append("Хирург вздрагивает — механизм не успел довершить работу.")
+                        extra_lines.append(rt.SURGEON_PHASE3_SURVIVED_LINE)
                     else:
                         battle.surgeon_phase3_failed = True
                         extra_lines.append(rt.SURGEON_PHASE3_FAIL_TEXT)
@@ -801,7 +801,7 @@ async def _grant_stage_clear_bonus(battle: RaidBattle) -> None:
         try:
             await _bot_api.messages.send(
                 peer_id=peer_id,
-                message=f"🔴 Тебе достаётся {scalpel.name} — Скальпель Хирурга.",
+                message=f"🔴 Тебе достаётся {scalpel.name}.",
                 random_id=0,
             )
         except Exception:

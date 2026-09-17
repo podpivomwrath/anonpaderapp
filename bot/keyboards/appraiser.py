@@ -62,12 +62,12 @@ def appraiser_trophies_keyboard(stock: list[tuple[TrophyDef, int]]) -> str:
     if stock:
         total = sum(d.sell_price * count for d, count in stock)
         kb.add(
-            Text(f"Продать всё — {total} зол.", payload={"type": "sell_trophies", "id": SELL_ALL_ID}),
+            Text(f"Продать всё - {total} зол.", payload={"type": "sell_trophies", "id": SELL_ALL_ID}),
             color=KeyboardButtonColor.POSITIVE,
         )
         kb.row()
         items = [
-            (f"Продать {trophy_def.emoji} ×{count} — {price} зол.", KeyboardButtonColor.SECONDARY,
+            (f"Продать {trophy_def.emoji} ×{count} - {price} зол.", KeyboardButtonColor.SECONDARY,
              {"type": "sell_trophies", "id": trophy_def.id})
             for trophy_def, count in stock
             for price in [trophy_def.sell_price * count]
@@ -89,12 +89,12 @@ def sell_gear_main_keyboard(
     kb = Keyboard(one_time=False)
     if groups:
         kb.add(
-            Text(f"Продать всё — {grand_total} зол.", payload={"type": "sell_all_gear"}),
+            Text(f"Продать всё - {grand_total} зол.", payload={"type": "sell_all_gear"}),
             color=KeyboardButtonColor.POSITIVE,
         )
         kb.row()
         items = [
-            (f"Продать {rdef.emoji} ×{len(items_)} — {total} зол.", KeyboardButtonColor.SECONDARY,
+            (f"Продать {rdef.emoji} ×{len(items_)} - {total} зол.", KeyboardButtonColor.SECONDARY,
              {"type": "sell_rarity", "rarity": rdef.id})
             for rdef, items_, total in groups
         ]

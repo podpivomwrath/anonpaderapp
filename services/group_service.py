@@ -121,7 +121,7 @@ async def send_invite(db: AsyncSession, inviter: Character, target: Character) -
     gap = level_gap(current_levels + [target.level])
     if gap > gc.GROUP_MAX_LEVEL_GAP:
         raise GroupError(
-            f"Разрыв уровней станет {gap} (максимум {gc.GROUP_MAX_LEVEL_GAP}) — приглашение не отправлено."
+            f"Разрыв уровней станет {gap} (максимум {gc.GROUP_MAX_LEVEL_GAP}) - приглашение не отправлено."
         )
 
     now = datetime.now(timezone.utc)
@@ -273,7 +273,7 @@ async def kick_member(db: AsyncSession, leader: Character, target_character_id: 
     if group.leader_character_id != leader.id:
         raise GroupError("Исключать может только лидер.")
     if target_character_id == leader.id:
-        raise GroupError("Нельзя исключить самого себя — используй /выйти.")
+        raise GroupError("Нельзя исключить самого себя - используй /выйти.")
     target_membership = await db.scalar(
         select(GroupMember).where(
             GroupMember.group_id == group.id, GroupMember.character_id == target_character_id,

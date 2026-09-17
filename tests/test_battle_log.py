@@ -34,7 +34,7 @@ def test_hit_line_format_matches_pattern() -> None:
     state = make_session(CombatMode.PVE, a, b)
     result = resolve_tick(state, {1: attack(2)}, NoCritRng())
     text = render_tick(state, result, viewer_side=0)
-    assert "Гостус → атака по Кандальный —" in text
+    assert "Гостус → атака по Кандальный -" in text
     assert "урона" in text
     assert "Кандальный:" in text  # HP delta in the hit line itself
 

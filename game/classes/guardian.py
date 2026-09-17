@@ -54,7 +54,7 @@ def shield_bash(ctx: SkillContext) -> None:
         for enemy in enemies:
             if enemy.kind == "mob":
                 enemy.taunted_by = actor.id
-        ctx.lines.append(f"{actor.name} провоцирует врагов — цели мобов форсированы!")
+        ctx.lines.append(f"{actor.name} провоцирует врагов - цели мобов форсированы!")
     else:
         # Патч 47: «Несгибаемый» — +provoke_duration_bonus ходов; 0 без баффа.
         duration = bc.PROVOKE_PVP_DURATION_TICKS + int(actor.buff_modifiers.get("provoke_duration_bonus", 0))

@@ -117,7 +117,7 @@ def test_sell_gear_main_keyboard_one_button_per_present_rarity() -> None:
     rarity_labels = {
         b["action"]["label"] for b in buttons if b["action"].get("payload", {}).get("type") == "sell_rarity"
     }
-    assert rarity_labels == {"Продать ⚪ ×12 — 216 зол.", "Продать 🟣 ×1 — 80 зол."}
+    assert rarity_labels == {"Продать ⚪ ×12 - 216 зол.", "Продать 🟣 ×1 - 80 зол."}
 
 
 def test_sell_gear_main_keyboard_rows_bounded_even_with_many_items() -> None:

@@ -35,8 +35,8 @@ export default function MapTab() {
   const [cellPx, setCellPx] = useState(DEFAULT_CELL_PX);
   const [mapState, setMapState] = useState(null);
   const [status, setStatus] = useState('loading');
-  const [hovered, setHovered] = useState(null); // {x,y, screenX, screenY} — десктоп-хавер
-  const [selected, setSelected] = useState(null); // {x,y} — открытая карточка (клик/тап)
+  const [hovered, setHovered] = useState(null); // {x,y, screenX, screenY} - десктоп-хавер
+  const [selected, setSelected] = useState(null); // {x,y} - открытая карточка (клик/тап)
   const [sendFlow, setSendFlow] = useState(null); // {step:'pick'|'confirm', mount}
   const [banner, setBanner] = useState(null);
 
@@ -57,16 +57,16 @@ export default function MapTab() {
 
   useEffect(() => { load(); }, [load]);
 
-  // Живой опрос ПОЗИЦИИ/путешествия — не клеток (см. mapCatalog.js).
+  // Живой опрос ПОЗИЦИИ/путешествия - не клеток (см. mapCatalog.js).
   useEffect(() => {
     const id = setInterval(load, 5000);
     return () => clearInterval(id);
   }, [load]);
 
   // Оба эффекта завязаны на status: контейнер .map-viewport рендерится ТОЛЬКО
-  // в ветке status==='ready' (при 'loading' — ранний возврат со спиннером),
+  // в ветке status==='ready' (при 'loading' - ранний возврат со спиннером),
   // поэтому эффект с пустыми deps срабатывает СЛИШКОМ РАНО (containerRef.current
-  // ещё null) и больше никогда не перезапускается — size навсегда остаётся
+  // ещё null) и больше никогда не перезапускается - size навсегда остаётся
   // дефолтным. Замечено при тестировании: клик резолвился в клетку с уходом
   // на десятки клеток от ожидаемой.
   useLayoutEffect(() => {
@@ -118,8 +118,8 @@ export default function MapTab() {
   const handlePointerDown = (e) => {
     isTouchRef.current = e.pointerType === 'touch';
     // Некоторые вебвью (встречается в ВК-мобильном на отдельных версиях
-    // Android/iOS) кидают исключение на setPointerCapture в редких гонках —
-    // не даём этому сорвать сам драг, capture — не более чем оптимизация.
+    // Android/iOS) кидают исключение на setPointerCapture в редких гонках -
+    // не даём этому сорвать сам драг, capture - не более чем оптимизация.
     try { e.currentTarget.setPointerCapture(e.pointerId); } catch { /* noop */ }
     pointers.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
     if (pointers.current.size === 1 && camera) {
@@ -158,7 +158,7 @@ export default function MapTab() {
       return;
     }
 
-    // Наведение (десктоп-мышь, без активного драга) — лёгкая подсказка.
+    // Наведение (десктоп-мышь, без активного драга) - лёгкая подсказка.
     if (!isTouchRef.current && pointers.current.size === 1 && !dragRef.current?.moved && camera) {
       const rect = containerRef.current.getBoundingClientRect();
       const world = screenToWorld(camera, cellPx, size, e.clientX - rect.left, e.clientY - rect.top);

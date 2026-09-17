@@ -3,7 +3,7 @@ import { Group, Header, Button, Div, Text, Caption } from '@vkontakte/vkui';
 import { computeDerived } from '../formulas.js';
 import { submitStats } from '../api.js';
 
-// toFixed режет 0.075 -> "0.07" из-за бинарного представления числа —
+// toFixed режет 0.075 -> "0.07" из-за бинарного представления числа -
 // небольшой эпсилон убирает эту ложную "не докрутку" в отображении.
 const EPS = 1e-9;
 
@@ -45,7 +45,7 @@ const DERIVED_DEFS = [
   },
 ];
 
-// Патч 34, ч.1: уворот — составная строка (от атак + от способностей вместе),
+// Патч 34, ч.1: уворот - составная строка (от атак + от способностей вместе),
 // генерическому DERIVED_DEFS не подходит (там один ключ = одно значение).
 function formatDodge(dodge, abilityDodge) {
   return `${(dodge * 100 + EPS).toFixed(1)}% (от способностей: ${(abilityDodge * 100 + EPS).toFixed(1)}%)`;

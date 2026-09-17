@@ -395,7 +395,7 @@ def stat_delta_line(old_item: Item | None, new_item: Item | None) -> str:
 
 def format_comparison(old_item: Item | None, new_item: Item) -> str:
     """Окно сравнения: было → стало по каждому стату + суммарная сила предмета."""
-    old_label = format_item_label(old_item) if old_item is not None else "—"
+    old_label = format_item_label(old_item) if old_item is not None else "-"
     new_label = format_item_label(new_item)
     lines = [f"{SLOT_TITLES[new_item.slot]}:", f"{old_label}  →  {new_label}"]
 

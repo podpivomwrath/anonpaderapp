@@ -72,7 +72,7 @@ def _character_payload(
         "base_class_title": CLASS_TITLES.get(character.base_class, character.base_class),
         "subclass": character.subclass,
         "region": character.region,
-        "region_title": REGION_TITLES.get(character.region, "—") if character.region else "—",
+        "region_title": REGION_TITLES.get(character.region, "-") if character.region else "-",
         "level": character.level,
         "farm_currency": wallet.farm_currency if wallet is not None else None,
         "donate_currency": wallet.donate_currency if wallet is not None else None,

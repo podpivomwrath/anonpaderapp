@@ -150,6 +150,6 @@ def test_final_message_renders() -> None:
     assert "Багровый_Витя" in text
     assert "Путь Стали" in text
     assert "🔥 Выжженный Предел" in text        # в сводке — с эмодзи
-    assert "— Значит, Выжженный Предел." in text  # в реплике — без
+    assert "- Значит, Выжженный Предел." in text  # в реплике — без
     assert "💪 25" in text and "✨ 15" in text
     assert "{" not in text  # все плейсхолдеры подставлены

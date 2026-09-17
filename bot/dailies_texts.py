@@ -45,14 +45,14 @@ def dailies_overview_text(overview: DailiesOverview) -> str:
     lines = ["📜 Ежедневные задания", ""]
     for q in overview.quests:
         mark = "✅" if q.completed else "▫️"
-        lines.append(f"{mark} {q.title}: {q.progress}/{q.target} — {q.progress_label}")
+        lines.append(f"{mark} {q.title}: {q.progress}/{q.target} - {q.progress_label}")
         if not q.completed:
             lines.append(f"    Награда: +{q.xp_reward} опыта, +{q.gold_reward} золота")
     lines.append("")
     lines.append(f"🔥 Стрик ежедневок: {overview.daily_streak} дней")
     if overview.next_milestone_day is not None:
         lines.append(
-            f"Следующий рубеж: день {overview.next_milestone_day} — "
+            f"Следующий рубеж: день {overview.next_milestone_day} - "
             f"{_reward_preview(overview.next_milestone_reward)}"
         )
     hours, rem = divmod(max(overview.seconds_until_reset, 0), 3600)

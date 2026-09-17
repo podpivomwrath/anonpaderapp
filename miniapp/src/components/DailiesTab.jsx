@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { Tabs, TabsItem, Group, Header, Div, Spinner, Placeholder } from '@vkontakte/vkui';
 import { getDailies } from '../api.js';
 
-// Патч 23: вкладка «Задания» — три раздела (Сюжет/Ежедневные/Вход).
+// Патч 23: вкладка «Задания» - три раздела (Сюжет/Ежедневные/Вход).
 const SECTIONS = [
   { id: 'story', label: 'Сюжет' },
   { id: 'dailies', label: 'Ежедневные' },
@@ -34,11 +34,11 @@ function StoryTab({ story }) {
           <p style={{ marginBottom: 8 }}>{story.active_quest.text}</p>
           {story.active_quest.target && (
             <p style={{ opacity: 0.8 }}>
-              📍 Цель: ({story.active_quest.target.x}; {story.active_quest.target.y}) —{' '}
+              📍 Цель: ({story.active_quest.target.x}; {story.active_quest.target.y}) -{' '}
               {story.active_quest.target.label}
             </p>
           )}
-          {story.active_quest.ready && <p style={{ opacity: 0.8 }}>Цель достигнута — вернись к наставнику.</p>}
+          {story.active_quest.ready && <p style={{ opacity: 0.8 }}>Цель достигнута - вернись к наставнику.</p>}
         </Div>
       ) : (
         <Div style={{ opacity: 0.8 }}>Активного сюжетного квеста нет.</Div>
@@ -116,7 +116,7 @@ function DailyQuestsTab({ dailies }) {
           <p>🔥 Стрик ежедневок: {dailies.daily_streak} дней</p>
           {dailies.next_milestone_day && (
             <p style={{ opacity: 0.8 }}>
-              Следующий рубеж: день {dailies.next_milestone_day} — {rewardText(dailies.next_milestone_reward)}
+              Следующий рубеж: день {dailies.next_milestone_day} - {rewardText(dailies.next_milestone_reward)}
             </p>
           )}
           <p style={{ opacity: 0.8 }}>

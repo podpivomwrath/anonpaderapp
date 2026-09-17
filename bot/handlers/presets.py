@@ -22,7 +22,7 @@ labeler = BotLabeler()
 _NS = "presets"
 _bot_api = None
 
-NO_SUBCLASS_TEXT = "Твоя Метка ещё не обрела форму — пресеты недоступны."
+NO_SUBCLASS_TEXT = "Твоя Метка ещё не обрела форму - пресеты недоступны."
 IN_COMBAT_TEXT = "Не сейчас. Кровь занята другим."
 
 

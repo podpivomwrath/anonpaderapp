@@ -401,7 +401,7 @@ async def group_open_target(message: Message) -> None:
         lines.append(f"{i}. {mob.name} · {hp_pct}% HP")
     lines.append("")
     current = combatants.get(current_id) if current_id is not None else None
-    lines.append(f"Текущая цель: {current.name if current is not None else '—'}")
+    lines.append(f"Текущая цель: {current.name if current is not None else '-'}")
     await editable_message.send_or_edit(
         _bot_api, "group_pve_target", peer_id, "\n".join(lines), group_target_keyboard(mob_ids),
     )
@@ -486,7 +486,7 @@ async def group_open_items(message: Message) -> None:
         return
     battle_kb = group_combat_keyboard(p.base_class, combatant.cooldowns, subclass_id=p.subclass_id)
     if combatant.has_effect(EffectKind.FREEZE):
-        await message.answer("Скован — не до зелий сейчас. ❄️", keyboard=battle_kb)
+        await message.answer("Скован - не до зелий сейчас. ❄️", keyboard=battle_kb)
         return
 
     async with get_session_factory()() as db:
@@ -503,7 +503,7 @@ async def group_open_items(message: Message) -> None:
     visible = [(d, count) for d, count in stock if d.category == "heal" or not limit_reached]
     text = "🎒 Что использовать?"
     if limit_reached and any(d.category == "combat" for d, _ in stock):
-        text += "\n\nБольше твоё тело не выдержит за один бой — боевые эликсиры недоступны."
+        text += "\n\nБольше твоё тело не выдержит за один бой - боевые эликсиры недоступны."
     await editable_message.send_or_edit(_bot_api, "group_pve_item", peer_id, text, group_items_keyboard(visible))
 
 
@@ -531,7 +531,7 @@ async def group_use_item(message: Message) -> None:
         return
     battle_kb = group_combat_keyboard(p.base_class, combatant.cooldowns, subclass_id=p.subclass_id)
     if combatant.has_effect(EffectKind.FREEZE):
-        await message.answer("Скован — не до зелий сейчас. ❄️", keyboard=battle_kb)
+        await message.answer("Скован - не до зелий сейчас. ❄️", keyboard=battle_kb)
         return
     if elixir.category == "combat" and combatant.combat_elixirs_used >= ec.ELIXIR_PER_BATTLE_LIMIT:
         await message.answer("Больше твоё тело не выдержит за один бой.", keyboard=battle_kb)

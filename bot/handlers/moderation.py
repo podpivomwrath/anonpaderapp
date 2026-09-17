@@ -26,9 +26,9 @@ labeler = BotLabeler()
 
 _bot_api = None
 
-BUG_CONFIRM = "🐞 Репорт отправлен. Спасибо — Пепельные Земли станут чуть менее сломанными."
+BUG_CONFIRM = "🐞 Репорт отправлен. Спасибо - Пепельные Земли станут чуть менее сломанными."
 BUG_ASK_TEXT = "Опиши проблему: /баг <текст>"
-BUG_RATE_LIMITED = "🐞 Reportов многовато за последний час — попробуй чуть позже."
+BUG_RATE_LIMITED = "🐞 Reportов многовато за последний час - попробуй чуть позже."
 
 
 def setup_middleware(bot) -> None:
@@ -94,7 +94,7 @@ async def _build_snapshot(db, character: Character, peer_id: int) -> dict:
         "name": character.name,
         "level": character.level,
         "class_title": admin_service.class_title(character),
-        "region": REGION_TITLES.get(character.region, character.region) if character.region else "—",
+        "region": REGION_TITLES.get(character.region, character.region) if character.region else "-",
         "pos_x": character.pos_x,
         "pos_y": character.pos_y,
         "state": state,

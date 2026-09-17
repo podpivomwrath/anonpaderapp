@@ -41,7 +41,7 @@ def level_gap_kick_line(kick: "group_service.LevelGapKick") -> str:
 
 
 def level_gap_kick_self_line() -> str:
-    return "👥 Разрыв уровней в группе превысил лимит — ты исключён из отряда."
+    return "👥 Разрыв уровней в группе превысил лимит - ты исключён из отряда."
 
 
 async def notify_group_kick(bot_api, kick: "group_service.LevelGapKick | None") -> None:

@@ -53,7 +53,7 @@ def render_hit(
     if is_dot:
         return f"{target_name} теряет {amount} HP от эффекта «{label}». {delta}"
     verb = f"атакует {target_name}" if label in _VERB_LABELS else f"использует {label} на {target_name}"
-    return f"{source_name} {verb} — {amount} урона{crit_suffix}. {delta}"
+    return f"{source_name} {verb} - {amount} урона{crit_suffix}. {delta}"
 
 
 def control_resisted_line(target_name: str) -> str:
@@ -71,4 +71,4 @@ def control_immune_line(target_name: str, turns: int) -> str:
 def control_blocked_line(target_name: str) -> str:
     # Патч 47, баг 3: «был под контролем» — гендерное прошедшее время, заменено
     # на настоящее без согласования по роду.
-    return f"{target_name} уже под контролем — новый эффект не наложен."
+    return f"{target_name} уже под контролем - новый эффект не наложен."

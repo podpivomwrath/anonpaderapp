@@ -56,7 +56,7 @@ def validate_preset(
             and unlocked_buff_ids is not None
             and buff_id not in unlocked_buff_ids
         ):
-            raise PresetValidationError(f"Бафф {buff_id} ещё не открыт — пройди испытание")
+            raise PresetValidationError(f"Бафф {buff_id} ещё не открыт - пройди испытание")
         categories.add(buff.category)
 
     if not categories & bc.PRESET_REQUIRED_CATEGORIES:
@@ -116,7 +116,7 @@ async def save_preset(
         )
         if existing_count >= effective_preset_slots(character):
             raise PresetValidationError(
-                "Нет свободных слотов пресетов — купи ещё один в разделе «Персонаж»"
+                "Нет свободных слотов пресетов - купи ещё один в разделе «Персонаж»"
             )
 
     await charge(db, character.id, "farm", bc.PRESET_CHANGE_COST_FARM)
@@ -192,7 +192,7 @@ async def switch_active_preset(
     slot_index = presets.index(target)
     if slot_index >= effective_preset_slots(character):
         raise PresetValidationError(
-            "Этот пресет вне доступных слотов — продли Метку Хранителя или купи слот"
+            "Этот пресет вне доступных слотов - продли Метку Хранителя или купи слот"
         )
     for preset in presets:
         preset.is_active = preset.id == preset_id

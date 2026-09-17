@@ -27,7 +27,7 @@ from services import experience_service, group_service, quest_service, wallet_se
 _lines: dict[str, StoryLineDef] = {}
 
 FALLBACK_NO_QUESTS_TEXT = (
-    "📜 Никто не ждёт от тебя ничего. Пепельные Земли не дают поручений — "
+    "📜 Никто не ждёт от тебя ничего. Пепельные Земли не дают поручений - "
     "здесь каждый идёт своей дорогой."
 )
 
@@ -87,7 +87,7 @@ def _format_assign(quest: StoryQuestDef, character: Character) -> str:
     if quest.target_x is not None and quest.target_y is not None:
         direction = compass_direction(character.pos_x, character.pos_y, quest.target_x, quest.target_y)
         text += (
-            f"\n\n📍 Ориентир: ({quest.target_x};{quest.target_y}) — {quest.target_label} · {direction}"
+            f"\n\n📍 Ориентир: ({quest.target_x};{quest.target_y}) - {quest.target_label} · {direction}"
         )
     return text
 
@@ -339,13 +339,13 @@ async def quest_reminder_text(db: AsyncSession, character: Character, mentor_nam
         if peek is None or peek.status is None:
             return f"У тебя нет активного задания. {mentor_name} ждёт тебя в городе."
         if peek.status == "ready":
-            return f"📜 {peek.title}: цель достигнута — возвращайся к {mentor_name}."
+            return f"📜 {peek.title}: цель достигнута - возвращайся к {mentor_name}."
         return f"📜 {peek.title}: {peek.progress_label} {peek.progress}/{peek.target_count}."
 
     if quest.kind == "travel_combat":
         row = await get_progress(db, character)
         if row.status == "ready":
-            return f"📜 {quest.title}: цель достигнута — возвращайся к {mentor_name}."
+            return f"📜 {quest.title}: цель достигнута - возвращайся к {mentor_name}."
         return _format_assign(quest, character)
 
     if quest.kind == "subclass_gate":

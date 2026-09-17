@@ -132,7 +132,7 @@ class TickEngine:
 
     def start_session(self, state: CombatSessionState) -> None:
         if state.mode not in (CombatMode.PVE, CombatMode.PVP_GROUP):
-            raise ValueError("Тиковый движок обслуживает pve и pvp_group; дуэль — duel_engine")
+            raise ValueError("Тиковый движок обслуживает pve и pvp_group; дуэль - duel_engine")
         self.sessions[state.session_id] = state
         self._generations[state.session_id] = uuid4().hex
         self._resolve_locks[state.session_id] = asyncio.Lock()
@@ -176,7 +176,7 @@ class TickEngine:
                 misfire_grace_time=30,
             )
             logger.info(
-                "Сессия {}: тик {} ({}) — окно до {:%H:%M:%S}, не успевшие пропустят ход",
+                "Сессия {}: тик {} ({}) - окно до {:%H:%M:%S}, не успевшие пропустят ход",
                 state.session_id,
                 state.tick_number,
                 state.mode,
@@ -184,7 +184,7 @@ class TickEngine:
             )
         else:
             logger.info(
-                "Сессия {}: тик {} (PvE соло) — ждём действия игрока (без таймера)",
+                "Сессия {}: тик {} (PvE соло) - ждём действия игрока (без таймера)",
                 state.session_id,
                 state.tick_number,
             )

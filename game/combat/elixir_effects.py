@@ -16,11 +16,11 @@ def apply_combat_elixir(actor: CombatantState, elixir_id: str) -> str:
             EffectKind.ASHEN_FEVER, ec.ASHEN_FEVER_DAMAGE_BONUS_STEP,
             ec.ASHEN_FEVER_DURATION, actor.id,
         )
-        return "🔥 Кровь вскипает пеплом. Удары станут злее — но жгут и тебя самого."
+        return "🔥 Кровь вскипает пеплом. Удары станут злее - но жгут и тебя самого."
 
     if elixir_id == "last_breath":
         actor.apply_effect(EffectKind.LAST_BREATH, 1.0, ec.LAST_BREATH_DURATION, actor.id)
-        return "💀 Дыхание задерживается на самой грани. Смерть подождёт — один раз."
+        return "💀 Дыхание задерживается на самой грани. Смерть подождёт - один раз."
 
     if elixir_id == "blood_for_blood":
         actor.apply_effect(
@@ -31,7 +31,7 @@ def apply_combat_elixir(actor: CombatantState, elixir_id: str) -> str:
 
     if elixir_id == "blood_clarity":
         actor.apply_effect(EffectKind.CONTROL_IMMUNE, 1.0, ec.BLOOD_CLARITY_DURATION, actor.id)
-        return "🧿 Разум проясняется — оковам не за что зацепиться."
+        return "🧿 Разум проясняется - оковам не за что зацепиться."
 
     if elixir_id == "second_heart":
         shield_amount = round(actor.max_hp * ec.SECOND_HEART_SHIELD_PCT_MAX_HP)
@@ -48,13 +48,13 @@ def apply_combat_elixir(actor: CombatantState, elixir_id: str) -> str:
             EffectKind.DODGE, ec.ASHEN_HAZE_DODGE_CHANCE,
             max(ec.ASHEN_HAZE_DURATION - 1, 1), actor.id,
         )
-        return "🌫️ Морок укрывает тебя пеплом — удары будут находить лишь его."
+        return "🌫️ Морок укрывает тебя пеплом - удары будут находить лишь его."
 
     if elixir_id == "shard_blood":
         bonus = round(actor.level * ec.SHARD_BLOOD_DAMAGE_PER_LEVEL)
         actor.apply_effect(
             EffectKind.FLAT_DAMAGE_BONUS, float(bonus), ec.SHARD_BLOOD_DURATION, actor.id
         )
-        return f"⚡ Осколки въедаются в клинок — каждый удар несёт +{bonus} урона."
+        return f"⚡ Осколки въедаются в клинок - каждый удар несёт +{bonus} урона."
 
     return "Эликсир не оказывает эффекта."

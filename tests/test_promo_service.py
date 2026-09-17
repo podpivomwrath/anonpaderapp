@@ -153,7 +153,7 @@ async def test_activate_xp_at_max_level_not_granted(db_session, make_character) 
     character = await make_character(level=bc.MAX_LEVEL)
     outcome = await promo_service.activate_code(db_session, character, "xpcode")
     assert outcome.status == "success"
-    assert outcome.lines == ["Опыт не начислен — достигнут максимальный уровень."]
+    assert outcome.lines == ["Опыт не начислен - достигнут максимальный уровень."]
 
 
 async def test_activate_raid_keys_over_cap_partial_grant(db_session, make_character) -> None:

@@ -12,7 +12,7 @@ const CATEGORY_LABELS = {
 export default function PresetsTab({ character }) {
   const [data, setData] = useState(null);
   const [status, setStatus] = useState('loading'); // loading | ready | error
-  const [editingId, setEditingId] = useState(undefined); // undefined — не редактируем; null — новый; число — существующий
+  const [editingId, setEditingId] = useState(undefined); // undefined - не редактируем; null - новый; число - существующий
   const [editName, setEditName] = useState('');
   const [editBuffs, setEditBuffs] = useState([]);
   const [busy, setBusy] = useState(false);
@@ -112,7 +112,7 @@ export default function PresetsTab({ character }) {
         <Div>
           <Input placeholder="Название" value={editName} onChange={(e) => setEditName(e.target.value)} />
         </Div>
-        <Div style={{ fontSize: 13, opacity: 0.7 }}>Выбери 3-5 баффов (хотя бы один — не урон):</Div>
+        <Div style={{ fontSize: 13, opacity: 0.7 }}>Выбери 3-5 баффов (хотя бы один - не урон):</Div>
         {data.buffs.map((b) => (
           <div className="stat-row" key={b.id}>
             <Checkbox disabled={!b.unlocked} checked={editBuffs.includes(b.id)} onChange={() => toggleBuff(b.id)}>
@@ -190,7 +190,7 @@ export default function PresetsTab({ character }) {
       {data.next_slot_cost !== null && (
         <Div>
           <Button mode="secondary" loading={busy} onClick={handleBuySlot} stretched>
-            Купить слот — {data.next_slot_cost} зол.
+            Купить слот - {data.next_slot_cost} зол.
           </Button>
         </Div>
       )}

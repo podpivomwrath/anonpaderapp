@@ -7,15 +7,15 @@ import {
   getAdminPromoCodes, createAdminPromoCode, deleteAdminPromoCode, getAdminPromoCodeActivations,
 } from '../api.js';
 
-// Патч 27, ч.2: вкладка «Админ» — видна только если character.is_admin
+// Патч 27, ч.2: вкладка «Админ» - видна только если character.is_admin
 // (сервер сам это подтвердил в /character); но КАЖДЫЙ вызов ниже сервер
-// перепроверяет заново (403 при несовпадении vk_id) — эта вкладка не
+// перепроверяет заново (403 при несовпадении vk_id) - эта вкладка не
 // является источником прав, только удобство отображения.
 //
-// Патч 31, п.4: раздел «Баги» убран из интерфейса — репорты приходят в ЛС
+// Патч 31, п.4: раздел «Баги» убран из интерфейса - репорты приходят в ЛС
 // администратору от бота, этого достаточно. Таблица bug_reports и её API
 // (bot/miniapp_admin_api.py, api.js::getAdminBugReports/setAdminBugReportStatus)
-// не тронуты — данные продолжают сохраняться для истории.
+// не тронуты - данные продолжают сохраняться для истории.
 const SECTIONS = [
   { id: 'overview', label: 'Обзор' },
   { id: 'player', label: 'Игрок' },
@@ -133,7 +133,7 @@ function ActionForm({ playerId, onDone }) {
       const updated = await postAdminAction(playerId, action, params);
       onDone(updated);
     } catch (e) {
-      // Патч 34, ч.3: тестовые предметы — только себе (services/admin_service.py::NotSelfTarget).
+      // Патч 34, ч.3: тестовые предметы - только себе (services/admin_service.py::NotSelfTarget).
       const message = e.message === 'self_only'
         ? 'Тестовые предметы можно выдать только себе.'
         : e.message || 'Ошибка';
@@ -176,7 +176,7 @@ function ActionForm({ playerId, onDone }) {
               options={[{ value: 'farm', label: '💰 Золото' }, { value: 'donate', label: '💎 Самоцветы' }]}
             />
           </FormItem>
-          <FormItem top="Количество (можно отрицательное — забрать)">
+          <FormItem top="Количество (можно отрицательное - забрать)">
             <Input type="number" value={fields.amount || ''} onChange={set('amount')} />
           </FormItem>
         </>
@@ -230,7 +230,7 @@ function ActionForm({ playerId, onDone }) {
   );
 }
 
-// Патч 31, п.5: человеко-читаемый статус игрока — приоритет так же, как в
+// Патч 31, п.5: человеко-читаемый статус игрока - приоритет так же, как в
 // игре (мёртв/бой перебивают перемещение, перемещение перебивает "в городе").
 function statusLabel(card) {
   if (card.is_dead) return '☠ Мёртв';
@@ -248,10 +248,10 @@ function PlayerCard({ card, onRefresh }) {
     <>
       <Group header={<Header>{card.is_premium ? '💠 ' : ''}{card.name}{card.title ? ` «${card.title}»` : ''} (vk_id {card.vk_id})</Header>}>
         <StatRow label="Ник" value={card.name} />
-        <StatRow label="vk_id" value={card.vk_id ?? '—'} />
-        <StatRow label="Создан" value={card.created_at ? new Date(card.created_at).toLocaleString('ru') : '—'} />
-        <StatRow label="Последняя активность" value={card.last_active_at ? new Date(card.last_active_at).toLocaleString('ru') : '—'} />
-        <StatRow label="Титул" value={card.title || '—'} />
+        <StatRow label="vk_id" value={card.vk_id ?? '-'} />
+        <StatRow label="Создан" value={card.created_at ? new Date(card.created_at).toLocaleString('ru') : '-'} />
+        <StatRow label="Последняя активность" value={card.last_active_at ? new Date(card.last_active_at).toLocaleString('ru') : '-'} />
+        <StatRow label="Титул" value={card.title || '-'} />
         <StatRow
           label="💠 Метка Хранителя"
           value={card.premium_until ? `до ${new Date(card.premium_until).toLocaleString('ru')}${card.is_premium ? '' : ' (истекла)'}` : 'нет'}
@@ -261,7 +261,7 @@ function PlayerCard({ card, onRefresh }) {
       <Group header={<Header>Прогресс</Header>}>
         <StatRow label="Уровень" value={`${card.level} (опыт ${card.xp_to_next == null ? 'МАКС' : `${card.experience} / ${card.xp_to_next}`})`} />
         <StatRow label="Класс" value={`${card.class_title}${card.subclass ? ` (${card.subclass})` : ''}`} />
-        <StatRow label="Регион" value={card.region || '—'} />
+        <StatRow label="Регион" value={card.region || '-'} />
         <StatRow label="Позиция" value={`(${card.pos_x}; ${card.pos_y})`} />
         <StatRow label="Состояние" value={statusLabel(card)} />
       </Group>
@@ -299,7 +299,7 @@ function PlayerCard({ card, onRefresh }) {
         {card.inventory.map((item) => (
           <StatRow
             key={item.id}
-            label={`${item.equipped ? '✅ ' : ''}${item.name} (${item.slot}, ${item.rarity || '—'})`}
+            label={`${item.equipped ? '✅ ' : ''}${item.name} (${item.slot}, ${item.rarity || '-'})`}
             value={`ур. ${item.ilvl}`}
           />
         ))}
@@ -323,14 +323,14 @@ function PlayerCard({ card, onRefresh }) {
       </Group>
 
       <Group header={<Header>Прогрессия контента</Header>}>
-        <StatRow label="Текущий квест" value={card.current_quest || '—'} />
+        <StatRow label="Текущий квест" value={card.current_quest || '-'} />
         {card.story_progress.map((s) => (
-          <StatRow key={s.region} label={`Сюжет: ${s.region}`} value={`акт ${s.act}, шаг ${s.quest_step ?? '—'} (${s.status})`} />
+          <StatRow key={s.region} label={`Сюжет: ${s.region}`} value={`акт ${s.act}, шаг ${s.quest_step ?? '-'} (${s.status})`} />
         ))}
         <StatRow label="Микробаффы" value={`${card.trial_progress.unlocked} / ${card.trial_progress.total}`} />
         <StatRow
           label="Активный пресет"
-          value={card.active_preset ? `${card.active_preset.name} (${card.active_preset.buff_ids.length} баффов)` : '—'}
+          value={card.active_preset ? `${card.active_preset.name} (${card.active_preset.buff_ids.length} баффов)` : '-'}
         />
         <StatRow label="Пепельная Песнь" value={`${card.song_progress.seen} / ${card.song_progress.total}${card.song_progress.complete ? ' ✅' : ''}`} />
       </Group>
@@ -351,7 +351,7 @@ function PlayerCard({ card, onRefresh }) {
           <StatRow
             key={i}
             label={`${a.action_type} · ${new Date(a.created_at).toLocaleString('ru')}`}
-            value={a.note || '—'}
+            value={a.note || '-'}
           />
         ))}
       </Group>
@@ -363,7 +363,7 @@ function PlayerCard({ card, onRefresh }) {
 
 function PlayerSection() {
   const [query, setQuery] = useState('');
-  const [results, setResults] = useState(null); // null — поиска ещё не было
+  const [results, setResults] = useState(null); // null - поиска ещё не было
   const [card, setCard] = useState(null);
   const [status, setStatus] = useState('idle');
   const [errorMsg, setErrorMsg] = useState(null);
@@ -378,7 +378,7 @@ function PlayerSection() {
       setStatus('ready');
     } catch (e) {
       // Патч 34, ч.2: ошибка запроса (403/сеть/что угодно) раньше молча
-      // проглатывалась — экран выглядел так же, как "ничего не нашли".
+      // проглатывалась - экран выглядел так же, как "ничего не нашли".
       setResults(null);
       setErrorMsg(e.message || 'Не удалось выполнить поиск');
       setStatus('error');
@@ -452,7 +452,7 @@ function JournalSection() {
       {actions.map((a) => (
         <Div key={a.id} style={{ borderBottom: '1px solid var(--vkui--color_separator_primary)', paddingBottom: 8 }}>
           <p style={{ marginBottom: 4 }}>
-            <b>{a.action_type}</b> · персонаж #{a.target_character_id ?? '—'} · {new Date(a.created_at).toLocaleString('ru')}
+            <b>{a.action_type}</b> · персонаж #{a.target_character_id ?? '-'} · {new Date(a.created_at).toLocaleString('ru')}
           </p>
           {a.note && <p style={{ opacity: 0.8, marginBottom: 0 }}>{a.note}</p>}
         </Div>
@@ -461,8 +461,8 @@ function JournalSection() {
   );
 }
 
-// Патч 50: типы наград промокода — поля зависят от типа (см.
-// services/promo_service.py::_apply_reward — те же ключи один в один).
+// Патч 50: типы наград промокода - поля зависят от типа (см.
+// services/promo_service.py::_apply_reward - те же ключи один в один).
 const REWARD_TYPE_OPTIONS = [
   { value: 'gold', label: '💰 Золото' },
   { value: 'gems', label: '💎 Самоцветы' },
@@ -589,7 +589,7 @@ function PromoCreateForm({ onCreated }) {
       <FormItem top="Код">
         <Input value={code} onChange={(e) => setCode(e.target.value)} placeholder="MONOLITH2026" />
       </FormItem>
-      <FormItem top="Лимит активаций (пусто — без лимита)">
+      <FormItem top="Лимит активаций (пусто - без лимита)">
         <Input type="number" value={maxActivations} onChange={(e) => setMaxActivations(e.target.value)} />
       </FormItem>
       <FormItem>
@@ -597,7 +597,7 @@ function PromoCreateForm({ onCreated }) {
           Одна активация на игрока
         </Checkbox>
       </FormItem>
-      <FormItem top="Действует до (пусто — бессрочно)">
+      <FormItem top="Действует до (пусто - бессрочно)">
         <Input type="datetime-local" value={expiresAt} onChange={(e) => setExpiresAt(e.target.value)} />
       </FormItem>
 

@@ -27,7 +27,7 @@ def shop_keyboard(elixirs: list[ElixirDef]) -> str:
     kb = Keyboard(one_time=False)
     for idx, elixir in enumerate(elixirs):
         price = ec.ELIXIR_PRICES.get(elixir.id, 0)
-        label = f"{elixir.emoji} {elixir.name} — {price} зол."
+        label = f"{elixir.emoji} {elixir.name} - {price} зол."
         kb.add(
             Text(label, payload={"type": "elixir_shop_select", "id": elixir.id}),
             color=KeyboardButtonColor.SECONDARY,
@@ -52,7 +52,7 @@ def elixir_quantity_keyboard(elixir: ElixirDef, farm_currency: int) -> str:
         total = unit_price * qty
         if total > farm_currency:
             continue
-        items.append((f"×{qty} — {total} зол.", KeyboardButtonColor.POSITIVE, {"type": "buy_elixir_qty", "id": elixir.id, "qty": qty}))
+        items.append((f"×{qty} - {total} зол.", KeyboardButtonColor.POSITIVE, {"type": "buy_elixir_qty", "id": elixir.id, "qty": qty}))
     add_paired(kb, items)
     kb.add(Text(BTN_BACK, payload={"type": "elixir_shop_item_back"}), color=KeyboardButtonColor.SECONDARY)
     return kb.get_json()

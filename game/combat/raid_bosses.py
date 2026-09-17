@@ -116,7 +116,7 @@ def check_veld_kill_order(
             c.current_hp = round(c.current_hp * mult)
         if violations <= 1:
             lines.append(
-                "Оставшиеся замирают. Что-то в них натягивается — будто нити, которых не видно, дёрнули разом."
+                "Оставшиеся замирают. Что-то в них натягивается - будто нити, которых не видно, дёрнули разом."
             )
         else:
             lines.append(

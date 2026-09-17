@@ -22,7 +22,7 @@ class Settings(BaseSettings):
         default="", description="Строка подтверждения сервера из настроек Callback API"
     )
     vk_secret: str = Field(
-        default="", description="Секретный ключ Callback API (если задан — проверяется)"
+        default="", description="Секретный ключ Callback API (если задан - проверяется)"
     )
 
     # --- Режим получения событий ---

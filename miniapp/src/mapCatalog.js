@@ -1,12 +1,12 @@
 /**
- * Чистые геометрические вычисления карты (патч 29) — воспроизводят
+ * Чистые геометрические вычисления карты (патч 29) - воспроизводят
  * серверные формулы (game/world/grid.py, game/world/location_types.py) на
  * клиенте, чтобы НЕ ходить на сервер при каждом движении/зуме карты.
  * Каталог (города/зоны/типы локаций) приходит с сервера ОДИН раз при
- * открытии вкладки (GET /api/miniapp/map/state) — дальше всё считается тут.
+ * открытии вкладки (GET /api/miniapp/map/state) - дальше всё считается тут.
  */
 
-// Портирован из game/world/location_types.py::_type_index — тот же 32-битный
+// Портирован из game/world/location_types.py::_type_index - тот же 32-битный
 // хеш координат, побитово идентичный результат для любых x,y в -50..50
 // (проверено на живых значениях из Python при разработке патча).
 export function locationTypeIndex(x, y, count) {
@@ -38,7 +38,7 @@ export function zoneLevelRange(catalog, dist) {
   return catalog.zone_table[catalog.zone_table.length - 1][2];
 }
 
-/** catalog.city_coords: {region: [x, y]} — возвращает region или null. */
+/** catalog.city_coords: {region: [x, y]} - возвращает region или null. */
 export function cityRegionAt(catalog, x, y) {
   for (const [region, [cx, cy]] of Object.entries(catalog.city_coords)) {
     if (cx === x && cy === y) return region;
@@ -60,7 +60,7 @@ const REGION_TITLES = {
   scorched: '🔥 Выжженный Предел',
 };
 
-/** Полная инфо-карточка клетки — координаты, регион, тип, зона, расстояние. */
+/** Полная инфо-карточка клетки - координаты, регион, тип, зона, расстояние. */
 export function cellInfo(catalog, x, y, playerPos, questTarget) {
   const cityRegion = cityRegionAt(catalog, x, y);
   const dist = chebyshevDistance(x, y);
@@ -113,7 +113,7 @@ export function cellColor(x, y, dist) {
   return `rgb(${tinted[0]}, ${tinted[1]}, ${tinted[2]})`;
 }
 
-// --- Проекция мир <-> экран (камера — центр видимой области в игровых
+// --- Проекция мир <-> экран (камера - центр видимой области в игровых
 // координатах; +y вверх/север, как на обычной карте). ---
 
 export function worldToScreen(camera, cellPx, viewport, gx, gy) {

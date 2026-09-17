@@ -8,7 +8,7 @@ function App() {
 
   useEffect(() => {
     bridge.send('VKWebAppInit').catch(() => {
-      // не в среде VK (локальная разработка вне iframe) — просто игнорируем
+      // не в среде VK (локальная разработка вне iframe) - просто игнорируем
     });
     const handler = (event) => {
       if (event.detail?.type === 'VKWebAppUpdateConfig') {

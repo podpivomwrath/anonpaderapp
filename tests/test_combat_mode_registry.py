@@ -175,7 +175,7 @@ def test_no_text_rule_is_claimed_by_two_handler_modules() -> None:
         if len(modules) > 1
     }
     assert not collisions, (
-        "Один и тот же текст кнопки слушают несколько обработчиков — "
+        "Один и тот же текст кнопки слушают несколько обработчиков - "
         "сработает только первый по порядку в bot/handlers/__init__.py::LABELERS: "
         f"{collisions}"
     )

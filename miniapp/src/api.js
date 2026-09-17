@@ -1,6 +1,6 @@
 /**
  * Все запросы к бэкенду мини-аппа. Подписанные launch-параметры VK приходят
- * в query-строке при открытии мини-аппа (window.location.search) — сервер
+ * в query-строке при открытии мини-аппа (window.location.search) - сервер
  * проверяет подпись на КАЖДОМ запросе, поэтому просто перекладываем эту
  * строку в каждый вызов как есть, ничего не добавляя и не подделывая.
  */
@@ -10,7 +10,7 @@ const LAUNCH_PARAMS = window.location.search; // включает ведущий
 
 function buildUrl(path) {
   // Патч 34, ч.2, доп. фикс: слепая конкатенация path + LAUNCH_PARAMS ломалась,
-  // если path уже нёс свой "?" (searchAdminPlayers/getAdminJournal) — получалось
+  // если path уже нёс свой "?" (searchAdminPlayers/getAdminJournal) - получалось
   // "...?q=X?vk_user_id=...", браузер считает query-строкой только часть ДО
   // второго "?", vk_user_id пропадал из распарсенных параметров целиком, и
   // подпись launch-параметров на сервере переставала сходиться (invalid_signature).
@@ -24,7 +24,7 @@ async function request(path, options) {
   const url = buildUrl(path);
   // ngrok-skip-browser-warning: без него бесплатный ngrok-туннель (альфа-тест,
   // см. README) отдаёт HTML-заглушку вместо JSON на первый запрос из вебвью.
-  // Безвредно для любого другого хостинга — заголовок просто игнорируется.
+  // Безвредно для любого другого хостинга - заголовок просто игнорируется.
   const res = await fetch(url, {
     ...options,
     headers: { 'ngrok-skip-browser-warning': 'true', ...(options?.headers || {}) },
@@ -101,7 +101,7 @@ export function getDailies() {
   return request('/dailies');
 }
 
-// --- Админка (патч 27) — доступна, только если character.is_admin; сервер
+// --- Админка (патч 27) - доступна, только если character.is_admin; сервер
 // перепроверяет права на каждом из этих вызовов независимо (403 иначе). ---
 
 export function getAdminOverview() {

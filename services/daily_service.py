@@ -143,7 +143,7 @@ async def ensure_day_rollover(
 
     if gap is None or gap > 1:
         if character.login_streak > 0:
-            lines.append("📅 Ты не приходил вчера. Списки не ждут — стрик обнулён.")
+            lines.append("📅 Ты не приходил вчера. Списки не ждут - стрик обнулён.")
         character.login_streak = 1
         character.login_cycle_day = 1
     else:  # gap == 1 — пришёл на следующий день подряд

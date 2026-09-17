@@ -96,7 +96,7 @@ def _describe_blood_knight_insatiable(b: BuffDef) -> str:
 
 def _describe_blood_knight_eternal_hunger(b: BuffDef) -> str:
     total = bc.BLOOD_KNIGHT_HEAL_CAP_PER_TURN + bc.BLOOD_KNIGHT_ETERNAL_HUNGER_HEAL_CAP_BONUS
-    return f"Кап лечения за ход — {_pct(total)} от maxHP вместо {_pct(bc.BLOOD_KNIGHT_HEAL_CAP_PER_TURN)}."
+    return f"Кап лечения за ход - {_pct(total)} от maxHP вместо {_pct(bc.BLOOD_KNIGHT_HEAL_CAP_PER_TURN)}."
 
 
 def _describe_blood_knight_second_wind(b: BuffDef) -> str:
@@ -123,14 +123,14 @@ def _describe_blood_knight_feast(b: BuffDef) -> str:
 def _describe_blood_knight_shared_thirst(b: BuffDef) -> str:
     return (
         f"{_pct(bc.BLOOD_KNIGHT_SHARED_THIRST_ALLY_HEAL_PCT)} лечения от лайфстила достаётся "
-        f"самому раненому живому союзнику. Не действует в бою 1×1 — союзников нет."
+        f"самому раненому живому союзнику. Не действует в бою 1×1 - союзников нет."
     )
 
 
 def _describe_blood_knight_blood_pact(b: BuffDef) -> str:
     base = bc.BLOOD_KNIGHT_CRIMSON_FEAST_HP_COST
     reduced = base * (1.0 - bc.BLOOD_KNIGHT_BLOOD_PACT_COST_REDUCTION)
-    return f"Себестоимость HP Багрового пира — {_pct(reduced)} текущего HP вместо {_pct(base)}."
+    return f"Себестоимость HP Багрового пира - {_pct(reduced)} текущего HP вместо {_pct(base)}."
 
 
 def _describe_blood_knight_shared_feast(b: BuffDef) -> str:
@@ -169,28 +169,28 @@ def _describe_elementalist_elemental_flow(b: BuffDef) -> str:
 def _describe_elementalist_flame_power(b: BuffDef) -> str:
     return (
         f"Урон Огненной плети увеличен на {_pct(bc.ELEMENTALIST_FLAME_POWER_BONUS)}. "
-        f"Не складывается со «Всеобщей стихией» на одном навыке — берётся больший бонус."
+        f"Не складывается со «Всеобщей стихией» на одном навыке - берётся больший бонус."
     )
 
 
 def _describe_elementalist_frost_power(b: BuffDef) -> str:
     return (
         f"Урон Ледяных оков увеличен на {_pct(bc.ELEMENTALIST_FROST_POWER_BONUS)}. "
-        f"Не складывается со «Всеобщей стихией» на одном навыке — берётся больший бонус."
+        f"Не складывается со «Всеобщей стихией» на одном навыке - берётся больший бонус."
     )
 
 
 def _describe_elementalist_storm_power(b: BuffDef) -> str:
     return (
         f"Урон Цепи молний увеличен на {_pct(bc.ELEMENTALIST_STORM_POWER_BONUS)}. "
-        f"Не складывается со «Всеобщей стихией» на одном навыке — берётся больший бонус."
+        f"Не складывается со «Всеобщей стихией» на одном навыке - берётся больший бонус."
     )
 
 
 def _describe_elementalist_universal_element(b: BuffDef) -> str:
     return (
         f"Урон всех стихийных навыков увеличен на {_pct(bc.ELEMENTALIST_UNIVERSAL_ELEMENT_BONUS)}. "
-        f"Не складывается с Пламенной/Ледяной мощью или Мощью бури на одном навыке — берётся больший бонус."
+        f"Не складывается с Пламенной/Ледяной мощью или Мощью бури на одном навыке - берётся больший бонус."
     )
 
 
@@ -211,7 +211,7 @@ def _describe_elementalist_firestorm(b: BuffDef) -> str:
     return (
         f"Горение от Огненной плети распространяется на других живых противников с "
         f"{_pct(bc.ELEMENTALIST_FIRESTORM_SPREAD_PCT)} силы. "
-        f"Действует только в бою с несколькими противниками (массовый PvP) — в одиночном бою эффекта нет."
+        f"Действует только в бою с несколькими противниками (массовый PvP) - в одиночном бою эффекта нет."
     )
 
 
@@ -219,7 +219,7 @@ def _describe_elementalist_ice_field(b: BuffDef) -> str:
     return (
         f"При заморозке основной цели Ледяными оковами сопротивление контролю других живых противников "
         f"снижается на {_points(bc.ELEMENTALIST_ICE_FIELD_CHILL_PCT)} на 1 ход. "
-        f"Действует только в бою с несколькими противниками (массовый PvP) — в одиночном бою эффекта нет."
+        f"Действует только в бою с несколькими противниками (массовый PvP) - в одиночном бою эффекта нет."
     )
 
 

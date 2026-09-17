@@ -32,7 +32,7 @@ class UpgradeResult:
 async def enchant(db: AsyncSession, item: Item, rng: random.Random) -> UpgradeResult:
     """Попытка заточки: +1 при успехе, откат на 1 шаг при неудаче."""
     if item.enchant_level >= bc.ENCHANT_MAX_LEVEL:
-        raise UpgradeError(f"Предмет уже на +{bc.ENCHANT_MAX_LEVEL} — доступно пробуждение")
+        raise UpgradeError(f"Предмет уже на +{bc.ENCHANT_MAX_LEVEL} - доступно пробуждение")
     before = item.enchant_level
     success = rng.random() < bc.ENCHANT_SUCCESS_CHANCE
     item.enchant_level = before + 1 if success else max(before - 1, 0)

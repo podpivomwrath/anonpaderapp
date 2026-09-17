@@ -341,7 +341,7 @@ async def on_battle_finished(session_id: int, result: TickResult) -> None:
         quest_id, remaining = story_state
         await _bot_api.messages.send(
             peer_id=peer_id,
-            message="Один повержен — но погоня не отступает. Ещё один бросается наперерез.",
+            message="Один повержен - но погоня не отступает. Ещё один бросается наперерез.",
             random_id=0,
         )
         dist = grid.chebyshev_distance(character.pos_x, character.pos_y)
@@ -571,7 +571,7 @@ async def use_item(message: Message) -> None:
     player = state.combatants[PLAYER_ID]
     if player.has_effect(EffectKind.FREEZE):
         # Патч 30, баг 2: бой активен — без клавиатуры игрок теряет кнопки.
-        await message.answer("Скован — не до зелий сейчас. ❄️", keyboard=_combat_kb(state, peer_id))
+        await message.answer("Скован - не до зелий сейчас. ❄️", keyboard=_combat_kb(state, peer_id))
         return
 
     async with get_session_factory()() as db:
@@ -588,7 +588,7 @@ async def use_item(message: Message) -> None:
     visible = [(d, count) for d, count in stock if d.category == "heal" or not limit_reached]
     text = "🎒 Что использовать?"
     if limit_reached and any(d.category == "combat" for d, _ in stock):
-        text += "\n\nБольше твоё тело не выдержит за один бой — боевые эликсиры недоступны."
+        text += "\n\nБольше твоё тело не выдержит за один бой - боевые эликсиры недоступны."
     await editable_message.send_or_edit(
         _bot_api, "combat_item", peer_id, text, combat_items_keyboard(visible)
     )
@@ -609,7 +609,7 @@ async def use_combat_item(message: Message) -> None:
     player = state.combatants[PLAYER_ID]
     if player.has_effect(EffectKind.FREEZE):
         # Патч 30, баг 2: бой активен — без клавиатуры игрок теряет кнопки.
-        await message.answer("Скован — не до зелий сейчас. ❄️", keyboard=_combat_kb(state, peer_id))
+        await message.answer("Скован - не до зелий сейчас. ❄️", keyboard=_combat_kb(state, peer_id))
         return
     if elixir.category == "combat" and player.combat_elixirs_used >= ec.ELIXIR_PER_BATTLE_LIMIT:
         await message.answer("Больше твоё тело не выдержит за один бой.", keyboard=_combat_kb(state, peer_id))
@@ -687,13 +687,13 @@ async def flee(message: Message) -> None:
         _last_player_hp.pop(peer_id, None)
         await _persist_hp(peer_id, hp)
         pos_x, pos_y, has_mount = await _get_position(peer_id)
-        await message.answer("🏃 Ты срываешься прочь — и темнота глотает твой след.",
+        await message.answer("🏃 Ты срываешься прочь - и темнота глотает твой след.",
                              keyboard=movement_keyboard(pos_x, pos_y, peer_id, has_mount=has_mount))
         return
     # Патч 30, баг 2: бой продолжается — без клавиатуры игрок теряет кнопки
     # до того, как declare_action(SKIP) ниже вызовет резолв следующего хода.
     await message.answer(
-        "🏃 Уйти не вышло — оно снова между тобой и спасением.",
+        "🏃 Уйти не вышло - оно снова между тобой и спасением.",
         keyboard=_combat_kb(_engine.sessions[peer_id], peer_id),
     )
     try:

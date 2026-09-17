@@ -197,7 +197,7 @@ class DuelEngine:
             )
 
         if action is None:
-            result.lines.append(f"⏳ {actor.name} не успел походить — ход пропущен")
+            result.lines.append(f"⏳ {actor.name} не успел походить - ход пропущен")
         elif actor.has_effect(EffectKind.FREEZE):
             # пропуск ИЗ-ЗА контроля — засчитывается в стрик DR (control-patch-8)
             actor.skipped_by_control_this_turn = True
@@ -233,7 +233,7 @@ class DuelEngine:
         alive = [c for c in state.combatants.values() if c.alive]
         if len(alive) == 0:
             result.finished, result.draw = True, True
-            result.lines.append("Ничья: взаимное истощение — ресурсы не переходят никому")
+            result.lines.append("Ничья: взаимное истощение - ресурсы не переходят никому")
         elif len(alive) == 1:
             result.finished = True
             result.winner_id = alive[0].id

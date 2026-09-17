@@ -63,13 +63,13 @@ def test_render_hit_strict_format_no_flavor() -> None:
         "Валгар", "Мирэль", label="Рассекающий удар", amount=184, crit=False,
         missed=False, is_dot=False, hp_before=72, hp_after=58, max_hp=100,
     )
-    assert line == "Валгар использует Рассекающий удар на Мирэль — 184 урона. (Мирэль: 72% → 58%)"
+    assert line == "Валгар использует Рассекающий удар на Мирэль - 184 урона. (Мирэль: 72% → 58%)"
 
     crit_line = combat_flavor.render_hit(
         "Гримм", "Тень_В_Ночи", label="бьёт", amount=143, crit=True,
         missed=False, is_dot=False, hp_before=100, hp_after=57, max_hp=100,
     )
-    assert crit_line.startswith("Гримм атакует Тень_В_Ночи — 143 урона (крит!).")
+    assert crit_line.startswith("Гримм атакует Тень_В_Ночи - 143 урона (крит!).")
 
     miss_line = combat_flavor.render_hit(
         "Мирэль", "Валгар", label="Ледяные оковы", amount=0, crit=False,
@@ -89,7 +89,7 @@ def test_render_hit_mob_bite_uses_verb_not_skill_name() -> None:
         "Волк", "Валгар", label="кусает", amount=12, crit=False,
         missed=False, is_dot=False, hp_before=88, hp_after=76, max_hp=100,
     )
-    assert line == "Волк атакует Валгар — 12 урона. (Валгар: 88% → 76%)"
+    assert line == "Волк атакует Валгар - 12 урона. (Валгар: 88% → 76%)"
 
 
 def test_render_hit_dot_line_has_no_verb() -> None:

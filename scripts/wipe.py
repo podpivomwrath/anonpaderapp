@@ -62,7 +62,7 @@ def main() -> None:
     if os.environ.get("ALLOW_WIPE") != "true":
         print(
             "Вайп заблокирован: нет ALLOW_WIPE=true в окружении. "
-            "Это защита прод-базы — см. DEPLOY.md."
+            "Это защита прод-базы - см. DEPLOY.md."
         )
         return
     answer = input('Полный вайп персонажей (users останутся). Введи "YES" для подтверждения: ')

@@ -29,12 +29,12 @@ def _action_word(label: str) -> str:
 
 def _hit_line(hit: RenderedHit, source_name: str, target_name: str, mode: str) -> str:
     if hit.missed:
-        return f"{source_name} → атака по {target_name} — промах, {target_name} уклоняется"
+        return f"{source_name} → атака по {target_name} - промах, {target_name} уклоняется"
     word = _action_word(hit.label)
     crit = " (крит!)" if hit.crit else ""
     before = display.hp_percent(hit.hp_before, hit.max_hp, mode)
     after = display.hp_percent(hit.hp_after, hit.max_hp, mode)
-    return f"{source_name} → {word} по {target_name} — {hit.amount} урона{crit} ({target_name}: {before} → {after})"
+    return f"{source_name} → {word} по {target_name} - {hit.amount} урона{crit} ({target_name}: {before} → {after})"
 
 
 def _dot_line(hit: RenderedHit, target_name: str) -> str:
@@ -45,7 +45,7 @@ def _heal_line(heal: RenderedHeal, source_name: str, target_name: str, mode: str
     before = display.hp_percent(heal.hp_before, heal.max_hp, mode)
     after = display.hp_percent(heal.hp_after, heal.max_hp, mode)
     who = "" if source_name == target_name else f"{target_name}: "
-    return f"{source_name} → {heal.label} — восполнено {heal.amount} HP ({who}{before} → {after})"
+    return f"{source_name} → {heal.label} - восполнено {heal.amount} HP ({who}{before} → {after})"
 
 
 def _guess_side(session: CombatSessionState, line: str) -> int | None:
@@ -95,7 +95,7 @@ def render_tick(session: CombatSessionState, result: TickResult, viewer_side: in
         target_name = session.combatants[hit.target_id].name
         bucket(hit.target_side).append(_dot_line(hit, target_name))
 
-    header = f"⚔️ БОЙ — ход {session.tick_number}"
+    header = f"⚔️ БОЙ - ход {session.tick_number}"
     parts = [
         header, "",
         "👥 ВАША СТОРОНА",

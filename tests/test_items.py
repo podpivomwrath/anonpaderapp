@@ -368,7 +368,7 @@ def test_format_comparison_empty_slot_shows_dash_and_full_gain() -> None:
 
     new_item = _FakeItem(new_item_gen)
     text = item_service.format_comparison(None, new_item)
-    assert "—  →" in text
+    assert "-  →" in text
     assert "Итого сила предмета: 0 →" in text
     assert "↑" in text
 

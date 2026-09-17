@@ -234,7 +234,7 @@ async def _start_raid_from_lobby(lobby_id: int) -> None:
                 await db.commit()
                 await db.close()
                 for cid, peer in peers.items():
-                    text = rt.NO_KEY_TEXT if cid == leader.id else "Рейд не начался — у лидера нет Ключа Монолита."
+                    text = rt.NO_KEY_TEXT if cid == leader.id else "Рейд не начался: у лидера нет Ключа Монолита."
                     try:
                         await _bot_api.messages.send(peer_id=peer, message=text, random_id=0)
                     except Exception:

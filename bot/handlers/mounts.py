@@ -229,7 +229,7 @@ async def offer_continue(peer_id: int, travel_id: int) -> None:
     _pending_continue[peer_id] = travel_id
     await _bot_api.messages.send(
         peer_id=peer_id,
-        message=f"Нападавший повержен. Дорога зовёт дальше — осталось {_format_seconds(left)}.",
+        message=f"Нападавший повержен. Дорога зовёт дальше - осталось {_format_seconds(left)}.",
         random_id=0,
         keyboard=kb.continue_travel_keyboard(travel_id),
     )
@@ -247,7 +247,7 @@ async def _recover_stranded(peer_id: int) -> None:
         pos = (character.pos_x, character.pos_y)
     await _bot_api.messages.send(
         peer_id=peer_id,
-        message="Путь прерван — продолжать нечего. Ты остаёшься на месте.",
+        message="Путь прерван - продолжать нечего. Ты остаёшься на месте.",
         random_id=0,
         keyboard=kb.movement_keyboard(*pos, peer_id, has_mount=has_mount),
     )
@@ -374,7 +374,7 @@ async def scan() -> None:
         _travel_message.pop(peer_id, None)
         await _bot_api.messages.send(
             peer_id=peer_id,
-            message="🐎 На пути внезапно возникает опасность — маунт спотыкается и встаёт.",
+            message="🐎 На пути внезапно возникает опасность - маунт спотыкается и встаёт.",
             random_id=0,
         )
         await combat_handlers.start_mount_ambush_encounter(

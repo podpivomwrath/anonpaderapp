@@ -172,7 +172,7 @@ async def _apply_reward(
         if amount <= 0:
             return None, None
         if character.level >= bc.MAX_LEVEL:
-            return "Опыт не начислен — достигнут максимальный уровень.", None
+            return "Опыт не начислен - достигнут максимальный уровень.", None
         stats = await db.scalar(select(CharacterStats).where(CharacterStats.character_id == character.id))
         levelup = experience_service.add_experience(character, stats, amount)
         group_kick = None

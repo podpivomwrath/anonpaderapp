@@ -42,7 +42,7 @@ def _catalog_text(counts: dict[str, int]) -> str:
         owned = counts.get(elixir.id, 0)
         owned_suffix = f" (у тебя: {owned})" if owned else ""
         price = elixir_service.price(elixir.id)
-        lines.append(f"{elixir.emoji} {elixir.name} — {price} зол.{owned_suffix}\n{elixir.description}")
+        lines.append(f"{elixir.emoji} {elixir.name} - {price} зол.{owned_suffix}\n{elixir.description}")
     return "\n\n".join(lines)
 
 
@@ -121,7 +121,7 @@ async def elixir_shop_select(message: Message) -> None:
             )
             return
 
-    text = f"{elixir.emoji} {elixir.name} — {price} зол. за штуку.\nСколько взять?"
+    text = f"{elixir.emoji} {elixir.name} - {price} зол. за штуку.\nСколько взять?"
     await editable_message.send_or_edit(
         _bot_api, _NS, peer_id, text, elixir_quantity_keyboard(elixir, farm_currency),
         attachment=shop_attachment(),

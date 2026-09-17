@@ -31,7 +31,7 @@ async def get_profile_text(session: AsyncSession, vk_id: int) -> str | None:
     s = character.stats
     wallet = await wallet_service.get_wallet(session, character.id)
     title = CLASS_TITLES.get(character.base_class, character.base_class)
-    region = REGION_TITLES.get(character.region, "—") if character.region else "—"
+    region = REGION_TITLES.get(character.region, "-") if character.region else "-"
     return (
         f"📜 {premium_service.badge(character)}{character.name}\n"
         f"Класс: {title}{f' ({character.subclass})' if character.subclass else ''}\n"

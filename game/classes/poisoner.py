@@ -114,7 +114,7 @@ def toxic_burst(ctx: SkillContext) -> None:
         return
     poison = target.effect_from(EffectKind.DOT, actor.id)
     if poison is None:
-        ctx.lines.append(f"{actor.name} бьёт впустую — на {target.name} нет яда")
+        ctx.lines.append(f"{actor.name} бьёт впустую - на {target.name} нет яда")
         return
     tick_damage = poison.value * poison.stacks
     amount = max(round(tick_damage * skill.effect_value), 1)

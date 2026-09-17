@@ -65,7 +65,7 @@ export default function InventoryTab() {
               {item.equipped ? ' (надето)' : ''}
             </div>
             <Text style={{ opacity: 0.7, fontSize: 13 }}>
-              {item.slot_title}, ур. {item.ilvl} — {statsLine(item.base_stats)}
+              {item.slot_title}, ур. {item.ilvl} - {statsLine(item.base_stats)}
             </Text>
           </div>
           {!item.equipped && (

@@ -134,7 +134,7 @@ async def _render_trophies(db, character, mult: float, prefix: str = "") -> tupl
         text = appraiser_empty()
     else:
         lines = "\n".join(
-            f"{d.emoji} {d.name} ×{count} — {round(d.sell_price * mult) * count} зол." for d, count in stock
+            f"{d.emoji} {d.name} ×{count} - {round(d.sell_price * mult) * count} зол." for d, count in stock
         )
         text = lines
     if prefix:
@@ -199,7 +199,7 @@ def _sellable(items: list[tuple], mult: float) -> list[tuple]:
 def _warning_lines(warnings: list[tuple]) -> str:
     return "\n".join(
         f"{item_service.rarity_def(item.rarity).emoji} {item.name} (ур. {item.ilvl}) "
-        f"— сильнее надетого на {delta}"
+        f"- сильнее надетого на {delta}"
         for item, delta in warnings
     )
 
@@ -216,7 +216,7 @@ async def _render_gear_main(db, character, mult: float, prefix: str = "") -> tup
 
     grand_total = sum(total for _, _, total in groups)
     lines = "\n".join(
-        f"{rdef.emoji} {rdef.name} — {len(gitems)} шт. · {total} зол." for rdef, gitems, total in groups
+        f"{rdef.emoji} {rdef.name} - {len(gitems)} шт. · {total} зол." for rdef, gitems, total in groups
     )
     text = f"🗡 Продать снаряжение\n\n{lines}"
     if prefix:
@@ -238,7 +238,7 @@ async def _render_gear_detail(db, character, mult: float, page: int, prefix: str
     page_entries = sellable[start:start + GEAR_DETAIL_PAGE_SIZE]
 
     lines = "\n".join(
-        f"{i}. {item_service.rarity_def(item.rarity).emoji} {item.name} (ур. {item.ilvl}) — {price} зол."
+        f"{i}. {item_service.rarity_def(item.rarity).emoji} {item.name} (ур. {item.ilvl}) - {price} зол."
         for i, (item, price) in enumerate(page_entries, start=1)
     )
     text = f"🎒 Снаряжение (стр. {page} из {total_pages})\n\n{lines}"

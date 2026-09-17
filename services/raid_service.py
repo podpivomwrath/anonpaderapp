@@ -96,7 +96,7 @@ async def touch_monolith(
         db.add(lobby)
         await db.flush()
     elif lobby.raid_id != raid_id:
-        raise RaidError("Твоя группа уже выбрала другой рейд — сначала разберитесь с ним.")
+        raise RaidError("Твоя группа уже выбрала другой рейд - сначала разберитесь с ним.")
 
     db.add(RaidLobbyMember(lobby_id=lobby.id, character_id=character.id, ready=True))
     await db.flush()

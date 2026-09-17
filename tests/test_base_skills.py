@@ -155,7 +155,7 @@ def test_pvp_hit_log_uses_strict_format_no_pve_flavor() -> None:
     result = resolve_tick(state, {1: attack(2)}, rng)
 
     hit_line = next(ln for ln in result.lines if "урона" in ln)
-    assert hit_line.startswith("Гримм атакует Тень_В_Ночи — ")
+    assert hit_line.startswith("Гримм атакует Тень_В_Ночи - ")
     assert "(Тень_В_Ночи:" in hit_line
     for banned in ("тварь", "Тварь", "оно", "существо"):
         assert banned not in hit_line
@@ -174,7 +174,7 @@ def test_pve_hit_log_uses_same_strict_format_as_pvp() -> None:
     result = resolve_tick(state, {1: attack(2)}, rng)
 
     hit_line = next(ln for ln in result.lines if "урона" in ln)
-    assert hit_line.startswith("Валгар атакует Волк — ")
+    assert hit_line.startswith("Валгар атакует Волк - ")
     assert "(Волк:" in hit_line
     for banned in ("тварь", "Тварь", "оно", "существо"):
         assert banned not in hit_line

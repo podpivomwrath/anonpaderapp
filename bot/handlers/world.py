@@ -251,7 +251,7 @@ async def show_location(message: Message, db, character) -> None:
         return
 
     if in_any_battle(message.peer_id):
-        await message.answer("⚔️ Ты в бою — реши его исход.")
+        await message.answer("⚔️ Ты в бою - реши его исход.")
         return
 
     region = grid.city_region_at(character.pos_x, character.pos_y)
@@ -496,7 +496,7 @@ async def collect_ash_handful(message: Message) -> None:
         await db.commit()
 
     text = (
-        "У ног — горстка пепла, слишком плотная для простой золы. В ней что-то есть.\n\n"
+        "У ног - горстка пепла, слишком плотная для простой золы. В ней что-то есть.\n\n"
         + display.xp_delta_line(result.xp, premium=result.xp_premium_applied)
     )
     drop_line = trophy_service.format_drop_line(result.trophies, source="ash_handful")
@@ -641,11 +641,11 @@ async def event_choice(message: Message) -> None:
 
 
 SONG_READ_SCENE = (
-    "Ты произносишь Песнь целиком — впервые за много лет она звучит от начала до конца.\n\n"
+    "Ты произносишь Песнь целиком - впервые за много лет она звучит от начала до конца.\n\n"
     "Пепел вокруг алтаря приходит в движение. Он поднимается столбом, уплотняется, обретает "
-    "форму — и на месте золы стоит конь, сотканный из пепла и багрового света. Он не дышит. "
+    "форму - и на месте золы стоит конь, сотканный из пепла и багрового света. Он не дышит. "
     "Он просто ждёт.\n\n"
-    "Списки пополнились новой строкой. Не именем — званием."
+    "Списки пополнились новой строкой. Не именем - званием."
 )
 
 
@@ -767,7 +767,7 @@ async def move(message: Message) -> None:
             await message.answer("Сначала разберись с боем.")
             return
         if message.peer_id in _exploring:
-            await message.answer("🔍 Ты осматриваешься — подожди.")
+            await message.answer("🔍 Ты осматриваешься - подожди.")
             return
         if message.peer_id in _resting:
             await message.answer("🛏️ Ты отдыхаешь. Дай себе минуту.")
@@ -904,7 +904,7 @@ async def talk_to_mentor(message: Message) -> None:
             story_result = await story_service.visit_mentor(db, character, stats)
             await db.commit()
             if story_result is None:
-                await message.answer("— У меня для тебя пока больше ничего нет. Возвращайся позже.")
+                await message.answer("- У меня для тебя пока больше ничего нет. Возвращайся позже.")
                 return
             story_text = story_result.text
             if (
@@ -922,7 +922,7 @@ async def talk_to_mentor(message: Message) -> None:
 
         # активен, но ещё не выполнен
         await message.answer(
-            f"— Ты уже здесь? Дело ещё не закончено — {progress.progress_label}: "
+            f"- Ты уже здесь? Дело ещё не закончено - {progress.progress_label}: "
             f"{progress.progress}/{progress.target_count}."
         )
 

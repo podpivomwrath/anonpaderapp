@@ -409,10 +409,10 @@ async def leaderboard_command(message: Message) -> None:
     for entry in entries:
         badge = pc.PREMIUM_BADGE + " " if entry.premium else ""
         name = f"{badge}{entry.name} «{entry.title}»" if entry.title else f"{badge}{entry.name}"
-        lines.append(f"{entry.rank}. {name} — {entry.wins} побед / {entry.losses} поражений")
+        lines.append(f"{entry.rank}. {name} - {entry.wins} побед / {entry.losses} поражений")
     if rank > len(entries):
-        lines.append("—")
-        lines.append(f"Ты: {rank} место — {character.pvp_wins} / {character.pvp_losses}")
+        lines.append("-")
+        lines.append(f"Ты: {rank} место - {character.pvp_wins} / {character.pvp_losses}")
     await message.answer("\n".join(lines))
 
 
@@ -552,7 +552,7 @@ def _render_duel(
     тогда используется duel.current_actor_id как есть (там он корректен)."""
     a_id, b_id = duel.order
     a, b = duel.combatants[a_id], duel.combatants[b_id]
-    header = f"⚔️ ДУЭЛЬ — ход {duel.turn_number}"
+    header = f"⚔️ ДУЭЛЬ - ход {duel.turn_number}"
     a_line = f"{a.name}: {display.health_bar(a.current_hp, a.max_hp)}"
     b_line = f"{b.name}: {display.health_bar(b.current_hp, b.max_hp)}"
     actor_id = next_actor_id if next_actor_id is not None else duel.current_actor_id
@@ -626,7 +626,7 @@ async def _handle_join_choice(message: Message, battle_id, side) -> None:
         battle.join_queue.append((participant, combatant))
         _peer_battle[peer_id] = battle_id
         await message.answer(
-            "Ты готовишься вступить в бой — присоединишься, как только закончится текущий ход."
+            "Ты готовишься вступить в бой - присоединишься, как только закончится текущий ход."
         )
         return
 
@@ -686,8 +686,8 @@ async def _convert_duel_to_mass(session_id: int, battle: Battle) -> None:
 
     for p in battle.participants.values():
         target_line = _target_line(session_id, battle, p.character_id)
-        board = "⚔️ В бой вступает третий! Теперь это массовая схватка — все стороны действуют " \
-            "одновременно, ход — 1 минута.\n\n" + _render_mass(state, [])
+        board = "⚔️ В бой вступает третий! Теперь это массовая схватка - все стороны действуют " \
+            "одновременно, ход - 1 минута.\n\n" + _render_mass(state, [])
         if target_line:
             board += f"\n{target_line}"
         await _bot_api.messages.send(
@@ -890,7 +890,7 @@ async def pvp_open_target(message: Message) -> None:
         lines.append(f"{i}. {enemy.name} · {enemy.level} ур. · {class_title} · {hp_pct}% HP")
     lines.append("")
     current = combatants.get(current_id) if current_id is not None else None
-    lines.append(f"Текущая цель: {current.name if current is not None else '—'}")
+    lines.append(f"Текущая цель: {current.name if current is not None else '-'}")
 
     await editable_message.send_or_edit(
         _bot_api, "pvp_target", peer_id, "\n".join(lines), pvp_target_keyboard(enemy_ids),
@@ -985,7 +985,7 @@ async def pvp_open_items(message: Message) -> None:
         return
     battle_kb = pvp_combat_keyboard(participant.base_class, combatant.cooldowns, subclass_id=combatant.subclass_id, show_target=battle.battle_type == "mass")
     if combatant.has_effect(EffectKind.FREEZE):
-        await message.answer("Скован — не до зелий сейчас. ❄️", keyboard=battle_kb)
+        await message.answer("Скован - не до зелий сейчас. ❄️", keyboard=battle_kb)
         return
 
     async with get_session_factory()() as db:
@@ -1002,7 +1002,7 @@ async def pvp_open_items(message: Message) -> None:
     visible = [(d, count) for d, count in stock if d.category == "heal" or not limit_reached]
     text = "🎒 Что использовать?"
     if limit_reached and any(d.category == "combat" for d, _ in stock):
-        text += "\n\nБольше твоё тело не выдержит за один бой — боевые эликсиры недоступны."
+        text += "\n\nБольше твоё тело не выдержит за один бой - боевые эликсиры недоступны."
     await editable_message.send_or_edit(
         _bot_api, "pvp_combat_item", peer_id, text, pvp_items_keyboard(visible)
     )
@@ -1032,7 +1032,7 @@ async def pvp_use_item(message: Message) -> None:
         return
     battle_kb = pvp_combat_keyboard(participant.base_class, combatant.cooldowns, subclass_id=combatant.subclass_id, show_target=battle.battle_type == "mass")
     if combatant.has_effect(EffectKind.FREEZE):
-        await message.answer("Скован — не до зелий сейчас. ❄️", keyboard=battle_kb)
+        await message.answer("Скован - не до зелий сейчас. ❄️", keyboard=battle_kb)
         return
     if elixir.category == "combat" and combatant.combat_elixirs_used >= ec.ELIXIR_PER_BATTLE_LIMIT:
         await message.answer("Больше твоё тело не выдержит за один бой.", keyboard=battle_kb)
@@ -1218,7 +1218,7 @@ async def _finish_duel(battle: Battle, winner_cid: int, loser_cid: int) -> None:
 
 
 def _render_mass(session: CombatSessionState, lines: list[str]) -> str:
-    header = f"⚔️ БОЙ — ход {session.tick_number}"
+    header = f"⚔️ БОЙ - ход {session.tick_number}"
     side_lines = []
     for side in (0, 1):
         members = [c for c in session.combatants.values() if c.side == side]
@@ -1368,7 +1368,7 @@ async def on_mass_battle_finished(session_id: int, result: TickResult) -> None:
                 peer_id=participant.peer_id, message=draw_text, random_id=0, keyboard=keyboard,
             )
         elif cid in survivor_ids:
-            text = "🏆 Бой окончен — твоя сторона побеждает!"
+            text = "🏆 Бой окончен - твоя сторона побеждает!"
             lines = transfer_lines.get(cid, [])
             if lines:
                 text += "\n\n" + "\n".join(lines)

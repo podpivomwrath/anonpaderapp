@@ -1,5 +1,5 @@
 {
-  "_comment": "Навыки подклассов (патч 39, ч.3): 4 на подкласс, заменяют базовые навыки класса после выбора подкласса (30 ур). Урон = базовый урон Атаки × multiplier. effect: null|custom|stun|target_vuln|self_dodge_buff|self_damage_cap. effect=custom — самописный Python-хендлер в game/classes/<subclass>.py (НЕ регистрируется дженериком).",
+  "_comment": "Навыки подклассов (патч 39, ч.3): 4 на подкласс, заменяют базовые навыки класса после выбора подкласса (30 ур). Урон = базовый урон Атаки × multiplier. effect: null|custom|stun|target_vuln|self_dodge_buff|self_damage_cap. effect=custom - самописный Python-хендлер в game/classes/<subclass>.py (НЕ регистрируется дженериком).",
 
   "guardian_shield_bash": {
     "id": "guardian_shield_bash", "name": "Удар щитом", "subclass_id": "guardian",
@@ -21,7 +21,7 @@
     "id": "guardian_unbreakable", "name": "Несокрушимый", "subclass_id": "guardian",
     "multiplier": 0, "cd": 6, "effect": "custom",
     "effect_value": 0.15, "effect_duration": 3,
-    "flavor": "Что бы ни пришло — оно придёт по частям."
+    "flavor": "Что бы ни пришло - оно придёт по частям."
   },
 
   "blood_knight_lifesteal_strike": {
@@ -40,13 +40,13 @@
     "id": "blood_knight_blood_seal", "name": "Кровавая печать", "subclass_id": "blood_knight",
     "multiplier": 0.85, "cd": 4, "effect": "custom",
     "effect_duration": 3,
-    "flavor": "Знак вспыхивает на его коже. Теперь он — твой источник."
+    "flavor": "Знак вспыхивает на его коже. Теперь он - твой источник."
   },
   "blood_knight_crimson_feast": {
     "id": "blood_knight_crimson_feast", "name": "Багровый пир", "subclass_id": "blood_knight",
     "multiplier": 2.0, "cd": 5, "effect": "custom",
     "effect_value": 0.45,
-    "flavor": "Ты платишь своей кровью вперёд — и забираешь с процентами."
+    "flavor": "Ты платишь своей кровью вперёд - и забираешь с процентами."
   },
 
   "shadow_blade_marked_strike": {
@@ -100,18 +100,18 @@
     "id": "elementalist_fire", "name": "Огненная плеть", "subclass_id": "elementalist",
     "multiplier": 1.3, "cd": 2, "effect": "custom",
     "effect_value": 0.2, "effect_duration": 3,
-    "flavor": "Пламя не гаснет — оно вцепляется."
+    "flavor": "Пламя не гаснет - оно вцепляется."
   },
   "elementalist_ice": {
     "id": "elementalist_ice", "name": "Ледяные оковы", "subclass_id": "elementalist",
     "multiplier": 1.05, "cd": 4, "effect": "stun",
-    "flavor": "Кровь врага на миг вспоминает, что она — вода."
+    "flavor": "Кровь врага на миг вспоминает, что она - вода."
   },
   "elementalist_lightning": {
     "id": "elementalist_lightning", "name": "Цепь молний", "subclass_id": "elementalist",
     "multiplier": 1.15, "cd": 3, "effect": "custom",
     "effect_value": 0.6,
-    "flavor": "Разряд ищет продолжение — и всегда находит."
+    "flavor": "Разряд ищет продолжение - и всегда находит."
   },
   "elementalist_convergence": {
     "id": "elementalist_convergence", "name": "Схождение стихий", "subclass_id": "elementalist",
@@ -142,6 +142,6 @@
     "id": "dark_mystic_circle", "name": "Круг тьмы", "subclass_id": "dark_mystic",
     "multiplier": 0, "cd": 6, "effect": "custom",
     "effect_value": 1.8,
-    "flavor": "Ты платишь собой — и платёж расходится кругами."
+    "flavor": "Ты платишь собой - и платёж расходится кругами."
   }
 }

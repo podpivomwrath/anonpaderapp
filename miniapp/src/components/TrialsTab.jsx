@@ -11,7 +11,7 @@ function BuffDetail({ trial }) {
           <Text style={{ fontSize: 14, marginTop: 4 }}>{trial.description}</Text>
         )
       ) : (
-        <Text style={{ fontSize: 14, marginTop: 4, opacity: 0.7 }}>⚙️ В разработке — эффект пока не действует в бою.</Text>
+        <Text style={{ fontSize: 14, marginTop: 4, opacity: 0.7 }}>⚙️ В разработке - эффект пока не действует в бою.</Text>
       )}
       <Text style={{ opacity: 0.7, fontSize: 13, marginTop: 6 }}>
         Статус: {trial.unlocked ? 'открыт' : 'не открыт'}

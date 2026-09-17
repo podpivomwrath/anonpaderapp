@@ -49,7 +49,7 @@ async def _render_list(db, character) -> tuple[str, list[tuple[Item, bool]]]:
         slot_title = item_service.SLOT_TITLES[item.slot]
         suffix = " (надето)" if equipped else ""
         lines.append(
-            f"{rarity.emoji} {item.name} — {slot_title}, ур. {item.ilvl}{suffix}\n"
+            f"{rarity.emoji} {item.name} - {slot_title}, ур. {item.ilvl}{suffix}\n"
             f"{_stats_line(item)}"
         )
     text = "🎒 Инвентарь:\n\n" + "\n\n".join(lines)
@@ -57,7 +57,7 @@ async def _render_list(db, character) -> tuple[str, list[tuple[Item, bool]]]:
         # Патч 41: клавиатура теперь настоящая пагинация (inventory_keyboard),
         # текстовое резюме по-прежнему показывает всё разом — уточняем, что
         # кнопки предметов идут постранично.
-        text += "\n\nКнопки — постранично, [Стр. →] внизу открывает следующую."
+        text += "\n\nКнопки - постранично, [Стр. →] внизу открывает следующую."
     return text, items
 
 
@@ -101,7 +101,7 @@ async def view_item(message: Message) -> None:
             old_item = equipped[item.slot]
 
     if entry.equipped:
-        text = f"{item_service.format_item_label(item)} — уже надето."
+        text = f"{item_service.format_item_label(item)} - уже надето."
     else:
         text = item_service.format_comparison(old_item, item)
     await editable_message.send_or_edit(

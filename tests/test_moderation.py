@@ -46,7 +46,7 @@ def test_format_report_includes_quest_line_when_present() -> None:
 
 def test_format_report_omits_quest_line_when_absent() -> None:
     snapshot = {
-        "name": "Валгар", "level": 1, "class_title": "Воин", "region": "—",
+        "name": "Валгар", "level": 1, "class_title": "Воин", "region": "-",
         "pos_x": 0, "pos_y": 0, "state": "в городе/на карте", "quest": None, "hp_percent": 100,
     }
     text = _format_report(1, 1, snapshot, "тест", datetime(2026, 8, 12, 14, 32))
