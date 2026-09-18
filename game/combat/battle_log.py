@@ -96,8 +96,10 @@ def render_tick(
     def bucket(side: int) -> list[str]:
         return own if side == viewer_side else enemy
 
-    non_dot = [h for h in result.hit_renders if not h.is_dot]
-    dot_hits = [h for h in result.hit_renders if h.is_dot]
+    # Делим по is_tick, а не по is_dot: «ядовитый» по механике удар может быть
+    # ДЕЙСТВИЕМ игрока (Токсический выброс), и его место в разделе того, кто бил.
+    non_dot = [h for h in result.hit_renders if not h.is_tick]
+    dot_hits = [h for h in result.hit_renders if h.is_tick]
 
     for hit in non_dot:
         source_name = session.combatants[hit.source_id].name

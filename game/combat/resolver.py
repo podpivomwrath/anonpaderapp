@@ -117,6 +117,8 @@ class RenderedHit:
     hp_before: int
     hp_after: int
     max_hp: int
+    #: пассивный тик эффекта, а не действие бойца - см. PendingHit
+    is_tick: bool = False
 
 
 @dataclass
@@ -328,6 +330,7 @@ def resolve_tick(
                     amount=shared_rules.poison_tick_damage(effect, source),
                     label="обжигает (ДоТ)",
                     is_dot=True,
+                    is_tick=True,
                 )
             )
 
@@ -485,6 +488,7 @@ def resolve_tick(
             RenderedHit(
                 source_id=source.id, target_id=target.id, source_side=source.side, target_side=target.side,
                 label=hit.label, amount=applied, crit=hit.crit, missed=hit.missed, is_dot=hit.is_dot,
+                is_tick=hit.is_tick,
                 hp_before=h_before, hp_after=h_after, max_hp=target.max_hp,
             )
         )

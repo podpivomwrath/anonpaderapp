@@ -4,7 +4,6 @@
 Тёмный мистик (Оберег/Иссушение/Круг тьмы)."""
 
 
-from game.combat import balance_config as bc
 from game.combat.resolver import resolve_tick
 from game.combat.session import ActionType, CombatMode, CombatSessionState, DeclaredAction, EffectKind
 from tests.conftest import NoCritRng, combatant
@@ -140,31 +139,22 @@ def test_disrupt_applies_weaken_and_can_control() -> None:
     assert any("теряет ход" in line or "пропускает" in line for line in result.lines) or enemy.has_effect(EffectKind.FREEZE)
 
 
-def test_toxic_burst_deals_damage_from_the_poison() -> None:
+def test_toxic_burst_deals_damage_and_clears_the_poison() -> None:
     """Подробные проверки выброса - в tests/test_toxic_burst.py. Здесь только
-    то, что он вообще срабатывает по наложенному яду.
-
-    Про снятие яда: выброс переносит не больше POISONER_BURST_MAX_TICKS ходов и
-    ровно столько же сжигает, остаток тикает дальше. Прежняя проверка «яда
-    больше нет» описывала поведение, при котором навык уничтожал больше урона,
-    чем наносил.
-    """
+    то, что он срабатывает по наложенному яду и снимает его целиком, как
+    обещает описание: «взрывает весь яд... стаки сгорают»."""
     rng = NoCritRng()
     poisoner = combatant(1, side=0, subclass_id="poisoner", will=100, agility=50)
     enemy = combatant(2, side=1, vitality=5000)
     state = make_session(poisoner, enemy)
 
     resolve_tick(state, {1: skill("poisoner_venom", 2)}, rng)
-    poison = enemy.effect_from(EffectKind.DOT, poisoner.id)
-    assert poison is not None
-    ticks_before = poison.remaining_ticks
+    assert enemy.has_effect(EffectKind.DOT)
 
     hp_before = enemy.current_hp
     resolve_tick(state, {1: skill("poisoner_toxic_burst", 2)}, rng)
     assert enemy.current_hp < hp_before
-    left = enemy.effect_from(EffectKind.DOT, poisoner.id)
-    burned = ticks_before - (left.remaining_ticks if left else 0)
-    assert burned >= bc.POISONER_BURST_MAX_TICKS
+    assert not enemy.has_effect(EffectKind.DOT)
 
 
 # --- Элементалист: Горение / Цепь молний / Схождение ---
