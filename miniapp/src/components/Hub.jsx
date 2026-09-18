@@ -68,10 +68,17 @@ export default function Hub() {
     }
   }, [load]);
 
-  const refreshButton = (
-    <PanelHeaderButton aria-label="Обновить" disabled={refreshing} onClick={refresh}>
-      {refreshing ? <Spinner size="s" /> : <span aria-hidden="true">🔄</span>}
-    </PanelHeaderButton>
+  // Кнопка стоит В ЦЕНТРЕ шапки, рядом с заголовком: справа её перекрывают
+  // крестик ВК и меню приложения - на телефоне туда просто не попасть.
+  const header = (title) => (
+    <PanelHeader>
+      <span className="hub-header">
+        {title}
+        <PanelHeaderButton aria-label="Обновить" disabled={refreshing} onClick={refresh}>
+          {refreshing ? <Spinner size="s" /> : <span aria-hidden="true">🔄</span>}
+        </PanelHeaderButton>
+      </span>
+    </PanelHeader>
   );
 
   useEffect(() => {
@@ -85,7 +92,7 @@ export default function Hub() {
   }, [activeTab, character?.is_admin]);
 
   if (ban) {
-    return <Panel><PanelHeader after={refreshButton}>Монолит</PanelHeader><Placeholder
+    return <Panel>{header('Монолит')}<Placeholder
       action={<Button onClick={() => load()}>Проверить доступ</Button>}
     >
       Доступ заблокирован администратором.
@@ -97,7 +104,7 @@ export default function Hub() {
   if (status === 'loading') {
     return (
       <Panel>
-        <PanelHeader after={refreshButton}>Монолит</PanelHeader>
+        {header('Монолит')}
         <Div style={{ display: 'flex', justifyContent: 'center', paddingTop: 48 }}>
           <Spinner size="l" />
         </Div>
@@ -108,7 +115,7 @@ export default function Hub() {
   if (status === 'error' || !character) {
     return (
       <Panel>
-        <PanelHeader after={refreshButton}>Монолит</PanelHeader>
+        {header('Монолит')}
         <Placeholder
           icon={<div style={{ fontSize: 48 }}>🩸</div>}
           action={
@@ -125,7 +132,7 @@ export default function Hub() {
 
   return (
     <Panel>
-      <PanelHeader after={refreshButton}>Персонаж</PanelHeader>
+      {header('Персонаж')}
       <div className="hub-banner">
         <p className="hub-banner__name">
           {character.name}

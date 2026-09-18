@@ -10,6 +10,7 @@
 """
 
 from game.combat import balance_config as bc
+from game.combat import shared_rules
 from game.combat import combat_flavor, control
 from game.classes.base import Role, SubclassDef, register
 from game.combat.session import CombatMode, Effect, EffectKind
@@ -142,8 +143,19 @@ def disrupt(ctx: SkillContext) -> None:
 
 @offensive_skill("poisoner_toxic_burst")
 def toxic_burst(ctx: SkillContext) -> None:
-    """Токсический выброс: мгновенный урон = 250% суммарного тик-урона яда на
-    цели, снимает все стаки Яда. Как и ДоТ — не проходит через уворот/крит."""
+    """Токсический выброс: часть оставшегося урона яда обрушивается сразу, с
+    надбавкой. Перенесённые ходы сгорают, остаток яда тикает дальше. Как и ДоТ - не проходит через уворот/крит.
+
+    Раньше урон считался как доля ОДНОГО тика, а яд при этом уничтожался
+    целиком: 283 урона вместо 453, которые тот же яд принёс бы сам, плюс
+    потраченный ход и перезарядка. Навык был чистой потерей, применять его не
+    имело смысла никогда. Теперь он переносит оставшийся урон в текущий ход -
+    это размен темпа, а не урона, и надбавка делает его осмысленным.
+
+    Сила яда берётся общим правилом (shared_rules.poison_tick_damage): раньше
+    выброс считал от БАЗОВОГО значения и молча игнорировал «Разъедающий токсин»
+    с «Некрозом» - игрок качал урон яда, видел растущие тики, а финишер не рос.
+    """
     skill = SUBCLASS_SKILL_DEFS["poisoner_toxic_burst"]
     actor = ctx.actor
     actor.cooldowns[skill.id] = skill.cd
@@ -154,7 +166,12 @@ def toxic_burst(ctx: SkillContext) -> None:
     if poison is None:
         ctx.lines.append(f"{actor.name} бьёт впустую - на {target.name} нет яда")
         return
-    tick_damage = poison.value * poison.stacks
-    amount = max(round(tick_damage * skill.effect_value), 1)
+    tick_damage = shared_rules.poison_tick_damage(poison, actor)
+    converted = min(max(poison.remaining_ticks, 1), bc.POISONER_BURST_MAX_TICKS)
+    amount = max(round(tick_damage * converted * skill.effect_value), 1)
     ctx.hits.append(PendingHit(source_id=actor.id, target_id=target.id, amount=amount, label="взрывает ядом", is_dot=True))
-    target.effects.remove(poison)
+    # Сгорает ровно перенесённая часть: остаток яда тикает дальше. Иначе выброс
+    # либо съедал больше урона, чем наносил, либо валил всё в один удар.
+    poison.remaining_ticks -= converted
+    if poison.remaining_ticks <= 0:
+        target.effects.remove(poison)

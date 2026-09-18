@@ -122,8 +122,9 @@ def skill_mechanics() -> dict[str, str]:
             f"С шансом {pct(_s('poisoner_disrupt').effect_value)} сбивает действие цели в этот же "
             f"ход и накладывает Ослабление {pct(bc.POISONER_DISRUPT_WEAKEN)} на 3 хода.",
         "poisoner_toxic_burst":
-            f"Взрывает весь яд на цели: урон - {pct(_s('poisoner_toxic_burst').effect_value)} "
-            "от суммарного тик-урона этого яда. Стаки сгорают.",
+            "Обрушивает сразу весь ОСТАВШИЙСЯ урон яда на цели, с надбавкой "
+            f"{pct(_s('poisoner_toxic_burst').effect_value - 1)}. Стаки сгорают. "
+            "Чем дольше яду ещё тикать - тем сильнее выброс.",
         "elementalist_fire":
             f"Поджигает цель на {turns(_s('elementalist_fire').effect_duration)}: каждый ход "
             f"Горение снимает {pct(_s('elementalist_fire').effect_value)} от урона ЭТОГО удара. "
