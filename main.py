@@ -159,7 +159,11 @@ async def run() -> None:
     raid_tick_engine.start()
     raid_combat_handlers.setup(raid_tick_engine, bot.api)
     raid_handlers.setup(bot.api)
-    fishing_handlers.setup(bot.api)
+    # Патч 58: поклёвка приходит отдельным сообщением по таймеру — тот же
+    # механизм, что прибытие/исследование ниже, и создаётся так же здесь.
+    bite_scheduler = PeerScheduler(fishing_handlers.on_bite, job_prefix="fishing_bite")
+    bite_scheduler.start()
+    fishing_handlers.setup(bot.api, bite_scheduler)
 
     travel_scheduler = PeerScheduler(world_handlers.handle_arrival, job_prefix="travel")
     travel_scheduler.start()

@@ -51,11 +51,10 @@ screen_service.PARENT["lake"] = None
 def setup(bot_api, scheduler: PeerScheduler | None = None) -> None:
     global _bot_api, _bite_scheduler
     _bot_api = bot_api
-    _bite_scheduler = scheduler or PeerScheduler(_on_bite, "fishing_bite")
-    _bite_scheduler.start()
+    _bite_scheduler = scheduler
 
 
-async def _on_bite(peer_id: int) -> None:
+async def on_bite(peer_id: int) -> None:
     """Сработал таймер поклёвки: шлём сообщение с кнопкой подсечки.
 
     Окно STRIKE_WINDOW_SECONDS отсчитывается от fishing_bite_at, проставленного
