@@ -437,6 +437,10 @@ async def scan() -> None:
             attachment=location_attachment(character),
             keyboard=kb.movement_keyboard(character.pos_x, character.pos_y, peer_id, has_mount=True),
         )
+        # Патч 58: прибытие на маунте — такой же вход на клетку, как пеший,
+        # и кнопка «К воде» обязана приходить и здесь. Раньше не приходила:
+        # вызов стоял только на пеших путях в bot/handlers/world.py.
+        await world_handlers.maybe_send_lake_button(peer_id, character)
 
     for peer_id, travel in countdowns:
         msg_id = _travel_message.get(peer_id)

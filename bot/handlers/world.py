@@ -28,7 +28,7 @@ from bot.handlers import inventory as inventory_handlers
 from bot.handlers import pvp as pvp_handlers
 from bot.handlers import raid_combat as raid_combat_handlers
 from bot.handlers import stats_window
-from bot import fishing_texts
+from bot import fishing_texts, lake_button_state
 from bot.keyboards import fishing as fishing_kb
 from bot.keyboards import raid as raid_kb
 from bot.keyboards import world as kb
@@ -168,17 +168,25 @@ async def _maybe_send_monolith_button(peer_id: int, character) -> None:
     )
 
 
-async def _maybe_send_lake_button(peer_id: int, character) -> None:
-    """Патч 58: на клетке с озером — кнопка «К воде» ОТДЕЛЬНЫМ сообщением с
-    инлайн-клавиатурой, ровно как «Прикоснуться» у Монолита выше.
+async def maybe_send_lake_button(peer_id: int, character) -> None:
+    """Патч 58: при ВХОДЕ на клетку с озером — кнопка «К воде» отдельным
+    сообщением с инлайн-клавиатурой, как «Прикоснуться» у Монолита выше.
 
-    Вторая дверь (команда «Озеро») нужна по той же причине, что и у Монолита:
-    эта кнопка приходит только при ВХОДЕ на клетку, и игроку, который уже
-    стоит у воды, иначе пришлось бы уходить и возвращаться.
+    Строго один раз на вход: после исследования, события или отдыха на той же
+    клетке кнопка не повторяется (bot/lake_button_state.py), иначе она
+    засоряла бы чат на каждое действие. Вход к воде при этом никуда не
+    девается — остаётся команда «Озеро», подсказка про неё есть в сводке
+    локации. При возвращении на клетку кнопка приходит снова.
     """
     lake = game_fishing.lake_at(character.pos_x, character.pos_y)
     if lake is None:
+        # Клетка без озера сбрасывает отметку: иначе возвращение на то же
+        # озеро не отличалось бы от «остался на нём» и кнопка не пришла бы.
+        lake_button_state.leave(peer_id)
         return
+    if not lake_button_state.should_send(peer_id, character.pos_x, character.pos_y):
+        return
+    lake_button_state.mark_sent(peer_id, character.pos_x, character.pos_y)
     await _bot_api.messages.send(
         peer_id=peer_id, message=fishing_texts.LAKE_HINT_LINE, random_id=0,
         keyboard=fishing_kb.approach_lake_keyboard(),
@@ -320,7 +328,7 @@ async def show_location(message: Message, db, character) -> None:
         keyboard=kb.movement_keyboard(character.pos_x, character.pos_y, message.peer_id, has_mount=has_mount),
     )
     await _maybe_send_monolith_button(message.peer_id, character)
-    await _maybe_send_lake_button(message.peer_id, character)
+    await maybe_send_lake_button(message.peer_id, character)
 
 
 @labeler.message(text=[kb.BTN_GATE])
@@ -385,7 +393,7 @@ async def gate_exit_direction(message: Message) -> None:
             keyboard=kb.movement_keyboard(character.pos_x, character.pos_y, message.peer_id, has_mount=has_mount),
         )
         await _maybe_send_monolith_button(message.peer_id, character)
-        await _maybe_send_lake_button(message.peer_id, character)
+        await maybe_send_lake_button(message.peer_id, character)
 
 
 ASH_BURNED_LINE = "Пепел разнесло ветром."
@@ -560,7 +568,6 @@ async def collect_ash_handful(message: Message) -> None:
         keyboard=kb.movement_keyboard(character.pos_x, character.pos_y, peer_id, has_mount=has_mount),
     )
     await _maybe_send_monolith_button(peer_id, character)
-    await _maybe_send_lake_button(peer_id, character)
 
 
 async def handle_explore_done(peer_id: int) -> None:
@@ -718,7 +725,6 @@ async def event_choice(message: Message) -> None:
         keyboard=kb.movement_keyboard(character.pos_x, character.pos_y, peer_id, has_mount=has_mount),
     )
     await _maybe_send_monolith_button(peer_id, character)
-    await _maybe_send_lake_button(peer_id, character)
 
 
 SONG_READ_SCENE = (
@@ -762,7 +768,6 @@ async def read_song(message: Message) -> None:
         keyboard=kb.movement_keyboard(character.pos_x, character.pos_y, peer_id, has_mount=True),
     )
     await _maybe_send_monolith_button(peer_id, character)
-    await _maybe_send_lake_button(peer_id, character)
 
 
 # --- Отдых (combat-patch-2, п.3): вне боя, 8-12 сек, HP → полное ---
@@ -931,7 +936,7 @@ async def handle_arrival(peer_id: int) -> None:
             keyboard=kb.movement_keyboard(character.pos_x, character.pos_y, peer_id, has_mount=has_mount),
         )
         await _maybe_send_monolith_button(peer_id, character)
-        await _maybe_send_lake_button(peer_id, character)
+        await maybe_send_lake_button(peer_id, character)
 
 
 @labeler.message(text=[kb.BTN_MENTOR, kb.BTN_MENTOR_BADGE])

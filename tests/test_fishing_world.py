@@ -181,3 +181,66 @@ def test_approach_lake_button_is_inline() -> None:
     """Кнопка приходит ОТДЕЛЬНЫМ сообщением и не должна сносить нижнюю
     клавиатуру перемещения — значит обязана быть inline."""
     assert json.loads(fkb.approach_lake_keyboard())["inline"] is True
+
+
+# --- Кнопка «К воде»: один раз на вход ----------------------------------------
+
+def test_lake_button_is_sent_once_per_entry() -> None:
+    """Кнопка приходит при входе на клетку и НЕ повторяется после действий на
+    ней (исследование, событие, отдых) — иначе она засоряет чат. Вход к воде
+    при этом остаётся доступен командой."""
+    from bot import lake_button_state as st
+
+    peer = 999001
+    st.leave(peer)
+
+    assert st.should_send(peer, 41, -41) is True
+    st.mark_sent(peer, 41, -41)
+    # Исследование/событие/отдых на той же клетке — кнопки больше нет.
+    assert st.should_send(peer, 41, -41) is False
+
+
+def test_lake_button_returns_after_leaving_and_coming_back() -> None:
+    """«При перезаходе на локацию кнопку снова возвращать»: уход на любую
+    другую клетку сбрасывает отметку."""
+    from bot import lake_button_state as st
+
+    peer = 999002
+    st.leave(peer)
+    st.mark_sent(peer, 41, -41)
+    assert st.should_send(peer, 41, -41) is False
+
+    st.leave(peer)  # ушёл на клетку без озера
+    assert st.should_send(peer, 41, -41) is True
+
+
+def test_moving_between_two_lakes_shows_the_button_each_time() -> None:
+    from bot import lake_button_state as st
+
+    peer = 999003
+    st.leave(peer)
+    st.mark_sent(peer, 41, -41)
+    assert st.should_send(peer, 1, -2) is True
+    st.mark_sent(peer, 1, -2)
+    assert st.should_send(peer, 41, -41) is True
+
+
+def test_lake_button_is_sent_only_from_cell_entry_points() -> None:
+    """Вызовы обязаны стоять только там, где игрок ВХОДИТ на клетку. Если
+    кнопка снова появится после сбора пепла или исхода события, правило «один
+    раз на вход» держится только на памяти процесса, а это ненадёжно."""
+    import inspect
+
+    from bot.handlers import world as world_handlers
+
+    source = inspect.getsource(world_handlers)
+    entry_functions = {"show_location", "gate_exit_direction", "handle_arrival"}
+    current = None
+    callers = set()
+    for line in source.splitlines():
+        stripped = line.strip()
+        if stripped.startswith(("async def ", "def ")):
+            current = stripped.split("(")[0].replace("async def ", "").replace("def ", "")
+        if "maybe_send_lake_button(" in stripped and not stripped.startswith(("async def", "def")):
+            callers.add(current)
+    assert callers == entry_functions, f"кнопка шлётся не только на входе: {callers}"
