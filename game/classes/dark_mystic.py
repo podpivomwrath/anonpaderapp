@@ -166,7 +166,11 @@ def drain(ctx: SkillContext) -> None:
     target = ctx.resolve_target()
     if target is None:
         return
-    multiplier = skill.multiplier * 1.4 if target.has_effect(EffectKind.FREEZE) else skill.multiplier
+    # По холоду бьёт сильнее: цель либо ещё под контролем, либо только что
+    # оттуда вышла. Проверять один FREEZE мало - он гаснет в тот же ход, и
+    # в последовательном бою очередь мистика наступает уже после.
+    controlled = target.has_effect(EffectKind.FREEZE) or target.has_effect(EffectKind.CHILLED)
+    multiplier = skill.multiplier * bc.DARK_MYSTIC_DRAIN_CONTROLLED_MULT if controlled else skill.multiplier
     hit = compute_hit(actor, target, ctx.rng, skill.name, multiplier, is_ability=True)
     ctx.hits.append(hit)
     heal = max(round(hit.amount * skill.effect_value * _solo_heal_penalty(ctx)), 1)

@@ -222,3 +222,72 @@ def test_buff_json_matches_balance_constants() -> None:
 def test_rng_unused_import_guard() -> None:
     """random импортируется ради детерминированных прогонов в других тестах."""
     assert isinstance(random.Random(1).random(), float)
+
+
+# --- След «по холоду»: связка «заморозил и разбил» ---
+
+
+def frozen_then(skill_id: str, mode: CombatMode, *, gap: int = 1) -> bool:
+    """Ледяные оковы, затем через gap ходов - проверяемый навык.
+    Возвращает, случился ли крит (rng сам по себе крит не выдаёт)."""
+    rng = NoCritRng()
+    caster = combatant(1, side=0, subclass_id="elementalist", intellect=100)
+    target = combatant(2, side=1, will=0, agility=0, vitality=5000)
+    state = make_session(caster, target, mode=mode)
+    state.tick_number = 1
+    resolve_tick(state, {1: skill("elementalist_ice", 2)}, rng)
+    for _ in range(gap - 1):
+        state.tick_number += 1
+        resolve_tick(state, {1: DeclaredAction(type=ActionType.ATTACK, target_id=2)}, rng)
+    state.tick_number += 1
+    result = resolve_tick(state, {1: skill(skill_id, 2)}, rng)
+    return any(h.crit for h in result.hits if h.source_id == 1 and not h.is_dot)
+
+
+def test_convergence_crits_after_freeze_in_both_modes() -> None:
+    """Связка «заморозил и разбил» обязана работать и против игроков.
+
+    Сама заморозка живёт один ход и гасится в тот же тик, поэтому проверки
+    одного FREEZE не хватает: в последовательном бою очередь бьющего наступает
+    уже после. След CHILLED разводит «сколько цель стоит» и «успеешь ли добить»."""
+    assert frozen_then("elementalist_convergence", CombatMode.PVE)
+    assert frozen_then("elementalist_convergence", CombatMode.PVP_GROUP)
+
+
+def test_chill_window_expires() -> None:
+    assert not frozen_then("elementalist_convergence", CombatMode.PVP_GROUP,
+                           gap=bc.CC_CHILL_WINDOW_TURNS + 2)
+
+
+def test_drain_also_reads_the_chill_mark() -> None:
+    """Иссушение обещает больше урона по цели под контролем и упиралось в ту же
+    однотиковую заморозку."""
+    rng = NoCritRng()
+
+    def damage(chilled: bool) -> int:
+        mystic = combatant(1, side=0, subclass_id="dark_mystic", intellect=100)
+        target = combatant(2, side=1, agility=0, vitality=5000)
+        if chilled:
+            target.apply_effect(EffectKind.CHILLED, 1.0, bc.CC_CHILL_WINDOW_TURNS, 99)
+        before = target.current_hp
+        resolve_tick(make_session(mystic, target), {1: skill("dark_mystic_drain", 2)}, rng)
+        return before - target.current_hp
+
+    assert damage(chilled=True) > damage(chilled=False)
+
+
+def test_any_control_leaves_the_chill_mark() -> None:
+    """След оставляет ЛЮБОЙ контроль, в том числе союзника: это даёт группе
+    связку «танк придержал - маг добил»."""
+    rng = NoCritRng()
+    target = combatant(2, side=1, will=0)
+    control.try_apply_control(target, 1, source_id=7, rng=rng, pvp=True)
+    assert target.has_effect(EffectKind.CHILLED)
+
+
+def test_execute_threshold_comes_from_config() -> None:
+    """Порог добивания и множитель были зашиты числами прямо в коде - справочник
+    о них врал бы при первой же калибровке."""
+    assert 0 < bc.SHADOW_BLADE_EXECUTE_HP_THRESHOLD < 1
+    assert bc.SHADOW_BLADE_EXECUTE_LOW_HP_MULT > 1
+    assert bc.DARK_MYSTIC_DRAIN_CONTROLLED_MULT > 1

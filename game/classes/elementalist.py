@@ -99,7 +99,10 @@ def convergence(ctx: SkillContext) -> None:
     multiplier = skill.multiplier * element_damage_multiplier(actor, None)
     if target.effect_from(EffectKind.DOT, actor.id) is not None:
         multiplier *= 1.0 + skill.effect_value
-    force_crit = target.has_effect(EffectKind.FREEZE)
+    # По холоду бьём гарантированным критом: цель либо ещё стоит, либо только
+    # что оттуда вышла (EffectKind.CHILLED - окно после любого контроля, хоть
+    # своего, хоть союзника).
+    force_crit = target.has_effect(EffectKind.FREEZE) or target.has_effect(EffectKind.CHILLED)
     ctx.hits.append(
         compute_hit(actor, target, ctx.rng, skill.name, multiplier, force_crit=force_crit, is_ability=True)
     )

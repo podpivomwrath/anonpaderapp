@@ -80,6 +80,7 @@ def try_apply_control(
     # PvE: контроль всегда проходит полной длительностью, DR не трогаем
     if not pvp:
         target.apply_effect(EffectKind.FREEZE, 1.0, base_duration, source_id)
+        _mark_chilled(target, source_id)
         return ControlResult(applied=True)
 
     # PvP: DR по «будущему» стрику — этот контроль вызовет пропуск в текущем ходу,
@@ -92,6 +93,7 @@ def try_apply_control(
         reduced = True
 
     target.apply_effect(EffectKind.FREEZE, 1.0, duration, source_id)
+    _mark_chilled(target, source_id)
     target.control_hits += 1
     target.control_hits_reset_in = bc.CC_HITS_RESET_TURNS
 
@@ -103,6 +105,14 @@ def try_apply_control(
         immunity_granted = True
 
     return ControlResult(applied=True, reduced=reduced, immunity_granted=immunity_granted)
+
+
+def _mark_chilled(target: CombatantState, source_id: int) -> None:
+    """Метка «по холоду»: цель побывала под контролем. Сама заморозка гаснет в
+    тот же ход, а по метке следующий удар ещё успевает застать цель врасплох -
+    иначе связка «заморозил и разбил» требует, чтобы контроль ДЛИЛСЯ, и любое
+    укорачивание контроля молча убивает её вместе с темпом."""
+    target.apply_effect(EffectKind.CHILLED, 1.0, bc.CC_CHILL_WINDOW_TURNS, source_id)
 
 
 def tick_control(combatant: CombatantState, pvp: bool) -> None:

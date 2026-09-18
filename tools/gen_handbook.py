@@ -76,9 +76,12 @@ def skill_mechanics() -> dict[str, str]:
             f"Провокация на {turns(bc.PROVOKE_PVP_DURATION_TICKS)}: в PvE мобы переключаются на "
             f"Стража, в PvP чужие цели получают на {pct(bc.PROVOKE_PVP_DAMAGE_REDUCTION)} меньше урона.",
         "guardian_block":
-            f"Снижает входящий урон на {pct(_s('guardian_block').effect_value)} и лечит за каждый "
-            f"срезанный блоком удар. Держится {turns(_s('guardian_block').effect_duration)}.",
-        "guardian_stonegrip": "Оглушает цель.",
+            f"Снижает входящий урон на {pct(_s('guardian_block').effect_value)} и лечит на "
+            f"{pct(bc.GUARDIAN_BLOCK_HEAL_PCT)} максимума здоровья за каждый срезанный блоком "
+            f"удар. Держится {turns(_s('guardian_block').effect_duration)}.",
+        "guardian_stonegrip":
+            "Оглушает цель. Как и любой контроль, оставляет после себя след «по холоду» - "
+            "союзный Элементалист успевает добить Схождением с гарантированным критом.",
         "guardian_unbreakable":
             f"Один удар не может снять больше {pct(_s('guardian_unbreakable').effect_value)} "
             f"максимума здоровья. Держится {turns(_s('guardian_unbreakable').effect_duration)}.",
@@ -102,7 +105,8 @@ def skill_mechanics() -> dict[str, str]:
             f"Добавляет {pct(_s('shadow_blade_shadow_dance').effect_value)} уклонения на "
             f"{turns(_s('shadow_blade_shadow_dance').effect_duration)}.",
         "shadow_blade_execute":
-            "Гарантированный крит. По цели ниже трети здоровья урон удваивается.",
+            f"Всегда бьёт критом. По цели ниже {pct(bc.SHADOW_BLADE_EXECUTE_HP_THRESHOLD)} "
+            f"здоровья урон умножается на {bc.SHADOW_BLADE_EXECUTE_LOW_HP_MULT:g}.",
         "poisoner_venom":
             f"Накладывает стак яда, максимум {bc.POISONER_MAX_STACKS}. Яд держится "
             f"{turns(bc.POISONER_POISON_DURATION_TICKS)} и тикает уроном каждый ход. "
@@ -121,14 +125,20 @@ def skill_mechanics() -> dict[str, str]:
             f"Взрывает весь яд на цели: урон - {pct(_s('poisoner_toxic_burst').effect_value)} "
             "от суммарного тик-урона этого яда. Стаки сгорают.",
         "elementalist_fire":
-            f"Поджигает цель на {turns(_s('elementalist_fire').effect_duration)}.",
-        "elementalist_ice": "Оглушает цель.",
+            f"Поджигает цель на {turns(_s('elementalist_fire').effect_duration)}: каждый ход "
+            f"Горение снимает {pct(_s('elementalist_fire').effect_value)} от урона ЭТОГО удара. "
+            "Горение нужно Схождению стихий.",
+        "elementalist_ice":
+            f"Оглушает цель. Ещё {turns(bc.CC_CHILL_WINDOW_TURNS)} после этого цель считается "
+            "«по холоду»: Схождение стихий бьёт по ней гарантированным критом.",
         "elementalist_lightning":
             f"Бьёт ещё двух противников на {pct(_s('elementalist_lightning').effect_value)} "
             "от основного урона.",
         "elementalist_convergence":
             f"Если на цели горит Горение этого элементалиста - урон больше на "
-            f"{pct(_s('elementalist_convergence').effect_value)}.",
+            f"{pct(_s('elementalist_convergence').effect_value)}. По цели под контролем "
+            f"или вышедшей из-под него в последний ход - ГАРАНТИРОВАННЫЙ КРИТ. Считается "
+            "любой контроль, в том числе наложенный союзником.",
         "dark_mystic_blood_pact":
             f"{pct(_s('dark_mystic_blood_pact').effect_value)} нанесённого урона уходит лечением "
             "самому раненому союзнику, а без союзников - себе, но слабее.",
@@ -137,7 +147,8 @@ def skill_mechanics() -> dict[str, str]:
             "Непробитый остаток превращается в лечение.",
         "dark_mystic_drain":
             f"Лечит на {pct(_s('dark_mystic_drain').effect_value)} нанесённого урона. По цели под "
-            "контролем урон выше.",
+            f"контролем или вышедшей из-под него в последний ход урон выше в "
+            f"{bc.DARK_MYSTIC_DRAIN_CONTROLLED_MULT:g} раза.",
         "dark_mystic_circle":
             f"Стоит {pct(bc.DARK_MYSTIC_CIRCLE_HP_COST)} текущего здоровья, лечит всех союзников. "
             "Без союзников лечит себя, но слабее.",

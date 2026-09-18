@@ -89,8 +89,8 @@ def execute(ctx: SkillContext) -> None:
     target = ctx.resolve_target()
     if target is None:
         return
-    low_hp = target.current_hp < target.max_hp * 0.3
+    low_hp = target.current_hp < target.max_hp * bc.SHADOW_BLADE_EXECUTE_HP_THRESHOLD
     hit = compute_hit(actor, target, ctx.rng, skill.name, skill.multiplier, force_crit=True, is_ability=True)
     if low_hp:
-        hit.amount *= 2
+        hit.amount = round(hit.amount * bc.SHADOW_BLADE_EXECUTE_LOW_HP_MULT)
     ctx.hits.append(hit)
