@@ -1,5 +1,8 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Panel, PanelHeader, Tabbar, TabbarItem, Placeholder, Spinner, Div, Button } from '@vkontakte/vkui';
+import {
+  Panel, PanelHeader, PanelHeaderButton, Tabbar, TabbarItem,
+  Placeholder, Spinner, Div, Button,
+} from '@vkontakte/vkui';
 import { getCharacter } from '../api.js';
 import AdminTab from './AdminTab.jsx';
 import CharacterTab from './CharacterTab.jsx';
@@ -27,6 +30,8 @@ export default function Hub() {
   const [character, setCharacter] = useState(null);
   const [status, setStatus] = useState('loading'); // loading | ready | error
   const [ban, setBan] = useState(null);
+  const [refreshing, setRefreshing] = useState(false);
+  const [reloadKey, setReloadKey] = useState(0);
 
   useEffect(() => {
     const onBan = (event) => setBan(event.detail);
@@ -34,16 +39,40 @@ export default function Hub() {
     return () => window.removeEventListener('account-banned', onBan);
   }, []);
 
-  const load = useCallback(() => {
-    setStatus('loading');
+  // silent=true - обновление на месте: экран не гасим и спиннер вместо всего
+  // хаба не показываем, иначе кнопка «обновить» каждый раз мигала бы пустотой.
+  const load = useCallback((options = {}) => {
+    const silent = options.silent === true;
+    if (!silent) setStatus('loading');
     setBan(null);
-    getCharacter()
+    return getCharacter()
       .then((data) => {
         setCharacter(data);
         setStatus('ready');
       })
-      .catch(() => setStatus('error'));
+      .catch(() => {
+        if (!silent) setStatus('error');
+      });
   }, []);
+
+  // Вкладки грузят свои данные сами при монтировании, поэтому обновление
+  // карточки персонажа их не тронуло бы. Смена ключа перемонтирует активную
+  // вкладку - и она перечитает своё.
+  const refresh = useCallback(async () => {
+    setRefreshing(true);
+    try {
+      await load({ silent: true });
+      setReloadKey((key) => key + 1);
+    } finally {
+      setRefreshing(false);
+    }
+  }, [load]);
+
+  const refreshButton = (
+    <PanelHeaderButton aria-label="Обновить" disabled={refreshing} onClick={refresh}>
+      {refreshing ? <Spinner size="s" /> : <span aria-hidden="true">🔄</span>}
+    </PanelHeaderButton>
+  );
 
   useEffect(() => {
     load();
@@ -56,8 +85,8 @@ export default function Hub() {
   }, [activeTab, character?.is_admin]);
 
   if (ban) {
-    return <Panel><PanelHeader>Монолит</PanelHeader><Placeholder
-      action={<Button onClick={load}>Проверить доступ</Button>}
+    return <Panel><PanelHeader after={refreshButton}>Монолит</PanelHeader><Placeholder
+      action={<Button onClick={() => load()}>Проверить доступ</Button>}
     >
       Доступ заблокирован администратором.
       {ban.reason && <p>Причина: {ban.reason}</p>}
@@ -68,7 +97,7 @@ export default function Hub() {
   if (status === 'loading') {
     return (
       <Panel>
-        <PanelHeader>Монолит</PanelHeader>
+        <PanelHeader after={refreshButton}>Монолит</PanelHeader>
         <Div style={{ display: 'flex', justifyContent: 'center', paddingTop: 48 }}>
           <Spinner size="l" />
         </Div>
@@ -79,11 +108,11 @@ export default function Hub() {
   if (status === 'error' || !character) {
     return (
       <Panel>
-        <PanelHeader>Монолит</PanelHeader>
+        <PanelHeader after={refreshButton}>Монолит</PanelHeader>
         <Placeholder
           icon={<div style={{ fontSize: 48 }}>🩸</div>}
           action={
-            <Button size="m" mode="secondary" onClick={load}>
+            <Button size="m" mode="secondary" onClick={() => load()}>
               Попробовать снова
             </Button>
           }
@@ -96,7 +125,7 @@ export default function Hub() {
 
   return (
     <Panel>
-      <PanelHeader>Персонаж</PanelHeader>
+      <PanelHeader after={refreshButton}>Персонаж</PanelHeader>
       <div className="hub-banner">
         <p className="hub-banner__name">
           {character.name}
@@ -114,7 +143,7 @@ export default function Hub() {
         )}
       </div>
 
-      <div className="hub-content">
+      <div className="hub-content" key={reloadKey}>
         {activeTab === 'character' && (
           <CharacterTab character={character} onCharacterUpdate={setCharacter} />
         )}

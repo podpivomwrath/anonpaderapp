@@ -49,9 +49,27 @@ async def _peer_ids_for(db, character_ids: list[int]) -> dict[int, int]:
     return result
 
 
+@labeler.message(text=[rt.MONOLITH_COMMAND])
+@activity_action
+async def touch_monolith_command(message: Message) -> None:
+    """Команда словом - вторая дверь к тому же экрану.
+
+    Кнопка «коснуться Монолита» приходит вместе с клавиатурой движения, то есть
+    только при ВХОДЕ на клетку: игроку, который уже стоял на (0; 0), приходилось
+    уходить и возвращаться, чтобы попасть в лобби рейда. Проверки те же самые -
+    занятость (бой, группа, путь) и позиция; вне (0; 0) команда молчит, чтобы
+    случайное слово в чате не вызывало ответ бота.
+    """
+    await _open_raid_list(message)
+
+
 @labeler.message(payload_contains={"type": "raid_touch"})
 @activity_action
 async def touch_monolith(message: Message) -> None:
+    await _open_raid_list(message)
+
+
+async def _open_raid_list(message: Message) -> None:
     async with get_session_factory()() as db:
         character = await onboarding_svc.get_character(db, message.from_id)
         if character is None or character.creation_state is not None:

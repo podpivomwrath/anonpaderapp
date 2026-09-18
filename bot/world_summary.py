@@ -9,11 +9,12 @@ Leaf-модуль: импортируется и world.py, и combat.py, сам 
 
 import random
 
-from bot import raid_key_texts
+from bot import raid_key_texts, raid_texts
 from bot.vk_media import photo_attachment
 from game.combat import balance_config as bc
 from game.combat import display
 from game.world import grid, location_types
+from game.economy import raid_config
 from services import experience_service, vitals_service
 
 _SEP = "━━━━━━━━━━━━━━"
@@ -78,6 +79,11 @@ def location_summary(
         if character.raid_keys > 0 else ""
     )
     group_suffix = "\n\n" + group_block if group_block else ""
+    # Монолит стоит ровно на (0; 0) - на остальных клетках строка не нужна.
+    monolith_block = (
+        raid_texts.MONOLITH_HINT_LINE + "\n"
+        if (x, y) == raid_config.MONOLITH_COORDS else ""
+    )
     return (
         f"{zone_line}\n{description}\n\n"
         f"{_SEP}\n"
@@ -86,6 +92,7 @@ def location_summary(
         f"{xp_bar(character.level, character.experience)}\n"
         f"{wallet_line(farm_currency, donate_currency)}\n"
         f"{key_block}"
+        f"{monolith_block}"
         f"{quest_block}"
         f"{_SEP}"
         f"{group_suffix}"
