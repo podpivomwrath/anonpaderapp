@@ -99,7 +99,7 @@ def lifesteal_strike(ctx: SkillContext) -> None:
 
 @offensive_skill("blood_knight_harvest")
 def harvest(ctx: SkillContext) -> None:
-    """Жатва: 150% урона. Если HP актёра ниже 50% — лечит на 30% нанесённого."""
+    """Жатва: 135% урона. Если HP актёра ниже 50% — лечит на 30% нанесённого."""
     skill = SUBCLASS_SKILL_DEFS["blood_knight_harvest"]
     actor = ctx.actor
     actor.cooldowns[skill.id] = skill.cd

@@ -56,7 +56,7 @@ def _describe_guardian_bulwark(b: BuffDef) -> str:
 def _describe_guardian_unyielding(b: BuffDef) -> str:
     base = bc.PROVOKE_PVP_DURATION_TICKS
     total = base + bc.GUARDIAN_UNYIELDING_PROVOKE_BONUS_TURNS
-    return f"Провокация от Удара щитом длится {_turns(total)} вместо {_turns(base)}."
+    return f"Провокация от Удара щитом длится {_turns(total)} вместо {base}."
 
 
 def _describe_guardian_vital_block(b: BuffDef) -> str:
@@ -211,7 +211,7 @@ def _describe_blood_knight_shared_feast(b: BuffDef) -> str:
 def _describe_poisoner_lingering_poison(b: BuffDef) -> str:
     base = bc.POISONER_POISON_DURATION_TICKS
     total = base + bc.POISONER_LINGERING_POISON_BONUS_TURNS
-    return f"Яд от Отравленного клинка держится {_turns(total)} вместо {_turns(base)}."
+    return f"Яд от Отравленного клинка держится {_turns(total)} вместо {base}."
 
 
 # --- Отравитель, микробаффы патча 56 ---
@@ -404,7 +404,7 @@ def _describe_elementalist_numbness(b: BuffDef) -> str:
     base = bc.CONTROL_BASE_DURATION_TICKS
     total = base + bc.ELEMENTALIST_NUMBNESS_FREEZE_BONUS_TURNS
     return (
-        f"Заморозка от Ледяных оков длится {_turns(total)} вместо {_turns(base)}. "
+        f"Заморозка от Ледяных оков длится {_turns(total)} вместо {base}. "
         "Против игроков длительность не растёт."
     )
 

@@ -175,7 +175,7 @@ def drain(ctx: SkillContext) -> None:
 
 @offensive_skill("dark_mystic_circle")
 def circle_of_dark(ctx: SkillContext) -> None:
-    """Круг тьмы: тратит 20% текущего HP, лечит всех союзников на 180% силы
+    """Круг тьмы: тратит 20% текущего HP, лечит всех союзников с силой, зависящей от Воли
     поддержки. Вне группы лечит себя вдвое сильнее."""
     skill = SUBCLASS_SKILL_DEFS["dark_mystic_circle"]
     actor = ctx.actor

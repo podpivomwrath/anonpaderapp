@@ -88,7 +88,7 @@ def chain_lightning(ctx: SkillContext) -> None:
 
 @offensive_skill("elementalist_convergence")
 def convergence(ctx: SkillContext) -> None:
-    """Схождение стихий: 240% урона. Есть Горение от этого элементалиста —
+    """Схождение стихий: 210% урона. Есть Горение от этого элементалиста —
     +60% урона; цель заморожена — гарантированный крит."""
     skill = SUBCLASS_SKILL_DEFS["elementalist_convergence"]
     actor = ctx.actor

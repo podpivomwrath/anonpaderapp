@@ -46,7 +46,7 @@ def poison_tick_damage_per_stack(will: int, agility: int) -> float:
 
 @offensive_skill("poisoner_venom")
 def venom(ctx: SkillContext) -> None:
-    """Отравленный клинок: 105% урона + стак яда (ДоТ) НА ЦЕЛЬ (макс. 3)."""
+    """Отравленный клинок: 120% урона + стак яда (ДоТ) НА ЦЕЛЬ (макс. 3)."""
     skill = SUBCLASS_SKILL_DEFS["poisoner_venom"]
     actor = ctx.actor
     actor.cooldowns[skill.id] = skill.cd
@@ -95,7 +95,7 @@ def venom(ctx: SkillContext) -> None:
 
 @offensive_skill("poisoner_disrupt")
 def disrupt(ctx: SkillContext) -> None:
-    """Дурманящий дротик: 80% урона, 60% шанс сбить действие цели В ЭТОТ ход,
+    """Дурманящий дротик: 95% урона, 60% шанс сбить действие цели В ЭТОТ ход,
     Ослабление -25% урона цели на 3 хода (безусловно)."""
     skill = SUBCLASS_SKILL_DEFS["poisoner_disrupt"]
     actor = ctx.actor
