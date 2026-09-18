@@ -304,8 +304,6 @@ async def test_full_cycle_cast_strike_catch_sell(db_session, make_character) -> 
     rng = random.Random(2024)
     for _ in range(60):
         fishing_service.start_cast(character, lake, rng, now=now)
-        if character.fishing_pending_fish is None:
-            continue  # пустой заброс — бывает, просто пробуем снова
         # Подсекаем внутри окна: сразу после поклёвки.
         strike_at = character.fishing_bite_at + timedelta(seconds=1)
         result = await fishing_service.strike(db_session, character, lake, rng, now=strike_at)
@@ -340,10 +338,7 @@ async def test_striking_before_the_bite_yields_nothing(db_session, make_characte
     lake = fishing.lake_at(41, -41)
     now = datetime.now(timezone.utc)
     rng = random.Random(5)
-    for _ in range(40):
-        fishing_service.start_cast(character, lake, rng, now=now)
-        if character.fishing_pending_fish is not None:
-            break
+    fishing_service.start_cast(character, lake, rng, now=now)
     result = await fishing_service.strike(db_session, character, lake, rng, now=now)
     assert result.too_early is True
     assert result.landed is False
@@ -362,13 +357,54 @@ async def test_missing_the_window_reads_as_missed_not_as_a_break(
     lake = fishing.lake_at(41, -41)
     now = datetime.now(timezone.utc)
     rng = random.Random(11)
-    for _ in range(40):
-        fishing_service.start_cast(character, lake, rng, now=now)
-        if character.fishing_pending_fish is not None:
-            break
+    fishing_service.start_cast(character, lake, rng, now=now)
     too_late = character.fishing_bite_at + timedelta(
         seconds=fc.STRIKE_WINDOW_SECONDS + 1
     )
     result = await fishing_service.strike(db_session, character, lake, rng, now=too_late)
     assert result.broke is True
     assert result.missed is True
+
+
+def test_a_bite_always_happens() -> None:
+    """Пустых забросов в игре нет: поклёвка случается всегда, вопрос только
+    когда. «Ничего не выловилось» — это обрыв лески или прозеванное окно
+    подсечки, а не отсутствие клёва."""
+    rng = random.Random(99)
+    for _ in range(5000):
+        wait, bonus = fishing.roll_bite(rng)
+        assert wait > 0
+        assert 0.0 <= bonus <= 1.0
+
+
+def test_longer_wait_means_heavier_fish() -> None:
+    """Длинное ожидание обязано что-то давать, иначе пауза — просто налог на
+    время игрока."""
+    bonuses = [bonus for _w, lo, hi, bonus in fc.BITE_MODES]
+    assert bonuses == sorted(bonuses)
+    assert bonuses[-1] > 0
+    starts = [lo for _w, lo, _hi, _b in fc.BITE_MODES]
+    assert starts == sorted(starts)
+
+
+def test_bite_mode_weights_sum_to_one() -> None:
+    assert sum(w for w, *_rest in fc.BITE_MODES) == pytest.approx(1.0)
+
+
+@pytest.mark.asyncio
+async def test_stale_cast_does_not_lock_the_rod_forever(db_session, make_character) -> None:
+    """Сообщение о поклёвке присылает планировщик в памяти процесса, и рестарт
+    бота его теряет. Заброс обязан протухать, иначе снасть «в воде» навсегда и
+    игрок не может забросить заново."""
+    from datetime import datetime, timedelta, timezone
+
+    character = await make_character()
+    lake = fishing.lake_at(41, -41)
+    now = datetime.now(timezone.utc)
+    fishing_service.start_cast(character, lake, random.Random(1), now=now)
+
+    assert fishing_service.cast_is_stale(character, now) is False
+    long_after = character.fishing_bite_at + timedelta(
+        seconds=fc.STRIKE_WINDOW_SECONDS + 1
+    )
+    assert fishing_service.cast_is_stale(character, long_after) is True

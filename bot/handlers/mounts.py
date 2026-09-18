@@ -174,13 +174,34 @@ async def coord_input(message: Message) -> None:
         if (to_x, to_y) == (character.pos_x, character.pos_y):
             await message.answer("Ты уже здесь. Назови другую клетку.")
             return
-        await mount_service.start_travel(db, character, mount_id, to_x, to_y, _rng, now)
-        cells = max(abs(to_x - character.pos_x), abs(to_y - character.pos_y))
-        seconds = mount_service.total_travel_seconds(mount_id, cells)
-        await db.commit()
+        seconds = await start_travel_and_notify(db, character, peer_id, mount_id, to_x, to_y, now)
+        assert seconds is not None  # гейты выше уже всё проверили
 
-    await _dispenser.delete(peer_id)
-    await notify_travel_started(peer_id, to_x, to_y, seconds, mount_service.ambush_chance(mount_id))
+
+async def start_travel_and_notify(
+    db, character, peer_id: int, mount_id: str, to_x: int, to_y: int,
+    now: datetime | None = None,
+) -> float:
+    """Начать поездку и сказать об этом в чат — ОДНА точка для обоих способов
+    отправки маунта: из чата (coord_input) и с карты мини-аппа
+    (bot/miniapp_map_api.py::handle_post_send_mount).
+
+    Раньше карта повторяла эти три шага у себя, и расхождение между путями
+    было вопросом времени: игрок отправлял маунта с карты и не получал в чат
+    ничего. Проверки прав/границ остаются на вызывающем (они у путей разные:
+    чат отвечает текстом, карта — кодом ошибки), но сам запуск и оповещение
+    теперь физически один и тот же код.
+
+    Коммит делает вызывающий: у карты и чата разные транзакционные границы.
+    """
+    await mount_service.start_travel(db, character, mount_id, to_x, to_y, _rng, now)
+    cells = max(abs(to_x - character.pos_x), abs(to_y - character.pos_y))
+    seconds = mount_service.total_travel_seconds(mount_id, cells)
+    await db.commit()
+    await notify_travel_started(
+        peer_id, to_x, to_y, seconds, mount_service.ambush_chance(mount_id)
+    )
+    return seconds
 
 
 async def notify_travel_started(peer_id: int, to_x: int, to_y: int, seconds: float, ambush_chance: float) -> None:
@@ -202,7 +223,17 @@ async def notify_travel_started(peer_id: int, to_x: int, to_y: int, seconds: flo
         f"🐎 Путь начат: ({to_x}; {to_y}), {_format_seconds(seconds)}.\n"
         f"Шанс нападения в пути: {round(ambush_chance * 100)}%."
     )
-    resp = await _bot_api.messages.send(peer_id=peer_id, message=text, random_id=0, keyboard=kb.waiting_keyboard())
+    try:
+        resp = await _bot_api.messages.send(
+            peer_id=peer_id, message=text, random_id=0, keyboard=kb.waiting_keyboard()
+        )
+    except Exception:  # noqa: BLE001 - сеть/VK могут бросить что угодно
+        # Поездка на этот момент УЖЕ записана в БД, и падение отправки не
+        # должно её отменять или ронять HTTP-запрос с карты. Но и молчать
+        # нельзя: именно так и выглядела жалоба «с карты не приходит ничего»,
+        # а в логах не было ни строчки.
+        logger.exception("Не удалось отправить в чат сообщение о начале пути ({})", peer_id)
+        return
     try:
         _travel_message[peer_id] = int(resp)
     except (TypeError, ValueError):

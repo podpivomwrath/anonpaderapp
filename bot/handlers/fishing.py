@@ -19,6 +19,7 @@ from bot.keyboards import fishing as kb
 from bot.keyboards.world import movement_keyboard
 from game.economy import fishing
 from game.economy import fishing_config as fc
+from game.world.scheduler import PeerScheduler
 from services import (
     fishing_service,
     item_service,
@@ -36,14 +37,45 @@ labeler = BotLabeler()
 _bot_api = None
 _rng = random.Random()
 
+#: Поклёвка приходит ОТДЕЛЬНЫМ сообщением через этот планировщик — тот же
+#: механизм, что у прибытия и исследования (game/world/scheduler.py). Именно
+#: он делает подсечку подсечкой: кнопка появляется в момент события, а не
+#: висит заранее.
+_bite_scheduler: PeerScheduler | None = None
+
 # Экран озера — вложенный, родитель корневой (карта), как у рейд-лобби:
 # озеро стоит в мире, а не в городе.
 screen_service.PARENT["lake"] = None
 
 
-def setup(bot_api) -> None:
-    global _bot_api
+def setup(bot_api, scheduler: PeerScheduler | None = None) -> None:
+    global _bot_api, _bite_scheduler
     _bot_api = bot_api
+    _bite_scheduler = scheduler or PeerScheduler(_on_bite, "fishing_bite")
+    _bite_scheduler.start()
+
+
+async def _on_bite(peer_id: int) -> None:
+    """Сработал таймер поклёвки: шлём сообщение с кнопкой подсечки.
+
+    Окно STRIKE_WINDOW_SECONDS отсчитывается от fishing_bite_at, проставленного
+    при забросе, а не от этого момента — если планировщик задержался, окно
+    честно уменьшается, а не продлевается.
+    """
+    if _bot_api is None:
+        return
+    async with get_session_factory()() as db:
+        character = await onboarding_svc.get_character(db, peer_id)
+        if character is None or character.screen != "lake":
+            return
+        if not fishing_service.is_casting(character):
+            return
+        if character.fishing_pending_fish is None:
+            return
+    await _bot_api.messages.send(
+        peer_id=peer_id, message=_rng.choice(ft.BITE_TEXTS), random_id=0,
+        keyboard=kb.bite_keyboard(),
+    )
 
 
 async def _enter_lake(message: Message) -> None:
@@ -103,11 +135,16 @@ async def cast(message: Message) -> None:
         if lake is None:
             await message.answer(ft.NOT_AT_LAKE_TEXT)
             return
-        if fishing_service.is_casting(character):
+        # Протухший заброс (бот перезапускался, и таймер поклёвки умер вместе
+        # с процессом) не должен запирать снасть в воде навсегда.
+        if fishing_service.is_casting(character) and not fishing_service.cast_is_stale(character):
             await message.answer(ft.ALREADY_CASTING_TEXT, keyboard=kb.casting_keyboard())
             return
-        fishing_service.start_cast(character, lake, _rng)
+        result = fishing_service.start_cast(character, lake, _rng)
         await db.commit()
+
+    if _bite_scheduler is not None:
+        _bite_scheduler.schedule(message.peer_id, result.seconds)
     await message.answer(ft.CAST_TEXT, keyboard=kb.casting_keyboard())
 
 
@@ -125,6 +162,8 @@ async def strike(message: Message) -> None:
         if not fishing_service.is_casting(character):
             await message.answer(ft.NOT_CASTING_TEXT, keyboard=kb.lake_keyboard())
             return
+        if _bite_scheduler is not None:
+            _bite_scheduler.cancel(message.peer_id)
 
         # Находка вместо рыбы разыгрывается ЗДЕСЬ, а не при забросе: она не
         # рвётся леской и не зависит от веса, поэтому ей нечего делать в
@@ -215,8 +254,10 @@ async def leave_lake(message: Message) -> None:
         character = await onboarding_svc.get_character(db, message.from_id)
         if character is None:
             return
-        # Заброшенная снасть при уходе снимается: иначе игрок вернулся бы к
-        # «поклёвке» многочасовой давности.
+        # Заброшенная снасть при уходе снимается вместе с таймером: иначе
+        # сообщение о поклёвке прилетело бы игроку, который уже ушёл.
+        if _bite_scheduler is not None:
+            _bite_scheduler.cancel(message.peer_id)
         fishing_service.clear_cast(character)
         await screen_service.set_screen(db, character, None)
         has_mount = await mount_service.has_any_mount(db, character.id)

@@ -166,21 +166,20 @@ async def handle_post_send_mount(request: web.Request) -> web.Response:
         if not any(m.mount_id == mount_id for m in owned):
             return web.json_response({"error": "mount_not_owned"}, status=400)
 
-        travel = await mount_service.start_travel(db, character, mount_id, x, y, _rng)
-        await db.commit()
-
-        cells = max(abs(x - character.pos_x), abs(y - character.pos_y))
-        seconds = mount_service.total_travel_seconds(mount_id, cells)
+        # Тот же код, что и при отправке из чата (bot/handlers/mounts.py::
+        # coord_input): запуск поездки и сообщение в чат — одна общая функция,
+        # а не два похожих куска. Раньше карта повторяла эти шаги у себя, и
+        # игрок, отправивший маунта с карты, не получал в чат ничего.
+        seconds = await mounts_handlers.start_travel_and_notify(
+            db, character, vk_user_id, mount_id, x, y
+        )
+        travel = await mount_service.active_travel(db, character.id)
         ambush_chance = mount_service.ambush_chance(mount_id)
-
-    # Та же нотификация, что и при отправке из чата (bot/handlers/mounts.py::
-    # coord_input) — сообщение в чат + замена клавиатуры на "в пути" (патч 31,
-    # фикс 1: раньше отправка с карты создавала MountTravel молча).
-    await mounts_handlers.notify_travel_started(vk_user_id, x, y, seconds, ambush_chance)
 
     return web.json_response(
         {
-            "travel_id": travel.id, "to_x": x, "to_y": y,
+            "travel_id": travel.id if travel is not None else None,
+            "to_x": x, "to_y": y,
             "seconds": seconds,
             "ambush_chance": ambush_chance,
         }

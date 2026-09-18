@@ -111,12 +111,7 @@ def simulate(lake_tier: int, fishing_level: int, hours: float, rng: random.Rando
         res.casts += 1
         res.seconds += fc.CAST_COOLDOWN_SECONDS
 
-        bite = fishing.roll_bite(rng)
-        if bite is None:
-            res.seconds += 8.0  # пустой заброс: подождал и вытащил
-            res.empty += 1
-            continue
-        wait, f_bonus = bite
+        wait, f_bonus = fishing.roll_bite(rng)
         res.seconds += wait + 2.0  # ожидание + сама подсечка
 
         if rng.random() < fc.JUNK_CHANCE:

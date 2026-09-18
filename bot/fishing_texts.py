@@ -26,7 +26,7 @@ LAKE_HINT_LINE = f"🎣 Напиши «{LAKE_COMMAND}», чтобы подойт
 
 BTN_FISH = "🎣 К воде"
 BTN_CAST = "🎣 Забросить"
-BTN_STRIKE = "🪝 Подсекать"
+BTN_STRIKE = "🪝 Подсечь"
 BTN_BAG = "🧺 Садок"
 BTN_LEAVE_LAKE = "Отойти от воды"
 
@@ -55,7 +55,7 @@ def bag_line(grams: int, capacity: int) -> str:
     return f"🧺 Садок: {fishing.format_kg(grams)} / {fishing.format_kg(capacity)}"
 
 
-CAST_TEXT = "Заброс сделан."
+CAST_TEXT = "Заброс сделан. Ждём."
 
 BITE_TEXTS = [
     "🌊 Повело! Подсекай.",
@@ -63,7 +63,7 @@ BITE_TEXTS = [
     "🌊 Резко повело в сторону. Подсекай!",
 ]
 
-NOTHING_TEXT = "Пусто."
+NOTHING_TEXT = "Поплавок так и не шевельнулся. Пусто."
 TOO_EARLY_TEXT = "Рано - снасть вышла пустой."
 STRIKE_MISSED_TEXT = "Опоздал."
 NOT_AT_LAKE_TEXT = "Здесь негде рыбачить."

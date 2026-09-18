@@ -51,6 +51,21 @@ def is_casting(character: Character) -> bool:
     return character.fishing_cast_at is not None
 
 
+def cast_is_stale(character: Character, now: datetime | None = None) -> bool:
+    """Заброс, который уже некому разрешить: окно подсечки прошло.
+
+    Нужен потому, что сообщение о поклёвке присылает планировщик в памяти
+    процесса, а рестарт бота его теряет. Без этой проверки снасть осталась бы
+    «в воде» навсегда, и игрок не смог бы забросить заново.
+    """
+    if character.fishing_cast_at is None:
+        return False
+    deadline = strike_deadline(character)
+    if deadline is None:
+        return True
+    return (now or datetime.now(timezone.utc)) > deadline
+
+
 def bite_ready(character: Character, now: datetime | None = None) -> bool:
     """Поклёвка уже случилась (можно подсекать)."""
     if character.fishing_bite_at is None:
@@ -82,10 +97,13 @@ def clear_cast(character: Character) -> None:
 
 @dataclass
 class CastResult:
-    """Заброс сделан. seconds — через сколько будет поклёвка (None — её вообще
-    не будет, пустой заброс: игрок об этом узнает, только вытащив снасть)."""
+    """Заброс сделан.
 
-    seconds: float | None
+    seconds — через сколько будет поклёвка. Она случается всегда: пустых
+    забросов в игре нет.
+    """
+
+    seconds: float
 
 
 def start_cast(
@@ -94,17 +112,7 @@ def start_cast(
     now = now or datetime.now(timezone.utc)
     character.fishing_cast_at = now
 
-    bite = fishing.roll_bite(rng)
-    if bite is None:
-        # Пустой заброс: bite_at остаётся NULL. Игрок всё равно ждёт и тянет
-        # снасть — пустой исход должен стоить времени, иначе его выгодно
-        # «пропускать», отменяя заброс сразу.
-        character.fishing_bite_at = None
-        character.fishing_pending_fish = None
-        character.fishing_pending_grams = None
-        return CastResult(seconds=None)
-
-    wait, f_bonus = bite
+    wait, f_bonus = fishing.roll_bite(rng)
     fish_id = fishing.roll_fish_id(rng, lake.tier)
     grams, _fraction = fishing.roll_weight(rng, fish_id, character.fishing_level, f_bonus)
     character.fishing_bite_at = now + timedelta(seconds=wait)

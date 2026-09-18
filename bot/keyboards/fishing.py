@@ -21,10 +21,20 @@ def lake_keyboard() -> str:
 
 
 def casting_keyboard() -> str:
-    """Снасть в воде. Кнопка подсечки видна СРАЗУ, ещё до поклёвки — иначе
-    игроку пришлось бы ждать новое сообщение с новой клавиатурой, и окно
-    подсечки съедалось бы задержкой VK. Ранняя подсечка наказывается пустой
-    снастью, так что кнопка не бесплатна."""
+    """Снасть в воде, поклёвки ещё не было. Кнопки подсечки здесь НЕТ: она
+    появляется только вместе с сообщением о поклёвке (bite_keyboard ниже).
+
+    Так подсечка и становится подсечкой — реакцией на событие, а не кнопкой,
+    которую можно нажать заранее и ждать. Сообщение о поклёвке присылает
+    планировщик (bot/handlers/fishing.py::_on_bite)."""
+    kb = Keyboard(one_time=True)
+    kb.add(Text(BTN_LEAVE_LAKE), color=KeyboardButtonColor.SECONDARY)
+    return kb.get_json()
+
+
+def bite_keyboard() -> str:
+    """Клюёт! Приходит ОТДЕЛЬНЫМ сообщением в момент поклёвки; окно на
+    подсечку — fishing_config.STRIKE_WINDOW_SECONDS."""
     kb = Keyboard(one_time=True)
     kb.add(Text(BTN_STRIKE), color=KeyboardButtonColor.PRIMARY)
     kb.row()

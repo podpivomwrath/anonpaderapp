@@ -142,6 +142,7 @@ def _rows(raw: str) -> list[list[dict]]:
     [
         ("озеро", fkb.lake_keyboard()),
         ("снасть в воде", fkb.casting_keyboard()),
+        ("поклёвка", fkb.bite_keyboard()),
         ("садок", fkb.bag_keyboard()),
         ("кнопка к воде", fkb.approach_lake_keyboard()),
         ("скупщик (корень)", akb.appraiser_root_keyboard()),
@@ -157,10 +158,21 @@ def test_keyboards_fit_vk_limits(name: str, raw: str) -> None:
         assert len(row) <= VK_MAX_PER_ROW, f"{name}: ряд из {len(row)} кнопок"
 
 
+def test_strike_button_appears_only_with_the_bite() -> None:
+    """Главное правило ловли: подсечка — реакция на событие, а не кнопка,
+    которую можно нажать заранее и ждать. Пока снасть просто в воде, кнопки
+    быть не должно; она приходит вместе с сообщением о поклёвке."""
+    casting = [b["action"]["label"] for row in _rows(fkb.casting_keyboard()) for b in row]
+    bite = [b["action"]["label"] for row in _rows(fkb.bite_keyboard()) for b in row]
+    assert ft.BTN_STRIKE not in casting
+    assert ft.BTN_STRIKE in bite
+
+
 def test_lake_screens_always_have_a_way_out() -> None:
     """Экран озера — вложенный и заменяет клавиатуру целиком, поэтому без
     выхода игрок застрял бы у воды."""
-    for raw in (fkb.lake_keyboard(), fkb.casting_keyboard(), fkb.bag_keyboard()):
+    for raw in (fkb.lake_keyboard(), fkb.casting_keyboard(),
+                fkb.bite_keyboard(), fkb.bag_keyboard()):
         labels = [b["action"]["label"] for row in _rows(raw) for b in row]
         assert ft.BTN_LEAVE_LAKE in labels
 
