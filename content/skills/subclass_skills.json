@@ -92,7 +92,7 @@
   "poisoner_toxic_burst": {
     "id": "poisoner_toxic_burst", "name": "Токсический выброс", "subclass_id": "poisoner",
     "multiplier": 0, "cd": 5, "effect": "custom",
-    "effect_value": 2.5,
+    "effect_value": 1.5,
     "flavor": "Всё, что копилось в нём, находит выход разом."
   },
 

@@ -143,18 +143,15 @@ def disrupt(ctx: SkillContext) -> None:
 
 @offensive_skill("poisoner_toxic_burst")
 def toxic_burst(ctx: SkillContext) -> None:
-    """Токсический выброс: взрывает ВЕСЬ яд на цели. Урон - 250% суммарного
-    тик-урона этого яда (то есть с учётом всех стаков), стаки сгорают. Как и
-    ДоТ, не проходит через уворот и крит.
+    """Токсический выброс: взрывает ВЕСЬ яд на цели.
 
-    Сила яда берётся общим правилом (shared_rules.poison_tick_damage), а не из
-    сырого значения эффекта: «суммарный тик-урон» - это то, что яд реально
-    снимает за ход, вместе с «Разъедающим токсином» и «Некрозом». Раньше выброс
-    считал от базового значения, и прокачка урона яда его не касалась: тик рос
-    со 113 до 169, а финишер оставался прежним.
+    «Суммарный тик-урон этого яда» - это сумма ВСЕХ оставшихся тиков: тик со
+    всеми стаками, умноженный на число ходов, которые яду ещё тикать. От неё
+    берётся множитель навыка, стаки сгорают целиком.
 
-    Размен осознанный: весь оставшийся урон яда меняется на мгновенный. Если яду
-    ещё долго тикать, суммарно выйдет меньше - зато сейчас и наверняка.
+    Тик берётся общим правилом (shared_rules.poison_tick_damage), а не сырым
+    значением эффекта: это то, что яд реально снимает за ход, вместе с
+    «Разъедающим токсином» и «Некрозом».
     """
     skill = SUBCLASS_SKILL_DEFS["poisoner_toxic_burst"]
     actor = ctx.actor
@@ -167,6 +164,7 @@ def toxic_burst(ctx: SkillContext) -> None:
         ctx.lines.append(f"{actor.name} бьёт впустую - на {target.name} нет яда")
         return
     tick_damage = shared_rules.poison_tick_damage(poison, actor)
-    amount = max(round(tick_damage * skill.effect_value), 1)
+    remaining_total = tick_damage * max(poison.remaining_ticks, 1)
+    amount = max(round(remaining_total * skill.effect_value), 1)
     ctx.hits.append(PendingHit(source_id=actor.id, target_id=target.id, amount=amount, label="взрывает ядом", is_dot=True))
     target.effects.remove(poison)  # весь яд, как и сказано в описании

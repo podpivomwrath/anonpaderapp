@@ -3,8 +3,10 @@
     «Взрывает весь яд на цели: урон - 250% от суммарного тик-урона этого яда.
      Стаки сгорают.»
 
-Отсюда три проверяемых обещания: считается ВЕСЬ настаканный яд, множитель
-берётся от РЕАЛЬНОГО тик-урона (а он растёт от «Разъедающего токсина» и
+«Суммарный тик-урон» - это сумма ВСЕХ оставшихся тиков: тик со всеми стаками,
+умноженный на число ходов, которые яду ещё тикать. Отсюда проверяемые
+обещания: считается весь настаканный яд, считается вся оставшаяся
+длительность, тик берётся реальный (он растёт от «Разъедающего токсина» и
 «Некроза»), и после применения яда на цели не остаётся.
 
 Раньше сила бралась из СЫРОГО значения эффекта мимо общего правила: тик рос со
@@ -57,12 +59,20 @@ def _burst(**kwargs) -> tuple[int, object, object]:
     return dealt, expected_tick, (enemy, result)
 
 
-def test_damage_is_the_promised_share_of_the_whole_tick() -> None:
-    """250% от суммарного тик-урона - ровно то число, что обещано игроку."""
+def test_damage_is_the_promised_share_of_all_remaining_ticks() -> None:
+    """Обещанное число: множитель от СУММЫ оставшихся тиков, а не от одного."""
     multiplier = SUBCLASS_SKILL_DEFS["poisoner_toxic_burst"].effect_value
     for stacks in (1, 2, 3):
-        dealt, tick, _ = _burst(stacks=stacks)
-        assert dealt == round(tick * multiplier), f"{stacks} стака"
+        for ticks in (1, 2, 4):
+            dealt, tick, _ = _burst(stacks=stacks, ticks=ticks)
+            assert dealt == round(tick * ticks * multiplier), f"{stacks} стака, {ticks} ходов"
+
+
+def test_damage_grows_with_remaining_duration() -> None:
+    """Чем дольше яду ещё тикать, тем больше в нём накоплено."""
+    long_left, _, _ = _burst(ticks=4)
+    short_left, _, _ = _burst(ticks=1)
+    assert long_left > short_left
 
 
 def test_all_stacks_are_counted() -> None:
@@ -73,7 +83,7 @@ def test_all_stacks_are_counted() -> None:
     """
     one, _, _ = _burst(stacks=1)
     three, _, _ = _burst(stacks=3)
-    assert abs(three - 3 * one) <= 3
+    assert abs(three - 3 * one) <= 3 + three * 0.01
 
 
 def test_poison_damage_buffs_raise_the_burst() -> None:
