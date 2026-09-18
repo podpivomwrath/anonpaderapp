@@ -43,7 +43,7 @@ def test_item_power_matches_patch_table() -> None:
     }
     mults = [1.0, 1.25, 1.5, 1.85, 2.25]
     for ilvl, expected_row in table.items():
-        for mult, expected in zip(mults, expected_row):
+        for mult, expected in zip(mults, expected_row, strict=True):
             assert item_gen.item_power(ilvl, mult) == expected
 
 

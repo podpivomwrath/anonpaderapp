@@ -6,7 +6,7 @@ bot/handlers/combat.py: PLAYER_ID=1, MOB_ID=2) — групповых/дуэль
 условий испытания не имеют (см. патч 12, "не делать").
 """
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
 from game.combat.resolver import TickResult
 from game.combat.session import ActionType

@@ -24,7 +24,6 @@ from services import (
     lootbox_service,
     premium_service,
     preset_service,
-    promo_service,
     pvp_service,
     quest_service,
     song_service,

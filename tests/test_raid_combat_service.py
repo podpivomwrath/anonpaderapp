@@ -2,7 +2,7 @@
 
 import random
 
-from services import experience_service, raid_combat_service as rcs
+from services import raid_combat_service as rcs
 
 
 class FixedRng(random.Random):

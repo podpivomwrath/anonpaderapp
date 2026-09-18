@@ -16,7 +16,7 @@ from vkbottle.bot import BotLabeler, Message
 from bot import dailies_texts, editable_message, group_texts, raid_key_texts, raid_texts as rt
 from bot.handlers import respawn as respawn_handlers
 from bot.handlers import stats_window
-from bot.handlers.group_combat import MemberCombatInput, build_member_inputs
+from bot.handlers.group_combat import MemberCombatInput
 from bot.keyboards import raid as kb
 from bot.keyboards.items import no_keyboard
 from bot.keyboards.world import movement_keyboard
@@ -835,7 +835,7 @@ async def _cleanup_and_return(session_id: int, battle: RaidBattle, text: str, *,
     async with get_session_factory()() as db:
         has_mount_by_cid = {}
         defeats: dict[int, object] = {}
-        for cid, p in battle.participants.items():
+        for cid in battle.participants:
             character = await db.get(Character, cid)
             if character is None:
                 continue

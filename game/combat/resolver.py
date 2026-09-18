@@ -19,10 +19,9 @@ import game.classes  # noqa: F401  — регистрация умений по�
 import game.combat.base_skills as base_skills  # регистрация базовых навыков + метаданные
 import game.combat.subclass_skills as subclass_skills  # регистрация навыков подклассов + метаданные
 from game.combat import balance_config as bc
-from game.combat import combat_flavor, control, display, formulas
+from game.combat import combat_flavor, control, display, formulas, shared_rules
 from game.combat.session import (
     ActionType,
-    Effect,
     CombatantState,
     CombatMode,
     CombatSessionState,
@@ -183,62 +182,6 @@ def _run_offensive(ctx: SkillContext, cid: int, action: DeclaredAction, session,
         )
 
 
-def _poisoner_on_poison_end(
-    session: CombatSessionState, result: "TickResult", alive_before: set[int]
-) -> None:
-    """Патч 56. «Токсичный всплеск»: когда последний стак яда истекает, цель
-    получает добавочный урон долей от тик-урона этого яда. «Зараза»: если
-    отравленная цель погибла, яд переходит на другого противника; «Эпидемия»
-    сохраняет при переходе полную силу, без неё сила падает вдвое.
-
-    Обе механики - о КОНЦЕ жизни яда, поэтому живут в одном месте, сразу
-    после тика длительностей и до подсчёта смертей."""
-    for combatant in list(session.combatants.values()):
-        expired = [e for e in getattr(combatant, "_expired_dots", [])]
-        for effect in expired:
-            source = session.combatants.get(effect.source_id)
-            if source is None:
-                continue
-            burst_pct = source.buff_modifiers.get("poison_expire_burst_pct", 0.0)
-            if burst_pct > 0 and combatant.alive:
-                amount = max(round(effect.value * effect.stacks * burst_pct), 1)
-                combatant.current_hp -= amount
-                result.lines.append(
-                    f"☠ Яд на {combatant.name} вспыхивает напоследок - {amount} урона"
-                )
-        combatant._expired_dots = []
-
-    # «Зараза»: яд с погибшей цели перескакивает на следующего противника.
-    for cid in alive_before:
-        victim = session.combatants[cid]
-        if victim.alive:
-            continue
-        for effect in list(victim.effects_of(EffectKind.DOT)):
-            source = session.combatants.get(effect.source_id)
-            if source is None or source.buff_modifiers.get("plague_spread", 0.0) <= 0:
-                continue
-            candidates = [
-                c for c in session.alive_enemies_of(source) if c.id != victim.id
-            ]
-            if not candidates:
-                continue
-            full_power = source.buff_modifiers.get("epidemic_full_power", 0.0) > 0
-            value = effect.value if full_power else effect.value * 0.5
-            new_target = candidates[0]
-            existing = new_target.effect_from(EffectKind.DOT, effect.source_id)
-            if existing is not None:
-                existing.stacks = min(existing.stacks + effect.stacks, bc.POISONER_MAX_STACKS)
-                existing.value = max(existing.value, value)
-                existing.remaining_ticks = max(existing.remaining_ticks, effect.remaining_ticks)
-            else:
-                new_target.effects.append(
-                    Effect(kind=EffectKind.DOT, value=value,
-                           remaining_ticks=max(effect.remaining_ticks, 1),
-                           source_id=effect.source_id, stacks=effect.stacks)
-                )
-            result.lines.append(f"☠ Яд перекидывается на {new_target.name}")
-
-
 def resolve_tick(
     session: CombatSessionState,
     actions: dict[int, DeclaredAction],
@@ -247,7 +190,6 @@ def resolve_tick(
     result = TickResult()
     mode = _display_mode(session)
     alive_before = {c.id for c in session.combatants.values() if c.alive}
-    hp_before = {c.id: c.current_hp for c in session.combatants.values()}
     # Эффекты, существовавшие НА НАЧАЛО хода: только они (кроме FREEZE) тикают
     # уроном/длительностью в этот ход. Свежий яд/дебаф начинает работать со
     # следующего хода; FREEZE — исключение, срабатывает и потребляется в этот ход.
@@ -259,14 +201,9 @@ def resolve_tick(
         if session.combatants[cid].has_effect(EffectKind.FREEZE)
     }
 
-    # Патч 56, Клинок теней: перед фазами хода расставляем флаги, к которым
-    # compute_hit не имеет доступа (сессии он не видит).
-    for c in session.combatants.values():
-        c.has_allies = bool(session.alive_allies_of(c))
-        c.dodged_this_tick = False
-        c.crit_this_tick = False
-        interval = int(c.buff_modifiers.get("second_chance_interval", 0))
-        c.second_chance_active = bool(interval) and session.tick_number % interval == 0
+    # Патч 56: флаги, к которым compute_hit не имеет доступа (сессии он не
+    # видит). Общие с дуэлью - см. game/combat/shared_rules.py.
+    shared_rules.begin_turn_flags(session, session.tick_number)
 
     normalized: dict[int, DeclaredAction] = {}
     for cid in session.expected_declarers():
@@ -383,19 +320,12 @@ def resolve_tick(
         for effect in combatant.effects_of(EffectKind.DOT):
             if id(effect) not in preexisting_effects:
                 continue
-            # Патч 56, Отравитель: «Разъедающий токсин» (+% урона яда) и
-            # «Некроз» (+% за каждый стак на цели). Модификаторы берутся у
-            # ИСТОЧНИКА яда, а не у жертвы; без баффов множитель ровно 1.0.
             source = session.combatants.get(effect.source_id)
-            poison_mult = 1.0
-            if source is not None:
-                poison_mult += source.buff_modifiers.get("poison_damage_bonus", 0.0)
-                poison_mult += source.buff_modifiers.get("poison_damage_per_stack", 0.0) * effect.stacks
             ctx.hits.append(
                 PendingHit(
                     source_id=effect.source_id,
                     target_id=combatant.id,
-                    amount=max(round(effect.value * effect.stacks * poison_mult), 1),
+                    amount=shared_rules.poison_tick_damage(effect, source),
                     label="обжигает (ДоТ)",
                     is_dot=True,
                 )
@@ -460,46 +390,22 @@ def resolve_tick(
                         amount=round(target.max_hp * block_heal_pct), label="исцеляется от блока",
                     )
                 )
-        if target.shield > 0:
-            # Патч 56, «Токсикология»: яд проходит мимо части щита. Митигацию
-            # ДоТы в этом движке не задевают вовсе (урон собирается напрямую,
-            # мимо compute_hit), поэтому «снижение урона», которое яд реально
-            # встречает, - это именно щит.
-            pierce = 0.0
-            if hit.is_dot:
-                dot_source = session.combatants.get(hit.source_id)
-                if dot_source is not None:
-                    pierce = dot_source.buff_modifiers.get("poison_shield_pierce", 0.0)
-            # Щит может поглотить лишь (1 - pierce) долю ядовитого урона:
-            # пробитая часть проходит всегда, даже сквозь огромный щит.
-            absorbable = round(amount * (1.0 - pierce)) if pierce else amount
-            absorbed = min(target.shield, absorbable)
-            target.shield -= absorbed
-            amount -= absorbed
-            if absorbed:
-                result.lines.append(f"Щит {target.name} поглощает {absorbed} урона 🛡")
-        # Второе сердце (патч 16): персистентный щит на несколько ходов,
-        # отдельный от однотикового target.shield (групповой щит стража).
-        shield_pool = target.effects_of(EffectKind.SHIELD_POOL)
-        if shield_pool and amount > 0:
-            pool = shield_pool[0]
-            pool_absorbed = min(int(pool.value), amount)
-            pool.value -= pool_absorbed
-            amount -= pool_absorbed
-            if pool_absorbed:
-                result.lines.append(f"🛡️ Второе сердце {target.name} поглощает {pool_absorbed} урона")
-        # Страж, «Отражение» (патч 56): доля СРЕЗАННОГО блоком урона уходит
-        # обратно атакующему. Считается от заблокированного, а не от
-        # прошедшего, поэтому живёт отдельно от «Крови за кровь» ниже.
-        block_reflect_pct = target.buff_modifiers.get("block_reflect_pct", 0.0)
-        if block_reflect_pct > 0 and hit.blocked > 0 and hit.source_id != target.id:
+        # Щиты (однотиковый + «Второе сердце») и «Токсикология» - общие с
+        # дуэлью, см. game/combat/shared_rules.py.
+        pierce = (
+            shared_rules.poison_shield_pierce(session.combatants.get(hit.source_id))
+            if hit.is_dot else 0.0
+        )
+        amount = shared_rules.absorb_by_shields(target, amount, result.lines, pierce=pierce)
+        # Страж, «Отражение» (патч 56) - общее с дуэлью правило.
+        reflected = shared_rules.block_reflect_amount(target, hit.blocked)
+        if reflected and hit.source_id != target.id:
             attacker = session.combatants.get(hit.source_id)
             if attacker is not None and attacker.alive:
                 reflect_hits.append(
                     PendingHit(
                         source_id=target.id, target_id=attacker.id,
-                        amount=max(round(hit.blocked * block_reflect_pct), 1),
-                        label="отражает щитом",
+                        amount=reflected, label="отражает щитом",
                     )
                 )
         # Кровь за кровь (патч 16): доля полученного урона возвращается атакующему
@@ -652,30 +558,12 @@ def resolve_tick(
             if heat_shock_bonus > 0:
                 combatant.apply_effect(EffectKind.CONTROL_RESIST_DOWN, heat_shock_bonus, 1, source.id)
 
-        # Страж, «Возмездие» (патч 56): окно последних N ходов по срезанному
-        # блоком. Двигаем ДО reset_transient, который гасит blocked_this_tick.
-        combatant.blocked_recent.append(combatant.blocked_this_tick)
-        if len(combatant.blocked_recent) > bc.GUARDIAN_RETRIBUTION_WINDOW_TURNS:
-            del combatant.blocked_recent[:-bc.GUARDIAN_RETRIBUTION_WINDOW_TURNS]
+        # Память подкласса о ходе (Возмездие, Жажда крови, Ускользание,
+        # Танцор клинков) - общая с дуэлью, см. game/combat/shared_rules.py.
+        shared_rules.end_turn_memory(combatant, session.tick_number)
 
-        # Патч 56: истёкшие в этот ход ДоТы нужны «Токсичному всплеску» ниже -
-        # после фильтра эффектов до них уже не добраться.
-        # Патч 56, Клинок теней: «Жажда крови» - после крита следующий удар
-        # критует гарантированно, но не чаще раза в N ходов.
-        bloodlust = int(combatant.buff_modifiers.get("bloodlust_cooldown", 0))
-        if bloodlust and combatant.crit_this_tick and session.tick_number >= combatant.bloodlust_ready_tick:
-            combatant.guaranteed_crit_next = True
-            combatant.bloodlust_ready_tick = session.tick_number + bloodlust
-        # «Ускользание» смотрит на уворот ПРОШЛОГО хода.
-        combatant.dodged_last_tick = combatant.dodged_this_tick
-        # «Танцор клинков»: удачный уворот продлевает уже висящие Метки, а не
-        # даёт им истечь - иначе уворот их в этом движке никак не касается.
-        if combatant.dodged_this_tick and combatant.buff_modifiers.get("blade_dancer", 0.0) > 0:
-            for mark_effect in combatant.effects_of(EffectKind.MARK):
-                mark_effect.remaining_ticks = max(
-                    mark_effect.remaining_ticks, bc.SHADOW_BLADE_MARK_DURATION
-                )
-
+        # Истёкшие в этот ход ДоТы нужны «Токсичному всплеску» - после фильтра
+        # эффектов до них уже не добраться.
         combatant._expired_dots = [
             e for e in combatant.effects if e.kind == EffectKind.DOT and e.remaining_ticks <= 0
         ]
@@ -694,30 +582,11 @@ def resolve_tick(
     }
 
     # --- Патч 56, Отравитель: «Токсичный всплеск» и «Зараза»/«Эпидемия» ---
-    _poisoner_on_poison_end(session, result, alive_before)
+    shared_rules.poison_end_effects(session, result.lines, alive_before)
 
     # --- Смерти и исход ---
     result.deaths = [cid for cid in alive_before if not session.combatants[cid].alive]
-    # Патч 56, Клинок теней, «Воодушевление»: добитая цель с Меткой лечит
-    # союзников её владельца и даёт им бонус урона. Только в бою с союзниками.
-    for cid in result.deaths:
-        victim = session.combatants[cid]
-        for mark in victim.effects_of(EffectKind.MARK):
-            owner = session.combatants.get(mark.source_id)
-            if owner is None or owner.buff_modifiers.get("inspiration_heal_pct", 0.0) <= 0:
-                continue
-            allies = session.alive_allies_of(owner)
-            if not allies:
-                continue
-            heal_pct = owner.buff_modifiers["inspiration_heal_pct"]
-            dmg_bonus = owner.buff_modifiers.get("inspiration_damage_bonus", 0.0)
-            for ally in allies:
-                ally.current_hp = min(ally.current_hp + round(ally.max_hp * heal_pct), ally.max_hp)
-                if dmg_bonus > 0:
-                    ally.apply_effect(
-                        EffectKind.DAMAGE_BUFF, dmg_bonus, bc.SHADOW_BLADE_INSPIRATION_TURNS, owner.id
-                    )
-            result.lines.append(f"{owner.name} воодушевляет союзников добычей")
+    shared_rules.inspiration_on_deaths(session, result.lines, result.deaths)
 
     for cid in result.deaths:
         result.lines.append(f"☠ {session.combatants[cid].name} погибает")

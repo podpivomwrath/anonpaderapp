@@ -2,7 +2,6 @@ import asyncio
 from types import SimpleNamespace
 
 import pytest
-from sqlalchemy import select
 
 from bot.activity import ActivityBusy, transition
 from game.combat.session import CombatMode

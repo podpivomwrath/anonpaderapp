@@ -3,7 +3,6 @@
 (Дурманящий дротик/Токсический выброс), Элементалист (Горение/Цепь молний/Схождение),
 Тёмный мистик (Оберег/Иссушение/Круг тьмы)."""
 
-import random
 
 from game.combat.resolver import resolve_tick
 from game.combat.session import ActionType, CombatMode, CombatSessionState, DeclaredAction, EffectKind

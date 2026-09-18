@@ -273,7 +273,6 @@ def test_stat_dodge_zero_agility_never_triggers_alone() -> None:
 def test_ability_dodge_uses_quarter_chance_not_full() -> None:
     """is_ability=True — уворот 25% от обычного; ролл, который сработал бы
     для атаки, не обязан сработать для способности."""
-    from game.combat import balance_config as bc
     from game.combat import formulas
 
     class _FixedRng(random.Random):

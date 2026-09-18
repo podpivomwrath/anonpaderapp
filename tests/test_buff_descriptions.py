@@ -35,8 +35,6 @@ def test_description_reflects_live_config_value() -> None:
 
     # Патч 49, ч.1: итоговое значение, не прибавка — "20% вместо 12%", не "+8pp".
     text2 = buff_descriptions.describe(buffs["blood_knight_thirst"])
-    base_ratio = 0.20  # blood_knight_lifesteal_strike.effect_value
-    total = round((base_ratio + bc.BLOOD_KNIGHT_THIRST_LOW_HP_LIFESTEAL_BONUS) * 100)
     assert f"{round(bc.BLOOD_KNIGHT_THIRST_LOW_HP_LIFESTEAL_BONUS * 100)} процентных пунктов" in text2
 
 

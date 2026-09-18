@@ -5,7 +5,6 @@
 ДоТы «применяются» по логу, но противник урона не получает.
 """
 
-import pytest
 
 from game.combat import balance_config as bc
 from game.combat.resolver import resolve_tick

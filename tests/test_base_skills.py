@@ -36,7 +36,7 @@ def test_all_skills_registered() -> None:
     from game.combat.skills import OFFENSIVE_SKILLS
 
     assert set(base_skills.BASE_SKILLS_BY_CLASS) == {"warrior", "rogue", "mage"}
-    for cls, skills in base_skills.BASE_SKILLS_BY_CLASS.items():
+    for _cls, skills in base_skills.BASE_SKILLS_BY_CLASS.items():
         assert len(skills) == 3
         for s in skills:
             assert s.id in OFFENSIVE_SKILLS

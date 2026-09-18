@@ -157,7 +157,7 @@ async def start_ready_group(db, group_id, members, region, dist, rng) -> None:
         raise ActivityBusy("Один из участников недоступен.")
     with transition(peers):
         cell = (members[0].pos_x, members[0].pos_y)
-        for c, peer in zip(members, peers):
+        for c, peer in zip(members, peers, strict=True):
             await db.refresh(c)
             reason = await blocked_reason(db, c, peer)
             if reason or (c.pos_x, c.pos_y) != cell:
@@ -650,7 +650,7 @@ async def on_group_battle_finished(session_id: int, result: TickResult) -> None:
         has_mount_by_cid = {}
         positions = {}
         defeats: dict[int, object] = {}
-        for cid, p in battle.participants.items():
+        for cid in battle.participants:
             character = await db.get(Character, cid)
             if character is None:
                 continue

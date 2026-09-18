@@ -223,7 +223,7 @@ async def kick_by_name(message: Message, name: str) -> None:
             await message.answer(NOT_FOUND_TEXT)
             return
         try:
-            result = await gs.kick_member(db, leader, target.id)
+            await gs.kick_member(db, leader, target.id)
         except gs.GroupError as exc:
             await message.answer(str(exc))
             return

@@ -3,7 +3,6 @@
 
 import random
 
-import pytest
 
 from game.combat import raid_bosses as rb
 from game.combat.session import CombatMode, CombatSessionState, EffectKind, Stats, build_combatant
@@ -193,7 +192,6 @@ def test_surgeon_rotation_order_and_effects():
     assert hits1[0].label == "Резекция"
 
     # 2. Замена частей — одна цель + Ослабление
-    hp_before = min(c.current_hp for c in (p1, p2))
     hits2 = ai(boss, session, rng)
     assert len(hits2) == 1
     assert hits2[0].label == "Замена частей"

@@ -25,7 +25,6 @@ from models import (
     BugReport,
     Character,
     CharacterDeath,
-    CharacterMount,
     CharacterStats,
     CharacterStoryProgress,
     CharacterTitle,

@@ -23,7 +23,6 @@ from bot.keyboards.world import (
     movement_keyboard,
     waiting_keyboard,
 )
-from bot.onboarding_texts import REGION_TITLES
 from bot.vk_media import photo_attachment
 from bot.world_texts import mentor_name
 from game.combat import balance_config as bc

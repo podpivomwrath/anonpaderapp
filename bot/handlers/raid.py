@@ -6,7 +6,7 @@ import random
 
 from loguru import logger
 from sqlalchemy import select
-from models import RaidLobby, RaidLobbyMember
+from models import RaidLobby
 from bot.activity import activity_action, transition, blocked_reason, ActivityBusy
 
 from vkbottle.bot import BotLabeler, Message

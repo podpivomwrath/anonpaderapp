@@ -1,6 +1,6 @@
 """Ежедневные задания, стрики, награды за вход (патч 23)."""
 
-from datetime import datetime, timedelta, timezone
+from datetime import timedelta
 
 import pytest
 

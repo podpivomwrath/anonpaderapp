@@ -4,7 +4,7 @@ import random
 
 from bot import ash_handful_state
 from game.economy import ash_config as ac
-from services import ash_service, wallet_service
+from services import ash_service
 from tests.conftest import NoCritRng
 
 

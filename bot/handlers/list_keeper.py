@@ -216,7 +216,6 @@ async def path_view(message: Message) -> None:
         valid_ids = {s.id for s in subclass_service.paths_for(character.base_class)}
         if subclass_id not in valid_ids:
             return  # чужой путь (не для базового класса игрока) — молча игнорируем
-        base_class = character.base_class
 
     await _dispenser.set(
         peer_id, SubclassSelectState.PATH_CONFIRM, pending_subclass=subclass_id

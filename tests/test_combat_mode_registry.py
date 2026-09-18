@@ -227,7 +227,7 @@ def _payload_rule_types() -> set[str]:
                 if keyword.arg != "payload_contains":
                     continue
                 if isinstance(keyword.value, ast.Dict):
-                    for key, value in zip(keyword.value.keys, keyword.value.values):
+                    for key, value in zip(keyword.value.keys, keyword.value.values, strict=True):
                         if (
                             isinstance(key, ast.Constant)
                             and key.value == "type"

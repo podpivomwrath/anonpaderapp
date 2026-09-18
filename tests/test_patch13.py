@@ -7,7 +7,6 @@ import bot.keyboards.world as world_kb
 from bot import editable_message
 from bot.keyboards.items import inventory_keyboard
 from config import Settings
-from game.combat import display
 from game.world import flavor, world_config as wc
 from models import Item
 from services import item_service

@@ -145,6 +145,15 @@ async def get_active_preset(db: AsyncSession, character_id: int) -> CharacterBuf
     )
 
 
+#: Суффиксы ключей, где меньшее значение выгоднее игроку: «перезарядка N ходов»
+#: и «срабатывает раз в N ходов». Всё остальное — прибавки, там больше = лучше.
+LOWER_IS_BETTER_SUFFIXES = ("_cooldown", "_interval")
+
+
+def is_lower_better(key: str) -> bool:
+    return key.endswith(LOWER_IS_BETTER_SUFFIXES)
+
+
 def resolve_buff_modifiers(buff_ids: list[str], catalog: dict[str, BuffDef]) -> dict[str, float]:
     """Мерж stat_modifiers всех баффов активного пресета в один словарь
     (патч 14, ч.3) — подаётся в build_combatant аналогично gear_bonus (патч 11).
@@ -152,7 +161,11 @@ def resolve_buff_modifiers(buff_ids: list[str], catalog: dict[str, BuffDef]) -> 
     Патч 56, общее правило: модификаторы ОДНОГО типа НЕ складываются, берётся
     БОЛЬШИЙ. Раньше здесь был dict.update, то есть побеждал последний бафф в
     списке — при двух баффах с одним ключом результат зависел от порядка
-    пресета, и больший модификатор мог молча проиграть меньшему."""
+    пресета, и больший модификатор мог молча проиграть меньшему.
+
+    Оговорка про направление: «больший» значит «выгодный игроку». Для
+    кулдаунов и интервалов («раз в N ходов») выгоднее МЕНЬШЕЕ число, поэтому
+    там берётся минимум — иначе правило выдавало бы игроку худший вариант."""
     merged: dict[str, float] = {}
     for buff_id in buff_ids:
         buff = catalog.get(buff_id)
@@ -160,7 +173,12 @@ def resolve_buff_modifiers(buff_ids: list[str], catalog: dict[str, BuffDef]) -> 
             continue
         for key, value in buff.stat_modifiers.items():
             current = merged.get(key)
-            merged[key] = value if current is None else max(current, value)
+            if current is None:
+                merged[key] = value
+            elif is_lower_better(key):
+                merged[key] = min(current, value)
+            else:
+                merged[key] = max(current, value)
     return merged
 
 

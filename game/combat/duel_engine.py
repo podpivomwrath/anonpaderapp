@@ -21,6 +21,7 @@ from apscheduler.triggers.date import DateTrigger
 from loguru import logger
 
 from game.combat import balance_config as bc
+from game.combat import shared_rules
 from game.combat import combat_flavor, control, display
 from game.combat.session import (
     ActionType,
@@ -33,7 +34,6 @@ from game.combat.skills import (
     OFFENSIVE_SKILLS,
     PendingHeal,
     SkillContext,
-    compute_hit,
     tick_overload,
 )
 from game.combat.session import CombatMode, CombatSessionState
@@ -78,9 +78,14 @@ class DuelState:
         return self.combatants[other_id]
 
     def as_session_state(self) -> CombatSessionState:
-        """Обёртка для переиспользования SkillContext/умений."""
+        """Обёртка для переиспользования SkillContext/умений.
+
+        tick_number обязан ехать вместе с состоянием: механики вида
+        «раз в N ходов» сверяются именно с ним, и при нуле условие
+        `tick_number % N == 0` было бы истинно КАЖДЫЙ ход дуэли."""
         state = CombatSessionState(session_id=self.session_id, mode=CombatMode.DUEL)
         state.combatants = self.combatants
+        state.tick_number = self.turn_number
         return state
 
 
@@ -180,13 +185,26 @@ class DuelEngine:
         actor = state.combatants[state.current_actor_id]
         result = DuelResult()
         turn = state.turn_number
+        session_view = state.as_session_state()
+        alive_before = {c.id for c in state.combatants.values() if c.alive}
+
+        # Флаги хода (союзники, «Второй шанс») - те же, что в тиковом движке.
+        shared_rules.begin_turn_flags(session_view, turn)
 
         # Однотиковая защита актёра действовала до начала его нового хода
         actor.reset_transient()
 
-        # ДоТы на актёре тикают в начале его собственного хода
+        # ДоТы на актёре тикают в начале его собственного хода. Сила яда и
+        # поглощение щитом считаются общими правилами - иначе в дуэли не
+        # работали бы «Разъедающий токсин»/«Некроз», а яд шёл бы сквозь щиты.
         for effect in actor.effects_of(EffectKind.DOT):
-            dot = max(round(effect.value * effect.stacks), 1)
+            source = state.combatants.get(effect.source_id)
+            dot = shared_rules.poison_tick_damage(effect, source)
+            dot = shared_rules.absorb_by_shields(
+                actor, dot, result.lines, pierce=shared_rules.poison_shield_pierce(source)
+            )
+            if dot <= 0:
+                continue
             before = actor.current_hp
             actor.current_hp -= dot
             result.lines.append(
@@ -224,10 +242,26 @@ class DuelEngine:
             heat_shock_bonus = source.buff_modifiers.get("burn_expire_resist_down", 0.0)
             if heat_shock_bonus > 0:
                 actor.apply_effect(EffectKind.CONTROL_RESIST_DOWN, heat_shock_bonus, 1, source.id)
+        # Истёкший яд нужен «Токсичному всплеску» - после фильтра эффектов
+        # до него уже не добраться.
+        actor._expired_dots = [
+            e for e in actor.effects if e.kind == EffectKind.DOT and e.remaining_ticks <= 0
+        ]
         actor.effects = [e for e in actor.effects if e.remaining_ticks > 0]
         actor.tick_cooldowns()
         tick_overload(actor)
         control.tick_control(actor, pvp=True)  # дуэль — всегда PvP
+
+        # Память о ходе пишется ОБОИМ: уворот и крит случаются и в чужой ход,
+        # а reset_transient гасит однотиковые поля, поэтому фиксируем сейчас.
+        for combatant in state.combatants.values():
+            shared_rules.end_turn_memory(combatant, turn)
+
+        shared_rules.poison_end_effects(session_view, result.lines, alive_before)
+        shared_rules.inspiration_on_deaths(
+            session_view, result.lines,
+            [cid for cid in alive_before if not state.combatants[cid].alive],
+        )
 
         # Исход: последовательные ходы, но взаимное истощение возможно
         alive = [c for c in state.combatants.values() if c.alive]
@@ -311,25 +345,13 @@ class DuelEngine:
                 ))
                 continue
             before = target.current_hp
-            amount = hit.amount
-            if target.shield > 0:
-                absorbed = min(target.shield, amount)
-                target.shield -= absorbed
-                amount -= absorbed
-                if absorbed:
-                    result.lines.append(f"Щит {target.name} поглощает {absorbed} урона 🛡")
-            # Патч 52, баг 2: Второе сердце (SHIELD_POOL) — персистентный щит на
-            # несколько ходов, ОТДЕЛЬНЫЙ от однотикового target.shield выше.
-            # Раньше здесь не учитывался вовсе (только в резолвере) — эликсир
-            # списывался из инвентаря, но не давал эффекта в дуэли.
-            shield_pool = target.effects_of(EffectKind.SHIELD_POOL)
-            if shield_pool and amount > 0:
-                pool = shield_pool[0]
-                pool_absorbed = min(int(pool.value), amount)
-                pool.value -= pool_absorbed
-                amount -= pool_absorbed
-                if pool_absorbed:
-                    result.lines.append(f"🛡️ Второе сердце {target.name} поглощает {pool_absorbed} урона")
+            # Щиты (однотиковый + «Второе сердце») считаются общим правилом:
+            # раньше этот блок жил своей жизнью, и патчу 52 пришлось отдельно
+            # добавлять сюда SHIELD_POOL, которого движок не знал.
+            amount = shared_rules.absorb_by_shields(
+                target, hit.amount, result.lines,
+                pierce=shared_rules.poison_shield_pierce(actor) if hit.is_dot else 0.0,
+            )
             target.current_hp -= amount
             result.lines.append(combat_flavor.render_hit(
                 actor.name, target.name, label=hit.label, amount=amount, crit=hit.crit,
@@ -337,6 +359,18 @@ class DuelEngine:
                 max_hp=target.max_hp,
             ))
             _apply_last_breath_guard(target, result)
+            # Страж, «Отражение»: доля срезанного блоком урона возвращается
+            # атакующему. Общее правило с тиковым движком.
+            blocked_back = shared_rules.block_reflect_amount(target, hit.blocked)
+            if blocked_back and actor.id != target.id and actor.alive:
+                actor_before = actor.current_hp
+                actor.current_hp -= blocked_back
+                result.lines.append(combat_flavor.render_hit(
+                    target.name, actor.name, label="отражает щитом", amount=blocked_back,
+                    crit=False, missed=False, is_dot=False, hp_before=actor_before,
+                    hp_after=actor.current_hp, max_hp=actor.max_hp,
+                ))
+                _apply_last_breath_guard(actor, result)
             # Патч 52, баг 2: Кровь за кровь (BLOOD_REFLECT) — раньше не
             # читалось здесь вовсе, эликсир не давал эффекта в дуэли.
             reflect_pct = target.effect_total(EffectKind.BLOOD_REFLECT)

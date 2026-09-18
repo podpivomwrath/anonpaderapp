@@ -60,7 +60,6 @@ from services import (
     daily_service,
     death_service,
     event_service,
-    experience_service,
     group_explore_service,
     group_service,
     item_service,
@@ -541,8 +540,6 @@ async def handle_explore_done(peer_id: int) -> None:
         outcome_kind = "combat" if _rng.random() < wc.EXPLORE_COMBAT_CHANCE else "event"
         daily_progress = await daily_service.record_exploration(db, character)
         await db.commit()
-        wallet = await wallet_service.get_wallet(db, character.id)
-        farm_currency, donate_currency = wallet.farm_currency, wallet.donate_currency
         gear_bonus = await item_service.compute_gear_bonus(db, character.id)
         buff_modifiers = await preset_service.resolve_active_modifiers(db, character)
 

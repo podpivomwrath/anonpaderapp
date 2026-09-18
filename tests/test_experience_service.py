@@ -24,8 +24,8 @@ class FakeStats:
 
 
 def test_xp_curve_is_increasing_before_plateau() -> None:
-    vals = [svc.xp_to_next(l) for l in range(1, 50)]
-    assert all(b > a for a, b in zip(vals, vals[1:]))  # строго нарастает
+    vals = [svc.xp_to_next(level) for level in range(1, 50)]
+    assert all(b > a for a, b in zip(vals, vals[1:], strict=False))  # строго нарастает
 
 
 def test_plateau_kink_at_50() -> None:

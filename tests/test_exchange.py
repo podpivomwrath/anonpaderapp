@@ -4,7 +4,6 @@ import pytest
 
 from game.combat import balance_config as bc
 from game.economy.exchange import Exchange, InMemoryExchangeState
-from models import ExchangeOrder
 from services.wallet_service import NotEnoughCurrency, get_wallet
 
 BASE = bc.EXCHANGE_BASE_BUY_PRICE

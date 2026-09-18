@@ -174,7 +174,7 @@ async def coord_input(message: Message) -> None:
         if (to_x, to_y) == (character.pos_x, character.pos_y):
             await message.answer("Ты уже здесь. Назови другую клетку.")
             return
-        travel = await mount_service.start_travel(db, character, mount_id, to_x, to_y, _rng, now)
+        await mount_service.start_travel(db, character, mount_id, to_x, to_y, _rng, now)
         cells = max(abs(to_x - character.pos_x), abs(to_y - character.pos_y))
         seconds = mount_service.total_travel_seconds(mount_id, cells)
         await db.commit()
