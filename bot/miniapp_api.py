@@ -420,7 +420,8 @@ async def handle_get_presets(request: web.Request) -> web.Response:
             return web.json_response({"error": "character_not_found"}, status=404)
         if character.subclass is None:
             return web.json_response(
-                {"subclass": None, "preset_slots": character.preset_slots, "next_slot_cost": None, "presets": [], "buffs": []}
+                {"subclass": None, "preset_slots": character.preset_slots, "next_slot_cost": None,
+                 "presets": [], "buffs": [], "rule_hint": ""}
             )
 
         presets = await _ordered_presets(session, character.id)
@@ -441,8 +442,19 @@ async def handle_get_presets(request: web.Request) -> web.Response:
                     {"id": p.id, "name": p.name, "buff_ids": p.buff_ids, "is_active": p.is_active}
                     for p in presets
                 ],
+                # Правило состава приходит с сервера: клиент его пересказывал
+                # своими словами и врал про групповую поддержку.
+                "rule_hint": preset_service.preset_rule_hint(buff_descriptions.CATEGORY_LABELS),
                 "buffs": [
-                    {"id": b.id, "name": b.name, "category": b.category, "unlocked": b.id in unlocked}
+                    {
+                        "id": b.id,
+                        "name": b.name,
+                        "category": b.category,
+                        "category_label": buff_descriptions.category_label(b.category),
+                        # без описания игрок собирает пресет вслепую, по одним названиям
+                        "description": buff_descriptions.describe(b),
+                        "unlocked": b.id in unlocked,
+                    }
                     for b in subclass_buffs
                 ],
             }

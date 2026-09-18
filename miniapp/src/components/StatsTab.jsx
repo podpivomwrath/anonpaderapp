@@ -62,6 +62,15 @@ function formatDodge(dodge, abilityDodge) {
 
 const EMPTY_PENDING = { str: 0, agi: 0, int: 0, vit: 0, wil: 0 };
 
+// Сервер отвечает конкретным кодом, а экран показывал «попробуй ещё раз» -
+// для «не хватает очков» это прямая неправда: повтор ничего не изменит.
+const SAVE_ERRORS = {
+  not_enough_points: 'Не хватает свободных очков.',
+  nothing_to_apply: 'Нечего применять: сначала распредели очки.',
+  invalid_increment: 'Некорректное распределение.',
+  character_not_found: 'Персонаж не найден.',
+};
+
 export default function StatsTab({ character, onCharacterUpdate }) {
   const [pending, setPending] = useState(EMPTY_PENDING);
   const [confirming, setConfirming] = useState(false);
@@ -115,7 +124,7 @@ export default function StatsTab({ character, onCharacterUpdate }) {
       setPending(EMPTY_PENDING);
       setConfirming(false);
     } catch (err) {
-      setErrorMsg('Не удалось сохранить распределение. Попробуй ещё раз.');
+      setErrorMsg(SAVE_ERRORS[err?.message] || 'Не удалось сохранить распределение. Попробуй ещё раз.');
     } finally {
       setSubmitting(false);
     }

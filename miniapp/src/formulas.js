@@ -48,6 +48,18 @@ const ABILITY_DODGE_RATIO = 0.25;
 
 export const PRIMARY_STAT_BY_CLASS = { warrior: 'str', rogue: 'agi', mage: 'int' };
 
+/**
+ * Округление «половина к чётному» - то же, что делает round() в Python.
+ * Math.round() округляет половину ВВЕРХ, поэтому на ровном .5 предпросмотр
+ * расходился с сервером: 526.5 HP показывалось как 527, а сервер давал 526.
+ */
+function roundHalfToEven(value) {
+  const floor = Math.floor(value);
+  const diff = value - floor;
+  if (Math.abs(diff - 0.5) > Number.EPSILON) return Math.round(value);
+  return floor % 2 === 0 ? floor : floor + 1;
+}
+
 export function tierForLevel(level) {
   if (level <= 15) return 'grey';
   if (level <= 30) return 'white';
@@ -75,8 +87,8 @@ export function computeDerived({ level, baseClass, stats, gearBonus = {} }) {
   const primaryValue = { str, agi, int: int_ }[primaryStat] ?? 0;
   const kDmg = K_DMG[primaryStat];
 
-  const maxHp = Math.round(HP_BASE + HP_PER_LEVEL * level + HP_PER_VIT * vit + HP_PER_TIER * tierMult);
-  const damage = Math.round((WEAPON_BASE_PER_TIER * tierMult + kDmg * primaryValue) * 10) / 10;
+  const maxHp = roundHalfToEven(HP_BASE + HP_PER_LEVEL * level + HP_PER_VIT * vit + HP_PER_TIER * tierMult);
+  const damage = roundHalfToEven((WEAPON_BASE_PER_TIER * tierMult + kDmg * primaryValue) * 10) / 10;
   const critChance = Math.min(CRIT_PER_AGI * agi, CRIT_CAP);
   const mitigation = Math.min(MITIGATION_PER_VIT * vit, MITIGATION_CAP);
   const controlResist = Math.min(CONTROL_RESIST_PER_WIL * wil, CONTROL_RESIST_CAP);

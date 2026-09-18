@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Group, Header, Div, Text, Spinner, Placeholder, Button } from '@vkontakte/vkui';
-import { getInventory, equipItem } from '../api.js';
+import { getInventory, equipItem, getCharacter } from '../api.js';
 
 const STAT_NAMES = { str: 'Сила', agi: 'Ловкость', int: 'Интеллект', vit: 'Выносливость', wil: 'Воля' };
 
@@ -10,10 +10,11 @@ function statsLine(baseStats) {
     .join(', ');
 }
 
-export default function InventoryTab() {
+export default function InventoryTab({ onCharacterUpdate }) {
   const [items, setItems] = useState(null);
   const [status, setStatus] = useState('loading'); // loading | ready | error
   const [equippingId, setEquippingId] = useState(null);
+  const [errorMsg, setErrorMsg] = useState(null);
 
   function load() {
     setStatus('loading');
@@ -29,11 +30,24 @@ export default function InventoryTab() {
 
   async function handleEquip(itemId) {
     setEquippingId(itemId);
+    setErrorMsg(null);
     try {
       const res = await equipItem(itemId);
       setItems(res.items);
+      // Надетая вещь меняет статы, а карточка персонажа лежит в Hub: без
+      // этого вкладка «Характеристики» показывала старые цифры до перезапуска
+      // мини-аппа - ровно тот же разрыв, что чинил патч 32 для предпросмотра.
+      if (onCharacterUpdate) {
+        try {
+          onCharacterUpdate(await getCharacter());
+        } catch {
+          /* предмет уже надет; обновление карточки подтянется при следующем открытии */
+        }
+      }
     } catch (err) {
-      setStatus('error');
+      // Раньше тут стоял setStatus('error') - одна неудачная экипировка
+      // подменяла весь загруженный список сообщением «не удалось загрузить».
+      setErrorMsg(err?.message || 'Не удалось надеть предмет.');
     } finally {
       setEquippingId(null);
     }
@@ -57,6 +71,11 @@ export default function InventoryTab() {
 
   return (
     <Group header={<Header>Инвентарь ({items.length})</Header>}>
+      {errorMsg && (
+        <Div>
+          <Text style={{ color: '#c81e3a' }}>{errorMsg}</Text>
+        </Div>
+      )}
       {items.map((item) => (
         <div className="stat-row" key={item.id}>
           <div>

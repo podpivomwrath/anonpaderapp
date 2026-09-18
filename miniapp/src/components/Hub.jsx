@@ -119,7 +119,7 @@ export default function Hub() {
           <CharacterTab character={character} onCharacterUpdate={setCharacter} />
         )}
         {activeTab === 'dailies' && <DailiesTab />}
-        {activeTab === 'inventory' && <InventoryTab />}
+        {activeTab === 'inventory' && <InventoryTab onCharacterUpdate={setCharacter} />}
         {activeTab === 'map' && <MapTab />}
         {activeTab === 'exchange' && (
           <StubTab text="Торговцы душами ещё не открыли лавку. Скоро." />

@@ -15,6 +15,7 @@ from urllib.parse import urlencode
 import pytest
 
 from game.combat import balance_config as bc
+from game.economy import buff_descriptions
 from aiohttp.test_utils import TestClient, TestServer
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
@@ -336,7 +337,8 @@ async def test_presets_empty_without_subclass(client, session_factory) -> None:
     assert resp.status == 200
     data = await resp.json()
     assert data == {
-        "subclass": None, "preset_slots": 1, "next_slot_cost": None, "presets": [], "buffs": [],
+        "subclass": None, "preset_slots": 1, "next_slot_cost": None,
+        "presets": [], "buffs": [], "rule_hint": "",
     }
 
 
@@ -355,6 +357,19 @@ async def test_presets_lists_slots_and_subclass_catalog(client, session_factory)
     assert bulwark["unlocked"] is True
     other = next(b for b in data["buffs"] if b["id"] == "guardian_command")
     assert other["unlocked"] is False
+
+    # Правило состава приходит с сервера: клиент пересказывал его своими
+    # словами («хотя бы один - не урон») и врал про групповую поддержку -
+    # такой пресет сервер отклоняет.
+    assert str(bc.PRESET_MIN_BUFFS) in data["rule_hint"]
+    assert str(bc.PRESET_MAX_BUFFS) in data["rule_hint"]
+    for category in bc.PRESET_REQUIRED_CATEGORIES:
+        assert buff_descriptions.category_label(category) in data["rule_hint"]
+
+    # Описание и ярлык категории тоже с сервера - без описания пресет
+    # собирался вслепую, по одним названиям.
+    assert bulwark["category_label"] == buff_descriptions.category_label(bulwark["category"])
+    assert bulwark["description"]
 
 
 async def test_save_preset_creates_and_charges_gold(client, session_factory) -> None:

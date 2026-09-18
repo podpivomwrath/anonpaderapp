@@ -2,12 +2,19 @@ import { useEffect, useState } from 'react';
 import { Group, Header, Div, Text, Spinner, Placeholder, Button, Input, Checkbox } from '@vkontakte/vkui';
 import { getPresets, savePreset, switchPreset, buyPresetSlot } from '../api.js';
 
-const CATEGORY_LABELS = {
-  damage: 'Урон',
-  defense: 'Оборона',
-  control_utility: 'Контроль/утилити',
-  group_support: 'Поддержка группы',
+// Коды ошибок сервера, у которых нет человеческого текста на той стороне.
+const ERROR_TEXTS = {
+  not_enough_gold: 'Не хватило золота.',
+  no_subclass: 'Сначала выбери подкласс.',
+  bad_request: 'Не удалось сохранить: проверь название и состав.',
 };
+
+function saveErrorText(err) {
+  const code = err?.message;
+  if (!code) return 'Не удалось сохранить пресет.';
+  // Ошибки валидации приходят готовой фразой на русском - показываем как есть.
+  return ERROR_TEXTS[code] || code;
+}
 
 export default function PresetsTab({ character }) {
   const [data, setData] = useState(null);
@@ -74,7 +81,9 @@ export default function PresetsTab({ character }) {
       setEditingId(undefined);
       load();
     } catch (err) {
-      setErrorMsg('Не удалось сохранить: проверь состав (3-5 баффов, хотя бы один не-урон) и золото.');
+      // Сервер присылает точную причину (состав, слоты, золото) - раньше она
+      // выбрасывалась, и игрок читал общую догадку вместо конкретики.
+      setErrorMsg(saveErrorText(err));
     } finally {
       setBusy(false);
     }
@@ -87,7 +96,7 @@ export default function PresetsTab({ character }) {
       await switchPreset(presetId);
       load();
     } catch (err) {
-      setErrorMsg('Не удалось переключить пресет.');
+      setErrorMsg(saveErrorText(err));
     } finally {
       setBusy(false);
     }
@@ -100,7 +109,7 @@ export default function PresetsTab({ character }) {
       await buyPresetSlot();
       load();
     } catch (err) {
-      setErrorMsg('Не хватило золота на слот.');
+      setErrorMsg(saveErrorText(err));
     } finally {
       setBusy(false);
     }
@@ -112,13 +121,17 @@ export default function PresetsTab({ character }) {
         <Div>
           <Input placeholder="Название" value={editName} onChange={(e) => setEditName(e.target.value)} />
         </Div>
-        <Div style={{ fontSize: 13, opacity: 0.7 }}>Выбери 3-5 баффов (хотя бы один - не урон):</Div>
+        <Div style={{ fontSize: 13, opacity: 0.7 }}>{data.rule_hint}</Div>
         {data.buffs.map((b) => (
           <div className="stat-row" key={b.id}>
             <Checkbox disabled={!b.unlocked} checked={editBuffs.includes(b.id)} onChange={() => toggleBuff(b.id)}>
               {b.unlocked ? '' : '🔒 '}
               {b.name}
-              <span style={{ opacity: 0.6 }}> · {CATEGORY_LABELS[b.category] || b.category}</span>
+              <span style={{ opacity: 0.6 }}> · {b.category_label || b.category}</span>
+              {/* без описания пресет собирался вслепую, по одним названиям */}
+              {b.description && (
+                <div style={{ opacity: 0.7, fontSize: 13, marginTop: 2 }}>{b.description}</div>
+              )}
             </Checkbox>
           </div>
         ))}

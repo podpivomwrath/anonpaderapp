@@ -61,7 +61,7 @@ def validate_preset(
 
     if not categories & bc.PRESET_REQUIRED_CATEGORIES:
         raise PresetValidationError(
-            "Минимум один бафф должен быть из категории обороны или контроль/утилити"
+            "Минимум один бафф должен быть из категории обороны или контроля и утилиты"
         )
 
 
@@ -142,6 +142,22 @@ async def get_active_preset(db: AsyncSession, character_id: int) -> CharacterBuf
             CharacterBuffPreset.character_id == character_id,
             CharacterBuffPreset.is_active.is_(True),
         )
+    )
+
+
+def preset_rule_hint(catalog_labels: dict[str, str]) -> str:
+    """Правило состава пресета словами - чтобы клиент его не пересказывал.
+
+    Мини-апп писал «хотя бы один - не урон», но групповая поддержка правилу НЕ
+    удовлетворяет: игрок собирал 4 урона плюс групповой бафф, делал ровно то,
+    что написано, и получал отказ сервера.
+    """
+    required = ", ".join(
+        sorted(catalog_labels.get(c, c) for c in bc.PRESET_REQUIRED_CATEGORIES)
+    )
+    return (
+        f"Выбери от {bc.PRESET_MIN_BUFFS} до {bc.PRESET_MAX_BUFFS} баффов. "
+        f"Хотя бы один обязан быть из категорий: {required}."
     )
 
 
