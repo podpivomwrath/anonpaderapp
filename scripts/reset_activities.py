@@ -13,10 +13,15 @@
 - боевые сессии (PvE tick_engine, PvP дуэль/групповой) ЦЕЛИКОМ в памяти
   процесса (см. патч 30, research) — рестарт бота их и так обнуляет, здесь
   дополнительно вычищаются возможные "зависшие" ключи Redis
-  combat:session:*:actions (на случай мид-тик креша ДО этого редеплоя).
+  combat:session:*:actions (на случай мид-тик креша ДО этого редеплоя);
+- заброшенная снасть (патч 58) — сообщение о поклёвке присылает планировщик
+  в памяти процесса, и рестарт его теряет.
 
-НЕ трогает: pos_x/pos_y, respawn_at, инвентарь, статы, квесты, экономику —
-только "я сейчас куда-то иду / дерусь" состояние.
+НЕ трогает: pos_x/pos_y, respawn_at, инвентарь, статы, квесты, экономику,
+садок с рыбой — только "я сейчас куда-то иду / дерусь / удю" состояние.
+
+Сама логика — в services/maintenance_service.py: её же дёргает кнопка
+«Сбросить состояния» в админ-панели мини-аппа, и расходиться им нельзя.
 
 Запуск: python scripts/reset_activities.py [--yes]
 --yes (или -y) пропускает интерактивное подтверждение — для запуска в составе
@@ -30,80 +35,31 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from dotenv import load_dotenv  # noqa: E402
+from dotenv import load_dotenv
 
 load_dotenv()
 
-from sqlalchemy import func, select, update  # noqa: E402
-
-from config import get_settings  # noqa: E402
-from models import Character, MountTravel  # noqa: E402
-from services.db import dispose_engine, get_session_factory  # noqa: E402
-
-
-async def _preview_counts(db) -> tuple[int, int]:
-    """Сколько строк реально затронет сброс — для текста подтверждения."""
-    travelers_count = await db.scalar(
-        select(func.count()).select_from(Character).where(
-            Character.creation_state.is_(None), Character.travel_arrives_at.is_not(None),
-        )
-    )
-    mount_travelers_count = await db.scalar(
-        select(func.count()).select_from(MountTravel)
-        .where(MountTravel.status.in_(("traveling", "ambushed")))
-    )
-    return travelers_count or 0, mount_travelers_count or 0
-
-
-async def _reset(db) -> tuple[int, int]:
-    travel_result = await db.execute(
-        update(Character)
-        .where(
-            Character.creation_state.is_(None),
-            Character.travel_arrives_at.is_not(None),
-        )
-        .values(travel_target_x=None, travel_target_y=None, travel_arrives_at=None)
-    )
-    mount_result = await db.execute(
-        update(MountTravel)
-        .where(MountTravel.status.in_(("traveling", "ambushed")))
-        .values(status="cancelled")
-    )
-    await db.commit()
-    return travel_result.rowcount, mount_result.rowcount
-
-
-async def _clear_redis_combat_keys() -> int:
-    """Лучшее из возможного, не критично: если Redis недоступен, DB-часть
-    сброса (главное) уже применена и закоммичена — просто предупреждаем."""
-    settings = get_settings()
-    if not settings.redis_url:
-        return 0
-    import redis.asyncio as aioredis
-
-    redis = aioredis.from_url(settings.redis_url, decode_responses=True)
-    cleared = 0
-    try:
-        async for key in redis.scan_iter(match="combat:session:*:actions"):
-            await redis.delete(key)
-            cleared += 1
-    except Exception as exc:
-        print(f"Предупреждение: не удалось очистить Redis-ключи боя ({exc}).")
-    finally:
-        await redis.aclose()
-    return cleared
+from config import get_settings
+from services import maintenance_service
+from services.db import dispose_engine, get_session_factory
 
 
 async def _run(skip_confirm: bool) -> None:
+    """Тонкая обёртка над services/maintenance_service.py.
+
+    Сама логика сброса живёт там, потому что её же дёргает кнопка в
+    админ-панели мини-аппа — двум путям расходиться нельзя.
+    """
     # Один event loop на весь скрипт: get_session_factory() кеширует движок
     # на процесс — повторный asyncio.run() с новым event loop ломает уже
     # открытое соединение (особенно заметно на Windows/ProactorEventLoop).
     sf = get_session_factory()
     async with sf() as db:
-        travelers_count, mount_travelers_count = await _preview_counts(db)
+        counts = await maintenance_service.preview(db)
         print(
-            f"Будет сброшено: {travelers_count} пеших переходов, "
-            f"{mount_travelers_count} поездок на маунте. Позиции и остальной "
+            f"Будет сброшено: {counts.travelers} пеших переходов, "
+            f"{counts.mount_travelers} поездок на маунте, "
+            f"{counts.casters} заброшенных снастей. Позиции и остальной "
             f"прогресс персонажей не меняются."
         )
         if not skip_confirm:
@@ -112,13 +68,16 @@ async def _run(skip_confirm: bool) -> None:
                 print("Отменено.")
                 return
 
-        travel_reset, mount_reset = await _reset(db)
+        report = await maintenance_service.reset_stuck_activities(db)
 
-    redis_cleared = await _clear_redis_combat_keys()
+    redis_cleared = await maintenance_service.clear_redis_combat_keys(
+        get_settings().redis_url
+    )
     await dispose_engine()
     print(
-        f"Готово: пеших переходов сброшено {travel_reset}, поездок на маунте "
-        f"отменено {mount_reset}, зависших Redis-ключей боя очищено {redis_cleared}."
+        f"Готово: пеших переходов сброшено {report.travel_reset}, поездок на "
+        f"маунте отменено {report.mount_reset}, снастей вынуто "
+        f"{report.fishing_reset}, зависших Redis-ключей боя очищено {redis_cleared}."
     )
 
 

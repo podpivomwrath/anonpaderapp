@@ -75,19 +75,41 @@ def test_plain_cell_is_not_a_lake() -> None:
 
 # --- Ивент рыбака -------------------------------------------------------------
 
-def test_fisher_event_never_appears_without_fish() -> None:
-    """Предложить продать улов тому, у кого улова нет, — пустой исход события,
-    а их в исследовании быть не должно (правило патча 10)."""
-    rng = random.Random(3)
-    for _ in range(500):
-        event = event_pool.random_event(rng, has_fish=False)
-        assert event.requires_fish is False
+def test_fisher_event_appears_regardless_of_the_bag() -> None:
+    """Рыбак выпадает при любом улове, в том числе пустом.
 
-
-def test_fisher_event_can_appear_with_fish() -> None:
+    Порог «килограмм в садке» был ловушкой: на стартовых озёрах рыба мелкая
+    (слепой пескарь — 100-700 г), и новичок не встречал рыбака вообще никогда,
+    сколько бы ни исследовал.
+    """
     rng = random.Random(3)
-    ids = {event_pool.random_event(rng, has_fish=True).id for _ in range(500)}
+    ids = {event_pool.random_event(rng).id for _ in range(500)}
     assert "lakeside_fisher" in ids
+
+
+def test_fisher_event_has_a_line_for_an_empty_bag() -> None:
+    """С пустым садком сцена обязана что-то сказать: «ничего не произошло» —
+    запрещённый исход события (правило патча 10)."""
+    event = event_pool.event_by_id("lakeside_fisher")
+    assert event.fish_trade is True
+    assert event.empty_text.strip()
+    # В этой ветке выбора нет, поэтому плейсхолдеров цены быть не должно.
+    assert "{gold}" not in event.empty_text
+    assert "{weight}" not in event.empty_text
+
+
+def test_all_events_are_equally_likely() -> None:
+    """Фильтров в пуле не осталось — если появится новый, шансы всех событий
+    поедут, и это должно быть осознанным решением, а не побочным эффектом."""
+    rng = random.Random(11)
+    counts = {}
+    for _ in range(20000):
+        eid = event_pool.random_event(rng).id
+        counts[eid] = counts.get(eid, 0) + 1
+    assert len(counts) == len(event_pool.all_events())
+    expected = 20000 / len(counts)
+    for eid, n in counts.items():
+        assert abs(n - expected) < expected * 0.15, f"{eid}: {n} вместо ~{expected:.0f}"
 
 
 def test_fisher_event_text_has_both_placeholders() -> None:

@@ -18,7 +18,7 @@ from bot.miniapp_auth import VK_USER_ID_KEY
 from config import Settings
 from game.world import grid
 from models import Character
-from services import admin_service, promo_service
+from services import admin_service, maintenance_service, promo_service
 from services import onboarding_service as onboarding_svc
 
 _rng = random.Random()
@@ -267,6 +267,41 @@ async def handle_post_bug_report_status(request: web.Request) -> web.Response:
         return web.json_response({"id": report.id, "status": report.status})
 
 
+# --- Обслуживание (патч 58) ---
+
+#: Что видят игроки при массовом сбросе. Текст здесь, а не на фронтенде:
+#: формулировки принадлежат серверу (то же правило, что и в bot/*_texts.py).
+SERVICE_RESET_NOTICE = "Рестарт сервера, все состояния сброшены"
+
+
+async def handle_post_reset_activities(request: web.Request) -> web.Response:
+    """Вытащить всех разом из зависания после рестарта сервера.
+
+    Сам сброс — services/maintenance_service.py, тот же код, что у
+    scripts/reset_activities.py. Рассылка обязательна, а не опциональна:
+    у игрока, сброшенного из пути или боя, внизу висит клавиатура ожидания,
+    и без нового сообщения с актуальной клавиатурой он остаётся «в зависании»
+    даже после того, как БД уже чистая.
+    """
+    if not _is_admin(request):
+        return _forbidden()
+    settings: Settings = request.app[SETTINGS_KEY]
+    session_factory = request.app[SESSION_FACTORY_KEY]
+    async with session_factory() as db:
+        report = await maintenance_service.reset_stuck_activities(db)
+    report.redis_cleared = await maintenance_service.clear_redis_combat_keys(
+        settings.redis_url
+    )
+    notified = await world_handlers.broadcast_service_notice(SERVICE_RESET_NOTICE)
+    return web.json_response({
+        "travel_reset": report.travel_reset,
+        "mount_reset": report.mount_reset,
+        "fishing_reset": report.fishing_reset,
+        "redis_cleared": report.redis_cleared,
+        "notified": notified,
+    })
+
+
 # --- Промокоды (патч 50) ---
 
 
@@ -383,6 +418,7 @@ def register_routes(app: web.Application) -> None:
     app.router.add_get("/api/miniapp/admin/journal", handle_get_journal)
     app.router.add_get("/api/miniapp/admin/bug_reports", handle_get_bug_reports)
     app.router.add_post("/api/miniapp/admin/bug_reports/{id}/status", handle_post_bug_report_status)
+    app.router.add_post("/api/miniapp/admin/reset_activities", handle_post_reset_activities)
     app.router.add_get("/api/miniapp/admin/promo_codes", handle_get_promo_codes)
     app.router.add_post("/api/miniapp/admin/promo_codes", handle_post_promo_codes)
     app.router.add_delete("/api/miniapp/admin/promo_codes/{id}", handle_delete_promo_code)

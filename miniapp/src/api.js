@@ -144,6 +144,11 @@ export function setAdminBugReportStatus(reportId, status) {
 
 // --- Промокоды (патч 50) ---
 
+// Патч 58: массовый сброс зависших состояний + служебная рассылка игрокам.
+export function resetAdminActivities() {
+  return request('/admin/reset_activities', { method: 'POST' });
+}
+
 export function getAdminPromoCodes() {
   return request('/admin/promo_codes');
 }

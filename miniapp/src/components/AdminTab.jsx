@@ -1,10 +1,12 @@
 import { useEffect, useState } from 'react';
 import {
   Tabs, TabsItem, Group, Header, Div, Spinner, Placeholder, Button, Input, FormItem, Select, Textarea, Checkbox,
+  Caption,
 } from '@vkontakte/vkui';
 import {
   getAdminOverview, searchAdminPlayers, getAdminPlayer, postAdminAction, getAdminJournal,
   getAdminPromoCodes, createAdminPromoCode, deleteAdminPromoCode, getAdminPromoCodeActivations,
+  resetAdminActivities,
 } from '../api.js';
 
 // Патч 27, ч.2: вкладка «Админ» - видна только если character.is_admin
@@ -29,6 +31,67 @@ function StatRow({ label, value }) {
       <span className="stat-row__label">{label}</span>
       <span className="stat-row__value">{value}</span>
     </div>
+  );
+}
+
+// Патч 58: кнопка «вытащить всех из зависания» после рестарта сервера.
+// Подтверждение обязательно: действие рассылает сообщение ВСЕМ игрокам, а
+// такое нельзя запускать одним случайным касанием.
+function MaintenanceSection() {
+  const [confirming, setConfirming] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [result, setResult] = useState(null);
+
+  async function run() {
+    setBusy(true);
+    setResult(null);
+    try {
+      const res = await resetAdminActivities();
+      setResult({
+        ok: true,
+        text: `Сброшено: пеших переходов ${res.travel_reset}, поездок ${res.mount_reset}, `
+          + `снастей ${res.fishing_reset}. Уведомлено игроков: ${res.notified}.`,
+      });
+    } catch {
+      setResult({ ok: false, text: 'Не удалось сбросить состояния.' });
+    } finally {
+      setBusy(false);
+      setConfirming(false);
+    }
+  }
+
+  return (
+    <Group header={<Header>🛠 Обслуживание</Header>}>
+      <Div>
+        <Caption level="1" style={{ opacity: 0.7, display: 'block', marginBottom: 8 }}>
+          Отменяет пешие переходы, поездки на маунте и заброшенные снасти у всех
+          игроков, затем рассылает всем служебное сообщение с актуальной
+          клавиатурой. Позиции, инвентарь, статы и садок не трогает.
+        </Caption>
+        {confirming ? (
+          <div style={{ display: 'flex', gap: 8 }}>
+            <Button mode="primary" loading={busy} onClick={run} stretched>
+              Да, сбросить всем
+            </Button>
+            <Button mode="secondary" disabled={busy} onClick={() => setConfirming(false)} stretched>
+              Отмена
+            </Button>
+          </div>
+        ) : (
+          <Button mode="secondary" onClick={() => setConfirming(true)} stretched>
+            Сбросить состояния всех игроков
+          </Button>
+        )}
+        {result && (
+          <Caption
+            level="1"
+            style={{ display: 'block', marginTop: 8, color: result.ok ? undefined : '#c81e3a' }}
+          >
+            {result.text}
+          </Caption>
+        )}
+      </Div>
+    </Group>
   );
 }
 
@@ -714,7 +777,7 @@ export default function AdminTab() {
           </TabsItem>
         ))}
       </Tabs>
-      {section === 'overview' && <OverviewSection />}
+      {section === 'overview' && <><OverviewSection /><MaintenanceSection /></>}
       {section === 'player' && <PlayerSection />}
       {section === 'journal' && <JournalSection />}
       {section === 'promo' && <PromoSection />}

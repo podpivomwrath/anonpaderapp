@@ -17,12 +17,15 @@ def all_events() -> list[ExplorationEventDef]:
     return _events
 
 
-def random_event(rng: random.Random, has_fish: bool = False) -> ExplorationEventDef:
-    """Случайное событие. has_fish=False убирает из пула события, требующие
-    непустого садка (патч 58): предложить продать улов тому, у кого улова нет,
-    — это пустой исход, а их в событиях быть не должно."""
-    pool = [e for e in all_events() if has_fish or not e.requires_fish]
-    return rng.choice(pool)
+def random_event(rng: random.Random) -> ExplorationEventDef:
+    """Случайное событие — все равновероятны.
+
+    Патч 58: фильтр «событие требует рыбы в садке» убран. Он делал рыбака
+    недостижимым для новичка (на стартовых озёрах рыба мелкая, порог в
+    килограмм набирался долго), а задачу решал плохо: пустой садок теперь
+    обрабатывается самим событием отдельной сценой, а не исключением из пула.
+    """
+    return rng.choice(all_events())
 
 
 def event_by_id(event_id: str) -> ExplorationEventDef | None:

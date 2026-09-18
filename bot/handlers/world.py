@@ -9,17 +9,26 @@
 исследования (game.world.scheduler) и множество исследующих сейчас игроков.
 """
 
+import asyncio
 import random
 from dataclasses import dataclass
 from datetime import datetime, timezone
 
+from loguru import logger
 from sqlalchemy import select
 from vkbottle.bot import BotLabeler, Message
 
-from bot import ash_handful_state, dailies_texts, group_texts, raid_key_texts
-from bot import raid_texts
-from bot.battle_keyboard import active_battle_keyboard, in_any_battle
+from bot import (
+    ash_handful_state,
+    dailies_texts,
+    fishing_texts,
+    group_texts,
+    lake_button_state,
+    raid_key_texts,
+    raid_texts,
+)
 from bot.activity import activity_action
+from bot.battle_keyboard import active_battle_keyboard, in_any_battle
 from bot.handlers import appraiser as appraiser_handlers
 from bot.handlers import combat as combat_handlers
 from bot.handlers import elixir_shop as elixir_shop_handlers
@@ -28,15 +37,12 @@ from bot.handlers import inventory as inventory_handlers
 from bot.handlers import pvp as pvp_handlers
 from bot.handlers import raid_combat as raid_combat_handlers
 from bot.handlers import stats_window
-from bot import fishing_texts, lake_button_state
 from bot.keyboards import fishing as fishing_kb
 from bot.keyboards import raid as raid_kb
 from bot.keyboards import world as kb
 from bot.keyboards.group_explore import group_ready_keyboard
 from bot.onboarding_texts import REGION_TITLES
 from bot.world_summary import location_attachment, location_summary
-from game.economy import fishing as game_fishing
-from game.economy import fishing_config as fc
 from bot.world_texts import (
     FOREIGN_NPC_REJECTION,
     city_square_text,
@@ -51,15 +57,17 @@ from bot.world_texts import (
     tavern_text,
 )
 from game.combat import display
+from game.economy import fishing as game_fishing
+from game.economy import fishing_config as fc
 from game.economy import premium_config as pc
 from game.economy import raid_config as raid_cfg
 from game.economy import story_config as sc
-from game.world import encounters, events as event_pool
-from game.world import flavor, grid
+from game.world import encounters, flavor, grid
+from game.world import events as event_pool
 from game.world import world_config as wc
 from game.world.location_types import region_for
 from game.world.scheduler import PeerScheduler
-from models import CharacterStats, MountTravel
+from models import Character, CharacterStats, MountTravel, User
 from services import (
     ash_service,
     daily_service,
@@ -99,6 +107,9 @@ _exploring: set[int] = set()
 # Игроки, которые сейчас отдыхают (8-12 сек до восстановления HP).
 _resting: set[int] = set()
 # peer_id -> id события с выбором, ожидающего ответа (патч 9, блок 1)
+#: Пауза между сообщениями служебной рассылки (VK лимитирует темп).
+SERVICE_NOTICE_DELAY_SECONDS = 0.06
+
 _pending_events: dict[int, str] = {}
 
 #: Патч 58: множитель цены рыбака на показанное сейчас предложение. Живёт
@@ -598,21 +609,35 @@ async def handle_explore_done(peer_id: int) -> None:
         event = None
         song_can_read = False
         fish_offer = None
+        empty_fisher = False
+        summary_bits = None
         if outcome_kind == "event":
-            bag_grams = await fishing_service.bag_total_grams(db, character.id)
-            has_fish = bag_grams >= fc.BUYER_EVENT_MIN_BAG_GRAMS
-            event = event_pool.random_event(_rng, has_fish=has_fish)
-            if event.requires_fish:
-                # Патч 58: цена рыбака разыгрывается СЕЙЧАС, при показе, и
-                # зависит от кольца КЛЕТКИ, а не от места вылова. Иначе игрок
-                # соглашался бы на сделку вслепую, а весь смысл — тащить улов
-                # туда, где опаснее и дороже.
-                multiplier = _roll_fish_offer_multiplier(character)
-                fish_offer = _FishOffer(
-                    multiplier=multiplier,
-                    gold=await fishing_service.bag_value(db, character.id, multiplier),
-                    weight_label=game_fishing.format_kg(bag_grams),
-                )
+            event = event_pool.random_event(_rng)
+            if event.fish_trade:
+                bag_grams = await fishing_service.bag_total_grams(db, character.id)
+                if bag_grams <= 0:
+                    # Продавать нечего: короткая сцена без выбора, сразу назад
+                    # к панели локации. Данные для неё собираем здесь, пока
+                    # сессия открыта.
+                    empty_fisher = True
+                    wallet = await wallet_service.get_wallet(db, character.id)
+                    summary_bits = (
+                        wallet.farm_currency, wallet.donate_currency,
+                        await story_service.quest_summary_line(db, character),
+                        await group_texts.group_summary_block(db, character.id),
+                        await mount_service.has_any_mount(db, character.id),
+                    )
+                else:
+                    # Патч 58: цена рыбака разыгрывается СЕЙЧАС, при показе, и
+                    # зависит от кольца КЛЕТКИ, а не от места вылова. Иначе
+                    # игрок соглашался бы на сделку вслепую, а весь смысл —
+                    # тащить улов туда, где опаснее и дороже.
+                    multiplier = _roll_fish_offer_multiplier(character)
+                    fish_offer = _FishOffer(
+                        multiplier=multiplier,
+                        gold=await fishing_service.bag_value(db, character.id, multiplier),
+                        weight_label=game_fishing.format_kg(bag_grams),
+                    )
             if event.id == "ash_altar":
                 # патч 25, п.6: доп. выбор «Прочесть Песнь», только если собрана
                 song_can_read = await song_service.can_read(db, character.id)
@@ -625,6 +650,23 @@ async def handle_explore_done(peer_id: int) -> None:
 
     if outcome_kind == "combat":
         await combat_handlers.start_encounter(peer_id, character, stats, gear_bonus, buff_modifiers)
+        return
+
+    if empty_fisher:
+        farm_currency, donate_currency, quest_line, group_block, has_mount = summary_bits
+        await _bot_api.messages.send(
+            peer_id=peer_id,
+            message=f"{event.title}" + chr(10) * 2 + event.empty_text,
+            random_id=0, attachment=event_attachment(event.id),
+        )
+        await _bot_api.messages.send(
+            peer_id=peer_id,
+            message=_map_text(character, stats, farm_currency, gear_bonus,
+                              quest_line, donate_currency, group_block),
+            random_id=0, attachment=location_attachment(character),
+            keyboard=kb.movement_keyboard(character.pos_x, character.pos_y, peer_id,
+                                          has_mount=has_mount),
+        )
         return
 
     _pending_events[peer_id] = event.id
@@ -1161,6 +1203,48 @@ async def _current_keyboard(db, character, peer_id: int, now: datetime) -> str:
         return keyboard
     has_mount = await mount_service.has_any_mount(db, character.id)
     return kb.movement_keyboard(character.pos_x, character.pos_y, peer_id, has_mount=has_mount)
+
+
+async def broadcast_service_notice(text: str) -> int:
+    """Служебная рассылка всем игрокам + АКТУАЛЬНАЯ клавиатура каждому.
+
+    Живёт здесь, потому что здесь же живёт _current_keyboard: смысл рассылки
+    после сброса состояний не в тексте, а именно в клавиатуре — у игрока,
+    которого сбросило из пути или из боя, внизу висит клавиатура ожидания,
+    и без новой он остаётся «в зависании» даже после того, как БД уже чистая.
+
+    Возвращает число игроков, которым сообщение ушло. Ошибка отправки одному
+    не прерывает рассылку: один заблокировавший бота не должен лишать
+    остальных возможности играть дальше.
+    """
+    if _bot_api is None:
+        return 0
+    now = datetime.now(timezone.utc)
+    sent = 0
+    async with get_session_factory()() as db:
+        rows = (
+            await db.execute(
+                select(Character.id, User.vk_id)
+                .join(User, User.id == Character.user_id)
+                .where(Character.creation_state.is_(None), Character.is_banned.is_(False))
+            )
+        ).all()
+        for character_id, peer_id in rows:
+            character = await db.get(Character, character_id)
+            if character is None:
+                continue
+            try:
+                keyboard = await _current_keyboard(db, character, peer_id, now)
+                await _bot_api.messages.send(
+                    peer_id=peer_id, message=text, random_id=0, keyboard=keyboard,
+                )
+                sent += 1
+            except Exception:  # noqa: BLE001 - один недоступный не рвёт рассылку
+                logger.warning("Не удалось доставить служебное сообщение игроку {}", peer_id)
+            # VK ограничивает скорость отправки сообществу; пауза дешевле, чем
+            # ловить 429 на середине рассылки.
+            await asyncio.sleep(SERVICE_NOTICE_DELAY_SECONDS)
+    return sent
 
 
 @labeler.message(text=["/клавиатура", "/keyboard"])
