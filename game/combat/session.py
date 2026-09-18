@@ -129,6 +129,10 @@ class CombatantState:
     control_streak: int = 0            # подряд пропущенных из-за контроля ходов
     control_immune_turns: int = 0      # осталось ходов иммунитета к контролю
     skipped_by_control_this_turn: bool = False  # transient: пропустил ход из-за контроля
+    # Сколько раз контроль УЖЕ лёг на эту цель за последнее время (PvP). Второй
+    # контроль проверяется удвоенной Волей, третий не проходит вовсе.
+    control_hits: int = 0
+    control_hits_reset_in: int = 0   # ходов до обнуления счётчика
 
     # --- Боевые эликсиры (патч 16): лимит 2 за бой, считается на весь бой ---
     combat_elixirs_used: int = 0

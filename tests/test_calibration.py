@@ -133,7 +133,8 @@ def test_poison_lands_on_target_not_attacker() -> None:
 
 
 def test_poison_scales_with_stats() -> None:
-    """Сила яда масштабируется от статов: 0.60×WIL + 0.40×AGI на стак."""
+    """Сила яда масштабируется от статов: коэффициенты берём из конфига,
+    иначе тест ломается при каждой правке баланса."""
     rng = NoCritRng()
     poisoner = combatant(1, side=0, subclass_id="poisoner", will=100, agility=50)
     enemy = combatant(2, side=1, vitality=500)
@@ -143,7 +144,8 @@ def test_poison_scales_with_stats() -> None:
     hp_before_dot = enemy.current_hp
     resolve_tick(state, {}, rng)
 
-    per_stack = (0.60 * 100 + 0.40 * 50) / bc.POISONER_MAX_STACKS  # 80/3
+    per_stack = (bc.POISONER_POISON_WIL_COEF * 100
+                 + bc.POISONER_POISON_AGI_COEF * 50) / bc.POISONER_MAX_STACKS
     assert hp_before_dot - enemy.current_hp == round(per_stack)
 
 
@@ -176,7 +178,10 @@ def test_blood_pact_heals_lowest_hp_ally() -> None:
     resolve_tick(state, {1: skill("dark_mystic_blood_pact", 4)}, rng)
 
     damage = enemy.max_hp - enemy.current_hp
-    assert wounded_ally.current_hp - hp_before == round(damage * 0.7)
+    from game.combat.subclass_skills import SUBCLASS_SKILL_DEFS
+
+    conversion = SUBCLASS_SKILL_DEFS["dark_mystic_blood_pact"].effect_value
+    assert wounded_ally.current_hp - hp_before == round(damage * conversion)
     assert healthy_ally.current_hp == healthy_ally.max_hp  # хил ушёл раненому
 
 
@@ -197,7 +202,7 @@ def test_blood_pact_heals_self_without_allies() -> None:
 
 def test_calibrated_guardian_buff_values_in_content() -> None:
     buffs = load_content().buffs
-    assert buffs["guardian_bulwark"].stat_modifiers["full_block_chance"] == 0.25
+    assert buffs["guardian_bulwark"].stat_modifiers["full_block_chance"] == bc.GUARDIAN_BULWARK_FULL_BLOCK_CHANCE
     # Патч 56: контратака переехала с «Возмездия» на «Контрудар» и привязана к
     # ПОЛНОМУ блоку; у «Возмездия» теперь накопление урона за заблокированное.
     assert buffs["guardian_counterattack"].stat_modifiers["counterstrike_mult"] == bc.GUARDIAN_COUNTERATTACK_MULT
@@ -322,17 +327,31 @@ class FixedRng(NoCritRng):
         return self._value
 
 
-def test_numbness_extends_freeze_past_same_tick_decay() -> None:
-    rng = AlwaysRollsRng()
+def _freeze_session(mode: CombatMode) -> tuple:
     caster = combatant(1, side=0, subclass_id="elementalist", intellect=100)
     caster.buff_modifiers["freeze_duration_bonus"] = 1
     enemy = combatant(2, side=1, kind="mob", will=0)
-    state = make_session(caster, enemy)
+    state = CombatSessionState(session_id=1, mode=mode)
+    state.add(caster)
+    state.add(enemy)
+    return state, enemy
 
-    resolve_tick(state, {1: skill("elementalist_ice", 2)}, rng)
-    # FREEZE — немедленный эффект, декрементится В ТОТ ЖЕ ход (1 без баффа
-    # истёк бы сразу); +1 от «Оцепенения» должен пережить этот тик.
+
+def test_numbness_extends_freeze_past_same_tick_decay() -> None:
+    """В PvE «Оцепенение» удлиняет заморозку: FREEZE - немедленный эффект и
+    без прибавки истёк бы в тот же тик."""
+    state, enemy = _freeze_session(CombatMode.PVE)
+    resolve_tick(state, {1: skill("elementalist_ice", 2)}, AlwaysRollsRng())
     assert enemy.has_effect(EffectKind.FREEZE)
+
+
+def test_numbness_does_not_extend_freeze_in_pvp() -> None:
+    """Против игроков прибавка длительности не работает: два подряд пропущенных
+    хода - это половина размена, а прежняя защита от чейн-контроля считала
+    подряд идущие пропуски и на двух ходах не срабатывала вовсе."""
+    state, enemy = _freeze_session(CombatMode.PVP_GROUP)
+    resolve_tick(state, {1: skill("elementalist_ice", 2)}, AlwaysRollsRng())
+    assert not enemy.has_effect(EffectKind.FREEZE)
 
 
 def test_without_numbness_freeze_consumed_same_tick() -> None:
@@ -432,10 +451,9 @@ def test_lingering_freeze_still_announces_lost_turn_next_tick() -> None:
     """Многоходовая заморозка (лингер С НАЧАЛА хода, без свежего наложения
     в этот тик) обязана по-прежнему показывать «теряет ход» ровно один раз."""
     rng = AlwaysRollsRng()
-    caster = combatant(1, side=0, subclass_id="elementalist", intellect=100)
-    caster.buff_modifiers["freeze_duration_bonus"] = 1
-    enemy = combatant(2, side=1, kind="mob", will=0)
-    state = make_session(caster, enemy)
+    # Многоходовая заморозка возможна только в PvE: против игроков прибавка
+    # длительности отключена.
+    state, enemy = _freeze_session(CombatMode.PVE)
 
     resolve_tick(state, {1: skill("elementalist_ice", 2)}, rng)
     assert enemy.has_effect(EffectKind.FREEZE)

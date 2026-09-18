@@ -552,6 +552,22 @@ def pvp_contribution(subclass_id: str, level: int, mods_by_sub: dict, rounds: in
 # ----------------------------------------------------------------------------
 
 
+def buff_marginal_group(subclass_id: str, buff_id: str, level: int, rounds: int,
+                        rng: random.Random) -> float:
+    """Вклад баффа В ГРУППЕ. Групповые баффы («Только в бою с союзниками») в
+    соло-замере всегда дают ноль - не потому что мёртвые, а потому что им
+    некого поддерживать. Судить их можно только здесь."""
+    team = [subclass_id, FILLER, FILLER]
+    mods_without = {subclass_id: {}}
+    mods_with = {subclass_id: modifiers_for([buff_id])}
+    _, _, without = team_winrate_pve(team, level, mods_without, 6, rounds, rng)
+    _, _, with_buff = team_winrate_pve(team, level, mods_with, 6, rounds, rng)
+    return with_buff - without
+
+
+GROUP_ONLY_CATEGORY = "group_support"
+
+
 def _score(res: dict) -> float:
     """Сводный КПД боя: сколько снято с врагов и сколько осталось своего HP.
     Обе части непрерывны, поэтому счёт двигается и у тех, кто всегда
@@ -593,15 +609,50 @@ def header(title: str) -> None:
     print("=" * 78)
 
 
+def scorecard(n: int, rng: random.Random, level: int = 50) -> None:
+    """Короткая сводка для итераций по балансу: один экран вместо отчёта.
+
+    Целевые коридоры (дизайн-решение зафиксировано в balance_config: Страж и
+    Тёмный мистик осознанно слабее в дуэлях, их ценность - в группе):
+      соло «двое»  40-75% у ДД, 25-55% у танка/саппорта/хилера, ноль - брак;
+      дуэль        35-65% у ДД, 20-30% у танка и хилера;
+      масс PvE     вклад не ниже -5%;
+      масс PvP     винрейт команды 45-80%.
+    """
+    subs = list(REGISTRY)
+    mixed = {s_: modifiers_for(preset_variants(s_).get("смешанный", [])) for s_ in subs}
+    mirror = mass_pvp([FILLER] * 3, [FILLER] * 3, level, mixed, n, rng)
+    duel = duel_tournament([(s_, "x", mixed[s_]) for s_ in subs], level, max(n // 4, 8), rng)
+    # доля урона в группе: прямая проверка «саппорт не бьёт сильнее ДД»
+    shares = group_pve(subs[:3] + subs[3:], level, mixed, n, rng)["damage_share"]
+    print(f"{'подкласс':18} {'роль':8} {'равный':>8} {'двое':>7} {'дуэль':>7} "
+          f"{'масс PvE':>9} {'масс PvP':>9} {'доля урона':>11}")
+    for sub in subs:
+        easy = solo_pve(sub, level, mixed[sub], n, rng, "равный")
+        solo = solo_pve(sub, level, mixed[sub], n, rng, "двое")
+        _, d_score = group_contribution(sub, level, mixed, 6, n, rng)
+        pvp_team, _ = pvp_contribution(sub, level, mixed, n, rng)
+        print(f"{REGISTRY[sub].title:18} {ROLE_RU[REGISTRY[sub].natural_role.value]:8} "
+              f"{easy['winrate']:>7.0%} {solo['winrate']:>7.0%} {duel[(sub, 'x')]:>7.0%} "
+              f"{d_score:>+9.0%} {pvp_team:>9.0%} {shares.get(sub, 0):>11.0%}")
+    print("")
+    print(f"Зеркальный масс PvP (опора): {mirror:.0%}")
+
+
 def main() -> None:
     sys.stdout.reconfigure(line_buffering=True)
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--fast", action="store_true", help="меньше боёв, быстрый прогон")
     parser.add_argument("--seed", type=int, default=20260918)
+    parser.add_argument("--scorecard", action="store_true",
+                        help="короткая сводка вместо полного отчёта")
     args = parser.parse_args()
     n = 30 if args.fast else 120
     rng = random.Random(args.seed)
     level = 50
+    if args.scorecard:
+        scorecard(n, rng, level)
+        return
     subs = list(REGISTRY)
     mixed = {s: modifiers_for(preset_variants(s).get("смешанный", [])) for s in subs}
 
@@ -664,11 +715,17 @@ def main() -> None:
         diff = pick_difficulty(sub, level, rng, max(n // 3, 12))
         print("")
         print(f"{REGISTRY[sub].title} (сложность «{diff}»)")
-        rows = [(b.name, buff_marginal(sub, b.id, level, max(n // 3, 12), rng, diff))
-                for b in buffs_of(sub)]
+        rows = []
+        for b in buffs_of(sub):
+            # групповые баффы меряем в группе, остальные - в соло
+            if b.category == GROUP_ONLY_CATEGORY:
+                delta = buff_marginal_group(sub, b.id, level, max(n // 3, 12), rng)
+                rows.append((b.name + " (в группе)", delta))
+            else:
+                rows.append((b.name, buff_marginal(sub, b.id, level, max(n // 3, 12), rng, diff)))
         for name, delta in sorted(rows, key=lambda kv: -kv[1]):
             mark = "  <- мёртвый?" if abs(delta) < 0.005 else ""
-            print(f"   {name:26} {delta:+.1%}{mark}")
+            print(f"   {name:34} {delta:+.1%}{mark}")
 
 
 if __name__ == "__main__":

@@ -87,11 +87,15 @@ def block(ctx: SkillContext) -> None:
         + actor.buff_modifiers.get("guard_block_bonus", 0.0)
     )
     full_block = full_block_chance > 0 and ctx.rng.random() < full_block_chance
+    # Стойка ставится ВСЕГДА. Раньше при полном блоке она не ставилась вовсе:
+    # «Несокрушимость» и «Гарда» срезали один удар, но отнимали многоходовую
+    # оборону и хил за срезанные удары - симулятор показал, что с этими
+    # баффами Страж становился ХУЖЕ, чем без них (-20% и -12% КПД).
+    actor.apply_effect(EffectKind.BLOCK_STANCE, _BLOCK.effect_value, _BLOCK.effect_duration, actor.id)
     if full_block:
         actor.block_reduction = 1.0
         ctx.lines.append(f"{actor.name} блокирует удар ПОЛНОСТЬЮ 🛡✨")
     else:
-        actor.apply_effect(EffectKind.BLOCK_STANCE, _BLOCK.effect_value, _BLOCK.effect_duration, actor.id)
         ctx.lines.append(f"{actor.name} уходит в глухую оборону 🛡")
     actor.apply_effect(EffectKind.BLOCK_HEAL, bc.GUARDIAN_BLOCK_HEAL_PCT, _BLOCK.effect_duration, actor.id)
 

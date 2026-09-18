@@ -13,6 +13,8 @@ from collections import OrderedDict
 from urllib.parse import urlencode
 
 import pytest
+
+from game.combat import balance_config as bc
 from aiohttp.test_utils import TestClient, TestServer
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
@@ -265,7 +267,7 @@ async def test_trials_lists_full_pool_with_progress(client, session_factory) -> 
     # Патч 48: описание/категория/статус реализации микробаффа.
     assert bulwark["implemented"] is True
     assert bulwark["category"] == "Оборона"
-    assert "25%" in bulwark["description"]
+    assert f"{round(bc.GUARDIAN_BULWARK_FULL_BLOCK_CHANCE * 100)}%" in bulwark["description"]
     # Патч 56: у Стража заглушек не осталось, все 14 реализованы.
     assert other["implemented"] is True
     assert other["description"] != ""

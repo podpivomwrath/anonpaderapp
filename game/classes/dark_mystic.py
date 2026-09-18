@@ -50,6 +50,12 @@ def _pay_hp(actor, pct: float) -> int:
     return cost
 
 
+def _solo_heal_penalty(ctx: SkillContext) -> float:
+    """Вне группы лечение мистика слабее: он командный хилер, и его сила
+    обязана расти от числа союзников, а не работать как личный сустейн."""
+    return 1.0 if ctx.session.alive_allies_of(ctx.actor) else bc.DARK_MYSTIC_SOLO_HEAL_PENALTY
+
+
 def _edge_multiplier(actor) -> float:
     """«Грань»: урон и лечение сильнее, пока мистик сам на низком HP."""
     bonus = actor.buff_modifiers.get("edge_bonus", 0.0)
@@ -89,7 +95,7 @@ def blood_pact(ctx: SkillContext) -> None:
     resonance = actor.buff_modifiers.get("resonance_bonus", 0.0)
     if resonance > 0 and heal_target.current_hp < heal_target.max_hp * bc.DARK_MYSTIC_RESONANCE_HP_THRESHOLD:
         conversion += resonance
-    heal = max(round(hit.amount * conversion), 1)
+    heal = max(round(hit.amount * conversion * _solo_heal_penalty(ctx)), 1)
     ctx.heals.append(PendingHeal(source_id=actor.id, target_id=heal_target.id, amount=heal, label="исцеляет тьмой"))
 
     ranked = _allies_by_hp(ctx)
@@ -163,7 +169,7 @@ def drain(ctx: SkillContext) -> None:
     multiplier = skill.multiplier * 1.4 if target.has_effect(EffectKind.FREEZE) else skill.multiplier
     hit = compute_hit(actor, target, ctx.rng, skill.name, multiplier, is_ability=True)
     ctx.hits.append(hit)
-    heal = max(round(hit.amount * skill.effect_value), 1)
+    heal = max(round(hit.amount * skill.effect_value * _solo_heal_penalty(ctx)), 1)
     ctx.heals.append(PendingHeal(source_id=actor.id, target_id=actor.id, amount=heal, label="исцеляется иссушением"))
 
 
@@ -191,4 +197,4 @@ def circle_of_dark(ctx: SkillContext) -> None:
         for ally in allies:
             ctx.heals.append(PendingHeal(source_id=actor.id, target_id=ally.id, amount=round(power), label="исцеляет кругом тьмы"))
     else:
-        ctx.heals.append(PendingHeal(source_id=actor.id, target_id=actor.id, amount=round(power * 2), label="исцеляет кругом тьмы"))
+        ctx.heals.append(PendingHeal(source_id=actor.id, target_id=actor.id, amount=round(power * bc.DARK_MYSTIC_CIRCLE_SOLO_MULT), label="исцеляет кругом тьмы"))

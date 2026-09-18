@@ -106,8 +106,18 @@ def disrupt(ctx: SkillContext) -> None:
 
     ctx.hits.append(compute_hit(actor, target, ctx.rng, skill.name, skill.multiplier, is_ability=True))
     # Патч 56: «Иссушение» усиливает Ослабление (0.25 -> 0.33).
-    weaken = bc.POISONER_DISRUPT_WEAKEN + actor.buff_modifiers.get("weaken_bonus", 0.0)
+    weaken_bonus = actor.buff_modifiers.get("weaken_bonus", 0.0)
+    weaken = bc.POISONER_DISRUPT_WEAKEN + weaken_bonus
     target.apply_effect(EffectKind.WEAKEN, weaken, 3, actor.id)
+    # Патч балансировки: с «Иссушением» Ослабление расходится по ВСЕМ врагам,
+    # которых Отравитель уже отравил. Это и есть его вклад в группу: он снижает
+    # входящий урон всей команде, а не одной цели. Один на один эффекта нет -
+    # отравлен там только тот же самый противник.
+    if weaken_bonus > 0:
+        spread = weaken * bc.POISONER_DESICCATION_SPREAD_PCT
+        for enemy in ctx.session.alive_enemies_of(actor):
+            if enemy.id != target.id and enemy.effect_from(EffectKind.DOT, actor.id) is not None:
+                enemy.apply_effect(EffectKind.WEAKEN, spread, 3, actor.id)
 
     # Патч 56: «Галлюциноген» поднимает шанс сбоя действия (0.60 -> 0.75).
     disrupt_chance = skill.effect_value + actor.buff_modifiers.get("disrupt_chance_bonus", 0.0)

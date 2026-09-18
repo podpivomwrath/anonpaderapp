@@ -153,7 +153,11 @@ def test_preset_full_block_chance_blocks_completely() -> None:
     resolve_tick(state, {1: skill("guardian_block"), 2: attack(1)}, rng)
     # compute_hit гарантирует минимум 1 урона (max(round(base), 1)) даже при
     # полном блоке — это уже существующий инвариант движка, не баг теста.
-    assert guardian.current_hp == guardian.max_hp - 1
+    # Патч балансировки: глухая оборона ставится и при ПОЛНОМ блоке, поэтому
+    # этот 1 урон тут же возвращается хилом за срезанный удар. Раньше полный
+    # блок стойку не ставил, и «Несокрушимость» делала Стража слабее.
+    assert guardian.current_hp == guardian.max_hp
+    assert guardian.has_effect(EffectKind.BLOCK_STANCE)
 
 
 def test_preset_heal_on_block_heals_self() -> None:

@@ -18,6 +18,15 @@ class AlwaysLowRng(NoCritRng):
         return 0.0
 
 
+class DodgeRng(NoCritRng):
+    """Ниже общего потолка уворота, но выше шанса крита: проверяем уворот,
+    не задевая криты. Потолок DODGE_HARD_CAP делает «гарантированный» уворот
+    невозможным в принципе - именно поэтому нельзя просто взять 0.999."""
+
+    def random(self) -> float:
+        return bc.DODGE_HARD_CAP - 0.05
+
+
 def make_session(*combatants) -> CombatSessionState:
     state = CombatSessionState(session_id=1, mode=CombatMode.PVP_GROUP)
     for c in combatants:
@@ -91,7 +100,7 @@ def test_mark_of_prey_plus_adds_stack_from_basic_attack() -> None:
 
 
 def test_shadow_adds_dodge() -> None:
-    rng = NoCritRng()  # 0.999: обычный уворот не срабатывает
+    rng = DodgeRng()
     blade = combatant(1, side=0, subclass_id="shadow_blade", agility=0)
     blade.buff_modifiers = {"dodge_bonus": 1.0}  # гарантированный уворот
     enemy = combatant(2, side=1)
@@ -111,7 +120,7 @@ def test_second_chance_forces_miss_on_schedule() -> None:
 
 
 def test_blade_hunger_adds_mark_on_successful_dodge() -> None:
-    rng = NoCritRng()
+    rng = DodgeRng()
     blade = combatant(1, side=0, subclass_id="shadow_blade", agility=0)
     blade.buff_modifiers = {"dodge_bonus": 1.0, "mark_on_dodge": 1.0}
     enemy = combatant(2, side=1)
@@ -120,7 +129,7 @@ def test_blade_hunger_adds_mark_on_successful_dodge() -> None:
 
 
 def test_slip_away_remembers_previous_dodge() -> None:
-    rng = NoCritRng()
+    rng = DodgeRng()
     blade = combatant(1, side=0, subclass_id="shadow_blade", agility=0)
     blade.buff_modifiers = {"dodge_bonus": 1.0, "slip_away_bonus": bc.SHADOW_BLADE_SLIP_AWAY}
     enemy = combatant(2, side=1)

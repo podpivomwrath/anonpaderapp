@@ -97,10 +97,21 @@ def _make_handler(skill: SubclassSkillDef):
                     weaken = bc.POISONER_DISRUPT_WEAKEN + actor.buff_modifiers.get("weaken_bonus", 0.0)
                     target.apply_effect(EffectKind.WEAKEN, weaken, skill.effect_duration, actor.id)
                     ctx.lines.append(f"{target.name}: двойная доза - ослабление вдобавок к уязвимости")
+                vulnerability = skill.effect_value + vuln_bonus
                 target.apply_effect(
-                    EffectKind.VULNERABILITY, skill.effect_value + vuln_bonus,
-                    skill.effect_duration, actor.id,
+                    EffectKind.VULNERABILITY, vulnerability, skill.effect_duration, actor.id,
                 )
+                # Патч балансировки: с «Токсичной кровью» Уязвимость расходится
+                # по ВСЕМ отравленным этим Отравителем целям. Это его вклад в
+                # группу: он поднимает урон всей команды, а не одной цели. Один
+                # на один нет-оп - отравлен там только тот же противник.
+                if vuln_bonus > 0:
+                    spread = vulnerability * bc.POISONER_TOXIC_BLOOD_SPREAD_PCT
+                    for other in ctx.session.alive_enemies_of(actor):
+                        if other.id != target.id and other.effect_from(EffectKind.DOT, actor.id):
+                            other.apply_effect(
+                                EffectKind.VULNERABILITY, spread, skill.effect_duration, actor.id
+                            )
 
     return handler
 

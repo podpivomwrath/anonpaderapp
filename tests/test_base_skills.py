@@ -322,42 +322,48 @@ def _skip_turn(target) -> None:
     control.tick_control(target, pvp=True)
 
 
-def test_dr_reduce_at_streak_3_immunity_at_4() -> None:
-    """PvP (control-patch-8): урезание на 3-м пропущенном ходу подряд, иммунитет
-    на 4-м, блок на 5-м. Стрик считает ПРОПУСКИ, не наложения."""
+def test_control_escalation_second_check_doubled_third_blocked() -> None:
+    """PvP: первый контроль проверяется обычной Волей, второй - удвоенной,
+    третий не проходит вовсе. Прежняя защита считала ПОДРЯД пропущенные ходы и
+    потому не срабатывала: заморозка на два хода давала стрик 2 при пороге 3 и
+    обнулялась на первом же свободном ходу."""
+    from game.combat import balance_config as bc
+    from game.combat import control, formulas
+
+    rng = NoCritRng()  # 0.999 - резист срабатывает только если он почти 100%
+    will = 60
+    target = combatant(2, side=1, will=will)
+
+    r1 = control.try_apply_control(target, base_duration=1, source_id=1, rng=rng, pvp=True)
+    assert r1.applied
+    assert target.control_hits == 1
+
+    r2 = control.try_apply_control(target, base_duration=1, source_id=1, rng=rng, pvp=True)
+    assert r2.applied  # прошёл, но проверялся удвоенной Волей
+    assert target.control_hits == 2
+    # именно удвоенной: одиночная Воля дала бы меньший резист
+    assert formulas.control_resist(will * bc.CC_RESIST_MULT_PER_HIT) > formulas.control_resist(will)
+
+    r3 = control.try_apply_control(target, base_duration=1, source_id=1, rng=rng, pvp=True)
+    assert not r3.applied and r3.immune  # третий не проходит
+
+    # счётчик живёт своим таймером, а не «подряд пропущенными» ходами
+    for _ in range(bc.CC_HITS_RESET_TURNS):
+        control.tick_control(target, pvp=True)
+    assert target.control_hits == 0
+    r4 = control.try_apply_control(target, base_duration=1, source_id=1, rng=rng, pvp=True)
+    assert r4.applied
+
+
+def test_control_escalation_is_pve_free() -> None:
+    """В PvE эскалации нет: против мобов контроль вешается каждый ход."""
     from game.combat import control
 
-    rng = NoCritRng()  # 0 WIL цель никогда не резистит
-    target = combatant(2, side=1, will=0)
-
-    # ход 1: пропуск 1 → полная длительность
-    r1 = control.try_apply_control(target, base_duration=1, source_id=1, rng=rng, pvp=True)
-    assert r1.applied and not r1.reduced and not r1.immunity_granted
-    _skip_turn(target)
-    assert target.control_streak == 1
-
-    # ход 2: пропуск 2 → полная
-    r2 = control.try_apply_control(target, base_duration=1, source_id=1, rng=rng, pvp=True)
-    assert r2.applied and not r2.reduced and not r2.immunity_granted
-    _skip_turn(target)
-    assert target.control_streak == 2
-
-    # ход 3: пропуск 3 → урезание (DR), иммунитета ещё нет
-    r3 = control.try_apply_control(target, base_duration=1, source_id=1, rng=rng, pvp=True)
-    assert r3.applied and r3.reduced and not r3.immunity_granted
-    _skip_turn(target)
-    assert target.control_streak == 3
-
-    # ход 4: пропуск 4 → иммунитет выдан (DR)
-    r4 = control.try_apply_control(target, base_duration=1, source_id=1, rng=rng, pvp=True)
-    assert r4.applied and r4.immunity_granted
-    _skip_turn(target)
-    assert target.control_immune_turns > 0
-
-    # ход 5: контроль заблокирован иммунитетом
-    r5 = control.try_apply_control(target, base_duration=1, source_id=1, rng=rng, pvp=True)
-    assert not r5.applied and r5.immune
-
+    target = combatant(2, side=1, kind="mob", will=0)
+    for _ in range(4):
+        assert control.try_apply_control(
+            target, base_duration=1, source_id=1, rng=NoCritRng(), pvp=False
+        ).applied
 
 def test_dr_streak_counts_skipped_turns_not_applications() -> None:
     """control-patch-8: пропуск из-за ДЛИТЕЛЬНОГО контроля тоже растит стрик,

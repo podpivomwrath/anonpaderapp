@@ -53,13 +53,27 @@ def try_apply_control(
     if pvp and target.control_immune_turns > 0:
         return ControlResult(applied=False, immune=True)
 
-    base_duration += duration_bonus
+    # Эскалация: третий контроль подряд не проходит вообще.
+    if pvp and target.control_hits >= bc.CC_MAX_HITS_BEFORE_IMMUNE:
+        return ControlResult(applied=False, immune=True)
+
+    # Против ИГРОКОВ контроль не удлиняется: два пропущенных хода подряд - это
+    # уже половина размена, а защита от чейн-контроля считает подряд идущие
+    # пропуски и на двух ходах не срабатывает. Прибавка длительности остаётся
+    # только в PvE, где она ни у кого не отнимает ход в размене.
+    if not pvp:
+        base_duration += duration_bonus
 
     # Резист Воли — в обоих режимах; chance_bonus (баффы кастера) и
     # CONTROL_RESIST_DOWN (эффект НА цели — «Тепловой шок»/«Ледяное поле»,
     # патч 49) оба снижают эффективный резист.
     resist_down = target.effect_total(EffectKind.CONTROL_RESIST_DOWN)
-    resist = max(formulas.control_resist(target.stats.will) - chance_bonus - resist_down, 0.0)
+    # Каждое уже прошедшее наложение удваивает проверяемую Волю: 100 WIL на
+    # втором контроле считаются как 200. В PvE эскалации нет.
+    effective_will = target.stats.will
+    if pvp:
+        effective_will = round(effective_will * bc.CC_RESIST_MULT_PER_HIT ** target.control_hits)
+    resist = max(formulas.control_resist(effective_will) - chance_bonus - resist_down, 0.0)
     if rng.random() < resist:
         return ControlResult(applied=False, resisted=True)
 
@@ -78,6 +92,8 @@ def try_apply_control(
         reduced = True
 
     target.apply_effect(EffectKind.FREEZE, 1.0, duration, source_id)
+    target.control_hits += 1
+    target.control_hits_reset_in = bc.CC_HITS_RESET_TURNS
 
     immunity_granted = False
     if prospective >= bc.CC_IMMUNITY_AT:
@@ -97,6 +113,12 @@ def tick_control(combatant: CombatantState, pvp: bool) -> None:
             combatant.control_streak += 1
         else:
             combatant.control_streak = 0
+        # Счётчик наложений живёт своим таймером, а не «подряд пропущенными»
+        # ходами: иначе свободный ход между контролями обнулял бы защиту.
+        if combatant.control_hits_reset_in > 0:
+            combatant.control_hits_reset_in -= 1
+            if combatant.control_hits_reset_in == 0:
+                combatant.control_hits = 0
         if combatant.control_immune_turns > 0:
             combatant.control_immune_turns -= 1
     combatant.skipped_by_control_this_turn = False

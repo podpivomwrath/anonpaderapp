@@ -315,12 +315,20 @@ def _describe_shadow_blade_hunting_mark(b: BuffDef) -> str:
 def _describe_poisoner_toxic_blood(b: BuffDef) -> str:
     base = _poisoner_base_vuln()
     total = base + bc.POISONER_TOXIC_BLOOD_VULN_BONUS
-    return f"Уязвимость от Разложения: {_pct(total)} вместо {_pct(base)}."
+    return (
+        f"Уязвимость от Разложения: {_pct(total)} вместо {_pct(base)}. Вдобавок она ложится "
+        f"на всех отравленных тобой врагов силой {_pct(bc.POISONER_TOXIC_BLOOD_SPREAD_PCT)} "
+        "от основной."
+    )
 
 
 def _describe_poisoner_desiccation(b: BuffDef) -> str:
     total = bc.POISONER_DISRUPT_WEAKEN + bc.POISONER_DESICCATION_WEAKEN_BONUS
-    return f"Ослабление от Дурманящего дротика: {_pct(total)} вместо {_pct(bc.POISONER_DISRUPT_WEAKEN)}."
+    return (
+        f"Ослабление от Дурманящего дротика: {_pct(total)} вместо {_pct(bc.POISONER_DISRUPT_WEAKEN)}. "
+        f"Вдобавок оно ложится на всех отравленных тобой врагов силой "
+        f"{_pct(bc.POISONER_DESICCATION_SPREAD_PCT)} от основного."
+    )
 
 
 def _describe_poisoner_double_dose(b: BuffDef) -> str:
@@ -395,7 +403,10 @@ def _describe_elementalist_deep_freeze(b: BuffDef) -> str:
 def _describe_elementalist_numbness(b: BuffDef) -> str:
     base = bc.CONTROL_BASE_DURATION_TICKS
     total = base + bc.ELEMENTALIST_NUMBNESS_FREEZE_BONUS_TURNS
-    return f"Заморозка от Ледяных оков длится {_turns(total)} вместо {_turns(base)}."
+    return (
+        f"Заморозка от Ледяных оков длится {_turns(total)} вместо {_turns(base)}. "
+        "Против игроков длительность не растёт."
+    )
 
 
 def _describe_elementalist_thrift(b: BuffDef) -> str:

@@ -43,6 +43,17 @@ CC_STREAK_REDUCE_AT = 3         # с какого подряд-контроля 
 CC_STREAK_REDUCE_FACTOR = 0.5   # во сколько резать длительность
 CC_IMMUNITY_AT = 4              # с какого подряд-контроля наступает иммунитет
 CC_IMMUNITY_DURATION = 2        # длительность иммунитета к контролю, ходов
+CC_RESIST_MULT_PER_HIT = 2.0    # каждый следующий контроль проверяется Волей, умноженной на это
+CC_MAX_HITS_BEFORE_IMMUNE = 2   # после стольких наложений подряд следующее не проходит вовсе
+CC_HITS_RESET_TURNS = 5         # ходов без нового контроля, после которых счётчик обнуляется
+# Правило эскалации (PvP): первый контроль проверяется обычной Волей, второй -
+# удвоенной, третий не проходит. Прежняя защита считала ПОДРЯД пропущенные ходы
+# и потому не срабатывала вовсе: заморозка на два хода давала стрик 2 при пороге
+# 3 и обнулялась на первом же свободном ходу.
+# Без этого защита от чейн-контроля не работала вовсе: она считает ПОДРЯД
+# пропущенные ходы, а заморозка на 2 хода даёт стрик 2 при пороге 3 и
+# обнуляется на первом же свободном ходу. Элементалист мог вешать контроль
+# каждые 5 ходов бесконечно, ни разу не упёршись в DR.
 
 # --- Патч 26/28: ребаланс сложности мобов ---
 # Специализация статов моба (вместо равномерного распределения): основной
@@ -124,7 +135,7 @@ SUPPORT_POWER_PER_WIL = 0.005  # без потолка
 # от стата, экипировка в него не должна давать больше 60% даже с бонусами).
 DODGE_PER_AGI = 0.00297
 DODGE_STAT_CAP = 0.60
-DODGE_HARD_CAP = 1.00
+DODGE_HARD_CAP = 0.65                       # 
 ABILITY_DODGE_RATIO = 0.25
 
 # --- Смерть и возрождение ---
@@ -189,7 +200,7 @@ EXCHANGE_MIN_SELL_PRICE = 1
 # --- Механики подклассов ---
 PROVOKE_PVP_DAMAGE_REDUCTION = 0.30     # PvP-провокация: урон по другим целям -30%
 PROVOKE_PVP_DURATION_TICKS = 2          # Удар щитом (патч 39): провокация держится 2 хода
-GUARDIAN_BLOCK_HEAL_PCT = 0.04          # Глухая оборона: хил % maxHP за каждый срезанный блоком удар
+GUARDIAN_BLOCK_HEAL_PCT = 0.03              # Глухая оборона: хил % maxHP за каждый срезанный блоком удар
 SHADOW_BLADE_MARK_MAX_STACKS = 5        # Метка добычи: максимум стаков
 SHADOW_BLADE_MARK_DURATION = 5          # ходов до истечения стака (обновляется при новом применении)
 
@@ -199,8 +210,8 @@ SHADOW_BLADE_CARVE_CRIT_MULT = 1.80         # Разделка: множител
 SHADOW_BLADE_CARVE_MIN_STACKS = 3           # ...сколько стаков нужно потратить
 SHADOW_BLADE_BLOODLUST_COOLDOWN = 6         # Жажда крови: не чаще раза в N ходов
 SHADOW_BLADE_MARK_ON_ATTACK_CHANCE = 0.25   # Пометка добычи+: шанс стака с обычной атаки
-SHADOW_BLADE_SHADOW_DODGE = 0.15            # Тень: +уклонение
-SHADOW_BLADE_SLIP_AWAY = 0.20               # Ускользание: -шанс попасть по нему после уворота
+SHADOW_BLADE_SHADOW_DODGE = 0.08            # Тень: +уклонение
+SHADOW_BLADE_SLIP_AWAY = 0.12               # Ускользание: -шанс попасть по нему после уворота
 SHADOW_BLADE_SOLO_DAMAGE = 0.10             # Одиночество охотника: +урон вне группы
 SHADOW_BLADE_SECOND_CHANCE_INTERVAL = 8     # Второй шанс: раз в N ходов гарантированный промах
 SHADOW_BLADE_ALLY_CRIT_ON_MARK = 0.10       # Передача метки: +крит союзникам по помеченной цели
@@ -215,11 +226,11 @@ SHADOW_BLADE_INSPIRATION_TURNS = 2          # ...на сколько ходов
 # для рейдов), НЕ через баффы кита.
 
 # Страж (микробаффы; значения продублированы в content/buffs.json)
-GUARDIAN_BULWARK_FULL_BLOCK_CHANCE = 0.25   # Несокрушимость: шанс полного блока
+GUARDIAN_BULWARK_FULL_BLOCK_CHANCE = 0.30   # Несокрушимость: шанс полного блока
 GUARDIAN_COUNTERSTRIKE_MULT = 0.70          # Контрудар при блоке: от обычного удара
 GUARDIAN_HEAL_ON_BLOCK = 0.08               # Живительный блок: хил % maxHP при блоке
 GUARDIAN_HEAVY_HAND_BONUS = 0.10            # Тяжёлая рука: бонус к урону
-GUARDIAN_PASSIVE_SUSTAIN_PER_TICK = 0.025   # Пассивная стойкость: самохил % maxHP вне блока
+GUARDIAN_PASSIVE_SUSTAIN_PER_TICK = 0.035   # Пассивная стойкость: самохил % maxHP вне блока
 
 # Кровавый рыцарь
 BLOOD_KNIGHT_RAGE_DAMAGE_BONUS = 0.05       # Кровавая ярость (урезано с +12%)
@@ -240,14 +251,19 @@ BLOOD_KNIGHT_CRIMSON_FEAST_HP_COST = 0.15   # Багровый пир: доля 
 
 # Отравитель — сила яда ОБЯЗАНА масштабироваться от статов (иначе класс
 # математически нежизнеспособен независимо от текста способностей)
-POISONER_POISON_WIL_COEF = 0.60             # вклад WIL в силу яда (на стак)
-POISONER_POISON_AGI_COEF = 0.40             # вклад AGI
+POISONER_POISON_WIL_COEF = 0.95             # вклад WIL в силу яда (на стак)
+POISONER_POISON_AGI_COEF = 0.65             # вклад AGI
 POISONER_MAX_STACKS = 3                     # тик-урон = сила яда / макс. стаки
-POISONER_POISON_DURATION_TICKS = 3          # TODO: content — длительность не калибровалась
+POISONER_POISON_DURATION_TICKS = 4          # TODO: content — длительность не калибровалась
 
 # Тёмный мистик
-DARK_MYSTIC_WARD_SHIELD_COEF = 2.0          # Оберег: поглощение = support_power(WIL) * коэф
+DARK_MYSTIC_WARD_SHIELD_COEF = 0.85         # Оберег: поглощение = support_power(WIL) * коэф
 DARK_MYSTIC_CIRCLE_HP_COST = 0.20           # Круг тьмы: доля ТЕКУЩЕГО HP, платится за навык
+DARK_MYSTIC_CIRCLE_SOLO_MULT = 1.0          # Круг тьмы без союзников: во сколько раз сильнее лечит себя
+DARK_MYSTIC_SOLO_HEAL_PENALTY = 0.60        # во сколько слабее лечит сам себя, когда союзников нет
+# Тёмный мистик - КОМАНДНЫЙ хилер (дизайн-решение выше по файлу: слаб в
+# дуэлях, силён в группе). Без этого множителя любое усиление лечения
+# одновременно делало его непробиваемым один на один.
 
 # --- Тёмный мистик, микробаффы патча 56 ---
 DARK_MYSTIC_BLOOD_BOND_BONUS = 0.15         # Кровавая связь: конверсия 0.70 -> 0.85
@@ -259,7 +275,7 @@ DARK_MYSTIC_SELF_DENIAL_BONUS = 0.50        # ...и насколько силь�
 DARK_MYSTIC_DARK_REWARD_BONUS = 0.25        # Тёмное вознаграждение: следующий пакт сильнее
 DARK_MYSTIC_EDGE_BONUS = 0.30               # Грань: +урон и лечение на низком HP
 DARK_MYSTIC_EDGE_HP_THRESHOLD = 0.25        # ...порог HP
-DARK_MYSTIC_WARD_SHIELD_BONUS = 0.30        # Оберег крови: +величина щита
+DARK_MYSTIC_WARD_SHIELD_BONUS = 0.18        # Оберег крови: +величина щита
 DARK_MYSTIC_STEADFAST_WARD_BONUS = 0.20     # Стойкий оберег: +поглощение
 DARK_MYSTIC_STEADFAST_WARD_CD = 1           # ...ценой +1 хода перезарядки
 DARK_MYSTIC_SHARED_PACT_PCT = 0.30          # Разделённый пакт: доля лечения второму союзнику
@@ -279,20 +295,22 @@ ELEMENTALIST_ELEMENTAL_FLOW_BONUS = 0.20        # Стихийный поток:
 # Патч 47: ещё 4 микробаффа-заглушки, о нерабочести которых сообщили игроки —
 # реализованы по той же схеме (значения в конфиг, buff_modifiers-ключ в
 # content/buffs.json, движок читает ключ по умолчанию 0/0.0 для всех).
-ELEMENTALIST_NUMBNESS_FREEZE_BONUS_TURNS = 1    # Оцепенение: +1 ход к длительности заморозки
+ELEMENTALIST_NUMBNESS_FREEZE_BONUS_TURNS = 1# Оцепенение: +1 ход к длительности заморозки
 ELEMENTALIST_DEEP_FREEZE_CHANCE_BONUS = 0.15    # Глубокая заморозка: +15% шанс наложить контроль
 POISONER_LINGERING_POISON_BONUS_TURNS = 1       # Затяжной яд: +1 ход к длительности яда
 
 # --- Отравитель, микробаффы патча 56 (винрейт 27%: пул усилен относительно
 # первоначального черновика) ---
-POISONER_DISRUPT_WEAKEN = 0.25              # Дурманящий дротик: базовое Ослабление (было зашито в коде)
+POISONER_DISRUPT_WEAKEN = 0.22              # Дурманящий дротик: базовое Ослабление (было зашито в коде)
 POISONER_TOXIC_BLOOD_VULN_BONUS = 0.08      # Токсичная кровь: Уязвимость 0.20 -> 0.28
-POISONER_DESICCATION_WEAKEN_BONUS = 0.08    # Иссушение: Ослабление 0.25 -> 0.33
+POISONER_TOXIC_BLOOD_SPREAD_PCT = 0.60      # ...и какой долей Уязвимость расходится по остальным отравленным
+POISONER_DESICCATION_WEAKEN_BONUS = 0.10    # Иссушение: Ослабление 0.25 -> 0.33
+POISONER_DESICCATION_SPREAD_PCT = 0.60      # ...и какой долей это Ослабление расходится по остальным отравленным целям
 POISONER_DOUBLE_DOSE_CHANCE = 0.25          # Двойная доза: шанс наложить оба дебаффа разом
 POISONER_CORRODING_TOXIN_BONUS = 0.25       # Разъедающий токсин: +урон яда
 POISONER_NECROSIS_PER_STACK = 0.08          # Некроз: +урон яда за каждый стак на цели
 POISONER_TOXIC_BURST_EXPIRE_PCT = 0.50      # Токсичный всплеск: доп. урон при истечении яда
-POISONER_VENOM_CLOUD_INTERVAL = 5           # Ядовитое облако: раз в N ходов яд на всех
+POISONER_VENOM_CLOUD_INTERVAL = 3           # Ядовитое облако: раз в N ходов яд на всех
 POISONER_HALLUCINOGEN_BONUS = 0.15          # Галлюциноген: шанс сбоя 0.60 -> 0.75
 POISONER_PARALYTIC_RESIST_DOWN = 0.15       # Паралитик: -сопротивление контролю после сбоя
 POISONER_TOXICOLOGY_SHIELD_PIERCE = 0.20    # Токсикология: доля щита, которую яд игнорирует
@@ -300,8 +318,8 @@ GUARDIAN_UNYIELDING_PROVOKE_BONUS_TURNS = 1     # Несгибаемый: +1 х�
 
 # --- Страж, микробаффы патча 56 (винрейт 14%: кит специально конвертирует
 # защиту в урон и пользу, иначе в дуэли он ни во что не превращается) ---
-GUARDIAN_STURDY_ARMOR_REDUCTION = 0.08      # Крепкая броня: снижение входящего урона
-GUARDIAN_RESILIENCE_REDUCTION = 0.12        # Стойкость: доп. снижение урона при низком HP
+GUARDIAN_STURDY_ARMOR_REDUCTION = 0.12      # Крепкая броня: снижение входящего урона
+GUARDIAN_RESILIENCE_REDUCTION = 0.18        # Стойкость: доп. снижение урона при низком HP
 GUARDIAN_RESILIENCE_HP_THRESHOLD = 0.30     # ...порог HP для Стойкости
 GUARDIAN_REFLECTION_PCT = 0.25              # Отражение: доля заблокированного урона обратно атакующему
 GUARDIAN_COMMAND_AGGRO_BONUS = 0.40         # Приказ: +агро (только PvE/рейд)
@@ -330,9 +348,9 @@ BLOOD_KNIGHT_SECOND_WIND_DAMAGE_REDUCTION = 0.10       # Второе дыхан
 BLOOD_KNIGHT_BLOOD_ARMOR_DAMAGE_REDUCTION = 0.05       # Кровавый доспех: -5% входящего урона безусловно
 BLOOD_KNIGHT_PAIN_RESISTANT_CRIT_REDUCTION = 0.15      # Стойкий к боли: -15% урона от кримов по себе
 BLOOD_KNIGHT_FEAST_CRIMSON_HEAL_BONUS = 0.10           # Пиршество: +10pp лечения от Багрового пира
-BLOOD_KNIGHT_SHARED_THIRST_ALLY_HEAL_PCT = 0.30        # Разделённая жажда: доля лайфстила — самому раненому союзнику
+BLOOD_KNIGHT_SHARED_THIRST_ALLY_HEAL_PCT = 0.45# Разделённая жажда: доля лайфстила — самому раненому союзнику
 BLOOD_KNIGHT_BLOOD_PACT_COST_REDUCTION = 0.20          # Кровавый пакт: -20% себестоимости Багрового пира
-BLOOD_KNIGHT_SHARED_FEAST_GROUP_DAMAGE_BONUS = 0.05    # Общий пир: +5% урона, пока жив хотя бы 1 союзник
+BLOOD_KNIGHT_SHARED_FEAST_GROUP_DAMAGE_BONUS = 0.10# Общий пир: +5% урона, пока жив хотя бы 1 союзник
 
 # Элементалист — оставшийся пул микробаффов (патч 49, ч.2): закрываем подкласс
 # полностью, первый в очереди после патча 46-47. «Всеобщая стихия» и
