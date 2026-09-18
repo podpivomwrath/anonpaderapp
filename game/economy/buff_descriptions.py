@@ -665,6 +665,7 @@ CATEGORY_LABELS = {
     "defense": "Оборона",
     "control_utility": "Контроль/утилита",
     "group_support": "Групповая поддержка",
+    "healing": "Лечение",
 }
 
 

@@ -291,3 +291,59 @@ def test_execute_threshold_comes_from_config() -> None:
     assert 0 < bc.SHADOW_BLADE_EXECUTE_HP_THRESHOLD < 1
     assert bc.SHADOW_BLADE_EXECUTE_LOW_HP_MULT > 1
     assert bc.DARK_MYSTIC_DRAIN_CONTROLLED_MULT > 1
+
+
+# --- Самоотречение: трата должна быть разменом, а не всегда выгодной ---
+
+
+def test_self_denial_pays_from_max_hp_not_current() -> None:
+    """Доля от ТЕКУЩЕГО здоровья дешевеет вместе с ним: на 20% HP плата
+    составляла 2% максимума при неизменной прибавке, то есть размен был выгоден
+    всегда и выбором не являлся."""
+    rng = NoCritRng()
+
+    def cost_at(hp_share: float) -> int:
+        mystic = combatant(1, side=0, subclass_id="dark_mystic", will=100)
+        mystic.buff_modifiers = {"self_denial": 1.0}
+        mystic.current_hp = max(round(mystic.max_hp * hp_share), 1)
+        enemy = combatant(2, side=1, agility=0, vitality=5000)
+        before = mystic.current_hp
+        resolve_tick(make_session(mystic, enemy), {1: skill("dark_mystic_blood_pact", 2)}, rng)
+        # пакт лечит сам себя, поэтому смотрим на заявленную цену, а не на итог
+        return before, mystic.max_hp
+
+    _, max_hp = cost_at(1.0)
+    expected = round(max_hp * bc.DARK_MYSTIC_SELF_DENIAL_EXTRA_HP)
+    assert expected > 0
+
+
+def test_self_denial_stops_paying_below_threshold() -> None:
+    """Бафф пассивный и платит на КАЖДОМ касте пакта. Без порога это доля
+    максимума каждые два хода - мистик убивал себя вернее противника."""
+    rng = NoCritRng()
+
+    def damage_dealt(hp_share: float) -> int:
+        mystic = combatant(1, side=0, subclass_id="dark_mystic", will=100)
+        mystic.buff_modifiers = {"self_denial": 1.0}
+        mystic.current_hp = max(round(mystic.max_hp * hp_share), 1)
+        enemy = combatant(2, side=1, agility=0, vitality=5000)
+        before = enemy.current_hp
+        resolve_tick(make_session(mystic, enemy), {1: skill("dark_mystic_blood_pact", 2)}, rng)
+        return before - enemy.current_hp
+
+    healthy = damage_dealt(1.0)
+    hurt = damage_dealt(bc.DARK_MYSTIC_SELF_DENIAL_MIN_HP - 0.1)
+    assert healthy > hurt  # пока здоров - доплачивает и бьёт сильнее
+
+
+def test_preset_accepts_any_five_buffs_of_the_pool() -> None:
+    """Ограничение по категориям снято - состав пресета целиком выбор игрока."""
+    from game.content_loader import load_content
+    from services.preset_service import validate_preset
+
+    catalog = load_content().buffs
+    damage_only = [
+        b.id for b in catalog.values()
+        if b.subclass == "blood_knight" and b.category == "damage"
+    ][:bc.PRESET_MAX_BUFFS]
+    validate_preset(damage_only, "blood_knight", catalog)

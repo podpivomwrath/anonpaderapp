@@ -42,10 +42,16 @@ def _allies_by_hp(ctx: SkillContext) -> list:
     return sorted(ctx.session.alive_allies_of(ctx.actor), key=lambda c: c.current_hp / c.max_hp)
 
 
-def _pay_hp(actor, pct: float) -> int:
-    """Плата собственным HP с учётом «Пакта крови+» (дешевле на долю)."""
+def _pay_hp(actor, pct: float, *, from_max: bool = False) -> int:
+    """Плата собственным HP с учётом «Пакта крови+» (дешевле на долю).
+
+    from_max=True берёт долю от МАКСИМУМА здоровья. Доля от текущего дешевеет
+    вместе с самим здоровьем, и на низком HP плата превращается в формальность:
+    «Самоотречение» на 20% здоровья стоило 2% максимума и давало постоянную
+    прибавку - такой размен выгоден всегда, то есть выбором не является."""
+    base = actor.max_hp if from_max else actor.current_hp
     reduction = actor.buff_modifiers.get("hp_cost_reduction", 0.0)
-    cost = round(actor.current_hp * pct * (1.0 - reduction))
+    cost = round(base * pct * (1.0 - reduction))
     actor.current_hp = max(actor.current_hp - cost, 1)
     return cost
 
@@ -78,9 +84,14 @@ def blood_pact(ctx: SkillContext) -> None:
     # «Грань» усиливает урон и лечение на низком HP, «Тёмное вознаграждение»
     # срабатывает, если предыдущий навык уже стоил мистику крови.
     effect_mult = _edge_multiplier(actor)
-    self_denial = actor.buff_modifiers.get("self_denial", 0.0) > 0
+    # Платит, только пока здоровья хватает: иначе пассивный бафф отдаёт долю
+    # максимума на КАЖДОМ касте пакта и убивает мистика вернее противника.
+    self_denial = (
+        actor.buff_modifiers.get("self_denial", 0.0) > 0
+        and actor.current_hp > actor.max_hp * bc.DARK_MYSTIC_SELF_DENIAL_MIN_HP
+    )
     if self_denial:
-        _pay_hp(actor, bc.DARK_MYSTIC_SELF_DENIAL_EXTRA_HP)
+        _pay_hp(actor, bc.DARK_MYSTIC_SELF_DENIAL_EXTRA_HP, from_max=True)
         effect_mult *= 1.0 + bc.DARK_MYSTIC_SELF_DENIAL_BONUS
     if actor.dark_reward_ready:
         effect_mult *= 1.0 + actor.buff_modifiers.get("dark_reward_bonus", 0.0)
