@@ -720,11 +720,7 @@ async def on_raid_tick_resolved(session_id: int, tick: int, result: TickResult) 
                 await quest_service.record_kill(db, character)
             await db.commit()
 
-    if extra_lines:
-        for cid in battle.participants:
-            notices[cid] = "\n".join(extra_lines) + (f"\n\n{notices[cid]}" if cid in notices else "")
-
-    await _broadcast_board(session_id, battle, result, notices)
+    await _broadcast_board(session_id, battle, result, notices, boss_lines=extra_lines)
 
 
 async def on_raid_battle_finished(session_id: int, result: TickResult) -> None:

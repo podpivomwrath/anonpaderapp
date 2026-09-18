@@ -14,7 +14,7 @@ from services.preset_service import (
 )
 from services.respec_service import full_class_reset
 from services.wallet_service import NotEnoughCurrency, get_wallet
-from models import BaseClass, CharacterStats, CharacterUnlockedBuff
+from models import BaseClass, CharacterBuffPreset, CharacterStats, CharacterUnlockedBuff
 from sqlalchemy import select
 
 CATALOG = load_content().buffs
@@ -159,12 +159,70 @@ async def test_full_class_reset(db_session, make_character) -> None:
     )
     stats.strength = 42
 
-    await full_class_reset(db_session, character, BaseClass.MAGE)  # уровень 3 — донат
+    await full_class_reset(db_session, character, BaseClass.MAGE)
     assert character.base_class == BaseClass.MAGE
     assert character.subclass is None
     # статы — к стартовому распределению НОВОГО класса (маг: 10/10/25/15/25)
     assert stats.strength == bc.STARTING_STATS["mage"]["STR"]
     assert stats.intellect == bc.STARTING_STATS["mage"]["INT"]
     assert stats.unspent_points == bc.STAT_POINTS_PER_LEVEL * 9
+    # на альфе переделка бесплатна, поэтому донат остаётся нетронутым
+    wallet = await get_wallet(db_session, character.id)
+    assert wallet.donate_currency == bc.CLASS_RESET_COST_DONATE
+
+
+async def test_full_class_reset_charges_when_alpha_is_over(
+    db_session, make_character, monkeypatch
+) -> None:
+    """Флаг альфы выключается одной строкой - списание обязано вернуться само,
+    без правок вызывающего кода."""
+    monkeypatch.setattr(bc, "ALPHA_FREE_RESPEC", False)
+    character = await make_character(
+        level=10, farm=0, donate=bc.CLASS_RESET_COST_DONATE, subclass="guardian"
+    )
+    await full_class_reset(db_session, character, BaseClass.MAGE)
     wallet = await get_wallet(db_session, character.id)
     assert wallet.donate_currency == 0
+
+
+async def test_reset_subclass_keeps_class_and_stats(db_session, make_character) -> None:
+    """Сброс подкласса обязан снести пресеты: они собраны из баффов прежнего
+    пула, а resolve_buff_modifiers ищет id в ОБЩЕМ каталоге и применил бы их."""
+    from services.respec_service import reset_subclass
+
+    character = await make_character(level=10, farm=10_000, subclass="guardian")
+    await _unlock(db_session, character, *OK_SET)
+    await save_preset(db_session, character, "боевой", list(OK_SET), CATALOG)
+    stats = await db_session.scalar(
+        select(CharacterStats).where(CharacterStats.character_id == character.id)
+    )
+    stats.strength = 42
+
+    await reset_subclass(db_session, character)
+
+    assert character.subclass is None
+    assert character.base_class == BaseClass.WARRIOR      # класс на месте
+    assert stats.strength == 42                           # статы не тронуты
+    left = (await db_session.scalars(
+        select(CharacterBuffPreset).where(CharacterBuffPreset.character_id == character.id)
+    )).all()
+    assert left == []
+
+
+async def test_reset_stats_returns_points_and_keeps_subclass(
+    db_session, make_character
+) -> None:
+    from services.respec_service import reset_stats
+
+    character = await make_character(level=10, farm=0, subclass="guardian")
+    stats = await db_session.scalar(
+        select(CharacterStats).where(CharacterStats.character_id == character.id)
+    )
+    stats.strength = 42
+    stats.unspent_points = 0
+
+    await reset_stats(db_session, character)
+
+    assert character.subclass == "guardian"               # подкласс на месте
+    assert stats.strength == bc.STARTING_STATS["warrior"]["STR"]
+    assert stats.unspent_points == bc.STAT_POINTS_PER_LEVEL * 9

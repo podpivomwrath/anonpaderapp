@@ -75,10 +75,20 @@ def _mark_suffix(session: CombatSessionState, target, viewer_side: int) -> str:
     return f" - Метка добычи ×{stacks}" if stacks else ""
 
 
-def render_tick(session: CombatSessionState, result: TickResult, viewer_side: int = 0) -> str:
+def render_tick(
+    session: CombatSessionState,
+    result: TickResult,
+    viewer_side: int = 0,
+    enemy_lines: list[str] | None = None,
+) -> str:
     """Личный боевой лог этого хода с точки зрения стороны viewer_side —
     ВСЕГДА показывает "своя сторона" первой, "противник" второй, независимо
-    от того, чьи это были действия внутри хода (одновременный резолв)."""
+    от того, чьи это были действия внутри хода (одновременный резолв).
+
+    enemy_lines — сценарные реплики рейд-босса (готовит инструмент, добивает,
+    меняет фазу). Это ДЕЙСТВИЯ противника, поэтому им место в его разделе;
+    раньше рейд клеил их над всей доской, и «Инструмент находит цель» висело
+    выше строки «⚔️ БОЙ - ход N», будто относилось к прошлому ходу."""
     mode = _mode(session)
     own: list[str] = []
     enemy: list[str] = []
@@ -111,6 +121,11 @@ def render_tick(session: CombatSessionState, result: TickResult, viewer_side: in
     for hit in dot_hits:
         target_name = session.combatants[hit.target_id].name
         bucket(hit.target_side).append(_dot_line(hit, target_name))
+
+    # Сценарные реплики босса идут первыми в его разделе: они объясняют, что
+    # он сделал в этот ход, и без них удары выглядят беспричинными.
+    if enemy_lines:
+        enemy[:0] = enemy_lines
 
     header = f"⚔️ БОЙ - ход {session.tick_number}"
     parts = [

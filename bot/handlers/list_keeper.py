@@ -14,17 +14,29 @@ from vkbottle.bot import BotLabeler, Message
 from bot.keyboards.list_keeper import (
     BTN_CHOOSE_PATH,
     BTN_CONFIRM_PATH,
+    BTN_KEEPER_LEAVE,
     BTN_LEAVE,
     BTN_OTHER_PATH,
     BTN_PAY,
+    BTN_REMAKE,
+    BTN_REMAKE_CANCEL,
+    BTN_REMAKE_CLASS,
+    BTN_REMAKE_CONFIRM,
+    BTN_REMAKE_STATS,
+    BTN_REMAKE_SUBCLASS,
     BTN_THINK_MORE,
+    base_class_keyboard,
     offer_keyboard,
     path_confirm_keyboard,
     path_view_keyboard,
     paths_keyboard,
+    remake_confirm_keyboard,
+    remake_keyboard,
+    trials_keyboard,
 )
 from bot.keyboards.world import BTN_KEEPER, tavern_keyboard
 from bot.vk_media import photo_attachment
+from bot.onboarding_texts import CLASS_BUTTONS
 from bot.world_texts import FOREIGN_NPC_REJECTION, mentor_name
 from game.classes.base import REGISTRY
 from game.combat import balance_config as bc
@@ -33,7 +45,14 @@ from game.content_loader import load_npc_texts
 from game.world import grid
 from models import CharacterStats
 from services import onboarding_service as onboarding_svc
-from services import screen_service, story_service, subclass_service, trial_service, wallet_service
+from services import (
+    respec_service,
+    screen_service,
+    story_service,
+    subclass_service,
+    trial_service,
+    wallet_service,
+)
 from services.db import get_session_factory
 from services.wallet_service import NotEnoughCurrency
 
@@ -49,6 +68,12 @@ KEEPER_ATTACHMENT = photo_attachment(_KEEPER_NPC["image"]) if _KEEPER_NPC.get("i
 STATE_OFFER = "subclass_offer"
 STATE_PATH_SELECT = "subclass_path_select"
 STATE_PATH_CONFIRM = "subclass_path_confirm"
+# Переделка персонажа (альфа-тест). В characters.subclass_select_state НЕ
+# сохраняется: сцена короткая, и после рестарта бота безопаснее начать её
+# заново, чем восстановить игрока посреди необратимого действия.
+STATE_REMAKE_MENU = "remake_menu"
+STATE_REMAKE_CLASS = "remake_class_select"
+STATE_REMAKE_CONFIRM = "remake_confirm"
 
 # Все титулы подклассов сразу (across 3 базовых класса) — конкретный игрок
 # видит только два своих, остальные тексты кнопок для него просто не появятся.
@@ -58,6 +83,9 @@ ALL_SUBCLASS_TITLES: dict[str, str] = {s.title: s.id for s in REGISTRY.values()}
 class SubclassSelectState(BaseStateGroup):
     OFFER = STATE_OFFER
     PATH_SELECT = STATE_PATH_SELECT
+    REMAKE_MENU = STATE_REMAKE_MENU
+    REMAKE_CLASS = STATE_REMAKE_CLASS
+    REMAKE_CONFIRM = STATE_REMAKE_CONFIRM
     PATH_CONFIRM = STATE_PATH_CONFIRM
 
 
@@ -126,7 +154,7 @@ async def _send_trials(peer_id: int, character) -> None:
         text = "\n".join(lines)
     await _bot_api.messages.send(
         peer_id=peer_id, message=text, random_id=0,
-        keyboard=tavern_keyboard(character), attachment=KEEPER_ATTACHMENT,
+        keyboard=trials_keyboard(), attachment=KEEPER_ATTACHMENT,
     )
 
 
@@ -300,3 +328,165 @@ async def _back_to_path_select(message: Message) -> None:
         titles = [s.title for s in subclass_service.paths_for(character.base_class)]
     await _dispenser.set(message.peer_id, SubclassSelectState.PATH_SELECT)
     await message.answer(KEEPER["path_relisten"], keyboard=paths_keyboard(titles))
+
+
+# --- Переделка персонажа (альфа-тест) -------------------------------------
+# На время альфы бесплатно и без ограничений: цена включится сама, когда
+# выключат bc.ALPHA_FREE_RESPEC (см. services/respec_service.py).
+
+_REMAKE_INTRO = (
+    "- Запись можно переписать. - Хранитель разворачивает страницу к тебе. - "
+    "Пока Список не затвердел, это ничего не стоит.\n\n"
+    "Сменить класс - подкласс, пресеты и характеристики сбросятся.\n"
+    "Сменить подкласс - сбросится только он и пресеты, характеристики останутся.\n"
+    "Сбросить характеристики - очки вернутся нераспределёнными."
+)
+_REMAKE_WARNINGS = {
+    BTN_REMAKE_CLASS: (
+        "Сменить класс. Подкласс, все пресеты и характеристики будут сброшены, "
+        "очки вернутся нераспределёнными. Уровень и вещи останутся."
+    ),
+    BTN_REMAKE_SUBCLASS: (
+        "Сменить подкласс. Пресеты будут удалены - они собраны из баффов "
+        "прежнего пула. Характеристики и уровень останутся."
+    ),
+    BTN_REMAKE_STATS: (
+        "Сбросить характеристики. Все вложенные очки вернутся нераспределёнными. "
+        "Класс, подкласс и пресеты останутся."
+    ),
+}
+
+
+async def _open_remake_menu(message: Message) -> None:
+    async with get_session_factory()() as db:
+        character = await onboarding_svc.get_character(db, message.from_id)
+        if character is None or character.creation_state is not None:
+            return
+        has_subclass = character.subclass is not None
+    await _dispenser.set(message.peer_id, SubclassSelectState.REMAKE_MENU)
+    await message.answer(_REMAKE_INTRO, keyboard=remake_keyboard(has_subclass),
+                         attachment=KEEPER_ATTACHMENT)
+
+
+@labeler.message(text=[BTN_REMAKE])
+async def remake_open(message: Message) -> None:
+    await _open_remake_menu(message)
+
+
+@labeler.message(text=[BTN_KEEPER_LEAVE])
+async def keeper_leave(message: Message) -> None:
+    async with get_session_factory()() as db:
+        character = await onboarding_svc.get_character(db, message.from_id)
+        if character is None:
+            return
+        await screen_service.set_screen(db, character, "tavern")
+        await db.commit()
+    await _dispenser.delete(message.peer_id)
+    await message.answer("Хранитель возвращается к своим записям.",
+                         keyboard=tavern_keyboard(character))
+
+
+@labeler.message(state=SubclassSelectState.REMAKE_MENU, text=[BTN_REMAKE_CLASS])
+async def remake_pick_class(message: Message) -> None:
+    """Смена класса — сначала выбор нового, подтверждение уже на нём."""
+    await _dispenser.set(message.peer_id, SubclassSelectState.REMAKE_CLASS)
+    await message.answer(
+        f"{_REMAKE_WARNINGS[BTN_REMAKE_CLASS]}\n\nКакой путь теперь?",
+        keyboard=base_class_keyboard(list(CLASS_BUTTONS)),
+    )
+
+
+@labeler.message(state=SubclassSelectState.REMAKE_CLASS, text=list(CLASS_BUTTONS))
+async def remake_apply_class(message: Message) -> None:
+    new_class = CLASS_BUTTONS[message.text]
+    async with get_session_factory()() as db:
+        character = await onboarding_svc.get_character(db, message.from_id)
+        if character is None or character.creation_state is not None:
+            return
+        await respec_service.full_class_reset(db, character, new_class)
+        await _set_select_state(db, character, None)
+        await screen_service.set_screen(db, character, "tavern")
+        await db.commit()
+    await _dispenser.delete(message.peer_id)
+    await message.answer(
+        f"- Переписано. - Перо идёт по странице. - Теперь ты {message.text}.\n\n"
+        "Подкласс и пресеты стёрты, характеристики ждут распределения.",
+        keyboard=tavern_keyboard(character), attachment=KEEPER_ATTACHMENT,
+    )
+
+
+@labeler.message(
+    state=SubclassSelectState.REMAKE_MENU, text=[BTN_REMAKE_SUBCLASS, BTN_REMAKE_STATS]
+)
+async def remake_confirm_ask(message: Message) -> None:
+    await _dispenser.set(
+        message.peer_id, SubclassSelectState.REMAKE_CONFIRM, pending_action=message.text
+    )
+    await message.answer(
+        f"{_REMAKE_WARNINGS[message.text]}\n\nПереписываем?",
+        keyboard=remake_confirm_keyboard(),
+    )
+
+
+@labeler.message(state=SubclassSelectState.REMAKE_CONFIRM, text=[BTN_REMAKE_CONFIRM])
+async def remake_apply(message: Message) -> None:
+    state = await _dispenser.get(message.peer_id)
+    action = (state.payload.get("pending_action") if state else None) or ""
+    async with get_session_factory()() as db:
+        character = await onboarding_svc.get_character(db, message.from_id)
+        if character is None or character.creation_state is not None:
+            return
+        if action == BTN_REMAKE_SUBCLASS:
+            if character.subclass is None:
+                return
+            await respec_service.reset_subclass(db, character)
+            reply = ("- Путь стёрт. - Хранитель закрывает страницу. - "
+                     "Приходи, когда решишь заново. Пресеты пришлось убрать.")
+        elif action == BTN_REMAKE_STATS:
+            await respec_service.reset_stats(db, character)
+            reply = ("- Готово. - Хранитель откладывает перо. - "
+                     "Очки снова твои, распредели их заново.")
+        else:
+            return
+        await _set_select_state(db, character, None)
+        await screen_service.set_screen(db, character, "tavern")
+        await db.commit()
+    await _dispenser.delete(message.peer_id)
+    await message.answer(reply, keyboard=tavern_keyboard(character),
+                         attachment=KEEPER_ATTACHMENT)
+
+
+@labeler.message(
+    state=SubclassSelectState.REMAKE_MENU, text=[BTN_REMAKE_CANCEL]
+)
+@labeler.message(
+    state=SubclassSelectState.REMAKE_CONFIRM, text=[BTN_REMAKE_CANCEL]
+)
+@labeler.message(
+    state=SubclassSelectState.REMAKE_CLASS, text=[BTN_REMAKE_CANCEL]
+)
+async def remake_cancel(message: Message) -> None:
+    async with get_session_factory()() as db:
+        character = await onboarding_svc.get_character(db, message.from_id)
+        if character is None:
+            return
+        await screen_service.set_screen(db, character, "tavern")
+        await db.commit()
+    await _dispenser.delete(message.peer_id)
+    await message.answer("- Как скажешь. - Страница остаётся прежней.",
+                         keyboard=tavern_keyboard(character))
+
+
+@labeler.message(state=SubclassSelectState.REMAKE_MENU)
+async def remake_menu_fallback(message: Message) -> None:
+    await _open_remake_menu(message)
+
+
+@labeler.message(state=SubclassSelectState.REMAKE_CONFIRM)
+async def remake_confirm_fallback(message: Message) -> None:
+    await message.answer("Переписываем?", keyboard=remake_confirm_keyboard())
+
+
+@labeler.message(state=SubclassSelectState.REMAKE_CLASS)
+async def remake_class_fallback(message: Message) -> None:
+    await message.answer("Какой путь теперь?", keyboard=base_class_keyboard(list(CLASS_BUTTONS)))
