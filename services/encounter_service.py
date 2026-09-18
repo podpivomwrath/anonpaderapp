@@ -62,6 +62,12 @@ async def resolve_victory(
     group_kick = None
     if levelup.levels_gained > 0:
         group_kick = await group_service.enforce_level_gap(db, character)
+    # Патч 58: счётчик убийств за всё время (топ «Убийства» в мини-аппе).
+    # Инкремент стоит в КАЖДОЙ из трёх точек добычи (encounter_service,
+    # group_combat_service, raid_combat_service), а не внутри общей
+    # trophy_service.grant_from_kill: рейд вызывает её в цикле по
+    # множителю лута, и один моб засчитался бы как несколько.
+    character.mobs_killed += 1
     trophies = await trophy_service.grant_from_kill(db, character, rng)
     item = await item_service.grant_from_kill(db, character, mob_level, rng)
     raid_key_dropped = await raid_key_service.maybe_grant(db, character, rng)

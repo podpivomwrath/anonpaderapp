@@ -79,6 +79,8 @@ async def reward_mob_kill(
         group_kick = None
         if levelup.levels_gained > 0:
             group_kick = await group_service.enforce_level_gap(db, character)
+        # Патч 58: см. комментарий в services/encounter_service.py.
+        character.mobs_killed += 1
         trophies = await trophy_service.grant_from_kill(db, character, rng)
         item = await item_service.grant_from_kill(db, character, mob_level, rng)
         raid_key_dropped = await raid_key_service.maybe_grant(db, character, rng)

@@ -38,4 +38,9 @@ def test_event_photo_ids_match_real_exploration_content() -> None:
     from game.content_loader import load_exploration_events
 
     real_ids = {e.id for e in load_exploration_events()}
-    assert set(EVENT_PHOTO_IDS) == real_ids
+    # Патч 58: равенство ослаблено до вложенности. Событие БЕЗ картинки —
+    # нормально (event_attachment вернёт None, сообщение уйдёт без вложения),
+    # ровно как у типов локаций с image=None. А вот картинка без события —
+    # это мусор, который здесь и ловится.
+    stale = set(EVENT_PHOTO_IDS) - real_ids
+    assert not stale, f"фото для несуществующих событий: {stale}"

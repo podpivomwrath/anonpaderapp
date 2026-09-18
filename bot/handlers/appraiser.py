@@ -27,6 +27,7 @@ from bot.appraiser_texts import (
 from bot.keyboards.appraiser import (
     GEAR_DETAIL_PAGE_SIZE,
     SELL_ALL_ID,
+    appraiser_fish_keyboard,
     appraiser_root_keyboard,
     appraiser_trophies_keyboard,
     sell_confirm_keyboard,
@@ -37,7 +38,9 @@ from bot.keyboards.world import BTN_APPRAISER
 from bot.world_texts import FOREIGN_APPRAISER_INTRO_SUFFIX
 from game.combat import balance_config as bc
 from game.world import grid
-from services import daily_service, item_service, screen_service
+from game.economy import fishing as game_fishing
+from game.economy import fishing_config as fc
+from services import daily_service, fishing_service, item_service, screen_service
 from services import onboarding_service as onboarding_svc
 from services import trophy_service
 from services import wallet_service
@@ -433,3 +436,80 @@ async def rebuild(db, character) -> tuple[str, str] | None:
     if character.screen == "appraiser_gear_detail":
         return await _render_gear_detail(db, character, mult, page=1)
     return None
+
+
+# --- Рыба (патч 58) ----------------------------------------------------------
+# Иргал берёт рыбу со скидкой APPRAISER_FISH_MULTIPLIER: он скупщик пепла, а
+# не рыбник. Зато берёт всегда и в любом городе — это гарантированный ПОЛ
+# цены, относительно которого ивент «Рыбак у воды» и является надбавкой.
+#
+# Наценка чужака (_price_multiplier) на рыбу НЕ накладывается: скидка за
+# профиль и наценка за чужой город — разные правила, и перемножать их значило
+# бы наказывать дважды за одно.
+
+async def _render_fish(db, character) -> tuple[str, str]:
+    bag = await fishing_service.get_bag(db, character.id)
+    gold = await fishing_service.bag_value(db, character.id, fc.APPRAISER_FISH_MULTIPLIER)
+    if not bag:
+        text = "- Рыбы нет - нечего и смотреть."
+        return text, appraiser_fish_keyboard(0)
+
+    lines = ["- Рыбой не торгую, но возьму. По своей цене.", ""]
+    for definition, grade_id, grams in bag:
+        emoji = fc.GRADE_EMOJI.get(grade_id, "")
+        mark = f"{emoji} " if emoji else ""
+        price = round(
+            game_fishing.price_of(definition.id, grams, grade_id)
+            * fc.APPRAISER_FISH_MULTIPLIER
+        )
+        lines.append(
+            f"{mark}{definition.emoji} {definition.name} "
+            f"({game_fishing.grade_name(grade_id)}) - "
+            f"{game_fishing.format_kg(grams)} · {price} зол."
+        )
+    lines.append("")
+    lines.append(f"Итого: {gold} зол.")
+    return chr(10).join(lines), appraiser_fish_keyboard(gold)
+
+
+@labeler.message(payload_contains={"type": "appraiser_fish"})
+async def appraiser_fish(message: Message) -> None:
+    peer_id = message.peer_id
+    async with get_session_factory()() as db:
+        character = await onboarding_svc.get_character(db, message.from_id)
+        if character is None or character.creation_state is not None:
+            return
+        await screen_service.set_screen(db, character, "appraiser_fish")
+        await db.commit()
+        text, kb = await _render_fish(db, character)
+    await editable_message.send_or_edit(
+        _bot_api, _NS, peer_id, text, kb, attachment=appraiser_attachment()
+    )
+
+
+@labeler.message(payload_contains={"type": "sell_fish"})
+async def sell_fish(message: Message) -> None:
+    peer_id = message.peer_id
+    async with get_session_factory()() as db:
+        character = await onboarding_svc.get_character(db, message.from_id)
+        if character is None or character.creation_state is not None:
+            return
+        gold, grams = await fishing_service.sell_bag(
+            db, character, fc.APPRAISER_FISH_MULTIPLIER
+        )
+        daily_progress = await daily_service.record_sell_gold(db, character, gold)
+        total = (await wallet_service.get_wallet(db, character.id)).farm_currency
+        await db.commit()
+        text, kb = await _render_fish(db, character)
+
+    if gold:
+        text = (
+            f"Продано {game_fishing.format_kg(grams)} рыбы за {gold} зол. "
+            f"(всего: {total})" + chr(10) * 2 + text
+        )
+    await editable_message.send_or_edit(
+        _bot_api, _NS, peer_id, text, kb, attachment=appraiser_attachment()
+    )
+    notice = dailies_texts.progress_notice(daily_progress)
+    if notice:
+        await _bot_api.messages.send(peer_id=peer_id, message=notice, random_id=0)

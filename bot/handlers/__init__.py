@@ -11,6 +11,7 @@ from bot.handlers.combat import labeler as combat_labeler
 from bot.handlers.dailies import labeler as dailies_labeler
 from bot.handlers.elixir_shop import labeler as elixir_shop_labeler
 from bot.handlers.fallback import labeler as fallback_labeler
+from bot.handlers.fishing import labeler as fishing_labeler
 from bot.handlers.group import labeler as group_labeler
 from bot.handlers.group_combat import labeler as group_combat_labeler
 from bot.handlers.inventory import labeler as inventory_labeler
@@ -32,6 +33,11 @@ LABELERS = [
     dailies_labeler, mounts_labeler, stats_window_labeler, moderation_labeler, basic_labeler,
     # Патч 53: рейд — до fallback/promo, как и остальные боевые/меню лейблеры.
     raid_labeler, raid_combat_labeler,
+    # Патч 58: рыбалка. До promo/fallback - у неё есть команда одним
+    # словом («Озеро»), которая иначе ушла бы в промокоды. Вне клетки с
+    # озером обработчик молчит, так что слово в обычном разговоре
+    # перехвачено не будет.
+    fishing_labeler,
     # Патч 51, ч.2: группы — команды конкретные ("пригласить <ник>", "/выйти",
     # "/выгнать <ник>"), но одиночное слово "пригласить" (приглашение
     # пересылкой) технически проходит под тот же regex, что и промокод —

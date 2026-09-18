@@ -68,8 +68,12 @@ export function cellInfo(catalog, x, y, playerPos, questTarget) {
   const isMonolith = x === 0 && y === 0;
   const isPlayer = playerPos && playerPos.x === x && playerPos.y === y;
   const isQuestTarget = questTarget && questTarget.x === x && questTarget.y === y;
+  // Патч 58: озёра приезжают статикой в каталоге, поэтому клиент знает про них
+  // без запроса к серверу — как про города и зоны.
+  const lake = (catalog?.lakes || []).find((l) => l.x === x && l.y === y) || null;
 
   return {
+    lake,
     x, y, dist,
     region: regionFor(x, y),
     regionTitle: REGION_TITLES[regionFor(x, y)],

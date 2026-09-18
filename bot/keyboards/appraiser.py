@@ -27,6 +27,7 @@ SELL_ALL_ID = "all"
 BTN_TROPHIES = "🧿 Трофеи"  # патч 41: было "Продать трофеи"
 BTN_SELL_GEAR = "🗡 Снаряжение"  # патч 41: было "Продать снаряжение"
 BTN_GEAR_DETAIL = "📋 По предметам"
+BTN_FISH = "🐟 Рыба"  # патч 58
 BTN_BACK = "← Назад"
 
 # Патч 35: 6 предметов на страницу подробного режима — вместе со служебными
@@ -48,6 +49,10 @@ def appraiser_root_keyboard() -> str:
     add_paired(kb, [
         (BTN_TROPHIES, KeyboardButtonColor.SECONDARY, {"type": "appraiser_trophies"}),
         (BTN_SELL_GEAR, KeyboardButtonColor.SECONDARY, {"type": "appraiser_gear"}),
+        # Патч 58: рыба — третий раздел. Иргал берёт её со скидкой (он скупщик
+        # пепла, а не рыбник), зато берёт ВСЕГДА и в любом городе: это
+        # гарантированный пол цены против случайного ивента с рыбаком.
+        (BTN_FISH, KeyboardButtonColor.SECONDARY, {"type": "appraiser_fish"}),
     ])
     add_miniapp_button(kb)
     kb.row()
@@ -136,4 +141,22 @@ def sell_confirm_keyboard(confirm_payload: dict) -> str:
     kb.add(Text("Да, продать", payload=confirm_payload), color=KeyboardButtonColor.POSITIVE)
     kb.row()
     kb.add(Text("Отмена", payload={"type": "appraiser_gear"}), color=KeyboardButtonColor.NEGATIVE)
+    return kb.get_json()
+
+
+def appraiser_fish_keyboard(gold: int) -> str:
+    """Экран рыбы (патч 58). Продажа только ЦЕЛИКОМ: рыба стакается по
+    (вид + градация), и кнопка на каждый стак упёрлась бы в лимит VK при
+    полном садке — то самое правило про списки переменной длины, что и у
+    снаряжения."""
+    kb = Keyboard(one_time=False)
+    if gold:
+        kb.add(
+            Text(f"Продать - {gold} зол.", payload={"type": "sell_fish"}),
+            color=KeyboardButtonColor.POSITIVE,
+        )
+        kb.row()
+    add_miniapp_button(kb)
+    kb.row()
+    kb.add(Text(BTN_BACK, payload={"type": "appraiser_root"}), color=KeyboardButtonColor.SECONDARY)
     return kb.get_json()

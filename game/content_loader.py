@@ -211,6 +211,11 @@ class EventOutcome(BaseModel):
     damage_min_pct: float = 0.0
     damage_max_pct: float = 0.0
     combat: bool = False  # засада — переход в бой
+    #: Патч 58: исход продаёт садок рыбаку. Множитель цены зависит от
+    #: кольца КЛЕТКИ, где выпал ивент (fishing_config.BUYER_EVENT_MARKUP),
+    #: и разыгрывается при ПОКАЗЕ события — иначе игрок соглашался бы на
+    #: сделку, не зная цены.
+    fish_buyer: bool = False
 
 
 class EventChoiceDef(BaseModel):
@@ -225,6 +230,10 @@ class ExplorationEventDef(BaseModel):
     title: str
     text: str
     choices: list[EventChoiceDef]
+    #: Патч 58: событие не предлагается, пока в садке нет рыбы. Без этого
+    #: «рыбак у воды» стал бы пустым исходом исследования, что запрещено
+    #: правилом патча 10.
+    requires_fish: bool = False
 
 
 def load_exploration_events(content_dir: Path = CONTENT_DIR) -> list[ExplorationEventDef]:
@@ -249,6 +258,53 @@ class LocationTypeDef(BaseModel):
 
 def load_location_types(content_dir: Path = CONTENT_DIR) -> list[LocationTypeDef]:
     return [LocationTypeDef(**raw) for raw in _load_json(content_dir / "locations" / "types.json")]
+
+
+class FishDef(BaseModel):
+    """Вид рыбы (content/fishing/fish.json, патч 58) — каталог: имя/эмодзи/лор.
+
+    Числа (диапазон веса, цена за килограмм, пулы озёр) намеренно НЕ здесь, а
+    в game/economy/fishing_config.py: их правит симулятор при калибровке, и
+    перезапись контентного файла из тулзы затирала бы лор.
+    """
+
+    id: str
+    emoji: str
+    name: str
+    tier: int
+    description: str = ""
+
+
+def load_fish_defs(content_dir: Path = CONTENT_DIR) -> list[FishDef]:
+    """Порядок в списке = порядок вывода (от дешёвых к дорогим, как в файле)."""
+    return [FishDef(**raw) for raw in _load_json(content_dir / "fishing" / "fish.json")]
+
+
+class LakeDef(BaseModel):
+    """Озеро (content/fishing/lakes.json, патч 58) — клетка с фиксированными
+    координатами, а не процедурный тип локации.
+
+    Выбор осознанный: процедурные озёра были бы безликими и взаимозаменяемыми,
+    а именованные с постоянными координатами игроки запоминают и передают друг
+    другу. `tier` обязан соответствовать кольцу сложности своих координат —
+    это проверяет tests/test_fishing_content.py.
+
+    region = None у общих озёр внутренних колец: они не принадлежат ни одной
+    фракции, туда ходят все и там встречаются.
+    """
+
+    id: str
+    x: int
+    y: int
+    tier: int
+    name: str
+    descriptions: list[str]
+    region: str | None = None
+    image: str | None = None
+
+
+def load_lakes(content_dir: Path = CONTENT_DIR) -> list[LakeDef]:
+    return [LakeDef(**raw) for raw in _load_json(content_dir / "fishing" / "lakes.json")]
 
 
 class ItemBaseDef(BaseModel):

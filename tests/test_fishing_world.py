@@ -1,0 +1,171 @@
+"""Рыбалка в мире (патч 58): подсказка у воды, ивент рыбака, лимиты клавиатур.
+
+Эти три вещи ломаются тихо:
+  - подсказка про «Озеро» — единственная вторая дверь к воде (кнопка приходит
+    только при ВХОДЕ на клетку), и если она пропадёт, игрок, уже стоящий у
+    озера, просто не найдёт вход;
+  - ивент рыбака с пустым садком превратился бы в пустой исход события;
+  - клавиатура сверх лимитов VK ломает экран целиком, а не одну кнопку.
+"""
+
+import json
+import random
+
+import pytest
+
+from bot import fishing_texts as ft
+from bot.keyboards import appraiser as akb
+from bot.keyboards import fishing as fkb
+from bot.keyboards import world as wkb
+from game.economy import fishing
+from game.economy import fishing_config as fc
+from game.world import events as event_pool
+
+# Клетка с озером первого кольца (Отмель Мары) и обычная клетка того же кольца.
+LAKE_XY = (41, -41)
+PLAIN_XY = (45, 45)
+
+
+# --- Подсказка у воды ---------------------------------------------------------
+
+class _Character:
+    """Минимальный персонаж для сводки локации — как в tests/test_monolith_command.py."""
+
+    def __init__(self, x: int, y: int) -> None:
+        self.pos_x, self.pos_y = x, y
+        self.level = 30
+        self.experience = 0
+        self.raid_keys = 0
+        self.region = "docks"
+        self.current_hp = None
+
+
+class _Stats:
+    strength = agility = intellect = vitality = will = 20
+
+
+def _summary(x: int, y: int) -> str:
+    from bot.world_summary import location_summary
+
+    return location_summary(_Character(x, y), _Stats(), random.Random(0), farm_currency=0)
+
+
+def test_lake_hint_is_shown_at_a_lake() -> None:
+    text = _summary(*LAKE_XY)
+    assert ft.LAKE_HINT_LINE in text
+    assert fishing.lake_at(*LAKE_XY).name in text
+
+
+def test_lake_hint_is_not_shown_on_a_plain_cell() -> None:
+    assert ft.LAKE_HINT_LINE not in _summary(*PLAIN_XY)
+
+
+def test_hint_names_the_command_the_handler_actually_catches() -> None:
+    """Текст обязан называть ту же команду, которую ловит обработчик — иначе
+    подсказка разойдётся с игрой при первом же переименовании."""
+    import bot.handlers.fishing as fishing_handlers
+
+    assert ft.LAKE_COMMAND in ft.LAKE_HINT_LINE
+    assert fishing_handlers.ft.LAKE_COMMAND == ft.LAKE_COMMAND
+
+
+def test_plain_cell_is_not_a_lake() -> None:
+    assert fishing.is_lake(*PLAIN_XY) is False
+
+
+# --- Ивент рыбака -------------------------------------------------------------
+
+def test_fisher_event_never_appears_without_fish() -> None:
+    """Предложить продать улов тому, у кого улова нет, — пустой исход события,
+    а их в исследовании быть не должно (правило патча 10)."""
+    rng = random.Random(3)
+    for _ in range(500):
+        event = event_pool.random_event(rng, has_fish=False)
+        assert event.requires_fish is False
+
+
+def test_fisher_event_can_appear_with_fish() -> None:
+    rng = random.Random(3)
+    ids = {event_pool.random_event(rng, has_fish=True).id for _ in range(500)}
+    assert "lakeside_fisher" in ids
+
+
+def test_fisher_event_text_has_both_placeholders() -> None:
+    """Шаблон подставляется в bot/handlers/world.py — если плейсхолдер уедет,
+    игрок увидит либо KeyError, либо цену без числа."""
+    event = event_pool.event_by_id("lakeside_fisher")
+    assert "{gold}" in event.text and "{weight}" in event.text
+    formatted = event.text.format(gold=123, weight="4,5 кг")
+    assert "123" in formatted and "4,5 кг" in formatted
+
+
+def test_fisher_event_has_a_sell_and_a_refuse_choice() -> None:
+    event = event_pool.event_by_id("lakeside_fisher")
+    flags = [
+        any(outcome.fish_buyer for outcome in choice.outcomes)
+        for choice in event.choices
+    ]
+    assert flags.count(True) == 1, "ровно один выбор должен продавать улов"
+    assert flags.count(False) >= 1, "должен остаться выбор отказаться"
+
+
+def test_deeper_rings_pay_strictly_more() -> None:
+    """Весь смысл ивента — тащить улов туда, где опаснее. Если наценки колец
+    перестанут расти, смысл пропадёт, а механика останется."""
+    previous = (0.0, 0.0)
+    for tier in sorted(fc.BUYER_EVENT_MARKUP):
+        low, high = fc.BUYER_EVENT_MARKUP[tier]
+        assert low < high
+        assert low >= previous[0] and high > previous[1], f"тир {tier} не дороже предыдущего"
+        previous = (low, high)
+
+
+def test_event_buyer_always_beats_the_appraiser() -> None:
+    """Иргал — гарантированный ПОЛ цены; рыбак обязан быть выше него всегда,
+    иначе тащить рыбу вглубь незачем."""
+    worst_buyer = min(low for low, _high in fc.BUYER_EVENT_MARKUP.values())
+    assert worst_buyer > fc.APPRAISER_FISH_MULTIPLIER
+
+
+# --- Лимиты клавиатур VK ------------------------------------------------------
+
+VK_MAX_ROWS = 10
+VK_MAX_PER_ROW = 5
+
+
+def _rows(raw: str) -> list[list[dict]]:
+    return json.loads(raw)["buttons"]
+
+
+@pytest.mark.parametrize(
+    "name, raw",
+    [
+        ("озеро", fkb.lake_keyboard()),
+        ("снасть в воде", fkb.casting_keyboard()),
+        ("садок", fkb.bag_keyboard()),
+        ("кнопка к воде", fkb.approach_lake_keyboard()),
+        ("скупщик (корень)", akb.appraiser_root_keyboard()),
+        ("скупщик: рыба", akb.appraiser_fish_keyboard(1234)),
+        ("скупщик: рыба пусто", akb.appraiser_fish_keyboard(0)),
+        ("карта со всеми кнопками", wkb.movement_keyboard(41, -41, None, has_mount=True)),
+    ],
+)
+def test_keyboards_fit_vk_limits(name: str, raw: str) -> None:
+    rows = _rows(raw)
+    assert len(rows) <= VK_MAX_ROWS, f"{name}: {len(rows)} рядов"
+    for row in rows:
+        assert len(row) <= VK_MAX_PER_ROW, f"{name}: ряд из {len(row)} кнопок"
+
+
+def test_lake_screens_always_have_a_way_out() -> None:
+    """Экран озера — вложенный и заменяет клавиатуру целиком, поэтому без
+    выхода игрок застрял бы у воды."""
+    for raw in (fkb.lake_keyboard(), fkb.casting_keyboard(), fkb.bag_keyboard()):
+        labels = [b["action"]["label"] for row in _rows(raw) for b in row]
+        assert ft.BTN_LEAVE_LAKE in labels
+
+
+def test_approach_lake_button_is_inline() -> None:
+    """Кнопка приходит ОТДЕЛЬНЫМ сообщением и не должна сносить нижнюю
+    клавиатуру перемещения — значит обязана быть inline."""
+    assert json.loads(fkb.approach_lake_keyboard())["inline"] is True

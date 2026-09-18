@@ -20,6 +20,7 @@ from bot.handlers import pvp as pvp_handlers
 from bot.handlers import world as world_handlers
 from bot.miniapp_auth import VK_USER_ID_KEY
 from game.content_loader import load_location_types
+from game.economy import fishing
 from game.world import grid
 from game.world import world_config as wc
 from models import Character, User
@@ -49,6 +50,14 @@ _STATIC_CATALOG = {
     "city_coords": {region: [x, y] for region, (x, y) in wc.CITY_COORDS.items()},
     "zone_table": [[lo, hi, [lvl_lo, lvl_hi]] for lo, hi, (lvl_lo, lvl_hi) in wc.ZONE_TABLE],
     "location_types": _location_type_catalog(),
+    # Патч 58: озёра — статика (фиксированные координаты), поэтому едут
+    # тем же разовым каталогом, что города и зоны, а не запросом на
+    # каждое движение карты.
+    "lakes": [
+        {"id": lake.id, "x": lake.x, "y": lake.y, "tier": lake.tier,
+         "name": lake.name, "safe": fishing.is_safe_lake(lake.x, lake.y)}
+        for lake in fishing.all_lakes()
+    ],
 }
 
 

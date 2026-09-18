@@ -39,7 +39,10 @@ class FixedRng(random.Random):
 def test_exploration_events_load() -> None:
     events = load_exploration_events()
     ids = {e.id for e in events}
-    assert ids == {"dead_box", "monolith_shard", "wounded_wanderer", "ash_altar"}
+    assert ids == {
+        "dead_box", "monolith_shard", "wounded_wanderer", "ash_altar",
+        "lakeside_fisher",  # патч 58
+    }
     for event in events:
         assert event.title and event.text
         assert len(event.choices) >= 2

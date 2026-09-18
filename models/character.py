@@ -86,6 +86,31 @@ class Character(Base):
     # — не теряется в PvP, не продаётся скупщику, просто другая колонка.
     raid_keys: Mapped[int] = mapped_column(default=0)
 
+    # Патч 58, рыбалка. Уровень БЕЗ потолка (в отличие от боевого с
+    # MAX_LEVEL=60): каждый следующий дороже предыдущего, расти можно
+    # бесконечно — см. game/economy/fishing.py::xp_to_next.
+    fishing_level: Mapped[int] = mapped_column(default=1)
+    fishing_xp: Mapped[int] = mapped_column(BigInteger, default=0)
+    # Состояние заброса, по образцу travel_* — переживает рестарт бота.
+    # fishing_bite_at = NULL — поклёвки нет (либо ещё ждём, либо не забрасывали).
+    fishing_cast_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    fishing_bite_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    # Что именно клюнуло: вид и вес разыгрываются В МОМЕНТ ЗАБРОСА, а не
+    # подсечки. Иначе исход зависел бы от того, когда игрок нажал кнопку, и
+    # быстрая реакция давала бы лучшую рыбу — подсечка проверяет внимание, а
+    # не удачу таймингa.
+    fishing_pending_fish: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    fishing_pending_grams: Mapped[int | None] = mapped_column(nullable=True)
+
+    # Патч 58: всего убито мобов за всё время. Истории боёв с мобами в базе
+    # нет (pvp_battles пишет только PvP), поэтому пересчитать задним числом
+    # нечем — счётчик стартует с нуля у всех, включая действующих игроков.
+    mobs_killed: Mapped[int] = mapped_column(BigInteger, default=0)
+
     # Патч 50: Метка Хранителя (премиум-подписка). NULL/в прошлом — не активна.
     # Не продаётся нигде — выдаётся ТОЛЬКО промокодом. Срок СУММИРУЕТСЯ при
     # повторной активации (services/premium_service.py::extend). Единая

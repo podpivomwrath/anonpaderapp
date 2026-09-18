@@ -17,8 +17,12 @@ def all_events() -> list[ExplorationEventDef]:
     return _events
 
 
-def random_event(rng: random.Random) -> ExplorationEventDef:
-    return rng.choice(all_events())
+def random_event(rng: random.Random, has_fish: bool = False) -> ExplorationEventDef:
+    """Случайное событие. has_fish=False убирает из пула события, требующие
+    непустого садка (патч 58): предложить продать улов тому, у кого улова нет,
+    — это пустой исход, а их в событиях быть не должно."""
+    pool = [e for e in all_events() if has_fish or not e.requires_fish]
+    return rng.choice(pool)
 
 
 def event_by_id(event_id: str) -> ExplorationEventDef | None:

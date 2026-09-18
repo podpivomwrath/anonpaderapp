@@ -12,6 +12,13 @@ from models import Character
 from services import premium_service
 
 
+def current_cap(character: Character) -> int:
+    """Потолок накопления ключей. Вынесено из maybe_grant: с патчем 58
+    ключ может прийти и с рыбалки (со дна), и правило капа не должно
+    существовать в двух местах."""
+    return rc.RAID_KEY_CAP_PREMIUM if premium_service.is_premium(character) else rc.RAID_KEY_CAP
+
+
 async def maybe_grant(db: AsyncSession, character: Character, rng: random.Random) -> bool:
     """True — ключ выпал (и уже начислен). Вызывается независимо от прочих
     бросков лута на каждом источнике дропа.
@@ -19,7 +26,7 @@ async def maybe_grant(db: AsyncSession, character: Character, rng: random.Random
     Патч 50: с Меткой Хранителя кап 4 вместо 2. Лимит ограничивает только
     НАКОПЛЕНИЕ новых ключей — при истечении премиума уже полученные ключи не
     отбираются нигде (character.raid_keys здесь только читается/растёт)."""
-    cap = rc.RAID_KEY_CAP_PREMIUM if premium_service.is_premium(character) else rc.RAID_KEY_CAP
+    cap = current_cap(character)
     if character.raid_keys >= cap:
         return False
     if rng.random() >= rc.RAID_KEY_DROP_CHANCE:

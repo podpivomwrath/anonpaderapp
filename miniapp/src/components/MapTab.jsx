@@ -91,6 +91,15 @@ export default function MapTab() {
   const boundsMin = catalog?.bounds_min ?? -50;
   const boundsMax = catalog?.bounds_max ?? 50;
 
+  // Патч 58: индекс озёр по «x:y». Каталог статичен и приезжает один раз,
+  // поэтому индекс строится один раз, а не перебором 27 озёр на каждую из
+  // сотен видимых клеток при каждом кадре перетаскивания карты.
+  const lakesByCell = useMemo(() => {
+    const index = new Map();
+    for (const lake of catalog?.lakes || []) index.set(`${lake.x}:${lake.y}`, lake);
+    return index;
+  }, [catalog]);
+
   const visibleCells = useMemo(() => {
     if (!camera || !catalog) return [];
     const halfW = size.width / 2 / cellPx;
@@ -255,6 +264,7 @@ export default function MapTab() {
           const screen = worldToScreen(camera, cellPx, size, gx, gy);
           const isCity = catalog.city_coords && Object.values(catalog.city_coords).some(([cx, cy]) => cx === gx && cy === gy);
           const isMonolith = gx === 0 && gy === 0;
+          const lake = lakesByCell.get(`${gx}:${gy}`);
           return (
             <div
               key={`${gx}:${gy}`}
@@ -270,6 +280,15 @@ export default function MapTab() {
               )}
               {showSymbols && isCity && !isMonolith && (
                 <span className="map-cell__symbol" style={{ fontSize: Math.max(10, cellPx * 0.5) }}>⛩</span>
+              )}
+              {showSymbols && lake && !isCity && !isMonolith && (
+                <span
+                  className="map-cell__symbol map-cell__symbol--lake"
+                  style={{ fontSize: Math.max(10, cellPx * 0.5) }}
+                  title={lake.name}
+                >
+                  🎣
+                </span>
               )}
             </div>
           );
@@ -394,6 +413,11 @@ function MapTooltipContent({ info }) {
       <p className="map-tooltip__line">{info.isMonolith ? '🩸 Багряный Монолит' : info.regionTitle}</p>
       {!info.isMonolith && <p className="map-tooltip__line">{info.typeName}</p>}
       <p className="map-tooltip__line">Уровень: {info.levelRange[0]}-{info.levelRange[1]} · {info.dist} кл.</p>
+      {info.lake && (
+        <p className="map-tooltip__line map-tooltip__line--lake">
+          🎣 {info.lake.name}{info.lake.safe ? ' · без PvP' : ''}
+        </p>
+      )}
     </>
   );
 }

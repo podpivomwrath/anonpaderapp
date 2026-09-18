@@ -51,11 +51,14 @@ def test_appraiser_root_keyboard_is_not_inline() -> None:
     assert kb["inline"] is False
 
 
-def test_appraiser_root_keyboard_has_two_actions_and_back_last() -> None:
+def test_appraiser_root_keyboard_has_all_sections_and_back_last() -> None:
     kb_json = appraiser_root_keyboard()
     buttons = [btn for row in _kb_rows(kb_json) for btn in row]
     payload_types = [b["action"]["payload"]["type"] for b in buttons if "payload" in b["action"]]
-    assert payload_types == ["appraiser_trophies", "appraiser_gear", "appraiser_back"]
+    assert payload_types == [
+        "appraiser_trophies", "appraiser_gear", "appraiser_fish",  # патч 58: + рыба
+        "appraiser_back",
+    ]
     assert _last_button(kb_json)["action"]["payload"]["type"] == "appraiser_back"
 
 

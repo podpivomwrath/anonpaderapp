@@ -10,6 +10,7 @@
 """
 
 import random
+from dataclasses import dataclass
 from datetime import datetime, timezone
 
 from sqlalchemy import select
@@ -27,11 +28,15 @@ from bot.handlers import inventory as inventory_handlers
 from bot.handlers import pvp as pvp_handlers
 from bot.handlers import raid_combat as raid_combat_handlers
 from bot.handlers import stats_window
+from bot import fishing_texts
+from bot.keyboards import fishing as fishing_kb
 from bot.keyboards import raid as raid_kb
 from bot.keyboards import world as kb
 from bot.keyboards.group_explore import group_ready_keyboard
 from bot.onboarding_texts import REGION_TITLES
 from bot.world_summary import location_attachment, location_summary
+from game.economy import fishing as game_fishing
+from game.economy import fishing_config as fc
 from bot.world_texts import (
     FOREIGN_NPC_REJECTION,
     city_square_text,
@@ -60,6 +65,7 @@ from services import (
     daily_service,
     death_service,
     event_service,
+    fishing_service,
     group_explore_service,
     group_service,
     item_service,
@@ -94,6 +100,25 @@ _exploring: set[int] = set()
 _resting: set[int] = set()
 # peer_id -> id события с выбором, ожидающего ответа (патч 9, блок 1)
 _pending_events: dict[int, str] = {}
+
+#: Патч 58: множитель цены рыбака на показанное сейчас предложение. Живёт
+#: рядом с _pending_events и очищается вместе с ним — цена принадлежит
+#: КОНКРЕТНОМУ показу события, и переиспользовать её на следующем нельзя.
+_pending_fish_offers: dict[int, float] = {}
+
+
+@dataclass
+class _FishOffer:
+    multiplier: float
+    gold: int
+    weight_label: str
+
+
+def _roll_fish_offer_multiplier(character) -> float:
+    """Наценка рыбака по кольцу КЛЕТКИ, где выпал ивент."""
+    tier = game_fishing.ring_tier(character.pos_x, character.pos_y)
+    low, high = fc.BUYER_EVENT_MARKUP[tier]
+    return _rng.uniform(low, high)
 
 
 
@@ -140,6 +165,23 @@ async def _maybe_send_monolith_button(peer_id: int, character) -> None:
     await _bot_api.messages.send(
         peer_id=peer_id, message=raid_texts.MONOLITH_CALL_TEXT, random_id=0,
         keyboard=raid_kb.touch_monolith_keyboard(),
+    )
+
+
+async def _maybe_send_lake_button(peer_id: int, character) -> None:
+    """Патч 58: на клетке с озером — кнопка «К воде» ОТДЕЛЬНЫМ сообщением с
+    инлайн-клавиатурой, ровно как «Прикоснуться» у Монолита выше.
+
+    Вторая дверь (команда «Озеро») нужна по той же причине, что и у Монолита:
+    эта кнопка приходит только при ВХОДЕ на клетку, и игроку, который уже
+    стоит у воды, иначе пришлось бы уходить и возвращаться.
+    """
+    lake = game_fishing.lake_at(character.pos_x, character.pos_y)
+    if lake is None:
+        return
+    await _bot_api.messages.send(
+        peer_id=peer_id, message=fishing_texts.LAKE_HINT_LINE, random_id=0,
+        keyboard=fishing_kb.approach_lake_keyboard(),
     )
 
 
@@ -278,6 +320,7 @@ async def show_location(message: Message, db, character) -> None:
         keyboard=kb.movement_keyboard(character.pos_x, character.pos_y, message.peer_id, has_mount=has_mount),
     )
     await _maybe_send_monolith_button(message.peer_id, character)
+    await _maybe_send_lake_button(message.peer_id, character)
 
 
 @labeler.message(text=[kb.BTN_GATE])
@@ -342,6 +385,7 @@ async def gate_exit_direction(message: Message) -> None:
             keyboard=kb.movement_keyboard(character.pos_x, character.pos_y, message.peer_id, has_mount=has_mount),
         )
         await _maybe_send_monolith_button(message.peer_id, character)
+        await _maybe_send_lake_button(message.peer_id, character)
 
 
 ASH_BURNED_LINE = "Пепел разнесло ветром."
@@ -516,6 +560,7 @@ async def collect_ash_handful(message: Message) -> None:
         keyboard=kb.movement_keyboard(character.pos_x, character.pos_y, peer_id, has_mount=has_mount),
     )
     await _maybe_send_monolith_button(peer_id, character)
+    await _maybe_send_lake_button(peer_id, character)
 
 
 async def handle_explore_done(peer_id: int) -> None:
@@ -545,8 +590,22 @@ async def handle_explore_done(peer_id: int) -> None:
 
         event = None
         song_can_read = False
+        fish_offer = None
         if outcome_kind == "event":
-            event = event_pool.random_event(_rng)
+            bag_grams = await fishing_service.bag_total_grams(db, character.id)
+            has_fish = bag_grams >= fc.BUYER_EVENT_MIN_BAG_GRAMS
+            event = event_pool.random_event(_rng, has_fish=has_fish)
+            if event.requires_fish:
+                # Патч 58: цена рыбака разыгрывается СЕЙЧАС, при показе, и
+                # зависит от кольца КЛЕТКИ, а не от места вылова. Иначе игрок
+                # соглашался бы на сделку вслепую, а весь смысл — тащить улов
+                # туда, где опаснее и дороже.
+                multiplier = _roll_fish_offer_multiplier(character)
+                fish_offer = _FishOffer(
+                    multiplier=multiplier,
+                    gold=await fishing_service.bag_value(db, character.id, multiplier),
+                    weight_label=game_fishing.format_kg(bag_grams),
+                )
             if event.id == "ash_altar":
                 # патч 25, п.6: доп. выбор «Прочесть Песнь», только если собрана
                 song_can_read = await song_service.can_read(db, character.id)
@@ -562,7 +621,13 @@ async def handle_explore_done(peer_id: int) -> None:
         return
 
     _pending_events[peer_id] = event.id
-    text = f"{event.title}\n\n{event.text}"
+    body = event.text
+    if fish_offer is not None:
+        # Цена принадлежит ЭТОМУ показу события: запоминаем ровно ту,
+        # которую сейчас увидит игрок, и по ней потом и продаём.
+        _pending_fish_offers[peer_id] = fish_offer.multiplier
+        body = body.format(gold=fish_offer.gold, weight=fish_offer.weight_label)
+    text = f"{event.title}" + chr(10) * 2 + body
     await _bot_api.messages.send(
         peer_id=peer_id, message=text, random_id=0,
         attachment=event_attachment(event.id),
@@ -587,6 +652,7 @@ async def event_choice(message: Message) -> None:
     if event is None or not isinstance(choice_idx, int) or not (0 <= choice_idx < len(event.choices)):
         return
     _pending_events.pop(peer_id, None)
+    fish_multiplier = _pending_fish_offers.pop(peer_id, None)
 
     async with get_session_factory()() as db:
         character = await onboarding_svc.get_character(db, peer_id)
@@ -595,6 +661,21 @@ async def event_choice(message: Message) -> None:
         stats = await _get_stats(db, character.id)
         outcome = event_service.pick_outcome(_rng, event.choices[choice_idx].outcomes)
         choice_label = event.choices[choice_idx].label
+        fish_sale_line = None
+        if outcome.fish_buyer:
+            # Продаём по цене, ПОКАЗАННОЙ игроку. Если множителя нет (бот
+            # перезапустился между показом и ответом), сделка не состоится:
+            # взять цену заново значило бы продать не по той, что обещали.
+            if fish_multiplier is None:
+                await message.answer(
+                    "Рыбак уже ушёл - и с ним его цена."
+                )
+                return
+            gold, grams = await fishing_service.sell_bag(db, character, fish_multiplier)
+            if gold:
+                fish_sale_line = (
+                    f"🧺 Продано {game_fishing.format_kg(grams)} рыбы за {gold} зол."
+                )
         choice_code = trial_service.EVENT_CHOICE_CODES.get(choice_label)
         result = await event_service.apply_outcome(
             db, character, stats, outcome, _rng, event_id=event.id, choice_code=choice_code
@@ -615,6 +696,8 @@ async def event_choice(message: Message) -> None:
 
     # ux-patch-10 п.1: сводка локации — всегда отдельное сообщение
     result_text = result.text
+    if fish_sale_line:
+        result_text += chr(10) * 2 + fish_sale_line
     if result.group_kick is not None and result.group_kick.kicked_character_id == character.id:
         result_text += f"\n\n{group_texts.level_gap_kick_self_line()}"
     await message.answer(result_text, keyboard=kb.waiting_keyboard())
@@ -635,6 +718,7 @@ async def event_choice(message: Message) -> None:
         keyboard=kb.movement_keyboard(character.pos_x, character.pos_y, peer_id, has_mount=has_mount),
     )
     await _maybe_send_monolith_button(peer_id, character)
+    await _maybe_send_lake_button(peer_id, character)
 
 
 SONG_READ_SCENE = (
@@ -678,6 +762,7 @@ async def read_song(message: Message) -> None:
         keyboard=kb.movement_keyboard(character.pos_x, character.pos_y, peer_id, has_mount=True),
     )
     await _maybe_send_monolith_button(peer_id, character)
+    await _maybe_send_lake_button(peer_id, character)
 
 
 # --- Отдых (combat-patch-2, п.3): вне боя, 8-12 сек, HP → полное ---
@@ -846,6 +931,7 @@ async def handle_arrival(peer_id: int) -> None:
             keyboard=kb.movement_keyboard(character.pos_x, character.pos_y, peer_id, has_mount=has_mount),
         )
         await _maybe_send_monolith_button(peer_id, character)
+        await _maybe_send_lake_button(peer_id, character)
 
 
 @labeler.message(text=[kb.BTN_MENTOR, kb.BTN_MENTOR_BADGE])

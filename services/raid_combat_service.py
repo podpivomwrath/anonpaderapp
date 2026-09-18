@@ -65,6 +65,9 @@ async def reward_mob_kill(
         if levelup.levels_gained > 0:
             group_kick = await group_service.enforce_level_gap(db, character)
 
+        # Патч 58: ровно +1 за моба, ВНЕ цикла loot_mult — множитель
+        # умножает добычу, а не число убитых.
+        character.mobs_killed += 1
         trophies_total: dict[str, int] = {}
         items_dropped: list[Item] = []
         raid_key_dropped = False

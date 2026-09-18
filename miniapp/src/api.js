@@ -93,8 +93,10 @@ export function buyPresetSlot() {
   return request('/presets/buy_slot', { method: 'POST' });
 }
 
-export function getPvpLeaderboard() {
-  return request('/pvp_leaderboard');
+// Патч 58: общие топы. board - id доски, перечень которых приходит в
+// ответе (клиент свой список не хранит, чтобы он не разъехался с сервером).
+export async function getLeaderboard(board) {
+  return request(`/leaderboard?board=${encodeURIComponent(board)}`);
 }
 
 export function getDailies() {

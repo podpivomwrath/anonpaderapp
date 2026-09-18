@@ -31,6 +31,7 @@ PARENT: dict[str, str | None] = {
     "appraiser": "market_quarter",
     "appraiser_trophies": "appraiser",
     "appraiser_gear": "appraiser",
+    "appraiser_fish": "appraiser",
     "appraiser_gear_detail": "appraiser_gear",
     "elixir_shop": "market_quarter",
     "inventory": "market_quarter",

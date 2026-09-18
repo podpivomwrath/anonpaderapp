@@ -9,6 +9,7 @@ from models.consumable import CharacterConsumable
 from models.dailies import CharacterDaily, CharacterTitle
 from models.economy import ExchangeOrder, PvpStakeTransfer, Wallet
 from models.enums import BaseClass, CombatStatus, CombatType, OrderDirection, QuestStatus, Region
+from models.fishing import CharacterFish, CharacterFishRecord
 from models.group import Group, GroupInvite, GroupMember
 from models.item import Inventory, Item, ItemUpgradeHistory
 from models.lootbox import CharacterLootbox
@@ -33,6 +34,8 @@ __all__ = [
     "CharacterConsumable",
     "CharacterDaily",
     "CharacterDeath",
+    "CharacterFish",
+    "CharacterFishRecord",
     "CharacterLootbox",
     "CharacterMount",
     "CharacterQuest",

@@ -21,6 +21,7 @@ from services import (
     daily_service,
     derived_stats_service,
     item_service,
+    leaderboard_service,
     lootbox_service,
     premium_service,
     preset_service,
@@ -31,6 +32,7 @@ from services import (
     stat_alloc_service,
     trial_service,
 )
+from game.economy import fishing as game_fishing
 from services.preset_service import PresetValidationError
 from services.wallet_service import NotEnoughCurrency, get_wallet
 
@@ -83,6 +85,15 @@ def _character_payload(
             "wil": stats.will,
         },
         "unspent_points": stats.unspent_points,
+        # Патч 58: уровень рыбалки живёт в «Характеристиках», отдельной вкладки
+        # у рыбалки нет. Потолка у него НЕТ — поэтому шкала всегда осмысленна,
+        # в отличие от боевого уровня, который упирается в MAX_LEVEL.
+        "fishing": {
+            "level": character.fishing_level,
+            "xp": character.fishing_xp,
+            "xp_to_next": game_fishing.xp_to_next(character.fishing_level),
+        },
+        "mobs_killed": character.mobs_killed,
         # Патч 32, баг 1: экипировка нужна фронтенду ОТДЕЛЬНО от derived — живой
         # предпросмотр (miniapp/src/formulas.js) пересчитывает derived сам при
         # вложении очка и без этого поля считал бы "после" без бонусов
@@ -205,8 +216,44 @@ async def handle_get_trials(request: web.Request) -> web.Response:
         )
 
 
+async def handle_get_leaderboard(request: web.Request) -> web.Response:
+    """Патч 58: общие топы — ?board=pvp|kills|fishing|fish_weight.
+
+    Строка достижения («14 побед», «12,4 кг · Костяная щука») приходит с
+    СЕРВЕРА уже готовой: клиент однажды уже пересказывал серверное правило
+    своими словами и соврал (правило пресетов, патч 57).
+    """
+    vk_user_id = request[VK_USER_ID_KEY]
+    board_id = request.query.get("board", leaderboard_service.BOARD_PVP)
+    if board_id not in leaderboard_service.BOARDS:
+        return web.json_response({"error": "unknown_board"}, status=400)
+    session_factory = request.app[SESSION_FACTORY_KEY]
+    async with session_factory() as session:
+        character = await _load_character(session, vk_user_id)
+        if character is None:
+            return web.json_response({"error": "character_not_found"}, status=404)
+        entries = await leaderboard_service.board(session, board_id, limit=10)
+        return web.json_response({
+            "board": board_id,
+            "boards": [
+                {"id": b, "title": leaderboard_service.BOARD_TITLES[b]}
+                for b in leaderboard_service.BOARDS
+            ],
+            "top": [
+                {"rank": e.rank, "name": e.name, "value": e.value,
+                 "title": e.title, "premium": e.premium}
+                for e in entries
+            ],
+        })
+
+
 async def handle_get_pvp_leaderboard(request: web.Request) -> web.Response:
-    """Патч 22: топ-10 по PvP-победам + место игрока, если он вне десятки."""
+    """Патч 22: топ-10 по PvP-победам + место игрока, если он вне десятки.
+
+    Патч 58: мини-апп перешёл на общий /leaderboard. Этот эндпоинт оставлен
+    намеренно — у игроков могут быть закешированы старые сборки фронтенда,
+    и их экран не должен ломаться до обновления кеша.
+    """
     vk_user_id = request[VK_USER_ID_KEY]
     session_factory = request.app[SESSION_FACTORY_KEY]
     async with session_factory() as session:
@@ -549,4 +596,5 @@ def register_routes(app: web.Application) -> None:
     app.router.add_post("/api/miniapp/presets/switch", handle_post_preset_switch)
     app.router.add_post("/api/miniapp/presets/buy_slot", handle_post_preset_buy_slot)
     app.router.add_get("/api/miniapp/pvp_leaderboard", handle_get_pvp_leaderboard)
+    app.router.add_get("/api/miniapp/leaderboard", handle_get_leaderboard)
     app.router.add_get("/api/miniapp/dailies", handle_get_dailies)

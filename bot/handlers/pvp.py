@@ -43,7 +43,13 @@ from bot.keyboards.pvp import (
     pvp_target_keyboard,
     pvp_waiting_keyboard,
 )
-from bot.pvp_texts import AFK_TARGET_TEXT, ALONE_ON_CELL, CITY_NO_PVP_TEXT, NOTHING_TO_TAKE
+from bot.pvp_texts import (
+    AFK_TARGET_TEXT,
+    ALONE_ON_CELL,
+    CITY_NO_PVP_TEXT,
+    LAKE_NO_PVP_TEXT,
+    NOTHING_TO_TAKE,
+)
 from game.combat import balance_config as bc
 from game.combat import display, elixir_effects
 from game.combat.base_skills import BASE_SKILL_DEFS
@@ -63,12 +69,13 @@ from game.combat.session import (
 from game.combat.skills import DEFENSIVE_SKILLS
 from game.combat.tick_engine import TickEngine
 from game.economy import elixir_config as ec
+from game.economy import fishing as game_fishing
 from game.economy import premium_config as pc
 from game.world import grid
 from models import Character, CharacterStats
 from services import (
-    admin_service, daily_service, death_service, elixir_service, item_service, mount_service, premium_service,
-    preset_service, pvp_service, trophy_service,
+    admin_service, daily_service, death_service, elixir_service, fishing_service, item_service,
+    mount_service, premium_service, preset_service, pvp_service, trophy_service,
 )
 from services import onboarding_service as onboarding_svc
 from services.db import get_session_factory
@@ -386,6 +393,9 @@ async def look_around(message: Message) -> None:
         if await _still_dead(db, character):
             await message.answer("☠ Сначала очнись.")
             return
+        # Патч 58: озёра первых двух колец — мирные, как города.
+        if fishing_service.is_safe_lake(character.pos_x, character.pos_y):
+            return
         # Патч 33, ч.2: города полностью мирные — кнопка и так не показывается
         # в городских клавиатурах (bot/keyboards/world.py), это защита от
         # устаревшей клавиатуры.
@@ -439,6 +449,12 @@ async def attack_command(message: Message, target: str) -> None:
             return
         # Патч 33, ч.2: PvP запрещено во ВСЕХ городах — и в своём, и в чужом
         # (отменяет патч 26, где чужой город был ареной без защиты).
+        # Патч 58: озёра первых двух колец — первые мирные клетки вне
+        # городов. Проверка стоит рядом с городской намеренно: это одно и то
+        # же правило «здесь не нападают», и разъезжаться им нельзя.
+        if fishing_service.is_safe_lake(character.pos_x, character.pos_y):
+            await message.answer(LAKE_NO_PVP_TEXT)
+            return
         if grid.city_region_at(character.pos_x, character.pos_y) is not None:
             await message.answer(CITY_NO_PVP_TEXT)
             return
@@ -1182,6 +1198,10 @@ async def _finish_duel(battle: Battle, winner_cid: int, loser_cid: int) -> None:
         pvp_service.record_loss(loser)
         no_reward = pvp_service.no_reward_for_kill(winner.level, loser.level)
         moved = {} if no_reward else await trophy_service.transfer_all(db, loser.id, winner.id)
+        # Патч 58: рыба из садка ПРОПАДАЕТ, а не переходит победителю.
+        # Иначе охотиться на рыбаков было бы выгоднее, чем рыбачить —
+        # риск для проигравшего при этом сохраняется полностью.
+        fish_lost = await fishing_service.drop_bag(db, loser.id)
         death_service.apply_pvp_death(loser)
         await admin_service.log_death(db, loser, "pvp")
         respawn_handlers.register_pvp_death(loser_p.peer_id)
@@ -1207,9 +1227,16 @@ async def _finish_duel(battle: Battle, winner_cid: int, loser_cid: int) -> None:
     )
     for c in daily_progress.completed:
         await stats_window.notify_levelup(winner_p.peer_id, c.levels_gained, c.new_level)
+    lose_text = f"☠ Тебя побеждает {winner_p.name}. Ты уходишь во тьму."
+    if fish_lost:
+        # Потерю садка нужно назвать вслух: рыба не переходит победителю, и
+        # без строки игрок решил бы, что улов просто пропал из-за бага.
+        lose_text += (
+            chr(10) * 2
+            + f"🧺 Садок пропал: {game_fishing.format_kg(fish_lost)} рыбы."
+        )
     await _bot_api.messages.send(
-        peer_id=loser_p.peer_id,
-        message=f"☠ Тебя побеждает {winner_p.name}. Ты уходишь во тьму.",
+        peer_id=loser_p.peer_id, message=lose_text,
         random_id=0, keyboard=kb.waiting_keyboard(),
     )
 
@@ -1333,6 +1360,8 @@ async def on_mass_battle_finished(session_id: int, result: TickResult) -> None:
                     continue
                 shares[attacker_cid] = dmg
             moved = await trophy_service.split_among(db, victim_cid, shares) if shares else {}
+            # Патч 58: садок пропадает и в массовом PvP, по тому же правилу.
+            await fishing_service.drop_bag(db, victim_cid)
             for winner_cid, drop in moved.items():
                 line = _format_transfer_line(drop)
                 if line:

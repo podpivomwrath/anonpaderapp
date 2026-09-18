@@ -22,6 +22,7 @@ from bot.handlers import mounts as mounts_handlers
 from bot.handlers import presets as presets_handlers
 from bot.handlers import promo as promo_handlers
 from bot.handlers import pvp as pvp_handlers
+from bot.handlers import fishing as fishing_handlers
 from bot.handlers import raid as raid_handlers
 from bot.handlers import raid_combat as raid_combat_handlers
 from bot.handlers import respawn as respawn_handlers
@@ -158,6 +159,7 @@ async def run() -> None:
     raid_tick_engine.start()
     raid_combat_handlers.setup(raid_tick_engine, bot.api)
     raid_handlers.setup(bot.api)
+    fishing_handlers.setup(bot.api)
 
     travel_scheduler = PeerScheduler(world_handlers.handle_arrival, job_prefix="travel")
     travel_scheduler.start()

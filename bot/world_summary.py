@@ -9,10 +9,11 @@ Leaf-модуль: импортируется и world.py, и combat.py, сам 
 
 import random
 
-from bot import raid_key_texts, raid_texts
+from bot import fishing_texts, raid_key_texts, raid_texts
 from bot.vk_media import photo_attachment
 from game.combat import balance_config as bc
 from game.combat import display
+from game.economy import fishing
 from game.world import grid, location_types
 from game.economy import raid_config
 from services import experience_service, vitals_service
@@ -84,6 +85,13 @@ def location_summary(
         raid_texts.MONOLITH_HINT_LINE + "\n"
         if (x, y) == raid_config.MONOLITH_COORDS else ""
     )
+    # Патч 58: озеро — как Монолит: кнопка приходит только при ВХОДЕ на
+    # клетку, поэтому у воды обязана быть вторая дверь командой словом.
+    lake = fishing.lake_at(x, y)
+    lake_block = (
+        f"🎣 {lake.name}" + chr(10) + fishing_texts.LAKE_HINT_LINE + chr(10)
+        if lake is not None else ""
+    )
     return (
         f"{zone_line}\n{description}\n\n"
         f"{_SEP}\n"
@@ -93,6 +101,7 @@ def location_summary(
         f"{wallet_line(farm_currency, donate_currency)}\n"
         f"{key_block}"
         f"{monolith_block}"
+        f"{lake_block}"
         f"{quest_block}"
         f"{_SEP}"
         f"{group_suffix}"
