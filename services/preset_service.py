@@ -31,9 +31,11 @@ def validate_preset(
     - 3-5 баффов, без дублей;
     - все баффы существуют и принадлежат пулу подкласса персонажа;
     - каждый бафф подкласса должен быть открыт испытанием (unlocked_buff_ids=None
-      отключает эту проверку — используется прямыми юнит-тестами validate_preset);
-    - минимум 1 бафф из категории обороны ИЛИ контроль/утилити
-      (нельзя собрать чистый моно-урон пресет).
+      отключает эту проверку — используется прямыми юнит-тестами validate_preset).
+
+    Ограничения по категориям НЕТ: игрок волен собрать любые 5 баффов своего
+    пула, включая чистый урон. Раньше требовался хотя бы один бафф обороны или
+    контроля — правило снято сознательно, состав сборки остаётся выбором игрока.
     """
     if not (bc.PRESET_MIN_BUFFS <= len(buff_ids) <= bc.PRESET_MAX_BUFFS):
         raise PresetValidationError(
@@ -42,7 +44,6 @@ def validate_preset(
     if len(set(buff_ids)) != len(buff_ids):
         raise PresetValidationError("Баффы в пресете не должны повторяться")
 
-    categories: set[str] = set()
     for buff_id in buff_ids:
         buff = catalog.get(buff_id)
         if buff is None:
@@ -57,12 +58,6 @@ def validate_preset(
             and buff_id not in unlocked_buff_ids
         ):
             raise PresetValidationError(f"Бафф {buff_id} ещё не открыт - пройди испытание")
-        categories.add(buff.category)
-
-    if not categories & bc.PRESET_REQUIRED_CATEGORIES:
-        raise PresetValidationError(
-            "Минимум один бафф должен быть из категории обороны или контроля и утилиты"
-        )
 
 
 def effective_preset_slots(character: Character) -> int:
@@ -145,19 +140,17 @@ async def get_active_preset(db: AsyncSession, character_id: int) -> CharacterBuf
     )
 
 
-def preset_rule_hint(catalog_labels: dict[str, str]) -> str:
+def preset_rule_hint(catalog_labels: dict[str, str] | None = None) -> str:
     """Правило состава пресета словами - чтобы клиент его не пересказывал.
 
-    Мини-апп писал «хотя бы один - не урон», но групповая поддержка правилу НЕ
-    удовлетворяет: игрок собирал 4 урона плюс групповой бафф, делал ровно то,
-    что написано, и получал отказ сервера.
+    Раньше клиент пересказывал правило сам и врал: писал «хотя бы один - не
+    урон», хотя групповая поддержка требованию не удовлетворяла. Само
+    ограничение по категориям снято, но текст остаётся на сервере - чтобы
+    следующее изменение правил снова не разошлось с экраном.
     """
-    required = ", ".join(
-        sorted(catalog_labels.get(c, c) for c in bc.PRESET_REQUIRED_CATEGORIES)
-    )
     return (
-        f"Выбери от {bc.PRESET_MIN_BUFFS} до {bc.PRESET_MAX_BUFFS} баффов. "
-        f"Хотя бы один обязан быть из категорий: {required}."
+        f"Выбери от {bc.PRESET_MIN_BUFFS} до {bc.PRESET_MAX_BUFFS} баффов - любых "
+        "из своего пула."
     )
 
 

@@ -44,16 +44,19 @@ def test_too_many_buffs() -> None:
         validate_preset(six, "guardian", CATALOG)
 
 
-def test_mono_damage_preset_rejected() -> None:
-    """Нельзя собрать чистый моно-урон без обороны/утилити."""
+def test_mono_damage_preset_is_allowed() -> None:
+    """Ограничение по категориям снято: чистый урон - легальная сборка.
+
+    Раньше требовался хотя бы один бафф обороны или контроля и утилиты. Состав
+    пресета теперь целиком выбор игрока, сервер проверяет только размер, дубли,
+    принадлежность пулу подкласса и открытость испытанием."""
     damage_only = ["guardian_heavy_hand", "guardian_reflection", "guardian_retribution"]
-    with pytest.raises(PresetValidationError):
-        validate_preset(damage_only, "guardian", CATALOG)
+    validate_preset(damage_only, "guardian", CATALOG)
 
 
-def test_defense_or_utility_satisfies_rule() -> None:
-    with_utility = ["guardian_heavy_hand", "guardian_reflection", "guardian_command"]
-    validate_preset(with_utility, "guardian", CATALOG)  # не бросает
+def test_any_five_from_own_pool_are_allowed() -> None:
+    five = [b.id for b in CATALOG.values() if b.subclass == "guardian"][:5]
+    validate_preset(five, "guardian", CATALOG)  # не бросает
 
 
 def test_unknown_and_foreign_buffs_rejected() -> None:

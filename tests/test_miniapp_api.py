@@ -359,12 +359,10 @@ async def test_presets_lists_slots_and_subclass_catalog(client, session_factory)
     assert other["unlocked"] is False
 
     # Правило состава приходит с сервера: клиент пересказывал его своими
-    # словами («хотя бы один - не урон») и врал про групповую поддержку -
-    # такой пресет сервер отклоняет.
+    # словами и врал. Ограничение по категориям снято - в тексте остаются
+    # только границы размера.
     assert str(bc.PRESET_MIN_BUFFS) in data["rule_hint"]
     assert str(bc.PRESET_MAX_BUFFS) in data["rule_hint"]
-    for category in bc.PRESET_REQUIRED_CATEGORIES:
-        assert buff_descriptions.category_label(category) in data["rule_hint"]
 
     # Описание и ярлык категории тоже с сервера - без описания пресет
     # собирался вслепую, по одним названиям.

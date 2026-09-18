@@ -139,9 +139,9 @@ def _pick(pool: list, categories: tuple[str, ...], limit: int) -> list:
 
 
 def preset_variants(subclass_id: str) -> dict[str, list[str]]:
-    """Варианты сборок. Правила пресета (services/preset_service.py): 3-5 баффов,
-    минимум один из обороны или контроль/утилити. «Без баффов» - не легальный
-    пресет, а точка отсчёта: показывает, сколько подкласс стоит сам по себе."""
+    """Варианты сборок. Правило пресета одно (services/preset_service.py): 3-5
+    баффов из своего пула, ограничений по категориям нет. «Без баффов» - не
+    легальный пресет, а точка отсчёта: сколько подкласс стоит сам по себе."""
     pool = buffs_of(subclass_id)
     defensive = _pick(pool, ("defense", "control_utility"), 5)
     damage = _pick(pool, ("damage",), 5)
@@ -153,15 +153,11 @@ def preset_variants(subclass_id: str) -> dict[str, list[str]]:
             for b in group_:
                 if b.id not in out and len(out) < bc.PRESET_MAX_BUFFS:
                     out.append(b.id)
-        # правило: хотя бы один бафф обороны/утилиты
-        if defensive and not any(
-            CONTENT.buffs[i].category in bc.PRESET_REQUIRED_CATEGORIES for i in out
-        ):
-            out[-1] = defensive[0].id
         return out
 
     variants = {
         "без баффов": [],
+        "чистый урон": compose(damage[:5]),
         "урон": compose(damage[:4], defensive[:1]),
         "оборона": compose(defensive[:4], damage[:1]),
         "смешанный": compose(damage[:2], defensive[:2], group[:1]),

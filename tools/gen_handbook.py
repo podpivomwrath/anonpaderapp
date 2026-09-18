@@ -225,7 +225,8 @@ def main() -> None:
     print("## Подклассы")
     print()
     print(f"Пресет баффов: от {bc.PRESET_MIN_BUFFS} до {bc.PRESET_MAX_BUFFS} штук, "
-          "минимум один из обороны или контроля и утилиты - чистый моно-урон собрать нельзя.")
+          "любых из пула своего подкласса. Ограничений по категориям нет - "
+          "хоть пять баффов урона.")
     print()
     for sub_id, sub in REGISTRY.items():
         roles = [ROLE_TITLES[sub.natural_role.value]]
