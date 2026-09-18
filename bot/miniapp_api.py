@@ -97,6 +97,7 @@ def _character_payload(
             "support_power": derived.support_power,
             "dodge_chance": derived.dodge_chance,
             "ability_dodge_chance": derived.ability_dodge_chance,
+            "poison_power": derived.poison_power,
         },
     }
 

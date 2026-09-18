@@ -6,6 +6,7 @@
 
 from dataclasses import dataclass
 
+from game.classes.poisoner import poison_tick_damage_per_stack
 from game.combat import balance_config as bc
 from game.combat import formulas
 from models import Character, CharacterStats
@@ -21,6 +22,10 @@ class DerivedStats:
     support_power: float
     dodge_chance: float
     ability_dodge_chance: float
+    #: Урон ядом Отравителя за ход при полном числе стаков. Считается НЕ от
+    #: урона атаки, а от Воли и Ловкости, поэтому по остальным статам его
+    #: не видно вовсе - без этой строки игрок не может понять, что качать.
+    poison_power: float
 
 
 def compute(
@@ -52,4 +57,7 @@ def compute(
         support_power=formulas.support_power(will),
         dodge_chance=formulas.dodge_chance(agility),
         ability_dodge_chance=formulas.ability_dodge_chance(agility),
+        poison_power=round(
+            poison_tick_damage_per_stack(will, agility) * bc.POISONER_MAX_STACKS, 1
+        ),
     )

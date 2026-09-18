@@ -35,6 +35,12 @@ const CONTROL_RESIST_CAP = 0.75;
 
 const SUPPORT_POWER_PER_WIL = 0.005;
 
+// Сила яда Отравителя. Считается НЕ от урона атаки, а от Воли и Ловкости,
+// причём Воля весит больше, хотя основной стат подкласса - Ловкость.
+const POISON_PER_WIL = 0.95;
+const POISON_PER_AGI = 0.65;
+const POISON_MAX_STACKS = 3;
+
 // Уворот от Ловкости (патч 34, ч.1).
 const DODGE_PER_AGI = 0.00297;
 const DODGE_STAT_CAP = 0.6;
@@ -75,11 +81,15 @@ export function computeDerived({ level, baseClass, stats, gearBonus = {} }) {
   const mitigation = Math.min(MITIGATION_PER_VIT * vit, MITIGATION_CAP);
   const controlResist = Math.min(CONTROL_RESIST_PER_WIL * wil, CONTROL_RESIST_CAP);
   const supportPower = SUPPORT_POWER_PER_WIL * wil;
+  // урон за ход при полном числе стаков: делится на стаки и тут же
+  // умножается обратно, но так формула читается так же, как в движке
+  const poisonPower =
+    ((POISON_PER_WIL * wil + POISON_PER_AGI * agi) / POISON_MAX_STACKS) * POISON_MAX_STACKS;
   const dodgeChance = Math.min(DODGE_PER_AGI * agi, DODGE_STAT_CAP);
   const abilityDodgeChance = dodgeChance * ABILITY_DODGE_RATIO;
 
   return {
     maxHp, damage, critChance, mitigation, controlResist, supportPower,
-    dodgeChance, abilityDodgeChance,
+    dodgeChance, abilityDodgeChance, poisonPower,
   };
 }

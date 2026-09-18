@@ -43,6 +43,15 @@ const DERIVED_DEFS = [
     label: '✨ Сила поддержки',
     format: (v) => (v + EPS).toFixed(2),
   },
+  {
+    key: 'poison_power',
+    clientKey: 'poisonPower',
+    label: '☠ Сила яда за ход',
+    // Урон ядом идёт мимо обычного урона и зависит от Воли и Ловкости, поэтому
+    // по остальным строкам его не видно. Показываем только тем, кому он нужен.
+    onlyFor: 'poisoner',
+    format: (v) => (v + EPS).toFixed(1),
+  },
 ];
 
 // Патч 34, ч.1: уворот - составная строка (от атак + от способностей вместе),
@@ -137,7 +146,7 @@ export default function StatsTab({ character, onCharacterUpdate }) {
       </Group>
 
       <Group header={<Header>Предпросмотр</Header>}>
-        {DERIVED_DEFS.map((row) => {
+        {DERIVED_DEFS.filter((row) => !row.onlyFor || row.onlyFor === character.subclass).map((row) => {
           const before = character.derived[row.key];
           const after = previewDerived[row.clientKey];
           const changed = totalPending > 0 && row.format(before) !== row.format(after);

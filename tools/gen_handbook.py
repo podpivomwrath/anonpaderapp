@@ -105,7 +105,12 @@ def skill_mechanics() -> dict[str, str]:
             "Гарантированный крит. По цели ниже трети здоровья урон удваивается.",
         "poisoner_venom":
             f"Накладывает стак яда, максимум {bc.POISONER_MAX_STACKS}. Яд держится "
-            f"{turns(bc.POISONER_POISON_DURATION_TICKS)} и тикает уроном каждый ход.",
+            f"{turns(bc.POISONER_POISON_DURATION_TICKS)} и тикает уроном каждый ход. "
+            "Урон яда считается НЕ от урона атаки, а от Воли и Ловкости, причём "
+            f"Воля весит больше: одно очко Воли даёт "
+            f"{bc.POISONER_POISON_WIL_COEF / bc.POISONER_MAX_STACKS:.2f} урона за стак, "
+            f"очко Ловкости - {bc.POISONER_POISON_AGI_COEF / bc.POISONER_MAX_STACKS:.2f}. "
+            "Яд не критует и не может промахнуться, но его держит щит.",
         "poisoner_decay":
             f"Уязвимость {pct(_s('poisoner_decay').effect_value)} на "
             f"{turns(_s('poisoner_decay').effect_duration)}: цель получает больше урона от ВСЕХ.",
