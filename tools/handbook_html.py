@@ -1,7 +1,15 @@
 """HTML-версия справочника: та же сборка из живых данных, но страницей.
 
 Держим отдельно от gen_handbook.py, чтобы разметка не мешалась с текстом.
-Запуск:  python tools/handbook_html.py > tools/handbook.html
+
+    python tools/handbook_html.py            > tools/handbook.html
+    python tools/handbook_html.py --offline  > tools/handbook_local.html
+
+--offline собирает файл, который можно просто отдать игроку: он открывается
+двойным кликом и работает без интернета. Отличие одно — не подтягиваются шрифты
+с Google Fonts, вместо них системные. Нужно это потому, что не у всех есть
+доступ к клоду, где лежит онлайн-версия, а страницу с битыми ссылками на CDN
+показывать игрокам нельзя: без сети она молча теряет всю типографику.
 """
 
 from __future__ import annotations
@@ -98,11 +106,6 @@ STYLE = """
     gap: 3rem;
     align-items: start;
   }
-  @media (max-width: 900px) {
-    .wrap { grid-template-columns: minmax(0, 1fr); gap: 2rem; }
-    nav.index { position: static; max-height: none; }
-  }
-
   h1, h2, h3 {
     font-family: "Old Standard TT", Georgia, "Times New Roman", serif;
     font-weight: 400;
@@ -204,6 +207,15 @@ STYLE = """
     margin-top: 4rem; padding-top: 1.2rem; border-top: 1px solid var(--rule);
     color: var(--ink-faint); font-size: 0.85rem;
   }
+
+  /* Узкий экран. Блок стоит В КОНЦЕ намеренно: медиазапрос не добавляет
+     специфичности, поэтому раньше базовое nav.index{position:sticky} ниже по
+     файлу перебивало его обратно — оглавление оставалось прилипшим, и текст
+     уезжал под него. На телефоне страница была нечитаема. */
+  @media (max-width: 900px) {
+    .wrap { grid-template-columns: minmax(0, 1fr); gap: 2rem; }
+    nav.index { position: static; max-height: none; overflow-y: visible; }
+  }
 </style>
 """
 
@@ -230,18 +242,31 @@ def skill_card(skill, mechanics: str | None, *, generic_effect: bool) -> str:
     return "\n".join(out)
 
 
-def main() -> None:
+def main(offline: bool = False) -> None:
     sys.stdout.reconfigure(encoding="utf-8")
     mech = skill_mechanics()
     o: list[str] = []
     a = o.append
 
     a("<title>Список Хранителя</title>")
-    a('<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>')
-    a('<link rel="stylesheet" href="https://fonts.googleapis.com/css2?'
-      'family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans:wght@400;600&'
-      'family=Old+Standard+TT:ital@0;1&display=swap">')
+    a('<meta charset="utf-8">')
+    a('<meta name="viewport" content="width=device-width,initial-scale=1">')
+    if not offline:
+        a('<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>')
+        a('<link rel="stylesheet" href="https://fonts.googleapis.com/css2?'
+          'family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans:wght@400;600&'
+          'family=Old+Standard+TT:ital@0;1&display=swap">')
     a(STYLE)
+    if offline:
+        # Шрифтов из сети нет — подменяем семейства системными, иначе браузер
+        # свалится на дефолтный Times и страница поедет.
+        a("<style>"
+          ":root{--ground:#e9e6e0;--surface:#f4f2ee;color-scheme:light dark}"
+          'body{font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}'
+          'h1,h2,h3,blockquote.keeper{font-family:Georgia,"Times New Roman",serif}'
+          '.numbers,.meta,.stamp,.cat,nav.index p,table.stats'
+          '{font-family:ui-monospace,Consolas,"DejaVu Sans Mono",monospace}'
+          "</style>")
     a('<div class="wrap">')
 
     # --- боковой указатель ---
@@ -327,4 +352,4 @@ def main() -> None:
 
 
 if __name__ == "__main__":
-    main()
+    main(offline="--offline" in sys.argv)
