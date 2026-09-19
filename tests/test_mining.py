@@ -495,7 +495,7 @@ async def test_restart_cancels_digs_and_returns_their_ore(
     released = await mining_service.release_after_restart(db_session)
     await db_session.refresh(character)
 
-    assert released == 1
+    assert released == [character.id], "нужно знать, КОГО предупреждать"
     assert character.screen is None
     assert not mining_service.is_digging(character)
     assert await mining_service.ore_in_mine(db_session, EASY_MINE) == 2
@@ -615,3 +615,22 @@ async def test_refill_tops_up_every_vein_without_touching_the_journal(
         sa_select(MiningEvent).where(MiningEvent.kind == "spawn")
     )).scalars().all()
     assert spawns == [], "пополнение админки не должно писаться как спавн"
+
+
+@pytest.mark.asyncio
+async def test_restart_reports_who_to_warn(db_session, make_character) -> None:
+    """Отмена добычи обязана быть громкой: молча снятый таймер неотличим от
+    зависшего, и игрок досиживает обещанные минуты впустую. Ровно это и
+    случилось на проде после одного из деплоев."""
+    digger = await make_character()
+    digger.pos_x, digger.pos_y = 46, 44
+    idle = await make_character()
+    db_session.add(MineVein(mine_id=EASY_MINE, ore_count=1))
+    await db_session.flush()
+    mine = mining.mine_by_id(EASY_MINE)
+    await mining_service.start_dig(db_session, digger, mine, random.Random(0))
+
+    released = await mining_service.release_after_restart(db_session)
+
+    assert released == [digger.id]
+    assert idle.id not in released, "спокойных игроков предупреждать не о чем"

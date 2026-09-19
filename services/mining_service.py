@@ -355,7 +355,7 @@ async def total_ore(db: AsyncSession, character_id: int) -> int:
 
 # --- Обслуживание -------------------------------------------------------------
 
-async def release_after_restart(db: AsyncSession) -> int:
+async def release_after_restart(db: AsyncSession) -> list[int]:
     """После рестарта бота выбрасывает копающих наверх и ОТМЕНЯЕТ их добычу.
 
     Возврата к прерванной добыче в игре нет: ушёл из забоя — начинаешь
@@ -365,6 +365,11 @@ async def release_after_restart(db: AsyncSession) -> int:
 
     Экран сбрасывается только тем, кто стоял в руднике: чужой сохранённый
     экран (скупщик, лавка) трогать незачем.
+
+    Возвращает id персонажей, у которых добыча была прервана — их обязательно
+    надо предупредить. Молчаливая отмена выглядит как зависший таймер: игрок
+    продолжает ждать обещанные минуты, а ждать уже нечего (так и случилось на
+    проде после одного из деплоев).
     """
     diggers = (
         await db.execute(
@@ -378,7 +383,7 @@ async def release_after_restart(db: AsyncSession) -> int:
         update(Character).where(Character.screen == "mine").values(screen=None)
     )
     await db.commit()
-    return len(diggers)
+    return [character.id for character in diggers]
 
 
 # --- Статистика для админки ---------------------------------------------------

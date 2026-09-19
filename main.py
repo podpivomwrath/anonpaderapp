@@ -79,12 +79,28 @@ async def run() -> None:
     async with get_session_factory()() as db:
         released = await mining_service.release_after_restart(db)
         if released:
-            logger.info("После рестарта поднято наверх из забоев: {}", released)
+            logger.info("После рестарта прервана добыча у {} игроков", len(released))
         recovered = await raid_service.recover_interrupted(db)
         await db.commit()
     if recovered:
         logger.warning("Recovered interrupted raids for {} characters; keys refunded", len(recovered))
     bot = create_bot(settings)
+    if released:
+        # Отмена добычи обязана быть ГРОМКОЙ. Молча снятый таймер неотличим от
+        # зависшего: игрок досиживает обещанные минуты впустую.
+        async with get_session_factory()() as db:
+            peers = await raid_handlers._peer_ids_for(db, sorted(set(released)))
+        for peer in peers.values():
+            try:
+                await bot.api.messages.send(
+                    peer_id=peer, random_id=0,
+                    message=(
+                        "⛏ Сервер перезапустился, и добыча прервалась. "
+                        "Начатая порода вернулась в жилу - спустись и начни заново."
+                    ),
+                )
+            except Exception:
+                logger.exception("Не удалось предупредить об отмене добычи")
     if recovered:
         async with get_session_factory()() as db:
             peers = await raid_handlers._peer_ids_for(db, sorted(set(recovered)))
