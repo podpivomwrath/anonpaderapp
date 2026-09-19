@@ -408,3 +408,38 @@ async def test_stale_cast_does_not_lock_the_rod_forever(db_session, make_charact
         seconds=fc.STRIKE_WINDOW_SECONDS + 1
     )
     assert fishing_service.cast_is_stale(character, long_after) is True
+
+
+# --- Порог уровня на вид рыбы (патч 62) ---------------------------------------
+
+def test_fish_tier_is_gated_by_fishing_level() -> None:
+    """Регрессия на реальный случай: рыбак 9-го уровня ловил у Монолита Слезу
+    глубины и Монолитова сома — рыбу тира 4-5.
+
+    Обрыв лески в 92% этого не останавливал: заброс стоит полминуты, и один
+    успех из двенадцати — шесть минут за трофей. Вероятностный гейт не
+    работает, когда попытка почти ничего не стоит.
+    """
+    rng = random.Random(1)
+    for level, expected_tier in ((1, 1), (9, 1), (10, 2), (25, 3), (50, 4), (80, 5)):
+        assert fishing.unlocked_tier(level) == expected_tier
+        assert fishing.pool_tier_for(5, level) == expected_tier
+        caught = {
+            fishing.roll_fish_id(rng, 5, level) for _ in range(400)
+        } - {fc.NAMELESS_ID}
+        allowed = set(fc.LAKE_POOLS[expected_tier])
+        assert caught <= allowed, f"ур.{level} выловил рыбу выше порога: {caught - allowed}"
+
+
+def test_fishing_gate_matches_the_mining_one() -> None:
+    """Шкала у ремёсел общая намеренно: два разных порога на одно и то же
+    «дорос или нет» игрок бы не запомнил."""
+    from game.economy import mining_config as mc
+
+    assert fc.LAKE_REQUIRED_LEVEL == mc.MINE_REQUIRED_LEVEL
+
+
+def test_gate_never_raises_the_tier_above_the_lake() -> None:
+    for level in (1, 80, 10_000):
+        for tier in fc.LAKE_POOLS:
+            assert fishing.pool_tier_for(tier, level) <= tier

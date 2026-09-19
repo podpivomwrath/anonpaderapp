@@ -282,7 +282,7 @@ async def finish_dig(
         mine = mining.mine_by_id(character.mining_mine_id)
         tier = mine.tier if mine is not None else 1
 
-    ore_id = mining.roll_ore_id(rng, tier, event_vein)
+    ore_id = mining.roll_ore_id(rng, tier, event_vein, character.mining_level)
     grade_id, grade_label = mining.roll_grade(rng, tier, character.mining_level, event_vein)
     await add_ore(db, character.id, ore_id, grade_id, 1)
     db.add(MiningEvent(

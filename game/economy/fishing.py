@@ -108,12 +108,34 @@ def roll_bite(rng: random.Random) -> tuple[float, float]:
 # --- Вид и вес ---------------------------------------------------------------
 
 
-def roll_fish_id(rng: random.Random, lake_tier: int) -> str:
-    """Какой вид клюнул. Безымянное проверяется ДО пула — оно доступно на
-    любом озере и не занимает место в его раскладке."""
+def unlocked_tier(fishing_level: int) -> int:
+    """Самый высокий тир рыбы, до которого рыбак дорос (патч 62)."""
+    unlocked = 1
+    for tier, required in sorted(fc.LAKE_REQUIRED_LEVEL.items()):
+        if fishing_level >= required:
+            unlocked = tier
+    return unlocked
+
+
+def pool_tier_for(lake_tier: int, fishing_level: int) -> int:
+    """Из какого пула тянуть рыбу: не выше озера и не выше своего уровня.
+
+    Не дорос — на глубоком озере клюёт то, что попроще. Рыба никуда не
+    девается, просто достаётся не тебе.
+    """
+    return min(lake_tier, unlocked_tier(fishing_level))
+
+
+def roll_fish_id(rng: random.Random, lake_tier: int, fishing_level: int = 10**9) -> str:
+    """Какой вид клюнул.
+
+    Безымянное проверяется ДО пула и порогом НЕ ограничено: 0.3% на заброс —
+    это лотерея, а не источник рыбы, и запирать её уровнем значило бы отнять у
+    новичка единственный шанс на чудо.
+    """
     if rng.random() < fc.NAMELESS_CHANCE:
         return fc.NAMELESS_ID
-    pool = fc.LAKE_POOLS[lake_tier]
+    pool = fc.LAKE_POOLS[pool_tier_for(lake_tier, fishing_level)]
     total = sum(pool.values())
     roll = rng.random() * total
     cumulative = 0.0

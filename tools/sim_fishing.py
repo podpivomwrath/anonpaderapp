@@ -120,7 +120,7 @@ def simulate(lake_tier: int, fishing_level: int, hours: float, rng: random.Rando
             res.gold += 1
             continue
 
-        fish_id = fishing.roll_fish_id(rng, lake_tier)
+        fish_id = fishing.roll_fish_id(rng, lake_tier, fishing_level)
         grams, fraction = fishing.roll_weight(rng, fish_id, fishing_level, f_bonus)
 
         if rng.random() < fishing.line_break_chance(lake_tier, fishing_level, fraction):

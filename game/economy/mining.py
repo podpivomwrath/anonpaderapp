@@ -112,20 +112,50 @@ def format_duration(seconds: float) -> str:
 # --- Вид и градация -----------------------------------------------------------
 
 
-def pool_tier_for(mine_tier: int, event_vein: bool) -> int:
-    """Мелкая жила из исследования беднее рудника того же кольца — иначе
-    рудники были бы не нужны вовсе."""
-    if not event_vein:
-        return mine_tier
-    return max(1, mine_tier - mc.EVENT_VEIN_TIER_PENALTY)
+def unlocked_tier(mining_level: int) -> int:
+    """Самый высокий тир руды, до которого игрок дорос.
+
+    Патч 62. Раньше вид руды зависел ТОЛЬКО от рудника: горняк 2-го уровня
+    приходил к Монолиту и добывал Багряный сросток — просто медленно. Уровень
+    влиял на скорость и градацию, но не на то, ЧТО можно взять, и эндгеймовый
+    материал был открыт с первого уровня (так и случилось на проде).
+
+    Шкала берётся из MINE_REQUIRED_LEVEL — той же, по которой считается штраф
+    за глубину. Отдельной заводить не стали: два разных порога на одно и то же
+    «дорос или нет» игрок бы не запомнил.
+    """
+    unlocked = 1
+    for tier, required in sorted(mc.MINE_REQUIRED_LEVEL.items()):
+        if mining_level >= required:
+            unlocked = tier
+    return unlocked
 
 
-def roll_ore_id(rng: random.Random, mine_tier: int, event_vein: bool = False) -> str:
-    """Какая руда попалась. Живой камень проверяется ДО пула: он доступен в
-    любой выработке и не занимает места в её раскладке."""
+def pool_tier_for(mine_tier: int, event_vein: bool, mining_level: int = 10**9) -> int:
+    """Из какого пула тянуть руду.
+
+    Три ограничения подряд: тир самого рудника, штраф мелкой жилы (она беднее
+    рудника того же кольца, иначе рудники были бы не нужны) и потолок по
+    уровню игрока. Не дорос — берёшь из рудника то, что попроще; руда никуда
+    не девается, просто достаётся не тебе.
+    """
+    tier = mine_tier if not event_vein else max(1, mine_tier - mc.EVENT_VEIN_TIER_PENALTY)
+    return min(tier, unlocked_tier(mining_level))
+
+
+def roll_ore_id(
+    rng: random.Random, mine_tier: int, event_vein: bool = False,
+    mining_level: int = 10**9,
+) -> str:
+    """Какая руда попалась.
+
+    Живой камень проверяется ДО пула и порогом уровня НЕ ограничен: 0.3% на
+    любую добычу — это лотерея, а не источник материала, и запирать её
+    уровнем значило бы отнять у новичка единственный шанс на чудо.
+    """
     if rng.random() < mc.LIVING_STONE_CHANCE:
         return mc.LIVING_STONE_ID
-    pool = mc.MINE_POOLS[pool_tier_for(mine_tier, event_vein)]
+    pool = mc.MINE_POOLS[pool_tier_for(mine_tier, event_vein, mining_level)]
     total = sum(pool.values())
     roll = rng.random() * total
     cumulative = 0.0

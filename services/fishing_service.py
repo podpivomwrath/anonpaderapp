@@ -113,7 +113,7 @@ def start_cast(
     character.fishing_cast_at = now
 
     wait, f_bonus = fishing.roll_bite(rng)
-    fish_id = fishing.roll_fish_id(rng, lake.tier)
+    fish_id = fishing.roll_fish_id(rng, lake.tier, character.fishing_level)
     grams, _fraction = fishing.roll_weight(rng, fish_id, character.fishing_level, f_bonus)
     character.fishing_bite_at = now + timedelta(seconds=wait)
     character.fishing_pending_fish = fish_id

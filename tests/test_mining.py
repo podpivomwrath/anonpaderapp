@@ -634,3 +634,42 @@ async def test_restart_reports_who_to_warn(db_session, make_character) -> None:
 
     assert released == [digger.id]
     assert idle.id not in released, "спокойных игроков предупреждать не о чем"
+
+
+# --- Порог уровня на вид руды (патч 62) ---------------------------------------
+
+def test_ore_tier_is_gated_by_mining_level() -> None:
+    """Регрессия на реальный случай: горняки 2-4 уровня добыли руду тира 4 и 5.
+
+    Вид руды зависел ТОЛЬКО от рудника — уровень влиял на скорость и градацию,
+    но не на то, ЧТО можно взять. Эндгеймовый материал был открыт с первого
+    уровня, надо было лишь дойти до Монолита и подождать.
+    """
+    rng = random.Random(1)
+    for level, expected_tier in ((1, 1), (9, 1), (10, 2), (25, 3), (50, 4), (80, 5)):
+        assert mining.unlocked_tier(level) == expected_tier
+        # В самом глубоком руднике новичку достаётся пул по его уровню.
+        assert mining.pool_tier_for(5, False, level) == expected_tier
+        ores = {
+            mining.roll_ore_id(rng, 5, False, level) for _ in range(400)
+        } - {mc.LIVING_STONE_ID}
+        allowed = set(mc.MINE_POOLS[expected_tier])
+        assert ores <= allowed, f"ур.{level} достал руду выше своего порога: {ores - allowed}"
+
+
+def test_level_gate_never_raises_the_tier_above_the_mine() -> None:
+    """Порог только ОПУСКАЕТ: мастер в бедном руднике не начинает добывать
+    то, чего там нет."""
+    for level in (1, 80, 10_000):
+        for tier in mc.MINE_POOLS:
+            assert mining.pool_tier_for(tier, False, level) <= tier
+
+
+def test_living_stone_stays_available_to_everyone() -> None:
+    """Лотерея 0.3% порогом не запирается: это шанс на чудо, а не источник
+    материала, и отнимать его у новичка незачем."""
+    class _AlwaysLottery(random.Random):
+        def random(self) -> float:
+            return 0.0
+
+    assert mining.roll_ore_id(_AlwaysLottery(), 1, False, 1) == mc.LIVING_STONE_ID
