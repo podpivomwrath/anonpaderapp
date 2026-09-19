@@ -49,6 +49,12 @@ def fire_whip(ctx: SkillContext) -> None:
     multiplier = skill.multiplier * element_damage_multiplier(actor, "fire")
     hit = compute_hit(actor, target, ctx.rng, skill.name, multiplier, is_ability=True)
     ctx.hits.append(hit)
+    # Удар мимо не поджигает. Раньше магнитуда считалась как
+    # max(hit.amount * effect_value, 1.0), и промах всё равно вешал Горение
+    # силой 1: три хода по 1 урону, взявшиеся из ничего. Выходим до всего
+    # остального - у промаха не должно быть и «Огненного дождя».
+    if hit.missed or hit.amount <= 0:
+        return
     burn_value = max(hit.amount * skill.effect_value, 1.0)
     target.apply_effect(EffectKind.DOT, burn_value, skill.effect_duration, actor.id)
     ctx.lines.append(f"{target.name} охвачен пламенем 🔥")

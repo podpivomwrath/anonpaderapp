@@ -106,26 +106,36 @@ def blood_pact(ctx: SkillContext) -> None:
     resonance = actor.buff_modifiers.get("resonance_bonus", 0.0)
     if resonance > 0 and heal_target.current_hp < heal_target.max_hp * bc.DARK_MYSTIC_RESONANCE_HP_THRESHOLD:
         conversion += resonance
-    heal = max(round(hit.amount * conversion * _solo_heal_penalty(ctx)), 1)
+    # Пакт конвертирует НАНЕСЁННЫЙ урон. Мимо - конвертировать нечего, и
+    # производные (разделённый пакт, круг тьмы) тоже не срабатывают: они
+    # считаются долей от этого лечения. Раньше стоял max(..., 1), и промах
+    # рассылал всей группе «восполнено 1 HP», не двигая ни одной полоски.
+    heal = round(hit.amount * conversion * _solo_heal_penalty(ctx))
+    if heal <= 0:
+        return
     ctx.heals.append(PendingHeal(source_id=actor.id, target_id=heal_target.id, amount=heal, label="исцеляет тьмой"))
 
     ranked = _allies_by_hp(ctx)
     # «Разделённый пакт»: доля лечения уходит ВТОРОМУ по тяжести раненому.
     shared = actor.buff_modifiers.get("shared_pact_pct", 0.0)
     if shared > 0 and len(ranked) >= 2:
-        ctx.heals.append(
-            PendingHeal(source_id=actor.id, target_id=ranked[1].id,
-                        amount=max(round(heal * shared), 1), label="делит пакт")
-        )
+        shared_heal = round(heal * shared)
+        if shared_heal > 0:
+            ctx.heals.append(
+                PendingHeal(source_id=actor.id, target_id=ranked[1].id,
+                            amount=shared_heal, label="делит пакт")
+            )
     # «Круг тьмы» (бафф): раз в N ходов пакт лечит вдобавок всех союзников.
     interval = int(actor.buff_modifiers.get("circle_interval", 0))
     if interval and ranked and ctx.session.tick_number % interval == 0:
         share = actor.buff_modifiers.get("circle_pct", bc.DARK_MYSTIC_CIRCLE_PCT)
-        for ally in ranked:
-            ctx.heals.append(
-                PendingHeal(source_id=actor.id, target_id=ally.id,
-                            amount=max(round(heal * share), 1), label="исцеляет кругом тьмы")
-            )
+        circle_heal = round(heal * share)
+        if circle_heal > 0:
+            for ally in ranked:
+                ctx.heals.append(
+                    PendingHeal(source_id=actor.id, target_id=ally.id,
+                                amount=circle_heal, label="исцеляет кругом тьмы")
+                )
 
     # Пакт с «Самоотречением» тоже стоил собственного HP - заряжаем награду
     # уже ПОСЛЕ применения, чтобы этот же удар себя не усилил.
@@ -184,8 +194,12 @@ def drain(ctx: SkillContext) -> None:
     multiplier = skill.multiplier * bc.DARK_MYSTIC_DRAIN_CONTROLLED_MULT if controlled else skill.multiplier
     hit = compute_hit(actor, target, ctx.rng, skill.name, multiplier, is_ability=True)
     ctx.hits.append(hit)
-    heal = max(round(hit.amount * skill.effect_value * _solo_heal_penalty(ctx)), 1)
-    ctx.heals.append(PendingHeal(source_id=actor.id, target_id=actor.id, amount=heal, label="исцеляется иссушением"))
+    # Иссушение тоже пьёт из нанесённого урона: промах не лечит.
+    heal = round(hit.amount * skill.effect_value * _solo_heal_penalty(ctx))
+    if heal > 0:
+        ctx.heals.append(
+            PendingHeal(source_id=actor.id, target_id=actor.id, amount=heal, label="исцеляется иссушением")
+        )
 
 
 @offensive_skill("dark_mystic_circle")

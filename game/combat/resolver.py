@@ -507,6 +507,14 @@ def resolve_tick(
         target = session.combatants[heal.target_id]
         h_before = running_hp[target.id]
         h_after = min(h_before + heal.amount, target.max_hp)
+        # В лог идёт ФАКТИЧЕСКИ восполненное, а не запрошенное. Лечение поверх
+        # полного HP не восполняет ничего, и строка «восполнено 1 HP
+        # (100.0% -> 100.0%)» сама себе противоречила. Ноль не печатаем вовсе:
+        # строка, в которой не изменилось ни число, ни проценты, - это шум,
+        # а в рейде на пятерых такого шума приходило по пять строк за ход.
+        applied = h_after - h_before
+        if applied <= 0:
+            continue
         running_hp[target.id] = h_after
         result.lines.append(
             display.action_line(
@@ -517,7 +525,7 @@ def resolve_tick(
         result.heal_renders.append(
             RenderedHeal(
                 source_id=source.id, target_id=target.id, source_side=source.side, target_side=target.side,
-                label=heal.label, amount=heal.amount, hp_before=h_before, hp_after=h_after, max_hp=target.max_hp,
+                label=heal.label, amount=applied, hp_before=h_before, hp_after=h_after, max_hp=target.max_hp,
             )
         )
 
