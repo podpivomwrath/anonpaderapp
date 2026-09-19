@@ -106,6 +106,22 @@ class Character(Base):
     fishing_pending_fish: Mapped[str | None] = mapped_column(String(32), nullable=True)
     fishing_pending_grams: Mapped[int | None] = mapped_column(nullable=True)
 
+    # Патч 59, горное дело. Уровень без потолка, как у рыбалки.
+    mining_level: Mapped[int] = mapped_column(default=1)
+    mining_xp: Mapped[int] = mapped_column(BigInteger, default=0)
+    # Состояние добычи. Добыча БЛОКИРУЕТ все действия, пока идёт, и живёт в
+    # БД, а не в памяти: она длится минутами (до полутора часов новичку в
+    # глубоком руднике), и терять её из-за деплоя нельзя.
+    #
+    # mining_mine_id — id статичного рудника; NULL при идущей добыче означает
+    # мелкую жилу из исследования. Правило возврата у них разное: к статичному
+    # руднику можно вернуться и доработать остаток, мелкая жила исчезает при
+    # любом выходе.
+    mining_ends_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    mining_mine_id: Mapped[str | None] = mapped_column(String(48), nullable=True)
+
     # Патч 58: всего убито мобов за всё время. Истории боёв с мобами в базе
     # нет (pvp_battles пишет только PvP), поэтому пересчитать задним числом
     # нечем — счётчик стартует с нуля у всех, включая действующих игроков.

@@ -23,6 +23,7 @@ from bot.handlers import presets as presets_handlers
 from bot.handlers import promo as promo_handlers
 from bot.handlers import pvp as pvp_handlers
 from bot.handlers import fishing as fishing_handlers
+from bot.handlers import mining as mining_handlers
 from bot.handlers import raid as raid_handlers
 from bot.handlers import raid_combat as raid_combat_handlers
 from bot.handlers import respawn as respawn_handlers
@@ -36,7 +37,7 @@ from game.combat.tick_engine import InMemoryActionStore, RedisActionStore, TickE
 from game.economy import mount_config as mc
 from game.world.scheduler import PeerScheduler
 from services.db import dispose_engine, get_session_factory
-from services import raid_service
+from services import mining_service, raid_service
 
 
 def create_bot(settings: Settings) -> Bot:
@@ -76,6 +77,9 @@ async def run() -> None:
 
     # Recover receipts before accepting any event or starting scheduled jobs.
     async with get_session_factory()() as db:
+        released = await mining_service.release_after_restart(db)
+        if released:
+            logger.info("После рестарта поднято наверх из забоев: {}", released)
         recovered = await raid_service.recover_interrupted(db)
         await db.commit()
     if recovered:
@@ -164,6 +168,11 @@ async def run() -> None:
     bite_scheduler = PeerScheduler(fishing_handlers.on_bite, job_prefix="fishing_bite")
     bite_scheduler.start()
     fishing_handlers.setup(bot.api, bite_scheduler)
+
+    # Патч 59: окончание добычи — тот же механизм отложенных событий.
+    dig_scheduler = PeerScheduler(mining_handlers.on_dig_done, job_prefix="mining_dig")
+    dig_scheduler.start()
+    mining_handlers.setup(bot.api, dig_scheduler)
 
     travel_scheduler = PeerScheduler(world_handlers.handle_arrival, job_prefix="travel")
     travel_scheduler.start()

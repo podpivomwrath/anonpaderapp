@@ -239,6 +239,10 @@ class ExplorationEventDef(BaseModel):
     #: Что рыбак говорит, когда продавать нечего. Выбора в этой сцене нет:
     #: предлагать «продать» с пустым садком было бы издевательством.
     empty_text: str = ""
+    #: Патч 59: мелкая рудная жила. Выбора нет и здесь — вместо него приходит
+    #: инлайн-кнопка «Добыть», потому что добыча это не мгновенный исход, а
+    #: процесс на несколько минут, который блокирует игрока.
+    ore_vein: bool = False
 
 
 def load_exploration_events(content_dir: Path = CONTENT_DIR) -> list[ExplorationEventDef]:
@@ -310,6 +314,47 @@ class LakeDef(BaseModel):
 
 def load_lakes(content_dir: Path = CONTENT_DIR) -> list[LakeDef]:
     return [LakeDef(**raw) for raw in _load_json(content_dir / "fishing" / "lakes.json")]
+
+
+class OreDef(BaseModel):
+    """Вид руды (content/mining/ores.json, патч 59) — каталог: имя/эмодзи/лор.
+
+    Числа (пулы рудников, градации, время, опыт) — в
+    game/economy/mining_config.py, как и у рыбы.
+    """
+
+    id: str
+    emoji: str
+    name: str
+    tier: int
+    description: str = ""
+
+
+def load_ore_defs(content_dir: Path = CONTENT_DIR) -> list[OreDef]:
+    return [OreDef(**raw) for raw in _load_json(content_dir / "mining" / "ores.json")]
+
+
+class MineDef(BaseModel):
+    """Рудник (content/mining/mines.json, патч 59) — клетка с фиксированными
+    координатами, по той же логике, что озёра, но в других местах.
+
+    Отличие от озера: рудник не бесконечен. Сколько в нём сейчас руды —
+    состояние мира (таблица mine_veins), общее для всех игроков, а не
+    свойство контента. `tier` обязан совпадать с кольцом своих координат.
+    """
+
+    id: str
+    x: int
+    y: int
+    tier: int
+    name: str
+    descriptions: list[str]
+    region: str | None = None
+    image: str | None = None
+
+
+def load_mines(content_dir: Path = CONTENT_DIR) -> list[MineDef]:
+    return [MineDef(**raw) for raw in _load_json(content_dir / "mining" / "mines.json")]
 
 
 class ItemBaseDef(BaseModel):

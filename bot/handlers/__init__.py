@@ -16,6 +16,7 @@ from bot.handlers.group import labeler as group_labeler
 from bot.handlers.group_combat import labeler as group_combat_labeler
 from bot.handlers.inventory import labeler as inventory_labeler
 from bot.handlers.list_keeper import labeler as list_keeper_labeler
+from bot.handlers.mining import labeler as mining_labeler
 from bot.handlers.moderation import labeler as moderation_labeler
 from bot.handlers.mounts import labeler as mounts_labeler
 from bot.handlers.onboarding import labeler as onboarding_labeler
@@ -38,6 +39,9 @@ LABELERS = [
     # озером обработчик молчит, так что слово в обычном разговоре
     # перехвачено не будет.
     fishing_labeler,
+    # Патч 59: горное дело. Тут та же причина, что у рыбалки —
+    # команда одним словом («Рудник») иначе ушла бы в промокоды.
+    mining_labeler,
     # Патч 51, ч.2: группы — команды конкретные ("пригласить <ник>", "/выйти",
     # "/выгнать <ник>"), но одиночное слово "пригласить" (приглашение
     # пересылкой) технически проходит под тот же regex, что и промокод —

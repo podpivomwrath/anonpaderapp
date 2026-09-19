@@ -100,6 +100,14 @@ export default function MapTab() {
     return index;
   }, [catalog]);
 
+  // Патч 59: рудники. Координаты статичны, а запас руды приходит отдельно и
+  // меняется постоянно — поэтому он берётся не из каталога, а из состояния.
+  const minesByCell = useMemo(() => {
+    const index = new Map();
+    for (const mine of catalog?.mines || []) index.set(`${mine.x}:${mine.y}`, mine);
+    return index;
+  }, [catalog]);
+
   const visibleCells = useMemo(() => {
     if (!camera || !catalog) return [];
     const halfW = size.width / 2 / cellPx;
@@ -265,6 +273,8 @@ export default function MapTab() {
           const isCity = catalog.city_coords && Object.values(catalog.city_coords).some(([cx, cy]) => cx === gx && cy === gy);
           const isMonolith = gx === 0 && gy === 0;
           const lake = lakesByCell.get(`${gx}:${gy}`);
+          const mine = minesByCell.get(`${gx}:${gy}`);
+          const mineOre = mine ? (mapState?.mine_ore?.[mine.id] || 0) : 0;
           return (
             <div
               key={`${gx}:${gy}`}
@@ -280,6 +290,15 @@ export default function MapTab() {
               )}
               {showSymbols && isCity && !isMonolith && (
                 <span className="map-cell__symbol" style={{ fontSize: Math.max(10, cellPx * 0.5) }}>⛩</span>
+              )}
+              {showSymbols && mine && !isCity && !isMonolith && (
+                <span
+                  className="map-cell__symbol map-cell__symbol--mine"
+                  style={{ fontSize: Math.max(10, cellPx * 0.5) }}
+                  title={`${mine.name}: руды ${mineOre}`}
+                >
+                  {mineOre > 0 ? '⛏' : '⚒'}
+                </span>
               )}
               {showSymbols && lake && !isCity && !isMonolith && (
                 <span
@@ -321,7 +340,10 @@ export default function MapTab() {
             className="map-tooltip"
             style={{ left: clamp(hovered.screenX + 12, 0, size.width - 180), top: clamp(hovered.screenY + 12, 0, size.height - 90) }}
           >
-            <MapTooltipContent info={cellInfo(catalog, hovered.x, hovered.y, playerPos, questTarget)} />
+            <MapTooltipContent
+              info={cellInfo(catalog, hovered.x, hovered.y, playerPos, questTarget)}
+              mineOre={mapState?.mine_ore}
+            />
           </div>
         )}
 
@@ -406,7 +428,7 @@ export default function MapTab() {
   );
 }
 
-function MapTooltipContent({ info }) {
+function MapTooltipContent({ info, mineOre }) {
   return (
     <>
       <p className="map-tooltip__coords">({info.x}; {info.y})</p>
@@ -416,6 +438,12 @@ function MapTooltipContent({ info }) {
       {info.lake && (
         <p className="map-tooltip__line map-tooltip__line--lake">
           🎣 {info.lake.name}{info.lake.safe ? ' · без PvP' : ''}
+        </p>
+      )}
+      {info.mine && (
+        <p className="map-tooltip__line map-tooltip__line--mine">
+          ⛏ {info.mine.name} · руды {mineOre?.[info.mine.id] || 0}
+          {info.mine.safe ? ' · без PvP' : ''}
         </p>
       )}
     </>

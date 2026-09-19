@@ -20,11 +20,12 @@ from bot.handlers import pvp as pvp_handlers
 from bot.handlers import world as world_handlers
 from bot.miniapp_auth import VK_USER_ID_KEY
 from game.content_loader import load_location_types
-from game.economy import fishing
+from game.economy import fishing, mining
+from game.economy import mining_config as mc
 from game.world import grid
 from game.world import world_config as wc
 from models import Character, User
-from services import death_service, movement_service, mount_service, story_service
+from services import death_service, mining_service, movement_service, mount_service, story_service
 
 _rng = random.Random()
 
@@ -58,6 +59,15 @@ _STATIC_CATALOG = {
          "name": lake.name, "safe": fishing.is_safe_lake(lake.x, lake.y)}
         for lake in fishing.all_lakes()
     ],
+    # Патч 59: рудники. Координаты статичны и едут каталогом, а вот СКОЛЬКО в
+    # них руды — состояние мира, оно меняется постоянно и приходит отдельно, в
+    # динамической части ответа (см. handle_get_state).
+    "mines": [
+        {"id": mine.id, "x": mine.x, "y": mine.y, "tier": mine.tier,
+         "name": mine.name, "safe": mining.is_safe_mine(mine.x, mine.y)}
+        for mine in mining.all_mines()
+    ],
+    "mine_ore_cap": mc.MINE_ORE_CAP,
 }
 
 
@@ -109,6 +119,9 @@ async def handle_get_state(request: web.Request) -> web.Response:
                     }
                     for m in owned
                 ],
+                # Запас руды по рудникам — динамика, поэтому здесь, а не в
+                # статичном каталоге: игрок видит, куда идти, до похода.
+                "mine_ore": await mining_service.ore_counts(db),
                 "catalog": _STATIC_CATALOG,
             }
         )

@@ -14,6 +14,7 @@ const DEFAULT_BOARDS = [
   { id: 'kills', title: '💀 Убийства' },
   { id: 'fishing', title: '🎣 Рыбалка' },
   { id: 'fish_weight', title: '🐟 Рекорды по рыбе' },
+  { id: 'mining', title: '⛏ Горное дело' },
 ];
 
 const EMPTY_HINTS = {
@@ -21,6 +22,7 @@ const EMPTY_HINTS = {
   kills: 'Пока никто не убил ни одного моба.',
   fishing: 'Пока никто не поднял уровень рыбалки.',
   fish_weight: 'Пока никто ничего не поймал.',
+  mining: 'Пока никто не поднял уровень горного дела.',
 };
 
 export default function TopsTab() {

@@ -297,6 +297,7 @@ async def handle_post_reset_activities(request: web.Request) -> web.Response:
         "travel_reset": report.travel_reset,
         "mount_reset": report.mount_reset,
         "fishing_reset": report.fishing_reset,
+        "mining_reset": report.mining_reset,
         "redis_cleared": report.redis_cleared,
         "notified": notified,
     })

@@ -18,8 +18,6 @@
 """
 
 import random
-from bot.activity import activity_action, transition, blocked_reason, ActivityBusy
-from bot.battle_keyboard import in_any_battle
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 
@@ -27,6 +25,8 @@ from sqlalchemy import select
 from vkbottle.bot import BotLabeler, Message
 
 from bot import dailies_texts, editable_message
+from bot.activity import ActivityBusy, activity_action, blocked_reason, transition
+from bot.battle_keyboard import in_any_battle
 from bot.dispatch_rules import TEXT_ONLY
 from bot.handlers import combat as combat_handlers
 from bot.handlers import respawn as respawn_handlers
@@ -53,20 +53,20 @@ from bot.pvp_texts import (
 from game.combat import balance_config as bc
 from game.combat import display, elixir_effects
 from game.combat.base_skills import BASE_SKILL_DEFS
-from game.combat.subclass_skills import SUBCLASS_SKILL_DEFS
 from game.combat.duel_engine import DuelEngine, DuelResult, DuelState
 from game.combat.resolver import TickResult
 from game.combat.session import (
     ActionType,
+    CombatantState,
     CombatMode,
     CombatSessionState,
-    CombatantState,
     DeclaredAction,
     EffectKind,
     Stats,
     build_combatant,
 )
 from game.combat.skills import DEFENSIVE_SKILLS
+from game.combat.subclass_skills import SUBCLASS_SKILL_DEFS
 from game.combat.tick_engine import TickEngine
 from game.economy import elixir_config as ec
 from game.economy import fishing as game_fishing
@@ -74,11 +74,34 @@ from game.economy import premium_config as pc
 from game.world import grid
 from models import Character, CharacterStats
 from services import (
-    admin_service, daily_service, death_service, elixir_service, fishing_service, item_service,
-    mount_service, premium_service, preset_service, pvp_service, trophy_service,
+    admin_service,
+    daily_service,
+    death_service,
+    elixir_service,
+    fishing_service,
+    item_service,
+    mining_service,
+    mount_service,
+    premium_service,
+    preset_service,
+    pvp_service,
+    trophy_service,
 )
 from services import onboarding_service as onboarding_svc
 from services.db import get_session_factory
+
+
+def _is_safe_craft_cell(character) -> bool:
+    """Мирная клетка ремесла: озеро или рудник первых двух колец.
+
+    Правило одно на все ремёсла сознательно — «первые два кольца мирные»
+    игрок должен помнить одно, а не по отдельному на каждое занятие.
+    """
+    return (
+        fishing_service.is_safe_lake(character.pos_x, character.pos_y)
+        or mining_service.is_safe_mine(character.pos_x, character.pos_y)
+    )
+
 
 labeler = BotLabeler()
 
@@ -393,8 +416,8 @@ async def look_around(message: Message) -> None:
         if await _still_dead(db, character):
             await message.answer("☠ Сначала очнись.")
             return
-        # Патч 58: озёра первых двух колец — мирные, как города.
-        if fishing_service.is_safe_lake(character.pos_x, character.pos_y):
+        # Патч 58-59: озёра и рудники первых двух колец — мирные, как города.
+        if _is_safe_craft_cell(character):
             return
         # Патч 33, ч.2: города полностью мирные — кнопка и так не показывается
         # в городских клавиатурах (bot/keyboards/world.py), это защита от
@@ -452,7 +475,7 @@ async def attack_command(message: Message, target: str) -> None:
         # Патч 58: озёра первых двух колец — первые мирные клетки вне
         # городов. Проверка стоит рядом с городской намеренно: это одно и то
         # же правило «здесь не нападают», и разъезжаться им нельзя.
-        if fishing_service.is_safe_lake(character.pos_x, character.pos_y):
+        if _is_safe_craft_cell(character):
             await message.answer(LAKE_NO_PVP_TEXT)
             return
         if grid.city_region_at(character.pos_x, character.pos_y) is not None:
@@ -1202,6 +1225,9 @@ async def _finish_duel(battle: Battle, winner_cid: int, loser_cid: int) -> None:
         # Иначе охотиться на рыбаков было бы выгоднее, чем рыбачить —
         # риск для проигравшего при этом сохраняется полностью.
         fish_lost = await fishing_service.drop_bag(db, loser.id)
+        # Патч 59: добыча прерывается. Нападение — единственное, что может
+        # случиться за те минуты, пока игрок стоит в забое.
+        mining_service.abandon_dig(loser)
         death_service.apply_pvp_death(loser)
         await admin_service.log_death(db, loser, "pvp")
         respawn_handlers.register_pvp_death(loser_p.peer_id)
@@ -1362,6 +1388,9 @@ async def on_mass_battle_finished(session_id: int, result: TickResult) -> None:
             moved = await trophy_service.split_among(db, victim_cid, shares) if shares else {}
             # Патч 58: садок пропадает и в массовом PvP, по тому же правилу.
             await fishing_service.drop_bag(db, victim_cid)
+            victim_character = await db.get(Character, victim_cid)
+            if victim_character is not None:
+                mining_service.abandon_dig(victim_character)
             for winner_cid, drop in moved.items():
                 line = _format_transfer_line(drop)
                 if line:

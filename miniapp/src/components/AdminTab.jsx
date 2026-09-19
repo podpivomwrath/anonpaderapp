@@ -50,7 +50,8 @@ function MaintenanceSection() {
       setResult({
         ok: true,
         text: `Сброшено: пеших переходов ${res.travel_reset}, поездок ${res.mount_reset}, `
-          + `снастей ${res.fishing_reset}. Уведомлено игроков: ${res.notified}.`,
+          + `снастей ${res.fishing_reset}, добыч ${res.mining_reset}. `
+          + `Уведомлено игроков: ${res.notified}.`,
       });
     } catch {
       setResult({ ok: false, text: 'Не удалось сбросить состояния.' });

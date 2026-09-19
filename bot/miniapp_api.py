@@ -33,6 +33,7 @@ from services import (
     trial_service,
 )
 from game.economy import fishing as game_fishing
+from game.economy import mining as game_mining
 from services.preset_service import PresetValidationError
 from services.wallet_service import NotEnoughCurrency, get_wallet
 
@@ -92,6 +93,12 @@ def _character_payload(
             "level": character.fishing_level,
             "xp": character.fishing_xp,
             "xp_to_next": game_fishing.xp_to_next(character.fishing_level),
+        },
+        # Патч 59: уровень горного дела — там же, где рыбалка. Потолка нет.
+        "mining": {
+            "level": character.mining_level,
+            "xp": character.mining_xp,
+            "xp_to_next": game_mining.xp_to_next(character.mining_level),
         },
         "mobs_killed": character.mobs_killed,
         # Патч 32, баг 1: экипировка нужна фронтенду ОТДЕЛЬНО от derived — живой

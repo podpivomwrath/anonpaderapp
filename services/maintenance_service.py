@@ -28,10 +28,11 @@ class ResetPreview:
     travelers: int
     mount_travelers: int
     casters: int
+    diggers: int = 0
 
     @property
     def total(self) -> int:
-        return self.travelers + self.mount_travelers + self.casters
+        return self.travelers + self.mount_travelers + self.casters + self.diggers
 
 
 @dataclass
@@ -39,11 +40,13 @@ class ResetReport:
     travel_reset: int
     mount_reset: int
     fishing_reset: int
+    mining_reset: int = 0
     redis_cleared: int = 0
 
     @property
     def total(self) -> int:
-        return self.travel_reset + self.mount_reset + self.fishing_reset
+        return (self.travel_reset + self.mount_reset + self.fishing_reset
+                + self.mining_reset)
 
 
 async def preview(db: AsyncSession) -> ResetPreview:
@@ -64,7 +67,15 @@ async def preview(db: AsyncSession) -> ResetPreview:
             Character.fishing_cast_at.is_not(None),
         )
     )
-    return ResetPreview(travelers or 0, mount_travelers or 0, casters or 0)
+    diggers = await db.scalar(
+        select(func.count()).select_from(Character).where(
+            Character.creation_state.is_(None),
+            Character.mining_ends_at.is_not(None),
+        )
+    )
+    return ResetPreview(
+        travelers or 0, mount_travelers or 0, casters or 0, diggers or 0
+    )
 
 
 async def reset_stuck_activities(db: AsyncSession) -> ResetReport:
@@ -100,11 +111,22 @@ async def reset_stuck_activities(db: AsyncSession) -> ResetReport:
             fishing_pending_fish=None, fishing_pending_grams=None,
         )
     )
+    # Патч 59: незаконченная добыча. Она блокирует игроку вообще всё, поэтому
+    # зависшая добыча — самое неприятное из того, что может пережить рестарт.
+    mining_result = await db.execute(
+        update(Character)
+        .where(
+            Character.creation_state.is_(None),
+            Character.mining_ends_at.is_not(None),
+        )
+        .values(mining_ends_at=None, mining_mine_id=None)
+    )
     await db.commit()
     return ResetReport(
         travel_reset=travel_result.rowcount,
         mount_reset=mount_result.rowcount,
         fishing_reset=fishing_result.rowcount,
+        mining_reset=mining_result.rowcount,
     )
 
 

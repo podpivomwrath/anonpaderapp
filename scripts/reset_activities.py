@@ -59,7 +59,8 @@ async def _run(skip_confirm: bool) -> None:
         print(
             f"Будет сброшено: {counts.travelers} пеших переходов, "
             f"{counts.mount_travelers} поездок на маунте, "
-            f"{counts.casters} заброшенных снастей. Позиции и остальной "
+            f"{counts.casters} заброшенных снастей, "
+            f"{counts.diggers} незаконченных добыч. Позиции и остальной "
             f"прогресс персонажей не меняются."
         )
         if not skip_confirm:
@@ -77,7 +78,8 @@ async def _run(skip_confirm: bool) -> None:
     print(
         f"Готово: пеших переходов сброшено {report.travel_reset}, поездок на "
         f"маунте отменено {report.mount_reset}, снастей вынуто "
-        f"{report.fishing_reset}, зависших Redis-ключей боя очищено {redis_cleared}."
+        f"{report.fishing_reset}, добыч прервано {report.mining_reset}, "
+        f"зависших Redis-ключей боя очищено {redis_cleared}."
     )
 
 

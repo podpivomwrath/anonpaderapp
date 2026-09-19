@@ -42,9 +42,15 @@ def test_exploration_events_load() -> None:
     assert ids == {
         "dead_box", "monolith_shard", "wounded_wanderer", "ash_altar",
         "lakeside_fisher",  # патч 58
+        "ore_vein",         # патч 59
     }
     for event in events:
         assert event.title and event.text
+        if event.ore_vein:
+            # У рудной жилы выбора нет: добыча это не мгновенный исход, а
+            # процесс на минуты, и запускается он инлайн-кнопкой «Добыть».
+            assert not event.choices
+            continue
         assert len(event.choices) >= 2
         for choice in event.choices:
             assert choice.label

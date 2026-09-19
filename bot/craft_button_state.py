@@ -1,4 +1,4 @@
-"""Патч 58: на какой клетке игроку уже показали кнопку «К воде».
+"""Патч 58-59: на какой клетке игроку уже показали кнопку ремесла.
 
 Кнопка приходит ОДИН раз — при входе на клетку с озером. После исследования,
 события или отдыха на той же клетке она больше не дублируется: вход к воде
@@ -14,19 +14,24 @@
 bot/ash_handful_state.py).
 """
 
-_last_cell: dict[int, tuple[int, int]] = {}
+#: Ключ — (peer_id, вид кнопки): у озера и рудника свои отметки, иначе
+#: они затирали бы друг друга на соседних клетках.
+_last_cell: dict[tuple[int, str], tuple[int, int]] = {}
+
+LAKE = "lake"
+MINE = "mine"
 
 
-def should_send(peer_id: int, x: int, y: int) -> bool:
+def should_send(peer_id: int, kind: str, x: int, y: int) -> bool:
     """True — кнопку для этой клетки ещё не показывали (и надо показать)."""
-    return _last_cell.get(peer_id) != (x, y)
+    return _last_cell.get((peer_id, kind)) != (x, y)
 
 
-def mark_sent(peer_id: int, x: int, y: int) -> None:
-    _last_cell[peer_id] = (x, y)
+def mark_sent(peer_id: int, kind: str, x: int, y: int) -> None:
+    _last_cell[(peer_id, kind)] = (x, y)
 
 
-def leave(peer_id: int) -> None:
-    """Игрок на клетке без озера — отметка сбрасывается, чтобы при следующем
-    возвращении к воде кнопка пришла заново."""
-    _last_cell.pop(peer_id, None)
+def leave(peer_id: int, kind: str) -> None:
+    """Игрок на клетке без этой выработки — отметка сбрасывается, чтобы при
+    следующем возвращении кнопка пришла заново."""
+    _last_cell.pop((peer_id, kind), None)

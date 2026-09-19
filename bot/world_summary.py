@@ -9,11 +9,11 @@ Leaf-модуль: импортируется и world.py, и combat.py, сам 
 
 import random
 
-from bot import fishing_texts, raid_key_texts, raid_texts
+from bot import fishing_texts, mining_texts, raid_key_texts, raid_texts
 from bot.vk_media import photo_attachment
 from game.combat import balance_config as bc
 from game.combat import display
-from game.economy import fishing
+from game.economy import fishing, mining
 from game.world import grid, location_types
 from game.economy import raid_config
 from services import experience_service, vitals_service
@@ -53,6 +53,7 @@ def wallet_line(farm_currency: int, donate_currency: int) -> str:
 def location_summary(
     character, stats, rng: random.Random, farm_currency: int, vit_bonus: int = 0,
     quest_line: str | None = None, donate_currency: int = 0, group_block: str | None = None,
+    mine_ore_left: int | None = None,
 ) -> str:
     """Сводка клетки: координаты/тип локации/зона, вариативное описание, HP,
     уровень, шкала опыта, золото (патч 9 блок 3, патч 10 блоки 2/4), активный
@@ -87,6 +88,25 @@ def location_summary(
     )
     # Патч 58: озеро — как Монолит: кнопка приходит только при ВХОДЕ на
     # клетку, поэтому у воды обязана быть вторая дверь командой словом.
+    # Патч 59: рудник — то же, что озеро. Запас руды показывается ДО спуска:
+    # идти 40 клеток к пустому руднику — то, после чего перестают ходить.
+    # mine_ore_left приходит от вызывающего: он один ходит в БД, сводка нет.
+    mine = mining.mine_at(x, y)
+    mine_block = ""
+    if mine is not None:
+        # mine_ore_left=None означает «вызывающий не ходил в БД», а не «пусто»:
+        # сводка синхронная и сама запрос сделать не может. Врать про пустую
+        # жилу в этом случае нельзя — просто не показываем запас.
+        if mine_ore_left is None:
+            stock = ""
+        elif mine_ore_left > 0:
+            stock = f" - руды {mine_ore_left}"
+        else:
+            stock = " - жила пуста"
+        mine_block = (
+            f"⛏ {mine.name}{stock}" + chr(10)
+            + mining_texts.MINE_HINT_LINE + chr(10)
+        )
     lake = fishing.lake_at(x, y)
     lake_block = (
         f"🎣 {lake.name}" + chr(10) + fishing_texts.LAKE_HINT_LINE + chr(10)
@@ -102,6 +122,7 @@ def location_summary(
         f"{key_block}"
         f"{monolith_block}"
         f"{lake_block}"
+        f"{mine_block}"
         f"{quest_block}"
         f"{_SEP}"
         f"{group_suffix}"

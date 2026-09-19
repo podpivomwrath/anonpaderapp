@@ -49,7 +49,7 @@ def activity_action(handler):
 async def blocked_reason(db, character, peer_id: int) -> str | None:
     from bot.battle_keyboard import in_any_battle
     from bot.handlers import world
-    from services import death_service, movement_service, mount_service
+    from services import death_service, mining_service, movement_service, mount_service
     if in_any_battle(peer_id):
         return "Сначала закончи текущий бой."
     if death_service.is_dead(character):
@@ -58,6 +58,13 @@ async def blocked_reason(db, character, peer_id: int) -> str | None:
         return "Сначала дождись прибытия."
     if world.is_busy(peer_id):
         return "Сначала закончи исследование или отдых."
+    # Патч 59: добыча руды блокирует ВСЁ до конца — это её единственный
+    # ограничитель. Проверка по БД, а не по памяти процесса: добыча длится
+    # минутами и переживает рестарт бота.
+    if mining_service.is_digging(character):
+        from bot import mining_texts
+
+        return mining_texts.BUSY_TEXT
     travel = await mount_service.active_travel(db, character.id)
     if travel is not None and travel.status == "traveling":
         return "Сначала дождись окончания поездки."

@@ -211,40 +211,40 @@ def test_lake_button_is_sent_once_per_entry() -> None:
     """Кнопка приходит при входе на клетку и НЕ повторяется после действий на
     ней (исследование, событие, отдых) — иначе она засоряет чат. Вход к воде
     при этом остаётся доступен командой."""
-    from bot import lake_button_state as st
+    from bot import craft_button_state as st
 
     peer = 999001
-    st.leave(peer)
+    st.leave(peer, st.LAKE)
 
-    assert st.should_send(peer, 41, -41) is True
-    st.mark_sent(peer, 41, -41)
+    assert st.should_send(peer, st.LAKE, 41, -41) is True
+    st.mark_sent(peer, st.LAKE, 41, -41)
     # Исследование/событие/отдых на той же клетке — кнопки больше нет.
-    assert st.should_send(peer, 41, -41) is False
+    assert st.should_send(peer, st.LAKE, 41, -41) is False
 
 
 def test_lake_button_returns_after_leaving_and_coming_back() -> None:
     """«При перезаходе на локацию кнопку снова возвращать»: уход на любую
     другую клетку сбрасывает отметку."""
-    from bot import lake_button_state as st
+    from bot import craft_button_state as st
 
     peer = 999002
-    st.leave(peer)
-    st.mark_sent(peer, 41, -41)
-    assert st.should_send(peer, 41, -41) is False
+    st.leave(peer, st.LAKE)
+    st.mark_sent(peer, st.LAKE, 41, -41)
+    assert st.should_send(peer, st.LAKE, 41, -41) is False
 
-    st.leave(peer)  # ушёл на клетку без озера
-    assert st.should_send(peer, 41, -41) is True
+    st.leave(peer, st.LAKE)  # ушёл на клетку без озера
+    assert st.should_send(peer, st.LAKE, 41, -41) is True
 
 
 def test_moving_between_two_lakes_shows_the_button_each_time() -> None:
-    from bot import lake_button_state as st
+    from bot import craft_button_state as st
 
     peer = 999003
-    st.leave(peer)
-    st.mark_sent(peer, 41, -41)
-    assert st.should_send(peer, 1, -2) is True
-    st.mark_sent(peer, 1, -2)
-    assert st.should_send(peer, 41, -41) is True
+    st.leave(peer, st.LAKE)
+    st.mark_sent(peer, st.LAKE, 41, -41)
+    assert st.should_send(peer, st.LAKE, 1, -2) is True
+    st.mark_sent(peer, st.LAKE, 1, -2)
+    assert st.should_send(peer, st.LAKE, 41, -41) is True
 
 
 def test_lake_button_is_sent_only_from_cell_entry_points() -> None:

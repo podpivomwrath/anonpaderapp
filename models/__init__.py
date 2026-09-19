@@ -13,6 +13,7 @@ from models.fishing import CharacterFish, CharacterFishRecord
 from models.group import Group, GroupInvite, GroupMember
 from models.item import Inventory, Item, ItemUpgradeHistory
 from models.lootbox import CharacterLootbox
+from models.mining import CharacterOre, MineVein
 from models.mount import CharacterMount, MountTravel
 from models.promo import PromoActivation, PromoCode
 from models.pvp import PvpBattle
@@ -38,6 +39,7 @@ __all__ = [
     "CharacterFishRecord",
     "CharacterLootbox",
     "CharacterMount",
+    "CharacterOre",
     "CharacterQuest",
     "CharacterSongFragment",
     "CharacterStats",
@@ -55,6 +57,7 @@ __all__ = [
     "GroupInvite",
     "GroupMember",
     "Inventory",
+    "MineVein",
     "Item",
     "ItemUpgradeHistory",
     "MountTravel",

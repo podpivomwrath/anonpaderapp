@@ -20,10 +20,10 @@ from vkbottle.bot import BotLabeler, Message
 
 from bot import (
     ash_handful_state,
+    craft_button_state,
     dailies_texts,
     fishing_texts,
     group_texts,
-    lake_button_state,
     raid_key_texts,
     raid_texts,
 )
@@ -38,6 +38,7 @@ from bot.handlers import pvp as pvp_handlers
 from bot.handlers import raid_combat as raid_combat_handlers
 from bot.handlers import stats_window
 from bot.keyboards import fishing as fishing_kb
+from bot.keyboards import mining as mining_kb
 from bot.keyboards import raid as raid_kb
 from bot.keyboards import world as kb
 from bot.keyboards.group_explore import group_ready_keyboard
@@ -59,6 +60,7 @@ from bot.world_texts import (
 from game.combat import display
 from game.economy import fishing as game_fishing
 from game.economy import fishing_config as fc
+from game.economy import mining
 from game.economy import premium_config as pc
 from game.economy import raid_config as raid_cfg
 from game.economy import story_config as sc
@@ -77,6 +79,7 @@ from services import (
     group_explore_service,
     group_service,
     item_service,
+    mining_service,
     mount_service,
     movement_service,
     premium_service,
@@ -184,7 +187,7 @@ async def maybe_send_lake_button(peer_id: int, character) -> None:
     сообщением с инлайн-клавиатурой, как «Прикоснуться» у Монолита выше.
 
     Строго один раз на вход: после исследования, события или отдыха на той же
-    клетке кнопка не повторяется (bot/lake_button_state.py), иначе она
+    клетке кнопка не повторяется (bot/craft_button_state.py), иначе она
     засоряла бы чат на каждое действие. Вход к воде при этом никуда не
     девается — остаётся команда «Озеро», подсказка про неё есть в сводке
     локации. При возвращении на клетку кнопка приходит снова.
@@ -193,14 +196,55 @@ async def maybe_send_lake_button(peer_id: int, character) -> None:
     if lake is None:
         # Клетка без озера сбрасывает отметку: иначе возвращение на то же
         # озеро не отличалось бы от «остался на нём» и кнопка не пришла бы.
-        lake_button_state.leave(peer_id)
+        craft_button_state.leave(peer_id, craft_button_state.LAKE)
         return
-    if not lake_button_state.should_send(peer_id, character.pos_x, character.pos_y):
+    if not craft_button_state.should_send(
+        peer_id, craft_button_state.LAKE, character.pos_x, character.pos_y
+    ):
         return
-    lake_button_state.mark_sent(peer_id, character.pos_x, character.pos_y)
+    craft_button_state.mark_sent(
+        peer_id, craft_button_state.LAKE, character.pos_x, character.pos_y
+    )
     await _bot_api.messages.send(
         peer_id=peer_id, message=fishing_texts.LAKE_HINT_LINE, random_id=0,
         keyboard=fishing_kb.approach_lake_keyboard(),
+    )
+
+
+async def mining_service_abandon(character) -> None:
+    """Сохраняет в БД обнуление добычи при уходе с клетки (патч 59)."""
+    async with get_session_factory()() as db:
+        fresh = await db.get(type(character), character.id)
+        if fresh is not None and mining_service.abandon_if_elsewhere(fresh):
+            await db.commit()
+
+
+async def maybe_send_mine_button(peer_id: int, character) -> None:
+    """Патч 59: при ВХОДЕ на клетку с рудником — кнопка «В выработку» отдельным
+    сообщением, ровно как у озера, и ровно один раз на вход.
+
+    Здесь же игрок узнаёт, сколько в жиле руды, ещё до спуска: это именно тот
+    запрос в БД, который синхронная сводка локации сделать не может.
+    """
+    lake_like = mining.mine_at(character.pos_x, character.pos_y)
+    if lake_like is None:
+        craft_button_state.leave(peer_id, craft_button_state.MINE)
+        return
+    if not craft_button_state.should_send(
+        peer_id, craft_button_state.MINE, character.pos_x, character.pos_y
+    ):
+        return
+    craft_button_state.mark_sent(
+        peer_id, craft_button_state.MINE, character.pos_x, character.pos_y
+    )
+    async with get_session_factory()() as db:
+        ore_left = await mining_service.ore_in_mine(db, lake_like.id)
+    stock = f"руды в жиле: {ore_left}" if ore_left else "жила пуста"
+    await _bot_api.messages.send(
+        peer_id=peer_id,
+        message=f"⛏ {lake_like.name} - {stock}.",
+        random_id=0,
+        keyboard=mining_kb.approach_mine_keyboard(),
     )
 
 
@@ -340,6 +384,9 @@ async def show_location(message: Message, db, character) -> None:
     )
     await _maybe_send_monolith_button(message.peer_id, character)
     await maybe_send_lake_button(message.peer_id, character)
+    # Патч 59: уход с клетки обнуляет незаконченную добычу.
+    await mining_service_abandon(character)
+    await maybe_send_mine_button(message.peer_id, character)
 
 
 @labeler.message(text=[kb.BTN_GATE])
@@ -405,6 +452,9 @@ async def gate_exit_direction(message: Message) -> None:
         )
         await _maybe_send_monolith_button(message.peer_id, character)
         await maybe_send_lake_button(message.peer_id, character)
+        # Патч 59: уход с клетки обнуляет незаконченную добычу.
+        await mining_service_abandon(character)
+        await maybe_send_mine_button(message.peer_id, character)
 
 
 ASH_BURNED_LINE = "Пепел разнесло ветром."
@@ -601,6 +651,10 @@ async def handle_explore_done(peer_id: int) -> None:
         stats = await _get_stats(db, character.id)
 
         outcome_kind = "combat" if _rng.random() < wc.EXPLORE_COMBAT_CHANCE else "event"
+        # Патч 59: завершённое исследование ЛЮБОГО игрока подбрасывает руду в
+        # случайный неполный рудник. Рудники — общий ресурс, который наполняет
+        # активность всего сервера, а не персональный кран.
+        await mining_service.spawn_ore(db, _rng)
         daily_progress = await daily_service.record_exploration(db, character)
         await db.commit()
         gear_bonus = await item_service.compute_gear_bonus(db, character.id)
@@ -613,6 +667,16 @@ async def handle_explore_done(peer_id: int) -> None:
         summary_bits = None
         if outcome_kind == "event":
             event = event_pool.random_event(_rng)
+            if event.ore_vein:
+                # Жила разрешается сразу, значит сводка локации нужна прямо
+                # здесь — иначе игрок останется с клавиатурой ожидания.
+                wallet = await wallet_service.get_wallet(db, character.id)
+                summary_bits = (
+                    wallet.farm_currency, wallet.donate_currency,
+                    await story_service.quest_summary_line(db, character),
+                    await group_texts.group_summary_block(db, character.id),
+                    await mount_service.has_any_mount(db, character.id),
+                )
             if event.fish_trade:
                 bag_grams = await fishing_service.bag_total_grams(db, character.id)
                 if bag_grams <= 0:
@@ -650,6 +714,27 @@ async def handle_explore_done(peer_id: int) -> None:
 
     if outcome_kind == "combat":
         await combat_handlers.start_encounter(peer_id, character, stats, gear_bonus, buff_modifiers)
+        return
+
+    if event is not None and event.ore_vein:
+        # У жилы нет выбора: либо берёшься за кирку, либо уходишь. Сначала
+        # сводка локации (она возвращает рабочую нижнюю клавиатуру), сверху —
+        # отдельное инлайн-сообщение с кнопкой добычи.
+        farm_currency, donate_currency, quest_line, group_block, has_mount = summary_bits
+        await _bot_api.messages.send(
+            peer_id=peer_id,
+            message=_map_text(character, stats, farm_currency, gear_bonus,
+                              quest_line, donate_currency, group_block),
+            random_id=0, attachment=location_attachment(character),
+            keyboard=kb.movement_keyboard(character.pos_x, character.pos_y, peer_id,
+                                          has_mount=has_mount),
+        )
+        await _bot_api.messages.send(
+            peer_id=peer_id,
+            message=f"{event.title}" + chr(10) * 2 + event.text,
+            random_id=0,
+            keyboard=mining_kb.event_vein_keyboard(event.id),
+        )
         return
 
     if empty_fisher:
@@ -979,6 +1064,9 @@ async def handle_arrival(peer_id: int) -> None:
         )
         await _maybe_send_monolith_button(peer_id, character)
         await maybe_send_lake_button(peer_id, character)
+        # Патч 59: уход с клетки обнуляет незаконченную добычу.
+        await mining_service_abandon(character)
+        await maybe_send_mine_button(peer_id, character)
 
 
 @labeler.message(text=[kb.BTN_MENTOR, kb.BTN_MENTOR_BADGE])

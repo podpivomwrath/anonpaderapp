@@ -25,14 +25,16 @@ BOARD_PVP = "pvp"
 BOARD_KILLS = "kills"
 BOARD_FISHING = "fishing"
 BOARD_FISH_WEIGHT = "fish_weight"
+BOARD_MINING = "mining"
 
-BOARDS = (BOARD_PVP, BOARD_KILLS, BOARD_FISHING, BOARD_FISH_WEIGHT)
+BOARDS = (BOARD_PVP, BOARD_KILLS, BOARD_FISHING, BOARD_FISH_WEIGHT, BOARD_MINING)
 
 BOARD_TITLES = {
     BOARD_PVP: "⚔️ PvP",
     BOARD_KILLS: "💀 Убийства",
     BOARD_FISHING: "🎣 Рыбалка",
     BOARD_FISH_WEIGHT: "🐟 Рекорды по рыбе",
+    BOARD_MINING: "⛏ Горное дело",
 }
 
 
@@ -167,11 +169,22 @@ async def fish_weight_board(db: AsyncSession, limit: int = 10) -> list[BoardEntr
     return entries
 
 
+async def mining_board(db: AsyncSession, limit: int = 10) -> list[BoardEntry]:
+    """Уровень горного дела. Как и у рыбалки, потолка нет — топ не упирается
+    в «все на максимуме»."""
+    return await _character_board(
+        db, Character.mining_level,
+        lambda level, _losses: f"ур. {level}",
+        limit, min_value=2,
+    )
+
+
 _LOADERS = {
     BOARD_PVP: pvp_board,
     BOARD_KILLS: kills_board,
     BOARD_FISHING: fishing_board,
     BOARD_FISH_WEIGHT: fish_weight_board,
+    BOARD_MINING: mining_board,
 }
 
 
