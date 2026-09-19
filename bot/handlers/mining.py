@@ -110,10 +110,6 @@ async def _enter_mine(message: Message) -> None:
                 return
 
         await screen_service.set_screen(db, character, "mine")
-        if digging_here:
-            # Вернулся в забой — часы снова пошли. Пока он был снаружи, они
-            # стояли: время идёт только пока игрок реально копает.
-            mining_service.resume_dig(character)
         ore_left = await mining_service.ore_in_mine(db, mine.id)
         remaining = mining_service.remaining_seconds(character)
         await db.commit()
@@ -174,7 +170,7 @@ async def dig(message: Message) -> None:
 
     _schedule_finish(message.peer_id, started.seconds)
     await message.answer(
-        mt.dig_started_text(started.seconds, started.resumed),
+        mt.dig_started_text(started.seconds),
         keyboard=kb.digging_keyboard(),
     )
 

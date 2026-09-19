@@ -7,7 +7,6 @@
 """
 
 import random
-from datetime import datetime, timedelta, timezone
 
 import pytest
 
@@ -280,26 +279,6 @@ async def test_finished_dig_puts_ore_in_the_inventory(db_session, make_character
     assert not mining_service.is_digging(character)
 
 
-@pytest.mark.asyncio
-async def test_returning_to_the_same_mine_keeps_the_remaining_time(
-    db_session, make_character
-) -> None:
-    """Правило статичных жил: пока не ушёл с клетки, можно вернуться и
-    доработать остаток. Новую руду при этом резервировать не надо."""
-    character = await make_character()
-    character.pos_x, character.pos_y = 46, 44
-    db_session.add(MineVein(mine_id=EASY_MINE, ore_count=2))
-    await db_session.flush()
-    mine = mining.mine_by_id(EASY_MINE)
-
-    first = await mining_service.start_dig(db_session, character, mine, random.Random(0))
-    left_before = await mining_service.ore_in_mine(db_session, EASY_MINE)
-    resumed = await mining_service.start_dig(db_session, character, mine, random.Random(0))
-
-    assert resumed.resumed is True
-    assert resumed.ends_at == first.ends_at
-    assert await mining_service.ore_in_mine(db_session, EASY_MINE) == left_before
-
 
 @pytest.mark.asyncio
 async def test_leaving_the_cell_zeroes_the_dig(db_session, make_character) -> None:
@@ -376,91 +355,8 @@ async def test_ore_has_no_carry_limit(db_session, make_character) -> None:
     assert await mining_service.total_ore(db_session, character.id) == 100_001
 
 
-@pytest.mark.asyncio
-async def test_restart_lifts_miners_out_and_STOPS_the_clock(
-    db_session, make_character
-) -> None:
-    """После рестарта игрока выбрасывает «в хаб», а часы добычи ВСТАЮТ.
-
-    Раньше хранился абсолютный срок, и он продолжал тикать, пока бот лежит и
-    пока игрок стоит в хабе. Время должно идти только в забое.
-    """
-    character = await make_character()
-    character.screen = "mine"
-    character.mining_mine_id = EASY_MINE
-    character.mining_ends_at = datetime.now(timezone.utc) + timedelta(minutes=5)
-    await db_session.flush()
-
-    await mining_service.release_after_restart(db_session)
-    await db_session.refresh(character)
-
-    assert character.screen is None
-    assert character.mining_ends_at is None, "срок остался тикать в фоне"
-    assert mining_service.is_paused(character) is True
-    assert 290 <= character.mining_left_seconds <= 300
-    assert character.mining_mine_id == EASY_MINE
 
 
-@pytest.mark.asyncio
-async def test_paused_dig_never_finishes_on_its_own(db_session, make_character) -> None:
-    """Главное свойство паузы: сколько бы ни прошло реального времени, добыча
-    вне забоя не завершается."""
-    character = await make_character()
-    character.mining_mine_id = EASY_MINE
-    character.mining_ends_at = datetime.now(timezone.utc) + timedelta(minutes=5)
-    mining_service.pause_dig(character)
-
-    far_future = datetime.now(timezone.utc) + timedelta(days=30)
-    assert mining_service.dig_finished(character, far_future) is False
-    assert mining_service.remaining_seconds(character, far_future) > 0
-
-
-@pytest.mark.asyncio
-async def test_pause_and_resume_preserve_the_remainder(
-    db_session, make_character
-) -> None:
-    character = await make_character()
-    character.pos_x, character.pos_y = 46, 44
-    db_session.add(MineVein(mine_id=EASY_MINE, ore_count=1))
-    await db_session.flush()
-    mine = mining.mine_by_id(EASY_MINE)
-    started = await mining_service.start_dig(db_session, character, mine, random.Random(0))
-
-    # Прошла минута, игрок вышел из забоя.
-    minute_later = datetime.now(timezone.utc) + timedelta(minutes=1)
-    mining_service.pause_dig(character, minute_later)
-    frozen = character.mining_left_seconds
-
-    # Снаружи он провёл час — остаток не изменился.
-    hour_later = minute_later + timedelta(hours=1)
-    assert character.mining_left_seconds == frozen
-    mining_service.resume_dig(character, hour_later)
-
-    assert character.mining_left_seconds is None
-    assert abs(mining_service.remaining_seconds(character, hour_later) - frozen) <= 1
-    assert started.seconds > frozen, "минута работы должна была зачесться"
-
-
-@pytest.mark.asyncio
-async def test_returning_to_the_mine_resumes_the_paused_dig(
-    db_session, make_character
-) -> None:
-    character = await make_character()
-    character.pos_x, character.pos_y = 46, 44
-    db_session.add(MineVein(mine_id=EASY_MINE, ore_count=2))
-    await db_session.flush()
-    mine = mining.mine_by_id(EASY_MINE)
-    await mining_service.start_dig(db_session, character, mine, random.Random(0))
-    mining_service.pause_dig(character)
-    left_in_vein = await mining_service.ore_in_mine(db_session, EASY_MINE)
-
-    resumed = await mining_service.start_dig(db_session, character, mine, random.Random(0))
-
-    assert resumed.resumed is True
-    assert mining_service.is_paused(character) is False
-    assert character.mining_ends_at is not None
-    # Возврат не резервирует новую руду: кусок уже занят.
-    assert await mining_service.ore_in_mine(db_session, EASY_MINE) == left_in_vein
 
 
 @pytest.mark.asyncio
@@ -554,3 +450,61 @@ async def test_finished_dig_does_NOT_return_the_ore(db_session, make_character) 
 
     assert await mining_service.ore_in_mine(db_session, EASY_MINE) == 1
     assert await mining_service.total_ore(db_session, character.id) == 1
+
+@pytest.mark.asyncio
+async def test_starting_a_new_dig_resets_the_old_one_and_returns_its_ore(
+    db_session, make_character
+) -> None:
+    """Возврата к прерванной добыче нет: начал заново — значит заново.
+
+    Кусок прежней добычи обязан вернуться в жилу: сброс таймера не должен
+    попутно уничтожать общий ресурс.
+    """
+    character = await make_character()
+    character.pos_x, character.pos_y = 46, 44
+    db_session.add(MineVein(mine_id=EASY_MINE, ore_count=3))
+    await db_session.flush()
+    mine = mining.mine_by_id(EASY_MINE)
+
+    first = await mining_service.start_dig(db_session, character, mine, random.Random(0))
+    assert await mining_service.ore_in_mine(db_session, EASY_MINE) == 2
+
+    second = await mining_service.start_dig(db_session, character, mine, random.Random(3))
+
+    assert second is not None
+    assert second.ends_at != first.ends_at, "таймер обязан начаться заново"
+    # Один кусок вернулся, другой зарезервирован под новую добычу.
+    assert await mining_service.ore_in_mine(db_session, EASY_MINE) == 2
+
+
+@pytest.mark.asyncio
+async def test_restart_cancels_digs_and_returns_their_ore(
+    db_session, make_character
+) -> None:
+    """Рестарт выносит игрока наверх, а значит он из забоя ушёл — добыча
+    сбрасывается по общему правилу. Руда при этом не пропадает."""
+    character = await make_character()
+    character.pos_x, character.pos_y = 46, 44
+    character.screen = "mine"
+    db_session.add(MineVein(mine_id=EASY_MINE, ore_count=2))
+    await db_session.flush()
+    mine = mining.mine_by_id(EASY_MINE)
+    await mining_service.start_dig(db_session, character, mine, random.Random(0))
+    assert await mining_service.ore_in_mine(db_session, EASY_MINE) == 1
+
+    released = await mining_service.release_after_restart(db_session)
+    await db_session.refresh(character)
+
+    assert released == 1
+    assert character.screen is None
+    assert not mining_service.is_digging(character)
+    assert await mining_service.ore_in_mine(db_session, EASY_MINE) == 2
+
+
+def test_dig_state_has_no_pause_left() -> None:
+    """Пауза снята как механика — на персонаже не должно остаться её следов."""
+    from models import Character
+
+    assert not hasattr(Character, "mining_left_seconds")
+    assert not hasattr(mining_service, "pause_dig")
+    assert not hasattr(mining_service, "resume_dig")

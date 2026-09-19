@@ -25,7 +25,13 @@ from game.economy import mining_config as mc
 from game.world import grid
 from game.world import world_config as wc
 from models import Character, User
-from services import death_service, mining_service, movement_service, mount_service, story_service
+from services import (
+    death_service,
+    mining_service,
+    mount_service,
+    movement_service,
+    story_service,
+)
 
 _rng = random.Random()
 
@@ -143,6 +149,11 @@ def _blocked_reason(character: Character, peer_id: int) -> str | None:
         return "busy"
     if movement_service.is_traveling(character):
         return "traveling_on_foot"
+    # Патч 59: добыча блокирует всё, включая отправку маунта. Эта копия гейта
+    # уже однажды разошлась с основной (bot/activity.py) — при добавлении
+    # новой блокирующей активности правило надо продублировать и здесь.
+    if mining_service.is_digging(character):
+        return "mining"
     return None
 
 

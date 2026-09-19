@@ -13,7 +13,7 @@ pvp_service.leaderboard намеренно НЕ удалён и не проду�
 from dataclasses import dataclass
 from datetime import datetime, timezone
 
-from sqlalchemy import desc, select
+from sqlalchemy import desc, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from game.economy import fishing
@@ -68,12 +68,18 @@ def _plural(n: int, one: str, few: str, many: str) -> str:
 
 
 async def _character_board(
-    db: AsyncSession, order_column, value_fn, limit: int, min_value: int = 1
+    db: AsyncSession, order_column, value_fn, limit: int, min_value: int = 1,
+    tiebreak=None,
 ) -> list[BoardEntry]:
-    """Топ по колонке самого персонажа (победы/убийства/уровень рыбалки).
+    """Топ по колонке самого персонажа (победы/убийства/уровень ремесла).
 
     min_value отсекает тех, кто ещё не начинал: список из десяти нулей —
     не топ, а шум.
+
+    tiebreak — чем разрешать равенство. Раньше это ВСЕГДА было число
+    PvP-поражений, из-за чего в топе рыбалки двух равных рыбаков разделял их
+    боевой послужной список. Теперь каждая доска называет своё правило, а
+    общий запасной вариант — id персонажа: кто раньше в игре, тот выше.
     """
     now = datetime.now(timezone.utc)
     rows = (
@@ -83,7 +89,7 @@ async def _character_board(
                 Character.premium_until, Character.pvp_losses,
             )
             .where(Character.creation_state.is_(None), order_column >= min_value)
-            .order_by(desc(order_column), Character.pvp_losses.asc())
+            .order_by(desc(order_column), *(tiebreak or (Character.id.asc(),)))
             .limit(limit)
         )
     ).all()
@@ -104,6 +110,9 @@ async def pvp_board(db: AsyncSession, limit: int = 10) -> list[BoardEntry]:
                              f"{_plural(wins, 'победа', 'победы', 'побед')} · {losses} "
                              f"{_plural(losses, 'поражение', 'поражения', 'поражений')}",
         limit,
+        # У PvP меньшее число поражений — осмысленный признак, тут его и
+        # оставляем: одинаковые победы при разных поражениях это не ничья.
+        tiebreak=(Character.pvp_losses.asc(), Character.id.asc()),
     )
 
 
@@ -125,33 +134,51 @@ async def fishing_board(db: AsyncSession, limit: int = 10) -> list[BoardEntry]:
         db, Character.fishing_level,
         lambda level, _losses: f"ур. {level}",
         limit, min_value=2,
+        tiebreak=(Character.fishing_level_at.asc().nulls_last(), Character.id.asc()),
     )
 
 
 async def fish_weight_board(db: AsyncSession, limit: int = 10) -> list[BoardEntry]:
-    """Самые тяжёлые пойманные экземпляры — по одному лучшему на игрока.
+    """Самые тяжёлые пойманные экземпляры — ровно ПО ОДНОМУ на игрока.
 
-    Иначе один рыбак с крупным озером занял бы весь топ своими рекордами по
-    пяти видам сразу, и таблица перестала бы показывать, кто чего добился.
+    Раньше бралось limit*8 строк и схлопывалось по имени уже в питоне: рыбак
+    с десятком рекордов вытеснял остальных из выборки ещё до дедупликации, и
+    они не попадали в топ вообще. Теперь лучший экземпляр каждого игрока
+    выбирается в самом запросе, и limit значит ровно то, что написано.
     """
     now = datetime.now(timezone.utc)
+    best = (
+        select(
+            CharacterFishRecord.character_id.label("character_id"),
+            func.max(CharacterFishRecord.weight_grams).label("weight_grams"),
+        )
+        .group_by(CharacterFishRecord.character_id)
+        .subquery()
+    )
     rows = (
         await db.execute(
             select(
                 Character.name, CharacterFishRecord.fish_id,
                 CharacterFishRecord.weight_grams, Character.active_title_id,
-                Character.premium_until,
+                Character.premium_until, CharacterFishRecord.caught_at,
             )
+            .join(best, best.c.character_id == CharacterFishRecord.character_id)
             .join(Character, Character.id == CharacterFishRecord.character_id)
-            .where(Character.creation_state.is_(None))
-            .order_by(desc(CharacterFishRecord.weight_grams))
-            .limit(limit * 8)
+            .where(
+                Character.creation_state.is_(None),
+                CharacterFishRecord.weight_grams == best.c.weight_grams,
+            )
+            # Ничья по весу — у кого рекорд старше, тот и выше.
+            .order_by(desc(CharacterFishRecord.weight_grams), CharacterFishRecord.caught_at.asc())
+            .limit(limit * 2)
         )
     ).all()
 
     seen: set[str] = set()
     entries: list[BoardEntry] = []
-    for name, fish_id, grams, title_id, premium_until in rows:
+    for name, fish_id, grams, title_id, premium_until, _caught_at in rows:
+        # Страховка на случай, когда у игрока два вида весят одинаково и оба
+        # прошли фильтр максимума: в топе он всё равно должен быть один раз.
         if name in seen:
             continue
         seen.add(name)
@@ -176,6 +203,7 @@ async def mining_board(db: AsyncSession, limit: int = 10) -> list[BoardEntry]:
         db, Character.mining_level,
         lambda level, _losses: f"ур. {level}",
         limit, min_value=2,
+        tiebreak=(Character.mining_level_at.asc().nulls_last(), Character.id.asc()),
     )
 
 

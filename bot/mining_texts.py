@@ -21,9 +21,11 @@ BTN_ORE = "🪨 Руда"
 BTN_LEAVE_MINE = "Выйти наверх"
 BTN_ABANDON = "Бросить кирку"
 
-#: Кнопка в ивенте мелкой жилы — там свой экран не открывается, добыча
-#: начинается прямо из события.
-BTN_DIG_VEIN = "⛏ Добыть"
+#: Кнопка в ивенте мелкой жилы. Подпись ОБЯЗАНА отличаться от BTN_DIG: в
+#: vkbottle побеждает первый подходящий обработчик, и при совпадении текстовое
+#: правило «Добыть» перехватывало нажатие инлайн-кнопки жилы раньше её
+#: собственного обработчика — вся ветка мелких жил молча не работала.
+BTN_DIG_VEIN = "⛏ Копать жилу"
 
 SEP = "━━━━━━━━━━━━━━"
 
@@ -53,9 +55,8 @@ def level_line(character) -> str:
     )
 
 
-def dig_started_text(seconds: float, resumed: bool = False) -> str:
-    head = "Возвращаешься к брошенному забою." if resumed else "Ты берёшься за кирку."
-    return f"{head} Работы примерно на {mining.format_duration(seconds)}."
+def dig_started_text(seconds: float) -> str:
+    return f"Ты берёшься за кирку. Работы примерно на {mining.format_duration(seconds)}."
 
 
 def dig_progress_text(seconds: float) -> str:

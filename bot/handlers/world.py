@@ -24,6 +24,7 @@ from bot import (
     dailies_texts,
     fishing_texts,
     group_texts,
+    mining_texts,
     raid_key_texts,
     raid_texts,
 )
@@ -475,6 +476,11 @@ async def explore(message: Message) -> None:
         if in_any_battle(peer_id):
             await message.answer("⚔️ Ты уже в бою.")
             return
+        if mining_service.is_digging(character):
+            await message.answer(
+                mining_texts.busy_text(mining_service.remaining_seconds(character))
+            )
+            return
         if peer_id in _exploring:
             await message.answer("🔍 Ты уже осматриваешься...")
             return
@@ -915,6 +921,11 @@ async def rest(message: Message) -> None:
         if in_any_battle(peer_id):
             await message.answer("В бою не отдохнёшь.")
             return
+        if mining_service.is_digging(character):
+            await message.answer(
+                mining_texts.busy_text(mining_service.remaining_seconds(character))
+            )
+            return
         if peer_id in _resting:
             await message.answer("🛏️ Ты уже отдыхаешь.")
             return
@@ -979,6 +990,11 @@ async def move(message: Message) -> None:
             return
         if in_any_battle(message.peer_id):
             await message.answer("Сначала разберись с боем.")
+            return
+        if mining_service.is_digging(character):
+            await message.answer(
+                mining_texts.busy_text(mining_service.remaining_seconds(character))
+            )
             return
         if message.peer_id in _exploring:
             await message.answer("🔍 Ты осматриваешься - подожди.")
@@ -1259,6 +1275,19 @@ async def _screen_keyboard(db, character) -> str | None:
         return result[1] if result is not None else None
     if character.screen == "raid_list":
         return raid_kb.raid_list_keyboard()
+    # Патч 59: экраны ремёсел. Без них /клавиатура возвращала клавиатуру карты
+    # поверх открытого экрана, а в забое это было прямым застреванием: кнопки
+    # «Бросить кирку» на карте нет, а все остальные отвечают «ты в забое».
+    if character.screen == "mine":
+        if mining_service.is_digging(character):
+            return mining_kb.digging_keyboard()
+        mine = mining_service.mine_at(character)
+        left = await mining_service.ore_in_mine(db, mine.id) if mine is not None else 0
+        return mining_kb.mine_keyboard(left > 0)
+    if character.screen == "lake":
+        if fishing_service.is_casting(character):
+            return fishing_kb.casting_keyboard()
+        return fishing_kb.lake_keyboard()
     for rebuild in _SCREEN_REBUILDERS:
         result = await rebuild(db, character)
         if result is not None:

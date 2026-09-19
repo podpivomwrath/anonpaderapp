@@ -1,6 +1,16 @@
 from datetime import date, datetime
 
-from sqlalchemy import JSON, BigInteger, Boolean, Date, DateTime, ForeignKey, Index, String, func
+from sqlalchemy import (
+    JSON,
+    BigInteger,
+    Boolean,
+    Date,
+    DateTime,
+    ForeignKey,
+    Index,
+    String,
+    func,
+)
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from models.base import Base
@@ -90,6 +100,12 @@ class Character(Base):
     # MAX_LEVEL=60): каждый следующий дороже предыдущего, расти можно
     # бесконечно — см. game/economy/fishing.py::xp_to_next.
     fishing_level: Mapped[int] = mapped_column(default=1)
+    # Когда взят ТЕКУЩИЙ уровень ремесла — тай-брейк в топах: при равных
+    # уровнях выше тот, кто добрался раньше. Раньше ничью разрешали по
+    # числу PvP-поражений, что к ремеслу отношения не имеет вовсе.
+    fishing_level_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
     fishing_xp: Mapped[int] = mapped_column(BigInteger, default=0)
     # Состояние заброса, по образцу travel_* — переживает рестарт бота.
     # fishing_bite_at = NULL — поклёвки нет (либо ещё ждём, либо не забрасывали).
@@ -108,26 +124,22 @@ class Character(Base):
 
     # Патч 59, горное дело. Уровень без потолка, как у рыбалки.
     mining_level: Mapped[int] = mapped_column(default=1)
+    mining_level_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
     mining_xp: Mapped[int] = mapped_column(BigInteger, default=0)
     # Состояние добычи. Добыча БЛОКИРУЕТ все действия, пока идёт, и живёт в
     # БД, а не в памяти: она длится минутами (до полутора часов новичку в
     # глубоком руднике), и терять её из-за деплоя нельзя.
     #
+    # Возврата к прерванной добыче НЕТ: ушёл из забоя — начинаешь заново.
+    # Поэтому и остатка времени хранить не надо, достаточно срока окончания.
     # mining_mine_id — id статичного рудника; NULL при идущей добыче означает
-    # мелкую жилу из исследования. Правило возврата у них разное: к статичному
-    # руднику можно вернуться и доработать остаток, мелкая жила исчезает при
-    # любом выходе.
+    # мелкую жилу из исследования.
     mining_ends_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
     )
     mining_mine_id: Mapped[str | None] = mapped_column(String(48), nullable=True)
-    # Остаток добычи в секундах, пока она ПРИОСТАНОВЛЕНА (игрок не в забое).
-    # Время идёт только когда игрок реально сидит и копает, поэтому у добычи
-    # два взаимоисключающих состояния:
-    #   идёт      — mining_ends_at задан, mining_left_seconds = NULL
-    #   на паузе  — mining_left_seconds задан, mining_ends_at = NULL
-    # Абсолютного срока на паузе быть не может: он продолжал бы тикать сам.
-    mining_left_seconds: Mapped[int | None] = mapped_column(nullable=True)
 
     # Патч 58: всего убито мобов за всё время. Истории боёв с мобами в базе
     # нет (pvp_battles пишет только PvP), поэтому пересчитать задним числом
@@ -192,4 +204,4 @@ Index("uq_characters_name_lower", func.lower(Character.name), unique=True)
 # Патч 22: быстрая выборка топа PvP (ORDER BY pvp_wins DESC)
 Index("ix_characters_pvp_wins", Character.pvp_wins.desc())
 
-from models.user import User  # noqa: E402
+from models.user import User

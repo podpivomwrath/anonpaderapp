@@ -184,6 +184,8 @@ async def _apply_break(
     level, remainder, levels = fishing.add_fishing_xp(
         character.fishing_level, character.fishing_xp, xp
     )
+    if levels:
+        character.fishing_level_at = datetime.now(timezone.utc)
     character.fishing_level, character.fishing_xp = level, remainder
     clear_cast(character)
     await db.flush()
@@ -229,6 +231,8 @@ async def _apply_catch(
     level, remainder, levels = fishing.add_fishing_xp(
         character.fishing_level, character.fishing_xp, xp
     )
+    if levels:
+        character.fishing_level_at = datetime.now(timezone.utc)
     character.fishing_level, character.fishing_xp = level, remainder
     clear_cast(character)
     await db.flush()
@@ -342,22 +346,3 @@ async def drop_bag(db: AsyncSession, character_id: int) -> int:
         await db.flush()
     return grams
 
-
-# --- Рекорды и топы -----------------------------------------------------------
-
-async def personal_records(
-    db: AsyncSession, character_id: int
-) -> list[tuple[FishDef, int]]:
-    rows = (
-        await db.execute(
-            select(CharacterFishRecord).where(
-                CharacterFishRecord.character_id == character_id
-            )
-        )
-    ).scalars().all()
-    by_fish = {r.fish_id: r.weight_grams for r in rows}
-    return [
-        (definition, by_fish[definition.id])
-        for definition in fishing.fish_defs_ordered()
-        if definition.id in by_fish
-    ]

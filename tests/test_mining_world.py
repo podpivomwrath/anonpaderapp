@@ -182,27 +182,33 @@ def test_ore_is_awarded_only_inside_the_mine() -> None:
     assert 'character.screen != "mine"' in source
 
 
-def test_entering_the_vein_restarts_the_clock() -> None:
-    """Вход в забой обязан снимать добычу с паузы. Иначе часы стоят навсегда:
-    кнопка «Добыть» на экране идущей добычи не показывается, и снять паузу
-    было бы нечем."""
+def test_dig_and_vein_buttons_have_different_labels() -> None:
+    """Регрессия: подписи совпадали («⛏ Добыть»), и текстовое правило кнопки
+    рудника перехватывало нажатие инлайн-кнопки жилы раньше её собственного
+    обработчика — вся ветка мелких жил молча не работала."""
+    assert mt.BTN_DIG != mt.BTN_DIG_VEIN
+
+
+def test_mining_blocks_move_explore_and_rest() -> None:
+    """Добыча обязана блокировать мир. Гейт bot/activity.py эти три
+    обработчика не вызывают вовсе — у них свои проверки, и проверка добычи
+    должна стоять в каждой."""
     import inspect
 
-    from bot.handlers import mining as handlers
+    from bot.handlers import world as world_handlers
 
-    source = inspect.getsource(handlers._enter_mine)
-    assert "resume_dig" in source
+    for handler in (world_handlers.move, world_handlers.explore, world_handlers.rest):
+        source = inspect.getsource(handler)
+        assert "mining_service.is_digging" in source, f"{handler.__name__} не знает про добычу"
 
 
-def test_leaving_the_vein_stops_the_clock() -> None:
-    """Обратная половина того же правила — время не идёт вне забоя.
-
-    Проверяется на сервисе: выйти из забоя с незаконченной добычей нельзя, но
-    рестарт бота выносит игрока наружу, и там пауза обязана сработать.
-    """
+def test_craft_screens_are_restorable() -> None:
+    """/клавиатура обязана знать про озеро и рудник. Без этого в забое она
+    выдавала клавиатуру карты — без кнопки «Бросить кирку», то есть тупик."""
     import inspect
 
-    from services import mining_service
+    from bot.handlers import world as world_handlers
 
-    source = inspect.getsource(mining_service.release_after_restart)
-    assert "pause_dig" in source
+    source = inspect.getsource(world_handlers._screen_keyboard)
+    assert '"mine"' in source
+    assert '"lake"' in source

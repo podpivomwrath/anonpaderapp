@@ -169,13 +169,6 @@ def grade_name(grade_id: str) -> str:
     return grade_id
 
 
-def grade_order(grade_id: str) -> int:
-    """Порядковый номер градации — для сортировки инвентаря от лучшей к худшей."""
-    for index, (_threshold, gid, _name) in enumerate(mc.GRADES):
-        if gid == grade_id:
-            return index
-    return 0
-
 
 # --- Уровень ------------------------------------------------------------------
 

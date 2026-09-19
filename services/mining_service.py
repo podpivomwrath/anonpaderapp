@@ -119,55 +119,21 @@ async def _take_one_ore(db: AsyncSession, mine_id: str) -> bool:
 # --- Состояние добычи ---------------------------------------------------------
 
 def is_digging(character: Character) -> bool:
-    """Добыча существует — идёт она сейчас или стоит на паузе."""
-    return character.mining_ends_at is not None or character.mining_left_seconds is not None
-
-
-def is_paused(character: Character) -> bool:
-    """Добыча есть, но время не идёт: игрок не в забое."""
-    return character.mining_left_seconds is not None
+    return character.mining_ends_at is not None
 
 
 def dig_finished(character: Character, now: datetime | None = None) -> bool:
-    """Добыча на паузе не заканчивается никогда — часы стоят."""
     if character.mining_ends_at is None:
         return False
     return (now or datetime.now(timezone.utc)) >= character.mining_ends_at
 
 
 def remaining_seconds(character: Character, now: datetime | None = None) -> float:
-    """Сколько копать осталось. На паузе это просто сохранённый остаток —
-    именно поэтому он и хранится числом, а не сроком: срок тикал бы сам."""
-    if character.mining_left_seconds is not None:
-        return float(character.mining_left_seconds)
     if character.mining_ends_at is None:
         return 0.0
     now = now or datetime.now(timezone.utc)
     return max((character.mining_ends_at - now).total_seconds(), 0.0)
 
-
-def pause_dig(character: Character, now: datetime | None = None) -> bool:
-    """Останавливает часы добычи: игрок вышел из забоя. True — остановили.
-
-    Время идёт ТОЛЬКО пока игрок сидит и копает. Раньше хранился абсолютный
-    срок, и он продолжал тикать, где бы игрок ни находился — из-за этого
-    добыча успевала завершиться, пока он стоял снаружи.
-    """
-    if character.mining_ends_at is None:
-        return False
-    character.mining_left_seconds = max(round(remaining_seconds(character, now)), 1)
-    character.mining_ends_at = None
-    return True
-
-
-def resume_dig(character: Character, now: datetime | None = None) -> bool:
-    """Снова запускает часы: игрок вернулся в забой. True — запустили."""
-    if character.mining_left_seconds is None:
-        return False
-    now = now or datetime.now(timezone.utc)
-    character.mining_ends_at = now + timedelta(seconds=character.mining_left_seconds)
-    character.mining_left_seconds = None
-    return True
 
 
 def is_event_vein(character: Character) -> bool:
@@ -184,7 +150,6 @@ def abandon_dig(character: Character) -> None:
     уже возвращена отдельно.
     """
     character.mining_ends_at = None
-    character.mining_left_seconds = None
     character.mining_mine_id = None
 
 
@@ -252,7 +217,6 @@ async def abandon_if_elsewhere(db: AsyncSession, character: Character) -> bool:
 class DigStart:
     seconds: float
     ends_at: datetime
-    resumed: bool = False
 
 
 @dataclass
@@ -276,19 +240,11 @@ async def start_dig(
     """
     now = now or datetime.now(timezone.utc)
 
-    # Возврат к своей же прерванной добыче: срок уже в БД, пересчитывать
-    # нечего и новую руду резервировать не надо.
+    # Возврата к прерванной добыче нет вовсе: ушёл из забоя — начинаешь
+    # заново. Правило выбрано осознанно ради простоты; цена ухода — только
+    # потраченное время, кусок руды возвращается в жилу.
     if is_digging(character):
-        same_mine = mine is not None and character.mining_mine_id == mine.id
-        if same_mine:
-            resume_dig(character, now)
-            await db.flush()
-            return DigStart(
-                seconds=remaining_seconds(character, now),
-                ends_at=character.mining_ends_at,
-                resumed=True,
-            )
-        abandon_dig(character)
+        await cancel_dig(db, character)
 
     if mine is not None:
         if not await _take_one_ore(db, mine.id):
@@ -326,6 +282,8 @@ async def finish_dig(
     level, remainder, levels = mining.add_mining_xp(
         character.mining_level, character.mining_xp, xp
     )
+    if levels:
+        character.mining_level_at = datetime.now(timezone.utc)
     character.mining_level, character.mining_xp = level, remainder
     abandon_dig(character)
     await db.flush()
@@ -385,31 +343,26 @@ async def total_ore(db: AsyncSession, character_id: int) -> int:
 # --- Обслуживание -------------------------------------------------------------
 
 async def release_after_restart(db: AsyncSession) -> int:
-    """После рестарта бота выбрасывает копающих «в хаб», НЕ трогая срок добычи.
+    """После рестарта бота выбрасывает копающих наверх и ОТМЕНЯЕТ их добычу.
 
-    Ровно то поведение, которое задумано: игрок оказывается на клетке без
-    открытого экрана рудника, но пока он с неё не ушёл — может зайти обратно и
-    доработать остаток. Уход с клетки обнулит добычу (bot/handlers/world.py).
+    Возврата к прерванной добыче в игре нет: ушёл из забоя — начинаешь
+    заново. Рестарт выносит игрока наверх, значит он из забоя ушёл, и правило
+    применяется без исключений. Цена — только потраченное время: начатые куски
+    возвращаются в жилы, уничтожать общий ресурс рестарт не должен.
 
-    Экран сбрасывается только у тех, кто стоял в руднике: у остальных
-    сохранённый экран (скупщик, лавка) трогать незачем.
+    Экран сбрасывается только тем, кто стоял в руднике: чужой сохранённый
+    экран (скупщик, лавка) трогать незачем.
     """
-    now = datetime.now(timezone.utc)
     diggers = (
         await db.execute(
             select(Character).where(Character.mining_ends_at.is_not(None))
         )
     ).scalars().all()
     for character in diggers:
-        # Часы останавливаются на остатке, который был к моменту рестарта.
-        # Без этого срок продолжал бы тикать, пока бот лежит и пока игрок
-        # стоит в хабе, — а время должно идти только в забое.
-        pause_dig(character, now)
+        await cancel_dig(db, character)
 
-    result = await db.execute(
-        update(Character)
-        .where(Character.screen == "mine")
-        .values(screen=None)
+    await db.execute(
+        update(Character).where(Character.screen == "mine").values(screen=None)
     )
     await db.commit()
-    return max(result.rowcount, len(diggers))
+    return len(diggers)
