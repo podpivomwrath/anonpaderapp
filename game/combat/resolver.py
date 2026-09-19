@@ -150,6 +150,10 @@ class TickResult:
     hits: list[PendingHit] = field(default_factory=list)
     actions: dict[int, DeclaredAction] = field(default_factory=dict)  # только "character"
     control_landed_by: set[int] = field(default_factory=set)  # cid, успешно наложившие контроль в этот ход
+    # Патч 66: {id цели: кто пытался её контролить} - включая отбитые попытки.
+    # Отдельно от control_landed_by: тому важен успех, этому - сам факт удара
+    # контролем по конкретной цели (окно прерывания Хирурга).
+    control_attempts_on: dict[int, set[int]] = field(default_factory=dict)
     # Патч 51, ч.5: структурные версии hit/heal-строк лога — см. RenderedHit/
     # RenderedHeal выше. lines[len(prelude_line_count):...] по-прежнему несёт
     # готовый текст (обратная совместимость и уже существующие тесты), эти
@@ -196,6 +200,8 @@ def resolve_tick(
     # уроном/длительностью в этот ход. Свежий яд/дебаф начинает работать со
     # следующего хода; FREEZE — исключение, срабатывает и потребляется в этот ход.
     preexisting_effects = {id(e) for c in session.combatants.values() for e in c.effects}
+    for combatant in session.combatants.values():
+        combatant.control_attempted_by.clear()  # патч 66: память попыток - однотиковая
 
     # Кто заморожен НА НАЧАЛО хода (лингер многоходового контроля) — не действует
     frozen_at_start = {
@@ -250,6 +256,10 @@ def resolve_tick(
                     and effect.source_id in control_actors
                 ):
                     result.control_landed_by.add(effect.source_id)
+
+    for combatant in session.combatants.values():
+        if combatant.control_attempted_by:
+            result.control_attempts_on[combatant.id] = set(combatant.control_attempted_by)
 
     # --- Фаза 3: кто способен действовать (заморожен на старте ИЛИ получил контроль) ---
     def is_frozen(c: CombatantState) -> bool:

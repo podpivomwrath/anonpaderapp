@@ -221,3 +221,76 @@ def test_surgeon_no_targets_returns_empty():
     boss = rb.build_surgeon(id=1)
     session = make_session(boss)  # ни одного игрока
     assert ai(boss, session, DeterministicRng()) == []
+
+
+# --- Патч 66: Хирург не поддаётся контролю, но контроль сбивает его навык ---
+
+
+class NoResistRng(random.Random):
+    """random() почти 1.0 - ни один процентный бросок НЕ срабатывает.
+
+    Для резиста Воли это "не сопротивился": проверка там rng.random() < resist,
+    так что DeterministicRng (0.0) дал бы ровно обратное - вечный резист.
+    """
+
+    def random(self) -> float:
+        return 0.999
+
+
+def _control_tick(boss, player, skill_id: str):
+    """Один ход: игрок бьёт по боссу контроль-навыком, резист не срабатывает."""
+    from game.combat import resolver
+    from game.combat.session import ActionType, DeclaredAction
+
+    session = make_session(boss, player)
+    return resolver.resolve_tick(
+        session,
+        {player.id: DeclaredAction(type=ActionType.SKILL, skill_id=skill_id, target_id=boss.id)},
+        NoResistRng(),
+    )
+
+
+def test_surgeon_is_never_controlled():
+    """Резист Воли упирается в 75% - у Хирурга контроль не проходит вовсе.
+
+    NoResistRng не даёт сработать ни одному резисту: если бы Хирург держался
+    только на Воле, контроль бы лёг.
+    """
+    boss = rb.build_surgeon(id=1)
+    assert boss.control_immune_always is True
+    player = make_player(2)
+    result = _control_tick(boss, player, "mage_ice_bonds")
+    # FREEZE потребляется в тот же ход (см. game/combat/control.py), поэтому
+    # факт наложения проверяем по control_landed_by, а не по остаточному эффекту.
+    assert player.id not in result.control_landed_by
+
+
+def test_control_attempt_on_surgeon_is_recorded_even_though_it_fails():
+    """Окно прерывания живёт именно на этом: попытка засчитана, эффекта нет."""
+    boss = rb.build_surgeon(id=1)
+    player = make_player(2)
+    result = _control_tick(boss, player, "mage_ice_bonds")
+    assert result.control_attempts_on.get(boss.id) == {player.id}
+    assert not result.control_landed_by  # ничего не легло - сбивается навык, не Хирург
+
+
+def test_ordinary_boss_still_yields_to_control():
+    """Иммунитет - свойство Хирурга, а не всех рейд-боссов."""
+    veld = rb.build_veld_mobs(start_id=1)[rc.VELD_OSWALD]
+    assert veld.control_immune_always is False
+    player = make_player(50)
+    result = _control_tick(veld, player, "mage_ice_bonds")
+    assert result.control_landed_by == {player.id}
+
+
+def test_control_attempts_do_not_leak_between_ticks():
+    from game.combat import resolver
+    from game.combat.session import ActionType, DeclaredAction
+
+    boss = rb.build_surgeon(id=1)
+    player = make_player(2)
+    session = make_session(boss, player)
+    attack = {player.id: DeclaredAction(type=ActionType.SKILL, skill_id="mage_ice_bonds", target_id=boss.id)}
+    resolver.resolve_tick(session, attack, NoResistRng())
+    quiet = resolver.resolve_tick(session, {}, NoResistRng())
+    assert boss.id not in quiet.control_attempts_on

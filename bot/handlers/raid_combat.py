@@ -625,10 +625,14 @@ async def on_raid_tick_resolved(session_id: int, tick: int, result: TickResult) 
         surgeon = state.combatants.get(battle.surgeon_id)
         ai = battle.surgeon_ai
         if surgeon is not None and ai is not None and surgeon.alive:
-            # Окно прерывания (первый ход ИЛИ только что открыто фазой 2) —
-            # проверяем результат ЭТОГО тика (control_landed_by).
+            # Окно прерывания (первый ход ИЛИ только что открыто фазой 2).
+            # Смотрим на ПОПЫТКУ контроля по самому Хирургу, а не на успешно
+            # наложенный эффект: Хирург не поддаётся контролю в принципе (патч 66),
+            # так что ждать FREEZE значило бы сделать окно непроходимым. Цель
+            # проверяется отдельно - контроль по другому противнику навык не
+            # сбивает.
             if ai.awaiting_interrupt:
-                if result.control_landed_by:
+                if result.control_attempts_on.get(battle.surgeon_id):
                     extra_lines.append(rt.SURGEON_INTERRUPTED_LINE)
                     ai.close_interrupt_window()
                 else:

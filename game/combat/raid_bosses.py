@@ -66,7 +66,13 @@ def build_veld_mobs(start_id: int) -> dict[str, CombatantState]:
 
 
 def build_surgeon(id: int) -> CombatantState:
-    return _boss_combatant(id, rc.SURGEON_NAME, rc.SURGEON_HP, SURGEON_STAT_MULT)
+    surgeon = _boss_combatant(id, rc.SURGEON_NAME, rc.SURGEON_HP, SURGEON_STAT_MULT)
+    # «Воли не имеет»: контроль на Хирурга не ложится никогда. Это не делает
+    # контроль бесполезным - наоборот, он становится единственным ключом к
+    # окну прерывания (см. bot/handlers/raid_combat.py), где важна попытка,
+    # а не наложенный эффект.
+    surgeon.control_immune_always = True
+    return surgeon
 
 
 # --- Этап 2: порядок убийства Вельдов ---
@@ -151,10 +157,13 @@ class SurgeonAI:
     def open_interrupt_window(self) -> None:
         """Хирург замирает готовя инструмент — следующий ХОД он не атакует
         (см. __call__: preparing/awaiting_interrupt оба гасят атаку), а ход
-        ПОСЛЕ ТОГО — окно, когда группа обязана его прервать (см.
-        bot/handlers/raid_combat.py — именно оно вешает FREEZE(1)+
-        CONTROL_RESIST_DOWN(2) на комбатанта Хирурга, здесь только флаг для
-        подавления атаки на этот единственный тик)."""
+        ПОСЛЕ ТОГО — окно, когда группа обязана его прервать.
+
+        Прерывает ЛЮБАЯ попытка контроля по Хирургу (патч 66) — оглушение,
+        заморозка, сбой Отравителя. Именно попытка: контроль на него не
+        ложится никогда, поэтому сбивается сам навык, а не Хирург уходит в
+        оглушение. Решение принимает оркестрация (bot/handlers/raid_combat.py),
+        здесь только флаг, гасящий атаку на этот единственный тик."""
         self.awaiting_interrupt = True
 
     def close_interrupt_window(self) -> None:
