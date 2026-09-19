@@ -132,3 +132,28 @@ async def test_reset_is_idempotent(db_session, make_character) -> None:
 
     assert first.total == 1
     assert second.total == 0
+
+
+def test_restart_notices_carry_a_keyboard() -> None:
+    """Регрессия на реальное застревание: игрока прервал рестарт посреди
+    рейда, уведомление ушло БЕЗ клавиатуры, и у него осталась боевая — её
+    кнопки вели в бой, которого больше нет.
+
+    Обработчики таких кнопок проверяют состояние в памяти процесса, ничего не
+    находят и молча выходят, даже не касаясь БД. Со стороны это выглядит как
+    умерший бот: игрок стоял так полтора часа, и даже last_active_at у него не
+    обновлялся.
+    """
+    import inspect
+    import pathlib
+
+    source = pathlib.Path(
+        inspect.getfile(inspect.getmodule(inspect.currentframe()))
+    ).parents[1] / "main.py"
+    text = source.read_text(encoding="utf-8")
+
+    assert "_notify_interrupted" in text, "рассылки о прерванной активности должны быть общими"
+    block = text[text.index("async def _notify_interrupted"):]
+    block = block[: block.index("await _notify_interrupted")]
+    assert "_current_keyboard" in block, "уведомление обязано нести актуальную клавиатуру"
+    assert "keyboard=keyboard" in block

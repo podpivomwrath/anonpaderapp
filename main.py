@@ -1,6 +1,7 @@
 """Точка входа: aiohttp-сервер (Callback API) + vkbottle + тик-движок."""
 
 import asyncio
+from datetime import datetime, timezone
 import sys
 
 import redis.asyncio as aioredis
@@ -37,7 +38,8 @@ from game.combat.tick_engine import InMemoryActionStore, RedisActionStore, TickE
 from game.economy import mount_config as mc
 from game.world.scheduler import PeerScheduler
 from services.db import dispose_engine, get_session_factory
-from services import mining_service, raid_service
+from models import Character
+from services import mining_service, onboarding_service, raid_service
 
 
 def create_bot(settings: Settings) -> Bot:
@@ -85,33 +87,43 @@ async def run() -> None:
     if recovered:
         logger.warning("Recovered interrupted raids for {} characters; keys refunded", len(recovered))
     bot = create_bot(settings)
-    if released:
-        # Отмена добычи обязана быть ГРОМКОЙ. Молча снятый таймер неотличим от
-        # зависшего: игрок досиживает обещанные минуты впустую.
+
+    # Обе рассылки идут через одну функцию НЕ ради краткости: уведомление о
+    # прерванной активности обязано нести КЛАВИАТУРУ. Без неё игрок остаётся с
+    # той, что была в бою или в забое, её кнопки ведут в состояние, которого
+    # больше нет, а обработчики таких кнопок проверяют память процесса, ничего
+    # не находят и молча выходят - даже не касаясь БД. Со стороны это выглядит
+    # как «бот умер»: именно так игрок и застрял на проде после рейда.
+    async def _notify_interrupted(character_ids: list[int], text: str, what: str) -> None:
+        if not character_ids:
+            return
+        now = datetime.now(timezone.utc)
         async with get_session_factory()() as db:
-            peers = await raid_handlers._peer_ids_for(db, sorted(set(released)))
-        for peer in peers.values():
-            try:
-                await bot.api.messages.send(
-                    peer_id=peer, random_id=0,
-                    message=(
-                        "⛏ Сервер перезапустился, и добыча прервалась. "
-                        "Начатая порода вернулась в жилу - спустись и начни заново."
-                    ),
-                )
-            except Exception:
-                logger.exception("Не удалось предупредить об отмене добычи")
-    if recovered:
-        async with get_session_factory()() as db:
-            peers = await raid_handlers._peer_ids_for(db, sorted(set(recovered)))
-        for peer in peers.values():
-            try:
-                await bot.api.messages.send(
-                    peer_id=peer, random_id=0,
-                    message="Рейд прерван перезапуском сервера. Ключ возвращён лидеру; полученные награды сохранены.",
-                )
-            except Exception:
-                logger.exception("Could not deliver raid recovery notice")
+            for character_id in sorted(set(character_ids)):
+                character = await db.get(Character, character_id)
+                peer = await onboarding_service.vk_id_for_character(db, character_id)
+                if character is None or peer is None:
+                    continue
+                try:
+                    keyboard = await world_handlers._current_keyboard(db, character, peer, now)
+                    await bot.api.messages.send(
+                        peer_id=peer, random_id=0, message=text, keyboard=keyboard,
+                    )
+                except Exception:
+                    logger.exception("Не удалось предупредить игрока {} ({})", peer, what)
+
+    await _notify_interrupted(
+        released,
+        "⛏ Сервер перезапустился, и добыча прервалась. "
+        "Начатая порода вернулась в жилу - спустись и начни заново.",
+        "добыча",
+    )
+    await _notify_interrupted(
+        recovered,
+        "Рейд прерван перезапуском сервера. Ключ возвращён лидеру; "
+        "полученные награды сохранены.",
+        "рейд",
+    )
     redis = aioredis.from_url(settings.redis_url, decode_responses=True)
 
     tick_engine = TickEngine(
