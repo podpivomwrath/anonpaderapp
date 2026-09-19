@@ -156,24 +156,36 @@ def stage_loot_line(stage: int) -> str:
     return f"×{mult} к трофеям и опыту за этот этап."
 
 
-def contribution_block(contribution, name: str) -> str:
-    """Патч 69: личная сводка вклада после рейда.
+def contribution_table(rows) -> str:
+    """Патч 69: общие итоги захода - ОДИН И ТОТ ЖЕ текст всем участникам.
 
-    Три числа, а не таблица на всю группу: рейд и так заканчивается длинным
-    сообщением, а сравнивать себя с другими игроки пойдут в топы. Нули не
-    прячем - «0 урона» это тоже разбор захода, и скрывать его значило бы
-    показывать сводку только тем, у кого всё хорошо.
+    rows - [(имя, RaidContribution)] в любом порядке.
+
+    Таблица, а не личная сводка: смысл именно в сравнении. Группа собирается
+    надолго, и по трём колонкам видно, кто тянет урон, кто держит удар, а кто
+    пришёл покататься - без этого отсеивать состав можно только на глаз.
+    Каждый раздел сортируется по своему числу: лучший танк редко совпадает с
+    лучшим уроном, и общий порядок строк врал бы про две колонки из трёх.
+
+    Нули показываем. Скрывать их значило бы прятать ровно тех, ради кого
+    таблицу и смотрят.
     """
-    damage = contribution.damage if contribution is not None else 0
-    healed = contribution.healed if contribution is not None else 0
-    absorbed = contribution.absorbed if contribution is not None else 0
-
-    def number(value: int) -> str:
-        return f"{value:,}".replace(",", " ")
-
-    return (
-        f"📊 {name} - итоги захода" + chr(10)
-        + f"⚔️ Урона нанесено: {number(damage)}" + chr(10)
-        + f"💚 Здоровья восполнено: {number(healed)}" + chr(10)
-        + f"🛡 Урона впитано: {number(absorbed)}"
+    sections = (
+        ("⚔️ Урона нанесено:", lambda c: c.damage),
+        ("💚 Здоровья восполнено:", lambda c: c.healed),
+        ("🛡 Урона впитано:", lambda c: c.absorbed),
     )
+    lines = ["📊 Итоги захода"]
+    for title, value_of in sections:
+        lines.append("")
+        lines.append(title)
+        # Ничья разводится по имени - иначе порядок двух нулей скакал бы от
+        # сообщения к сообщению и выглядел как разные результаты.
+        ordered = sorted(rows, key=lambda row: (-value_of(row[1]), row[0]))
+        for name, contribution in ordered:
+            lines.append(f"{name} - {_thousands(value_of(contribution))}")
+    return chr(10).join(lines)
+
+
+def _thousands(value: int) -> str:
+    return f"{value:,}".replace(",", " ")

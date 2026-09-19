@@ -350,7 +350,7 @@ async def _broadcast_board(
         target_line = _target_line(battle_id, battle, cid)
         if target_line and combatant is not None and combatant.alive:
             personal = f"{personal}\n{target_line}"
-        await _bot_api.messages.send(peer_id=p.peer_id, message=personal, random_id=0, keyboard=keyboard)
+        await _bot_api.messages.send(peer_id=p.peer_id, message=text, random_id=0, keyboard=keyboard)
 
 
 # --- Действия боя (атака/навык) ---
@@ -926,25 +926,32 @@ async def _cleanup_and_return(session_id: int, battle: RaidBattle, text: str, *,
         await raid_service.finish_run(db, battle.run_id)
         await db.commit()
 
+    # Таблица итогов ОДНА на всех и уходит каждому - и в победе, и в
+    # поражении: разбор неудачного захода нужен не меньше, чем удачного.
+    # Строится один раз - она у всех одинаковая, в этом и смысл: игроки
+    # смотрят её, чтобы сравнить состав между собой.
+    table = rt.contribution_table([
+        (p.name, battle.contribution.get(cid, RaidContribution()))
+        for cid, p in battle.participants.items()
+    ])
+    text = f"{text}\n\n{table}"
+
     for cid, p in battle.participants.items():
-        # Сводка вклада идёт КАЖДОМУ и в победе, и в поражении: разбор
-        # неудачного захода нужен не меньше, чем удачного.
-        personal = f"{text}\n\n{rt.contribution_block(battle.contribution.get(cid), p.name)}"
         if cid in has_mount_by_cid:
             await _bot_api.messages.send(
-                peer_id=p.peer_id, message=personal, random_id=0,
+                peer_id=p.peer_id, message=text, random_id=0,
                 keyboard=movement_keyboard(*rc.MONOLITH_COORDS, p.peer_id, has_mount=has_mount_by_cid.get(cid, False)),
             )
         elif cid in defeats:
             defeat, respawn_at = defeats[cid]
             await _bot_api.messages.send(
-                peer_id=p.peer_id, message=personal, random_id=0, keyboard=kb.raid_waiting_keyboard(),
+                peer_id=p.peer_id, message=text, random_id=0, keyboard=kb.raid_waiting_keyboard(),
             )
             await respawn_handlers.register_death(p.peer_id, respawn_at, defeat.xp_lost)
         else:
             # Персонажа не нашли в БД. Раньше такой участник не получал НИ
             # ОДНОГО сообщения и оставался с боевой клавиатурой мёртвого боя.
             await _bot_api.messages.send(
-                peer_id=p.peer_id, message=personal, random_id=0,
+                peer_id=p.peer_id, message=text, random_id=0,
                 keyboard=movement_keyboard(*rc.MONOLITH_COORDS, p.peer_id, has_mount=False),
             )

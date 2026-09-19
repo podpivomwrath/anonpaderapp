@@ -1,4 +1,4 @@
-"""Патч 69: личная сводка после рейда — урон, лечение, впитанное.
+"""Патч 69: общие итоги рейда - одна таблица на всех — урон, лечение, впитанное.
 
 Копится по ходам, потому что TickResult живёт ровно один ход. Один battle_id
 держит весь рейд, поэтому копилка обязана пережить смену этапа.
@@ -80,7 +80,7 @@ def test_miss_adds_nothing() -> None:
 
 def test_friendly_fire_is_not_counted_as_damage_dealt() -> None:
     """Урон засчитывается только по ЧУЖОЙ стороне: иначе отражённый щитом
-    удар или урон по союзнику попадал бы в личный счёт как достижение."""
+    удар или урон по союзнику поднимал бы человека в таблице."""
     battle = _battle()
     raid._record_contribution(battle, _tick(
         hits=[_hit(PLAYER, ALLY, 50, source_side=0, target_side=0)],
@@ -97,15 +97,54 @@ def test_absorb_is_credited_to_the_one_who_took_the_hit() -> None:
     assert PLAYER not in battle.contribution
 
 
-def test_block_reports_zeroes_for_a_player_who_did_nothing() -> None:
-    """Нули - тоже разбор захода. Пустая сводка была бы хуже: игрок решил бы,
-    что сводка сломалась, а не что он ничего не успел."""
-    block = rt.contribution_block(None, "Гостус")
-    assert "Гостус" in block
-    assert block.count("0") >= 3
+def test_table_ranks_each_column_separately() -> None:
+    """Лучший танк редко совпадает с лучшим уроном - общий порядок строк врал
+    бы про две колонки из трёх."""
+    rows = [
+        ("Танк", raid.RaidContribution(damage=1000, healed=0, absorbed=50_000)),
+        ("Дамагер", raid.RaidContribution(damage=90_000, healed=0, absorbed=1000)),
+        ("Хилер", raid.RaidContribution(damage=5000, healed=40_000, absorbed=2000)),
+    ]
+    table = rt.contribution_table(rows).split(chr(10))
+
+    def section(title: str) -> list[str]:
+        i = table.index(title)
+        return [line.split(" - ")[0] for line in table[i + 1:i + 4]]
+
+    assert section("⚔️ Урона нанесено:") == ["Дамагер", "Хилер", "Танк"]
+    assert section("💚 Здоровья восполнено:") == ["Хилер", "Дамагер", "Танк"]
+    assert section("🛡 Урона впитано:") == ["Танк", "Хилер", "Дамагер"]
 
 
-def test_block_groups_thousands() -> None:
-    block = rt.contribution_block(raid.RaidContribution(damage=1234567, healed=0, absorbed=890), "pupsik")
-    assert "1 234 567" in block
-    assert "890" in block
+def test_table_lists_everyone_including_zeroes() -> None:
+    """Ради этих строк таблицу и смотрят: прятать нули - прятать ровно тех,
+    кого игроки пытаются отсеять."""
+    rows = [
+        ("pupsik", raid.RaidContribution(damage=10_000)),
+        ("Пассажир", raid.RaidContribution()),
+    ]
+    table = rt.contribution_table(rows)
+    assert "Пассажир - 0" in table
+    assert table.count("Пассажир") == 3  # во всех трёх разделах
+
+
+def test_table_is_identical_for_everyone() -> None:
+    """Таблица общая: её строят один раз и рассылают как есть."""
+    rows = [("a", raid.RaidContribution(damage=1)), ("b", raid.RaidContribution(damage=2))]
+    assert rt.contribution_table(rows) == rt.contribution_table(list(reversed(rows)))
+
+
+def test_ties_are_ordered_by_name_not_by_luck() -> None:
+    """Иначе порядок двух нулей скакал бы от сообщения к сообщению и читался
+    как разные результаты."""
+    rows = [("Яна", raid.RaidContribution()), ("Антон", raid.RaidContribution())]
+    table = rt.contribution_table(rows).split(chr(10))
+    i = table.index("⚔️ Урона нанесено:")
+    assert table[i + 1].startswith("Антон")
+    assert table[i + 2].startswith("Яна")
+
+
+def test_table_groups_thousands() -> None:
+    table = rt.contribution_table([("pupsik", raid.RaidContribution(damage=1234567, absorbed=890))])
+    assert "1 234 567" in table
+    assert "890" in table
