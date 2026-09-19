@@ -177,11 +177,33 @@ def _start_stage_session(battle_id: int, battle: RaidBattle) -> CombatSessionSta
         battle.surgeon_phase3_hp_at_start = None
         battle.surgeon_phase3_failed = False
 
-    for p in battle.participants.values():
-        enemies = list(battle.mob_ids)
-        if enemies:
-            _chosen_target[p.character_id] = enemies[0]
+    default_target = _default_target_id(battle)
+    if default_target is not None:
+        for p in battle.participants.values():
+            _chosen_target[p.character_id] = default_target
     return state
+
+
+def _default_target_id(battle: RaidBattle) -> int | None:
+    """Цель, которая стоит у всех на первом ходу этапа.
+
+    На 2 этапе это НАМЕРЕННО тот Вельд, которого надо убить ПОСЛЕДНИМ. Раньше
+    сюда попадал Освальд - он же первый в rc.VELD_ORDER, он же первый по HP,
+    он же первый в лоре. Загадка про порядок решалась сама собой: достаточно
+    было жать «Ударить», ни разу не сменив цель. Теперь автобой ведёт ровно в
+    противоположный конец очереди, и цель приходится выбирать руками.
+
+    На 1 и 3 этапах выбирать не из чего (три одинаковые куклы / один Хирург),
+    поэтому просто первый по id - sorted, а не обход set, чтобы у всех
+    участников цель совпадала гарантированно, а не по везению с хешами.
+    """
+    if battle.stage == 2 and battle.veld_combatant_ids:
+        last_in_order = rc.VELD_ORDER[-1]
+        target = battle.veld_combatant_ids.get(last_in_order)
+        if target is not None:
+            return target
+    enemies = sorted(battle.mob_ids)
+    return enemies[0] if enemies else None
 
 
 _STAGE_APPEAR_TEXT = {1: rt.STAGE1_APPEAR_TEXT, 2: rt.STAGE2_APPEAR_TEXT, 3: rt.STAGE3_APPEAR_TEXT}
@@ -277,25 +299,26 @@ def _target_line(battle_id: int, battle: RaidBattle, cid: int) -> str:
     return f"🎯 Цель: {target.name} ({hp_pct}% HP)"
 
 
-def _render_board(state: CombatSessionState, result: TickResult | None = None) -> str:
-    return battle_log.render_tick(state, result or TickResult(), viewer_side=0)
+def _render_board(
+    state: CombatSessionState, result: TickResult | None = None, boss_lines: list[str] | None = None,
+) -> str:
+    return battle_log.render_tick(state, result or TickResult(), viewer_side=0, enemy_lines=boss_lines)
 
 
 async def _broadcast_board(
     battle_id: int, battle: RaidBattle, result: TickResult | None, notices: dict[int, str] | None = None,
     boss_lines: list[str] | None = None,
 ) -> None:
-    """boss_lines - объявления механик боссов (порядок Вельдов, фазы Хирурга).
+    """boss_lines - сценарные реплики босса (порядок Вельдов, фазы Хирурга).
 
-    Они идут ОБЩИМ хвостом под доской, а не в notices: notices персональные
-    (опыт, дроп), а механика касается всех одинаково, и игрок обязан видеть
-    её рядом с тем ходом, который её вызвал.
+    Уходят В ДОСКУ, в раздел противника (battle_log.render_tick ждёт их
+    параметром enemy_lines - ради них он и написан): это ДЕЙСТВИЯ врага в
+    этот ход, и читаться они должны перед ударами, которые объясняют.
+    Персональные notices (опыт, дроп) - наоборот, над доской: к ходу боя
+    они отношения не имеют.
     """
     state = _engine.sessions.get(battle_id)
-    text = _render_board(state, result) if state is not None else ""
-    if boss_lines:
-        tail = "\n".join(boss_lines)
-        text = f"{text}\n\n{tail}" if text else tail
+    text = _render_board(state, result, boss_lines) if state is not None else ""
     notices = notices or {}
     for cid, p in battle.participants.items():
         combatant = _live_state(battle_id, battle).get(cid)

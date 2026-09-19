@@ -294,3 +294,45 @@ def test_control_attempts_do_not_leak_between_ticks():
     resolver.resolve_tick(session, attack, NoResistRng())
     quiet = resolver.resolve_tick(session, {}, NoResistRng())
     assert boss.id not in quiet.control_attempts_on
+
+
+# --- Патч 67: автоцель 2 этапа не должна совпадать с нужной ---
+
+
+def test_veld_kill_order_is_not_hp_order_by_accident():
+    """Фиксирует исходные данные загадки: очередь задана VELD_ORDER, и сейчас
+    она совпадает и с порядком HP, и с порядком представления в лоре. Если
+    это когда-нибудь поменяют, тест автоцели ниже надо перечитать."""
+    assert rc.VELD_ORDER == (rc.VELD_OSWALD, rc.VELD_IRMA, rc.VELD_LITTA)
+    by_hp = sorted(rc.VELD_ORDER, key=lambda v: -rc.VELD_HP[v])
+    assert list(rc.VELD_ORDER) == by_hp
+
+
+def test_stage2_autotarget_is_not_the_one_to_kill_first():
+    """Раньше автоцель вставала в Освальда - он же и нужен первым, так что
+    этап проходился нажатием «Ударить» без единой смены цели."""
+    from bot.handlers import raid_combat as raid
+
+    velds = rb.build_veld_mobs(start_id=20_100_000)
+    battle = raid.RaidBattle(
+        group_id=None, participants={}, member_inputs=[], rng=DeterministicRng(),
+        stage=2, mob_ids={c.id for c in velds.values()},
+        veld_combatant_ids={vid: c.id for vid, c in velds.items()},
+    )
+    target = raid._default_target_id(battle)
+    assert target is not None
+    assert target != velds[rc.VELD_ORDER[0]].id
+    assert target == velds[rc.VELD_ORDER[-1]].id
+
+
+def test_stage1_autotarget_is_stable():
+    """На 1 этапе куклы одинаковые - важно лишь, что цель у всех одна и та же
+    (обход set давал бы её по везению с хешами)."""
+    from bot.handlers import raid_combat as raid
+
+    mobs = rb.build_stage1_mobs(start_id=20_000_000)
+    battle = raid.RaidBattle(
+        group_id=None, participants={}, member_inputs=[], rng=DeterministicRng(),
+        stage=1, mob_ids={m.id for m in mobs},
+    )
+    assert raid._default_target_id(battle) == min(m.id for m in mobs)
