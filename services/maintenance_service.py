@@ -70,7 +70,8 @@ async def preview(db: AsyncSession) -> ResetPreview:
     diggers = await db.scalar(
         select(func.count()).select_from(Character).where(
             Character.creation_state.is_(None),
-            Character.mining_ends_at.is_not(None),
+            Character.mining_ends_at.is_not(None)
+            | Character.mining_left_seconds.is_not(None),
         )
     )
     return ResetPreview(
@@ -117,9 +118,12 @@ async def reset_stuck_activities(db: AsyncSession) -> ResetReport:
         update(Character)
         .where(
             Character.creation_state.is_(None),
-            Character.mining_ends_at.is_not(None),
+            # Приостановленная добыча тоже висит на игроке и тоже блокирует
+            # его, когда он в забое, — сбрасывать надо оба состояния.
+            Character.mining_ends_at.is_not(None)
+            | Character.mining_left_seconds.is_not(None),
         )
-        .values(mining_ends_at=None, mining_mine_id=None)
+        .values(mining_ends_at=None, mining_left_seconds=None, mining_mine_id=None)
     )
     await db.commit()
     return ResetReport(

@@ -121,6 +121,13 @@ class Character(Base):
         DateTime(timezone=True), nullable=True
     )
     mining_mine_id: Mapped[str | None] = mapped_column(String(48), nullable=True)
+    # Остаток добычи в секундах, пока она ПРИОСТАНОВЛЕНА (игрок не в забое).
+    # Время идёт только когда игрок реально сидит и копает, поэтому у добычи
+    # два взаимоисключающих состояния:
+    #   идёт      — mining_ends_at задан, mining_left_seconds = NULL
+    #   на паузе  — mining_left_seconds задан, mining_ends_at = NULL
+    # Абсолютного срока на паузе быть не может: он продолжал бы тикать сам.
+    mining_left_seconds: Mapped[int | None] = mapped_column(nullable=True)
 
     # Патч 58: всего убито мобов за всё время. Истории боёв с мобами в базе
     # нет (pvp_battles пишет только PvP), поэтому пересчитать задним числом

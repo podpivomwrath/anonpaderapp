@@ -180,3 +180,29 @@ def test_ore_is_awarded_only_inside_the_mine() -> None:
 
     source = inspect.getsource(handlers.on_dig_done)
     assert 'character.screen != "mine"' in source
+
+
+def test_entering_the_vein_restarts_the_clock() -> None:
+    """Вход в забой обязан снимать добычу с паузы. Иначе часы стоят навсегда:
+    кнопка «Добыть» на экране идущей добычи не показывается, и снять паузу
+    было бы нечем."""
+    import inspect
+
+    from bot.handlers import mining as handlers
+
+    source = inspect.getsource(handlers._enter_mine)
+    assert "resume_dig" in source
+
+
+def test_leaving_the_vein_stops_the_clock() -> None:
+    """Обратная половина того же правила — время не идёт вне забоя.
+
+    Проверяется на сервисе: выйти из забоя с незаконченной добычей нельзя, но
+    рестарт бота выносит игрока наружу, и там пауза обязана сработать.
+    """
+    import inspect
+
+    from services import mining_service
+
+    source = inspect.getsource(mining_service.release_after_restart)
+    assert "pause_dig" in source
