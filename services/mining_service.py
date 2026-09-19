@@ -176,18 +176,55 @@ def is_event_vein(character: Character) -> bool:
 
 
 def abandon_dig(character: Character) -> None:
-    """Добыча отменяется: уход с клетки, «Бросить», смерть в PvP.
+    """Снимает состояние добычи с персонажа, НЕ трогая жилу.
 
-    Зарезервированная руда НЕ возвращается в жилу. Так задумано: иначе можно
-    было бы занимать последний кусок рудника и отпускать его, когда удобно,
-    блокируя остальных бесплатно.
+    Почти всегда нужен не этот вызов, а cancel_dig ниже: он ещё и возвращает
+    начатый кусок в жилу. Голый abandon_dig оставлен для мелкой жилы из
+    исследования (возвращать некуда, её нет на карте) и для мест, где руда
+    уже возвращена отдельно.
     """
     character.mining_ends_at = None
     character.mining_left_seconds = None
     character.mining_mine_id = None
 
 
-def abandon_if_elsewhere(character: Character) -> bool:
+async def release_ore(db: AsyncSession, mine_id: str) -> None:
+    """Возвращает начатый кусок обратно в жилу.
+
+    Руда резервируется в начале добычи, и сперва она при отмене пропадала.
+    Это открывало griefing: начать и сразу бросить восемь раз — рудник пуст,
+    повторить по всей карте — руды в мире нет вообще. Порчи чужого ресурса
+    быть не должно, поэтому отмена только сбрасывает таймер.
+
+    Клампим потолком на случай, если за время добычи в жилу успел упасть
+    спавн: превышать кромку возврат не должен.
+    """
+    vein = await db.get(MineVein, mine_id)
+    if vein is None:
+        db.add(MineVein(mine_id=mine_id, ore_count=1))
+    else:
+        vein.ore_count = min(vein.ore_count + 1, mc.MINE_ORE_CAP)
+    await db.flush()
+
+
+async def cancel_dig(db: AsyncSession, character: Character) -> bool:
+    """Отмена добычи с возвратом куска в жилу. True — добыча была.
+
+    Единственная правильная точка отмены: «Бросить кирку», поражение в PvP,
+    уход с клетки, массовый сброс. Кусок возвращается всегда — отменяющий не
+    должен иметь возможности уничтожить общий ресурс.
+    """
+    if not is_digging(character):
+        return False
+    mine_id = character.mining_mine_id
+    abandon_dig(character)
+    if mine_id is not None:
+        await release_ore(db, mine_id)
+    await db.flush()
+    return True
+
+
+async def abandon_if_elsewhere(db: AsyncSession, character: Character) -> bool:
     """Обнуляет добычу, если игрок оказался не на той клетке. True — обнулили.
 
     Правило из дизайна: к статичному руднику можно вернуться и доработать
@@ -199,14 +236,14 @@ def abandon_if_elsewhere(character: Character) -> bool:
     сработает это ровно в одном сценарии: бот перезапустился, игрока подняло
     наверх, и он ушёл вместо того, чтобы вернуться в забой.
     """
-    if character.mining_ends_at is None:
+    if not is_digging(character):
         return False
     if character.mining_mine_id is None:
         abandon_dig(character)  # мелкая жила: её больше нет нигде
         return True
     mine = mining.mine_by_id(character.mining_mine_id)
     if mine is None or (mine.x, mine.y) != (character.pos_x, character.pos_y):
-        abandon_dig(character)
+        await cancel_dig(db, character)
         return True
     return False
 

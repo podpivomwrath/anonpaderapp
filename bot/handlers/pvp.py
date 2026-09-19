@@ -1225,9 +1225,9 @@ async def _finish_duel(battle: Battle, winner_cid: int, loser_cid: int) -> None:
         # Иначе охотиться на рыбаков было бы выгоднее, чем рыбачить —
         # риск для проигравшего при этом сохраняется полностью.
         fish_lost = await fishing_service.drop_bag(db, loser.id)
-        # Патч 59: добыча прерывается. Нападение — единственное, что может
-        # случиться за те минуты, пока игрок стоит в забое.
-        mining_service.abandon_dig(loser)
+        # Патч 59: добыча прерывается, но начатый кусок возвращается в жилу —
+        # победитель прерывает работу, а не уничтожает общий ресурс.
+        await mining_service.cancel_dig(db, loser)
         death_service.apply_pvp_death(loser)
         await admin_service.log_death(db, loser, "pvp")
         respawn_handlers.register_pvp_death(loser_p.peer_id)
@@ -1390,7 +1390,7 @@ async def on_mass_battle_finished(session_id: int, result: TickResult) -> None:
             await fishing_service.drop_bag(db, victim_cid)
             victim_character = await db.get(Character, victim_cid)
             if victim_character is not None:
-                mining_service.abandon_dig(victim_character)
+                await mining_service.cancel_dig(db, victim_character)
             for winner_cid, drop in moved.items():
                 line = _format_transfer_line(drop)
                 if line:

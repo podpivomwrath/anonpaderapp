@@ -114,6 +114,25 @@ async def reset_stuck_activities(db: AsyncSession) -> ResetReport:
     )
     # Патч 59: незаконченная добыча. Она блокирует игроку вообще всё, поэтому
     # зависшая добыча — самое неприятное из того, что может пережить рестарт.
+    #
+    # Начатые куски возвращаются в жилы: массовый сброс не должен уничтожать
+    # общий ресурс мира. Иначе каждое нажатие кнопки в админке стирало бы по
+    # руде с каждой занятой жилы.
+    from services import mining_service
+
+    occupied = (
+        await db.execute(
+            select(Character.mining_mine_id).where(
+                Character.creation_state.is_(None),
+                Character.mining_mine_id.is_not(None),
+                Character.mining_ends_at.is_not(None)
+                | Character.mining_left_seconds.is_not(None),
+            )
+        )
+    ).scalars().all()
+    for mine_id in occupied:
+        await mining_service.release_ore(db, mine_id)
+
     mining_result = await db.execute(
         update(Character)
         .where(

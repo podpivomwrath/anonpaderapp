@@ -310,9 +310,9 @@ async def test_leaving_the_cell_zeroes_the_dig(db_session, make_character) -> No
     mine = mining.mine_by_id(EASY_MINE)
     await mining_service.start_dig(db_session, character, mine, random.Random(0))
 
-    assert mining_service.abandon_if_elsewhere(character) is False
+    assert await mining_service.abandon_if_elsewhere(db_session, character) is False
     character.pos_x, character.pos_y = 46, 45  # ушёл на соседнюю клетку
-    assert mining_service.abandon_if_elsewhere(character) is True
+    assert await mining_service.abandon_if_elsewhere(db_session, character) is True
     assert not mining_service.is_digging(character)
 
 
@@ -324,7 +324,7 @@ async def test_event_vein_vanishes_on_any_exit(db_session, make_character) -> No
     await mining_service.start_dig(db_session, character, None, random.Random(0))
 
     assert mining_service.is_event_vein(character) is True
-    assert mining_service.abandon_if_elsewhere(character) is True
+    assert await mining_service.abandon_if_elsewhere(db_session, character) is True
     assert not mining_service.is_digging(character)
 
 
@@ -461,3 +461,96 @@ async def test_returning_to_the_mine_resumes_the_paused_dig(
     assert character.mining_ends_at is not None
     # Возврат не резервирует новую руду: кусок уже занят.
     assert await mining_service.ore_in_mine(db_session, EASY_MINE) == left_in_vein
+
+
+@pytest.mark.asyncio
+async def test_cancelling_returns_the_ore_to_the_vein(db_session, make_character) -> None:
+    """Отмена только сбрасывает таймер, кусок остаётся в жиле.
+
+    Регрессия на griefing: пока отмена уничтожала кусок, любому желающему
+    хватало начать и сразу бросить добычу восемь раз, чтобы обнулить рудник,
+    и повторить это по всей карте. Порчи общего ресурса быть не должно.
+    """
+    character = await make_character()
+    character.pos_x, character.pos_y = 46, 44
+    db_session.add(MineVein(mine_id=EASY_MINE, ore_count=3))
+    await db_session.flush()
+    mine = mining.mine_by_id(EASY_MINE)
+
+    await mining_service.start_dig(db_session, character, mine, random.Random(0))
+    assert await mining_service.ore_in_mine(db_session, EASY_MINE) == 2
+
+    await mining_service.cancel_dig(db_session, character)
+
+    assert await mining_service.ore_in_mine(db_session, EASY_MINE) == 3
+    assert not mining_service.is_digging(character)
+
+
+@pytest.mark.asyncio
+async def test_griefer_cannot_drain_a_mine(db_session, make_character) -> None:
+    """Прямая проверка сценария: начать и бросить столько раз, сколько руды в
+    жиле. Руды должно остаться столько же."""
+    character = await make_character()
+    character.pos_x, character.pos_y = 46, 44
+    db_session.add(MineVein(mine_id=EASY_MINE, ore_count=mc.MINE_ORE_CAP))
+    await db_session.flush()
+    mine = mining.mine_by_id(EASY_MINE)
+
+    for _ in range(mc.MINE_ORE_CAP * 3):
+        await mining_service.start_dig(db_session, character, mine, random.Random(0))
+        await mining_service.cancel_dig(db_session, character)
+
+    assert await mining_service.ore_in_mine(db_session, EASY_MINE) == mc.MINE_ORE_CAP
+
+
+@pytest.mark.asyncio
+async def test_return_never_exceeds_the_cap(db_session, make_character) -> None:
+    """Если за время добычи в жилу упал спавн, возврат не должен переполнить
+    её сверх кромки."""
+    character = await make_character()
+    character.pos_x, character.pos_y = 46, 44
+    db_session.add(MineVein(mine_id=EASY_MINE, ore_count=mc.MINE_ORE_CAP))
+    await db_session.flush()
+    mine = mining.mine_by_id(EASY_MINE)
+    await mining_service.start_dig(db_session, character, mine, random.Random(0))
+
+    # Спавн добил жилу до кромки, пока игрок копал.
+    vein = await db_session.get(MineVein, EASY_MINE)
+    vein.ore_count = mc.MINE_ORE_CAP
+    await db_session.flush()
+
+    await mining_service.cancel_dig(db_session, character)
+
+    assert await mining_service.ore_in_mine(db_session, EASY_MINE) == mc.MINE_ORE_CAP
+
+
+@pytest.mark.asyncio
+async def test_leaving_the_cell_also_returns_the_ore(db_session, make_character) -> None:
+    character = await make_character()
+    character.pos_x, character.pos_y = 46, 44
+    db_session.add(MineVein(mine_id=EASY_MINE, ore_count=2))
+    await db_session.flush()
+    mine = mining.mine_by_id(EASY_MINE)
+    await mining_service.start_dig(db_session, character, mine, random.Random(0))
+
+    character.pos_x, character.pos_y = 46, 45
+    assert await mining_service.abandon_if_elsewhere(db_session, character) is True
+
+    assert await mining_service.ore_in_mine(db_session, EASY_MINE) == 2
+
+
+@pytest.mark.asyncio
+async def test_finished_dig_does_NOT_return_the_ore(db_session, make_character) -> None:
+    """Обратная сторона: доведённая до конца добыча руду в жилу не возвращает —
+    она у игрока."""
+    character = await make_character()
+    character.pos_x, character.pos_y = 46, 44
+    db_session.add(MineVein(mine_id=EASY_MINE, ore_count=2))
+    await db_session.flush()
+    mine = mining.mine_by_id(EASY_MINE)
+    await mining_service.start_dig(db_session, character, mine, random.Random(0))
+
+    await mining_service.finish_dig(db_session, character, random.Random(5))
+
+    assert await mining_service.ore_in_mine(db_session, EASY_MINE) == 1
+    assert await mining_service.total_ore(db_session, character.id) == 1

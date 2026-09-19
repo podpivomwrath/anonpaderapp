@@ -215,7 +215,7 @@ async def mining_service_abandon(character) -> None:
     """Сохраняет в БД обнуление добычи при уходе с клетки (патч 59)."""
     async with get_session_factory()() as db:
         fresh = await db.get(type(character), character.id)
-        if fresh is not None and mining_service.abandon_if_elsewhere(fresh):
+        if fresh is not None and await mining_service.abandon_if_elsewhere(db, fresh):
             await db.commit()
 
 

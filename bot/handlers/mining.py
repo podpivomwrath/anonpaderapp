@@ -189,7 +189,7 @@ async def abandon(message: Message) -> None:
         if not mining_service.is_digging(character):
             await message.answer(mt.NOT_DIGGING_TEXT)
             return
-        mining_service.abandon_dig(character)
+        await mining_service.cancel_dig(db, character)
         mine = mining_service.mine_at(character)
         left = await mining_service.ore_in_mine(db, mine.id) if mine else 0
         await db.commit()

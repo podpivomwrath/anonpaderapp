@@ -69,7 +69,7 @@ NOT_AT_MINE_TEXT = "Здесь нечего копать."
 ALREADY_DIGGING_TEXT = "Ты уже копаешь."
 NOT_DIGGING_TEXT = "Сначала возьмись за кирку."
 LEAVE_WHILE_DIGGING_TEXT = "Не бросив кирку, наверх не подняться."
-ABANDONED_TEXT = "Ты бросаешь забой. Начатый кусок пропал."
+ABANDONED_TEXT = "Ты бросаешь забой. Начатая порода остаётся в жиле."
 
 
 def busy_text(seconds: float) -> str:
