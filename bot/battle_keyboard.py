@@ -43,3 +43,35 @@ def in_any_battle(peer_id: int) -> bool:
 
     return (raid_combat.has_active_battle(peer_id) or group_combat.has_active_group_battle(peer_id)
             or pvp_handlers.has_active_battle(peer_id) or combat_handlers.has_active_encounter(peer_id))
+
+
+async def answer_battle_gone(message) -> None:
+    """Ответ на кнопку боя, которого в памяти процесса больше нет.
+
+    Реестры боёв живут ТОЛЬКО в памяти (см. bot/handlers/raid_combat.py,
+    pvp.py): рестарт бота, аварийное завершение рейда или возврат ключа
+    стирают их, а клавиатура у игрока на экране остаётся. Дальше он жмёт её
+    кнопки, хендлер не находит бой и молча выходит - не касаясь даже БД.
+    Снаружи это неотличимо от мёртвого бота: именно так игрок и застрял на
+    проде после одного из деплоев.
+
+    Поэтому молчать нельзя НИКОГДА: отвечаем и обязательно прикладываем
+    клавиатуру текущего состояния, иначе мёртвые кнопки останутся висеть.
+    """
+    from datetime import datetime, timezone
+
+    from bot.handlers import world as world_handlers
+    from services import onboarding_service
+    from services.db import get_session_factory
+
+    async with get_session_factory()() as db:
+        character = await onboarding_service.get_character(db, message.from_id)
+        if character is None or character.creation_state is not None:
+            return
+        keyboard = await world_handlers._current_keyboard(
+            db, character, message.peer_id, datetime.now(timezone.utc)
+        )
+    await message.answer(
+        "Этого боя больше нет - он закончился или прервался. Возвращаю к текущему состоянию.",
+        keyboard=keyboard,
+    )

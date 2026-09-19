@@ -205,12 +205,12 @@ async def publish_lobby(snapshot) -> None:
                 await _bot_api.messages.send(peer_id=peers[c.id], message=text, random_id=0,
                                              keyboard=kb.raid_lobby_keyboard(ready))
             except Exception:
-                # Метку снимаем, иначе непрошедшая рассылка больше никогда не
-                # повторится: следующий проход reconcile_lobbies увидит ту же
-                # подпись и промолчит.
-                _published.pop(snapshot.id, None)
+                # Дальше по списку, а не выход. Чаще всего это «заблокировал
+                # бота», то есть навсегда: прерывание рассылки лишало бы
+                # остальных строки лобби, а снятая метка заставила бы
+                # reconcile_lobbies через 3 секунды отправить её заново ВСЕМ -
+                # и те, кому дошло, получали бы дубль из-за чужой блокировки.
                 logger.exception("Cannot notify raid lobby {}", snapshot.id)
-                return
 
 
 async def reconcile_lobbies() -> None:

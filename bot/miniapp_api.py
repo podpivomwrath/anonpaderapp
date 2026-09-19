@@ -162,6 +162,15 @@ async def handle_post_stats(request: web.Request) -> web.Response:
 
     total = sum(increments.values())
 
+    # Раздавать очки в разгар боя нельзя: боец собирается снимком на старте,
+    # так что на текущий бой это не влияет вовсе - игрок просто потратил бы
+    # очки и не увидел эффекта. Остальные состояния (путь, добыча) очкам не
+    # мешают: они ничего не ломают и ждать их незачем.
+    from bot.battle_keyboard import in_any_battle
+
+    if in_any_battle(vk_user_id):
+        return web.json_response({"error": "in_battle"}, status=409)
+
     session_factory = request.app[SESSION_FACTORY_KEY]
     async with session_factory() as session:
         character = await _load_character(session, vk_user_id)

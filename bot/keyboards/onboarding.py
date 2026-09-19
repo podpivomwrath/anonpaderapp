@@ -31,6 +31,7 @@ def classes_keyboard() -> str:
 def path_view_keyboard() -> str:
     kb = Keyboard(one_time=True)
     kb.add(Text(BTN_CHOOSE_PATH), color=KeyboardButtonColor.POSITIVE)
+    kb.row()
     kb.add(Text(BTN_OTHER_PATHS), color=KeyboardButtonColor.SECONDARY)
     return kb.get_json()
 
@@ -38,22 +39,26 @@ def path_view_keyboard() -> str:
 def path_confirm_keyboard() -> str:
     kb = Keyboard(one_time=True)
     kb.add(Text(BTN_CONFIRM_PATH), color=KeyboardButtonColor.POSITIVE)
+    kb.row()
     kb.add(Text(BTN_THINK_MORE), color=KeyboardButtonColor.SECONDARY)
     return kb.get_json()
 
 
 def regions_keyboard() -> str:
+    # По одной в ряд: названия регионов длиннее 14 символов, и в паре VK
+    # обрезал их многоточием - «⚓ Соляные Прист...». Переименовывать регионы
+    # ради раскладки нельзя, а во всю ширину они помещаются целиком.
     kb = Keyboard(one_time=True)
-    for i, label in enumerate(REGION_BUTTONS):
-        if i == 2:
-            kb.row()
+    for label in REGION_BUTTONS:
         kb.add(Text(label), color=KeyboardButtonColor.PRIMARY)
+        kb.row()
     return kb.get_json()
 
 
 def region_view_keyboard() -> str:
     kb = Keyboard(one_time=True)
     kb.add(Text(BTN_GO_REGION), color=KeyboardButtonColor.POSITIVE)
+    kb.row()
     kb.add(Text(BTN_OTHER_ROADS), color=KeyboardButtonColor.SECONDARY)
     return kb.get_json()
 

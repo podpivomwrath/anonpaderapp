@@ -9,6 +9,7 @@ SESSION_FACTORY_KEY — sqlite :memory: держит все сессии на о
 import base64
 import hashlib
 import hmac
+import time
 from collections import OrderedDict
 from urllib.parse import urlencode
 
@@ -43,8 +44,19 @@ def _sign(params: dict[str, str], secret: str) -> str:
     return base64.urlsafe_b64encode(digest).decode("utf-8").rstrip("=")
 
 
-def _signed_query(vk_user_id: int, secret: str = MINIAPP_SECRET) -> dict[str, str]:
-    params = {"vk_user_id": str(vk_user_id), "vk_app_id": "1"}
+def _signed_query(
+    vk_user_id: int, secret: str = MINIAPP_SECRET, ts: int | None = None
+) -> dict[str, str]:
+    """vk_ts обязателен: launch-параметры протухают (bot/miniapp_auth.py).
+
+    VK присылает его всегда и включает в подпись, поэтому и здесь он идёт
+    внутрь подписываемого набора, а не рядом с ним.
+    """
+    params = {
+        "vk_user_id": str(vk_user_id),
+        "vk_app_id": "1",
+        "vk_ts": str(int(time.time()) if ts is None else ts),
+    }
     return {**params, "sign": _sign(params, secret)}
 
 
@@ -466,3 +478,45 @@ async def test_cors_header_on_real_response(client, session_factory) -> None:
     await _make_character(session_factory, vk_id=205)
     resp = await client.get("/api/miniapp/character", params=_signed_query(205))
     assert resp.headers["Access-Control-Allow-Origin"] == "*"
+
+
+# --- Срок годности launch-параметров (аудит, п.5) ---
+
+
+def test_launch_params_expire() -> None:
+    """Подпись VK бессрочна сама по себе.
+
+    Без проверки возраста утёкшая ссылка - скриншот, история браузера, лог
+    прокси - открывала бы доступ к аккаунту навсегда.
+    """
+    from bot.miniapp_auth import LAUNCH_PARAMS_MAX_AGE_SECONDS, _launch_params_fresh
+
+    now = 1_000_000_000
+    assert _launch_params_fresh({"vk_ts": str(now)}, now=now)
+    assert _launch_params_fresh({"vk_ts": str(now - LAUNCH_PARAMS_MAX_AGE_SECONDS)}, now=now)
+    assert not _launch_params_fresh({"vk_ts": str(now - LAUNCH_PARAMS_MAX_AGE_SECONDS - 1)}, now=now)
+
+
+def test_launch_params_without_ts_are_rejected() -> None:
+    """vk_ts подписан VK и обязан быть: его отсутствие - не «старый клиент»,
+    а набор параметров, собранный не через VK."""
+    from bot.miniapp_auth import _launch_params_fresh
+
+    assert not _launch_params_fresh({})
+    assert not _launch_params_fresh({"vk_ts": "позавчера"})
+
+
+def test_clock_skew_does_not_kill_a_live_session() -> None:
+    """Метка из будущего - это расхождение часов сервера и VK, а не атака."""
+    from bot.miniapp_auth import _launch_params_fresh
+
+    now = 1_000_000_000
+    assert _launch_params_fresh({"vk_ts": str(now + 600)}, now=now)
+
+
+async def test_expired_launch_params_get_403(client, session_factory) -> None:
+    await _make_character(session_factory, vk_id=4242)
+    stale = _signed_query(4242, ts=int(time.time()) - 60 * 60 * 24 * 7)
+    resp = await client.get("/api/miniapp/character", params=stale)
+    assert resp.status == 403
+    assert (await resp.json())["error"] == "launch_params_expired"

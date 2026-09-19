@@ -18,6 +18,7 @@ from bot.handlers import respawn as respawn_handlers
 from bot.handlers import stats_window
 from bot.handlers.group_combat import MemberCombatInput
 from bot.keyboards import raid as kb
+from bot.battle_keyboard import answer_battle_gone
 from bot.keyboards.items import no_keyboard
 from bot.keyboards.world import movement_keyboard
 from game.combat import balance_config as bc
@@ -373,10 +374,11 @@ async def raid_skill(message: Message) -> None:
         return
     peer_id = message.peer_id
     battle_id = _peer_battle.get(peer_id)
-    if battle_id is None:
-        return
-    battle = _battles.get(battle_id)
+    battle = _battles.get(battle_id) if battle_id is not None else None
     if battle is None:
+        # Молчать здесь нельзя: клавиатура боя осталась у игрока на экране,
+        # а самого боя в памяти уже нет. См. battle_keyboard.answer_battle_gone.
+        await answer_battle_gone(message)
         return
     cid = _character_id_for_peer(battle, peer_id)
     if cid is None:
@@ -394,10 +396,11 @@ async def raid_skill(message: Message) -> None:
 async def _raid_action(message: Message, action: DeclaredAction) -> None:
     peer_id = message.peer_id
     battle_id = _peer_battle.get(peer_id)
-    if battle_id is None:
-        return
-    battle = _battles.get(battle_id)
+    battle = _battles.get(battle_id) if battle_id is not None else None
     if battle is None:
+        # Молчать здесь нельзя: клавиатура боя осталась у игрока на экране,
+        # а самого боя в памяти уже нет. См. battle_keyboard.answer_battle_gone.
+        await answer_battle_gone(message)
         return
     cid = _character_id_for_peer(battle, peer_id)
     if cid is None:
@@ -432,10 +435,11 @@ async def _raid_action(message: Message, action: DeclaredAction) -> None:
 async def raid_open_target(message: Message) -> None:
     peer_id = message.peer_id
     battle_id = _peer_battle.get(peer_id)
-    if battle_id is None:
-        return
-    battle = _battles.get(battle_id)
+    battle = _battles.get(battle_id) if battle_id is not None else None
     if battle is None:
+        # Молчать здесь нельзя: клавиатура боя осталась у игрока на экране,
+        # а самого боя в памяти уже нет. См. battle_keyboard.answer_battle_gone.
+        await answer_battle_gone(message)
         return
     cid = _character_id_for_peer(battle, peer_id)
     if cid is None:
@@ -466,10 +470,11 @@ async def raid_pick_target(message: Message) -> None:
     if not isinstance(target_id, int):
         return
     battle_id = _peer_battle.get(peer_id)
-    if battle_id is None:
-        return
-    battle = _battles.get(battle_id)
+    battle = _battles.get(battle_id) if battle_id is not None else None
     if battle is None:
+        # Молчать здесь нельзя: клавиатура боя осталась у игрока на экране,
+        # а самого боя в памяти уже нет. См. battle_keyboard.answer_battle_gone.
+        await answer_battle_gone(message)
         return
     cid = _character_id_for_peer(battle, peer_id)
     if cid is None:
@@ -495,10 +500,11 @@ async def raid_pick_target(message: Message) -> None:
 async def raid_target_back(message: Message) -> None:
     peer_id = message.peer_id
     battle_id = _peer_battle.get(peer_id)
-    if battle_id is None:
-        return
-    battle = _battles.get(battle_id)
+    battle = _battles.get(battle_id) if battle_id is not None else None
     if battle is None:
+        # Молчать здесь нельзя: клавиатура боя осталась у игрока на экране,
+        # а самого боя в памяти уже нет. См. battle_keyboard.answer_battle_gone.
+        await answer_battle_gone(message)
         return
     cid = _character_id_for_peer(battle, peer_id)
     if cid is None:
@@ -521,10 +527,11 @@ async def raid_target_back(message: Message) -> None:
 async def raid_open_items(message: Message) -> None:
     peer_id = message.peer_id
     battle_id = _peer_battle.get(peer_id)
-    if battle_id is None:
-        return
-    battle = _battles.get(battle_id)
+    battle = _battles.get(battle_id) if battle_id is not None else None
     if battle is None:
+        # Молчать здесь нельзя: клавиатура боя осталась у игрока на экране,
+        # а самого боя в памяти уже нет. См. battle_keyboard.answer_battle_gone.
+        await answer_battle_gone(message)
         return
     cid = _character_id_for_peer(battle, peer_id)
     if cid is None:
@@ -560,10 +567,11 @@ async def raid_open_items(message: Message) -> None:
 async def raid_use_item(message: Message) -> None:
     peer_id = message.peer_id
     battle_id = _peer_battle.get(peer_id)
-    if battle_id is None:
-        return
-    battle = _battles.get(battle_id)
+    battle = _battles.get(battle_id) if battle_id is not None else None
     if battle is None:
+        # Молчать здесь нельзя: клавиатура боя осталась у игрока на экране,
+        # а самого боя в памяти уже нет. См. battle_keyboard.answer_battle_gone.
+        await answer_battle_gone(message)
         return
     cid = _character_id_for_peer(battle, peer_id)
     if cid is None:

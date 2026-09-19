@@ -158,7 +158,7 @@ async def fish_weight_board(db: AsyncSession, limit: int = 10) -> list[BoardEntr
     rows = (
         await db.execute(
             select(
-                Character.name, CharacterFishRecord.fish_id,
+                Character.id, Character.name, CharacterFishRecord.fish_id,
                 CharacterFishRecord.weight_grams, Character.active_title_id,
                 Character.premium_until, CharacterFishRecord.caught_at,
             )
@@ -174,14 +174,17 @@ async def fish_weight_board(db: AsyncSession, limit: int = 10) -> list[BoardEntr
         )
     ).all()
 
-    seen: set[str] = set()
+    seen: set[int] = set()
     entries: list[BoardEntry] = []
-    for name, fish_id, grams, title_id, premium_until, _caught_at in rows:
+    for character_id, name, fish_id, grams, title_id, premium_until, _caught_at in rows:
         # Страховка на случай, когда у игрока два вида весят одинаково и оба
         # прошли фильтр максимума: в топе он всё равно должен быть один раз.
-        if name in seen:
+        # Ключ - id, а не имя: имена сейчас уникальны (uq_characters_name_lower),
+        # но правило топа не должно держаться на чужом индексе - иначе в день,
+        # когда имена разрешат повторять, второй игрок молча исчезнет из топа.
+        if character_id in seen:
             continue
-        seen.add(name)
+        seen.add(character_id)
         definition = fishing.fish_def(fish_id)
         label = definition.name if definition else fish_id
         emoji = f"{definition.emoji} " if definition else ""

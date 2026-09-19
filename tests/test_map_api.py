@@ -7,6 +7,7 @@ combat_handlers.has_active_encounter требует инициализирова
 import base64
 import hashlib
 import hmac
+import time
 from collections import OrderedDict
 from datetime import datetime, timedelta, timezone
 from urllib.parse import urlencode
@@ -58,7 +59,12 @@ def _sign(params: dict[str, str], secret: str) -> str:
 
 
 def _signed_query(vk_user_id: int) -> dict[str, str]:
-    params = {"vk_user_id": str(vk_user_id), "vk_app_id": "1"}
+    # vk_ts обязателен: launch-параметры протухают (bot/miniapp_auth.py).
+    params = {
+        "vk_user_id": str(vk_user_id),
+        "vk_app_id": "1",
+        "vk_ts": str(int(time.time())),
+    }
     return {**params, "sign": _sign(params, MINIAPP_SECRET)}
 
 

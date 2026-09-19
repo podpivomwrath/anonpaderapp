@@ -23,5 +23,6 @@ def leave_confirm_keyboard() -> str:
         Text("Подтвердить выход", payload={"type": "group_leave_confirm"}),
         color=KeyboardButtonColor.NEGATIVE,
     )
+    kb.row()
     kb.add(Text("Отмена", payload={"type": "group_leave_cancel"}), color=KeyboardButtonColor.SECONDARY)
     return kb.get_json()

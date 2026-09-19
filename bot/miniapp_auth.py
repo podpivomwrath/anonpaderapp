@@ -12,6 +12,7 @@ Middleware проверяет подпись на КАЖДОМ /api/miniapp/* з
 import base64
 import hashlib
 import hmac
+import time
 from collections import OrderedDict
 from typing import Awaitable, Callable
 from urllib.parse import urlencode
@@ -25,6 +26,12 @@ from config import Settings
 VK_USER_ID_KEY: web.RequestKey[int] = web.RequestKey("vk_user_id")
 
 MINIAPP_PREFIX = "/api/miniapp/"
+
+#: Сколько живут launch-параметры. Подпись VK бессрочна сама по себе, поэтому
+#: утёкшая ссылка (скриншот, история браузера, лог прокси) без этой проверки
+#: давала бы доступ к аккаунту НАВСЕГДА. Сутки - запас на открытый в фоне
+#: мини-апп, но не на «нашёл ссылку через месяц».
+LAUNCH_PARAMS_MAX_AGE_SECONDS = 24 * 60 * 60
 
 
 def verify_launch_params(params: dict[str, str], secret: str) -> bool:
@@ -48,6 +55,24 @@ def verify_launch_params(params: dict[str, str], secret: str) -> bool:
     return hmac.compare_digest(expected, sign)
 
 
+def _launch_params_fresh(params: dict[str, str], now: float | None = None) -> bool:
+    """vk_ts входит в подпись, значит подделать его нельзя - только состарить.
+
+    Отсутствующий или нечисловой vk_ts считаем несвежим: он подписан VK и
+    обязан быть. Метку из будущего не отвергаем - часы сервера и VK могут
+    разойтись на минуты, и ронять из-за этого живые сессии незачем.
+    """
+    raw = params.get("vk_ts")
+    if raw is None:
+        return False
+    try:
+        issued_at = int(raw)
+    except ValueError:
+        return False
+    age = (time.time() if now is None else now) - issued_at
+    return age <= LAUNCH_PARAMS_MAX_AGE_SECONDS
+
+
 @web.middleware
 async def miniapp_auth_middleware(
     request: web.Request, handler: Callable[[web.Request], Awaitable[web.Response]]
@@ -61,6 +86,10 @@ async def miniapp_auth_middleware(
     if not verify_launch_params(params, settings.vk_miniapp_secret):
         logger.warning("Miniapp: неверная подпись launch-параметров, путь={}", request.path)
         return web.json_response({"error": "invalid_signature"}, status=403)
+
+    if not _launch_params_fresh(params):
+        logger.warning("Miniapp: просроченные launch-параметры, путь={}", request.path)
+        return web.json_response({"error": "launch_params_expired"}, status=403)
 
     try:
         vk_user_id = int(params["vk_user_id"])

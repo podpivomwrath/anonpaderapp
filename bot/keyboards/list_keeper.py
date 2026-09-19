@@ -22,6 +22,7 @@ BTN_KEEPER_LEAVE = "Уйти в таверну"
 def offer_keyboard() -> str:
     kb = Keyboard(one_time=True)
     kb.add(Text(BTN_PAY), color=KeyboardButtonColor.POSITIVE)
+    kb.row()
     kb.add(Text(BTN_LEAVE), color=KeyboardButtonColor.SECONDARY)
     return kb.get_json()
 
@@ -36,6 +37,7 @@ def paths_keyboard(titles: list[str]) -> str:
 def path_view_keyboard() -> str:
     kb = Keyboard(one_time=True)
     kb.add(Text(BTN_CHOOSE_PATH), color=KeyboardButtonColor.POSITIVE)
+    kb.row()
     kb.add(Text(BTN_OTHER_PATH), color=KeyboardButtonColor.SECONDARY)
     return kb.get_json()
 
@@ -43,6 +45,7 @@ def path_view_keyboard() -> str:
 def path_confirm_keyboard() -> str:
     kb = Keyboard(one_time=True)
     kb.add(Text(BTN_CONFIRM_PATH), color=KeyboardButtonColor.POSITIVE)
+    kb.row()
     kb.add(Text(BTN_THINK_MORE), color=KeyboardButtonColor.SECONDARY)
     return kb.get_json()
 
@@ -65,6 +68,7 @@ def remake_keyboard(has_subclass: bool) -> str:
 def remake_confirm_keyboard() -> str:
     kb = Keyboard(one_time=True)
     kb.add(Text(BTN_REMAKE_CONFIRM), color=KeyboardButtonColor.NEGATIVE)
+    kb.row()
     kb.add(Text(BTN_REMAKE_CANCEL), color=KeyboardButtonColor.SECONDARY)
     return kb.get_json()
 
