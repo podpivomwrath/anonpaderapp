@@ -64,6 +64,12 @@ async def on_dig_done(peer_id: int) -> None:
             # не выдаём руду досрочно, просто переставляем будильник.
             _schedule_finish(peer_id, mining_service.remaining_seconds(character))
             return
+        if character.screen != "mine":
+            # Страховка от того же класса ошибок: руду получает только тот,
+            # кто реально стоит в забое. Если игрока вынесло наружу (рестарт
+            # бота, любая будущая ветка выхода) — добыча остаётся висеть и
+            # завершится, когда он вернётся в жилу.
+            return
         result = await mining_service.finish_dig(db, character, _rng)
         mine = mining_service.mine_at(character)
         left = await mining_service.ore_in_mine(db, mine.id) if mine else 0
@@ -203,24 +209,27 @@ async def ore_inventory(message: Message) -> None:
 async def leave_mine(message: Message) -> None:
     """Выход наверх с экрана рудника.
 
-    Во время добычи сюда попасть нельзя: в забое кнопка ровно одна — отменить
-    копание. Сюда приходят либо не начав копать, либо уже отменив. Остаётся
-    один случай, когда добыча всё же идёт: игрок вернулся в жилу после
-    рестарта бота, посмотрел остаток и вышел — тогда добыча сохраняется, и к
-    ней можно вернуться, пока он не ушёл с клетки.
+    С незаконченной добычей выйти НЕЛЬЗЯ — сначала бросить кирку. Раньше было
+    можно, и это давало руду человеку, стоящему снаружи: выход не отменял
+    добычу (чтобы можно было вернуться и доработать), но и таймер завершения
+    не снимал, так что тот исправно срабатывал «дистанционно».
+
+    Кнопки такой в забое больше нет, но текст можно набрать руками — поэтому
+    проверка стоит здесь, в обработчике, а не только в раскладке клавиатуры.
     """
     async with get_session_factory()() as db:
         character = await onboarding_svc.get_character(db, message.from_id)
         if character is None:
             return
-        # Мелкая жила из исследования исчезает при любом выходе — возвращаться
-        # к ней некуда, её нет на карте.
-        if mining_service.is_event_vein(character):
-            mining_service.abandon_dig(character)
-            _cancel_finish(message.peer_id)
+        if mining_service.is_digging(character):
+            await message.answer(
+                mt.LEAVE_WHILE_DIGGING_TEXT, keyboard=kb.digging_keyboard()
+            )
+            return
         await screen_service.set_screen(db, character, None)
         has_mount = await mount_service.has_any_mount(db, character.id)
         await db.commit()
+    _cancel_finish(message.peer_id)
     await message.answer(
         "Ты поднимаешься наверх.",
         keyboard=movement_keyboard(

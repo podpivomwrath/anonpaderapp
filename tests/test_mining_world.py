@@ -153,3 +153,30 @@ def test_entry_buttons_are_inline() -> None:
     """Приходят отдельным сообщением и не должны сносить нижнюю клавиатуру."""
     assert json.loads(kb.approach_mine_keyboard())["inline"] is True
     assert json.loads(kb.event_vein_keyboard("ore_vein"))["inline"] is True
+
+
+def test_leaving_while_digging_is_refused() -> None:
+    """Регрессия на реальный случай: игрок вышел наверх, а руда всё равно
+    пришла. Выход не отменял добычу (чтобы можно было вернуться), но и таймер
+    завершения не снимал — тот срабатывал «дистанционно», пока игрок стоял
+    снаружи. Кнопки в забое больше нет, но текст можно набрать руками, поэтому
+    отказ обязан жить в обработчике.
+    """
+    import inspect
+
+    from bot.handlers import mining as handlers
+
+    source = inspect.getsource(handlers.leave_mine)
+    assert "is_digging" in source, "выход не проверяет, идёт ли добыча"
+    assert "LEAVE_WHILE_DIGGING_TEXT" in source
+
+
+def test_ore_is_awarded_only_inside_the_mine() -> None:
+    """Вторая линия защиты от того же класса ошибок: таймер, сработавший у
+    игрока вне забоя, не должен выдавать руду."""
+    import inspect
+
+    from bot.handlers import mining as handlers
+
+    source = inspect.getsource(handlers.on_dig_done)
+    assert 'character.screen != "mine"' in source
