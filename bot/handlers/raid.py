@@ -188,6 +188,11 @@ async def publish_lobby(snapshot) -> None:
                  tuple((c.id, ready) for c, ready in snapshot.members))
     if _published.get(snapshot.id) == signature:
         return
+    # Метку ставим ДО рассылки, а не после. publish_lobby зовут из двух мест:
+    # обработчик нажатия и reconcile_lobbies (раз в 3 секунды). Пока первый
+    # вызов ждал ответа VK, метки ещё не было, и второй слал ту же строку
+    # повторно - игрок видел «Готовы: 1/2» дважды.
+    _published[snapshot.id] = signature
     leader = next((c for c, _ in snapshot.members if c.id == snapshot.leader_character_id), None)
     text = rt.lobby_status_line(sum(r for _, r in snapshot.members), snapshot.denominator)
     if leader:
@@ -200,9 +205,12 @@ async def publish_lobby(snapshot) -> None:
                 await _bot_api.messages.send(peer_id=peers[c.id], message=text, random_id=0,
                                              keyboard=kb.raid_lobby_keyboard(ready))
             except Exception:
+                # Метку снимаем, иначе непрошедшая рассылка больше никогда не
+                # повторится: следующий проход reconcile_lobbies увидит ту же
+                # подпись и промолчит.
+                _published.pop(snapshot.id, None)
                 logger.exception("Cannot notify raid lobby {}", snapshot.id)
                 return
-    _published[snapshot.id] = signature
 
 
 async def reconcile_lobbies() -> None:

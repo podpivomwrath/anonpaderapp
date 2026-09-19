@@ -283,9 +283,19 @@ def _render_board(state: CombatSessionState, result: TickResult | None = None) -
 
 async def _broadcast_board(
     battle_id: int, battle: RaidBattle, result: TickResult | None, notices: dict[int, str] | None = None,
+    boss_lines: list[str] | None = None,
 ) -> None:
+    """boss_lines - объявления механик боссов (порядок Вельдов, фазы Хирурга).
+
+    Они идут ОБЩИМ хвостом под доской, а не в notices: notices персональные
+    (опыт, дроп), а механика касается всех одинаково, и игрок обязан видеть
+    её рядом с тем ходом, который её вызвал.
+    """
     state = _engine.sessions.get(battle_id)
     text = _render_board(state, result) if state is not None else ""
+    if boss_lines:
+        tail = "\n".join(boss_lines)
+        text = f"{text}\n\n{tail}" if text else tail
     notices = notices or {}
     for cid, p in battle.participants.items():
         combatant = _live_state(battle_id, battle).get(cid)
