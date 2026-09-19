@@ -154,3 +154,26 @@ def raid_key_missing_line() -> str:
 def stage_loot_line(stage: int) -> str:
     mult = {1: rc.STAGE1_LOOT_MULT, 2: rc.STAGE2_LOOT_MULT, 3: rc.STAGE3_LOOT_MULT}[stage]
     return f"×{mult} к трофеям и опыту за этот этап."
+
+
+def contribution_block(contribution, name: str) -> str:
+    """Патч 69: личная сводка вклада после рейда.
+
+    Три числа, а не таблица на всю группу: рейд и так заканчивается длинным
+    сообщением, а сравнивать себя с другими игроки пойдут в топы. Нули не
+    прячем - «0 урона» это тоже разбор захода, и скрывать его значило бы
+    показывать сводку только тем, у кого всё хорошо.
+    """
+    damage = contribution.damage if contribution is not None else 0
+    healed = contribution.healed if contribution is not None else 0
+    absorbed = contribution.absorbed if contribution is not None else 0
+
+    def number(value: int) -> str:
+        return f"{value:,}".replace(",", " ")
+
+    return (
+        f"📊 {name} - итоги захода" + chr(10)
+        + f"⚔️ Урона нанесено: {number(damage)}" + chr(10)
+        + f"💚 Здоровья восполнено: {number(healed)}" + chr(10)
+        + f"🛡 Урона впитано: {number(absorbed)}"
+    )

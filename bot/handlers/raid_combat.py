@@ -68,6 +68,20 @@ class Participant:
 
 
 @dataclass
+class RaidContribution:
+    """Вклад одного участника за ВЕСЬ рейд, все три этапа.
+
+    Копится по ходам, а не считается в конце: TickResult живёт один ход, и к
+    финалу восстановить его уже нечем. Один battle_id держит весь рейд, так
+    что переживает смену этапа вместе с остальным состоянием боя.
+    """
+
+    damage: int = 0     # дошло до противников (промахи и поглощённое не в счёт)
+    healed: int = 0     # фактически восполнено союзникам, включая себя
+    absorbed: int = 0   # срезано блоком и съедено щитами ПО НЕМУ
+
+
+@dataclass
 class RaidBattle:
     group_id: int | None
     participants: dict[int, Participant]
@@ -86,6 +100,7 @@ class RaidBattle:
     surgeon_id: int | None = None
     surgeon_phase3_hp_at_start: int | None = None
     surgeon_phase3_failed: bool = False
+    contribution: dict[int, RaidContribution] = field(default_factory=dict)
 
 
 _battles: dict[int, RaidBattle] = {}
@@ -629,6 +644,7 @@ async def on_raid_tick_resolved(session_id: int, tick: int, result: TickResult) 
     if battle is None:
         return
     _declared_this_tick.pop(session_id, None)
+    _record_contribution(battle, result)
     state = _engine.sessions.get(session_id)
     extra_lines: list[str] = []
     scripted_death_ids: list[int] = []
@@ -760,6 +776,25 @@ async def on_raid_tick_resolved(session_id: int, tick: int, result: TickResult) 
     await _broadcast_board(session_id, battle, result, notices, boss_lines=extra_lines)
 
 
+def _record_contribution(battle: RaidBattle, result: TickResult) -> None:
+    """Складывает вклад этого хода в копилку рейда.
+
+    Урон считаем по ПРИШЕДШЕМУ (hit_renders.amount уже после блока и щитов):
+    сводка должна отвечать «сколько ты снял с боссов», а не «сколько бы снял».
+    Тик яда/горения тоже засчитывается автору эффекта - он его повесил.
+    """
+    for hit in result.hit_renders:
+        if hit.target_id in battle.participants and hit.absorbed:
+            battle.contribution.setdefault(hit.target_id, RaidContribution()).absorbed += hit.absorbed
+        if hit.missed or hit.amount <= 0:
+            continue
+        if hit.source_id in battle.participants and hit.target_side != hit.source_side:
+            battle.contribution.setdefault(hit.source_id, RaidContribution()).damage += hit.amount
+    for heal in result.heal_renders:
+        if heal.source_id in battle.participants and heal.amount > 0:
+            battle.contribution.setdefault(heal.source_id, RaidContribution()).healed += heal.amount
+
+
 async def on_raid_battle_finished(session_id: int, result: TickResult) -> None:
     battle = _battles.get(session_id)
     if battle is None:
@@ -884,12 +919,24 @@ async def _cleanup_and_return(session_id: int, battle: RaidBattle, text: str, *,
         await db.commit()
 
     for cid, p in battle.participants.items():
+        # Сводка вклада идёт КАЖДОМУ и в победе, и в поражении: разбор
+        # неудачного захода нужен не меньше, чем удачного.
+        personal = f"{text}\n\n{rt.contribution_block(battle.contribution.get(cid), p.name)}"
         if cid in has_mount_by_cid:
             await _bot_api.messages.send(
-                peer_id=p.peer_id, message=text, random_id=0,
+                peer_id=p.peer_id, message=personal, random_id=0,
                 keyboard=movement_keyboard(*rc.MONOLITH_COORDS, p.peer_id, has_mount=has_mount_by_cid.get(cid, False)),
             )
         elif cid in defeats:
             defeat, respawn_at = defeats[cid]
-            await _bot_api.messages.send(peer_id=p.peer_id, message=text, random_id=0, keyboard=kb.raid_waiting_keyboard())
+            await _bot_api.messages.send(
+                peer_id=p.peer_id, message=personal, random_id=0, keyboard=kb.raid_waiting_keyboard(),
+            )
             await respawn_handlers.register_death(p.peer_id, respawn_at, defeat.xp_lost)
+        else:
+            # Персонажа не нашли в БД. Раньше такой участник не получал НИ
+            # ОДНОГО сообщения и оставался с боевой клавиатурой мёртвого боя.
+            await _bot_api.messages.send(
+                peer_id=p.peer_id, message=personal, random_id=0,
+                keyboard=movement_keyboard(*rc.MONOLITH_COORDS, p.peer_id, has_mount=False),
+            )

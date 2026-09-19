@@ -119,6 +119,11 @@ class RenderedHit:
     max_hp: int
     #: пассивный тик эффекта, а не действие бойца - см. PendingHit
     is_tick: bool = False
+    # Сколько урона НЕ дошло до цели: срезал блок плюс съели щит и
+    # «Несокрушимый». amount - это то, что дошло, поэтому без отдельного поля
+    # впитанное посчитать уже нечем: исходная величина удара к этому моменту
+    # нигде не хранится. Нужно сводке рейда (bot/handlers/raid_combat.py).
+    absorbed: int = 0
 
 
 @dataclass
@@ -500,6 +505,7 @@ def resolve_tick(
                 label=hit.label, amount=applied, crit=hit.crit, missed=hit.missed, is_dot=hit.is_dot,
                 is_tick=hit.is_tick,
                 hp_before=h_before, hp_after=h_after, max_hp=target.max_hp,
+                absorbed=hit.blocked + max(hit.amount - applied, 0),
             )
         )
     for heal in ctx.heals:
