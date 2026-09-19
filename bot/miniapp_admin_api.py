@@ -18,7 +18,7 @@ from bot.miniapp_auth import VK_USER_ID_KEY
 from config import Settings
 from game.world import grid
 from models import Character
-from services import admin_service, maintenance_service, promo_service
+from services import admin_service, maintenance_service, mining_service, promo_service
 from services import onboarding_service as onboarding_svc
 
 _rng = random.Random()
@@ -303,6 +303,38 @@ async def handle_post_reset_activities(request: web.Request) -> web.Response:
     })
 
 
+async def handle_get_mining_stats(request: web.Request) -> web.Response:
+    """Как горное дело ведёт себя на проде: сбор, спавн, длительность добычи.
+
+    Считается по журналу событий (models/mining.py::MiningEvent), а не по
+    остатку в жилах: остаток не показывает ни оборота, ни скорости.
+    """
+    if not _is_admin(request):
+        return _forbidden()
+    try:
+        hours = max(1, min(int(request.query.get("hours", 24)), 24 * 30))
+    except ValueError:
+        hours = 24
+    session_factory = request.app[SESSION_FACTORY_KEY]
+    async with session_factory() as db:
+        return web.json_response(await mining_service.stats(db, hours))
+
+
+async def handle_post_mining_refill(request: web.Request) -> web.Response:
+    """Наполнить все жилы до кромки — тестовый инструмент.
+
+    В журнал эти события НЕ пишутся: это не игровой спавн, и он не должен
+    искажать статистику, по которой мы судим о настоящем.
+    """
+    if not _is_admin(request):
+        return _forbidden()
+    session_factory = request.app[SESSION_FACTORY_KEY]
+    async with session_factory() as db:
+        added = await mining_service.refill_all_veins(db)
+        stats = await mining_service.stats(db)
+    return web.json_response({"added": added, "in_veins": stats["in_veins"]})
+
+
 # --- Промокоды (патч 50) ---
 
 
@@ -420,6 +452,8 @@ def register_routes(app: web.Application) -> None:
     app.router.add_get("/api/miniapp/admin/bug_reports", handle_get_bug_reports)
     app.router.add_post("/api/miniapp/admin/bug_reports/{id}/status", handle_post_bug_report_status)
     app.router.add_post("/api/miniapp/admin/reset_activities", handle_post_reset_activities)
+    app.router.add_get("/api/miniapp/admin/mining_stats", handle_get_mining_stats)
+    app.router.add_post("/api/miniapp/admin/mining_refill", handle_post_mining_refill)
     app.router.add_get("/api/miniapp/admin/promo_codes", handle_get_promo_codes)
     app.router.add_post("/api/miniapp/admin/promo_codes", handle_post_promo_codes)
     app.router.add_delete("/api/miniapp/admin/promo_codes/{id}", handle_delete_promo_code)

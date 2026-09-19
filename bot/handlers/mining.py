@@ -31,6 +31,12 @@ _rng = random.Random()
 #: механизм, что у поклёвки, прибытия и исследования.
 _dig_scheduler: PeerScheduler | None = None
 
+#: peer_id -> сколько секунд по плану длится текущая добыча. Нужна только для
+#: журнала (services/mining_service.py::finish_dig): момент старта в БД не
+#: хранится, потому что возврата к добыче нет и он не нужен. Потеря при
+#: рестарте не важна — рестарт добычу всё равно отменяет.
+_dig_seconds: dict[int, float] = {}
+
 # Экран рудника — вложенный, родитель корневой (карта), как у озера.
 screen_service.PARENT["mine"] = None
 
@@ -42,11 +48,13 @@ def setup(bot_api, scheduler: PeerScheduler | None = None) -> None:
 
 
 def _schedule_finish(peer_id: int, seconds: float) -> None:
+    _dig_seconds[peer_id] = seconds
     if _dig_scheduler is not None:
         _dig_scheduler.schedule(peer_id, max(seconds, 1.0))
 
 
 def _cancel_finish(peer_id: int) -> None:
+    _dig_seconds.pop(peer_id, None)
     if _dig_scheduler is not None:
         _dig_scheduler.cancel(peer_id)
 
@@ -70,7 +78,9 @@ async def on_dig_done(peer_id: int) -> None:
             # бота, любая будущая ветка выхода) — добыча остаётся висеть и
             # завершится, когда он вернётся в жилу.
             return
-        result = await mining_service.finish_dig(db, character, _rng)
+        result = await mining_service.finish_dig(
+            db, character, _rng, dig_seconds=_dig_seconds.pop(peer_id, None)
+        )
         mine = mining_service.mine_at(character)
         left = await mining_service.ore_in_mine(db, mine.id) if mine else 0
         on_mine_screen = character.screen == "mine"

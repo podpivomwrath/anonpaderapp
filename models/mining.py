@@ -1,4 +1,14 @@
-from sqlalchemy import BigInteger, ForeignKey, String, UniqueConstraint
+from datetime import datetime
+
+from sqlalchemy import (
+    BigInteger,
+    DateTime,
+    ForeignKey,
+    Index,
+    String,
+    UniqueConstraint,
+    func,
+)
 from sqlalchemy.orm import Mapped, mapped_column
 
 from models.base import Base
@@ -53,3 +63,43 @@ class MineVein(Base):
 
     mine_id: Mapped[str] = mapped_column(String(48), primary_key=True)
     ore_count: Mapped[int] = mapped_column(default=0)
+
+
+class MiningEvent(Base):
+    """Журнал событий горного дела (патч 61): что добыли и когда появилось.
+
+    Заведён, чтобы смотреть, как ремесло ведёт себя НА ПРОДЕ, а не в
+    симуляторе: сколько руды реально собирают, какой именно, и успевает ли
+    спавн за добычей. Текущий остаток в жилах на эти вопросы не отвечает — по
+    нему не видно ни оборота, ни скорости.
+
+    Одна строка на событие, агрегаты считаются запросом. Так можно задать
+    вопрос, который не предусмотрели заранее; счётчики этого не умеют.
+
+    Поля заполняются по виду события:
+      spawn — mine_id, остальное пусто (вид и градация при спавне ещё не
+              определены, они разыгрываются в момент добычи);
+      dig   — character_id, ore_id, grade, seconds; mine_id пуст у мелкой
+              жилы из исследования, её нет на карте.
+    """
+
+    __tablename__ = "mining_events"
+    __table_args__ = (
+        Index("ix_mining_events_kind_created", "kind", "created_at"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    # spawn | dig
+    kind: Mapped[str] = mapped_column(String(8))
+    mine_id: Mapped[str | None] = mapped_column(String(48), nullable=True)
+    character_id: Mapped[int | None] = mapped_column(
+        ForeignKey("characters.id", ondelete="SET NULL"), nullable=True
+    )
+    ore_id: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    grade: Mapped[str | None] = mapped_column(String(16), nullable=True)
+    # Сколько секунд заняла добыча — видно, как на деле работает штраф за
+    # глубину и насколько он мешает.
+    seconds: Mapped[int | None] = mapped_column(nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), index=True
+    )

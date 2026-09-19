@@ -508,3 +508,110 @@ def test_dig_state_has_no_pause_left() -> None:
     assert not hasattr(Character, "mining_left_seconds")
     assert not hasattr(mining_service, "pause_dig")
     assert not hasattr(mining_service, "resume_dig")
+
+
+# --- Телеметрия ---------------------------------------------------------------
+
+@pytest.mark.asyncio
+async def test_journal_records_spawns_and_digs(db_session, make_character) -> None:
+    """По журналу считаются и сбор, и скорость спавна — остаток в жилах на эти
+    вопросы не отвечает вовсе."""
+    from sqlalchemy import select as sa_select
+
+    from models import MiningEvent
+
+    character = await make_character()
+    character.pos_x, character.pos_y = 46, 44
+    db_session.add(MineVein(mine_id=EASY_MINE, ore_count=2))
+    await db_session.flush()
+    mine = mining.mine_by_id(EASY_MINE)
+
+    class _AlwaysSpawn(random.Random):
+        def random(self) -> float:
+            return 0.0
+
+    await mining_service.spawn_ore(db_session, _AlwaysSpawn())
+    await mining_service.start_dig(db_session, character, mine, random.Random(0))
+    await mining_service.finish_dig(db_session, character, random.Random(5), dig_seconds=420)
+
+    rows = (await db_session.execute(sa_select(MiningEvent))).scalars().all()
+    kinds = [r.kind for r in rows]
+    assert kinds.count("spawn") == 1
+    assert kinds.count("dig") == 1
+
+    dig = next(r for r in rows if r.kind == "dig")
+    assert dig.character_id == character.id
+    assert dig.mine_id == EASY_MINE
+    assert dig.ore_id and dig.grade
+    assert dig.seconds == 420
+
+
+@pytest.mark.asyncio
+async def test_abandoned_dig_is_not_counted_as_collected(
+    db_session, make_character
+) -> None:
+    """В журнал попадает только доведённая до конца добыча: иначе брошенные
+    забои раздували бы цифру сбора и статистика врала бы."""
+    from sqlalchemy import select as sa_select
+
+    from models import MiningEvent
+
+    character = await make_character()
+    character.pos_x, character.pos_y = 46, 44
+    db_session.add(MineVein(mine_id=EASY_MINE, ore_count=2))
+    await db_session.flush()
+    mine = mining.mine_by_id(EASY_MINE)
+
+    await mining_service.start_dig(db_session, character, mine, random.Random(0))
+    await mining_service.cancel_dig(db_session, character)
+
+    digs = (await db_session.execute(
+        sa_select(MiningEvent).where(MiningEvent.kind == "dig")
+    )).scalars().all()
+    assert digs == []
+
+
+@pytest.mark.asyncio
+async def test_stats_report_the_balance_of_spawn_and_digging(
+    db_session, make_character
+) -> None:
+    character = await make_character()
+    character.pos_x, character.pos_y = 46, 44
+    db_session.add(MineVein(mine_id=EASY_MINE, ore_count=3))
+    await db_session.flush()
+    mine = mining.mine_by_id(EASY_MINE)
+    await mining_service.start_dig(db_session, character, mine, random.Random(0))
+    await mining_service.finish_dig(db_session, character, random.Random(5), dig_seconds=300)
+
+    report = await mining_service.stats(db_session, hours=24)
+
+    assert report["dug_total"] == 1
+    assert report["dug_from_veins"] == 1
+    assert report["dug_from_event_veins"] == 0
+    assert report["veins_total"] == len(mining.all_mines())
+    assert report["ores"] and report["ores"][0]["total"] == 1
+    assert report["avg_dig_seconds"] == 300
+
+
+@pytest.mark.asyncio
+async def test_refill_tops_up_every_vein_without_touching_the_journal(
+    db_session, make_character
+) -> None:
+    """Тестовое пополнение не должно попадать в статистику: иначе по ней
+    нельзя будет судить, работает ли настоящий спавн."""
+    from sqlalchemy import select as sa_select
+
+    from models import MiningEvent
+
+    db_session.add(MineVein(mine_id=EASY_MINE, ore_count=1))
+    await db_session.flush()
+
+    added = await mining_service.refill_all_veins(db_session)
+
+    assert added > 0
+    for mine in mining.all_mines():
+        assert await mining_service.ore_in_mine(db_session, mine.id) == mc.MINE_ORE_CAP
+    spawns = (await db_session.execute(
+        sa_select(MiningEvent).where(MiningEvent.kind == "spawn")
+    )).scalars().all()
+    assert spawns == [], "пополнение админки не должно писаться как спавн"

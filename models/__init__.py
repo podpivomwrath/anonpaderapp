@@ -8,12 +8,19 @@ from models.combat import CombatParticipant, CombatSession
 from models.consumable import CharacterConsumable
 from models.dailies import CharacterDaily, CharacterTitle
 from models.economy import ExchangeOrder, PvpStakeTransfer, Wallet
-from models.enums import BaseClass, CombatStatus, CombatType, OrderDirection, QuestStatus, Region
+from models.enums import (
+    BaseClass,
+    CombatStatus,
+    CombatType,
+    OrderDirection,
+    QuestStatus,
+    Region,
+)
 from models.fishing import CharacterFish, CharacterFishRecord
 from models.group import Group, GroupInvite, GroupMember
 from models.item import Inventory, Item, ItemUpgradeHistory
 from models.lootbox import CharacterLootbox
-from models.mining import CharacterOre, MineVein
+from models.mining import CharacterOre, MineVein, MiningEvent
 from models.mount import CharacterMount, MountTravel
 from models.promo import PromoActivation, PromoCode
 from models.pvp import PvpBattle
@@ -57,9 +64,10 @@ __all__ = [
     "GroupInvite",
     "GroupMember",
     "Inventory",
-    "MineVein",
     "Item",
     "ItemUpgradeHistory",
+    "MineVein",
+    "MiningEvent",
     "MountTravel",
     "OrderDirection",
     "PromoActivation",

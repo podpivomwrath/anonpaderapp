@@ -149,6 +149,15 @@ export function resetAdminActivities() {
   return request('/admin/reset_activities', { method: 'POST' });
 }
 
+// Патч 61: телеметрия горного дела и тестовое пополнение жил.
+export function getAdminMiningStats(hours = 24) {
+  return request(`/admin/mining_stats?hours=${hours}`);
+}
+
+export function refillAdminMining() {
+  return request('/admin/mining_refill', { method: 'POST' });
+}
+
 export function getAdminPromoCodes() {
   return request('/admin/promo_codes');
 }

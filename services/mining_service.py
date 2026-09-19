@@ -23,13 +23,13 @@ import random
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 
-from sqlalchemy import select, update
+from sqlalchemy import func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from game.content_loader import MineDef, OreDef
 from game.economy import mining
 from game.economy import mining_config as mc
-from models import Character, CharacterOre, MineVein
+from models import Character, CharacterOre, MineVein, MiningEvent
 
 # --- Клетка -------------------------------------------------------------------
 
@@ -90,6 +90,7 @@ async def spawn_ore(db: AsyncSession, rng: random.Random) -> str | None:
         vein = MineVein(mine_id=mine_id, ore_count=0)
         db.add(vein)
     vein.ore_count += 1
+    db.add(MiningEvent(kind="spawn", mine_id=mine_id))
     await db.flush()
     return mine_id
 
@@ -261,9 +262,16 @@ async def start_dig(
 
 
 async def finish_dig(
-    db: AsyncSession, character: Character, rng: random.Random
+    db: AsyncSession, character: Character, rng: random.Random,
+    dig_seconds: float | None = None,
 ) -> DigResult | None:
-    """Завершает добычу и кладёт руду в инвентарь. None — добыча не идёт."""
+    """Завершает добычу и кладёт руду в инвентарь. None — добыча не идёт.
+
+    dig_seconds — сколько добыча длилась по плану; идёт в журнал, чтобы на
+    проде было видно, как на деле работает штраф за глубину. Момент старта не
+    хранится (возврата к добыче нет, он не нужен), поэтому длительность
+    передаёт вызывающий.
+    """
     if not is_digging(character):
         return None
 
@@ -277,6 +285,11 @@ async def finish_dig(
     ore_id = mining.roll_ore_id(rng, tier, event_vein)
     grade_id, grade_label = mining.roll_grade(rng, tier, character.mining_level, event_vein)
     await add_ore(db, character.id, ore_id, grade_id, 1)
+    db.add(MiningEvent(
+        kind="dig", mine_id=character.mining_mine_id, character_id=character.id,
+        ore_id=ore_id, grade=grade_id,
+        seconds=round(dig_seconds) if dig_seconds is not None else None,
+    ))
 
     xp = mining.dig_xp(ore_id, grade_id)
     level, remainder, levels = mining.add_mining_xp(
@@ -366,3 +379,117 @@ async def release_after_restart(db: AsyncSession) -> int:
     )
     await db.commit()
     return len(diggers)
+
+
+# --- Статистика для админки ---------------------------------------------------
+
+async def stats(db: AsyncSession, hours: int = 24) -> dict:
+    """Как горное дело ведёт себя на самом деле.
+
+    Три вопроса, на которые текущий остаток в жилах не отвечает:
+      - сколько руды и какой реально собрали (всего и за окно);
+      - успевает ли спавн за добычей (это и есть «работает или нет»);
+      - сколько на деле длится добыча.
+
+    hours — окно для «свежих» чисел. Итоги за всё время считаются отдельно:
+    по ним видно оборот, а по окну — текущий темп.
+    """
+    since = datetime.now(timezone.utc) - timedelta(hours=hours)
+
+    async def _count(kind: str, window: bool) -> int:
+        query = select(func.count()).select_from(MiningEvent).where(MiningEvent.kind == kind)
+        if window:
+            query = query.where(MiningEvent.created_at >= since)
+        return int(await db.scalar(query) or 0)
+
+    by_ore = (
+        await db.execute(
+            select(MiningEvent.ore_id, MiningEvent.grade, func.count())
+            .where(MiningEvent.kind == "dig")
+            .group_by(MiningEvent.ore_id, MiningEvent.grade)
+        )
+    ).all()
+
+    seconds_rows = (
+        await db.execute(
+            select(func.avg(MiningEvent.seconds), func.max(MiningEvent.seconds))
+            .where(MiningEvent.kind == "dig", MiningEvent.seconds.is_not(None))
+        )
+    ).first()
+
+    from_veins = int(await db.scalar(
+        select(func.count()).select_from(MiningEvent)
+        .where(MiningEvent.kind == "dig", MiningEvent.mine_id.is_not(None))
+    ) or 0)
+
+    counts = await ore_counts(db)
+    dug_total = await _count("dig", False)
+    spawned_total = await _count("spawn", False)
+    dug_window = await _count("dig", True)
+    spawned_window = await _count("spawn", True)
+
+    ores: dict[str, dict] = {}
+    for ore_id, grade, count in by_ore:
+        if ore_id is None:
+            continue
+        definition = mining.ore_def(ore_id)
+        row = ores.setdefault(ore_id, {
+            "name": definition.name if definition else ore_id,
+            "emoji": definition.emoji if definition else "",
+            "tier": definition.tier if definition else 0,
+            "total": 0, "by_grade": {},
+        })
+        row["total"] += count
+        row["by_grade"][grade or "?"] = count
+
+    return {
+        "hours": hours,
+        "in_veins": sum(counts.values()),
+        "veins_with_ore": len(counts),
+        "veins_total": len(mining.all_mines()),
+        "vein_cap": mc.MINE_ORE_CAP,
+        "dug_total": dug_total,
+        "spawned_total": spawned_total,
+        # Из рудников против мелких жил: жилы не трогают общий пул, и если
+        # добыча идёт в основном из них, конечность рудников ни на что не
+        # влияет — это ровно тот перекос, который мы хотели увидеть.
+        "dug_from_veins": from_veins,
+        "dug_from_event_veins": dug_total - from_veins,
+        "dug_window": dug_window,
+        "spawned_window": spawned_window,
+        "spawn_per_hour": round(spawned_window / hours, 2) if hours else 0,
+        "dig_per_hour": round(dug_window / hours, 2) if hours else 0,
+        "avg_dig_seconds": round(seconds_rows[0]) if seconds_rows and seconds_rows[0] else None,
+        "max_dig_seconds": int(seconds_rows[1]) if seconds_rows and seconds_rows[1] else None,
+        "ores": sorted(ores.values(), key=lambda r: (r["tier"], r["name"])),
+        "by_mine": [
+            {"id": m.id, "name": m.name, "tier": m.tier, "ore": counts.get(m.id, 0)}
+            for m in mining.all_mines()
+        ],
+    }
+
+
+async def refill_all_veins(db: AsyncSession, amount: int | None = None) -> int:
+    """Наполняет ВСЕ жилы до указанного количества (по умолчанию до кромки).
+
+    Тестовый инструмент админки: если карту выкопали досуха, ждать спавна
+    ради проверки чего-то другого — пустая трата времени. В журнал события
+    НЕ пишутся: это не игровой спавн, и он не должен искажать статистику,
+    по которой мы судим, работает ли настоящий.
+    """
+    target = mc.MINE_ORE_CAP if amount is None else max(0, min(amount, mc.MINE_ORE_CAP))
+    existing = {
+        row.mine_id: row
+        for row in (await db.execute(select(MineVein))).scalars().all()
+    }
+    added = 0
+    for mine in mining.all_mines():
+        vein = existing.get(mine.id)
+        if vein is None:
+            db.add(MineVein(mine_id=mine.id, ore_count=target))
+            added += target
+        elif vein.ore_count < target:
+            added += target - vein.ore_count
+            vein.ore_count = target
+    await db.commit()
+    return added

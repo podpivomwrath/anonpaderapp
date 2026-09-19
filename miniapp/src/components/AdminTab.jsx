@@ -6,7 +6,7 @@ import {
 import {
   getAdminOverview, searchAdminPlayers, getAdminPlayer, postAdminAction, getAdminJournal,
   getAdminPromoCodes, createAdminPromoCode, deleteAdminPromoCode, getAdminPromoCodeActivations,
-  resetAdminActivities,
+  resetAdminActivities, getAdminMiningStats, refillAdminMining,
 } from '../api.js';
 
 // Патч 27, ч.2: вкладка «Админ» - видна только если character.is_admin
@@ -22,6 +22,7 @@ const SECTIONS = [
   { id: 'overview', label: 'Обзор' },
   { id: 'player', label: 'Игрок' },
   { id: 'journal', label: 'Журнал' },
+  { id: 'mining', label: '⛏ Руда' },
   { id: 'promo', label: '🎟 Промокоды' },
 ];
 
@@ -93,6 +94,94 @@ function MaintenanceSection() {
         )}
       </Div>
     </Group>
+  );
+}
+
+// Патч 61: телеметрия горного дела. Смотрим не остаток в жилах (он не
+// показывает ни оборота, ни скорости), а журнал событий: сколько собрали,
+// какой руды, и успевает ли спавн за добычей.
+function MiningSection() {
+  const [data, setData] = useState(null);
+  const [status, setStatus] = useState('loading');
+  const [busy, setBusy] = useState(false);
+  const [notice, setNotice] = useState(null);
+
+  const load = () => {
+    setStatus('loading');
+    getAdminMiningStats(24)
+      .then((res) => { setData(res); setStatus('ready'); })
+      .catch(() => setStatus('error'));
+  };
+
+  useEffect(load, []);
+
+  async function refill() {
+    setBusy(true);
+    setNotice(null);
+    try {
+      const res = await refillAdminMining();
+      setNotice(`Добавлено ${res.added} руды, в жилах ${res.in_veins}.`);
+      load();
+    } catch {
+      setNotice('Не удалось пополнить жилы.');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  if (status === 'loading') return <Div style={{ display: 'flex', justifyContent: 'center', paddingTop: 24 }}><Spinner size="l" /></Div>;
+  if (status === 'error' || !data) return <Placeholder>Не удалось загрузить статистику руды.</Placeholder>;
+
+  const balance = data.spawned_window - data.dug_window;
+  return (
+    <>
+      <Group header={<Header>⛏ Руда в мире</Header>}>
+        <StatRow label="Сейчас в жилах" value={`${data.in_veins} / ${data.veins_total * data.vein_cap}`} />
+        <StatRow label="Непустых жил" value={`${data.veins_with_ore} из ${data.veins_total}`} />
+        <StatRow label="Добыто всего" value={data.dug_total} />
+        <StatRow label="Заспавнено всего" value={data.spawned_total} />
+        <StatRow label="Из рудников / из жил" value={`${data.dug_from_veins} / ${data.dug_from_event_veins}`} />
+      </Group>
+
+      <Group header={<Header>📈 За {data.hours} ч</Header>}>
+        <StatRow label="Заспавнено" value={`${data.spawned_window} (${data.spawn_per_hour}/ч)`} />
+        <StatRow label="Добыто" value={`${data.dug_window} (${data.dig_per_hour}/ч)`} />
+        <StatRow label="Баланс" value={balance >= 0 ? `+${balance} (спавн успевает)` : `${balance} (выкапывают быстрее)`} />
+        <StatRow
+          label="Добыча длится"
+          value={data.avg_dig_seconds
+            ? `в среднем ${Math.round(data.avg_dig_seconds / 60)} мин, максимум ${Math.round(data.max_dig_seconds / 60)} мин`
+            : 'нет данных'}
+        />
+      </Group>
+
+      {data.ores.length > 0 && (
+        <Group header={<Header>🪨 Что добывают</Header>}>
+          {data.ores.map((ore) => (
+            <StatRow
+              key={ore.name}
+              label={`${ore.emoji} ${ore.name}`}
+              value={`${ore.total} шт. · ${Object.entries(ore.by_grade).map(([g, n]) => `${g} ${n}`).join(', ')}`}
+            />
+          ))}
+        </Group>
+      )}
+
+      <Group header={<Header>🛠 Тестовое</Header>}>
+        <Div>
+          <Caption level="1" style={{ opacity: 0.7, display: 'block', marginBottom: 8 }}>
+            Наполняет все жилы до кромки. В статистику эти события не попадают —
+            иначе они исказили бы картину настоящего спавна.
+          </Caption>
+          <Button mode="secondary" loading={busy} onClick={refill} stretched>
+            Пополнить руду по всей карте
+          </Button>
+          {notice && (
+            <Caption level="1" style={{ display: 'block', marginTop: 8 }}>{notice}</Caption>
+          )}
+        </Div>
+      </Group>
+    </>
   );
 }
 
@@ -781,6 +870,7 @@ export default function AdminTab() {
       {section === 'overview' && <><OverviewSection /><MaintenanceSection /></>}
       {section === 'player' && <PlayerSection />}
       {section === 'journal' && <JournalSection />}
+      {section === 'mining' && <MiningSection />}
       {section === 'promo' && <PromoSection />}
     </>
   );
