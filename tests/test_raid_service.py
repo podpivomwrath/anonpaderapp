@@ -99,14 +99,32 @@ async def test_leave_lobby_last_member_dissolves_it(db_session, make_character) 
 async def test_group_leave_group_removes_raid_lobby_membership(db_session, make_character) -> None:
     """Патч 53: выход из ГРУППЫ (не только с клетки) тоже снимает
     членство в рейд-лобби — интеграция через group_service.leave_group."""
-    group_id, (leader, member2) = await _make_group(db_session, make_character, size=2)
-    await rs.touch_monolith(db_session, leader, rc.RAID_PUPPET_THEATRE_ID, group_id=group_id)
-    await rs.touch_monolith(db_session, member2, rc.RAID_PUPPET_THEATRE_ID, group_id=group_id)
+    # Группа из ТРОИХ: вдвоём выход одного распускает группу целиком, и
+    # проверять «остальные остались в лобби» было бы не на ком.
+    group_id, (leader, member2, member3) = await _make_group(db_session, make_character, size=3)
+    for member in (leader, member2, member3):
+        await rs.touch_monolith(db_session, member, rc.RAID_PUPPET_THEATRE_ID, group_id=group_id)
 
     await gs.leave_group(db_session, member2.id)
     assert await rs.get_membership(db_session, member2.id) is None
     snapshot = await rs.get_snapshot(db_session, (await rs.get_membership(db_session, leader.id)).lobby_id)
-    assert len(snapshot.members) == 1
+    assert len(snapshot.members) == 2
+
+
+async def test_group_dissolving_pulls_everyone_out_of_the_lobby(
+    db_session, make_character
+) -> None:
+    """Группа распадается, когда остаётся один. Лобби рейда считает людей по
+    группе, поэтому оставшегося надо вынуть и оттуда — иначе он висел бы в
+    лобби со знаменателем, которому больше не по чему считаться."""
+    group_id, (leader, member2) = await _make_group(db_session, make_character, size=2)
+    for member in (leader, member2):
+        await rs.touch_monolith(db_session, member, rc.RAID_PUPPET_THEATRE_ID, group_id=group_id)
+
+    await gs.leave_group(db_session, member2.id)
+
+    assert await rs.get_membership(db_session, member2.id) is None
+    assert await rs.get_membership(db_session, leader.id) is None
 
 
 async def test_consume_key_and_start_requires_key(db_session, make_character) -> None:

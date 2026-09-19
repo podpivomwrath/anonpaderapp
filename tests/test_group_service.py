@@ -154,16 +154,41 @@ async def test_leave_transfers_leadership_to_next_by_join_order(db_session, make
     assert {m.id for m in snapshot.members} == {second.id, third.id}
 
 
-async def test_leave_dissolves_group_when_last_member_leaves(db_session, make_character) -> None:
+async def test_leave_dissolves_group_when_one_would_remain(db_session, make_character) -> None:
+    """Группа из одного человека — не группа: ею нельзя воспользоваться ни для
+    чего, ради чего группы собирают, зато она блокирует приглашения и висит на
+    экране. Поэтому распад наступает на ОДНОМ оставшемся, а не на нуле."""
     leader = await make_character(level=10)
     member = await make_character(level=10)
     invite = await gs.send_invite(db_session, leader, member)
     await gs.accept_invite(db_session, invite.id, member.id)
 
-    await gs.leave_group(db_session, leader.id)
-    result = await gs.leave_group(db_session, member.id)
+    result = await gs.leave_group(db_session, leader.id)
+
     assert result.dissolved is True
+    assert result.new_leader_character_id is None, "передавать лидерство некому"
+    # Оставшегося надо предупредить — иначе распад произойдёт молча.
+    assert result.remaining_member_character_ids == [member.id]
     assert await gs.get_group_snapshot(db_session, member.id) is None
+    assert await gs.get_membership(db_session, member.id) is None
+
+
+async def test_group_of_three_survives_a_departure(db_session, make_character) -> None:
+    """Обратная сторона правила: пока остаётся хотя бы двое, группа жива, а
+    лидерство при уходе лидера переходит дальше."""
+    leader = await make_character(level=10)
+    second = await make_character(level=10)
+    third = await make_character(level=10)
+    for member in (second, third):
+        invite = await gs.send_invite(db_session, leader, member)
+        await gs.accept_invite(db_session, invite.id, member.id)
+
+    result = await gs.leave_group(db_session, leader.id)
+
+    assert result.dissolved is False
+    assert result.new_leader_character_id == second.id
+    assert sorted(result.remaining_member_character_ids) == sorted([second.id, third.id])
+    assert await gs.get_group_snapshot(db_session, second.id) is not None
 
 
 async def test_leave_not_in_group_raises(db_session, make_character) -> None:
@@ -182,8 +207,10 @@ async def test_kick_member_only_by_leader(db_session, make_character) -> None:
         await gs.kick_member(db_session, member, leader.id)
 
     result = await gs.kick_member(db_session, leader, member.id)
-    assert result.dissolved is False
+    # Исключение из группы вдвоём оставляет лидера одного — значит распад.
+    assert result.dissolved is True
     assert await gs.get_group_snapshot(db_session, member.id) is None
+    assert await gs.get_membership(db_session, leader.id) is None
 
 
 async def test_kick_self_rejected(db_session, make_character) -> None:
@@ -208,23 +235,27 @@ async def test_enforce_level_gap_kicks_leveled_up_member(db_session, make_charac
     kick = await gs.enforce_level_gap(db_session, member)
     assert kick is not None
     assert kick.kicked_character_id == member.id
-    assert kick.dissolved is False
+    # Группа была вдвоём: вылет одного оставляет второго одного — распад.
+    assert kick.dissolved is True
     assert await gs.get_group_snapshot(db_session, member.id) is None
-    # лидер остаётся лидером — исключили НЕ его
-    snapshot = await gs.get_group_snapshot(db_session, leader.id)
-    assert snapshot.leader_character_id == leader.id
+    assert await gs.get_group_snapshot(db_session, leader.id) is None
 
 
 async def test_enforce_level_gap_kicks_leader_and_transfers(db_session, make_character) -> None:
+    """Втроём лидерство передаётся: группа переживает вылет лидера. Вдвоём
+    передавать было бы некому — это проверяет тест выше."""
     leader = await make_character(level=10)
     member = await make_character(level=10)
-    invite = await gs.send_invite(db_session, leader, member)
-    await gs.accept_invite(db_session, invite.id, member.id)
+    third = await make_character(level=10)
+    for invited in (member, third):
+        invite = await gs.send_invite(db_session, leader, invited)
+        await gs.accept_invite(db_session, invite.id, invited.id)
 
     leader.level = 25
     kick = await gs.enforce_level_gap(db_session, leader)
     assert kick is not None
     assert kick.kicked_character_id == leader.id
+    assert kick.dissolved is False
     assert kick.new_leader_character_id == member.id
     snapshot = await gs.get_group_snapshot(db_session, member.id)
     assert snapshot.leader_character_id == member.id

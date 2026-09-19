@@ -195,12 +195,16 @@ async def leave_confirm(message: Message) -> None:
             new_leader_name = new_leader.name if new_leader is not None else None
 
     await message.answer("Ты вышел из группы.")
-    if result.dissolved:
-        return
     for vk_id in remaining_peer_ids:
-        text = f"👥 {left_name} покинул группу."
-        if new_leader_name is not None:
-            text += f" Новый лидер: 👑 {new_leader_name}."
+        if result.dissolved:
+            # Группа распадается, когда остаётся один. Сказать об этом надо:
+            # иначе последний участник видит «группа» на экране и не понимает,
+            # почему она больше ничего не умеет.
+            text = f"👥 {left_name} покинул группу. Группа распалась - ты остался один."
+        else:
+            text = f"👥 {left_name} покинул группу."
+            if new_leader_name is not None:
+                text += f" Новый лидер: 👑 {new_leader_name}."
         try:
             await _bot_api.messages.send(peer_id=vk_id, message=text, random_id=0)
         except Exception:

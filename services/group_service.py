@@ -218,10 +218,21 @@ async def decline_invite(db: AsyncSession, invite_id: int, character_id: int) ->
 # --- Выход / исключение ---
 
 
+#: Меньше этого числа участников группа не существует. Группа из одного
+#: человека — не группа: её нельзя использовать ни для чего, ради чего группы
+#: и собирают (общий бой, рейд, дележ добычи), зато она молча блокирует
+#: приглашения и висит у игрока на экране.
+GROUP_MIN_SIZE = 2
+
+
 @dataclass
 class LeaveResult:
     dissolved: bool
     new_leader_character_id: int | None  # заполнено, только если лидерство ПЕРЕШЛО
+    #: КОГО уведомить. Обычно это те, кто остался в группе. Если группа
+    #: распалась из-за того, что в ней остался один человек, здесь будет он —
+    #: ему тоже надо сказать, и это единственный случай, когда список непуст
+    #: при dissolved=True.
     remaining_member_character_ids: list[int]
 
 
@@ -233,10 +244,25 @@ async def _remove_member(db: AsyncSession, group: Group, character_id: int, was_
             .order_by(GroupMember.joined_at)
         )
     ).all()
-    if not remaining:
+    if len(remaining) < GROUP_MIN_SIZE:
+        # Группа распадается, когда в ней остаётся меньше двоих. Раньше
+        # распад наступал только на нуле, и последний участник оставался в
+        # «группе» из самого себя: пользы никакой, а приглашения она
+        # блокировала и продолжала висеть на экране.
+        from services import raid_service
+
+        last_ids = [m.character_id for m in remaining]
+        for member in remaining:
+            # Лобби рейда считает людей по группе — оставшийся там знаменатель
+            # пересчитывать было бы не по чему.
+            await raid_service.leave_lobby_if_present(db, member.character_id)
+            await db.delete(member)
         await db.delete(group)
         await db.flush()
-        return LeaveResult(dissolved=True, new_leader_character_id=None, remaining_member_character_ids=[])
+        return LeaveResult(
+            dissolved=True, new_leader_character_id=None,
+            remaining_member_character_ids=last_ids,
+        )
     new_leader_id = None
     if was_leader:
         new_leader_id = remaining[0].character_id
