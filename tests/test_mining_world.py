@@ -140,10 +140,13 @@ def test_empty_mine_hides_the_dig_button() -> None:
 
 
 def test_mine_screens_always_have_a_way_out() -> None:
-    for raw in (kb.mine_keyboard(True), kb.mine_keyboard(False),
-                kb.digging_keyboard(), kb.ore_keyboard()):
+    """У каждого экрана рудника есть выход. У забоя он свой — отмена копания:
+    выйти наверх, не бросив кирку, нельзя, добыча блокирует всё."""
+    for raw in (kb.mine_keyboard(True), kb.mine_keyboard(False), kb.ore_keyboard()):
         labels = [b["action"]["label"] for row in _rows(raw) for b in row]
         assert mt.BTN_LEAVE_MINE in labels
+    digging = [b["action"]["label"] for row in _rows(kb.digging_keyboard()) for b in row]
+    assert mt.BTN_ABANDON in digging
 
 
 def test_entry_buttons_are_inline() -> None:

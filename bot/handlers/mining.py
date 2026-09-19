@@ -201,9 +201,14 @@ async def ore_inventory(message: Message) -> None:
 @labeler.message(text=[mt.BTN_LEAVE_MINE])
 @activity_action
 async def leave_mine(message: Message) -> None:
-    """Выход наверх. Добыча НЕ отменяется: к статичному руднику можно
-    вернуться и доработать остаток, пока не ушёл с клетки. Уход с клетки
-    обнуляет её — см. bot/handlers/world.py."""
+    """Выход наверх с экрана рудника.
+
+    Во время добычи сюда попасть нельзя: в забое кнопка ровно одна — отменить
+    копание. Сюда приходят либо не начав копать, либо уже отменив. Остаётся
+    один случай, когда добыча всё же идёт: игрок вернулся в жилу после
+    рестарта бота, посмотрел остаток и вышел — тогда добыча сохраняется, и к
+    ней можно вернуться, пока он не ушёл с клетки.
+    """
     async with get_session_factory()() as db:
         character = await onboarding_svc.get_character(db, message.from_id)
         if character is None:
