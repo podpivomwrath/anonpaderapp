@@ -21,6 +21,7 @@ export const SECTION_ICONS = {
   inventory: { emoji: '🎒', src: null },
   craft: { emoji: '🔨', src: null },
   map: { emoji: '🗺️', src: null },
+  tops: { emoji: '🏆', src: null },
   exchange: { emoji: '💱', src: null },
   admin: { emoji: '🛡️', src: null },
 };

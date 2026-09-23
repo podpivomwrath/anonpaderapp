@@ -11,6 +11,7 @@ import DailiesTab from './DailiesTab.jsx';
 import InventoryTab from './InventoryTab.jsx';
 import MapTab from './MapTab.jsx';
 import StubTab from './StubTab.jsx';
+import TopsTab from './TopsTab.jsx';
 
 // Патч 14, ч.1: было 5 вкладок (Характеристики/Инвентарь/Пресеты/Испытания/
 // Биржа) - Характеристики+Пресеты+Испытания объединены в «Персонаж».
@@ -28,8 +29,15 @@ const SECTIONS = [
   { id: 'inventory', label: 'Инвентарь' },
   { id: 'craft', label: 'Мастерская' },
   { id: 'map', label: 'Карта' },
+  { id: 'tops', label: 'Топы' },
   { id: 'exchange', label: 'Биржа' },
 ];
+
+/** Числа с разрядами: без них четырёхзначное золото читается как каша. */
+function money(value) {
+  return Number(value ?? 0).toLocaleString('ru-RU');
+}
+
 
 export default function Hub() {
   const [activeTab, setActiveTab] = useState('character');
@@ -193,7 +201,9 @@ export default function Hub() {
         </p>
         {character.farm_currency !== null && (
           <p className="hub-banner__meta">
-            💰 Золото: {character.farm_currency} · 💎 Самоцветы: {character.donate_currency}
+            {/* Патч 74: разряды и без подписей. Подписи занимали половину
+                строки, а «Золото»/«Самоцветы» и так читаются по значку. */}
+            💰 {money(character.farm_currency)} · 💎 {money(character.donate_currency)}
           </p>
         )}
       </div>
@@ -206,6 +216,7 @@ export default function Hub() {
         {activeTab === 'inventory' && <InventoryTab onCharacterUpdate={setCharacter} />}
         {activeTab === 'craft' && <CraftTab />}
         {activeTab === 'map' && <MapTab />}
+        {activeTab === 'tops' && <TopsTab />}
         {activeTab === 'exchange' && (
           <StubTab text="Торговцы душами ещё не открыли лавку. Скоро." />
         )}

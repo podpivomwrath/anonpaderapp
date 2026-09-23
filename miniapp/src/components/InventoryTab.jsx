@@ -1,20 +1,43 @@
 import { useEffect, useState } from 'react';
-import { Group, Header, Div, Text, Spinner, Placeholder, Button } from '@vkontakte/vkui';
-import { getInventory, equipItem, getCharacter } from '../api.js';
+import {
+  Button, Div, Group, Header, Placeholder, SimpleCell, Spinner, Text,
+} from '@vkontakte/vkui';
+import { equipItem, getCharacter, getInventory } from '../api.js';
 
-const STAT_NAMES = { str: 'Сила', agi: 'Ловкость', int: 'Интеллект', vit: 'Выносливость', wil: 'Воля' };
+// Патч 74: вместо одного плоского списка - «Надето» отдельно и сумка,
+// свёрнутая по слотам. Плоский список рос вместе с дропом и превращался в
+// стену одинаковых строк, где надетое терялось среди лишнего.
+
+const STAT_NAMES = {
+  str: 'Сила', agi: 'Ловкость', int: 'Интеллект', vit: 'Выносливость', wil: 'Воля',
+};
+
+// Порядок сверху вниз, как надевают. Слоты приходят с сервера уже с
+// названиями (slot_title), здесь только очерёдность показа.
+const SLOT_ORDER = ['weapon', 'helmet', 'armor', 'legs', 'boots'];
 
 function statsLine(baseStats) {
-  return Object.entries(baseStats)
+  return Object.entries(baseStats || {})
+    .sort((a, b) => b[1] - a[1])
     .map(([key, amount]) => `${STAT_NAMES[key] || key} +${amount}`)
     .join(', ');
 }
 
+function itemSubtitle(item) {
+  const parts = [];
+  if (item.craft_efficiency) parts.push(`${item.craft_efficiency}%`);
+  else if (item.ilvl) parts.push(`ур. ${item.ilvl}`);
+  const stats = statsLine(item.base_stats);
+  if (stats) parts.push(stats);
+  return parts.join(' · ');
+}
+
 export default function InventoryTab({ onCharacterUpdate }) {
   const [items, setItems] = useState(null);
-  const [status, setStatus] = useState('loading'); // loading | ready | error
+  const [status, setStatus] = useState('loading');
   const [equippingId, setEquippingId] = useState(null);
   const [errorMsg, setErrorMsg] = useState(null);
+  const [openSlot, setOpenSlot] = useState(null);
 
   function load() {
     setStatus('loading');
@@ -69,50 +92,83 @@ export default function InventoryTab({ onCharacterUpdate }) {
     return <Placeholder icon={<div style={{ fontSize: 48 }}>🎒</div>}>Твоя сумка пока пуста.</Placeholder>;
   }
 
+  const equipped = items.filter((i) => i.equipped);
+  const spare = items.filter((i) => !i.equipped);
+  const slots = SLOT_ORDER
+    .map((slot) => ({
+      slot,
+      title: (items.find((i) => i.slot === slot) || {}).slot_title || slot,
+      rows: spare.filter((i) => i.slot === slot),
+    }))
+    .filter((group) => group.rows.length > 0);
+
+  const craftButton = (item) => item.craftable && (
+    <Button
+      mode="outline" size="s"
+      onClick={() => window.dispatchEvent(new CustomEvent('open-craft'))}
+    >
+      В мастерскую
+    </Button>
+  );
+
   return (
-    <Group header={<Header>Инвентарь ({items.length})</Header>}>
+    <>
       {errorMsg && (
-        <Div>
-          <Text style={{ color: '#c81e3a' }}>{errorMsg}</Text>
-        </Div>
+        <Div><Text style={{ color: '#c81e3a' }}>{errorMsg}</Text></Div>
       )}
-      {items.map((item) => (
-        <div className="stat-row" key={item.id}>
-          <div>
-            <div className="stat-row__label">
-              {item.rarity_emoji} {item.name}
-              {item.equipped ? ' (надето)' : ''}
-              {item.craft_efficiency ? ` · ${item.craft_efficiency}%` : ''}
-            </div>
-            <Text style={{ opacity: 0.7, fontSize: 13 }}>
-              {item.slot_title}, ур. {item.ilvl} - {statsLine(item.base_stats)}
-            </Text>
-          </div>
-          <div className="inventory-actions">
-            {item.craftable && (
-              // Патч 72: вход в мастерскую прямо с карточки - иначе игрок,
-              // получивший боссовую вещь, не догадается, что с ней делать.
-              <Button
-                mode="outline"
-                size="s"
-                onClick={() => window.dispatchEvent(new CustomEvent('open-craft'))}
-              >
-                В мастерскую
-              </Button>
+
+      <Group header={<Header>Надето</Header>}>
+        {equipped.length === 0 && <Div>Ничего не надето.</Div>}
+        {SLOT_ORDER.map((slot) => equipped.find((i) => i.slot === slot)).filter(Boolean).map((item) => (
+          <SimpleCell
+            key={item.id}
+            multiline
+            after={craftButton(item)}
+            subtitle={itemSubtitle(item)}
+          >
+            {`${item.rarity_emoji} ${item.name}`}
+          </SimpleCell>
+        ))}
+      </Group>
+
+      <Group header={<Header>В сумке ({spare.length})</Header>}>
+        {slots.length === 0 && <Div>Сумка пуста - всё на тебе.</Div>}
+        {slots.map((group) => (
+          <div key={group.slot}>
+            <SimpleCell
+              onClick={() => setOpenSlot((cur) => (cur === group.slot ? null : group.slot))}
+              after={openSlot === group.slot ? '▴' : `${group.rows.length} ▾`}
+            >
+              {group.title}
+            </SimpleCell>
+            {openSlot === group.slot && (
+              <div className="craft-expand">
+                {group.rows.map((item) => (
+                  <SimpleCell
+                    key={item.id}
+                    multiline
+                    subtitle={itemSubtitle(item)}
+                    after={
+                      <div className="inventory-actions">
+                        {craftButton(item)}
+                        <Button
+                          mode="secondary" size="s"
+                          loading={equippingId === item.id}
+                          onClick={() => handleEquip(item.id)}
+                        >
+                          Надеть
+                        </Button>
+                      </div>
+                    }
+                  >
+                    {`${item.rarity_emoji} ${item.name}`}
+                  </SimpleCell>
+                ))}
+              </div>
             )}
-            {!item.equipped && (
-              <Button
-                mode="secondary"
-                size="s"
-                loading={equippingId === item.id}
-                onClick={() => handleEquip(item.id)}
-              >
-                Надеть
-              </Button>
-            )}
           </div>
-        </div>
-      ))}
-    </Group>
+        ))}
+      </Group>
+    </>
   );
 }

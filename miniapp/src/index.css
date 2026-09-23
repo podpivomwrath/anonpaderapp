@@ -471,3 +471,17 @@ body,
   flex-wrap: wrap;
   justify-content: flex-end;
 }
+
+/* Раскрытый подсписок (патч 74): градации руды, полоски специализации.
+   Отступ слева и приглушённый фон показывают вложенность без рамок. */
+.craft-expand {
+  padding: 0 0 0 12px;
+  margin: 0 0 4px 12px;
+  border-left: 2px solid var(--vkui--color_background_secondary, rgba(0, 0, 0, 0.1));
+}
+
+.craft-expand .vkuiSimpleCell {
+  padding-top: 6px;
+  padding-bottom: 6px;
+  min-height: 0;
+}
