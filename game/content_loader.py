@@ -647,3 +647,32 @@ def load_content(content_dir: Path = CONTENT_DIR) -> GameContent:
         items={i.id: i for i in items},
         buffs={b.id: b for b in buffs},
     )
+
+
+class CraftOutputDef(BaseModel):
+    """Один из трёх результатов перековки (content/crafting/recipes.json)."""
+
+    name: str
+    gender: str = "m"
+    flavor: str = ""
+
+
+class CraftRecipeDef(BaseModel):
+    """Что получается из предмета-источника (патч 72).
+
+    Ключ рецепта = id уникального предмета из content/items/unique_items.json.
+    Числа (бюджет очков, веса специализаций, цена, эффективность) живут в
+    game/economy/craft_config.py — здесь только контент, как у рыбы и руды.
+    """
+
+    source_name: str
+    outputs: dict[str, CraftOutputDef]
+
+
+def load_craft_recipes(content_dir: Path = CONTENT_DIR) -> dict[str, CraftRecipeDef]:
+    raw = _load_json(content_dir / "crafting" / "recipes.json")
+    return {
+        key: CraftRecipeDef(**value)
+        for key, value in raw.items()
+        if not key.startswith("_")
+    }
