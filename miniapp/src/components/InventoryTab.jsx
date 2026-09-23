@@ -82,21 +82,35 @@ export default function InventoryTab({ onCharacterUpdate }) {
             <div className="stat-row__label">
               {item.rarity_emoji} {item.name}
               {item.equipped ? ' (надето)' : ''}
+              {item.craft_efficiency ? ` · ${item.craft_efficiency}%` : ''}
             </div>
             <Text style={{ opacity: 0.7, fontSize: 13 }}>
               {item.slot_title}, ур. {item.ilvl} - {statsLine(item.base_stats)}
             </Text>
           </div>
-          {!item.equipped && (
-            <Button
-              mode="secondary"
-              size="s"
-              loading={equippingId === item.id}
-              onClick={() => handleEquip(item.id)}
-            >
-              Надеть
-            </Button>
-          )}
+          <div className="inventory-actions">
+            {item.craftable && (
+              // Патч 72: вход в мастерскую прямо с карточки - иначе игрок,
+              // получивший боссовую вещь, не догадается, что с ней делать.
+              <Button
+                mode="outline"
+                size="s"
+                onClick={() => window.dispatchEvent(new CustomEvent('open-craft'))}
+              >
+                В мастерскую
+              </Button>
+            )}
+            {!item.equipped && (
+              <Button
+                mode="secondary"
+                size="s"
+                loading={equippingId === item.id}
+                onClick={() => handleEquip(item.id)}
+              >
+                Надеть
+              </Button>
+            )}
+          </div>
         </div>
       ))}
     </Group>

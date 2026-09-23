@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useState } from 'react';
 import {
-  Panel, PanelHeader, PanelHeaderButton, Tabbar, TabbarItem,
-  Placeholder, Spinner, Div, Button,
+  Panel, PanelHeader, PanelHeaderButton, Placeholder, Spinner, Div, Button,
 } from '@vkontakte/vkui';
 import { getCharacter } from '../api.js';
+import NavIcon from './NavIcon.jsx';
 import AdminTab from './AdminTab.jsx';
 import CharacterTab from './CharacterTab.jsx';
+import CraftTab from './CraftTab.jsx';
 import DailiesTab from './DailiesTab.jsx';
 import InventoryTab from './InventoryTab.jsx';
 import MapTab from './MapTab.jsx';
@@ -13,20 +14,26 @@ import StubTab from './StubTab.jsx';
 
 // Патч 14, ч.1: было 5 вкладок (Характеристики/Инвентарь/Пресеты/Испытания/
 // Биржа) - Характеристики+Пресеты+Испытания объединены в «Персонаж».
-// Патч 23: + «Задания» (сюжет/ежедневки/вход). Патч 29: + «Карта».
-// Патч 27: + «Админ» - добавляется в TABS условно, только когда
-// character.is_admin (сервер уже подтвердил права); это ТОЛЬКО видимость,
-// реальная защита - на каждом /api/miniapp/admin/* эндпоинте отдельно.
-const TABS = [
-  { id: 'character', label: 'Персонаж', icon: '🎭' },
-  { id: 'dailies', label: 'Задания', icon: '📜' },
-  { id: 'inventory', label: 'Инвентарь', icon: '🎒' },
-  { id: 'map', label: 'Карта', icon: '🗺️' },
-  { id: 'exchange', label: 'Биржа', icon: '💱' },
+// Патч 23: + «Задания». Патч 29: + «Карта». Патч 27: + «Админ» - добавляется
+// условно, только когда character.is_admin (сервер уже подтвердил права);
+// это ТОЛЬКО видимость, реальная защита - на каждом /api/miniapp/admin/*.
+//
+// Патч 72: нижний Tabbar заменён шторкой по бургеру. Причина - разделов
+// стало больше, чем помещается в ряд на телефоне: седьмая вкладка сжимала
+// подписи до нечитаемых. В вертикальном списке места столько, сколько нужно,
+// и новый раздел не требует переверстки остальных.
+const SECTIONS = [
+  { id: 'character', label: 'Персонаж' },
+  { id: 'dailies', label: 'Задания' },
+  { id: 'inventory', label: 'Инвентарь' },
+  { id: 'craft', label: 'Мастерская' },
+  { id: 'map', label: 'Карта' },
+  { id: 'exchange', label: 'Биржа' },
 ];
 
 export default function Hub() {
   const [activeTab, setActiveTab] = useState('character');
+  const [menuOpen, setMenuOpen] = useState(false);
   const [character, setCharacter] = useState(null);
   const [status, setStatus] = useState('loading'); // loading | ready | error
   const [ban, setBan] = useState(null);
@@ -37,6 +44,14 @@ export default function Hub() {
     const onBan = (event) => setBan(event.detail);
     window.addEventListener('account-banned', onBan);
     return () => window.removeEventListener('account-banned', onBan);
+  }, []);
+
+  // Патч 72: из инвентаря можно прыгнуть сразу в мастерскую - событие вместо
+  // проброса колбэка через три слоя. Раздел один, слушатель один.
+  useEffect(() => {
+    const open = () => { setActiveTab('craft'); setMenuOpen(false); };
+    window.addEventListener('open-craft', open);
+    return () => window.removeEventListener('open-craft', open);
   }, []);
 
   // silent=true - обновление на месте: экран не гасим и спиннер вместо всего
@@ -68,10 +83,21 @@ export default function Hub() {
     }
   }, [load]);
 
-  // Кнопка стоит В ЦЕНТРЕ шапки, рядом с заголовком: справа её перекрывают
+  const sections = character?.is_admin
+    ? [...SECTIONS, { id: 'admin', label: 'Админ' }]
+    : SECTIONS;
+  const current = sections.find((s) => s.id === activeTab) || sections[0];
+
+  // Бургер слева, «обновить» рядом с заголовком: справа шапку перекрывают
   // крестик ВК и меню приложения - на телефоне туда просто не попасть.
   const header = (title) => (
-    <PanelHeader>
+    <PanelHeader
+      before={
+        <PanelHeaderButton aria-label="Разделы" onClick={() => setMenuOpen((open) => !open)}>
+          <span aria-hidden="true" style={{ fontSize: 20 }}>{menuOpen ? '✕' : '☰'}</span>
+        </PanelHeaderButton>
+      }
+    >
       <span className="hub-header">
         {title}
         <PanelHeaderButton aria-label="Обновить" disabled={refreshing} onClick={refresh}>
@@ -86,7 +112,7 @@ export default function Hub() {
   }, [load]);
 
   useEffect(() => {
-    if (!TABS.some((tab) => tab.id === activeTab) && !(activeTab === 'admin' && character?.is_admin)) {
+    if (!SECTIONS.some((s) => s.id === activeTab) && !(activeTab === 'admin' && character?.is_admin)) {
       setActiveTab('character');
     }
   }, [activeTab, character?.is_admin]);
@@ -132,7 +158,29 @@ export default function Hub() {
 
   return (
     <Panel>
-      {header('Персонаж')}
+      {header(current.label)}
+
+      {menuOpen && (
+        <>
+          <div className="nav-scrim" onClick={() => setMenuOpen(false)} aria-hidden="true" />
+          <nav className="nav-drawer" aria-label="Разделы">
+            {sections.map((section) => (
+              <button
+                type="button"
+                key={section.id}
+                className={
+                  section.id === activeTab ? 'nav-drawer__item nav-drawer__item--active' : 'nav-drawer__item'
+                }
+                onClick={() => { setActiveTab(section.id); setMenuOpen(false); }}
+              >
+                <NavIcon id={section.id} />
+                <span className="nav-drawer__label">{section.label}</span>
+              </button>
+            ))}
+          </nav>
+        </>
+      )}
+
       <div className="hub-banner">
         <p className="hub-banner__name">
           {character.name}
@@ -150,34 +198,19 @@ export default function Hub() {
         )}
       </div>
 
-      <div className="hub-content" key={reloadKey}>
+      <div className="hub-content hub-content--drawer" key={reloadKey}>
         {activeTab === 'character' && (
           <CharacterTab character={character} onCharacterUpdate={setCharacter} />
         )}
         {activeTab === 'dailies' && <DailiesTab />}
         {activeTab === 'inventory' && <InventoryTab onCharacterUpdate={setCharacter} />}
+        {activeTab === 'craft' && <CraftTab />}
         {activeTab === 'map' && <MapTab />}
         {activeTab === 'exchange' && (
           <StubTab text="Торговцы душами ещё не открыли лавку. Скоро." />
         )}
         {activeTab === 'admin' && character.is_admin && <AdminTab />}
       </div>
-
-      <Tabbar>
-        {(character.is_admin ? [...TABS, { id: 'admin', label: 'Админ', icon: '🛡️' }] : TABS).map((tab) => (
-          <TabbarItem
-            key={tab.id}
-            selected={activeTab === tab.id}
-            onClick={() => setActiveTab(tab.id)}
-            label={tab.label}
-            aria-label={tab.label}
-          >
-            <span style={{ fontSize: 22 }} aria-hidden="true">
-              {tab.icon}
-            </span>
-          </TabbarItem>
-        ))}
-      </Tabbar>
     </Panel>
   );
 }

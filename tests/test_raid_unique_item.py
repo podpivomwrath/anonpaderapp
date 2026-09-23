@@ -45,17 +45,43 @@ def test_no_rarity_upgrades_into_unique_for_any_rollable_input() -> None:
         assert item_gen.maybe_upgrade_rarity(rarity_id, rarities, rng, chance=1.0) != "unique"
 
 
-async def test_grant_unique_item_uses_class_primary_stat(db_session, make_character) -> None:
+async def test_grant_unique_item_rolls_stats_around_the_class_primary(
+    db_session, make_character
+) -> None:
+    """Патч 72: раскладка РОЛЛИТСЯ, а не кладётся вся в основной стат.
+
+    Боссовая вещь — сырьё для крафта, но носить её можно, поэтому перекос в
+    основной стат класса остаётся, а одинаковыми два скальпеля быть не должны.
+    """
+    import random
+
     warrior = await make_character(base_class="warrior")
-    item = await item_service.grant_unique_item(db_session, warrior, "surgeon_scalpel")
+    item = await item_service.grant_unique_item(
+        db_session, warrior, "surgeon_scalpel", random.Random(1)
+    )
     assert item.rarity == "unique"
     assert item.slot == "weapon"
     assert item.name == "Скальпель Хирурга"
-    assert item.base_stats == {"str": 45}
+    assert sum(item.base_stats.values()) == 45, "бюджет очков обязан сойтись"
+    assert "int" not in item.base_stats, "чужой основной стат не должен появляться"
 
     mage = await make_character(base_class="mage")
-    mage_item = await item_service.grant_unique_item(db_session, mage, "surgeon_scalpel")
-    assert mage_item.base_stats == {"int": 45}
+    mage_item = await item_service.grant_unique_item(
+        db_session, mage, "surgeon_scalpel", random.Random(1)
+    )
+    assert sum(mage_item.base_stats.values()) == 45
+    assert "str" not in mage_item.base_stats
+
+
+async def test_granted_unique_remembers_its_recipe(db_session, make_character) -> None:
+    """Без craft_source_id мастерская не нашла бы, во что это перековывать."""
+    import random
+
+    character = await make_character(base_class="warrior")
+    item = await item_service.grant_unique_item(
+        db_session, character, "surgeon_scalpel", random.Random(2)
+    )
+    assert item.craft_source_id == "surgeon_scalpel"
 
 
 async def test_unique_item_is_unsellable(db_session, make_character) -> None:

@@ -12,6 +12,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from game.combat import balance_config as bc
+from game.economy import crafting
 from game.content_loader import (
     ItemBaseDef,
     ItemRarityDef,
@@ -148,18 +149,32 @@ async def grant_random_item(
     return item
 
 
-async def grant_unique_item(db: AsyncSession, character: Character, unique_id: str) -> Item:
+async def grant_unique_item(
+    db: AsyncSession, character: Character, unique_id: str,
+    rng: random.Random | None = None,
+) -> Item:
     """Выдаёт конкретный уникальный предмет (патч 53, content/items/
     unique_items.json) — в обход item_gen целиком, как admin_service.
-    grant_admin_weapon. 100% power идёт в ОСНОВНОЙ стат класса получателя
-    (Сила/Ловкость/Интеллект), как у обычного оружия. Дубликаты не
-    ограничены — предмет выдаётся всегда, даже если такой уже есть
-    (задел на будущий крафт, см. текст патча)."""
+    grant_admin_weapon. Дубликаты не ограничены — предмет выдаётся всегда,
+    даже если такой уже есть.
+
+    Патч 72: статы РОЛЛЯТСЯ, а не кладутся все в основной стат класса. Суть
+    боссовой вещи — сырьё для крафта, но носить её можно, и два скальпеля не
+    должны быть одинаковыми. Перекос в основной стат при этом сохраняется,
+    иначе предмет перестал бы годиться как оружие.
+
+    craft_source_id проставляется здесь же: по нему мастерская находит
+    рецепт, причём и для уже скованного оружия — так перекрафт в соседнюю
+    специализацию не требует обратных рецептов на каждую пару."""
     unique_def = unique_items()[unique_id]
     primary_stat = bc.PRIMARY_STAT_BY_CLASS[character.base_class]
     item = Item(
         name=unique_def.name, slot=unique_def.slot,
-        base_stats={primary_stat: unique_def.power}, rarity=UNIQUE_RARITY_ID, ilvl=None,
+        base_stats=crafting.roll_boss_item_stats(
+            rng or random.Random(), unique_def.power, primary_stat
+        ),
+        rarity=UNIQUE_RARITY_ID, ilvl=None,
+        craft_source_id=unique_id if crafting.is_craftable(unique_id) else None,
     )
     db.add(item)
     await db.flush()
@@ -169,10 +184,15 @@ async def grant_unique_item(db: AsyncSession, character: Character, unique_id: s
 
 
 def is_unsellable(item: Item) -> bool:
-    """Служебные (admin_only) и уникальные (патч 53) предметы скупщик не
-    принимает никогда — единая точка проверки для sell_price/sell_item/
-    sell_by_rarity/sell_all_gear."""
-    return item.admin_only or item.rarity in (None, UNIQUE_RARITY_ID)
+    """Служебные (admin_only), уникальные (патч 53) и привязанные (патч 72)
+    предметы скупщик не принимает никогда — единая точка проверки для
+    sell_price/sell_item/sell_by_rarity/sell_all_gear.
+
+    Привязанное перечислено отдельно, хотя сейчас у скованного оружия и так
+    уникальная редкость: правило «привязанное не продаётся» принадлежит
+    крафту, а не редкости, и не должно молча сломаться, если редкость
+    когда-нибудь поменяют."""
+    return item.admin_only or item.bound or item.rarity in (None, UNIQUE_RARITY_ID)
 
 
 async def get_equipped(db: AsyncSession, character_id: int) -> dict[str, Item | None]:

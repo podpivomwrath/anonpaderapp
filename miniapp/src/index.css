@@ -333,3 +333,141 @@ body,
   align-items: center;
   gap: 4px;
 }
+
+/* --- Шторка разделов (патч 72) ------------------------------------------- */
+/* Нижний Tabbar заменён вертикальным списком: разделов стало больше, чем
+   помещается в ряд на телефоне, и седьмая вкладка сжимала подписи до
+   нечитаемых. Оформление намеренно минимальное - им займёмся отдельно. */
+
+.nav-scrim {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  z-index: 90;
+}
+
+.nav-drawer {
+  position: fixed;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  width: min(72vw, 260px);
+  padding: 56px 8px 16px;
+  overflow-y: auto;
+  background: var(--vkui--color_background_content, #fff);
+  box-shadow: 2px 0 16px rgba(0, 0, 0, 0.25);
+  z-index: 100;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.nav-drawer__item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 12px 14px;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.nav-drawer__item--active {
+  background: var(--vkui--color_background_secondary, rgba(0, 0, 0, 0.06));
+  font-weight: 600;
+}
+
+.nav-drawer__label {
+  flex: 1;
+}
+
+/* Слот под иконку: размер фиксирован заранее, чтобы при замене эмодзи на
+   картинку список не дёрнулся. */
+.nav-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  flex: 0 0 22px;
+}
+
+.nav-icon--emoji {
+  line-height: 1;
+}
+
+/* Таббара больше нет - место под него внизу резервировать не нужно. */
+.hub-content--drawer {
+  padding-bottom: 16px;
+}
+
+/* --- Мастерская ----------------------------------------------------------- */
+/* Полоски предрасположенности: игрок видит, КУДА целится специализация, но не
+   конкретные числа - иначе выбор превратился бы в арифметику. */
+
+.craft-lean {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  margin-top: 4px;
+}
+
+.craft-lean__row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.craft-lean__name {
+  flex: 0 0 86px;
+  font-size: 12px;
+  opacity: 0.75;
+}
+
+.craft-lean__track {
+  flex: 1;
+  height: 6px;
+  border-radius: 3px;
+  background: var(--vkui--color_background_secondary, rgba(0, 0, 0, 0.08));
+  overflow: hidden;
+}
+
+.craft-lean__fill {
+  display: block;
+  height: 100%;
+  border-radius: 3px;
+  background: var(--vkui--color_background_accent, #4986cc);
+}
+
+.craft-notice {
+  border-radius: 10px;
+  margin: 8px 12px;
+  padding: 10px 12px;
+  font-size: 14px;
+}
+
+.craft-notice--ok {
+  background: rgba(76, 175, 80, 0.14);
+}
+
+.craft-notice--bad {
+  background: rgba(229, 57, 53, 0.14);
+}
+
+.craft-hint {
+  margin: 8px 0 0;
+  font-size: 12px;
+  opacity: 0.7;
+}
+
+.inventory-actions {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}

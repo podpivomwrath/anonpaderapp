@@ -869,7 +869,9 @@ async def _grant_stage_clear_bonus(battle: RaidBattle) -> None:
         async with get_session_factory()() as db:
             scalpel_winner = battle.rng.choice(candidates)
             scalpel_winner = await db.get(Character, scalpel_winner.id)
-            scalpel = await item_service.grant_unique_item(db, scalpel_winner, rc.RAID_UNIQUE_ITEM_ID)
+            scalpel = await item_service.grant_unique_item(
+                db, scalpel_winner, rc.RAID_UNIQUE_ITEM_ID, battle.rng,
+            )
             peer_id = battle.participants[scalpel_winner.id].peer_id
             from services import raid_service
             await raid_service.finish_run(db, battle.run_id)

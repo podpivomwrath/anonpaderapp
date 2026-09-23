@@ -48,6 +48,27 @@ class Item(Base):
     # services/admin_service.py::grant_admin_weapon, себе же.
     admin_only: Mapped[bool] = mapped_column(Boolean, default=False)
 
+    # --- Крафт (патч 72) ---
+    # Из какого уникального предмета скован (ключ content/crafting/recipes.json).
+    # Нужен и для перекрафта: рецепт ищется по ИСТОЧНИКУ, а не по результату,
+    # поэтому оружие можно перековать в соседнюю специализацию, не заводя
+    # обратных рецептов на каждую пару.
+    craft_source_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    # tank | dps | support (craft_config.SPECS)
+    craft_spec: Mapped[str | None] = mapped_column(String(16), nullable=True)
+    # 80..120. Множитель к СУММЕ очков, см. game/economy/crafting.py.
+    craft_efficiency: Mapped[int | None] = mapped_column(nullable=True)
+    # Ролл на 100%. base_stats выше - он же, умноженный на craft_efficiency.
+    # Храним отдельно, иначе подъём по ступеням 80->90->...->120 был бы
+    # цепочкой округлений, и предмет, поднятый по лестнице, отличался бы от
+    # скованного сразу на 120 при одинаковой удаче в ролле.
+    craft_base_stats: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    # Сколько раз этот экземпляр уже перековывали - цена следующего
+    # перекрафта удваивается (craft_config.recraft_ore_cost).
+    craft_recrafts: Mapped[int] = mapped_column(default=0)
+    # Привязанное нельзя передать другому игроку и нельзя продать скупщику.
+    bound: Mapped[bool] = mapped_column(Boolean, default=False)
+
 
 class ItemUpgradeHistory(Base):
     """История попыток заточки/пробуждения (аудит + аналитика баланса).

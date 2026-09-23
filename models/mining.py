@@ -103,3 +103,29 @@ class MiningEvent(Base):
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), index=True
     )
+
+
+class CharacterCraftTool(Base):
+    """Расходник для подъёма эффективности крафченого оружия (патч 72).
+
+    Хранится не предметом в инвентаре, а счётчиком — как руда: инструмент
+    безымянный, отличается ровно одним числом (до какой ступени качает), и
+    заводить под это строку в items означало бы засорять инвентарь
+    десятком одинаковых записей.
+
+    ceiling — потолок, до которого инструмент способен поднять (90/100/110/
+    120). Применить его к ступени НИЖЕ потолка можно: расточительно, но
+    запрещать игроку тратить своё незачем.
+    """
+
+    __tablename__ = "character_craft_tools"
+    __table_args__ = (
+        UniqueConstraint("character_id", "ceiling", name="uq_craft_tool_char_ceiling"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    character_id: Mapped[int] = mapped_column(
+        ForeignKey("characters.id", ondelete="CASCADE"), index=True
+    )
+    ceiling: Mapped[int] = mapped_column()
+    count: Mapped[int] = mapped_column(BigInteger, default=0)

@@ -191,3 +191,28 @@ export function sendMountFromMap(mountId, x, y) {
     body: JSON.stringify({ mount_id: mountId, x, y }),
   });
 }
+
+// --- Мастерская (патч 72) ---
+
+export const getCraft = () => request('/craft');
+
+export const craftItem = (itemId, spec, oreId, grade) =>
+  request('/craft', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ item_id: itemId, spec, ore_id: oreId, grade }),
+  });
+
+export const craftTool = (oreId, grade) =>
+  request('/craft/tool', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ ore_id: oreId, grade }),
+  });
+
+export const upgradeCraft = (itemId, ceiling) =>
+  request('/craft/upgrade', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ item_id: itemId, ceiling }),
+  });

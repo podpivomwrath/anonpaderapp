@@ -12,6 +12,7 @@ from sqlalchemy.orm import selectinload
 
 from bot.app_keys import SESSION_FACTORY_KEY, SETTINGS_KEY
 from bot.miniapp_auth import VK_USER_ID_KEY
+from game.economy import crafting
 from bot.onboarding_texts import REGION_TITLES
 from config import Settings
 from game.content_loader import load_content
@@ -418,6 +419,13 @@ def _inventory_payload(items: list) -> dict:
                 "base_stats": item.base_stats,
                 "power": item_service.item_power(item),
                 "equipped": equipped,
+                # Патч 72: можно ли отнести в мастерскую и что с ним там уже
+                # сделали. Решает СЕРВЕР: клиент однажды уже пересказывал
+                # серверное правило своими словами и врал (патч 57).
+                "craftable": crafting.is_craftable(item.craft_source_id),
+                "craft_spec": item.craft_spec,
+                "craft_efficiency": item.craft_efficiency,
+                "bound": item.bound,
             }
             for item, equipped in items
         ]

@@ -20,7 +20,7 @@ from models.fishing import CharacterFish, CharacterFishRecord
 from models.group import Group, GroupInvite, GroupMember
 from models.item import Inventory, Item, ItemUpgradeHistory
 from models.lootbox import CharacterLootbox
-from models.mining import CharacterOre, MineVein, MiningEvent
+from models.mining import CharacterCraftTool, CharacterOre, MineVein, MiningEvent
 from models.mount import CharacterMount, MountTravel
 from models.promo import PromoActivation, PromoCode
 from models.pvp import PvpBattle
@@ -46,6 +46,7 @@ __all__ = [
     "CharacterFishRecord",
     "CharacterLootbox",
     "CharacterMount",
+    "CharacterCraftTool",
     "CharacterOre",
     "CharacterQuest",
     "CharacterSongFragment",
