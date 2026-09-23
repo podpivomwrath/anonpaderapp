@@ -413,8 +413,8 @@ function PlayerCard({ card, onRefresh }) {
 
       <Group header={<Header>Прогресс</Header>}>
         <StatRow label="Уровень" value={`${card.level} (опыт ${card.xp_to_next == null ? 'МАКС' : `${card.experience} / ${card.xp_to_next}`})`} />
-        <StatRow label="Класс" value={`${card.class_title}${card.subclass ? ` (${card.subclass})` : ''}`} />
-        <StatRow label="Регион" value={card.region || '-'} />
+        <StatRow label="Класс" value={card.class_title} />
+        <StatRow label="Регион" value={card.region_title || '-'} />
         <StatRow label="Позиция" value={`(${card.pos_x}; ${card.pos_y})`} />
         <StatRow label="Состояние" value={statusLabel(card)} />
       </Group>
@@ -452,7 +452,7 @@ function PlayerCard({ card, onRefresh }) {
         {card.inventory.map((item) => (
           <StatRow
             key={item.id}
-            label={`${item.equipped ? '✅ ' : ''}${item.name} (${item.slot}, ${item.rarity || '-'})`}
+            label={`${item.equipped ? '✅ ' : ''}${item.name} (${item.slot_title}, ${item.rarity_title || '-'})`}
             value={`ур. ${item.ilvl}`}
           />
         ))}
@@ -465,7 +465,7 @@ function PlayerCard({ card, onRefresh }) {
       <Group header={<Header>Маунты</Header>}>
         {card.mounts.length === 0 && <Div style={{ opacity: 0.7 }}>Маунтов нет.</Div>}
         {card.mounts.map((m) => (
-          <StatRow key={m.mount_id} label={`${m.emoji} ${m.name}`} value={m.rarity} />
+          <StatRow key={m.mount_id} label={`${m.emoji} ${m.name}`} value={m.rarity_title || m.rarity} />
         ))}
         {card.mount_travel && (
           <StatRow
@@ -478,7 +478,7 @@ function PlayerCard({ card, onRefresh }) {
       <Group header={<Header>Прогрессия контента</Header>}>
         <StatRow label="Текущий квест" value={card.current_quest || '-'} />
         {card.story_progress.map((s) => (
-          <StatRow key={s.region} label={`Сюжет: ${s.region}`} value={`акт ${s.act}, шаг ${s.quest_step ?? '-'} (${s.status})`} />
+          <StatRow key={s.region} label={`Сюжет: ${s.region_title || s.region}`} value={`акт ${s.act}, шаг ${s.quest_step ?? '-'} (${s.status})`} />
         ))}
         <StatRow label="Микробаффы" value={`${card.trial_progress.unlocked} / ${card.trial_progress.total}`} />
         <StatRow

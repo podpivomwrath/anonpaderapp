@@ -18,7 +18,7 @@ from bot.miniapp_auth import VK_USER_ID_KEY
 from config import Settings
 from game.world import grid
 from models import Character
-from services import admin_service, maintenance_service, mining_service, promo_service
+from services import admin_service, maintenance_service, mining_service, naming, promo_service
 from services import onboarding_service as onboarding_svc
 
 _rng = random.Random()
@@ -65,6 +65,7 @@ async def handle_get_search(request: web.Request) -> web.Response:
                 {
                     "id": c.id, "vk_id": vk_id, "name": c.name, "level": c.level,
                     "class_title": admin_service.class_title(c), "region": c.region,
+                    "region_title": naming.region_title(c.region),
                     "is_banned": c.is_banned,
                 }
             )

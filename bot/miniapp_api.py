@@ -13,6 +13,7 @@ from sqlalchemy.orm import selectinload
 from bot.app_keys import SESSION_FACTORY_KEY, SETTINGS_KEY
 from bot.miniapp_auth import VK_USER_ID_KEY
 from game.economy import crafting
+from services import naming
 from bot.onboarding_texts import REGION_TITLES
 from config import Settings
 from game.content_loader import load_content
@@ -74,6 +75,9 @@ def _character_payload(
         "base_class": character.base_class,
         "base_class_title": CLASS_TITLES.get(character.base_class, character.base_class),
         "subclass": character.subclass,
+        # Название резолвит СЕРВЕР (патч 73): раньше клиент показывал
+        # сырой id и в шапке висело «dark_mystic».
+        "subclass_title": naming.subclass_title(character.subclass),
         "region": character.region,
         "region_title": REGION_TITLES.get(character.region, "-") if character.region else "-",
         "level": character.level,

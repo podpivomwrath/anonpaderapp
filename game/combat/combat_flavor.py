@@ -72,3 +72,20 @@ def control_blocked_line(target_name: str) -> str:
     # Патч 47, баг 3: «был под контролем» — гендерное прошедшее время, заменено
     # на настоящее без согласования по роду.
     return f"{target_name} уже под контролем - новый эффект не наложен."
+
+
+def unimplemented_skill_line(actor_name: str, skill_id: str | None) -> str:
+    """Навык объявлен, но обработчика к нему нет.
+
+    Ветка страховочная — сейчас все навыки каталога обработаны, и тест это
+    удерживает. Но раньше здесь печаталось «умение «dark_mystic_ward» ещё не
+    реализовано (TODO: content)»: игроку показывали внутренний id и записку
+    разработчика. Если страховка всё же сработает, пусть выглядит как часть
+    игры, а не как утечка из исходников.
+    """
+    from game.combat.base_skills import BASE_SKILL_DEFS
+    from game.combat.subclass_skills import SUBCLASS_SKILL_DEFS
+
+    definition = BASE_SKILL_DEFS.get(skill_id) or SUBCLASS_SKILL_DEFS.get(skill_id)
+    name = definition.name if definition is not None else "приём"
+    return f"{actor_name} пытается применить «{name}», но ничего не выходит."

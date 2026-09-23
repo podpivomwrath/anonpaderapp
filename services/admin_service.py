@@ -56,7 +56,8 @@ from services import (
     wallet_service,
 )
 
-BASE_CLASS_TITLES = {"warrior": "Воин", "rogue": "Разбойник", "mage": "Маг"}
+from services import naming
+from services.naming import BASE_CLASS_TITLES  # единая точка названий (патч 73)
 
 
 def class_title(character: Character) -> str:
@@ -341,8 +342,10 @@ async def player_card(db: AsyncSession, character_id: int) -> dict | None:
         ),
         "base_class": character.base_class,
         "subclass": character.subclass,
+        "subclass_title": naming.subclass_title(character.subclass),
         "class_title": class_title(character),
         "region": character.region,
+        "region_title": naming.region_title(character.region),
         "pos_x": character.pos_x,
         "pos_y": character.pos_y,
         "is_dead": death_service.is_dead(character),
@@ -378,6 +381,8 @@ async def player_card(db: AsyncSession, character_id: int) -> dict | None:
         "inventory": [
             {
                 "id": item.id, "name": item.name, "slot": item.slot, "rarity": item.rarity,
+                "slot_title": naming.slot_title(item.slot),
+                "rarity_title": naming.rarity_title(item.rarity),
                 "ilvl": item.ilvl, "equipped": equipped, "stats": item.base_stats,
             }
             for item, equipped in inventory
@@ -386,11 +391,14 @@ async def player_card(db: AsyncSession, character_id: int) -> dict | None:
             {"id": d.id, "name": d.name, "emoji": d.emoji, "count": count} for d, count in elixirs
         ],
         "mounts": [
-            {"mount_id": m.mount_id, "name": m.name, "rarity": m.rarity, "emoji": m.emoji}
+            {"mount_id": m.mount_id, "name": m.name, "rarity": m.rarity, "emoji": m.emoji,
+             "rarity_title": naming.rarity_title(m.rarity)}
             for m in owned_mounts
         ],
         "story_progress": [
-            {"region": row.region, "act": row.act, "quest_step": row.quest_step, "status": row.status, "completed": row.completed}
+            {"region": row.region, "region_title": naming.region_title(row.region),
+             "act": row.act, "quest_step": row.quest_step, "status": row.status,
+             "completed": row.completed}
             for row in story_rows
         ],
         "current_quest": quest_line,

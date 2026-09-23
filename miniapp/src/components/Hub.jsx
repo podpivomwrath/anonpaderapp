@@ -188,7 +188,7 @@ export default function Hub() {
         </p>
         <p className="hub-banner__meta">
           {character.base_class_title}
-          {character.subclass ? ` · ${character.subclass}` : ''} · {character.region_title} · Ур.{' '}
+          {character.subclass_title ? ` · ${character.subclass_title}` : ''} · {character.region_title} · Ур.{' '}
           {character.level}
         </p>
         {character.farm_currency !== null && (

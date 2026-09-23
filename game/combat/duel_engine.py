@@ -311,7 +311,7 @@ class DuelEngine:
             # Патч 30, баг 3, п.3: лечебное зелье в PvP-дуэли — тратит ход,
             # как обычное действие (те же правила, что в PvE, патч 16).
             # Раньше ActionType.ITEM здесь не обрабатывался ВООБЩЕ — падал в
-            # ветку "TODO: content" ниже, зелье молча пропадало без эффекта.
+            # страховочную ветку ниже, зелье молча пропадало без эффекта.
             pct = ec.HEAL_PCT.get(action.item_id) if action.item_id else None
             if pct is not None:
                 amount = round(actor.max_hp * pct)
@@ -329,7 +329,7 @@ class DuelEngine:
             handler(ctx)
         else:
             result.lines.append(
-                f"{actor.name}: умение «{action.skill_id}» ещё не реализовано (TODO: content)"
+                combat_flavor.unimplemented_skill_line(actor.name, action.skill_id)
             )
 
         # Ход резолвится СРАЗУ — противник увидит результат перед своим ходом.

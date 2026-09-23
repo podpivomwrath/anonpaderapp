@@ -189,7 +189,7 @@ def _run_offensive(ctx: SkillContext, cid: int, action: DeclaredAction, session,
         OFFENSIVE_SKILLS[action.skill_id](ctx)
     elif action.type == ActionType.SKILL and action.skill_id not in DEFENSIVE_SKILLS:
         result.lines.append(
-            f"{ctx.actor.name}: умение «{action.skill_id}» ещё не реализовано (TODO: content)"
+            combat_flavor.unimplemented_skill_line(ctx.actor.name, action.skill_id)
         )
 
 
