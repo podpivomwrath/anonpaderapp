@@ -146,7 +146,7 @@ export default function CraftTab() {
         {data.items.map((row) => (
           <SimpleCell
             key={row.id}
-            before={<ItemIcon icon={row.icon} alt={row.name} />}
+            before={<ItemIcon icon={row.icon} rarity={row.rarity} alt={row.name} />}
             onClick={() => setItemId(row.id)}
             subtitle={`${statLine(row.stats)}${row.efficiency ? ` · ${row.efficiency}%` : ''}`}
             after={row.id === item.id ? '✓' : null}
@@ -190,12 +190,20 @@ export default function CraftTab() {
             {craftGroups.map((group) => (
               <div key={group.id}>
                 <SimpleCell
-                  before={<ItemIcon icon={`ore:${group.id}`} alt={group.name} />}
+                  before={
+                    <ItemIcon
+                      icon={`ore:${group.id}`}
+                      // Лучшая градация из имеющихся: строка вида целиком, и
+                      // свечение должно показывать, что в ней есть ценного.
+                      rarity={group.grades[group.grades.length - 1]?.grade}
+                      alt={group.name}
+                    />
+                  }
                   onClick={() => toggleOre(group.id)}
                   after={openOre === group.id ? '▴' : '▾'}
                   subtitle={`Всего ${group.total} · старт ${group.craft_efficiency}%`}
                 >
-                  {`${group.emoji} ${group.name}`}
+                  {group.name}
                 </SimpleCell>
                 {openOre === group.id && (
                   <div className="craft-expand">
@@ -293,7 +301,13 @@ export default function CraftTab() {
                 <SimpleCell
                   key={group.id}
                   multiline
-                  before={<ItemIcon icon={`ore:${group.id}`} alt={group.name} />}
+                  before={
+                    <ItemIcon
+                      icon={`ore:${group.id}`}
+                      rarity={group.grades[group.grades.length - 1]?.grade}
+                      alt={group.name}
+                    />
+                  }
                   after={
                     <Button
                       size="s"
@@ -309,7 +323,7 @@ export default function CraftTab() {
                       : `До ${group.tool_ceiling}% · всего ${group.total} - не хватает`
                   }
                 >
-                  {`${group.emoji} ${group.name}`}
+                  {group.name}
                 </SimpleCell>
               );
             })}

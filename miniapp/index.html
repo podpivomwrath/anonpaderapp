@@ -3,6 +3,17 @@
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <!-- Патч 79: Forum - римская антиква с родной кириллицей, только для
+         заголовков и имени персонажа. Списки остаются системным шрифтом:
+         антиква на 12 пикселях в длинном списке читается плохо, особенно
+         на Android. preconnect - чтобы подмена шрифта не тянулась.
+         Самохост был бы лучше (в вебвью ВК внешний запрос даёт вспышку),
+         но woff2 нужно положить в репозиторий руками. -->
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Forum&amp;display=swap"
+      rel="stylesheet"
+    />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <title>Монолит — Персонаж</title>
   </head>

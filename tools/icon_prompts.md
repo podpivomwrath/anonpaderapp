@@ -523,6 +523,17 @@ a mount called «Пепельный вестник», gaunt and ash-covered ridi
 ```
 
 
+## Фон приложения
+
+Одна картинка на весь мини-апп. Требования к ней необычные: её видно каждую секунду, и она НЕ должна спорить с текстом. Поэтому композиция широкая и почти пустая, детали собраны вверху (низ закроют списки), контраст низкий.
+
+**Фон — Монолит**
+
+```
+a wide vertical wallpaper for a dark fantasy game: a colossal black monolith standing far away in an ash plain under a heavy overcast sky, seen from below. Composition deliberately sparse: detail concentrated in the upper third, the lower two thirds are near-empty ash and haze so that interface panels can sit over them. Very low contrast, no focal point in the centre, muted palette of ash grey, rust brown and a single faint crimson glow at the monolith's base. Painterly, atmospheric, no characters, no text, no watermark, portrait 9:16
+```
+
+
 ## Иконки разделов мини-аппа
 
 Не предметы, а навигация — поэтому плоские и монохромные, иначе перетянут внимание с содержимого. Кладутся в miniapp/src/assets/icons/.

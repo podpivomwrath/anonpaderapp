@@ -443,6 +443,10 @@ def _inventory_payload(items: list) -> dict:
                 # сделали. Решает СЕРВЕР: клиент однажды уже пересказывал
                 # серверное правило своими словами и врал (патч 57).
                 "icon": naming.item_icon_key(item),
+                # Словом, а не только цветом: свечение рамки показывает
+                # редкость быстро, но различать оттенки умеют не все
+                # (патч 79).
+                "rarity_title": naming.rarity_title(item.rarity),
                 "craftable": crafting.is_craftable(item.craft_source_id),
                 "craft_spec": item.craft_spec,
                 "craft_efficiency": item.craft_efficiency,

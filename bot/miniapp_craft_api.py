@@ -60,6 +60,8 @@ def _item_payload(item: Item) -> dict:
         "name": item.name,
         "slot": item.slot,
         "icon": naming.item_icon_key(item),
+        # Редкость нужна интерфейсу для свечения рамки (патч 79).
+        "rarity": item.rarity,
         "stats": item.base_stats or {},
         "spec": item.craft_spec,
         "spec_title": cc.SPEC_TITLES.get(item.craft_spec) if item.craft_spec else None,

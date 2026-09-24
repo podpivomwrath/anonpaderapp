@@ -511,3 +511,115 @@ body {
   background: var(--vkui--color_background_secondary, rgba(0, 0, 0, 0.06));
   flex: 0 0 auto;
 }
+
+/* ===== Оформление (патч 79) ============================================== */
+
+/* Фон. Картинка лежит ПОД контентом отдельным фиксированным слоем, а не в
+   background-attachment: fixed — на iOS в вебвью ВК тот дёргается при
+   скролле. Затемнение НЕ глобальное: будь оно на весь экран, потемнели бы и
+   свободные места. Вместо него тёмную подложку несёт каждая панель, а в
+   промежутках между ними картинка видна как есть — ровно этого мы и хотели.
+
+   Пока файла нет, --app-bg пуст: слой просто невидим, ничего не ломается. */
+:root {
+  --app-bg: none;
+  --surface: rgba(18, 19, 21, 0.88);
+  --surface-soft: rgba(18, 19, 21, 0.72);
+}
+
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  background-image: var(--app-bg);
+  background-size: cover;
+  background-position: center top;
+  /* Виньетка по краям: без неё картинка спорит с текстом у границ экрана. */
+  box-shadow: inset 0 0 180px 60px #0e0f11;
+  pointer-events: none;
+}
+
+/* Панели притемняются сами. Прозрачность небольшая: задача не «показать
+   картинку сквозь список», а дать ей дышать в промежутках. */
+.hub-content .vkuiGroup,
+.hub-content .vkuiPlaceholder {
+  background: var(--surface);
+}
+
+.hub-content .vkuiGroup {
+  border-radius: 14px;
+  margin: 10px 8px;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.nav-drawer {
+  background: rgba(16, 17, 19, 0.96);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+
+/* Заголовки и имя персонажа — Forum. Списки остаются системным шрифтом:
+   антиква на 12 пикселях в длинном списке читается плохо. */
+.hub-banner__name,
+.hub-content .vkuiHeader__content,
+.vkuiPanelHeader__content {
+  font-family: Forum, 'Times New Roman', serif;
+  letter-spacing: 0.02em;
+}
+
+.hub-banner__name {
+  font-size: 23px;
+  font-weight: 400;
+}
+
+.hub-content .vkuiHeader__content {
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-size: 13px;
+  opacity: 0.75;
+}
+
+/* Шапка полупрозрачная — сквозь неё видно верх картинки, где у неё обычно
+   самое интересное. */
+.hub-banner {
+  background:
+    linear-gradient(160deg, rgba(58, 10, 18, 0.88) 0%, rgba(26, 5, 8, 0.94) 100%);
+}
+
+/* Цифры статов — табличные: иначе колонки прыгают при смене чисел. */
+.stat-row__value,
+.craft-lean__name,
+.hub-banner__meta {
+  font-variant-numeric: tabular-nums;
+}
+
+/* --- Редкость свечением рамки ------------------------------------------- */
+/* Цвет живёт на ПРЕДМЕТЕ, а не на подписи: имя остаётся читаемым, а взгляд
+   всё равно цепляется за нужную строку. У обычных вещей свечения нет вовсе -
+   обычное и должно выглядеть обычным. Оттенки те же, что у эмодзи в чате и
+   у акцентов в промтах иконок. */
+.item-icon--uncommon {
+  box-shadow: 0 0 0 1px #6c8db355, 0 0 8px -1px #6c8db366;
+}
+
+.item-icon--rare {
+  box-shadow: 0 0 0 1px #8b6cb355, 0 0 9px -1px #8b6cb377;
+}
+
+.item-icon--epic {
+  box-shadow: 0 0 0 1px #b8823f66, 0 0 11px -1px #b8823f88;
+}
+
+.item-icon--legendary {
+  box-shadow: 0 0 0 1px #c8a94a77, 0 0 13px -1px #c8a94a99;
+}
+
+.item-icon--unique {
+  box-shadow: 0 0 0 1px #c81e3a88, 0 0 15px -2px #c81e3aaa;
+}
+
+.item-icon--admin {
+  box-shadow: 0 0 0 1px #ffffff33;
+}

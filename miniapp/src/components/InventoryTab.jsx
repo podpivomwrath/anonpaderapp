@@ -26,6 +26,9 @@ function statsLine(baseStats) {
 
 function itemSubtitle(item) {
   const parts = [];
+  // Редкость словом. Эмодзи-кружок из названия убран (патч 79): цвет теперь
+  // несёт свечение рамки, а в подписи слово читается быстрее оттенка.
+  if (item.rarity_title) parts.push(item.rarity_title);
   if (item.craft_efficiency) parts.push(`${item.craft_efficiency}%`);
   else if (item.ilvl) parts.push(`ур. ${item.ilvl}`);
   const stats = statsLine(item.base_stats);
@@ -124,11 +127,11 @@ export default function InventoryTab({ onCharacterUpdate }) {
           <SimpleCell
             key={item.id}
             multiline
-            before={<ItemIcon icon={item.icon} alt={item.name} />}
+            before={<ItemIcon icon={item.icon} rarity={item.rarity} alt={item.name} />}
             after={craftButton(item)}
             subtitle={itemSubtitle(item)}
           >
-            {`${item.rarity_emoji} ${item.name}`}
+            {item.name}
           </SimpleCell>
         ))}
       </Group>
@@ -149,7 +152,7 @@ export default function InventoryTab({ onCharacterUpdate }) {
                   <SimpleCell
                     key={item.id}
                     multiline
-                    before={<ItemIcon icon={item.icon} alt={item.name} />}
+                    before={<ItemIcon icon={item.icon} rarity={item.rarity} alt={item.name} />}
                     subtitle={itemSubtitle(item)}
                     after={
                       <div className="inventory-actions">
@@ -164,7 +167,7 @@ export default function InventoryTab({ onCharacterUpdate }) {
                       </div>
                     }
                   >
-                    {`${item.rarity_emoji} ${item.name}`}
+                    {item.name}
                   </SimpleCell>
                 ))}
               </div>
