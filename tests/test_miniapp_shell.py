@@ -211,3 +211,22 @@ def test_map_is_not_squeezed_by_the_column_cap() -> None:
     assert "hub-content--wide" in hub, "карта должна просить себе широкую колонку"
     assert "'map'" in hub
     assert ".hub-content--wide" in css, "модификатор ширины не описан в стилях"
+
+
+def test_centred_columns_keep_a_definite_width() -> None:
+    """Ловушка flex: авто-отступы по горизонтали ОТМЕНЯЮТ растягивание.
+
+    .vkuiPanel__in - flex-колонка, а .hub-banner/.hub-content в ней
+    flex-элементы. С `margin-left/right: auto` их ширина начинает считаться
+    по содержимому. Спискам это сошло с рук (текст даёт ширину), а карта
+    исчезла целиком: её сетка рисуется абсолютно позиционированными
+    клетками, которые в расчёт ширины не входят, и колонка схлопнулась в
+    ноль. Поэтому рядом с auto-отступами обязан стоять width.
+    """
+    css = (MINIAPP / "src" / "index.css").read_text(encoding="utf-8")
+    for match in re.finditer(r"\{([^{}]*margin-left:\s*auto[^{}]*)\}", css):
+        block = match.group(1)
+        assert "width: 100%" in block or "width:100%" in block, (
+            "блок центруется авто-отступами без явной ширины - в flex-колонке "
+            f"он схлопнется по содержимому: {block.strip()[:90]}"
+        )
