@@ -1,9 +1,5 @@
 /* СГЕНЕРИРОВАНО: python tools/icon_assets.py — править нечего. */
 
-:root {
-  --app-bg: url('./assets/bg-mobile.webp');
-}
-
 @media (min-width: 720px) {
   :root {
     --app-bg: url('./assets/bg-wide.webp');

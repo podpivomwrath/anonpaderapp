@@ -80,17 +80,19 @@ def test_background_css_is_always_present() -> None:
     assert "background.css" in (MINIAPP / "src" / "main.jsx").read_text(encoding="utf-8")
 
 
-def test_wide_background_overrides_the_mobile_one() -> None:
-    """Обе строки обязаны лежать в ОДНОМ файле: когда выбор по ширине жил в
-    index.css, а картинки - в background.css, правило из подключённого позже
-    файла перебивало медиазапрос, и на ПК оставался телефонный фон."""
+def test_background_is_desktop_only() -> None:
+    """Патч 84: на телефоне фона нет вовсе.
+
+    Список там занимает почти весь экран, свободного места под картинку не
+    остаётся, а сама сцена очень тёмная - разглядывать было нечего, зато вес
+    и лишний запрос были. На ПК колонка ограничена, по бокам остаются поля.
+    """
     css = (MINIAPP / "src" / "background.css").read_text(encoding="utf-8")
     if "--app-bg" not in css:
-        pytest.skip("фоны ещё не сгенерированы")
-    mobile = css.find("--app-bg:")
-    wide = css.rfind("--app-bg:")
-    assert "min-width" in css, "широкий фон должен подключаться медиазапросом"
-    assert wide > mobile, "широкий фон обязан идти вторым, иначе он не переопределит"
+        pytest.skip("фон ещё не сгенерирован")
+    assert "min-width" in css, "фон обязан подключаться только на широком экране"
+    before_media = css[: css.index("@media")]
+    assert "--app-bg" not in before_media, "вне медиазапроса фона быть не должно"
 
 
 def test_background_layer_sits_below_content_without_negative_z() -> None:
