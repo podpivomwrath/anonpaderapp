@@ -1,0 +1,343 @@
+"""Промты для генерации иконок — СОБИРАЮТСЯ ИЗ КОНТЕНТА (патч 75).
+
+Запуск:  python tools/icon_prompts.py > tools/icon_prompts.md
+
+Зачем генератор, а не написанный руками список: предметы добавляются каждый
+патч (шесть руд, восемнадцать рыб, три результата крафта — и это за последний
+месяц). Список, набранный вручную, разошёлся бы с игрой на первой же новой
+рыбе, и заметили бы это только по пропавшей иконке.
+
+Лор берётся из самого контента: у руды и уникальных вещей есть описания, и
+они дают художнику куда больше, чем название. Где описания нет, подставляется
+короткая формулировка по типу предмета.
+
+Промты на английском: модели генерации изображений понимают его заметно
+точнее. Названия в заголовках оставлены русскими, чтобы список было удобно
+листать.
+"""
+
+import json
+import sys
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parent.parent
+CONTENT = ROOT / "content"
+
+# Общий стилевой хвост. Дописывается к КАЖДОМУ промту — иначе иконки выйдут
+# из разных миров: одна мультяшная, другая фотографическая. Мир игры —
+# пепел, ржавчина, кровь и Монолит, поэтому палитра приглушённая.
+STYLE = (
+    "dark fantasy game item icon, single object centered, slight 3/4 angle, "
+    "painterly semi-realistic, muted desaturated palette of ash grey, rust brown "
+    "and dried blood, weathered and worn surfaces, soft rim light from the upper "
+    "left, deep neutral background, no text, no watermark, no border, "
+    "square 1:1 composition, crisp readable silhouette at small size"
+)
+
+# Акцентный цвет по редкости/тиру. Один и тот же язык цвета во всей игре:
+# эмодзи в чате, полоски в мини-аппе и иконки должны совпадать.
+ACCENT = {
+    1: "cold off-white accents",
+    2: "pale steel-blue accents",
+    3: "muted violet accents",
+    4: "burnt amber accents",
+    5: "deep crimson accents, faint inner glow",
+    6: "deep crimson accents, unsettling inner glow",
+}
+
+RARITY_ACCENT = {
+    "common": ACCENT[1],
+    "uncommon": ACCENT[2],
+    "rare": ACCENT[3],
+    "epic": ACCENT[4],
+    "legendary": "pale gold accents, faint inner glow",
+    "unique": "deep crimson accents, strong inner glow",
+    "admin": "flat neutral grey, deliberately plain",
+}
+
+SLOT_HINT = {
+    "weapon": "a weapon held by an adventurer",
+    "helmet": "a piece of head armour",
+    "armor": "a torso armour piece",
+    "legs": "leg armour",
+    "boots": "footwear",
+}
+
+
+def load(name: str):
+    return json.loads((CONTENT / name).read_text(encoding="utf-8"))
+
+
+def clean(node: dict) -> dict:
+    return {k: v for k, v in node.items() if not k.startswith("_")}
+
+
+def prompt(subject: str, accent: str, extra: str = "") -> str:
+    parts = [subject.rstrip(". "), accent]
+    if extra:
+        parts.append(extra.rstrip(". "))
+    parts.append(STYLE)
+    return ", ".join(parts)
+
+
+def section(title: str, note: str = "") -> None:
+    print(f"\n## {title}\n")
+    if note:
+        print(f"{note}\n")
+
+
+def entry(label: str, text: str) -> None:
+    print(f"**{label}**\n")
+    print("```")
+    print(text)
+    print("```\n")
+
+
+def first_sentence(text: str, limit: int = 160) -> str:
+    text = (text or "").strip().replace("\n", " ")
+    return text[:limit]
+
+
+# --- Разделы --------------------------------------------------------------------
+
+
+def equipment() -> None:
+    section(
+        "Экипировка — базы по слотам",
+        "На каждую базу нужна одна иконка. Редкость поверх неё даётся цветом "
+        "рамки или свечения (см. раздел «Редкости»), перерисовывать предмет "
+        "под каждую из пяти редкостей не нужно.",
+    )
+    bases = clean(load("items/bases.json"))
+    for slot, rows in bases.items():
+        for row in rows:
+            entry(
+                f"{row['name']} ({slot})",
+                prompt(
+                    f"{SLOT_HINT.get(slot, 'a piece of equipment')} called «{row['name']}», "
+                    "battered and field-repaired, scavenged look",
+                    ACCENT[1],
+                ),
+            )
+
+
+def rarities() -> None:
+    section(
+        "Редкости — рамки",
+        "Рисуются один раз и накладываются на любую иконку предмета. "
+        "Тот же язык цвета, что у эмодзи в чате.",
+    )
+    for rarity_id, row in clean(load("items/rarities.json")).items():
+        entry(
+            f"{row['emoji']} {row['name']}",
+            prompt(
+                "empty square item frame for an inventory slot, ornate but restrained "
+                "metal edging, hollow centre",
+                RARITY_ACCENT.get(rarity_id, ACCENT[1]),
+                "the frame is the only subject, nothing inside it",
+            ),
+        )
+
+
+def elixirs() -> None:
+    section(
+        "Эликсиры",
+        "Общая форма склянки должна читаться как одна серия: различаются "
+        "содержимым, пробкой и цветом.",
+    )
+    for row in load("items/elixirs.json"):
+        entry(
+            f"{row['emoji']} {row['name']}",
+            prompt(
+                f"small glass vial of an alchemical draught called «{row['name']}», "
+                f"hand-blown uneven glass, wax-sealed stopper, cloth label. "
+                f"Effect: {first_sentence(row['description'])}",
+                ACCENT[3],
+                "the liquid inside visually hints at the effect",
+            ),
+        )
+
+
+def trophies() -> None:
+    section("Трофеи", "Выпадают с мобов, копятся стаками — читаемость в мелком размере важнее детализации.")
+    rows = load("trophies.json")
+    rows = rows if isinstance(rows, list) else list(clean(rows).values())
+    for i, row in enumerate(rows, start=1):
+        entry(
+            f"{row.get('emoji','')} {row['name']}",
+            prompt(
+                f"a grim trophy called «{row['name']}», a small organic-mineral fragment "
+                "taken from a slain creature, resting on nothing",
+                ACCENT.get(min(i, 5), ACCENT[1]),
+            ),
+        )
+
+
+def ores() -> None:
+    section("Руда", "У каждой породы есть описание в контенте — оно и задаёт вид.")
+    for row in load("mining/ores.json"):
+        entry(
+            f"{row['emoji']} {row['name']} (тир {row['tier']})",
+            prompt(
+                f"a raw ore chunk called «{row['name']}». {first_sentence(row.get('description'))}",
+                ACCENT.get(row["tier"], ACCENT[1]),
+                "rough unworked mineral, freshly broken facets",
+            ),
+        )
+
+
+def fish() -> None:
+    section(
+        "Рыба",
+        "Вид сбоку, как в определителе: так силуэты не сливаются между собой.",
+    )
+    for row in load("fishing/fish.json"):
+        entry(
+            f"{row.get('emoji','')} {row['name']} (тир {row['tier']})",
+            prompt(
+                f"a freshwater fish called «{row['name']}», full body side view, "
+                "wet scales, caught and lifeless",
+                ACCENT.get(row["tier"], ACCENT[1]),
+                "anatomically plausible but subtly wrong, as if the water it came from is sick",
+            ),
+        )
+
+
+def uniques_and_craft() -> None:
+    section(
+        "Рейдовые и крафченые",
+        "Три результата ковки должны читаться как переделки ОДНОГО скальпеля: "
+        "общая рукоять, разное полотно.",
+    )
+    for row in clean(load("items/unique_items.json")).values():
+        entry(
+            row["name"],
+            prompt(
+                f"a unique surgical weapon called «{row['name']}». {first_sentence(row.get('flavor'))}",
+                RARITY_ACCENT["unique"],
+                "clearly a medical instrument repurposed as a weapon",
+            ),
+        )
+    for recipe in clean(load("crafting/recipes.json")).values():
+        for spec, out in recipe["outputs"].items():
+            entry(
+                f"{out['name']} ({spec}, из «{recipe['source_name']}»)",
+                prompt(
+                    f"a reforged surgical weapon called «{out['name']}». "
+                    f"{first_sentence(out.get('flavor'))}",
+                    RARITY_ACCENT["unique"],
+                    f"visibly reforged from «{recipe['source_name']}» — same handle wrapping, "
+                    "different blade",
+                ),
+            )
+
+
+def tools() -> None:
+    section(
+        "Инструменты мастерской",
+        "Расходник, поднимающий эффективность на ступень. Отличаются только "
+        "потолком, поэтому различать их стоит материалом и числом клейм.",
+    )
+    sys.path.insert(0, str(ROOT))
+    from game.economy import craft_config as cc
+
+    ladder = sorted(set(cc.TOOL_CEILING_BY_ORE_TIER.values()))
+    for i, ceiling in enumerate(ladder, start=1):
+        entry(
+            f"Инструмент до {ceiling}%",
+            prompt(
+                "a blacksmith's finishing tool: a hand punch and file bound together, "
+                f"single-use, stamped with {i} mark(s)",
+                ACCENT.get(min(i + 1, 5), ACCENT[2]),
+                "clearly consumable — already half worn out",
+            ),
+        )
+
+
+def misc() -> None:
+    section("Прочее")
+    entry(
+        "🗝 Ключ Монолита",
+        prompt(
+            "an ancient key to a sealed place called the Monolith, oversized and heavy, "
+            "cast from dark stone rather than metal, warm to the touch",
+            ACCENT[5],
+        ),
+    )
+    chest = load("lootbox/ashen_chest.json")
+    for row in chest:
+        entry(
+            f"{row.get('emoji','')} Пепельный сундук — {row['name']}",
+            prompt(
+                f"a small looted chest, «{row['name']}» grade, lid ajar, ash spilling out",
+                ACCENT.get(min(chest.index(row) + 1, 5), ACCENT[1]),
+            ),
+        )
+    for path in sorted((CONTENT / "mounts").glob("*.json")):
+        rows = json.loads(path.read_text(encoding="utf-8"))
+        rows = rows if isinstance(rows, list) else list(clean(rows).values())
+        for row in rows:
+            entry(
+                f"Маунт — {row['name']}",
+                prompt(
+                    f"a mount called «{row['name']}», gaunt and ash-covered riding beast, "
+                    "side view, saddled",
+                    ACCENT[4],
+                    "ridden hard for a long time",
+                ),
+            )
+
+
+def sections_ui() -> None:
+    section(
+        "Иконки разделов мини-аппа",
+        "Не предметы, а навигация — поэтому плоские и монохромные, иначе "
+        "перетянут внимание с содержимого. Кладутся в miniapp/src/assets/icons/.",
+    )
+    sys.path.insert(0, str(ROOT))
+    titles = {
+        "character": "a masked face in profile",
+        "dailies": "a rolled parchment with a wax seal",
+        "inventory": "a worn travel satchel",
+        "craft": "a smith's hammer crossed with tongs",
+        "map": "a folded map with a route drawn on it",
+        "tops": "a simple laurel wreath around a numeral one",
+        "exchange": "two arrows curving into each other",
+        "admin": "a plain shield",
+    }
+    for key, subject in titles.items():
+        entry(
+            f"{key}.svg",
+            f"{subject}, flat monochrome UI icon, single weight line art, "
+            "no fill, no gradient, no text, square 1:1, centred with even padding, "
+            "legible at 22x22 pixels",
+        )
+
+
+def main() -> None:
+    print("# Промты для генерации иконок\n")
+    print(
+        "Собрано из контента игры: `python tools/icon_prompts.py > tools/icon_prompts.md`.\n"
+        "После добавления предметов перегенерировать — руками список разойдётся "
+        "с игрой на первой же новой вещи.\n"
+    )
+    print(
+        "Промты на английском: модели генерации понимают его точнее. "
+        "Общий стилевой хвост дописан к каждому — без него набор выйдет "
+        "из разных миров.\n"
+    )
+    equipment()
+    rarities()
+    elixirs()
+    trophies()
+    ores()
+    fish()
+    uniques_and_craft()
+    tools()
+    misc()
+    sections_ui()
+
+
+if __name__ == "__main__":
+    sys.stdout.reconfigure(encoding="utf-8")
+    main()

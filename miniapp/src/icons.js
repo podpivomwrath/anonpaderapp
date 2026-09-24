@@ -16,12 +16,12 @@
 //   2. заменить здесь  src: null  на  src: new URL('./assets/icons/<id>.svg', import.meta.url).href
 // Эмодзи оставляем как запасной вариант: он же виден, пока картинка грузится.
 export const SECTION_ICONS = {
-  character: { emoji: '🎭', src: null },
-  dailies: { emoji: '📜', src: null },
-  inventory: { emoji: '🎒', src: null },
-  craft: { emoji: '🔨', src: null },
-  map: { emoji: '🗺️', src: null },
-  tops: { emoji: '🏆', src: null },
-  exchange: { emoji: '💱', src: null },
-  admin: { emoji: '🛡️', src: null },
+  character: { emoji: '🎭', src: new URL('./assets/icons/character.svg', import.meta.url).href },
+  dailies: { emoji: '📜', src: new URL('./assets/icons/dailies.svg', import.meta.url).href },
+  inventory: { emoji: '🎒', src: new URL('./assets/icons/inventory.svg', import.meta.url).href },
+  craft: { emoji: '🔨', src: new URL('./assets/icons/craft.svg', import.meta.url).href },
+  map: { emoji: '🗺️', src: new URL('./assets/icons/map.svg', import.meta.url).href },
+  tops: { emoji: '🏆', src: new URL('./assets/icons/tops.svg', import.meta.url).href },
+  exchange: { emoji: '💱', src: new URL('./assets/icons/exchange.svg', import.meta.url).href },
+  admin: { emoji: '🛡️', src: new URL('./assets/icons/admin.svg', import.meta.url).href },
 };

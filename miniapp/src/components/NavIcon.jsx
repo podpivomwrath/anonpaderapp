@@ -1,22 +1,28 @@
 import { SECTION_ICONS } from '../icons.js';
 
 /**
- * Слот под иконку раздела. Пока рисует эмодзи, но переключится на
- * картинку сам, как только в src/icons.js появится путь - размер
- * зарезервирован заранее, чтобы список не дёрнулся при подмене.
+ * Иконка раздела. Пока в манифесте нет файла - рисуется эмодзи.
+ *
+ * Файл подставляется CSS-маской, а не тегом <img>: в <img> внешний SVG не
+ * видит currentColor и остаётся того цвета, каким его сохранили - в тёмной
+ * теме иконки были бы чёрными пятнами. Маска же красится background-ом,
+ * то есть наследует цвет текста и активного пункта сама.
  */
 export default function NavIcon({ id, size = 22 }) {
   const icon = SECTION_ICONS[id];
   if (!icon) return null;
   if (icon.src) {
     return (
-      <img
-        className="nav-icon"
-        src={icon.src}
-        alt=""
+      <span
+        className="nav-icon nav-icon--mask"
         aria-hidden="true"
-        width={size}
-        height={size}
+        style={{
+          width: size,
+          height: size,
+          flexBasis: size,
+          maskImage: `url(${icon.src})`,
+          WebkitMaskImage: `url(${icon.src})`,
+        }}
       />
     );
   }

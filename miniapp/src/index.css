@@ -485,3 +485,16 @@ body,
   padding-bottom: 6px;
   min-height: 0;
 }
+
+/* Иконка-маска (патч 75): цвет берётся из background, значит наследует тему
+   и подсветку активного пункта. Через <img> внешний SVG про currentColor не
+   знает и остался бы чёрным в тёмной теме. */
+.nav-icon--mask {
+  background-color: currentColor;
+  mask-repeat: no-repeat;
+  mask-position: center;
+  mask-size: contain;
+  -webkit-mask-repeat: no-repeat;
+  -webkit-mask-position: center;
+  -webkit-mask-size: contain;
+}
