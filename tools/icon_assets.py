@@ -56,12 +56,43 @@ SKIP_PREFIXES = ("nav:",)
 
 #: Фоны обрабатываются отдельно: это не иконки в списке, а подложка на весь
 #: экран, и ужимать её до 128 пикселей нельзя. Ключ -> (файл, ширина).
+#: Третий элемент - имя исходника. Фоны ищутся не только по промту:
+#: телефонный сгенерирован по ПЕРЕПИСАННОМУ тексту («используй landscape как
+#: референс»), и по началу строки его не найти. Фонов всего два, имена у них
+#: говорящие, поэтому явная привязка честнее любой эвристики.
 BACKGROUNDS = {
-    "bg:app": ("bg-mobile.webp", 900),
-    "bg:app_wide": ("bg-wide.webp", 1600),
+    "bg:app": ("bg-mobile.webp", 900, "фон_монолит_телефон_9x16.png"),
+    "bg:app_wide": ("bg-wide.webp", 1600, "фон_монолит_пк_16x9.png"),
 }
 BG_OUT = ROOT / "miniapp" / "src" / "assets"
 BG_CSS = ROOT / "miniapp" / "src" / "background.css"
+
+
+def load_manifests() -> list[dict]:
+    """Все описи в img/: и общая, и отдельные, вроде той, что пришла с фонами."""
+    rows: list[dict] = []
+    for path in sorted(SRC.glob("*.json")):
+        data = json.loads(path.read_text(encoding="utf-8"))
+        if isinstance(data, list):
+            rows += [row for row in data if isinstance(row, dict) and row.get("filename")]
+    return rows
+
+
+def find(by_prompt: dict[str, dict], prompt: str) -> dict | None:
+    """Наш промт либо совпадает целиком, либо является НАЧАЛОМ записанного.
+
+    Генератор дописывает к промту свои требования, и точное сравнение после
+    этого не сходится. Сравнение по началу это переживает, а чужую картинку
+    всё равно не подставит: начало у каждого предмета своё.
+    """
+    prompt = prompt.strip()
+    exact = by_prompt.get(prompt)
+    if exact is not None:
+        return exact
+    for recorded, row in by_prompt.items():
+        if recorded.startswith(prompt):
+            return row
+    return None
 
 
 def entries() -> list[dict]:
@@ -80,11 +111,10 @@ def entries() -> list[dict]:
 
 
 def main() -> None:
-    manifest = json.loads((SRC / "manifest.json").read_text(encoding="utf-8"))
+    manifest = load_manifests()
     # Ключ поиска - ТЕКСТ ПРОМТА. Он выводится из самого предмета, поэтому
     # переживает любую перестановку разделов; индекс не пережил и первой.
     by_prompt = {row.get("prompt", "").strip(): row for row in manifest}
-    by_index = {row["index"]: row for row in manifest}
 
     OUT.mkdir(parents=True, exist_ok=True)
     for stale in OUT.glob("*.webp"):
@@ -99,15 +129,12 @@ def main() -> None:
         key = record["key"]
         if key is None or key.startswith(SKIP_PREFIXES):
             continue
-        row = by_prompt.get(record["prompt"].strip())
-        if row is None:
-            # Запасной вариант для манифестов, собранных до того, как промт
-            # стал ключом. Если и он промахнётся - лучше пропустить, чем
-            # поставить чужую картинку.
-            candidate = by_index.get(record["index"])
-            if candidate is not None and candidate.get("prompt", "").strip() == record["prompt"].strip():
-                row = candidate
-        if row is None or row.get("status") != "generated":
+        row = find(by_prompt, record["prompt"])
+        if row is None and key in BACKGROUNDS:
+            hint = BACKGROUNDS[key][2]
+            if (SRC / hint).exists():
+                row = {"filename": hint}
+        if row is None or row.get("status", "generated") != "generated":
             missing.append(f"{key} ({record['label']})")
             continue
         source = SRC / row["filename"]
@@ -116,7 +143,7 @@ def main() -> None:
             continue
 
         if key in BACKGROUNDS:
-            name, width = BACKGROUNDS[key]
+            name, width, _hint = BACKGROUNDS[key]
             with Image.open(source) as image:
                 image = image.convert("RGB")
                 # Только по ширине: высоту режет CSS (cover), а вот
@@ -165,10 +192,13 @@ def write_backgrounds(found: dict[str, str]) -> None:
     if "bg:app" in found:
         lines += [":root {", f"  --app-bg: url('./assets/{found['bg:app']}');", "}", ""]
     if "bg:app_wide" in found:
+        # Идёт ВТОРОЙ и переопределяет --app-bg напрямую: разносить выбор по
+        # двум файлам уже пробовали, и правило из подключённого позже файла
+        # перебивало медиазапрос из подключённого раньше.
         lines += [
             "@media (min-width: 720px) {",
             "  :root {",
-            f"    --app-bg-wide: url('./assets/{found['bg:app_wide']}');",
+            f"    --app-bg: url('./assets/{found['bg:app_wide']}');",
             "  }",
             "}",
             "",
