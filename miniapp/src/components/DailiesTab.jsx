@@ -9,21 +9,9 @@ const SECTIONS = [
   { id: 'login', label: 'Вход' },
 ];
 
-function rewardText(reward) {
-  if (!reward) return '';
-  const parts = [];
-  if (reward.gold) parts.push(`${reward.gold} золота`);
-  if (reward.gems) parts.push(`💎 ${reward.gems} самоцветов`);
-  if (reward.elixir) {
-    const [elixirId, count] = reward.elixir;
-    parts.push(`${elixirId} ×${count}`);
-  }
-  if (reward.elixirs_random_combat) {
-    parts.push(`${reward.elixirs_random_combat} случайных боевых эликсира (по 2 шт.)`);
-  }
-  if (reward.title) parts.push(`титул «${reward.title}»`);
-  return parts.join(', ');
-}
+// Патч 78: локальный сборщик строки награды убран - он печатал сырой id
+// («heal_small ×3»). Текст приходит с сервера готовым, как и всё остальное
+// форматирование (патч 73: формат принадлежит серверу).
 
 function StoryTab({ story }) {
   return (
@@ -116,7 +104,7 @@ function DailyQuestsTab({ dailies }) {
           <p>🔥 Стрик ежедневок: {dailies.daily_streak} дней</p>
           {dailies.next_milestone_day && (
             <p style={{ opacity: 0.8 }}>
-              Следующий рубеж: день {dailies.next_milestone_day} - {rewardText(dailies.next_milestone_reward)}
+              Следующий рубеж: день {dailies.next_milestone_day} - {dailies.next_milestone_reward_text}
             </p>
           )}
           <p style={{ opacity: 0.8 }}>
@@ -138,6 +126,7 @@ function LoginCycleTab({ login }) {
           {Array.from({ length: login.cycle_length }, (_, i) => i + 1).map((day) => (
             <div
               key={day}
+              title={login.rewards_text?.[day] || ''}
               style={{
                 width: 28,
                 height: 28,
@@ -156,7 +145,7 @@ function LoginCycleTab({ login }) {
         </div>
         {login.today_reward && (
           <p style={{ opacity: 0.8 }}>
-            Награда дня: {rewardText(login.today_reward)} ({login.claimed_today ? 'уже получена сегодня' : 'будет выдана автоматически'})
+            Награда дня: {login.today_reward_text} ({login.claimed_today ? 'уже получена сегодня' : 'будет выдана автоматически'})
           </p>
         )}
       </Div>

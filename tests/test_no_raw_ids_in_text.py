@@ -125,3 +125,51 @@ def test_every_skill_has_a_handler() -> None:
     declared = set(BASE_SKILL_DEFS) | set(SUBCLASS_SKILL_DEFS)
     handled = set(OFFENSIVE_SKILLS) | set(DEFENSIVE_SKILLS)
     assert not declared - handled, f"навыки без обработчика: {sorted(declared - handled)}"
+
+
+# --- Награды (патч 78) ------------------------------------------------------------
+
+
+def test_reward_preview_resolves_the_elixir_name() -> None:
+    """В «Заданиях» висело «heal_small ×3»: мини-апп собирал строку награды
+    сам и печатал внутренний id."""
+    from bot import dailies_texts
+
+    text = dailies_texts.reward_preview({"elixir": ["heal_small", 3]})
+    assert "heal_small" not in text
+    assert "Малое исцеление" in text
+    assert "×3" in text
+
+
+def test_reward_preview_resolves_a_title() -> None:
+    from bot import dailies_texts
+    from services import title_service
+
+    any_title = next(iter(title_service.TITLE_NAMES), None)
+    if any_title is None:
+        pytest.skip("в игре пока нет титулов")
+    text = dailies_texts.reward_preview({"title": any_title})
+    assert any_title not in text
+
+
+def test_reward_preview_handles_nothing() -> None:
+    from bot import dailies_texts
+
+    assert dailies_texts.reward_preview(None) == ""
+    assert dailies_texts.reward_preview({}) == ""
+
+
+def test_miniapp_does_not_format_rewards_itself() -> None:
+    """Формат принадлежит серверу. Клиент, собиравший строку награды сам,
+    уже однажды разошёлся с ним и показал игроку id."""
+    offenders = []
+    for path in _jsx_files():
+        if path.name == "AdminTab.jsx":
+            # Редактор промокодов показывает id, который админ ТОЛЬКО ЧТО ввёл
+            # в поле. Резолвить его там нельзя: опечатка стала бы невидимой.
+            continue
+        text = path.read_text(encoding="utf-8")
+        for needle in ("reward.elixir", "reward.gold", "reward.gems"):
+            if needle in text:
+                offenders.append(f"{path.name}: собирает награду сам ({needle})")
+    assert not offenders, "\n".join(offenders)

@@ -11,6 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from bot.app_keys import SESSION_FACTORY_KEY, SETTINGS_KEY
+from bot import dailies_texts
 from bot.miniapp_auth import VK_USER_ID_KEY
 from game.economy import crafting
 from services import naming
@@ -382,6 +383,12 @@ async def handle_get_dailies(request: web.Request) -> web.Response:
                     "daily_streak": overview.daily_streak,
                     "next_milestone_day": overview.next_milestone_day,
                     "next_milestone_reward": overview.next_milestone_reward,
+                    # Готовая строка, а не сырая награда: собирать её на
+                    # клиенте однажды уже пробовали - получалось
+                    # «heal_small ×3» (патч 78).
+                    "next_milestone_reward_text": dailies_texts.reward_preview(
+                        overview.next_milestone_reward
+                    ),
                     "seconds_until_reset": overview.seconds_until_reset,
                     "lootbox_history": [
                         {
@@ -402,8 +409,17 @@ async def handle_get_dailies(request: web.Request) -> web.Response:
                     "cycle_day": login_state.cycle_day,
                     "cycle_length": login_state.cycle_length,
                     "today_reward": login_state.today_reward,
+                    "today_reward_text": dailies_texts.reward_preview(
+                        login_state.today_reward
+                    ),
                     "claimed_today": login_state.claimed_today,
                     "rewards": login_state.rewards,
+                    # Что даёт каждый день цикла - подписью к клеткам
+                    # календаря. Данные и так уходили, просто не читались.
+                    "rewards_text": {
+                        str(day): dailies_texts.reward_preview(reward)
+                        for day, reward in login_state.rewards.items()
+                    },
                 },
             }
         )

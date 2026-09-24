@@ -23,7 +23,15 @@ def progress_notice(result: DailyProgressResult) -> str | None:
     return progress_notice_from(result.completed, result.streak_notice)
 
 
-def _reward_preview(reward: dict) -> str:
+def reward_preview(reward: dict | None) -> str:
+    """Человеческое описание награды: «🧪 Малое исцеление ×3».
+
+    Публичная, потому что этим же занимается мини-апп. Раньше он
+    форматировал награду сам и печатал «heal_small ×3» - сырой id прямо
+    игроку. Правило прежнее (патч 73): формат принадлежит СЕРВЕРУ.
+    """
+    if not reward:
+        return ""
     parts = []
     if "gold" in reward:
         parts.append(f"{reward['gold']} золота")
@@ -53,7 +61,7 @@ def dailies_overview_text(overview: DailiesOverview) -> str:
     if overview.next_milestone_day is not None:
         lines.append(
             f"Следующий рубеж: день {overview.next_milestone_day} - "
-            f"{_reward_preview(overview.next_milestone_reward)}"
+            f"{reward_preview(overview.next_milestone_reward)}"
         )
     hours, rem = divmod(max(overview.seconds_until_reset, 0), 3600)
     minutes = rem // 60
@@ -66,9 +74,9 @@ def login_overview_text(state: LoginCycleState) -> str:
     lines.append(f"День цикла: {state.cycle_day}/{state.cycle_length}")
     if state.today_reward is not None:
         status = "уже получена сегодня" if state.claimed_today else "будет выдана автоматически"
-        lines.append(f"Награда дня: {_reward_preview(state.today_reward)} ({status})")
+        lines.append(f"Награда дня: {reward_preview(state.today_reward)} ({status})")
     next_day = state.cycle_day % state.cycle_length + 1
     next_reward = state.rewards.get(next_day)
     if next_reward is not None:
-        lines.append(f"Завтра (день {next_day}): {_reward_preview(next_reward)}")
+        lines.append(f"Завтра (день {next_day}): {reward_preview(next_reward)}")
     return "\n".join(lines)
