@@ -1,29 +1,32 @@
 import { SECTION_ICONS } from '../icons.js';
 
 /**
- * Иконка раздела. Пока в манифесте нет файла - рисуется эмодзи.
+ * Иконка раздела: встроенный SVG, красится currentColor.
  *
- * Файл подставляется CSS-маской, а не тегом <img>: в <img> внешний SVG не
- * видит currentColor и остаётся того цвета, каким его сохранили - в тёмной
- * теме иконки были бы чёрными пятнами. Маска же красится background-ом,
- * то есть наследует цвет текста и активного пункта сама.
+ * Именно встроенный, а не <img> и не CSS-маска. Через <img> внешний SVG не
+ * видит currentColor и остаётся чёрным в тёмной теме; через маску его
+ * ломали одинарные кавычки внутри data-URL, который собирает Vite. Здесь
+ * контур - часть разметки, и обе проблемы отпадают.
  */
 export default function NavIcon({ id, size = 22 }) {
   const icon = SECTION_ICONS[id];
   if (!icon) return null;
-  if (icon.src) {
+  if (icon.path) {
     return (
-      <span
-        className="nav-icon nav-icon--mask"
+      <svg
+        className="nav-icon"
+        viewBox="0 0 24 24"
+        width={size}
+        height={size}
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.6"
+        strokeLinecap="round"
+        strokeLinejoin="round"
         aria-hidden="true"
-        style={{
-          width: size,
-          height: size,
-          flexBasis: size,
-          maskImage: `url(${icon.src})`,
-          WebkitMaskImage: `url(${icon.src})`,
-        }}
-      />
+      >
+        <path d={icon.path} />
+      </svg>
     );
   }
   return (
