@@ -13,7 +13,12 @@ import Hub from './components/Hub.jsx';
 //
 // Отдельной светлой темы не делаем: поддерживать два комплекта артов ради
 // неё пришлось бы бесконечно.
-const APPEARANCE = 'dark';
+//
+// Проп называется colorScheme. Раньше тут стоял appearance - в VKUI 8 его
+// уже нет, React передавал неизвестный проп дальше, и VKUI молча брал тему
+// из системы. На ПК у клиента ВК тёмная, на телефоне светлая - отсюда и
+// белый интерфейс на телефоне при «зафиксированной» тёмной теме.
+const COLOR_SCHEME = 'dark';
 
 function App() {
   useEffect(() => {
@@ -23,7 +28,7 @@ function App() {
   }, []);
 
   return (
-    <ConfigProvider appearance={APPEARANCE}>
+    <ConfigProvider colorScheme={COLOR_SCHEME}>
       <AppRoot className="hub">
         <SplitLayout>
           <SplitCol>
