@@ -97,7 +97,10 @@ ENTRIES: list[dict] = []
 
 
 def entry(label: str, text: str, key: str | None = None) -> None:
-    ENTRIES.append({"index": len(ENTRIES), "key": key, "label": label})
+    # text нужен не только для печати: по нему tools/icon_assets.py находит
+    # картинку в манифесте. Индекс для этого не годится - он съезжает от
+    # любой вставки раздела в середину.
+    ENTRIES.append({"index": len(ENTRIES), "key": key, "label": label, "prompt": text})
     if QUIET:
         return
     print(f"**{label}**\n")
@@ -317,13 +320,27 @@ def misc() -> None:
 def background() -> None:
     section(
         "Фон приложения",
-        "Одна картинка на весь мини-апп. Требования к ней необычные: её "
-        "видно каждую секунду, и она НЕ должна спорить с текстом. Поэтому "
-        "композиция широкая и почти пустая, детали собраны вверху (низ "
-        "закроют списки), контраст низкий.",
+        "ДВЕ картинки: соотношение сторон телефона около 0.46, окна на ПК - "
+        "за единицу, и одну композицию cover обрезал бы до неузнаваемости. "
+        "Сцена и палитра общие, различается только компоновка. Требования к "
+        "обеим необычные: их видно каждую секунду, и они НЕ должны спорить с "
+        "текстом - контраст низкий, в середине пусто, детали по краям.",
     )
     entry(
-        "Фон — Монолит",
+        "Фон — Монолит, широкий экран (ПК)",
+        "a wide horizontal wallpaper for a dark fantasy game: a colossal black "
+        "monolith standing far away in an ash plain under a heavy overcast sky. "
+        "Same scene and palette as the portrait version, recomposed for width: "
+        "the monolith sits off-centre, the rest is empty ash plain and haze, so "
+        "that a narrow centred column of interface panels can sit over the "
+        "middle without covering anything important. Very low contrast, muted "
+        "ash grey and rust brown with a single faint crimson glow at the "
+        "monolith's base. Painterly, atmospheric, no characters, no text, "
+        "no watermark, landscape 16:9",
+        key="bg:app_wide",
+    )
+    entry(
+        "Фон — Монолит, телефон",
         "a wide vertical wallpaper for a dark fantasy game: a colossal black "
         "monolith standing far away in an ash plain under a heavy overcast sky, "
         "seen from below. Composition deliberately sparse: detail concentrated "

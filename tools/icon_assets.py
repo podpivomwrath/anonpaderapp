@@ -50,9 +50,18 @@ def slug(key: str) -> str:
     return "".join(ch if ch.isalnum() or ch == "_" else "_" for ch in out)
 
 
-#: Иконки навигации уже лежат отдельно (assets/icons) и подключены маской —
-#: здесь они не нужны.
+#: Иконки навигации рисуются контурами прямо в коде (miniapp/src/icons.js) —
+#: файлов под них нет.
 SKIP_PREFIXES = ("nav:",)
+
+#: Фоны обрабатываются отдельно: это не иконки в списке, а подложка на весь
+#: экран, и ужимать её до 128 пикселей нельзя. Ключ -> (файл, ширина).
+BACKGROUNDS = {
+    "bg:app": ("bg-mobile.webp", 900),
+    "bg:app_wide": ("bg-wide.webp", 1600),
+}
+BG_OUT = ROOT / "miniapp" / "src" / "assets"
+BG_CSS = ROOT / "miniapp" / "src" / "background.css"
 
 
 def entries() -> list[dict]:
@@ -72,6 +81,9 @@ def entries() -> list[dict]:
 
 def main() -> None:
     manifest = json.loads((SRC / "manifest.json").read_text(encoding="utf-8"))
+    # Ключ поиска - ТЕКСТ ПРОМТА. Он выводится из самого предмета, поэтому
+    # переживает любую перестановку разделов; индекс не пережил и первой.
+    by_prompt = {row.get("prompt", "").strip(): row for row in manifest}
     by_index = {row["index"]: row for row in manifest}
 
     OUT.mkdir(parents=True, exist_ok=True)
@@ -79,6 +91,7 @@ def main() -> None:
         stale.unlink()
 
     mapping: dict[str, str] = {}
+    backgrounds: dict[str, str] = {}
     missing: list[str] = []
     total_src = total_out = 0
 
@@ -86,13 +99,35 @@ def main() -> None:
         key = record["key"]
         if key is None or key.startswith(SKIP_PREFIXES):
             continue
-        row = by_index.get(record["index"])
+        row = by_prompt.get(record["prompt"].strip())
+        if row is None:
+            # Запасной вариант для манифестов, собранных до того, как промт
+            # стал ключом. Если и он промахнётся - лучше пропустить, чем
+            # поставить чужую картинку.
+            candidate = by_index.get(record["index"])
+            if candidate is not None and candidate.get("prompt", "").strip() == record["prompt"].strip():
+                row = candidate
         if row is None or row.get("status") != "generated":
             missing.append(f"{key} ({record['label']})")
             continue
         source = SRC / row["filename"]
         if not source.exists():
             missing.append(f"{key} — нет файла {row['filename']}")
+            continue
+
+        if key in BACKGROUNDS:
+            name, width = BACKGROUNDS[key]
+            with Image.open(source) as image:
+                image = image.convert("RGB")
+                # Только по ширине: высоту режет CSS (cover), а вот
+                # уменьшать фон до иконочных размеров нельзя - он на весь экран.
+                if image.width > width:
+                    ratio = width / image.width
+                    image = image.resize((width, round(image.height * ratio)), Image.LANCZOS)
+                image.save(BG_OUT / name, "WEBP", quality=78, method=6)
+            backgrounds[key] = name
+            total_src += source.stat().st_size
+            total_out += (BG_OUT / name).stat().st_size
             continue
 
         name = slug(key) + ".webp"
@@ -106,13 +141,41 @@ def main() -> None:
         mapping[key] = name
 
     write_map(mapping)
+    write_backgrounds(backgrounds)
 
-    print(f"подключено: {len(mapping)}")
+    print(f"подключено: {len(mapping)} иконок, фонов: {len(backgrounds)}")
     print(f"вес: {total_src / 1e6:.0f} МБ -> {total_out / 1e3:.0f} КБ")
     if missing:
         print(f"\nбез картинки ({len(missing)}):")
         for item in missing:
             print(f"  {item}")
+
+
+def write_backgrounds(found: dict[str, str]) -> None:
+    """CSS-переменные под фоны. Файл пишется ВСЕГДА, даже пустой.
+
+    Иначе main.jsx импортировал бы то, чего нет, и сборка падала бы до тех
+    пор, пока картинки не нарисуют — а до этого момента приложение обязано
+    собираться и работать, просто без фона.
+    """
+    lines = [
+        "/* СГЕНЕРИРОВАНО: python tools/icon_assets.py — править нечего. */",
+        "",
+    ]
+    if "bg:app" in found:
+        lines += [":root {", f"  --app-bg: url('./assets/{found['bg:app']}');", "}", ""]
+    if "bg:app_wide" in found:
+        lines += [
+            "@media (min-width: 720px) {",
+            "  :root {",
+            f"    --app-bg-wide: url('./assets/{found['bg:app_wide']}');",
+            "  }",
+            "}",
+            "",
+        ]
+    if not found:
+        lines += ["/* Фонов пока нет: --app-bg остаётся none, слой невидим. */", ""]
+    BG_CSS.write_text("\n".join(lines), encoding="utf-8", newline="\n")
 
 
 def write_map(mapping: dict[str, str]) -> None:

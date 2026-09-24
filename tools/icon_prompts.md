@@ -525,9 +525,15 @@ a mount called «Пепельный вестник», gaunt and ash-covered ridi
 
 ## Фон приложения
 
-Одна картинка на весь мини-апп. Требования к ней необычные: её видно каждую секунду, и она НЕ должна спорить с текстом. Поэтому композиция широкая и почти пустая, детали собраны вверху (низ закроют списки), контраст низкий.
+ДВЕ картинки: соотношение сторон телефона около 0.46, окна на ПК - за единицу, и одну композицию cover обрезал бы до неузнаваемости. Сцена и палитра общие, различается только компоновка. Требования к обеим необычные: их видно каждую секунду, и они НЕ должны спорить с текстом - контраст низкий, в середине пусто, детали по краям.
 
-**Фон — Монолит**
+**Фон — Монолит, широкий экран (ПК)**
+
+```
+a wide horizontal wallpaper for a dark fantasy game: a colossal black monolith standing far away in an ash plain under a heavy overcast sky. Same scene and palette as the portrait version, recomposed for width: the monolith sits off-centre, the rest is empty ash plain and haze, so that a narrow centred column of interface panels can sit over the middle without covering anything important. Very low contrast, muted ash grey and rust brown with a single faint crimson glow at the monolith's base. Painterly, atmospheric, no characters, no text, no watermark, landscape 16:9
+```
+
+**Фон — Монолит, телефон**
 
 ```
 a wide vertical wallpaper for a dark fantasy game: a colossal black monolith standing far away in an ash plain under a heavy overcast sky, seen from below. Composition deliberately sparse: detail concentrated in the upper third, the lower two thirds are near-empty ash and haze so that interface panels can sit over them. Very low contrast, no focal point in the centre, muted palette of ash grey, rust brown and a single faint crimson glow at the monolith's base. Painterly, atmospheric, no characters, no text, no watermark, portrait 9:16
