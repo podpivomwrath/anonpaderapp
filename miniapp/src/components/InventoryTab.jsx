@@ -3,6 +3,7 @@ import {
   Button, Div, Group, Header, Placeholder, SimpleCell, Spinner, Text,
 } from '@vkontakte/vkui';
 import { equipItem, getCharacter, getInventory } from '../api.js';
+import ItemIcon from './ItemIcon.jsx';
 
 // Патч 74: вместо одного плоского списка - «Надето» отдельно и сумка,
 // свёрнутая по слотам. Плоский список рос вместе с дропом и превращался в
@@ -123,6 +124,7 @@ export default function InventoryTab({ onCharacterUpdate }) {
           <SimpleCell
             key={item.id}
             multiline
+            before={<ItemIcon icon={item.icon} alt={item.name} />}
             after={craftButton(item)}
             subtitle={itemSubtitle(item)}
           >
@@ -147,6 +149,7 @@ export default function InventoryTab({ onCharacterUpdate }) {
                   <SimpleCell
                     key={item.id}
                     multiline
+                    before={<ItemIcon icon={item.icon} alt={item.name} />}
                     subtitle={itemSubtitle(item)}
                     after={
                       <div className="inventory-actions">

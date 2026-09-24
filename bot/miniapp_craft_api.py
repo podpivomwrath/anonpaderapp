@@ -18,7 +18,7 @@ from bot.miniapp_auth import VK_USER_ID_KEY
 from game.economy import craft_config as cc
 from game.economy import crafting, mining
 from models import Item
-from services import craft_service, item_service
+from services import craft_service, item_service, naming
 from services import onboarding_service as onboarding_svc
 
 _rng = random.Random()
@@ -59,6 +59,7 @@ def _item_payload(item: Item) -> dict:
         "id": item.id,
         "name": item.name,
         "slot": item.slot,
+        "icon": naming.item_icon_key(item),
         "stats": item.base_stats or {},
         "spec": item.craft_spec,
         "spec_title": cc.SPEC_TITLES.get(item.craft_spec) if item.craft_spec else None,

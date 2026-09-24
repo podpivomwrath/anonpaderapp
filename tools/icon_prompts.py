@@ -80,13 +80,26 @@ def prompt(subject: str, accent: str, extra: str = "") -> str:
     return ", ".join(parts)
 
 
+QUIET = False
+
+
 def section(title: str, note: str = "") -> None:
+    if QUIET:
+        return
     print(f"\n## {title}\n")
     if note:
         print(f"{note}\n")
 
 
-def entry(label: str, text: str) -> None:
+#: Все записи по порядку. Индекс в этом списке = index в img/manifest.json,
+#: по нему картинка и связывается с предметом.
+ENTRIES: list[dict] = []
+
+
+def entry(label: str, text: str, key: str | None = None) -> None:
+    ENTRIES.append({"index": len(ENTRIES), "key": key, "label": label})
+    if QUIET:
+        return
     print(f"**{label}**\n")
     print("```")
     print(text)
@@ -118,6 +131,7 @@ def equipment() -> None:
                     "battered and field-repaired, scavenged look",
                     ACCENT[1],
                 ),
+                key=f"base:{slot}:{row['name']}",
             )
 
 
@@ -136,6 +150,7 @@ def rarities() -> None:
                 RARITY_ACCENT.get(rarity_id, ACCENT[1]),
                 "the frame is the only subject, nothing inside it",
             ),
+            key=f"rarity:{rarity_id}",
         )
 
 
@@ -155,6 +170,7 @@ def elixirs() -> None:
                 ACCENT[3],
                 "the liquid inside visually hints at the effect",
             ),
+            key=f"elixir:{row['id']}",
         )
 
 
@@ -170,6 +186,7 @@ def trophies() -> None:
                 "taken from a slain creature, resting on nothing",
                 ACCENT.get(min(i, 5), ACCENT[1]),
             ),
+            key=f"trophy:{row.get('id')}",
         )
 
 
@@ -183,6 +200,7 @@ def ores() -> None:
                 ACCENT.get(row["tier"], ACCENT[1]),
                 "rough unworked mineral, freshly broken facets",
             ),
+            key=f"ore:{row['id']}",
         )
 
 
@@ -200,6 +218,7 @@ def fish() -> None:
                 ACCENT.get(row["tier"], ACCENT[1]),
                 "anatomically plausible but subtly wrong, as if the water it came from is sick",
             ),
+            key=f"fish:{row['id']}",
         )
 
 
@@ -209,7 +228,8 @@ def uniques_and_craft() -> None:
         "Три результата ковки должны читаться как переделки ОДНОГО скальпеля: "
         "общая рукоять, разное полотно.",
     )
-    for row in clean(load("items/unique_items.json")).values():
+    for unique_id, row in clean(load("items/unique_items.json")).items():
+        row = {**row, "id_key": unique_id}
         entry(
             row["name"],
             prompt(
@@ -217,6 +237,7 @@ def uniques_and_craft() -> None:
                 RARITY_ACCENT["unique"],
                 "clearly a medical instrument repurposed as a weapon",
             ),
+            key=f"unique:{row['id_key']}",
         )
     for recipe in clean(load("crafting/recipes.json")).values():
         for spec, out in recipe["outputs"].items():
@@ -229,6 +250,7 @@ def uniques_and_craft() -> None:
                     f"visibly reforged from «{recipe['source_name']}» — same handle wrapping, "
                     "different blade",
                 ),
+                key=f"craft:{spec}",
             )
 
 
@@ -251,6 +273,7 @@ def tools() -> None:
                 ACCENT.get(min(i + 1, 5), ACCENT[2]),
                 "clearly consumable — already half worn out",
             ),
+            key=f"tool:{ceiling}",
         )
 
 
@@ -263,6 +286,7 @@ def misc() -> None:
             "cast from dark stone rather than metal, warm to the touch",
             ACCENT[5],
         ),
+        key="misc:raid_key",
     )
     chest = load("lootbox/ashen_chest.json")
     for row in chest:
@@ -272,6 +296,7 @@ def misc() -> None:
                 f"a small looted chest, «{row['name']}» grade, lid ajar, ash spilling out",
                 ACCENT.get(min(chest.index(row) + 1, 5), ACCENT[1]),
             ),
+            key=f"chest:{row['id']}",
         )
     for path in sorted((CONTENT / "mounts").glob("*.json")):
         rows = json.loads(path.read_text(encoding="utf-8"))
@@ -285,6 +310,7 @@ def misc() -> None:
                     ACCENT[4],
                     "ridden hard for a long time",
                 ),
+                key=f"mount:{row['id']}",
             )
 
 
@@ -311,6 +337,7 @@ def sections_ui() -> None:
             f"{subject}, flat monochrome UI icon, single weight line art, "
             "no fill, no gradient, no text, square 1:1, centred with even padding, "
             "legible at 22x22 pixels",
+            key=f"nav:{key}",
         )
 
 
@@ -340,4 +367,16 @@ def main() -> None:
 
 if __name__ == "__main__":
     sys.stdout.reconfigure(encoding="utf-8")
-    main()
+    if "--keys" in sys.argv:
+        # Машинный вывод для tools/icon_assets.py: какой предмет под каким
+        # индексом. Сам документ при этом глушится целиком - main() печатает
+        # ещё и шапку, мимо section()/entry().
+        import contextlib
+        import io as _io
+
+        QUIET = True
+        with contextlib.redirect_stdout(_io.StringIO()):
+            main()
+        print(json.dumps(ENTRIES, ensure_ascii=False, indent=2))
+    else:
+        main()

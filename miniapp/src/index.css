@@ -498,3 +498,13 @@ body,
   -webkit-mask-position: center;
   -webkit-mask-size: contain;
 }
+
+/* Картинка предмета в списке (патч 76). Скруглена и слегка утоплена в фон -
+   иконки сгенерированы с собственным тёмным фоном, без подложки они бы
+   висели резкими квадратами на светлой теме. */
+.item-icon {
+  border-radius: 8px;
+  object-fit: cover;
+  background: var(--vkui--color_background_secondary, rgba(0, 0, 0, 0.06));
+  flex: 0 0 auto;
+}

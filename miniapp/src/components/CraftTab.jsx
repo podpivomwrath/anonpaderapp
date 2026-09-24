@@ -3,6 +3,7 @@ import {
   Button, Div, Group, Header, Placeholder, SimpleCell, Spinner, Tabs, TabsItem,
 } from '@vkontakte/vkui';
 import { craftItem, craftTool, getCraft, upgradeCraft } from '../api.js';
+import ItemIcon from './ItemIcon.jsx';
 
 // Патч 72: мастерская. Два подраздела - «Крафт» (сковать/перековать) и
 // «Улучшение» (инструменты и ступени процентов).
@@ -145,6 +146,7 @@ export default function CraftTab() {
         {data.items.map((row) => (
           <SimpleCell
             key={row.id}
+            before={<ItemIcon icon={row.icon} alt={row.name} />}
             onClick={() => setItemId(row.id)}
             subtitle={`${statLine(row.stats)}${row.efficiency ? ` · ${row.efficiency}%` : ''}`}
             after={row.id === item.id ? '✓' : null}
@@ -188,6 +190,7 @@ export default function CraftTab() {
             {craftGroups.map((group) => (
               <div key={group.id}>
                 <SimpleCell
+                  before={<ItemIcon icon={`ore:${group.id}`} alt={group.name} />}
                   onClick={() => toggleOre(group.id)}
                   after={openOre === group.id ? '▴' : '▾'}
                   subtitle={`Всего ${group.total} · старт ${group.craft_efficiency}%`}
@@ -259,6 +262,7 @@ export default function CraftTab() {
             {data.tools.map((tool) => (
               <SimpleCell
                 key={tool.ceiling}
+                before={<ItemIcon icon={`tool:${tool.ceiling}`} alt="Инструмент" />}
                 after={
                   <Button
                     size="s"
@@ -289,6 +293,7 @@ export default function CraftTab() {
                 <SimpleCell
                   key={group.id}
                   multiline
+                  before={<ItemIcon icon={`ore:${group.id}`} alt={group.name} />}
                   after={
                     <Button
                       size="s"

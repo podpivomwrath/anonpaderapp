@@ -426,6 +426,7 @@ def _inventory_payload(items: list) -> dict:
                 # Патч 72: можно ли отнести в мастерскую и что с ним там уже
                 # сделали. Решает СЕРВЕР: клиент однажды уже пересказывал
                 # серверное правило своими словами и врал (патч 57).
+                "icon": naming.item_icon_key(item),
                 "craftable": crafting.is_craftable(item.craft_source_id),
                 "craft_spec": item.craft_spec,
                 "craft_efficiency": item.craft_efficiency,

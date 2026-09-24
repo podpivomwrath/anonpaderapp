@@ -15,3 +15,9 @@ venv/
 miniapp/node_modules/
 miniapp/dist/
 miniapp/.env
+
+# Исходники иконок (патч 76): 79 PNG по 1254x1254, ~150 МБ. В репозиторий не
+# кладём — git хранит каждую версию навсегда, а в игре нужны производные по
+# 128px (miniapp/src/assets/items, ~150 КБ). Пересобрать их из img/ можно в
+# любой момент: python tools/icon_assets.py
+img/

@@ -15,7 +15,7 @@
 
 from bot.onboarding_texts import REGION_TITLES
 from game.classes import REGISTRY
-from services.item_service import SLOT_TITLES, rarities
+from services.item_service import SLOT_TITLES, bases, rarities
 
 #: Базовые классы. Живут здесь, а не в админке, откуда их пришлось бы
 #: импортировать всем остальным - названия принадлежат этому модулю.
@@ -52,3 +52,30 @@ def rarity_title(rarity_id: str | None) -> str | None:
         return None
     definition = rarities().get(rarity_id)
     return definition.name if definition is not None else rarity_id
+
+
+# --- Иконки ---------------------------------------------------------------------
+
+def item_icon_key(item) -> str | None:
+    """Ключ картинки предмета (см. miniapp/src/itemIcons.js).
+
+    Считает СЕРВЕР, а не клиент: у процедурной экипировки имя собрано из
+    суффикса редкости и базы («Кровавый клинок»), и чтобы достать из него
+    базу, нужен каталог баз — на клиенте его нет, а дублировать разбор имени
+    туда значило бы завести второе место, где это правило живёт.
+
+    Порядок проверок = от частного к общему: скованное оружие носит имя
+    результата ковки, уникальное — своё собственное, и ни то ни другое
+    искать среди баз не нужно.
+    """
+    if item.craft_spec:
+        return f"craft:{item.craft_spec}"
+    if item.craft_source_id:
+        return f"unique:{item.craft_source_id}"
+    if not item.slot or not item.name:
+        return None
+    lowered = item.name.lower()
+    for base in bases().get(item.slot, []):
+        if base.name.lower() in lowered:
+            return f"base:{item.slot}:{base.name}"
+    return None
