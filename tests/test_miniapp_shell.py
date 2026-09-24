@@ -117,3 +117,85 @@ def test_background_layer_has_no_heavy_vignette() -> None:
         assert int(blur.group(1)) <= 40, (
             f"виньетка {blur.group(1)}px снова съест картинку: у неё яркость 28-42 из 255"
         )
+
+
+# --- Кто на самом деле красит контейнер (патч 85) --------------------------------
+
+
+def _built_css() -> str | None:
+    import glob
+
+    files = glob.glob(str(MINIAPP / "dist" / "assets" / "index-*.css"))
+    return Path(files[0]).read_text(encoding="utf-8") if files else None
+
+
+def _specificity(selector: str) -> tuple[int, int, int]:
+    """Вес ОДНОГО селектора. Считать надо именно по одному.
+
+    На этом я и ошибся: правило `.a,.b,.c{...}` на глаз выглядит
+    специфичным, но каждый его селектор весит как один класс. Своё
+    `.vkuiPanel__in` (0,1,0) проигрывало темному `.vkuiPanel__modePlain
+    .vkuiPanel__in` (0,2,0) при любом порядке - панель оставалась чёрной на
+    весь экран, и фон под ней было не разглядеть.
+    """
+    sel = re.sub(r"::[a-z-]+", "", selector)
+    ids = len(re.findall(r"#[\w-]+", sel))
+    classes = len(re.findall(r"\.[\w-]+|\[[^\]]+\]", sel))
+    classes += len(re.findall(r":(?!:)[a-z-]+", sel))
+    return (ids, classes, 0)
+
+
+def _winning_background(css: str, target_class: str) -> str | None:
+    """Правило, которое реально красит элемент: максимум веса, затем последнее."""
+    found = []
+    for match in re.finditer(r"([^{}]+)\{([^{}]*)\}", css):
+        selectors, body = match.group(1), match.group(2)
+        values = re.findall(r"background(?:-color)?:\s*([^;]+)", body)
+        if not values:
+            continue
+        for selector in selectors.split(","):
+            selector = selector.strip()
+            if selector.endswith("." + target_class):
+                found.append((_specificity(selector), match.start(), values[-1].strip()))
+    if not found:
+        return None
+    found.sort(key=lambda row: (row[0], row[1]))
+    return found[-1][2]
+
+
+OPAQUE_TOKENS = ("var(--vkui--color_background", "#17181a", "#000")
+
+
+@pytest.mark.parametrize(
+    "container",
+    ["vkuiPanel__in", "vkuiAppRoot__layoutPlain", "vkuiAppRoot__layoutCard"],
+)
+def test_layout_containers_do_not_paint_over_the_background(container: str) -> None:
+    """Слой с картинкой лежит ПОД разметкой VKUI: любой непрозрачный
+    контейнер поверх - и фона не видно вовсе."""
+    css = _built_css()
+    if css is None:
+        pytest.skip("мини-апп не собран")
+    winner = _winning_background(css, container)
+    assert winner is not None, f".{container} не найден в сборке"
+    assert not winner.startswith(OPAQUE_TOKENS), (
+        f".{container} красится непрозрачно ({winner}) и закроет фон"
+    )
+
+
+def test_panel_really_asks_vkui_to_drop_its_background() -> None:
+    """Проверка выше смотрит CSS, но его одного мало.
+
+    Правило `.vkuiPanel__disableBackground .vkuiPanel__in{background:0 0}`
+    VKUI отдаёт всегда - сработает оно только если КЛАСС есть на элементе, а
+    класс появляется от пропа. Без этой проверки предыдущий тест оставался
+    зелёным при убранном пропе (проверено).
+    """
+    hub = (MINIAPP / "src" / "components" / "Hub.jsx").read_text(encoding="utf-8")
+    panels = re.findall(r"<Panel\b([^>]*)>", hub)
+    assert panels, "Panel не найден в Hub.jsx"
+    without = [p for p in panels if "disableBackground" not in p]
+    assert not without, (
+        f"{len(without)} из {len(panels)} Panel без disableBackground - "
+        "они закрасят фон своей заливкой"
+    )

@@ -126,7 +126,7 @@ export default function Hub() {
   }, [activeTab, character?.is_admin]);
 
   if (ban) {
-    return <Panel>{header('Монолит')}<Placeholder
+    return <Panel disableBackground>{header('Монолит')}<Placeholder
       action={<Button onClick={() => load()}>Проверить доступ</Button>}
     >
       Доступ заблокирован администратором.
@@ -137,7 +137,7 @@ export default function Hub() {
 
   if (status === 'loading') {
     return (
-      <Panel>
+      <Panel disableBackground>
         {header('Монолит')}
         <Div style={{ display: 'flex', justifyContent: 'center', paddingTop: 48 }}>
           <Spinner size="l" />
@@ -148,7 +148,7 @@ export default function Hub() {
 
   if (status === 'error' || !character) {
     return (
-      <Panel>
+      <Panel disableBackground>
         {header('Монолит')}
         <Placeholder
           icon={<div style={{ fontSize: 48 }}>🩸</div>}
@@ -165,7 +165,7 @@ export default function Hub() {
   }
 
   return (
-    <Panel>
+    <Panel disableBackground>
       {header(current.label)}
 
       {menuOpen && (

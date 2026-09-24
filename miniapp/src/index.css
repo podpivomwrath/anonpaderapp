@@ -700,14 +700,24 @@ body::before {
    своя подложка. */
 .vkuiAppRoot__layoutPlain,
 .vkuiAppRoot__layoutCard,
-.vkuiPanel__in,
 .vkuiSplitLayout__inner,
 .vkuiSplitCol__host {
   background: transparent;
 }
 
+/* Panel здесь НЕТ намеренно: его красит `.vkuiPanel__modePlain
+   .vkuiPanel__in` со специфичностью (0,2,0), и своим `.vkuiPanel__in`
+   (0,1,0) это не перебить никаким порядком - правило просто проигрывает.
+   Ровно на этом фон и не появлялся. Панель гасится штатным пропом
+   disableBackground (см. Hub.jsx): VKUI сам даёт правило той же
+   специфичности и ставит его последним. */
+
 /* Шапка полупрозрачная: за ней верх картинки, где стоит Монолит. Плотности
    хватает, чтобы бургер и заголовок не терялись. */
+/* Двойной селектор не для красоты: VKUI в прозрачном режиме ставит
+   `.vkuiPanelHeader__trnsp .vkuiPanelHeader__in` со специфичностью (0,2,0),
+   и одиночный класс ей проигрывает - подложка просто не применялась бы. */
+.vkuiPanelHeader__trnsp .vkuiPanelHeader__in,
 .vkuiPanelHeader__in {
   background: rgba(16, 17, 19, 0.72);
   backdrop-filter: blur(8px);
