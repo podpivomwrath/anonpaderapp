@@ -208,7 +208,17 @@ export default function Hub() {
         )}
       </div>
 
-      <div className="hub-content hub-content--drawer" key={reloadKey}>
+      {/* Карте ширина нужна вся: она рисует сетку мира, и в узкой колонке
+          видно несколько клеток вместо области вокруг игрока. Остальные
+          разделы - списки, им 560 в самый раз. */}
+      <div
+        className={
+          activeTab === 'map'
+            ? 'hub-content hub-content--drawer hub-content--wide'
+            : 'hub-content hub-content--drawer'
+        }
+        key={reloadKey}
+      >
         {activeTab === 'character' && (
           <CharacterTab character={character} onCharacterUpdate={setCharacter} />
         )}

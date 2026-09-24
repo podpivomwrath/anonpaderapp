@@ -199,3 +199,15 @@ def test_panel_really_asks_vkui_to_drop_its_background() -> None:
         f"{len(without)} из {len(panels)} Panel без disableBackground - "
         "они закрасят фон своей заливкой"
     )
+
+
+def test_map_is_not_squeezed_by_the_column_cap() -> None:
+    """Колонка ограничена 560 ради читаемости списков, но карта рисует сетку
+    мира - в такой ширине видно несколько клеток вместо области вокруг
+    игрока. Сломалось это не сразу: до патча 84 браузер пропускал весь
+    медиазапрос из-за range-синтаксиса, и карта оставалась во всю ширину."""
+    hub = (MINIAPP / "src" / "components" / "Hub.jsx").read_text(encoding="utf-8")
+    css = (MINIAPP / "src" / "index.css").read_text(encoding="utf-8")
+    assert "hub-content--wide" in hub, "карта должна просить себе широкую колонку"
+    assert "'map'" in hub
+    assert ".hub-content--wide" in css, "модификатор ширины не описан в стилях"
