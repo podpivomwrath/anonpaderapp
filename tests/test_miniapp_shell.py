@@ -91,3 +91,27 @@ def test_wide_background_overrides_the_mobile_one() -> None:
     wide = css.rfind("--app-bg:")
     assert "min-width" in css, "широкий фон должен подключаться медиазапросом"
     assert wide > mobile, "широкий фон обязан идти вторым, иначе он не переопределит"
+
+
+def test_background_layer_sits_below_content_without_negative_z() -> None:
+    """Отрицательный слой зависит от того, кто из предков создаёт контекст
+    наложения, и отлаживать это в вебвью нечем. Контент поднят явно."""
+    css = (MINIAPP / "src" / "index.css").read_text(encoding="utf-8")
+    layer = css[css.index("body::before"):]
+    layer = layer[: layer.index("}")]
+    assert "z-index: -1" not in layer, "слой фона снова на отрицательном z-index"
+    assert re.search(r"#root\s*\{[^}]*z-index:\s*1", css, re.DOTALL),         "#root должен явно лежать над слоем фона"
+
+
+def test_background_layer_has_no_heavy_vignette() -> None:
+    """Виньетка inset 0 0 120px 10px при 75% чёрного роняла картинку с 42 до
+    10 из 255 - темнее базового фона. Игрок видел ровную черноту и решил,
+    что картинка не подключилась."""
+    css = (MINIAPP / "src" / "index.css").read_text(encoding="utf-8")
+    layer = css[css.index("body::before"):]
+    layer = layer[: layer.index("}")]
+    blur = re.search(r"box-shadow:[^;]*?(\d+)px\s+\d+px", layer)
+    if blur:
+        assert int(blur.group(1)) <= 40, (
+            f"виньетка {blur.group(1)}px снова съест картинку: у неё яркость 28-42 из 255"
+        )
