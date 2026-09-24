@@ -37,7 +37,7 @@ def test_config_provider_gets_only_props_vkui_knows() -> None:
     if not VKUI_PROPS.exists():
         pytest.skip("node_modules не установлены")
 
-    declared = set(re.findall(r"^\s{4}(\w+)[?:]", VKUI_PROPS.read_text(encoding="utf-8"), re.M))
+    declared = set(re.findall(r"^\s{4}(\w+)[?:]", VKUI_PROPS.read_text(encoding="utf-8"), re.MULTILINE))
     assert declared, "не удалось прочитать список пропов ConfigProvider"
 
     used = re.search(r"<ConfigProvider\s([^>]*)>", _app_jsx())
@@ -59,7 +59,7 @@ def test_theme_is_pinned_to_dark() -> None:
     # Проверяем МЕХАНИЗМ, а не слово: упоминание в комментарии - это история
     # правки, и запрещать её незачем (ровно на этом тест уже спотыкался
     # в патче 73).
-    code = re.sub(r"//[^\n]*|/\*.*?\*/", "", app, flags=re.S)
+    code = re.sub(r"//[^\n]*|/\*.*?\*/", "", app, flags=re.DOTALL)
     assert "bridge.subscribe" not in code, "за темой клиента ВК больше не следуем"
 
 
