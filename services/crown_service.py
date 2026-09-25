@@ -119,8 +119,9 @@ def held_since(character: Character, board: str) -> datetime | None:
     return datetime.fromisoformat(raw) if raw else None
 
 
-def xp_multiplier(character: Character) -> float:
-    return 1.0 + cc.XP_BONUS if has_crown(character, leaderboard_service.BOARD_PVP) else 1.0
+def craft_ore_multiplier(character: Character) -> float:
+    board = leaderboard_service.BOARD_PVP
+    return 1.0 - cc.CRAFT_ORE_CUT if has_crown(character, board) else 1.0
 
 
 def mob_gold_multiplier(character: Character) -> float:

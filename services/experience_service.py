@@ -10,7 +10,7 @@ from dataclasses import dataclass
 from game.combat import balance_config as bc
 from game.economy import premium_config as pc
 from models import Character, CharacterStats
-from services import crown_service, premium_service
+from services import premium_service
 
 
 def xp_to_next(level: int) -> int:
@@ -86,11 +86,6 @@ def add_experience(
     premium_applied = apply_premium and amount > 0 and premium_service.is_premium(character)
     if premium_applied:
         amount = round(amount * pc.PREMIUM_XP_MULTIPLIER)
-    # Венец «Клинок» (патч 91) - здесь по той же причине, по какой здесь же
-    # живёт премиум: это единственная точка начисления опыта в игре, и бонус
-    # сам собой достаётся всем источникам сразу.
-    if amount > 0:
-        amount = round(amount * crown_service.xp_multiplier(character))
     if amount > 0:
         character.experience += amount
     levels = 0

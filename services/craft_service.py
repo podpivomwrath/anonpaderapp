@@ -25,7 +25,7 @@ from game.combat import balance_config as bc
 from game.economy import craft_config as cc
 from game.economy import crafting, mining
 from models import Character, CharacterCraftTool, CharacterOre, Inventory, Item
-from services import item_service
+from services import crown_service, item_service
 
 
 class CraftError(Exception):
@@ -44,6 +44,36 @@ async def ore_amount(db: AsyncSession, character_id: int, ore_id: str, grade: st
         )
     )
     return int(row or 0)
+
+
+def _discounted(character: Character, cost: int) -> int:
+    """Цена в руде с учётом венца «Клинок».
+
+    Округление до ближайшего, но не ниже единицы: бесплатных операций в
+    мастерской быть не должно даже при большой скидке.
+
+    ЕДИНСТВЕННАЯ точка расчёта - её зовут и списание, и показ цены в
+    мини-аппе. Раньше цена считалась в четырёх местах, и скидка неизбежно
+    приехала бы не во все: игрок увидел бы одно число, а списалось бы
+    другое, причём молча.
+    """
+    return max(1, round(cost * crown_service.craft_ore_multiplier(character)))
+
+
+def first_craft_cost(character: Character) -> int:
+    """Цена ковки предмета, которого ещё не ковали."""
+    return _discounted(character, cc.CRAFT_ORE_COST)
+
+
+def recraft_cost(character: Character, item: Item) -> int:
+    """Цена следующей ковки этого предмета: первая - обычная, дальше дороже."""
+    if item.craft_spec is None:
+        return _discounted(character, cc.CRAFT_ORE_COST)
+    return _discounted(character, cc.recraft_ore_cost(item.craft_recrafts))
+
+
+def tool_cost(character: Character, ceiling: int) -> int:
+    return _discounted(character, cc.tool_ore_cost(ceiling))
 
 
 async def _spend_ore(
@@ -153,7 +183,9 @@ async def craft(
         )
 
     was_recraft = item.craft_spec is not None
-    cost = cc.recraft_ore_cost(item.craft_recrafts) if was_recraft else cc.CRAFT_ORE_COST
+    # Цену берём ДО правки предмета: ниже проставляется craft_spec и растёт
+    # craft_recrafts, а от них она и зависит.
+    cost = recraft_cost(character, item)
     await _spend_ore(db, character.id, ore_id, grade, cost)
 
     base_stats, efficiency = crafting.roll_crafted_stats(
@@ -218,7 +250,7 @@ async def make_tool(
     if ceiling is None:
         raise CraftError("Из этой руды инструмент не выходит.")
 
-    await _spend_ore(db, character.id, ore_id, grade, cc.tool_ore_cost(ceiling))
+    await _spend_ore(db, character.id, ore_id, grade, tool_cost(character, ceiling))
 
     row = await db.scalar(
         select(CharacterCraftTool).where(

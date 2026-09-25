@@ -125,18 +125,86 @@ async def test_one_player_can_hold_several_boards(db_session, make_character) ->
 # --- Бонусы -----------------------------------------------------------------
 
 
-async def test_pvp_crown_adds_experience(db_session, make_character) -> None:
-    plain = await make_character(level=10)
-    crowned = await _crowned(db_session, make_character, leaderboard_service.BOARD_PVP, level=10)
+async def test_pvp_crown_cuts_the_ore_price(db_session, make_character) -> None:
+    """Венцу PvP сперва достался опыт, и это была ошибка: первым по PvP
+    скорее всего будет игрок предельного уровня, которому опыт уже ни к
+    чему. Награда доставалась бы ровно тому, кому она не нужна.
 
+    Руда - настоящая валюта эндгейма: одна добыча даёт ОДНУ руду и занимает
+    от пяти минут, а инструмент на 120% стоит тринадцать.
+    """
+    from game.economy import craft_config
+    from services import craft_service
+
+    crowned = await _crowned(db_session, make_character, leaderboard_service.BOARD_PVP, level=60)
+    plain = await make_character(level=60)
+
+    for ceiling, full in craft_config.TOOL_ORE_COST_BY_TARGET.items():
+        assert craft_service.tool_cost(plain, ceiling) == full
+        assert craft_service.tool_cost(crowned, ceiling) == max(
+            1, round(full * (1 - cc.CRAFT_ORE_CUT))
+        )
+        assert craft_service.tool_cost(crowned, ceiling) < full, (
+            f"на потолке {ceiling}% скидка не видна вовсе"
+        )
+
+
+async def test_ore_price_never_drops_to_zero(
+    db_session, make_character, monkeypatch
+) -> None:
+    """Бесплатных операций в мастерской быть не должно - руда перестала бы
+    что-либо значить.
+
+    При нынешних 25% до нуля не доходит: round(1 * 0.75) = 1. Защита стоит
+    на случай, когда долю поднимут, поэтому и проверяется она именно так -
+    иначе тест был бы зелёным независимо от наличия защиты (проверено).
+    """
+    from services import craft_service
+
+    crowned = await _crowned(db_session, make_character, leaderboard_service.BOARD_PVP, level=60)
+    monkeypatch.setattr(cc, "CRAFT_ORE_CUT", 0.9)
+
+    assert craft_service._discounted(crowned, 1) >= 1
+    assert craft_service._discounted(crowned, 3) >= 1
+
+
+async def test_shown_price_is_the_one_charged(db_session, make_character) -> None:
+    """Цена считалась в четырёх местах: дважды при списании и дважды при
+    показе в мини-аппе. Скидка неизбежно приехала бы не во все - игрок увидел
+    бы одно число, а списалось бы другое, причём молча."""
+    import ast
+    from pathlib import Path
+
+    from services import craft_service
+
+    crowned = await _crowned(db_session, make_character, leaderboard_service.BOARD_PVP, level=60)
+    assert craft_service.first_craft_cost(crowned) < craft_service.first_craft_cost(
+        await make_character(level=60)
+    )
+
+    api = (
+        Path(__file__).resolve().parent.parent / "bot" / "miniapp_craft_api.py"
+    ).read_text(encoding="utf-8")
+    raw = [
+        ast.unparse(node)
+        for node in ast.walk(ast.parse(api))
+        if isinstance(node, ast.Attribute) and node.attr in {"tool_ore_cost", "recraft_ore_cost"}
+    ]
+    assert not raw, f"цена берётся мимо craft_service, скидка туда не попадёт: {raw}"
+
+
+async def test_no_crown_touches_experience(db_session, make_character) -> None:
+    """Опыт венцами больше не трогают вовсе - ни одним."""
+    plain = await make_character(level=10)
     base = experience_service.add_experience(
         plain, await _stats(db_session, plain), 1000, apply_premium=False
     )
-    with_crown = experience_service.add_experience(
-        crowned, await _stats(db_session, crowned), 1000, apply_premium=False
-    )
-
-    assert with_crown.xp_awarded == round(base.xp_awarded * (1 + cc.XP_BONUS))
+    for board in BOARDS:
+        crowned = await _crowned(db_session, make_character, board, level=10)
+        got = experience_service.add_experience(
+            crowned, await _stats(db_session, crowned), 1000, apply_premium=False
+        )
+        assert got.xp_awarded == base.xp_awarded, f"венец «{board}» влияет на опыт"
 
 
 async def test_trophy_crown_does_not_touch_experience(db_session, make_character) -> None:
@@ -265,7 +333,7 @@ async def test_all_bonuses_work_regardless_of_the_worn_frame(db_session, make_ch
     await db_session.flush()
     crown_service.set_frame(player, leaderboard_service.BOARD_MINING)
 
-    assert crown_service.xp_multiplier(player) == 1 + cc.XP_BONUS
+    assert crown_service.craft_ore_multiplier(player) == 1 - cc.CRAFT_ORE_CUT
     assert crown_service.mining_multiplier(player) == 1 - cc.MINING_CUT
 
 

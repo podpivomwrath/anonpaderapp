@@ -17,7 +17,7 @@ from bot.app_keys import SESSION_FACTORY_KEY
 from bot.miniapp_auth import VK_USER_ID_KEY
 from game.economy import craft_config as cc
 from game.economy import crafting, mining
-from models import Item
+from models import Character, Item
 from services import craft_service, item_service, naming
 from services import onboarding_service as onboarding_svc
 
@@ -54,7 +54,7 @@ def _spec_payload(source_id: str) -> list[dict]:
     return result
 
 
-def _item_payload(item: Item) -> dict:
+def _item_payload(character: Character, item: Item) -> dict:
     return {
         "id": item.id,
         "name": item.name,
@@ -74,10 +74,9 @@ def _item_payload(item: Item) -> dict:
         "bound": item.bound,
         "source_id": item.craft_source_id,
         # Цена СЛЕДУЮЩЕЙ операции — считает сервер, клиент только показывает.
-        "next_craft_cost": (
-            cc.recraft_ore_cost(item.craft_recrafts)
-            if item.craft_spec is not None else cc.CRAFT_ORE_COST
-        ),
+        # Через craft_service, а не по конфигу напрямую: там же живёт скидка
+        # венца, и показанная цена обязана совпадать со списанной.
+        "next_craft_cost": craft_service.recraft_cost(character, item),
     }
 
 
@@ -90,7 +89,7 @@ async def handle_get_craft(request: web.Request) -> web.Response:
             return _error("character_not_found", 404)
 
         items = [
-            _item_payload(item)
+            _item_payload(character, item)
             for item, _equipped in await item_service.get_inventory(db, character.id)
             if crafting.is_craftable(item.craft_source_id)
         ]
@@ -108,9 +107,11 @@ async def handle_get_craft(request: web.Request) -> web.Response:
                     if definition.tier <= cc.CRAFT_MAX_ORE_TIER else None
                 ),
                 "tool_ceiling": crafting.tool_ceiling_for(definition.tier),
-                "craft_cost": cc.CRAFT_ORE_COST,
+                "craft_cost": craft_service.first_craft_cost(character),
                 "tool_cost": (
-                    cc.tool_ore_cost(crafting.tool_ceiling_for(definition.tier))
+                    craft_service.tool_cost(
+                        character, crafting.tool_ceiling_for(definition.tier)
+                    )
                     if crafting.tool_ceiling_for(definition.tier) else None
                 ),
             }
@@ -173,7 +174,7 @@ async def handle_post_craft(request: web.Request) -> web.Response:
             return _error(str(exc), 409)
         await db.commit()
         return web.json_response({
-            "item": _item_payload(result.item),
+            "item": _item_payload(character, result.item),
             "ore_spent": result.ore_spent,
             "was_recraft": result.was_recraft,
         })
@@ -217,7 +218,7 @@ async def handle_post_upgrade(request: web.Request) -> web.Response:
             return _error(str(exc), 409)
         await db.commit()
         return web.json_response({
-            "item": _item_payload(result.item),
+            "item": _item_payload(character, result.item),
             "efficiency_before": result.efficiency_before,
             "efficiency_after": result.efficiency_after,
         })
