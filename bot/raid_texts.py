@@ -200,9 +200,23 @@ def _thousands(value: int) -> str:
 # Пустая строка означает "картинка ещё не загружена": сообщение тогда уходит
 # без вложения, как уходило до сих пор. Рейд не должен падать из-за того, что
 # художник не успел.
-STAGE_PHOTO_IDS: dict[int, str] = {1: "", 2: "", 3: ""}
+STAGE_PHOTO_IDS: dict[int, str] = {
+    1: "457239134",  # пробные куклы
+    2: "457239135",  # семья Вельд - все трое в одном кадре
+    3: "457239136",  # Хирург
+}
+
+#: Пролог - зал, а не сцена: единственный кадр рейда, где игрок смотрит в
+#: зрительские кресла. Поэтому он уходит отдельным сообщением: в одном с
+#: появлением кукол ВК свёл бы обе картинки в мелкую пару превью, и ни та ни
+#: другая не читалась бы.
+PROLOGUE_PHOTO_ID = "457239133"
 
 
 def stage_attachment(stage: int) -> str | None:
     photo_id = STAGE_PHOTO_IDS.get(stage)
     return photo_attachment(photo_id) if photo_id else None
+
+
+def prologue_attachment() -> str | None:
+    return photo_attachment(PROLOGUE_PHOTO_ID) if PROLOGUE_PHOTO_ID else None

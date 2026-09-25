@@ -64,6 +64,12 @@ def test_miniapp_never_renders_a_raw_id() -> None:
         for number, line in enumerate(path.read_text(encoding="utf-8").split("\n"), 1):
             if "key={" in line or "onClick" in line or "onChange" in line:
                 continue  # служебное использование, не текст
+            if "icon={" in line:
+                # Ключ картинки: по id ищут ФАЙЛ (itemIcons.js), а не пишут
+                # его на экран. Названием не заменить - в нём пробелы и
+                # перевод. Узость исключения стережёт test_icon_key_alt.py:
+                # рядом обязан стоять alt с человеческим названием.
+                continue
             for field in ID_FIELDS:
                 if re.search(rf"\.{field}_(title|name)", line):
                     continue

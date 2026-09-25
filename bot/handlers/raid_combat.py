@@ -250,10 +250,12 @@ async def start_raid(group_id: int | None, member_inputs: list[MemberCombatInput
 
     for p in participants.values():
         await _bot_api.messages.send(
-            peer_id=p.peer_id,
-            message=f"{rt.PROLOGUE_TEXT}\n\n{_STAGE_APPEAR_TEXT[1]}",
-            attachment=rt.stage_attachment(1),
-            random_id=0,
+            peer_id=p.peer_id, message=rt.PROLOGUE_TEXT,
+            attachment=rt.prologue_attachment(), random_id=0,
+        )
+        await _bot_api.messages.send(
+            peer_id=p.peer_id, message=_STAGE_APPEAR_TEXT[1],
+            attachment=rt.stage_attachment(1), random_id=0,
         )
     await _broadcast_board(battle_id, battle, None)
 

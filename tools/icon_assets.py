@@ -72,6 +72,21 @@ SKIP_KEYS = {"bg:app"}
 BACKGROUNDS = {
     "bg:app_wide": ("bg-wide.webp", 1600, "фон_монолит_пк_16x9.png"),
 }
+#: Эмблемы подклассов привязаны ПО ИМЕНИ ФАЙЛА, а не по промту.
+#: Картинки заказывались не нашим промтом: в описи лежит текст генератора
+#: («A polished dark fantasy RPG subclass icon...»), и сравнение по началу
+#: строки его не узнает. Имена файлов при этом говорящие и заданы вручную,
+#: поэтому явная привязка честнее любой эвристики - тот же случай, что и с
+#: телефонным фоном выше.
+SUBCLASS_FILES = {
+    "subclass:guardian": "путь_01_страж.png",
+    "subclass:blood_knight": "путь_02_кровавый_рыцарь.png",
+    "subclass:shadow_blade": "путь_03_клинок_теней.png",
+    "subclass:poisoner": "путь_04_отравитель.png",
+    "subclass:elementalist": "путь_05_элементалист.png",
+    "subclass:dark_mystic": "путь_06_тёмный_мистик.png",
+}
+
 BG_OUT = ROOT / "miniapp" / "src" / "assets"
 BG_CSS = ROOT / "miniapp" / "src" / "background.css"
 
@@ -138,9 +153,11 @@ def main() -> None:
         if key is None or key.startswith(SKIP_PREFIXES) or key in SKIP_KEYS:
             continue
         row = find(by_prompt, record["prompt"])
-        if row is None and key in BACKGROUNDS:
-            hint = BACKGROUNDS[key][2]
-            if (SRC / hint).exists():
+        if row is None:
+            hint = SUBCLASS_FILES.get(key)
+            if hint is None and key in BACKGROUNDS:
+                hint = BACKGROUNDS[key][2]
+            if hint is not None and (SRC / hint).exists():
                 row = {"filename": hint}
         if row is None or row.get("status", "generated") != "generated":
             missing.append(f"{key} ({record['label']})")

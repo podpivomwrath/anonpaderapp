@@ -380,6 +380,33 @@ def sections_ui() -> None:
         )
 
 
+def subclasses() -> None:
+    section(
+        "Эмблемы подклассов",
+        "Показываются в мини-аппе рядом с названием пути. Это ЭМБЛЕМА, а не "
+        "персонаж: игрок смотрит на свой подкласс, и чужое лицо спорило бы с "
+        "тем, кого он себе представляет. Промты для картинок в чат отдельные, "
+        "там как раз фигура (tools/story_art_prompts.md).",
+    )
+    sys.path.insert(0, str(ROOT))
+    from game.classes import REGISTRY
+
+    subjects = {
+        "guardian": "a battered tower shield seen head on, dented but whole",
+        "blood_knight": "a straight blade held point down with blood running along the fuller",
+        "shadow_blade": "a slim dagger half dissolving into shadow",
+        "poisoner": "a stoppered glass vial of dark liquid beside a withered leaf",
+        "elementalist": "a sphere split into flame, frost and storm wind",
+        "dark_mystic": "an open palm cut across the centre with a blood sigil beneath it",
+    }
+    for subclass in REGISTRY.values():
+        entry(
+            f"{subclass.title} ({subclass.id})",
+            prompt(subjects[subclass.id], ACCENT[4], "an emblem rather than a character"),
+            key=f"subclass:{subclass.id}",
+        )
+
+
 def main() -> None:
     print("# Промты для генерации иконок\n")
     print(
@@ -402,6 +429,7 @@ def main() -> None:
     tools()
     misc()
     background()
+    subclasses()
     sections_ui()
 
 

@@ -48,7 +48,7 @@
       "title": "Гнилое снабжение",
       "level_min": 15,
       "level_max": 25,
-      "image": null,
+      "image": "457239151",
       "quests": [
         {
           "id": "ridge_2_1",
@@ -99,7 +99,7 @@
       "title": "Клинок Ордена",
       "level_min": 25,
       "level_max": 30,
-      "image": null,
+      "image": "457239137",
       "quests": [
         {
           "id": "ridge_3_1",
@@ -135,7 +135,7 @@
       "title": "Имя в Совете",
       "level_min": 30,
       "level_max": 45,
-      "image": null,
+      "image": "457239138",
       "quests": [
         {
           "id": "ridge_4_1",
@@ -191,7 +191,7 @@
       "title": "Дорога к сердцу",
       "level_min": 45,
       "level_max": 60,
-      "image": null,
+      "image": "457239139",
       "quests": [
         {
           "id": "ridge_5_1",

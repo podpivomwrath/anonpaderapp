@@ -540,6 +540,47 @@ a wide vertical wallpaper for a dark fantasy game: a colossal black monolith sta
 ```
 
 
+## Эмблемы подклассов
+
+Показываются в мини-аппе рядом с названием пути. Это ЭМБЛЕМА, а не персонаж: игрок смотрит на свой подкласс, и чужое лицо спорило бы с тем, кого он себе представляет. Промты для картинок в чат отдельные, там как раз фигура (tools/story_art_prompts.md).
+
+**Кровавый рыцарь (blood_knight)**
+
+```
+a straight blade held point down with blood running along the fuller, burnt amber accents, an emblem rather than a character, dark fantasy game item icon, single object centered, slight 3/4 angle, painterly semi-realistic, muted desaturated palette of ash grey, rust brown and dried blood, weathered and worn surfaces, soft rim light from the upper left, deep neutral background, no text, no watermark, no border, square 1:1 composition, crisp readable silhouette at small size
+```
+
+**Тёмный мистик (dark_mystic)**
+
+```
+an open palm cut across the centre with a blood sigil beneath it, burnt amber accents, an emblem rather than a character, dark fantasy game item icon, single object centered, slight 3/4 angle, painterly semi-realistic, muted desaturated palette of ash grey, rust brown and dried blood, weathered and worn surfaces, soft rim light from the upper left, deep neutral background, no text, no watermark, no border, square 1:1 composition, crisp readable silhouette at small size
+```
+
+**Элементалист (elementalist)**
+
+```
+a sphere split into flame, frost and storm wind, burnt amber accents, an emblem rather than a character, dark fantasy game item icon, single object centered, slight 3/4 angle, painterly semi-realistic, muted desaturated palette of ash grey, rust brown and dried blood, weathered and worn surfaces, soft rim light from the upper left, deep neutral background, no text, no watermark, no border, square 1:1 composition, crisp readable silhouette at small size
+```
+
+**Страж (guardian)**
+
+```
+a battered tower shield seen head on, dented but whole, burnt amber accents, an emblem rather than a character, dark fantasy game item icon, single object centered, slight 3/4 angle, painterly semi-realistic, muted desaturated palette of ash grey, rust brown and dried blood, weathered and worn surfaces, soft rim light from the upper left, deep neutral background, no text, no watermark, no border, square 1:1 composition, crisp readable silhouette at small size
+```
+
+**Отравитель (poisoner)**
+
+```
+a stoppered glass vial of dark liquid beside a withered leaf, burnt amber accents, an emblem rather than a character, dark fantasy game item icon, single object centered, slight 3/4 angle, painterly semi-realistic, muted desaturated palette of ash grey, rust brown and dried blood, weathered and worn surfaces, soft rim light from the upper left, deep neutral background, no text, no watermark, no border, square 1:1 composition, crisp readable silhouette at small size
+```
+
+**Клинок теней (shadow_blade)**
+
+```
+a slim dagger half dissolving into shadow, burnt amber accents, an emblem rather than a character, dark fantasy game item icon, single object centered, slight 3/4 angle, painterly semi-realistic, muted desaturated palette of ash grey, rust brown and dried blood, weathered and worn surfaces, soft rim light from the upper left, deep neutral background, no text, no watermark, no border, square 1:1 composition, crisp readable silhouette at small size
+```
+
+
 ## Иконки разделов мини-аппа
 
 Не предметы, а навигация — поэтому плоские и монохромные, иначе перетянут внимание с содержимого. Кладутся в miniapp/src/assets/icons/.

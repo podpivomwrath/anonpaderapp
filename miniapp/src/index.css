@@ -58,10 +58,22 @@ body {
 }
 
 .hub-banner {
+  /* Эмблема пути слева, текст справа. align-items: center, а не flex-start:
+     блок текста бывает в две строки и в три (золото показывают не всем), и
+     по верхнему краю эмблема висела бы то у имени, то над ним. */
+  display: flex;
+  align-items: center;
+  gap: 12px;
   padding: 20px 16px 16px;
   background: linear-gradient(160deg, #3a0a12 0%, #1a0508 100%);
   color: #f2d9dc;
   border-bottom: 1px solid #c81e3a55;
+}
+
+.hub-banner__text {
+  /* min-width: 0 - иначе длинное имя распирает flex-элемент шире колонки,
+     и строка уезжает под край экрана вместо переноса. */
+  min-width: 0;
 }
 
 .hub-banner__name {

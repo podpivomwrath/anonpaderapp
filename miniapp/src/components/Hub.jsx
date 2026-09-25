@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
+import ItemIcon from './ItemIcon.jsx';
 import {
   Panel, PanelHeader, PanelHeaderButton, Placeholder, Spinner, Div, Button,
 } from '@vkontakte/vkui';
@@ -190,6 +191,17 @@ export default function Hub() {
       )}
 
       <div className="hub-banner">
+        {/* Эмблема пути. Стоит у имени, а не у слова «Тёмный мистик»:
+            подкласс выбирают один раз и навсегда, и в шапке он часть того,
+            КТО ты, а не ещё одна строка характеристик. */}
+        {character.subclass && (
+          <ItemIcon
+            icon={`subclass:${character.subclass}`}
+            alt={character.subclass_title}
+            size={44}
+          />
+        )}
+        <div className="hub-banner__text">
         <p className="hub-banner__name">
           {character.name}
           {character.title ? ` «${character.title}»` : ''}
@@ -206,6 +218,7 @@ export default function Hub() {
             💰 {money(character.farm_currency)} · 💎 {money(character.donate_currency)}
           </p>
         )}
+        </div>
       </div>
 
       {/* Карте ширина нужна вся: она рисует сетку мира, и в узкой колонке
