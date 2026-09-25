@@ -65,6 +65,14 @@ _KEEPER_NPC = load_npc_texts("list_keeper")
 KEEPER = _KEEPER_NPC["subclass_select"]
 KEEPER_ATTACHMENT = photo_attachment(_KEEPER_NPC["image"]) if _KEEPER_NPC.get("image") else None
 
+
+def path_attachment(subclass_id: str) -> str | None:
+    """Иллюстрация пути - там, где игрок читает про него целиком и ещё может
+    передумать. Пустой id означает, что картинки пока нет: сообщение уйдёт
+    без вложения, как уходило до сих пор."""
+    photo_id = KEEPER.get("path_images", {}).get(subclass_id)
+    return photo_attachment(photo_id) if photo_id else None
+
 STATE_OFFER = "subclass_offer"
 STATE_PATH_SELECT = "subclass_path_select"
 STATE_PATH_CONFIRM = "subclass_path_confirm"
@@ -249,7 +257,8 @@ async def path_view(message: Message) -> None:
         peer_id, SubclassSelectState.PATH_CONFIRM, pending_subclass=subclass_id
     )
     await message.answer(
-        KEEPER["path_descriptions"][subclass_id], keyboard=path_view_keyboard()
+        KEEPER["path_descriptions"][subclass_id], keyboard=path_view_keyboard(),
+        attachment=path_attachment(subclass_id),
     )
 
 

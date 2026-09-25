@@ -48,6 +48,7 @@
       "title": "Чужие деньги",
       "level_min": 15,
       "level_max": 25,
+      "image": null,
       "quests": [
         {
           "id": "docks_2_1",
@@ -92,6 +93,7 @@
       "title": "Тот, кто платит",
       "level_min": 25,
       "level_max": 30,
+      "image": null,
       "quests": [
         {
           "id": "docks_3_1",
@@ -128,6 +130,7 @@
       "title": "Списанные",
       "level_min": 30,
       "level_max": 45,
+      "image": null,
       "quests": [
         {
           "id": "docks_4_1",
@@ -184,6 +187,7 @@
       "title": "Расчёт",
       "level_min": 45,
       "level_max": 60,
+      "image": null,
       "quests": [
         {
           "id": "docks_5_1",

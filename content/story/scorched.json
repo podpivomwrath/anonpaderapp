@@ -48,6 +48,7 @@
       "title": "Те, кто не ждут",
       "level_min": 15,
       "level_max": 25,
+      "image": null,
       "quests": [
         {
           "id": "scorched_2_1",
@@ -104,6 +105,7 @@
       "title": "Голос из пепла",
       "level_min": 25,
       "level_max": 30,
+      "image": null,
       "quests": [
         {
           "id": "scorched_3_1",
@@ -140,6 +142,7 @@
       "title": "Топливо",
       "level_min": 30,
       "level_max": 45,
+      "image": null,
       "quests": [
         {
           "id": "scorched_4_1",
@@ -196,6 +199,7 @@
       "title": "Второй раскол",
       "level_min": 45,
       "level_max": 60,
+      "image": null,
       "quests": [
         {
           "id": "scorched_5_1",

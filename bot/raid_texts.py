@@ -18,6 +18,7 @@
 Интерфейсные подписи (BTN_*, счётчик готовности) и строки механик (⚠️-строки,
 множители лута) намеренно НЕ трогались - они должны оставаться сухими."""
 
+from bot.vk_media import photo_attachment
 from game.economy import raid_config as rc
 
 MONOLITH_CALL_TEXT = (
@@ -189,3 +190,19 @@ def contribution_table(rows) -> str:
 
 def _thousands(value: int) -> str:
     return f"{value:,}".replace(",", " ")
+
+
+# --- Иллюстрации этапов (фото в альбоме группы VK, как у мобов и событий) ---
+
+# Один кадр на БОЙ, а не на противника: на втором этапе трое именных кукол,
+# и по замыслу они стоят в одном кадре (промты - tools/raid_art_prompts.md).
+#
+# Пустая строка означает "картинка ещё не загружена": сообщение тогда уходит
+# без вложения, как уходило до сих пор. Рейд не должен падать из-за того, что
+# художник не успел.
+STAGE_PHOTO_IDS: dict[int, str] = {1: "", 2: "", 3: ""}
+
+
+def stage_attachment(stage: int) -> str | None:
+    photo_id = STAGE_PHOTO_IDS.get(stage)
+    return photo_attachment(photo_id) if photo_id else None

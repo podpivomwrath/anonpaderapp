@@ -47,6 +47,7 @@ from bot.onboarding_texts import REGION_TITLES
 from bot.world_summary import location_attachment, location_summary
 from bot.world_texts import (
     FOREIGN_NPC_REJECTION,
+    act_attachment,
     city_square_text,
     event_attachment,
     foreign_city_entry_text,
@@ -1146,7 +1147,7 @@ async def talk_to_mentor(message: Message) -> None:
                 and story_result.group_kick.kicked_character_id == character.id
             ):
                 story_text += f"\n\n{group_texts.level_gap_kick_self_line()}"
-            await message.answer(story_text)
+            await message.answer(story_text, attachment=act_attachment(story_result.act_image))
             if story_result.levels_gained > 0:
                 await stats_window.notify_levelup(
                     message.peer_id, story_result.levels_gained, story_result.new_level

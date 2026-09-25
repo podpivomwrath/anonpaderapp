@@ -117,6 +117,13 @@ def hub_attachment(region: str) -> str | None:
     return photo_attachment(photo_id) if photo_id else None
 
 
+def act_attachment(photo_id: str | None) -> str | None:
+    """Иллюстрация сюжетного акта. id приходит из контента через
+    services/story_service.py: сервис не знает про вложения ВК, а хендлер не
+    знает про устройство сюжета."""
+    return photo_attachment(photo_id) if photo_id else None
+
+
 def event_attachment(event_id: str) -> str | None:
     photo_id = EVENT_PHOTO_IDS.get(event_id)
     return photo_attachment(photo_id) if photo_id else None

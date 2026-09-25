@@ -67,6 +67,18 @@ def _find(line: StoryLineDef, quest_id: str) -> tuple[int, StoryQuestDef] | None
     return None
 
 
+def act_opening_image(line: StoryLineDef, quest_id: str) -> str | None:
+    """Картинка акта - только если quest_id ОТКРЫВАЕТ свой акт.
+
+    Иначе она повторялась бы на каждом задании акта и перестала бы что-либо
+    значить. Возвращается сырой id фото: сервис не знает про вложения ВК,
+    их собирает хендлер."""
+    for act in line.acts:
+        if act.quests and act.quests[0].id == quest_id:
+            return act.image
+    return None
+
+
 def _next(line: StoryLineDef, quest_id: str) -> tuple[int, StoryQuestDef] | None:
     flat = _flatten(line)
     for idx, (_, quest) in enumerate(flat):
@@ -155,6 +167,9 @@ class StoryTurnResult:
     new_level: int = 1
     region_completed: bool = False
     group_kick: "group_service.LevelGapKick | None" = None  # патч 51, ч.2
+    # Строго ПОСЛЕДНИМ: существующие вызовы передают поля позиционно, и новое
+    # поле в середине молча сдвинуло бы levels_gained в чужой слот.
+    act_image: str | None = None  # id фото акта, если этот ход открывает акт
 
 
 async def get_progress(db: AsyncSession, character: Character) -> CharacterStoryProgress | None:
@@ -216,14 +231,20 @@ async def visit_mentor(
         reward_text, levelup, group_kick = await _grant(db, character, stats, quest)
         await _advance_pointer(db, row, line, quest.id)
         text = f"{format_text(quest.assign_text, character)}\n\n{reward_text}".strip()
-        return StoryTurnResult(text, levelup.levels_gained, levelup.new_level, row.completed, group_kick)
+        return StoryTurnResult(
+            text, levelup.levels_gained, levelup.new_level, row.completed, group_kick,
+            act_image=act_opening_image(line, quest.id),
+        )
 
     if quest.kind == "city_scene":
         reward_text, levelup, group_kick = await _grant(db, character, stats, quest)
         await _advance_pointer(db, row, line, quest.id)
         assign = format_text(quest.assign_text, character)
         text = f"{assign}\n\n{reward_text}" if reward_text else assign
-        return StoryTurnResult(text, levelup.levels_gained, levelup.new_level, row.completed, group_kick)
+        return StoryTurnResult(
+            text, levelup.levels_gained, levelup.new_level, row.completed, group_kick,
+            act_image=act_opening_image(line, quest.id),
+        )
 
     if quest.kind == "travel_combat":
         if row.status == "ready":
@@ -234,7 +255,10 @@ async def visit_mentor(
             return StoryTurnResult(text, levelup.levels_gained, levelup.new_level, row.completed, group_kick)
         row.quest_seen = True
         await db.flush()
-        return StoryTurnResult(text=_format_assign(quest, character))
+        return StoryTurnResult(
+            text=_format_assign(quest, character),
+            act_image=act_opening_image(line, quest.id),
+        )
 
     return None
 

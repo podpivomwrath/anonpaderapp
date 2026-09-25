@@ -47,6 +47,7 @@
       "title": "Гниль в корнях",
       "level_min": 15,
       "level_max": 25,
+      "image": null,
       "quests": [
         {
           "id": "woods_2_1",
@@ -103,6 +104,7 @@
       "title": "Отступник",
       "level_min": 25,
       "level_max": 30,
+      "image": null,
       "quests": [
         {
           "id": "woods_3_1",
@@ -139,6 +141,7 @@
       "title": "Голос из глубины",
       "level_min": 30,
       "level_max": 45,
+      "image": null,
       "quests": [
         {
           "id": "woods_4_1",
@@ -194,6 +197,7 @@
       "title": "Договор расторгнут",
       "level_min": 45,
       "level_max": 60,
+      "image": null,
       "quests": [
         {
           "id": "woods_5_1",

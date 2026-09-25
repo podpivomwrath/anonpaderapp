@@ -46,6 +46,15 @@
     "trials_header": "- Вот твои испытания. Бери любое, порядка нет - важен путь, не очередь.",
     "trials_all_done": "- Список пуст. Метка выучила всё, чему я мог её научить. Дальше - только ты.",
     "trial_entry_open": "🔓 {buff_name}",
-    "trial_entry_locked": "🔒 {buff_name} - {progress}/{target}: {text}"
+    "trial_entry_locked": "🔒 {buff_name} - {progress}/{target}: {text}",
+    "_comment_path_images": "Иллюстрация пути: показывается вместе с его описанием, в тот единственный момент, когда игрок читает про путь целиком и ещё может передумать. Пустая строка - картинки пока нет, сообщение уйдёт без вложения. id - номер фото в альбоме группы ВК, как у мобов и событий.",
+    "path_images": {
+      "guardian": "",
+      "blood_knight": "",
+      "shadow_blade": "",
+      "poisoner": "",
+      "elementalist": "",
+      "dark_mystic": ""
+    }
   }
 }
