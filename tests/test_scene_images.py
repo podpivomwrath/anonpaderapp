@@ -137,3 +137,27 @@ def test_story_turn_result_keeps_act_image_last() -> None:
 
     fields = list(StoryTurnResult.__dataclass_fields__)
     assert fields[-1] == "act_image", f"act_image обязан быть последним, сейчас {fields}"
+
+
+# --- Промты не должны отставать от контента -------------------------------
+
+PROMPTS = ROOT / "tools" / "story_art_prompts.md"
+
+
+def test_every_picture_slot_has_a_prompt_written_for_it() -> None:
+    """Слот без промта - это картинка, которую никто не закажет.
+
+    Тот же урок, из-за которого промты иконок генерируются из контента
+    (tools/icon_prompts.py): список, набранный руками, расходится с игрой на
+    первом же новом акте, и замечают это по пустому месту в чате.
+    """
+    doc = PROMPTS.read_text(encoding="utf-8")
+
+    missing = [s.title for s in REGISTRY.values() if s.title not in doc]
+    assert not missing, f"пути без промта: {missing}"
+
+    for region in REGIONS:
+        for act in load_story_line(region).acts:
+            if act.act == 1:
+                continue
+            assert act.title in doc, f"{region}: у акта «{act.title}» нет промта"
