@@ -13,6 +13,7 @@ from dataclasses import dataclass
 from sqlalchemy import func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from game.economy import raid_config as rc
 from models import Character, Group, GroupMember, RaidLobby, RaidLobbyMember, RaidRun
 
 
@@ -142,6 +143,41 @@ async def leave_lobby_if_present(db: AsyncSession, character_id: int) -> LobbySn
     if lobby is not None and lobby.leader_character_id == character_id:
         lobby.leader_character_id = min(remaining, key=lambda m: m.id).character_id
         await db.flush()
+    return await get_snapshot(db, lobby_id)
+
+
+async def prune_absent_members(db: AsyncSession, lobby_id: int) -> LobbySnapshot | None:
+    """Выводит из лобби всех, кто уже не стоит на клетке Монолита.
+
+    Уйти с Монолита можно не одним способом: шагом (bot/handlers/world.py),
+    поездкой на маунте (bot/handlers/mounts.py, он же вызывается с карты
+    мини-аппа) и телепортом администратора. Учтён был только шаг. Из-за
+    этого лобби Гостуса провисело в базе шесть дней и рассылало «Готовы:
+    0/4» после каждого перезапуска бота.
+
+    Поэтому правило проверяется ЗДЕСЬ - один раз и по факту позиции, а не в
+    каждом обработчике, который двигает персонажа. Новый способ
+    перемещения не потребует помнить про рейд-лобби.
+
+    Персонаж в пути считается ушедшим сразу: pos_x/y меняются только по
+    прибытии, но поездка начинается именно с Монолита и всегда ведёт с
+    него.
+
+    None - лобби распущено, потому что не осталось никого.
+    """
+    rows = (
+        await db.execute(
+            select(Character)
+            .join(RaidLobbyMember, RaidLobbyMember.character_id == Character.id)
+            .where(RaidLobbyMember.lobby_id == lobby_id)
+        )
+    ).scalars().all()
+    absent = [
+        c.id for c in rows
+        if (c.pos_x, c.pos_y) != rc.MONOLITH_COORDS or c.travel_target_x is not None
+    ]
+    for character_id in absent:
+        await leave_lobby_if_present(db, character_id)
     return await get_snapshot(db, lobby_id)
 
 

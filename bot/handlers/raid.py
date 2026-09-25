@@ -181,11 +181,21 @@ async def cancel_ready(message: Message) -> None:
 
 
 _published: dict[int, tuple] = {}
+# Метки публикации живут в памяти процесса, а лобби - в базе. После
+# перезапуска бота меток нет, и первая же сверка рассылала неизменившуюся
+# строку заново. Игрок видел «Готовы: 0/4» в случайные часы - это были
+# деплои. Пока бот лежит, состояние лобби менять некому, поэтому первый
+# проход сверки только ЗАПОМИНАЕТ подписи, ничего не отправляя.
+_primed = False
+
+
+def _signature(snapshot) -> tuple:
+    return (snapshot.leader_character_id, snapshot.denominator,
+            tuple((c.id, ready) for c, ready in snapshot.members))
 
 
 async def publish_lobby(snapshot) -> None:
-    signature = (snapshot.leader_character_id, snapshot.denominator,
-                 tuple((c.id, ready) for c, ready in snapshot.members))
+    signature = _signature(snapshot)
     if _published.get(snapshot.id) == signature:
         return
     # Метку ставим ДО рассылки, а не после. publish_lobby зовут из двух мест:
@@ -215,6 +225,7 @@ async def publish_lobby(snapshot) -> None:
 
 async def reconcile_lobbies() -> None:
     """Also reacts to group exits/kicks and movement after their transactions commit."""
+    global _primed
     async with get_session_factory()() as db:
         ids = list(await db.scalars(select(RaidLobby.id).where(RaidLobby.status == "waiting")))
     for old in set(_published) - set(ids):
@@ -223,6 +234,13 @@ async def reconcile_lobbies() -> None:
         try:
             async with get_session_factory()() as db:
                 snapshot = await rs.get_snapshot(db, lobby_id)
+                if snapshot is not None and not _primed:
+                    # Запоминаем ДО чистки: это та строка, которую игроки
+                    # видели последней. Если чистка что-то изменит,
+                    # publish_lobby заметит расхождение и отправит новую.
+                    _published[snapshot.id] = _signature(snapshot)
+                snapshot = await rs.prune_absent_members(db, lobby_id)
+                await db.commit()
             if snapshot is not None:
                 await publish_lobby(snapshot)
                 if rs.is_ready_to_start(snapshot):
@@ -231,6 +249,7 @@ async def reconcile_lobbies() -> None:
             continue  # retry after the participant's current transition
         except Exception:
             logger.exception("Raid lobby reconciliation failed: {}", lobby_id)
+    _primed = True
 
 
 async def _start_raid_from_lobby(lobby_id: int) -> None:
