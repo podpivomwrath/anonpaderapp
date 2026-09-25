@@ -49,6 +49,13 @@ class BoardEntry:
     value: str
     title: str | None = None
     premium: bool = False
+    #: Нужны мини-аппу (значок класса в строке) и crown_service (кто первый).
+    #: Раньше строка топа несла только имя, и опознать по ней персонажа было
+    #: нечем - имена уникальны лишь по индексу, а правило топа не должно
+    #: держаться на чужом индексе.
+    character_id: int | None = None
+    base_class: str | None = None
+    subclass: str | None = None
 
 
 def _premium(premium_until: datetime | None, now: datetime) -> bool:
@@ -87,6 +94,7 @@ async def _character_board(
             select(
                 Character.name, order_column, Character.active_title_id,
                 Character.premium_until, Character.pvp_losses,
+                Character.id, Character.base_class, Character.subclass,
             )
             .where(Character.creation_state.is_(None), order_column >= min_value)
             .order_by(desc(order_column), *(tiebreak or (Character.id.asc(),)))
@@ -98,8 +106,12 @@ async def _character_board(
             rank=i, name=name, value=value_fn(value, losses),
             title=title_service.name_of(title_id) if title_id else None,
             premium=_premium(premium_until, now),
+            character_id=character_id, base_class=base_class, subclass=subclass,
         )
-        for i, (name, value, title_id, premium_until, losses) in enumerate(rows, start=1)
+        for i, (
+            name, value, title_id, premium_until, losses,
+            character_id, base_class, subclass,
+        ) in enumerate(rows, start=1)
     ]
 
 
@@ -161,6 +173,7 @@ async def fish_weight_board(db: AsyncSession, limit: int = 10) -> list[BoardEntr
                 Character.id, Character.name, CharacterFishRecord.fish_id,
                 CharacterFishRecord.weight_grams, Character.active_title_id,
                 Character.premium_until, CharacterFishRecord.caught_at,
+                Character.base_class, Character.subclass,
             )
             .join(best, best.c.character_id == CharacterFishRecord.character_id)
             .join(Character, Character.id == CharacterFishRecord.character_id)
@@ -176,7 +189,10 @@ async def fish_weight_board(db: AsyncSession, limit: int = 10) -> list[BoardEntr
 
     seen: set[int] = set()
     entries: list[BoardEntry] = []
-    for character_id, name, fish_id, grams, title_id, premium_until, _caught_at in rows:
+    for (
+        character_id, name, fish_id, grams, title_id, premium_until, _caught_at,
+        base_class, subclass,
+    ) in rows:
         # Страховка на случай, когда у игрока два вида весят одинаково и оба
         # прошли фильтр максимума: в топе он всё равно должен быть один раз.
         # Ключ - id, а не имя: имена сейчас уникальны (uq_characters_name_lower),
@@ -193,6 +209,7 @@ async def fish_weight_board(db: AsyncSession, limit: int = 10) -> list[BoardEntr
             value=f"{fishing.format_kg(grams)} · {emoji}{label}",
             title=title_service.name_of(title_id) if title_id else None,
             premium=_premium(premium_until, now),
+            character_id=character_id, base_class=base_class, subclass=subclass,
         ))
         if len(entries) >= limit:
             break
@@ -217,6 +234,13 @@ _LOADERS = {
     BOARD_FISH_WEIGHT: fish_weight_board,
     BOARD_MINING: mining_board,
 }
+
+
+async def leader_character_id(db: AsyncSession, board_id: str) -> int | None:
+    """Кто сейчас первый. None - на доске вообще никого (все ниже порога
+    min_value или список пуст)."""
+    top = await board(db, board_id, limit=1)
+    return top[0].character_id if top else None
 
 
 async def board(db: AsyncSession, board_id: str, limit: int = 10) -> list[BoardEntry]:

@@ -87,6 +87,25 @@ SUBCLASS_FILES = {
     "subclass:dark_mystic": "путь_06_тёмный_мистик.png",
 }
 
+#: Картинки, которых нет в контенте игры: значки базовых классов и рамки
+#: венцов топ-1 (патч 91). Промты для них написаны руками
+#: (tools/crown_art_prompts.md), из контента они не выводятся, поэтому и
+#: живут отдельным списком, а не в генераторе промтов.
+#:
+#: Отсутствующий файл - это НЕ ошибка: картинка может быть ещё не нарисована.
+#: Мини-апп в таком случае просто не покажет значок (ItemIcon отдаёт null),
+#: а отчёт скажет, чего не хватает.
+EXTRA_FILES = {
+    "class:warrior": "класс_01_воин.png",
+    "class:rogue": "класс_02_разбойник.png",
+    "class:mage": "класс_03_маг.png",
+    "crown:pvp": "венец_01_клинок.png",
+    "crown:kills": "венец_02_охотник.png",
+    "crown:fishing": "венец_03_мастер_лески.png",
+    "crown:fish_weight": "венец_04_трофей.png",
+    "crown:mining": "венец_05_жила.png",
+}
+
 BG_OUT = ROOT / "miniapp" / "src" / "assets"
 BG_CSS = ROOT / "miniapp" / "src" / "background.css"
 
@@ -192,11 +211,36 @@ def main() -> None:
         total_out += (OUT / name).stat().st_size
         mapping[key] = name
 
+    # Рамки венцов ОСТАЮТСЯ с альфа-каналом: они накладываются поверх значка
+    # класса, и залитая середина закрыла бы его целиком. Остальные иконки
+    # сводятся в RGB - прозрачность им не нужна, а вес с ней больше.
+    not_drawn: list[str] = []
+    for key, filename in EXTRA_FILES.items():
+        source = SRC / filename
+        if not source.exists():
+            not_drawn.append(f"{key} ({filename})")
+            continue
+        name = slug(key) + ".webp"
+        keep_alpha = key.startswith("crown:")
+        with Image.open(source) as image:
+            image = image.convert("RGBA" if keep_alpha else "RGB")
+            image.thumbnail((SIZE, SIZE), Image.LANCZOS)
+            image.save(OUT / name, "WEBP", quality=QUALITY, method=6)
+        total_src += source.stat().st_size
+        total_out += (OUT / name).stat().st_size
+        mapping[key] = name
+
     write_map(mapping)
     write_backgrounds(backgrounds)
 
     print(f"подключено: {len(mapping)} иконок, фонов: {len(backgrounds)}")
     print(f"вес: {total_src / 1e6:.0f} МБ -> {total_out / 1e3:.0f} КБ")
+    if not_drawn:
+        # Не «потеряно», а «ещё не нарисовано» - отдельной строкой, чтобы
+        # не путалось с настоящими промахами привязки.
+        print(f"\nещё не нарисованы ({len(not_drawn)}):")
+        for item in not_drawn:
+            print(f"  {item}")
     if missing:
         print(f"\nбез картинки ({len(missing)}):")
         for item in missing:

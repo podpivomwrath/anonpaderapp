@@ -25,6 +25,7 @@ from bot.handlers import promo as promo_handlers
 from bot.handlers import pvp as pvp_handlers
 from bot.handlers import fishing as fishing_handlers
 from bot.handlers import mining as mining_handlers
+from bot.handlers import crowns as crown_handlers
 from bot.handlers import raid as raid_handlers
 from bot.handlers import raid_combat as raid_combat_handlers
 from bot.handlers import respawn as respawn_handlers
@@ -220,6 +221,17 @@ async def run() -> None:
     respawn_scheduler.start()
     respawn_scheduler.add_job(raid_handlers.reconcile_lobbies, "interval", seconds=3,
                              id="raid_lobbies", max_instances=1, coalesce=True)
+
+    # Венцы топ-1 (патч 91): раз в сутки. Не вживую - движок боя берёт
+    # характеристики на старте сессии, и смена венца посреди боя
+    # рассинхронила бы бой с тем, что игрок видит на экране.
+    # Час ночной: пересчёт задевает бонусы, и лучше, чтобы он случался не
+    # посреди вечерней игры.
+    crown_handlers.setup(bot.api)
+    respawn_scheduler.add_job(
+        crown_handlers.recompute_and_notify, "cron", hour=3, minute=0,
+        id="crowns_daily", max_instances=1, coalesce=True,
+    )
 
     # Маунты (патч 25, п.7): нападения/прибытия/live-отсчёт — свой job,
     # интервал из game/economy/mount_config.py (игровая тонкая настройка, не

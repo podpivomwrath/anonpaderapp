@@ -30,6 +30,7 @@ from game.content_loader import MineDef, OreDef
 from game.economy import mining
 from game.economy import mining_config as mc
 from models import Character, CharacterOre, MineVein, MiningEvent
+from services import crown_service
 
 # --- Клетка -------------------------------------------------------------------
 
@@ -255,6 +256,7 @@ async def start_dig(
         tier, event_vein = mining.ring_tier(character.pos_x, character.pos_y), True
 
     seconds = mining.roll_dig_seconds(rng, tier, character.mining_level, event_vein)
+    seconds *= crown_service.mining_multiplier(character)  # венец «Жила», патч 91
     character.mining_ends_at = now + timedelta(seconds=seconds)
     character.mining_mine_id = mine.id if mine is not None else None
     await db.flush()

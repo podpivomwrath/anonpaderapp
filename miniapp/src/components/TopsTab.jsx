@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Group, Header, Div, Spinner, Placeholder, Tabs, TabsItem } from '@vkontakte/vkui';
 import { getLeaderboard } from '../api.js';
+import ClassIcon from './ClassIcon.jsx';
 
 // Патч 58: раньше здесь был один топ (PvP). Теперь их четыре, и список вкладок
 // приходит С СЕРВЕРА вместе с данными — клиент не хранит собственную копию
@@ -84,6 +85,14 @@ export default function TopsTab() {
           {top.map((e) => (
             <div className="stat-row" key={e.rank}>
               <span className="stat-row__label">
+                {/* Венец только у первого места: рамка и есть награда за
+                    него, второму и третьему не достаётся ничего (патч 91). */}
+                <ClassIcon
+                  subclass={e.subclass}
+                  baseClass={e.base_class}
+                  crown={e.rank === 1 ? board : null}
+                  size={28}
+                />
                 {e.rank}. {e.premium && '💠 '}
                 {e.name}
               </span>

@@ -24,6 +24,7 @@ from services import (
     daily_service,
     derived_stats_service,
     item_service,
+    crown_service,
     leaderboard_service,
     lootbox_service,
     premium_service,
@@ -79,6 +80,10 @@ def _character_payload(
         # Название резолвит СЕРВЕР (патч 73): раньше клиент показывал
         # сырой id и в шапке висело «dark_mystic».
         "subclass_title": naming.subclass_title(character.subclass),
+        # Венец топ-1 (патч 91). Держать можно сразу несколько досок, но
+        # рамка в шапке одна: берём первую в порядке BOARDS, иначе она
+        # менялась бы от показа к показу вслед за порядком выдачи из базы.
+        "crowns": crown_service.crown_boards(character),
         "region": character.region,
         "region_title": REGION_TITLES.get(character.region, "-") if character.region else "-",
         "level": character.level,
@@ -263,7 +268,11 @@ async def handle_get_leaderboard(request: web.Request) -> web.Response:
             ],
             "top": [
                 {"rank": e.rank, "name": e.name, "value": e.value,
-                 "title": e.title, "premium": e.premium}
+                 "title": e.title, "premium": e.premium,
+                 # Значок класса в строке. Подкласс есть не у всех (до 30
+                 # уровня его нет вовсе), поэтому клиенту отдаются оба, а
+                 # он показывает подкласс, если тот выбран.
+                 "base_class": e.base_class, "subclass": e.subclass}
                 for e in entries
             ],
         })

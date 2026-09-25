@@ -29,7 +29,7 @@ from game.content_loader import FishDef, LakeDef
 from game.economy import fishing
 from game.economy import fishing_config as fc
 from models import Character, CharacterFish, CharacterFishRecord
-from services import wallet_service
+from services import crown_service, wallet_service
 
 # --- Клетка ------------------------------------------------------------------
 
@@ -316,6 +316,7 @@ async def sell_bag(
     bag = await get_bag(db, character.id)
     if not bag:
         return 0, 0
+    multiplier *= crown_service.fish_sale_multiplier(character)
     gold = sum(
         round(fishing.price_of(definition.id, grams, grade_id) * multiplier)
         for definition, grade_id, grams in bag

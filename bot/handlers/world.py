@@ -1032,11 +1032,11 @@ async def move(message: Message) -> None:
         # и "вышел из группы" (см. services/group_service.py).
         if (character.pos_x, character.pos_y) == raid_cfg.MONOLITH_COORDS:
             await raid_service.leave_lobby_if_present(db, character.id)
-        movement_service.start_travel(character, dx, dy, now)
+        travel_seconds = movement_service.start_travel(character, dx, dy, now)
         await db.commit()
         # в пути — кнопки убираем, вернём по прибытии (чистка визуального шума)
         await message.answer(flavor.travel_line(_rng), keyboard=kb.waiting_keyboard())
-        _travel_scheduler.schedule(message.peer_id, wc.CELL_TRAVEL_SECONDS)
+        _travel_scheduler.schedule(message.peer_id, travel_seconds)
 
 
 async def handle_arrival(peer_id: int) -> None:

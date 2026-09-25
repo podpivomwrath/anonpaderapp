@@ -155,6 +155,16 @@ class Character(Base):
     # в extend() при каждом продлении, чтобы уведомления сработали заново на
     # следующий срок. Доставка — тот же механизм, что character._daily_notice
     # (services/onboarding_service.py::get_character), не отдельный канал.
+    # Венцы топ-1 (патч 91): {id доски: когда получен, ISO}. Колонкой, а не
+    # отдельной таблицей со связью, по одной конкретной причине: бонус
+    # читают там, где до базы уже не дотянуться. experience_service
+    # .add_experience принимает готового персонажа и про сессию не знает - и
+    # не должен, это ЕДИНСТВЕННАЯ точка начисления опыта в игре (патч 50).
+    # Связь пришлось бы подгружать лениво, а ленивая подгрузка в асинхронном
+    # коде падает с MissingGreenlet на первом же персонаже, которого создали
+    # и тут же наградили опытом.
+    crowns: Mapped[dict] = mapped_column(JSON, default=dict, server_default="{}")
+
     premium_warn_sent: Mapped[bool] = mapped_column(Boolean, default=False)
     premium_expire_notified: Mapped[bool] = mapped_column(Boolean, default=False)
 
@@ -165,6 +175,7 @@ class Character(Base):
     buff_presets: Mapped[list["CharacterBuffPreset"]] = relationship(
         back_populates="character", cascade="all, delete-orphan"
     )
+
 
 
 class CharacterStats(Base):

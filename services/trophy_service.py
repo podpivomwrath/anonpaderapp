@@ -13,7 +13,7 @@ from game.content_loader import TrophyDef, load_trophy_defs
 from game.economy import loot
 from game.world import grid
 from models import Character, CharacterTrophy
-from services import wallet_service
+from services import crown_service, wallet_service
 
 _trophy_defs: dict[str, TrophyDef] | None = None
 
@@ -106,7 +106,11 @@ async def sell_all(db: AsyncSession, character: Character, price_multiplier: flo
     stock = await get_stock(db, character.id)
     if not stock:
         return 0
-    total = round(sum(d.sell_price * count for d, count in stock) * price_multiplier)
+    total = round(
+        sum(d.sell_price * count for d, count in stock)
+        * price_multiplier
+        * crown_service.mob_gold_multiplier(character)
+    )
     for d, _count in stock:
         row = await _get_row(db, character.id, d.id)
         row.count = 0
@@ -126,7 +130,11 @@ async def sell_one(
     trophy_def = _defs().get(trophy_id)
     if trophy_def is None:
         return 0
-    total = round(trophy_def.sell_price * row.count * price_multiplier)
+    total = round(
+        trophy_def.sell_price * row.count
+        * price_multiplier
+        * crown_service.mob_gold_multiplier(character)
+    )
     row.count = 0
     await wallet_service.deposit(db, character.id, "farm", total)
     await db.flush()
