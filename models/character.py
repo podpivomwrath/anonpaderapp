@@ -164,6 +164,15 @@ class Character(Base):
     # коде падает с MissingGreenlet на первом же персонаже, которого создали
     # и тут же наградили опытом.
     crowns: Mapped[dict] = mapped_column(JSON, default=dict, server_default="{}")
+    # Какую рамку игрок носит, когда венцов несколько. Бонусы при этом
+    # действуют ВСЕ - выбирается только вид.
+    #   None       - не выбирал: показываем первый венец по порядку досок;
+    #   "off"      - снял рамку намеренно;
+    #   id доски   - выбрал её.
+    # Отдельное значение для «снял» нужно потому, что пустой выбор и
+    # осознанный отказ - разные вещи: иначе снятая рамка возвращалась бы
+    # сама при получении следующего венца.
+    crown_frame: Mapped[str | None] = mapped_column(String(32), nullable=True)
 
     premium_warn_sent: Mapped[bool] = mapped_column(Boolean, default=False)
     premium_expire_notified: Mapped[bool] = mapped_column(Boolean, default=False)

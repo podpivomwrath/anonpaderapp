@@ -197,6 +197,90 @@ def test_every_board_has_a_title_and_an_effect() -> None:
     assert set(cc.CROWN_EFFECTS) == set(BOARDS)
 
 
+# --- Выбор рамки (патч 92) --------------------------------------------------
+
+
+async def test_without_a_choice_the_first_crown_is_worn(db_session, make_character) -> None:
+    player = await make_character(level=60)
+    player.crowns = {"mining": "2026-09-01T00:00:00+00:00", "pvp": "2026-09-02T00:00:00+00:00"}
+    await db_session.flush()
+
+    # Порядок берётся из BOARDS, а не из порядка ключей в JSON - иначе рамка
+    # менялась бы от показа к показу.
+    assert crown_service.frame_board(player) == leaderboard_service.BOARD_PVP
+
+
+async def test_player_can_wear_the_crown_he_prefers(db_session, make_character) -> None:
+    player = await make_character(level=60)
+    player.crowns = {"pvp": "2026-09-01T00:00:00+00:00", "mining": "2026-09-01T00:00:00+00:00"}
+    await db_session.flush()
+
+    assert crown_service.set_frame(player, leaderboard_service.BOARD_MINING) is True
+    assert crown_service.frame_board(player) == leaderboard_service.BOARD_MINING
+
+
+async def test_taking_the_frame_off_survives_a_new_crown(db_session, make_character) -> None:
+    """«Снял» и «не выбирал» - разные вещи. Если их смешать, снятая рамка
+    вернётся сама, как только игрок возьмёт следующий венец."""
+    player = await make_character(level=60)
+    player.crowns = {"pvp": "2026-09-01T00:00:00+00:00"}
+    await db_session.flush()
+    crown_service.set_frame(player, None)
+    assert crown_service.frame_board(player) is None
+
+    player.crowns = {**player.crowns, "mining": "2026-09-02T00:00:00+00:00"}
+    await db_session.flush()
+
+    assert crown_service.frame_board(player) is None
+
+
+async def test_cannot_wear_a_crown_you_do_not_hold(db_session, make_character) -> None:
+    player = await make_character(level=60)
+    player.crowns = {"pvp": "2026-09-01T00:00:00+00:00"}
+    await db_session.flush()
+
+    assert crown_service.set_frame(player, leaderboard_service.BOARD_MINING) is False
+    assert crown_service.frame_board(player) == leaderboard_service.BOARD_PVP
+
+
+async def test_losing_the_worn_crown_falls_back_to_another(db_session, make_character) -> None:
+    """Выбор остаётся записанным, а венца уже нет: показывать его рамку -
+    значит показывать награду, которую отобрали."""
+    player = await make_character(level=60)
+    player.crowns = {"pvp": "2026-09-01T00:00:00+00:00", "mining": "2026-09-01T00:00:00+00:00"}
+    await db_session.flush()
+    crown_service.set_frame(player, leaderboard_service.BOARD_MINING)
+
+    player.crowns = {"pvp": "2026-09-01T00:00:00+00:00"}
+    await db_session.flush()
+
+    assert crown_service.frame_board(player) == leaderboard_service.BOARD_PVP
+
+
+async def test_all_bonuses_work_regardless_of_the_worn_frame(db_session, make_character) -> None:
+    """Рамка - только вид. Бонусы действуют все сразу, иначе выбор рамки
+    превратился бы в выбор бонуса."""
+    player = await make_character(level=10)
+    player.crowns = {"pvp": "2026-09-01T00:00:00+00:00", "mining": "2026-09-01T00:00:00+00:00"}
+    await db_session.flush()
+    crown_service.set_frame(player, leaderboard_service.BOARD_MINING)
+
+    assert crown_service.xp_multiplier(player) == 1 + cc.XP_BONUS
+    assert crown_service.mining_multiplier(player) == 1 - cc.MINING_CUT
+
+
+async def test_menu_describes_every_held_crown(db_session, make_character) -> None:
+    player = await make_character(level=60)
+    player.crowns = {"pvp": "2026-09-01T00:00:00+00:00"}
+    await db_session.flush()
+
+    (row,) = crown_service.menu(player)
+    assert row["board"] == leaderboard_service.BOARD_PVP
+    assert row["title"] == cc.CROWN_TITLES[leaderboard_service.BOARD_PVP]
+    assert row["effect"] == cc.CROWN_EFFECTS[leaderboard_service.BOARD_PVP]
+    assert row["board_title"]
+
+
 def test_arrival_is_scheduled_by_the_actual_travel_time() -> None:
     """Планировщик прибытия обязан брать ТУ ЖЕ величину, что записана в
     travel_arrives_at.

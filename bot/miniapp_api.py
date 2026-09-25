@@ -84,6 +84,10 @@ def _character_payload(
         # рамка в шапке одна: берём первую в порядке BOARDS, иначе она
         # менялась бы от показа к показу вслед за порядком выдачи из базы.
         "crowns": crown_service.crown_boards(character),
+        # Рамка выбирается, бонусы действуют ВСЕ. Подменю приходит готовыми
+        # строками: формат принадлежит серверу (патч 57).
+        "crown_frame": crown_service.frame_board(character),
+        "crown_menu": crown_service.menu(character),
         "region": character.region,
         "region_title": REGION_TITLES.get(character.region, "-") if character.region else "-",
         "level": character.level,
@@ -241,6 +245,36 @@ async def handle_get_trials(request: web.Request) -> web.Response:
                 ],
             }
         )
+
+
+async def handle_post_crown_frame(request: web.Request) -> web.Response:
+    """Какую рамку носить. {"board": "pvp"} или {"board": null} — снять."""
+    vk_user_id = request[VK_USER_ID_KEY]
+    try:
+        body = await request.json()
+    except Exception:
+        return web.json_response({"error": "bad_request"}, status=400)
+    if not isinstance(body, dict):
+        return web.json_response({"error": "bad_request"}, status=400)
+
+    board = body.get("board")
+    if board is not None and not isinstance(board, str):
+        return web.json_response({"error": "bad_request"}, status=400)
+
+    session_factory = request.app[SESSION_FACTORY_KEY]
+    async with session_factory() as session:
+        character = await _load_character(session, vk_user_id)
+        if character is None:
+            return web.json_response({"error": "character_not_found"}, status=404)
+        # Венец могли отобрать между открытием подменю и нажатием: выбор
+        # чужой рамки отклоняем, а не молча показываем её.
+        if not crown_service.set_frame(character, board):
+            return web.json_response({"error": "crown_not_held"}, status=400)
+        await session.commit()
+        return web.json_response({
+            "crown_frame": crown_service.frame_board(character),
+            "crown_menu": crown_service.menu(character),
+        })
 
 
 async def handle_get_leaderboard(request: web.Request) -> web.Response:
@@ -646,6 +680,7 @@ async def handle_post_preset_buy_slot(request: web.Request) -> web.Response:
 def register_routes(app: web.Application) -> None:
     app.router.add_get("/api/miniapp/character", handle_get_character)
     app.router.add_post("/api/miniapp/stats", handle_post_stats)
+    app.router.add_post("/api/miniapp/crown-frame", handle_post_crown_frame)
     app.router.add_get("/api/miniapp/trials", handle_get_trials)
     app.router.add_get("/api/miniapp/inventory", handle_get_inventory)
     app.router.add_post("/api/miniapp/equip", handle_post_equip)

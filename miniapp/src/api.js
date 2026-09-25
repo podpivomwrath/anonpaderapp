@@ -99,6 +99,17 @@ export async function getLeaderboard(board) {
   return request(`/leaderboard?board=${encodeURIComponent(board)}`);
 }
 
+// Патч 92: какую рамку венца носить. board === null - снять рамку.
+// Бонусы при этом не трогаются: действуют все венцы сразу, выбирается
+// только вид.
+export function setCrownFrame(board) {
+  return request('/crown-frame', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ board }),
+  });
+}
+
 export function getDailies() {
   return request('/dailies');
 }

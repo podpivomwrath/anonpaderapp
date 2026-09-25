@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import ClassIcon from './ClassIcon.jsx';
+import CrownPicker from './CrownPicker.jsx';
 import {
   Panel, PanelHeader, PanelHeaderButton, Placeholder, Spinner, Div, Button,
 } from '@vkontakte/vkui';
@@ -43,6 +44,7 @@ function money(value) {
 export default function Hub() {
   const [activeTab, setActiveTab] = useState('character');
   const [menuOpen, setMenuOpen] = useState(false);
+  const [crownOpen, setCrownOpen] = useState(false);
   const [character, setCharacter] = useState(null);
   const [status, setStatus] = useState('loading'); // loading | ready | error
   const [ban, setBan] = useState(null);
@@ -190,16 +192,44 @@ export default function Hub() {
         </>
       )}
 
+      {crownOpen && (
+        <CrownPicker
+          menu={character.crown_menu || []}
+          current={character.crown_frame || null}
+          onChange={(res) => setCharacter((prev) => ({ ...prev, ...res }))}
+          onClose={() => setCrownOpen(false)}
+        />
+      )}
+
       <div className="hub-banner">
         {/* Эмблема пути. Стоит у имени, а не у слова «Тёмный мистик»:
             подкласс выбирают один раз и навсегда, и в шапке он часть того,
             КТО ты, а не ещё одна строка характеристик. */}
-        <ClassIcon
-          subclass={character.subclass}
-          baseClass={character.base_class}
-          crown={character.crowns?.[0] || null}
-          size={44}
-        />
+        {/* Нажатие открывает выбор рамки. Кнопкой эмблема становится только
+            при наличии венца: выбирать иначе не из чего, а мнимая кнопка
+            хуже её отсутствия. */}
+        {character.crown_menu?.length ? (
+          <button
+            type="button"
+            className="hub-banner__emblem"
+            onClick={() => setCrownOpen(true)}
+            aria-label="Рамка"
+          >
+            <ClassIcon
+              subclass={character.subclass}
+              baseClass={character.base_class}
+              crown={character.crown_frame || null}
+              size={44}
+            />
+          </button>
+        ) : (
+          <ClassIcon
+            subclass={character.subclass}
+            baseClass={character.base_class}
+            crown={character.crown_frame || null}
+            size={44}
+          />
+        )}
         <div className="hub-banner__text">
         <p className="hub-banner__name">
           {character.name}

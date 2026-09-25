@@ -64,6 +64,56 @@ def crown_boards(character: Character) -> list[str]:
     return [board for board in leaderboard_service.BOARDS if board in held]
 
 
+#: Записывается в crown_frame, когда игрок снял рамку намеренно. Ни одна
+#: доска так не называется, спутать не с чем.
+FRAME_OFF = "off"
+
+
+def frame_board(character: Character) -> str | None:
+    """Какую рамку показывать. None - никакой.
+
+    Выбор проверяется на актуальность: венец можно потерять, а строка в
+    crown_frame останется. Показывать рамку доски, которую игрок больше не
+    держит, нельзя - это ровно та награда, которую у него забрали.
+    """
+    held = crown_boards(character)
+    choice = character.crown_frame
+    if choice == FRAME_OFF:
+        return None
+    if choice in held:
+        return choice
+    # Не выбирал или выбор устарел - первый венец по порядку досок.
+    return held[0] if held else None
+
+
+def set_frame(character: Character, board: str | None) -> bool:
+    """board=None - снять рамку. False, если такого венца у игрока нет."""
+    if board is None:
+        character.crown_frame = FRAME_OFF
+        return True
+    if board not in crown_boards(character):
+        return False
+    character.crown_frame = board
+    return True
+
+
+def menu(character: Character) -> list[dict]:
+    """Что показать в подменю выбора рамки - готовыми строками.
+
+    Формат принадлежит серверу: клиент в этом проекте уже однажды
+    пересказывал серверное правило своими словами и соврал (патч 57).
+    """
+    return [
+        {
+            "board": board,
+            "title": cc.CROWN_TITLES.get(board, board),
+            "board_title": leaderboard_service.BOARD_TITLES.get(board, board),
+            "effect": cc.CROWN_EFFECTS.get(board, ""),
+        }
+        for board in crown_boards(character)
+    ]
+
+
 def held_since(character: Character, board: str) -> datetime | None:
     raw = _crowns(character).get(board)
     return datetime.fromisoformat(raw) if raw else None

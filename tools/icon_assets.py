@@ -96,14 +96,14 @@ SUBCLASS_FILES = {
 #: Мини-апп в таком случае просто не покажет значок (ItemIcon отдаёт null),
 #: а отчёт скажет, чего не хватает.
 EXTRA_FILES = {
-    "class:warrior": "класс_01_воин.png",
-    "class:rogue": "класс_02_разбойник.png",
-    "class:mage": "класс_03_маг.png",
-    "crown:pvp": "венец_01_клинок.png",
-    "crown:kills": "венец_02_охотник.png",
-    "crown:fishing": "венец_03_мастер_лески.png",
-    "crown:fish_weight": "венец_04_трофей.png",
-    "crown:mining": "венец_05_жила.png",
+    "class:warrior": "класс_воин_путь_стали.png",
+    "class:rogue": "класс_разбойник.png",
+    "class:mage": "класс_маг.png",
+    "crown:pvp": "рамка_топ1_pvp_клинок.png",
+    "crown:kills": "рамка_топ1_убийства_охотник.png",
+    "crown:fishing": "рамка_топ1_рыбалка_мастер_лески.png",
+    "crown:fish_weight": "рамка_топ1_рекорд_рыбы_трофей.png",
+    "crown:mining": "рамка_топ1_горное_дело_жила.png",
 }
 
 BG_OUT = ROOT / "miniapp" / "src" / "assets"
