@@ -352,6 +352,24 @@ def load_lakes(content_dir: Path = CONTENT_DIR) -> list[LakeDef]:
     return [LakeDef(**raw) for raw in _load_json(content_dir / "fishing" / "lakes.json")]
 
 
+class WorldBossDef(BaseModel):
+    """Мировой босс (content/world_bosses.json, патч 104).
+
+    Только облик: имя, описание, картинка. Сила и награда от босса не
+    зависят - их задаёт кольцо, где он появился
+    (game/economy/world_boss_config.py). Привязки к региону нет.
+    """
+
+    id: str
+    name: str
+    flavor: str
+    image: str = ""
+
+
+def load_world_bosses(content_dir: Path = CONTENT_DIR) -> list[WorldBossDef]:
+    return [WorldBossDef(**raw) for raw in _load_json(content_dir / "world_bosses.json")]
+
+
 class OreDef(BaseModel):
     """Вид руды (content/mining/ores.json, патч 59) — каталог: имя/эмодзи/лор.
 

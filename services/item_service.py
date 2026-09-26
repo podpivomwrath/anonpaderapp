@@ -115,19 +115,23 @@ async def grant_from_kill(
 
 
 async def grant_random_item(
-    db: AsyncSession, character: Character, ilvl: int, rng: random.Random
+    db: AsyncSession, character: Character, ilvl: int, rng: random.Random,
+    rarity_id: str | None = None,
 ) -> Item:
     """Гарантированный ролл предмета (редкость по обычным весам, БЕЗ внешнего
     ITEM_DROP_CHANCE) — для источников со своим гейтом выше по стеку (напр.
-    горстка пепла, патч 25, п.4: сам ~2% шанс уже сыгран вызывающим кодом)."""
-    roll = rng.random()
-    cumulative = 0.0
-    rarity_id = None
-    for rid, chance in ic.ITEM_RARITY_CHANCES.items():
-        cumulative += chance
-        if roll < cumulative:
-            rarity_id = rid
-            break
+    горстка пепла, патч 25, п.4: сам ~2% шанс уже сыгран вызывающим кодом).
+
+    rarity_id (патч 104) — редкость уже разыграна вызывающим по своей таблице
+    (пул мирового босса); тогда здесь выбирается только слот и статы."""
+    if rarity_id is None:
+        roll = rng.random()
+        cumulative = 0.0
+        for rid, chance in ic.ITEM_RARITY_CHANCES.items():
+            cumulative += chance
+            if roll < cumulative:
+                rarity_id = rid
+                break
     if rarity_id is None:
         rarity_id = next(iter(ic.ITEM_RARITY_CHANCES))
     if premium_service.is_premium(character):

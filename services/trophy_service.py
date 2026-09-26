@@ -235,6 +235,7 @@ DROP_SOURCE_PREFIXES: dict[str, str] = {
     "monolith_shard": "Среди осколков лежит",
     "wounded_wanderer": "Он вкладывает тебе в ладонь",
     "ash_altar": "Среди подношений",
+    "world_boss": "С босса осыпается",
 }
 
 

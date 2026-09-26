@@ -33,6 +33,7 @@ from bot.handlers import raid_combat as raid_combat_handlers
 from bot.handlers import respawn as respawn_handlers
 from bot.handlers import stats_window as stats_window_handlers
 from bot.handlers import world as world_handlers
+from bot.handlers import world_boss as world_boss_handlers
 from bot.webhook import WEBHOOK_PATH, create_app
 from config import Settings, get_settings
 from game.combat import balance_config as bc
@@ -260,6 +261,14 @@ async def run() -> None:
     respawn_scheduler.add_job(
         crown_handlers.recompute_and_notify, "cron", hour=3, minute=0,
         id="crowns_daily", max_instances=1, coalesce=True,
+    )
+
+    # Мировые боссы (патч 104): уход по истечении времени - раз в минуту.
+    # Появление отдельной задачи не требует, его двигают исследования.
+    world_boss_handlers.setup(bot.api)
+    respawn_scheduler.add_job(
+        world_boss_handlers.expire_job, "interval", minutes=1,
+        id="world_boss_expire", max_instances=1, coalesce=True,
     )
 
     # Маунты (патч 25, п.7): нападения/прибытия/live-отсчёт — свой job,

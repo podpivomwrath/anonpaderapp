@@ -27,6 +27,7 @@ from bot.handlers.raid import labeler as raid_labeler
 from bot.handlers.raid_combat import labeler as raid_combat_labeler
 from bot.handlers.stats_window import labeler as stats_window_labeler
 from bot.handlers.world import labeler as world_labeler
+from bot.handlers.world_boss import labeler as world_boss_labeler
 
 LABELERS = [
     onboarding_labeler, world_labeler, combat_labeler, group_combat_labeler, pvp_labeler, appraiser_labeler,
@@ -42,6 +43,9 @@ LABELERS = [
     # Патч 59: горное дело. Тут та же причина, что у рыбалки —
     # команда одним словом («Рудник») иначе ушла бы в промокоды.
     mining_labeler,
+    # Патч 104: мировые боссы - команда одним словом («Босс»), та же
+    # причина, что у рыбалки и горного дела.
+    world_boss_labeler,
     # Патч 51, ч.2: группы — команды конкретные ("пригласить <ник>", "/выйти",
     # "/выгнать <ник>"), но одиночное слово "пригласить" (приглашение
     # пересылкой) технически проходит под тот же regex, что и промокод —

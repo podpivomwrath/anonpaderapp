@@ -38,6 +38,7 @@ from bot.handlers import inventory as inventory_handlers
 from bot.handlers import pvp as pvp_handlers
 from bot.handlers import raid_combat as raid_combat_handlers
 from bot.handlers import stats_window
+from bot.handlers import world_boss as world_boss_handlers
 from bot.keyboards import fishing as fishing_kb
 from bot.keyboards import mining as mining_kb
 from bot.keyboards import raid as raid_kb
@@ -96,6 +97,7 @@ from services import (
     trophy_service,
     vitals_service,
     wallet_service,
+    world_boss_service,
 )
 from services import onboarding_service as onboarding_svc
 from services.db import get_session_factory
@@ -431,6 +433,7 @@ async def show_location(message: Message, db, character) -> None:
     # Патч 59: уход с клетки обнуляет незаконченную добычу.
     await mining_service_abandon(character)
     await maybe_send_mine_button(message.peer_id, character)
+    await world_boss_handlers.maybe_send_here_button(message.peer_id, character)
 
 
 @labeler.message(text=[kb.BTN_GATE])
@@ -706,8 +709,13 @@ async def handle_explore_done(peer_id: int) -> None:
         # случайный неполный рудник. Рудники — общий ресурс, который наполняет
         # активность всего сервера, а не персональный кран.
         await mining_service.spawn_ore(db, _rng)
+        # Патч 104: тот же принцип для мировых боссов - счётчик наполняет
+        # активность всего сервера.
+        new_boss = await world_boss_service.record_exploration(db, _rng)
         daily_progress = await daily_service.record_exploration(db, character)
         await db.commit()
+        if new_boss is not None:
+            world_boss_handlers.on_spawned(new_boss.id)
         gear_bonus = await item_service.compute_gear_bonus(db, character.id)
         buff_modifiers = await preset_service.resolve_active_modifiers(db, character)
 
@@ -1130,6 +1138,7 @@ async def handle_arrival(peer_id: int) -> None:
         # Патч 59: уход с клетки обнуляет незаконченную добычу.
         await mining_service_abandon(character)
         await maybe_send_mine_button(peer_id, character)
+        await world_boss_handlers.maybe_send_here_button(peer_id, character)
 
 
 @labeler.message(text=[kb.BTN_MENTOR, kb.BTN_MENTOR_BADGE])

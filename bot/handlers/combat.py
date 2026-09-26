@@ -85,6 +85,10 @@ _battle_trackers: dict[int, BattleTracker] = {}
 _story_encounter: dict[int, tuple[str, int]] = {}
 # peer_id -> id mount_travels для боя-нападения в пути на маунте (патч 25, п.7)
 _mount_ambush: dict[int, int] = {}
+# peer_id -> id мирового босса (world_bosses.id) для захода к нему (патч 104).
+# Ходы такого боя ведёт bot/handlers/world_boss.py: общее здоровье, лимит
+# ходов, свой итог вместо победы/смерти.
+_world_boss: dict[int, int] = {}
 # колбэк смерти игрока (world.on_player_defeat): убрать кнопки, текст, запустить респавн
 on_defeat_hook = None
 
@@ -280,7 +284,48 @@ async def start_mount_ambush_encounter(
     )
 
 
+async def start_world_boss_encounter(
+    peer_id: int, character, char_stats, gear_bonus, buff_modifiers,
+    boss_pk: int, encounter: encounters.Encounter,
+) -> None:
+    """Заход к мировому боссу (патч 104): обычный соло-бой с теми же
+    кнопками, но ходы ведёт bot/handlers/world_boss.py."""
+    _world_boss[peer_id] = boss_pk
+    await start_encounter(
+        peer_id, character, char_stats, gear_bonus, buff_modifiers, forced_encounter=encounter
+    )
+
+
+def world_boss_of(peer_id: int) -> int | None:
+    return _world_boss.get(peer_id)
+
+
+def world_boss_fighters() -> dict[int, int]:
+    """peer_id -> id босса у всех, кто сейчас в заходе."""
+    return dict(_world_boss)
+
+
+def end_world_boss_fight(peer_id: int) -> None:
+    """Закрывает заход без наград и без смерти: итог считает world_boss.py.
+    HP игрока не сохраняется - босс не бьёт, терять было нечего."""
+    _engine.abort_session(peer_id)
+    _world_boss.pop(peer_id, None)
+    _encounter_class.pop(peer_id, None)
+    _encounter_mob_level.pop(peer_id, None)
+    _last_player_hp.pop(peer_id, None)
+    _battle_trackers.pop(peer_id, None)
+
+
+def render_board(state: CombatSessionState, result: TickResult | None = None) -> str:
+    return _render(state, result)
+
+
 async def on_tick_resolved(session_id: int, tick: int, result: TickResult) -> None:
+    if session_id in _world_boss:
+        from bot.handlers import world_boss as world_boss_handlers  # избегаем цикла импортов
+
+        await world_boss_handlers.on_tick(session_id, tick, result)
+        return
     state = _engine.sessions.get(session_id)
     if state is None:
         return  # бой уже завершён этим ходом — сообщение отправит on_battle_finished
@@ -300,6 +345,11 @@ async def on_tick_resolved(session_id: int, tick: int, result: TickResult) -> No
 
 async def on_battle_finished(session_id: int, result: TickResult) -> None:
     peer_id = session_id
+    if _world_boss.pop(peer_id, None) is not None:
+        # Заход к боссу закрывает world_boss.on_tick сам (end_world_boss_fight),
+        # сюда он дойти не должен. Если всё же дошёл - ни победы, ни смерти.
+        end_world_boss_fight(peer_id)
+        return
     _encounter_class.pop(peer_id, None)
     mob_level = _encounter_mob_level.pop(peer_id, 1)
     final_hp = _last_player_hp.pop(peer_id, None)
@@ -689,6 +739,10 @@ async def interrupt_for_pvp(peer_id: int) -> None:
     (тем же путём, что и обычный побег)."""
     if not has_active_encounter(peer_id):
         return
+    if peer_id in _world_boss:
+        # Урон захода уже записан по ходам - просто закрываем бой.
+        end_world_boss_fight(peer_id)
+        return
     hp = _engine.sessions[peer_id].combatants[PLAYER_ID].current_hp
     _engine.abort_session(peer_id)
     _encounter_class.pop(peer_id, None)
@@ -702,6 +756,12 @@ async def flee(message: Message) -> None:
     peer_id = message.peer_id
     if not has_active_encounter(peer_id):
         await _no_encounter(message)
+        return
+    if peer_id in _world_boss:
+        # От босса уходят всегда: он не держит и не бьёт в спину.
+        from bot.handlers import world_boss as world_boss_handlers  # избегаем цикла импортов
+
+        await world_boss_handlers.leave(peer_id)
         return
     if _rng.random() < FLEE_SUCCESS_CHANCE:
         # сохраняем остаток HP игрока перед выходом из боя
