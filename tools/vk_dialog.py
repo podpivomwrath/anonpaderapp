@@ -23,7 +23,7 @@ from pathlib import Path
 import aiohttp
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-from config import get_settings  # noqa: E402
+from config import get_settings
 
 PUPSIK = 106468413
 #: Время - московское: по нему живут ежедневки и весь игровой календарь.
