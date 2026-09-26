@@ -88,7 +88,7 @@ async def _setup(factory, hp: int, level: int = 60) -> tuple[int, int]:
         db.add_all([boss, user])
         await db.flush()
         character = Character(
-            user_id=user.id, name="Боец", base_class="warrior", level=level,
+            user_id=user.id, name="Боец", base_class="warrior", level=level, region="ridge",
             pos_x=x, pos_y=y, last_active_at=now,
         )
         db.add(character)
@@ -146,7 +146,9 @@ async def test_killing_blow_ends_the_boss_and_pays_out(wired) -> None:
     boss_pk, _ = await _setup(factory, hp=50)
 
     await handler.attack(_Message())
-    await _hit()
+    # Удар может промахнуться - бьём, пока заход не кончится.
+    while combat.world_boss_of(PEER) is not None:
+        await _hit()
 
     assert combat.world_boss_of(PEER) is None
     async with factory() as db:
@@ -154,3 +156,8 @@ async def test_killing_blow_ends_the_boss_and_pays_out(wired) -> None:
     assert boss.status == "killed" and boss.hp == 0
     assert any("пал" in text for text in sent), sent
     assert any("Опыт +" in text for text in sent)
+    # итог босса раньше сводки локации: сводка несёт клавиатуру карты и
+    # должна быть последним сообщением
+    fell = next(i for i, text in enumerate(sent) if "пал" in text)
+    over = next(i for i, text in enumerate(sent) if "Заход окончен" in text)
+    assert fell < over

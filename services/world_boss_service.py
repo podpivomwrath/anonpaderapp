@@ -227,6 +227,8 @@ class DamageResult:
     killed_now: bool
     #: босса больше нет (убит кем-то, ушёл) - заход окончен
     over: bool
+    #: весь урон этого игрока по этому боссу, со всех заходов
+    my_total: int = 0
 
 
 async def apply_damage(
@@ -236,12 +238,12 @@ async def apply_damage(
     boss = await _lock(db, boss_pk)
     if boss is None:
         return DamageResult(0, 1, 0, False, True)
+    row = await _contribution(db, boss.id, character_id)
     if not is_alive(boss, now):
-        return DamageResult(boss.hp, boss.max_hp, 0, False, True)
+        return DamageResult(boss.hp, boss.max_hp, 0, False, True, row.damage if row else 0)
     dealt = max(0, min(damage, boss.hp))
     if dealt:
         boss.hp -= dealt
-        row = await _contribution(db, boss.id, character_id)
         if row is None:
             row = WorldBossContribution(
                 world_boss_id=boss.id, character_id=character_id, damage=0, attempts=0,
@@ -254,7 +256,7 @@ async def apply_damage(
         boss.status = KILLED
         boss.ended_at = now
     await db.flush()
-    return DamageResult(boss.hp, boss.max_hp, dealt, killed, killed)
+    return DamageResult(boss.hp, boss.max_hp, dealt, killed, killed, row.damage if row else 0)
 
 
 async def damage_by_character(db: AsyncSession, boss_pk: int) -> dict[int, int]:

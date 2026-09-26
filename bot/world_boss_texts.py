@@ -81,6 +81,10 @@ def turn_header(tick: int) -> str:
     return f"⚔️ БОЙ - ход {tick}/{wbc.ATTEMPT_TURNS}"
 
 
+def contribution_lines(attempt: int, total: int) -> str:
+    return f"🗡 Урон за заход: {attempt}\n📊 Твой вклад в босса: {total}"
+
+
 def attempt_over_text(dealt: int, total: int, boss_gone: bool) -> str:
     text = f"Заход окончен. Урон за заход: {dealt}, всего твой вклад: {total}."
     if not boss_gone:

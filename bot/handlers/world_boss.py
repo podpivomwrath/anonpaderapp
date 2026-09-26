@@ -12,7 +12,6 @@
 
 import asyncio
 import random
-from datetime import datetime, timezone
 
 from loguru import logger
 from vkbottle.bot import BotLabeler, Message
@@ -221,14 +220,17 @@ async def on_tick(peer_id: int, tick: int, result) -> None:
     finished = damage.over or tick >= wbc.ATTEMPT_TURNS or result.finished
     board = combat_handlers.render_board(state, result)
     board = board.replace(board.split("\n", 1)[0], texts.turn_header(tick), 1)
+    board += "\n\n" + texts.contribution_lines(_attempt_damage[peer_id], damage.my_total)
     if not finished:
         await _send(peer_id, board, keyboard=combat_handlers.rebuild_keyboard(peer_id))
         return
 
     await _send(peer_id, board, keyboard=empty_keyboard())
-    await _close_attempt(peer_id, boss_gone=damage.over)
     if damage.killed_now:
+        # Этот заход закроет _finish_boss вместе с остальными - после итога.
         await _finish_boss(boss_pk, granted)
+        return
+    await _close_attempt(peer_id, boss_gone=damage.over)
 
 
 async def leave(peer_id: int) -> None:
@@ -236,11 +238,11 @@ async def leave(peer_id: int) -> None:
     await _close_attempt(peer_id, boss_gone=False)
 
 
-async def _close_attempt(peer_id: int, boss_gone: bool) -> None:
+async def _close_attempt(peer_id: int, boss_gone: bool, boss_pk: int | None = None) -> None:
     from bot.handlers import combat as combat_handlers  # избегаем цикла импортов
     from bot.handlers import world as world_handlers  # избегаем цикла импортов
 
-    boss_pk = combat_handlers.world_boss_of(peer_id)
+    boss_pk = combat_handlers.world_boss_of(peer_id) or boss_pk
     combat_handlers.end_world_boss_fight(peer_id)
     character_id = _fighter.pop(peer_id, None)
     _known_hp.pop(peer_id, None)
@@ -252,22 +254,32 @@ async def _close_attempt(peer_id: int, boss_gone: bool) -> None:
         character = await onboarding_service.get_character(db, peer_id)
         if character is None:
             return
-        keyboard = await world_handlers._current_keyboard(
-            db, character, peer_id, datetime.now(timezone.utc)
-        )
-    await _send(peer_id, texts.attempt_over_text(dealt, total, boss_gone), keyboard=keyboard)
+        # После захода - сводка локации, как после обычного боя: без неё
+        # игрок оставался с одной строкой итога и не видел, где стоит.
+        summary = await world_handlers.location_summary_parts(db, character, peer_id)
+    await _send(peer_id, texts.attempt_over_text(dealt, total, boss_gone))
+    text, attachment, keyboard = summary
+    await _send(peer_id, text, attachment=attachment, keyboard=keyboard)
 
 
 # --- Конец босса ------------------------------------------------------------------
 
 
 async def _finish_boss(boss_pk: int, granted) -> None:
-    """Босс убит или ушёл: закрываем чужие заходы и рассылаем итоги."""
+    """Босс убит или ушёл: рассылаем итоги и закрываем все заходы к нему.
+
+    Итог идёт первым: закрытие захода присылает сводку локации с клавиатурой
+    карты, и она должна быть последним сообщением у игрока."""
     from bot.handlers import combat as combat_handlers  # избегаем цикла импортов
 
-    for peer_id, fighting_pk in combat_handlers.world_boss_fighters().items():
-        if fighting_pk == boss_pk:
-            await _close_attempt(peer_id, boss_gone=True)
+    fighting = [
+        peer_id for peer_id, fighting_pk in combat_handlers.world_boss_fighters().items()
+        if fighting_pk == boss_pk
+    ]
+    # Бой закрываем сразу, сообщения - после итога: иначе ход, пришедший
+    # между ними, ещё успел бы сходить по мёртвому боссу.
+    for peer_id in fighting:
+        combat_handlers.end_world_boss_fight(peer_id)
 
     async with get_session_factory()() as db:
         boss = await db.get(WorldBoss, boss_pk)
@@ -282,6 +294,8 @@ async def _finish_boss(boss_pk: int, granted) -> None:
     )
     total = sum(got.damage for got in granted or [])
     await _notify_results(boss, granted or [], peers, total)
+    for peer_id in fighting:
+        await _close_attempt(peer_id, boss_gone=True, boss_pk=boss_pk)
 
 
 async def _notify_results(boss: WorldBoss, granted, peers: dict[int, int | None], total: int) -> None:

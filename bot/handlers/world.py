@@ -379,6 +379,24 @@ async def _render_city_screen(db, character, screen: str | None) -> tuple[str, s
     return text, kb.city_square_keyboard(character, mentor_badge, has_mount=has_mount, is_foreign=is_foreign)
 
 
+async def location_summary_parts(db, character, peer_id: int) -> tuple[str, str | None, str]:
+    """Сводка клетки карты целиком: текст, картинка, клавиатура перемещения.
+    Для тех, кто возвращает игрока на карту вне обычного показа локации
+    (заход к мировому боссу, патч 104)."""
+    stats = await _get_stats(db, character.id)
+    wallet = await wallet_service.get_wallet(db, character.id)
+    gear_bonus = await item_service.compute_gear_bonus(db, character.id)
+    quest_line = await story_service.quest_summary_line(db, character)
+    group_block = await group_texts.group_summary_block(db, character.id)
+    has_mount = await mount_service.has_any_mount(db, character.id)
+    text = _map_text(
+        character, stats, wallet.farm_currency, gear_bonus, quest_line,
+        wallet.donate_currency, group_block,
+    )
+    keyboard = kb.movement_keyboard(character.pos_x, character.pos_y, peer_id, has_mount=has_mount)
+    return text, location_attachment(character), keyboard
+
+
 async def show_location(message: Message, db, character) -> None:
     """Показывает текущий контекст персонажа: город / клетка карты / в пути / мёртв."""
     await _deliver_daily_notice(message.peer_id, character)
