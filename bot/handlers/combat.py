@@ -23,6 +23,7 @@ from bot.keyboards.world import (
     movement_keyboard,
     waiting_keyboard,
 )
+from bot.battle_keyboard import answer_battle_gone, in_any_battle
 from bot.vk_media import photo_attachment
 from bot.world_texts import mentor_name
 from game.combat import balance_config as bc
@@ -103,6 +104,22 @@ def setup(engine: TickEngine, bot_api) -> None:
 
 def has_active_encounter(peer_id: int) -> bool:
     return _engine is not None and peer_id in _engine.sessions
+
+
+async def _no_encounter(message: Message) -> None:
+    """Кнопка обычного боя, а самого боя в памяти процесса нет (патч 97).
+
+    Так бывает после деплоя посреди боя: реестр боёв живёт в памяти, а
+    клавиатура у игрока на экране остаётся. Раньше обработчик молча выходил,
+    и игрок жал «Атака» в пустоту - снаружи это неотличимо от мёртвого бота.
+    PvP и рейд отвечают на такое давно (bot/battle_keyboard.answer_battle_gone),
+    обычный бой - нет.
+
+    Отвечаем, ТОЛЬКО если игрок не в бою вообще. Текст этих кнопок может
+    совпадать с кнопками групповых боёв, и чужой бой перехватывать нельзя.
+    """
+    if not in_any_battle(message.peer_id):
+        await answer_battle_gone(message)
 
 
 async def _get_position(peer_id: int) -> tuple[int, int, bool]:
@@ -523,6 +540,7 @@ async def item_choice(message: Message) -> None:
 @labeler.message(text=[BTN_ATTACK])
 async def attack(message: Message) -> None:
     if not has_active_encounter(message.peer_id):
+        await _no_encounter(message)
         return
     try:
         await _engine.declare_action(
@@ -535,6 +553,7 @@ async def attack(message: Message) -> None:
 @labeler.message(payload_contains={"type": "skill"})
 async def use_skill(message: Message) -> None:
     if not has_active_encounter(message.peer_id):
+        await _no_encounter(message)
         return
     payload = message.get_payload_json() or {}
     skill_id = payload.get("id")
@@ -565,6 +584,7 @@ async def use_item(message: Message) -> None:
     просто не показываются в списке, с пояснением."""
     peer_id = message.peer_id
     if not has_active_encounter(peer_id):
+        await _no_encounter(message)
         return
     state = _engine.sessions[peer_id]
     player = state.combatants[PLAYER_ID]
@@ -597,6 +617,7 @@ async def use_item(message: Message) -> None:
 async def use_combat_item(message: Message) -> None:
     peer_id = message.peer_id
     if not has_active_encounter(peer_id):
+        await _no_encounter(message)
         return
     payload = message.get_payload_json() or {}
     elixir_id = payload.get("id")
@@ -677,6 +698,7 @@ async def interrupt_for_pvp(peer_id: int) -> None:
 async def flee(message: Message) -> None:
     peer_id = message.peer_id
     if not has_active_encounter(peer_id):
+        await _no_encounter(message)
         return
     if _rng.random() < FLEE_SUCCESS_CHANCE:
         # сохраняем остаток HP игрока перед выходом из боя
