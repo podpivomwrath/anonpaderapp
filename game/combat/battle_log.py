@@ -28,9 +28,11 @@ def _action_word(label: str) -> str:
 
 
 def _hit_line(hit: RenderedHit, source_name: str, target_name: str, mode: str) -> str:
-    if hit.missed:
-        return f"{source_name} → атака по {target_name} - промах, {target_name} уклоняется"
     word = _action_word(hit.label)
+    if hit.missed:
+        # Промах называет то, чем били: навык, промахнувшийся «атакой»,
+        # выглядел так, будто нажатие не сработало.
+        return f"{source_name} → {word} по {target_name} - промах, {target_name} уклоняется"
     crit = " (крит!)" if hit.crit else ""
     before = display.hp_percent(hit.hp_before, hit.max_hp, mode)
     after = display.hp_percent(hit.hp_after, hit.max_hp, mode)

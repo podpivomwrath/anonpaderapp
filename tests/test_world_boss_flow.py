@@ -161,3 +161,15 @@ async def test_killing_blow_ends_the_boss_and_pays_out(wired) -> None:
     fell = next(i for i, text in enumerate(sent) if "пал" in text)
     over = next(i for i, text in enumerate(sent) if "Заход окончен" in text)
     assert fell < over
+
+
+def test_missed_skill_is_named_in_the_log() -> None:
+    """На заходе к боссу игрок нажал навык, а промах в логе назвался «атакой»."""
+    from game.combat.battle_log import _hit_line
+    from game.combat.resolver import RenderedHit
+
+    hit = RenderedHit(
+        source_id=1, target_id=2, source_side=0, target_side=1, label="Кровавый пакт",
+        amount=0, crit=False, missed=True, is_dot=False, hp_before=10, hp_after=10, max_hp=10,
+    )
+    assert "Кровавый пакт по Босс - промах" in _hit_line(hit, "Игрок", "Босс", "pve")
