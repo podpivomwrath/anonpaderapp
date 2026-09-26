@@ -87,6 +87,29 @@ def _consume_heal_item(ctx: SkillContext, item_id: str | None) -> None:
     )
 
 
+def _dies_this_tick(mob: CombatantState, incoming: list) -> bool:
+    """Умрёт ли моб от ударов этого хода - тогда он не бьёт в ответ.
+
+    Раньше сравнивалась сырая сумма урона с HP. С лимитом урона за удар и
+    щитом (патч 103) это врало в пользу игрока: Гулкий латник, у которого за
+    удар уходит не больше 15%, получал «смертельный» удар, выживал - и всё
+    равно пропускал ход, будто умер. Здесь урон считается так же, как его
+    потом применит движок: с лимитом за удар, за вычетом щита, и моб с
+    «последним вздохом» не умирает вовсе.
+    """
+    if mob.has_effect(EffectKind.LAST_BREATH):
+        return False
+    cap = mob.effect_total(EffectKind.DAMAGE_CAP)
+    total = 0
+    for hit in incoming:
+        amount = hit.amount
+        if cap > 0 and amount > 0:
+            amount = min(amount, max(round(mob.max_hp * cap), 1))
+        total += amount
+    shield = sum(e.value for e in mob.effects_of(EffectKind.SHIELD_POOL))
+    return total - shield >= mob.current_hp
+
+
 def _apply_last_breath_guard(combatant: CombatantState, result: "TickResult") -> None:
     """Последний вздох (патч 16): если HP<=0 и эффект активен — спасение
     на 1 HP, один раз, эффект снимается."""
@@ -94,7 +117,13 @@ def _apply_last_breath_guard(combatant: CombatantState, result: "TickResult") ->
         return
     combatant.effects = [e for e in combatant.effects if e.kind != EffectKind.LAST_BREATH]
     combatant.current_hp = 1
-    result.lines.append(f"✨ Последний вздох удерживает {combatant.name} на грани (1 HP)")
+    brain = getattr(combatant, "mob_brain", None)
+    if brain is not None:
+        # У мобов это не эликсир, а их способность («Не уйду», «Не умер») -
+        # строка про эликсир игроков тут сбивала бы с толку.
+        result.lines.append(f"✨ {combatant.name}: {brain.ability.title.lower()} - держится на 1 HP")
+    else:
+        result.lines.append(f"✨ Последний вздох удерживает {combatant.name} на грани (1 HP)")
 
 
 @dataclass
@@ -299,10 +328,12 @@ def resolve_tick(
     # Патч 25, п.3: в PvE моб, которого хиты этого хода уже опускают до 0 HP,
     # не наносит ответный урон — мёртвый не бьёт. В PvP правила резолва не
     # меняются (взаимное уничтожение — валидный исход).
-    pending_damage: dict[int, int] = {}
-    if session.mode == CombatMode.PVE:
-        for hit in ctx.hits:
-            pending_damage[hit.target_id] = pending_damage.get(hit.target_id, 0) + hit.amount
+    # Удары по каждому мобу в этом ходу - его способности на них отвечают
+    # (отражение, рассол, контрудар). Только до хода мобов: собственные удары
+    # мобов в ответ на ответ не идут.
+    incoming_by_target: dict[int, list] = {}
+    for hit in ctx.hits:
+        incoming_by_target.setdefault(hit.target_id, []).append(hit)
     for mob in [c for c in session.combatants.values() if c.kind == "mob" and c.alive]:
         if is_frozen(mob):
             mob.skipped_by_control_this_turn = True  # пропуск из-за контроля (стрик DR)
@@ -310,7 +341,7 @@ def resolve_tick(
             # вывода «теряет ход», без исключения для лингера/свежей заморозки.
             result.lines.append(f"{mob.name} теряет ход ❄️")
             continue
-        if session.mode == CombatMode.PVE and pending_damage.get(mob.id, 0) >= mob.current_hp:
+        if session.mode == CombatMode.PVE and _dies_this_tick(mob, incoming_by_target.get(mob.id, [])):
             continue  # уже мёртв по итогам этого хода — не бьёт (патч 25, п.3)
         if mob.scripted_hit is not None:
             # Патч 53: рейд-босс с собственным сценарием хода (ротация
@@ -327,6 +358,15 @@ def resolve_tick(
                 target = taunter
         if target is None:
             target = _choose_mob_target(session, mob, rng)
+        if mob.mob_brain is not None:
+            # Патч 103: способность моба. Сюда попадает только моб, который
+            # этот ход переживёт (проверка выше), поэтому ни одна ответная
+            # механика не срабатывает от добивающего удара.
+            turn = mob.mob_brain.act(mob, target, session, rng, incoming_by_target.get(mob.id, []))
+            ctx.hits.extend(turn.hits)
+            ctx.heals.extend(turn.heals)
+            ctx.lines.extend(turn.lines)
+            continue
         if target is not None:
             ctx.hits.append(compute_hit(mob, target, rng, label="кусает"))
 

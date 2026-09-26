@@ -337,7 +337,7 @@ async def _maybe_trigger_story(peer_id: int, db, character, stats) -> bool:
         image = quest.named_enemy.image or encounters.base_mob_image(quest.named_enemy.base_mob_id)
         encounter = encounters.spawn_named_enemy(
             combat_handlers.MOB_ID, quest.named_enemy.name, quest.named_enemy.flavor,
-            level, mult, image=image,
+            level, mult, image=image, base_mob_id=quest.named_enemy.base_mob_id,
         )
         await combat_handlers.start_story_encounter(
             peer_id, character, stats, gear_bonus, buff_modifiers,

@@ -214,6 +214,7 @@ def compute_hit(
     force_crit: bool = False,
     is_ability: bool = False,
     crit_multiplier: float | None = None,
+    ignore_dodge: bool = False,
 ) -> PendingHit:
     """Расчёт удара. multiplier — множитель урона навыка (Атака = 1.0);
     force_crit — гарантированный крит (Теневой рывок); is_ability (патч 34,
@@ -238,7 +239,14 @@ def compute_hit(
     total_dodge = min(
         stat_dodge + target.effect_total(EffectKind.DODGE) + extra_dodge, bc.DODGE_HARD_CAP
     )
-    if target.second_chance_active or (total_dodge > 0 and rng.random() < total_dodge):
+    # Патч 103, «Знает, где ты»: против такого бойца уворот цели не работает
+    # вовсе - ни стат, ни эффекты, ни «Второй шанс» Клинка теней.
+    if ignore_dodge:
+        total_dodge = 0.0
+    dodges = (not ignore_dodge and target.second_chance_active) or (
+        total_dodge > 0 and rng.random() < total_dodge
+    )
+    if dodges:
         target.second_chance_active = False
         target.dodged_this_tick = True
         # «Голод клинка»: каждый удачный уворот добавляет стак Метки добычи

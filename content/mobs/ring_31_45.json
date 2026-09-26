@@ -8,7 +8,18 @@
       "zone_min": 31,
       "zone_max": 45,
       "primary_stat": "str",
-      "image": "457239087"
+      "image": "457239087",
+      "ability": {
+        "title": "Отряд отвечает",
+        "hint": "раз в 2 хода отряд бьёт ещё раз, вполсилы",
+        "traits": [
+          {
+            "kind": "extra_hit",
+            "period": 2,
+            "mult": 0.5
+          }
+        ]
+      }
     },
     {
       "id": "stone_devourer",
@@ -17,7 +28,19 @@
       "zone_min": 31,
       "zone_max": 45,
       "primary_stat": "str",
-      "image": "457239088"
+      "image": "457239088",
+      "ability": {
+        "title": "Сквозь камень",
+        "hint": "раз в 3 хода уходит в камень - по нему трудно попасть, - и выныривает с ударом ×1,5",
+        "traits": [
+          {
+            "kind": "dive",
+            "period": 3,
+            "value": 0.65,
+            "mult": 1.5
+          }
+        ]
+      }
     },
     {
       "id": "murder_hole_choir",
@@ -26,7 +49,19 @@
       "zone_min": 31,
       "zone_max": 45,
       "primary_stat": "int",
-      "image": "457239083"
+      "image": "457239083",
+      "ability": {
+        "title": "По очереди",
+        "hint": "в группе бьёт по всем; в одиночку каждый 2-й удар ×1,3",
+        "traits": [
+          {
+            "kind": "choir",
+            "period": 2,
+            "mult": 1.3,
+            "value": 0.6
+          }
+        ]
+      }
     }
   ],
   "woods": [
@@ -37,7 +72,21 @@
       "zone_min": 31,
       "zone_max": 45,
       "primary_stat": "agi",
-      "image": "457239098"
+      "image": "457239098",
+      "ability": {
+        "title": "Таран",
+        "hint": "раз в 3 хода опускает рога и следующим бьёт ×2,3 - и 2 хода ты получаешь на 20% больше",
+        "traits": [
+          {
+            "kind": "windup",
+            "period": 3,
+            "mult": 2.3,
+            "effect": "vulnerability",
+            "value": 0.2,
+            "duration": 2
+          }
+        ]
+      }
     },
     {
       "id": "quiet_hunter",
@@ -46,7 +95,16 @@
       "zone_min": 31,
       "zone_max": 45,
       "primary_stat": "agi",
-      "image": "457239099"
+      "image": "457239099",
+      "ability": {
+        "title": "Засада",
+        "hint": "первый удар боя - всегда крит",
+        "traits": [
+          {
+            "kind": "first_hit_crit"
+          }
+        ]
+      }
     },
     {
       "id": "rotting_druid",
@@ -55,7 +113,24 @@
       "zone_min": 31,
       "zone_max": 45,
       "primary_stat": "int",
-      "image": "457239100"
+      "image": "457239100",
+      "ability": {
+        "title": "Договор с лесом",
+        "hint": "зарастает на 2% за ход и может ослабить тебя на 15%",
+        "traits": [
+          {
+            "kind": "regen",
+            "value": 0.02
+          },
+          {
+            "kind": "on_hit",
+            "effect": "weaken",
+            "value": 0.15,
+            "duration": 2,
+            "chance": 0.3
+          }
+        ]
+      }
     }
   ],
   "docks": [
@@ -66,7 +141,18 @@
       "zone_min": 31,
       "zone_max": 45,
       "primary_stat": "str",
-      "image": "457239109"
+      "image": "457239109",
+      "ability": {
+        "title": "Счёт по головам",
+        "hint": "раз в 3 хода замахивается и следующим бьёт ×2,6 - контроль сбивает замах",
+        "traits": [
+          {
+            "kind": "windup",
+            "period": 3,
+            "mult": 2.6
+          }
+        ]
+      }
     },
     {
       "id": "mast_hanged",
@@ -75,7 +161,21 @@
       "zone_min": 31,
       "zone_max": 45,
       "primary_stat": "int",
-      "image": "457239110"
+      "image": "457239110",
+      "ability": {
+        "title": "Петля",
+        "hint": "раз в 3 хода накидывает петлю и следующим душит: сильное кровотечение на 3 хода",
+        "traits": [
+          {
+            "kind": "windup",
+            "period": 3,
+            "mult": 1.4,
+            "effect": "dot",
+            "value": 0.45,
+            "duration": 3
+          }
+        ]
+      }
     },
     {
       "id": "salt_widow",
@@ -84,7 +184,20 @@
       "zone_min": 31,
       "zone_max": 45,
       "primary_stat": "agi",
-      "image": "457239111"
+      "image": "457239111",
+      "ability": {
+        "title": "Не тот",
+        "hint": "может сделать тебя уязвимее на 20% на 2 хода",
+        "traits": [
+          {
+            "kind": "on_hit",
+            "effect": "vulnerability",
+            "value": 0.2,
+            "duration": 2,
+            "chance": 0.35
+          }
+        ]
+      }
     }
   ],
   "scorched": [
@@ -95,7 +208,19 @@
       "zone_min": 31,
       "zone_max": 45,
       "primary_stat": "int",
-      "image": "457239121"
+      "image": "457239121",
+      "ability": {
+        "title": "Самосожжение",
+        "hint": "ниже 30% здоровья загорается: бьёт ×1,5, но сам теряет по 5% за ход",
+        "traits": [
+          {
+            "kind": "self_burn",
+            "threshold": 0.3,
+            "mult": 1.5,
+            "value": 0.05
+          }
+        ]
+      }
     },
     {
       "id": "ash_whirl",
@@ -104,7 +229,17 @@
       "zone_min": 31,
       "zone_max": 45,
       "primary_stat": "agi",
-      "image": "457239122"
+      "image": "457239122",
+      "ability": {
+        "title": "Лица в пепле",
+        "hint": "уворачивается в 20% случаев",
+        "traits": [
+          {
+            "kind": "dodge",
+            "value": 0.2
+          }
+        ]
+      }
     },
     {
       "id": "the_promised",
@@ -113,7 +248,16 @@
       "zone_min": 31,
       "zone_max": 45,
       "primary_stat": "int",
-      "image": "457239123"
+      "image": "457239123",
+      "ability": {
+        "title": "Не уйду",
+        "hint": "один раз переживает смертельный удар с 1 здоровья",
+        "traits": [
+          {
+            "kind": "last_breath"
+          }
+        ]
+      }
     }
   ]
 }

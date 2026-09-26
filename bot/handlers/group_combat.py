@@ -221,6 +221,13 @@ async def start_group_encounter(
 
     mob_names = ", ".join(enc.combatant.name for enc in mob_encounters)
     flavor = mob_encounters[0].flavor if mob_encounters else ""
+    # Патч 103: способности всех мобов пачки - по строке на каждого, без
+    # повторов (два одинаковых моба - одна строка).
+    abilities = list(dict.fromkeys(
+        f"{enc.combatant.name}. {enc.ability_line}" for enc in mob_encounters if enc.ability_line
+    ))
+    if abilities:
+        flavor += "\n\n" + "\n".join(abilities)
     for p in participants.values():
         await _bot_api.messages.send(
             peer_id=p.peer_id,

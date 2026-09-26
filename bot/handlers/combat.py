@@ -237,7 +237,10 @@ async def start_encounter(
     # флейвор моба перед боем + боевой интерфейс
     await _bot_api.messages.send(
         peer_id=peer_id,
-        message=f"⚠️ {encounter.combatant.name}\n\n{encounter.flavor}",
+        # Патч 103: строка о способности - одна, под описанием. Моба узнают
+        # по поведению, а не гадают, почему он вдруг лечится.
+        message=f"⚠️ {encounter.combatant.name}\n\n{encounter.flavor}"
+        + (f"\n\n{encounter.ability_line}" if encounter.ability_line else ""),
         random_id=0,
         attachment=photo_attachment(encounter.image) if encounter.image else None,
     )

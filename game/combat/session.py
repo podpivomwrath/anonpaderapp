@@ -192,6 +192,10 @@ class CombatantState:
     # Не персистится нигде — как и весь CombatantState, живёт только в
     # памяти на время конкретного рейд-боя (game/combat/raid_bosses.py).
     scripted_hit: "Callable[[CombatantState, CombatSessionState, object], list[PendingHit]] | None" = None
+    # Патч 103: способность обычного моба (game/combat/mob_abilities.py).
+    # Резолвер зовёт её ход вместо стандартного «кусает». None - у игроков и
+    # у рейд-боссов, которые ходят через scripted_hit.
+    mob_brain: object | None = None
 
     @property
     def alive(self) -> bool:

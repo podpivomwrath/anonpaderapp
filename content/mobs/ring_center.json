@@ -8,7 +8,20 @@
       "zone_min": 60,
       "zone_max": 60,
       "primary_stat": "int",
-      "image": "457239127"
+      "image": "457239127",
+      "ability": {
+        "title": "Помнит целое",
+        "hint": "зарастает на 2% за ход и не поддаётся контролю",
+        "traits": [
+          {
+            "kind": "regen",
+            "value": 0.02
+          },
+          {
+            "kind": "control_immune"
+          }
+        ]
+      }
     },
     {
       "id": "the_first_marked",
@@ -17,7 +30,21 @@
       "zone_min": 60,
       "zone_max": 60,
       "primary_stat": "str",
-      "image": "457239128"
+      "image": "457239128",
+      "ability": {
+        "title": "Не умер",
+        "hint": "один раз переживает смерть, а ниже половины здоровья бьёт на 25% сильнее",
+        "traits": [
+          {
+            "kind": "last_breath"
+          },
+          {
+            "kind": "rage_below",
+            "threshold": 0.5,
+            "mult": 1.25
+          }
+        ]
+      }
     },
     {
       "id": "echo_of_the_sundering",
@@ -26,7 +53,24 @@
       "zone_min": 60,
       "zone_max": 60,
       "primary_stat": "int",
-      "image": "457239129"
+      "image": "457239129",
+      "ability": {
+        "title": "Повторяется",
+        "hint": "раз в 3 хода бьёт дважды и может сделать тебя уязвимее на 15%",
+        "traits": [
+          {
+            "kind": "repeat_every",
+            "period": 3
+          },
+          {
+            "kind": "on_hit",
+            "effect": "vulnerability",
+            "value": 0.15,
+            "duration": 2,
+            "chance": 0.3
+          }
+        ]
+      }
     },
     {
       "id": "child_of_the_monolith",
@@ -35,7 +79,24 @@
       "zone_min": 60,
       "zone_max": 60,
       "primary_stat": "int",
-      "image": "457239130"
+      "image": "457239130",
+      "ability": {
+        "title": "Смотрит без лица",
+        "hint": "может ослабить тебя на 15% и возвращает 20% полученного урона",
+        "traits": [
+          {
+            "kind": "on_hit",
+            "effect": "weaken",
+            "value": 0.15,
+            "duration": 2,
+            "chance": 0.3
+          },
+          {
+            "kind": "reflect",
+            "value": 0.2
+          }
+        ]
+      }
     }
   ]
 }

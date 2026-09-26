@@ -43,6 +43,39 @@ class BuffDef(BaseModel):
     implemented: bool = False
 
 
+class MobTraitDef(BaseModel):
+    """Одна механика способности моба (патч 103). Смысл полей зависит от kind
+    и описан в game/combat/mob_abilities.py - там же список допустимых kind.
+
+    Поля общие, а не отдельный класс на каждый kind: механик под тридцать, и
+    контент читается проще, когда у всех одинаковые имена (value/chance/...).
+    """
+
+    kind: str
+    value: float = 0.0       # основная величина: доля, шанс уворота, % здоровья
+    chance: float = 1.0      # шанс срабатывания при ударе
+    duration: int = 0        # ходов у наложенного эффекта
+    period: int = 0          # раз в сколько ходов
+    mult: float = 1.0        # множитель урона
+    threshold: float = 0.0   # порог по доле здоровья
+    step: float = 0.0        # прирост за ход
+    cap: float = 0.0         # потолок прироста
+    effect: str = ""         # dot | weaken | vulnerability
+
+
+class MobAbilityDef(BaseModel):
+    """Способность моба (патч 103): чем он отличается от остальных в бою.
+
+    title и hint видит игрок - hint одной строкой перед боем, чтобы моба
+    узнавали по поведению, а не угадывали. traits - механики; у мобов
+    центра их две, у остальных обычно одна.
+    """
+
+    title: str
+    hint: str
+    traits: list[MobTraitDef]
+
+
 class StarterRingMob(BaseModel):
     """Моб стартового кольца (content/mobs/starter_ring.json).
 
@@ -63,6 +96,9 @@ class StarterRingMob(BaseModel):
     # ID фото альбома сообщества ВК (без owner_id) — см. bot/vk_media.py::photo_attachment.
     # None — картинки для этого моба ещё нет, показываем бой без вложения.
     image: str | None = None
+    # Патч 103: способность. None допустим только технически - у каждого
+    # моба бестиария она есть, за этим следит тест.
+    ability: MobAbilityDef | None = None
 
 
 def _load_mob_file(filename: str, content_dir: Path) -> dict[str, list[StarterRingMob]]:

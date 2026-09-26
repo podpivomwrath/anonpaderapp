@@ -8,7 +8,27 @@
       "zone_min": 46,
       "zone_max": 60,
       "primary_stat": "int",
-      "image": "457239089"
+      "image": "457239089",
+      "ability": {
+        "title": "Вопросы не словами",
+        "hint": "каждый удар делает тебя уязвимее на 25%, иногда пускает кровь",
+        "traits": [
+          {
+            "kind": "on_hit",
+            "effect": "vulnerability",
+            "value": 0.25,
+            "duration": 2,
+            "chance": 1.0
+          },
+          {
+            "kind": "on_hit",
+            "effect": "dot",
+            "value": 0.2,
+            "duration": 3,
+            "chance": 0.3
+          }
+        ]
+      }
     },
     {
       "id": "granite_colossus",
@@ -17,7 +37,20 @@
       "zone_min": 46,
       "zone_max": 60,
       "primary_stat": "str",
-      "image": "457239090"
+      "image": "457239090",
+      "ability": {
+        "title": "Не останавливается",
+        "hint": "не поддаётся контролю и за удар теряет не больше 12% здоровья",
+        "traits": [
+          {
+            "kind": "control_immune"
+          },
+          {
+            "kind": "damage_cap",
+            "value": 0.12
+          }
+        ]
+      }
     },
     {
       "id": "crimson_vow",
@@ -26,7 +59,17 @@
       "zone_min": 46,
       "zone_max": 60,
       "primary_stat": "str",
-      "image": "457239091"
+      "image": "457239091",
+      "ability": {
+        "title": "Тысяча глоток",
+        "hint": "возвращает 20% полученного урона - кроме добивающего удара",
+        "traits": [
+          {
+            "kind": "reflect",
+            "value": 0.2
+          }
+        ]
+      }
     }
   ],
   "woods": [
@@ -37,7 +80,17 @@
       "zone_min": 46,
       "zone_max": 60,
       "primary_stat": "int",
-      "image": "457239101"
+      "image": "457239101",
+      "ability": {
+        "title": "Пульсирует",
+        "hint": "зарастает на 3% здоровья каждый ход",
+        "traits": [
+          {
+            "kind": "regen",
+            "value": 0.03
+          }
+        ]
+      }
     },
     {
       "id": "the_round_dance",
@@ -46,7 +99,17 @@
       "zone_min": 46,
       "zone_max": 60,
       "primary_stat": "int",
-      "image": "457239102"
+      "image": "457239102",
+      "ability": {
+        "title": "Круг",
+        "hint": "за удар теряет не больше 10% здоровья - нужен долгий бой",
+        "traits": [
+          {
+            "kind": "damage_cap",
+            "value": 0.1
+          }
+        ]
+      }
     },
     {
       "id": "the_listener",
@@ -55,7 +118,16 @@
       "zone_min": 46,
       "zone_max": 60,
       "primary_stat": "int",
-      "image": "457239103"
+      "image": "457239103",
+      "ability": {
+        "title": "Знает, где ты",
+        "hint": "твой уворот против него не работает",
+        "traits": [
+          {
+            "kind": "ignore_dodge"
+          }
+        ]
+      }
     }
   ],
   "docks": [
@@ -66,7 +138,19 @@
       "zone_min": 46,
       "zone_max": 60,
       "primary_stat": "str",
-      "image": "457239112"
+      "image": "457239112",
+      "ability": {
+        "title": "Топит свой флот",
+        "hint": "ниже 40% здоровья один раз закрывается щитом на 15% и дальше бьёт на 15% сильнее",
+        "traits": [
+          {
+            "kind": "shield_below",
+            "threshold": 0.4,
+            "value": 0.15,
+            "mult": 1.15
+          }
+        ]
+      }
     },
     {
       "id": "tidal_maw",
@@ -75,7 +159,18 @@
       "zone_min": 46,
       "zone_max": 60,
       "primary_stat": "str",
-      "image": "457239113"
+      "image": "457239113",
+      "ability": {
+        "title": "Захлопывается",
+        "hint": "раз в 3 хода раскрывается и следующим бьёт ×2,8 - контроль сбивает",
+        "traits": [
+          {
+            "kind": "windup",
+            "period": 3,
+            "mult": 2.8
+          }
+        ]
+      }
     },
     {
       "id": "drowned_choir",
@@ -84,7 +179,18 @@
       "zone_min": 46,
       "zone_max": 60,
       "primary_stat": "int",
-      "image": "457239114"
+      "image": "457239114",
+      "ability": {
+        "title": "Разбираешь слова",
+        "hint": "с каждым ходом ты бьёшь на 5% слабее, до -30%",
+        "traits": [
+          {
+            "kind": "stacking_weaken",
+            "step": 0.05,
+            "cap": 0.3
+          }
+        ]
+      }
     }
   ],
   "scorched": [
@@ -95,7 +201,18 @@
       "zone_min": 46,
       "zone_max": 60,
       "primary_stat": "int",
-      "image": "457239124"
+      "image": "457239124",
+      "ability": {
+        "title": "Корона",
+        "hint": "с каждым ходом бьёт на 3% сильнее, до +45% - затягивать нельзя",
+        "traits": [
+          {
+            "kind": "growing",
+            "step": 0.03,
+            "cap": 0.45
+          }
+        ]
+      }
     },
     {
       "id": "glass_queen",
@@ -104,7 +221,21 @@
       "zone_min": 46,
       "zone_max": 60,
       "primary_stat": "int",
-      "image": "457239125"
+      "image": "457239125",
+      "ability": {
+        "title": "Отражения",
+        "hint": "уворачивается в 20% случаев и, увернувшись, бьёт в ответ вполсилы",
+        "traits": [
+          {
+            "kind": "dodge",
+            "value": 0.2
+          },
+          {
+            "kind": "counter_on_dodge",
+            "mult": 0.5
+          }
+        ]
+      }
     },
     {
       "id": "the_unquenched",
@@ -113,7 +244,20 @@
       "zone_min": 46,
       "zone_max": 60,
       "primary_stat": "int",
-      "image": "457239126"
+      "image": "457239126",
+      "ability": {
+        "title": "Дождь злит",
+        "hint": "каждый удар сильно поджигает",
+        "traits": [
+          {
+            "kind": "on_hit",
+            "effect": "dot",
+            "value": 0.25,
+            "duration": 2,
+            "chance": 1.0
+          }
+        ]
+      }
     }
   ]
 }

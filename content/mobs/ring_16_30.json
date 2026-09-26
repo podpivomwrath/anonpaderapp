@@ -8,7 +8,17 @@
       "zone_min": 16,
       "zone_max": 30,
       "primary_stat": "str",
-      "image": "457239084"
+      "image": "457239084",
+      "ability": {
+        "title": "Жрёт с породой",
+        "hint": "лечится на 25% нанесённого урона",
+        "traits": [
+          {
+            "kind": "lifesteal",
+            "value": 0.25
+          }
+        ]
+      }
     },
     {
       "id": "faceless_standard_bearer",
@@ -17,7 +27,17 @@
       "zone_min": 16,
       "zone_max": 30,
       "primary_stat": "str",
-      "image": "457239085"
+      "image": "457239085",
+      "ability": {
+        "title": "Штандарт",
+        "hint": "первый ход поднимает штандарт, дальше бьёт на 25% сильнее",
+        "traits": [
+          {
+            "kind": "banner",
+            "value": 0.25
+          }
+        ]
+      }
     },
     {
       "id": "shard_golem",
@@ -26,7 +46,17 @@
       "zone_min": 16,
       "zone_max": 30,
       "primary_stat": "str",
-      "image": "457239086"
+      "image": "457239086",
+      "ability": {
+        "title": "Каменная корка",
+        "hint": "начинает бой за щитом на 15% здоровья",
+        "traits": [
+          {
+            "kind": "shield_start",
+            "value": 0.15
+          }
+        ]
+      }
     }
   ],
   "woods": [
@@ -37,7 +67,17 @@
       "zone_min": 16,
       "zone_max": 30,
       "primary_stat": "agi",
-      "image": "457239095"
+      "image": "457239095",
+      "ability": {
+        "title": "Шьёт шкуру",
+        "hint": "лечится на 30% нанесённого урона",
+        "traits": [
+          {
+            "kind": "lifesteal",
+            "value": 0.3
+          }
+        ]
+      }
     },
     {
       "id": "weeper",
@@ -46,7 +86,18 @@
       "zone_min": 16,
       "zone_max": 30,
       "primary_stat": "int",
-      "image": "457239096"
+      "image": "457239096",
+      "ability": {
+        "title": "Детский голос",
+        "hint": "в начале боя сбивает с толку: следующий твой ход на 40% слабее",
+        "traits": [
+          {
+            "kind": "first_turn_weaken",
+            "value": 0.4,
+            "duration": 1
+          }
+        ]
+      }
     },
     {
       "id": "root_mother",
@@ -55,7 +106,17 @@
       "zone_min": 16,
       "zone_max": 30,
       "primary_stat": "int",
-      "image": "457239097"
+      "image": "457239097",
+      "ability": {
+        "title": "Внутри шевелится",
+        "hint": "зарастает на 3% здоровья каждый ход",
+        "traits": [
+          {
+            "kind": "regen",
+            "value": 0.03
+          }
+        ]
+      }
     }
   ],
   "docks": [
@@ -66,7 +127,19 @@
       "zone_min": 16,
       "zone_max": 30,
       "primary_stat": "str",
-      "image": "457239131"
+      "image": "457239131",
+      "ability": {
+        "title": "Лопается рассолом",
+        "hint": "от удара сильнее 20% его здоровья обдаёт тебя рассолом",
+        "traits": [
+          {
+            "kind": "brine_spray",
+            "threshold": 0.2,
+            "value": 0.2,
+            "duration": 2
+          }
+        ]
+      }
     },
     {
       "id": "hookhand",
@@ -75,7 +148,20 @@
       "zone_min": 16,
       "zone_max": 30,
       "primary_stat": "agi",
-      "image": "457239107"
+      "image": "457239107",
+      "ability": {
+        "title": "Абордажный крюк",
+        "hint": "может пустить кровь на 3 хода",
+        "traits": [
+          {
+            "kind": "on_hit",
+            "effect": "dot",
+            "value": 0.2,
+            "duration": 3,
+            "chance": 0.35
+          }
+        ]
+      }
     },
     {
       "id": "flask_swarm",
@@ -84,7 +170,17 @@
       "zone_min": 16,
       "zone_max": 30,
       "primary_stat": "agi",
-      "image": "457239108"
+      "image": "457239108",
+      "ability": {
+        "title": "Рой",
+        "hint": "уворачивается в 18% случаев",
+        "traits": [
+          {
+            "kind": "dodge",
+            "value": 0.18
+          }
+        ]
+      }
     }
   ],
   "scorched": [
@@ -95,7 +191,20 @@
       "zone_min": 16,
       "zone_max": 30,
       "primary_stat": "int",
-      "image": "457239118"
+      "image": "457239118",
+      "ability": {
+        "title": "Стеклянный хлыст",
+        "hint": "может сделать тебя уязвимее на 15% на 2 хода",
+        "traits": [
+          {
+            "kind": "on_hit",
+            "effect": "vulnerability",
+            "value": 0.15,
+            "duration": 2,
+            "chance": 0.3
+          }
+        ]
+      }
     },
     {
       "id": "embercoal",
@@ -104,7 +213,20 @@
       "zone_min": 16,
       "zone_max": 30,
       "primary_stat": "str",
-      "image": "457239119"
+      "image": "457239119",
+      "ability": {
+        "title": "Просто погреться",
+        "hint": "каждый удар слегка поджигает",
+        "traits": [
+          {
+            "kind": "on_hit",
+            "effect": "dot",
+            "value": 0.12,
+            "duration": 2,
+            "chance": 1.0
+          }
+        ]
+      }
     },
     {
       "id": "glassblower",
@@ -113,7 +235,18 @@
       "zone_min": 16,
       "zone_max": 30,
       "primary_stat": "agi",
-      "image": "457239120"
+      "image": "457239120",
+      "ability": {
+        "title": "Стеклянная фигура",
+        "hint": "ниже половины здоровья один раз прячется за щит на 20%",
+        "traits": [
+          {
+            "kind": "shield_below",
+            "threshold": 0.5,
+            "value": 0.2
+          }
+        ]
+      }
     }
   ]
 }

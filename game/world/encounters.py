@@ -12,7 +12,7 @@ import random
 from dataclasses import dataclass
 
 from game.combat import balance_config as bc
-from game.combat import formulas
+from game.combat import formulas, mob_abilities
 from game.combat.session import CombatantState, Stats, build_combatant
 from game.content_loader import StarterRingMob, load_bestiary
 from game.world import grid
@@ -88,6 +88,29 @@ class Encounter:
     combatant: CombatantState
     flavor: str
     image: str | None = None
+    #: Патч 103: строка о способности моба - показывается перед боем, чтобы
+    #: моба узнавали по поведению, а не угадывали. None - способности нет.
+    ability_line: str | None = None
+
+
+def ability_line(ability) -> str | None:
+    return f"✦ {ability.title}: {ability.hint}." if ability is not None else None
+
+
+def base_mob_ability(base_mob_id: str | None):
+    """Способность базового моба - для сюжетных врагов (патч 103).
+
+    То же правило, что с картинкой (патч 36): производная сущность наследует
+    всё от базовой, если своего не задано. Отдельно раздавать способности
+    сюжетным врагам не нужно.
+    """
+    global _mob_by_id
+    if base_mob_id is None:
+        return None
+    if _mob_by_id is None:
+        _mob_by_id = {m.id: m for mobs in load_bestiary().values() for m in mobs}
+    mob = _mob_by_id.get(base_mob_id)
+    return mob.ability if mob is not None else None
 
 
 def spawn_mob(
@@ -117,12 +140,16 @@ def spawn_mob(
         stats=stats,
         primary_stat=mob.primary_stat,
     )
-    return Encounter(combatant=combatant, flavor=mob.flavor, image=mob.image)
+    mob_abilities.prepare(combatant, mob.ability)
+    return Encounter(
+        combatant=combatant, flavor=mob.flavor, image=mob.image,
+        ability_line=ability_line(mob.ability),
+    )
 
 
 def spawn_named_enemy(
     participant_id: int, name: str, flavor: str, level: int, stat_mult: float,
-    image: str | None = None,
+    image: str | None = None, base_mob_id: str | None = None,
 ) -> Encounter:
     """Именной сюжетный враг (патч 18) — та же balanced_mob_stats, что и у
     обычного моба, но с уникальным именем/флейвором и множителем к статам
@@ -141,4 +168,8 @@ def spawn_named_enemy(
         id=participant_id, side=1, kind="mob", name=name, level=level,
         stats=scaled, primary_stat="str",
     )
-    return Encounter(combatant=combatant, flavor=flavor, image=image)
+    ability = base_mob_ability(base_mob_id)
+    mob_abilities.prepare(combatant, ability)
+    return Encounter(
+        combatant=combatant, flavor=flavor, image=image, ability_line=ability_line(ability),
+    )
