@@ -61,11 +61,19 @@ async def apply_outcome(
     rng: random.Random,
     event_id: str | None = None,
     choice_code: str | None = None,
+    fish_sold: bool | None = None,
 ) -> OutcomeResult:
     """Общее правило (патч 10, блок 3): события вне боя НЕ выдают боевых баффов
     и никогда не дают пустой исход — только опыт, трофеи, урон, бой (или их
     комбинация). event_id/choice_code (патч 12) — прогресс классовых испытаний
-    типа event_choice_count; передаются вызывающим кодом (см. bot/handlers/world.py)."""
+    типа event_choice_count; передаются вызывающим кодом (см. bot/handlers/world.py).
+
+    fish_sold - исход «Продать рыбу» (fish_buyer): садок продаёт вызывающий
+    код до этого вызова, и продажа - это и есть результат события. Раньше
+    здесь о ней не знали, считали исход пустым и каждую продажу рыбаку
+    докладывали как ошибку контента, да ещё и с аварийным опытом сверху.
+    False - садок опустел между показом и ответом: утешительный опыт, но это
+    не ошибка контента."""
     if outcome.combat:
         return OutcomeResult(outcome.text, is_combat=True)
 
@@ -94,7 +102,7 @@ async def apply_outcome(
     if raid_key_dropped:
         lines.append(raid_key_texts.raid_key_drop_line())
 
-    reward_added = False
+    reward_added = bool(fish_sold)
 
     if outcome.trophy:
         drop = await trophy_service.grant_from_event(db, character, rng)
@@ -133,6 +141,18 @@ async def apply_outcome(
         new_hp = max(1, current - dmg)  # событие вне боя не убивает
         vitals_service.set_hp(character, stats, new_hp, vit_bonus)
         lines.append(display.hp_delta_line(current, new_hp, max_hp))
+        reward_added = True
+
+    if not reward_added and fish_sold is False:
+        # Садок опустел между показом рыбака и ответом (продал в другом
+        # месте, проиграл в PvP): не ошибка контента - просто утешительный опыт.
+        zone_level = grid.mob_level_at(character.pos_x, character.pos_y, character.level)
+        xp = experience_service.event_xp(zone_level, character.level, wc.EVENT_XP_SAFE)
+        levelup = experience_service.add_experience(character, stats, xp)
+        levels_gained, new_level = levelup.levels_gained, levelup.new_level
+        if levels_gained > 0:
+            group_kick = await group_service.enforce_level_gap(db, character)
+        lines.append(display.xp_delta_line(levelup.xp_awarded, premium=levelup.premium_applied))
         reward_added = True
 
     if not reward_added:

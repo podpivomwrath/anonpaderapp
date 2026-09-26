@@ -303,3 +303,51 @@ async def test_outcome_without_any_reward_flag_falls_back_to_minimum_xp(db_sessi
 
     assert result.text.strip()
     assert character.experience > before
+
+
+# --- Рыбак у воды (патч 58): продажа - и есть результат события ---
+
+
+async def test_fish_sale_is_the_outcome_not_an_empty_event(db_session, character_at) -> None:
+    """Каждая продажа рыбаку уходила в ERROR «событие без результата» и
+    приносила аварийный опыт сверху: продажу делает обработчик до
+    apply_outcome, а тот о ней не знал."""
+    from loguru import logger
+
+    errors: list[str] = []
+    sink = logger.add(lambda m: errors.append(str(m)), level="ERROR")
+    try:
+        character = await character_at(50, 50, level=5)
+        stats = await _stats(db_session, character)
+        xp_before = character.experience
+        outcome = EventOutcome(weight=100, text="Он пересыпает рыбу в вёдра.", fish_buyer=True)
+        result = await event_service.apply_outcome(
+            db_session, character, stats, outcome, FixedRng(0.9), event_id="lakeside_fisher",
+            fish_sold=True,
+        )
+    finally:
+        logger.remove(sink)
+    assert not errors, errors
+    assert character.experience == xp_before, "за продажу опыт не положен"
+    assert "опыта" not in result.text
+
+
+async def test_emptied_bag_gets_consolation_without_error(db_session, character_at) -> None:
+    """Садок опустел между показом рыбака и ответом - не ошибка контента,
+    но и уйти ни с чем игрок не должен."""
+    from loguru import logger
+
+    errors: list[str] = []
+    sink = logger.add(lambda m: errors.append(str(m)), level="ERROR")
+    try:
+        character = await character_at(50, 50, level=5)
+        stats = await _stats(db_session, character)
+        outcome = EventOutcome(weight=100, text="Он пересыпает рыбу в вёдра.", fish_buyer=True)
+        result = await event_service.apply_outcome(
+            db_session, character, stats, outcome, FixedRng(0.9), event_id="lakeside_fisher",
+            fish_sold=False,
+        )
+    finally:
+        logger.remove(sink)
+    assert not errors, errors
+    assert "опыта" in result.text

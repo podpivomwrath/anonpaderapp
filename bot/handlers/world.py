@@ -882,6 +882,7 @@ async def event_choice(message: Message) -> None:
         outcome = event_service.pick_outcome(_rng, event.choices[choice_idx].outcomes)
         choice_label = event.choices[choice_idx].label
         fish_sale_line = None
+        fish_sold = None
         if outcome.fish_buyer:
             # Продаём по цене, ПОКАЗАННОЙ игроку. Если множителя нет (бот
             # перезапустился между показом и ответом), сделка не состоится:
@@ -892,13 +893,15 @@ async def event_choice(message: Message) -> None:
                 )
                 return
             gold, grams = await fishing_service.sell_bag(db, character, fish_multiplier)
+            fish_sold = gold > 0
             if gold:
                 fish_sale_line = (
                     f"🧺 Продано {game_fishing.format_kg(grams)} рыбы за {gold} зол."
                 )
         choice_code = trial_service.EVENT_CHOICE_CODES.get(choice_label)
         result = await event_service.apply_outcome(
-            db, character, stats, outcome, _rng, event_id=event.id, choice_code=choice_code
+            db, character, stats, outcome, _rng, event_id=event.id, choice_code=choice_code,
+            fish_sold=fish_sold,
         )
         wallet = await wallet_service.get_wallet(db, character.id)
         farm_currency, donate_currency = wallet.farm_currency, wallet.donate_currency
