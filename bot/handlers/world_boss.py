@@ -183,7 +183,7 @@ async def attack(message: Message) -> None:
         combat_handlers.MOB_ID, boss_def, boss.ring, boss_hp, boss.max_hp,
     )
     encounter = encounters.Encounter(
-        combatant=combatant, flavor=texts.intro_text(boss, boss_def.flavor),
+        combatant=combatant, flavor=texts.intro_text(boss),
         image=boss_def.image or None,
     )
     _fighter[peer_id] = character.id
@@ -249,26 +249,25 @@ async def leave(peer_id: int) -> None:
     await _close_attempt(peer_id, boss_gone=False)
 
 
-async def _close_attempt(peer_id: int, boss_gone: bool, boss_pk: int | None = None) -> None:
+async def _close_attempt(peer_id: int, boss_gone: bool, got_result: bool = False) -> None:
+    """got_result - игроку только что пришёл итог босса («пала!»), и строка
+    «заход окончен» после него была бы повтором."""
     from bot.handlers import combat as combat_handlers  # избегаем цикла импортов
     from bot.handlers import world as world_handlers  # избегаем цикла импортов
 
-    boss_pk = combat_handlers.world_boss_of(peer_id) or boss_pk
     combat_handlers.end_world_boss_fight(peer_id)
-    character_id = _fighter.pop(peer_id, None)
+    _fighter.pop(peer_id, None)
     _known_hp.pop(peer_id, None)
-    dealt = _attempt_damage.pop(peer_id, 0)
+    _attempt_damage.pop(peer_id, None)
     async with get_session_factory()() as db:
-        total = 0
-        if boss_pk is not None and character_id is not None:
-            total = (await world_boss_service.damage_by_character(db, boss_pk)).get(character_id, 0)
         character = await onboarding_service.get_character(db, peer_id)
         if character is None:
             return
         # После захода - сводка локации, как после обычного боя: без неё
         # игрок оставался с одной строкой итога и не видел, где стоит.
         summary = await world_handlers.location_summary_parts(db, character, peer_id)
-    await _send(peer_id, texts.attempt_over_text(dealt, total, boss_gone))
+    if not got_result:
+        await _send(peer_id, texts.attempt_over_text(boss_gone))
     text, attachment, keyboard = summary
     await _send(peer_id, text, attachment=attachment, keyboard=keyboard)
 
@@ -305,8 +304,9 @@ async def _finish_boss(boss_pk: int, granted) -> None:
     )
     total = sum(got.damage for got in granted or [])
     await _notify_results(boss, granted or [], peers, total)
+    notified = {peer for peer in peers.values() if peer is not None}
     for peer_id in fighting:
-        await _close_attempt(peer_id, boss_gone=True, boss_pk=boss_pk)
+        await _close_attempt(peer_id, boss_gone=True, got_result=peer_id in notified)
 
 
 async def _notify_results(boss: WorldBoss, granted, peers: dict[int, int | None], total: int) -> None:

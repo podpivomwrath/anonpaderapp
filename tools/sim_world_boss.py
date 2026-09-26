@@ -4,7 +4,7 @@
 
 Игрок уровня босса (без экипировки, как в tools/sim_balance.py) 10 ходов
 бьёт босса, который не отвечает. Здоровье босса в конфиге = средний урон
-захода x ATTEMPTS_TO_KILL (game/economy/world_boss_config.py).
+захода x REAL_DAMAGE_FACTOR x ATTEMPTS_TO_KILL (game/economy/world_boss_config.py).
 
 До 30 уровня подклассов нет - там считаются базовые классы.
 """
@@ -69,7 +69,9 @@ def main() -> None:
         print(
             f"кольцо {wbc.RING_NAMES[ring]:>3} (ур.{level}): заход в среднем {avg:8.0f}"
             f" | меньше всех {lo} {per_fighter[lo]:.0f}, больше всех {hi} {per_fighter[hi]:.0f}"
-            f" | здоровье на {wbc.ATTEMPTS_TO_KILL} заходов: {round(avg * wbc.ATTEMPTS_TO_KILL, -2):.0f}"
+            f" | живой заход ~{avg * wbc.REAL_DAMAGE_FACTOR:.0f}"
+            f" | здоровье на {wbc.ATTEMPTS_TO_KILL} заходов:"
+            f" {round(avg * wbc.REAL_DAMAGE_FACTOR * wbc.ATTEMPTS_TO_KILL, -3):.0f}"
         )
 
 

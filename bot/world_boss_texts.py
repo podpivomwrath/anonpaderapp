@@ -62,7 +62,7 @@ def status_text(boss, my_damage: int, cooldown: int, can_attack: bool) -> str:
 
 def refusal_text(reason: str, minutes_left: int = 0, ring: int | None = None) -> str:
     if reason == "cooldown":
-        return f"Ты уже заходил. Следующий заход через {minutes_left} мин."
+        return f"Следующий заход через {minutes_left} мин."
     if reason == "level":
         return f"Этот босс для уровня до {world_boss.max_attacker_level(ring)}."
     if reason == "not_here":
@@ -70,10 +70,12 @@ def refusal_text(reason: str, minutes_left: int = 0, ring: int | None = None) ->
     return "Босса уже нет."
 
 
-def intro_text(boss, flavor: str) -> str:
+def intro_text(boss) -> str:
+    """Одна строка: заход повторяется каждый час, а описание босса игрок уже
+    прочёл в объявлении."""
     return (
-        f"{flavor}\n\nБосс не отвечает на удары. У тебя {wbc.ATTEMPT_TURNS} ходов. "
-        f"Здоровье {boss.hp}/{boss.max_hp}."
+        f"Босс не отвечает на удары. У тебя {wbc.ATTEMPT_TURNS} ходов, "
+        f"у него {boss.hp}/{boss.max_hp} здоровья."
     )
 
 
@@ -82,14 +84,19 @@ def turn_header(tick: int) -> str:
 
 
 def contribution_lines(attempt: int, total: int) -> str:
-    return f"🗡 Урон за заход: {attempt}\n📊 Твой вклад в босса: {total}"
+    """Вклад в босса - только когда он больше этого захода: на первом заходе
+    это одно и то же число."""
+    line = f"🗡 Урон за заход: {attempt}"
+    if total > attempt:
+        line += f"\n📊 Вклад в босса: {total}"
+    return line
 
 
-def attempt_over_text(dealt: int, total: int, boss_gone: bool) -> str:
-    text = f"Заход окончен. Урон за заход: {dealt}, всего твой вклад: {total}."
-    if not boss_gone:
-        text += f" Следующий заход через {wbc.ATTEMPT_COOLDOWN_MINUTES} мин."
-    return text
+def attempt_over_text(boss_gone: bool) -> str:
+    """Цифры урона уже в логе последнего хода - здесь только что дальше."""
+    if boss_gone:
+        return "Заход окончен: босса больше нет."
+    return f"Заход окончен. Следующий - через {wbc.ATTEMPT_COOLDOWN_MINUTES} мин."
 
 
 def reward_lines(got) -> list[str]:

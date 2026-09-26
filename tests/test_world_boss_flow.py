@@ -159,8 +159,9 @@ async def test_killing_blow_ends_the_boss_and_pays_out(wired) -> None:
     # итог босса раньше сводки локации: сводка несёт клавиатуру карты и
     # должна быть последним сообщением
     fell = next(i for i, text in enumerate(sent) if "пал" in text)
-    over = next(i for i, text in enumerate(sent) if "Заход окончен" in text)
-    assert fell < over
+    summary = next(i for i, text in enumerate(sent) if text.startswith("📍"))
+    assert fell < summary
+    assert not any("Заход окончен" in text for text in sent), "после «пал!» это повтор"
 
 
 def test_missed_skill_is_named_in_the_log() -> None:
