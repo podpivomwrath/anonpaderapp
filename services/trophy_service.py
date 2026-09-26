@@ -100,19 +100,42 @@ async def get_stock(db: AsyncSession, character_id: int) -> list[tuple[TrophyDef
     return [(d, counts[d.id]) for d in trophy_defs_ordered() if d.id in counts]
 
 
+async def _lock_rows(
+    db: AsyncSession, character_id: int, trophy_id: str | None = None
+) -> list[CharacterTrophy]:
+    """Непустые стаки под блокировкой строки - для продажи и переноса.
+
+    Продажа устроена как «прочитать количество -> обнулить -> заплатить», а
+    вебхук обрабатывает события ПАРАЛЛЕЛЬНО. Без блокировки два нажатия
+    «Продать» читали одно и то же количество и платили оба: на настоящем
+    Postgres десять трофеев за 20 золота принесли 120 (патч 94).
+
+    FOR UPDATE держит строку до конца транзакции. Второе нажатие ждёт, а
+    дождавшись, перечитывает строку уже с нулём и продаёт ничего.
+    populate_existing - чтобы не взять старое число из кэша сессии.
+    """
+    query = select(CharacterTrophy).where(
+        CharacterTrophy.character_id == character_id, CharacterTrophy.count > 0
+    )
+    if trophy_id is not None:
+        query = query.where(CharacterTrophy.trophy_id == trophy_id)
+    query = query.with_for_update().execution_options(populate_existing=True)
+    return list((await db.execute(query)).scalars().all())
+
+
 async def sell_all(db: AsyncSession, character: Character, price_multiplier: float = 1.0) -> int:
     """Продаёт весь стек всех градаций разом; возвращает вырученное золото.
     price_multiplier (патч 26) — наценка чужака у скупщика в чужом городе."""
-    stock = await get_stock(db, character.id)
-    if not stock:
+    defs = _defs()
+    rows = [r for r in await _lock_rows(db, character.id) if r.trophy_id in defs]
+    if not rows:
         return 0
     total = round(
-        sum(d.sell_price * count for d, count in stock)
+        sum(defs[r.trophy_id].sell_price * r.count for r in rows)
         * price_multiplier
         * crown_service.mob_gold_multiplier(character)
     )
-    for d, _count in stock:
-        row = await _get_row(db, character.id, d.id)
+    for row in rows:
         row.count = 0
     await wallet_service.deposit(db, character.id, "farm", total)
     await db.flush()
@@ -124,12 +147,13 @@ async def sell_one(
 ) -> int:
     """Продаёт весь стек ОДНОЙ градации; возвращает вырученное золото (0, если пусто).
     price_multiplier (патч 26) — наценка чужака у скупщика в чужом городе."""
-    row = await _get_row(db, character.id, trophy_id)
-    if row is None or row.count <= 0:
-        return 0
     trophy_def = _defs().get(trophy_id)
     if trophy_def is None:
         return 0
+    locked = await _lock_rows(db, character.id, trophy_id)
+    if not locked:
+        return 0
+    row = locked[0]
     total = round(
         trophy_def.sell_price * row.count
         * price_multiplier
@@ -144,12 +168,14 @@ async def sell_one(
 async def transfer_all(db: AsyncSession, loser_id: int, winner_id: int) -> dict[str, int]:
     """Переносит ВЕСЬ стек трофеев проигравшего победителю (дуэль, патч 22).
     Возвращает перенесённый набор {trophy_id: count} для сообщения."""
-    stock = await get_stock(db, loser_id)
-    moved = {d.id: count for d, count in stock}
-    for trophy_id, count in moved.items():
-        row = await _get_row(db, loser_id, trophy_id)
+    taken: dict[str, int] = {}
+    for row in await _lock_rows(db, loser_id):
+        taken[row.trophy_id] = row.count
         row.count = 0
-        await _add(db, winner_id, trophy_id, count)
+        await _add(db, winner_id, row.trophy_id, taken[row.trophy_id])
+    # Порядок каталога, как было до блокировок: из него собирается сообщение
+    # о добыче, и строки не должны прыгать от боя к бою.
+    moved = {d.id: taken[d.id] for d in trophy_defs_ordered() if d.id in taken}
     if moved:
         await db.flush()
     return moved

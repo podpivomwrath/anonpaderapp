@@ -8,7 +8,7 @@
 import math
 import random
 
-from sqlalchemy import select
+from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from game.combat import balance_config as bc
@@ -352,8 +352,25 @@ async def sell_item(
     if item is None or is_unsellable(item):
         return 0
     gold = sell_price(item, price_multiplier)
-    await db.delete(row)
-    await db.delete(item)
+
+    # Предмет ЗАБИРАЕТСЯ условным удалением, и платим, только если оно
+    # прошло. Раньше строка удалялась через сессию, а золото начислялось
+    # независимо от того, удалила ли она что-нибудь: вебхук обрабатывает
+    # события параллельно, и на настоящем Postgres один предмет продавался
+    # десять раз из десяти (патч 94). Удалить строку может ровно одна
+    # транзакция - остальные получат rowcount 0 и уйдут ни с чем.
+    claimed = await db.execute(
+        delete(Inventory).where(
+            Inventory.character_id == character.id,
+            Inventory.item_id == item_id,
+            Inventory.equipped.is_(False),
+        )
+    )
+    if not claimed.rowcount:
+        return 0
+    db.expunge(row)
+    await db.execute(delete(Item).where(Item.id == item_id))
+    db.expunge(item)
     await wallet_service.deposit(db, character.id, "farm", gold)
     await db.flush()
     return gold

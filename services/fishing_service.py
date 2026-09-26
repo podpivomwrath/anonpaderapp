@@ -312,7 +312,24 @@ async def sell_bag(
     db: AsyncSession, character: Character, multiplier: float = 1.0
 ) -> tuple[int, int]:
     """Продаёт садок целиком. Возвращает (золото, суммарный вес в граммах).
-    Рекорды не трогаются — проданная рыба остаётся в рекордах навсегда."""
+    Рекорды не трогаются — проданная рыба остаётся в рекордах навсегда.
+
+    Строки садка берутся под блокировкой (патч 94). Продажа устроена как
+    «прочитать садок -> удалить -> заплатить», а вебхук обрабатывает
+    события параллельно: без блокировки два нажатия «Продать» читали один и
+    тот же садок и платили оба - так же, как это подтвердилось на трофеях.
+    Второе нажатие теперь ждёт первого и находит садок уже пустым.
+    """
+    locked = (
+        await db.execute(
+            select(CharacterFish)
+            .where(CharacterFish.character_id == character.id, CharacterFish.total_grams > 0)
+            .with_for_update()
+            .execution_options(populate_existing=True)
+        )
+    ).scalars().all()
+    if not locked:
+        return 0, 0
     bag = await get_bag(db, character.id)
     if not bag:
         return 0, 0

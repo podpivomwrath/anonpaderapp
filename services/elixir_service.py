@@ -5,7 +5,7 @@
 "🧪 Малое исцеление ×3", не 3 отдельные записи.
 """
 
-from sqlalchemy import select
+from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from game.content_loader import ElixirDef, load_elixirs
@@ -94,9 +94,18 @@ async def get_stock(db: AsyncSession, character_id: int) -> list[tuple[ElixirDef
 async def consume(db: AsyncSession, character_id: int, elixir_id: str) -> bool:
     """Списывает 1 штуку. False, если стека нет/пуст — вызывающий не должен
     применять эффект в этом случае."""
-    row = await _get_row(db, character_id, elixir_id)
-    if row is None or row.count <= 0:
-        return False
-    row.count -= 1
-    await db.flush()
-    return True
+    # Условное списание одним UPDATE, как у руды и кошелька (патч 94).
+    # `row.count -= 1` в питоне читал число и писал обратно: два нажатия на
+    # последний эликсир оба видели единицу, оба записывали ноль - и эффект
+    # применялся дважды за одну склянку.
+    result = await db.execute(
+        update(CharacterConsumable)
+        .where(
+            CharacterConsumable.character_id == character_id,
+            CharacterConsumable.elixir_id == elixir_id,
+            CharacterConsumable.count > 0,
+        )
+        .values(count=CharacterConsumable.count - 1)
+        .execution_options(synchronize_session="fetch")
+    )
+    return bool(result.rowcount)

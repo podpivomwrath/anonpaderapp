@@ -119,3 +119,109 @@ async def test_parallel_recovery_refunds_once(pg_factory):
     await asyncio.gather(recover(), recover())
     async with pg_factory() as db:
         assert (await db.get(Character, 1)).raid_keys == 1
+
+
+# --- Патч 94: продажи и расход под параллельными нажатиями -------------------
+#
+# Вебхук запускает каждое событие отдельной задачей, поэтому два быстрых
+# нажатия «Продать» идут ОДНОВРЕМЕННО. На боевом Postgres до исправления:
+# десять трофеев за 20 золота приносили 80-120, один предмет продавался
+# десять раз из десяти, садок - тоже, а одну склянку выпивали дважды.
+# SQLite гонку не воспроизводит (пишет по одному), поэтому проверка - здесь.
+
+TAPS = 10
+
+
+async def _race(pg_factory, op):
+    ready = asyncio.Barrier(TAPS)
+
+    async def one():
+        async with pg_factory() as db:
+            character = await db.get(Character, 1)
+            await ready.wait()
+            got = await op(db, character)
+            await db.commit()
+            return got
+
+    return await asyncio.gather(*(one() for _ in range(TAPS)))
+
+
+async def _gold(pg_factory) -> int:
+    from models import Wallet
+    async with pg_factory() as db:
+        return await db.scalar(select(Wallet.farm_currency).where(Wallet.character_id == 1)) or 0
+
+
+async def _with_wallet(pg_factory):
+    from models import Wallet
+    async with pg_factory() as db:
+        if await db.scalar(select(Wallet).where(Wallet.character_id == 1)) is None:
+            db.add(Wallet(character_id=1, farm_currency=0, donate_currency=0))
+            await db.commit()
+
+
+async def test_parallel_trophy_sales_pay_once(pg_factory):
+    from models import CharacterTrophy
+    from services import trophy_service
+    await _with_wallet(pg_factory)
+    async with pg_factory() as db:
+        db.add(CharacterTrophy(character_id=1, trophy_id="ash_dust", count=10))
+        await db.commit()
+    price = next(d.sell_price for d in trophy_service.trophy_defs_ordered() if d.id == "ash_dust")
+
+    paid = await _race(pg_factory, lambda db, c: trophy_service.sell_all(db, c))
+
+    assert sum(1 for p in paid if p) == 1
+    assert await _gold(pg_factory) == price * 10
+
+
+async def test_parallel_item_sales_pay_once(pg_factory):
+    import random
+    from services import item_service
+    await _with_wallet(pg_factory)
+
+    class _Rng(random.Random):
+        def random(self):
+            return 0.0
+
+    async with pg_factory() as db:
+        c = await db.get(Character, 1)
+        item = await item_service.grant_from_kill(db, c, 20, _Rng())
+        price = item_service.sell_price(item)
+        item_id = item.id
+        await db.commit()
+
+    paid = await _race(pg_factory, lambda db, c: item_service.sell_item(db, c, item_id))
+
+    assert sum(1 for p in paid if p) == 1
+    assert await _gold(pg_factory) == price
+
+
+async def test_parallel_bag_sales_pay_once(pg_factory):
+    from models import CharacterFish
+    from services import fishing_service
+    await _with_wallet(pg_factory)
+    async with pg_factory() as db:
+        db.add(CharacterFish(character_id=1, fish_id="ashen_roach", grade="common",
+                             total_grams=5000))
+        await db.commit()
+
+    async def sell(db, c):
+        gold, _grams = await fishing_service.sell_bag(db, c)
+        return gold
+
+    paid = await _race(pg_factory, sell)
+
+    assert sum(1 for p in paid if p) == 1
+    assert await _gold(pg_factory) == max(paid)
+
+
+async def test_last_elixir_is_drunk_once(pg_factory):
+    from services import elixir_service
+    async with pg_factory() as db:
+        await elixir_service.grant(db, 1, "heal_small", 1)
+        await db.commit()
+
+    drunk = await _race(pg_factory, lambda db, c: elixir_service.consume(db, c.id, "heal_small"))
+
+    assert sum(1 for d in drunk if d) == 1
