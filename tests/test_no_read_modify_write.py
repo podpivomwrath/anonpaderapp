@@ -74,3 +74,30 @@ def test_trophy_sales_go_through_the_lock() -> None:
 
 def test_elixir_is_not_decremented_in_python() -> None:
     assert "count -= 1" not in _code(elixir_service.consume)
+
+
+def test_wallet_is_changed_only_through_wallet_service() -> None:
+    """Баланс меняется ТОЛЬКО атомарными операциями wallet_service (патч 96).
+
+    Прямая правка `wallet.farm_currency -= cost` читает баланс в питон и
+    пишет обратно целым числом. Два одновременных изменения тогда теряют
+    одно из них, а проверка «хватает ли» проходит у обоих. Так были
+    устроены ставки PvP и биржа золото-самоцветы - первая молча съедала
+    продажу, совпавшую с концом дуэли, вторая дала бы дюп самоцветов в день
+    подключения.
+    """
+    import re
+    from pathlib import Path
+
+    root = Path(__file__).resolve().parent.parent
+    pattern = re.compile(r"\.(farm_currency|donate_currency)\s*(\+=|-=|\*=)")
+    offenders = []
+    for folder in ("services", "game", "bot"):
+        for path in (root / folder).rglob("*.py"):
+            if path.name == "wallet_service.py":
+                continue
+            code = re.sub(r"#[^\n]*", "", path.read_text(encoding="utf-8"))
+            for number, line in enumerate(code.split("\n"), 1):
+                if pattern.search(line):
+                    offenders.append(f"{path.relative_to(root)}:{number} {line.strip()}")
+    assert not offenders, "баланс правится мимо wallet_service:\n" + "\n".join(offenders)

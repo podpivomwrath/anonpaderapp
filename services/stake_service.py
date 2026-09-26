@@ -5,11 +5,12 @@
 """
 
 from loguru import logger
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from game.combat import balance_config as bc
-from models import PvpStakeTransfer
-from services.wallet_service import get_wallet
+from models import PvpStakeTransfer, Wallet
+from services.wallet_service import charge, deposit
 
 
 async def settle_stakes(
@@ -25,11 +26,21 @@ async def settle_stakes(
 
     transfers: list[PvpStakeTransfer] = []
     for loser_id in loser_character_ids:
-        loser_wallet = await get_wallet(db, loser_id)
+        # Кошелёк проигравшего под блокировкой (патч 96): ставка - доля от
+        # ТЕКУЩЕГО баланса, и прочитать его надо так, чтобы до списания его
+        # никто не поменял. Раньше баланс читался в питон и записывался
+        # обратно целым числом - продажа, совпавшая с концом дуэли, молча
+        # пропадала: её прибавку перезаписывало старое значение.
+        loser_wallet = await db.scalar(
+            select(Wallet).where(Wallet.character_id == loser_id)
+            .with_for_update().execution_options(populate_existing=True)
+        )
+        if loser_wallet is None:
+            continue
         stake = int(loser_wallet.farm_currency * bc.PVP_STAKE_PERCENT)
         if stake <= 0:
             continue
-        loser_wallet.farm_currency -= stake
+        await charge(db, loser_id, "farm", stake)
 
         share = stake // len(winner_character_ids)
         remainder = stake - share * len(winner_character_ids)
@@ -37,8 +48,7 @@ async def settle_stakes(
             portion = share + (remainder if i == 0 else 0)
             if portion <= 0:
                 continue
-            winner_wallet = await get_wallet(db, winner_id)
-            winner_wallet.farm_currency += portion
+            await deposit(db, winner_id, "farm", portion)
             transfer = PvpStakeTransfer(
                 session_id=session_id,
                 loser_character_id=loser_id,

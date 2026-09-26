@@ -20,7 +20,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from game.combat import balance_config as bc
 from models import ExchangeOrder, OrderDirection
-from services.wallet_service import NotEnoughCurrency, get_wallet
+from services.wallet_service import NotEnoughCurrency, charge, deposit
 
 
 class ExchangeStateStore(Protocol):
@@ -141,11 +141,13 @@ class Exchange:
         net_sold = await self._state.get_net_sold()
         cost = self.buy_cost(net_sold, amount)
 
-        wallet = await get_wallet(db, character_id)
-        if wallet.farm_currency < cost:
-            raise NotEnoughCurrency(f"Нужно {cost} золота, есть {wallet.farm_currency}")
-        wallet.farm_currency -= cost
-        wallet.donate_currency += amount
+        # Только через атомарные операции кошелька (патч 96). Прямое
+        # `wallet.farm_currency -= cost` читало баланс в питон: два
+        # одновременных нажатия оба проходили проверку и платили ОДНУ цену,
+        # а самоцветы получали дважды. Биржа пока не подключена к игре - это
+        # мина на день подключения, а не открытая дыра.
+        await charge(db, character_id, "farm", cost)
+        await deposit(db, character_id, "donate", amount)
         await self._state.add_net_sold(amount)
 
         order = ExchangeOrder(
@@ -163,16 +165,11 @@ class Exchange:
         """Игрок продаёт донат-валюту за золото."""
         if amount <= 0:
             raise ValueError("Объём должен быть положительным")
-        wallet = await get_wallet(db, character_id)
-        if wallet.donate_currency < amount:
-            raise NotEnoughCurrency(
-                f"Нужно {amount} донат-валюты, есть {wallet.donate_currency}"
-            )
         net_sold = await self._state.get_net_sold()
         gain = self.sell_gain(net_sold, amount)
 
-        wallet.donate_currency -= amount
-        wallet.farm_currency += gain
+        await charge(db, character_id, "donate", amount)
+        await deposit(db, character_id, "farm", gain)
         await self._state.add_net_sold(-amount)
 
         order = ExchangeOrder(
