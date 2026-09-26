@@ -1,4 +1,4 @@
-# Промты: пути подкласса, сюжетные акты и враги
+# Промты: пути подкласса, сюжетные акты, враги, рудники и озёра
 
 Продолжение `tools/raid_art_prompts.md`. Там три кадра рейда, здесь шесть
 путей и шестнадцать актов. Слоты под всё это уже есть в коде (патч 88):
@@ -644,4 +644,230 @@ and steel with snow and bluish shadows, dark fantasy enemy portrait for a
 turn-based fight, painterly semi-realistic, muted desaturated palette of ash
 grey, rust brown and dried blood, hard dramatic side light, no text, no
 watermark, no logo, horizontal 3:2 composition
+```
+
+---
+
+# Рудники и озёра — по тирам
+
+Десять кадров: пять тиров рудников и пять тиров озёр. Показываются при входе
+к жиле или к воде. Номера фото вписываются в `TIER_PHOTO_IDS` в
+`bot/mining_texts.py` и `bot/fishing_texts.py`.
+
+**Один кадр на весь тир.** На первом тире двенадцать мест, и картинка у них
+общая. Поэтому в кадре не должно быть примет одного конкретного места —
+иначе остальные одиннадцать окажутся подписаны чужой картинкой. Промты
+собраны из мотивов, общих для тира. Исключение — пятый тир: там место одно,
+и кадр рисует именно его.
+
+**Тиры — это лестница к Монолиту**, и кадр обязан её показывать. Чем выше
+тир, тем ближе центр мира, тем опаснее: с третьего тира начинается открытое
+PvP. Чтобы лестница читалась с одного взгляда, у каждого набора свой
+сквозной приём:
+
+- у **озёр** на горизонте стоит Монолит, и от тира к тиру он растёт — от
+  едва видной иглы в дымке до стены на полнеба;
+- у **рудников** неба нет, поэтому растёт **красное свечение** в породе —
+  от ничего на первом тире до камня, который уже наполовину не камень.
+
+Людей в кадрах нет: картинка показывает место, а не того, кто в нём.
+
+## Общий хвост рудников
+
+```
+dark fantasy mine, medieval mining with picks, timber props, rope and lanterns
+only, no rails, no carts on tracks, no machinery, no people, painterly
+semi-realistic, muted desaturated palette of ash grey, rust brown and dried
+blood, wide establishing shot, no text, no watermark, no logo, no modern
+objects, horizontal 3:2 composition
+```
+
+## Рудник, тир 1
+
+Бурое железо и соляной кварц. Выработки у поверхности: вход на брёвнах,
+что «держится на честном слове», неглубокий открытый разрез, уступы с
+зарубками. Сюда ещё доходит дневной свет. Красного нет совсем — это просто
+работа.
+
+```
+a shallow surface mine at the foot of a hill, a small adit held up by
+weathered timber props at the entrance, a waist deep open cut pit beside it
+with a flat bottom, rusty brown iron streaks and pale salt crystals in the
+exposed rock, dry dust, plain grey daylight reaching inside, humble worn
+human scale, dark fantasy mine, medieval mining with picks, timber props, rope
+and lanterns only, no rails, no carts on tracks, no machinery, no people,
+painterly semi-realistic, muted desaturated palette of ash grey, rust brown
+and dried blood, wide establishing shot, no text, no watermark, no logo, no
+modern objects, horizontal 3:2 composition
+```
+
+## Рудник, тир 2
+
+Соляной кварц и скверный колчедан. Уже не яма, а ход в глубь горы: ровная
+галерея, крепь через каждый шаг, дневной свет остался у входа. Первые
+нездоровые жёлтые прожилки колчедана — пока без свечения.
+
+```
+a long straight gallery driven deep into a mountain, timber supports every
+single step fading into darkness, lantern light only, daylight left far behind
+at the entrance, pale salt quartz in the walls with first sickly yellow veins
+of tainted pyrite, orderly but oppressive, dark fantasy mine, medieval mining
+with picks, timber props, rope and lanterns only, no rails, no carts on
+tracks, no machinery, no people, painterly semi-realistic, muted desaturated
+palette of ash grey, rust brown and dried blood, wide establishing shot, no
+text, no watermark, no logo, no modern objects, horizontal 3:2 composition
+```
+
+## Рудник, тир 3
+
+Скверный колчедан и пепельное серебро. Тут уже страшно: свод обваливался,
+нижние горизонты затоплены, и работают только наверху. Крепь местами не из
+брёвен — из того, что нашли здесь же. В глубине породы впервые едва тлеет
+красное.
+
+```
+a deep mine after a collapse, part of the vault fallen in, lower levels
+flooded with still black water and only the top level still worked, some of
+the props made not of timber but of large old bones found on site, veins of
+dull ash grey silver and tainted yellow pyrite, and deep in the rock the first
+faint barely visible red glow, dread and silence, dark fantasy mine, medieval
+mining with picks, timber props, rope and lanterns only, no rails, no carts on
+tracks, no machinery, no people, painterly semi-realistic, muted desaturated
+palette of ash grey, rust brown and dried blood, wide establishing shot, no
+text, no watermark, no logo, no modern objects, horizontal 3:2 composition
+```
+
+## Рудник, тир 4
+
+Пепельное серебро и багряный сросток. Жила светит красным сквозь породу на
+всю длину забоя, из стен торчат осколки Монолита — все под одним углом,
+как зубья. Красный свет здесь главный, фонари уже почти не нужны.
+
+```
+a mine face where a crimson vein glows through the rock along its entire
+length, monolith shards jutting out of the walls all at the same angle like
+teeth, the red light now brighter than the few lanterns, ash grey silver in
+the stone, heavy heat, dark fantasy mine, medieval mining with picks, timber
+props, rope and lanterns only, no rails, no carts on tracks, no machinery, no
+people, painterly semi-realistic, muted desaturated palette of ash grey, rust
+brown and dried blood, wide establishing shot, no text, no watermark, no logo,
+no modern objects, horizontal 3:2 composition
+```
+
+## Рудник, тир 5 — Подножный забой
+
+Место одно, и кадр рисует его. Копают у самого основания Монолита, порода
+здесь уже наполовину не порода. Главное в кадре — этот переход: обычный
+камень у края сменяется чем-то гладким, тёплым и неправильным.
+
+```
+a dig at the very base of the monolith, the black glossy wall of the monolith
+itself filling the top of the frame and rising out of sight, the rock around
+the dig half turned into something smooth, warm and wrong, ordinary stone at
+the edges of the frame gradually becoming glassy and pulsing with deep crimson
+light toward the centre, crimson clusters growing out of it, a few abandoned
+picks, dark fantasy mine, medieval mining with picks, timber props, rope and
+lanterns only, no rails, no carts on tracks, no machinery, no people, painterly
+semi-realistic, muted desaturated palette of ash grey, rust brown and dried
+blood, wide establishing shot, no text, no watermark, no logo, no modern
+objects, horizontal 3:2 composition
+```
+
+## Общий хвост озёр
+
+```
+dark fantasy landscape of a lake, the monolith visible on the horizon as a
+single tall black spire, no people, painterly semi-realistic, muted
+desaturated palette of ash grey, rust brown and dried blood, overcast light,
+wide establishing shot, no text, no watermark, no logo, no modern objects,
+horizontal 3:2 composition
+```
+
+## Озеро, тир 1
+
+Пепельная плотва, слепой пескарь, бледный окунь. Тихая мелкая вода: чаши
+у родников, гладь, что не рябит на ветру, мелководье, где дно видно насквозь.
+Монолит на горизонте — едва заметная игла в дымке.
+
+```
+a small calm lake with shallow clear water and the bottom visible through it,
+a still surface that does not ripple even in the wind and reflects like dull
+tin, a spring welling from stone at the edge into a worn basin, reeds, the
+monolith barely visible as a thin faint needle far away in the haze, peaceful
+and ordinary, dark fantasy landscape of a lake, the monolith visible on the
+horizon as a single tall black spire, no people, painterly semi-realistic,
+muted desaturated palette of ash grey, rust brown and dried blood, overcast
+light, wide establishing shot, no text, no watermark, no logo, no modern
+objects, horizontal 3:2 composition
+```
+
+## Озеро, тир 2
+
+Солоноводный лещ, ржавый линь, шепчущий голавль. Вода темнеет и мутнеет:
+мутно-голубая чаша со льдом по кромке, чёрная старица цвета крепкого чая.
+Из воды торчат ряды старой крепи — сюда уже приходили люди и не справились.
+Монолит — маленький, но уже отчётливый.
+
+```
+a cold lake in a rocky hollow with murky blue grey water and a rim of old ice
+along the shore that never melts, in part of it rows of old mine timbering
+sticking out of the water where a flooded working drowned, darker tea coloured
+water toward the middle where the bottom cannot be seen, the monolith small
+but clearly visible on the horizon, dark fantasy landscape of a lake, the
+monolith visible on the horizon as a single tall black spire, no people,
+painterly semi-realistic, muted desaturated palette of ash grey, rust brown
+and dried blood, overcast light, wide establishing shot, no text, no
+watermark, no logo, no modern objects, horizontal 3:2 composition
+```
+
+## Озеро, тир 3
+
+Костяная щука, чёрный сом, скверный угорь. Вода, набравшаяся в провал: земля
+ушла вниз разом. Отвесные берега, соль слоями по стенам — и слоёв слишком
+много. Мёртвая тишина. Монолит средний и уже заметно тянет взгляд.
+
+```
+a deep lake filling a sudden collapse pit with sheer steep walls, layers upon
+layers of salt crust on the walls, far too many layers, dark still water with
+no bottom in sight, dead unnatural silence, no birds, the monolith of medium
+size on the horizon already pulling the eye, dark fantasy landscape of a lake,
+the monolith visible on the horizon as a single tall black spire, no people,
+painterly semi-realistic, muted desaturated palette of ash grey, rust brown
+and dried blood, overcast light, wide establishing shot, no text, no
+watermark, no logo, no modern objects, horizontal 3:2 composition
+```
+
+## Озеро, тир 4
+
+Пепельный осётр, утопленничья камбала, багряный налим. Вода отдаёт в красное
+— и это не закат, закатов тут не видно. Из воды торчат осколки Монолита,
+вросшие в дно под наклоном, и все смотрят в одну сторону — на него. Монолит
+большой и главный в кадре.
+
+```
+a lake with water tinted dull red that is not a sunset, monolith shards grown
+into the lake bottom sticking out of the surface at a slant, all pointing in
+the same direction toward the monolith, the monolith large and dominating the
+horizon, heavy overcast sky with no sun, dark fantasy landscape of a lake, the
+monolith visible on the horizon as a single tall black spire, no people,
+painterly semi-realistic, muted desaturated palette of ash grey, rust brown
+and dried blood, wide establishing shot, no text, no watermark, no logo, no
+modern objects, horizontal 3:2 composition
+```
+
+## Озеро, тир 5 — Слёзная чаша
+
+Место одно, и кадр рисует его. Монолит стоит вплотную и закрывает полнеба.
+Вода под ним тёплая и медленно ходит кругами без всякого ветра — это движение
+и должно быть в кадре главным.
+
+```
+a round pool at the very foot of the monolith, the black monolith standing
+right beside it and filling half of the sky, warm water with faint steam
+slowly turning in wide concentric circles although there is no wind at all,
+the surface reflecting a deep crimson glow from the monolith, utterly still
+air, dark fantasy landscape of a lake, no people, painterly semi-realistic,
+muted desaturated palette of ash grey, rust brown and dried blood, wide
+establishing shot, no text, no watermark, no logo, no modern objects,
+horizontal 3:2 composition
 ```

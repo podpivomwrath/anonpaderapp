@@ -106,7 +106,7 @@ async def _enter_lake(message: Message) -> None:
         f"{ft.bag_line(grams, capacity)}\n"
         f"{ft.SEP}"
     )
-    await message.answer(text, keyboard=kb.lake_keyboard())
+    await message.answer(text, keyboard=kb.lake_keyboard(), attachment=ft.lake_attachment(lake))
 
 
 @labeler.message(text=[ft.LAKE_COMMAND])

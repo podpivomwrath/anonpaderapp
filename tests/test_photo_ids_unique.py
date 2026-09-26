@@ -22,6 +22,9 @@ CODE = (
     "bot/raid_texts.py",
     "bot/handlers/combat.py",
     "bot/handlers/respawn.py",
+    # Патч 99: картинки рудников и озёр по тирам.
+    "bot/mining_texts.py",
+    "bot/fishing_texts.py",
 )
 PHOTO_ID = re.compile(r'"(\d{9})"')
 

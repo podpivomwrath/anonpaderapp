@@ -6,6 +6,7 @@
 
 import random
 
+from bot.vk_media import photo_attachment
 from game.content_loader import MineDef
 from game.economy import mining
 from game.economy import mining_config as mc
@@ -136,3 +137,19 @@ def ore_screen(ore: list) -> str:
         "Руду пока некому продать - она пойдёт на прокачку снаряжения.",
     ]
     return chr(10).join(lines)
+
+
+# --- Иллюстрации (фото в альбоме группы VK, патч 99) ---
+
+#: Одна картинка на ТИР, а не на рудник: рудников двадцать семь, а тиров пять.
+#: Своё поле image у места по-прежнему главнее - если однажды захочется
+#: выделить особое место, картинка тира его не перебьёт (то же правило
+#: наследования, что у мобов, патч 36).
+#: Пустая строка - картинки ещё нет, сообщение уйдёт без вложения.
+TIER_PHOTO_IDS: dict[int, str] = {1: "", 2: "", 3: "", 4: "", 5: ""}
+
+
+def mine_attachment(mine: MineDef) -> str | None:
+    """Только ко входу в рудник. Ход добычи - повторяющееся действие."""
+    photo_id = mine.image or TIER_PHOTO_IDS.get(mine.tier)
+    return photo_attachment(photo_id) if photo_id else None

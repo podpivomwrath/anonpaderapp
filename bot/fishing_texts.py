@@ -14,6 +14,7 @@
 
 import random
 
+from bot.vk_media import photo_attachment
 from game.content_loader import LakeDef
 from game.economy import fishing
 from game.economy import fishing_config as fc
@@ -146,3 +147,21 @@ def bag_screen(bag: list, grams: int, capacity: int, value: int) -> str:
         "Рыбак у воды в глубоких кольцах платит больше.",
     ]
     return chr(10).join(lines)
+
+
+
+# --- Иллюстрации (фото в альбоме группы VK, патч 99) ---
+
+#: Одна картинка на ТИР, а не на озеро: озёр двадцать семь, а тиров пять.
+#: Своё поле image у места по-прежнему главнее - если однажды захочется
+#: выделить особое место, картинка тира его не перебьёт (то же правило
+#: наследования, что у мобов, патч 36).
+#: Пустая строка - картинки ещё нет, сообщение уйдёт без вложения.
+TIER_PHOTO_IDS: dict[int, str] = {1: "", 2: "", 3: "", 4: "", 5: ""}
+
+
+def lake_attachment(lake: LakeDef) -> str | None:
+    """Только ко входу к воде. Подсечка - повторяющееся действие, картинка
+    там была бы шумом."""
+    photo_id = lake.image or TIER_PHOTO_IDS.get(lake.tier)
+    return photo_attachment(photo_id) if photo_id else None

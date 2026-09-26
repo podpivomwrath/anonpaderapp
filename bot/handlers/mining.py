@@ -141,7 +141,9 @@ async def _enter_mine(message: Message) -> None:
     warning = mt.depth_warning(mine, character.mining_level)
     if warning:
         text += chr(10) + warning
-    await message.answer(text, keyboard=kb.mine_keyboard(ore_left > 0))
+    await message.answer(
+        text, keyboard=kb.mine_keyboard(ore_left > 0), attachment=mt.mine_attachment(mine),
+    )
 
 
 @labeler.message(text=[mt.MINE_COMMAND])
