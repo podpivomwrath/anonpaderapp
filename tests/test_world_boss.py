@@ -80,6 +80,13 @@ def test_overlevelled_players_are_kept_out() -> None:
     assert world_boss.can_attack(60, 4)
 
 
+def test_boss_goes_only_where_someone_can_fight_it() -> None:
+    rng = random.Random(2)
+    rings = {world_boss.pick_ring(rng, {4: 11, 2: 1}) for _ in range(300)}
+    assert rings == {2, 4}
+    assert {world_boss.pick_ring(rng, {}) for _ in range(300)} == set(wbc.RINGS)
+
+
 # --- Бой -------------------------------------------------------------------------
 
 

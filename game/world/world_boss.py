@@ -54,10 +54,13 @@ def ring_of_level(level: int) -> int | None:
 
 
 def pick_ring(rng: random.Random, players_by_ring: dict[int, int]) -> int:
-    """Кольцо чаще там, где сейчас играют: вес = 1 + игроков, которым этот
-    босс по уровню. Единица - чтобы и пустое кольцо иногда получало босса."""
+    """Кольцо - только там, где за сутки были игроки, которым этот босс по
+    уровню, с весом по их числу. Босс в кольце без таких игроков три часа
+    стоит впустую и не даёт появиться следующему. Никого нет вовсе - любое."""
     rings = sorted(wbc.RINGS)
-    weights = [1 + players_by_ring.get(r, 0) for r in rings]
+    weights = [players_by_ring.get(r, 0) for r in rings]
+    if not any(weights):
+        return rng.choice(rings)
     return rng.choices(rings, weights=weights)[0]
 
 
