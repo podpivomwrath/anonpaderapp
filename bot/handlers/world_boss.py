@@ -89,9 +89,20 @@ async def announce(boss_pk: int) -> None:
         boss.id, boss.boss_id, boss.ring, boss.x, boss.y, len(recipients),
     )
     text = texts.announce_text(boss)
+    attachment = _attachment(boss)
+    delivered = 0
     for peer_id in recipients:
-        await _send(peer_id, text, attachment=_attachment(boss))
+        try:
+            await _bot_api.messages.send(
+                peer_id=peer_id, message=text, random_id=0, attachment=attachment,
+            )
+            delivered += 1
+        except Exception:  # noqa: BLE001 - один недоступный не рвёт рассылку
+            # Рассылка идёт и тем, кто давно не заходил: кто-то запретил
+            # сообщения сообществу. Это не ошибка бота - без трассировки.
+            logger.warning("Мировой босс: объявление не доставлено {}", peer_id)
         await asyncio.sleep(0.05)  # лимит сообщений сообщества
+    logger.info("Мировой босс {}: объявление доставлено {} из {}", boss.id, delivered, len(recipients))
 
 
 async def maybe_send_here_button(peer_id: int, character) -> None:

@@ -139,16 +139,15 @@ async def spawn(db: AsyncSession, rng: random.Random, now: datetime | None = Non
     return boss
 
 
-async def announce_recipients(db: AsyncSession, boss: WorldBoss, now: datetime | None = None) -> list[int]:
-    """vk_id тех, кому стоит сообщить о боссе: были в игре за сутки и
-    допускаются к нему по уровню. Остальным сообщение было бы шумом."""
+async def announce_recipients(db: AsyncSession, boss: WorldBoss) -> list[int]:
+    """vk_id всех, кого босс пускает по уровню, - и тех, кто сейчас не в
+    игре: объявление и должно звать вернуться (решение владельца игры).
+    Тем, кто перерос кольцо, не пишем - зайти к боссу они всё равно не смогут."""
     from models import User
 
-    now = now or _now()
     rows = await db.execute(
         select(User.vk_id).join(Character, Character.user_id == User.id).where(
             Character.creation_state.is_(None),
-            Character.last_active_at >= now - timedelta(days=1),
             Character.level <= world_boss.max_attacker_level(boss.ring),
         )
     )

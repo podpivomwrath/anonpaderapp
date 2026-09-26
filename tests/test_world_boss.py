@@ -314,3 +314,21 @@ def test_end_text_agrees_with_the_boss_name() -> None:
     assert "Жилохват пал!" in world_boss_texts.end_text(killed, got, 10)
     left = SimpleNamespace(boss_id="faceless_procession", status="escaped", hp=5, max_hp=10)
     assert "Безликая процессия ушла. С неё" in world_boss_texts.end_text(left, got, 10)
+
+
+async def test_announcement_reaches_offline_players_of_fitting_level(db_session, make_character) -> None:
+    """Объявление зовёт вернуться - и тех, кто давно не заходил. Кого босс
+    не пустит по уровню, не зовём."""
+    boss = await _boss(db_session, ring=2)
+    away = await make_character(level=25)
+    away.last_active_at = NOW - timedelta(days=30)
+    too_strong = await make_character(level=30 + wbc.MAX_LEVEL_OVER_RING + 1)
+    await db_session.flush()
+
+    recipients = await svc.announce_recipients(db_session, boss)
+
+    from models import User
+
+    away_vk = await db_session.scalar(select(User.vk_id).where(User.id == away.user_id))
+    strong_vk = await db_session.scalar(select(User.vk_id).where(User.id == too_strong.user_id))
+    assert away_vk in recipients and strong_vk not in recipients
