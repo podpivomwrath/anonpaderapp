@@ -32,15 +32,15 @@ from pathlib import Path
 import aiohttp
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-from config import get_settings  # noqa: E402
+from config import get_settings
 
 API = "https://api.vk.com/method/"
 VERSION = "5.199"
 MAX_SIDE = 1600
 #: Фото игры, по которому находится её альбом (пролог рейда).
 REFERENCE_PHOTO_ID = "457239133"
-#: ВК принимает до пяти файлов за один запрос к серверу загрузки.
-BATCH = 5
+#: Попыток на одну картинку - каждая с новым сервером загрузки.
+ATTEMPTS = 6
 
 
 class VkError(RuntimeError):
@@ -99,33 +99,52 @@ async def game_album(session: aiohttp.ClientSession, token: str, group_id: int) 
     return photo["album_id"]
 
 
-async def upload_batch(
-    session: aiohttp.ClientSession, token: str, group_id: int, album_id: int, paths: list[Path],
-) -> list[dict]:
-    server = await _call(
-        session, token, "photos.getUploadServer", album_id=album_id, group_id=group_id
-    )
-    form = aiohttp.FormData()
-    for number, path in enumerate(paths, 1):
-        form.add_field(
-            f"file{number}", _jpeg(path), filename=path.stem + ".jpg", content_type="image/jpeg"
+async def upload_one(
+    session: aiohttp.ClientSession, token: str, group_id: int, album_id: int, path: Path,
+) -> dict:
+    """Одна картинка в альбом группы.
+
+    По одной, хотя документация ВК описывает до пяти файлов за запрос:
+    поштучно номер фото однозначно привязан к своему файлу, без расчёта на
+    порядок в пачке.
+
+    Имя файла в запросе латиницей: кириллическое уходит в заголовок в
+    кодировке RFC 2231, и полагаться на её разбор незачем - имя ВК не нужно.
+    """
+    uploaded = None
+    # Сервер загрузки ВК выдаётся наугад и через раз отвечает пустым
+    # photos_list, ничего не объясняя. На проде поле `file` на одних серверах
+    # прошло, на других нет; `file1` из документации тоже давал пустой ответ.
+    # Поэтому - повтор с НОВЫМ сервером, чередуя оба имени поля. Пустой ответ
+    # ничего не сохраняет (сохраняет только photos.save ниже), так что повтор
+    # безопасен и дублей в альбоме не даёт.
+    for attempt in range(ATTEMPTS):
+        server = await _call(
+            session, token, "photos.getUploadServer", album_id=album_id, group_id=group_id
         )
-    async with session.post(server["upload_url"], data=form) as response:
-        uploaded = await response.json(content_type=None)
-    if not uploaded.get("photos_list") or uploaded["photos_list"] == "[]":
-        raise VkError(f"сервер загрузки не принял файлы: {uploaded}")
+        field = ("file", "file1")[attempt % 2]
+        form = aiohttp.FormData()
+        form.add_field(field, _jpeg(path), filename="image.jpg", content_type="image/jpeg")
+        async with session.post(server["upload_url"], data=form) as response:
+            answer = await response.json(content_type=None)
+        if answer.get("photos_list") and answer["photos_list"] != "[]":
+            uploaded = answer
+            break
+        await asyncio.sleep(1)
+    if uploaded is None:
+        raise VkError(f"{path.name}: сервер загрузки не принял файл за {ATTEMPTS} попыток")
     saved = await _call(
         session, token, "photos.save", album_id=album_id, group_id=group_id,
         server=uploaded["server"], photos_list=uploaded["photos_list"], hash=uploaded["hash"],
     )
-    if len(saved) != len(paths):
-        raise VkError(f"загружено {len(saved)} из {len(paths)} - порядок уже не сопоставить")
-    for photo in saved:
-        # Игра собирает вложение как фото ГРУППЫ. Чужое фото по этой строке
-        # не найдётся, и ВК отклонит сообщение целиком.
-        if photo["owner_id"] != -group_id:
-            raise VkError(f"фото {photo['id']} принадлежит {photo['owner_id']}, а не группе")
-    return saved
+    if len(saved) != 1:
+        raise VkError(f"{path.name}: ожидалось одно фото, сохранено {len(saved)}")
+    photo = saved[0]
+    # Игра собирает вложение как фото ГРУППЫ. Чужое фото по этой строке не
+    # найдётся, и ВК отклонит сообщение целиком.
+    if photo["owner_id"] != -group_id:
+        raise VkError(f"{path.name}: фото принадлежит {photo['owner_id']}, а не группе")
+    return photo
 
 
 async def main(paths: list[Path]) -> dict[str, int]:
@@ -139,14 +158,10 @@ async def main(paths: list[Path]) -> dict[str, int]:
         print("токен:", await check_token(session, token, group_id), file=sys.stderr)
         album_id = await game_album(session, token, group_id)
         print("альбом игры:", album_id, file=sys.stderr)
-        for start in range(0, len(paths), BATCH):
-            chunk = paths[start:start + BATCH]
-            # ВК возвращает фото в порядке файлов в запросе - на этом держится
-            # сопоставление имён с номерами, поэтому выше и сверяется счёт.
-            saved = await upload_batch(session, token, group_id, album_id, chunk)
-            for path, photo in zip(chunk, saved):
-                result[path.name] = photo["id"]
-                print(f"  {path.name} -> {photo['id']}", file=sys.stderr)
+        for path in paths:
+            photo = await upload_one(session, token, group_id, album_id, path)
+            result[path.name] = photo["id"]
+            print(f"  {path.name} -> {photo['id']}", file=sys.stderr)
     return result
 
 
