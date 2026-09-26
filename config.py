@@ -18,6 +18,11 @@ class Settings(BaseSettings):
     # main.py проверяет заполненность перед запуском бота.
     vk_token: str = Field(default="", description="Токен сообщества VK")
     vk_group_id: int = Field(default=0, description="ID сообщества")
+    # Токен ПОЛЬЗОВАТЕЛЯ-админа группы, только для загрузки картинок в альбом
+    # (tools/vk_upload.py). Токену сообщества VK загрузку в альбом не
+    # разрешает вовсе (ошибка 27), а фото «для сообщений» ложатся на аккаунт
+    # админа, а не на группу. Бот этим токеном больше ничего не делает.
+    vk_user_token: str = Field(default="", description="Токен админа: только загрузка фото")
     vk_confirmation_code: str = Field(
         default="", description="Строка подтверждения сервера из настроек Callback API"
     )
