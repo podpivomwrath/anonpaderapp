@@ -263,6 +263,9 @@ def test_lake_button_is_sent_only_from_cell_entry_points() -> None:
         stripped = line.strip()
         if stripped.startswith(("async def ", "def ")):
             current = stripped.split("(")[0].replace("async def ", "").replace("def ", "")
-        if "maybe_send_lake_button(" in stripped and not stripped.startswith(("async def", "def")):
+        if "send_cell_buttons(" in stripped and not stripped.startswith(("async def", "def")):
             callers.add(current)
+        if "maybe_send_lake_button(" in stripped and not stripped.startswith(("async def", "def")):
+            # Патч 104: кнопки клетки шлёт одна функция, её зовут входы.
+            assert current == "send_cell_buttons", f"кнопка озера в обход входа: {current}"
     assert callers == entry_functions, f"кнопка шлётся не только на входе: {callers}"

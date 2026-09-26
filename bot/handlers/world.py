@@ -294,6 +294,24 @@ async def maybe_send_mine_button(peer_id: int, character) -> None:
     )
 
 
+async def send_cell_buttons(peer_id: int, character) -> None:
+    """Всё, что приходит при ВХОДЕ на клетку: кнопки Монолита, озера,
+    рудника, мирового босса. Одна точка на все пути входа - пешком, за
+    ворота, на маунте, показ локации.
+
+    Раньше каждый путь звал кнопки сам, и новые пути их забывали: у маунта
+    не было кнопки рудника, у выхода за ворота - кнопки босса (патч 104,
+    игрок пришёл на босса и не увидел его). tests/test_cell_buttons.py
+    следит, чтобы кнопки не звались в обход этой функции.
+    """
+    await _maybe_send_monolith_button(peer_id, character)
+    await maybe_send_lake_button(peer_id, character)
+    # Патч 59: уход с клетки обнуляет незаконченную добычу.
+    await mining_service_abandon(character)
+    await maybe_send_mine_button(peer_id, character)
+    await world_boss_handlers.maybe_send_here_button(peer_id, character)
+
+
 async def _deliver_daily_notice(peer_id: int, character) -> None:
     """Патч 23: доставка уведомления о сбросе дня/стрике/награде за вход,
     отложенного в onboarding_service.get_character (транзиентный атрибут,
@@ -446,12 +464,7 @@ async def show_location(message: Message, db, character) -> None:
         attachment=location_attachment(character),
         keyboard=kb.movement_keyboard(character.pos_x, character.pos_y, message.peer_id, has_mount=has_mount),
     )
-    await _maybe_send_monolith_button(message.peer_id, character)
-    await maybe_send_lake_button(message.peer_id, character)
-    # Патч 59: уход с клетки обнуляет незаконченную добычу.
-    await mining_service_abandon(character)
-    await maybe_send_mine_button(message.peer_id, character)
-    await world_boss_handlers.maybe_send_here_button(message.peer_id, character)
+    await send_cell_buttons(message.peer_id, character)
 
 
 @labeler.message(text=[kb.BTN_GATE])
@@ -515,11 +528,7 @@ async def gate_exit_direction(message: Message) -> None:
             attachment=location_attachment(character),
             keyboard=kb.movement_keyboard(character.pos_x, character.pos_y, message.peer_id, has_mount=has_mount),
         )
-        await _maybe_send_monolith_button(message.peer_id, character)
-        await maybe_send_lake_button(message.peer_id, character)
-        # Патч 59: уход с клетки обнуляет незаконченную добычу.
-        await mining_service_abandon(character)
-        await maybe_send_mine_button(message.peer_id, character)
+        await send_cell_buttons(message.peer_id, character)
 
 
 ASH_BURNED_LINE = "Пепел разнесло ветром."
@@ -1151,12 +1160,7 @@ async def handle_arrival(peer_id: int) -> None:
             attachment=location_attachment(character),
             keyboard=kb.movement_keyboard(character.pos_x, character.pos_y, peer_id, has_mount=has_mount),
         )
-        await _maybe_send_monolith_button(peer_id, character)
-        await maybe_send_lake_button(peer_id, character)
-        # Патч 59: уход с клетки обнуляет незаконченную добычу.
-        await mining_service_abandon(character)
-        await maybe_send_mine_button(peer_id, character)
-        await world_boss_handlers.maybe_send_here_button(peer_id, character)
+        await send_cell_buttons(peer_id, character)
 
 
 @labeler.message(text=[kb.BTN_MENTOR, kb.BTN_MENTOR_BADGE])
