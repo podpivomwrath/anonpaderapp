@@ -17,6 +17,7 @@ from uuid import uuid4
 from datetime import datetime, timedelta, timezone
 from typing import Awaitable, Callable, Protocol
 
+from apscheduler.jobstores.base import JobLookupError
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.date import DateTrigger
 from loguru import logger
@@ -145,7 +146,7 @@ class TickEngine:
         self._resolve_locks.pop(session_id, None)
         try:
             self.scheduler.remove_job(self._job_id(session_id))
-        except Exception:
+        except JobLookupError:
             pass
 
     # --- Тик ---
@@ -231,7 +232,7 @@ class TickEngine:
                 return
             try:
                 self.scheduler.remove_job(self._job_id(session_id))
-            except Exception:
+            except JobLookupError:
                 pass  # PvE-режим или job уже отработал
 
             raw = await self.store.pop_all(self._action_key(state))

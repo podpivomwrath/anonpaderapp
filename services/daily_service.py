@@ -178,13 +178,21 @@ async def ensure_day_rollover(
 
 async def _active_dailies(db: AsyncSession, character: Character) -> list[CharacterDaily]:
     today = today_msk()
+    # Под блокировкой (патч 98). Выполнение устроено как «прочитать
+    # completed -> выставить -> наградить», а прогресс приходит и от кнопок
+    # (продажа закрывает ежедневку на золото). Два одновременных события
+    # оба видели completed=False и платили оба. С блокировкой второе ждёт,
+    # а дождавшись, перечитывает строку и видит её уже выполненной.
     rows = (
         await db.scalars(
-            select(CharacterDaily).where(
+            select(CharacterDaily)
+            .where(
                 CharacterDaily.character_id == character.id,
                 CharacterDaily.date == today,
                 CharacterDaily.completed.is_(False),
             )
+            .with_for_update()
+            .execution_options(populate_existing=True)
         )
     ).all()
     return list(rows)
@@ -241,6 +249,13 @@ async def _finish(
         return DailyProgressResult()
     today = today_msk()
     notice_parts: list[str] = []
+    # Сундук дня - один. Два запроса, закрывшие РАЗНЫЕ ежедневки, блокировки
+    # строк ежедневок не пересекаются, и оба видели «сегодня ещё не было».
+    # Строка персонажа под блокировкой это исключает. flush ДО refresh
+    # обязателен: выше в этом же запросе начислен опыт, и перечитывание без
+    # сохранения молча стёрло бы его.
+    await db.flush()
+    await db.refresh(character, with_for_update=True)
     if character.last_daily_completed_date != today:
         character.last_daily_completed_date = today
         character.daily_streak += 1

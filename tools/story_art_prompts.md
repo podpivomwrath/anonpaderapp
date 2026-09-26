@@ -1,4 +1,4 @@
-# Промты: пути подкласса и сюжетные акты
+# Промты: пути подкласса, сюжетные акты и враги
 
 Продолжение `tools/raid_art_prompts.md`. Там три кадра рейда, здесь шесть
 путей и шестнадцать актов. Слоты под всё это уже есть в коде (патч 88):
@@ -428,4 +428,220 @@ beneath the cracks, absolute stillness, no people, dark fantasy landscape, hot
 orange embers and black soot, painterly semi-realistic, muted desaturated
 palette of ash grey, rust brown and dried blood, wide establishing shot, no
 text, no watermark, no logo, no modern objects, horizontal 3:2 composition
+```
+
+---
+
+# Сюжетные враги
+
+Семь именных врагов, которым не досталось картинки: у них нет ни своей, ни
+базового моба, от которого её можно было бы унаследовать. Среди них финальные
+боссы трёх регионов, а сражались они до сих пор без портрета, при том что у
+любого рядового волка он есть.
+
+**Здесь врага показывать можно и нужно** — в отличие от кадров актов.
+Портрет приходит в начале боя, то есть после сцены, где враг уже появился.
+Спойлерить уже нечего.
+
+Портрет по пояс, лицом к зрителю, фигура смещена от центра, а за спиной
+видно место боя. Лицо врага, в отличие от путей подкласса, открыто: это не
+игрок, это противник, и его надо узнать.
+
+Место за спиной у Хелста и Матери Углей совпадает с кадрами их актов,
+которые уже нарисованы: кресло на причале и гладкий пепел в сердце Предела.
+Так бой читается продолжением той же сцены.
+
+Куда вписывать номера фото: поле `image` у `named_enemy` в
+`content/story/<регион>.json`.
+
+## Общий хвост врагов
+
+```
+dark fantasy enemy portrait for a turn-based fight, single figure from the
+waist up facing the viewer, three-quarter view, figure off-centre with the
+place of the fight visible behind, painterly semi-realistic, muted desaturated
+palette of ash grey, rust brown and dried blood, hard dramatic side light, no
+text, no watermark, no logo, no modern objects, horizontal 3:2 composition
+```
+
+## Надсмотрщик глубин — Кряж, акт 3
+
+Кнут в одной руке, клинок в другой — он привык, что боятся обоих. За спиной
+тайная выработка: пленные Меченые в кандалах. Он заметил тебя первым —
+поэтому смотрит прямо, без удивления.
+
+```
+a broad mine overseer holding a coiled whip in one hand and a short heavy
+blade in the other, calm unimpressed stare straight at the viewer, dust and
+grit in his beard, behind him a hidden mining pit where shackled prisoners
+chip glowing shards out of a rock vein under lantern light, cold grey stone and
+steel with bluish shadows, dark fantasy enemy portrait for a turn-based fight,
+single figure from the waist up facing the viewer, three-quarter view, figure
+off-centre with the place of the fight visible behind, painterly
+semi-realistic, muted desaturated palette of ash grey, rust brown and dried
+blood, hard dramatic side light, no text, no watermark, no logo, no modern
+objects, horizontal 3:2 composition
+```
+
+## Чужой посредник — Кряж, акт 4
+
+Чужой выговор, чужой герб на плаще — не из Кряжа и не из соседних земель.
+Герб не должен совпасть ни с чем в игре: вся суть в том, что его никто не
+узнаёт. Сделка оборвана на полуслове — в руке ещё осколок.
+
+```
+a well dressed foreign broker in a travelling cloak with an unfamiliar heraldic
+emblem that belongs to no known land, one hand still holding a glowing shard
+mid deal, the other already reaching for a hidden knife, cold measuring look
+of someone who does not leave witnesses, behind him a windswept snowy mountain
+pass with a half loaded pack mule, cold grey stone and steel with snow and
+bluish shadows, dark fantasy enemy portrait for a turn-based fight, single
+figure from the waist up facing the viewer, three-quarter view, figure
+off-centre with the place of the fight visible behind, painterly
+semi-realistic, muted desaturated palette of ash grey, rust brown and dried
+blood, hard dramatic side light, no text, no watermark, no logo, no modern
+objects, horizontal 3:2 composition
+```
+
+## Магистр-отступник — Кряж, финал
+
+Держит клинок так, будто держал его всю жизнь, а не только годы
+предательства. Осколки на броне светятся собственным, неправильным светом.
+Спокоен: ждал этого разговора годами. Не злодей в маске — старый солдат,
+который давно всё для себя решил.
+
+```
+an aging knight commander of a military order in ornate but battle worn plate,
+holding a long sword with the easy grip of a lifetime, monolith shards set into
+the armour glowing with a wrong unnatural light, completely calm and patient
+expression of a man who has long made his decision, grey close cropped hair,
+behind him the last bare ridge before the centre of the world with a deep
+crimson glow on the horizon, cold grey stone and steel with bluish shadows,
+dark fantasy enemy portrait for a turn-based fight, single figure from the
+waist up facing the viewer, three-quarter view, figure off-centre with the
+place of the fight visible behind, painterly semi-realistic, muted desaturated
+palette of ash grey, rust brown and dried blood, hard dramatic side light, no
+text, no watermark, no logo, no modern objects, horizontal 3:2 composition
+```
+
+## Тот, что носит её лицо — Пущи, акт 1
+
+Движется слишком плавно для человека и слишком твёрдо для тени. Лицо
+травницы сидит на нём, как маска, снятая с ещё тёплого тела. Страшно
+именно тем, что лицо обычное и доброе, а всё остальное — нет.
+
+```
+a tall wrong shaped figure wearing the ordinary kind face of a village herb
+woman like a mask, the face slightly too small for the head and not moving with
+the body, the body beneath too smooth and too long limbed to be human, dark
+bark like skin at the neck where the face ends, behind it a spilled wicker
+basket on wet moss with berries already sprouted, trees standing in the wrong
+places, sickly green and wet black bark, dark fantasy enemy portrait for a
+turn-based fight, single figure from the waist up facing the viewer,
+three-quarter view, figure off-centre with the place of the fight visible
+behind, painterly semi-realistic, muted desaturated palette of ash grey, rust
+brown and dried blood, hard dramatic side light, no text, no watermark, no logo,
+no modern objects, horizontal 3:2 composition
+```
+
+## Привитый — Пущи, акт 4
+
+Был друидом. Осколок Монолита растёт в нём, как чужой орган, а он улыбается,
+будто это благословение. Свет сквозь ткань идёт неправильный, и от него тянет
+жаром — тем же тёплым светом, что на кадре этого акта светил между стволами.
+
+```
+a former druid in torn ritual robes with a monolith shard grown into his chest
+like a foreign organ, veins of wrong warm orange light spreading under the skin
+and glowing through the fabric, serene blissful smile as if it were a blessing,
+heat shimmer around him, behind him the bend of a straight cut forest road with
+dense trunks, sickly green and wet black bark with a single warm orange light
+source, dark fantasy enemy portrait for a turn-based fight, single figure from
+the waist up facing the viewer, three-quarter view, figure off-centre with the
+place of the fight visible behind, painterly semi-realistic, muted desaturated
+palette of ash grey, rust brown and dried blood, hard dramatic side light, no
+text, no watermark, no logo, no modern objects, horizontal 3:2 composition
+```
+
+## Барон Хелст — Пристани, финал
+
+Стар, на бойца не похож и **даже не встаёт** — сидит в том самом кресле на
+своём ухоженном причале, которое пустым стояло на кадре акта. Опасен не он,
+а наёмники за спиной, купленные на деньги с семи потопленных судов.
+
+```
+an old wealthy harbour baron seated at ease in a single chair on an immaculate
+private pier, not bothering to stand, rings on his fingers, fine but plain
+dark coat, amused contemptuous look of a merchant who has already counted the
+price, behind him several hired mercenaries in mismatched armour waiting for
+his nod, lanterns lit in daylight, rotting shipwrecks visible in the fog beyond
+the clean pier, pale salt crust, wet timber and brine green, dark fantasy enemy
+portrait for a turn-based fight, figure from the waist up facing the viewer,
+three-quarter view, figure off-centre with the place of the fight visible
+behind, painterly semi-realistic, muted desaturated palette of ash grey, rust
+brown and dried blood, hard dramatic side light, no text, no watermark, no logo,
+no modern objects, horizontal 3:2 composition
+```
+
+## Мать Углей — Предел, финал
+
+Шрамов не носит: спираль вырезана в ней самой временем и верой десятилетий.
+Смотрит не на тебя — на Шрама, своего ученика, стоящего за кадром. Огонь
+вокруг неё обжигает только врагов. Место — сердце пепла с кадра акта:
+гладкий пепел, жар без пламени.
+
+```
+a very old priestess with no visible scars, a deep spiral pattern that seems to
+be part of her weathered skin itself rather than cut into it, looking past the
+viewer to someone just out of frame with the disappointed tenderness of a
+teacher, a slow ring of fire circling her without touching her robes, fierce
+heat haze, behind her the dead centre of a burnt land with smooth undisturbed
+ash and a crimson glow beneath cracked ground, hot orange embers and black
+soot, dark fantasy enemy portrait for a turn-based fight, single figure from
+the waist up, three-quarter view, figure off-centre with the place of the fight
+visible behind, painterly semi-realistic, muted desaturated palette of ash
+grey, rust brown and dried blood, hard dramatic side light, no text, no
+watermark, no logo, no modern objects, horizontal 3:2 composition
+```
+
+---
+
+# Моб с чужой картинкой
+
+«Гулкий латник» и «Кряжевый вопленик» (Кряж, стартовое кольцо) делят одно
+фото 457239081, а это явно разные существа — значит, один из них показывает
+чужую картинку. Какой именно, видно только глазами: промты есть на обоих,
+нужен тот, чья картинка не совпадает.
+
+Стиль подгони под остальных мобов Кряжа: если у них своя манера, бери её, а
+не хвост выше.
+
+## Гулкий латник
+
+Пустой доспех солдата Ордена. Когда идёт, внутри гудит, как в колодце.
+
+```
+an empty suit of plate armour of an order soldier walking on its own, dark
+nothing visible through the visor slit and the gaps at the joints, dented and
+frost rimmed, the hollow resonance suggested by faint rings of disturbed snow
+and dust around each heavy step, cold grey stone and steel with snow and
+bluish shadows, dark fantasy enemy portrait for a turn-based fight, painterly
+semi-realistic, muted desaturated palette of ash grey, rust brown and dried
+blood, hard dramatic side light, no text, no watermark, no logo, horizontal 3:2
+composition
+```
+
+## Кряжевый вопленик
+
+Кричит на одной ноте и не смолкает. От этого крика ноют зубы и трескается
+камень.
+
+```
+a gaunt grey mountain creature with its jaw unhinged wide in one endless
+scream, the air in front of its mouth visibly rippling, fresh cracks spreading
+through the rock under and around it, loose pebbles jumping, cold grey stone
+and steel with snow and bluish shadows, dark fantasy enemy portrait for a
+turn-based fight, painterly semi-realistic, muted desaturated palette of ash
+grey, rust brown and dried blood, hard dramatic side light, no text, no
+watermark, no logo, horizontal 3:2 composition
 ```

@@ -21,3 +21,6 @@ miniapp/.env
 # 128px (miniapp/src/assets/items, ~150 КБ). Пересобрать их из img/ можно в
 # любой момент: python tools/icon_assets.py
 img/
+
+# Файловые логи бота (патч 98) - на проде живут на томе
+logs/

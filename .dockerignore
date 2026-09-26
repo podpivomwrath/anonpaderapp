@@ -24,3 +24,6 @@ tests
 sim.js
 README.md
 DEPLOY.md
+
+# Файловые логи бота (патч 98) - на проде живут на томе
+logs/

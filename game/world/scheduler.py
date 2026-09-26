@@ -8,6 +8,7 @@
 from datetime import datetime, timedelta, timezone
 from typing import Awaitable, Callable
 
+from apscheduler.jobstores.base import JobLookupError
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.date import DateTrigger
 
@@ -55,5 +56,5 @@ class PeerScheduler:
     def cancel(self, peer_id: int) -> None:
         try:
             self.scheduler.remove_job(self._job_id(peer_id))
-        except Exception:
+        except JobLookupError:
             pass

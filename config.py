@@ -73,6 +73,9 @@ class Settings(BaseSettings):
     bug_report_max_per_hour: int = Field(default=5, description="Лимит /баг репортов в час на игрока")
 
     log_level: str = "INFO"
+    # Папка для файловых логов. Пустая строка - файл не пишется. На проде
+    # она смонтирована томом (docker-compose.prod.yml) и переживает деплой.
+    log_dir: str = "logs"
 
 
 @lru_cache

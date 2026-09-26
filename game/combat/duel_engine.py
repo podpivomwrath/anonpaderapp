@@ -16,6 +16,7 @@ from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 from typing import Awaitable, Callable
 
+from apscheduler.jobstores.base import JobLookupError
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.date import DateTrigger
 from loguru import logger
@@ -167,7 +168,7 @@ class DuelEngine:
             raise ValueError("Сейчас не твой ход")
         try:
             self.scheduler.remove_job(self._job_id(session_id))
-        except Exception:
+        except JobLookupError:
             pass
         return await self._resolve_turn(state, action)
 

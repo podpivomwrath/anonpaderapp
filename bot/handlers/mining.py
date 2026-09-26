@@ -138,6 +138,9 @@ async def _enter_mine(message: Message) -> None:
         mt.mine_intro(mine, _rng, ore_left) + chr(10) * 2
         + mt.SEP + chr(10) + mt.level_line(character) + chr(10) + mt.SEP
     )
+    warning = mt.depth_warning(mine, character.mining_level)
+    if warning:
+        text += chr(10) + warning
     await message.answer(text, keyboard=kb.mine_keyboard(ore_left > 0))
 
 

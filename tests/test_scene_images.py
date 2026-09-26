@@ -161,3 +161,20 @@ def test_every_picture_slot_has_a_prompt_written_for_it() -> None:
             if act.act == 1:
                 continue
             assert act.title in doc, f"{region}: у акта «{act.title}» нет промта"
+
+
+
+def test_every_story_enemy_without_a_picture_has_a_prompt() -> None:
+    """Именной враг без своей картинки и без базового моба сражается вовсе
+    без портрета. Таких было семь, среди них финальные боссы трёх регионов.
+    Новый такой враг не должен появиться, не получив хотя бы промта.
+    """
+    doc = PROMPTS.read_text(encoding="utf-8")
+    missing = []
+    for region in REGIONS:
+        for act in load_story_line(region).acts:
+            for quest in act.quests:
+                enemy = getattr(quest, "named_enemy", None)
+                if enemy and not enemy.image and not enemy.base_mob_id and enemy.name not in doc:
+                    missing.append(f"{quest.id}: {enemy.name}")
+    assert not missing, f"враги без картинки и без промта: {missing}"

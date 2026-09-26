@@ -47,6 +47,30 @@ def mine_intro(mine: MineDef, rng: random.Random, ore_count: int) -> str:
     )
 
 
+def depth_warning(mine: MineDef, mining_level: int) -> str | None:
+    """Строка-предупреждение, если рудник игроку не по уровню. None - по уровню.
+
+    Штраф за глубину - намеренный барьер (mining.time_multiplier), но его не
+    было видно: новичок у глубокой жилы узнавал о нём, только начав копать,
+    а о том, что руда всё равно будет по его уровню, - не узнавал вовсе.
+    Выходил час ожидания ради того, что рядом с городом добывается за
+    десять минут. Одна строка: вход в рудник видят часто, а лор - в описании.
+    """
+    factor = mining.time_multiplier(mine.tier, mining_level)
+    if factor <= 1.0:
+        return None
+    low, high = (sec * factor for sec in mc.STATIC_MINE_SECONDS)
+    need = mc.MINE_REQUIRED_LEVEL[mine.tier]
+    ore_note = (
+        " Руда глубже твоего уровня отсюда не пойдёт."
+        if mining.unlocked_tier(mining_level) < mine.tier else ""
+    )
+    return (
+        f"⚠️ Не по уровню (нужен {need}): кусок займёт от "
+        f"{mining.format_duration(low)} до {mining.format_duration(high)}.{ore_note}"
+    )
+
+
 def level_line(character) -> str:
     need = mining.xp_to_next(character.mining_level)
     return (

@@ -45,6 +45,7 @@ from bot.keyboards import world as kb
 from bot.keyboards.group_explore import group_ready_keyboard
 from bot.onboarding_texts import REGION_TITLES
 from bot.world_summary import location_attachment, location_summary
+from bot import pending_activity
 from bot.world_texts import (
     FOREIGN_NPC_REJECTION,
     act_attachment,
@@ -149,6 +150,47 @@ def setup(
     _explore_scheduler = explore_scheduler
     _rest_scheduler = rest_scheduler
     _bot_api = bot_api
+
+
+async def resume_after_restart() -> dict[str, int]:
+    """Возвращает в строй занятия, оборванные перезапуском (патч 98).
+
+    Звать ПОСЛЕ setup, когда планировщики уже запущены. Возвращает, сколько
+    чего возобновлено - для строки в логе.
+
+    Пеший переход хранится в базе целиком, пропадала только задача «прибыл».
+    Исследование и отдых жили в памяти целиком - их отметку держит Redis
+    (bot/pending_activity.py). В обоих случаях завершение досылается ровно
+    тогда, когда оно и должно было прийти, а если срок уже прошёл - сразу.
+    Игрок не видит ничего, кроме слегка опоздавшего сообщения.
+    """
+    resumed = {"travel": 0, "explore": 0, "rest": 0}
+    now = datetime.now(timezone.utc)
+    async with get_session_factory()() as db:
+        rows = (
+            await db.execute(
+                select(User.vk_id, Character.travel_arrives_at)
+                .join(Character, Character.user_id == User.id)
+                .where(Character.travel_arrives_at.is_not(None))
+            )
+        ).all()
+    for peer_id, arrives_at in rows:
+        # Postgres отдаёт дату с поясом, SQLite (тесты) - без. Время в базе
+        # всегда пишется в UTC, так что пустой пояс и есть UTC.
+        if arrives_at.tzinfo is None:
+            arrives_at = arrives_at.replace(tzinfo=timezone.utc)
+        _travel_scheduler.schedule(peer_id, max(0.0, (arrives_at - now).total_seconds()))
+        resumed["travel"] += 1
+
+    for kind, peer_id, left in await pending_activity.pending():
+        if kind == "explore":
+            _exploring.add(peer_id)
+            _explore_scheduler.schedule(peer_id, left)
+        else:
+            _resting.add(peer_id)
+            _rest_scheduler.schedule(peer_id, left)
+        resumed[kind] += 1
+    return resumed
 
 
 async def _get_stats(db, character_id: int) -> CharacterStats:
@@ -572,6 +614,7 @@ async def explore(message: Message) -> None:
         text += f"\n\n{fragment.text}"
     await message.answer(text, keyboard=kb.waiting_keyboard())
     _explore_scheduler.schedule(peer_id, delay)
+    await pending_activity.remember("explore", peer_id, delay)
 
 
 @labeler.message(payload_contains={"type": "group_explore_cancel"})
@@ -645,6 +688,7 @@ async def handle_explore_done(peer_id: int) -> None:
     остался только внутри сообщения ожидания "Ты осматриваешься..." (patch-5),
     которое уже показано раньше и не пересекается с этим исходом."""
     _exploring.discard(peer_id)
+    await pending_activity.forget("explore", peer_id)
     async with get_session_factory()() as db:
         character = await onboarding_svc.get_character(db, peer_id)
         if character is None or character.creation_state is not None:
@@ -943,6 +987,7 @@ async def rest(message: Message) -> None:
     # отдых — кнопки убираем на время (чистка шума)
     await message.answer(flavor.rest_start(), keyboard=kb.waiting_keyboard())
     _rest_scheduler.schedule(peer_id, delay)
+    await pending_activity.remember("rest", peer_id, delay)
 
 
 async def handle_rest_done(peer_id: int) -> None:
@@ -950,6 +995,7 @@ async def handle_rest_done(peer_id: int) -> None:
     if peer_id not in _resting:
         return  # отдых прерван (напр. пришёл бой — задел на будущее)
     _resting.discard(peer_id)
+    await pending_activity.forget("rest", peer_id)
     async with get_session_factory()() as db:
         character = await onboarding_svc.get_character(db, peer_id)
         if character is None or character.creation_state is not None:
@@ -1445,6 +1491,10 @@ async def force_unstick(db, character, peer_id: int, *, admin_override: bool = F
                 await mount_service.cancel_travel(db, travel)
     _exploring.discard(peer_id)
     _resting.discard(peer_id)
+    # Запись в Redis снимается вместе с отметкой в памяти. Иначе сброшенный
+    # отдых воскрес бы после следующего деплоя и вылечил бы бесплатно.
+    await pending_activity.forget("explore", peer_id)
+    await pending_activity.forget("rest", peer_id)
     now = datetime.now(timezone.utc)
     if movement_service.is_traveling(character, now):
         movement_service.cancel_travel(character)

@@ -3,6 +3,7 @@
 import asyncio
 from datetime import datetime, timezone
 import sys
+from pathlib import Path
 
 import redis.asyncio as aioredis
 from aiohttp import web
@@ -25,6 +26,7 @@ from bot.handlers import promo as promo_handlers
 from bot.handlers import pvp as pvp_handlers
 from bot.handlers import fishing as fishing_handlers
 from bot.handlers import mining as mining_handlers
+from bot import pending_activity
 from bot.handlers import crowns as crown_handlers
 from bot.handlers import raid as raid_handlers
 from bot.handlers import raid_combat as raid_combat_handlers
@@ -70,6 +72,26 @@ async def run() -> None:
     settings = get_settings()
     logger.remove()
     logger.add(sys.stderr, level=settings.log_level)
+    # Файл на томе переживает деплой, вывод контейнера - нет. enqueue пишет
+    # из отдельного потока: диск не должен тормозить цикл событий, в котором
+    # крутятся бои. Ошибки дублируются в свой файл, чтобы их не выуживать
+    # из тысяч строк о событиях ВК.
+    if settings.log_dir:
+        log_dir = Path(settings.log_dir)
+        try:
+            log_dir.mkdir(parents=True, exist_ok=True)
+            logger.add(
+                log_dir / "bot.log", level=settings.log_level, encoding="utf-8",
+                rotation="20 MB", retention=10, compression="gz", enqueue=True,
+            )
+            logger.add(
+                log_dir / "errors.log", level="WARNING", encoding="utf-8",
+                rotation="10 MB", retention=20, compression="gz", enqueue=True,
+            )
+        except OSError:
+            # Логи - вспомогательное. Нет прав на папку или место на диске -
+            # бот обязан подняться всё равно и писать хотя бы в stderr.
+            logger.exception("Файловые логи недоступны ({}), пишу только в stderr", log_dir)
 
     if not settings.vk_token:
         raise RuntimeError(
@@ -210,6 +232,13 @@ async def run() -> None:
     rest_scheduler = PeerScheduler(world_handlers.handle_rest_done, job_prefix="rest")
     rest_scheduler.start()
     world_handlers.setup(travel_scheduler, explore_scheduler, rest_scheduler, bot.api)
+    # Переходы, исследования и отдых, оборванные перезапуском (патч 98).
+    # Без этого у игрока оставалась клавиатура ожидания без кнопок, а само
+    # занятие не заканчивалось никогда.
+    pending_activity.setup(redis)
+    resumed = await world_handlers.resume_after_restart()
+    if any(resumed.values()):
+        logger.info("После рестарта возобновлено: {}", resumed)
 
     # Авто-респавн: один общий батч-сканер мёртвых игроков (не задача-на-игрока)
     respawn_handlers.setup(bot.api, settings.respawn_live_countdown)

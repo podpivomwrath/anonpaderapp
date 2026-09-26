@@ -14,7 +14,11 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY . .
 
+# logs/ создаётся ДО chown: на неё монтируется том, а новый именованный том
+# Docker заполняет содержимым и ВЛАДЕЛЬЦЕМ папки из образа. Без этого том
+# достался бы root, и бот под appuser не смог бы писать в него ни строки.
 RUN useradd --create-home --uid 1000 appuser \
+    && mkdir -p /app/logs \
     && chmod +x entrypoint.sh \
     && chown -R appuser:appuser /app
 USER appuser

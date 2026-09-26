@@ -17,6 +17,11 @@ services:
       # чтобы не дублировать его отдельно в DATABASE_URL.
       DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
       REDIS_URL: redis://redis:6379/0
+    # Логи на томе, а не только в выводе контейнера: контейнер пересоздаётся
+    # на каждом деплое и уносит свой вывод с собой. При десятке деплоев в
+    # день ошибки пропадали раньше, чем их успевали прочитать.
+    volumes:
+      - botlogs:/app/logs
     depends_on:
       postgres:
         condition: service_healthy
@@ -82,6 +87,7 @@ services:
       - bot
 
 volumes:
+  botlogs:
   pgdata:
   redisdata:
   caddy_data:
