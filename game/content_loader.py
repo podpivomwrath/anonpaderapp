@@ -364,6 +364,8 @@ class WorldBossDef(BaseModel):
     name: str
     flavor: str
     image: str = ""
+    #: женский род имени: «пала», «ушла» - «Праматерь корней пал» режет глаз
+    feminine: bool = False
 
 
 def load_world_bosses(content_dir: Path = CONTENT_DIR) -> list[WorldBossDef]:

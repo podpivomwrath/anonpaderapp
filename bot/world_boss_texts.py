@@ -51,7 +51,7 @@ def status_text(boss, my_damage: int, cooldown: int, can_attack: bool) -> str:
         f"Здоровье {boss.hp}/{boss.max_hp} ({_pct(boss.hp, boss.max_hp)}%), уйдёт через {_time_left(boss)}.",
     ]
     if not can_attack:
-        lines.append(f"Он для уровня до {world_boss.max_attacker_level(boss.ring)}.")
+        lines.append(f"Этот босс для уровня до {world_boss.max_attacker_level(boss.ring)}.")
         return "\n".join(lines)
     if my_damage:
         lines.append(f"Твой урон: {my_damage}.")
@@ -72,7 +72,7 @@ def refusal_text(reason: str, minutes_left: int = 0, ring: int | None = None) ->
 
 def intro_text(boss, flavor: str) -> str:
     return (
-        f"{flavor}\n\nОн не отвечает на удары. У тебя {wbc.ATTEMPT_TURNS} ходов. "
+        f"{flavor}\n\nБосс не отвечает на удары. У тебя {wbc.ATTEMPT_TURNS} ходов. "
         f"Здоровье {boss.hp}/{boss.max_hp}."
     )
 
@@ -112,12 +112,16 @@ def reward_lines(got) -> list[str]:
 
 
 def end_text(boss, got, total_damage: int) -> str:
-    name = world_boss.boss_def(boss.boss_id).name
+    boss_def = world_boss.boss_def(boss.boss_id)
+    name, fem = boss_def.name, boss_def.feminine
     if boss.status == "killed":
-        head = f"☠ {name} пал!"
+        head = f"☠ {name} {'пала' if fem else 'пал'}!"
     else:
         removed = _pct(boss.max_hp - boss.hp, boss.max_hp)
-        head = f"{name} ушёл. С него сняли {removed}% здоровья - разыграна такая же часть награды."
+        head = (
+            f"{name} {'ушла' if fem else 'ушёл'}. С {'неё' if fem else 'него'} сняли {removed}% "
+            f"здоровья - разыграна такая же часть награды."
+        )
     share = _pct(got.damage, total_damage)
     lines = [head, f"Твой урон: {got.damage} ({share}% от всех)."]
     rewards = reward_lines(got)

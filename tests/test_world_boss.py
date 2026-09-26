@@ -298,3 +298,19 @@ async def test_escaped_boss_leaves_and_pays_a_part(db_session, make_character) -
     assert granted and granted[0].character_id == character.id
     # второй проход ничего не раздаёт повторно
     assert await svc.expire_due(db_session, random.Random(1), NOW + timedelta(hours=4)) == []
+
+
+def test_end_text_agrees_with_the_boss_name() -> None:
+    """«Праматерь корней пал!» пришло на проде - род берётся из контента."""
+    from types import SimpleNamespace
+
+    from bot import world_boss_texts
+    from services.world_boss_service import Granted
+
+    got = Granted(character_id=1, damage=10)
+    killed = SimpleNamespace(boss_id="root_foremother", status="killed", hp=0, max_hp=10)
+    assert "Праматерь корней пала!" in world_boss_texts.end_text(killed, got, 10)
+    killed.boss_id = "vein_grabber"
+    assert "Жилохват пал!" in world_boss_texts.end_text(killed, got, 10)
+    left = SimpleNamespace(boss_id="faceless_procession", status="escaped", hp=5, max_hp=10)
+    assert "Безликая процессия ушла. С неё" in world_boss_texts.end_text(left, got, 10)
