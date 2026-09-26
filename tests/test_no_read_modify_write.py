@@ -26,7 +26,7 @@ import textwrap
 
 import pytest
 
-from services import elixir_service, fishing_service, item_service, trophy_service
+from services import elixir_service, fishing_service, item_service, promo_service, trophy_service
 
 
 def _code(func) -> str:
@@ -55,6 +55,8 @@ def _code(func) -> str:
          "золото платится, не проверив, что предмет действительно забран"),
         (elixir_service.consume, "rowcount",
          "склянка списывается в питоне - последнюю можно выпить дважды"),
+        (promo_service.activate_code, "with_for_update",
+         "промокод без блокировки - лимит 3 давал 10 активаций из 10"),
     ],
 )
 def test_consumption_is_atomic(func, mechanism, why) -> None:

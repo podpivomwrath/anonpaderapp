@@ -234,7 +234,18 @@ async def activate_code(db: AsyncSession, character: Character, raw_text: str) -
     normalized = normalize_code(raw_text)
     if not normalized:
         return None
-    promo = await db.scalar(select(PromoCode).where(PromoCode.code == normalized))
+    # Строка промокода берётся под блокировкой (патч 94). Обе проверки ниже -
+    # «лимит активаций» и «уже активировал» - читают число, а запись об
+    # активации появляется только в конце. Вебхук обрабатывает события
+    # параллельно, и без блокировки все одновременные нажатия проходили
+    # проверки до первой записи: на боевом Postgres код с лимитом 3 дал 10
+    # активаций из 10. С блокировкой второе нажатие ждёт, пока первое
+    # закончит, и видит уже записанную активацию.
+    promo = await db.scalar(
+        select(PromoCode)
+        .where(PromoCode.code == normalized)
+        .with_for_update()
+    )
     if promo is None:
         return None
 

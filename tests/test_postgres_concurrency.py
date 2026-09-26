@@ -5,7 +5,7 @@ from uuid import uuid4
 from urllib.parse import urlparse
 
 import pytest
-from sqlalchemy import select, text
+from sqlalchemy import func, select, text
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker
 
 from models import Base, User, Character, CharacterStats, RaidRun
@@ -225,3 +225,41 @@ async def test_last_elixir_is_drunk_once(pg_factory):
     drunk = await _race(pg_factory, lambda db, c: elixir_service.consume(db, c.id, "heal_small"))
 
     assert sum(1 for d in drunk if d) == 1
+
+
+async def test_promo_limit_holds_under_parallel_taps(pg_factory):
+    """До исправления код с лимитом 3 дал 10 активаций из 10."""
+    from models import PromoActivation, PromoCode
+    from services import promo_service
+    await _with_wallet(pg_factory)
+    async with pg_factory() as db:
+        db.add(PromoCode(code="racelim", rewards=[{"type": "gold", "amount": 1}],
+                         one_per_player=False, max_activations=3, created_by=1))
+        await db.commit()
+
+    async def tap(db, c):
+        return (await promo_service.activate_code(db, c, "racelim")).status
+
+    statuses = await _race(pg_factory, tap)
+
+    assert statuses.count("success") == 3
+    async with pg_factory() as db:
+        assert await db.scalar(select(func.count()).select_from(PromoActivation)) == 3
+
+
+async def test_promo_once_per_player_under_parallel_taps(pg_factory):
+    from models import PromoCode
+    from services import promo_service
+    await _with_wallet(pg_factory)
+    async with pg_factory() as db:
+        db.add(PromoCode(code="raceone", rewards=[{"type": "gold", "amount": 1000}],
+                         one_per_player=True, max_activations=None, created_by=1))
+        await db.commit()
+
+    async def tap(db, c):
+        return (await promo_service.activate_code(db, c, "raceone")).status
+
+    statuses = await _race(pg_factory, tap)
+
+    assert statuses.count("success") == 1
+    assert await _gold(pg_factory) == 1000
