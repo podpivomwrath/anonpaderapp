@@ -871,3 +871,103 @@ muted desaturated palette of ash grey, rust brown and dried blood, wide
 establishing shot, no text, no watermark, no logo, no modern objects,
 horizontal 3:2 composition
 ```
+
+---
+
+# Мировые боссы (патч 104)
+
+Шесть кадров, по одному на босса. Слот - поле `image` в
+`content/world_bosses.json`. Картинка приходит в объявлении о появлении и в
+итоге после убийства. Кольца не рисуем: один и тот же босс встаёт в любом
+кольце.
+
+Босс огромный, и масштаб в кадре обязан читаться сразу. Поэтому рядом с ним
+всегда крошечная фигура человека или привычный предмет (дерево, дом,
+телега). Самого игрока в кадре нет. Босс ни на кого не бросается: он занят
+своим и не замечает тех, кто бьёт, так и в игре.
+
+## Общий хвост боссов
+
+```
+colossal creature dwarfing everything around it, a tiny human silhouette
+nearby for scale, dark fantasy, painterly semi-realistic, muted desaturated
+palette of ash grey, rust brown and dried blood, overcast light, wide low
+angle shot, no text, no watermark, no logo, no modern objects, horizontal
+3:2 composition
+```
+
+## Жилохват
+
+Рудный червь толщиной со штольню. Прогрызает землю насквозь.
+
+```
+a gigantic segmented ore worm as thick as a mine tunnel bursting out of a
+rocky hillside, its hide made of cracked stone plates with veins of raw
+metal glinting between them, a ring mouth lined with rows of blunt grinding
+teeth, broken mine timbers and rails hanging from its body, dust and rubble
+pouring down, [общий хвост]
+```
+
+## Праматерь корней
+
+Дерево, которое ходит. Корни волочатся за ней на сотню шагов, и в каждом
+кто-то застрял.
+
+```
+an enormous walking tree with a hunched humanlike posture, dragging a vast
+tangle of roots behind it across a dead forest floor, pale human shapes
+half swallowed inside the roots and the bark, moss and fungus hanging like
+rags, bent old trees reaching only to its knees, [общий хвост]
+```
+
+## Утопленный колокол
+
+Колокол размером с дом, весь в соли и ракушках. Внутри что-то ворочается, и
+он гудит сам по себе.
+
+```
+a church bell the size of a house resting tilted on a salt-crusted
+shoreline, its bronze covered in white salt, barnacles and seaweed,
+something large and dark shifting in the shadow beneath its rim, faint
+ripples in the air around it as if it hums, a wrecked pier and a small
+boat beside it for scale, [общий хвост]
+```
+
+## Негаснущий костёр
+
+Погребальный костёр, который встал и пошёл. Дождь над ним шипит и не
+долетает до земли.
+
+```
+a towering funeral pyre shaped like a striding figure, a frame of charred
+logs and bones burning with low steady orange fire, heavy rain falling all
+around and turning to steam before it can touch the flames, scorched black
+ground and ash under its steps, a burnt-out cart beside it for scale,
+[общий хвост]
+```
+
+## Сшитый великан
+
+Его собирали из многих, и швы видно издалека. Стоит на месте и смотрит в
+разные стороны разными глазами.
+
+```
+a huge giant stitched together from many different bodies, thick crude
+seams and iron staples running across grey mismatched skin, several eyes of
+different sizes looking in different directions, standing perfectly still
+in a ruined village, the roofs of the houses reaching only to its waist,
+[общий хвост]
+```
+
+## Безликая процессия
+
+Сотня фигур без лиц идёт за одним штандартом и дышит в такт. Бьёшь одну -
+вздрагивают все.
+
+```
+a long dense procession of a hundred tall faceless hooded figures walking
+in perfect step behind a single tattered standard, their smooth blank faces
+without eyes or mouths, all of them moving as one body, the column winding
+across a grey plain toward the horizon, a lone signpost beside the road for
+scale, [общий хвост]
+```
