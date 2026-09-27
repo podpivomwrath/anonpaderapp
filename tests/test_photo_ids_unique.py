@@ -34,6 +34,14 @@ PHOTO_ID = re.compile(r'"(\d{9})"')
 #: появится — строку убрать, и тест сам проследит, что её не забыли.
 KNOWN_COLLISION = {"457239081"}
 
+#: Намеренно общие картинки: номер -> кто его делит. Это не ошибка, а решение,
+#: поэтому записано поимённо: чужой номер, случайно совпавший с этим, тест
+#: всё равно поймает.
+INTENTIONAL_SHARED = {
+    # Патч 110: оба пустых тайника ложного следа - одна и та же сцена.
+    "457239194": {"scenes.json: trail_false_1", "scenes.json: trail_false_2"},
+}
+
 
 def _collect() -> dict[str, list[str]]:
     found: dict[str, list[str]] = defaultdict(list)
@@ -66,6 +74,7 @@ def test_no_photo_is_used_by_two_different_things() -> None:
         photo: users
         for photo, users in _collect().items()
         if len(users) > 1 and photo not in KNOWN_COLLISION
+        and set(users) != INTENTIONAL_SHARED.get(photo)
     }
     assert not collisions, "один номер фото на несколько сущностей:\n" + "\n".join(
         f"  {photo}: {', '.join(users)}" for photo, users in sorted(collisions.items())
