@@ -18,6 +18,27 @@ const STAT_NAMES = {
 // названиями (slot_title), здесь только очерёдность показа.
 const SLOT_ORDER = ['weapon', 'helmet', 'armor', 'legs', 'boots'];
 
+// Иконки нарисованы здесь, а не взяты из @vkontakte/icons: пакета нет в
+// зависимостях мини-аппа, он приезжает только транзитом через VKUI.
+function CopyIcon() {
+  return (
+    <svg width="20" height="20" viewBox="0 0 20 20" fill="none" aria-hidden="true">
+      <rect x="7" y="7" width="9.5" height="9.5" rx="2" stroke="currentColor" strokeWidth="1.6" />
+      <path d="M13 4.8V4.5A1.5 1.5 0 0 0 11.5 3h-7A1.5 1.5 0 0 0 3 4.5v7A1.5 1.5 0 0 0 4.5 13h.3"
+        stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+function CheckIcon() {
+  return (
+    <svg width="20" height="20" viewBox="0 0 20 20" fill="none" aria-hidden="true">
+      <path d="M4.5 10.5l3.5 3.5 7.5-8" stroke="currentColor" strokeWidth="1.8"
+        strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
 function statsLine(baseStats) {
   return Object.entries(baseStats || {})
     .sort((a, b) => b[1] - a[1])
@@ -132,9 +153,15 @@ export default function InventoryTab({ onCharacterUpdate }) {
   };
 
   const transferButton = (item) => item.transfer_command && (
-    <Button mode="outline" size="s" onClick={() => copyTransfer(item)}>
-      {copiedId === item.id ? 'Скопировано' : 'Команда передачи'}
-    </Button>
+    <button
+      type="button"
+      className="copy-transfer"
+      title="Скопировать команду передачи"
+      aria-label="Скопировать команду передачи"
+      onClick={() => copyTransfer(item)}
+    >
+      {copiedId === item.id ? <CheckIcon /> : <CopyIcon />}
+    </button>
   );
 
   return (

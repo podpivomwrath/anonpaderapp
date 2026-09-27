@@ -469,10 +469,10 @@ async def handle_get_dailies(request: web.Request) -> web.Response:
 
 
 def _transfer_command(item) -> str | None:
+    """Команда передачи - у всего, что можно передать. Надетое сюда
+    попадает тоже: команда верная, просто сначала вещь надо снять."""
     from services import transfer_service
 
-    if item.rarity != item_service.UNIQUE_RARITY_ID:
-        return None
     if transfer_service.is_transferable(item, equipped=False) is not None:
         return None
     return transfer_service.command_for(item)
@@ -505,7 +505,7 @@ def _inventory_payload(items: list) -> dict:
                 "craft_efficiency": item.craft_efficiency,
                 "bound": item.bound,
                 # Готовая команда передачи с номером этого экземпляра - её
-                # копирует кнопка у уникальных вещей (Скальпель Хирурга).
+                # копирует кнопка у каждой вещи, которую можно передать.
                 # Решает сервер: правила «что можно передать» живут в
                 # transfer_service, клиент их не пересказывает.
                 "transfer_command": _transfer_command(item),

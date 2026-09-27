@@ -163,3 +163,20 @@ async def test_equipped_service_item_says_it_is_never_transferable(db_session, m
     a = await make_character()
     await _item(db_session, a, name="Перо Хранителя", rarity="admin", equipped=True, admin_only=True)
     assert "Служебные" in (await ts.find(db_session, a.id, "перо хранителя")).refusal
+
+
+def test_miniapp_offers_the_command_for_every_transferable_item() -> None:
+    from types import SimpleNamespace
+
+    from bot.miniapp_api import _transfer_command
+
+    def item(**kw):
+        base = {"id": 7, "name": "Пепельный клинок", "rarity": "common", "admin_only": False,
+                "bound": False, "craft_spec": None}
+        base.update(kw)
+        return SimpleNamespace(**base)
+
+    assert _transfer_command(item()) == "передать Пепельный клинок 7"
+    assert _transfer_command(item(rarity="unique", name="Скальпель Хирурга")) == "передать Скальпель Хирурга 7"
+    assert _transfer_command(item(bound=True, craft_spec="dps")) is None
+    assert _transfer_command(item(admin_only=True)) is None
