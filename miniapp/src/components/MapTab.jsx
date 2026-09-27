@@ -26,7 +26,6 @@ import {
 
 const DRAG_THRESHOLD_PX = 5;
 const MAX_SCALE = 4400;          // щипком на телефоне - клетка до ~60 px
-const GRID_FROM_CELL_PX = 20;    // сетка видна с этого размера клетки
 const CELL_K = 0.0143;           // средний размер клетки на картинке (доля ширины)
 
 // Линза: увеличение от ×2 до ×4 шагом 0.1 (колесо мыши).
@@ -196,29 +195,44 @@ export default function MapTab() {
 
   const cellPx = view ? CELL_K * view.scale : 10;
 
-  // Все клетки мира - один раз: их ~2800, дальше только фильтр по окну.
-  const allCells = useMemo(() => {
+  // Патч 112: сетка клеток - всегда. Клетки на картинке искривлены
+  // калибровкой колец, поэтому границы клеток - не прямые, а кривые: каждая
+  // линия x = k + 0.5 (и y = k + 0.5) проходит через ту же калибровку, что и
+  // нажатие, и сетка точно совпадает с клетками, куда попадает клик.
+  // Считается один раз в долях картинки; на экран - при смене вида.
+  const gridLines = useMemo(() => {
     if (!catalog) return [];
-    const r = catalog.world_radius;
-    const cells = [];
-    for (let x = -r; x <= r; x++) {
-      for (let y = -r; y <= r; y++) {
-        if (monolithDistance(x, y) <= r) cells.push([x, y]);
+    const r = catalog.world_radius + 0.5;
+    const lines = [];
+    const trace = (fixed, vertical) => {
+      let run = [];
+      for (let t = -r; t <= r + 1e-9; t += 0.25) {
+        const [x, y] = vertical ? [fixed, t] : [t, fixed];
+        if (Math.hypot(x, y) <= r) {
+          const p = cellToMap(x, y);
+          run.push([p.u, p.v]);
+        } else if (run.length) {
+          lines.push(run);
+          run = [];
+        }
       }
+      if (run.length > 1) lines.push(run);
+    };
+    for (let k = -catalog.world_radius - 1; k <= catalog.world_radius; k++) {
+      trace(k + 0.5, true);
+      trace(k + 0.5, false);
     }
-    return cells;
+    return lines;
   }, [catalog]);
 
-  const gridCells = useMemo(() => {
-    if (!view || cellPx < GRID_FROM_CELL_PX) return [];
-    const pad = cellPx;
-    return allCells
-      .map(([x, y]) => {
-        const s = cellScreen(x, y);
-        return { x, y, sx: s.x, sy: s.y, size: cellSizeAt(monolithDistance(x, y)) * view.scale };
-      })
-      .filter((c) => c.sx > -pad && c.sy > -pad && c.sx < size.width + pad && c.sy < size.height + pad);
-  }, [allCells, cellScreen, cellPx, view, size]);
+  const gridPath = useMemo(() => {
+    if (!view) return '';
+    return gridLines.map((line) => line.map(([u, v], i) => {
+      const sx = (u - view.cu) * view.scale + size.width / 2;
+      const sy = (v - view.cv) * view.scale + size.height / 2;
+      return `${i ? 'L' : 'M'}${sx.toFixed(1)} ${sy.toFixed(1)}`;
+    }).join('')).join('');
+  }, [gridLines, view, size]);
 
   const cellAtScreen = (sx, sy) => {
     const m = toMap(sx, sy);
@@ -490,6 +504,28 @@ export default function MapTab() {
     lensBox = { cx, cy, S, m };
   }
 
+  // Сетка в линзе: те же кривые, только в координатах окна линзы и лишь
+  // рядом с ней (весь мир пересчитывать на каждое движение мыши незачем).
+  let lensGridPath = '';
+  if (lensBox) {
+    const reach = (lensD / 2 + 4) / lensBox.S;
+    lensGridPath = gridLines.map((line) => {
+      let d = '';
+      let open = false;
+      for (const [u, v] of line) {
+        if (Math.abs(u - lensBox.m.u) > reach || Math.abs(v - lensBox.m.v) > reach) {
+          open = false;
+          continue;
+        }
+        const lx = lensD / 2 + (u - lensBox.m.u) * lensBox.S;
+        const ly = lensD / 2 + (v - lensBox.m.v) * lensBox.S;
+        d += `${open ? 'L' : 'M'}${lx.toFixed(1)} ${ly.toFixed(1)}`;
+        open = true;
+      }
+      return d;
+    }).join('');
+  }
+
   return (
     <div className="map-tab">
       <div
@@ -525,14 +561,7 @@ export default function MapTab() {
                   className={i === 0 ? 'map-ring map-ring--rim' : 'map-ring'}
                 />
               ))}
-              {gridCells.map((c) => (
-                <rect
-                  key={`${c.x}:${c.y}`}
-                  className="map-grid-cell"
-                  x={c.sx - c.size / 2 + 1} y={c.sy - c.size / 2 + 1}
-                  width={Math.max(c.size - 2, 1)} height={Math.max(c.size - 2, 1)} rx={3}
-                />
-              ))}
+              <path className="map-grid" d={gridPath} />
               {travelTarget && playerPos && (() => {
                 const a = cellScreen(playerPos.x, playerPos.y);
                 const b = cellScreen(travelTarget.to_x, travelTarget.to_y);
@@ -571,6 +600,9 @@ export default function MapTab() {
                   transform: `translate(${lensD / 2 - lensBox.m.u * lensBox.S}px, ${lensD / 2 - lensBox.m.v * lensBox.S}px)`,
                 }}
               />
+              <svg className="map-lens__grid" width={lensD} height={lensD}>
+                <path className="map-grid map-grid--lens" d={lensGridPath} />
+              </svg>
               {(() => {
                 const cell = cellAtScreen(lensPoint.x, lensPoint.y);
                 if (!cell) return null;
