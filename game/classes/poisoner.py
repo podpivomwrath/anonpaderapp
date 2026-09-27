@@ -128,7 +128,7 @@ def disrupt(ctx: SkillContext) -> None:
             target, base_duration=bc.CONTROL_BASE_DURATION_TICKS, source_id=actor.id, rng=ctx.rng, pvp=pvp,
         )
         if res.immune:
-            ctx.lines.append(combat_flavor.control_blocked_line(target.name))
+            ctx.lines.append(combat_flavor.control_blocked_line(target.name, res.reason))
         elif res.resisted:
             ctx.lines.append(combat_flavor.control_resisted_line(target.name))
         else:

@@ -11,6 +11,7 @@ import asyncio
 import random
 from dataclasses import dataclass, field
 
+from loguru import logger
 from vkbottle.bot import BotLabeler, Message
 
 from bot import dailies_texts, editable_message, group_texts, raid_key_texts, raid_texts as rt
@@ -79,7 +80,7 @@ class RaidContribution:
 
     damage: int = 0     # дошло до противников (промахи и поглощённое не в счёт)
     healed: int = 0     # фактически восполнено союзникам, включая себя
-    absorbed: int = 0   # срезано блоком и съедено щитами ПО НЕМУ
+    absorbed: int = 0   # весь урон, пришедший в игрока: дошедший + срезанный блоком и щитами
 
 
 @dataclass
@@ -796,8 +797,12 @@ def _record_contribution(battle: RaidBattle, result: TickResult) -> None:
     Тик яда/горения тоже засчитывается автору эффекта - он его повесил.
     """
     for hit in result.hit_renders:
-        if hit.target_id in battle.participants and hit.absorbed:
-            battle.contribution.setdefault(hit.target_id, RaidContribution()).absorbed += hit.absorbed
+        # «Впитано» - весь урон, пришедший в игрока: и дошедший, и срезанный
+        # блоком и щитами. Раньше считалось только срезанное, и тот, кто
+        # весь рейд принимал удары на себя без щита, стоял в таблице с нулём.
+        taken = (0 if hit.missed else max(hit.amount, 0)) + (hit.absorbed or 0)
+        if hit.target_id in battle.participants and taken:
+            battle.contribution.setdefault(hit.target_id, RaidContribution()).absorbed += taken
         if hit.missed or hit.amount <= 0:
             continue
         if hit.source_id in battle.participants and hit.target_side != hit.source_side:
@@ -900,6 +905,22 @@ async def _finish_wipe(session_id: int, battle: RaidBattle) -> None:
     await _cleanup_and_return(session_id, battle, rt.RAID_DEFEAT_TEXT, defeated=True)
 
 
+async def _send_location_summary(character_id: int, peer_id: int) -> None:
+    from bot.handlers import world as world_handlers  # избегаем цикла импортов
+
+    try:
+        async with get_session_factory()() as db:
+            character = await db.get(Character, character_id)
+            if character is None:
+                return
+            text, attachment, keyboard = await world_handlers.location_summary_parts(db, character, peer_id)
+        await _bot_api.messages.send(
+            peer_id=peer_id, message=text, random_id=0, attachment=attachment, keyboard=keyboard,
+        )
+    except Exception:
+        logger.exception("Рейд: не удалось отправить сводку локации {}", peer_id)
+
+
 async def _cleanup_and_return(session_id: int, battle: RaidBattle, text: str, *, defeated: bool) -> None:
     """И победа, и поражение возвращают всех к Монолиту (0;0) — позиция
     персонажей не менялась на всём протяжении рейда, поэтому достаточно
@@ -949,6 +970,9 @@ async def _cleanup_and_return(session_id: int, battle: RaidBattle, text: str, *,
                 peer_id=p.peer_id, message=text, random_id=0,
                 keyboard=movement_keyboard(*rc.MONOLITH_COORDS, p.peer_id, has_mount=has_mount_by_cid.get(cid, False)),
             )
+            # Сводка клетки (0; 0), как после любого боя: без неё игрок
+            # оставался с эпилогом и не видел, где стоит (живой прогон рейда).
+            await _send_location_summary(cid, p.peer_id)
         elif cid in defeats:
             defeat, respawn_at = defeats[cid]
             await _bot_api.messages.send(

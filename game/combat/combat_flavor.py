@@ -68,10 +68,16 @@ def control_immune_line(target_name: str, turns: int) -> str:
     return f"{target_name} получает иммунитет к контролю на {turns} хода."
 
 
-def control_blocked_line(target_name: str) -> str:
-    # Патч 47, баг 3: «был под контролем» — гендерное прошедшее время, заменено
-    # на настоящее без согласования по роду.
-    return f"{target_name} уже под контролем - новый эффект не наложен."
+def control_blocked_line(target_name: str, reason: str | None = None) -> str:
+    """Контроль не лёг из-за защиты цели. Без согласования по роду (патч 47).
+
+    Раньше одна строка «уже под контролем» печаталась на любую защиту - и у
+    Хирурга, которого контроль не берёт вовсе, выходила на каждую попытку."""
+    if reason == "always":
+        return f"{target_name} не поддаётся контролю."
+    if reason == "effect":
+        return f"{target_name}: защита от контроля - эффект не наложен."
+    return f"{target_name}: защита от повторного контроля - эффект не наложен."
 
 
 def unimplemented_skill_line(actor_name: str, skill_id: str | None) -> str:

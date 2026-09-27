@@ -19,6 +19,10 @@ VELD_IRMA = "veld_irma"
 VELD_LITTA = "veld_litta"
 # Порядок = ПРАВИЛЬНЫЙ порядок убийства.
 VELD_ORDER: tuple[str, ...] = (VELD_OSWALD, VELD_IRMA, VELD_LITTA)
+# Порядок ПОКАЗА - в выборе цели и на доске боя. Намеренно не совпадает с
+# порядком убийства: при «1 - Освальд» первая же кнопка случайно оказывалась
+# правильной, и загадка этапа решалась сама собой.
+VELD_DISPLAY_ORDER: tuple[str, ...] = (VELD_IRMA, VELD_LITTA, VELD_OSWALD)
 VELD_HP: dict[str, int] = {VELD_OSWALD: 14_000, VELD_IRMA: 9_000, VELD_LITTA: 6_000}
 VELD_NAMES: dict[str, str] = {
     VELD_OSWALD: "Освальд Вельд", VELD_IRMA: "Ирма Вельд", VELD_LITTA: "Литта Вельд",

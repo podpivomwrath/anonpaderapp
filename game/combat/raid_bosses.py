@@ -58,10 +58,11 @@ def build_stage1_mobs(start_id: int) -> list[CombatantState]:
 
 def build_veld_mobs(start_id: int) -> dict[str, CombatantState]:
     """{veld_id: CombatantState} — id комбатанта = start_id + позиция в
-    rc.VELD_ORDER (устойчиво, не зависит от порядка обхода словаря)."""
+    rc.VELD_DISPLAY_ORDER. Выбор цели и доска боя идут по id, поэтому этот
+    порядок игрок и видит; порядок убийства (rc.VELD_ORDER) от него не зависит."""
     return {
         veld_id: _boss_combatant(start_id + i, rc.VELD_NAMES[veld_id], rc.VELD_HP[veld_id], VELD_STAT_MULT)
-        for i, veld_id in enumerate(rc.VELD_ORDER)
+        for i, veld_id in enumerate(rc.VELD_DISPLAY_ORDER)
     }
 
 

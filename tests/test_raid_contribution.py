@@ -60,7 +60,7 @@ def test_damage_healing_and_absorb_are_counted() -> None:
     mine = battle.contribution[PLAYER]
     assert mine.damage == 500
     assert mine.healed == 40
-    assert mine.absorbed == 120
+    assert mine.absorbed == 200  # весь пришедший урон: 80 дошло + 120 срезано
 
 
 def test_totals_survive_across_ticks_and_stages() -> None:
@@ -93,7 +93,7 @@ def test_absorb_is_credited_to_the_one_who_took_the_hit() -> None:
     raid._record_contribution(battle, _tick(
         hits=[_hit(BOSS, ALLY, 10, absorbed=300, source_side=1, target_side=0)],
     ))
-    assert battle.contribution[ALLY].absorbed == 300
+    assert battle.contribution[ALLY].absorbed == 310
     assert PLAYER not in battle.contribution
 
 
@@ -148,3 +148,14 @@ def test_table_groups_thousands() -> None:
     table = rt.contribution_table([("pupsik", raid.RaidContribution(damage=1234567, absorbed=890))])
     assert "1 234 567" in table
     assert "890" in table
+
+
+def test_taken_counts_even_without_a_shield() -> None:
+    """«Впитано» - весь полученный урон. Кто держал удары без щита, раньше
+    стоял в таблице с нулём (живой прогон рейда)."""
+    battle = _battle()
+    raid._record_contribution(battle, _tick(
+        hits=[_hit(BOSS, PLAYER, 636, source_side=1, target_side=0),
+              _hit(BOSS, PLAYER, 0, missed=True, source_side=1, target_side=0)],
+    ))
+    assert battle.contribution[PLAYER].absorbed == 636

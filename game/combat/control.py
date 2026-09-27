@@ -30,6 +30,10 @@ class ControlResult:
     resisted: bool = False     # отбито резистом WIL (оба режима)
     reduced: bool = False      # длительность урезана DR (только PvP)
     immunity_granted: bool = False  # выдан иммунитет после серии (только PvP)
+    #: почему immune: "always" - существо не поддаётся контролю вовсе (Хирург),
+    #: "effect" - защита эликсиром, "chain" - защита от цепочки в PvP. Текст
+    #: у них разный: раньше на все три печаталось «уже под контролем».
+    reason: str | None = None
 
 
 def try_apply_control(
@@ -49,21 +53,21 @@ def try_apply_control(
 
     # Абсолютный иммунитет существа (патч 66) — раньше эликсира и резиста.
     if target.control_immune_always:
-        return ControlResult(applied=False, immune=True)
+        return ControlResult(applied=False, immune=True, reason="always")
 
     # Ясность крови (патч 16) — иммунитет от эликсира, работает в ОБОИХ режимах,
     # проверяется раньше DR/резиста: профилактика, а не спасение от уже
     # наложенного контроля.
     if target.has_effect(EffectKind.CONTROL_IMMUNE):
-        return ControlResult(applied=False, immune=True)
+        return ControlResult(applied=False, immune=True, reason="effect")
 
     # DR-иммунитет проверяется только в PvP
     if pvp and target.control_immune_turns > 0:
-        return ControlResult(applied=False, immune=True)
+        return ControlResult(applied=False, immune=True, reason="chain")
 
     # Эскалация: третий контроль подряд не проходит вообще.
     if pvp and target.control_hits >= bc.CC_MAX_HITS_BEFORE_IMMUNE:
-        return ControlResult(applied=False, immune=True)
+        return ControlResult(applied=False, immune=True, reason="chain")
 
     # Против ИГРОКОВ контроль не удлиняется: два пропущенных хода подряд - это
     # уже половина размена, а защита от чейн-контроля считает подряд идущие

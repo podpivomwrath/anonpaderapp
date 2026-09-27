@@ -69,7 +69,7 @@ def _make_handler(skill: SubclassSkillDef):
                         other.apply_effect(EffectKind.CONTROL_RESIST_DOWN, ice_field_bonus, 1, actor.id)
                 # Единый краткий текст независимо от режима (патч 43, ч.1).
                 if res.immune:
-                    ctx.lines.append(combat_flavor.control_blocked_line(target.name))
+                    ctx.lines.append(combat_flavor.control_blocked_line(target.name, res.reason))
                 elif res.resisted:
                     ctx.lines.append(combat_flavor.control_resisted_line(target.name))
                 else:

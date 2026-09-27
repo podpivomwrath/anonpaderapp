@@ -53,9 +53,13 @@ def test_build_veld_mobs_hp_and_names():
     assert velds[rc.VELD_OSWALD].max_hp == 14_000
     assert velds[rc.VELD_IRMA].max_hp == 9_000
     assert velds[rc.VELD_LITTA].max_hp == 6_000
-    assert velds[rc.VELD_OSWALD].id == 200
-    assert velds[rc.VELD_IRMA].id == 201
-    assert velds[rc.VELD_LITTA].id == 202
+    # Показ (и номера в выборе цели) - Ирма, Литта, Освальд: не в порядке
+    # убийства, чтобы первая кнопка не оказывалась правильной случайно.
+    assert velds[rc.VELD_IRMA].id == 200
+    assert velds[rc.VELD_LITTA].id == 201
+    assert velds[rc.VELD_OSWALD].id == 202
+    assert [v.name for v in velds.values()] == ["Ирма Вельд", "Литта Вельд", "Освальд Вельд"]
+    assert rc.VELD_ORDER == (rc.VELD_OSWALD, rc.VELD_IRMA, rc.VELD_LITTA), "порядок убийства не менялся"
     assert velds[rc.VELD_OSWALD].name == "Освальд Вельд"
 
 

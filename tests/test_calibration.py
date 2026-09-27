@@ -948,3 +948,15 @@ def test_calibrated_elementalist_remaining_buff_values_in_content() -> None:
         "elementalist_firestorm", "elementalist_ice_field",
     ):
         assert buffs[buff_id].implemented is True, buff_id
+
+
+def test_control_blocked_line_names_the_reason() -> None:
+    """Хирург не поддаётся контролю вовсе, а на каждую попытку печаталось
+    «уже под контролем» (живой прогон рейда)."""
+    from game.combat import combat_flavor
+
+    assert combat_flavor.control_blocked_line("Хирург", "always") == "Хирург не поддаётся контролю."
+    assert "защита от контроля" in combat_flavor.control_blocked_line("Тест", "effect")
+    assert "повторного контроля" in combat_flavor.control_blocked_line("Тест", "chain")
+    for reason in ("always", "effect", "chain", None):
+        assert "уже под контролем" not in combat_flavor.control_blocked_line("Тест", reason)
