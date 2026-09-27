@@ -29,6 +29,14 @@ _WORLD_EDGE = _load("world_edge.json")
 EXPLORE_FRAGMENT_CHANCE = 0.5
 
 
+def _pick(key: str, rng: random.Random | None = None) -> str:
+    """Патч 109: у состояний - списки вариантов (раньше по одной строке)."""
+    pool = _SYSTEM[key]
+    if isinstance(pool, str):
+        return pool
+    return (rng or random).choice(pool)
+
+
 def travel_line(rng: random.Random) -> str:
     return rng.choice(_SYSTEM["travel"])
 
@@ -40,19 +48,21 @@ def world_edge_line(rng: random.Random) -> str:
 
 
 def rest_start() -> str:
-    return _SYSTEM["rest_start"]
+    return _pick("rest_start")
 
 
 def rest_done() -> str:
-    return _SYSTEM["rest_done"]
+    return _pick("rest_done")
 
 
-def death_line() -> str:
-    return _SYSTEM["death"]
+def death_line(seed: int | None = None) -> str:
+    """seed - чтобы текст одной смерти не менялся: сообщение о смерти
+    редактируется каждый тик отсчёта и собирается заново (bot/handlers/respawn.py)."""
+    return _pick("death", random.Random(seed) if seed is not None else None)
 
 
 def respawn_line(city_title: str) -> str:
-    return _SYSTEM["respawn"].format(city=city_title)
+    return _pick("respawn").format(city=city_title)
 
 
 def levelup_line(level: int, rng: random.Random) -> str:
@@ -62,7 +72,7 @@ def levelup_line(level: int, rng: random.Random) -> str:
 
 def death_penalty_line(xp: int) -> str:
     """Штраф опыта: доля добавлена патчем 13, ч.2 (бок о бок с абсолютным числом)."""
-    return f"{_SYSTEM['death_penalty']} {display.xp_penalty_line(xp, bc.DEATH_XP_PENALTY)}"
+    return f"{_pick('death_penalty', random.Random(xp))} {display.xp_penalty_line(xp, bc.DEATH_XP_PENALTY)}"
 
 
 def quest_reward_line(xp: int, premium: bool = False) -> str:

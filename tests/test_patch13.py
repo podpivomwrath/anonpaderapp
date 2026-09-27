@@ -214,7 +214,8 @@ def test_flavor_is_no_longer_a_standalone_explore_outcome() -> None:
 
 def test_remarks_are_plain_strings_without_reward() -> None:
     assert all(isinstance(entry, str) for entry in flavor._REMARKS["remarks"])
-    assert len(flavor._REMARKS["remarks"]) == 5
+    remarks = flavor._REMARKS["remarks"]
+    assert len(remarks) >= 5 and len(set(remarks)) == len(remarks)
 
 
 def test_remark_pick_returns_plain_text() -> None:

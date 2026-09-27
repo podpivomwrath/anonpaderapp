@@ -47,7 +47,8 @@ def setup(bot_api, live_countdown: bool) -> None:
 
 
 def _death_text(respawn_at: datetime, now: datetime, xp_lost: int = 0) -> str:
-    text = flavor.death_line()
+    # Один текст на всю смерть: сообщение пересобирается каждый тик отсчёта.
+    text = flavor.death_line(int(respawn_at.timestamp()) if respawn_at is not None else None)
     if xp_lost > 0:
         text += "\n" + flavor.death_penalty_line(xp_lost)
     if _live_countdown and respawn_at is not None:
