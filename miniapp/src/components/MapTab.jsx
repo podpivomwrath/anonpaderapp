@@ -376,6 +376,12 @@ export default function MapTab() {
       return;
     }
     const step = e.deltaY < 0 ? LENS_STEP : -LENS_STEP;
+    if (step < 0 && lens.mag <= LENS_MIN) {
+      // Отдаление дальше ×2 - линза убирается; следующее колесо вернёт её.
+      setLens((cur) => ({ ...cur, on: false }));
+      setLensPoint(null);
+      return;
+    }
     setLens((cur) => ({
       ...cur,
       mag: Math.round(clamp(cur.mag + step, LENS_MIN, LENS_MAX) * 10) / 10,
