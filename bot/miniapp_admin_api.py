@@ -18,7 +18,14 @@ from bot.miniapp_auth import VK_USER_ID_KEY
 from config import Settings
 from game.world import grid
 from models import Character
-from services import admin_service, maintenance_service, mining_service, naming, promo_service
+from services import (
+    admin_grant_service,
+    admin_service,
+    maintenance_service,
+    mining_service,
+    naming,
+    promo_service,
+)
 from services import onboarding_service as onboarding_svc
 
 _rng = random.Random()
@@ -129,6 +136,7 @@ async def handle_post_action(request: web.Request) -> web.Response:
         if character is None:
             return web.json_response({"error": "not_found"}, status=404)
 
+        granted = None
         try:
             if action == "grant_currency":
                 currency = body.get("currency")
@@ -187,8 +195,19 @@ async def handle_post_action(request: web.Request) -> web.Response:
                 await admin_service.grant_admin_mount(db, admin_vk_id, character)
             elif action == "grant_admin_weapon":
                 await admin_service.grant_admin_weapon(db, admin_vk_id, character)
+            elif action == "grant_any":
+                # Патч 107: выдача любой позиции каталога (admin_grant_service).
+                key, amount, ilvl = body.get("key"), body.get("amount"), body.get("ilvl")
+                if (
+                    not isinstance(key, str) or not isinstance(amount, int)
+                    or (ilvl is not None and not isinstance(ilvl, int))
+                ):
+                    return web.json_response({"error": "bad_request"}, status=400)
+                granted = await admin_grant_service.grant(db, admin_vk_id, character, key, amount, ilvl, _rng)
             else:
                 return web.json_response({"error": "unknown_action"}, status=400)
+        except admin_grant_service.GrantError as e:
+            return web.json_response({"error": str(e)}, status=400)
         except ValueError:
             return web.json_response({"error": "out_of_bounds"}, status=400)
         except admin_service.NotSelfTarget:
@@ -197,7 +216,17 @@ async def handle_post_action(request: web.Request) -> web.Response:
 
         await db.commit()
         card = await admin_service.player_card(db, character_id)
+        if granted is not None:
+            card["granted"] = granted
         return web.json_response(card)
+
+
+async def handle_get_catalog(request: web.Request) -> web.Response:
+    """Патч 107: всё, что можно выдать, по группам - для кнопки «Выдать
+    предмет» в карточке игрока."""
+    if not _is_admin(request):
+        return _forbidden()
+    return web.json_response({"groups": admin_grant_service.catalog()})
 
 
 async def handle_get_journal(request: web.Request) -> web.Response:
@@ -449,6 +478,7 @@ def register_routes(app: web.Application) -> None:
     app.router.add_get("/api/miniapp/admin/search", handle_get_search)
     app.router.add_get("/api/miniapp/admin/player/{id}", handle_get_player)
     app.router.add_post("/api/miniapp/admin/player/{id}/action", handle_post_action)
+    app.router.add_get("/api/miniapp/admin/catalog", handle_get_catalog)
     app.router.add_get("/api/miniapp/admin/journal", handle_get_journal)
     app.router.add_get("/api/miniapp/admin/bug_reports", handle_get_bug_reports)
     app.router.add_post("/api/miniapp/admin/bug_reports/{id}/status", handle_post_bug_report_status)

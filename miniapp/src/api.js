@@ -135,6 +135,11 @@ export function getAdminPlayer(characterId) {
   return request(`/admin/player/${characterId}`);
 }
 
+// Патч 107: всё, что можно выдать игроку, по группам.
+export function getAdminCatalog() {
+  return request('/admin/catalog');
+}
+
 export function postAdminAction(characterId, action, params = {}) {
   return request(`/admin/player/${characterId}/action`, {
     method: 'POST',

@@ -6,7 +6,7 @@ import {
 import {
   getAdminOverview, searchAdminPlayers, getAdminPlayer, postAdminAction, getAdminJournal,
   getAdminPromoCodes, createAdminPromoCode, deleteAdminPromoCode, getAdminPromoCodeActivations,
-  resetAdminActivities, getAdminMiningStats, refillAdminMining,
+  resetAdminActivities, getAdminMiningStats, refillAdminMining, getAdminCatalog,
 } from '../api.js';
 
 // Патч 27, ч.2: вкладка «Админ» - видна только если character.is_admin
@@ -411,6 +411,122 @@ function Fold({ title, children }) {
   );
 }
 
+// Патч 107: выдача любого предмета игры. Кнопка раскрывает типы, тип -
+// предметы, предмет - форму выдачи. Каталог приходит с сервера целиком
+// (admin_grant_service.catalog), так что новая руда или реликвия появится
+// здесь без правки мини-аппа.
+function GrantEntry({ entry, playerId, onDone }) {
+  const [open, setOpen] = useState(false);
+  const [variant, setVariant] = useState(entry.variants ? entry.variants[0].key : entry.key);
+  const [amount, setAmount] = useState('1');
+  const [ilvl, setIlvl] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [result, setResult] = useState(null);
+
+  const run = async () => {
+    setBusy(true);
+    setResult(null);
+    try {
+      const params = { key: variant, amount: parseInt(amount, 10) || 0 };
+      if (entry.ilvl && ilvl) params.ilvl = parseInt(ilvl, 10) || 1;
+      const updated = await postAdminAction(playerId, 'grant_any', params);
+      setResult({ ok: true, text: `Выдано: ${updated.granted}` });
+      onDone(updated);
+    } catch (e) {
+      const text = e.message === 'self_only' ? 'Это можно выдать только себе.' : e.message || 'Ошибка';
+      setResult({ ok: false, text });
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <>
+      <SimpleCell onClick={() => setOpen((v) => !v)} after={open ? '▴' : '▾'} style={{ paddingLeft: 32 }}>
+        {entry.label}
+      </SimpleCell>
+      {open && (
+        <div style={{ paddingLeft: 32 }}>
+          {entry.variants && (
+            <FormItem top="Градация">
+              <Select
+                value={variant}
+                onChange={(e) => setVariant(e.target.value)}
+                options={entry.variants.map((v) => ({ value: v.key, label: v.label }))}
+              />
+            </FormItem>
+          )}
+          {entry.ilvl && (
+            <FormItem top="Уровень предмета (пусто - уровень игрока)">
+              <Input type="number" value={ilvl} onChange={(e) => setIlvl(e.target.value)} />
+            </FormItem>
+          )}
+          {entry.amount !== 'one' && (
+            <FormItem top={entry.amount === 'pieces' ? 'Сколько штук (до 50)' : 'Количество'}>
+              <Input type="number" value={amount} onChange={(e) => setAmount(e.target.value)} />
+            </FormItem>
+          )}
+          <Div>
+            <Button size="m" stretched loading={busy} onClick={run}>Выдать</Button>
+            {result && (
+              <Caption
+                level="1"
+                style={{ display: 'block', marginTop: 8, color: result.ok ? undefined : 'var(--vkui--color_text_negative)' }}
+              >
+                {result.text}
+              </Caption>
+            )}
+          </Div>
+        </div>
+      )}
+    </>
+  );
+}
+
+function GrantGroup({ group, playerId, onDone }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <>
+      <SimpleCell onClick={() => setOpen((v) => !v)} after={open ? '▴' : '▾'} style={{ paddingLeft: 16 }}>
+        {group.title} <span style={{ opacity: 0.5 }}>· {group.entries.length}</span>
+      </SimpleCell>
+      {open && group.entries.map((entry) => (
+        <GrantEntry key={entry.key} entry={entry} playerId={playerId} onDone={onDone} />
+      ))}
+    </>
+  );
+}
+
+function GrantSection({ playerId, onDone }) {
+  const [open, setOpen] = useState(false);
+  const [groups, setGroups] = useState(null);
+  const [error, setError] = useState(null);
+
+  const toggle = () => {
+    setOpen((v) => !v);
+    if (groups === null) {
+      getAdminCatalog()
+        .then((res) => setGroups(res.groups))
+        .catch(() => setError('Не удалось загрузить каталог.'));
+    }
+  };
+
+  return (
+    <Group>
+      <SimpleCell onClick={toggle} after={open ? '▴' : '▾'}>
+        <b>🎁 Выдать предмет</b>
+      </SimpleCell>
+      {open && error && <Div style={{ color: 'var(--vkui--color_text_negative)' }}>{error}</Div>}
+      {open && !error && groups === null && (
+        <Div style={{ display: 'flex', justifyContent: 'center' }}><Spinner size="m" /></Div>
+      )}
+      {open && groups && groups.filter((g) => g.entries.length > 0).map((group) => (
+        <GrantGroup key={group.id} group={group} playerId={playerId} onDone={onDone} />
+      ))}
+    </Group>
+  );
+}
+
 function PlayerCard({ card, onRefresh }) {
   return (
     <>
@@ -524,6 +640,7 @@ function PlayerCard({ card, onRefresh }) {
         ))}
       </Fold>
 
+      <GrantSection playerId={card.id} onDone={onRefresh} />
       <ActionForm playerId={card.id} onDone={onRefresh} />
     </>
   );
