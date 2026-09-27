@@ -22,7 +22,7 @@ from game.economy import fishing_config as fc
 from game.world import events as event_pool
 
 # Клетка с озером первого кольца (Отмель Мары) и обычная клетка того же кольца.
-LAKE_XY = (41, -41)
+LAKE_XY = (25, 0)
 PLAIN_XY = (45, 45)
 
 
@@ -170,7 +170,7 @@ def _rows(raw: str) -> list[list[dict]]:
         ("скупщик (корень)", akb.appraiser_root_keyboard()),
         ("скупщик: рыба", akb.appraiser_fish_keyboard(1234)),
         ("скупщик: рыба пусто", akb.appraiser_fish_keyboard(0)),
-        ("карта со всеми кнопками", wkb.movement_keyboard(41, -41, None, has_mount=True)),
+        ("карта со всеми кнопками", wkb.movement_keyboard(25, 0, None, has_mount=True)),
     ],
 )
 def test_keyboards_fit_vk_limits(name: str, raw: str) -> None:
@@ -216,10 +216,10 @@ def test_lake_button_is_sent_once_per_entry() -> None:
     peer = 999001
     st.leave(peer, st.LAKE)
 
-    assert st.should_send(peer, st.LAKE, 41, -41) is True
-    st.mark_sent(peer, st.LAKE, 41, -41)
+    assert st.should_send(peer, st.LAKE, 25, 0) is True
+    st.mark_sent(peer, st.LAKE, 25, 0)
     # Исследование/событие/отдых на той же клетке — кнопки больше нет.
-    assert st.should_send(peer, st.LAKE, 41, -41) is False
+    assert st.should_send(peer, st.LAKE, 25, 0) is False
 
 
 def test_lake_button_returns_after_leaving_and_coming_back() -> None:
@@ -229,11 +229,11 @@ def test_lake_button_returns_after_leaving_and_coming_back() -> None:
 
     peer = 999002
     st.leave(peer, st.LAKE)
-    st.mark_sent(peer, st.LAKE, 41, -41)
-    assert st.should_send(peer, st.LAKE, 41, -41) is False
+    st.mark_sent(peer, st.LAKE, 25, 0)
+    assert st.should_send(peer, st.LAKE, 25, 0) is False
 
     st.leave(peer, st.LAKE)  # ушёл на клетку без озера
-    assert st.should_send(peer, st.LAKE, 41, -41) is True
+    assert st.should_send(peer, st.LAKE, 25, 0) is True
 
 
 def test_moving_between_two_lakes_shows_the_button_each_time() -> None:
@@ -241,10 +241,10 @@ def test_moving_between_two_lakes_shows_the_button_each_time() -> None:
 
     peer = 999003
     st.leave(peer, st.LAKE)
-    st.mark_sent(peer, st.LAKE, 41, -41)
+    st.mark_sent(peer, st.LAKE, 25, 0)
     assert st.should_send(peer, st.LAKE, 1, -2) is True
     st.mark_sent(peer, st.LAKE, 1, -2)
-    assert st.should_send(peer, st.LAKE, 41, -41) is True
+    assert st.should_send(peer, st.LAKE, 25, 0) is True
 
 
 def test_lake_button_is_sent_only_from_cell_entry_points() -> None:

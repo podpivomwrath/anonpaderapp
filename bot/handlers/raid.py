@@ -78,7 +78,7 @@ async def _open_raid_list(message: Message) -> None:
         if reason:
             await message.answer(reason)
             return
-        if grid.chebyshev_distance(character.pos_x, character.pos_y) != 0:
+        if grid.monolith_distance(character.pos_x, character.pos_y) != 0:
             return  # устаревшая кнопка — уже не на (0;0)
         await screen_service.set_screen(db, character, "raid_list")
         await db.commit()
@@ -123,7 +123,7 @@ async def pick_raid(message: Message) -> None:
         if reason:
             await message.answer(reason)
             return
-        if grid.chebyshev_distance(character.pos_x, character.pos_y) != 0:
+        if grid.monolith_distance(character.pos_x, character.pos_y) != 0:
             await message.answer("Ты уже не у Монолита.")
             return
         if raid_combat_handlers.has_active_raid(character.id):

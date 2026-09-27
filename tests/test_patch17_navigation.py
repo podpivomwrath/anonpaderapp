@@ -41,16 +41,16 @@ def test_movement_keyboard_keeps_direction_leading_out_of_bounds() -> None:
 
 
 def test_movement_keyboard_shows_city_name_instead_of_arrow() -> None:
-    # (49;50) — соседняя клетка вправо (50;50) это Обетованный Кряж
-    labels = _labels(movement_keyboard(49, 50))
+    # (-1;30) — соседняя клетка вправо (0;30) это Обетованный Кряж
+    labels = _labels(movement_keyboard(-1, 30))
     assert REGION_TITLES["ridge"] in labels
     assert BTN_RIGHT not in labels
-    assert BTN_UP in labels  # (49;51) — за границей (BOUNDS_MAX=50), но кнопка на месте
+    assert BTN_UP in labels  # (-1;31) — за краем мира, но кнопка на месте
     assert BTN_DOWN in labels and BTN_LEFT in labels
 
 
 def test_resolve_direction_matches_city_label() -> None:
-    assert resolve_direction(49, 50, REGION_TITLES["ridge"]) == (1, 0)
+    assert resolve_direction(-1, 30, REGION_TITLES["ridge"]) == (1, 0)
 
 
 def test_resolve_direction_resolves_out_of_bounds_arrow() -> None:
@@ -65,11 +65,13 @@ def test_resolve_direction_none_for_stale_city_label_far_from_city() -> None:
 
 
 @pytest.mark.parametrize("region,coords", list(wc.CITY_COORDS.items()))
-def test_gate_direction_keyboard_offers_exactly_two_inward_directions(region, coords) -> None:
+def test_gate_direction_keyboard_offers_only_directions_inside_the_world(region, coords) -> None:
+    """Патч 108: город на краю круга - наружу пути нет, внутрь и вдоль края
+    есть: ровно три выхода."""
     x, y = coords
     kb = json.loads(gate_direction_keyboard(x, y))
     buttons = [btn for row in kb["buttons"] for btn in row]
-    assert len(buttons) == 2
+    assert len(buttons) == 3
     for btn in buttons:
         dx, dy = btn["action"]["payload"]["dx"], btn["action"]["payload"]["dy"]
         assert grid.in_bounds(x + dx, y + dy)

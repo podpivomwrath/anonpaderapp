@@ -183,7 +183,7 @@ async def test_dig_reserves_ore_at_the_start(db_session, make_character) -> None
     """Руда снимается с жилы В НАЧАЛЕ добычи, а не в конце: иначе двое,
     начавшие одновременно, забрали бы один и тот же последний кусок."""
     character = await make_character()
-    character.pos_x, character.pos_y = 46, 44
+    character.pos_x, character.pos_y = 3, 27
     db_session.add(MineVein(mine_id=EASY_MINE, ore_count=1))
     await db_session.flush()
 
@@ -201,7 +201,7 @@ async def test_two_diggers_cannot_take_the_same_last_ore(
     first = await make_character()
     second = await make_character()
     for char in (first, second):
-        char.pos_x, char.pos_y = 46, 44
+        char.pos_x, char.pos_y = 3, 27
     db_session.add(MineVein(mine_id=EASY_MINE, ore_count=1))
     await db_session.flush()
     mine = mining.mine_by_id(EASY_MINE)
@@ -216,7 +216,7 @@ async def test_two_diggers_cannot_take_the_same_last_ore(
 @pytest.mark.asyncio
 async def test_empty_mine_refuses_the_dig(db_session, make_character) -> None:
     character = await make_character()
-    character.pos_x, character.pos_y = 46, 44
+    character.pos_x, character.pos_y = 3, 27
     mine = mining.mine_by_id(EASY_MINE)
 
     assert await mining_service.start_dig(db_session, character, mine, random.Random(0)) is None
@@ -265,7 +265,7 @@ async def test_spawn_adds_exactly_one_ore(db_session) -> None:
 @pytest.mark.asyncio
 async def test_finished_dig_puts_ore_in_the_inventory(db_session, make_character) -> None:
     character = await make_character()
-    character.pos_x, character.pos_y = 46, 44
+    character.pos_x, character.pos_y = 3, 27
     db_session.add(MineVein(mine_id=EASY_MINE, ore_count=3))
     await db_session.flush()
     mine = mining.mine_by_id(EASY_MINE)
@@ -283,14 +283,14 @@ async def test_finished_dig_puts_ore_in_the_inventory(db_session, make_character
 @pytest.mark.asyncio
 async def test_leaving_the_cell_zeroes_the_dig(db_session, make_character) -> None:
     character = await make_character()
-    character.pos_x, character.pos_y = 46, 44
+    character.pos_x, character.pos_y = 3, 27
     db_session.add(MineVein(mine_id=EASY_MINE, ore_count=1))
     await db_session.flush()
     mine = mining.mine_by_id(EASY_MINE)
     await mining_service.start_dig(db_session, character, mine, random.Random(0))
 
     assert await mining_service.abandon_if_elsewhere(db_session, character) is False
-    character.pos_x, character.pos_y = 46, 45  # ушёл на соседнюю клетку
+    character.pos_x, character.pos_y = 4, 27  # ушёл на соседнюю клетку
     assert await mining_service.abandon_if_elsewhere(db_session, character) is True
     assert not mining_service.is_digging(character)
 
@@ -299,7 +299,7 @@ async def test_leaving_the_cell_zeroes_the_dig(db_session, make_character) -> No
 async def test_event_vein_vanishes_on_any_exit(db_session, make_character) -> None:
     """Мелкая жила не принадлежит карте — возвращаться к ней некуда."""
     character = await make_character()
-    character.pos_x, character.pos_y = 20, 20
+    character.pos_x, character.pos_y = 10, 5
     await mining_service.start_dig(db_session, character, None, random.Random(0))
 
     assert mining_service.is_event_vein(character) is True
@@ -314,7 +314,7 @@ async def test_abandoned_dig_does_not_return_ore_to_the_vein(
     """Иначе можно было бы занимать последний кусок рудника и отпускать его,
     когда удобно, бесплатно блокируя остальных."""
     character = await make_character()
-    character.pos_x, character.pos_y = 46, 44
+    character.pos_x, character.pos_y = 3, 27
     db_session.add(MineVein(mine_id=EASY_MINE, ore_count=1))
     await db_session.flush()
     mine = mining.mine_by_id(EASY_MINE)
@@ -368,7 +368,7 @@ async def test_cancelling_returns_the_ore_to_the_vein(db_session, make_character
     и повторить это по всей карте. Порчи общего ресурса быть не должно.
     """
     character = await make_character()
-    character.pos_x, character.pos_y = 46, 44
+    character.pos_x, character.pos_y = 3, 27
     db_session.add(MineVein(mine_id=EASY_MINE, ore_count=3))
     await db_session.flush()
     mine = mining.mine_by_id(EASY_MINE)
@@ -387,7 +387,7 @@ async def test_griefer_cannot_drain_a_mine(db_session, make_character) -> None:
     """Прямая проверка сценария: начать и бросить столько раз, сколько руды в
     жиле. Руды должно остаться столько же."""
     character = await make_character()
-    character.pos_x, character.pos_y = 46, 44
+    character.pos_x, character.pos_y = 3, 27
     db_session.add(MineVein(mine_id=EASY_MINE, ore_count=mc.MINE_ORE_CAP))
     await db_session.flush()
     mine = mining.mine_by_id(EASY_MINE)
@@ -404,7 +404,7 @@ async def test_return_never_exceeds_the_cap(db_session, make_character) -> None:
     """Если за время добычи в жилу упал спавн, возврат не должен переполнить
     её сверх кромки."""
     character = await make_character()
-    character.pos_x, character.pos_y = 46, 44
+    character.pos_x, character.pos_y = 3, 27
     db_session.add(MineVein(mine_id=EASY_MINE, ore_count=mc.MINE_ORE_CAP))
     await db_session.flush()
     mine = mining.mine_by_id(EASY_MINE)
@@ -423,13 +423,13 @@ async def test_return_never_exceeds_the_cap(db_session, make_character) -> None:
 @pytest.mark.asyncio
 async def test_leaving_the_cell_also_returns_the_ore(db_session, make_character) -> None:
     character = await make_character()
-    character.pos_x, character.pos_y = 46, 44
+    character.pos_x, character.pos_y = 3, 27
     db_session.add(MineVein(mine_id=EASY_MINE, ore_count=2))
     await db_session.flush()
     mine = mining.mine_by_id(EASY_MINE)
     await mining_service.start_dig(db_session, character, mine, random.Random(0))
 
-    character.pos_x, character.pos_y = 46, 45
+    character.pos_x, character.pos_y = 4, 27
     assert await mining_service.abandon_if_elsewhere(db_session, character) is True
 
     assert await mining_service.ore_in_mine(db_session, EASY_MINE) == 2
@@ -440,7 +440,7 @@ async def test_finished_dig_does_NOT_return_the_ore(db_session, make_character) 
     """Обратная сторона: доведённая до конца добыча руду в жилу не возвращает —
     она у игрока."""
     character = await make_character()
-    character.pos_x, character.pos_y = 46, 44
+    character.pos_x, character.pos_y = 3, 27
     db_session.add(MineVein(mine_id=EASY_MINE, ore_count=2))
     await db_session.flush()
     mine = mining.mine_by_id(EASY_MINE)
@@ -461,7 +461,7 @@ async def test_starting_a_new_dig_resets_the_old_one_and_returns_its_ore(
     попутно уничтожать общий ресурс.
     """
     character = await make_character()
-    character.pos_x, character.pos_y = 46, 44
+    character.pos_x, character.pos_y = 3, 27
     db_session.add(MineVein(mine_id=EASY_MINE, ore_count=3))
     await db_session.flush()
     mine = mining.mine_by_id(EASY_MINE)
@@ -484,7 +484,7 @@ async def test_restart_cancels_digs_and_returns_their_ore(
     """Рестарт выносит игрока наверх, а значит он из забоя ушёл — добыча
     сбрасывается по общему правилу. Руда при этом не пропадает."""
     character = await make_character()
-    character.pos_x, character.pos_y = 46, 44
+    character.pos_x, character.pos_y = 3, 27
     character.screen = "mine"
     db_session.add(MineVein(mine_id=EASY_MINE, ore_count=2))
     await db_session.flush()
@@ -521,7 +521,7 @@ async def test_journal_records_spawns_and_digs(db_session, make_character) -> No
     from models import MiningEvent
 
     character = await make_character()
-    character.pos_x, character.pos_y = 46, 44
+    character.pos_x, character.pos_y = 3, 27
     db_session.add(MineVein(mine_id=EASY_MINE, ore_count=2))
     await db_session.flush()
     mine = mining.mine_by_id(EASY_MINE)
@@ -557,7 +557,7 @@ async def test_abandoned_dig_is_not_counted_as_collected(
     from models import MiningEvent
 
     character = await make_character()
-    character.pos_x, character.pos_y = 46, 44
+    character.pos_x, character.pos_y = 3, 27
     db_session.add(MineVein(mine_id=EASY_MINE, ore_count=2))
     await db_session.flush()
     mine = mining.mine_by_id(EASY_MINE)
@@ -576,7 +576,7 @@ async def test_stats_report_the_balance_of_spawn_and_digging(
     db_session, make_character
 ) -> None:
     character = await make_character()
-    character.pos_x, character.pos_y = 46, 44
+    character.pos_x, character.pos_y = 3, 27
     db_session.add(MineVein(mine_id=EASY_MINE, ore_count=3))
     await db_session.flush()
     mine = mining.mine_by_id(EASY_MINE)
@@ -623,7 +623,7 @@ async def test_restart_reports_who_to_warn(db_session, make_character) -> None:
     зависшего, и игрок досиживает обещанные минуты впустую. Ровно это и
     случилось на проде после одного из деплоев."""
     digger = await make_character()
-    digger.pos_x, digger.pos_y = 46, 44
+    digger.pos_x, digger.pos_y = 3, 27
     idle = await make_character()
     db_session.add(MineVein(mine_id=EASY_MINE, ore_count=1))
     await db_session.flush()

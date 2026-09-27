@@ -12,6 +12,7 @@
 региона пройдена целиком).
 """
 
+import math
 from dataclasses import dataclass
 
 from sqlalchemy import select
@@ -39,13 +40,15 @@ _DIR_WORDS = {
 
 
 def compass_direction(px: int, py: int, tx: int, ty: int) -> str:
-    """Направление словом от (px;py) к (tx;ty) — патч 21, пп. 4-5."""
+    """Направление словом от (px;py) к (tx;ty) — патч 21, пп. 4-5. Патч 108:
+    по углу (восемь секторов по 45°), а не по знакам: цель чуть восточнее
+    строго на севере - это «север», а не «северо-восток»."""
     dx, dy = tx - px, ty - py
     if dx == 0 and dy == 0:
         return "ты уже на месте"
-    sx = (dx > 0) - (dx < 0)
-    sy = (dy > 0) - (dy < 0)
-    return f"на {_DIR_WORDS[(sx, sy)]}"
+    sector = round(math.degrees(math.atan2(dy, dx)) / 45) % 8
+    steps = [(1, 0), (1, 1), (0, 1), (-1, 1), (-1, 0), (-1, -1), (0, -1), (1, -1)]
+    return f"на {_DIR_WORDS[steps[sector]]}"
 
 
 def get_line(region: str) -> StoryLineDef:
@@ -279,7 +282,7 @@ async def check_zone_trigger(db: AsyncSession, character: Character) -> StoryQue
         return None
     dx = character.pos_x - quest.target_x
     dy = character.pos_y - quest.target_y
-    if grid.chebyshev_distance(dx, dy) > sc.STORY_TRIGGER_RADIUS:
+    if grid.cells_between(0, 0, dx, dy) > sc.STORY_TRIGGER_RADIUS:
         return None
     return quest
 

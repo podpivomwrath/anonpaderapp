@@ -69,7 +69,7 @@ def location_summary(
     выводится вовсе."""
     x, y = character.pos_x, character.pos_y
     loc_type = location_types.location_type_at(x, y)
-    lo, hi = grid.zone_level_range(grid.chebyshev_distance(x, y))
+    lo, hi = grid.zone_level_range(grid.monolith_distance(x, y))
     zone_line = f"📍 ({x}; {y}) - {loc_type.name} · зона {lo}-{hi} ур."
     description = rng.choice(loc_type.descriptions)
     max_hp = vitals_service.max_hp(character, stats, vit_bonus)

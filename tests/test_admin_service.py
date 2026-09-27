@@ -54,7 +54,7 @@ async def test_overview_excludes_unfinished_onboarding(db_session, make_characte
 
 
 async def test_overview_deaths_by_zone_uses_position(db_session, character_at) -> None:
-    character = await character_at(50, 50)  # зона 1-15 (внешнее кольцо)
+    character = await character_at(0, 28)  # зона 1-15 (внешнее кольцо)
     await admin_service.log_death(db_session, character, "pve")
     stats = await admin_service.overview_stats(db_session)
     assert stats.combat["deaths_24h"] == 1

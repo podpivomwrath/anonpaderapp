@@ -110,7 +110,7 @@ async def test_daily_curious_progresses_on_any_choice_label(db_session, characte
     from models import CharacterDaily
     from services import daily_service
 
-    character = await character_at(50, 50)
+    character = await character_at(0, 28)
     stats = await _stats(db_session, character)
     db_session.add(CharacterDaily(
         character_id=character.id, quest_id="curious", progress=0, completed=False,
@@ -137,7 +137,7 @@ async def test_outcome_without_reward_flags_gets_safety_net_not_silence(db_sessi
     молча возвращал исходный текст без последствий — теперь это ловится
     защитной сеткой (см. test_outcome_without_any_reward_flag_falls_back_to_minimum_xp
     выше) и всегда добавляет минимальную награду опыта, а не тишину."""
-    character = await character_at(50, 50)
+    character = await character_at(0, 28)
     stats = await _stats(db_session, character)
     outcome = EventOutcome(weight=100, text="Ты не трогаешь чужую смерть.")
     result = await event_service.apply_outcome(db_session, character, stats, outcome, FixedRng(0.0))
@@ -147,7 +147,7 @@ async def test_outcome_without_reward_flags_gets_safety_net_not_silence(db_sessi
 
 
 async def test_outcome_combat_flag_short_circuits(db_session, character_at) -> None:
-    character = await character_at(50, 50)
+    character = await character_at(0, 28)
     stats = await _stats(db_session, character)
     outcome = EventOutcome(weight=100, text="Рана оказывается краской.", combat=True)
     result = await event_service.apply_outcome(db_session, character, stats, outcome, FixedRng(0.0))
@@ -158,7 +158,7 @@ async def test_outcome_combat_flag_short_circuits(db_session, character_at) -> N
 async def test_outcome_xp_grants_fraction_of_mob_xp(db_session, character_at) -> None:
     """(50;50) — dist 50, зона 1-15; уровень 5 внутри зоны, зона-уровень == 5,
     поэтому численно совпадает со старой формулой по character.level."""
-    character = await character_at(50, 50, level=5)
+    character = await character_at(0, 28, level=5)
     stats = await _stats(db_session, character)
     before = character.experience
     outcome = EventOutcome(weight=100, text="Тепло растекается по венам.", xp=True)
@@ -171,8 +171,8 @@ async def test_outcome_xp_scales_by_zone_not_player_level(db_session, character_
     """Патч 36: то же событие на клетке у Монолита (зона 60) даёт заметно
     больше опыта высокоуровневому игроку, чем на дальнем кольце (зона 1-15) —
     раньше опыт зависел только от character.level, разница в зоне роли не играла."""
-    far_ring = await character_at(50, 50, level=30)  # dist 50 → зона 1-15 → клампится до 15
-    near_center = await character_at(2, 2, level=30)  # dist 2 → зона 60-60
+    far_ring = await character_at(0, 28, level=30)  # dist 28 → зона 1-15 → клампится до 15
+    near_center = await character_at(1, 0, level=30)  # dist 1 → зона 60-60
     far_stats = await _stats(db_session, far_ring)
     near_stats = await _stats(db_session, near_center)
     outcome = EventOutcome(weight=100, text="Тепло растекается по венам.", xp=True)
@@ -219,7 +219,7 @@ async def test_outcome_trophy_uses_event_specific_source_text(db_session, charac
 
 
 async def test_outcome_damage_reduces_hp_but_never_kills(db_session, character_at) -> None:
-    character = await character_at(50, 50, level=5)
+    character = await character_at(0, 28, level=5)
     stats = await _stats(db_session, character)
     max_hp = vitals_service.max_hp(character, stats)
     vitals_service.set_hp(character, stats, 1)  # уже почти мёртв
@@ -256,7 +256,7 @@ async def test_outcome_combines_trophy_and_damage(db_session, character_at) -> N
 async def test_outcome_xp_big_grants_more_than_normal(db_session, character_at) -> None:
     """ux-patch-10: "крупнее обычного" опыт — рискованный выбор (Пульсирующий
     осколок / Коснуться, успех)."""
-    character = await character_at(50, 50, level=5)
+    character = await character_at(0, 28, level=5)
     stats = await _stats(db_session, character)
     before = character.experience
     outcome = EventOutcome(weight=100, text="Тепло растекается по венам.", xp_big=True)
@@ -274,7 +274,7 @@ async def test_dead_box_open_never_empty_across_many_rolls(db_session, character
     раньше в ~31% случаев обрывалась без строки о находке (roll_once даёт
     None). Прогоняем много раз подряд разными roll'ами RNG — ни одного
     пустого текста, как того требует чеклист патча (10-15 раз подряд)."""
-    character = await character_at(50, 50, level=10)
+    character = await character_at(0, 28, level=10)
     stats = await _stats(db_session, character)
     events = load_exploration_events()
     dead_box = next(e for e in events if e.id == "dead_box")
@@ -294,7 +294,7 @@ async def test_outcome_without_any_reward_flag_falls_back_to_minimum_xp(db_sessi
     """Патч 38, защитная сетка: контентная ошибка (исход без trophy/xp/
     xp_big/damage) не должна оставить игрока ни с чем — минимум опыта
     начисляется автоматически."""
-    character = await character_at(50, 50, level=5)
+    character = await character_at(0, 28, level=5)
     stats = await _stats(db_session, character)
     before = character.experience
     broken_outcome = EventOutcome(weight=100, text="")  # ни одного флага награды
@@ -317,7 +317,7 @@ async def test_fish_sale_is_the_outcome_not_an_empty_event(db_session, character
     errors: list[str] = []
     sink = logger.add(lambda m: errors.append(str(m)), level="ERROR")
     try:
-        character = await character_at(50, 50, level=5)
+        character = await character_at(0, 28, level=5)
         stats = await _stats(db_session, character)
         xp_before = character.experience
         outcome = EventOutcome(weight=100, text="Он пересыпает рыбу в вёдра.", fish_buyer=True)
@@ -340,7 +340,7 @@ async def test_emptied_bag_gets_consolation_without_error(db_session, character_
     errors: list[str] = []
     sink = logger.add(lambda m: errors.append(str(m)), level="ERROR")
     try:
-        character = await character_at(50, 50, level=5)
+        character = await character_at(0, 28, level=5)
         stats = await _stats(db_session, character)
         outcome = EventOutcome(weight=100, text="Он пересыпает рыбу в вёдра.", fish_buyer=True)
         result = await event_service.apply_outcome(

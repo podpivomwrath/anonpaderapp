@@ -277,11 +277,12 @@ body {
 .map-viewport {
   position: relative;
   overflow: hidden;
-  height: 60vh;
-  max-height: 520px;
-  min-height: 320px;
+  overflow: clip;
+  height: 64vh;
+  max-height: 640px;
+  min-height: 340px;
   border-radius: 8px;
-  background: #1a1414;
+  background: #07080a;
   /* touch-action: none - иначе браузер перехватывает свайп/щипок как нативный
      скролл/зум страницы, конфликтуя с нашим pointer-based драгом. */
   touch-action: none;
@@ -289,41 +290,141 @@ body {
   cursor: grab;
 }
 
-.map-cell {
+/* Патч 108: сцена с картинкой и слоями. Отдельно от .map-viewport и с
+   overflow: clip: картинка намного больше окна, и блок с overflow: hidden
+   браузер прокручивает программно (фокус, scrollIntoView) - вместе с ним
+   уезжали кнопки зума. clip прокрутку запрещает совсем. */
+.map-stage {
   position: absolute;
-  box-sizing: border-box;
+  inset: 0;
+  overflow: hidden;
+  overflow: clip;
+}
+
+/* Картинка двигается transform-ом, размер меняется только при зуме. */
+.map-image {
+  position: absolute;
+  left: 0;
+  top: 0;
+  transform-origin: 0 0;
+  pointer-events: none;
+  user-select: none;
+  -webkit-user-drag: none;
+}
+
+.map-overlay {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+/* Границы колец: тонкая тлеющая линия - видно, где меняется уровень зоны,
+   но арт не перечёркивается. */
+.map-ring {
+  fill: none;
+  stroke: rgba(255, 120, 90, 0.28);
+  stroke-width: 1.2;
+  stroke-dasharray: 5 7;
+  filter: drop-shadow(0 0 3px rgba(220, 40, 30, 0.6));
+}
+
+.map-ring--rim {
+  stroke: rgba(240, 225, 205, 0.22);
+  stroke-dasharray: none;
+  filter: none;
+}
+
+.map-grid-cell {
+  fill: none;
+  stroke: rgba(255, 240, 225, 0.1);
+  stroke-width: 1;
+}
+
+.map-cell-hover {
+  fill: rgba(255, 240, 225, 0.1);
+  stroke: rgba(255, 240, 225, 0.6);
+  stroke-width: 1.2;
+}
+
+.map-cell-selected {
+  fill: rgba(255, 70, 50, 0.16);
+  stroke: #ff6a4d;
+  stroke-width: 2;
+  filter: drop-shadow(0 0 4px rgba(255, 60, 40, 0.8));
+}
+
+.map-route {
+  stroke: #ffe066;
+  stroke-width: 2;
+  stroke-dasharray: 6 6;
+  opacity: 0.8;
+}
+
+.map-pins {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.map-pin {
+  position: absolute;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  line-height: 1;
+  background: rgba(10, 8, 8, 0.72);
+  border: 1px solid rgba(255, 240, 225, 0.35);
+  box-shadow: 0 0 6px rgba(0, 0, 0, 0.8);
+}
+
+.map-pin--lake { border-color: rgba(120, 190, 255, 0.7); }
+.map-pin--mine { border-color: rgba(255, 170, 80, 0.75); }
+.map-pin--empty { opacity: 0.55; }
+
+.map-pin--quest {
+  border: 2px dashed #f2d9dc;
+  background: rgba(40, 10, 14, 0.8);
+}
+
+.map-pin--boss {
+  border: 2px solid #ff3b30;
+  background: rgba(60, 0, 6, 0.85);
+  animation: map-boss-glow 2.2s ease-in-out infinite;
+}
+
+.map-pin--route {
+  border-color: #ffe066;
+  color: #ffe066;
+}
+
+.map-pin--player {
+  background: radial-gradient(circle, #ffe066 0 28%, rgba(255, 224, 102, 0.15) 32% 100%);
+  border: 2px solid #ffe066;
+  animation: map-pulse 1.6s ease-in-out infinite;
+}
+
+@keyframes map-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(255, 224, 102, 0.6); }
+  50% { box-shadow: 0 0 0 7px rgba(255, 224, 102, 0); }
+}
+
+@keyframes map-boss-glow {
+  0%, 100% { box-shadow: 0 0 6px 1px rgba(255, 40, 30, 0.55); }
+  50% { box-shadow: 0 0 14px 4px rgba(255, 40, 30, 0.85); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .map-pin--player, .map-pin--boss { animation: none; }
+}
+
+.map-loading {
+  position: absolute;
+  inset: 0;
   display: flex;
   align-items: center;
   justify-content: center;
   pointer-events: none;
-}
-
-.map-cell__symbol {
-  color: rgba(255, 255, 255, 0.88);
-  text-shadow: 0 0 3px rgba(0, 0, 0, 0.8);
-  pointer-events: none;
-}
-
-.map-marker {
-  position: absolute;
-  pointer-events: none;
-  box-sizing: border-box;
-}
-
-.map-marker--player {
-  border: 2px solid #ffe066;
-  border-radius: 50%;
-  animation: map-pulse 1.6s ease-in-out infinite;
-}
-
-.map-marker--quest {
-  border: 2px dashed #f2d9dc;
-  border-radius: 50%;
-}
-
-@keyframes map-pulse {
-  0%, 100% { opacity: 1; transform: scale(0.85); }
-  50% { opacity: 0.5; transform: scale(1.15); }
 }
 
 .map-tooltip {
@@ -366,6 +467,12 @@ body {
   background: rgba(20, 12, 12, 0.85);
   color: #f2d9dc;
   font-size: 16px;
+}
+
+.map-travel-banner.map-travel-banner--boss {
+  top: auto;
+  bottom: 8px;
+  border: 1px solid #ff3b3066;
 }
 
 .map-travel-banner {

@@ -131,7 +131,7 @@ def test_generate_item_end_to_end() -> None:
 
 
 async def test_grant_from_kill_creates_unequipped_item(db_session, character_at) -> None:
-    character = await character_at(50, 50, base_class="mage")
+    character = await character_at(0, 30, base_class="mage")
 
     class AlwaysDropWeaponCommonRng(random.Random):
         def __init__(self) -> None:
@@ -157,7 +157,7 @@ async def test_grant_from_kill_creates_unequipped_item(db_session, character_at)
 
 
 async def test_grant_from_kill_none_when_rng_never_drops(db_session, character_at) -> None:
-    character = await character_at(50, 50)
+    character = await character_at(0, 30)
 
     class NeverDropRng(random.Random):
         def random(self) -> float:
@@ -171,7 +171,7 @@ async def test_grant_from_kill_none_when_rng_never_drops(db_session, character_a
 async def test_grant_random_item_ignores_item_drop_chance(db_session, character_at) -> None:
     """Патч 25, п.4: горстка пепла — свой (внешний) шанс, ITEM_DROP_CHANCE
     (~12%) не должен ещё раз резать вероятность — здесь предмет ГАРАНТИРОВАН."""
-    character = await character_at(50, 50, base_class="warrior")
+    character = await character_at(0, 30, base_class="warrior")
 
     class NeverDropRng(random.Random):
         def random(self) -> float:
@@ -187,7 +187,7 @@ async def test_grant_random_item_ignores_item_drop_chance(db_session, character_
 
 
 async def test_equip_item_swaps_old_out(db_session, character_at) -> None:
-    character = await character_at(50, 50, base_class="warrior")
+    character = await character_at(0, 30, base_class="warrior")
     first = await item_service.grant_from_kill(db_session, character, 20, FixedRng(0.0))
     await item_service.equip_item(db_session, character.id, first.id)
 
@@ -207,7 +207,7 @@ async def test_equip_item_swaps_old_out(db_session, character_at) -> None:
 
 
 async def test_gear_bonus_sums_equipped_items(db_session, character_at) -> None:
-    character = await character_at(50, 50, base_class="mage")
+    character = await character_at(0, 30, base_class="mage")
     item = await item_service.grant_from_kill(db_session, character, 20, FixedRng(0.0))
     await item_service.equip_item(db_session, character.id, item.id)
 
@@ -216,7 +216,7 @@ async def test_gear_bonus_sums_equipped_items(db_session, character_at) -> None:
 
 
 async def test_sell_item_credits_gold_and_removes_item(db_session, character_at) -> None:
-    character = await character_at(50, 50, farm=0)
+    character = await character_at(0, 30, farm=0)
     item = await item_service.grant_from_kill(db_session, character, 20, FixedRng(0.0))
     expected_gold = item_service.sell_price(item)
     assert expected_gold > 0
@@ -231,7 +231,7 @@ async def test_sell_item_credits_gold_and_removes_item(db_session, character_at)
 
 async def test_sell_item_applies_price_multiplier(db_session, character_at) -> None:
     """Патч 26: наценка чужака у скупщика в чужом городе (FOREIGN_CITY_PRICE_PENALTY)."""
-    character = await character_at(50, 50, farm=0)
+    character = await character_at(0, 30, farm=0)
     item = await item_service.grant_from_kill(db_session, character, 20, FixedRng(0.0))
     full_price = item_service.sell_price(item)
     discounted_price = item_service.sell_price(item, 0.7)
@@ -242,7 +242,7 @@ async def test_sell_item_applies_price_multiplier(db_session, character_at) -> N
 
 
 async def test_sell_item_equipped_rejected(db_session, character_at) -> None:
-    character = await character_at(50, 50, farm=0)
+    character = await character_at(0, 30, farm=0)
     item = await item_service.grant_from_kill(db_session, character, 20, FixedRng(0.0))
     await item_service.equip_item(db_session, character.id, item.id)
 
@@ -256,7 +256,7 @@ async def test_sell_item_equipped_rejected(db_session, character_at) -> None:
 
 
 async def test_sell_item_unknown_or_foreign_rejected(db_session, character_at) -> None:
-    character = await character_at(50, 50)
+    character = await character_at(0, 30)
     assert await item_service.sell_item(db_session, character, 999999) == 0
 
 
@@ -273,7 +273,7 @@ async def _add_item(db_session, character, *, slot, rarity, ilvl, stats, equippe
 
 
 async def test_group_sellable_by_rarity_groups_and_orders_by_catalog(db_session, character_at) -> None:
-    character = await character_at(50, 50, farm=0)
+    character = await character_at(0, 30, farm=0)
     a = await _add_item(db_session, character, slot="weapon", rarity="common", ilvl=10, stats={"str": 2})
     b = await _add_item(db_session, character, slot="helmet", rarity="common", ilvl=10, stats={"str": 2})
     await _add_item(db_session, character, slot="armor", rarity="rare", ilvl=10, stats={"str": 5})
@@ -293,7 +293,7 @@ def test_group_sellable_by_rarity_empty_input() -> None:
 
 
 async def test_sell_by_rarity_sells_only_matching_rarity(db_session, character_at) -> None:
-    character = await character_at(50, 50, farm=0)
+    character = await character_at(0, 30, farm=0)
     common = await _add_item(db_session, character, slot="weapon", rarity="common", ilvl=10, stats={"str": 2})
     rare = await _add_item(db_session, character, slot="helmet", rarity="rare", ilvl=10, stats={"str": 5})
     expected = item_service.sell_price(common)
@@ -306,7 +306,7 @@ async def test_sell_by_rarity_sells_only_matching_rarity(db_session, character_a
 
 
 async def test_sell_by_rarity_skips_equipped_and_admin_only(db_session, character_at) -> None:
-    character = await character_at(50, 50, farm=0)
+    character = await character_at(0, 30, farm=0)
     equipped_item = await _add_item(
         db_session, character, slot="weapon", rarity="common", ilvl=10, stats={"str": 2}, equipped=True,
     )
@@ -320,7 +320,7 @@ async def test_sell_by_rarity_skips_equipped_and_admin_only(db_session, characte
 
 
 async def test_sell_all_gear_sells_every_unequipped_item(db_session, character_at) -> None:
-    character = await character_at(50, 50, farm=0)
+    character = await character_at(0, 30, farm=0)
     a = await _add_item(db_session, character, slot="weapon", rarity="common", ilvl=10, stats={"str": 2})
     b = await _add_item(db_session, character, slot="helmet", rarity="rare", ilvl=10, stats={"str": 5})
     equipped_item = await _add_item(
@@ -394,7 +394,7 @@ def test_format_drop_announcement_includes_emoji_and_level() -> None:
 
 
 async def test_derived_stats_include_gear_bonus(db_session, character_at) -> None:
-    character = await character_at(50, 50, base_class="mage")
+    character = await character_at(0, 30, base_class="mage")
     stats = await _stats(db_session, character)
     without_gear = derived_stats_service.compute(character, stats)
 

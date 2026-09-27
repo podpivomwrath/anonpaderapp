@@ -22,7 +22,7 @@ from bot.miniapp_auth import VK_USER_ID_KEY
 from game.content_loader import load_location_types
 from game.economy import fishing, mining
 from game.economy import mining_config as mc
-from game.world import grid
+from game.world import grid, world_boss
 from game.world import world_config as wc
 from models import Character, User
 from services import (
@@ -31,6 +31,7 @@ from services import (
     mount_service,
     movement_service,
     story_service,
+    world_boss_service,
 )
 
 _rng = random.Random()
@@ -52,6 +53,7 @@ def _location_type_catalog() -> dict[str, list[dict]]:
 
 
 _STATIC_CATALOG = {
+    "world_radius": wc.WORLD_RADIUS,
     "bounds_min": wc.BOUNDS_MIN,
     "bounds_max": wc.BOUNDS_MAX,
     "city_coords": {region: [x, y] for region, (x, y) in wc.CITY_COORDS.items()},
@@ -111,6 +113,17 @@ async def handle_get_state(request: web.Request) -> web.Response:
 
         owned = await mount_service.owned_mounts(db, character.id)
 
+        # Патч 108: живой мировой босс - метка на карте.
+        world_boss_mark = None
+        boss = await world_boss_service.active_boss(db)
+        if boss is not None:
+            boss_def = world_boss.boss_def(boss.boss_id)
+            world_boss_mark = {
+                "x": boss.x, "y": boss.y, "ring": boss.ring, "level": boss.level,
+                "name": boss_def.name if boss_def else "Мировой босс",
+                "hp_percent": round(100 * boss.hp / boss.max_hp) if boss.max_hp else 0,
+            }
+
         return web.json_response(
             {
                 "pos_x": character.pos_x, "pos_y": character.pos_y,
@@ -118,6 +131,7 @@ async def handle_get_state(request: web.Request) -> web.Response:
                 "foot_travel": foot_travel,
                 "mount_travel": mount_travel,
                 "quest_target": quest_target,
+                "world_boss": world_boss_mark,
                 "mounts": [
                     {
                         "mount_id": m.mount_id, "name": m.name, "rarity": m.rarity, "emoji": m.emoji,

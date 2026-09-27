@@ -10,6 +10,7 @@ import random
 
 from game.content_loader import FishDef, LakeDef, load_fish_defs, load_lakes
 from game.economy import fishing_config as fc
+from game.world import grid
 
 _fish_defs: dict[str, FishDef] | None = None
 _lakes_by_coords: dict[tuple[int, int], LakeDef] | None = None
@@ -47,22 +48,15 @@ def all_lakes() -> list[LakeDef]:
 
 # --- Клетка ------------------------------------------------------------------
 
-#: (dist_min, dist_max, тир) — те же границы, что world_config.ZONE_TABLE.
 #: Тир озера ОБЯЗАН совпадать с тиром своего кольца (проверяется тестом):
 #: иначе «сложность озера» и «сложность клетки» разъедутся, и правило PvP
-#: (мирные кольца I-II) начало бы противоречить сложности рыбы.
-RING_BOUNDS: list[tuple[int, int, int]] = [
-    (40, 50, 1), (25, 39, 2), (12, 24, 3), (3, 11, 4), (0, 2, 5),
-]
+#: (мирные кольца I-II) начало бы противоречить сложности рыбы. Границы колец -
+#: world_config.ZONE_TABLE, единственный их источник (патч 108).
 
 
 def ring_tier(x: int, y: int) -> int:
-    """Тир кольца клетки по расстоянию Чебышёва до Монолита."""
-    dist = max(abs(x), abs(y))
-    for lo, hi, tier in RING_BOUNDS:
-        if lo <= dist <= hi:
-            return tier
-    return RING_BOUNDS[-1][2]
+    """Тир кольца клетки: 1 - внешнее, 5 - центр."""
+    return grid.ring_tier(x, y)
 
 
 def lake_at(x: int, y: int) -> LakeDef | None:

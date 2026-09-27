@@ -39,7 +39,7 @@ async def test_full_creation_flow(db_session) -> None:
         10, 10, 25, 15, 25,
     )
     # позиция — родной город региона (🔥 Выжженный Предел)
-    assert (char.pos_x, char.pos_y) == (-50, -50)
+    assert (char.pos_x, char.pos_y) == (0, -30)
 
 
 async def test_resume_keeps_state(db_session) -> None:

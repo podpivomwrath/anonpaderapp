@@ -76,15 +76,11 @@ def _cell_is_free(x: int, y: int) -> bool:
 
 
 def pick_cell(ring: int, rng: random.Random) -> tuple[int, int]:
-    """Случайная клетка кольца: сначала расстояние до Монолита, потом точка на
-    этом «квадрате» (расстояние Чебышёва)."""
+    """Случайная свободная клетка кольца (патч 108: кольца - круги, поэтому
+    просто выбор из всех клеток кольца, а не точка на «квадрате»)."""
     lo, hi = wbc.RINGS[ring][1]
-    while True:
-        dist = rng.randint(lo, hi)
-        side = rng.randint(-dist, dist)
-        x, y = rng.choice([(side, dist), (side, -dist), (dist, side), (-dist, side)])
-        if _cell_is_free(x, y):
-            return x, y
+    cells = [c for c in grid.all_cells() if lo <= grid.monolith_distance(*c) <= hi and _cell_is_free(*c)]
+    return rng.choice(cells)
 
 
 def _stands_still(mob: CombatantState, session, rng) -> list:

@@ -12,27 +12,27 @@ def test_all_regions_have_four_types() -> None:
     assert by_region == {"ridge": 4, "woods": 4, "docks": 4, "scorched": 4}
 
 
-def test_region_by_quadrant() -> None:
+def test_region_by_compass_sector() -> None:
+    assert location_types.region_for(2, 20) == "ridge"
+    assert location_types.region_for(-20, 3) == "woods"
+    assert location_types.region_for(20, -3) == "docks"
+    assert location_types.region_for(-2, -20) == "scorched"
+    # на диагонали клетка уходит к северу/югу; центр - Кряж (тай-брейк)
     assert location_types.region_for(10, 10) == "ridge"
-    assert location_types.region_for(-10, 10) == "woods"
-    assert location_types.region_for(10, -10) == "docks"
     assert location_types.region_for(-10, -10) == "scorched"
-    # граничные случаи (ось) — детерминированный тай-брейк, но не падает
     assert location_types.region_for(0, 0) == "ridge"
-    assert location_types.region_for(0, -5) == "docks"
-    assert location_types.region_for(-5, 0) == "woods"
 
 
 def test_same_cell_always_same_type() -> None:
-    first = location_types.location_type_at(-49, 49)
-    second = location_types.location_type_at(-49, 49)
+    first = location_types.location_type_at(-25, 5)
+    second = location_types.location_type_at(-25, 5)
     assert first.id == second.id
 
 
 def test_type_matches_cell_region() -> None:
-    t = location_types.location_type_at(-30, 40)
+    t = location_types.location_type_at(-25, 5)
     assert t.region == "woods"
-    t2 = location_types.location_type_at(30, -40)
+    t2 = location_types.location_type_at(25, -5)
     assert t2.region == "docks"
 
 

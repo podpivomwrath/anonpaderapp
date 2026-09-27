@@ -12,13 +12,13 @@ import bot.handlers.world as world_handlers
 
 
 async def test_appraiser_rebuild_none_for_foreign_screen(db_session, character_at) -> None:
-    character = await character_at(50, 50)
+    character = await character_at(0, 30)
     character.screen = "elixir_shop"
     assert await appraiser_handlers.rebuild(db_session, character) is None
 
 
 async def test_appraiser_rebuild_covers_all_four_screens(db_session, character_at) -> None:
-    character = await character_at(50, 50)
+    character = await character_at(0, 30)
     for screen in ("appraiser", "appraiser_trophies", "appraiser_gear", "appraiser_gear_detail"):
         character.screen = screen
         result = await appraiser_handlers.rebuild(db_session, character)
@@ -29,7 +29,7 @@ async def test_appraiser_rebuild_covers_all_four_screens(db_session, character_a
 
 
 async def test_elixir_shop_rebuild_only_for_own_screen(db_session, character_at) -> None:
-    character = await character_at(50, 50)
+    character = await character_at(0, 30)
     assert await elixir_shop_handlers.rebuild(db_session, character) is None
 
     character.screen = "elixir_shop"
@@ -41,7 +41,7 @@ async def test_elixir_shop_rebuild_only_for_own_screen(db_session, character_at)
 
 
 async def test_inventory_rebuild_only_for_own_screen(db_session, character_at) -> None:
-    character = await character_at(50, 50)
+    character = await character_at(0, 30)
     assert await inventory_handlers.rebuild(db_session, character) is None
 
     character.screen = "inventory"
@@ -53,7 +53,7 @@ async def test_inventory_rebuild_only_for_own_screen(db_session, character_at) -
 
 
 async def test_world_screen_keyboard_dispatches_to_owning_module(db_session, character_at) -> None:
-    character = await character_at(50, 50)
+    character = await character_at(0, 30)
     assert await world_handlers._screen_keyboard(db_session, character) is None
 
     character.screen = "appraiser"
@@ -75,7 +75,7 @@ async def test_force_unstick_resets_screen_to_root(db_session, character_at, mon
 
     monkeypatch.setattr(combat_handlers, "_engine", _FakeEngine())
 
-    character = await character_at(50, 50)
+    character = await character_at(0, 30)
     character.screen = "appraiser_gear"
     await world_handlers.force_unstick(db_session, character, peer_id=999999)
     assert character.screen is None

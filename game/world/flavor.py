@@ -34,7 +34,7 @@ def travel_line(rng: random.Random) -> str:
 
 
 def world_edge_line(rng: random.Random) -> str:
-    """Патч 31, п.7: попытка шагнуть за границу карты (-50..50) — лорный
+    """Патч 31, п.7: попытка шагнуть за край мира — лорный
     отказ вместо тихого игнора, позиция игрока не меняется."""
     return rng.choice(_WORLD_EDGE["lines"])
 

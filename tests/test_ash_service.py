@@ -32,7 +32,7 @@ def test_roll_appears_respects_chance() -> None:
 
 
 async def test_collect_grants_xp_and_trophy(db_session, character_at) -> None:
-    character = await character_at(50, 50, level=10, experience=0)
+    character = await character_at(0, 28, level=10, experience=0)
     from sqlalchemy import select
     from models import CharacterStats
 
@@ -50,7 +50,7 @@ async def test_collect_item_only_when_rare_roll_hits(db_session, character_at) -
     from sqlalchemy import select
     from models import CharacterStats
 
-    character = await character_at(50, 50, level=10)
+    character = await character_at(0, 28, level=10)
     stats = await db_session.scalar(
         select(CharacterStats).where(CharacterStats.character_id == character.id)
     )
@@ -85,8 +85,8 @@ async def test_collect_xp_scales_by_zone_not_player_level(db_session, character_
     from game.world import grid
     from services import experience_service
 
-    far_ring = await character_at(50, 50, level=30, experience=0)  # dist 50 → зона 1-15
-    near_center = await character_at(2, 2, level=30, experience=0)  # dist 2 → зона 60-60
+    far_ring = await character_at(0, 28, level=30, experience=0)  # dist 28 → зона 1-15
+    near_center = await character_at(1, 0, level=30, experience=0)  # dist 1 → зона 60-60
     far_stats = await db_session.scalar(
         select(CharacterStats).where(CharacterStats.character_id == far_ring.id)
     )
@@ -98,6 +98,6 @@ async def test_collect_xp_scales_by_zone_not_player_level(db_session, character_
     near_result = await ash_service.collect(db_session, near_center, near_stats, NoCritRng())
 
     assert far_result.xp < near_result.xp
-    zone_level = grid.mob_level_at(50, 50, 30)
+    zone_level = grid.mob_level_at(0, 30, 30)
     assert zone_level == 15  # clamp(30, 1, 15)
     assert far_result.xp == experience_service.event_xp(zone_level, 30, ac.EVENT_XP_ASH)

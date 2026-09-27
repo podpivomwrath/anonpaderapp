@@ -253,7 +253,7 @@ async def overview_stats(db: AsyncSession) -> OverviewStats:
     for x, y in death_zone_rows:
         if x is None or y is None:
             continue
-        dist = grid.chebyshev_distance(x, y)
+        dist = grid.monolith_distance(x, y)
         lo, hi = grid.zone_level_range(dist)
         key = f"{lo}-{hi}"
         zone_counts[key] = zone_counts.get(key, 0) + 1

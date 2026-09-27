@@ -270,7 +270,7 @@ async def test_bag_capacity_blocks_catch_instead_of_dropping_fish(
     character.fishing_cast_at = now - timedelta(seconds=10)
     character.fishing_bite_at = now - timedelta(seconds=1)
 
-    lake = fishing.lake_at(1, -2)
+    lake = fishing.lake_at(1, 0)
     result = await fishing_service.strike(
         db_session, character, lake, random.Random(0), now=now
     )
@@ -296,7 +296,7 @@ async def test_full_cycle_cast_strike_catch_sell(db_session, make_character) -> 
 
     character = await make_character()
     character.fishing_level = 60  # обрыв на первом кольце близок к минимуму
-    lake = fishing.lake_at(41, -41)
+    lake = fishing.lake_at(25, 0)
     assert lake is not None and lake.tier == 1
 
     caught = 0
@@ -335,7 +335,7 @@ async def test_striking_before_the_bite_yields_nothing(db_session, make_characte
     from datetime import datetime, timezone
 
     character = await make_character()
-    lake = fishing.lake_at(41, -41)
+    lake = fishing.lake_at(25, 0)
     now = datetime.now(timezone.utc)
     rng = random.Random(5)
     fishing_service.start_cast(character, lake, rng, now=now)
@@ -354,7 +354,7 @@ async def test_missing_the_window_reads_as_missed_not_as_a_break(
     from datetime import datetime, timedelta, timezone
 
     character = await make_character()
-    lake = fishing.lake_at(41, -41)
+    lake = fishing.lake_at(25, 0)
     now = datetime.now(timezone.utc)
     rng = random.Random(11)
     fishing_service.start_cast(character, lake, rng, now=now)
@@ -399,7 +399,7 @@ async def test_stale_cast_does_not_lock_the_rod_forever(db_session, make_charact
     from datetime import datetime, timedelta, timezone
 
     character = await make_character()
-    lake = fishing.lake_at(41, -41)
+    lake = fishing.lake_at(25, 0)
     now = datetime.now(timezone.utc)
     fishing_service.start_cast(character, lake, random.Random(1), now=now)
 

@@ -17,6 +17,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from game.content_loader import MountDef, load_mounts
 from game.economy import mount_config as mc
+from game.world import grid
 from models import Character, CharacterMount, MountTravel
 
 _mounts: dict[str, MountDef] | None = None
@@ -123,7 +124,7 @@ async def start_travel(
     rng: random.Random, now: datetime | None = None,
 ) -> MountTravel:
     now = now or datetime.now(timezone.utc)
-    cells = max(abs(to_x - character.pos_x), abs(to_y - character.pos_y))
+    cells = grid.cells_between(character.pos_x, character.pos_y, to_x, to_y)
     seconds = total_travel_seconds(mount_id, cells)
     arrives_at = now + timedelta(seconds=seconds)
 

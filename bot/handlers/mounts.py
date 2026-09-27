@@ -136,7 +136,7 @@ async def open_mounts(message: Message) -> None:
     await message.answer(
         f"{mount.emoji} {mount.name} готов в путь.\n"
         f"Ты в ({pos_x}; {pos_y}). Куда направиться? Пришли координаты в формате X:Y "
-        f"(в пределах {wc.BOUNDS_MIN}..{wc.BOUNDS_MAX} по обеим осям, например 12:-30)."
+        f"(не дальше {wc.WORLD_RADIUS} клеток от Монолита, например 12:-20)."
     )
 
 
@@ -150,7 +150,7 @@ async def coord_input(message: Message) -> None:
         return
     match = _COORD_RE.match(message.text or "")
     if match is None:
-        await message.answer("Не понял координаты. Формат: X:Y (например 12:-30).")
+        await message.answer("Не понял координаты. Формат: X:Y (например 12:-20).")
         return
     to_x, to_y = int(match.group(1)), int(match.group(2))
 
@@ -167,7 +167,7 @@ async def coord_input(message: Message) -> None:
             return
         if not grid.in_bounds(to_x, to_y):
             await message.answer(
-                f"Эти координаты за пределами обжитых земель ({wc.BOUNDS_MIN}..{wc.BOUNDS_MAX}). "
+                f"Эти координаты за краем мира: он кончается в {wc.WORLD_RADIUS} клетках от Монолита. "
                 "Попробуй ещё раз."
             )
             return
@@ -195,7 +195,7 @@ async def start_travel_and_notify(
     Коммит делает вызывающий: у карты и чата разные транзакционные границы.
     """
     await mount_service.start_travel(db, character, mount_id, to_x, to_y, _rng, now)
-    cells = max(abs(to_x - character.pos_x), abs(to_y - character.pos_y))
+    cells = grid.cells_between(character.pos_x, character.pos_y, to_x, to_y)
     seconds = mount_service.total_travel_seconds(mount_id, cells)
     await db.commit()
     await notify_travel_started(
@@ -354,7 +354,7 @@ async def scan() -> None:
             stats = await _stats(db, character.id)
             gear_bonus = await item_service.compute_gear_bonus(db, character.id)
             buff_modifiers = await preset_service.resolve_active_modifiers(db, character)
-            dist = grid.chebyshev_distance(travel.to_x, travel.to_y)
+            dist = grid.monolith_distance(travel.to_x, travel.to_y)
             # Патч 32, баг 4: регион — по клетке нападения (куда едет маунт),
             # не по домашнему региону игрока (см. bot/handlers/combat.py).
             cell_region = region_for(travel.to_x, travel.to_y)

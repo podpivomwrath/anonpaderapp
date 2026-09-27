@@ -146,8 +146,9 @@ async def test_state_returns_position_and_catalog(client, session_factory) -> No
     assert data["mount_travel"] is None
     assert data["mounts"] == []
     catalog = data["catalog"]
-    assert catalog["bounds_min"] == -50 and catalog["bounds_max"] == 50
-    assert catalog["city_coords"]["ridge"] == [50, 50]
+    assert catalog["world_radius"] == 30
+    assert catalog["bounds_min"] == -30 and catalog["bounds_max"] == 30
+    assert catalog["city_coords"]["ridge"] == [0, 30]
     assert len(catalog["zone_table"]) == 5
     assert set(catalog["location_types"]) == {"ridge", "woods", "docks", "scorched"}
     assert len(catalog["location_types"]["ridge"]) == 4
@@ -304,3 +305,27 @@ def test_blocked_reason_none_when_free() -> None:
 
     character = Character(user_id=1, name="x", base_class="warrior")
     assert _blocked_reason(character, peer_id=1) is None
+
+
+async def test_state_marks_the_live_world_boss(client, session_factory) -> None:
+    """Патч 108: живой мировой босс приходит меткой в состоянии карты."""
+    from models import WorldBoss
+
+    await _make_player(session_factory)
+    now = datetime.now(timezone.utc)
+    async with session_factory() as db:
+        db.add(WorldBoss(
+            boss_id="stitched_giant", ring=3, level=45, x=9, y=-12, max_hp=1000, hp=250,
+            status="active", spawned_at=now, expires_at=now + timedelta(hours=3),
+        ))
+        await db.commit()
+    resp = await client.get("/api/miniapp/map/state", params=_signed_query(PLAYER_VK_ID))
+    mark = (await resp.json())["world_boss"]
+    assert (mark["x"], mark["y"], mark["level"], mark["hp_percent"]) == (9, -12, 45, 25)
+    assert mark["name"]
+
+
+async def test_state_has_no_boss_mark_without_a_boss(client, session_factory) -> None:
+    await _make_player(session_factory)
+    resp = await client.get("/api/miniapp/map/state", params=_signed_query(PLAYER_VK_ID))
+    assert (await resp.json())["world_boss"] is None

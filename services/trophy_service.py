@@ -62,8 +62,8 @@ async def _grant(db: AsyncSession, character_id: int, drop: dict[str, int]) -> d
 async def grant_from_kill(
     db: AsyncSession, character: Character, rng: random.Random
 ) -> dict[str, int]:
-    """Дроп с убитого моба: число бросков растёт к центру карты (dist Чебышёва)."""
-    dist = grid.chebyshev_distance(character.pos_x, character.pos_y)
+    """Дроп с убитого моба: число бросков растёт к центру карты (кольцо клетки)."""
+    dist = grid.monolith_distance(character.pos_x, character.pos_y)
     rolls = loot.rolls_for_dist(dist)
     drop = loot.roll_drop(rng, rolls)
     return await _grant(db, character.id, drop)

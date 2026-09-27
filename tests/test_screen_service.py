@@ -25,7 +25,7 @@ def test_parent_of_unknown_screen_is_root() -> None:
 
 
 async def test_set_screen_persists_on_character(db_session, character_at) -> None:
-    character = await character_at(50, 50)
+    character = await character_at(0, 30)
     assert character.screen is None
 
     await screen_service.set_screen(db_session, character, "appraiser")

@@ -68,7 +68,7 @@ def test_boss_stands_on_a_plain_cell_of_its_ring() -> None:
     for ring, (_level, (lo, hi)) in wbc.RINGS.items():
         for _ in range(300):
             x, y = world_boss.pick_cell(ring, rng)
-            assert lo <= grid.chebyshev_distance(x, y) <= hi
+            assert lo <= grid.monolith_distance(x, y) <= hi
             assert grid.city_region_at(x, y) is None
             assert fishing.lake_at(x, y) is None and mining.mine_at(x, y) is None
 

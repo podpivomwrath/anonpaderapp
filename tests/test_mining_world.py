@@ -11,7 +11,7 @@ from bot.keyboards import mining as kb
 from game.economy import mining
 from game.world import events as event_pool
 
-MINE_XY = (46, 44)
+MINE_XY = (3, 27)
 PLAIN_XY = (45, 45)
 
 

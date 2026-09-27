@@ -217,7 +217,7 @@ async def start_encounter(
         # здесь ошибочно передавался character.region (домашний регион), из-за
         # чего в чужой четверти карты всегда спавнились мобы родного региона
         # игрока (кроме центра, там пул "any" и так общий).
-        dist = grid.chebyshev_distance(character.pos_x, character.pos_y)
+        dist = grid.monolith_distance(character.pos_x, character.pos_y)
         cell_region = region_for(character.pos_x, character.pos_y)
         encounter = encounters.spawn_mob(MOB_ID, cell_region, character.level, dist, _rng)
     state = CombatSessionState(session_id=peer_id, mode=CombatMode.PVE)
@@ -413,7 +413,7 @@ async def on_battle_finished(session_id: int, result: TickResult) -> None:
             message="Один повержен - но погоня не отступает. Ещё один бросается наперерез.",
             random_id=0,
         )
-        dist = grid.chebyshev_distance(character.pos_x, character.pos_y)
+        dist = grid.monolith_distance(character.pos_x, character.pos_y)
         cell_region = region_for(character.pos_x, character.pos_y)
         next_encounter = encounters.spawn_mob(MOB_ID, cell_region, character.level, dist, _rng)
         await start_story_encounter(

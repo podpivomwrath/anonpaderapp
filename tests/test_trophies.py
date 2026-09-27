@@ -17,15 +17,15 @@ async def _seed_trophy(db_session, character_id: int, trophy_id: str, count: int
 
 
 def test_rolls_for_dist_matches_bands() -> None:
-    assert loot.rolls_for_dist(50) == 1
-    assert loot.rolls_for_dist(40) == 1
-    assert loot.rolls_for_dist(39) == 2
-    assert loot.rolls_for_dist(25) == 2
-    assert loot.rolls_for_dist(24) == 3
-    assert loot.rolls_for_dist(12) == 3
-    assert loot.rolls_for_dist(11) == 4
-    assert loot.rolls_for_dist(3) == 4
-    assert loot.rolls_for_dist(2) == 5
+    assert loot.rolls_for_dist(30) == 1
+    assert loot.rolls_for_dist(24) == 1
+    assert loot.rolls_for_dist(23) == 2
+    assert loot.rolls_for_dist(15) == 2
+    assert loot.rolls_for_dist(14) == 3
+    assert loot.rolls_for_dist(7) == 3
+    assert loot.rolls_for_dist(6) == 4
+    assert loot.rolls_for_dist(2) == 4
+    assert loot.rolls_for_dist(1) == 5
     assert loot.rolls_for_dist(0) == 5
 
 
@@ -146,7 +146,7 @@ async def test_grant_from_kill_scales_rolls_by_zone(db_session, character_at) ->
 
 
 async def test_grant_from_kill_persists_and_accumulates(db_session, character_at) -> None:
-    character = await character_at(50, 50)  # dist=50 -> 1 бросок
+    character = await character_at(0, 30)  # dist=30 -> 1 бросок
     await trophy_service.grant_from_kill(db_session, character, AlwaysAshRng())
     await trophy_service.grant_from_kill(db_session, character, AlwaysAshRng())
     stock = await trophy_service.get_stock(db_session, character.id)
@@ -181,7 +181,7 @@ async def test_grant_nothing_when_rng_never_hits(db_session, character_at) -> No
 
 
 async def test_get_stock_ordered_cheap_to_expensive(db_session, character_at) -> None:
-    character = await character_at(50, 50)
+    character = await character_at(0, 30)
     await _seed_trophy(db_session, character.id, "blood_shard", 1)
     await _seed_trophy(db_session, character.id, "ash_dust", 3)
     stock = await trophy_service.get_stock(db_session, character.id)
@@ -189,7 +189,7 @@ async def test_get_stock_ordered_cheap_to_expensive(db_session, character_at) ->
 
 
 async def test_sell_all_credits_gold_and_clears_stock(db_session, character_at) -> None:
-    character = await character_at(50, 50, farm=0)
+    character = await character_at(0, 30, farm=0)
     await _seed_trophy(db_session, character.id, "ash_dust", 3)    # 3*2=6
     await _seed_trophy(db_session, character.id, "taint_clot", 2)  # 2*15=30
 
@@ -203,7 +203,7 @@ async def test_sell_all_credits_gold_and_clears_stock(db_session, character_at) 
 
 async def test_sell_all_applies_price_multiplier(db_session, character_at) -> None:
     """Патч 26: наценка чужака у скупщика в чужом городе."""
-    character = await character_at(50, 50, farm=0)
+    character = await character_at(0, 30, farm=0)
     await _seed_trophy(db_session, character.id, "ash_dust", 3)     # 3*2=6
     await _seed_trophy(db_session, character.id, "taint_clot", 2)   # 2*15=30
 
@@ -212,12 +212,12 @@ async def test_sell_all_applies_price_multiplier(db_session, character_at) -> No
 
 
 async def test_sell_all_empty_stock_returns_zero(db_session, character_at) -> None:
-    character = await character_at(50, 50)
+    character = await character_at(0, 30)
     assert await trophy_service.sell_all(db_session, character) == 0
 
 
 async def test_sell_one_only_sells_that_grade(db_session, character_at) -> None:
-    character = await character_at(50, 50, farm=0)
+    character = await character_at(0, 30, farm=0)
     await _seed_trophy(db_session, character.id, "ash_dust", 3)
     await _seed_trophy(db_session, character.id, "blood_shard", 1)
 
@@ -229,7 +229,7 @@ async def test_sell_one_only_sells_that_grade(db_session, character_at) -> None:
 
 
 async def test_sell_one_applies_price_multiplier(db_session, character_at) -> None:
-    character = await character_at(50, 50, farm=0)
+    character = await character_at(0, 30, farm=0)
     await _seed_trophy(db_session, character.id, "ash_dust", 3)  # 3*2=6
 
     gold = await trophy_service.sell_one(db_session, character, "ash_dust", price_multiplier=0.7)
@@ -237,7 +237,7 @@ async def test_sell_one_applies_price_multiplier(db_session, character_at) -> No
 
 
 async def test_sell_one_nothing_to_sell_returns_zero(db_session, character_at) -> None:
-    character = await character_at(50, 50)
+    character = await character_at(0, 30)
     assert await trophy_service.sell_one(db_session, character, "monolith_tear") == 0
 
 

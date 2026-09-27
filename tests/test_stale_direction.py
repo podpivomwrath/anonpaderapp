@@ -1,6 +1,6 @@
 """Устаревшая стрелка карты получает ответ, а не тишину.
 
-Живой прогон на pupsik: с клетки (50;49) нажатие «⬆️» (вверх там уже
+Живой прогон на pupsik: с клетки (0;29) (тогда - (50;49)) нажатие «⬆️» (вверх там уже
 подпись города) уходило в пустоту - обработчик молча выходил. Для игрока со
 старой клавиатурой это неотличимо от мёртвого бота.
 """
@@ -38,7 +38,7 @@ async def factory(monkeypatch):
         db.add(user)
         await db.flush()
         character = Character(user_id=user.id, name="Путник", base_class="warrior", level=10,
-                              region="ridge", pos_x=50, pos_y=49,
+                              region="ridge", pos_x=0, pos_y=29,
                               last_active_at=datetime.now(timezone.utc))
         db.add(character)
         await db.flush()

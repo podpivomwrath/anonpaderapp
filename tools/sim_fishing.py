@@ -62,8 +62,7 @@ def mob_gold_per_hour(ring_tier: int) -> float:
         chance * next(t["sell_price"] for t in _TROPHIES if t["id"] == trophy_id)
         for trophy_id, chance in lc.TROPHY_ROLL_CHANCES.items()
     )
-    dist = {1: 45, 2: 32, 3: 18, 4: 7, 5: 1}[ring_tier]
-    rolls = next(r for lo, hi, r in lc.ROLLS_BY_DIST if lo <= dist <= hi)
+    rolls = lc.ROLLS_BY_RING[ring_tier]
     return per_roll * rolls * (3600.0 / MOB_CYCLE_SECONDS)
 
 

@@ -109,7 +109,7 @@ def test_spawn_named_enemy_image_defaults_to_none() -> None:
 def test_spawn_mob_returns_encounter_with_flavor() -> None:
     rng = random.Random(1)
     for region in ("ridge", "woods", "docks", "scorched"):
-        enc = encounters.spawn_mob(2, region, player_level=5, dist=45, rng=rng)
+        enc = encounters.spawn_mob(2, region, player_level=5, dist=27, rng=rng)
         assert enc.combatant.kind == "mob"
         assert enc.combatant.side == 1
         assert enc.combatant.tier == "grey"  # уровни 1-15 → серый тир
@@ -119,9 +119,9 @@ def test_spawn_mob_returns_encounter_with_flavor() -> None:
 
 def test_spawn_mob_level_matches_clamped_player_level() -> None:
     rng = random.Random(1)
-    enc = encounters.spawn_mob(2, "ridge", player_level=8, dist=45, rng=rng)
+    enc = encounters.spawn_mob(2, "ridge", player_level=8, dist=27, rng=rng)
     assert enc.combatant.level == 8  # внутри зоны 1-15
-    enc_high = encounters.spawn_mob(2, "ridge", player_level=99, dist=45, rng=rng)
+    enc_high = encounters.spawn_mob(2, "ridge", player_level=99, dist=27, rng=rng)
     assert enc_high.combatant.level == 15  # потолок зоны (dist 45 => кольцо 1-15)
 
 
@@ -129,18 +129,18 @@ def test_spawn_mob_picks_from_region_pool() -> None:
     rng = random.Random(42)
     ring = load_starter_ring()
     ridge_names = {m.name for m in ring["ridge"]}
-    got = {encounters.spawn_mob(2, "ridge", 5, dist=45, rng=rng).combatant.name for _ in range(30)}
+    got = {encounters.spawn_mob(2, "ridge", 5, dist=27, rng=rng).combatant.name for _ in range(30)}
     assert got <= ridge_names
 
 
 def test_spawn_mob_picks_from_current_ring_not_home_region_pool() -> None:
-    """dist=30 -> кольцо 16-30 (ZONE_TABLE: dist 25-39), патч 15: моб приходит
+    """dist=20 -> кольцо 16-30 (ZONE_TABLE: dist 25-39), патч 15: моб приходит
     из соответствующего файла бестиария, даже если игрок 5 уровня (уровень
     клампится ВВЕРХ до 16)."""
     rng = random.Random(7)
     bestiary = load_bestiary()
     ring16_30_names = {m.name for m in bestiary["ridge"] if (m.zone_min, m.zone_max) == (16, 30)}
-    enc = encounters.spawn_mob(2, "ridge", player_level=5, dist=30, rng=rng)
+    enc = encounters.spawn_mob(2, "ridge", player_level=5, dist=20, rng=rng)
     assert enc.combatant.name in ring16_30_names
     assert enc.combatant.level == 16  # clamp вверх — зашёл рано
 
@@ -149,7 +149,7 @@ def test_spawn_mob_low_level_player_in_high_ring_clamps_to_ring_floor() -> None:
     """Патч 15, техзаметки: игрок 5 уровня, зашедший в кольцо 46-60 (dist 3-11),
     должен встретить моба 46 уровня (нижняя граница), а не своего уровня."""
     rng = random.Random(11)
-    enc = encounters.spawn_mob(2, "ridge", player_level=5, dist=7, rng=rng)
+    enc = encounters.spawn_mob(2, "ridge", player_level=5, dist=4, rng=rng)
     assert enc.combatant.level == 46
 
 
@@ -160,7 +160,7 @@ def test_spawn_mob_uses_content_primary_stat() -> None:
     ring = load_starter_ring()
     by_id = {m.id: m for mobs in ring.values() for m in mobs}
     for _ in range(20):
-        enc = encounters.spawn_mob(2, "ridge", player_level=5, dist=45, rng=rng)
+        enc = encounters.spawn_mob(2, "ridge", player_level=5, dist=27, rng=rng)
         mob_def = next(m for m in by_id.values() if m.name == enc.combatant.name)
         assert enc.combatant.primary_stat == mob_def.primary_stat
 
@@ -174,7 +174,7 @@ def test_spawn_mob_applies_damage_multiplier_to_primary_stat() -> None:
     from game.combat import balance_config as bc
 
     rng = random.Random(1)
-    enc = encounters.spawn_mob(2, "ridge", player_level=8, dist=45, rng=rng)
+    enc = encounters.spawn_mob(2, "ridge", player_level=8, dist=27, rng=rng)
     field = _STAT_FIELD[enc.combatant.primary_stat]
     raw = encounters.balanced_mob_stats(8, enc.combatant.primary_stat)
     expected = round(getattr(raw, field) * bc.MOB_DAMAGE_MULTIPLIER * 1.0)
@@ -187,7 +187,7 @@ def test_spawn_mob_applies_hp_multiplier_to_vitality() -> None:
     from game.combat import balance_config as bc
 
     rng = random.Random(1)
-    enc = encounters.spawn_mob(2, "ridge", player_level=8, dist=45, rng=rng)
+    enc = encounters.spawn_mob(2, "ridge", player_level=8, dist=27, rng=rng)
     raw = encounters.balanced_mob_stats(8, enc.combatant.primary_stat)
     expected = round(raw.vitality * bc.MOB_HP_MULTIPLIER * 1.0)
     assert enc.combatant.stats.vitality == expected
@@ -199,7 +199,7 @@ def test_spawn_mob_ring_multiplier_is_halved_for_damage() -> None:
     from game.combat import balance_config as bc
 
     rng = random.Random(5)
-    enc = encounters.spawn_mob(2, "ridge", player_level=20, dist=30, rng=rng)  # кольцо 16-30
+    enc = encounters.spawn_mob(2, "ridge", player_level=20, dist=20, rng=rng)  # кольцо 16-30
     field = _STAT_FIELD[enc.combatant.primary_stat]
     raw = encounters.balanced_mob_stats(enc.combatant.level, enc.combatant.primary_stat)
 

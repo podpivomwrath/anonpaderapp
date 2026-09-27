@@ -129,7 +129,7 @@ async def test_travel_combat_active_shows_target_marker(db_session, character_at
     await _set_progress(db_session, character, "ridge_1_2", act=1, status="active")
     stats = await db_session.get(CharacterStats, character.id)
     result = await story_service.visit_mentor(db_session, character, stats)
-    assert "(40;46)" in result.text
+    assert "(-10;25)" in result.text
     assert "Осыпающиеся террасы" in result.text
 
     # патч 21: показанный (не резолвящий) визит помечает шаг увиденным
@@ -169,7 +169,7 @@ async def test_no_level_gate_travel_combat_available_regardless_of_level(
     await _set_progress(db_session, character, "ridge_2_1", act=2, status="active")
     stats = await db_session.get(CharacterStats, character.id)
     result = await story_service.visit_mentor(db_session, character, stats)
-    assert "(30;35)" in result.text
+    assert "(-7;19)" in result.text
     assert "Забытый редут" in result.text
 
 
@@ -189,7 +189,7 @@ async def test_region_completed_after_last_quest(db_session, make_character) -> 
 
 
 async def test_zone_trigger_fires_within_radius(db_session, character_at) -> None:
-    character = await character_at(41, 45, region="ridge", level=20)  # dist=1 до (40;46)
+    character = await character_at(-9, 24, region="ridge", level=20)  # dist=1 до (-10;25)
     await _set_progress(db_session, character, "ridge_1_2", act=1, status="active")
     quest = await story_service.check_zone_trigger(db_session, character)
     assert quest is not None
@@ -197,7 +197,7 @@ async def test_zone_trigger_fires_within_radius(db_session, character_at) -> Non
 
 
 async def test_zone_trigger_respects_radius_boundary(db_session, character_at) -> None:
-    character = await character_at(40 + sc.STORY_TRIGGER_RADIUS, 46, region="ridge", level=20)
+    character = await character_at(-10 + sc.STORY_TRIGGER_RADIUS, 25, region="ridge", level=20)
     await _set_progress(db_session, character, "ridge_1_2", act=1, status="active")
     assert await story_service.check_zone_trigger(db_session, character) is not None
 
@@ -213,7 +213,7 @@ async def test_zone_trigger_none_far_away(db_session, character_at) -> None:
 
 async def test_zone_trigger_ignores_ready_status(db_session, character_at) -> None:
     """Цель уже достигнута (ждём наставника) — повторный вход в зону не триггерит снова."""
-    character = await character_at(40, 46, region="ridge", level=20)
+    character = await character_at(-10, 25, region="ridge", level=20)
     await _set_progress(db_session, character, "ridge_1_2", act=1, status="ready")
     assert await story_service.check_zone_trigger(db_session, character) is None
 
@@ -316,6 +316,8 @@ async def test_quest_reminder_ready_travel_combat(db_session, make_character) ->
         (0, 0, -5, 5, "на северо-запад"),
         (0, 0, 5, -5, "на юго-восток"),
         (0, 0, -5, -5, "на юго-запад"),
+        (0, 0, 1, 10, "на север"),
+        (0, 0, 10, -2, "на восток"),
         (3, 3, 3, 3, "ты уже на месте"),
     ],
 )
@@ -378,7 +380,7 @@ async def test_quest_summary_line_travel_combat_active(db_session, character_at)
     character = await character_at(0, 0, region="ridge", level=20)
     await _set_progress(db_session, character, "ridge_1_2", act=1, status="active")
     line = await story_service.quest_summary_line(db_session, character)
-    assert line == "📜 Пропавший патруль → (40; 46) · на северо-восток"
+    assert line == "📜 Пропавший патруль → (-10; 25) · на север"
 
 
 async def test_quest_summary_line_travel_combat_ready(db_session, make_character) -> None:

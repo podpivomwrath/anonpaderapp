@@ -618,7 +618,7 @@ async def explore(message: Message) -> None:
                 # исследовании (без событий/обрывков Песни/пепла, патч 51, ч.3).
                 group_explore_service.clear(snapshot.id)
                 region = region_for(character.pos_x, character.pos_y)
-                dist = grid.chebyshev_distance(character.pos_x, character.pos_y)
+                dist = grid.monolith_distance(character.pos_x, character.pos_y)
                 await group_combat_handlers.start_ready_group(
                     db, snapshot.id, cohort, region, dist, _rng,
                 )
@@ -1113,7 +1113,7 @@ async def move(message: Message) -> None:
             return
         dx, dy = direction
         if not grid.in_bounds(character.pos_x + dx, character.pos_y + dy):
-            # Патч 31, п.7: за границей карты (-50..50) — лорный отказ вместо
+            # Патч 31, п.7: за краем мира — лорный отказ вместо
             # движения, позиция и клавиатура не меняются.
             has_mount = await mount_service.has_any_mount(db, character.id)
             await message.answer(

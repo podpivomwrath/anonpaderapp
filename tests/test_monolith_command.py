@@ -62,4 +62,4 @@ def test_command_and_button_share_one_path() -> None:
 
     body = inspect.getsource(raid_handlers._open_raid_list)
     assert "blocked_reason" in body
-    assert "chebyshev_distance" in body
+    assert "monolith_distance" in body

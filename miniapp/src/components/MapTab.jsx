@@ -1,14 +1,27 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Div, Spinner, Placeholder, Button, IconButton } from '@vkontakte/vkui';
 import { getMapState, sendMountFromMap } from '../api.js';
+import worldMap from '../assets/world-map-3072.webp';
 import {
-  cellColor, cellInfo, chebyshevDistance, clamp, screenToWorld, worldToScreen,
+  MAP_CENTER, cellInfo, cellSizeAt, cellToMap, cellsBetween, clamp, mapToCell, monolithDistance,
+  ringBorders,
 } from '../mapCatalog.js';
 
-const MIN_CELL_PX = 8;
-const MAX_CELL_PX = 40;
-const DEFAULT_CELL_PX = 20;
-const DRAG_THRESHOLD_PX = 4;
+/**
+ * Карта мира (патч 108): нарисованная карта, клетки поверх.
+ *
+ * Камера - точка картинки в центре окна (cu, cv - доли ширины картинки) и
+ * масштаб scale - сколько пикселей экрана занимает вся картинка по ширине.
+ * Клетки не рисуются все сразу: сетка проступает только при приближении, а
+ * клетку определяет нажатие (mapToCell). Метки - обычные элементы поверх,
+ * их размер не зависит от зума.
+ */
+
+const DRAG_THRESHOLD_PX = 5;
+const MAX_SCALE = 4400;          // клетка ~64 px
+const DEFAULT_CELL_PX = 26;      // стартовый зум: клетка ~26 px
+const GRID_FROM_CELL_PX = 20;    // сетка видна с этого размера клетки
+const CELL_K = 0.0146;           // средний размер клетки на картинке (доля ширины)
 
 const ERROR_MESSAGES = {
   dead: 'Сначала очнись.',
@@ -18,11 +31,19 @@ const ERROR_MESSAGES = {
   mining: 'Ты в забое - сначала закончи или брось добычу.',
   traveling_on_foot: 'Ты уже в пути пешком.',
   already_on_mount: 'Ты уже в пути на маунте.',
-  out_of_bounds: 'Эти координаты за пределами обжитых земель.',
+  out_of_bounds: 'Это за краем мира.',
   already_there: 'Ты уже здесь.',
   mount_not_owned: 'Этого маунта у тебя нет.',
   bad_request: 'Что-то пошло не так.',
 };
+
+function cellsWord(n) {
+  const mod10 = n % 10;
+  const mod100 = n % 100;
+  if (mod10 === 1 && mod100 !== 11) return 'клетка';
+  if (mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14)) return 'клетки';
+  return 'клеток';
+}
 
 function formatSeconds(seconds) {
   if (seconds >= 60) return `~${(seconds / 60).toFixed(1)} мин.`;
@@ -32,13 +53,13 @@ function formatSeconds(seconds) {
 export default function MapTab() {
   const containerRef = useRef(null);
   const [size, setSize] = useState({ width: 360, height: 420 });
-  const [camera, setCamera] = useState(null);
-  const [cellPx, setCellPx] = useState(DEFAULT_CELL_PX);
+  const [view, setView] = useState(null); // {cu, cv, scale}
   const [mapState, setMapState] = useState(null);
   const [status, setStatus] = useState('loading');
-  const [hovered, setHovered] = useState(null); // {x,y, screenX, screenY} - десктоп-хавер
-  const [selected, setSelected] = useState(null); // {x,y} - открытая карточка (клик/тап)
-  const [sendFlow, setSendFlow] = useState(null); // {step:'pick'|'confirm', mount}
+  const [imageReady, setImageReady] = useState(false);
+  const [hovered, setHovered] = useState(null); // {x, y, sx, sy}
+  const [selected, setSelected] = useState(null); // {x, y}
+  const [sendFlow, setSendFlow] = useState(null); // {step: 'pick'|'confirm', mount}
   const [banner, setBanner] = useState(null);
 
   const pointers = useRef(new Map());
@@ -51,25 +72,20 @@ export default function MapTab() {
       .then((data) => {
         setMapState(data);
         setStatus('ready');
-        setCamera((prev) => prev ?? { cx: data.pos_x, cy: data.pos_y });
       })
       .catch(() => setStatus('error'));
   }, []);
 
   useEffect(() => { load(); }, [load]);
 
-  // Живой опрос ПОЗИЦИИ/путешествия - не клеток (см. mapCatalog.js).
+  // Живой опрос позиции/пути/босса - не каталога.
   useEffect(() => {
     const id = setInterval(load, 5000);
     return () => clearInterval(id);
   }, [load]);
 
-  // Оба эффекта завязаны на status: контейнер .map-viewport рендерится ТОЛЬКО
-  // в ветке status==='ready' (при 'loading' - ранний возврат со спиннером),
-  // поэтому эффект с пустыми deps срабатывает СЛИШКОМ РАНО (containerRef.current
-  // ещё null) и больше никогда не перезапускается - size навсегда остаётся
-  // дефолтным. Замечено при тестировании: клик резолвился в клетку с уходом
-  // на десятки клеток от ожидаемой.
+  // Контейнер появляется только в ветке ready - поэтому эффекты завязаны на
+  // status (иначе мерили бы null и навсегда остались бы с размером по умолчанию).
   useLayoutEffect(() => {
     const el = containerRef.current;
     if (!el) return;
@@ -79,7 +95,7 @@ export default function MapTab() {
 
   useEffect(() => {
     const el = containerRef.current;
-    if (!el || typeof ResizeObserver === 'undefined') return;
+    if (!el || typeof ResizeObserver === 'undefined') return undefined;
     const observer = new ResizeObserver((entries) => {
       const { width, height } = entries[0].contentRect;
       if (width > 0 && height > 0) setSize({ width, height });
@@ -88,139 +104,197 @@ export default function MapTab() {
     return () => observer.disconnect();
   }, [status]);
 
+  // Весь мир (~0.92 ширины картинки) целиком влезает в окно - дальше
+  // отдалять незачем.
+  const minScale = Math.min(size.width, size.height) / 0.96;
+  const clampScale = useCallback((s) => clamp(s, minScale, MAX_SCALE), [minScale]);
+  // Камеру не уводим за край мира: центр окна может отойти от Монолита
+  // ровно настолько, чтобы край мира доходил до края окна. На полном
+  // отдалении это ноль - карта стоит по центру.
+  const clampView = useCallback((v) => {
+    const reachU = Math.max(0, 0.47 - size.width / 2 / v.scale);
+    const reachV = Math.max(0, 0.47 - size.height / 2 / v.scale);
+    return {
+      scale: v.scale,
+      cu: clamp(v.cu, MAP_CENTER.u - reachU, MAP_CENTER.u + reachU),
+      cv: clamp(v.cv, MAP_CENTER.v - reachV, MAP_CENTER.v + reachV),
+    };
+  }, [size]);
+
+  // Стартовая камера - на персонаже, клетка ~DEFAULT_CELL_PX.
+  useEffect(() => {
+    if (!mapState || view) return;
+    const p = cellToMap(mapState.pos_x, mapState.pos_y);
+    setView(clampView({ cu: p.u, cv: p.v, scale: clampScale(DEFAULT_CELL_PX / CELL_K) }));
+  }, [mapState, view, clampScale, clampView]);
+
   const catalog = mapState?.catalog;
-  const boundsMin = catalog?.bounds_min ?? -50;
-  const boundsMax = catalog?.bounds_max ?? 50;
-
-  // Патч 58: индекс озёр по «x:y». Каталог статичен и приезжает один раз,
-  // поэтому индекс строится один раз, а не перебором 27 озёр на каждую из
-  // сотен видимых клеток при каждом кадре перетаскивания карты.
-  const lakesByCell = useMemo(() => {
-    const index = new Map();
-    for (const lake of catalog?.lakes || []) index.set(`${lake.x}:${lake.y}`, lake);
-    return index;
-  }, [catalog]);
-
-  // Патч 59: рудники. Координаты статичны, а запас руды приходит отдельно и
-  // меняется постоянно — поэтому он берётся не из каталога, а из состояния.
-  const minesByCell = useMemo(() => {
-    const index = new Map();
-    for (const mine of catalog?.mines || []) index.set(`${mine.x}:${mine.y}`, mine);
-    return index;
-  }, [catalog]);
-
-  const visibleCells = useMemo(() => {
-    if (!camera || !catalog) return [];
-    const halfW = size.width / 2 / cellPx;
-    const halfH = size.height / 2 / cellPx;
-    const x0 = clamp(Math.floor(camera.cx - halfW) - 1, boundsMin, boundsMax);
-    const x1 = clamp(Math.ceil(camera.cx + halfW) + 1, boundsMin, boundsMax);
-    const y0 = clamp(Math.floor(camera.cy - halfH) - 1, boundsMin, boundsMax);
-    const y1 = clamp(Math.ceil(camera.cy + halfH) + 1, boundsMin, boundsMax);
-    const cells = [];
-    for (let gy = y0; gy <= y1; gy++) {
-      for (let gx = x0; gx <= x1; gx++) cells.push([gx, gy]);
-    }
-    return cells;
-  }, [camera, cellPx, size, catalog, boundsMin, boundsMax]);
-
   const playerPos = mapState ? { x: mapState.pos_x, y: mapState.pos_y } : null;
   const questTarget = mapState?.quest_target ?? null;
+  const worldBoss = mapState?.world_boss ?? null;
 
-  const recenterOnPlayer = () => {
-    if (mapState) setCamera({ cx: mapState.pos_x, cy: mapState.pos_y });
+  const toScreen = useCallback((u, v) => ({
+    x: (u - view.cu) * view.scale + size.width / 2,
+    y: (v - view.cv) * view.scale + size.height / 2,
+  }), [view, size]);
+
+  const toMap = useCallback((sx, sy) => ({
+    u: view.cu + (sx - size.width / 2) / view.scale,
+    v: view.cv + (sy - size.height / 2) / view.scale,
+  }), [view, size]);
+
+  const cellScreen = useCallback((x, y) => {
+    const p = cellToMap(x, y);
+    return toScreen(p.u, p.v);
+  }, [toScreen]);
+
+  const cellPx = view ? CELL_K * view.scale : DEFAULT_CELL_PX;
+
+  // Все клетки мира - один раз: их ~2800, дальше только фильтр по окну.
+  const allCells = useMemo(() => {
+    if (!catalog) return [];
+    const r = catalog.world_radius;
+    const cells = [];
+    for (let x = -r; x <= r; x++) {
+      for (let y = -r; y <= r; y++) {
+        if (monolithDistance(x, y) <= r) cells.push([x, y]);
+      }
+    }
+    return cells;
+  }, [catalog]);
+
+  const gridCells = useMemo(() => {
+    if (!view || cellPx < GRID_FROM_CELL_PX) return [];
+    const pad = cellPx;
+    return allCells
+      .map(([x, y]) => {
+        const s = cellScreen(x, y);
+        return { x, y, sx: s.x, sy: s.y, size: cellSizeAt(monolithDistance(x, y)) * view.scale };
+      })
+      .filter((c) => c.sx > -pad && c.sy > -pad && c.sx < size.width + pad && c.sy < size.height + pad);
+  }, [allCells, cellScreen, cellPx, view, size]);
+
+  const cellAtScreen = (sx, sy) => {
+    const m = toMap(sx, sy);
+    return mapToCell(catalog, m.u, m.v);
   };
 
-  // --- Указатели: драг одним пальцем/мышью, щипок двумя пальцами ---
+  const recenterOnPlayer = () => {
+    if (!mapState || !view) return;
+    const p = cellToMap(mapState.pos_x, mapState.pos_y);
+    setView(clampView({ ...view, cu: p.u, cv: p.v }));
+  };
+
+  /** Зум с неподвижной точкой (sx, sy) - под курсором или между пальцами. */
+  const zoomAt = (factor, sx, sy, base = view) => {
+    const scale = clampScale(base.scale * factor);
+    const anchor = {
+      u: base.cu + (sx - size.width / 2) / base.scale,
+      v: base.cv + (sy - size.height / 2) / base.scale,
+    };
+    setView(clampView({
+      scale,
+      cu: anchor.u - (sx - size.width / 2) / scale,
+      cv: anchor.v - (sy - size.height / 2) / scale,
+    }));
+  };
+
+  // --- Указатели: драг одним пальцем/мышью, щипок двумя ---
+
+  const localPoint = (e) => {
+    const rect = containerRef.current.getBoundingClientRect();
+    return { x: e.clientX - rect.left, y: e.clientY - rect.top };
+  };
+
+  // Кнопки зума и плашки лежат поверх карты - их нажатия не драг и не
+  // выбор клетки.
+  const isOverlayTarget = (e) => Boolean(e.target.closest?.('.map-controls, .map-travel-banner'));
 
   const handlePointerDown = (e) => {
+    if (isOverlayTarget(e)) return;
     isTouchRef.current = e.pointerType === 'touch';
-    // Некоторые вебвью (встречается в ВК-мобильном на отдельных версиях
-    // Android/iOS) кидают исключение на setPointerCapture в редких гонках -
-    // не даём этому сорвать сам драг, capture - не более чем оптимизация.
-    try { e.currentTarget.setPointerCapture(e.pointerId); } catch { /* noop */ }
-    pointers.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
-    if (pointers.current.size === 1 && camera) {
-      dragRef.current = {
-        startCx: camera.cx, startCy: camera.cy, startX: e.clientX, startY: e.clientY, moved: false,
-      };
+    try { e.currentTarget.setPointerCapture(e.pointerId); } catch { /* вебвью ВК иногда бросает */ }
+    pointers.current.set(e.pointerId, localPoint(e));
+    if (pointers.current.size === 1 && view) {
+      const p = localPoint(e);
+      dragRef.current = { start: view, x: p.x, y: p.y, moved: false };
       pinchRef.current = null;
-    } else if (pointers.current.size === 2) {
+    } else if (pointers.current.size === 2 && view) {
       dragRef.current = null;
-      const pts = [...pointers.current.values()];
-      const dist = Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y);
-      pinchRef.current = { startDist: dist || 1, startCellPx: cellPx };
+      const [a, b] = [...pointers.current.values()];
+      pinchRef.current = {
+        dist: Math.hypot(a.x - b.x, a.y - b.y) || 1,
+        mid: { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 },
+        start: view,
+      };
     }
   };
 
   const handlePointerMove = (e) => {
-    if (!pointers.current.has(e.pointerId)) return;
-    pointers.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    if (!view) return;
+    const p = localPoint(e);
+    if (pointers.current.has(e.pointerId)) pointers.current.set(e.pointerId, p);
 
     if (pointers.current.size === 2 && pinchRef.current) {
-      const pts = [...pointers.current.values()];
-      const dist = Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y);
-      const scale = dist / pinchRef.current.startDist;
-      setCellPx(clamp(pinchRef.current.startCellPx * scale, MIN_CELL_PX, MAX_CELL_PX));
+      const [a, b] = [...pointers.current.values()];
+      const factor = Math.hypot(a.x - b.x, a.y - b.y) / pinchRef.current.dist;
+      zoomAt(factor, pinchRef.current.mid.x, pinchRef.current.mid.y, pinchRef.current.start);
       return;
     }
 
-    if (pointers.current.size === 1 && dragRef.current && camera) {
-      const dx = e.clientX - dragRef.current.startX;
-      const dy = e.clientY - dragRef.current.startY;
+    if (pointers.current.size === 1 && dragRef.current) {
+      const dx = p.x - dragRef.current.x;
+      const dy = p.y - dragRef.current.y;
       if (Math.hypot(dx, dy) > DRAG_THRESHOLD_PX) dragRef.current.moved = true;
-      setCamera({
-        cx: clamp(dragRef.current.startCx - dx / cellPx, boundsMin, boundsMax),
-        cy: clamp(dragRef.current.startCy + dy / cellPx, boundsMin, boundsMax),
-      });
+      if (dragRef.current.moved) {
+        const start = dragRef.current.start;
+        setView(clampView({ ...start, cu: start.cu - dx / start.scale, cv: start.cv - dy / start.scale }));
+        setHovered(null);
+      }
       return;
     }
 
-    // Наведение (десктоп-мышь, без активного драга) - лёгкая подсказка.
-    if (!isTouchRef.current && pointers.current.size === 1 && !dragRef.current?.moved && camera) {
-      const rect = containerRef.current.getBoundingClientRect();
-      const world = screenToWorld(camera, cellPx, size, e.clientX - rect.left, e.clientY - rect.top);
-      const gx = Math.round(world.x);
-      const gy = Math.round(world.y);
-      if (gx >= boundsMin && gx <= boundsMax && gy >= boundsMin && gy <= boundsMax) {
-        setHovered({ x: gx, y: gy, screenX: e.clientX - rect.left, screenY: e.clientY - rect.top });
-      }
+    // Наведение мышью без нажатия - лёгкая подсказка.
+    if (!isTouchRef.current && pointers.current.size === 0) {
+      const cell = cellAtScreen(p.x, p.y);
+      setHovered(cell ? { ...cell, sx: p.x, sy: p.y } : null);
     }
   };
 
   const handlePointerUp = (e) => {
-    const wasSinglePointerTap = pointers.current.size === 1 && dragRef.current && !dragRef.current.moved;
+    const tap = pointers.current.size === 1 && dragRef.current && !dragRef.current.moved;
     pointers.current.delete(e.pointerId);
     if (pointers.current.size < 2) pinchRef.current = null;
-
-    if (wasSinglePointerTap && camera) {
-      const rect = containerRef.current.getBoundingClientRect();
-      const world = screenToWorld(camera, cellPx, size, e.clientX - rect.left, e.clientY - rect.top);
-      const gx = clamp(Math.round(world.x), boundsMin, boundsMax);
-      const gy = clamp(Math.round(world.y), boundsMin, boundsMax);
-      setSelected({ x: gx, y: gy });
+    if (tap && view) {
+      const p = localPoint(e);
+      const cell = cellAtScreen(p.x, p.y);
+      setSelected(cell);
       setSendFlow(null);
     }
     if (pointers.current.size === 0) dragRef.current = null;
   };
 
-  const handlePointerLeave = () => setHovered(null);
-
-  const handleWheel = (e) => {
+  // Колесо: React вешает onWheel пассивным, preventDefault там не работает -
+  // слушатель ставим сами, иначе вместе с картой прокручивалась бы страница.
+  const wheelRef = useRef(null);
+  wheelRef.current = (e) => {
+    if (!view) return;
     e.preventDefault();
-    const factor = e.deltaY < 0 ? 1.15 : 1 / 1.15;
-    setCellPx((prev) => clamp(prev * factor, MIN_CELL_PX, MAX_CELL_PX));
+    const p = localPoint(e);
+    zoomAt(e.deltaY < 0 ? 1.15 : 1 / 1.15, p.x, p.y);
   };
-
-  const zoomBy = (factor) => setCellPx((prev) => clamp(prev * factor, MIN_CELL_PX, MAX_CELL_PX));
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return undefined;
+    const onWheel = (e) => wheelRef.current(e);
+    el.addEventListener('wheel', onWheel, { passive: false });
+    return () => el.removeEventListener('wheel', onWheel);
+  }, [status]);
 
   // --- Отправка маунта ---
 
   const isTraveling = Boolean(mapState?.foot_travel || mapState?.mount_travel);
   const canSendMount = mapState && !mapState.is_dead && !isTraveling && mapState.mounts.length > 0;
-
-  const startSendFlow = () => setSendFlow({ step: 'pick', mount: null });
-  const pickMount = (mount) => setSendFlow({ step: 'confirm', mount });
 
   const confirmSend = async () => {
     if (!selected || !sendFlow?.mount) return;
@@ -237,7 +311,7 @@ export default function MapTab() {
   };
 
   useEffect(() => {
-    if (!banner) return;
+    if (!banner) return undefined;
     const id = setTimeout(() => setBanner(null), 4000);
     return () => clearTimeout(id);
   }, [banner]);
@@ -249,12 +323,29 @@ export default function MapTab() {
       </Div>
     );
   }
-  if (status === 'error' || !mapState || !camera) {
+  if (status === 'error' || !mapState) {
     return <Placeholder icon={<div style={{ fontSize: 48 }}>🗺️</div>}>Не удалось загрузить карту.</Placeholder>;
   }
 
-  const info = selected ? cellInfo(catalog, selected.x, selected.y, playerPos, questTarget) : null;
-  const showSymbols = cellPx >= 14;
+  const info = selected ? cellInfo(catalog, selected.x, selected.y, playerPos, questTarget, worldBoss) : null;
+  const center = view ? toScreen(MAP_CENTER.u, MAP_CENTER.v) : null;
+  const markerPx = clamp(cellPx * 0.9, 16, 30);
+  const travelTarget = mapState.mount_travel || mapState.foot_travel;
+
+  const marker = (x, y, className, content, title, extraSize = 1) => {
+    const s = cellScreen(x, y);
+    const px = markerPx * extraSize;
+    return (
+      <div
+        key={`${className}:${x}:${y}`}
+        className={`map-pin ${className}`}
+        style={{ left: s.x - px / 2, top: s.y - px / 2, width: px, height: px, fontSize: px * 0.62 }}
+        title={title}
+      >
+        {content}
+      </div>
+    );
+  };
 
   return (
     <div className="map-tab">
@@ -265,92 +356,84 @@ export default function MapTab() {
         onPointerMove={handlePointerMove}
         onPointerUp={handlePointerUp}
         onPointerCancel={handlePointerUp}
-        onPointerLeave={handlePointerLeave}
-        onWheel={handleWheel}
+        onPointerLeave={() => setHovered(null)}
       >
-        {visibleCells.map(([gx, gy]) => {
-          const dist = chebyshevDistance(gx, gy);
-          const screen = worldToScreen(camera, cellPx, size, gx, gy);
-          const isCity = catalog.city_coords && Object.values(catalog.city_coords).some(([cx, cy]) => cx === gx && cy === gy);
-          const isMonolith = gx === 0 && gy === 0;
-          const lake = lakesByCell.get(`${gx}:${gy}`);
-          const mine = minesByCell.get(`${gx}:${gy}`);
-          const mineOre = mine ? (mapState?.mine_ore?.[mine.id] || 0) : 0;
-          return (
-            <div
-              key={`${gx}:${gy}`}
-              className="map-cell"
+        {view && (
+          <div className="map-stage">
+            <img
+              className="map-image"
+              src={worldMap}
+              alt=""
+              draggable={false}
+              onLoad={() => setImageReady(true)}
               style={{
-                left: screen.x - cellPx / 2, top: screen.y - cellPx / 2,
-                width: cellPx - 1, height: cellPx - 1,
-                background: cellColor(gx, gy, dist),
+                width: view.scale,
+                height: view.scale,
+                transform: `translate(${size.width / 2 - view.cu * view.scale}px, ${size.height / 2 - view.cv * view.scale}px)`,
               }}
-            >
-              {showSymbols && isMonolith && (
-                <span className="map-cell__symbol" style={{ fontSize: Math.max(10, cellPx * 0.5) }}>◆</span>
-              )}
-              {showSymbols && isCity && !isMonolith && (
-                <span className="map-cell__symbol" style={{ fontSize: Math.max(10, cellPx * 0.5) }}>⛩</span>
-              )}
-              {showSymbols && mine && !isCity && !isMonolith && (
-                <span
-                  className="map-cell__symbol map-cell__symbol--mine"
-                  style={{ fontSize: Math.max(10, cellPx * 0.5) }}
-                  title={`${mine.name}: руды ${mineOre}`}
-                >
-                  {mineOre > 0 ? '⛏' : '⚒'}
-                </span>
-              )}
-              {showSymbols && lake && !isCity && !isMonolith && (
-                <span
-                  className="map-cell__symbol map-cell__symbol--lake"
-                  style={{ fontSize: Math.max(10, cellPx * 0.5) }}
-                  title={lake.name}
-                >
-                  🎣
-                </span>
-              )}
-            </div>
-          );
-        })}
+            />
 
-        {questTarget && (
-          <div
-            className="map-marker map-marker--quest"
-            style={{
-              left: worldToScreen(camera, cellPx, size, questTarget.x, questTarget.y).x - cellPx / 2,
-              top: worldToScreen(camera, cellPx, size, questTarget.x, questTarget.y).y - cellPx / 2,
-              width: cellPx, height: cellPx,
-            }}
-          />
+            <svg className="map-overlay" width={size.width} height={size.height}>
+              {ringBorders(catalog).map((r, i) => (
+                <circle
+                  key={r}
+                  cx={center.x} cy={center.y} r={r * view.scale}
+                  className={i === 0 ? 'map-ring map-ring--rim' : 'map-ring'}
+                />
+              ))}
+              {gridCells.map((c) => (
+                <rect
+                  key={`${c.x}:${c.y}`}
+                  className="map-grid-cell"
+                  x={c.sx - c.size / 2 + 1} y={c.sy - c.size / 2 + 1}
+                  width={Math.max(c.size - 2, 1)} height={Math.max(c.size - 2, 1)} rx={3}
+                />
+              ))}
+              {travelTarget && playerPos && (() => {
+                const a = cellScreen(playerPos.x, playerPos.y);
+                const b = cellScreen(travelTarget.to_x, travelTarget.to_y);
+                return <line className="map-route" x1={a.x} y1={a.y} x2={b.x} y2={b.y} />;
+              })()}
+              {[[hovered, 'map-cell-hover'], [selected, 'map-cell-selected']].filter(([c]) => c).map(([c, cls]) => {
+                const s = cellScreen(c.x, c.y);
+                const px = Math.max(cellSizeAt(monolithDistance(c.x, c.y)) * view.scale, 10);
+                return <rect key={cls} className={cls} x={s.x - px / 2} y={s.y - px / 2} width={px} height={px} rx={4} />;
+              })}
+            </svg>
+
+            <div className="map-pins">
+              {(catalog.lakes || []).map((l) => marker(l.x, l.y, 'map-pin--lake', '🎣', l.name, 0.8))}
+              {(catalog.mines || []).map((m) => marker(
+                m.x, m.y, `map-pin--mine${(mapState.mine_ore?.[m.id] || 0) > 0 ? '' : ' map-pin--empty'}`,
+                '⛏', `${m.name}: руды ${mapState.mine_ore?.[m.id] || 0}`, 0.8,
+              ))}
+              {questTarget && marker(questTarget.x, questTarget.y, 'map-pin--quest', '📜', questTarget.label)}
+              {worldBoss && marker(worldBoss.x, worldBoss.y, 'map-pin--boss', '💀', worldBoss.name, 1.3)}
+              {travelTarget && marker(travelTarget.to_x, travelTarget.to_y, 'map-pin--route', '⚑', 'Цель пути')}
+              {playerPos && marker(playerPos.x, playerPos.y, 'map-pin--player', '', 'Ты здесь', 1.1)}
+            </div>
+          </div>
         )}
 
-        {playerPos && (
-          <div
-            className="map-marker map-marker--player"
-            style={{
-              left: worldToScreen(camera, cellPx, size, playerPos.x, playerPos.y).x - cellPx / 2,
-              top: worldToScreen(camera, cellPx, size, playerPos.x, playerPos.y).y - cellPx / 2,
-              width: cellPx, height: cellPx,
-            }}
-          />
+        {!imageReady && (
+          <div className="map-loading"><Spinner size="m" /></div>
         )}
 
         {hovered && (
           <div
             className="map-tooltip"
-            style={{ left: clamp(hovered.screenX + 12, 0, size.width - 180), top: clamp(hovered.screenY + 12, 0, size.height - 90) }}
+            style={{ left: clamp(hovered.sx + 14, 0, size.width - 190), top: clamp(hovered.sy + 14, 0, size.height - 100) }}
           >
             <MapTooltipContent
-              info={cellInfo(catalog, hovered.x, hovered.y, playerPos, questTarget)}
-              mineOre={mapState?.mine_ore}
+              info={cellInfo(catalog, hovered.x, hovered.y, playerPos, questTarget, worldBoss)}
+              mineOre={mapState.mine_ore}
             />
           </div>
         )}
 
         <div className="map-controls">
-          <IconButton className="map-controls__btn" onClick={() => zoomBy(1.3)} aria-label="Приблизить">＋</IconButton>
-          <IconButton className="map-controls__btn" onClick={() => zoomBy(1 / 1.3)} aria-label="Отдалить">－</IconButton>
+          <IconButton className="map-controls__btn" onClick={() => zoomAt(1.35, size.width / 2, size.height / 2)} aria-label="Приблизить">＋</IconButton>
+          <IconButton className="map-controls__btn" onClick={() => zoomAt(1 / 1.35, size.width / 2, size.height / 2)} aria-label="Отдалить">－</IconButton>
           <IconButton className="map-controls__btn" onClick={recenterOnPlayer} aria-label="К себе">◎</IconButton>
         </div>
 
@@ -359,6 +442,11 @@ export default function MapTab() {
             {mapState.mount_travel
               ? `🐎 В пути к (${mapState.mount_travel.to_x}; ${mapState.mount_travel.to_y})`
               : `🚶 В пути к (${mapState.foot_travel.to_x}; ${mapState.foot_travel.to_y})`}
+          </div>
+        )}
+        {worldBoss && !isTraveling && (
+          <div className="map-travel-banner map-travel-banner--boss">
+            💀 {worldBoss.name} · ({worldBoss.x}; {worldBoss.y}) · {worldBoss.hp_percent}%
           </div>
         )}
       </div>
@@ -370,9 +458,16 @@ export default function MapTab() {
           <button className="map-card__close" onClick={() => { setSelected(null); setSendFlow(null); }} aria-label="Закрыть">✕</button>
           <p className="map-card__coords">({info.x}; {info.y})</p>
           <p className="map-card__line">{info.isMonolith ? '🩸 Багряный Монолит' : info.regionTitle}</p>
-          {!info.isMonolith && <p className="map-card__line">{info.typeName}</p>}
+          {!info.isMonolith && !info.isCity && <p className="map-card__line">{info.typeName}</p>}
           <p className="map-card__line">Уровень мобов: {info.levelRange[0]}-{info.levelRange[1]}</p>
-          <p className="map-card__line">Расстояние: {info.dist} клеток</p>
+          <p className="map-card__line">До Монолита: {info.dist} {cellsWord(info.dist)}</p>
+          {info.lake && <p className="map-card__line">🎣 {info.lake.name}{info.lake.safe ? ' · без PvP' : ''}</p>}
+          {info.mine && (
+            <p className="map-card__line">
+              ⛏ {info.mine.name} · руды {mapState.mine_ore?.[info.mine.id] || 0}{info.mine.safe ? ' · без PvP' : ''}
+            </p>
+          )}
+          {info.boss && <p className="map-card__line">💀 {info.boss.name} · ур. {info.boss.level} · {info.boss.hp_percent}%</p>}
           <div className="map-card__badges">
             {info.isCity && <span className="map-card__badge">Город</span>}
             {info.isPlayer && <span className="map-card__badge">Ты здесь</span>}
@@ -383,7 +478,7 @@ export default function MapTab() {
             <Button
               size="l" stretched mode="secondary" className="map-card__action"
               disabled={!canSendMount}
-              onClick={startSendFlow}
+              onClick={() => setSendFlow({ step: 'pick', mount: null })}
             >
               🐎 Отправить маунта
             </Button>
@@ -397,12 +492,11 @@ export default function MapTab() {
           {sendFlow?.step === 'pick' && (
             <div className="map-card__mounts">
               {mapState.mounts.map((m) => {
-                const cells = chebyshevDistance(info.x - playerPos.x, info.y - playerPos.y);
-                const seconds = m.seconds_per_cell * cells;
+                const cells = cellsBetween(playerPos.x, playerPos.y, info.x, info.y);
                 return (
-                  <button key={m.mount_id} className="map-card__mount-option" onClick={() => pickMount(m)}>
+                  <button key={m.mount_id} className="map-card__mount-option" onClick={() => setSendFlow({ step: 'confirm', mount: m })}>
                     <span>{m.emoji} {m.name}</span>
-                    <span className="map-card__mount-meta">{formatSeconds(seconds)} · риск {Math.round(m.ambush_chance * 100)}%</span>
+                    <span className="map-card__mount-meta">{formatSeconds(m.seconds_per_cell * cells)} · риск {Math.round(m.ambush_chance * 100)}%</span>
                   </button>
                 );
               })}
@@ -410,19 +504,21 @@ export default function MapTab() {
             </div>
           )}
 
-          {sendFlow?.step === 'confirm' && (
-            <div className="map-card__confirm">
-              <p className="map-card__line">
-                Путь: {chebyshevDistance(info.x - playerPos.x, info.y - playerPos.y)} клеток · {sendFlow.mount.name} ·{' '}
-                {formatSeconds(sendFlow.mount.seconds_per_cell * chebyshevDistance(info.x - playerPos.x, info.y - playerPos.y))} ·{' '}
-                риск нападения {Math.round(sendFlow.mount.ambush_chance * 100)}%
-              </p>
-              <div className="map-card__confirm-actions">
-                <Button size="m" stretched onClick={confirmSend}>Подтвердить</Button>
-                <Button size="m" stretched mode="tertiary" onClick={() => setSendFlow({ step: 'pick', mount: null })}>Назад</Button>
+          {sendFlow?.step === 'confirm' && (() => {
+            const cells = cellsBetween(playerPos.x, playerPos.y, info.x, info.y);
+            return (
+              <div className="map-card__confirm">
+                <p className="map-card__line">
+                  Путь: {cells} {cellsWord(cells)} · {sendFlow.mount.name} · {formatSeconds(sendFlow.mount.seconds_per_cell * cells)} ·{' '}
+                  риск нападения {Math.round(sendFlow.mount.ambush_chance * 100)}%
+                </p>
+                <div className="map-card__confirm-actions">
+                  <Button size="m" stretched onClick={confirmSend}>Подтвердить</Button>
+                  <Button size="m" stretched mode="tertiary" onClick={() => setSendFlow({ step: 'pick', mount: null })}>Назад</Button>
+                </div>
               </div>
-            </div>
-          )}
+            );
+          })()}
         </div>
       )}
     </div>
@@ -434,8 +530,9 @@ function MapTooltipContent({ info, mineOre }) {
     <>
       <p className="map-tooltip__coords">({info.x}; {info.y})</p>
       <p className="map-tooltip__line">{info.isMonolith ? '🩸 Багряный Монолит' : info.regionTitle}</p>
-      {!info.isMonolith && <p className="map-tooltip__line">{info.typeName}</p>}
-      <p className="map-tooltip__line">Уровень: {info.levelRange[0]}-{info.levelRange[1]} · {info.dist} кл.</p>
+      {!info.isMonolith && !info.isCity && <p className="map-tooltip__line">{info.typeName}</p>}
+      {info.isCity && <p className="map-tooltip__line">Город</p>}
+      <p className="map-tooltip__line">Уровень: {info.levelRange[0]}-{info.levelRange[1]} · до Монолита {info.dist}</p>
       {info.lake && (
         <p className="map-tooltip__line map-tooltip__line--lake">
           🎣 {info.lake.name}{info.lake.safe ? ' · без PvP' : ''}
@@ -447,6 +544,7 @@ function MapTooltipContent({ info, mineOre }) {
           {info.mine.safe ? ' · без PvP' : ''}
         </p>
       )}
+      {info.boss && <p className="map-tooltip__line">💀 {info.boss.name} · {info.boss.hp_percent}%</p>}
     </>
   );
 }

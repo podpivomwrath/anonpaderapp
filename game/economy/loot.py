@@ -7,14 +7,12 @@
 import random
 
 from game.economy import loot_config as lc
+from game.world import world_config as wc
 
 
 def rolls_for_dist(dist: int) -> int:
-    """Число независимых бросков по расстоянию Чебышёва до Монолита."""
-    for lo, hi, rolls in lc.ROLLS_BY_DIST:
-        if lo <= dist <= hi:
-            return rolls
-    return lc.ROLLS_BY_DIST[-1][2]  # недостижимо при dist в 0..50
+    """Число независимых бросков по расстоянию до Монолита."""
+    return lc.ROLLS_BY_RING[wc.ring_tier_for_dist(dist)]
 
 
 def roll_once(rng: random.Random) -> str | None:
