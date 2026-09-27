@@ -9,8 +9,8 @@ from services import item_service
 
 
 def _item(**kw):
-    base = dict(name="Вещь", rarity="common", ilvl=10, admin_only=False, bound=False,
-                slot="weapon", base_stats={"str": 5})
+    base = {"name": "Вещь", "rarity": "common", "ilvl": 10, "admin_only": False, "bound": False,
+            "slot": "weapon", "base_stats": {"str": 5}}
     base.update(kw)
     return SimpleNamespace(**base)
 
