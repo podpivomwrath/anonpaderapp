@@ -847,6 +847,7 @@ async def handle_explore_done(peer_id: int) -> None:
             peer_id=peer_id,
             message=f"{event.title}" + chr(10) * 2 + event.text,
             random_id=0,
+            attachment=event_attachment(event.id),
             keyboard=mining_kb.event_vein_keyboard(event.id),
         )
         return
