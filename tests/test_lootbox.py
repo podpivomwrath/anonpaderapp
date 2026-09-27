@@ -112,6 +112,8 @@ async def test_daily_streak_completion_grants_exactly_one_chest(db_session, make
         )
     ).all()
     assert len(rows) == 1
+    assert rows[0].status == "closed", "патч 106: ларец ложится в сумку, открывает игрок"
+    assert "Редкости" in result.streak_notice
 
 
 async def test_second_completion_same_day_does_not_grant_second_chest(db_session, make_character) -> None:

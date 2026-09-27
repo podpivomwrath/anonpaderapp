@@ -20,7 +20,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from game.combat import balance_config as bc
 from game.content_loader import DailyQuestDef, load_daily_quests
 from game.economy import dailies_config as dc
-from game.economy import lootbox_config as lc
 from models import Character, CharacterDaily, CharacterStats
 from services import (
     elixir_service,
@@ -261,19 +260,14 @@ async def _finish(
         character.last_daily_completed_date = today
         character.daily_streak += 1
 
-        # Патч 24: 1 Пепельный ларец за КАЖДЫЙ день стрика ежедневок,
-        # открывается сразу — не продаётся ни за что (см. lootbox_config.py).
-        chest = await lootbox_service.open_chest(db, character, character.daily_streak, _rng)
-        chest_text = (
-            f"🗃️ Ты находишь Пепельный ларец. День стрика: {character.daily_streak}\n\n"
-            f"Крышка поддаётся...\n\n"
-            f"{chest.grade.emoji} {chest.grade.name.upper()} ЛАРЕЦ\n"
-            f"Получено: {', '.join(chest.lines)}"
+        # Патч 24: 1 Пепельный ларец за КАЖДЫЙ день стрика ежедневок.
+        # Патч 106: ларец ложится в сумку закрытым - открывает игрок сам, в
+        # мини-аппе рулеткой. Не продаётся ни за что (см. lootbox_config.py).
+        await lootbox_service.grant_chest(db, character, character.daily_streak)
+        notice_parts.append(
+            f"🗃️ Пепельный ларец - в сумке. День стрика: {character.daily_streak}\n"
+            f"Открыть его можно в мини-аппе: Инвентарь → Редкости."
         )
-        flourish = lc.GRADE_FLOURISH.get(chest.grade.id)
-        if flourish:
-            chest_text += f"\n\n{flourish}"
-        notice_parts.append(chest_text)
 
         milestone = dc.STREAK_MILESTONES.get(character.daily_streak)
         if milestone is not None:

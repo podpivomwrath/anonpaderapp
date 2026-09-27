@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import bridge from '@vkontakte/vk-bridge';
 import { AppRoot, ConfigProvider, SplitLayout, SplitCol } from '@vkontakte/vkui';
+import BackgroundScene from './components/BackgroundScene.jsx';
 import Hub from './components/Hub.jsx';
 
 // Патч 77: тема ВСЕГДА тёмная, за клиентом ВК больше не следуем.
@@ -29,6 +30,7 @@ function App() {
 
   return (
     <ConfigProvider colorScheme={COLOR_SCHEME}>
+      <BackgroundScene />
       <AppRoot className="hub">
         <SplitLayout>
           <SplitCol>

@@ -1007,3 +1007,263 @@ body::before {
 .nav-drawer__item--active {
   background: rgba(200, 30, 58, 0.18);
 }
+
+/* --- Рулетка Пепельного ларца (патч 106) ------------------------------------ */
+/* Окно поверх страницы, как шторки: список под ним не меняется. Лента
+   уезжает влево и встаёт выигрышной карточкой под красную метку. */
+
+.roulette-scrim {
+  background: rgba(0, 0, 0, 0.72);
+  z-index: 110;
+}
+
+.roulette {
+  position: fixed;
+  left: 50%;
+  top: 50%;
+  z-index: 120;
+  width: min(640px, calc(100vw - 24px));
+  transform: translate(-50%, -50%);
+  padding: 18px 0 16px;
+  border: 1px solid #c81e3a44;
+  border-radius: 16px;
+  background: #121316;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.6);
+}
+
+.roulette__title {
+  margin: 0 16px 12px;
+  font-family: 'Forum', serif;
+  font-size: 20px;
+  text-align: center;
+  color: #f2d9dc;
+}
+
+.roulette__viewport {
+  position: relative;
+  overflow: hidden;
+  padding: 10px 0;
+  /* Края затухают: карточки выныривают из тьмы и уходят в неё. */
+  -webkit-mask-image: linear-gradient(90deg, transparent, #000 14%, #000 86%, transparent);
+  mask-image: linear-gradient(90deg, transparent, #000 14%, #000 86%, transparent);
+}
+
+.roulette__marker {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 50%;
+  z-index: 2;
+  width: 2px;
+  margin-left: -1px;
+  background: #e8304f;
+  box-shadow: 0 0 10px #e8304f, 0 0 22px #c81e3a;
+}
+
+.roulette__track {
+  display: flex;
+  gap: 10px;
+  padding: 0 12px;
+  will-change: transform;
+}
+
+.roulette__card {
+  flex: 0 0 116px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  min-height: 148px;
+  padding: 10px 8px;
+  border: 1px solid var(--card-color, #ffffff22);
+  border-radius: 12px;
+  background: linear-gradient(180deg, #1c1d21, #141518);
+  box-shadow: inset 0 -26px 30px -26px var(--card-color, transparent);
+  text-align: center;
+}
+
+.roulette__card--dusty { --card-color: #8f959c; }
+.roulette__card--dim { --card-color: #3d7bd9; }
+.roulette__card--crimson { --card-color: #9b3dd9; }
+.roulette__card--searing { --card-color: #e8842a; }
+.roulette__card--tear { --card-color: #e8c547; }
+
+.roulette__card--win {
+  box-shadow: 0 0 0 2px var(--card-color), 0 0 26px var(--card-color);
+  animation: roulette-win 1.2s ease-in-out infinite alternate;
+}
+
+@keyframes roulette-win {
+  from { filter: brightness(1); }
+  to { filter: brightness(1.25); }
+}
+
+.roulette__grade {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--card-color);
+}
+
+.roulette__label {
+  font-size: 11.5px;
+  line-height: 1.25;
+  opacity: 0.85;
+}
+
+.roulette__result {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  min-height: 44px;
+  margin: 14px 16px 0;
+  text-align: center;
+  font-size: 14px;
+}
+
+.roulette__result--shown {
+  animation: roulette-reveal 0.4s ease-out;
+}
+
+@keyframes roulette-reveal {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: none; }
+}
+
+.roulette__result-grade {
+  font-size: 18px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.roulette__result-grade--dusty { color: #b5bac0; }
+.roulette__result-grade--dim { color: #5d97ee; }
+.roulette__result-grade--crimson { color: #b56bef; }
+.roulette__result-grade--searing { color: #f09a48; }
+.roulette__result-grade--tear { color: #f2d465; }
+
+.roulette__hint {
+  opacity: 0.6;
+}
+
+@media (max-width: 480px) {
+  .roulette__card {
+    flex-basis: 96px;
+    min-height: 132px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .roulette__track {
+    transition-duration: 600ms !important;
+  }
+}
+
+/* --- Живой фон (патч 106) ----------------------------------------------------
+   Сцена рисуется компонентом BackgroundScene только на широком экране; тогда
+   статичная картинка body::before не нужна - иначе под сценой лежала бы
+   вторая, несдвигаемая копия. */
+
+@media (min-width: 720px) {
+  body::before {
+    display: none;
+  }
+}
+
+.scene {
+  --px: 0;
+  --py: 0;
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+/* Картинка чуть больше экрана: при сдвиге параллакса края не оголяются. */
+.scene__image {
+  position: absolute;
+  inset: -16px;
+  background-size: cover;
+  background-position: center top;
+  transform: translate3d(calc(var(--px) * -8px), calc(var(--py) * -5px), 0);
+  transition: transform 0.6s ease-out;
+}
+
+/* Красное у основания Монолита: мягкое пятно, неровно мерцает, как тлеющая
+   трещина. screen - чтобы подсвечивало картинку, а не заливало её. */
+.scene__glow {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  border-radius: 50%;
+  background: radial-gradient(ellipse at center,
+    rgba(255, 80, 60, 0.42) 0%,
+    rgba(200, 30, 40, 0.18) 42%,
+    rgba(120, 10, 20, 0) 72%);
+  mix-blend-mode: screen;
+  filter: blur(4px);
+  animation: scene-flicker 4.6s infinite;
+}
+
+@keyframes scene-flicker {
+  0%, 100% { opacity: 0.55; }
+  8% { opacity: 0.9; }
+  12% { opacity: 0.6; }
+  26% { opacity: 0.8; }
+  41% { opacity: 0.5; }
+  47% { opacity: 1; }
+  52% { opacity: 0.7; }
+  68% { opacity: 0.85; }
+  83% { opacity: 0.55; }
+  90% { opacity: 0.95; }
+}
+
+/* Туман: две полосы у земли на разной «глубине» - дальняя медленнее и
+   слабее реагирует на мышь, ближняя плотнее и заметнее. */
+.scene__mist {
+  position: absolute;
+  left: -20%;
+  right: -20%;
+  pointer-events: none;
+  filter: blur(18px);
+}
+
+.scene__mist--far {
+  top: 42%;
+  height: 34%;
+  opacity: 0.55;
+  background:
+    radial-gradient(ellipse 30% 45% at 20% 55%, rgba(160, 160, 170, 0.10), transparent 70%),
+    radial-gradient(ellipse 35% 40% at 62% 45%, rgba(150, 150, 160, 0.09), transparent 70%),
+    radial-gradient(ellipse 28% 38% at 88% 60%, rgba(170, 150, 150, 0.08), transparent 70%);
+  transform: translate3d(calc(var(--px) * -14px), calc(var(--py) * -6px), 0);
+  animation: scene-drift-far 48s ease-in-out infinite alternate;
+}
+
+.scene__mist--near {
+  top: 56%;
+  height: 44%;
+  opacity: 0.7;
+  background:
+    radial-gradient(ellipse 34% 42% at 12% 50%, rgba(170, 170, 180, 0.12), transparent 70%),
+    radial-gradient(ellipse 40% 45% at 48% 62%, rgba(160, 160, 170, 0.11), transparent 70%),
+    radial-gradient(ellipse 30% 40% at 80% 48%, rgba(175, 165, 165, 0.10), transparent 70%);
+  transform: translate3d(calc(var(--px) * -26px), calc(var(--py) * -10px), 0);
+  animation: scene-drift-near 34s ease-in-out infinite alternate;
+}
+
+/* Дрейф - через margin, чтобы не спорить с transform параллакса. */
+@keyframes scene-drift-far {
+  from { margin-left: 0; }
+  to { margin-left: -6%; }
+}
+
+@keyframes scene-drift-near {
+  from { margin-left: -4%; }
+  to { margin-left: 5%; }
+}
+
+.scene--calm .scene__glow,
+.scene--calm .scene__mist {
+  animation: none;
+}

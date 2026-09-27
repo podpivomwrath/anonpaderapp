@@ -3,7 +3,8 @@ import bridge from '@vkontakte/vk-bridge';
 import {
   Button, Div, Group, Header, Placeholder, SimpleCell, Spinner, Text,
 } from '@vkontakte/vkui';
-import { equipItem, getCharacter, getInventory } from '../api.js';
+import { equipItem, getCharacter, getInventory, openChest } from '../api.js';
+import ChestRoulette from './ChestRoulette.jsx';
 import ItemIcon from './ItemIcon.jsx';
 
 // Патч 74: вместо одного плоского списка - «Надето» отдельно и сумка,
@@ -90,6 +91,11 @@ function detailRows(entry) {
     if (data.equipped) rows.push(['Состояние', 'Надето']);
     if (data.bound) rows.push(['Передача', 'Привязано к хозяину']);
     return rows;
+  }
+  if (kind === 'chest') {
+    return [['В сумке', `×${data.count}`]].concat(
+      (data.grades || []).map((g) => [`${g.name} ларец`, `${g.chance}%`]),
+    );
   }
   if (kind === 'trophy') {
     return [
@@ -201,11 +207,35 @@ export default function InventoryTab({ onCharacterUpdate }) {
   const [copiedId, setCopiedId] = useState(null);
   const [detail, setDetail] = useState(null);      // {kind, data}
   const [qtyEntry, setQtyEntry] = useState(null);  // расходник, для которого выбираем количество
+  const [chests, setChests] = useState([]);
+  const [opening, setOpening] = useState(false);
+  const [roulette, setRoulette] = useState(null);  // ответ сервера на открытие ларца
 
   function apply(res) {
     setItems(res.items);
     setTrophies(res.trophies || []);
     setConsumables(res.consumables || []);
+    setChests(res.chests || []);
+  }
+
+  async function handleOpenChest() {
+    if (opening) return;
+    setOpening(true);
+    setErrorMsg(null);
+    try {
+      setRoulette(await openChest());
+    } catch (err) {
+      setErrorMsg(err?.message === 'no_chest' ? 'Ларцов в сумке больше нет.' : 'Не удалось открыть ларец.');
+    } finally {
+      setOpening(false);
+    }
+  }
+
+  function closeRoulette() {
+    // Сумка обновляется после рулетки, а не до: иначе стопка ларцов и
+    // награда в группах менялись бы, пока игрок ещё смотрит на ленту.
+    if (roulette?.inventory) apply(roulette.inventory);
+    setRoulette(null);
   }
 
   function load() {
@@ -257,7 +287,7 @@ export default function InventoryTab({ onCharacterUpdate }) {
     return <Placeholder icon={<div style={{ fontSize: 48 }}>🎒</div>}>Не удалось загрузить инвентарь.</Placeholder>;
   }
 
-  if (items.length === 0 && trophies.length === 0 && consumables.length === 0) {
+  if (items.length === 0 && trophies.length === 0 && consumables.length === 0 && chests.length === 0) {
     return <Placeholder icon={<div style={{ fontSize: 48 }}>🎒</div>}>Твоя сумка пока пуста.</Placeholder>;
   }
 
@@ -276,11 +306,12 @@ export default function InventoryTab({ onCharacterUpdate }) {
       rows: spare.filter((i) => i.slot === slot),
     }))
     .concat([
+      { key: 'chests', kind: 'chest', title: 'Редкости', rows: chests },
       { key: 'trophies', kind: 'trophy', title: 'Реликвии', rows: trophies },
       { key: 'consumables', kind: 'consumable', title: 'Расходники', rows: consumables },
     ])
     .filter((group) => group.rows.length > 0);
-  const bagCount = spare.length + trophies.length + consumables.length;
+  const bagCount = spare.length + trophies.length + consumables.length + chests.length;
 
   const craftButton = (item) => item.craftable && (
     <Button
@@ -363,16 +394,25 @@ export default function InventoryTab({ onCharacterUpdate }) {
 
   const stackRow = (kind, entry) => {
     const open = opener(kind, entry);
-    const subtitle = kind === 'trophy'
-      ? [entry.rarity_title, `×${entry.count}`].filter(Boolean).join(' · ')
-      : `${entry.category_title} · ×${entry.count}`;
+    let subtitle = `${entry.category_title} · ×${entry.count}`;
+    if (kind === 'trophy') subtitle = [entry.rarity_title, `×${entry.count}`].filter(Boolean).join(' · ');
+    if (kind === 'chest') subtitle = `×${entry.count}`;
+    let after = null;
+    if (kind === 'consumable') after = <div className="inventory-actions">{quantityButton(entry)}</div>;
+    if (kind === 'chest') {
+      after = (
+        <Button mode="primary" size="s" loading={opening} onClick={handleOpenChest}>
+          Открыть
+        </Button>
+      );
+    }
     return (
       <SimpleCell
         key={entry.id}
         multiline
         before={open.before}
         subtitle={subtitle}
-        after={kind === 'consumable' ? <div className="inventory-actions">{quantityButton(entry)}</div> : null}
+        after={after}
       >
         {open.name}
       </SimpleCell>
@@ -411,6 +451,14 @@ export default function InventoryTab({ onCharacterUpdate }) {
       </Group>
 
       {detail && <ItemSheet entry={detail} onClose={() => setDetail(null)} />}
+      {roulette && (
+        <ChestRoulette
+          strip={roulette.strip}
+          winIndex={roulette.win_index}
+          result={roulette.result}
+          onClose={closeRoulette}
+        />
+      )}
       {qtyEntry && (
         <QuantitySheet
           entry={qtyEntry}

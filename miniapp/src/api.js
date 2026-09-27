@@ -69,6 +69,12 @@ export function equipItem(itemId) {
   });
 }
 
+// Открыть самый старый ларец из сумки. Исход решает сервер, рулетка его
+// только показывает: ответ несёт ленту карточек и место выигрыша.
+export function openChest() {
+  return request('/chest/open', { method: 'POST' });
+}
+
 export function getPresets() {
   return request('/presets');
 }

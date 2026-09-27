@@ -5,6 +5,8 @@ miniapp_auth_middleware после проверки подписи — тело 
 не влияет.
 """
 
+import random
+
 from aiohttp import web
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -575,7 +577,54 @@ async def _full_inventory(session, character_id: int) -> dict:
     payload = _inventory_payload(await item_service.get_inventory(session, character_id))
     payload["trophies"] = _trophies_payload(await trophy_service.get_stock(session, character_id))
     payload["consumables"] = _consumables_payload(await elixir_service.get_stock(session, character_id))
+    payload["chests"] = _chests_payload(await lootbox_service.closed_chests(session, character_id))
     return payload
+
+
+#: Ролл ларцов - системный генератор: исход не должен угадываться по seed.
+_chest_rng = random.SystemRandom()
+
+
+def _chests_payload(chests) -> list[dict]:
+    """Ларцы - одной стопкой: до открытия они одинаковые, открывается
+    самый старый. Шансы градаций - для подсказки."""
+    if not chests:
+        return []
+    grades = lootbox_service.grade_catalog()
+    total = sum(g.chance for g in grades) or 1
+    return [{
+        "id": "ash_chest",
+        "name": lootbox_service.CHEST_NAME,
+        "count": len(chests),
+        "icon": lootbox_service.CHEST_ICON,
+        "description": "Ларец за день стрика ежедневок. Что внутри - решает рулетка при открытии.",
+        "grades": [{"name": g.name, "icon": f"chest:{g.id}", "grade": g.id,
+                    "chance": round(100 * g.chance / total, 1)} for g in grades],
+    }]
+
+
+async def handle_post_chest_open(request: web.Request) -> web.Response:
+    """Открыть ларец из сумки: исход решает сервер, рулетка его показывает."""
+    vk_user_id = request[VK_USER_ID_KEY]
+    session_factory = request.app[SESSION_FACTORY_KEY]
+    async with session_factory() as session:
+        character = await _load_character(session, vk_user_id)
+        if character is None:
+            return web.json_response({"error": "character_not_found"}, status=404)
+        try:
+            chest, result = await lootbox_service.open_owned(session, character, None, _chest_rng)
+        except lootbox_service.ChestGone:
+            await session.rollback()
+            return web.json_response({"error": "no_chest"}, status=409)
+        strip, win_index = lootbox_service.roulette_strip(result, chest.streak or 1, _chest_rng)
+        await session.commit()
+        inventory = await _full_inventory(session, character.id)
+        return web.json_response({
+            "strip": strip,
+            "win_index": win_index,
+            "result": {"grade": result.grade.id, "grade_name": result.grade.name, "lines": result.lines},
+            "inventory": inventory,
+        })
 
 
 async def handle_get_inventory(request: web.Request) -> web.Response:
@@ -760,6 +809,7 @@ def register_routes(app: web.Application) -> None:
     app.router.add_get("/api/miniapp/trials", handle_get_trials)
     app.router.add_get("/api/miniapp/inventory", handle_get_inventory)
     app.router.add_post("/api/miniapp/equip", handle_post_equip)
+    app.router.add_post("/api/miniapp/chest/open", handle_post_chest_open)
     app.router.add_get("/api/miniapp/presets", handle_get_presets)
     app.router.add_post("/api/miniapp/presets", handle_post_presets)
     app.router.add_post("/api/miniapp/presets/switch", handle_post_preset_switch)
