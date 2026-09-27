@@ -505,6 +505,61 @@ body {
   z-index: 4;
 }
 
+/* Патч 112: линза. Окно - круг с увеличенной картой и метками, поверх -
+   бронзовая оправа (картинка с прозрачностью), чуть больше окна. */
+.map-viewport--lens {
+  cursor: none;
+}
+
+.map-lens {
+  position: absolute;
+  z-index: 5;
+  pointer-events: none;
+}
+
+.map-lens__glass {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  overflow: hidden;
+  background: #d9d2c3;
+  /* Край стекла темнее середины - как у настоящей линзы. */
+  box-shadow: inset 0 0 22px 6px rgba(20, 12, 8, 0.45);
+}
+
+.map-lens__cell {
+  position: absolute;
+  box-sizing: border-box;
+  border: 2px solid rgba(160, 20, 30, 0.85);
+  border-radius: 4px;
+  background: rgba(200, 40, 40, 0.08);
+}
+
+.map-lens__frame {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+  filter: drop-shadow(0 6px 10px rgba(0, 0, 0, 0.55));
+}
+
+.map-lens__mag {
+  position: absolute;
+  left: 50%;
+  bottom: -30px;
+  transform: translateX(-50%);
+  padding: 1px 8px;
+  border-radius: 8px;
+  font-size: 12px;
+  background: rgba(20, 12, 12, 0.85);
+  color: #f2d9dc;
+}
+
+.map-controls__btn--on {
+  box-shadow: 0 0 0 2px #c8962e inset;
+}
+
 .map-controls__btn {
   width: 32px;
   height: 32px;
