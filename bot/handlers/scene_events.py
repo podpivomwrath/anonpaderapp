@@ -174,7 +174,7 @@ CURRENCY_BUTTONS = {"gold": "💰 Золото", "gems": "💎 Самоцвет�
 
 
 def _money(currency: str, amount: int) -> str:
-    return f"{amount} 💎" if currency == "gems" else f"{amount} зол."
+    return f"{amount} 💎" if currency == "gems" else f"{amount} золота"
 
 
 async def start(peer_id: int, event: SceneEvent) -> None:
