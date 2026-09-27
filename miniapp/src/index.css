@@ -644,6 +644,115 @@ body {
   cursor: pointer;
 }
 
+/* Иконка и название предмета открывают подсказку - кнопки без оформления,
+   чтобы строка выглядела как раньше. */
+.item-open {
+  display: inline-flex;
+  align-items: center;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.item-open--name {
+  display: inline;
+}
+
+/* Подсказка о предмете и выбор количества - та же шторка, что выбор рамки. */
+.item-sheet {
+  padding: 16px 16px calc(16px + env(safe-area-inset-bottom));
+  /* Непрозрачный: сквозь полупрозрачную шторку венцов просвечивал список. */
+  background: #141518;
+}
+
+.item-sheet__head {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 12px;
+}
+
+.item-sheet__title b {
+  display: block;
+  font-size: 17px;
+  font-weight: 600;
+}
+
+.item-sheet__title small {
+  display: block;
+  margin-top: 2px;
+  font-size: 13px;
+  opacity: 0.65;
+}
+
+.item-sheet__desc {
+  margin: 0 0 12px;
+  font-size: 14px;
+  line-height: 1.4;
+  opacity: 0.85;
+}
+
+.item-sheet__rows {
+  margin: 0 0 12px;
+}
+
+.item-sheet__row {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 6px 0;
+  border-bottom: 1px solid #ffffff10;
+  font-size: 14px;
+}
+
+.item-sheet__row dt {
+  opacity: 0.65;
+}
+
+.item-sheet__row dd {
+  margin: 0;
+  text-align: right;
+}
+
+.item-sheet__note {
+  margin: 0 0 12px;
+  font-size: 12.5px;
+  opacity: 0.6;
+}
+
+.qty-picker {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+
+.qty-picker input[type="range"] {
+  flex: 1;
+  min-width: 0;
+  accent-color: var(--vkui--color_icon_accent, #2688eb);
+}
+
+.qty-picker__input {
+  width: 72px;
+  padding: 8px;
+  border: 1px solid #ffffff24;
+  border-radius: 8px;
+  background: #ffffff0d;
+  color: inherit;
+  font: inherit;
+  text-align: center;
+}
+
+.qty-picker__buttons {
+  display: flex;
+  gap: 8px;
+}
+
 .copy-transfer:hover,
 .copy-transfer:focus-visible {
   background: var(--vkui--color_background_secondary, rgba(0, 0, 0, 0.06));

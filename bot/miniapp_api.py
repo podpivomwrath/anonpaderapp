@@ -22,6 +22,7 @@ from game.economy import buff_descriptions
 from models import BaseClass, Character, CharacterBuffPreset, User
 from services import (
     daily_service,
+    elixir_service,
     derived_stats_service,
     item_service,
     crown_service,
@@ -35,6 +36,7 @@ from services import (
     story_service,
     stat_alloc_service,
     trial_service,
+    trophy_service,
 )
 from game.economy import fishing as game_fishing
 from game.economy import mining as game_mining
@@ -468,6 +470,57 @@ async def handle_get_dailies(request: web.Request) -> web.Response:
         )
 
 
+_ELIXIR_CATEGORY_TITLES = {"heal": "Лечебное", "combat": "Боевой эликсир"}
+
+
+def _unique_flavor(item) -> str | None:
+    """Описание уникальной вещи (content/items/unique_items.json, поле flavor)."""
+    if item.rarity != item_service.UNIQUE_RARITY_ID:
+        return None
+    for unique in item_service.unique_items().values():
+        if unique.name == item.name:
+            return unique.flavor or None
+    return None
+
+
+def _trophies_payload(stock) -> list[dict]:
+    """Реликвии на продажу: редкость по цвету кружка (он совпадает с
+    редкостью вещей), описание из контента и цена у скупщика в своём
+    городе - в чужом он платит меньше (FOREIGN_CITY_PRICE_PENALTY)."""
+    by_emoji = {r.emoji: (rid, r.name) for rid, r in item_service.rarities().items()}
+    out = []
+    for trophy, count in stock:
+        rarity_id, rarity_name = by_emoji.get(trophy.emoji, (None, None))
+        out.append({
+            "id": trophy.id,
+            "name": trophy.name,
+            "count": count,
+            "icon": f"trophy:{trophy.id}",
+            "rarity": rarity_id,
+            "rarity_title": rarity_name,
+            "description": trophy.description,
+            "price": trophy.sell_price,
+            "price_total": trophy.sell_price * count,
+        })
+    return out
+
+
+def _consumables_payload(stock) -> list[dict]:
+    return [
+        {
+            "id": elixir.id,
+            "name": elixir.name,
+            "count": count,
+            "icon": f"elixir:{elixir.id}",
+            "category_title": _ELIXIR_CATEGORY_TITLES.get(elixir.category, elixir.category),
+            "description": elixir.description,
+            # Количество клиент допишет после ползунка: «передать <имя> <N>».
+            "transfer_prefix": f"передать {elixir.name}",
+        }
+        for elixir, count in stock
+    ]
+
+
 def _transfer_command(item) -> str | None:
     """Команда передачи - у всего, что можно передать. Надетое сюда
     попадает тоже: команда верная, просто сначала вещь надо снять."""
@@ -509,10 +562,20 @@ def _inventory_payload(items: list) -> dict:
                 # Решает сервер: правила «что можно передать» живут в
                 # transfer_service, клиент их не пересказывает.
                 "transfer_command": _transfer_command(item),
+                "description": _unique_flavor(item),
             }
             for item, equipped in items
         ]
     }
+
+
+async def _full_inventory(session, character_id: int) -> dict:
+    """Экипировка + реликвии + расходники - один ответ и для показа, и после
+    «Надеть»: иначе после надевания реликвии и расходники пропадали бы."""
+    payload = _inventory_payload(await item_service.get_inventory(session, character_id))
+    payload["trophies"] = _trophies_payload(await trophy_service.get_stock(session, character_id))
+    payload["consumables"] = _consumables_payload(await elixir_service.get_stock(session, character_id))
+    return payload
 
 
 async def handle_get_inventory(request: web.Request) -> web.Response:
@@ -524,8 +587,7 @@ async def handle_get_inventory(request: web.Request) -> web.Response:
         character = await _load_character(session, vk_user_id)
         if character is None:
             return web.json_response({"error": "character_not_found"}, status=404)
-        items = await item_service.get_inventory(session, character.id)
-        return web.json_response(_inventory_payload(items))
+        return web.json_response(await _full_inventory(session, character.id))
 
 
 async def handle_post_equip(request: web.Request) -> web.Response:
@@ -549,8 +611,7 @@ async def handle_post_equip(request: web.Request) -> web.Response:
             return web.json_response({"error": "cannot_equip"}, status=400)
         await item_service.equip_item(session, character.id, item_id)
         await session.commit()
-        items = await item_service.get_inventory(session, character.id)
-        return web.json_response(_inventory_payload(items))
+        return web.json_response(await _full_inventory(session, character.id))
 
 
 async def _ordered_presets(session: AsyncSession, character_id: int) -> list[CharacterBuffPreset]:

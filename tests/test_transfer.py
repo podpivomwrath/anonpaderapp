@@ -180,3 +180,32 @@ def test_miniapp_offers_the_command_for_every_transferable_item() -> None:
     assert _transfer_command(item(rarity="unique", name="Скальпель Хирурга")) == "передать Скальпель Хирурга 7"
     assert _transfer_command(item(bound=True, craft_spec="dps")) is None
     assert _transfer_command(item(admin_only=True)) is None
+
+
+def test_short_forms_and_number_first() -> None:
+    """«передать 100 зол», «передать 100 сам» - как пишут в чате."""
+    assert ts.parse("100 зол") == ("зол", 100)
+    assert ts.parse("100 Сам") == ("сам", 100)
+    assert ts.parse("3 Малое Исцеление") == ("малое исцеление", 3)
+    assert "зол" in ts.GOLD_WORDS and "сам" in ts.GEM_WORDS
+
+
+async def test_gems_by_short_word(db_session, make_character) -> None:
+    a = await make_character(donate=5)
+    name, qty = ts.parse("5 сам")
+    offer = (await ts.find(db_session, a.id, name, qty)).offers[0]
+    assert offer.kind == "gems"
+
+
+async def test_inventory_payload_lists_relics_and_consumables(db_session, make_character) -> None:
+    from bot.miniapp_api import _full_inventory
+
+    a = await make_character()
+    await trophy_service.grant_specific(db_session, a.id, "blood_shard", 3)
+    await elixir_service.grant(db_session, a.id, "heal_small", 4)
+    payload = await _full_inventory(db_session, a.id)
+    relic = payload["trophies"][0]
+    assert relic["rarity_title"] == "Редкая" and relic["price_total"] == relic["price"] * 3
+    assert relic["icon"] == "trophy:blood_shard" and relic["description"]
+    potion = payload["consumables"][0]
+    assert potion["transfer_prefix"] == "передать Малое исцеление" and potion["count"] == 4

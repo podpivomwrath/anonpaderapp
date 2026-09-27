@@ -29,8 +29,9 @@ from services import (
     wallet_service,
 )
 
-GOLD_WORDS = {"золото", "золота", "зол", "золотом", "gold"}
-GEM_WORDS = {"самоцвет", "самоцветы", "самоцветов", "самоцвета", "пепельные самоцветы", "gems"}
+GOLD_WORDS = {"золото", "золота", "зол", "зол.", "золотом", "золотых", "gold"}
+GEM_WORDS = {"сам", "сам.", "самоц", "самоцвет", "самоцветы", "самоцветов", "самоцвета",
+             "пепельные самоцветы", "gems"}
 _GRADE_STEMS = {"обычн": "common", "редк": "rare", "эпич": "epic", "легенд": "legendary"}
 
 
@@ -57,8 +58,13 @@ class Lookup:
 
 
 def parse(text: str) -> tuple[str, int | None]:
-    """«Малое исцеление 5» -> ("малое исцеление", 5); «золото» -> ("золото", None)."""
+    """«Малое исцеление 5» -> ("малое исцеление", 5); «золото» -> ("золото", None).
+    Число можно ставить и перед названием: «100 зол», «3 малое исцеление».
+    Регистр не важен - всё сравнивается в нижнем."""
     text = " ".join(text.split()).strip()
+    first = re.match(r"^(\d+)\s+(\D.*)$", text)
+    if first:
+        return first.group(2).strip().lower(), int(first.group(1))
     match = re.match(r"^(.*?)(?:\s+(\d+))?$", text)
     name, qty = match.group(1), match.group(2)
     return name.strip().lower(), (int(qty) if qty else None)
