@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import {
   Tabs, TabsItem, Group, Header, Div, Spinner, Placeholder, Button, Input, FormItem, Select, Textarea, Checkbox,
-  Caption,
+  Caption, SimpleCell,
 } from '@vkontakte/vkui';
 import {
   getAdminOverview, searchAdminPlayers, getAdminPlayer, postAdminAction, getAdminJournal,
@@ -396,10 +396,25 @@ function statusLabel(card) {
   return '🗺 На карте';
 }
 
+// Сворачиваемая группа карточки игрока - как слоты в сумке: строка с
+// названием, по нажатию раскрывается. Изначально свёрнута: карточка длинная,
+// а смотрят обычно одну-две группы.
+function Fold({ title, children }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <Group>
+      <SimpleCell onClick={() => setOpen((v) => !v)} after={open ? '▴' : '▾'}>
+        <b>{title}</b>
+      </SimpleCell>
+      {open && children}
+    </Group>
+  );
+}
+
 function PlayerCard({ card, onRefresh }) {
   return (
     <>
-      <Group header={<Header>{card.is_premium ? '💠 ' : ''}{card.name}{card.title ? ` «${card.title}»` : ''} (vk_id {card.vk_id})</Header>}>
+      <Fold title={<>{card.is_premium ? '💠 ' : ''}{card.name}{card.title ? ` «${card.title}»` : ''} (vk_id {card.vk_id})</>}>
         <StatRow label="Ник" value={card.name} />
         <StatRow label="vk_id" value={card.vk_id ?? '-'} />
         <StatRow label="Создан" value={card.created_at ? new Date(card.created_at).toLocaleString('ru') : '-'} />
@@ -409,18 +424,18 @@ function PlayerCard({ card, onRefresh }) {
           label="💠 Метка Хранителя"
           value={card.premium_until ? `до ${new Date(card.premium_until).toLocaleString('ru')}${card.is_premium ? '' : ' (истекла)'}` : 'нет'}
         />
-      </Group>
+      </Fold>
 
-      <Group header={<Header>Прогресс</Header>}>
+      <Fold title={<>Прогресс</>}>
         <StatRow label="Уровень" value={`${card.level} (опыт ${card.xp_to_next == null ? 'МАКС' : `${card.experience} / ${card.xp_to_next}`})`} />
         <StatRow label="Класс" value={card.class_title} />
         <StatRow label="Регион" value={card.region_title || '-'} />
         <StatRow label="Позиция" value={`(${card.pos_x}; ${card.pos_y})`} />
         <StatRow label="Состояние" value={statusLabel(card)} />
-      </Group>
+      </Fold>
 
       {card.stats && (
-        <Group header={<Header>Характеристики</Header>}>
+        <Fold title={<>Характеристики</>}>
           <StatRow label="СИЛ / ЛОВ / ИНТ / ВЫН / ВОЛ" value={`${card.stats.str} / ${card.stats.agi} / ${card.stats.int} / ${card.stats.vit} / ${card.stats.wil}`} />
           <StatRow label="Свободных очков" value={card.stats.unspent_points} />
           {card.derived && (
@@ -437,17 +452,17 @@ function PlayerCard({ card, onRefresh }) {
               />
             </>
           )}
-        </Group>
+        </Fold>
       )}
 
-      <Group header={<Header>Ресурсы</Header>}>
+      <Fold title={<>Ресурсы</>}>
         <StatRow label="Золото / Самоцветы" value={`${card.gold} / ${card.gems}`} />
         {Object.entries(card.trophies).map(([id, count]) => (
           <StatRow key={id} label={`Трофей: ${id}`} value={count} />
         ))}
-      </Group>
+      </Fold>
 
-      <Group header={<Header>Снаряжение</Header>}>
+      <Fold title={<>Снаряжение</>}>
         {card.inventory.length === 0 && <Div style={{ opacity: 0.7 }}>Инвентарь пуст.</Div>}
         {card.inventory.map((item) => (
           <StatRow
@@ -460,9 +475,9 @@ function PlayerCard({ card, onRefresh }) {
         {card.elixirs.map((e) => (
           <StatRow key={e.id} label={`${e.emoji} ${e.name}`} value={`×${e.count}`} />
         ))}
-      </Group>
+      </Fold>
 
-      <Group header={<Header>Маунты</Header>}>
+      <Fold title={<>Маунты</>}>
         {card.mounts.length === 0 && <Div style={{ opacity: 0.7 }}>Маунтов нет.</Div>}
         {card.mounts.map((m) => (
           <StatRow key={m.mount_id} label={`${m.emoji} ${m.name}`} value={m.rarity_title || m.rarity} />
@@ -473,9 +488,9 @@ function PlayerCard({ card, onRefresh }) {
             value={`(${card.mount_travel.to_x}; ${card.mount_travel.to_y}) · осталось ${Math.round(card.mount_travel.remaining_seconds)} сек.`}
           />
         )}
-      </Group>
+      </Fold>
 
-      <Group header={<Header>Прогрессия контента</Header>}>
+      <Fold title={<>Прогрессия контента</>}>
         <StatRow label="Текущий квест" value={card.current_quest || '-'} />
         {card.story_progress.map((s) => (
           <StatRow key={s.region} label={`Сюжет: ${s.region_title || s.region}`} value={`акт ${s.act}, шаг ${s.quest_step ?? '-'} (${s.status})`} />
@@ -486,18 +501,18 @@ function PlayerCard({ card, onRefresh }) {
           value={card.active_preset ? `${card.active_preset.name} (${card.active_preset.buff_ids.length} баффов)` : '-'}
         />
         <StatRow label="Пепельная Песнь" value={`${card.song_progress.seen} / ${card.song_progress.total}${card.song_progress.complete ? ' ✅' : ''}`} />
-      </Group>
+      </Fold>
 
-      <Group header={<Header>Активность</Header>}>
+      <Fold title={<>Активность</>}>
         <StatRow label="Стрики (вход/ежедневки)" value={`${card.login_streak} / ${card.daily_streak}`} />
         <StatRow label="PvP" value={`${card.pvp_wins} побед / ${card.pvp_losses} поражений`} />
         {card.dailies_today.length === 0 && <Div style={{ opacity: 0.7 }}>Ежедневки на сегодня не назначены.</Div>}
         {card.dailies_today.map((q) => (
           <StatRow key={q.title} label={`${q.completed ? '✅ ' : ''}${q.title}`} value={`${q.progress} / ${q.target}`} />
         ))}
-      </Group>
+      </Fold>
 
-      <Group header={<Header>Служебное</Header>}>
+      <Fold title={<>Служебное</>}>
         <StatRow label="Бан" value={card.is_banned ? `🚫 ${card.ban_reason || 'без причины'}${card.banned_until ? ` до ${new Date(card.banned_until).toLocaleString('ru')}` : ' (навсегда)'}` : 'нет'} />
         {card.recent_admin_actions.length === 0 && <Div style={{ opacity: 0.7 }}>Действий администратора не было.</Div>}
         {card.recent_admin_actions.map((a, i) => (
@@ -507,7 +522,7 @@ function PlayerCard({ card, onRefresh }) {
             value={a.note || '-'}
           />
         ))}
-      </Group>
+      </Fold>
 
       <ActionForm playerId={card.id} onDone={onRefresh} />
     </>
