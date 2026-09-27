@@ -3,7 +3,7 @@ import bridge from '@vkontakte/vk-bridge';
 import {
   Button, Div, Group, Header, Placeholder, SimpleCell, Spinner, Text,
 } from '@vkontakte/vkui';
-import { equipItem, getCharacter, getInventory, openChest } from '../api.js';
+import { equipItem, getCharacter, getInventory, openChest, unequipItem } from '../api.js';
 import ChestRoulette from './ChestRoulette.jsx';
 import ItemIcon from './ItemIcon.jsx';
 
@@ -111,7 +111,7 @@ function detailRows(entry) {
   ];
 }
 
-function ItemSheet({ entry, onClose }) {
+function ItemSheet({ entry, onClose, onUnequip, unequipping }) {
   const { kind, data } = entry;
   const note = kind === 'trophy'
     ? 'Цена - у скупщика в своём городе, в чужом он платит меньше. Реликвии не передаются.'
@@ -137,6 +137,15 @@ function ItemSheet({ entry, onClose }) {
           ))}
         </dl>
         {note && <p className="item-sheet__note">{note}</p>}
+        {kind === 'gear' && data.equipped && onUnequip && (
+          <Button
+            mode="outline" size="l" stretched loading={unequipping}
+            onClick={() => onUnequip(data.id)}
+            style={{ marginBottom: 8 }}
+          >
+            Снять
+          </Button>
+        )}
         <Button mode="secondary" size="l" stretched onClick={onClose}>Закрыть</Button>
       </div>
     </>
@@ -275,6 +284,28 @@ export default function InventoryTab({ onCharacterUpdate }) {
     }
   }
 
+  // Патч 111: снять надетую вещь. Как и после «Надеть» - перезапросить
+  // персонажа: статы и Мощь в шапке зависят от того, что надето сейчас.
+  async function handleUnequip(itemId) {
+    setEquippingId(itemId);
+    setErrorMsg(null);
+    try {
+      apply(await unequipItem(itemId));
+      setDetail(null);
+      if (onCharacterUpdate) {
+        try {
+          onCharacterUpdate(await getCharacter());
+        } catch {
+          /* вещь уже снята; шапка обновится при следующем открытии */
+        }
+      }
+    } catch (err) {
+      setErrorMsg(err?.message === 'cannot_unequip' ? 'Эта вещь уже не надета.' : 'Не удалось снять предмет.');
+    } finally {
+      setEquippingId(null);
+    }
+  }
+
   if (status === 'loading') {
     return (
       <Div style={{ display: 'flex', justifyContent: 'center', paddingTop: 48 }}>
@@ -385,7 +416,18 @@ export default function InventoryTab({ onCharacterUpdate }) {
               Надеть
             </Button>
           </div>
-        ) : craftButton(item)}
+        ) : (
+          <div className="inventory-actions">
+            {craftButton(item)}
+            <Button
+              mode="tertiary" size="s"
+              loading={equippingId === item.id}
+              onClick={() => handleUnequip(item.id)}
+            >
+              Снять
+            </Button>
+          </div>
+        )}
       >
         {open.name}
       </SimpleCell>
@@ -450,7 +492,12 @@ export default function InventoryTab({ onCharacterUpdate }) {
         ))}
       </Group>
 
-      {detail && <ItemSheet entry={detail} onClose={() => setDetail(null)} />}
+      {detail && (
+        <ItemSheet
+          entry={detail} onClose={() => setDetail(null)}
+          onUnequip={handleUnequip} unequipping={equippingId === detail.data?.id}
+        />
+      )}
       {roulette && (
         <ChestRoulette
           strip={roulette.strip}

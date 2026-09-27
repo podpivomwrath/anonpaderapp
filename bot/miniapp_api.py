@@ -681,6 +681,29 @@ async def handle_post_equip(request: web.Request) -> web.Response:
         return web.json_response(await _full_inventory(session, character.id))
 
 
+async def handle_post_unequip(request: web.Request) -> web.Response:
+    """Снять надетую вещь в сумку (патч 111)."""
+    vk_user_id = request[VK_USER_ID_KEY]
+    try:
+        body = await request.json()
+    except Exception:
+        return web.json_response({"error": "bad_request"}, status=400)
+
+    item_id = body.get("item_id") if isinstance(body, dict) else None
+    if not isinstance(item_id, int):
+        return web.json_response({"error": "bad_request"}, status=400)
+
+    session_factory = request.app[SESSION_FACTORY_KEY]
+    async with session_factory() as session:
+        character = await _load_character(session, vk_user_id)
+        if character is None:
+            return web.json_response({"error": "character_not_found"}, status=404)
+        if not await item_service.unequip_item(session, character.id, item_id):
+            return web.json_response({"error": "cannot_unequip"}, status=400)
+        await session.commit()
+        return web.json_response(await _full_inventory(session, character.id))
+
+
 async def _ordered_presets(session: AsyncSession, character_id: int) -> list[CharacterBuffPreset]:
     return (
         await session.scalars(
@@ -827,6 +850,7 @@ def register_routes(app: web.Application) -> None:
     app.router.add_get("/api/miniapp/trials", handle_get_trials)
     app.router.add_get("/api/miniapp/inventory", handle_get_inventory)
     app.router.add_post("/api/miniapp/equip", handle_post_equip)
+    app.router.add_post("/api/miniapp/unequip", handle_post_unequip)
     app.router.add_post("/api/miniapp/chest/open", handle_post_chest_open)
     app.router.add_get("/api/miniapp/presets", handle_get_presets)
     app.router.add_post("/api/miniapp/presets", handle_post_presets)

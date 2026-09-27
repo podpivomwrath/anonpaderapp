@@ -8,7 +8,7 @@
 import math
 import random
 
-from sqlalchemy import delete, select
+from sqlalchemy import delete, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from game.combat import balance_config as bc
@@ -267,6 +267,24 @@ async def equip_item(db: AsyncSession, character_id: int, item_id: int) -> Item 
     row.equipped = True
     await db.flush()
     return old_item
+
+
+async def unequip_item(db: AsyncSession, character_id: int, item_id: int) -> bool:
+    """Снимает надетый предмет в сумку. False - он не твой или уже снят.
+
+    Условным UPDATE: два нажатия «Снять» подряд не должны оба «успешно»
+    снимать одну вещь (события идут параллельно, патч 94)."""
+    result = await db.execute(
+        update(Inventory)
+        .where(
+            Inventory.character_id == character_id,
+            Inventory.item_id == item_id,
+            Inventory.equipped.is_(True),
+        )
+        .values(equipped=False)
+    )
+    await db.flush()
+    return bool(result.rowcount)
 
 
 def sell_price(item: Item, price_multiplier: float = 1.0) -> int:

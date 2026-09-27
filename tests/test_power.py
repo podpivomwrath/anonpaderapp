@@ -44,5 +44,28 @@ async def test_subclass_and_active_buffs_add_percent(db_session, make_character)
     assert power.total == round(before * (1 + 0.10 + 4 * 0.03))
 
 
+async def test_power_is_current_not_best_ever(db_session, make_character) -> None:
+    """Мощь - по тому, что надето СЕЙЧАС: сняли - упала, надели слабее - меньше."""
+    from services import item_service
+
+    me = await make_character()
+    naked = (await power_service.power_of(db_session, me)).total
+    strong = await _equip(db_session, me, {"str": 40})
+    with_strong = (await power_service.power_of(db_session, me)).total
+    assert with_strong == naked + 40
+
+    assert await item_service.unequip_item(db_session, me.id, strong.id)
+    assert (await power_service.power_of(db_session, me)).total == naked
+    assert not await item_service.unequip_item(db_session, me.id, strong.id), "уже снята"
+
+    weak = Item(name="Слабая", slot="weapon", base_stats={"str": 10}, rarity="common", ilvl=10)
+    db_session.add(weak)
+    await db_session.flush()
+    db_session.add(Inventory(character_id=me.id, item_id=weak.id, equipped=False))
+    await db_session.flush()
+    await item_service.equip_item(db_session, me.id, weak.id)
+    assert (await power_service.power_of(db_session, me)).total == naked + 10
+
+
 def test_only_combat_boards_show_power() -> None:
     assert set(leaderboard_service.COMBAT_BOARDS) == {"pvp", "kills"}

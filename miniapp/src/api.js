@@ -69,6 +69,15 @@ export function equipItem(itemId) {
   });
 }
 
+// Патч 111: снять надетую вещь в сумку.
+export function unequipItem(itemId) {
+  return request('/unequip', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ item_id: itemId }),
+  });
+}
+
 // Открыть самый старый ларец из сумки. Исход решает сервер, рулетка его
 // только показывает: ответ несёт ленту карточек и место выигрыша.
 export function openChest() {
