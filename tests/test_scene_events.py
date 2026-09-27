@@ -59,6 +59,11 @@ def test_content_graph_is_consistent() -> None:
         assert finale is not None and finale.tier == "finale", kind
 
 
+def test_every_event_has_a_picture() -> None:
+    """Промты - tools/event_art_prompts.md; событие без картинки - недоделка."""
+    assert [e.id for e in se.content().events if not e.image] == []
+
+
 def test_every_trail_can_be_started_from_the_random_pool() -> None:
     started = set()
     for event in se.content().events:

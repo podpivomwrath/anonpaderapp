@@ -3,6 +3,7 @@
   "events": [
     {
       "id": "rockfall",
+      "image": "457239188",
       "title": "🪨 Завал на тропе",
       "tier": "medium",
       "scenes": {
@@ -25,6 +26,7 @@
     },
     {
       "id": "thirsty_wanderer",
+      "image": "457239190",
       "title": "🩸 Путник без сил",
       "tier": "medium",
       "scenes": {
@@ -48,6 +50,7 @@
     },
     {
       "id": "crumbling_ledge",
+      "image": "457239180",
       "title": "💥 Земля уходит из-под ног",
       "tier": "medium",
       "scenes": {
@@ -63,6 +66,7 @@
     },
     {
       "id": "dice_player",
+      "image": "457239181",
       "title": "🎲 Игрок в кости",
       "tier": "medium",
       "scenes": {
@@ -79,6 +83,7 @@
     },
     {
       "id": "hooded_cheat",
+      "image": "457239183",
       "title": "🎲 Шулер в капюшоне",
       "tier": "medium",
       "rings": [2, 3, 4, 5],
@@ -96,6 +101,7 @@
     },
     {
       "id": "blood_on_stones",
+      "image": "457239176",
       "title": "🐾 Кровь на камнях",
       "tier": "medium",
       "scenes": {
@@ -110,6 +116,7 @@
     },
     {
       "id": "torn_map",
+      "image": "457239191",
       "title": "🗺 Обрывок карты",
       "tier": "medium",
       "scenes": {
@@ -126,6 +133,7 @@
     },
     {
       "id": "distant_fires",
+      "image": "457239182",
       "title": "🔥 Огни на горизонте",
       "tier": "medium",
       "rings": [2, 3, 4],
@@ -141,6 +149,7 @@
     },
     {
       "id": "carved_marks",
+      "image": "457239179",
       "title": "🦉 Зарубки на дереве",
       "tier": "medium",
       "scenes": {
@@ -155,6 +164,7 @@
     },
     {
       "id": "broken_altar",
+      "image": "457239177",
       "title": "🦴 Разбитый алтарь",
       "tier": "medium",
       "scenes": {
@@ -173,6 +183,7 @@
     },
     {
       "id": "mirror_marsh",
+      "image": "457239185",
       "title": "🪞 Неподвижная вода",
       "tier": "medium",
       "scenes": {
@@ -189,6 +200,7 @@
     },
     {
       "id": "old_well",
+      "image": "457239186",
       "title": "🕳 Колодец",
       "tier": "deep",
       "scenes": {
@@ -218,6 +230,7 @@
     },
     {
       "id": "shard_crack",
+      "image": "457239189",
       "title": "💎 Трещина с осколками",
       "tier": "deep",
       "scenes": {
@@ -244,6 +257,7 @@
     },
     {
       "id": "campfire_riddle",
+      "image": "457239178",
       "title": "🔥 Безглазый у костра",
       "tier": "deep",
       "scenes": {
@@ -266,6 +280,7 @@
     },
     {
       "id": "trail_blood_finale",
+      "image": "457239192",
       "title": "🐾 Логово",
       "tier": "finale",
       "scenes": {
@@ -282,6 +297,7 @@
     },
     {
       "id": "trail_cart_finale",
+      "image": "457239193",
       "title": "🛒 Брошенная телега",
       "tier": "finale",
       "scenes": {
@@ -303,6 +319,7 @@
     },
     {
       "id": "trail_map_finale",
+      "image": "457239197",
       "title": "🗺 Печать на камне",
       "tier": "finale",
       "scenes": {
@@ -322,6 +339,7 @@
     },
     {
       "id": "trail_fires_finale",
+      "image": "457239196",
       "title": "🔥 Стоянка культа",
       "tier": "finale",
       "scenes": {
@@ -341,6 +359,7 @@
     },
     {
       "id": "trail_false_1",
+      "image": "457239194",
       "title": "🦉 Пустой тайник",
       "tier": "finale",
       "scenes": {
@@ -355,6 +374,7 @@
     },
     {
       "id": "trail_false_2",
+      "image": "457239194",
       "title": "🦉 Снова пусто",
       "tier": "finale",
       "scenes": {
@@ -369,6 +389,7 @@
     },
     {
       "id": "trail_false_3",
+      "image": "457239195",
       "title": "🦉 Конец пути",
       "tier": "finale",
       "scenes": {
