@@ -5,7 +5,12 @@
 потоков для одного peer_id не затирали id сообщений друг друга (игрок может
 держать открытым, например, и инвентарь, и окно статов одновременно)."""
 
-# (namespace, peer_id) -> conversation_message_id уже открытого окна
+# (namespace, peer_id) -> message_id уже открытого окна.
+#
+# Именно message_id: его возвращает messages.send с peer_id. До живого
+# прогона на pupsik (27.09) правка шла по conversation_message_id - номеру
+# внутри диалога, это совсем другое число (4220 против 299687). ВК не находил
+# сообщение, правка падала всегда, и каждое окно приходило новым сообщением.
 _tracked: dict[tuple[str, int], int] = {}
 
 
@@ -25,7 +30,7 @@ async def send_or_edit(
     if existing is not None:
         try:
             await bot_api.messages.edit(
-                peer_id=peer_id, conversation_message_id=existing, message=text,
+                peer_id=peer_id, message_id=existing, message=text,
                 keyboard=keyboard, attachment=attachment,
             )
             return

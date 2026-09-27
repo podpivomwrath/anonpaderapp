@@ -26,7 +26,7 @@ from services.db import get_session_factory
 
 _bot_api = None
 _live_countdown = True
-# peer_id -> conversation_message_id сообщения о смерти (для edit-отсчёта)
+# peer_id -> message_id сообщения о смерти (для edit-отсчёта)
 _death_message: dict[int, int] = {}
 # peer_id -> ждёт PvP-лорную фразу возрождения вместо обычной (патч 22) —
 # PvP-поражение не показывает счётчик смерти в реальном времени, само
@@ -68,7 +68,9 @@ async def register_death(peer_id: int, respawn_at: datetime, xp_lost: int = 0) -
         peer_id=peer_id, message=_death_text(respawn_at, now, xp_lost), random_id=0,
         attachment=photo_attachment(DEATH_PHOTO_ID), keyboard=kb.waiting_keyboard(),
     )
-    # vkbottle messages.send возвращает conversation_message_id (или message_id)
+    # messages.send с peer_id возвращает message_id - по нему и правим. Раньше
+    # его передавали как conversation_message_id (номер в диалоге, совсем другое
+    # число): правка всегда падала, и отсчёт не обновлялся никогда.
     try:
         _death_message[peer_id] = int(resp)
     except (TypeError, ValueError):
@@ -126,7 +128,7 @@ async def scan() -> None:
             try:
                 await _bot_api.messages.edit(
                     peer_id=peer_id,
-                    conversation_message_id=msg_id,
+                    message_id=msg_id,
                     message=_death_text(respawn_at, now),
                 )
             except Exception:

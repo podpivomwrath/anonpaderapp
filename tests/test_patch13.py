@@ -221,3 +221,25 @@ def test_remark_pick_returns_plain_text() -> None:
 
     text = flavor.remark_pick(random.Random(1))
     assert isinstance(text, str) and text
+
+
+
+async def test_edit_goes_by_the_id_that_send_returned() -> None:
+    """messages.send с peer_id возвращает message_id, и править надо по нему.
+    Правка по conversation_message_id с этим числом на проде падала всегда:
+    окна приходили новыми сообщениями, отсчёты смерти и пути не обновлялись."""
+    api = FakeBotApi()
+    await editable_message.send_or_edit(api, "ns_id", 1, "текст 1", "kb")
+    await editable_message.send_or_edit(api, "ns_id", 1, "текст 2", "kb")
+    assert api.edit_calls[0].get("message_id") == 101
+    assert "conversation_message_id" not in api.edit_calls[0]
+    editable_message.clear("ns_id", 1)
+
+
+def test_countdowns_edit_by_message_id() -> None:
+    from pathlib import Path
+
+    root = Path(__file__).resolve().parent.parent
+    for relative in ("bot/handlers/respawn.py", "bot/handlers/mounts.py", "bot/editable_message.py"):
+        source = (root / relative).read_text(encoding="utf-8")
+        assert "conversation_message_id=" not in source, relative

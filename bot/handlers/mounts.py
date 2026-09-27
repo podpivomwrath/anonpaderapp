@@ -54,7 +54,7 @@ _dispenser = None
 _live_countdown = True
 _rng = random.Random()
 
-# peer_id -> conversation_message_id последнего сообщения "в пути" (live-отсчёт)
+# peer_id -> message_id последнего сообщения "в пути" (live-отсчёт)
 _travel_message: dict[int, int] = {}
 # peer_id -> id поездки, ожидающей подтверждения "Продолжить путь"
 _pending_continue: dict[int, int] = {}
@@ -448,7 +448,7 @@ async def scan() -> None:
             continue
         try:
             await _bot_api.messages.edit(
-                peer_id=peer_id, conversation_message_id=msg_id, message=_travel_text(travel, now),
+                peer_id=peer_id, message_id=msg_id, message=_travel_text(travel, now),
             )
         except Exception:
             logger.debug("Не удалось обновить отсчёт пути для {}", peer_id)
