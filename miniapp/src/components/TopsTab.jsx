@@ -3,6 +3,10 @@ import { Group, Header, Div, Spinner, Placeholder, Tabs, TabsItem } from '@vkont
 import { getLeaderboard } from '../api.js';
 import ClassIcon from './ClassIcon.jsx';
 
+function money(value) {
+  return Number(value ?? 0).toLocaleString('ru-RU');
+}
+
 // Патч 58: раньше здесь был один топ (PvP). Теперь их четыре, и список вкладок
 // приходит С СЕРВЕРА вместе с данными — клиент не хранит собственную копию
 // перечня досок, иначе она разъедется с серверной при добавлении пятой.
@@ -95,6 +99,8 @@ export default function TopsTab() {
                 />
                 {e.rank}. {e.premium && '💠 '}
                 {e.name}
+                {/* Патч 111: Мощь - только в боевых топах (сервер шлёт её там). */}
+                {e.power != null && <span className="power-chip" title="Мощь">⚔ {money(e.power)}</span>}
               </span>
               <span className="stat-row__value">{e.value}</span>
             </div>

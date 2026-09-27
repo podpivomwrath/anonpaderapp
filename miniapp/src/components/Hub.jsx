@@ -35,6 +35,15 @@ const SECTIONS = [
   { id: 'exchange', label: 'Биржа' },
 ];
 
+/** Из чего сложилась Мощь - подсказка к числу в шапке. */
+function powerHint(parts) {
+  if (!parts) return 'Мощь';
+  const bonuses = [];
+  if (parts.subclass_pct) bonuses.push(`подкласс +${parts.subclass_pct}%`);
+  if (parts.buffs) bonuses.push(`микробаффы ${parts.buffs} × ${parts.buff_pct}%`);
+  return `Статы ${parts.stats} + вещи ${parts.gear}` + (bonuses.length ? `, ${bonuses.join(', ')}` : '');
+}
+
 /** Числа с разрядами: без них четырёхзначное золото читается как каша. */
 function money(value) {
   return Number(value ?? 0).toLocaleString('ru-RU');
@@ -252,6 +261,14 @@ export default function Hub() {
           </p>
         )}
         </div>
+        {/* Патч 111: Мощь - одно число силы персонажа. Состав - в подсказке:
+            формула на сервере (power_service), здесь только её части. */}
+        {character.power != null && (
+          <div className="hub-banner__power" title={powerHint(character.power_parts)}>
+            <span className="hub-banner__power-label">Мощь</span>
+            <span className="hub-banner__power-value">{money(character.power)}</span>
+          </div>
+        )}
       </div>
       )}
 

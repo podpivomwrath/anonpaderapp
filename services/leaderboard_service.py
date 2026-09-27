@@ -28,6 +28,8 @@ BOARD_FISH_WEIGHT = "fish_weight"
 BOARD_MINING = "mining"
 
 BOARDS = (BOARD_PVP, BOARD_KILLS, BOARD_FISHING, BOARD_FISH_WEIGHT, BOARD_MINING)
+#: Патч 111: в этих топах рядом с ником показывается Мощь - там она о деле.
+COMBAT_BOARDS = (BOARD_PVP, BOARD_KILLS)
 
 BOARD_TITLES = {
     BOARD_PVP: "⚔️ PvP",

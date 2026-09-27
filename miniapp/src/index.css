@@ -70,6 +70,43 @@ body {
   border-bottom: 1px solid #c81e3a55;
 }
 
+/* Патч 111: Мощь справа в шапке - крупное число, подпись над ним. */
+.hub-banner__power {
+  margin-left: auto;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  padding-left: 12px;
+  flex-shrink: 0;
+}
+
+.hub-banner__power-label {
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  opacity: 0.7;
+}
+
+.hub-banner__power-value {
+  font-family: 'Cormorant SC', Forum, serif;
+  font-weight: 600;
+  font-size: 26px;
+  line-height: 1.1;
+  color: #f3e6d6;
+  text-shadow: 0 0 8px rgba(220, 40, 30, 0.55);
+}
+
+/* Мощь рядом с ником в боевых топах. */
+.power-chip {
+  margin-left: 8px;
+  padding: 1px 6px;
+  border-radius: 6px;
+  font-size: 12px;
+  background: rgba(200, 30, 58, 0.18);
+  color: #f2d9dc;
+  white-space: nowrap;
+}
+
 .hub-banner__text {
   /* min-width: 0 - иначе длинное имя распирает flex-элемент шире колонки,
      и строка уезжает под край экрана вместо переноса. */

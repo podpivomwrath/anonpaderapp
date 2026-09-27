@@ -31,6 +31,7 @@ from services import (
     leaderboard_service,
     lootbox_service,
     premium_service,
+    power_service,
     preset_service,
     pvp_service,
     quest_service,
@@ -71,6 +72,7 @@ async def _load_character(session: AsyncSession, vk_user_id: int) -> Character |
 
 def _character_payload(
     character: Character, gear_bonus: dict[str, int] | None = None, wallet=None, is_admin: bool = False,
+    power=None,
 ) -> dict:
     stats = character.stats
     derived = derived_stats_service.compute(character, stats, gear_bonus)
@@ -95,6 +97,13 @@ def _character_payload(
         "region": character.region,
         "region_title": REGION_TITLES.get(character.region, "-") if character.region else "-",
         "level": character.level,
+        # Патч 111: Мощь - одно число силы персонажа (services/power_service.py).
+        "power": power.total if power is not None else None,
+        "power_parts": {
+            "stats": power.stats, "gear": power.gear,
+            "subclass_pct": round(power.subclass_bonus * 100), "buffs": power.buffs,
+            "buff_pct": round(power_service.PER_BUFF_BONUS * 100),
+        } if power is not None else None,
         "farm_currency": wallet.farm_currency if wallet is not None else None,
         "donate_currency": wallet.donate_currency if wallet is not None else None,
         "stats": {
@@ -156,9 +165,10 @@ async def handle_get_character(request: web.Request) -> web.Response:
             return web.json_response({"error": "character_not_found"}, status=404)
         gear_bonus = await item_service.compute_gear_bonus(session, character.id)
         wallet = await get_wallet(session, character.id)
+        power = await power_service.power_of(session, character)
         await session.commit()
         return web.json_response(
-            _character_payload(character, gear_bonus, wallet, _is_admin(request, vk_user_id))
+            _character_payload(character, gear_bonus, wallet, _is_admin(request, vk_user_id), power)
         )
 
 
@@ -206,9 +216,10 @@ async def handle_post_stats(request: web.Request) -> web.Response:
 
         gear_bonus = await item_service.compute_gear_bonus(session, character.id)
         wallet = await get_wallet(session, character.id)
+        power = await power_service.power_of(session, character)
         await session.commit()
         return web.json_response(
-            _character_payload(character, gear_bonus, wallet, _is_admin(request, vk_user_id))
+            _character_payload(character, gear_bonus, wallet, _is_admin(request, vk_user_id), power)
         )
 
 
@@ -298,6 +309,11 @@ async def handle_get_leaderboard(request: web.Request) -> web.Response:
         if character is None:
             return web.json_response({"error": "character_not_found"}, status=404)
         entries = await leaderboard_service.board(session, board_id, limit=10)
+        powers = {}
+        if board_id in leaderboard_service.COMBAT_BOARDS:
+            for e in entries:
+                if e.character_id is not None:
+                    powers[e.character_id] = await power_service.power_by_id(session, e.character_id)
         return web.json_response({
             "board": board_id,
             "boards": [
@@ -310,7 +326,9 @@ async def handle_get_leaderboard(request: web.Request) -> web.Response:
                  # Значок класса в строке. Подкласс есть не у всех (до 30
                  # уровня его нет вовсе), поэтому клиенту отдаются оба, а
                  # он показывает подкласс, если тот выбран.
-                 "base_class": e.base_class, "subclass": e.subclass}
+                 "base_class": e.base_class, "subclass": e.subclass,
+                 # Патч 111: Мощь рядом с ником - только в боевых топах.
+                 "power": powers.get(e.character_id)}
                 for e in entries
             ],
         })
