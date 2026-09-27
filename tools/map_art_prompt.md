@@ -1,5 +1,63 @@
 # Промт: карта мира (круглая)
 
+## Вариант «рисованная карта» (на оценку игрокам, 2026-09-28)
+
+Живописная карта при приближении мылится. Рисованная (тушь, штриховка,
+акварель на пергаменте) держит зум лучше: линии чёткие, а мягкость читается
+как стиль. Геометрия та же - шаблон `tools/map_template.png` как основа,
+круг, пять колец, города по сторонам света, Монолит в центре. Квадрат 1:1,
+2048+.
+
+**А - светлый пергамент, тушь и акварель:**
+
+```
+hand-drawn fantasy world map on aged parchment, ink linework with watercolor
+washes, top-down cartographic view, square 1:1, follow the reference layout
+exactly: one circular landmass centred on the canvas, five concentric zones
+around the exact centre marked by thin dashed ink circles,
+at the exact centre a small black obelisk drawn in ink with a red crack,
+red-brown ink stains spreading from it in rings, the inner zones washed in
+dried-blood red, the outer zones in pale ash grey,
+four regions around the circle: north - hatched ink mountain ranges in cold
+blue-grey wash with a tiny fortress on the northern rim; east - stippled salt
+flats and a coastline with wave lines and a tiny harbour on the eastern rim;
+south - scorched land with small ink volcanoes and red lava lines, a tiny
+burnt fort on the southern rim; west - dense little ink tree symbols in muted
+green wash, a tiny settlement on the western rim,
+classic cartographer's style, crisp confident pen strokes, cross-hatching,
+subtle paper texture, coffee stains and worn edges outside the circle, dark
+fantasy mood, no text, no letters, no labels, no compass rose, no legend
+```
+
+**Б - тёмный пергамент, сепия (ближе к палитре игры):**
+
+```
+hand-drawn dark fantasy world map on dark smoke-stained parchment, sepia and
+black ink linework with muted watercolor, top-down cartographic view, square
+1:1, follow the reference layout exactly: one circular landmass centred on
+the canvas, five concentric zones around the exact centre marked by thin
+dashed ink circles,
+at the exact centre a small black ink obelisk with a glowing crimson crack,
+crimson ink bleeding outward in rings, inner zones in deep blood red wash,
+outer zones in faded ash grey,
+four regions around the circle: north - cross-hatched mountain ranges in cold
+slate wash with a tiny fortress on the northern rim; east - stippled white
+salt flats and an inked coastline with a tiny harbour on the eastern rim;
+south - charred land, small inked volcanoes and thin red lava lines, a tiny
+burnt fort on the southern rim; west - clusters of small ink tree symbols in
+dark moss green, a tiny settlement on the western rim,
+old cartographer's hand, crisp pen strokes, hatching instead of gradients,
+ember-singed edges outside the circle, grim atmosphere, no text, no letters,
+no labels, no compass rose, no legend
+```
+
+Если генератор тянет надписи - дописать в конец `absolutely no writing of
+any kind`. После выбора варианта: замерить центр и кольца заново
+(как для v2 ниже) и подставить калибровку в miniapp/src/mapCatalog.js.
+
+---
+
+
 Картинка-основа для карты мини-аппа. Клетки на ней не рисуются: код ставит их
 поверх, подогнав разметку под нарисованное (центр и радиусы границ колец
 замеряются по готовой картинке). Поэтому от арта нужна не точность до
