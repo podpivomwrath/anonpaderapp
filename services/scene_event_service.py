@@ -149,9 +149,9 @@ def cost_label(character: Character, req: Requirement | None) -> str:
     if req.gems:
         parts.append(f"{req.gems} 💎")
     if req.elixir:
-        parts.append("зелье")
+        parts.append("−🧪")
     if req.trophy:
-        parts.append("трофей")
+        parts.append("−🦴")
     return f" · {', '.join(parts)}" if parts else ""
 
 
