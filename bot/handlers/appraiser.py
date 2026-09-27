@@ -193,15 +193,18 @@ async def sell_trophies(message: Message) -> None:
 
 
 def _sellable(items: list[tuple], mult: float) -> list[tuple]:
+    """Только то, что скупщик реально купит. Раньше отсеивались лишь служебные
+    вещи, и уникальная Игла Хирурга висела в списке «за 0 зол.» с кнопкой
+    продажи, которая ничего не продавала (живой прогон на pupsik)."""
     return [
         (item, item_service.sell_price(item, mult))
-        for item, equipped in items if not equipped and not item.admin_only
+        for item, equipped in items if not equipped and not item_service.is_unsellable(item)
     ]
 
 
 def _warning_lines(warnings: list[tuple]) -> str:
     return "\n".join(
-        f"{item_service.rarity_def(item.rarity).emoji} {item.name} (ур. {item.ilvl}) "
+        f"{item_service.rarity_def(item.rarity).emoji} {item.name}{item_service.level_note(item)} "
         f"- сильнее надетого на {delta}"
         for item, delta in warnings
     )
@@ -241,7 +244,8 @@ async def _render_gear_detail(db, character, mult: float, page: int, prefix: str
     page_entries = sellable[start:start + GEAR_DETAIL_PAGE_SIZE]
 
     lines = "\n".join(
-        f"{i}. {item_service.rarity_def(item.rarity).emoji} {item.name} (ур. {item.ilvl}) - {price} зол."
+        f"{i}. {item_service.rarity_def(item.rarity).emoji} {item.name}{item_service.level_note(item)}"
+        f" - {price} зол."
         for i, (item, price) in enumerate(page_entries, start=1)
     )
     text = f"🎒 Снаряжение (стр. {page} из {total_pages})\n\n{lines}"

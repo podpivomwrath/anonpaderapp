@@ -47,9 +47,11 @@ async def _render_list(db, character) -> tuple[str, list[tuple[Item, bool]]]:
     for item, equipped in items:
         rarity = item_service.rarity_def(item.rarity)
         slot_title = item_service.SLOT_TITLES[item.slot]
+        if item.ilvl is not None:  # у уникальных и служебных вещей уровня нет
+            slot_title += f", ур. {item.ilvl}"
         suffix = " (надето)" if equipped else ""
         lines.append(
-            f"{rarity.emoji} {item.name} - {slot_title}, ур. {item.ilvl}{suffix}\n"
+            f"{rarity.emoji} {item.name} - {slot_title}{suffix}\n"
             f"{_stats_line(item)}"
         )
     text = "🎒 Инвентарь:\n\n" + "\n\n".join(lines)

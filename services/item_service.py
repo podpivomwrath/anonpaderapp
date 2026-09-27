@@ -401,14 +401,20 @@ async def compute_gear_bonus(db: AsyncSession, character_id: int) -> dict[str, i
 # --- Тексты (окно сравнения при дропе, патч 11) ---
 
 
+def level_note(item: Item) -> str:
+    """« (ур. 60)» - или пусто: у уникальных и служебных вещей уровня нет, и
+    живой прогон на pupsik показал «Игла Хирурга (ур. None)» в пяти местах."""
+    return f" (ур. {item.ilvl})" if item.ilvl is not None else ""
+
+
 def format_drop_announcement(item: Item) -> str:
     emoji = rarity_def(item.rarity).emoji
-    return f"🎁 С твари падает: {emoji} {item.name} (ур. {item.ilvl})"
+    return f"🎁 С твари падает: {emoji} {item.name}{level_note(item)}"
 
 
 def format_item_label(item: Item) -> str:
     emoji = rarity_def(item.rarity).emoji
-    return f"{emoji} {item.name} (ур. {item.ilvl})"
+    return f"{emoji} {item.name}{level_note(item)}"
 
 
 def _arrow(before: int, after: int) -> str:
