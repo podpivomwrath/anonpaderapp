@@ -87,6 +87,15 @@ SUBCLASS_FILES = {
     "subclass:dark_mystic": "путь_06_тёмный_мистик.png",
 }
 
+#: Патч 110: генератор переписал промты новых баз оружия («held by» ->
+#: «used by»), и сравнение по началу строки их не узнаёт. Файлы названы
+#: говорящими именами - привязка по ним, как у эмблем подклассов.
+BASE_FILES = {
+    "base:weapon:Булава": "предмет_булава.png",
+    "base:weapon:Кистень": "предмет_кистень.png",
+    "base:weapon:Жезл": "предмет_жезл.png",
+}
+
 #: Картинки, которых нет в контенте игры: значки базовых классов и рамки
 #: венцов топ-1 (патч 91). Промты для них написаны руками
 #: (tools/crown_art_prompts.md), из контента они не выводятся, поэтому и
@@ -115,6 +124,10 @@ def load_manifests() -> list[dict]:
     rows: list[dict] = []
     for path in sorted(SRC.glob("*.json")):
         data = json.loads(path.read_text(encoding="utf-8"))
+        # Описи приходят и списком, и объектом {"items": [...]} (так пришли
+        # события и предметы патча 110).
+        if isinstance(data, dict):
+            data = data.get("items", [])
         if isinstance(data, list):
             rows += [row for row in data if isinstance(row, dict) and row.get("filename")]
     return rows
@@ -173,7 +186,7 @@ def main() -> None:
             continue
         row = find(by_prompt, record["prompt"])
         if row is None:
-            hint = SUBCLASS_FILES.get(key)
+            hint = SUBCLASS_FILES.get(key) or BASE_FILES.get(key)
             if hint is None and key in BACKGROUNDS:
                 hint = BACKGROUNDS[key][2]
             if hint is not None and (SRC / hint).exists():
