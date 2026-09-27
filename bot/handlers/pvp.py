@@ -386,6 +386,12 @@ async def _resolve_target(db, character: Character, target: str):
     for c in solo:
         if c.name.lower() == lowered:
             return c, None
+    # Ник того, кто уже дерётся на этой клетке, - это вход в его бой, как
+    # номер боя из «Осмотреться». Раньше отвечали «Здесь нет такой цели»,
+    # хотя игрок стоял рядом и дрался (живой прогон с тестовыми персонажами).
+    for battle_id, battle in battles:
+        if any(p.name.lower() == lowered for p in battle.participants.values()):
+            return None, (battle_id, battle)
     return None, None
 
 
@@ -482,6 +488,9 @@ async def attack_command(message: Message, target: str) -> None:
             await message.answer(CITY_NO_PVP_TEXT)
             return
 
+        if target.strip().lower() == character.name.lower():
+            await message.answer("На себя не нападают.")
+            return
         victim, battle_entry = await _resolve_target(db, character, target)
         if victim is None and battle_entry is None:
             if await _afk_target_named(db, character, target):

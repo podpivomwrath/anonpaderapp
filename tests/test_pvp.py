@@ -789,3 +789,22 @@ async def test_start_forced_duel_assigns_distinct_sides(db_session, character_at
 
     target = pvp_handlers._default_enemy_target(battle_id, pvp_handlers._battles[battle_id], attacker.id)
     assert target == victim.id
+
+
+async def test_name_of_a_fighter_leads_into_his_battle(db_session, character_at) -> None:
+    """Живой прогон: «/напасть ТестДва», пока тот дрался рядом, отвечало
+    «Здесь нет такой цели». Ник участника идущего боя - вход в этот бой."""
+    me = await character_at(3, 3, region="ridge")
+    fighter_a = await character_at(3, 3, region="ridge")
+    fighter_b = await character_at(3, 3, region="ridge")
+    fighter_a.name = "Драчун"
+    battle = _make_battle("duel", (3, 3))
+    battle.participants[fighter_a.id] = pvp_handlers._participant(fighter_a, peer_id=111)
+    battle.participants[fighter_b.id] = pvp_handlers._participant(fighter_b, peer_id=222)
+    battle.side_of = {fighter_a.id: 0, fighter_b.id: 1}
+    pvp_handlers._battles[-1] = battle
+
+    victim, entry = await pvp_handlers._resolve_target(db_session, me, "драчун")
+
+    assert victim is None
+    assert entry is not None and entry[1] is battle
