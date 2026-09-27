@@ -99,6 +99,23 @@ def test_dice_faces_agree_with_outcome() -> None:
     assert 0.44 < wins / 4000 < 0.50  # в среднем игрок чуть проигрывает
 
 
+def test_stake_is_read_from_free_text() -> None:
+    from bot.handlers.scene_events import parse_stake
+
+    assert parse_stake("250") == 250
+    assert parse_stake("1 000 зол") == 1000
+    assert parse_stake("ноль") is None
+    assert parse_stake("0") is None
+    assert parse_stake("9" * 20) is None
+
+
+def test_dice_scenes_offer_known_currencies() -> None:
+    for event in se.content().events:
+        for scene in event.scenes.values():
+            if scene.type == "dice":
+                assert scene.currencies and set(scene.currencies) <= {"gold", "gems"}
+
+
 def test_riddle_answers() -> None:
     assert se.answer_matches("Тень!", ["тень"])
     assert se.answer_matches("это же тень", ["тень"])

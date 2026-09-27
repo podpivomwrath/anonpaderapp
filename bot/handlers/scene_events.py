@@ -49,8 +49,9 @@ class Pending:
     token: int
     step: int = 0            # push: сделано рывков
     bank: float = 0.0        # push: накоплено
-    round: int = 0           # dice: сыграно партий
     riddle: Riddle | None = None
+    currency: str | None = None  # dice: выбранная валюта (gold | gems)
+    stake: int | None = None     # dice: введённая ставка
     deadline: float = 0.0    # timer / riddle: time.monotonic()
     busy: bool = False       # идёт обработка нажатия - второе нажатие не пускаем
     task: asyncio.Task | None = None
@@ -150,27 +151,30 @@ async def _render(db, character, stats, p: Pending, peer_id: int) -> tuple[str, 
         p.task = asyncio.create_task(_expire(peer_id, p.token, p.scene_id, RIDDLE_SECONDS, "giveup"))
 
     elif scene.type == "dice":
-        wallet = await wallet_service.get_wallet(db, character.id)
-        if scene.currency == "gems":
-            text += f"\n\n💎 У тебя: {wallet.donate_currency}"
+        # Одна партия в три шага, на каждом - «Отменить»: валюта -> сумма
+        # сообщением -> «Бросить кости». Деньги списываются только при броске.
+        if p.currency is None:
+            for currency in scene.currencies:
+                _button(kb, CURRENCY_BUTTONS[currency], {**base, "a": "currency", "v": currency})
+        elif p.stake is None:
+            wallet = await wallet_service.get_wallet(db, character.id)
+            have = wallet.donate_currency if p.currency == "gems" else wallet.farm_currency
+            text = f"Сколько ставишь? Напиши сумму сообщением.\n\n{_money(p.currency, have)} у тебя."
+            p.deadline = time.monotonic() + RIDDLE_SECONDS
+            p.task = asyncio.create_task(_expire(peer_id, p.token, p.scene_id, RIDDLE_SECONDS, "cancel"))
         else:
-            text += f"\n\n💰 У тебя: {wallet.farm_currency}"
-        for i, stake in enumerate(scene.stakes):
-            _button(kb, f"🎲 Поставить {_stake_label(character, scene, stake)}", {**base, "a": "stake", "i": i})
-        _button(kb, scene.leave_label, {**base, "a": "leave"})
+            text = f"Ставка: {_money(p.currency, p.stake)}."
+            _button(kb, "🎲 Бросить кости", {**base, "a": "roll"}, KeyboardButtonColor.POSITIVE)
+        _button(kb, "Отменить", {**base, "a": "cancel"})
 
     return text, _finish_keyboard(kb)
 
 
-def _stake_amount(character, scene: Scene, stake: float) -> int:
-    if scene.currency == "gems":
-        return int(stake)
-    return scene_event_service.gold_amount(character, stake)
+CURRENCY_BUTTONS = {"gold": "💰 Золото", "gems": "💎 Самоцветы"}
 
 
-def _stake_label(character, scene: Scene, stake: float) -> str:
-    amount = _stake_amount(character, scene, stake)
-    return f"{amount} 💎" if scene.currency == "gems" else f"{amount} зол."
+def _money(currency: str, amount: int) -> str:
+    return f"{amount} 💎" if currency == "gems" else f"{amount} зол."
 
 
 async def start(peer_id: int, event: SceneEvent) -> None:
@@ -307,7 +311,7 @@ async def _resolve(peer_id, db, character, stats, p: Pending, result: SceneResul
 
     if result.next:
         p.scene_id = result.next
-        p.step, p.bank, p.round, p.riddle = 0, 0.0, 0, None
+        p.step, p.bank, p.riddle, p.currency, p.stake = 0, 0.0, None, None, None
         text, keyboard = await _render(db, character, stats, p, peer_id)
         await db.commit()
         await _send(peer_id, "\n\n".join([*lines, text]), keyboard)
@@ -359,35 +363,43 @@ async def _cash_out(db, character, scene: Scene, bank: float, applied) -> None:
 
 
 async def _dice(peer_id, db, character, stats, p: Pending, scene: Scene, action: str, payload: dict) -> None:
-    if action == "leave":
+    """Одна партия: валюта -> сумма (сообщением, см. stake_answer) -> бросок."""
+    if action == "cancel":
         await _resolve(peer_id, db, character, stats, p, SceneResult(text=scene.leave_text), [])
         return
-    idx = payload.get("i")
-    if action != "stake" or not isinstance(idx, int) or not 0 <= idx < len(scene.stakes):
-        return
-    amount = _stake_amount(character, scene, scene.stakes[idx])
-    currency = "donate" if scene.currency == "gems" else "farm"
-    sign = "💎" if scene.currency == "gems" else "зол."
-    try:
-        await wallet_service.charge(db, character.id, currency, amount)
-    except wallet_service.NotEnoughCurrency:
+    if action == "currency" and p.currency is None and payload.get("v") in scene.currencies:
+        p.currency = payload["v"]
         text, keyboard = await _render(db, character, stats, p, peer_id)
-        await _send(peer_id, "Нечем ставить.\n\n" + text, keyboard)
+        await _send(peer_id, text, keyboard)
+        return
+    if action != "roll" or p.currency is None or p.stake is None:
+        return
+    wallet_column = "donate" if p.currency == "gems" else "farm"
+    try:
+        await wallet_service.charge(db, character.id, wallet_column, p.stake)
+    except wallet_service.NotEnoughCurrency:
+        p.stake = None
+        text, keyboard = await _render(db, character, stats, p, peer_id)
+        await _send(peer_id, "Столько у тебя уже нет.\n\n" + text, keyboard)
         return
     won, mine, theirs = se.roll_dice(_rng, scene.win_chance)
     if won:
-        await wallet_service.deposit(db, character.id, currency, amount * 2)
+        await wallet_service.deposit(db, character.id, wallet_column, p.stake * 2)
     line = (
-        f"🎲 Ты: {mine[0]}+{mine[1]}, он: {theirs[0]}+{theirs[1]}. "
-        + (f"{scene.win_text} +{amount} {sign}" if won else f"{scene.lose_text} −{amount} {sign}")
+        f"🎲 Ты: {mine[0]} и {mine[1]}, он: {theirs[0]} и {theirs[1]}.\n"
+        + (f"{scene.win_text} +{_money(p.currency, p.stake)}" if won
+           else f"{scene.lose_text} −{_money(p.currency, p.stake)}")
     )
-    p.round += 1
-    if p.round >= scene.rounds:
-        await _resolve(peer_id, db, character, stats, p, SceneResult(text=scene.leave_text), [line])
-        return
-    text, keyboard = await _render(db, character, stats, p, peer_id)
-    await db.commit()
-    await _send(peer_id, f"{line}\n\n{text}", keyboard)
+    await _resolve(peer_id, db, character, stats, p, SceneResult(), [line])
+
+
+def parse_stake(text: str) -> int | None:
+    """Сумма ставки из сообщения: «250», «1 000», «250 зол» - берём число."""
+    digits = "".join(ch for ch in text if ch.isdigit())
+    if not digits or len(digits) > 12:
+        return None
+    value = int(digits)
+    return value if value > 0 else None
 
 
 # --- Таймер и загадка -------------------------------------------------------------
@@ -406,7 +418,12 @@ async def _expire(peer_id: int, token: int, scene_id: str, seconds: float, actio
     p.task = None
     try:
         scene = se.event_by_id(p.event_id).scenes[p.scene_id]
-        result = scene.timeout if action == "timeout" else scene.failure
+        if action == "timeout":
+            result = scene.timeout
+        elif action == "cancel":  # ставку так и не назвали
+            result = SceneResult(text=scene.leave_text)
+        else:
+            result = scene.failure
         async with get_session_factory()() as db:
             character, stats = await _load(db, peer_id)
             if character is None:
@@ -448,6 +465,52 @@ async def riddle_answer(message: Message) -> None:
             await _resolve(peer_id, db, character, stats, p, scene.success if right else scene.failure, [])
     except Exception:
         logger.exception("Событие {}: сбой на ответе загадки", p.event_id)
+        cancel(peer_id)
+    finally:
+        p.busy = False
+
+
+def _awaits_stake(p: Pending | None) -> bool:
+    if p is None or p.currency is None or p.stake is not None:
+        return False
+    return se.event_by_id(p.event_id).scenes[p.scene_id].type == "dice"
+
+
+class StakeAnswer(ABCRule[Message]):
+    """Свободный текст - это сумма ставки, только пока кости её ждут."""
+
+    async def check(self, event: Message) -> bool:
+        return bool(_awaits_stake(_pending.get(event.peer_id)) and event.text and not event.payload)
+
+
+@labeler.message(StakeAnswer())
+async def stake_answer(message: Message) -> None:
+    peer_id = message.peer_id
+    p = _pending.get(peer_id)
+    if not _awaits_stake(p):
+        return
+    p = _claim(peer_id, p.token)
+    if p is None:
+        return
+    try:
+        async with get_session_factory()() as db:
+            character, stats = await _load(db, peer_id)
+            if character is None:
+                cancel(peer_id)
+                return
+            wallet = await wallet_service.get_wallet(db, character.id)
+            have = wallet.donate_currency if p.currency == "gems" else wallet.farm_currency
+            amount = parse_stake(message.text)
+            if amount is None:
+                note = "Нужна сумма числом, например 250."
+            elif amount > have:
+                note = f"У тебя только {_money(p.currency, have)}."
+            else:
+                p.stake, note = amount, None
+            text, keyboard = await _render(db, character, stats, p, peer_id)
+        await _send(peer_id, f"{note}\n\n{text}" if note else text, keyboard)
+    except Exception:
+        logger.exception("Событие {}: сбой на ставке", p.event_id)
         cancel(peer_id)
     finally:
         p.busy = False

@@ -126,12 +126,9 @@ class Scene(BaseModel):
     riddles: list[Riddle] = Field(default_factory=list)
     failure: SceneResult | None = None
     giveup_label: str = "Сдаться"
-    # dice
-    currency: str = "gold"             # gold | gems
-    stakes: list[float] = Field(default_factory=list)
+    # dice: одна партия - валюта, сумма сообщением, бросок
+    currencies: list[str] = Field(default_factory=lambda: ["gold", "gems"])
     win_chance: float = 0.47
-    rounds: int = 3
-    leave_label: str = "Уйти"
     win_text: str = ""
     lose_text: str = ""
     leave_text: str = ""
