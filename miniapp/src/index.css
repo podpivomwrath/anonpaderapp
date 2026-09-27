@@ -320,7 +320,9 @@ body {
   overflow: clip;
   height: calc(100vh - 56px);
   min-height: 320px;
-  background: #07080a;
+  /* Прозрачно: квадратная карта не заполняет широкий экран, и по бокам
+     должен быть общий фон страницы, а не чёрные полосы (патч 112). */
+  background: transparent;
   /* touch-action: none - иначе браузер перехватывает свайп/щипок как нативный
      скролл/зум страницы, конфликтуя с нашим pointer-based драгом. */
   touch-action: none;
