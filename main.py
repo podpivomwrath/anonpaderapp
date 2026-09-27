@@ -32,6 +32,7 @@ from bot.handlers import raid as raid_handlers
 from bot.handlers import raid_combat as raid_combat_handlers
 from bot.handlers import respawn as respawn_handlers
 from bot.handlers import stats_window as stats_window_handlers
+from bot.handlers import transfer as transfer_handlers
 from bot.handlers import world as world_handlers
 from bot.handlers import world_boss as world_boss_handlers
 from bot.webhook import WEBHOOK_PATH, create_app
@@ -165,6 +166,7 @@ async def run() -> None:
     elixir_shop_handlers.setup(bot.api)
     group_handlers.setup(bot.api)
     promo_handlers.setup(bot.api)
+    transfer_handlers.setup(bot.api)
     moderation_handlers.setup(bot.api)  # патч 27: ЛС администратору с /баг-репортами
 
     # Открытое PvP (патч 22): дуэль (последовательные ходы) + массовый бой

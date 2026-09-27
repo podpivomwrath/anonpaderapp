@@ -26,6 +26,7 @@ from bot.handlers.pvp import labeler as pvp_labeler
 from bot.handlers.raid import labeler as raid_labeler
 from bot.handlers.raid_combat import labeler as raid_combat_labeler
 from bot.handlers.stats_window import labeler as stats_window_labeler
+from bot.handlers.transfer import labeler as transfer_labeler
 from bot.handlers.world import labeler as world_labeler
 from bot.handlers.world_boss import labeler as world_boss_labeler
 
@@ -52,6 +53,8 @@ LABELERS = [
     # регистрируется СТРОГО ДО promo_labeler, чтобы угадавший совпадение
     # промокод не перехватил приглашение.
     group_labeler,
+    # Передача: «передать ...» с пересланным сообщением - до promo/fallback.
+    transfer_labeler,
     # Патч 50: промокоды — TEXT_ONLY, без state/payload гейта, поэтому
     # регистрируется ПОСЛЕ всех более специфичных обработчиков (координаты
     # маунта, никнейм, PvP "1"/"2" и т.д.) — те гарантированно успевают

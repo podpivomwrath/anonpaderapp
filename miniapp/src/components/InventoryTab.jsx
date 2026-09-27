@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import bridge from '@vkontakte/vk-bridge';
 import {
   Button, Div, Group, Header, Placeholder, SimpleCell, Spinner, Text,
 } from '@vkontakte/vkui';
@@ -42,6 +43,7 @@ export default function InventoryTab({ onCharacterUpdate }) {
   const [equippingId, setEquippingId] = useState(null);
   const [errorMsg, setErrorMsg] = useState(null);
   const [openSlot, setOpenSlot] = useState(null);
+  const [copiedId, setCopiedId] = useState(null);
 
   function load() {
     setStatus('loading');
@@ -115,6 +117,26 @@ export default function InventoryTab({ onCharacterUpdate }) {
     </Button>
   );
 
+  // Команду передачи с номером экземпляра собирает сервер (transfer_command);
+  // здесь только копирование. В ВК буфер обмена надёжен лишь через мост:
+  // navigator.clipboard в веб-вью клиента часто запрещён.
+  const copyTransfer = async (item) => {
+    const text = item.transfer_command;
+    try {
+      await bridge.send('VKWebAppCopyText', { text });
+    } catch {
+      try { await navigator.clipboard.writeText(text); } catch { /* показ ниже всё равно поможет */ }
+    }
+    setCopiedId(item.id);
+    setTimeout(() => setCopiedId((cur) => (cur === item.id ? null : cur)), 2500);
+  };
+
+  const transferButton = (item) => item.transfer_command && (
+    <Button mode="outline" size="s" onClick={() => copyTransfer(item)}>
+      {copiedId === item.id ? 'Скопировано' : 'Команда передачи'}
+    </Button>
+  );
+
   return (
     <>
       {errorMsg && (
@@ -157,6 +179,7 @@ export default function InventoryTab({ onCharacterUpdate }) {
                     after={
                       <div className="inventory-actions">
                         {craftButton(item)}
+                        {transferButton(item)}
                         <Button
                           mode="secondary" size="s"
                           loading={equippingId === item.id}
