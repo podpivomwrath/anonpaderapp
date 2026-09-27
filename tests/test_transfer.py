@@ -156,3 +156,10 @@ def test_command_for_names_the_exact_item() -> None:
     from types import SimpleNamespace
 
     assert ts.command_for(SimpleNamespace(name="Скальпель Хирурга", id=1212)) == "передать Скальпель Хирурга 1212"
+
+
+async def test_equipped_service_item_says_it_is_never_transferable(db_session, make_character) -> None:
+    """Перо Хранителя надето и служебное: «сначала сними» обещало бы то, чего нет."""
+    a = await make_character()
+    await _item(db_session, a, name="Перо Хранителя", rarity="admin", equipped=True, admin_only=True)
+    assert "Служебные" in (await ts.find(db_session, a.id, "перо хранителя")).refusal

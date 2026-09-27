@@ -76,13 +76,14 @@ def _split_grade(name: str) -> tuple[str, str | None]:
 
 
 def is_transferable(item: Item, equipped: bool) -> str | None:
-    """None - можно; иначе причина отказа."""
-    if equipped:
-        return "Надетое не передать - сначала сними."
+    """None - можно; иначе причина отказа. Сначала то, что не передать
+    никогда: «сначала сними» у служебной вещи обещало бы то, чего нет."""
     if item.admin_only:
         return "Служебные вещи не передаются."
     if item.bound or item.craft_spec is not None:
         return "Скованная экипировка привязана к хозяину - её не передать."
+    if equipped:
+        return "Надетое не передать - сначала сними."
     return None
 
 
