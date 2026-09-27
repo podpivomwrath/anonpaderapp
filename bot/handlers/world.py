@@ -687,10 +687,10 @@ async def collect_ash_handful(message: Message) -> None:
         has_mount = await mount_service.has_any_mount(db, character.id)
         await db.commit()
 
-    text = (
-        "У ног - горстка пепла, слишком плотная для простой золы. В ней что-то есть.\n\n"
-        + display.xp_delta_line(result.xp, premium=result.xp_premium_applied)
-    )
+    text = "У ног - горстка пепла, слишком плотная для простой золы. В ней что-то есть."
+    xp_line = display.xp_delta_line(result.xp, premium=result.xp_premium_applied)
+    if xp_line:  # на 60 уровне опыта нет - и строки нет
+        text += "\n\n" + xp_line
     drop_line = trophy_service.format_drop_line(result.trophies, source="ash_handful")
     if drop_line is not None:
         text += f"\n{drop_line}"

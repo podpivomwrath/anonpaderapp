@@ -143,7 +143,7 @@ async def test_second_attempt_within_the_hour_is_refused(wired) -> None:
 
 async def test_killing_blow_ends_the_boss_and_pays_out(wired) -> None:
     factory, sent = wired
-    boss_pk, _ = await _setup(factory, hp=50)
+    boss_pk, _ = await _setup(factory, hp=50, level=55)  # на 60 уровне опыта нет
 
     await handler.attack(_Message())
     # Удар может промахнуться - бьём, пока заход не кончится.

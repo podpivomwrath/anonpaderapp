@@ -152,7 +152,7 @@ async def _grant(
     if levelup.levels_gained > 0:
         group_kick = await group_service.enforce_level_gap(db, character)
     lines = []
-    if quest.xp_reward:
+    if levelup.xp_awarded:  # на 60 уровне опыта нет - и строки нет
         lines.append(display.xp_delta_line(levelup.xp_awarded, premium=levelup.premium_applied))
     if quest.gold_reward:
         wallet = await wallet_service.deposit(db, character.id, "farm", quest.gold_reward)

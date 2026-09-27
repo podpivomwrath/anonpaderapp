@@ -13,7 +13,8 @@ def progress_notice_from(completed: list, streak_notice: str | None) -> str | No
     lines = []
     for c in completed:
         premium_mark = " (💠 +50%)" if c.xp_premium_applied else ""
-        lines.append(f"✅ Ежедневка «{c.quest_title}» выполнена! +{c.xp} опыта{premium_mark}, +{c.gold} золота.")
+        xp_part = f"+{c.xp} опыта{premium_mark}, " if c.xp else ""  # на 60 уровне опыта нет
+        lines.append(f"✅ Ежедневка «{c.quest_title}» выполнена! {xp_part}+{c.gold} золота.")
     if streak_notice:
         lines.append(streak_notice)
     return "\n".join(lines)
@@ -55,7 +56,8 @@ def dailies_overview_text(overview: DailiesOverview) -> str:
         mark = "✅" if q.completed else "▫️"
         lines.append(f"{mark} {q.title}: {q.progress}/{q.target} - {q.progress_label}")
         if not q.completed:
-            lines.append(f"    Награда: +{q.xp_reward} опыта, +{q.gold_reward} золота")
+            xp_part = f"+{q.xp_reward} опыта, " if q.xp_reward else ""  # на 60 уровне опыта нет
+            lines.append(f"    Награда: {xp_part}+{q.gold_reward} золота")
     lines.append("")
     lines.append(f"🔥 Стрик ежедневок: {overview.daily_streak} дней")
     if overview.next_milestone_day is not None:

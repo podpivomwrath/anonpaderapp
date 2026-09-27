@@ -83,6 +83,11 @@ def add_experience(
     чате (баг патча 51). LevelUp.premium_applied — был ли бонус применён,
     для пометки "💠 +50%" в тексте.
     """
+    if character.level >= bc.MAX_LEVEL:
+        # На потолке опыт ни начисляется, ни копится: раньше его считали,
+        # записывали и тут же обнуляли, а игроку показывали «+105 опыта».
+        # Ноль в xp_awarded - сигнал текстам не печатать строку опыта.
+        return LevelUp(levels_gained=0, new_level=character.level)
     premium_applied = apply_premium and amount > 0 and premium_service.is_premium(character)
     if premium_applied:
         amount = round(amount * pc.PREMIUM_XP_MULTIPLIER)
@@ -109,7 +114,10 @@ def add_experience(
 
 def apply_death_penalty(character: Character) -> int:
     """Штраф смерти: теряется доля опыта ТЕКУЩЕГО уровня (без понижения уровня,
-    не ниже 0). Возвращает величину потери для лорного сообщения."""
+    не ниже 0). Возвращает величину потери для лорного сообщения.
+    На потолке уровня терять нечего - ноль, в базу ничего не пишется."""
+    if character.level >= bc.MAX_LEVEL:
+        return 0
     penalty = int(character.experience * bc.DEATH_XP_PENALTY)
     character.experience = max(0, character.experience - penalty)
     return penalty

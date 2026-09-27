@@ -608,7 +608,9 @@ async def on_group_tick_resolved(session_id: int, tick: int, result: TickResult)
                     if p is None:
                         continue
                     lines = [f"💀 {mob_name} повержен(а)!"]
-                    lines.append(display.xp_delta_line(r.xp_gained, premium=r.xp_premium_applied))
+                    xp_line = display.xp_delta_line(r.xp_gained, premium=r.xp_premium_applied)
+                    if xp_line:  # на 60 уровне опыта нет - и строки нет
+                        lines.append(xp_line)
                     drop_line = trophy_service.format_drop_line(r.trophies)
                     if drop_line:
                         lines.append(drop_line)

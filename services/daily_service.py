@@ -17,6 +17,7 @@ from zoneinfo import ZoneInfo
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from game.combat import balance_config as bc
 from game.content_loader import DailyQuestDef, load_daily_quests
 from game.economy import dailies_config as dc
 from game.economy import lootbox_config as lc
@@ -444,6 +445,8 @@ async def get_dailies_overview(
         )
     ).all()
     xp, gold = dc.daily_reward(character.level)
+    if character.level >= bc.MAX_LEVEL:
+        xp = 0  # на потолке опыт не начисляется - и обещать его незачем
     quests = []
     for row in rows:
         qdef = quest_def(row.quest_id)

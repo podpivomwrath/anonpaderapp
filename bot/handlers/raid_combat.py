@@ -759,7 +759,8 @@ async def on_raid_tick_resolved(session_id: int, tick: int, result: TickResult) 
                 p = battle.participants.get(r.character_id)
                 if p is None:
                     continue
-                lines = [display.xp_delta_line(r.xp_gained, premium=r.xp_premium_applied)]
+                xp_line = display.xp_delta_line(r.xp_gained, premium=r.xp_premium_applied)
+                lines = [xp_line] if xp_line else []  # на 60 уровне опыта нет
                 drop_line = trophy_service.format_drop_line(r.trophies)
                 if drop_line:
                     lines.append(drop_line)
