@@ -402,11 +402,17 @@ async def on_battle_finished(session_id: int, result: TickResult) -> None:
                 db, character, mob_level, _rng, battle_report
             )
             old_item = None
+            weaker_drop = False
             if outcome.item_dropped is not None:
                 # старый предмет в этом слоте — для окна сравнения (ещё ДО коммита,
                 # grant_from_kill только добавил новый в инвентарь, не экипировал)
                 equipped = await item_service.get_equipped(db, character.id)
                 old_item = equipped[outcome.item_dropped.slot]
+                # Вещь не сильнее надетой - окно «Надеть?» ни к чему: она
+                # уже в сумке, хватит строки в итогах боя.
+                weaker_drop = old_item is not None and (
+                    item_service.item_power(outcome.item_dropped) <= item_service.item_power(old_item)
+                )
             wallet = await wallet_service.get_wallet(db, character.id)
             farm_currency, donate_currency = wallet.farm_currency, wallet.donate_currency
             quest_ready_now = story_state is not None and story_state[1] <= 1
@@ -466,6 +472,11 @@ async def on_battle_finished(session_id: int, result: TickResult) -> None:
             text += f"\n{raid_key_texts.raid_key_drop_line()}"
         for line in event_lines:
             text += f"\n{line}"
+        if weaker_drop:
+            text += (
+                f"\n{item_service.format_drop_announcement(outcome.item_dropped)}."
+                " Слабее надетого - убрано в сумку."
+            )
         if outcome.quest_progress is not None:
             text += f"\n📜 {outcome.quest_label}: {outcome.quest_progress}/{outcome.quest_target}"
             if outcome.quest_ready:
@@ -521,7 +532,7 @@ async def on_battle_finished(session_id: int, result: TickResult) -> None:
             # (персонаж физически "в дороге"), а предложение продолжить путь.
             # Предмет (если выпал) просто уже в инвентаре — без интерактивного
             # окна сравнения, чтобы не плодить развилки посреди поездки.
-            if outcome.item_dropped is not None:
+            if outcome.item_dropped is not None and not weaker_drop:
                 await _bot_api.messages.send(
                     peer_id=peer_id,
                     message=item_service.format_drop_announcement(outcome.item_dropped),
@@ -532,7 +543,7 @@ async def on_battle_finished(session_id: int, result: TickResult) -> None:
             await mount_handlers.offer_continue(peer_id, travel_id)
             return
 
-        if outcome.item_dropped is not None:
+        if outcome.item_dropped is not None and not weaker_drop:
             # ux-patch-11: окно сравнения — сводка локации откладывается до
             # решения игрока (Надеть/В инвентарь), как event_choice в патче 9.
             new_item = outcome.item_dropped
