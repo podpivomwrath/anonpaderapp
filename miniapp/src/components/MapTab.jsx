@@ -86,12 +86,28 @@ export default function MapTab() {
 
   // Контейнер появляется только в ветке ready - поэтому эффекты завязаны на
   // status (иначе мерили бы null и навсегда остались бы с размером по умолчанию).
+  // Карта занимает всю страницу под шапкой: высоту считаем от верха окна
+  // карты до низа экрана. В CSS это не выразить надёжно - высота шапки
+  // разная в вебвью ВК на разных платформах.
+  const [fillHeight, setFillHeight] = useState(null);
+  useLayoutEffect(() => {
+    const el = containerRef.current;
+    if (!el) return undefined;
+    const fit = () => {
+      const top = el.getBoundingClientRect().top + window.scrollY;
+      setFillHeight(Math.max(320, Math.round(window.innerHeight - top)));
+    };
+    fit();
+    window.addEventListener('resize', fit);
+    return () => window.removeEventListener('resize', fit);
+  }, [status]);
+
   useLayoutEffect(() => {
     const el = containerRef.current;
     if (!el) return;
     const rect = el.getBoundingClientRect();
     if (rect.width > 0 && rect.height > 0) setSize({ width: rect.width, height: rect.height });
-  }, [status]);
+  }, [status, fillHeight]);
 
   useEffect(() => {
     const el = containerRef.current;
@@ -352,6 +368,7 @@ export default function MapTab() {
       <div
         ref={containerRef}
         className="map-viewport"
+        style={fillHeight ? { height: fillHeight } : undefined}
         onPointerDown={handlePointerDown}
         onPointerMove={handlePointerMove}
         onPointerUp={handlePointerUp}

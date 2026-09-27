@@ -270,18 +270,19 @@ body {
 
 /* --- Патч 29: карта мира --- */
 
+/* Патч 108: карта на всю площадь страницы под шапкой - без отступов и
+   скруглений. Высоту до низа экрана выставляет MapTab. Карточка клетки и
+   уведомления лежат поверх карты. */
 .map-tab {
-  padding: 8px 8px 0;
+  position: relative;
 }
 
 .map-viewport {
   position: relative;
   overflow: hidden;
   overflow: clip;
-  height: 64vh;
-  max-height: 640px;
-  min-height: 340px;
-  border-radius: 8px;
+  height: calc(100vh - 56px);
+  min-height: 320px;
   background: #07080a;
   /* touch-action: none - иначе браузер перехватывает свайп/щипок как нативный
      скролл/зум страницы, конфликтуя с нашим pointer-based драгом. */
@@ -488,21 +489,43 @@ body {
 }
 
 .map-toast {
-  margin-top: 8px;
+  position: absolute;
+  left: 50%;
+  top: 56px;
+  transform: translateX(-50%);
+  z-index: 6;
+  max-width: calc(100% - 32px);
   padding: 8px 12px;
   border-radius: 6px;
   background: #3a0a12;
   color: #f2d9dc;
   font-size: 13px;
   text-align: center;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.6);
 }
 
 .map-card {
-  position: relative;
-  margin-top: 8px;
+  position: absolute;
+  left: 8px;
+  right: 8px;
+  bottom: calc(8px + env(safe-area-inset-bottom, 0px));
+  z-index: 6;
+  max-height: 60%;
+  overflow-y: auto;
   padding: 12px 14px;
-  border-radius: 8px;
-  background: var(--vkui--color_background_secondary);
+  border-radius: 12px;
+  background: rgba(20, 21, 24, 0.94);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.65);
+}
+
+@media (min-width: 720px) {
+  .map-card {
+    left: 16px;
+    right: auto;
+    bottom: 16px;
+    width: 340px;
+  }
 }
 
 .map-card__close {
@@ -712,6 +735,10 @@ body {
 /* Таббара больше нет - место под него внизу резервировать не нужно. */
 .hub-content--drawer {
   padding-bottom: 16px;
+}
+
+.hub-content--wide {
+  padding-bottom: 0;
 }
 
 /* --- Мастерская ----------------------------------------------------------- */
@@ -1101,8 +1128,9 @@ body::before {
      сломалось, когда медиазапрос наконец начал применяться (патч 84): до
      него браузер пропускал весь блок из-за range-синтаксиса, и карта
      оставалась во всю ширину. */
+  /* Карта - на всю ширину страницы (патч 108). */
   .hub-content--wide {
-    max-width: min(1100px, 100%);
+    max-width: none;
   }
 
   .hub-banner {
