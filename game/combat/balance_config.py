@@ -167,7 +167,6 @@ PVP_DRAW_TURN_LIMIT_TEXT = (
 )
 
 # --- Ставки PvP ---
-PVP_STAKE_PERCENT = 0.10  # доля farm-валюты проигравшего победителю; TODO: калибровка
 
 # --- Пресеты баффов и респек ---
 PRESET_MIN_BUFFS = 3

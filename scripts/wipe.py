@@ -6,7 +6,7 @@
 "YES" в консоли.
 
 Порядок удаления учитывает FK без ON DELETE CASCADE:
-  - pvp_stake_transfers, combat_participants, exchange_orders ссылаются на
+  - combat_participants, exchange_orders ссылаются на
     characters БЕЗ каскада — удаляем явно первыми;
   - items удаляем целиком: ondelete CASCADE на inventory.item_id чистит
     инвентарь автоматически;
@@ -38,7 +38,6 @@ from models import (  # noqa: E402
     CombatSession,
     ExchangeOrder,
     Item,
-    PvpStakeTransfer,
 )
 from services.db import dispose_engine, get_session_factory  # noqa: E402
 
@@ -46,7 +45,6 @@ from services.db import dispose_engine, get_session_factory  # noqa: E402
 async def wipe() -> None:
     sf = get_session_factory()
     async with sf() as db:
-        await db.execute(delete(PvpStakeTransfer))
         await db.execute(delete(CombatParticipant))
         await db.execute(delete(CombatSession))
         await db.execute(delete(ExchangeOrder))

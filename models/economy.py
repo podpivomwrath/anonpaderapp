@@ -32,21 +32,3 @@ class ExchangeOrder(Base):
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )
-
-
-class PvpStakeTransfer(Base):
-    """Перевод ставки по итогам PvP: победитель забирает долю farm-валюты
-    проигравшего (процент — в balance_config). При ничьей переводов нет."""
-
-    __tablename__ = "pvp_stake_transfers"
-
-    id: Mapped[int] = mapped_column(primary_key=True)
-    session_id: Mapped[int] = mapped_column(
-        ForeignKey("combat_sessions.id", ondelete="CASCADE"), index=True
-    )
-    loser_character_id: Mapped[int] = mapped_column(ForeignKey("characters.id"))
-    winner_character_id: Mapped[int] = mapped_column(ForeignKey("characters.id"))
-    amount: Mapped[int] = mapped_column(BigInteger)  # farm-валюта
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=func.now()
-    )
