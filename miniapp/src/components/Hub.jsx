@@ -109,6 +109,7 @@ export default function Hub() {
         </PanelHeaderButton>
       }
     >
+      <span className="hub-brand" aria-hidden="true">Монолит</span>
       <span className="hub-header">
         {title}
         <PanelHeaderButton aria-label="Обновить" disabled={refreshing} onClick={refresh}>

@@ -488,6 +488,53 @@ body {
   gap: 4px;
 }
 
+/* Название игры по центру шапки (патч 107). Позиционируется от
+   .vkuiPanelHeader__in (у него position: relative), а не от заголовка
+   раздела - иначе центр съезжал бы вместе с длиной «Персонаж»/«Мастерская».
+   На узком экране не помещается между заголовком раздела и кнопками ВК
+   справа - там его нет. */
+.hub-brand {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+  font-family: 'Cormorant SC', Forum, serif;
+  font-weight: 600;
+  font-size: 26px;
+  letter-spacing: 0.22em;
+  padding-left: 0.22em; /* letter-spacing добавляет хвост справа - уравниваем */
+  color: #f3e6d6;
+  text-shadow:
+    0 0 6px rgba(255, 90, 60, 0.55),
+    0 0 16px rgba(220, 40, 30, 0.45),
+    0 0 32px rgba(180, 20, 20, 0.35);
+  animation: hub-brand-glow 5s ease-in-out infinite;
+}
+
+@keyframes hub-brand-glow {
+  0%, 100% {
+    text-shadow:
+      0 0 6px rgba(255, 90, 60, 0.55),
+      0 0 16px rgba(220, 40, 30, 0.45),
+      0 0 32px rgba(180, 20, 20, 0.35);
+  }
+  50% {
+    text-shadow:
+      0 0 8px rgba(255, 110, 70, 0.75),
+      0 0 22px rgba(230, 50, 35, 0.6),
+      0 0 44px rgba(190, 25, 20, 0.45);
+  }
+}
+
+@media (max-width: 559px) {
+  .hub-brand { display: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hub-brand { animation: none; }
+}
+
 /* --- Шторка разделов (патч 72) ------------------------------------------- */
 /* Нижний Tabbar заменён вертикальным списком: разделов стало больше, чем
    помещается в ряд на телефоне, и седьмая вкладка сжимала подписи до
