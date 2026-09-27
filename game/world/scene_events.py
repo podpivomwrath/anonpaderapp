@@ -144,6 +144,9 @@ class SceneEvent(BaseModel):
     min_level: int = 1
     start: str = "start"
     scenes: dict[str, Scene]
+    #: id фото в альбоме VK - показывается с первой сценой. Промты картинок:
+    #: tools/event_art_prompts.md. Пусто - событие идёт без картинки.
+    image: str | None = None
 
 
 class TrailDef(BaseModel):

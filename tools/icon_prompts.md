@@ -40,6 +40,24 @@ a weapon held by an adventurer called «Посох», battered and field-repaire
 a weapon held by an adventurer called «Кинжал», battered and field-repaired, scavenged look, cold off-white accents, dark fantasy game item icon, single object centered, slight 3/4 angle, painterly semi-realistic, muted desaturated palette of ash grey, rust brown and dried blood, weathered and worn surfaces, soft rim light from the upper left, deep neutral background, no text, no watermark, no border, square 1:1 composition, crisp readable silhouette at small size
 ```
 
+**Булава (weapon)**
+
+```
+a weapon held by an adventurer called «Булава», a flanged iron mace, battered and field-repaired, scavenged look, cold off-white accents, dark fantasy game item icon, single object centered, slight 3/4 angle, painterly semi-realistic, muted desaturated palette of ash grey, rust brown and dried blood, weathered and worn surfaces, soft rim light from the upper left, deep neutral background, no text, no watermark, no border, square 1:1 composition, crisp readable silhouette at small size
+```
+
+**Кистень (weapon)**
+
+```
+a weapon held by an adventurer called «Кистень», a flail with a spiked iron ball on a short chain, battered and field-repaired, scavenged look, cold off-white accents, dark fantasy game item icon, single object centered, slight 3/4 angle, painterly semi-realistic, muted desaturated palette of ash grey, rust brown and dried blood, weathered and worn surfaces, soft rim light from the upper left, deep neutral background, no text, no watermark, no border, square 1:1 composition, crisp readable silhouette at small size
+```
+
+**Жезл (weapon)**
+
+```
+a weapon held by an adventurer called «Жезл», a short ceremonial rod topped with a cracked crystal, battered and field-repaired, scavenged look, cold off-white accents, dark fantasy game item icon, single object centered, slight 3/4 angle, painterly semi-realistic, muted desaturated palette of ash grey, rust brown and dried blood, weathered and worn surfaces, soft rim light from the upper left, deep neutral background, no text, no watermark, no border, square 1:1 composition, crisp readable silhouette at small size
+```
+
 **Шлем (helmet)**
 
 ```
@@ -56,6 +74,24 @@ a piece of head armour called «Капюшон», battered and field-repaired, s
 
 ```
 a piece of head armour called «Венец», battered and field-repaired, scavenged look, cold off-white accents, dark fantasy game item icon, single object centered, slight 3/4 angle, painterly semi-realistic, muted desaturated palette of ash grey, rust brown and dried blood, weathered and worn surfaces, soft rim light from the upper left, deep neutral background, no text, no watermark, no border, square 1:1 composition, crisp readable silhouette at small size
+```
+
+**Маска (helmet)**
+
+```
+a piece of head armour called «Маска», a full-face metal mask with narrow eye slits, battered and field-repaired, scavenged look, cold off-white accents, dark fantasy game item icon, single object centered, slight 3/4 angle, painterly semi-realistic, muted desaturated palette of ash grey, rust brown and dried blood, weathered and worn surfaces, soft rim light from the upper left, deep neutral background, no text, no watermark, no border, square 1:1 composition, crisp readable silhouette at small size
+```
+
+**Шишак (helmet)**
+
+```
+a piece of head armour called «Шишак», a pointed conical helmet with a nasal guard, battered and field-repaired, scavenged look, cold off-white accents, dark fantasy game item icon, single object centered, slight 3/4 angle, painterly semi-realistic, muted desaturated palette of ash grey, rust brown and dried blood, weathered and worn surfaces, soft rim light from the upper left, deep neutral background, no text, no watermark, no border, square 1:1 composition, crisp readable silhouette at small size
+```
+
+**Обруч (helmet)**
+
+```
+a piece of head armour called «Обруч», a thin iron circlet worn around the brow, battered and field-repaired, scavenged look, cold off-white accents, dark fantasy game item icon, single object centered, slight 3/4 angle, painterly semi-realistic, muted desaturated palette of ash grey, rust brown and dried blood, weathered and worn surfaces, soft rim light from the upper left, deep neutral background, no text, no watermark, no border, square 1:1 composition, crisp readable silhouette at small size
 ```
 
 **Кираса (armor)**
@@ -76,6 +112,24 @@ a torso armour piece called «Панцирь», battered and field-repaired, sca
 a torso armour piece called «Роба», battered and field-repaired, scavenged look, cold off-white accents, dark fantasy game item icon, single object centered, slight 3/4 angle, painterly semi-realistic, muted desaturated palette of ash grey, rust brown and dried blood, weathered and worn surfaces, soft rim light from the upper left, deep neutral background, no text, no watermark, no border, square 1:1 composition, crisp readable silhouette at small size
 ```
 
+**Кольчуга (armor)**
+
+```
+a torso armour piece called «Кольчуга», a mail shirt of riveted iron rings, battered and field-repaired, scavenged look, cold off-white accents, dark fantasy game item icon, single object centered, slight 3/4 angle, painterly semi-realistic, muted desaturated palette of ash grey, rust brown and dried blood, weathered and worn surfaces, soft rim light from the upper left, deep neutral background, no text, no watermark, no border, square 1:1 composition, crisp readable silhouette at small size
+```
+
+**Бригантина (armor)**
+
+```
+a torso armour piece called «Бригантина», a brigandine: a cloth coat lined with riveted steel plates, battered and field-repaired, scavenged look, cold off-white accents, dark fantasy game item icon, single object centered, slight 3/4 angle, painterly semi-realistic, muted desaturated palette of ash grey, rust brown and dried blood, weathered and worn surfaces, soft rim light from the upper left, deep neutral background, no text, no watermark, no border, square 1:1 composition, crisp readable silhouette at small size
+```
+
+**Мантия (armor)**
+
+```
+a torso armour piece called «Мантия», a long hooded robe with a stiff collar, battered and field-repaired, scavenged look, cold off-white accents, dark fantasy game item icon, single object centered, slight 3/4 angle, painterly semi-realistic, muted desaturated palette of ash grey, rust brown and dried blood, weathered and worn surfaces, soft rim light from the upper left, deep neutral background, no text, no watermark, no border, square 1:1 composition, crisp readable silhouette at small size
+```
+
 **Поножи (legs)**
 
 ```
@@ -94,6 +148,24 @@ leg armour called «Штаны», battered and field-repaired, scavenged look, c
 leg armour called «Набедренники», battered and field-repaired, scavenged look, cold off-white accents, dark fantasy game item icon, single object centered, slight 3/4 angle, painterly semi-realistic, muted desaturated palette of ash grey, rust brown and dried blood, weathered and worn surfaces, soft rim light from the upper left, deep neutral background, no text, no watermark, no border, square 1:1 composition, crisp readable silhouette at small size
 ```
 
+**Шоссы (legs)**
+
+```
+leg armour called «Шоссы», mail chausses: chain mail leggings, battered and field-repaired, scavenged look, cold off-white accents, dark fantasy game item icon, single object centered, slight 3/4 angle, painterly semi-realistic, muted desaturated palette of ash grey, rust brown and dried blood, weathered and worn surfaces, soft rim light from the upper left, deep neutral background, no text, no watermark, no border, square 1:1 composition, crisp readable silhouette at small size
+```
+
+**Порты (legs)**
+
+```
+leg armour called «Порты», plain padded cloth trousers, battered and field-repaired, scavenged look, cold off-white accents, dark fantasy game item icon, single object centered, slight 3/4 angle, painterly semi-realistic, muted desaturated palette of ash grey, rust brown and dried blood, weathered and worn surfaces, soft rim light from the upper left, deep neutral background, no text, no watermark, no border, square 1:1 composition, crisp readable silhouette at small size
+```
+
+**Обмотки (legs)**
+
+```
+leg armour called «Обмотки», legs wrapped in long strips of cloth and leather, battered and field-repaired, scavenged look, cold off-white accents, dark fantasy game item icon, single object centered, slight 3/4 angle, painterly semi-realistic, muted desaturated palette of ash grey, rust brown and dried blood, weathered and worn surfaces, soft rim light from the upper left, deep neutral background, no text, no watermark, no border, square 1:1 composition, crisp readable silhouette at small size
+```
+
 **Сапоги (boots)**
 
 ```
@@ -110,6 +182,24 @@ footwear called «Поршни», battered and field-repaired, scavenged look, c
 
 ```
 footwear called «Ботфорты», battered and field-repaired, scavenged look, cold off-white accents, dark fantasy game item icon, single object centered, slight 3/4 angle, painterly semi-realistic, muted desaturated palette of ash grey, rust brown and dried blood, weathered and worn surfaces, soft rim light from the upper left, deep neutral background, no text, no watermark, no border, square 1:1 composition, crisp readable silhouette at small size
+```
+
+**Башмаки (boots)**
+
+```
+footwear called «Башмаки», sturdy low leather shoes, battered and field-repaired, scavenged look, cold off-white accents, dark fantasy game item icon, single object centered, slight 3/4 angle, painterly semi-realistic, muted desaturated palette of ash grey, rust brown and dried blood, weathered and worn surfaces, soft rim light from the upper left, deep neutral background, no text, no watermark, no border, square 1:1 composition, crisp readable silhouette at small size
+```
+
+**Опорки (boots)**
+
+```
+footwear called «Опорки», worn-out cut-down old boots, battered and field-repaired, scavenged look, cold off-white accents, dark fantasy game item icon, single object centered, slight 3/4 angle, painterly semi-realistic, muted desaturated palette of ash grey, rust brown and dried blood, weathered and worn surfaces, soft rim light from the upper left, deep neutral background, no text, no watermark, no border, square 1:1 composition, crisp readable silhouette at small size
+```
+
+**Сабатоны (boots)**
+
+```
+footwear called «Сабатоны», plated armoured sabatons, battered and field-repaired, scavenged look, cold off-white accents, dark fantasy game item icon, single object centered, slight 3/4 angle, painterly semi-realistic, muted desaturated palette of ash grey, rust brown and dried blood, weathered and worn surfaces, soft rim light from the upper left, deep neutral background, no text, no watermark, no border, square 1:1 composition, crisp readable silhouette at small size
 ```
 
 

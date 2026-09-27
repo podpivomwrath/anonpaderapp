@@ -23,6 +23,7 @@ from vkbottle.dispatch.rules import ABCRule
 from bot import dailies_texts, group_texts
 from bot.handlers import stats_window
 from bot.keyboards.world import waiting_keyboard
+from bot.vk_media import photo_attachment
 from game.world import scene_events as se
 from game.world.scene_events import Riddle, Scene, SceneEvent, SceneResult
 from models import CharacterStats
@@ -80,8 +81,10 @@ def _label(text: str) -> str:
     return text if len(text) <= LABEL_LIMIT else text[: LABEL_LIMIT - 1].rstrip() + "…"
 
 
-async def _send(peer_id: int, text: str, keyboard: str | None = None) -> None:
-    await _api().messages.send(peer_id=peer_id, message=text, random_id=0, keyboard=keyboard)
+async def _send(peer_id: int, text: str, keyboard: str | None = None, attachment: str | None = None) -> None:
+    await _api().messages.send(
+        peer_id=peer_id, message=text, random_id=0, keyboard=keyboard, attachment=attachment,
+    )
 
 
 async def _load(db, peer_id: int):
@@ -188,7 +191,8 @@ async def start(peer_id: int, event: SceneEvent) -> None:
             _pending.pop(peer_id, None)
             return
         text, keyboard = await _render(db, character, stats, p, peer_id)
-    await _send(peer_id, f"{event.title}\n\n{text}", keyboard)
+    attachment = photo_attachment(event.image) if event.image else None
+    await _send(peer_id, f"{event.title}\n\n{text}", keyboard, attachment)
 
 
 # --- Нажатия ----------------------------------------------------------------------

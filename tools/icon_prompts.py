@@ -63,6 +63,28 @@ SLOT_HINT = {
     "boots": "footwear",
 }
 
+#: Патч 109: у новых баз русское название генератору ничего не говорит
+#: («Шоссы», «Опорки»), поэтому - форма по-английски. Только для новых:
+#: промт старых баз менять нельзя, по его тексту icon_assets.py находит уже
+#: нарисованную иконку.
+BASE_SHAPE = {
+    "Булава": "a flanged iron mace",
+    "Кистень": "a flail with a spiked iron ball on a short chain",
+    "Жезл": "a short ceremonial rod topped with a cracked crystal",
+    "Маска": "a full-face metal mask with narrow eye slits",
+    "Шишак": "a pointed conical helmet with a nasal guard",
+    "Обруч": "a thin iron circlet worn around the brow",
+    "Кольчуга": "a mail shirt of riveted iron rings",
+    "Бригантина": "a brigandine: a cloth coat lined with riveted steel plates",
+    "Мантия": "a long hooded robe with a stiff collar",
+    "Шоссы": "mail chausses: chain mail leggings",
+    "Порты": "plain padded cloth trousers",
+    "Обмотки": "legs wrapped in long strips of cloth and leather",
+    "Башмаки": "sturdy low leather shoes",
+    "Опорки": "worn-out cut-down old boots",
+    "Сабатоны": "plated armoured sabatons",
+}
+
 
 def load(name: str):
     return json.loads((CONTENT / name).read_text(encoding="utf-8"))
@@ -131,7 +153,8 @@ def equipment() -> None:
                 f"{row['name']} ({slot})",
                 prompt(
                     f"{SLOT_HINT.get(slot, 'a piece of equipment')} called «{row['name']}», "
-                    "battered and field-repaired, scavenged look",
+                    + (f"{BASE_SHAPE[row['name']]}, " if row["name"] in BASE_SHAPE else "")
+                    + "battered and field-repaired, scavenged look",
                     ACCENT[1],
                 ),
                 key=f"base:{slot}:{row['name']}",
