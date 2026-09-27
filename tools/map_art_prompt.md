@@ -1,5 +1,43 @@
 # Промт: карта мира (круглая)
 
+## Оправа линзы для карты (2026-09-28)
+
+Круглая оправа, через которую на карте видно увеличенное место. Середина
+пустая: туда код подставляет увеличенную карту. Нужен PNG с прозрачным фоном
+и прозрачной серединой; если генератор прозрачность не умеет - сплошной
+#00FF00 и в фоне, и в середине (вырезается хромакеем).
+
+**Без ручки (рекомендую - кольцо ездит за курсором, ручка мешала бы у краёв):**
+
+```
+a single circular magnifying lens frame seen straight on, perfectly round,
+aged dark bronze rim with worn edges, tiny engraved runes and notches around
+the ring, a thin inner bevel catching a faint warm crimson glint, subtle
+scratches and patina, the rim is fairly thin - about one tenth of the lens
+radius, the inside of the ring is completely empty with no glass texture,
+no reflections and no image, dark fantasy game UI element, painterly
+semi-realistic, centered, symmetrical, square 1:1 canvas, transparent
+background, transparent empty centre, PNG with alpha, if transparency is not
+possible use a flat solid pure green #00FF00 for both the background and the
+empty centre, no text, no hand, no handle, no shadow on the background
+```
+
+**С ручкой (если хочется узнаваемой лупы):**
+
+```
+a single antique magnifying glass seen straight on, perfectly round lens
+ring of aged dark bronze with engraved runes, a short carved bone handle
+angled down to the lower right, faint warm crimson glint on the inner bevel,
+patina and scratches, the inside of the ring is completely empty with no
+glass texture, no reflections and no image, dark fantasy game UI element,
+painterly semi-realistic, square 1:1 canvas, transparent background,
+transparent empty centre, PNG with alpha, if transparency is not possible use
+a flat solid pure green #00FF00 for both the background and the empty
+centre, no text, no hand holding it, no shadow on the background
+```
+
+---
+
 ## Вариант «рисованная карта» (на оценку игрокам, 2026-09-28)
 
 Живописная карта при приближении мылится. Рисованная (тушь, штриховка,
