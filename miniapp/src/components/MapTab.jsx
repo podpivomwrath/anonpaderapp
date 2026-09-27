@@ -603,6 +603,9 @@ export default function MapTab() {
               <svg className="map-lens__grid" width={lensD} height={lensD}>
                 <path className="map-grid map-grid--lens" d={lensGridPath} />
               </svg>
+              {/* Прицел: центр линзы - ровно та точка, куда уйдёт клик
+                  (содержимое линзы всегда сдвинуто так, даже у края карты). */}
+              <span className="map-lens__cross" aria-hidden="true" />
               {(() => {
                 const cell = cellAtScreen(lensPoint.x, lensPoint.y);
                 if (!cell) return null;

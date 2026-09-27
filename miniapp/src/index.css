@@ -550,6 +550,23 @@ body {
   background: rgba(200, 40, 40, 0.08);
 }
 
+/* Прицел в центре линзы: тонкий плюс цвета туши со светлой обводкой -
+   читается и на тёмной штриховке, и на пустом пергаменте. */
+.map-lens__cross {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 18px;
+  height: 18px;
+  transform: translate(-50%, -50%);
+  z-index: 2;
+  pointer-events: none;
+  background:
+    linear-gradient(rgba(120, 10, 20, 0.95), rgba(120, 10, 20, 0.95)) center / 2px 100% no-repeat,
+    linear-gradient(rgba(120, 10, 20, 0.95), rgba(120, 10, 20, 0.95)) center / 100% 2px no-repeat;
+  filter: drop-shadow(0 0 1px rgba(255, 245, 230, 0.95)) drop-shadow(0 0 1px rgba(255, 245, 230, 0.95));
+}
+
 .map-lens__frame {
   position: absolute;
   left: 50%;
