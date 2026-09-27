@@ -24,8 +24,18 @@ def test_zone_level_range_covers_full_map(dist: int, expected: tuple[int, int]) 
 
 
 def test_zone_table_covers_every_distance_without_gaps() -> None:
-    for dist in range(0, 51):
-        grid.zone_level_range(dist)  # не должно кидать/молча возвращать мусор
+    """Каждое расстояние 0..50 - ровно в одном кольце, кольца идут подряд
+    без дыр, а уровни растут к центру."""
+    from game.world import world_config as wc
+
+    covered = sorted(d for lo, hi, _ in wc.ZONE_TABLE for d in range(lo, hi + 1))
+    assert covered == list(range(0, 51))
+    previous_max = 0
+    for dist in range(50, -1, -1):
+        lo, hi = grid.zone_level_range(dist)
+        assert 1 <= lo <= hi <= 60
+        assert hi >= previous_max
+        previous_max = hi
 
 
 def test_city_region_at() -> None:

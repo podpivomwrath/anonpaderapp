@@ -206,8 +206,9 @@ def test_death_penalty_line_includes_percentage() -> None:
 # --- ч.3: убран флейвор как самостоятельный исход исследования ---
 
 
-def test_explore_combat_chance_is_half_and_flavor_chance_removed() -> None:
-    assert wc.EXPLORE_COMBAT_CHANCE == 0.5
+def test_flavor_is_no_longer_a_standalone_explore_outcome() -> None:
+    # Сам шанс боя - настройка баланса, его число здесь не закрепляем.
+    assert 0 < wc.EXPLORE_COMBAT_CHANCE < 1
     assert not hasattr(wc, "EXPLORE_FLAVOR_CHANCE")
 
 

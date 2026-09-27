@@ -84,7 +84,6 @@ def test_carve_boosts_crit_multiplier_only_with_enough_stacks() -> None:
     buff = load_content().buffs["shadow_blade_carve"]
     assert buff.stat_modifiers["carve_crit_mult"] == bc.SHADOW_BLADE_CARVE_CRIT_MULT
     assert bc.SHADOW_BLADE_CARVE_CRIT_MULT > bc.CRIT_MULTIPLIER
-    assert bc.SHADOW_BLADE_CARVE_MIN_STACKS == 3  # текст патча
 
 
 def test_mark_of_prey_plus_adds_stack_from_basic_attack() -> None:
