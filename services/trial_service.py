@@ -178,6 +178,22 @@ _RESET_ON_REST = {"win_streak_no_rest"}
 _RESET_ON_DEFEAT = {"win_streak_no_rest", "win_streak_start_hp_below"}
 
 
+async def record_level_kill(db: AsyncSession, character: Character, mob_level: int) -> list[str]:
+    """Победа над противником уровня mob_level вне обычного PvE-боя (рейд).
+
+    Нужна для «Победи того, кто выше тебя уровнем»: на 60 уровне в мире нет
+    мобов выше, и испытание было невыполнимо. Хирург рейда засчитывается как
+    61-й (raid_config.SURGEON_TRIAL_LEVEL)."""
+    unlocked: list[str] = []
+    for trial in await _active_trials(db, character):
+        if trial.condition_type != "defeat_higher_level":
+            continue
+        buff = await _apply_delta(db, character.id, trial, int(mob_level > character.level))
+        if buff:
+            unlocked.append(buff)
+    return unlocked
+
+
 async def record_battle(db: AsyncSession, character: Character, report: BattleReport) -> list[str]:
     """Вызывать после КАЖДОГО PvE-боя игрока (и победы, и поражения)."""
     unlocked: list[str] = []

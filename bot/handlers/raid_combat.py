@@ -47,6 +47,7 @@ from services import (
     mount_service,
     quest_service,
     raid_combat_service,
+    trial_service,
     trophy_service,
 )
 from services import onboarding_service as onboarding_svc
@@ -784,6 +785,16 @@ async def on_raid_tick_resolved(session_id: int, tick: int, result: TickResult) 
                     await stats_window.notify_levelup(p.peer_id, r.levels_gained, r.new_level)
             for character in characters:
                 await quest_service.record_kill(db, character)
+            if battle.stage == 3 and battle.surgeon_id in dead_mob_ids:
+                # Хирург - «выше уровнем» для испытаний (см. SURGEON_TRIAL_LEVEL).
+                # Засчитывается всем, кто в рейде: победа общая, как и рейд.
+                for cid, p in battle.participants.items():
+                    character = await db.get(Character, cid)
+                    if character is None or character.subclass is None:
+                        continue
+                    for buff_id in await trial_service.record_level_kill(db, character, rc.SURGEON_TRIAL_LEVEL):
+                        opened = f"📖 Испытание пройдено. Открыт бафф: {trial_service.buff_name(buff_id)}."
+                        notices[cid] = f"{notices[cid]}\n{opened}" if notices.get(cid) else opened
             await db.commit()
 
     await _broadcast_board(session_id, battle, result, notices, boss_lines=extra_lines)
