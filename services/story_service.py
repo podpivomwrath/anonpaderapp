@@ -339,6 +339,18 @@ async def mentor_badge_active(db: AsyncSession, character: Character) -> bool:
 
 
 async def quest_summary_line(db: AsyncSession, character: Character) -> str | None:
+    """Строки сводки локации под квестом: сам квест, а с патча 110 - ещё след
+    события и эффекты на N боёв. Все сводки берут эту строку, поэтому след и
+    эффекты видны везде, где видна сводка."""
+    from services import scene_event_service  # цикл: тот зовёт compass_direction
+
+    lines = [await _story_summary_line(db, character)]
+    lines += await scene_event_service.summary_lines(db, character)
+    lines = [line for line in lines if line]
+    return "\n".join(lines) if lines else None
+
+
+async def _story_summary_line(db: AsyncSession, character: Character) -> str | None:
     """Строка активного сюжетного квеста для сводки локации (патч 21, п.4):
     '📜 [Название] → (x;y) · направление' / '📜 [Название] → вернуться в город'.
     None — показывать нечего (первый квест — легаси, не отображается тут;

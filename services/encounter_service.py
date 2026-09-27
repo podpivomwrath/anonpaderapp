@@ -69,6 +69,15 @@ async def resolve_victory(
     # множителю лута, и один моб засчитался бы как несколько.
     character.mobs_killed += 1
     trophies = await trophy_service.grant_from_kill(db, character, rng)
+    # Патч 110: эффект события «больше трофеев» - лишний бросок с шансом.
+    # resolve_victory зовётся только из одиночного боя, как и сами эффекты.
+    from services import scene_event_service
+
+    bonus = await scene_event_service.trophy_bonus(db, character.id)
+    if bonus > 0 and rng.random() < bonus:
+        extra = await scene_event_service.extra_kill_trophies(db, character, rng)
+        for trophy_id, count in extra.items():
+            trophies[trophy_id] = trophies.get(trophy_id, 0) + count
     item = await item_service.grant_from_kill(db, character, mob_level, rng)
     raid_key_dropped = await raid_key_service.maybe_grant(db, character, rng)
 

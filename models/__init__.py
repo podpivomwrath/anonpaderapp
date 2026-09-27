@@ -26,6 +26,7 @@ from models.promo import PromoActivation, PromoCode
 from models.pvp import PvpBattle
 from models.quest import CharacterQuest, Quest
 from models.raid import RaidLobby, RaidLobbyMember, RaidRun
+from models.scene_event import CharacterEventEffect, EventTrail
 from models.song import CharacterSongFragment
 from models.story import CharacterStoryProgress
 from models.subclass_trial import CharacterTrialProgress, CharacterUnlockedBuff
@@ -88,4 +89,6 @@ __all__ = [
     "WorldBossContribution",
     "WorldBossMeter",
     "Wallet",
+    "CharacterEventEffect",
+    "EventTrail",
 ]

@@ -37,6 +37,7 @@ from bot.handlers import group_combat as group_combat_handlers
 from bot.handlers import inventory as inventory_handlers
 from bot.handlers import pvp as pvp_handlers
 from bot.handlers import raid_combat as raid_combat_handlers
+from bot.handlers import scene_events as scene_event_handlers
 from bot.handlers import stats_window
 from bot.handlers import world_boss as world_boss_handlers
 from bot.keyboards import fishing as fishing_kb
@@ -68,7 +69,7 @@ from game.economy import mining
 from game.economy import premium_config as pc
 from game.economy import raid_config as raid_cfg
 from game.economy import story_config as sc
-from game.world import encounters, flavor, grid
+from game.world import encounters, flavor, grid, scene_events
 from game.world import events as event_pool
 from game.world import world_config as wc
 from game.world.location_types import region_for
@@ -88,6 +89,7 @@ from services import (
     movement_service,
     premium_service,
     preset_service,
+    scene_event_service,
     quest_service,
     raid_service,
     screen_service,
@@ -345,7 +347,9 @@ async def _maybe_trigger_story(peer_id: int, db, character, stats) -> bool:
         )
     if quest.named_enemy is not None:
         gear_bonus = await item_service.compute_gear_bonus(db, character.id)
-        buff_modifiers = await preset_service.resolve_active_modifiers(db, character)
+        buff_modifiers = await scene_event_service.solo_modifiers(
+            db, character, await preset_service.resolve_active_modifiers(db, character),
+        )
         mult = quest.named_enemy.stat_mult or sc.NAMED_ENEMY_STAT_MULT_DEFAULT
         # Патч 36: уровень квестового врага — по клетке цели (как у обычных
         # мобов), не напрямую по уровню игрока — раньше сильно прокачанный
@@ -732,6 +736,22 @@ async def handle_explore_done(peer_id: int) -> None:
         stats = await _get_stats(db, character.id)
 
         outcome_kind = "combat" if _rng.random() < wc.EXPLORE_COMBAT_CHANCE else "event"
+        # Патч 110: след события обрывается на этой клетке - вместо обычного
+        # исхода его финал. Событие со сценами - средний/глубокий слой.
+        scene_event = None
+        trail = await scene_event_service.take_trail_here(db, character)
+        if trail is not None:
+            trail_def = scene_events.content().trails.get(trail.kind)
+            scene_event = scene_events.event_by_id(trail_def.finale) if trail_def else None
+        elif outcome_kind == "event":
+            tier = scene_events.roll_tier(_rng)
+            if tier != "light":
+                scene_event = scene_events.pick_event(
+                    _rng, tier, grid.ring_tier(character.pos_x, character.pos_y),
+                    region_for(character.pos_x, character.pos_y), character.level,
+                )
+        if scene_event is not None:
+            outcome_kind = "scene"
         # Патч 59: завершённое исследование ЛЮБОГО игрока подбрасывает руду в
         # случайный неполный рудник. Рудники — общий ресурс, который наполняет
         # активность всего сервера, а не персональный кран.
@@ -744,7 +764,9 @@ async def handle_explore_done(peer_id: int) -> None:
         if new_boss is not None:
             world_boss_handlers.on_spawned(new_boss.id)
         gear_bonus = await item_service.compute_gear_bonus(db, character.id)
-        buff_modifiers = await preset_service.resolve_active_modifiers(db, character)
+        buff_modifiers = await scene_event_service.solo_modifiers(
+            db, character, await preset_service.resolve_active_modifiers(db, character),
+        )
 
         event = None
         song_can_read = False
@@ -801,6 +823,12 @@ async def handle_explore_done(peer_id: int) -> None:
     if outcome_kind == "combat":
         await combat_handlers.start_encounter(peer_id, character, stats, gear_bonus, buff_modifiers)
         return
+
+    if outcome_kind == "scene":
+        _pending_events.pop(peer_id, None)
+        await scene_event_handlers.start(peer_id, scene_event)
+        return
+    scene_event_handlers.cancel(peer_id)
 
     if event is not None and event.ore_vein:
         # У жилы нет выбора: либо берёшься за кирку, либо уходишь. Сначала
@@ -906,7 +934,9 @@ async def event_choice(message: Message) -> None:
         wallet = await wallet_service.get_wallet(db, character.id)
         farm_currency, donate_currency = wallet.farm_currency, wallet.donate_currency
         gear_bonus = await item_service.compute_gear_bonus(db, character.id)
-        buff_modifiers = await preset_service.resolve_active_modifiers(db, character)
+        buff_modifiers = await scene_event_service.solo_modifiers(
+            db, character, await preset_service.resolve_active_modifiers(db, character),
+        )
         quest_line = await story_service.quest_summary_line(db, character)
         group_block = await group_texts.group_summary_block(db, character.id)
         has_mount = await mount_service.has_any_mount(db, character.id)

@@ -56,12 +56,14 @@ from services import (
     item_service,
     mount_service,
     preset_service,
+    scene_event_service,
     story_service,
     trial_service,
     trophy_service,
     vitals_service,
     wallet_service,
 )
+from game.world.scene_events import SceneResult
 from services import onboarding_service as onboarding_svc
 from services.db import get_session_factory
 
@@ -89,6 +91,8 @@ _mount_ambush: dict[int, int] = {}
 # Ходы такого боя ведёт bot/handlers/world_boss.py: общее здоровье, лимит
 # ходов, свой итог вместо победы/смерти.
 _world_boss: dict[int, int] = {}
+# peer_id -> награда события за победу, в мобах (патч 110: вожак в финале следа)
+_event_bonus: dict[int, float] = {}
 # колбэк смерти игрока (world.on_player_defeat): убрать кнопки, текст, запустить респавн
 on_defeat_hook = None
 
@@ -270,6 +274,22 @@ async def start_story_encounter(
     )
 
 
+async def start_event_encounter(
+    peer_id: int, character, char_stats, gear_bonus, buff_modifiers,
+    elite: bool = False, bonus: float = 0.0,
+) -> None:
+    """Бой из события исследования (патч 110): засада или вожак из финала
+    следа. bonus - награда события за победу сверх обычной за моба."""
+    dist = grid.monolith_distance(character.pos_x, character.pos_y)
+    cell_region = region_for(character.pos_x, character.pos_y)
+    encounter = encounters.spawn_mob(MOB_ID, cell_region, character.level, dist, _rng, elite=elite)
+    if bonus:
+        _event_bonus[peer_id] = bonus
+    await start_encounter(
+        peer_id, character, char_stats, gear_bonus, buff_modifiers, forced_encounter=encounter
+    )
+
+
 async def start_mount_ambush_encounter(
     peer_id: int, character, char_stats, gear_bonus, buff_modifiers,
     travel_id: int, encounter: encounters.Encounter,
@@ -356,6 +376,8 @@ async def on_battle_finished(session_id: int, result: TickResult) -> None:
     tracker = _battle_trackers.pop(peer_id, None)
     story_state = _story_encounter.pop(peer_id, None)  # (quest_id, остаток цепочки), патч 18
     travel_id = _mount_ambush.pop(peer_id, None)  # бой-нападение в пути на маунте, патч 25 п.7
+    event_bonus = _event_bonus.pop(peer_id, None)  # патч 110: награда события за вожака
+    event_lines: list[str] = []
     battle_report = tracker.finalize(result.winner_side == 0) if tracker is not None else None
     sf = get_session_factory()
     async with sf() as db:
@@ -392,14 +414,23 @@ async def on_battle_finished(session_id: int, result: TickResult) -> None:
                 # последний бой цепочки (или обычный одиночный сюжетный бой) —
                 # цель достигнута, ждём разговора с наставником
                 await story_service.mark_ready(db, character, story_state[0])
+            if event_bonus:
+                bonus = await scene_event_service.apply_result(
+                    db, character, stats, SceneResult(reward=event_bonus), _rng,
+                )
+                event_lines += bonus.lines
+            event_lines += await scene_event_service.tick_effects(db, character.id)
             await db.commit()
             new_level = outcome.new_level
             levels = outcome.levels_gained
-            buff_modifiers = await preset_service.resolve_active_modifiers(db, character)
+            buff_modifiers = await scene_event_service.solo_modifiers(
+                db, character, await preset_service.resolve_active_modifiers(db, character),
+            )
             quest_line = await story_service.quest_summary_line(db, character)
             group_block = await group_texts.group_summary_block(db, character.id)
         else:  # моб выиграл или ничья — смерть игрока (авто-респавн по таймеру)
             defeat = await encounter_service.resolve_defeat(db, character)
+            await scene_event_service.tick_effects(db, character.id)
             await db.commit()
             respawn_at = character.respawn_at
             xp_lost = defeat.xp_lost
@@ -433,6 +464,8 @@ async def on_battle_finished(session_id: int, result: TickResult) -> None:
             text += f"\n{drop_line}"
         if outcome.raid_key_dropped:
             text += f"\n{raid_key_texts.raid_key_drop_line()}"
+        for line in event_lines:
+            text += f"\n{line}"
         if outcome.quest_progress is not None:
             text += f"\n📜 {outcome.quest_label}: {outcome.quest_progress}/{outcome.quest_target}"
             if outcome.quest_ready:

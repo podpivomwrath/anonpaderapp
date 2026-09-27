@@ -40,6 +40,7 @@ from services import (
     item_service,
     mount_service,
     preset_service,
+    scene_event_service,
     screen_service,
     story_service,
     wallet_service,
@@ -353,7 +354,9 @@ async def scan() -> None:
                 continue
             stats = await _stats(db, character.id)
             gear_bonus = await item_service.compute_gear_bonus(db, character.id)
-            buff_modifiers = await preset_service.resolve_active_modifiers(db, character)
+            buff_modifiers = await scene_event_service.solo_modifiers(
+                db, character, await preset_service.resolve_active_modifiers(db, character),
+            )
             dist = grid.monolith_distance(travel.to_x, travel.to_y)
             # Патч 32, баг 4: регион — по клетке нападения (куда едет маунт),
             # не по домашнему региону игрока (см. bot/handlers/combat.py).

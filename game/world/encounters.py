@@ -113,8 +113,15 @@ def base_mob_ability(base_mob_id: str | None):
     return mob.ability if mob is not None else None
 
 
+#: Патч 110: вожак - матёрая тварь из финала следа-охоты. Крепче и больнее
+#: обычного моба той же клетки; награда за него выдаётся событием сверху.
+ELITE_HP_MULT = 1.8
+ELITE_DMG_MULT = 1.3
+
+
 def spawn_mob(
-    participant_id: int, region: str, player_level: int, dist: int, rng: random.Random
+    participant_id: int, region: str, player_level: int, dist: int, rng: random.Random,
+    elite: bool = False,
 ) -> Encounter:
     """dist (патч 15) — расстояние Чебышёва до Монолита ТЕКУЩЕЙ клетки игрока:
     определяет, какое кольцо бестиария используется (не домашний регион).
@@ -130,12 +137,15 @@ def spawn_mob(
     # урон (опасность) — вполовину слабее (см. balance_config.py).
     hp_mult = bc.MOB_HP_MULTIPLIER * formulas.mob_ring_multiplier(*zone)
     dmg_mult = bc.MOB_DAMAGE_MULTIPLIER * formulas.mob_ring_damage_multiplier(*zone)
+    if elite:
+        hp_mult *= ELITE_HP_MULT
+        dmg_mult *= ELITE_DMG_MULT
     stats = _scale_stats_split(balanced_mob_stats(level, mob.primary_stat), hp_mult, dmg_mult)
     combatant = build_combatant(
         id=participant_id,
         side=1,
         kind="mob",
-        name=mob.name,
+        name=f"{mob.name}-вожак" if elite else mob.name,
         level=level,
         stats=stats,
         primary_stat=mob.primary_stat,

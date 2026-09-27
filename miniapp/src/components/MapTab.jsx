@@ -426,6 +426,7 @@ export default function MapTab() {
               ))}
               {questTarget && marker(questTarget.x, questTarget.y, 'map-pin--quest', '📜', questTarget.label)}
               {worldBoss && marker(worldBoss.x, worldBoss.y, 'map-pin--boss', '💀', worldBoss.name, 1.3)}
+              {mapState.trail && marker(mapState.trail.x, mapState.trail.y, 'map-pin--trail', mapState.trail.emoji, mapState.trail.title, 1.1)}
               {travelTarget && marker(travelTarget.to_x, travelTarget.to_y, 'map-pin--route', '⚑', 'Цель пути')}
               {playerPos && marker(playerPos.x, playerPos.y, 'map-pin--player', '', 'Ты здесь', 1.1)}
             </div>

@@ -22,7 +22,7 @@ from bot.miniapp_auth import VK_USER_ID_KEY
 from game.content_loader import load_location_types
 from game.economy import fishing, mining
 from game.economy import mining_config as mc
-from game.world import grid, world_boss
+from game.world import grid, scene_events, world_boss
 from game.world import world_config as wc
 from models import Character, User
 from services import (
@@ -30,6 +30,7 @@ from services import (
     mining_service,
     mount_service,
     movement_service,
+    scene_event_service,
     story_service,
     world_boss_service,
 )
@@ -113,6 +114,13 @@ async def handle_get_state(request: web.Request) -> web.Response:
 
         owned = await mount_service.owned_mounts(db, character.id)
 
+        # Патч 110: след события - метка на карте, пока не остыл.
+        trail_mark = None
+        trail = await scene_event_service.get_trail(db, character.id)
+        trail_def = scene_events.content().trails.get(trail.kind) if trail is not None else None
+        if trail_def is not None and scene_event_service.trail_alive(trail):
+            trail_mark = {"x": trail.x, "y": trail.y, "title": trail_def.title, "emoji": trail_def.emoji}
+
         # Патч 108: живой мировой босс - метка на карте.
         world_boss_mark = None
         boss = await world_boss_service.active_boss(db)
@@ -132,6 +140,7 @@ async def handle_get_state(request: web.Request) -> web.Response:
                 "mount_travel": mount_travel,
                 "quest_target": quest_target,
                 "world_boss": world_boss_mark,
+                "trail": trail_mark,
                 "mounts": [
                     {
                         "mount_id": m.mount_id, "name": m.name, "rarity": m.rarity, "emoji": m.emoji,

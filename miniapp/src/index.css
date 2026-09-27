@@ -394,6 +394,13 @@ body {
   animation: map-boss-glow 2.2s ease-in-out infinite;
 }
 
+/* Патч 110: след события - пульсирует, как цель, к которой торопишься. */
+.map-pin--trail {
+  border: 2px solid #e8a33d;
+  background: rgba(40, 22, 6, 0.85);
+  animation: map-pulse 1.8s ease-in-out infinite;
+}
+
 .map-pin--route {
   border-color: #ffe066;
   color: #ffe066;
