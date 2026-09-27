@@ -139,7 +139,7 @@ def _kb_rows(kb_json: str) -> list[list[dict]]:
 
 
 def test_inventory_keyboard_caps_rows_at_vk_limit(monkeypatch) -> None:
-    """Патч 41: инвентарь — настоящая пагинация (6/стр., 2 в ряд), а не
+    """Патч 41: инвентарь — настоящая пагинация (10/стр., 2 в ряд), а не
     жёсткий срез в один длинный столбик — при любом размере инвентаря
     страница остаётся короткой."""
     monkeypatch.setattr(world_kb, "get_settings", lambda: Settings(_env_file=None))
@@ -148,33 +148,33 @@ def test_inventory_keyboard_caps_rows_at_vk_limit(monkeypatch) -> None:
     ]
     rows = _kb_rows(inventory_keyboard(items))
     assert len(rows) <= 10
-    # 6 предметов/стр. по 2 в ряд = 3 ряда + [Стр. →] + [← Назад].
-    assert len(rows) == 5
+    # 10 предметов/стр. по 2 в ряд = 5 рядов + [Стр. →] + [← Назад].
+    assert len(rows) == 7
 
 
 def test_inventory_keyboard_pagination_pages_through_items(monkeypatch) -> None:
     monkeypatch.setattr(world_kb, "get_settings", lambda: Settings(_env_file=None))
     items = [
-        (Item(id=i, name=f"Предмет {i}", slot="weapon", base_stats={}), False) for i in range(20)
+        (Item(id=i, name=f"Предмет {i}", slot="weapon", base_stats={}), False) for i in range(25)
     ]
 
     page1 = json.loads(inventory_keyboard(items, page=1))
     labels_p1 = {b["action"]["label"] for row in page1["buttons"] for b in row}
     assert "Предмет 0" in labels_p1
-    assert "Предмет 6" not in labels_p1
+    assert "Предмет 10" not in labels_p1
     assert "Стр. →" in labels_p1
     assert "← Стр." not in labels_p1
 
     page2 = json.loads(inventory_keyboard(items, page=2))
     labels_p2 = {b["action"]["label"] for row in page2["buttons"] for b in row}
-    assert "Предмет 6" in labels_p2
+    assert "Предмет 10" in labels_p2
     assert "Предмет 0" not in labels_p2
     assert "← Стр." in labels_p2
     assert "Стр. →" in labels_p2
 
     last_page = json.loads(inventory_keyboard(items, page=99))  # за пределами — клампится
     labels_last = {b["action"]["label"] for row in last_page["buttons"] for b in row}
-    assert "Предмет 19" in labels_last
+    assert "Предмет 24" in labels_last
     assert "Стр. →" not in labels_last
 
 

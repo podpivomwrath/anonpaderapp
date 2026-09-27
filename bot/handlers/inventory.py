@@ -13,7 +13,12 @@
 from vkbottle.bot import BotLabeler, Message
 
 from bot import editable_message
-from bot.keyboards.items import INVENTORY_PAGE_SIZE, inventory_keyboard, item_view_keyboard
+from bot.keyboards.items import (
+    INVENTORY_PAGE_SIZE,
+    inventory_keyboard,
+    inventory_page_bounds,
+    item_view_keyboard,
+)
 from bot.keyboards.world import BTN_INVENTORY
 from game.world import grid
 from models import Item
@@ -39,12 +44,21 @@ def _stats_line(item: Item) -> str:
     )
 
 
-async def _render_list(db, character) -> tuple[str, list[tuple[Item, bool]]]:
+def _page_of(payload: dict) -> int:
+    page = payload.get("page")
+    return page if isinstance(page, int) else 1
+
+
+async def _render_list(db, character, page: int = 1) -> tuple[str, list[tuple[Item, bool]]]:
+    """Текст одной страницы инвентаря - те же вещи, что на кнопках этой
+    страницы (патч 109: раньше текст показывал всё разом)."""
     items = await item_service.get_inventory(db, character.id)
     if not items:
         return "🎒 Твоя сумка пока пуста.", items
+    page, total_pages = inventory_page_bounds(len(items), page)
+    start = (page - 1) * INVENTORY_PAGE_SIZE
     lines = []
-    for item, equipped in items:
+    for item, equipped in items[start:start + INVENTORY_PAGE_SIZE]:
         rarity = item_service.rarity_def(item.rarity)
         slot_title = item_service.SLOT_TITLES[item.slot]
         if item.ilvl is not None:  # у уникальных и служебных вещей уровня нет
@@ -54,13 +68,10 @@ async def _render_list(db, character) -> tuple[str, list[tuple[Item, bool]]]:
             f"{rarity.emoji} {item.name} - {slot_title}{suffix}\n"
             f"{_stats_line(item)}"
         )
-    text = "🎒 Инвентарь:\n\n" + "\n\n".join(lines)
-    if len(items) > INVENTORY_PAGE_SIZE:
-        # Патч 41: клавиатура теперь настоящая пагинация (inventory_keyboard),
-        # текстовое резюме по-прежнему показывает всё разом — уточняем, что
-        # кнопки предметов идут постранично.
-        text += "\n\nКнопки - постранично, [Стр. →] внизу открывает следующую."
-    return text, items
+    header = "🎒 Инвентарь:"
+    if total_pages > 1:
+        header = f"🎒 Инвентарь, стр. {page} из {total_pages} (вещей: {len(items)}):"
+    return header + "\n\n" + "\n\n".join(lines), items
 
 
 @labeler.message(text=[BTN_INVENTORY])
@@ -86,6 +97,7 @@ async def view_item(message: Message) -> None:
     item_id = payload.get("item")
     if not isinstance(item_id, int):
         return
+    page = _page_of(payload)
 
     async with get_session_factory()() as db:
         character = await onboarding_svc.get_character(db, message.from_id)
@@ -107,15 +119,15 @@ async def view_item(message: Message) -> None:
     else:
         text = item_service.format_comparison(old_item, item)
     await editable_message.send_or_edit(
-        _bot_api, _NS, peer_id, text, item_view_keyboard(item_id, entry.equipped),
+        _bot_api, _NS, peer_id, text, item_view_keyboard(item_id, entry.equipped, page),
     )
 
 
 @labeler.message(payload_contains={"type": "inventory_page"})
 async def inventory_page(message: Message) -> None:
     """Патч 41: пагинация списка инвентаря — переключение страницы кнопками
-    [← Стр.]/[Стр. →], текст остаётся тем же (полный список), меняются
-    только кнопки предметов на клавиатуре."""
+    [← Стр.]/[Стр. →]. Патч 109: меняется и текст - он показывает ту же
+    страницу, что и кнопки."""
     peer_id = message.peer_id
     payload = message.get_payload_json() or {}
     page = payload.get("page")
@@ -125,7 +137,7 @@ async def inventory_page(message: Message) -> None:
         character = await onboarding_svc.get_character(db, message.from_id)
         if character is None or character.creation_state is not None:
             return
-        text, items = await _render_list(db, character)
+        text, items = await _render_list(db, character, page)
 
     await editable_message.send_or_edit(_bot_api, _NS, peer_id, text, inventory_keyboard(items, page))
 
@@ -133,13 +145,14 @@ async def inventory_page(message: Message) -> None:
 @labeler.message(payload_contains={"type": "inventory_back"})
 async def back_to_list(message: Message) -> None:
     peer_id = message.peer_id
+    page = _page_of(message.get_payload_json() or {})
     async with get_session_factory()() as db:
         character = await onboarding_svc.get_character(db, message.from_id)
         if character is None or character.creation_state is not None:
             return
-        text, items = await _render_list(db, character)
+        text, items = await _render_list(db, character, page)
 
-    await editable_message.send_or_edit(_bot_api, _NS, peer_id, text, inventory_keyboard(items))
+    await editable_message.send_or_edit(_bot_api, _NS, peer_id, text, inventory_keyboard(items, page))
 
 
 @labeler.message(payload_contains={"type": "inventory_root_back"})
@@ -174,6 +187,7 @@ async def equip_from_inventory(message: Message) -> None:
     item_id = payload.get("item")
     if not isinstance(item_id, int):
         return
+    page = _page_of(payload)
 
     async with get_session_factory()() as db:
         character = await onboarding_svc.get_character(db, message.from_id)
@@ -185,11 +199,11 @@ async def equip_from_inventory(message: Message) -> None:
         new_item = await db.get(Item, item_id)
         old_item = await item_service.equip_item(db, character.id, item_id)
         await db.commit()
-        text, items = await _render_list(db, character)
+        text, items = await _render_list(db, character, page)
 
     delta_line = item_service.stat_delta_line(old_item, new_item)
     full_text = f"Надето. {delta_line}\n\n{text}"
-    await editable_message.send_or_edit(_bot_api, _NS, peer_id, full_text, inventory_keyboard(items))
+    await editable_message.send_or_edit(_bot_api, _NS, peer_id, full_text, inventory_keyboard(items, page))
 
 
 async def rebuild(db, character) -> tuple[str, str] | None:
