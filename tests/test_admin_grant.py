@@ -91,3 +91,7 @@ async def test_bad_key_amount_and_duplicate_mount(db_session, make_character) ->
     await ag.grant(db_session, 0, me, "mount:ashen_steed", 1, None, random.Random(1))
     with pytest.raises(ag.GrantError):
         await ag.grant(db_session, 0, me, "mount:ashen_steed", 1, None, random.Random(1))
+
+
+def test_player_notice_names_item_and_count() -> None:
+    assert ag.player_notice("🧪 Малое исцеление ×5") == "🎁 Вы получили: 🧪 Малое исцеление - 5 шт."

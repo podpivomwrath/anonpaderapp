@@ -293,3 +293,9 @@ async def grant(
         new_value={"key": key, "amount": amount}, note=note,
     )
     return note
+
+
+def player_notice(note: str) -> str:
+    """Сообщение игроку о выдаче. note - то, что вернул grant()."""
+    label, _, amount = note.rpartition(" ×")
+    return f"🎁 Вы получили: {label} - {amount} шт."

@@ -1413,6 +1413,19 @@ async def _current_keyboard(db, character, peer_id: int, now: datetime) -> str:
     return kb.movement_keyboard(character.pos_x, character.pos_y, peer_id, has_mount=has_mount)
 
 
+async def send_plain_notice(peer_id: int, text: str) -> bool:
+    """Одно сообщение игроку без клавиатуры (у него остаётся текущая).
+    False - не ушло: игрок мог закрыть сообщения, дело от этого не страдает."""
+    if _bot_api is None:
+        return False
+    try:
+        await _bot_api.messages.send(peer_id=peer_id, random_id=0, message=text)
+    except Exception:  # noqa: BLE001 - уведомление вторично, действие уже совершено
+        logger.warning("Не удалось отправить уведомление игроку {}", peer_id)
+        return False
+    return True
+
+
 async def broadcast_service_notice(text: str) -> int:
     """Служебная рассылка всем игрокам + АКТУАЛЬНАЯ клавиатура каждому.
 

@@ -218,6 +218,9 @@ async def handle_post_action(request: web.Request) -> web.Response:
         card = await admin_service.player_card(db, character_id)
         if granted is not None:
             card["granted"] = granted
+            peer_id = await onboarding_svc.vk_id_for_character(db, character_id)
+            if peer_id is not None:
+                await world_handlers.send_plain_notice(peer_id, admin_grant_service.player_notice(granted))
         return web.json_response(card)
 
 
