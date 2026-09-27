@@ -257,6 +257,12 @@ async def _remove_member(db: AsyncSession, group: Group, character_id: int, was_
             # пересчитывать было бы не по чему.
             await raid_service.leave_lobby_if_present(db, member.character_id)
             await db.delete(member)
+        # Сначала участники, потом группа. Связи в ORM между ними нет, и
+        # порядок удаления в одном flush не определён: на Postgres группа
+        # уходила первой, каскад базы стирал участника, а ORM следом удалял
+        # уже пустое место - «expected to delete 1 row(s); 0 were matched»
+        # (живой прогон на pupsik). SQLite каскадов не делает и молчал.
+        await db.flush()
         await db.delete(group)
         await db.flush()
         return LeaveResult(
