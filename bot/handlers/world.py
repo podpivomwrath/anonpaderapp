@@ -1058,7 +1058,10 @@ async def handle_rest_done(peer_id: int) -> None:
         else:
             keyboard = kb.movement_keyboard(character.pos_x, character.pos_y, peer_id, has_mount=has_mount)
     await _deliver_daily_notice(peer_id, character)
-    text = f"{flavor.rest_done()}\n{display.hp_delta_line(hp_before, max_hp, max_hp)}"
+    text = flavor.rest_done()
+    if hp_before < max_hp:
+        # При полном здоровье строка «+0 HP · 100% → 100%» - пустая.
+        text += "\n" + display.hp_delta_line(hp_before, max_hp, max_hp)
     await _bot_api.messages.send(peer_id=peer_id, message=text, random_id=0, keyboard=keyboard)
 
 
@@ -1100,7 +1103,14 @@ async def move(message: Message) -> None:
             return
         direction = kb.resolve_direction(character.pos_x, character.pos_y, message.text)
         if direction is None:
-            return  # устаревшая клавиатура — кнопка больше не подходит к позиции
+            # Устаревшая клавиатура: кнопка не подходит к клетке (стрелка там,
+            # где теперь подпись города, и наоборот). Раньше - молчали, и
+            # нажатие уходило в пустоту: со стороны неотличимо от мёртвого бота.
+            await message.answer(
+                "Отсюда так не пройти - вот кнопки этой клетки.",
+                keyboard=await _current_keyboard(db, character, message.peer_id, now),
+            )
+            return
         dx, dy = direction
         if not grid.in_bounds(character.pos_x + dx, character.pos_y + dy):
             # Патч 31, п.7: за границей карты (-50..50) — лорный отказ вместо
