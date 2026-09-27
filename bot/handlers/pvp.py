@@ -26,7 +26,7 @@ from vkbottle.bot import BotLabeler, Message
 
 from bot import dailies_texts, editable_message
 from bot.activity import ActivityBusy, activity_action, blocked_reason, transition
-from bot.battle_keyboard import answer_battle_gone, in_any_battle
+from bot.battle_keyboard import active_battle_keyboard, answer_battle_gone, in_any_battle
 from bot.dispatch_rules import TEXT_ONLY
 from bot.handlers import combat as combat_handlers
 from bot.handlers import respawn as respawn_handlers
@@ -413,7 +413,10 @@ def _battle_roster_text(battle_id: int, battle: Battle) -> str:
 @labeler.message(text=[kb.BTN_LOOK_AROUND])
 async def look_around(message: Message) -> None:
     peer_id = message.peer_id
-    if has_active_battle(peer_id):
+    if in_any_battle(peer_id):
+        # Кнопка со старой клавиатуры посреди боя: раньше молчали, и нажатие
+        # уходило в пустоту. Отвечаем и возвращаем кнопки боя.
+        await message.answer("⚔️ Ты в бою - оглядеться некогда.", keyboard=active_battle_keyboard(peer_id))
         return
     async with get_session_factory()() as db:
         character = await onboarding_svc.get_character(db, message.from_id)
