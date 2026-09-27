@@ -636,6 +636,22 @@ async def test_restart_reports_who_to_warn(db_session, make_character) -> None:
     assert idle.id not in released, "спокойных игроков предупреждать не о чем"
 
 
+@pytest.mark.asyncio
+async def test_event_vein_diggers_are_told_apart(db_session, make_character) -> None:
+    """Жилу из исследования после рестарта не вернуть - ей нужен свой текст,
+    без «спустись и начни заново» (main.py). Копающий в руднике - не из них."""
+    in_mine = await make_character()
+    in_mine.pos_x, in_mine.pos_y = 3, 27
+    in_vein = await make_character()
+    in_vein.pos_x, in_vein.pos_y = 10, 5
+    db_session.add(MineVein(mine_id=EASY_MINE, ore_count=1))
+    await db_session.flush()
+    await mining_service.start_dig(db_session, in_mine, mining.mine_by_id(EASY_MINE), random.Random(0))
+    await mining_service.start_dig(db_session, in_vein, None, random.Random(0))
+
+    assert await mining_service.event_vein_diggers(db_session) == {in_vein.id}
+
+
 # --- Порог уровня на вид руды (патч 62) ---------------------------------------
 
 def test_ore_tier_is_gated_by_mining_level() -> None:

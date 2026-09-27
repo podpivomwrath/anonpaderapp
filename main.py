@@ -104,6 +104,7 @@ async def run() -> None:
 
     # Recover receipts before accepting any event or starting scheduled jobs.
     async with get_session_factory()() as db:
+        vein_diggers = await mining_service.event_vein_diggers(db)
         released = await mining_service.release_after_restart(db)
         if released:
             logger.info("После рестарта прервана добыча у {} игроков", len(released))
@@ -138,10 +139,17 @@ async def run() -> None:
                     logger.exception("Не удалось предупредить игрока {} ({})", peer, what)
 
     await _notify_interrupted(
-        released,
+        [cid for cid in released if cid not in vein_diggers],
         "⛏ Сервер перезапустился, и добыча прервалась. "
         "Начатая порода вернулась в жилу - спустись и начни заново.",
         "добыча",
+    )
+    # Жила из исследования - не рудник: после рестарта её нет, и звать
+    # «спуститься заново» некуда.
+    await _notify_interrupted(
+        [cid for cid in released if cid in vein_diggers],
+        "⛏ Сервер перезапустился, и добыча прервалась.",
+        "добыча в жиле",
     )
     await _notify_interrupted(
         recovered,

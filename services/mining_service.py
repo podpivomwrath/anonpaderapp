@@ -357,6 +357,20 @@ async def total_ore(db: AsyncSession, character_id: int) -> int:
 
 # --- Обслуживание -------------------------------------------------------------
 
+async def event_vein_diggers(db: AsyncSession) -> set[int]:
+    """Кто прямо сейчас копает жилу из исследования (у неё нет рудника).
+
+    Спрашивать ДО release_after_restart: тот обнуляет добычу. Нужно для
+    текста после рестарта - в жилу «спуститься заново» нельзя, её больше нет.
+    """
+    rows = await db.execute(
+        select(Character.id).where(
+            Character.mining_ends_at.is_not(None), Character.mining_mine_id.is_(None),
+        )
+    )
+    return set(rows.scalars().all())
+
+
 async def release_after_restart(db: AsyncSession) -> list[int]:
     """После рестарта бота выбрасывает копающих наверх и ОТМЕНЯЕТ их добычу.
 
