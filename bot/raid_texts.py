@@ -18,8 +18,10 @@
 Интерфейсные подписи (BTN_*, счётчик готовности) и строки механик (⚠️-строки,
 множители лута) намеренно НЕ трогались - они должны оставаться сухими."""
 
+from bot import raid_archive_texts as at
 from bot import raid_field_texts as ft
 from bot.vk_media import photo_attachment
+from game.economy import raid_archive_config as ac
 from game.economy import raid_config as rc
 from game.economy import raid_field_config as fc
 
@@ -37,7 +39,8 @@ RAID_LIST_TEXT = (
     "За Монолитом начинаются места, которые кто-то однажды видел во сне и не "
     "сумел забыть. Сны остались, тот, кто их видел, - нет.\n\n"
     "На афише у входа в театр стоит твоё имя. Написано давно, чернила выцвели. "
-    "А с другой стороны камня, из тумана, кто-то трубит в рог."
+    "А с другой стороны камня, из тумана, кто-то трубит в рог. И откуда-то "
+    "снизу, сквозь камень, слышно, как переворачивают страницы."
 )
 BTN_PUPPET_THEATRE = "🎭 Кукольный театр"
 
@@ -45,6 +48,7 @@ BTN_PUPPET_THEATRE = "🎭 Кукольный театр"
 RAID_TITLES = {
     rc.RAID_PUPPET_THEATRE_ID: BTN_PUPPET_THEATRE,
     fc.RAID_FIELD_ID: ft.BTN_FIELD,
+    ac.RAID_ARCHIVE_ID: at.BTN_ARCHIVE,
 }
 RAID_IDS = tuple(RAID_TITLES)
 
@@ -158,6 +162,8 @@ def group_touch_notice(leader_name: str, raid_id: str = rc.RAID_PUPPET_THEATRE_I
     f-строка была без единой подстановки."""
     if raid_id == fc.RAID_FIELD_ID:
         return ft.group_touch_notice(leader_name)
+    if raid_id == ac.RAID_ARCHIVE_ID:
+        return at.group_touch_notice(leader_name)
     return (
         f"{leader_name} открыл вход в Кукольный театр. Придите к Монолиту (0; 0) "
         f"и прикоснитесь."

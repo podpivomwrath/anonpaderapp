@@ -258,3 +258,75 @@ rows of fallen soldiers in rusted mail half sunk into the mud, no text, no
 watermark, no logo, no modern objects, horizontal 3:2 composition, full figure
 visible and not cropped
 ```
+
+---
+---
+
+# Промты для рейда «Безликий архив»
+
+Тот же формат: **3:2 горизонтально**, английские промты, лор - из
+`bot/raid_archive_texts.py`. Слоты - `STAGE_PHOTO_IDS` и `PROLOGUE_PHOTO_ID`
+там же. Лица Архивариуса нет совсем: гладкая кожа от лба до подбородка.
+
+## Общий стилевой хвост
+
+```
+dark fantasy scene, endless ancient library, painterly semi-realistic, muted
+desaturated palette of ash grey, aged parchment, dried ink and dried blood,
+warm candlelight against deep shadow, dust motes in the air, shelves rising
+out of sight into darkness, no readable text, no watermark, no logo, no modern
+objects, horizontal 3:2 composition
+```
+
+## Пролог - библиотека
+
+```
+view down an aisle of an impossibly tall library, wooden shelves rising into
+darkness with no visible ceiling, floorboards worn smooth by countless steps,
+a single page drifting down through the candlelight, nobody in sight,
+unsettling stillness, dark fantasy scene, endless ancient library, painterly
+semi-realistic, muted desaturated palette of ash grey, aged parchment, dried
+ink and dried blood, warm candlelight against deep shadow, dust motes in the
+air, no readable text, no watermark, no logo, no modern objects, horizontal
+3:2 composition
+```
+
+## Этап 1 - Зал головоломок
+
+```
+a massive iron-bound door set into a wall of bookshelves, five different
+ornate locks on it, each with its own mechanism of tiles, runes, candles and
+small sliding plates, a large hourglass mounted above the door with sand
+already running, dark fantasy scene, endless ancient library, painterly
+semi-realistic, muted desaturated palette of ash grey, aged parchment, dried
+ink and dried blood, warm candlelight against deep shadow, dust motes in the
+air, no readable text, no watermark, no logo, no modern objects, horizontal
+3:2 composition
+```
+
+## Этап 2 - Дверь со стёртой строкой
+
+```
+a smooth wax-pale door with no handle and no lock, a single carved line of
+illegible script across it with several words scraped away, deep darkness
+around the door with the faint suggestion of whispering shapes, candles
+melted down to stubs on the floor, dark fantasy scene, endless ancient
+library, painterly semi-realistic, muted desaturated palette of ash grey,
+aged parchment, dried ink and dried blood, warm candlelight against deep
+shadow, dust motes in the air, no readable text, no watermark, no logo, no
+modern objects, horizontal 3:2 composition
+```
+
+## Этап 3 - Безликий Архивариус
+
+```
+a gaunt robed scholar sitting at a huge reading desk piled with open books,
+his face completely smooth skin from forehead to chin with no eyes, nose or
+mouth, writing with a quill without looking at the page, ink stains on his
+long fingers, books floating open around him in the candlelight, calm and
+utterly terrifying, dark fantasy scene, endless ancient library, painterly
+semi-realistic, muted desaturated palette of ash grey, aged parchment, dried
+ink and dried blood, warm candlelight against deep shadow, dust motes in the
+air, no readable text, no watermark, no logo, no modern objects, horizontal
+3:2 composition, full figure visible and not cropped
+```

@@ -15,6 +15,7 @@ from loguru import logger
 from vkbottle.bot import BotLabeler, Message
 
 from bot import dailies_texts, editable_message, group_texts, raid_key_texts, raid_texts as rt
+from bot import raid_archive_texts as at
 from bot import raid_field_texts as ft
 from bot.handlers import respawn as respawn_handlers
 from bot.handlers import stats_window
@@ -24,7 +25,7 @@ from bot.battle_keyboard import answer_battle_gone
 from bot.keyboards.items import no_keyboard
 from bot.keyboards.world import movement_keyboard
 from game.combat import balance_config as bc
-from game.combat import battle_log, display, elixir_effects, raid_bosses, raid_field
+from game.combat import battle_log, display, elixir_effects, raid_archive, raid_bosses, raid_field
 from game.combat.resolver import TickResult
 from game.combat.session import (
     ActionType,
@@ -39,6 +40,7 @@ from game.combat.skills import DEFENSIVE_SKILLS
 from game.combat.tick_engine import TickEngine
 from game.economy import elixir_config as ec
 from game.economy import raid_config as rc
+from game.economy import raid_archive_config as ac
 from game.economy import raid_field_config as fc
 from models import Character
 from services import (
@@ -116,9 +118,20 @@ class RaidBattle:
     #: строки, которые этап выкладывает на доску до первого хода
     opening_lines: list[str] = field(default_factory=list)
 
+    # --- Рейд «Безликий архив»: этапы 1-2 без боя (bot/handlers/raid_archive.py) ---
+    leader_id: int | None = None
+
     @property
     def is_field(self) -> bool:
         return self.raid_id == fc.RAID_FIELD_ID
+
+    @property
+    def is_archive(self) -> bool:
+        return self.raid_id == ac.RAID_ARCHIVE_ID
+
+    @property
+    def is_theatre(self) -> bool:
+        return self.raid_id == rc.RAID_PUPPET_THEATRE_ID
 
 
 _battles: dict[int, RaidBattle] = {}
@@ -147,6 +160,10 @@ def rebuild_keyboard(peer_id: int) -> str | None:
     battle = _battles.get(battle_id)
     if battle is None:
         return None
+    if battle.is_archive and battle.stage < 3:
+        from bot.handlers import raid_archive  # цикл импортов
+
+        return raid_archive.keyboard_for(peer_id)
     state = _engine.sessions.get(battle_id) if _engine else None
     cid = _character_id_for_peer(battle, peer_id)
     c = state.combatants.get(cid) if state else None
@@ -186,7 +203,7 @@ def _start_stage_session(battle_id: int, battle: RaidBattle) -> CombatSessionSta
     state = CombatSessionState(session_id=battle_id, mode=CombatMode.PVE, is_raid=True)
     _build_player_combatants(state, battle.member_inputs)
 
-    if battle.is_field:
+    if battle.is_field or battle.is_archive:
         _build_field_stage(battle, state)
     elif battle.stage == 1:
         mobs = raid_bosses.build_stage1_mobs(start_id=20_000_000)
@@ -221,8 +238,11 @@ def _start_stage_session(battle_id: int, battle: RaidBattle) -> CombatSessionSta
 
 def _build_field_stage(battle: RaidBattle, state: CombatSessionState) -> None:
     """Этап «Безмогильного поля». id противников - свой диапазон на этап,
-    как у театра: объекты и скелеты нумеруются дальше от него."""
-    if battle.stage == 1:
+    как у театра: объекты и скелеты нумеруются дальше от него. У архива
+    боевой только третий этап - Архивариус."""
+    if battle.is_archive:
+        stage = raid_archive.ArchiveStage(start_id=20_600_000)
+    elif battle.stage == 1:
         stage = raid_field.FogStage(start_id=20_300_000)
     elif battle.stage == 2:
         stage = raid_field.SummonerStage(start_id=20_400_000, participants=len(battle.participants))
@@ -267,21 +287,49 @@ _FIELD_APPEAR_TEXT = {1: ft.STAGE1_APPEAR_TEXT, 2: ft.STAGE2_APPEAR_TEXT, 3: ft.
 _FIELD_LOOT_MULT = {1: fc.STAGE1_LOOT_MULT, 2: fc.STAGE2_LOOT_MULT, 3: fc.STAGE3_LOOT_MULT}
 
 
+_ARCHIVE_LOOT_MULT = {1: ac.STAGE1_LOOT_MULT, 2: ac.STAGE2_LOOT_MULT, 3: ac.STAGE3_LOOT_MULT}
+
+
+def _texts(battle: RaidBattle):
+    """Модуль текстов рейда: пролог, эпилог, поражение, картинки."""
+    if battle.is_field:
+        return ft
+    if battle.is_archive:
+        return at
+    return rt
+
+
 def _appear_text(battle: RaidBattle) -> str:
+    if battle.is_archive:
+        return at.STAGE3_APPEAR_TEXT
     return (_FIELD_APPEAR_TEXT if battle.is_field else _STAGE_APPEAR_TEXT)[battle.stage]
 
 
 def _stage_attachment(battle: RaidBattle) -> str | None:
-    return (ft if battle.is_field else rt).stage_attachment(battle.stage)
+    return _texts(battle).stage_attachment(battle.stage)
 
 
 def _loot_mult(battle: RaidBattle) -> int:
+    if battle.is_archive:
+        return _ARCHIVE_LOOT_MULT[battle.stage]
     return (_FIELD_LOOT_MULT if battle.is_field else _STAGE_LOOT_MULT)[battle.stage]
+
+
+def _trial_level(battle: RaidBattle) -> int:
+    if battle.is_archive:
+        return ac.TRIAL_LEVEL
+    return fc.TRIAL_LEVEL if battle.is_field else rc.SURGEON_TRIAL_LEVEL
+
+
+def _unique_id(battle: RaidBattle) -> str:
+    if battle.is_archive:
+        return ac.RAID_UNIQUE_ITEM_ID
+    return fc.RAID_UNIQUE_ITEM_ID if battle.is_field else rc.RAID_UNIQUE_ITEM_ID
 
 
 async def start_raid(
     group_id: int | None, member_inputs: list[MemberCombatInput], rng: random.Random, *,
-    run_id: int | None = None, raid_id: str = rc.RAID_PUPPET_THEATRE_ID,
+    run_id: int | None = None, raid_id: str = rc.RAID_PUPPET_THEATRE_ID, leader_id: int | None = None,
 ) -> None:
     global _next_battle_id
     battle_id = _next_battle_id
@@ -296,17 +344,30 @@ async def start_raid(
     }
     battle = RaidBattle(
         group_id=group_id, participants=participants, member_inputs=member_inputs, rng=rng,
-        run_id=run_id, raid_id=raid_id,
+        run_id=run_id, raid_id=raid_id, leader_id=leader_id,
     )
     _battles[battle_id] = battle
     for cid, p in participants.items():
         _peer_battle[p.peer_id] = battle_id
         _character_in_raid.add(cid)
 
+    texts = _texts(battle)
+    if battle.is_archive:
+        # Первые два этапа архива - головоломки и загадки, не бой: ими
+        # ведёт свой модуль, а бой начнётся с begin_combat_stage.
+        from bot.handlers import raid_archive  # цикл импортов
+
+        for p in participants.values():
+            await _bot_api.messages.send(
+                peer_id=p.peer_id, message=texts.PROLOGUE_TEXT,
+                attachment=texts.prologue_attachment(), random_id=0,
+            )
+        await raid_archive.start(battle_id, battle)
+        return
+
     state = _start_stage_session(battle_id, battle)
     _engine.start_session(state)
 
-    texts = ft if battle.is_field else rt
     for p in participants.values():
         await _bot_api.messages.send(
             peer_id=p.peer_id, message=texts.PROLOGUE_TEXT,
@@ -319,6 +380,30 @@ async def start_raid(
     await _broadcast_board(battle_id, battle, None, boss_lines=_take_opening_lines(battle))
 
 
+async def begin_combat_stage(battle_id: int) -> None:
+    """Архив: загадки позади - третий этап, бой с Архивариусом."""
+    battle = _battles.get(battle_id)
+    if battle is None:
+        return
+    battle.stage = 3
+    state = _start_stage_session(battle_id, battle)
+    _engine.start_session(state)
+    for p in battle.participants.values():
+        await _bot_api.messages.send(
+            peer_id=p.peer_id, message=_appear_text(battle),
+            attachment=_stage_attachment(battle), random_id=0,
+        )
+    await _broadcast_board(battle_id, battle, None, boss_lines=_take_opening_lines(battle))
+
+
+async def award_stage(battle_id: int) -> dict[int, str]:
+    """Архив: награда за пройденный небоевой этап - всем участникам."""
+    battle = _battles.get(battle_id)
+    if battle is None:
+        return {}
+    return await _stage_rewards(battle, list(battle.participants))
+
+
 def _take_opening_lines(battle: RaidBattle) -> list[str] | None:
     lines, battle.opening_lines = battle.opening_lines, []
     return lines or None
@@ -329,6 +414,10 @@ def abort_run(run_id: int) -> None:
         if battle.run_id != run_id:
             continue
         _engine.abort_session(battle_id)
+        if battle.is_archive:
+            from bot.handlers import raid_archive  # цикл импортов
+
+            raid_archive.abort(battle_id)
         _battles.pop(battle_id, None)
         _declared_this_tick.pop(battle_id, None)
         for p in battle.participants.values():
@@ -732,14 +821,14 @@ async def on_raid_tick_resolved(session_id: int, tick: int, result: TickResult) 
     field_cleared = False
     frozen_ids: list[int] = []
 
-    if battle.is_field and state is not None and battle.field_stage is not None:
+    if not battle.is_theatre and state is not None and battle.field_stage is not None:
         outcome = _field_after_tick(battle, state, result)
         extra_lines.extend(outcome.lines)
         scripted_death_ids.extend(outcome.deaths)
         field_cleared = outcome.cleared and not result.finished
         frozen_ids = [cid for cid in outcome.frozen if cid in battle.participants]
 
-    if not battle.is_field and battle.stage == 2 and state is not None:
+    if battle.is_theatre and battle.stage == 2 and state is not None:
         dead_veld_ids = [vid for vid, cid in battle.veld_combatant_ids.items() if cid in result.deaths]
         if dead_veld_ids:
             dead_veld_ids.sort(key=lambda vid: rc.VELD_ORDER.index(vid))
@@ -750,7 +839,7 @@ async def on_raid_tick_resolved(session_id: int, tick: int, result: TickResult) 
             battle.veld_violations = outcome.violations
             extra_lines.extend(outcome.lines)
 
-    if not battle.is_field and battle.stage == 3 and state is not None and battle.surgeon_id is not None:
+    if battle.is_theatre and battle.stage == 3 and state is not None and battle.surgeon_id is not None:
         surgeon = state.combatants.get(battle.surgeon_id)
         ai = battle.surgeon_ai
         if surgeon is not None and ai is not None and surgeon.alive:
@@ -824,66 +913,19 @@ async def on_raid_tick_resolved(session_id: int, tick: int, result: TickResult) 
     stage_won = field_cleared or (result.finished and result.winner_side == 0)
     notices: dict[int, str] = {}
     if stage_won:
-        async with get_session_factory()() as db:
-            alive_char_ids = [
-                cid for cid, c in _live_state(session_id, battle).items()
-                if c.side == 0 and c.alive and cid in battle.participants
-            ]
-            characters = []
-            for cid in alive_char_ids:
-                character = await db.get(Character, cid)
-                if character is not None:
-                    characters.append(character)
-            mob_level = raid_bosses.BOSS_LEVEL
-            rewards = await raid_combat_service.reward_mob_kill(
-                db, characters, mob_level, battle.rng, _loot_mult(battle),
-            )
-            for r in rewards:
-                p = battle.participants.get(r.character_id)
-                if p is None:
-                    continue
-                xp_line = display.xp_delta_line(r.xp_gained, premium=r.xp_premium_applied)
-                lines = [xp_line] if xp_line else []  # на 60 уровне опыта нет
-                drop_line = trophy_service.format_drop_line(r.trophies)
-                if drop_line:
-                    lines.append(drop_line)
-                for item in r.items_dropped:
-                    lines.append(item_service.format_drop_announcement(item))
-                if r.raid_key_dropped:
-                    lines.append(raid_key_texts.raid_key_drop_line())
-                if r.group_kick is not None and r.group_kick.kicked_character_id == r.character_id:
-                    lines.append(group_texts.level_gap_kick_self_line())
-                character = next((c for c in characters if c.id == r.character_id), None)
-                if character is not None and r.trophies:
-                    daily_progress = await daily_service.record_trophies(db, character, r.trophies)
-                    daily_notice = dailies_texts.progress_notice(daily_progress)
-                    if daily_notice:
-                        lines.append(daily_notice)
-                    for c in daily_progress.completed:
-                        await stats_window.notify_levelup(p.peer_id, c.levels_gained, c.new_level)
-                notices[r.character_id] = "\n".join(lines)
-                if r.levels_gained > 0:
-                    await stats_window.notify_levelup(p.peer_id, r.levels_gained, r.new_level)
-            for character in characters:
-                await quest_service.record_kill(db, character)
-            if battle.stage == 3:
-                # Хирург и Генерал - «выше уровнем» для испытаний (см.
-                # SURGEON_TRIAL_LEVEL). Засчитывается всем, кто в рейде:
-                # победа общая, как и рейд.
-                trial_level = fc.TRIAL_LEVEL if battle.is_field else rc.SURGEON_TRIAL_LEVEL
-                for cid, p in battle.participants.items():
-                    character = await db.get(Character, cid)
-                    if character is None or character.subclass is None:
-                        continue
-                    for buff_id in await trial_service.record_level_kill(db, character, trial_level):
-                        opened = f"📖 Испытание пройдено. Открыт бафф: {trial_service.buff_name(buff_id)}."
-                        notices[cid] = f"{notices[cid]}\n{opened}" if notices.get(cid) else opened
-            await db.commit()
+        alive_char_ids = [
+            cid for cid, c in _live_state(session_id, battle).items()
+            if c.side == 0 and c.alive and cid in battle.participants
+        ]
+        notices = await _stage_rewards(battle, alive_char_ids)
 
     if frozen_ids and not field_cleared:
         _declared_this_tick.setdefault(session_id, set()).update(frozen_ids)
         for cid in frozen_ids:
-            held = "🦴 Руки держат крепко: этот ход ты пропускаешь."
+            held = (
+                "📖 Каталог сковал тебя: этот ход ты пропускаешь." if battle.is_archive
+                else "🦴 Руки держат крепко: этот ход ты пропускаешь."
+            )
             notices[cid] = f"{notices[cid]}\n{held}" if notices.get(cid) else held
     await _broadcast_board(session_id, battle, result, notices, boss_lines=extra_lines)
 
@@ -902,6 +944,64 @@ async def on_raid_tick_resolved(session_id: int, tick: int, result: TickResult) 
         asyncio.get_running_loop().create_task(_auto_skip(session_id, frozen_ids))
 
 
+async def _stage_rewards(battle: RaidBattle, alive_char_ids: list[int]) -> dict[int, str]:
+    """Награда за взятый этап живым участникам: опыт, трофеи, дроп, ключ;
+    на третьем этапе - испытание «выше уровнем». {id: строки уведомления}."""
+    notices: dict[int, str] = {}
+    async with get_session_factory()() as db:
+        characters = []
+        for cid in alive_char_ids:
+            character = await db.get(Character, cid)
+            if character is not None:
+                characters.append(character)
+        mob_level = raid_bosses.BOSS_LEVEL
+        rewards = await raid_combat_service.reward_mob_kill(
+            db, characters, mob_level, battle.rng, _loot_mult(battle),
+        )
+        for r in rewards:
+            p = battle.participants.get(r.character_id)
+            if p is None:
+                continue
+            xp_line = display.xp_delta_line(r.xp_gained, premium=r.xp_premium_applied)
+            lines = [xp_line] if xp_line else []  # на 60 уровне опыта нет
+            drop_line = trophy_service.format_drop_line(r.trophies)
+            if drop_line:
+                lines.append(drop_line)
+            for item in r.items_dropped:
+                lines.append(item_service.format_drop_announcement(item))
+            if r.raid_key_dropped:
+                lines.append(raid_key_texts.raid_key_drop_line())
+            if r.group_kick is not None and r.group_kick.kicked_character_id == r.character_id:
+                lines.append(group_texts.level_gap_kick_self_line())
+            character = next((c for c in characters if c.id == r.character_id), None)
+            if character is not None and r.trophies:
+                daily_progress = await daily_service.record_trophies(db, character, r.trophies)
+                daily_notice = dailies_texts.progress_notice(daily_progress)
+                if daily_notice:
+                    lines.append(daily_notice)
+                for c in daily_progress.completed:
+                    await stats_window.notify_levelup(p.peer_id, c.levels_gained, c.new_level)
+            notices[r.character_id] = "\n".join(lines)
+            if r.levels_gained > 0:
+                await stats_window.notify_levelup(p.peer_id, r.levels_gained, r.new_level)
+        for character in characters:
+            await quest_service.record_kill(db, character)
+        if battle.stage == 3:
+            # Хирург и Генерал - «выше уровнем» для испытаний (см.
+            # SURGEON_TRIAL_LEVEL). Засчитывается всем, кто в рейде:
+            # победа общая, как и рейд.
+            trial_level = _trial_level(battle)
+            for cid, p in battle.participants.items():
+                character = await db.get(Character, cid)
+                if character is None or character.subclass is None:
+                    continue
+                for buff_id in await trial_service.record_level_kill(db, character, trial_level):
+                    opened = f"📖 Испытание пройдено. Открыт бафф: {trial_service.buff_name(buff_id)}."
+                    notices[cid] = f"{notices[cid]}\n{opened}" if notices.get(cid) else opened
+        await db.commit()
+    return notices
+
+
 async def _auto_skip(battle_id: int, character_ids: list[int]) -> None:
     """Пропуск хода за скованного: иначе группа ждала бы таймера хода."""
     for cid in character_ids:
@@ -913,6 +1013,8 @@ async def _auto_skip(battle_id: int, character_ids: list[int]) -> None:
 
 def _field_after_tick(battle: RaidBattle, state: CombatSessionState, result: TickResult):
     stage = battle.field_stage
+    if isinstance(stage, raid_archive.ArchiveStage):
+        return stage.after_tick(state, result, battle.rng)
     if isinstance(stage, raid_field.FogStage):
         return stage.after_tick(state, result)
     if isinstance(stage, raid_field.SummonerStage):
@@ -965,7 +1067,7 @@ async def _advance_or_finish(session_id: int, battle: RaidBattle) -> None:
         await _finish_victory(session_id, battle)
         return
 
-    texts = ft if battle.is_field else rt
+    texts = _texts(battle)
     transition_text = texts.STAGE1_TO_STAGE2_TEXT if stage_cleared == 1 else texts.STAGE2_TO_STAGE3_TEXT
     for p in battle.participants.values():
         await _bot_api.messages.send(
@@ -1017,7 +1119,7 @@ async def _grant_stage_clear_bonus(battle: RaidBattle) -> None:
         pass
 
     if battle.stage == 3:
-        unique_id = fc.RAID_UNIQUE_ITEM_ID if battle.is_field else rc.RAID_UNIQUE_ITEM_ID
+        unique_id = _unique_id(battle)
         async with get_session_factory()() as db:
             scalpel_winner = battle.rng.choice(candidates)
             scalpel_winner = await db.get(Character, scalpel_winner.id)
@@ -1040,13 +1142,20 @@ async def _grant_stage_clear_bonus(battle: RaidBattle) -> None:
 
 async def _finish_victory(session_id: int, battle: RaidBattle) -> None:
     await _grant_stage_clear_bonus(battle)
-    texts = ft if battle.is_field else rt
+    texts = _texts(battle)
     await _cleanup_and_return(session_id, battle, texts.EPILOGUE_TEXT, defeated=False)
 
 
-async def _finish_wipe(session_id: int, battle: RaidBattle) -> None:
-    texts = ft if battle.is_field else rt
-    await _cleanup_and_return(session_id, battle, texts.RAID_DEFEAT_TEXT, defeated=True)
+async def _finish_wipe(session_id: int, battle: RaidBattle, text: str | None = None) -> None:
+    texts = _texts(battle)
+    await _cleanup_and_return(session_id, battle, text or texts.RAID_DEFEAT_TEXT, defeated=True)
+
+
+async def wipe(battle_id: int, text: str) -> None:
+    """Архив: время головоломок или загадок вышло - гибнет вся группа."""
+    battle = _battles.get(battle_id)
+    if battle is not None:
+        await _finish_wipe(battle_id, battle, text)
 
 
 async def _send_location_summary(character_id: int, peer_id: int) -> None:

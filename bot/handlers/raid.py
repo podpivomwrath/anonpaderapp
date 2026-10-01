@@ -297,6 +297,7 @@ async def _start_raid_from_lobby(lobby_id: int) -> None:
             try:
                 await raid_combat_handlers.start_raid(
                     snapshot.group_id, inputs, _rng, run_id=run.id, raid_id=snapshot.raid_id,
+                    leader_id=snapshot.leader_character_id,
                 )
             except Exception:
                 raid_combat_handlers.abort_run(run.id)

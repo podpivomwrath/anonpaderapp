@@ -265,6 +265,12 @@ UNIQUE_LOOK = {
         "a reforged general's body armour",
         "same dented breastplate core, different reworking around it, shown on its own with no wearer",
     ),
+    "archivist_mask": (
+        "a unique featureless mask made of pressed old paper and leather",
+        "no eye holes, faint handwritten lines across its smooth surface, shown on its own with no wearer",
+        "a reforged head piece made from a featureless paper mask",
+        "same smooth eyeless paper face at its core, different reworking around it, shown on its own",
+    ),
 }
 
 
