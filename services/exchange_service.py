@@ -177,6 +177,21 @@ def yesterday_msk() -> date:
     return datetime.now(_TZ).date() - timedelta(days=1)
 
 
+async def fill_missing_days(db: AsyncSession, first_day: date | None = None) -> list[date]:
+    """Дописывает снимки всех закрытых дней, которых ещё нет: от последнего
+    снимка (или first_day) до вчера. Идемпотентна - её можно звать хоть каждый
+    час: точное «после полуночи» бот пропускает, если в этот момент
+    перезапускался, а снимок прошлого дня всё равно считается точно."""
+    last = (await db.scalars(select(ExchangeDaily.day).order_by(ExchangeDaily.day.desc()).limit(1))).first()
+    day = (last + timedelta(days=1)) if last else (first_day or yesterday_msk())
+    written = []
+    while day <= yesterday_msk():
+        await snapshot_day(db, day)
+        written.append(day)
+        day += timedelta(days=1)
+    return written
+
+
 
 def today_start_msk() -> datetime:
     return datetime.combine(datetime.now(_TZ).date(), time.min, tzinfo=_TZ)

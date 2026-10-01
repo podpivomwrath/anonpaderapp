@@ -298,20 +298,25 @@ async def run() -> None:
         id="guild_season", max_instances=1, coalesce=True,
     )
 
-    # Биржа: точка графика - курс на закрытие дня, раз в сутки после полуночи.
+    # Биржа: точка графика - курс на закрытие дня (снимки закрытых дней).
     async def _exchange_snapshot() -> None:
         from services import exchange_service
 
         try:
             async with get_session_factory()() as db:
-                await exchange_service.snapshot_day(db, exchange_service.yesterday_msk())
+                written = await exchange_service.fill_missing_days(db)
                 await db.commit()
+            if written:
+                logger.info("Биржа: снимки дней {}", written)
         except Exception:
             logger.exception("Биржа: снимок дня не записан")
 
+    # Раз в час и сразу при старте: пропущенные дни (бот мог перезапускаться
+    # ровно в полночь) дописываются сами.
     respawn_scheduler.add_job(
-        _exchange_snapshot, "cron", hour=0, minute=2, timezone="Europe/Moscow",
+        _exchange_snapshot, "cron", minute=2, timezone="Europe/Moscow",
         id="exchange_snapshot", max_instances=1, coalesce=True,
+        next_run_time=datetime.now(timezone.utc),
     )
 
     # Маунты (патч 25, п.7): нападения/прибытия/live-отсчёт — свой job,

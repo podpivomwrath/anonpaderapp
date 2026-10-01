@@ -153,3 +153,15 @@ async def test_chart_points_only_closed_days(db_session, make_character) -> None
     kinds = [p["kind"] for p in points]
     assert kinds == ["buy", "close"]
     assert points[0]["buy"] == Exchange.lot_buy_price(1) and points[1]["buy"] == Exchange.lot_buy_price(1)
+
+
+async def test_fill_missing_days(db_session, make_character) -> None:
+    from datetime import timedelta
+
+    from services import exchange_service
+
+    y = exchange_service.yesterday_msk()
+    await exchange_service.snapshot_day(db_session, y - timedelta(days=3))
+    written = await exchange_service.fill_missing_days(db_session)
+    assert written == [y - timedelta(days=2), y - timedelta(days=1), y]
+    assert await exchange_service.fill_missing_days(db_session) == []
