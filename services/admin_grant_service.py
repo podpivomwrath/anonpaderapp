@@ -225,6 +225,7 @@ async def grant(
             # градации; дальше - обычная прокачка инструментами.
             base, efficiency = crafting.roll_crafted_stats(
                 rng, spec, source.power, _primary_stat(character), cc.CRAFT_MAX_ORE_TIER, "common",
+                weights=crafting.spec_weights(source_id, spec),
             )
             await _add_item(db, character, Item(
                 name=recipe.outputs[spec].name, slot=source.slot,

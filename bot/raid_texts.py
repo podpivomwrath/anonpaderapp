@@ -18,8 +18,10 @@
 Интерфейсные подписи (BTN_*, счётчик готовности) и строки механик (⚠️-строки,
 множители лута) намеренно НЕ трогались - они должны оставаться сухими."""
 
+from bot import raid_field_texts as ft
 from bot.vk_media import photo_attachment
 from game.economy import raid_config as rc
+from game.economy import raid_field_config as fc
 
 MONOLITH_CALL_TEXT = (
     "Вблизи от Монолита теплеет лицо. Камень сухой и тёплый, как лоб больного, "
@@ -34,9 +36,21 @@ RAID_LIST_TEXT = (
     "🩸 ЗА ГРАНЬЮ\n\n"
     "За Монолитом начинаются места, которые кто-то однажды видел во сне и не "
     "сумел забыть. Сны остались, тот, кто их видел, - нет.\n\n"
-    "На афише у входа в театр стоит твоё имя. Написано давно, чернила выцвели."
+    "На афише у входа в театр стоит твоё имя. Написано давно, чернила выцвели. "
+    "А с другой стороны камня, из тумана, кто-то трубит в рог."
 )
 BTN_PUPPET_THEATRE = "🎭 Кукольный театр"
+
+#: Рейды, которые можно выбрать у Монолита, и как их называть в лобби.
+RAID_TITLES = {
+    rc.RAID_PUPPET_THEATRE_ID: BTN_PUPPET_THEATRE,
+    fc.RAID_FIELD_ID: ft.BTN_FIELD,
+}
+RAID_IDS = tuple(RAID_TITLES)
+
+
+def raid_title(raid_id: str) -> str:
+    return RAID_TITLES.get(raid_id, BTN_PUPPET_THEATRE)
 BTN_RAID_BACK = "← Вернуться"
 BTN_RAID_CANCEL_READY = "Отменить готовность"
 
@@ -139,9 +153,11 @@ def lobby_status_line(ready: int, total: int) -> str:
     return f"Готовы: {ready}/{total}"
 
 
-def group_touch_notice(leader_name: str) -> str:
+def group_touch_notice(leader_name: str, raid_id: str = rc.RAID_PUPPET_THEATRE_ID) -> str:
     """Патч 55: имя лидера раньше принималось, но в текст не подставлялось -
     f-строка была без единой подстановки."""
+    if raid_id == fc.RAID_FIELD_ID:
+        return ft.group_touch_notice(leader_name)
     return (
         f"{leader_name} открыл вход в Кукольный театр. Придите к Монолиту (0; 0) "
         f"и прикоснитесь."

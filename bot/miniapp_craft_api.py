@@ -39,7 +39,7 @@ def _spec_payload(source_id: str) -> list[dict]:
     recipe = crafting.recipe_for(source_id)
     result = []
     for spec in cc.SPECS:
-        weights = cc.SPEC_WEIGHTS[spec]
+        weights = crafting.spec_weights(source_id, spec)
         top = max(weights.values())
         result.append({
             "id": spec,
@@ -122,12 +122,20 @@ async def handle_get_craft(request: web.Request) -> web.Response:
             for ceiling, count in sorted((await craft_service.tools_of(db, character.id)).items())
         ]
         specs = _spec_payload(items[0]["source_id"]) if items else _spec_payload("surgeon_scalpel")
+        # У каждого источника свои названия результатов и свои веса (доспех
+        # раскладывается только в живучесть и основной стат) - мастерская
+        # показывает варианты того предмета, что выбран, а не первого в списке.
+        specs_by_source = {
+            source_id: _spec_payload(source_id)
+            for source_id in {row["source_id"] for row in items if row["source_id"]}
+        }
 
         return web.json_response({
             "items": items,
             "ore": ore,
             "tools": tools,
             "specs": specs,
+            "specs_by_source": specs_by_source,
             "efficiency": {
                 "min": cc.EFFICIENCY_MIN,
                 "craft_max": cc.EFFICIENCY_CRAFT_MAX,

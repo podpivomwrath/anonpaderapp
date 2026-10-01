@@ -9,7 +9,7 @@ from vkbottle import Keyboard, KeyboardButtonColor, Text
 
 from bot.keyboards import combat_modes
 from bot.keyboards.layout import add_paired
-from bot.raid_texts import BTN_PUPPET_THEATRE, BTN_RAID_BACK, BTN_RAID_CANCEL_READY, BTN_TOUCH_MONOLITH
+from bot.raid_texts import BTN_RAID_BACK, BTN_RAID_CANCEL_READY, BTN_TOUCH_MONOLITH, RAID_TITLES
 from game.combat.base_skills import skills_for_character
 
 _TARGET_ROW_WIDTH = 5
@@ -33,18 +33,19 @@ def touch_monolith_keyboard() -> str:
 
 def raid_list_keyboard() -> str:
     kb = Keyboard(one_time=False)
-    kb.add(Text(BTN_PUPPET_THEATRE, payload={"type": "raid_pick", "raid": "puppet_theatre"}))
-    kb.row()
+    for raid_id, title in RAID_TITLES.items():
+        kb.add(Text(title, payload={"type": "raid_pick", "raid": raid_id}))
+        kb.row()
     kb.add(Text(BTN_RAID_BACK, payload={"type": "raid_list_back"}))
     return kb.get_json()
 
 
-def raid_lobby_keyboard(ready: bool = True) -> str:
+def raid_lobby_keyboard(ready: bool = True, raid_id: str = "puppet_theatre") -> str:
     kb = Keyboard(inline=True)
     if ready:
         kb.add(Text(BTN_RAID_CANCEL_READY, payload={"type": "raid_cancel_ready"}), color=KeyboardButtonColor.SECONDARY)
     else:
-        kb.add(Text("Готов", payload={"type": "raid_pick", "raid": "puppet_theatre"}), color=KeyboardButtonColor.POSITIVE)
+        kb.add(Text("Готов", payload={"type": "raid_pick", "raid": raid_id}), color=KeyboardButtonColor.POSITIVE)
     return kb.get_json()
 
 

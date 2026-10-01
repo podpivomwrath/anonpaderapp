@@ -32,6 +32,15 @@ def is_craftable(source_id: str | None) -> bool:
     return source_id is not None and source_id in _all()
 
 
+def spec_weights(source_id: str | None, spec: str) -> dict[str, float]:
+    """Веса специализации для этого источника: у доспеха свои (только
+    живучесть и основной стат), у остального - общие из craft_config."""
+    recipe = recipe_for(source_id) if source_id else None
+    if recipe is not None and recipe.weights and spec in recipe.weights:
+        return recipe.weights[spec]
+    return cc.SPEC_WEIGHTS[spec]
+
+
 def output_name(source_id: str, spec: str) -> str | None:
     recipe = recipe_for(source_id)
     if recipe is None or spec not in recipe.outputs:
@@ -145,7 +154,7 @@ def roll_stats(
 
 def roll_crafted_stats(
     rng: random.Random, spec: str, source_power: int, primary_stat: str,
-    ore_tier: int, ore_grade: str,
+    ore_tier: int, ore_grade: str, weights: dict[str, float] | None = None,
 ) -> tuple[dict[str, int], int]:
     """(БАЗОВЫЙ ролл на 100%, стартовая эффективность).
 
@@ -157,22 +166,24 @@ def roll_crafted_stats(
     """
     efficiency = cc.craft_efficiency_for(ore_tier)
     base = roll_stats(
-        rng, cc.SPEC_WEIGHTS[spec], craft_power(source_power), primary_stat,
+        rng, weights or cc.SPEC_WEIGHTS[spec], craft_power(source_power), primary_stat,
         focus_for_grade(ore_grade),
     )
     return base, efficiency
 
 
 def roll_boss_item_stats(
-    rng: random.Random, power: int, primary_stat: str
+    rng: random.Random, power: int, primary_stat: str,
+    weights: dict[str, float] | None = None,
 ) -> dict[str, int]:
     """Раскладка для предмета, выпавшего с босса.
 
     Раньше все 100% уходили в основной стат класса. Теперь раскладка
     случайная: боссовая вещь — сырьё для крафта, но носить её можно, и два
-    скальпеля не должны быть одинаковыми.
+    скальпеля не должны быть одинаковыми. weights - своя раскладка предмета
+    (content/items/unique_items.json), иначе общая боссовая.
     """
-    return roll_stats(rng, cc.BOSS_ITEM_WEIGHTS, power, primary_stat)
+    return roll_stats(rng, weights or cc.BOSS_ITEM_WEIGHTS, power, primary_stat)
 
 
 def stats_at_efficiency(base_stats: dict[str, int], efficiency: int) -> dict[str, int]:

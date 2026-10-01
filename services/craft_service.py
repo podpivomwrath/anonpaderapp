@@ -189,7 +189,8 @@ async def craft(
     await _spend_ore(db, character.id, ore_id, grade, cost)
 
     base_stats, efficiency = crafting.roll_crafted_stats(
-        rng, spec, _source_power(item, recipe), _primary_stat(character), tier, grade
+        rng, spec, _source_power(item, recipe), _primary_stat(character), tier, grade,
+        weights=crafting.spec_weights(source_id, spec),
     )
     stats = crafting.stats_at_efficiency(base_stats, efficiency)
 

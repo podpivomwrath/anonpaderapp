@@ -69,6 +69,10 @@ def item_icon_key(item) -> str | None:
     искать среди баз не нужно.
     """
     if item.craft_spec:
+        # Картинки специализаций скальпеля появились первыми и живут под
+        # коротким ключом; у остальных источников своя тройка картинок.
+        if item.craft_source_id and item.craft_source_id != "surgeon_scalpel":
+            return f"craft:{item.craft_source_id}:{item.craft_spec}"
         return f"craft:{item.craft_spec}"
     if item.craft_source_id:
         return f"unique:{item.craft_source_id}"

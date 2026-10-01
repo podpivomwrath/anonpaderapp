@@ -496,6 +496,9 @@ class UniqueItemDef(BaseModel):
     slot: str
     power: int
     flavor: str = ""
+    #: своя раскладка статов при выдаче (панцирь: живучесть + основной);
+    #: None - общая боссовая craft_config.BOSS_ITEM_WEIGHTS
+    weights: dict[str, float] | None = None
 
 
 def load_unique_items(content_dir: Path = CONTENT_DIR) -> dict[str, UniqueItemDef]:
@@ -736,6 +739,8 @@ class CraftRecipeDef(BaseModel):
 
     source_name: str
     outputs: dict[str, CraftOutputDef]
+    #: {специализация: веса статов} вместо общих craft_config.SPEC_WEIGHTS
+    weights: dict[str, dict[str, float]] | None = None
 
 
 def load_craft_recipes(content_dir: Path = CONTENT_DIR) -> dict[str, CraftRecipeDef]:

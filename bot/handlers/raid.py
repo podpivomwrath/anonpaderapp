@@ -113,7 +113,7 @@ async def raid_list_back_payload(message: Message) -> None:
 async def pick_raid(message: Message) -> None:
     payload = message.get_payload_json() or {}
     raid_id = payload.get("raid")
-    if raid_id != rc.RAID_PUPPET_THEATRE_ID:
+    if raid_id not in rt.RAID_IDS:
         return
     async with get_session_factory()() as db:
         character = await onboarding_svc.get_character(db, message.from_id)
@@ -150,7 +150,9 @@ async def pick_raid(message: Message) -> None:
 
     for peer_id in notify_peer_ids:
         try:
-            await _bot_api.messages.send(peer_id=peer_id, message=rt.group_touch_notice(leader_name), random_id=0)
+            await _bot_api.messages.send(
+                peer_id=peer_id, message=rt.group_touch_notice(leader_name, raid_id), random_id=0,
+            )
         except Exception:
             pass
 
@@ -205,6 +207,7 @@ async def publish_lobby(snapshot) -> None:
     _published[snapshot.id] = signature
     leader = next((c for c, _ in snapshot.members if c.id == snapshot.leader_character_id), None)
     text = rt.lobby_status_line(sum(r for _, r in snapshot.members), snapshot.denominator)
+    text = f"{rt.raid_title(snapshot.raid_id)}\n{text}"
     if leader:
         text += f"\nЛидер: {leader.name}. Ключ будет списан у лидера."
     async with get_session_factory()() as db:
@@ -213,7 +216,7 @@ async def publish_lobby(snapshot) -> None:
         if c.id in peers:
             try:
                 await _bot_api.messages.send(peer_id=peers[c.id], message=text, random_id=0,
-                                             keyboard=kb.raid_lobby_keyboard(ready))
+                                             keyboard=kb.raid_lobby_keyboard(ready, snapshot.raid_id))
             except Exception:
                 # Дальше по списку, а не выход. Чаще всего это «заблокировал
                 # бота», то есть навсегда: прерывание рассылки лишало бы
@@ -292,7 +295,9 @@ async def _start_raid_from_lobby(lobby_id: int) -> None:
             await db.commit()
             await db.close()
             try:
-                await raid_combat_handlers.start_raid(snapshot.group_id, inputs, _rng, run_id=run.id)
+                await raid_combat_handlers.start_raid(
+                    snapshot.group_id, inputs, _rng, run_id=run.id, raid_id=snapshot.raid_id,
+                )
             except Exception:
                 raid_combat_handlers.abort_run(run.id)
                 async with get_session_factory()() as recovery_db:

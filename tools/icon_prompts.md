@@ -506,12 +506,18 @@ a freshwater fish called «Безымянное», full body side view, wet scal
 
 ## Рейдовые и крафченые
 
-Три результата ковки должны читаться как переделки ОДНОГО скальпеля: общая рукоять, разное полотно.
+Три результата ковки должны читаться как переделки ОДНОЙ вещи: у скальпеля общая рукоять и разное полотно, у панциря общая помятая грудная пластина и разная переделка вокруг неё.
 
 **Скальпель Хирурга**
 
 ```
 a unique surgical weapon called «Скальпель Хирурга». Лезвие тонкое до прозрачности и до сих пор тёплое. Рукоять обмотана полосками кожи, выделанной мелко, аккуратно, с большим знанием дела, deep crimson accents, strong inner glow, clearly a medical instrument repurposed as a weapon, dark fantasy game item icon, single object centered, slight 3/4 angle, painterly semi-realistic, muted desaturated palette of ash grey, rust brown and dried blood, weathered and worn surfaces, soft rim light from the upper left, deep neutral background, no text, no watermark, no border, square 1:1 composition, crisp readable silhouette at small size
+```
+
+**Панцирь Тавра**
+
+```
+a unique battered general's steel cuirass called «Панцирь Тавра». Пластины помяты так, как мнутся только в настоящем бою, и ни одна не пробита насквозь. Изнутри панцирь холодный, как земля, в которой его не стали хоронить, deep crimson accents, strong inner glow, breastplate shown on its own with no wearer, dented in real battle but never pierced, cold grave-soil grime in the seams, dark fantasy game item icon, single object centered, slight 3/4 angle, painterly semi-realistic, muted desaturated palette of ash grey, rust brown and dried blood, weathered and worn surfaces, soft rim light from the upper left, deep neutral background, no text, no watermark, no border, square 1:1 composition, crisp readable silhouette at small size
 ```
 
 **Костяная пила (tank, из «Скальпель Хирурга»)**
@@ -530,6 +536,24 @@ a reforged surgical weapon called «Тонкий скальпель». Лезв�
 
 ```
 a reforged surgical weapon called «Игла Хирурга». Из рукояти осталась только обмотка, остальное ушло в стержень. Он тёплый ровно настолько, чтобы это было заметно, deep crimson accents, strong inner glow, visibly reforged from «Скальпель Хирурга» — same handle wrapping, different blade, dark fantasy game item icon, single object centered, slight 3/4 angle, painterly semi-realistic, muted desaturated palette of ash grey, rust brown and dried blood, weathered and worn surfaces, soft rim light from the upper left, deep neutral background, no text, no watermark, no border, square 1:1 composition, crisp readable silhouette at small size
+```
+
+**Нагрудник Знаменосца (tank, из «Панцирь Тавра»)**
+
+```
+a reforged general's body armour called «Нагрудник Знаменосца». Пластины склёпаны внахлёст, в два слоя там, где обычно хватает одного. В таком стоят под знаменем, пока стоит знамя, deep crimson accents, strong inner glow, visibly reforged from «Панцирь Тавра» — same dented breastplate core, different reworking around it, shown on its own with no wearer, dark fantasy game item icon, single object centered, slight 3/4 angle, painterly semi-realistic, muted desaturated palette of ash grey, rust brown and dried blood, weathered and worn surfaces, soft rim light from the upper left, deep neutral background, no text, no watermark, no border, square 1:1 composition, crisp readable silhouette at small size
+```
+
+**Чешуя Жнеца (dps, из «Панцирь Тавра»)**
+
+```
+a reforged general's body armour called «Чешуя Жнеца». Сняли всё, что мешает замаху, оставили то, что не даёт умереть от первого ответа. Чешуйки звенят, только когда ты бьёшь, deep crimson accents, strong inner glow, visibly reforged from «Панцирь Тавра» — same dented breastplate core, different reworking around it, shown on its own with no wearer, dark fantasy game item icon, single object centered, slight 3/4 angle, painterly semi-realistic, muted desaturated palette of ash grey, rust brown and dried blood, weathered and worn surfaces, soft rim light from the upper left, deep neutral background, no text, no watermark, no border, square 1:1 composition, crisp readable silhouette at small size
+```
+
+**Саван Генерала (support, из «Панцирь Тавра»)**
+
+```
+a reforged general's body armour called «Саван Генерала». Под кольчугу подшит погребальный холст - тот самый, в который он отказался ложиться. Холст тёплый изнутри, deep crimson accents, strong inner glow, visibly reforged from «Панцирь Тавра» — same dented breastplate core, different reworking around it, shown on its own with no wearer, dark fantasy game item icon, single object centered, slight 3/4 angle, painterly semi-realistic, muted desaturated palette of ash grey, rust brown and dried blood, weathered and worn surfaces, soft rim light from the upper left, deep neutral background, no text, no watermark, no border, square 1:1 composition, crisp readable silhouette at small size
 ```
 
 

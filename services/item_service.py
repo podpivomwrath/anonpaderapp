@@ -175,7 +175,7 @@ async def grant_unique_item(
     item = Item(
         name=unique_def.name, slot=unique_def.slot,
         base_stats=crafting.roll_boss_item_stats(
-            rng or random.Random(), unique_def.power, primary_stat
+            rng or random.Random(), unique_def.power, primary_stat, unique_def.weights,
         ),
         rarity=UNIQUE_RARITY_ID, ilvl=None,
         craft_source_id=unique_id if crafting.is_craftable(unique_id) else None,

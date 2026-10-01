@@ -165,7 +165,7 @@ export default function CraftTab() {
       {subtab === 'craft' ? (
         <>
           <Group header={<Header>Во что ковать</Header>}>
-            {data.specs.map((option) => (
+            {(data.specs_by_source?.[item.source_id] ?? data.specs).map((option) => (
               <div key={option.id}>
                 <SimpleCell
                   onClick={() => setSpec(option.id)}

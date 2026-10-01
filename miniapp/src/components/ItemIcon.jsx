@@ -11,8 +11,14 @@ import { itemIcon } from '../itemIcons.js';
  * У обычных вещей свечения нет вовсе - это не потеря, а смысл: обычное и
  * должно выглядеть обычным.
  */
+// Новой боссовой вещи картинку рисуют позже, чем выходит сам рейд - до
+// тех пор вместо пустого места знак уникальной редкости.
+function fallbackFor(icon) {
+  return icon.startsWith('unique:') || icon.startsWith('craft:') ? itemIcon('rarity:unique') : null;
+}
+
 export default function ItemIcon({ icon, rarity, alt = '', size = 36 }) {
-  const src = icon ? itemIcon(icon) : null;
+  const src = icon ? itemIcon(icon) ?? fallbackFor(icon) : null;
   if (!src) return null;
   const className = rarity ? `item-icon item-icon--${rarity}` : 'item-icon';
   return (

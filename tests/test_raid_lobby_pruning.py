@@ -144,6 +144,7 @@ def _snapshot(*, denominator: int = 4, members=(3,)):
     class _Snapshot:
         id = 11
         leader_character_id = 3
+        raid_id = "puppet_theatre"
 
     snapshot = _Snapshot()
     snapshot.denominator = denominator

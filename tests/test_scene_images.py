@@ -53,7 +53,7 @@ def test_both_raid_scenes_carry_the_stage_picture() -> None:
         for node in ast.walk(ast.parse(source))
         if isinstance(node, ast.Call)
         and any(
-            isinstance(kw.value, (ast.Name, ast.JoinedStr, ast.Subscript))
+            isinstance(kw.value, (ast.Name, ast.JoinedStr, ast.Subscript, ast.Call))
             and kw.arg == "message"
             for kw in node.keywords
         )

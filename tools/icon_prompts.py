@@ -248,35 +248,58 @@ def fish() -> None:
         )
 
 
+#: Как описать боссовую вещь и её перековку - по источнику. Скальпель -
+#: хирургический инструмент, ставший оружием; панцирь Тавра - генеральские
+#: латы с поля, где армию не похоронили.
+UNIQUE_LOOK = {
+    "surgeon_scalpel": (
+        "a unique surgical weapon",
+        "clearly a medical instrument repurposed as a weapon",
+        "a reforged surgical weapon",
+        "same handle wrapping, different blade",
+    ),
+    "general_cuirass": (
+        "a unique battered general's steel cuirass",
+        "breastplate shown on its own with no wearer, dented in real battle but never "
+        "pierced, cold grave-soil grime in the seams",
+        "a reforged general's body armour",
+        "same dented breastplate core, different reworking around it, shown on its own with no wearer",
+    ),
+}
+
+
 def uniques_and_craft() -> None:
     section(
         "Рейдовые и крафченые",
-        "Три результата ковки должны читаться как переделки ОДНОГО скальпеля: "
-        "общая рукоять, разное полотно.",
+        "Три результата ковки должны читаться как переделки ОДНОЙ вещи: "
+        "у скальпеля общая рукоять и разное полотно, у панциря общая помятая "
+        "грудная пластина и разная переделка вокруг неё.",
     )
     for unique_id, row in clean(load("items/unique_items.json")).items():
-        row = {**row, "id_key": unique_id}
+        what, detail, _, _ = UNIQUE_LOOK[unique_id]
         entry(
             row["name"],
             prompt(
-                f"a unique surgical weapon called «{row['name']}». {first_sentence(row.get('flavor'))}",
+                f"{what} called «{row['name']}». {first_sentence(row.get('flavor'))}",
                 RARITY_ACCENT["unique"],
-                "clearly a medical instrument repurposed as a weapon",
+                detail,
             ),
-            key=f"unique:{row['id_key']}",
+            key=f"unique:{unique_id}",
         )
-    for recipe in clean(load("crafting/recipes.json")).values():
+    for source_id, recipe in clean(load("crafting/recipes.json")).items():
+        _, _, what, kinship = UNIQUE_LOOK[source_id]
         for spec, out in recipe["outputs"].items():
+            # Ключ - как у services/naming.py::item_icon_key: картинки
+            # скальпеля появились первыми и живут под коротким ключом.
+            key = f"craft:{spec}" if source_id == "surgeon_scalpel" else f"craft:{source_id}:{spec}"
             entry(
                 f"{out['name']} ({spec}, из «{recipe['source_name']}»)",
                 prompt(
-                    f"a reforged surgical weapon called «{out['name']}». "
-                    f"{first_sentence(out.get('flavor'))}",
+                    f"{what} called «{out['name']}». {first_sentence(out.get('flavor'))}",
                     RARITY_ACCENT["unique"],
-                    f"visibly reforged from «{recipe['source_name']}» — same handle wrapping, "
-                    "different blade",
+                    f"visibly reforged from «{recipe['source_name']}» — {kinship}",
                 ),
-                key=f"craft:{spec}",
+                key=key,
             )
 
 

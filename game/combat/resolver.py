@@ -97,7 +97,7 @@ def _dies_this_tick(mob: CombatantState, incoming: list) -> bool:
     потом применит движок: с лимитом за удар, за вычетом щита, и моб с
     «последним вздохом» не умирает вовсе.
     """
-    if mob.has_effect(EffectKind.LAST_BREATH):
+    if mob.has_effect(EffectKind.LAST_BREATH) or mob.hp_floor > 0:
         return False
     cap = mob.effect_total(EffectKind.DAMAGE_CAP)
     total = 0
@@ -430,6 +430,9 @@ def resolve_tick(
     for hit in ctx.hits:
         target = session.combatants[hit.target_id]
         amount = hit.amount
+        # Рейд «Безмогильное поле»: купол и стойки генерала (session.py).
+        if target.incoming_hit_hook is not None and amount > 0:
+            amount = max(target.incoming_hit_hook(hit, session.combatants.get(hit.source_id), amount), 0)
         # Несокрушимый (патч 39): входящий урон за удар не может превышать
         # value*maxHP, применяется ДО щитов (щит гасит то, что осталось).
         damage_cap = target.effect_total(EffectKind.DAMAGE_CAP)
@@ -517,6 +520,8 @@ def resolve_tick(
         combatant = session.combatants[cid]
         delta = heal_taken.get(cid, 0) - damage_taken.get(cid, 0)
         combatant.current_hp = min(combatant.current_hp + delta, combatant.max_hp)
+        if combatant.hp_floor > 0 and combatant.current_hp < combatant.hp_floor:
+            combatant.current_hp = combatant.hp_floor
         _apply_last_breath_guard(combatant, result)
 
     # --- Строки лога: единый краткий формат везде — PvE, PvP, рейды (патч 43,
