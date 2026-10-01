@@ -411,9 +411,29 @@ def gear_bonus(equipped: dict[str, Item | None]) -> dict[str, int]:
 
 
 async def compute_gear_bonus(db: AsyncSession, character_id: int) -> dict[str, int]:
-    """Удобный шорткат: get_equipped + gear_bonus одним вызовом."""
+    """Удобный шорткат: get_equipped + gear_bonus одним вызовом.
+
+    Гильдии: сюда же ложится прибавка гильдии (древо, молитва в часовне,
+    аура тотема). Эту функцию зовут ВСЕ бои и все экраны характеристик, и
+    прибавка, добавленная где-то ещё, неизбежно доехала бы не везде. В Мощь
+    (power_service) она не попадает: та считает снаряжение сама."""
     equipped = await get_equipped(db, character_id)
-    return gear_bonus(equipped)
+    bonus = gear_bonus(equipped)
+    character = await db.get(Character, character_id)
+    if character is not None and character.guild_id is not None:
+        from models import CharacterStats
+        from services import guild_territory_service
+
+        stats = await db.scalar(select(CharacterStats).where(CharacterStats.character_id == character_id))
+        if stats is not None:
+            base = {
+                "str": stats.strength, "agi": stats.agility, "int": stats.intellect,
+                "vit": stats.vitality, "wil": stats.will,
+            }
+            base = {k: v + bonus.get(k, 0) for k, v in base.items()}
+            for stat, extra in (await guild_territory_service.stat_bonus(db, character, base)).items():
+                bonus[stat] = bonus.get(stat, 0) + extra
+    return bonus
 
 
 # --- Тексты (окно сравнения при дропе, патч 11) ---

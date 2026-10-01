@@ -14,6 +14,7 @@ from bot.handlers.fallback import labeler as fallback_labeler
 from bot.handlers.fishing import labeler as fishing_labeler
 from bot.handlers.group import labeler as group_labeler
 from bot.handlers.group_combat import labeler as group_combat_labeler
+from bot.handlers.guild import labeler as guild_labeler
 from bot.handlers.inventory import labeler as inventory_labeler
 from bot.handlers.list_keeper import labeler as list_keeper_labeler
 from bot.handlers.mining import labeler as mining_labeler
@@ -53,6 +54,8 @@ LABELERS = [
     # Патч 104: мировые боссы - команда одним словом («Босс»), та же
     # причина, что у рыбалки и горного дела.
     world_boss_labeler,
+    # Гильдии: «Гильдия» и «Страж» - одним словом, та же причина.
+    guild_labeler,
     # Патч 51, ч.2: группы — команды конкретные ("пригласить <ник>", "/выйти",
     # "/выгнать <ник>"), но одиночное слово "пригласить" (приглашение
     # пересылкой) технически проходит под тот же regex, что и промокод —

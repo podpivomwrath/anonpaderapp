@@ -292,6 +292,22 @@ async def _finish(
     return DailyProgressResult(completed=completions, streak_notice=notice)
 
 
+async def _with_guild(
+    db: AsyncSession, character: Character, metric: str, amount: int, result: DailyProgressResult,
+) -> DailyProgressResult:
+    """Гильдейские задания двигаются в тех же точках, что и обычные
+    ежедневки. Их строки идут в streak_notice: его уже показывают все, кто
+    показывает итоги ежедневок."""
+    if getattr(character, "guild_id", None) is None or amount <= 0:
+        return result
+    from services import guild_quest_service  # избегаем цикла импортов
+
+    notices = await guild_quest_service.record(db, character, metric, amount)
+    if notices:
+        result.streak_notice = "\n".join(filter(None, [result.streak_notice, *notices]))
+    return result
+
+
 async def record_battle(db: AsyncSession, character: Character, report) -> DailyProgressResult:
     """Вызывать после КАЖДОЙ победы в PvE (services/encounter_service.py)."""
     completions = []
@@ -314,7 +330,8 @@ async def record_battle(db: AsyncSession, character: Character, report) -> Daily
             completion = await _apply_delta(db, character, row, delta)
             if completion:
                 completions.append(completion)
-    return await _finish(db, character, completions)
+    result = await _finish(db, character, completions)
+    return await _with_guild(db, character, "kill", int(report.won), result)
 
 
 async def record_defeat(db: AsyncSession, character: Character) -> None:
@@ -354,7 +371,8 @@ async def record_trophies(
         completion = await _apply_delta(db, character, row, amount)
         if completion:
             completions.append(completion)
-    return await _finish(db, character, completions)
+    result = await _finish(db, character, completions)
+    return await _with_guild(db, character, "trophies", sum(trophies.values()), result)
 
 
 async def record_cell_moved(db: AsyncSession, character: Character) -> DailyProgressResult:
@@ -365,7 +383,8 @@ async def record_cell_moved(db: AsyncSession, character: Character) -> DailyProg
             completion = await _apply_delta(db, character, row, 1)
             if completion:
                 completions.append(completion)
-    return await _finish(db, character, completions)
+    result = await _finish(db, character, completions)
+    return await _with_guild(db, character, "cells", 1, result)
 
 
 async def record_exploration(db: AsyncSession, character: Character) -> DailyProgressResult:
@@ -376,7 +395,8 @@ async def record_exploration(db: AsyncSession, character: Character) -> DailyPro
             completion = await _apply_delta(db, character, row, 1)
             if completion:
                 completions.append(completion)
-    return await _finish(db, character, completions)
+    result = await _finish(db, character, completions)
+    return await _with_guild(db, character, "explore", 1, result)
 
 
 async def record_event_choice(db: AsyncSession, character: Character) -> DailyProgressResult:
@@ -387,7 +407,8 @@ async def record_event_choice(db: AsyncSession, character: Character) -> DailyPr
             completion = await _apply_delta(db, character, row, 1)
             if completion:
                 completions.append(completion)
-    return await _finish(db, character, completions)
+    result = await _finish(db, character, completions)
+    return await _with_guild(db, character, "event", 1, result)
 
 
 async def record_sell_gold(db: AsyncSession, character: Character, gold: int) -> DailyProgressResult:
@@ -400,7 +421,8 @@ async def record_sell_gold(db: AsyncSession, character: Character, gold: int) ->
             completion = await _apply_delta(db, character, row, gold)
             if completion:
                 completions.append(completion)
-    return await _finish(db, character, completions)
+    result = await _finish(db, character, completions)
+    return await _with_guild(db, character, "sell_gold", gold, result)
 
 
 async def record_pvp_win(db: AsyncSession, character: Character) -> DailyProgressResult:
@@ -411,7 +433,8 @@ async def record_pvp_win(db: AsyncSession, character: Character) -> DailyProgres
             completion = await _apply_delta(db, character, row, 1)
             if completion:
                 completions.append(completion)
-    return await _finish(db, character, completions)
+    result = await _finish(db, character, completions)
+    return await _with_guild(db, character, "pvp_win", 1, result)
 
 
 # --- Чтение состояния (чат /ежедневки, мини-апп) ---

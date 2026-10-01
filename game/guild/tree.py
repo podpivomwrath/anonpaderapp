@@ -1,0 +1,315 @@
+"""Древо гильдии: три ветви (Война, Промысел, Братство), в каждой 51 малый
+узел, 10 средних и 3 ключевых.
+
+Древо строится КОДОМ, детерминированно, а не лежит контентным файлом: узлов
+почти двести, и у каждого координаты для мини-аппа и связи с соседями.
+Руками такой файл не правят, а сгенерированный рядом с генератором однажды
+разошёлся бы с ним. Id узлов стабильны (ветвь, рука, позиция), поэтому
+взятые узлы в базе переживают любые правки текстов и чисел.
+
+Устройство ветви: корень (берётся бесплатно), от него три руки. Рука - цепь
+из 21 узла: малые, средние на 6-й, 13-й и 19-й позиции и ключевой в конце.
+Соседние руки сшиты перемычками у средних узлов, а между руками стоит ещё
+по одному среднему узлу - так у древа есть развилки, как в Path of Exile,
+а не три прямые дорожки.
+
+Брать можно узел, соседний с уже взятым (или с корнем ветви).
+"""
+
+import math
+from dataclasses import dataclass, field
+from functools import lru_cache
+
+# --- Эффекты -------------------------------------------------------------------
+# key -> (подпись с {v}, единица: "%" | "ч" | "" , значение малого узла)
+EFFECTS: dict[str, tuple[str, str, float]] = {
+    # Война
+    "garrison_power_pct": ("+{v}% к силе гарнизона", "%", 1.5),
+    "siege_damage_pct": ("+{v}% урона в осадах", "%", 0.5),
+    "siege_defense_pct": ("-{v}% входящего урона в осадах", "%", 0.5),
+    "siege_cost_pct": ("-{v}% к цене осады", "%", 1.0),
+    "claim_speed_pct": ("-{v}% исследований для закладки знамени", "%", 1.0),
+    "pvp_damage_pct": ("+{v}% урона в PvP", "%", 0.2),
+    "shield_hours": ("+{v} ч щита после захвата", "ч", 1.0),
+    "garrison_size": ("+{v} страж в гарнизоне каждой базы", "", 1.0),
+    # Промысел
+    "build_cost_pct": ("-{v}% к цене построек", "%", 0.5),
+    "build_time_pct": ("-{v}% ко времени стройки", "%", 1.0),
+    "shaft_speed_pct": ("+{v}% к скорости шахты", "%", 2.0),
+    "warehouse_pct": ("+{v}% к вместимости склада", "%", 2.0),
+    "tithe_pct": ("+{v}% к десятине", "%", 2.0),
+    "sell_pct": ("+{v}% к выручке у скупщика", "%", 0.3),
+    "prayer_cost_pct": ("-{v}% к цене молитвы", "%", 1.0),
+    "totem_drop_pct": ("+{v}% к шансу тотема удвоить добычу", "%", 0.1),
+    "mining_speed_pct": ("-{v}% ко времени добычи руды", "%", 0.3),
+    # Братство
+    "xp_pct": ("+{v}% опыта", "%", 0.3),
+    "fame_pct": ("+{v}% славы гильдии", "%", 0.5),
+    "daily_gold_pct": ("+{v}% золота за гильдейские ежедневки", "%", 2.0),
+    "stat_pct": ("+{v}% ко всем характеристикам", "%", 0.05),
+    "respawn_pct": ("-{v}% ко времени возрождения", "%", 0.5),
+    "trophy_pct": ("+{v}% к шансу лишних трофеев", "%", 0.3),
+    "key_chance_pct": ("+{v}% к шансу Ключа Монолита", "%", 1.0),
+}
+
+#: Потолки суммарных эффектов - на случай будущих правок чисел древа.
+EFFECT_CAPS: dict[str, float] = {
+    "siege_defense_pct": 40, "siege_cost_pct": 60, "claim_speed_pct": 60,
+    "build_cost_pct": 50, "build_time_pct": 60, "prayer_cost_pct": 60,
+    "mining_speed_pct": 30, "respawn_pct": 50,
+}
+
+
+def effect_text(key: str, value: float) -> str:
+    label, _unit, _small = EFFECTS[key]
+    shown = f"{value:g}" if value != int(value) else str(int(value))
+    return label.format(v=shown)
+
+
+# --- Ветви ----------------------------------------------------------------------
+BRANCHES = ["war", "craft", "kin"]
+BRANCH_TITLES = {"war": "Война", "craft": "Промысел", "kin": "Братство"}
+
+#: Темы рук: малые узлы руки чередуют эти эффекты.
+ARM_THEMES: dict[str, list[list[str]]] = {
+    "war": [
+        ["garrison_power_pct", "siege_defense_pct", "shield_hours"],
+        ["siege_damage_pct", "pvp_damage_pct", "siege_cost_pct"],
+        ["claim_speed_pct", "siege_cost_pct", "garrison_power_pct"],
+    ],
+    "craft": [
+        ["shaft_speed_pct", "warehouse_pct", "mining_speed_pct"],
+        ["tithe_pct", "sell_pct", "prayer_cost_pct"],
+        ["build_cost_pct", "build_time_pct", "totem_drop_pct"],
+    ],
+    "kin": [
+        ["xp_pct", "fame_pct", "daily_gold_pct"],
+        ["stat_pct", "respawn_pct", "trophy_pct"],
+        ["key_chance_pct", "trophy_pct", "xp_pct"],
+    ],
+}
+
+#: Имена малых узлов по эффекту - берутся по кругу.
+SMALL_NAMES: dict[str, list[str]] = {
+    "garrison_power_pct": ["Выучка", "Строевой шаг", "Тяжёлые щиты", "Сторожевой паёк"],
+    "siege_damage_pct": ["Таран", "Штурмовой клин", "Горячая смола"],
+    "siege_defense_pct": ["Зубцы", "Двойная кладка", "Мокрые шкуры"],
+    "siege_cost_pct": ["Свои подводы", "Наёмный обоз", "Трофейные лестницы"],
+    "claim_speed_pct": ["Межевые камни", "Быстрые колья", "Разметка"],
+    "pvp_damage_pct": ["Жажда схватки", "Злость", "Короткий клинок"],
+    "shield_hours": ["Ночной караул", "Засека", "Рвы"],
+    "build_cost_pct": ["Свой кирпич", "Бережливость", "Старые балки"],
+    "build_time_pct": ["Артель", "Леса", "Ранний подъём"],
+    "shaft_speed_pct": ["Крепь", "Водоотлив", "Вагонетки"],
+    "warehouse_pct": ["Подвалы", "Стеллажи", "Опись"],
+    "tithe_pct": ["Мытари", "Межевая пошлина", "Сборщики"],
+    "sell_pct": ["Свой человек у скупщика", "Торговая хватка", "Весы без обмана"],
+    "prayer_cost_pct": ["Свечной двор", "Певчие", "Ладан"],
+    "totem_drop_pct": ["Резьба по кости", "Подношения", "Старые знаки"],
+    "mining_speed_pct": ["Заточенные кайла", "Рудознатцы", "Чутьё на жилу"],
+    "xp_pct": ["Наука старших", "Байки у костра", "Разбор боя"],
+    "fame_pct": ["Глашатаи", "Слухи", "Песни о гильдии"],
+    "daily_gold_pct": ["Жалованье", "Общий котёл", "Премия"],
+    "stat_pct": ["Закалка", "Братская кровь", "Общая клятва"],
+    "respawn_pct": ["Лекари", "Обереги", "Зов дома"],
+    "trophy_pct": ["Зоркий глаз", "Мешки побольше", "Добытчики"],
+    "key_chance_pct": ["Шёпот Монолита", "Ключники", "Счастливая монета"],
+}
+
+#: Средние узлы: (имя, {эффект: значение}). По 10 на ветвь: 9 на руках
+#: (по три на руку) и 1 между руками.
+NOTABLES: dict[str, list[tuple[str, dict[str, float]]]] = {
+    "war": [
+        ("Кованые ворота", {"garrison_power_pct": 6, "siege_defense_pct": 2}),
+        ("Стража без сна", {"shield_hours": 4, "garrison_power_pct": 4}),
+        ("Последний рубеж", {"siege_defense_pct": 4, "shield_hours": 3}),
+        ("Боевой рог", {"siege_damage_pct": 3, "pvp_damage_pct": 1}),
+        ("Знамёна вперёд", {"siege_damage_pct": 2, "siege_cost_pct": 5}),
+        ("Кровавая жатва", {"pvp_damage_pct": 1.5, "siege_damage_pct": 2}),
+        ("Землемеры", {"claim_speed_pct": 6, "siege_cost_pct": 3}),
+        ("Обоз войны", {"siege_cost_pct": 6, "garrison_power_pct": 3}),
+        ("Прирезанная земля", {"claim_speed_pct": 8}),
+        ("Военный совет", {"siege_damage_pct": 1.5, "siege_defense_pct": 1.5, "garrison_power_pct": 3}),
+    ],
+    "craft": [
+        ("Глубокий забой", {"shaft_speed_pct": 10, "mining_speed_pct": 1}),
+        ("Амбары", {"warehouse_pct": 12, "shaft_speed_pct": 4}),
+        ("Горная артель", {"mining_speed_pct": 2, "warehouse_pct": 6}),
+        ("Дорожная пошлина", {"tithe_pct": 10, "sell_pct": 0.5}),
+        ("Лавка при гильдии", {"sell_pct": 1.5, "tithe_pct": 4}),
+        ("Свой приход", {"prayer_cost_pct": 6, "sell_pct": 0.5}),
+        ("Зодческий цех", {"build_cost_pct": 3, "build_time_pct": 4}),
+        ("Леса до неба", {"build_time_pct": 6, "build_cost_pct": 1}),
+        ("Священная роща", {"totem_drop_pct": 0.6, "build_cost_pct": 1}),
+        ("Гильдейская палата", {"tithe_pct": 5, "build_cost_pct": 1.5, "shaft_speed_pct": 4}),
+    ],
+    "kin": [
+        ("Школа гильдии", {"xp_pct": 1.5, "fame_pct": 2}),
+        ("Летописец", {"fame_pct": 4, "daily_gold_pct": 5}),
+        ("Щедрая казна", {"daily_gold_pct": 10, "xp_pct": 0.5}),
+        ("Плечом к плечу", {"stat_pct": 0.3, "respawn_pct": 2}),
+        ("Знахарка", {"respawn_pct": 4, "trophy_pct": 0.5}),
+        ("Удачливые руки", {"trophy_pct": 1.5, "stat_pct": 0.1}),
+        ("Хранители ключей", {"key_chance_pct": 5, "trophy_pct": 0.5}),
+        ("Добыча на всех", {"trophy_pct": 1.5, "xp_pct": 0.5}),
+        ("Путь к Монолиту", {"key_chance_pct": 4, "xp_pct": 1}),
+        ("Общий очаг", {"stat_pct": 0.2, "fame_pct": 2, "xp_pct": 0.5}),
+    ],
+}
+
+#: Ключевые узлы: по одному в конце каждой руки.
+KEYSTONES: dict[str, list[tuple[str, str, dict[str, float]]]] = {
+    "war": [
+        ("Железный гарнизон", "Каждую базу держит на одного стража больше, и стражи злее.",
+         {"garrison_size": 1, "garrison_power_pct": 10}),
+        ("Натиск", "Гильдия идёт на штурм дешевле и бьёт под стенами сильнее.",
+         {"siege_damage_pct": 5, "siege_cost_pct": 15}),
+        ("Вечная стража", "Отбитая или взятая клетка дольше закрыта щитом.",
+         {"shield_hours": 24, "siege_defense_pct": 5}),
+    ],
+    "craft": [
+        ("Глубокие штольни", "Шахта копает много быстрее, склад вмещает больше.",
+         {"shaft_speed_pct": 30, "warehouse_pct": 50}),
+        ("Десятина Монолита", "Каждое исследование на землях гильдии приносит казне куда больше.",
+         {"tithe_pct": 50, "sell_pct": 1}),
+        ("Зодчие", "Постройки дешевле и растут вдвое быстрее прежнего.",
+         {"build_cost_pct": 10, "build_time_pct": 25}),
+    ],
+    "kin": [
+        ("Наставничество", "Гильдия учит своих: больше опыта и больше славы.",
+         {"xp_pct": 5, "fame_pct": 10}),
+        ("Кровные узы", "Все участники становятся сильнее.",
+         {"stat_pct": 2, "respawn_pct": 10}),
+        ("Вечное возвращение", "Ключи Монолита и трофеи идут к своим охотнее.",
+         {"key_chance_pct": 15, "trophy_pct": 3}),
+    ],
+}
+
+KIND_SMALL = "small"
+KIND_NOTABLE = "notable"
+KIND_KEYSTONE = "keystone"
+KIND_ROOT = "root"
+POINTS = {KIND_SMALL: 1, KIND_NOTABLE: 2, KIND_KEYSTONE: 3, KIND_ROOT: 0}
+
+ARM_LENGTH = 21
+NOTABLE_POSITIONS = (6, 13, 19)
+
+
+@dataclass
+class TreeNode:
+    id: str
+    branch: str
+    kind: str
+    name: str
+    effects: dict[str, float]
+    x: float
+    y: float
+    description: str = ""
+    links: set[str] = field(default_factory=set)
+
+
+def _link(nodes: dict[str, TreeNode], a: str, b: str) -> None:
+    nodes[a].links.add(b)
+    nodes[b].links.add(a)
+
+
+def _point(angle_deg: float, radius: float) -> tuple[float, float]:
+    rad = math.radians(angle_deg)
+    return round(radius * math.cos(rad), 1), round(radius * math.sin(rad), 1)
+
+
+@lru_cache(maxsize=1)
+def build() -> dict[str, TreeNode]:
+    nodes: dict[str, TreeNode] = {}
+    for b_index, branch in enumerate(BRANCHES):
+        center = -90 + 120 * b_index
+        root_id = f"{branch}:root"
+        rx, ry = _point(center, 70)
+        nodes[root_id] = TreeNode(
+            root_id, branch, KIND_ROOT, BRANCH_TITLES[branch], {}, rx, ry,
+            description="Начало ветви. Берётся бесплатно.",
+        )
+        name_cursor: dict[str, int] = {}
+        notable_iter = iter(NOTABLES[branch])
+        for arm in range(3):
+            arm_angle = center + (arm - 1) * 34
+            theme = ARM_THEMES[branch][arm]
+            previous = root_id
+            small_index = 0
+            for pos in range(ARM_LENGTH):
+                node_id = f"{branch}:{arm}:{pos}"
+                # Лёгкий изгиб: руки расходятся веером, а не лучами.
+                angle = arm_angle + (arm - 1) * pos * 0.9
+                x, y = _point(angle, 120 + 34 * pos)
+                if pos == ARM_LENGTH - 1:
+                    name, desc, effects = KEYSTONES[branch][arm]
+                    node = TreeNode(node_id, branch, KIND_KEYSTONE, name, dict(effects), x, y, desc)
+                elif pos in NOTABLE_POSITIONS:
+                    name, effects = next(notable_iter)
+                    node = TreeNode(node_id, branch, KIND_NOTABLE, name, dict(effects), x, y)
+                else:
+                    key = theme[small_index % len(theme)]
+                    small_index += 1
+                    names = SMALL_NAMES[key]
+                    n = name_cursor.get(key, 0)
+                    name_cursor[key] = n + 1
+                    node = TreeNode(
+                        node_id, branch, KIND_SMALL, names[n % len(names)],
+                        {key: EFFECTS[key][2]}, x, y,
+                    )
+                nodes[node_id] = node
+                _link(nodes, previous, node_id)
+                previous = node_id
+        # Перемычки между соседними руками у средних узлов: обход вокруг.
+        for arm in range(2):
+            for pos in (6, 13):
+                _link(nodes, f"{branch}:{arm}:{pos}", f"{branch}:{arm + 1}:{pos - 1}")
+        # Десятый средний узел - между руками 0 и 1 на середине пути.
+        bridge_id = f"{branch}:bridge"
+        name, effects = next(notable_iter)
+        a, c = nodes[f"{branch}:0:9"], nodes[f"{branch}:1:9"]
+        nodes[bridge_id] = TreeNode(
+            bridge_id, branch, KIND_NOTABLE, name, dict(effects),
+            round((a.x + c.x) / 2, 1), round((a.y + c.y) / 2, 1),
+        )
+        _link(nodes, bridge_id, a.id)
+        _link(nodes, bridge_id, c.id)
+    for node in nodes.values():
+        if not node.description and node.kind != KIND_ROOT:
+            node.description = "; ".join(effect_text(k, v) for k, v in node.effects.items())
+    return nodes
+
+
+def node(node_id: str) -> TreeNode | None:
+    return build().get(node_id)
+
+
+def roots() -> set[str]:
+    return {f"{b}:root" for b in BRANCHES}
+
+
+def can_allocate(node_id: str, allocated: set[str]) -> bool:
+    """Узел соседствует с уже взятым или с корнем ветви."""
+    target = node(node_id)
+    if target is None or target.kind == KIND_ROOT or node_id in allocated:
+        return False
+    reachable = allocated | roots()
+    return bool(target.links & reachable)
+
+
+def total_effects(allocated: set[str]) -> dict[str, float]:
+    total: dict[str, float] = {}
+    for node_id in allocated:
+        n = node(node_id)
+        if n is None:
+            continue
+        for key, value in n.effects.items():
+            total[key] = total.get(key, 0.0) + value
+    for key, cap in EFFECT_CAPS.items():
+        if key in total:
+            total[key] = min(total[key], cap)
+    return {k: round(v, 3) for k, v in total.items()}
+
+
+def points_total() -> int:
+    return sum(POINTS[n.kind] for n in build().values())

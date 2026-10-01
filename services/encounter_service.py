@@ -8,7 +8,6 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from game.combat.battle_report import BattleReport
-from game.combat.formulas import respawn_time_minutes
 from models import Character, CharacterStats, Item
 from services import (
     admin_service,
@@ -42,6 +41,29 @@ class VictoryOutcome:
     raid_key_dropped: bool = False  # патч 45, ч.4 — Ключ Монолита
     xp_premium_applied: bool = False  # патч 51, ч.1 — был ли применён бонус +50% Метки Хранителя
     group_kick: "group_service.LevelGapKick | None" = None  # патч 51, ч.2 — исключён из группы левелапом
+
+
+async def _guild_trophy_bonus(
+    db: AsyncSession, character: Character, trophies: dict[str, int], rng: random.Random,
+) -> dict[str, int]:
+    """Гильдия: лишний бросок трофеев (древо) и удвоение добычи в ауре
+    тотема своей базы."""
+    if character.guild_id is None:
+        return trophies
+    from services import guild_service, guild_territory_service, scene_event_service
+
+    trophies = dict(trophies)
+    chance = guild_service.perk(character, "trophy_pct") / 100
+    if chance > 0 and rng.random() < chance:
+        extra = await scene_event_service.extra_kill_trophies(db, character, rng)
+        for trophy_id, count in extra.items():
+            trophies[trophy_id] = trophies.get(trophy_id, 0) + count
+    double = await guild_territory_service.totem_double_chance(db, character)
+    if trophies and double > 0 and rng.random() < double:
+        for trophy_id, count in list(trophies.items()):
+            await trophy_service.grant_specific(db, character.id, trophy_id, count)
+            trophies[trophy_id] = count * 2
+    return trophies
 
 
 async def resolve_victory(
@@ -78,6 +100,7 @@ async def resolve_victory(
         extra = await scene_event_service.extra_kill_trophies(db, character, rng)
         for trophy_id, count in extra.items():
             trophies[trophy_id] = trophies.get(trophy_id, 0) + count
+    trophies = await _guild_trophy_bonus(db, character, trophies, rng)
     item = await item_service.grant_from_kill(db, character, mob_level, rng)
     raid_key_dropped = await raid_key_service.maybe_grant(db, character, rng)
 
@@ -126,7 +149,7 @@ class DefeatOutcome:
 async def resolve_defeat(db: AsyncSession, character: Character) -> DefeatOutcome:
     """Смерть в PvE: штраф опыта текущего уровня, таймер респавна. Возрождение в
     родном городе — АВТОМАТИЧЕСКИ по таймеру (bot.handlers.respawn)."""
-    minutes = respawn_time_minutes(character.level)
+    minutes = death_service._respawn_minutes(character)
     xp_lost = death_service.apply_death(character)
     character.travel_target_x = None
     character.travel_target_y = None

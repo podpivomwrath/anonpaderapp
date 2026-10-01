@@ -377,6 +377,9 @@ async def scan() -> None:
             if character.subclass is not None:
                 await trial_service.record_cell_moved(db, character)
             await daily_service.record_cell_moved(db, character)
+            from bot.handlers import guild as guild_handlers  # избегаем цикла импортов
+
+            await guild_handlers.on_arrival(db, character)
             stats = await _stats(db, character.id)
             wallet = await wallet_service.get_wallet(db, character.id)
             gear_bonus = await item_service.compute_gear_bonus(db, character.id)

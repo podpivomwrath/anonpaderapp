@@ -18,6 +18,7 @@ from bot.handlers import combat as combat_handlers
 from bot.handlers import elixir_shop as elixir_shop_handlers
 from bot.handlers import group as group_handlers
 from bot.handlers import group_combat as group_combat_handlers
+from bot.handlers import guild as guild_handlers
 from bot.handlers import inventory as inventory_handlers
 from bot.handlers import moderation as moderation_handlers
 from bot.handlers import mounts as mounts_handlers
@@ -279,6 +280,22 @@ async def run() -> None:
     respawn_scheduler.add_job(
         world_boss_handlers.expire_job, "interval", minutes=1,
         id="world_boss_expire", max_instances=1, coalesce=True,
+    )
+
+    # Гильдии: стройка, закладки, осады и Страж - раз в 30 секунд; шахты -
+    # раз в 5 минут; сезон и снимок владений - раз в сутки ночью.
+    guild_handlers.setup(bot.api)
+    respawn_scheduler.add_job(
+        guild_handlers.tick_job, "interval", seconds=30,
+        id="guild_tick", max_instances=1, coalesce=True,
+    )
+    respawn_scheduler.add_job(
+        guild_handlers.shaft_job, "interval", minutes=5,
+        id="guild_shafts", max_instances=1, coalesce=True,
+    )
+    respawn_scheduler.add_job(
+        guild_handlers.season_job, "cron", hour=0, minute=5, timezone="Europe/Moscow",
+        id="guild_season", max_instances=1, coalesce=True,
     )
 
     # Маунты (патч 25, п.7): нападения/прибытия/live-отсчёт — свой job,

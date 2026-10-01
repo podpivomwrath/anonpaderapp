@@ -57,7 +57,10 @@ def _discounted(character: Character, cost: int) -> int:
     приехала бы не во все: игрок увидел бы одно число, а списалось бы
     другое, причём молча.
     """
-    return max(1, round(cost * crown_service.craft_ore_multiplier(character)))
+    from services import guild_service
+
+    forge = 1 - guild_service.perk(character, "_forge_cut")
+    return max(1, round(cost * crown_service.craft_ore_multiplier(character) * forge))
 
 
 def first_craft_cost(character: Character) -> int:

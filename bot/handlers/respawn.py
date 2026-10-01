@@ -21,7 +21,7 @@ from bot.vk_media import photo_attachment
 from game.world import flavor
 from game.world import world_config as wc
 from models import Character, User
-from services import death_service, screen_service, vitals_service
+from services import death_service, guild_territory_service, screen_service, vitals_service
 from services.db import get_session_factory
 
 _bot_api = None
@@ -78,6 +78,22 @@ async def register_death(peer_id: int, respawn_at: datetime, xp_lost: int = 0) -
         pass
 
 
+CHAPEL_RESPAWN_TEXT = "⛪ Ты приходишь в себя у часовни своей гильдии. Колокол ещё гудит."
+
+
+async def _field_keyboard(peer_id: int) -> str | None:
+    """Клавиатура клетки, где игрок очнулся: часовня стоит в поле, и
+    площадь города тут неуместна."""
+    from bot.handlers import world as world_handlers  # избегаем цикла импортов
+    from services import onboarding_service
+
+    async with get_session_factory()() as db:
+        character = await onboarding_service.get_character(db, peer_id)
+        if character is None:
+            return None
+        return await world_handlers._current_keyboard(db, character, peer_id, datetime.now(timezone.utc))
+
+
 async def scan() -> None:
     """Батч-проход: возродить готовых, обновить отсчёт остальным. Один job на всех."""
     if _bot_api is None:
@@ -100,15 +116,28 @@ async def scan() -> None:
                 death_service.respawn_if_ready(character, now)
                 vitals_service.restore_full(character)
                 character.pos_x, character.pos_y = wc.CITY_COORDS[character.region]
+                # Гильдии: кто выбрал часовню, встаёт у неё, а не в городе.
+                chapel = None
+                if character.respawn_at_chapel and character.guild_id is not None:
+                    chapel = await guild_territory_service.chapel_cell(db, character.guild_id)
+                    if chapel is not None:
+                        character.pos_x, character.pos_y = chapel.x, chapel.y
                 # Патч 39: возрождение — всегда корневой экран (площадь).
                 await screen_service.set_screen(db, character, None)
-                to_revive.append((vk_id, character.region))
+                to_revive.append((vk_id, None if chapel is not None else character.region))
             else:
                 to_update.append((vk_id, character.respawn_at))
         await db.commit()
 
     for peer_id, region in to_revive:
         _death_message.pop(peer_id, None)
+        if region is None:
+            _pvp_death_pending.discard(peer_id)
+            await _bot_api.messages.send(
+                peer_id=peer_id, message=CHAPEL_RESPAWN_TEXT, random_id=0,
+                keyboard=await _field_keyboard(peer_id),
+            )
+            continue
         if peer_id in _pvp_death_pending:
             _pvp_death_pending.discard(peer_id)
             text = PVP_RESPAWN_LORE.format(city=REGION_TITLES[region])

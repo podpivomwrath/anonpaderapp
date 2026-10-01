@@ -17,7 +17,7 @@ def apply_death(character: Character, now: datetime | None = None) -> int:
     Возвращает величину потерянного опыта (для лорного сообщения)."""
     now = now or datetime.now(timezone.utc)
     penalty = experience_service.apply_death_penalty(character)
-    character.respawn_at = now + timedelta(minutes=respawn_time_minutes(character.level))
+    character.respawn_at = now + timedelta(minutes=_respawn_minutes(character))
     return penalty
 
 
@@ -25,7 +25,14 @@ def apply_pvp_death(character: Character, now: datetime | None = None) -> None:
     """Поражение в открытом PvP (патч 22): таймер респавна как при обычной
     смерти, но БЕЗ штрафа опыта — цена поражения уже уплачена трофеями."""
     now = now or datetime.now(timezone.utc)
-    character.respawn_at = now + timedelta(minutes=respawn_time_minutes(character.level))
+    character.respawn_at = now + timedelta(minutes=_respawn_minutes(character))
+
+
+def _respawn_minutes(character: Character) -> float:
+    """Часовня гильдии и древо сокращают ожидание."""
+    from services import guild_territory_service
+
+    return respawn_time_minutes(character.level) * guild_territory_service.respawn_multiplier(character)
 
 
 def is_dead(character: Character, now: datetime | None = None) -> bool:

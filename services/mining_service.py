@@ -257,6 +257,9 @@ async def start_dig(
 
     seconds = mining.roll_dig_seconds(rng, tier, character.mining_level, event_vein)
     seconds *= crown_service.mining_multiplier(character)  # венец «Жила», патч 91
+    from services import guild_service
+
+    seconds *= 1 - guild_service.perk(character, "mining_speed_pct") / 100
     character.mining_ends_at = now + timedelta(seconds=seconds)
     character.mining_mine_id = mine.id if mine is not None else None
     await db.flush()

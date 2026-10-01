@@ -20,6 +20,7 @@ from bot.keyboards.world import movement_keyboard
 from game.economy import fishing
 from game.economy import fishing_config as fc
 from game.world.scheduler import PeerScheduler
+from services import guild_quest_service
 from services import (
     fishing_service,
     item_service,
@@ -174,6 +175,7 @@ async def strike(message: Message) -> None:
             return
 
         result = await fishing_service.strike(db, character, lake, _rng)
+        guild_lines = await guild_quest_service.record(db, character, "fish", 1) if result.landed else []
         grams = await fishing_service.bag_total_grams(db, character.id)
         capacity = fishing.bag_capacity_grams(character.fishing_level)
         await db.commit()
@@ -194,6 +196,8 @@ async def strike(message: Message) -> None:
         body = ft.catch_text(result)
 
     text = f"{body}\n\n{ft.SEP}\n{ft.bag_line(grams, capacity)}\n{ft.SEP}"
+    if guild_lines:
+        text += "\n\n" + "\n".join(guild_lines)
     await message.answer(text, keyboard=kb.lake_keyboard())
 
 

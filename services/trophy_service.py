@@ -123,6 +123,12 @@ async def _lock_rows(
     return list((await db.execute(query)).scalars().all())
 
 
+def _guild_sell_multiplier(character: Character) -> float:
+    from services import guild_service
+
+    return 1 + guild_service.perk(character, "sell_pct") / 100
+
+
 async def sell_all(db: AsyncSession, character: Character, price_multiplier: float = 1.0) -> int:
     """Продаёт весь стек всех градаций разом; возвращает вырученное золото.
     price_multiplier (патч 26) — наценка чужака у скупщика в чужом городе."""
@@ -134,6 +140,7 @@ async def sell_all(db: AsyncSession, character: Character, price_multiplier: flo
         sum(defs[r.trophy_id].sell_price * r.count for r in rows)
         * price_multiplier
         * crown_service.mob_gold_multiplier(character)
+        * _guild_sell_multiplier(character)
     )
     for row in rows:
         row.count = 0
@@ -158,6 +165,7 @@ async def sell_one(
         trophy_def.sell_price * row.count
         * price_multiplier
         * crown_service.mob_gold_multiplier(character)
+        * _guild_sell_multiplier(character)
     )
     row.count = 0
     await wallet_service.deposit(db, character.id, "farm", total)

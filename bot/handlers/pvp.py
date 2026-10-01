@@ -49,6 +49,7 @@ from bot.pvp_texts import (
     CITY_NO_PVP_TEXT,
     LAKE_NO_PVP_TEXT,
     NOTHING_TO_TAKE,
+    SIEGE_NO_PVP_TEXT,
 )
 from game.combat import balance_config as bc
 from game.combat import display, elixir_effects
@@ -79,6 +80,8 @@ from services import (
     death_service,
     elixir_service,
     fishing_service,
+    guild_service,
+    guild_siege_service,
     item_service,
     mining_service,
     mount_service,
@@ -131,6 +134,11 @@ class Battle:
     damage_by_pair: dict[tuple[int, int], int] = field(default_factory=dict)  # (attacker, victim) -> total
     join_queue: list[tuple[Participant, "CombatantState"]] = field(default_factory=list)
     last_combatants: dict[int, "CombatantState"] = field(default_factory=dict)  # снимок на конец последнего хода
+    # Гильдии: бой - осада. Стороны подписаны тегами, опоздавшие встают
+    # только к своей гильдии, итог считает bot/handlers/guild_siege.py.
+    siege_id: int | None = None
+    side_titles: tuple[str, str] | None = None
+    side_guilds: tuple[int, int] | None = None
 
 
 _battles: dict[int, Battle] = {}
@@ -264,6 +272,12 @@ async def _build_combatant_for(db, character: Character) -> CombatantState:
         will=stats_row.will + gear_bonus.get("wil", 0),
     )
     primary = bc.PRIMARY_STAT_BY_CLASS[character.base_class]
+    pvp_bonus = guild_service.perk(character, "pvp_damage_pct") / 100
+    if pvp_bonus:
+        # Древо гильдии: урон в PvP - через основную характеристику, как и
+        # остальная сила персонажа.
+        field_name = {"str": "strength", "agi": "agility", "int": "intellect"}[primary]
+        setattr(stats, field_name, round(getattr(stats, field_name) * (1 + pvp_bonus)))
     # Патч 22: перед PvP-боем ОБА восстанавливаются до полного HP — build_combatant
     # всегда стартует с current_hp=max_hp, что ровно и нужно (никакого переноса
     # текущего HP из vitals_service, как в PvE).
@@ -490,6 +504,9 @@ async def attack_command(message: Message, target: str) -> None:
         if grid.city_region_at(character.pos_x, character.pos_y) is not None:
             await message.answer(CITY_NO_PVP_TEXT)
             return
+        if await guild_siege_service.lock_at(db, character.pos_x, character.pos_y) is not None:
+            await message.answer(SIEGE_NO_PVP_TEXT)
+            return
 
         if target.strip().lower() == character.name.lower():
             await message.answer("На себя не нападают.")
@@ -668,7 +685,14 @@ async def _handle_join_choice(message: Message, battle_id, side) -> None:
         if (character.pos_x, character.pos_y) != battle.location:
             await message.answer("Ты уже не на той клетке.")
             return
+        if battle.side_guilds is not None:
+            if character.guild_id not in battle.side_guilds:
+                await message.answer("Это осада - чужим в ней места нет.")
+                return
+            side = battle.side_guilds.index(character.guild_id) + 1
         combatant = await _build_combatant_for(db, character)
+        if battle.siege_id is not None:
+            combatant.stats = guild_siege_service.siege_modifiers(combatant.stats, character, side == 1)
         participant = _participant(character, peer_id)
 
     combatant.side = side - 1
@@ -747,6 +771,72 @@ async def _convert_duel_to_mass(session_id: int, battle: Battle) -> None:
             random_id=0,
             keyboard=pvp_combat_keyboard(p.base_class, state.combatants[p.character_id].cooldowns, subclass_id=state.combatants[p.character_id].subclass_id, show_target=True),
         )
+
+
+async def start_siege_battle(
+    siege_id: int, location: tuple[int, int],
+    attackers: list[tuple[Character, int]], defenders: list[tuple[Character, int]],
+    garrison: list[CombatantState], titles: tuple[str, str], guild_ids: tuple[int, int],
+    intro: str,
+) -> int:
+    """Массовый бой осады: сторона 1 - осаждающие, сторона 2 - защитники и
+    гарнизон. Возвращает id боя."""
+    battle_id = _new_battle_id()
+    battle = Battle(
+        battle_type="mass", location=location, siege_id=siege_id,
+        side_titles=titles, side_guilds=guild_ids,
+    )
+    state = CombatSessionState(session_id=battle_id, mode=CombatMode.PVP_GROUP)
+    async with get_session_factory()() as db:
+        for side, roster in ((0, attackers), (1, defenders)):
+            for character, peer_id in roster:
+                character = await db.get(Character, character.id)
+                combatant = await _build_combatant_for(db, character)
+                combatant.side = side
+                combatant.stats = guild_siege_service.siege_modifiers(combatant.stats, character, side == 0)
+                # Статы поменялись - здоровье пересчитываем от новой живучести.
+                rebuilt = build_combatant(
+                    id=combatant.id, side=side, kind="character", name=combatant.name,
+                    level=combatant.level, stats=combatant.stats, primary_stat=combatant.primary_stat,
+                    subclass_id=combatant.subclass_id, buff_modifiers=combatant.buff_modifiers,
+                )
+                state.add(rebuilt)
+                battle.participants[character.id] = _participant(character, peer_id)
+                battle.side_of[character.id] = side
+                _peer_battle[peer_id] = battle_id
+    for guard in garrison:
+        state.add(guard)
+    _battles[battle_id] = battle
+    battle.last_combatants = dict(state.combatants)
+    _mass_engine.start_session(state)
+    for cid in battle.participants:
+        _init_target(battle_id, battle, cid)
+    for p in battle.participants.values():
+        board = intro + "\n\n" + _render_mass(state, [])
+        target_line = _target_line(battle_id, battle, p.character_id)
+        if target_line:
+            board += f"\n{target_line}"
+        combatant = state.combatants[p.character_id]
+        await _bot_api.messages.send(
+            peer_id=p.peer_id, message=board, random_id=0,
+            keyboard=pvp_combat_keyboard(
+                p.base_class, combatant.cooldowns, subclass_id=combatant.subclass_id, show_target=True,
+            ),
+        )
+    return battle_id
+
+
+def battle_at(location: tuple[int, int]) -> int | None:
+    for battle_id, battle in _battles.items():
+        if battle.location == location and battle.siege_id is not None:
+            return battle_id
+    return None
+
+
+def release_participants(battle: Battle) -> None:
+    for p in battle.participants.values():
+        _peer_battle.pop(p.peer_id, None)
+        _chosen_target.pop(p.character_id, None)
 
 
 # --- Ходы дуэли ---
@@ -1288,12 +1378,15 @@ async def _finish_duel(battle: Battle, winner_cid: int, loser_cid: int) -> None:
 
 
 def _render_mass(session: CombatSessionState, lines: list[str]) -> str:
-    header = f"⚔️ БОЙ - ход {session.tick_number}"
+    battle = _battles.get(session.session_id)
+    titles = battle.side_titles if battle is not None and battle.side_titles else None
+    header = f"{'🏰 ОСАДА' if titles else '⚔️ БОЙ'} - ход {session.tick_number}"
     side_lines = []
     for side in (0, 1):
         members = [c for c in session.combatants.values() if c.side == side]
         roster = ", ".join(f"{c.name} {display.health_bar(c.current_hp, c.max_hp)}" for c in members)
-        side_lines.append(f"Сторона {side + 1}: {roster}")
+        title = titles[side] if titles else f"Сторона {side + 1}"
+        side_lines.append(f"{title}: {roster}")
     log = " ".join(lines) if lines else "Бой продолжается."
     return "\n".join([header, *side_lines, "", log])
 
@@ -1368,6 +1461,12 @@ async def on_mass_battle_finished(session_id: int, result: TickResult) -> None:
     combatants = battle.last_combatants
     dead_ids = [cid for cid in battle.participants if cid in combatants and not combatants[cid].alive]
     survivor_ids = [cid for cid in battle.participants if cid in combatants and combatants[cid].alive]
+
+    if battle.siege_id is not None:
+        from bot.handlers import guild_siege  # избегаем цикла импортов
+
+        await guild_siege.on_siege_battle_finished(battle, result, dead_ids, survivor_ids)
+        return
 
     async with get_session_factory()() as db:
         characters: dict[int, Character] = {}

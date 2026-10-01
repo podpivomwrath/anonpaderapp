@@ -41,6 +41,8 @@ from bot.handlers import scene_events as scene_event_handlers
 from bot.handlers import group_events as group_event_handlers
 from bot.handlers import stats_window
 from bot.handlers import world_boss as world_boss_handlers
+from bot.handlers import guild as guild_handlers
+from bot.pvp_texts import SIEGE_NO_EXPLORE_TEXT
 from bot.keyboards import fishing as fishing_kb
 from bot.keyboards import mining as mining_kb
 from bot.keyboards import raid as raid_kb
@@ -83,6 +85,8 @@ from services import (
     event_service,
     fishing_service,
     group_explore_service,
+    guild_siege_service,
+    guild_territory_service,
     group_service,
     item_service,
     mining_service,
@@ -572,6 +576,11 @@ async def explore(message: Message) -> None:
         if grid.city_region_at(character.pos_x, character.pos_y) is not None:
             await message.answer("В городе безопасно. Исследовать можно только за воротами.")
             return
+        # Гильдии: за час до осады на клетке не дерутся - и не исследуют,
+        # исследование может затянуть в бой с мобом к самому началу осады.
+        if await guild_siege_service.lock_at(db, character.pos_x, character.pos_y) is not None:
+            await message.answer(SIEGE_NO_EXPLORE_TEXT)
+            return
 
         # Патч 51, ч.3: групповое исследование — только если на ЭТОЙ клетке
         # ещё есть хотя бы один другой участник группы (иначе — обычное
@@ -624,6 +633,12 @@ async def explore(message: Message) -> None:
                 # все разом) или, чаще, групповой бой. Обрывков Песни и пепла
                 # в групповом исследовании нет (патч 51, ч.3).
                 group_explore_service.clear(snapshot.id)
+                # Гильдии: групповое исследование - тоже исследование клетки
+                # для каждого (десятина владельцу, закладка знамени).
+                for m in cohort:
+                    member_character = await db.get(Character, m.id)
+                    if member_character is not None:
+                        await guild_territory_service.on_exploration(db, member_character)
                 region = region_for(character.pos_x, character.pos_y)
                 dist = grid.monolith_distance(character.pos_x, character.pos_y)
                 if await group_event_handlers.maybe_start(
@@ -768,9 +783,11 @@ async def handle_explore_done(peer_id: int) -> None:
         # активность всего сервера.
         new_boss = await world_boss_service.record_exploration(db, _rng)
         daily_progress = await daily_service.record_exploration(db, character)
+        guild_outcome = await guild_territory_service.on_exploration(db, character)
         await db.commit()
         if new_boss is not None:
             world_boss_handlers.on_spawned(new_boss.id)
+        await guild_handlers.after_exploration(peer_id, character, guild_outcome)
         gear_bonus = await item_service.compute_gear_bonus(db, character.id)
         buff_modifiers = await scene_event_service.solo_modifiers(
             db, character, await preset_service.resolve_active_modifiers(db, character),
@@ -1183,6 +1200,7 @@ async def handle_arrival(peer_id: int) -> None:
         if character.subclass is not None:
             await trial_service.record_cell_moved(db, character)
         await daily_service.record_cell_moved(db, character)
+        await guild_handlers.on_arrival(db, character)
         await db.commit()
         await _deliver_daily_notice(peer_id, character)
         region = grid.city_region_at(character.pos_x, character.pos_y)

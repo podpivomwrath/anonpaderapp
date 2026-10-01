@@ -91,6 +91,14 @@ def add_experience(
     premium_applied = apply_premium and amount > 0 and premium_service.is_premium(character)
     if premium_applied:
         amount = round(amount * pc.PREMIUM_XP_MULTIPLIER)
+    if apply_premium and amount > 0:
+        # Древо гильдии (ветвь «Братство»). Сам опыт копией на персонаже -
+        # сессии БД здесь нет, как и у венцов.
+        from services import guild_service
+
+        guild_xp = guild_service.perk(character, "xp_pct")
+        if guild_xp:
+            amount = round(amount * (1 + guild_xp / 100))
     if amount > 0:
         character.experience += amount
     levels = 0

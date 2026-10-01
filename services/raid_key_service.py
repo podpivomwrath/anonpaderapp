@@ -29,7 +29,10 @@ async def maybe_grant(db: AsyncSession, character: Character, rng: random.Random
     cap = current_cap(character)
     if character.raid_keys >= cap:
         return False
-    if rng.random() >= rc.RAID_KEY_DROP_CHANCE:
+    from services import guild_service
+
+    chance = rc.RAID_KEY_DROP_CHANCE * (1 + guild_service.perk(character, "key_chance_pct") / 100)
+    if rng.random() >= chance:
         return False
     character.raid_keys += 1
     await db.flush()

@@ -10,6 +10,7 @@ from models import Character, CharacterTitle
 TITLE_NAMES = {
     "relentless": "Неотступный",  # патч 24: 365 дней стрика ежедневок
     "chronicler": "Летописец",  # патч 25: полный сбор Пепельной Песни
+    "season_lords": "Владыка Пепла",  # гильдии: лучшая гильдия сезона
 }
 
 

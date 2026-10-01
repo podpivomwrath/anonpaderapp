@@ -18,6 +18,22 @@ from models.enums import (
 )
 from models.fishing import CharacterFish, CharacterFishRecord
 from models.group import Group, GroupInvite, GroupMember
+from models.guild import (
+    Guild,
+    GuildBoss,
+    GuildBossContribution,
+    GuildBuilding,
+    GuildCell,
+    GuildDaily,
+    GuildInvite,
+    GuildItem,
+    GuildLog,
+    GuildMember,
+    GuildOre,
+    GuildSeasonScore,
+    GuildSiege,
+    GuildWeekly,
+)
 from models.item import Inventory, Item, ItemUpgradeHistory
 from models.lootbox import CharacterLootbox
 from models.mining import CharacterCraftTool, CharacterOre, MineVein, MiningEvent
@@ -67,6 +83,20 @@ __all__ = [
     "Group",
     "GroupInvite",
     "GroupMember",
+    "Guild",
+    "GuildBoss",
+    "GuildBossContribution",
+    "GuildBuilding",
+    "GuildCell",
+    "GuildDaily",
+    "GuildInvite",
+    "GuildItem",
+    "GuildLog",
+    "GuildMember",
+    "GuildOre",
+    "GuildSeasonScore",
+    "GuildSiege",
+    "GuildWeekly",
     "Inventory",
     "Item",
     "ItemUpgradeHistory",

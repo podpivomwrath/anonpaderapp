@@ -18,7 +18,7 @@ from bot.activity import activity_action, blocked_reason
 from bot.keyboards import mining as kb
 from bot.keyboards.world import movement_keyboard
 from game.world.scheduler import PeerScheduler
-from services import mining_service, mount_service, screen_service
+from services import guild_quest_service, mining_service, mount_service, screen_service
 from services import onboarding_service as onboarding_svc
 from services.db import get_session_factory
 
@@ -81,6 +81,9 @@ async def on_dig_done(peer_id: int) -> None:
         result = await mining_service.finish_dig(
             db, character, _rng, dig_seconds=_dig_seconds.pop(peer_id, None)
         )
+        guild_lines = (
+            await guild_quest_service.record(db, character, "ore", 1) if result is not None else []
+        )
         mine = mining_service.mine_at(character)
         left = await mining_service.ore_in_mine(db, mine.id) if mine else 0
         on_mine_screen = character.screen == "mine"
@@ -89,6 +92,8 @@ async def on_dig_done(peer_id: int) -> None:
     if result is None:
         return
     text = mt.dig_result_text(result)
+    if guild_lines:
+        text += "\n\n" + "\n".join(guild_lines)
     keyboard = kb.mine_keyboard(left > 0) if on_mine_screen else None
     await _bot_api.messages.send(
         peer_id=peer_id, message=text, random_id=0, keyboard=keyboard,

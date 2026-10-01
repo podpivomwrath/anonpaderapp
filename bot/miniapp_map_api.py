@@ -132,9 +132,22 @@ async def handle_get_state(request: web.Request) -> web.Response:
                 "hp_percent": round(100 * boss.hp / boss.max_hp) if boss.max_hp else 0,
             }
 
+        # Гильдии: владения и закладки - цветом гильдии на карте.
+        from services import guild_territory_service
+
+        guild_cells = [
+            {
+                "x": cell.x, "y": cell.y, "tag": guild.tag, "guild_id": guild.id,
+                "own": guild.id == character.guild_id, "status": cell.status,
+                "base_tier": cell.base_tier, "mine": cell.mine_id is not None,
+            }
+            for cell, guild in await guild_territory_service.all_cells(db)
+        ]
+
         return web.json_response(
             {
                 "pos_x": character.pos_x, "pos_y": character.pos_y,
+                "guild_cells": guild_cells,
                 "is_dead": death_service.is_dead(character),
                 "foot_travel": foot_travel,
                 "mount_travel": mount_travel,

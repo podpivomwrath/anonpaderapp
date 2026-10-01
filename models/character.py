@@ -9,6 +9,7 @@ from sqlalchemy import (
     ForeignKey,
     Index,
     String,
+    false,
     func,
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -173,6 +174,26 @@ class Character(Base):
     # осознанный отказ - разные вещи: иначе снятая рамка возвращалась бы
     # сама при получении следующего венца.
     crown_frame: Mapped[str | None] = mapped_column(String(32), nullable=True)
+
+    # --- Гильдии ---
+    # guild_id дублирует guild_members намеренно: «в гильдии ли он» спрашивают
+    # горячие пути (каждое исследование, каждый бой), и лишний запрос там
+    # ни к чему. Источник правды о звании и вкладе - guild_members.
+    guild_id: Mapped[int | None] = mapped_column(
+        ForeignKey("guilds.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+    # Сумма эффектов древа гильдии - копия на персонаже, как венцы (crowns):
+    # бонус опыта читается в experience_service.add_experience, у которого
+    # нет сессии БД. Пересчитывается при изменении древа и составе.
+    guild_perks: Mapped[dict] = mapped_column(JSON, default=dict, server_default="{}")
+    # Когда последний раз ушёл из гильдии - защита от прыжков.
+    guild_left_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    # Молитва в часовне: какая характеристика и до какого момента.
+    prayer_stat: Mapped[str | None] = mapped_column(String(3), nullable=True)
+    prayer_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    # Возрождаться в часовне гильдии вместо родного города.
+    respawn_at_chapel: Mapped[bool] = mapped_column(Boolean, default=False, server_default=false())
+    gates_used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
     premium_warn_sent: Mapped[bool] = mapped_column(Boolean, default=False)
     premium_expire_notified: Mapped[bool] = mapped_column(Boolean, default=False)
