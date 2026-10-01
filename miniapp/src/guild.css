@@ -158,3 +158,38 @@
 .map-guild-cell--claiming { stroke-dasharray: 3 3; }
 .map-pin--guild { border-color: rgba(210, 210, 230, 0.7); }
 .map-pin--guild-own { border-color: #e8a33d; }
+
+/* Карточка узла древа - поверх древа, как карточка клетки на карте. */
+.guild-tree__card {
+  position: absolute;
+  left: 10px;
+  right: 54px;
+  bottom: 10px;
+  max-height: 70%;
+  overflow-y: auto;
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: rgba(14, 10, 10, 0.94);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.7);
+}
+.guild-tree__card-title {
+  margin: 0 24px 2px 0;
+  font-weight: 700;
+  font-size: 16px;
+}
+.guild-tree__card-close {
+  position: absolute;
+  top: 6px;
+  right: 8px;
+  border: none;
+  background: none;
+  color: #fff;
+  font-size: 16px;
+  opacity: 0.7;
+}
+.guild-tree__card-lack {
+  margin: 6px 0 0;
+  font-size: 13px;
+  color: #ff8a73;
+}

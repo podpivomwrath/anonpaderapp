@@ -356,32 +356,138 @@ function Quests({ state }) {
 
 // --- Казна и склад -----------------------------------------------------------------
 
+/** Подсписок: заголовок со счётчиком, раскрывается нажатием. */
+function Folder({ title, count, children }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <>
+      <SimpleCell onClick={() => setOpen(!open)} after={`${count} ${open ? '▴' : '▾'}`}>{title}</SimpleCell>
+      {open && <div className="craft-expand">{children}</div>}
+    </>
+  );
+}
+
+/** Руда - по видам, внутри вида - градации. */
+function groupOre(rows) {
+  const groups = new Map();
+  rows.forEach((o) => {
+    const g = groups.get(o.ore_id) || { id: o.ore_id, title: `${o.emoji} ${o.name}`, tier: o.tier, rows: [], total: 0 };
+    g.rows.push(o);
+    g.total += o.count;
+    groups.set(o.ore_id, g);
+  });
+  return [...groups.values()].sort((a, b) => a.tier - b.tier);
+}
+
+/** Снаряжение - по слотам. */
+function groupItems(items) {
+  const groups = new Map();
+  items.forEach((i) => {
+    const g = groups.get(i.slot) || { id: i.slot, title: i.slot, rows: [] };
+    g.rows.push(i);
+    groups.set(i.slot, g);
+  });
+  return [...groups.values()];
+}
+
+const TREASURY_MODES = [
+  { id: 'stock', label: 'Склад и выдача' },
+  { id: 'give', label: 'Сдать' },
+];
+
 function Treasury({ state, run, busy }) {
   const { guild, me, warehouse, members } = state;
+  const [mode, setMode] = useState('stock');
   const [gold, setGold] = useState('');
   const [gems, setGems] = useState('');
   const [wGold, setWGold] = useState('');
+  const [wGems, setWGems] = useState('');
   const [to, setTo] = useState('');
-  const [oreCount, setOreCount] = useState({});
+  const [counts, setCounts] = useState({});
   const target = to ? Number(to) : undefined;
+  const amount = (key, fallback) => counts[key] ?? String(fallback);
+  const setAmount = (key, v) => setCounts({ ...counts, [key]: v });
+
+  const header = (
+    <Group>
+      <Div>
+        <p className="guild-line">💰 Казна: {money(guild.treasury_gold)} · 💎 {money(guild.treasury_gems)}</p>
+        <p className="craft-hint">
+          📦 Склад: руда {warehouse.ore_total}/{warehouse.capacity.ore}, вещи {warehouse.items.length}/{warehouse.capacity.items}
+        </p>
+      </Div>
+      <Tabs>
+        {TREASURY_MODES.map((m) => (
+          <TabsItem key={m.id} selected={mode === m.id} onClick={() => setMode(m.id)}>{m.label}</TabsItem>
+        ))}
+      </Tabs>
+    </Group>
+  );
+
+  if (mode === 'give') {
+    return (
+      <>
+        {header}
+        <Group header={<Header>Внести в казну</Header>}>
+          <Div>
+            <p className="craft-hint">У тебя: 💰 {money(me.gold)} · 💎 {money(me.gems)}. Взнос виден в журнале.</p>
+            <div className="guild-row">
+              <NumberInput value={gold} onChange={setGold} placeholder="Золото" />
+              <Button size="m" disabled={busy || !gold} onClick={() => { run('deposit', { currency: 'gold', amount: Number(gold) }, 'Внесено.'); setGold(''); }}>Внести</Button>
+            </div>
+            <div className="guild-row">
+              <NumberInput value={gems} onChange={setGems} placeholder="Самоцветы" />
+              <Button size="m" disabled={busy || !gems} onClick={() => { run('deposit', { currency: 'gems', amount: Number(gems) }, 'Внесено.'); setGems(''); }}>Внести 💎</Button>
+            </div>
+          </Div>
+        </Group>
+        <Group header={<Header>Сдать руду</Header>}>
+          {warehouse.my_ore.length === 0 && <Div style={{ opacity: 0.8 }}>У тебя нет руды.</Div>}
+          {groupOre(warehouse.my_ore).map((g) => (
+            <Folder key={g.id} title={g.title} count={g.total}>
+              {g.rows.map((o) => {
+                const key = `my:${o.ore_id}:${o.grade}`;
+                const count = amount(key, o.count);
+                return (
+                  <SimpleCell key={key} subtitle={`у тебя ${o.count}`} after={(
+                    <span className="guild-row guild-row--tight">
+                      <NumberInput value={count} onChange={(v) => setAmount(key, v)} placeholder="шт" />
+                      <Button size="s" disabled={busy || !Number(count)}
+                        onClick={() => run('deposit_ore', { ore_id: o.ore_id, grade: o.grade, count: Number(count) }, 'Сдано на склад.')}>
+                        Сдать
+                      </Button>
+                    </span>
+                  )}>
+                    {o.grade_name}
+                  </SimpleCell>
+                );
+              })}
+            </Folder>
+          ))}
+        </Group>
+        <Group header={<Header>Сдать снаряжение</Header>}>
+          {warehouse.my_items.length === 0 && <Div style={{ opacity: 0.8 }}>В сумке нечего сдать.</Div>}
+          {groupItems(warehouse.my_items).map((g) => (
+            <Folder key={g.id} title={g.title} count={g.rows.length}>
+              {g.rows.map((i) => (
+                <SimpleCell key={i.id} after={(
+                  <Button size="s" disabled={busy} onClick={() => run('deposit_item', { item_id: i.id }, 'Сдано на склад.')}>Сдать</Button>
+                )}>{i.name}</SimpleCell>
+              ))}
+            </Folder>
+          ))}
+          <Div className="craft-hint">Надетые и привязанные вещи и реликвии на склад не кладут.</Div>
+        </Group>
+      </>
+    );
+  }
+
+  const canGive = me.perms.treasury;
   return (
     <>
-      <Group header={<Header>💰 Казна</Header>}>
-        <Div>
-          <p className="guild-line">Золото: {money(guild.treasury_gold)} · Самоцветы: 💎 {money(guild.treasury_gems)}</p>
-          <p className="craft-hint">У тебя: 💰 {money(me.gold)} · 💎 {money(me.gems)}. Взнос виден в журнале.</p>
-          <div className="guild-row">
-            <NumberInput value={gold} onChange={setGold} placeholder="Золото" />
-            <Button size="m" disabled={busy || !gold} onClick={() => { run('deposit', { currency: 'gold', amount: Number(gold) }, 'Внесено.'); setGold(''); }}>Внести</Button>
-          </div>
-          <div className="guild-row">
-            <NumberInput value={gems} onChange={setGems} placeholder="Самоцветы" />
-            <Button size="m" disabled={busy || !gems} onClick={() => { run('deposit', { currency: 'gems', amount: Number(gems) }, 'Внесено.'); setGems(''); }}>Внести 💎</Button>
-          </div>
-        </Div>
-      </Group>
-      {me.perms.treasury && (
-        <Group header={<Header>Выдать из казны и со склада</Header>}>
+      {header}
+      {canGive && (
+        <Group header={<Header>Кому выдавать</Header>}>
           <Div className="guild-form">
             <select className="guild-input" value={to} onChange={(e) => setTo(e.target.value)}>
               <option value="">Себе</option>
@@ -391,58 +497,49 @@ function Treasury({ state, run, busy }) {
               <NumberInput value={wGold} onChange={setWGold} placeholder="Золото" />
               <Button size="m" disabled={busy || !wGold} onClick={() => { run('withdraw', { currency: 'gold', amount: Number(wGold), to: target }, 'Выдано.'); setWGold(''); }}>Выдать</Button>
             </div>
-            <p className="craft-hint">Руду и вещи со склада выдают кнопками ниже - тому, кто выбран здесь.</p>
+            <div className="guild-row">
+              <NumberInput value={wGems} onChange={setWGems} placeholder="Самоцветы" />
+              <Button size="m" disabled={busy || !wGems} onClick={() => { run('withdraw', { currency: 'gems', amount: Number(wGems), to: target }, 'Выдано.'); setWGems(''); }}>Выдать 💎</Button>
+            </div>
           </Div>
         </Group>
       )}
-      <Group header={<Header>📦 Склад: руда {warehouse.ore_total}/{warehouse.capacity.ore}</Header>}>
+      <Group header={<Header>Руда на складе</Header>}>
         {warehouse.ore.length === 0 && <Div style={{ opacity: 0.8 }}>Руды нет.</Div>}
-        {warehouse.ore.map((o) => (
-          <SimpleCell key={`${o.ore_id}:${o.grade}`} subtitle={o.grade_name}
-            after={me.perms.treasury && (
-              <Button size="s" mode="secondary" disabled={busy}
-                onClick={() => run('withdraw_ore', { ore_id: o.ore_id, grade: o.grade, count: o.count, to: target }, 'Выдано.')}>
-                Выдать {o.count}
-              </Button>
-            )}>
-            {o.emoji} {o.name} ×{o.count}
-          </SimpleCell>
+        {groupOre(warehouse.ore).map((g) => (
+          <Folder key={g.id} title={g.title} count={g.total}>
+            {g.rows.map((o) => {
+              const key = `wh:${o.ore_id}:${o.grade}`;
+              const count = amount(key, o.count);
+              return (
+                <SimpleCell key={key} subtitle={`на складе ${o.count}`} after={canGive && (
+                  <span className="guild-row guild-row--tight">
+                    <NumberInput value={count} onChange={(v) => setAmount(key, v)} placeholder="шт" />
+                    <Button size="s" mode="secondary" disabled={busy || !Number(count)}
+                      onClick={() => run('withdraw_ore', { ore_id: o.ore_id, grade: o.grade, count: Number(count), to: target }, 'Выдано.')}>
+                      Выдать
+                    </Button>
+                  </span>
+                )}>
+                  {o.grade_name}
+                </SimpleCell>
+              );
+            })}
+          </Folder>
         ))}
       </Group>
-      <Group header={<Header>Сдать руду</Header>}>
-        {warehouse.my_ore.length === 0 && <Div style={{ opacity: 0.8 }}>У тебя нет руды.</Div>}
-        {warehouse.my_ore.map((o) => {
-          const key = `${o.ore_id}:${o.grade}`;
-          const count = oreCount[key] ?? String(o.count);
-          return (
-            <SimpleCell key={key} subtitle={`${o.grade_name} · у тебя ${o.count}`} after={(
-              <span className="guild-row guild-row--tight">
-                <NumberInput value={count} onChange={(v) => setOreCount({ ...oreCount, [key]: v })} placeholder="шт" />
-                <Button size="s" disabled={busy || !Number(count)}
-                  onClick={() => run('deposit_ore', { ore_id: o.ore_id, grade: o.grade, count: Number(count) }, 'Сдано на склад.')}>
-                  Сдать
-                </Button>
-              </span>
-            )}>
-              {o.emoji} {o.name}
-            </SimpleCell>
-          );
-        })}
-      </Group>
-      <Group header={<Header>📦 Склад: снаряжение {warehouse.items.length}/{warehouse.capacity.items}</Header>}>
+      <Group header={<Header>Снаряжение на складе</Header>}>
         {warehouse.items.length === 0 && <Div style={{ opacity: 0.8 }}>Пусто.</Div>}
-        {warehouse.items.map((i) => (
-          <SimpleCell key={i.id} subtitle={i.slot} after={me.perms.treasury && (
-            <Button size="s" mode="secondary" disabled={busy} onClick={() => run('withdraw_item', { item_id: i.id, to: target }, 'Выдано.')}>Выдать</Button>
-          )}>{i.name}</SimpleCell>
+        {groupItems(warehouse.items).map((g) => (
+          <Folder key={g.id} title={g.title} count={g.rows.length}>
+            {g.rows.map((i) => (
+              <SimpleCell key={i.id} after={canGive && (
+                <Button size="s" mode="secondary" disabled={busy} onClick={() => run('withdraw_item', { item_id: i.id, to: target }, 'Выдано.')}>Выдать</Button>
+              )}>{i.name}</SimpleCell>
+            ))}
+          </Folder>
         ))}
-        {warehouse.my_items.length > 0 && <Header>Сдать вещь</Header>}
-        {warehouse.my_items.map((i) => (
-          <SimpleCell key={i.id} subtitle={i.slot} after={(
-            <Button size="s" disabled={busy} onClick={() => run('deposit_item', { item_id: i.id }, 'Сдано на склад.')}>Сдать</Button>
-          )}>{i.name}</SimpleCell>
-        ))}
-        <Div className="craft-hint">Привязанные вещи и реликвии на склад не кладут.</Div>
+        {!canGive && <Div className="craft-hint">Выдают со склада глава и казначеи.</Div>}
       </Group>
     </>
   );
