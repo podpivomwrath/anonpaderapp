@@ -213,18 +213,29 @@ def _link(nodes: dict[str, TreeNode], a: str, b: str) -> None:
     nodes[b].links.add(a)
 
 
-def _point(angle_deg: float, radius: float) -> tuple[float, float]:
+#: Раскладка: ветви растут СНИЗУ ВВЕРХ. Корни стоят рядом внизу, руки
+#: тянутся вверх и расходятся веером, крайние - сильнее (крона).
+ROOT_SPACING = 400
+BRANCH_TILT = {"war": -26.0, "craft": 0.0, "kin": 26.0}
+ARM_SPREAD = 22.0
+#: Насколько руки раскидываются к концу: угол растёт на эту долю к вершине.
+ARM_FAN = 0.45
+
+
+def _grow(root_x: float, angle_deg: float, length: float) -> tuple[float, float]:
+    """Точка на руке: угол от вертикали (минус - влево), y растёт вниз,
+    поэтому вверх - отрицательные y."""
     rad = math.radians(angle_deg)
-    return round(radius * math.cos(rad), 1), round(radius * math.sin(rad), 1)
+    return round(root_x + length * math.sin(rad), 1), round(-length * math.cos(rad), 1)
 
 
 @lru_cache(maxsize=1)
 def build() -> dict[str, TreeNode]:
     nodes: dict[str, TreeNode] = {}
     for b_index, branch in enumerate(BRANCHES):
-        center = -90 + 120 * b_index
+        root_x = (b_index - 1) * ROOT_SPACING
         root_id = f"{branch}:root"
-        rx, ry = _point(center, 70)
+        rx, ry = root_x, 0.0
         nodes[root_id] = TreeNode(
             root_id, branch, KIND_ROOT, BRANCH_TITLES[branch], {}, rx, ry,
             description="Начало ветви. Берётся бесплатно.",
@@ -232,15 +243,17 @@ def build() -> dict[str, TreeNode]:
         name_cursor: dict[str, int] = {}
         notable_iter = iter(NOTABLES[branch])
         for arm in range(3):
-            arm_angle = center + (arm - 1) * 34
+            arm_angle = BRANCH_TILT[branch] + (arm - 1) * ARM_SPREAD
             theme = ARM_THEMES[branch][arm]
             previous = root_id
             small_index = 0
             for pos in range(ARM_LENGTH):
                 node_id = f"{branch}:{arm}:{pos}"
                 # Лёгкий изгиб: руки расходятся веером, а не лучами.
-                angle = arm_angle + (arm - 1) * pos * 0.9
-                x, y = _point(angle, 120 + 34 * pos)
+                angle = arm_angle * (1 + ARM_FAN * pos / (ARM_LENGTH - 1))
+                # Ключевой узел крупный - на вершине руки ему нужно больше места.
+                tip = 16 if pos == ARM_LENGTH - 1 else 0
+                x, y = _grow(root_x, angle, 70 + 34 * pos + tip)
                 if pos == ARM_LENGTH - 1:
                     name, desc, effects = KEYSTONES[branch][arm]
                     node = TreeNode(node_id, branch, KIND_KEYSTONE, name, dict(effects), x, y, desc)

@@ -1,16 +1,23 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Button, Div, Group, Header, Placeholder, Spinner } from '@vkontakte/vkui';
+import { Button, Div, Placeholder, Spinner } from '@vkontakte/vkui';
 import { getGuildTree, guildAction } from '../api.js';
 
 // Древо гильдии: три ветви, почти двести узлов. Рисуется SVG целиком, а
 // смотрится как карта - перетаскиванием и масштабом. Координаты и связи
 // приходят с сервера (game/guild/tree.py): клиент ничего не пересчитывает.
+//
+// Ветви растут снизу вверх. Экран древа занимает всю высоту окна, а сама
+// страница на нём не листается: иначе жест по древу то тянул его, то
+// прокручивал страницу. Сводка, итоги и карточка узла - плашками поверх.
 
 const BRANCH_COLOR = { war: '#d9483b', craft: '#e8a33d', kin: '#5fa8d9' };
 const RADIUS = { root: 22, small: 9, notable: 15, keystone: 22 };
-const WORLD = 1800;
-const MIN_SCALE = 0.2;
-const MAX_SCALE = 5;
+//: Ширина древа в его единицах при масштабе 1 - видно всё целиком.
+const BASE_WIDTH = 2500;
+//: Начальный вид: центр чуть выше корней, древо целиком.
+const HOME = { x: 0, y: -380, scale: 1 };
+const MIN_SCALE = 0.6;
+const MAX_SCALE = 10;
 const clampScale = (s) => Math.min(MAX_SCALE, Math.max(MIN_SCALE, s));
 const money = (v) => Number(v ?? 0).toLocaleString('ru-RU');
 const KIND_TITLES = { root: 'начало ветви', small: 'малый узел', notable: 'средний узел', keystone: 'ключевой узел' };
@@ -21,7 +28,9 @@ export default function GuildTree({ onChanged }) {
   const [selected, setSelected] = useState(null);
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState(null);
-  const [view, setView] = useState({ x: 0, y: 0, scale: 0.35 });
+  const [view, setView] = useState(HOME);
+  const [size, setSize] = useState({ w: 1, h: 0 });
+  const [info, setInfo] = useState(false);
   const drag = useRef(null);
   // Пальцы на экране: один - тянем древо, два - масштаб щипком.
   const pointers = useRef(new Map());
@@ -34,6 +43,32 @@ export default function GuildTree({ onChanged }) {
       .catch(() => setStatus('error'));
   }, []);
   useEffect(() => { load(); }, [load]);
+
+  // Страница на экране древа не листается: древо само заполняет окно.
+  useEffect(() => {
+    const body = document.body.style.overflow;
+    const html = document.documentElement.style.overflow;
+    document.body.style.overflow = 'hidden';
+    document.documentElement.style.overflow = 'hidden';
+    window.scrollTo(0, 0);
+    return () => {
+      document.body.style.overflow = body;
+      document.documentElement.style.overflow = html;
+    };
+  }, []);
+
+  // Высота - до низа окна от верха древа.
+  useEffect(() => {
+    const measure = () => {
+      const el = box.current;
+      if (!el) return;
+      const rect = el.getBoundingClientRect();
+      setSize({ w: rect.width, h: Math.max(320, Math.round(window.innerHeight - rect.top - 8)) });
+    };
+    measure();
+    window.addEventListener('resize', measure);
+    return () => window.removeEventListener('resize', measure);
+  }, [status]);
 
   // Колесо - нативным обработчиком: в React он пассивный, preventDefault в
   // нём не работает, и вместо приближения листалась вся страница.
@@ -107,11 +142,11 @@ export default function GuildTree({ onChanged }) {
     const dx = e.clientX - d.x;
     const dy = e.clientY - d.y;
     if (Math.abs(dx) + Math.abs(dy) > 4) d.moved = true;
-    // Пиксели экрана -> единицы viewBox: видимая ширина мира / ширина окна.
+    // Пиксели экрана -> единицы древа: видимая ширина / ширина окна.
     const width = e.currentTarget.getBoundingClientRect().width || 1;
     setView((v) => {
-      const k = WORLD / v.scale / 2 / width;
-      return { ...v, x: d.vx + dx * k, y: d.vy + dy * k };
+      const k = BASE_WIDTH / v.scale / width;
+      return { ...v, x: d.vx - dx * k, y: d.vy - dy * k };
     });
   };
   const onPointerUp = (e) => {
@@ -143,102 +178,112 @@ export default function GuildTree({ onChanged }) {
     return null;
   };
 
-  const vbSize = WORLD / view.scale / 2;
-  const viewBox = `${-view.x - vbSize / 2} ${-view.y - vbSize / 2} ${vbSize} ${vbSize}`;
+  // Видимая область в единицах древа: ширина от масштаба, высота - по
+  // пропорциям экрана, чтобы древо не сплющивалось.
+  const vbW = BASE_WIDTH / view.scale;
+  const vbH = vbW * (size.h / Math.max(size.w, 1));
+  const viewBox = `${view.x - vbW / 2} ${view.y - vbH / 2} ${vbW} ${vbH}`;
+  const stop = { onPointerDown: (e) => e.stopPropagation(), onPointerUp: (e) => e.stopPropagation() };
 
   return (
-    <>
-      <Group header={<Header>🌳 Древо гильдии</Header>}>
-        <Div>
-          <p className="guild-line">
-            Взято узлов: {tree.taken}/{tree.total_nodes} · свободных очков: {tree.points_available}
-            {tree.can_edit ? ` · в казне ${money(tree.treasury_gold)} 💰` : ''}
-          </p>
-          <p className="craft-hint">
-            Очки дают уровни гильдии. Узел берут рядом с уже взятым. Малый - 1 очко, средний - 2, ключевой - 3,
-            плюс золото из казны. Брать могут глава и казначеи.
-          </p>
+    <div
+      ref={box}
+      className="guild-tree"
+      style={{ height: size.h || undefined }}
+      onPointerDown={onPointerDown} onPointerMove={onPointerMove} onPointerUp={onPointerUp}
+      onPointerCancel={onPointerUp}
+    >
+      <svg viewBox={viewBox} className="guild-tree__svg" preserveAspectRatio="xMidYMid meet">
+        {edges.map(([a, b]) => (
+          <line key={`${a.id}|${b.id}`} x1={a.x} y1={a.y} x2={b.x} y2={b.y}
+            className={a.taken && b.taken ? 'guild-tree__edge guild-tree__edge--on' : 'guild-tree__edge'}
+            style={a.taken && b.taken ? { stroke: BRANCH_COLOR[a.branch] } : undefined} />
+        ))}
+        {tree.nodes.map((n) => (
+          <circle key={n.id} cx={n.x} cy={n.y} r={RADIUS[n.kind]}
+            className={[
+              'guild-tree__node',
+              n.taken ? 'guild-tree__node--taken' : '',
+              n.available ? 'guild-tree__node--available' : '',
+              selected === n.id ? 'guild-tree__node--selected' : '',
+            ].join(' ')}
+            style={{ '--branch': BRANCH_COLOR[n.branch] }}
+            data-node={n.id}
+          />
+        ))}
+        {tree.nodes.filter((n) => n.kind === 'root').map((n) => (
+          <text key={`t:${n.id}`} x={n.x} y={n.y + 48} className="guild-tree__root-label"
+            style={{ fill: BRANCH_COLOR[n.branch] }}>{n.name}</text>
+        ))}
+      </svg>
+
+      {/* Сводка - плашкой поверх древа: страница не листается, всё здесь. */}
+      <div className="guild-tree__bar" {...stop}>
+        <span>Очков: <b>{tree.points_available}</b> · узлов {tree.taken}/{tree.total_nodes}</span>
+        <button type="button" onClick={() => { setInfo(!info); setSelected(null); }}>
+          {info ? '✕' : 'Итоги'}
+        </button>
+      </div>
+
+      {info && (
+        <div className="guild-tree__card guild-tree__card--top" {...stop}>
+          <p className="guild-tree__card-title">Древо гильдии</p>
           <div className="guild-tree__legend">
             {Object.entries(tree.branches).map(([id, title]) => (
               <span key={id}><i style={{ background: BRANCH_COLOR[id] }} /> {title}</span>
             ))}
           </div>
-        </Div>
-        <div
-          ref={box}
-          className="guild-tree"
-          onPointerDown={onPointerDown} onPointerMove={onPointerMove} onPointerUp={onPointerUp}
-          onPointerCancel={onPointerUp}
-        >
-          <svg viewBox={viewBox} className="guild-tree__svg">
-            {edges.map(([a, b]) => (
-              <line key={`${a.id}|${b.id}`} x1={a.x} y1={a.y} x2={b.x} y2={b.y}
-                className={a.taken && b.taken ? 'guild-tree__edge guild-tree__edge--on' : 'guild-tree__edge'}
-                style={a.taken && b.taken ? { stroke: BRANCH_COLOR[a.branch] } : undefined} />
-            ))}
-            {tree.nodes.map((n) => (
-              <circle key={n.id} cx={n.x} cy={n.y} r={RADIUS[n.kind]}
-                className={[
-                  'guild-tree__node',
-                  n.taken ? 'guild-tree__node--taken' : '',
-                  n.available ? 'guild-tree__node--available' : '',
-                  selected === n.id ? 'guild-tree__node--selected' : '',
-                ].join(' ')}
-                style={{ '--branch': BRANCH_COLOR[n.branch] }}
-                data-node={n.id}
-              />
-            ))}
-          </svg>
-          {node && (
-            // Карточка узла поверх древа - как карточка клетки на карте.
-            // Свои нажатия не отдаёт древу, иначе каждое касание кнопки
-            // начинало бы перетаскивание.
-            <div className="guild-tree__card" onPointerDown={(e) => e.stopPropagation()}
-              onPointerUp={(e) => e.stopPropagation()}>
-              <button type="button" className="guild-tree__card-close" onClick={() => setSelected(null)}
-                aria-label="Закрыть">✕</button>
-              <p className="guild-tree__card-title" style={{ color: BRANCH_COLOR[node.branch] }}>{node.name}</p>
-              <p className="craft-hint">{tree.branches[node.branch]} · {KIND_TITLES[node.kind]}</p>
-              <p className="guild-line">{node.description}</p>
-              {node.kind === 'root' || node.taken ? (
-                node.kind !== 'root' && <p className="guild-line">✅ Взят</p>
-              ) : (
-                <>
-                  <p className="craft-hint">
-                    Цена: {node.points} очк. (есть {tree.points_available}) и {money(node.gold)} 💰
-                    {tree.can_edit ? ` (в казне ${money(tree.treasury_gold)})` : ''}
-                  </p>
-                  {lack(node) ? (
-                    <p className="guild-tree__card-lack">{lack(node)}</p>
-                  ) : (
-                    <Button size="m" stretched disabled={busy}
-                      onClick={() => act('tree_allocate', { node_id: node.id }, `Узел «${node.name}» взят.`)}>
-                      Взять узел
-                    </Button>
-                  )}
-                </>
-              )}
-            </div>
-          )}
-          <div className="guild-tree__zoom">
-            <button type="button" onClick={() => zoom(1.3)}>+</button>
-            <button type="button" onClick={() => zoom(1 / 1.3)}>−</button>
-            <button type="button" onClick={() => setView({ x: 0, y: 0, scale: 0.35 })}>◎</button>
-          </div>
+          <p className="craft-hint">
+            Ветви растут снизу вверх. Узел берут рядом с уже взятым: малый - 1 очко, средний - 2, ключевой - 3,
+            плюс золото из казны{tree.can_edit ? ` (в казне ${money(tree.treasury_gold)})` : ''}. Очки дают уровни
+            гильдии. Брать могут глава и казначеи.
+          </p>
+          {tree.effects.length === 0
+            ? <p className="guild-line">Узлов пока нет.</p>
+            : tree.effects.map((e) => <p key={e} className="guild-line">• {e}</p>)}
         </div>
-      </Group>
+      )}
+
+      {node && !info && (
+        // Карточка узла - как карточка клетки на карте.
+        <div className="guild-tree__card guild-tree__card--top" {...stop}>
+          <button type="button" className="guild-tree__card-close" onClick={() => setSelected(null)}
+            aria-label="Закрыть">✕</button>
+          <p className="guild-tree__card-title" style={{ color: BRANCH_COLOR[node.branch] }}>{node.name}</p>
+          <p className="craft-hint">{tree.branches[node.branch]} · {KIND_TITLES[node.kind]}</p>
+          <p className="guild-line">{node.description}</p>
+          {node.kind === 'root' || node.taken ? (
+            node.kind !== 'root' && <p className="guild-line">✅ Взят</p>
+          ) : (
+            <>
+              <p className="craft-hint">
+                Цена: {node.points} очк. (есть {tree.points_available}) и {money(node.gold)} 💰
+              </p>
+              {lack(node) ? (
+                <p className="guild-tree__card-lack">{lack(node)}</p>
+              ) : (
+                <Button size="m" stretched disabled={busy}
+                  onClick={() => act('tree_allocate', { node_id: node.id }, `Узел «${node.name}» взят.`)}>
+                  Взять узел
+                </Button>
+              )}
+            </>
+          )}
+        </div>
+      )}
 
       {notice && (
-        <Div className={`craft-notice ${notice.ok ? 'craft-notice--ok' : 'craft-notice--bad'}`} onClick={() => setNotice(null)}>
+        <div className={`guild-tree__toast ${notice.ok ? 'craft-notice--ok' : 'craft-notice--bad'}`}
+          {...stop} onClick={() => setNotice(null)}>
           {notice.text}
-        </Div>
+        </div>
       )}
 
-      {tree.effects.length > 0 && (
-        <Group header={<Header>Итого с древа</Header>}>
-          <Div>{tree.effects.map((e) => <p key={e} className="guild-line">• {e}</p>)}</Div>
-        </Group>
-      )}
-    </>
+      <div className="guild-tree__zoom" {...stop}>
+        <button type="button" onClick={() => zoom(1.3)}>+</button>
+        <button type="button" onClick={() => zoom(1 / 1.3)}>−</button>
+        <button type="button" onClick={() => setView(HOME)}>◎</button>
+      </div>
+    </div>
   );
 }
