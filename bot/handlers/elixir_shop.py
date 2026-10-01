@@ -37,7 +37,9 @@ async def _owned_counts(db, character_id: int) -> dict[str, int]:
 
 
 def _catalog_text(counts: dict[str, int]) -> str:
-    lines = [shop_intro(), ""]
+    # Без пустого элемента: строки и так склеиваются через пустую строку, а
+    # лишний "" давал три пустых строки после приветствия старухи.
+    lines = [shop_intro()]
     for elixir in elixir_service.elixir_defs_ordered():
         owned = counts.get(elixir.id, 0)
         owned_suffix = f" (у тебя: {owned})" if owned else ""

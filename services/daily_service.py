@@ -21,6 +21,17 @@ from game.combat import balance_config as bc
 from game.content_loader import DailyQuestDef, load_daily_quests
 from game.economy import dailies_config as dc
 from models import Character, CharacterDaily, CharacterStats
+
+
+def _days(n: int) -> str:
+    """«1 день», «3 дня», «5 дней» - раньше серия писалась «1 дней»."""
+    if n % 10 == 1 and n % 100 != 11:
+        word = "день"
+    elif 2 <= n % 10 <= 4 and not 12 <= n % 100 <= 14:
+        word = "дня"
+    else:
+        word = "дней"
+    return f"{n} {word}"
 from services import (
     elixir_service,
     experience_service,
@@ -165,7 +176,7 @@ async def ensure_day_rollover(
         lines.append(
             f"📅 День {character.login_streak} подряд. Пепельные Земли отмечают упорных.\n"
             f"Получено: {', '.join(reward_lines)}\n"
-            f"Стрик входа: {character.login_streak} дней"
+            f"Серия входов: {_days(character.login_streak)}"
         )
 
     await _assign_new_dailies(db, character, today)
@@ -273,7 +284,7 @@ async def _finish(
         if milestone is not None:
             reward_lines = await _grant_reward(db, character, milestone)
             notice_parts.append(
-                f"🔥 Стрик ежедневок: {character.daily_streak} дней!\n"
+                f"🔥 Серия ежедневок: {_days(character.daily_streak)}!\n"
                 f"Получено: {', '.join(reward_lines)}"
             )
     await db.flush()

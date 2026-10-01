@@ -16,42 +16,42 @@
   {
     "id": "collector",
     "title": "Собиратель",
-    "progress_label": "Собрать трофеев (любой градации)",
+    "progress_label": "Собрать трофеи (любой градации)",
     "condition_type": "trophy_any",
     "base_target": 15
   },
   {
     "id": "diligent",
     "title": "Старательный",
-    "progress_label": "Собрать трофеев градации 🔵 или выше",
+    "progress_label": "Собрать трофеи градации 🔵 или выше",
     "condition_type": "trophy_rare",
     "base_target": 5
   },
   {
     "id": "wanderer",
     "title": "Странник",
-    "progress_label": "Пройти клеток карты",
+    "progress_label": "Пройти клетки карты",
     "condition_type": "cells_moved",
     "base_target": 30
   },
   {
     "id": "explorer",
     "title": "Исследователь",
-    "progress_label": "Провести исследований",
+    "progress_label": "Провести исследования",
     "condition_type": "explorations",
     "base_target": 8
   },
   {
     "id": "curious",
     "title": "Любопытный",
-    "progress_label": "Пройти событий с выбором",
+    "progress_label": "Пройти события с выбором",
     "condition_type": "event_choices",
     "base_target": 5
   },
   {
     "id": "fence",
     "title": "Барыга",
-    "progress_label": "Продать Иргалу трофеев на золото",
+    "progress_label": "Продать Иргалу трофеи на золото",
     "condition_type": "sell_gold",
     "base_target": 500
   },

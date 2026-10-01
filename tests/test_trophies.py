@@ -243,7 +243,7 @@ async def test_sell_one_nothing_to_sell_returns_zero(db_session, character_at) -
 
 def test_format_drop_line_orders_rare_first() -> None:
     line = trophy_service.format_drop_line({"ash_dust": 2, "blood_shard": 1})
-    assert line == "С твари осыпается: 🟣 Кровяной осколок, ⚪ Пепельная крошка ×2."
+    assert line == "Добыча: 🟣 Кровяной осколок, ⚪ Пепельная крошка ×2."
 
 
 def test_format_drop_line_empty_is_none() -> None:
@@ -256,7 +256,7 @@ def test_format_drop_line_empty_is_none() -> None:
 
 def test_format_drop_line_defaults_to_mob_source() -> None:
     line = trophy_service.format_drop_line({"ash_dust": 1})
-    assert line.startswith("С твари осыпается:")
+    assert line.startswith("Добыча:")
 
 
 def test_format_drop_line_ash_handful_source() -> None:

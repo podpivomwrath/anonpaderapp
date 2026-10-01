@@ -427,7 +427,8 @@ def level_note(item: Item) -> str:
 
 def format_drop_announcement(item: Item) -> str:
     emoji = rarity_def(item.rarity).emoji
-    return f"🎁 С твари падает: {emoji} {item.name}{level_note(item)}"
+    # Безлично: вещь приходит и с боя, и с этапа рейда, и из события.
+    return f"🎁 Добыча: {emoji} {item.name}{level_note(item)}"
 
 
 def format_item_label(item: Item) -> str:

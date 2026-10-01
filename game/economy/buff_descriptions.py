@@ -148,13 +148,13 @@ def _describe_blood_knight_blood_rage(b: BuffDef) -> str:
 
 def _describe_blood_knight_thirst(b: BuffDef) -> str:
     return (
-        f"Лайфстил всех навыков лайфстила увеличен на {_points(bc.BLOOD_KNIGHT_THIRST_LOW_HP_LIFESTEAL_BONUS)}, "
+        f"Навыки, которые лечат от нанесённого урона, лечат больше на {_points(bc.BLOOD_KNIGHT_THIRST_LOW_HP_LIFESTEAL_BONUS)}, "
         f"если здоровье ниже 50%."
     )
 
 
 def _describe_blood_knight_vein_rupture(b: BuffDef) -> str:
-    return f"Лайфстил увеличен на {_points(bc.BLOOD_KNIGHT_VEIN_RUPTURE_CRIT_LIFESTEAL_BONUS)} при критическом ударе."
+    return f"При критическом ударе лечение от нанесённого урона больше на {_points(bc.BLOOD_KNIGHT_VEIN_RUPTURE_CRIT_LIFESTEAL_BONUS)}."
 
 
 def _describe_blood_knight_recklessness(b: BuffDef) -> str:
@@ -162,12 +162,12 @@ def _describe_blood_knight_recklessness(b: BuffDef) -> str:
 
 
 def _describe_blood_knight_insatiable(b: BuffDef) -> str:
-    return f"Лайфстил всех навыков лайфстила увеличен на {_points(bc.BLOOD_KNIGHT_INSATIABLE_LIFESTEAL_BONUS)}, безусловно."
+    return f"Навыки, которые лечат от нанесённого урона, всегда лечат больше на {_points(bc.BLOOD_KNIGHT_INSATIABLE_LIFESTEAL_BONUS)}."
 
 
 def _describe_blood_knight_eternal_hunger(b: BuffDef) -> str:
     total = bc.BLOOD_KNIGHT_HEAL_CAP_PER_TURN + bc.BLOOD_KNIGHT_ETERNAL_HUNGER_HEAL_CAP_BONUS
-    return f"Кап лечения за ход - {_pct(total)} от maxHP вместо {_pct(bc.BLOOD_KNIGHT_HEAL_CAP_PER_TURN)}."
+    return f"За ход можно вылечить до {_pct(total)} максимального здоровья вместо {_pct(bc.BLOOD_KNIGHT_HEAL_CAP_PER_TURN)}."
 
 
 def _describe_blood_knight_second_wind(b: BuffDef) -> str:
@@ -193,7 +193,7 @@ def _describe_blood_knight_feast(b: BuffDef) -> str:
 
 def _describe_blood_knight_shared_thirst(b: BuffDef) -> str:
     return (
-        f"{_pct(bc.BLOOD_KNIGHT_SHARED_THIRST_ALLY_HEAL_PCT)} лечения от лайфстила достаётся "
+        f"{_pct(bc.BLOOD_KNIGHT_SHARED_THIRST_ALLY_HEAL_PCT)} лечения от нанесённого урона достаётся "
         f"самому раненому живому союзнику. Не действует в бою 1×1 - союзников нет."
     )
 

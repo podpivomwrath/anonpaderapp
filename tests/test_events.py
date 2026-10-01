@@ -196,7 +196,7 @@ async def test_outcome_trophy_grants_and_appends_drop_line(db_session, character
     outcome = EventOutcome(weight=100, text="Замок поддаётся.", trophy=True)
     result = await event_service.apply_outcome(db_session, character, stats, outcome, AlwaysAshRng())
     assert "Замок поддаётся." in result.text
-    assert "С твари осыпается: ⚪ Пепельная крошка." in result.text
+    assert "Добыча: ⚪ Пепельная крошка." in result.text
 
 
 async def test_outcome_trophy_uses_event_specific_source_text(db_session, character_at) -> None:
@@ -249,7 +249,7 @@ async def test_outcome_combines_trophy_and_damage(db_session, character_at) -> N
         trophy=True, damage_min_pct=8, damage_max_pct=12,
     )
     result = await event_service.apply_outcome(db_session, character, stats, outcome, AlwaysAshRng())
-    assert "С твари осыпается" in result.text
+    assert "Добыча:" in result.text
     assert vitals_service.current_hp(character, stats) < full_hp
 
 

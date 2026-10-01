@@ -2,6 +2,7 @@
 
 from services import elixir_service, title_service
 from services.daily_service import DailiesOverview, DailyProgressResult, LoginCycleState
+from services.daily_service import _days
 
 
 def progress_notice_from(completed: list, streak_notice: str | None) -> str | None:
@@ -59,7 +60,7 @@ def dailies_overview_text(overview: DailiesOverview) -> str:
             xp_part = f"+{q.xp_reward} опыта, " if q.xp_reward else ""  # на 60 уровне опыта нет
             lines.append(f"    Награда: {xp_part}+{q.gold_reward} золота")
     lines.append("")
-    lines.append(f"🔥 Стрик ежедневок: {overview.daily_streak} дней")
+    lines.append(f"🔥 Серия ежедневок: {_days(overview.daily_streak)}")
     if overview.next_milestone_day is not None:
         lines.append(
             f"Следующий рубеж: день {overview.next_milestone_day} - "
@@ -72,7 +73,7 @@ def dailies_overview_text(overview: DailiesOverview) -> str:
 
 
 def login_overview_text(state: LoginCycleState) -> str:
-    lines = ["📅 Награда за вход", "", f"Стрик входа: {state.login_streak} дней"]
+    lines = ["📅 Награда за вход", "", f"Серия входов: {_days(state.login_streak)}"]
     lines.append(f"День цикла: {state.cycle_day}/{state.cycle_length}")
     if state.today_reward is not None:
         status = "уже получена сегодня" if state.claimed_today else "будет выдана автоматически"
