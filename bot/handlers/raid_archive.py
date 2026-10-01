@@ -348,6 +348,9 @@ async def _watch(battle_id: int, token: int) -> None:
     run.done = True
     from bot.handlers import raid_combat
 
+    # Сам таймер - это и есть run.task: abort() отменил бы его посреди
+    # гибели группы, и рейд закрывался бы без сообщений и без смерти.
+    run.task = None
     abort(battle_id)
     try:
         await raid_combat.wipe(battle_id, at.TIMEOUT_TEXT)
