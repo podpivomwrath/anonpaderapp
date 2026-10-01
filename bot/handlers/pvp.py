@@ -693,6 +693,7 @@ async def _handle_join_choice(message: Message, battle_id, side) -> None:
         combatant = await _build_combatant_for(db, character)
         if battle.siege_id is not None:
             combatant.stats = guild_siege_service.siege_modifiers(combatant.stats, character, side == 1)
+            combatant.incoming_hit_hook = guild_siege_service.siege_guard(character)
         participant = _participant(character, peer_id)
 
     combatant.side = side - 1
@@ -800,6 +801,7 @@ async def start_siege_battle(
                     level=combatant.level, stats=combatant.stats, primary_stat=combatant.primary_stat,
                     subclass_id=combatant.subclass_id, buff_modifiers=combatant.buff_modifiers,
                 )
+                rebuilt.incoming_hit_hook = guild_siege_service.siege_guard(character)
                 state.add(rebuilt)
                 battle.participants[character.id] = _participant(character, peer_id)
                 battle.side_of[character.id] = side

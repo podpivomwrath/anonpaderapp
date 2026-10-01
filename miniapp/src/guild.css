@@ -239,3 +239,4 @@
 .guild-tree__toast { background: rgba(14, 10, 10, 0.94); border: 1px solid rgba(255, 255, 255, 0.2); }
 .guild-tree__toast.craft-notice--ok { border-color: #4caf50; }
 .guild-tree__toast.craft-notice--bad { border-color: #e5533d; }
+.guild-tree__desc { white-space: pre-line; }

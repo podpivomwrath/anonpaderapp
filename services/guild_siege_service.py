@@ -186,17 +186,30 @@ async def garrison(db: AsyncSession, siege: GuildSiege, first_id: int) -> list[C
     return result
 
 
+_PRIMARY_FIELD = {"str": "strength", "agi": "agility", "int": "intellect"}
+
+
 def siege_modifiers(stats: Stats, character, attacker: bool) -> Stats:
-    """Древо: урон и защита в осадах - через основные статы бойца."""
+    """Древо: «+N% к основной характеристике в осадах» - ровно это: основная
+    характеристика класса бойца (у разбойника - ловкость)."""
     dmg = guild_service.perk(character, "siege_damage_pct") / 100
-    defense = guild_service.perk(character, "siege_defense_pct") / 100
-    return Stats(
-        strength=round(stats.strength * (1 + dmg)),
-        agility=stats.agility,
-        intellect=round(stats.intellect * (1 + dmg)),
-        vitality=round(stats.vitality * (1 + defense * 2)),
-        will=stats.will,
+    result = Stats(
+        strength=stats.strength, agility=stats.agility, intellect=stats.intellect,
+        vitality=stats.vitality, will=stats.will,
     )
+    if dmg:
+        field_name = _PRIMARY_FIELD[bc.PRIMARY_STAT_BY_CLASS[character.base_class]]
+        setattr(result, field_name, round(getattr(result, field_name) * (1 + dmg)))
+    return result
+
+
+def siege_guard(character):
+    """Древо: «-N% входящего урона в осадах» - срез каждого удара по бойцу.
+    None - срезать нечего."""
+    cut = guild_service.perk(character, "siege_defense_pct") / 100
+    if cut <= 0:
+        return None
+    return lambda _hit, _source, amount: max(1, round(amount * (1 - cut)))
 
 
 # --- Исход ------------------------------------------------------------------------

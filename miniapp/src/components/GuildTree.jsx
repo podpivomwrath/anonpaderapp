@@ -251,7 +251,7 @@ export default function GuildTree({ onChanged }) {
             aria-label="Закрыть">✕</button>
           <p className="guild-tree__card-title" style={{ color: BRANCH_COLOR[node.branch] }}>{node.name}</p>
           <p className="craft-hint">{tree.branches[node.branch]} · {KIND_TITLES[node.kind]}</p>
-          <p className="guild-line">{node.description}</p>
+          <p className="guild-line guild-tree__desc">{node.description}</p>
           {node.kind === 'root' || node.taken ? (
             node.kind !== 'root' && <p className="guild-line">✅ Взят</p>
           ) : (
