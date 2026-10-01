@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Button, Div, Group, Header, Placeholder, SimpleCell, Spinner } from '@vkontakte/vkui';
 import { exchangeTrade, getExchange } from '../api.js';
+import PriceChart from './PriceChart.jsx';
 
 // Биржа самоцветов. Игра - дилер: курс считает сервер по формуле
 // (game/economy/exchange.py) от того, сколько самоцветов игроки купили и
@@ -12,59 +13,6 @@ const MAX_PREVIEW = 10;
 
 function when(iso) {
   return iso ? new Date(iso).toLocaleString('ru-RU', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : '';
-}
-
-/** График курса по дням: точка - закрытие дня (снимок раз в сутки).
- *  Наведение или касание точки показывает цены лота в тот день. */
-function DailyChart({ days }) {
-  const [active, setActive] = useState(null);
-  if (days.length === 0) {
-    return <p className="craft-hint">График появится завтра: точка дня ставится после полуночи по Москве.</p>;
-  }
-  const w = 320;
-  const h = 140;
-  const pad = 10;
-  const values = days.flatMap((d) => [d.buy, d.sell]);
-  const min = Math.min(...values);
-  const max = Math.max(...values);
-  const span = max - min || 1;
-  const x = (i) => (days.length === 1 ? w / 2 : pad + (i / (days.length - 1)) * (w - 2 * pad));
-  const y = (v) => pad + (1 - (v - min) / span) * (h - 2 * pad);
-  const line = (key) => days.map((d, i) => `${i ? 'L' : 'M'}${x(i).toFixed(1)} ${y(d[key]).toFixed(1)}`).join(' ');
-  const cur = active !== null ? days[active] : null;
-  const label = (iso) => new Date(iso).toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit' });
-  return (
-    <div className="exchange-chart" onMouseLeave={() => setActive(null)}>
-      <svg viewBox={`0 0 ${w} ${h}`} preserveAspectRatio="none">
-        <path className="exchange-chart__buy" d={line('buy')} />
-        <path className="exchange-chart__sell" d={line('sell')} />
-        {days.map((d, i) => (
-          <g key={d.day}>
-            <circle className="exchange-chart__dot exchange-chart__dot--buy" cx={x(i)} cy={y(d.buy)} r={active === i ? 4 : 2.6} />
-            <circle className="exchange-chart__dot exchange-chart__dot--sell" cx={x(i)} cy={y(d.sell)} r={active === i ? 4 : 2.6} />
-            {/* Широкая невидимая полоса - по точке легко попасть пальцем. */}
-            <rect x={x(i) - Math.max((w - 2 * pad) / days.length / 2, 4)} y={0}
-              width={Math.max((w - 2 * pad) / days.length, 8)} height={h} fill="transparent"
-              onMouseEnter={() => setActive(i)} onClick={() => setActive(i)} />
-          </g>
-        ))}
-      </svg>
-      <div className="exchange-chart__axis">
-        <span>{label(days[0].day)}</span>
-        <span>{money(min)} - {money(max)} за лот</span>
-        <span>{label(days[days.length - 1].day)}</span>
-      </div>
-      {cur ? (
-        <div className="exchange-chart__tip">
-          <b>{label(cur.day)}</b>: покупка лота <b className="exchange-chart__buy-text">{money(cur.buy)}</b>,
-          продажа <b className="exchange-chart__sell-text">{money(cur.sell)}</b>.
-          За день куплено лотов: {cur.bought}, продано: {cur.sold}.
-        </div>
-      ) : (
-        <div className="exchange-chart__tip craft-hint">Наведи на точку или нажми на неё - покажу курс того дня.</div>
-      )}
-    </div>
-  );
 }
 
 export default function ExchangeTab({ onWallet }) {
@@ -163,8 +111,8 @@ export default function ExchangeTab({ onWallet }) {
         </Div>
       </Group>
 
-      <Group header={<Header>📈 Курс по дням</Header>}>
-        <Div><DailyChart days={data.chart} /></Div>
+      <Group header={<Header>📈 Курс лота</Header>}>
+        <Div><PriceChart points={data.chart} /></Div>
       </Group>
 
       {data.mine.length > 0 && (

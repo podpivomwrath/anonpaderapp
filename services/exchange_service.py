@@ -10,7 +10,7 @@
 """
 
 from dataclasses import dataclass
-from datetime import date, datetime, time, timedelta
+from datetime import date, datetime, time, timedelta, timezone
 from zoneinfo import ZoneInfo
 
 from sqlalchemy import select
@@ -175,3 +175,46 @@ async def daily_chart(db: AsyncSession, days: int = 60) -> list[ExchangeDaily]:
 
 def yesterday_msk() -> date:
     return datetime.now(_TZ).date() - timedelta(days=1)
+
+
+
+def today_start_msk() -> datetime:
+    return datetime.combine(datetime.now(_TZ).date(), time.min, tzinfo=_TZ)
+
+
+async def chart_points(db: AsyncSession, days: int = 14) -> list[dict]:
+    """Точки графика: каждая сделка (курс сразу после неё) и закрытие каждого
+    дня - только по ЗАКРЫТЫМ дням: график обновляется раз в сутки.
+
+    Курс в сделке не хранится - он восстанавливается обратным ходом от
+    текущего объёма: покупка сдвинула его вверх, продажа - вниз."""
+    cutoff = today_start_msk()
+    since = cutoff - timedelta(days=days)
+    net = await DbExchangeState(db).get_net_sold()
+    orders = (
+        await db.scalars(
+            select(ExchangeOrder).where(ExchangeOrder.created_at >= since)
+            .order_by(ExchangeOrder.created_at.desc(), ExchangeOrder.id.desc())
+        )
+    ).all()
+    points = []
+    for order in orders:
+        created = order.created_at if order.created_at.tzinfo else order.created_at.replace(tzinfo=timezone.utc)
+        if created < cutoff:
+            level = Exchange._lot_of(net)
+            points.append({
+                "t": created.isoformat(), "kind": "buy" if order.direction == OrderDirection.BUY else "sell",
+                "lots": order.amount // LOT, "buy": Exchange.lot_buy_price(level), "sell": Exchange.lot_sell_price(level),
+            })
+        net -= order.amount if order.direction == OrderDirection.BUY else -order.amount
+    for row in await daily_chart(db, days):
+        start, end = _day_bounds(row.day)
+        if start < since or end > cutoff + timedelta(seconds=1):
+            continue
+        points.append({
+            "t": (end - timedelta(seconds=1)).isoformat(), "kind": "close",
+            "lots": row.bought_lots + row.sold_lots, "buy": row.buy_lot, "sell": row.sell_lot,
+            "bought": row.bought_lots, "sold": row.sold_lots,
+        })
+    points.sort(key=lambda p: p["t"])
+    return points

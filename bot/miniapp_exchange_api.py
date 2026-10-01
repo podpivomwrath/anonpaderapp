@@ -42,11 +42,7 @@ async def _state(db, character) -> dict:
         "tax": int(guild_service.perk(character, "_tax")),
         "mine": [_order(o) for o in await exchange_service.my_orders(db, character.id)],
         # График - по дням, обновляется раз в сутки (снимок после полуночи).
-        "chart": [
-            {"day": d.day.isoformat(), "buy": d.buy_lot, "sell": d.sell_lot,
-             "bought": d.bought_lots, "sold": d.sold_lots}
-            for d in await exchange_service.daily_chart(db)
-        ],
+        "chart": await exchange_service.chart_points(db),
     }
 
 

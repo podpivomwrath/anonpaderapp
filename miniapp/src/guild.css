@@ -268,3 +268,34 @@
 .exchange-chart__tip { margin-top: 8px; font-size: 13px; line-height: 1.4; }
 .exchange-chart__buy-text { color: #4caf50; }
 .exchange-chart__sell-text { color: #e5533d; }
+
+/* График курса биржи. */
+.price-chart { position: relative; width: 100%; user-select: none; touch-action: pan-y; }
+.price-chart svg { display: block; }
+.price-chart__grid { stroke: rgba(255, 255, 255, 0.08); stroke-width: 1; }
+.price-chart__label { fill: rgba(255, 255, 255, 0.55); font-size: 11px; }
+.price-chart__line { fill: none; stroke-width: 2; stroke-linejoin: round; }
+.price-chart__line--buy { stroke: #e8a33d; }
+.price-chart__line--sell { stroke: #c9636b; stroke-dasharray: 5 4; }
+.price-chart__dot { stroke: #141010; stroke-width: 1.5; transition: r 0.1s; }
+.price-chart__dot--buy { fill: #e8a33d; }
+.price-chart__dot--sell { fill: #c9636b; }
+.price-chart__cursor { stroke: rgba(255, 255, 255, 0.35); stroke-dasharray: 3 3; }
+.price-chart__tip {
+  position: absolute;
+  width: 180px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: rgba(20, 14, 14, 0.95);
+  border: 1px solid rgba(232, 163, 61, 0.45);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.6);
+  font-size: 12px;
+  line-height: 1.5;
+  pointer-events: none;
+}
+.price-chart__tip-time { opacity: 0.7; margin-bottom: 2px; }
+.price-chart__tip-note { opacity: 0.7; margin-top: 2px; }
+.price-chart__key { display: inline-block; width: 10px; height: 3px; margin-right: 6px; vertical-align: middle; border-radius: 2px; }
+.price-chart__key--buy { background: #e8a33d; }
+.price-chart__key--sell { background: #c9636b; }
+.price-chart__legend { display: flex; gap: 14px; flex-wrap: wrap; font-size: 12px; margin-top: 4px; align-items: center; }

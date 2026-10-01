@@ -136,3 +136,20 @@ async def test_daily_snapshot(db_session, make_character) -> None:
     assert row.bought_lots == 0 and row.buy_lot == START
     chart = await exchange_service.daily_chart(db_session)
     assert [r.day for r in chart] == [today - timedelta(days=1), today]
+
+
+async def test_chart_points_only_closed_days(db_session, make_character) -> None:
+    from datetime import timedelta
+
+    from services import exchange_service
+
+    character = await make_character(farm=100_000)
+    old = await exchange_service.buy(db_session, character, 1)
+    old.created_at = exchange_service.today_start_msk() - timedelta(hours=3)
+    await exchange_service.buy(db_session, character, 1)  # сегодняшняя - на графике её ещё нет
+    await db_session.flush()
+    await exchange_service.snapshot_day(db_session, exchange_service.yesterday_msk())
+    points = await exchange_service.chart_points(db_session)
+    kinds = [p["kind"] for p in points]
+    assert kinds == ["buy", "close"]
+    assert points[0]["buy"] == Exchange.lot_buy_price(1) and points[1]["buy"] == Exchange.lot_buy_price(1)
