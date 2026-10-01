@@ -477,7 +477,7 @@ def resolve_tick(
                 reflect_hits.append(
                     PendingHit(
                         source_id=target.id, target_id=attacker.id,
-                        amount=max(round(amount * reflect_pct), 1), label="шипы",
+                        amount=max(round(amount * reflect_pct), 1), label=target.reflect_label,
                     )
                 )
         applied_by_hit[id(hit)] = amount

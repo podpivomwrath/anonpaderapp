@@ -206,6 +206,9 @@ class CombatantState:
     # генерала меняют его по типу удара. Вызывается в фазе применения, до
     # лимитов и щитов. None у всех остальных - чистое расширение.
     incoming_hit_hook: "Callable[[object, CombatantState | None, int], int] | None" = None
+    # Подпись отражённого удара (EffectKind.BLOOD_REFLECT) в логе: у эликсира
+    # это шипы, у стойки генерала - «Заслон».
+    reflect_label: str = "шипы"
 
     @property
     def alive(self) -> bool:

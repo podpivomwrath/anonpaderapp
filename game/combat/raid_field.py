@@ -333,7 +333,7 @@ class SummonerStage:
         if session.combatants[obj.combatant_id].alive:
             out.lines.append(f"⛰ Курган трескается ({len(obj.hitters)}/{obj.required}).")
         else:
-            out.lines.append(f"⛰ Курган осыпается. {SUMMONER_NAME} снова открыт.")
+            out.lines.append(f"⛰ Курган осыпается. {SUMMONER_NAME}, снова открыт.")
 
     def _tick_chain(self, session: CombatSessionState, result: TickResult, out: StageTick) -> None:
         for obj in self.objects:
@@ -372,7 +372,7 @@ class SummonerStage:
         summoner.current_hp = min(summoner.max_hp, before + round(summoner.max_hp * fc.BELL_HEAL_FRACTION))
         healed = summoner.current_hp - before
         if healed > 0:
-            out.lines.append(f"🔔 Колокол звонит. {SUMMONER_NAME} затягивает раны: +{healed} HP.")
+            out.lines.append(f"🔔 Колокол звонит. {SUMMONER_NAME}, затягивает раны: +{healed} HP.")
 
     def _tick_hands(self, session: CombatSessionState, out: StageTick) -> None:
         for obj in self.objects:
@@ -466,7 +466,7 @@ class SummonerStage:
             bell = _object_combatant(self._new_id(), "🔔 Погребальный колокол", fc.BELL_HP_PER_PLAYER * hp_scale)
             session.add(bell)
             self.objects.append(FieldObject(BELL, bell.id))
-            out.lines.append(f"⚠️ Из земли поднимается колокол. Пока он звонит, {SUMMONER_NAME} затягивает раны.")
+            out.lines.append(f"⚠️ Из земли поднимается колокол. Пока он звонит, {SUMMONER_NAME}, затягивает раны.")
         elif kind == MOUND:
             required = min(fc.MOUND_HITS_REQUIRED, len(players))
             mound = _object_combatant(self._new_id(), "⛰ Курган", fc.MOUND_SEGMENT_HP * required)
@@ -603,6 +603,7 @@ class GeneralStage:
         general.scripted_hit = self.ai
         general.control_immune_always = True
         general.incoming_hit_hook = self.ai.hook
+        general.reflect_label = "Заслон"
         self.general_id = general.id
         session.add(general)
         lines = []

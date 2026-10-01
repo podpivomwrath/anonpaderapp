@@ -287,8 +287,8 @@ def test_guard_returns_the_blow_and_does_not_attack() -> None:
     state, stage, general = _general()
     _force(stage, general, state, rf.GUARD)
     result = _tick(state, {1: _attack(general.id)})
-    assert any(h.target_id == 1 and h.label == "шипы" for h in result.hit_renders)
-    assert not any(h.source_id == general.id and h.label != "шипы" for h in result.hit_renders)
+    assert any(h.target_id == 1 and h.label == "Заслон" for h in result.hit_renders)
+    assert not any(h.source_id == general.id and h.label != "Заслон" for h in result.hit_renders)
 
 
 def test_iron_stance_ignores_plain_attacks() -> None:
