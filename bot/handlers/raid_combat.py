@@ -817,13 +817,13 @@ async def on_raid_tick_resolved(session_id: int, tick: int, result: TickResult) 
             await _finish_wipe(session_id, battle)
             return
 
-    dead_mob_ids = [cid for cid in result.deaths if cid in battle.mob_ids]
-    if field_cleared and battle.stage == 2:
-        # Призыватель не умирает, а встаёт генералом - но этап взят, и
-        # награда за него та же, что за убийство.
-        dead_mob_ids.extend(battle.mob_ids)
+    # Награда - одна за ВЗЯТЫЙ ЭТАП, а не за каждого павшего противника:
+    # раньше каждая кукла, Вельд и знаменосец отдельно сыпали трофеями и
+    # опытом. Этап взят, когда сторона противника пала (театр, туман,
+    # генерал) или когда поле закрыло этап само (призыватель взял алебарду).
+    stage_won = field_cleared or (result.finished and result.winner_side == 0)
     notices: dict[int, str] = {}
-    if dead_mob_ids:
+    if stage_won:
         async with get_session_factory()() as db:
             alive_char_ids = [
                 cid for cid, c in _live_state(session_id, battle).items()
@@ -866,10 +866,7 @@ async def on_raid_tick_resolved(session_id: int, tick: int, result: TickResult) 
                     await stats_window.notify_levelup(p.peer_id, r.levels_gained, r.new_level)
             for character in characters:
                 await quest_service.record_kill(db, character)
-            final_boss_id = (
-                next(iter(battle.mob_ids), None) if battle.is_field else battle.surgeon_id
-            )
-            if battle.stage == 3 and final_boss_id in dead_mob_ids:
+            if battle.stage == 3:
                 # Хирург и Генерал - «выше уровнем» для испытаний (см.
                 # SURGEON_TRIAL_LEVEL). Засчитывается всем, кто в рейде:
                 # победа общая, как и рейд.
