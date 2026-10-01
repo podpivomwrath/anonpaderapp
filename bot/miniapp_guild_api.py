@@ -231,6 +231,7 @@ async def _state(db, character: Character) -> dict:
             "fame": guild.fame, "fame_next": gc.fame_to_next(guild.level), "fame_total": guild.fame_total,
             "members": len(rows), "cap": gc.member_cap(guild.level),
             "treasury_gold": guild.treasury_gold, "treasury_gems": guild.treasury_gems,
+            "gold_tax": guild.gold_tax, "tax_collected": guild.tax_collected,
             "siege_hour": guild.siege_hour, "crown": guild_season_service.has_crown(guild),
             "season_wins": guild.season_wins,
             "tree_points": guild_service.tree_points_available(guild),
@@ -313,6 +314,8 @@ async def _state(db, character: Character) -> dict:
         "config": {
             "ranks": gc.RANK_TITLES, "siege_hours": list(gc.SIEGE_HOURS_ALLOWED),
             "gather_minutes": gc.SIEGE_GATHER_MINUTES,
+            "tax_max": gc.TAX_MAX,
+            "deposit_min_gold": gc.DEPOSIT_MIN_GOLD, "deposit_min_gems": gc.DEPOSIT_MIN_GEMS,
         },
     }
 
@@ -437,6 +440,10 @@ async def _act(db, character: Character, vk_user_id: int, body: dict) -> list:
         when = siege.starts_at.astimezone(guild_siege_service._TZ).strftime("%d.%m в %H:%M")
         notes.append(("guild", attacker.id, f"⚔️ Объявлена осада [{defender.tag}] на ({siege.x}; {siege.y}): {when} МСК."))
         notes.append(("guild", defender.id, f"🛡 [{attacker.tag}] объявляет осаду ({siege.x}; {siege.y}): {when} МСК. Готовьте оборону!"))
+    elif action == "tax":
+        await guild_service.set_tax(db, character, _int(body, "percent"))
+        guild = await guild_service.guild_of(db, character)
+        notes.append(("guild", guild.id, f"🏰 Налог гильдии теперь {guild.gold_tax}%: эта доля любого золота участников идёт в казну."))
     elif action == "siege_hour":
         await guild_siege_service.set_siege_hour(db, character, _int(body, "hour"))
     elif action == "tree_allocate":

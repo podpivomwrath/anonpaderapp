@@ -21,6 +21,28 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from models import Wallet
 
 
+async def _guild_tax(db: AsyncSession, character_id: int, amount: int) -> int:
+    """Сколько золота уходит в казну гильдии с этого начисления."""
+    from models import Character, Guild
+
+    row = (
+        await db.execute(
+            select(Guild.id, Guild.gold_tax).join(Character, Character.guild_id == Guild.id)
+            .where(Character.id == character_id)
+        )
+    ).first()
+    if row is None or not row.gold_tax:
+        return 0
+    cut = amount * row.gold_tax // 100
+    if cut > 0:
+        await db.execute(
+            update(Guild).where(Guild.id == row.id).values(
+                treasury_gold=Guild.treasury_gold + cut, tax_collected=Guild.tax_collected + cut,
+            ).execution_options(synchronize_session="fetch")
+        )
+    return cut
+
+
 class NotEnoughCurrency(Exception):
     """Недостаточно валюты для операции."""
 
@@ -55,9 +77,18 @@ async def charge(db: AsyncSession, character_id: int, currency: str, amount: int
     return wallet
 
 
-async def deposit(db: AsyncSession, character_id: int, currency: str, amount: int) -> Wallet:
+async def deposit(
+    db: AsyncSession, character_id: int, currency: str, amount: int, taxable: bool = True,
+) -> Wallet:
+    """Начисление. Единственная точка, через которую игрок получает золото, -
+    поэтому здесь же налог гильдии: его доля уходит в казну, игроку - остаток.
+    При передаче между игроками налог платит получатель (сюда приходит его
+    начисление). taxable=False - выдачи из самой казны и возврат при роспуске:
+    налог с денег гильдии гонял бы их по кругу."""
     wallet = await get_wallet(db, character_id)
     column = _column(currency)
+    if currency == "farm" and taxable and amount > 0:
+        amount -= await _guild_tax(db, character_id, amount)
     await db.execute(
         update(Wallet)
         .where(Wallet.character_id == character_id)

@@ -621,3 +621,41 @@ async def test_join_level_and_directory_sums(db_session, make_character) -> None
     await db_session.flush()
     entry = (await guild_service.directory(db_session))[0]
     assert (entry.members, entry.pve, entry.pvp) == (2, 150, 5)
+
+
+# --- Налог и минимальные взносы --------------------------------------------------------------
+
+
+async def test_deposit_minimums(db_session, make_character) -> None:
+    guild, leader = await _found(db_session, make_character, gold=1000)
+    await wallet_service.deposit(db_session, leader.id, "donate", 50)
+    with pytest.raises(GuildError, match="от 100"):
+        await guild_service.deposit(db_session, leader, "gold", 99)
+    with pytest.raises(GuildError, match="от 10"):
+        await guild_service.deposit(db_session, leader, "gems", 9)
+    await guild_service.deposit(db_session, leader, "gold", 100)
+    await guild_service.deposit(db_session, leader, "gems", 10)
+
+
+async def test_gold_tax_goes_to_treasury(db_session, make_character) -> None:
+    guild, leader = await _found(db_session, make_character)
+    member = await _add(db_session, make_character, guild)
+    with pytest.raises(GuildError):
+        await guild_service.set_tax(db_session, member, 10)
+    with pytest.raises(GuildError, match="до 50"):
+        await guild_service.set_tax(db_session, leader, 51)
+    await guild_service.set_tax(db_session, leader, 20)
+    await wallet_service.deposit(db_session, member.id, "farm", 1000)
+    await wallet_service.deposit(db_session, member.id, "donate", 100)
+    wallet = await wallet_service.get_wallet(db_session, member.id)
+    await db_session.refresh(guild)
+    assert wallet.farm_currency == 800 and wallet.donate_currency == 100
+    assert guild.treasury_gold == 200 and guild.tax_collected == 200
+    # Выдача из казны налогом не облагается.
+    await guild_service.withdraw(db_session, leader, "gold", 200, member.id)
+    wallet = await wallet_service.get_wallet(db_session, member.id)
+    assert wallet.farm_currency == 1000
+    # Без гильдии налога нет.
+    loner = await make_character(level=30)
+    await wallet_service.deposit(db_session, loner.id, "farm", 1000)
+    assert (await wallet_service.get_wallet(db_session, loner.id)).farm_currency == 1000

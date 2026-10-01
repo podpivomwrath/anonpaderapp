@@ -507,7 +507,7 @@ async def disband(db: AsyncSession, actor: Character) -> list[int]:
     if member.rank != gc.RANK_LEADER:
         raise GuildError("Распустить гильдию может только глава.")
     if guild.treasury_gold:
-        await wallet_service.deposit(db, actor.id, "farm", guild.treasury_gold)
+        await wallet_service.deposit(db, actor.id, "farm", guild.treasury_gold, taxable=False)
     if guild.treasury_gems:
         await wallet_service.deposit(db, actor.id, "donate", guild.treasury_gems)
     for ore in (await db.scalars(select(GuildOre).where(GuildOre.guild_id == guild.id))).all():
@@ -561,6 +561,10 @@ async def deposit(db: AsyncSession, character: Character, currency: str, amount:
     guild, _member = await _require_member(db, character)
     if currency not in CURRENCY_FIELDS or amount <= 0:
         raise GuildError("Неверная сумма.")
+    minimum = gc.DEPOSIT_MIN_GOLD if currency == "gold" else gc.DEPOSIT_MIN_GEMS
+    if amount < minimum:
+        what = "золота" if currency == "gold" else "самоцветов"
+        raise GuildError(f"Вносить можно от {minimum} {what}.")
     wallet_currency, _ = CURRENCY_FIELDS[currency]
     try:
         await wallet_service.charge(db, character.id, wallet_currency, amount)
@@ -590,10 +594,18 @@ async def withdraw(
         await treasury_spend(db, guild.id, gold=amount)
     else:
         await treasury_spend(db, guild.id, gems=amount)
-    await wallet_service.deposit(db, receiver.id, CURRENCY_FIELDS[currency][0], amount)
+    await wallet_service.deposit(db, receiver.id, CURRENCY_FIELDS[currency][0], amount, taxable=False)
     what = f"{amount} золота" if currency == "gold" else f"💎 {amount}"
     await log(db, guild.id, "withdraw", f"{actor.name} выдаёт из казны {what}: {receiver.name}.", actor.id)
     return receiver
+
+
+async def set_tax(db: AsyncSession, actor: Character, percent: int) -> None:
+    guild, _member = await require_treasurer(db, actor)
+    if not 0 <= percent <= gc.TAX_MAX:
+        raise GuildError(f"Налог - от 0 до {gc.TAX_MAX}%.")
+    guild.gold_tax = percent
+    await log(db, guild.id, "tax", f"{actor.name} назначает налог гильдии: {percent}%.", actor.id)
 
 
 # --- Склад --------------------------------------------------------------------

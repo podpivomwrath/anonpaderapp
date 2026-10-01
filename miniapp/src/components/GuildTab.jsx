@@ -403,6 +403,7 @@ function Treasury({ state, run, busy }) {
   const [wGold, setWGold] = useState('');
   const [wGems, setWGems] = useState('');
   const [to, setTo] = useState('');
+  const [tax, setTax] = useState(null);
   const [counts, setCounts] = useState({});
   const target = to ? Number(to) : undefined;
   const amount = (key, fallback) => counts[key] ?? String(fallback);
@@ -414,6 +415,9 @@ function Treasury({ state, run, busy }) {
         <p className="guild-line">💰 Казна: {money(guild.treasury_gold)} · 💎 {money(guild.treasury_gems)}</p>
         <p className="craft-hint">
           📦 Склад: руда {warehouse.ore_total}/{warehouse.capacity.ore}, вещи {warehouse.items.length}/{warehouse.capacity.items}
+        </p>
+        <p className="craft-hint">
+          🪙 Налог гильдии: {guild.gold_tax}% с любого золота участников (собрано всего {money(guild.tax_collected)}).
         </p>
       </Div>
       <Tabs>
@@ -430,7 +434,10 @@ function Treasury({ state, run, busy }) {
         {header}
         <Group header={<Header>Внести в казну</Header>}>
           <Div>
-            <p className="craft-hint">У тебя: 💰 {money(me.gold)} · 💎 {money(me.gems)}. Взнос виден в журнале.</p>
+            <p className="craft-hint">
+              У тебя: 💰 {money(me.gold)} · 💎 {money(me.gems)}. Взнос - от {state.config.deposit_min_gold} золота
+              или от {state.config.deposit_min_gems} самоцветов, виден в журнале.
+            </p>
             <div className="guild-row">
               <NumberInput value={gold} onChange={setGold} placeholder="Золото" />
               <Button size="m" disabled={busy || !gold} onClick={() => { run('deposit', { currency: 'gold', amount: Number(gold) }, 'Внесено.'); setGold(''); }}>Внести</Button>
@@ -486,6 +493,24 @@ function Treasury({ state, run, busy }) {
   return (
     <>
       {header}
+      {canGive && (
+        <Group header={<Header>🪙 Налог гильдии</Header>}>
+          <Div className="guild-form">
+            <p className="craft-hint">
+              Доля любого золота, которое получают участники (добыча, продажа, награды; при передаче - с получателя),
+              уходит в казну. Выдачи из казны налогом не облагаются.
+            </p>
+            <div className="guild-row">
+              <NumberInput value={tax ?? String(guild.gold_tax)} onChange={setTax} placeholder="%" />
+              <span className="guild-line">% (0-{state.config.tax_max})</span>
+              <Button size="m" disabled={busy || tax === null || Number(tax) === guild.gold_tax}
+                onClick={() => { run('tax', { percent: Number(tax) }, 'Налог назначен.'); setTax(null); }}>
+                Назначить
+              </Button>
+            </div>
+          </Div>
+        </Group>
+      )}
       {canGive && (
         <Group header={<Header>Кому выдавать</Header>}>
           <Div className="guild-form">

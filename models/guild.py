@@ -42,6 +42,9 @@ class Guild(Base):
     #: Взятые узлы древа (id из game/guild/tree.py).
     tree_nodes: Mapped[list] = mapped_column(JSON, default=list)
     tree_gold_spent: Mapped[int] = mapped_column(BigInteger, default=0)
+    #: Налог гильдии, %: доля любого золота, которое получают участники.
+    gold_tax: Mapped[int] = mapped_column(default=0)
+    tax_collected: Mapped[int] = mapped_column(BigInteger, default=0)
     #: Час начала окна осад (МСК): осада на земли гильдии начинается только в него.
     siege_hour: Mapped[int] = mapped_column(default=20)
     #: Венец сезона: до какого момента гильдия носит его.
