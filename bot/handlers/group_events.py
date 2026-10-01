@@ -5,6 +5,9 @@
 выбрал вариант по умолчанию, см. group_events.default_choice). Итог всем
 одинаковый (кто что выбрал), плюс у каждого своя строка награды.
 
+Гнездо и осада идут в несколько раундов: после итога раунда те, кто
+продолжает, получают следующий; закончившие - сводку клетки.
+
 Висящее событие - в памяти процесса, как у соло-событий: рестарт бота его
 теряет, кнопки просто перестают отвечать. Логика исходов -
 game/world/group_events.py, награды - services/scene_event_service.py.
@@ -26,7 +29,7 @@ from bot.keyboards.world import waiting_keyboard
 from bot.vk_media import photo_attachment
 from game.world import group_events as ge
 from models import Character, CharacterStats
-from services import death_service, scene_event_service
+from services import death_service, scene_event_service, wallet_service
 from services import onboarding_service as onboarding_svc
 from services.db import get_session_factory
 
@@ -53,14 +56,21 @@ class GroupScene:
     dist: int
     cell: tuple[int, int]
     victim_id: int | None = None
+    state: dict = field(default_factory=dict)
     choices: dict[int, str | None] = field(default_factory=dict)
     resolving: bool = False
     task: asyncio.Task | None = None
 
+    @property
+    def event(self) -> ge.GroupEvent:
+        return ge.event_by_id(self.event_id)
+
+    def options(self, cid: int) -> list[tuple[str, str]]:
+        return ge.choices_of(self.event, cid, self.victim_id, self.state, len(self.members))
+
     def deciders(self) -> list[int]:
-        """Кому есть что выбирать (у жертвы в спасении кнопок нет)."""
-        event = ge.event_by_id(self.event_id)
-        return [cid for cid in self.members if ge.choices_of(event, cid, self.victim_id)]
+        """Кому есть что выбирать в этом раунде."""
+        return [cid for cid in self.members if self.options(cid)]
 
 
 _scenes: dict[int, GroupScene] = {}
@@ -86,8 +96,7 @@ async def _send(peer_id: int, text: str, keyboard: str | None = None, attachment
 
 
 def _keyboard(scene: GroupScene, cid: int) -> str:
-    event = ge.event_by_id(scene.event_id)
-    options = ge.choices_of(event, cid, scene.victim_id)
+    options = scene.options(cid)
     if not options:
         return waiting_keyboard()
     kb = Keyboard(one_time=False)
@@ -127,6 +136,7 @@ async def start(group_id: int, event: ge.GroupEvent, members: dict[int, Member],
     scene = GroupScene(
         token=next(_tokens), group_id=group_id, event_id=event.id, members=members,
         leader_id=leader_id, region=region, dist=dist, cell=cell,
+        state=ge.initial_state(event, list(members)),
     )
     if event.mechanic == "rescue":
         scene.victim_id = _rng.choice(sorted(members))
@@ -136,11 +146,17 @@ async def start(group_id: int, event: ge.GroupEvent, members: dict[int, Member],
     victim = members.get(scene.victim_id) if scene.victim_id is not None else None
     for cid, m in members.items():
         parts = [event.title, event.text]
+        if event.mechanic == "siege":
+            parts.append(ge.round_prompt(event, scene.state))
         if victim is not None:
             parts.append(event.victim_text if cid == victim.character_id else f"В трясине: {victim.name}.")
         parts.append(f"⏱ {ge.DECISION_SECONDS} сек. Решают все.")
         await _send(m.peer_id, "\n\n".join(parts), _keyboard(scene, cid), attachment)
-    scene.task = asyncio.get_running_loop().create_task(_timer(group_id, scene.token))
+    _arm_timer(scene)
+
+
+def _arm_timer(scene: GroupScene) -> None:
+    scene.task = asyncio.get_running_loop().create_task(_timer(scene.group_id, scene.token))
 
 
 async def _timer(group_id: int, token: int) -> None:
@@ -166,8 +182,7 @@ async def on_choice(message: Message) -> None:
     cid = next((c for c, m in scene.members.items() if m.peer_id == message.peer_id), None)
     if cid is None:
         return
-    event = ge.event_by_id(scene.event_id)
-    options = dict(ge.choices_of(event, cid, scene.victim_id))
+    options = dict(scene.options(cid))
     if value not in options:
         return
     if cid in scene.choices:
@@ -191,58 +206,107 @@ async def _resolve(scene: GroupScene) -> None:
     if scene.resolving:
         return
     scene.resolving = True
+    continues = False
     try:
-        await _finish(scene)
+        continues = await _finish(scene)
     except Exception:
         logger.exception("Групповое событие {} упало на итоге", scene.event_id)
         for m in scene.members.values():
             await _send(m.peer_id, "Что-то пошло не так - событие прервалось.", waiting_keyboard())
             await scene_event_handlers._epilogue(m.peer_id, [], None)
     finally:
-        if _scenes.get(scene.group_id) is scene:
+        if continues:
+            scene.resolving = False
+        elif _scenes.get(scene.group_id) is scene:
             _scenes.pop(scene.group_id, None)
 
 
-async def _finish(scene: GroupScene) -> None:
-    event = ge.event_by_id(scene.event_id)
+async def _finish(scene: GroupScene) -> bool:
+    """Итог раунда. True - событие продолжается следующим раундом."""
+    event = scene.event
     default = ge.default_choice(event)
-    choices = {cid: scene.choices.get(cid, default) for cid in scene.members}
+    deciders = set(scene.deciders())
+    choices = {cid: scene.choices.get(cid, default if cid in deciders else None) for cid in scene.members}
     names = {cid: m.name for cid, m in scene.members.items()}
-    outcome = ge.resolve(event, names, choices, _rng, scene.leader_id, scene.victim_id)
 
-    personal: dict[int, list[str]] = {}
+    personal: dict[int, list[str]] = {cid: [] for cid in scene.members}
     applied_by: dict[int, object] = {}
     fighters: list[int] = []
     async with get_session_factory()() as db:
+        loaded = {}
         for cid in scene.members:
             character = await db.get(Character, cid)
             if character is None or death_service.is_dead(character):
                 continue
             stats = await db.scalar(select(CharacterStats).where(CharacterStats.character_id == cid))
+            loaded[cid] = (character, stats)
+
+        if event.mechanic == "pot":
+            # Ставка, которую уже нечем оплатить, - не ставка: это видно
+            # всем в итоге, а котёл не платит за то, чего не получил.
+            stakes = {s.id: s for s in event.stakes}
+            for cid, value in list(choices.items()):
+                stake = stakes.get(value)
+                if stake is None or stake.gold <= 0:
+                    continue
+                if cid not in loaded:
+                    choices[cid] = ge.NO_STAKE
+                    continue
+                wallet = await wallet_service.get_wallet(db, cid)
+                if wallet.farm_currency < scene_event_service.gold_amount(loaded[cid][0], stake.gold):
+                    choices[cid] = ge.NO_STAKE
+                    personal[cid].append("Денег на эту ставку уже нет - котёл тебя не взял.")
+
+        outcome = ge.resolve(event, names, choices, _rng, scene.leader_id, scene.victim_id, scene.state)
+
+        for cid, units in outcome.charges.items():
+            if cid not in loaded:
+                continue
+            try:
+                await wallet_service.charge(db, cid, "farm", scene_event_service.gold_amount(loaded[cid][0], units))
+            except wallet_service.NotEnoughCurrency:
+                # Успел потратить, пока решали: ставка сгорает без выплаты.
+                outcome.results.pop(cid, None)
+                personal[cid].append("Денег на ставку уже не хватило.")
+
+        for cid, (character, stats) in loaded.items():
             result = outcome.results.get(cid)
-            lines: list[str] = []
-            applied = None
             if result is not None:
-                applied = await scene_event_service.apply_result(db, character, stats, ge.scale(result), _rng)
-                await scene_event_service.finish_event(db, character, applied)
-                lines = applied.lines
-            personal[cid] = lines
-            applied_by[cid] = applied
+                result = ge.scale(result) if outcome.scaled else result
+                applied = await scene_event_service.apply_result(db, character, stats, result, _rng)
+                if not outcome.next_round or cid not in outcome.active:
+                    await scene_event_service.finish_event(db, character, applied)
+                personal[cid] += applied.lines
+                applied_by[cid] = applied
             if (character.pos_x, character.pos_y) == scene.cell:
                 fighters.append(cid)
         await db.commit()
 
     summary = "\n".join(outcome.summary)
     for cid, m in scene.members.items():
-        lines = personal.get(cid, [])
-        text = "\n\n".join(part for part in (event.title, summary, "\n".join(lines)) if part)
+        text = "\n\n".join(part for part in (event.title, summary, "\n".join(personal[cid])) if part)
         await _send(m.peer_id, text, waiting_keyboard())
         await scene_event_handlers._notify(m.peer_id, applied_by.get(cid))
 
+    if outcome.next_round:
+        done = [cid for cid in scene.members if cid not in outcome.active]
+        for cid in done:
+            await scene_event_handlers._epilogue(scene.members[cid].peer_id, [], None)
+        scene.members = {cid: m for cid, m in scene.members.items() if cid in outcome.active}
+        scene.state = outcome.state
+        scene.choices = {}
+        scene.token = next(_tokens)
+        prompt = ge.round_prompt(event, scene.state)
+        for cid, m in scene.members.items():
+            await _send(m.peer_id, f"{prompt}\n\n⏱ {ge.DECISION_SECONDS} сек.", _keyboard(scene, cid))
+        _arm_timer(scene)
+        return True
+
     if outcome.combat and await _start_ambush(scene, fighters):
-        return
+        return False
     for m in scene.members.values():
         await scene_event_handlers._epilogue(m.peer_id, [], None)
+    return False
 
 
 async def _start_ambush(scene: GroupScene, fighter_ids: list[int]) -> bool:

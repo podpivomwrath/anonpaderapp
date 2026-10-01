@@ -471,3 +471,89 @@ grey, rust brown and dried blood, drifting ash in the air, moody overcast
 light, no text, no watermark, no logo, no modern objects, horizontal 3:2
 composition
 ```
+
+## 🩸 Алтарь — `g_blood_altar`
+
+```
+a flat black stone altar stained dark with old blood, a bowl carved into its
+top, heat shimmer rising above it, several hooded travellers standing around
+it in a loose ring seen from behind, one of them slowly stretching a hand
+toward the bowl, faces hidden, dark fantasy scene illustration, painterly
+semi-realistic, muted desaturated palette of ash grey, rust brown and dried
+blood, drifting ash in the air, moody overcast light, no text, no watermark,
+no logo, no modern objects, horizontal 3:2 composition
+```
+
+## 🪨 Ритуальный круг — `g_ritual_circle`
+
+```
+a ring of five weathered standing stones on a bare hilltop, each carved with
+a different faintly glowing sigil, one stone in the centre, a few hooded
+travellers walking between the stones seen from behind, choosing where to
+stand, faces hidden, dark fantasy scene illustration, painterly
+semi-realistic, muted desaturated palette of ash grey, rust brown and dried
+blood, drifting ash in the air, moody overcast light, no text, no watermark,
+no logo, no modern objects, horizontal 3:2 composition
+```
+
+## 🩹 Раненый незнакомец — `g_wounded_stranger`
+
+```
+a wounded stranger sitting against a roadside rock pressing a hand to his
+side, dark blood between his fingers, his face turned away toward the empty
+road, a couple of hooded travellers approaching him seen from behind, one
+kneeling, one watching the road, dark fantasy scene illustration, painterly
+semi-realistic, muted desaturated palette of ash grey, rust brown and dried
+blood, drifting ash in the air, moody overcast light, no text, no watermark,
+no logo, no modern objects, horizontal 3:2 composition
+```
+
+## 🎲 Котёл костей — `g_bone_pot`
+
+```
+an old hunched woman in a shawl sitting by a small campfire at night with a
+dented copper cauldron in front of her, bone dice rattling inside it, her
+face hidden in shadow, a group of hooded travellers standing around the fire
+seen from behind, coins glinting in their hands, dark fantasy scene
+illustration, painterly semi-realistic, muted desaturated palette of ash
+grey, rust brown and dried blood, warm firelight against the cold dark, no
+text, no watermark, no logo, no modern objects, horizontal 3:2 composition
+```
+
+## 🛒 Караван мертвецов — `g_dead_caravan`
+
+```
+three covered wagons standing across a muddy road, dead drivers still
+sitting on the boxes with the reins in their hands, the lead driver's seat
+empty with fresh footprints leading off into the fog, a small group of
+hooded travellers at the edge of the frame seen from behind, splitting up
+toward the wagons and the footprints, dark fantasy scene illustration,
+painterly semi-realistic, muted desaturated palette of ash grey, rust brown
+and dried blood, drifting ash in the air, moody overcast light, no text, no
+watermark, no logo, no modern objects, horizontal 3:2 composition
+```
+
+## 🦅 Гнездо падальщиков — `g_scavenger_nest`
+
+```
+a huge scavenger bird nest woven from bones and rags on a ledge high up a
+cliff face, glinting stolen trinkets inside it, dark carrion birds sleeping
+on the rocks further down, hooded travellers climbing the cliff toward the
+nest seen from behind and below, dark fantasy scene illustration, painterly
+semi-realistic, muted desaturated palette of ash grey, rust brown and dried
+blood, drifting ash in the air, moody overcast light, no text, no watermark,
+no logo, no modern objects, horizontal 3:2 composition
+```
+
+## 🏰 Осада башни — `g_tower_siege`
+
+```
+an old three-tiered stone watchtower on a rocky rise, smoke drifting out of
+its arrow slits, the gate barred from inside, a narrow path winding around
+its base, a small group of hooded travellers crouching behind rocks in the
+foreground seen from behind, studying the tower, dark fantasy scene
+illustration, painterly semi-realistic, muted desaturated palette of ash
+grey, rust brown and dried blood, drifting ash in the air, moody overcast
+light, no text, no watermark, no logo, no modern objects, horizontal 3:2
+composition
+```
