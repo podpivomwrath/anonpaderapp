@@ -247,3 +247,17 @@ export const upgradeCraft = (itemId, ceiling) =>
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ item_id: itemId, ceiling }),
   });
+
+// --- Гильдии ---
+
+export const getGuild = () => request('/guild');
+
+export const getGuildTree = () => request('/guild/tree');
+
+/** Любое действие гильдии. В ответ - новое состояние целиком. */
+export const guildAction = (action, params = {}) =>
+  request('/guild/action', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ action, ...params }),
+  });

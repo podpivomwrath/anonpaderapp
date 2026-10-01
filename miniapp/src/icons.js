@@ -41,6 +41,11 @@ export const SECTION_ICONS = {
     emoji: '🗺️',
     path: 'M3 6.5l6-2.5 6 2.5 6-2.5v13l-6 2.5-6-2.5-6 2.5v-13z M9 4v13 M15 7v13',
   },
+  // Гильдия — знамя на древке.
+  guild: {
+    emoji: '🏰',
+    path: 'M6 21V3 M6 4h11l-2.5 4 2.5 4H6',
+  },
   // Топы — кубок.
   tops: {
     emoji: '🏆',

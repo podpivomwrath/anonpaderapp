@@ -579,3 +579,30 @@ async def test_members_listing(db_session, make_character) -> None:
     assert len(rows) == 2
     assert await db_session.scalar(select(Guild).where(Guild.id == guild.id)) is not None
     assert len((await db_session.scalars(select(GuildMember))).all()) == 2
+
+
+# --- API мини-аппа -------------------------------------------------------------------------
+
+
+async def test_api_state_and_actions(db_session, make_character) -> None:
+    from bot import miniapp_guild_api as api
+
+    loner = await make_character(level=25, donate=gc.FOUND_COST_GEMS)
+    loner.pos_x, loner.pos_y = 5, 12
+    state = await api._state(db_session, loner)
+    assert state["in_guild"] is False and state["found_cost"] == gc.FOUND_COST_GEMS
+    await api._act(db_session, loner, 1, {"action": "create", "name": "Тест Гильдия", "tag": "TG"})
+    guild = await guild_service.guild_of(db_session, loner)
+    cell = await _held_base(db_session, guild, 5, 12, tier=gc.BASE_CITADEL)
+    db_session.add(GuildBuilding(cell_id=cell.id, building=gc.B_GATES, level=1))
+    await db_session.flush()
+    state = await api._state(db_session, loner)
+    assert state["in_guild"] and state["me"]["rank"] == gc.RANK_LEADER
+    assert state["cells"][0]["here"] and state["boss"]["has_citadel"]
+    assert any(b["building"] == gc.B_SHAFT for b in state["cells"][0]["buildings"]) is False
+    with pytest.raises(GuildError):
+        await api._act(db_session, loner, 1, {"action": "nope"})
+    with pytest.raises(GuildError):
+        await api._act(db_session, loner, 1, {"action": "deposit", "currency": "gold", "amount": "x"})
+    tree = guild_tree_service.payload(guild)
+    assert len(tree["nodes"]) == len(guild_tree.build())

@@ -10,6 +10,7 @@ import AdminTab from './AdminTab.jsx';
 import CharacterTab from './CharacterTab.jsx';
 import CraftTab from './CraftTab.jsx';
 import DailiesTab from './DailiesTab.jsx';
+import GuildTab from './GuildTab.jsx';
 import InventoryTab from './InventoryTab.jsx';
 import MapTab from './MapTab.jsx';
 import StubTab from './StubTab.jsx';
@@ -31,6 +32,7 @@ const SECTIONS = [
   { id: 'inventory', label: 'Инвентарь' },
   { id: 'craft', label: 'Мастерская' },
   { id: 'map', label: 'Карта' },
+  { id: 'guild', label: 'Гильдия' },
   { id: 'tops', label: 'Топы' },
   { id: 'exchange', label: 'Биржа' },
 ];
@@ -304,6 +306,7 @@ export default function Hub() {
         {activeTab === 'craft' && <CraftTab />}
         {activeTab === 'map' && <MapTab />}
         {activeTab === 'tops' && <TopsTab />}
+        {activeTab === 'guild' && <GuildTab />}
         {activeTab === 'exchange' && (
           <StubTab text="Торговцы душами ещё не открыли лавку. Скоро." />
         )}

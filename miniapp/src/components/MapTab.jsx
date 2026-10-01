@@ -176,6 +176,8 @@ export default function MapTab() {
   const playerPos = mapState ? { x: mapState.pos_x, y: mapState.pos_y } : null;
   const questTarget = mapState?.quest_target ?? null;
   const worldBoss = mapState?.world_boss ?? null;
+  // Гильдии: владения и закладки знамён.
+  const guildCells = mapState?.guild_cells ?? [];
 
   const toScreen = useCallback((u, v) => ({
     x: (u - view.cu) * view.scale + size.width / 2,
@@ -473,6 +475,11 @@ export default function MapTab() {
     ...(mapState.trail
       ? [[mapState.trail.x, mapState.trail.y, 'map-pin--trail', mapState.trail.emoji, mapState.trail.title, 1.1]]
       : []),
+    ...guildCells.map((g) => [
+      g.x, g.y, g.own ? 'map-pin--guild map-pin--guild-own' : 'map-pin--guild',
+      g.status === 'claiming' ? '🚩' : (g.base_tier === 'citadel' ? '🏯' : '🏰'),
+      `[${g.tag}] ${g.status === 'claiming' ? 'закладка знамени' : 'земля гильдии'}`, 0.8,
+    ]),
     ...(travelTarget ? [[travelTarget.to_x, travelTarget.to_y, 'map-pin--route', '⚑', 'Цель пути', 1]] : []),
     ...(playerPos ? [[playerPos.x, playerPos.y, 'map-pin--player', '', 'Ты здесь', 1.1]] : []),
   ];
@@ -561,6 +568,12 @@ export default function MapTab() {
                 />
               ))}
               <path className="map-grid" d={gridPath} />
+              {guildCells.map((g) => {
+                const s = cellScreen(g.x, g.y);
+                const px = Math.max(cellSizeAt(monolithDistance(g.x, g.y)) * view.scale, 8);
+                const cls = `map-guild-cell${g.own ? ' map-guild-cell--own' : ''}${g.status === 'claiming' ? ' map-guild-cell--claiming' : ''}`;
+                return <rect key={`g:${g.x}:${g.y}`} className={cls} x={s.x - px / 2} y={s.y - px / 2} width={px} height={px} rx={3} />;
+              })}
               {travelTarget && playerPos && (() => {
                 const a = cellScreen(playerPos.x, playerPos.y);
                 const b = cellScreen(travelTarget.to_x, travelTarget.to_y);
@@ -693,6 +706,12 @@ export default function MapTab() {
             </p>
           )}
           {info.boss && <p className="map-card__line">💀 {info.boss.name} · ур. {info.boss.level} · {info.boss.hp_percent}%</p>}
+          {(() => {
+            const g = guildCells.find((c) => c.x === info.x && c.y === info.y);
+            if (!g) return null;
+            const what = g.status === 'claiming' ? 'закладывают знамя' : (g.mine ? 'рудник гильдии' : 'земля гильдии');
+            return <p className="map-card__line">🏰 [{g.tag}] · {what}{g.own ? ' (твоя гильдия)' : ''}</p>;
+          })()}
           <div className="map-card__badges">
             {info.isCity && <span className="map-card__badge">Город</span>}
             {info.isPlayer && <span className="map-card__badge">Ты здесь</span>}

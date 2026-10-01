@@ -1,0 +1,160 @@
+/* --- Гильдии --------------------------------------------------------------- */
+
+.guild-tabs {
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.guild-tabs::-webkit-scrollbar { display: none; }
+
+.guild-title {
+  font-family: 'Cormorant SC', Forum, serif;
+  font-size: 22px;
+  font-weight: 600;
+  margin: 0 0 4px;
+}
+
+.guild-line {
+  margin: 4px 0;
+  font-size: 14px;
+  line-height: 1.4;
+}
+
+.guild-bar {
+  height: 6px;
+  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.12);
+  overflow: hidden;
+  margin: 4px 0 6px;
+}
+.guild-bar__fill {
+  height: 100%;
+  background: linear-gradient(90deg, #8f1327, #e8a33d);
+}
+
+.guild-form {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-items: flex-start;
+}
+
+.guild-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+  margin: 6px 0;
+}
+.guild-row--tight { margin: 0; flex-wrap: nowrap; }
+
+.guild-input {
+  min-width: 0;
+  flex: 1 1 140px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  background: rgba(0, 0, 0, 0.35);
+  color: inherit;
+  font: inherit;
+  font-size: 14px;
+}
+.guild-row--tight .guild-input { flex: 0 0 56px; width: 56px; }
+.guild-input--short { flex: 0 0 auto; }
+
+.guild-confirm {
+  display: inline-flex;
+  gap: 6px;
+}
+
+.guild-check {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  font-size: 14px;
+}
+
+.guild-member-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  align-items: center;
+  padding-top: 0;
+}
+
+.guild-quest { padding-top: 6px; padding-bottom: 6px; }
+
+.guild-cell { border-top: 1px solid rgba(255, 255, 255, 0.06); }
+.guild-building {
+  width: 100%;
+  border-bottom: 1px dashed rgba(255, 255, 255, 0.08);
+  padding-bottom: 6px;
+}
+
+.guild-log { max-height: 320px; overflow-y: auto; }
+.guild-log__row { margin: 3px 0; font-size: 13px; line-height: 1.35; }
+.guild-log__at { opacity: 0.55; font-size: 12px; }
+
+.guild-danger { display: flex; justify-content: center; padding-bottom: 24px; }
+
+.guild-tree {
+  position: relative;
+  height: 420px;
+  margin: 0 12px 12px;
+  border-radius: 12px;
+  background: radial-gradient(circle at center, rgba(60, 20, 20, 0.6), rgba(10, 8, 8, 0.9));
+  touch-action: none;
+  overflow: hidden;
+  user-select: none;
+}
+.guild-tree__svg { width: 100%; height: 100%; display: block; }
+.guild-tree__edge { stroke: rgba(255, 255, 255, 0.14); stroke-width: 3; }
+.guild-tree__edge--on { stroke-width: 5; opacity: 0.9; }
+.guild-tree__node {
+  fill: rgba(20, 16, 16, 0.95);
+  stroke: var(--branch);
+  stroke-width: 2.5;
+  opacity: 0.45;
+  cursor: pointer;
+}
+.guild-tree__node--available { opacity: 1; stroke-dasharray: 4 3; }
+.guild-tree__node--taken { opacity: 1; fill: var(--branch); }
+.guild-tree__node--selected { stroke: #fff; stroke-width: 4; opacity: 1; }
+.guild-tree__zoom {
+  position: absolute;
+  right: 8px;
+  top: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.guild-tree__zoom button {
+  width: 34px;
+  height: 34px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  background: rgba(0, 0, 0, 0.6);
+  color: #fff;
+  font-size: 18px;
+}
+.guild-tree__legend { display: flex; gap: 14px; flex-wrap: wrap; font-size: 13px; }
+.guild-tree__legend i {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  margin-right: 4px;
+}
+
+/* Карта: владения гильдий. */
+.map-guild-cell {
+  fill: rgba(170, 170, 200, 0.16);
+  stroke: rgba(210, 210, 230, 0.55);
+  stroke-width: 1;
+}
+.map-guild-cell--own {
+  fill: rgba(232, 163, 61, 0.22);
+  stroke: #e8a33d;
+}
+.map-guild-cell--claiming { stroke-dasharray: 3 3; }
+.map-pin--guild { border-color: rgba(210, 210, 230, 0.7); }
+.map-pin--guild-own { border-color: #e8a33d; }
