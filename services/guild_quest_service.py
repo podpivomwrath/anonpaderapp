@@ -120,7 +120,7 @@ async def record(db: AsyncSession, character: Character, metric: str, amount: in
             await wallet_service.deposit(db, character.id, "farm", gold)
             line = (
                 f"🏰 Гильдейская ежедневка «{title_of(metric)}» выполнена: "
-                f"+{fame.gained} славы гильдии, +{gold} золота."
+                f"+{fame.gained} славы гильдии, +{guild_service.gold_label(character, gold)}."
             )
             if fame.levels_gained:
                 line += f"\n🏰 Гильдия достигает {fame.new_level} уровня!"

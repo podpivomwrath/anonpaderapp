@@ -270,6 +270,8 @@ async def _state(db, character: Character) -> dict:
         "warehouse": {
             "capacity": {"ore": cap.ore, "items": cap.items},
             "ore_total": await guild_service.ore_total(db, guild.id),
+            # Шахта в полный склад не копает - это надо видеть, а не гадать.
+            "ore_full": await guild_service.ore_total(db, guild.id) >= cap.ore,
             "ore": [_ore_line(o.ore_id, o.grade, o.count) for o in await guild_service.ore_stock(db, guild.id)],
             "items": [
                 {"id": i.id, "name": i.name, "slot": naming.slot_title(i.slot), "rarity": i.rarity,

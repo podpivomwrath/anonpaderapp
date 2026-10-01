@@ -15,7 +15,8 @@ def progress_notice_from(completed: list, streak_notice: str | None) -> str | No
     for c in completed:
         premium_mark = " (💠 +50%)" if c.xp_premium_applied else ""
         xp_part = f"+{c.xp} опыта{premium_mark}, " if c.xp else ""  # на 60 уровне опыта нет
-        lines.append(f"✅ Ежедневка «{c.quest_title}» выполнена! {xp_part}+{c.gold} золота.")
+        gold = getattr(c, "gold_label", "") or f"{c.gold} золота"
+        lines.append(f"✅ Ежедневка «{c.quest_title}» выполнена! {xp_part}+{gold}.")
     if streak_notice:
         lines.append(streak_notice)
     return "\n".join(lines)

@@ -187,6 +187,9 @@ async def guild_effects(db: AsyncSession, guild: Guild) -> dict[str, float]:
     levels = await building_levels(db, guild.id)
     effects["_forge_cut"] = round(levels.get(gc.B_FORGE, 0) * gc.FORGE_ORE_CUT_PER_LEVEL, 4)
     effects["_chapel"] = levels.get(gc.B_CHAPEL, 0)
+    # Ставка налога - тоже копией на персонаже: тексты о золоте показывают
+    # «сколько на руки» там, где до базы не дотянуться.
+    effects["_tax"] = guild.gold_tax or 0
     return effects
 
 
@@ -194,6 +197,21 @@ async def refresh_perks(db: AsyncSession, guild: Guild) -> None:
     effects = await guild_effects(db, guild)
     for _member, character in await members(db, guild.id):
         character.guild_perks = dict(effects)
+
+
+def after_tax(character, amount: int) -> int:
+    """Сколько золота дойдёт до игрока после налога гильдии. Округление то
+    же, что в wallet_service._guild_tax."""
+    tax = int(perk(character, "_tax"))
+    return amount - amount * tax // 100 if amount > 0 else amount
+
+
+def gold_label(character, amount: int, word: str = "золота") -> str:
+    """«500 золота» или «500 золота (после налога 450)»."""
+    net = after_tax(character, amount)
+    if net == amount:
+        return f"{amount} {word}"
+    return f"{amount} {word} (после налога {net})"
 
 
 def perk(character, key: str) -> float:
@@ -606,6 +624,8 @@ async def set_tax(db: AsyncSession, actor: Character, percent: int) -> None:
         raise GuildError(f"Налог - от 0 до {gc.TAX_MAX}%.")
     guild.gold_tax = percent
     await log(db, guild.id, "tax", f"{actor.name} назначает налог гильдии: {percent}%.", actor.id)
+    await db.flush()
+    await refresh_perks(db, guild)
 
 
 # --- Склад --------------------------------------------------------------------

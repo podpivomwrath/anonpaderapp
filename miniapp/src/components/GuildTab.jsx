@@ -415,6 +415,7 @@ function Treasury({ state, run, busy }) {
         <p className="guild-line">💰 Казна: {money(guild.treasury_gold)} · 💎 {money(guild.treasury_gems)}</p>
         <p className="craft-hint">
           📦 Склад: руда {warehouse.ore_total}/{warehouse.capacity.ore}, вещи {warehouse.items.length}/{warehouse.capacity.items}
+          {warehouse.ore_full ? ' · полон, шахты стоят' : ''}
         </p>
         <p className="craft-hint">
           🪙 Налог гильдии: {guild.gold_tax}% с любого золота участников (собрано всего {money(guild.tax_collected)}).
@@ -665,6 +666,9 @@ function Cell({ cell, state, run, busy }) {
                 {b.emoji} <b>{b.title}</b> {b.built ? `${b.level}/${b.max}` : '- не построена'}
                 {b.upgrading_to ? ` · строится ${b.upgrading_to} ур., ещё ${timeLeft(b.done_at)}` : ''}
               </p>
+              {b.building === 'shaft' && b.level > 0 && state.warehouse.ore_full && (
+                <p className="guild-tree__card-lack">📦 Склад полон - шахта стоит. Потратьте руду или постройте склад.</p>
+              )}
               {b.next && perms.treasury && !b.upgrading_to && (
                 <div className="guild-row">
                   <span className="craft-hint">

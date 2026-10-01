@@ -21,6 +21,7 @@ from bot.miniapp_admin_api import register_routes as register_miniapp_admin_rout
 from bot.miniapp_api import register_routes as register_miniapp_routes
 from bot.miniapp_craft_api import register_routes as register_craft_routes
 from bot.miniapp_guild_api import register_routes as register_guild_routes
+from bot.miniapp_exchange_api import register_routes as register_exchange_routes
 from bot.miniapp_auth import miniapp_auth_middleware, miniapp_cors_middleware
 from bot.miniapp_map_api import register_routes as register_miniapp_map_routes
 from config import Settings
@@ -105,6 +106,7 @@ def create_app(settings: Settings, route_event: RouteEvent, redis=None) -> web.A
     register_miniapp_routes(app)
     register_craft_routes(app)
     register_guild_routes(app)
+    register_exchange_routes(app)
     register_miniapp_admin_routes(app)
     register_miniapp_map_routes(app)
     return app

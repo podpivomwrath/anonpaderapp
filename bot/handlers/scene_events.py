@@ -27,6 +27,7 @@ from bot.vk_media import photo_attachment
 from game.world import scene_events as se
 from game.world.scene_events import Riddle, Scene, SceneEvent, SceneResult
 from models import CharacterStats
+from services import guild_service
 from services import item_service, preset_service, scene_event_service, wallet_service
 from services import onboarding_service as onboarding_svc
 from services.db import get_session_factory
@@ -391,7 +392,10 @@ async def _dice(peer_id, db, character, stats, p: Pending, scene: Scene, action:
         await wallet_service.deposit(db, character.id, wallet_column, p.stake * 2)
     line = (
         f"🎲 Ты: {mine[0]} и {mine[1]}, он: {theirs[0]} и {theirs[1]}.\n"
-        + (f"{scene.win_text} +{_money(p.currency, p.stake)}" if won
+        + (f"{scene.win_text} +{_money(p.currency, p.stake)}"
+           + (f" (после налога гильдии на руки {guild_service.after_tax(character, p.stake * 2)} из {p.stake * 2})"
+              if won and p.currency == "gold" and guild_service.after_tax(character, p.stake * 2) != p.stake * 2 else "")
+           if won
            else f"{scene.lose_text} −{_money(p.currency, p.stake)}")
     )
     await _resolve(peer_id, db, character, stats, p, SceneResult(), [line])

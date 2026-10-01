@@ -32,3 +32,18 @@ class ExchangeOrder(Base):
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )
+
+
+class ExchangeState(Base):
+    """Состояние биржи: одна строка (id=1) - чистый объём самоцветов,
+    проданных игрокам (купили минус продали). От него считается курс.
+
+    В базе, а не в Redis: сделка и сдвиг курса обязаны жить в одной
+    транзакции под одной блокировкой - иначе два одновременных лота
+    прошли бы по одной цене.
+    """
+
+    __tablename__ = "exchange_state"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    net_sold: Mapped[int] = mapped_column(BigInteger, default=0)

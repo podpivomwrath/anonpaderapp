@@ -85,7 +85,9 @@ async def _grant_reward(db: AsyncSession, character: Character, reward: dict) ->
     lines: list[str] = []
     if "gold" in reward:
         await wallet_service.deposit(db, character.id, "farm", reward["gold"])
-        lines.append(f"{reward['gold']} золота")
+        from services import guild_service
+
+        lines.append(guild_service.gold_label(character, reward["gold"]))
     if "gems" in reward:
         await wallet_service.deposit(db, character.id, "donate", reward["gems"])
         lines.append(f"💎 {reward['gems']} Пепельных самоцветов")
@@ -217,6 +219,7 @@ class DailyCompletion:
     levels_gained: int
     new_level: int
     xp_premium_applied: bool = False  # патч 51, ч.1
+    gold_label: str = ""  # «150 золота (после налога 135)» - налог гильдии
     group_kick: "group_service.LevelGapKick | None" = None  # патч 51, ч.2
 
 
@@ -224,6 +227,12 @@ class DailyCompletion:
 class DailyProgressResult:
     completed: list[DailyCompletion] = field(default_factory=list)
     streak_notice: str | None = None
+
+
+def _guild_gold_label(character: Character, gold: int) -> str:
+    from services import guild_service  # избегаем цикла импортов
+
+    return guild_service.gold_label(character, gold)
 
 
 async def _apply_delta(
@@ -250,6 +259,7 @@ async def _apply_delta(
         quest_title=qdef.title, xp=levelup.xp_awarded, gold=gold,
         levels_gained=levelup.levels_gained, new_level=levelup.new_level,
         xp_premium_applied=levelup.premium_applied, group_kick=group_kick,
+        gold_label=_guild_gold_label(character, gold),
     )
 
 

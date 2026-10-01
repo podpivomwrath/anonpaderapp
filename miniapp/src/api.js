@@ -261,3 +261,14 @@ export const guildAction = (action, params = {}) =>
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ action, ...params }),
   });
+
+// --- Биржа ---
+
+export const getExchange = () => request('/exchange');
+
+export const exchangeTrade = (direction, lots) =>
+  request('/exchange', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ direction, lots }),
+  });

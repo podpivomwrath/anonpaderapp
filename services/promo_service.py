@@ -160,7 +160,9 @@ async def _apply_reward(
         if amount <= 0:
             return None, None
         await wallet_service.deposit(db, character.id, "farm", amount)
-        return f"{amount} золота", None
+        from services import guild_service
+
+        return guild_service.gold_label(character, amount), None
     if rtype == "gems":
         amount = int(reward.get("amount", 0))
         if amount <= 0:

@@ -79,6 +79,7 @@ from game.world.location_types import region_for
 from game.world.scheduler import PeerScheduler
 from models import Character, CharacterStats, MountTravel, User
 from services import (
+    guild_service,
     ash_service,
     daily_service,
     death_service,
@@ -950,7 +951,8 @@ async def event_choice(message: Message) -> None:
             fish_sold = gold > 0
             if gold:
                 fish_sale_line = (
-                    f"🧺 Продано {game_fishing.format_kg(grams)} рыбы за {gold} зол."
+                    f"🧺 Продано {game_fishing.format_kg(grams)} рыбы за "
+                    f"{guild_service.gold_label(character, gold, 'зол.')}"
                 )
         choice_code = trial_service.EVENT_CHOICE_CODES.get(choice_label)
         result = await event_service.apply_outcome(

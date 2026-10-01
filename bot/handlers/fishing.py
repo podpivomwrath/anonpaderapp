@@ -231,7 +231,7 @@ async def _resolve_junk(db, character) -> tuple[str, str]:
     junk_id = _rng.choice(list(fc.JUNK_ITEMS))
     _emoji, _name, price = fc.JUNK_ITEMS[junk_id]
     await wallet_service.deposit(db, character.id, "farm", price)
-    return ft.junk_text(junk_id), kb.lake_keyboard()
+    return ft.junk_text(junk_id, character), kb.lake_keyboard()
 
 
 @labeler.message(text=[ft.BTN_BAG])

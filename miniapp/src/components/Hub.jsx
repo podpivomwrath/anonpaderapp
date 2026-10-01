@@ -10,6 +10,7 @@ import AdminTab from './AdminTab.jsx';
 import CharacterTab from './CharacterTab.jsx';
 import CraftTab from './CraftTab.jsx';
 import DailiesTab from './DailiesTab.jsx';
+import ExchangeTab from './ExchangeTab.jsx';
 import GuildTab from './GuildTab.jsx';
 import InventoryTab from './InventoryTab.jsx';
 import MapTab from './MapTab.jsx';
@@ -313,7 +314,7 @@ export default function Hub() {
         {activeTab === 'tops' && <TopsTab />}
         {activeTab === 'guild' && <GuildTab />}
         {activeTab === 'exchange' && (
-          <StubTab text="Торговцы душами ещё не открыли лавку. Скоро." />
+          <ExchangeTab onWallet={(w) => setCharacter((prev) => ({ ...prev, ...w }))} />
         )}
         {activeTab === 'admin' && character.is_admin && <AdminTab />}
       </div>

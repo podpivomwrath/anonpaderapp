@@ -160,6 +160,11 @@ async def _grant(
     if quest.gold_reward:
         wallet = await wallet_service.deposit(db, character.id, "farm", quest.gold_reward)
         lines.append(display.gold_delta_line(quest.gold_reward, wallet.farm_currency))
+        from services import guild_service
+
+        net = guild_service.after_tax(character, quest.gold_reward)
+        if net != quest.gold_reward:
+            lines.append(f"После налога гильдии: {net} золота.")
     return "\n".join(lines), levelup, group_kick
 
 

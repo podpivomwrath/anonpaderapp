@@ -98,7 +98,7 @@ DEPOSIT_MIN_GEMS = 10
 TAX_MAX = 50
 # Казна - золото и самоцветы. Склад - руда и снаряжение. Реликвии (трофеи)
 # на склад не кладутся: это товар скупщика, а не ресурс гильдии.
-WAREHOUSE_BASE_ORE = 100
+WAREHOUSE_BASE_ORE = 500
 WAREHOUSE_BASE_ITEMS = 10
 WAREHOUSE_ORE_PER_LEVEL = 250
 WAREHOUSE_ITEMS_PER_LEVEL = 5

@@ -198,11 +198,15 @@ AWAKENING_DESTRUCTION_CHANCE = 0.30
 AWAKENING_REFUND_RATIO = 0.5        # частичный возврат ресурсов; TODO: content
 
 # --- Биржа (игра — дилер) ---
-EXCHANGE_BLOCK_SIZE = 100           # блок донат-валюты, за который цена делает шаг
-EXCHANGE_BASE_BUY_PRICE = 100       # золота за 1 донат в нулевом блоке; TODO: калибровка
-EXCHANGE_PRICE_STEP = 5             # ЛИНЕЙНЫЙ шаг цены за блок; TODO: калибровка
-EXCHANGE_SPREAD = 15                # фикс. спред: sell = buy - spread (round-trip убыточен)
-EXCHANGE_MIN_SELL_PRICE = 1
+# Самоцветы торгуются только лотами по EXCHANGE_BLOCK_SIZE: лот = одна
+# ступень цены. Старт - 5000 золота за 100 самоцветов, дальше курс
+# выстраивают игроки: покупки двигают цену вверх, продажи - вниз.
+EXCHANGE_BLOCK_SIZE = 100           # лот и ступень цены, в самоцветах
+EXCHANGE_BASE_BUY_PRICE = 50        # золота за 1 самоцвет на нулевой ступени (5000 за лот)
+EXCHANGE_PRICE_STEP = 1             # +1 золото за самоцвет на каждый лот чистого спроса (+2%)
+EXCHANGE_SPREAD = 5                 # продажа на 5 за самоцвет дешевле покупки: перепродажа в минус
+EXCHANGE_MIN_BUY_PRICE = 10         # пол цены покупки: ниже рынок не проваливается
+EXCHANGE_MIN_SELL_PRICE = 5
 
 # --- Механики подклассов ---
 PROVOKE_PVP_DAMAGE_REDUCTION = 0.30     # PvP-провокация: урон по другим целям -30%

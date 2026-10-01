@@ -40,6 +40,7 @@ from game.combat import balance_config as bc
 from game.world import grid
 from game.economy import fishing as game_fishing
 from game.economy import fishing_config as fc
+from services import guild_service
 from services import daily_service, fishing_service, item_service, screen_service
 from services import onboarding_service as onboarding_svc
 from services import trophy_service
@@ -181,7 +182,7 @@ async def sell_trophies(message: Message) -> None:
         total = (await wallet_service.get_wallet(db, character.id)).farm_currency
         await db.commit()
         text, kb = await _render_trophies(
-            db, character, mult, prefix=appraiser_sold(gold, total) if gold > 0 else "",
+            db, character, mult, prefix=appraiser_sold(gold, total, guild_service.after_tax(character, gold)) if gold > 0 else "",
         )
 
     await editable_message.send_or_edit(_bot_api, _NS, peer_id, text, kb, attachment=appraiser_attachment())
@@ -270,7 +271,7 @@ async def _sell_now(peer_id: int, from_id: int, rarity_id: str | None) -> None:
         total = (await wallet_service.get_wallet(db, character.id)).farm_currency
         await db.commit()
         text, kb = await _render_gear_main(
-            db, character, mult, prefix=appraiser_sold(gold, total) if gold > 0 else "",
+            db, character, mult, prefix=appraiser_sold(gold, total, guild_service.after_tax(character, gold)) if gold > 0 else "",
         )
 
     await editable_message.send_or_edit(_bot_api, _NS, peer_id, text, kb)
@@ -415,7 +416,7 @@ async def sell_gear_item(message: Message) -> None:
         total = (await wallet_service.get_wallet(db, character.id)).farm_currency
         await db.commit()
         text, kb = await _render_gear_detail(
-            db, character, mult, page, prefix=appraiser_sold(gold, total) if gold > 0 else "",
+            db, character, mult, page, prefix=appraiser_sold(gold, total, guild_service.after_tax(character, gold)) if gold > 0 else "",
         )
 
     await editable_message.send_or_edit(_bot_api, _NS, peer_id, text, kb)
@@ -508,7 +509,7 @@ async def sell_fish(message: Message) -> None:
 
     if gold:
         text = (
-            f"Продано {game_fishing.format_kg(grams)} рыбы за {gold} зол. "
+            f"Продано {game_fishing.format_kg(grams)} рыбы за {guild_service.gold_label(character, gold, 'зол.')} "
             f"(всего: {total})" + chr(10) * 2 + text
         )
     await editable_message.send_or_edit(

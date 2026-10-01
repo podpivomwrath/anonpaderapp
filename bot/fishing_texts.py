@@ -120,9 +120,12 @@ def catch_text(result) -> str:
     return chr(10).join(lines)
 
 
-def junk_text(junk_id: str) -> str:
+def junk_text(junk_id: str, character=None) -> str:
+    from services import guild_service
+
     emoji, name, price = fc.JUNK_ITEMS[junk_id]
-    return f"{emoji} {name}. Продано за {price} зол."
+    label = guild_service.gold_label(character, price, "зол.") if character is not None else f"{price} зол."
+    return f"{emoji} {name}. Продано за {label}"
 
 
 def bag_screen(bag: list, grams: int, capacity: int, value: int) -> str:

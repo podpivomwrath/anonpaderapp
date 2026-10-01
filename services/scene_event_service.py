@@ -202,7 +202,9 @@ async def grant_trophies(db, character, units: float, rng: random.Random, applie
 async def grant_gold(db, character, units: float, applied: Applied) -> int:
     amount = gold_amount(character, units)
     await wallet_service.deposit(db, character.id, "farm", amount)
-    applied.lines.append(f"💰 +{amount} золота")
+    from services import guild_service
+
+    applied.lines.append(f"💰 +{guild_service.gold_label(character, amount)}")
     return amount
 
 

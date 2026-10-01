@@ -74,3 +74,49 @@ async def test_quote_moves_with_volume(db_session, make_character) -> None:
     q1 = await exchange.quote()
     assert q1.buy_price == q0.buy_price + 3 * STEP
     assert q1.block == 3
+
+
+def test_start_price_is_5000_per_lot() -> None:
+    assert Exchange.buy_cost(0, BLOCK) == 5000
+
+
+def test_price_falls_when_players_sell_but_has_floor() -> None:
+    assert Exchange.buy_price_at(-BLOCK) == BASE - STEP
+    assert Exchange.buy_price_at(-10_000 * BLOCK) == bc.EXCHANGE_MIN_BUY_PRICE
+    assert Exchange.sell_price_at(-10_000 * BLOCK) == bc.EXCHANGE_MIN_SELL_PRICE
+    # Продажа из нуля идёт по нисходящим ступеням.
+    assert Exchange.sell_gain(0, 2 * BLOCK) == BLOCK * (BASE - STEP - bc.EXCHANGE_SPREAD) + BLOCK * (
+        BASE - 2 * STEP - bc.EXCHANGE_SPREAD
+    )
+
+
+async def test_service_lots_and_course(db_session, make_character) -> None:
+    from services import exchange_service
+
+    character = await make_character(farm=100_000, donate=500)
+    q0 = await exchange_service.quote(db_session)
+    assert q0.buy_lot == 5000 and q0.buy_series[1] == 5000 + 5000 + BLOCK * STEP
+    with pytest.raises(exchange_service.ExchangeError):
+        await exchange_service.buy(db_session, character, 0)
+    order = await exchange_service.buy(db_session, character, 2)
+    assert order.amount == 200 and order.gold_amount == q0.buy_series[1]
+    q1 = await exchange_service.quote(db_session)
+    assert q1.buy_lot > q0.buy_lot
+    await exchange_service.sell(db_session, character, 3)
+    q2 = await exchange_service.quote(db_session)
+    assert q2.net_sold == -BLOCK and q2.buy_lot < q0.buy_lot
+    with pytest.raises(exchange_service.ExchangeError, match="самоцветов"):
+        await exchange_service.sell(db_session, character, 50)
+
+
+async def test_sell_gems_is_taxed_by_guild(db_session, make_character) -> None:
+    from game.economy import guild_config as gc
+    from services import exchange_service, guild_service
+
+    leader = await make_character(level=30, donate=gc.FOUND_COST_GEMS + 100)
+    await guild_service.create(db_session, leader, "Торговцы", "ТРГ")
+    await guild_service.set_tax(db_session, leader, 10)
+    order = await exchange_service.sell(db_session, leader, 1)
+    wallet = await get_wallet(db_session, leader.id)
+    assert wallet.farm_currency == order.gold_amount - order.gold_amount // 10
+    assert guild_service.gold_label(leader, 1000) == "1000 золота (после налога 900)"

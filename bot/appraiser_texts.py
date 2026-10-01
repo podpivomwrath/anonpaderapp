@@ -24,6 +24,10 @@ def appraiser_gear_empty() -> str:
     return APPRAISER["gear_empty"]
 
 
-def appraiser_sold(gold: int, total: int) -> str:
-    """Патч 13, ч.2: сумма сделки + новый баланс единой числовой скобкой."""
-    return f"{APPRAISER['sold']} {display.gold_delta_line(gold, total)}"
+def appraiser_sold(gold: int, total: int, net: int | None = None) -> str:
+    """Патч 13, ч.2: сумма сделки + новый баланс единой числовой скобкой.
+    net - сколько дошло после налога гильдии (если он есть)."""
+    line = f"{APPRAISER['sold']} {display.gold_delta_line(gold, total)}"
+    if net is not None and net != gold:
+        line += f"\nПосле налога гильдии: {net} золота."
+    return line

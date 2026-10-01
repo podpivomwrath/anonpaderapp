@@ -1,0 +1,92 @@
+"""Эндпоинты биржи: /api/miniapp/exchange.
+
+GET - курс, цены 1..10 лотов подряд, кошелёк, свои и последние сделки.
+POST {"direction": "buy"|"sell", "lots": N} - сделка; в ответ то же, что GET.
+Личность - только из request[VK_USER_ID_KEY].
+"""
+
+from aiohttp import web
+
+from bot.app_keys import SESSION_FACTORY_KEY
+from bot.miniapp_auth import VK_USER_ID_KEY
+from game.combat import balance_config as bc
+from services import exchange_service, guild_service, wallet_service
+from services import onboarding_service as onboarding_svc
+
+
+def _error(message: str, status: int = 400) -> web.Response:
+    return web.json_response({"error": message}, status=status)
+
+
+def _order(order) -> dict:
+    lots = order.amount // exchange_service.LOT
+    return {
+        "direction": order.direction, "lots": lots, "gems": order.amount, "gold": order.gold_amount,
+        "per_lot": round(order.gold_amount / lots) if lots else order.gold_amount,
+        "at": order.created_at.isoformat() if order.created_at else None,
+    }
+
+
+async def _state(db, character) -> dict:
+    q = await exchange_service.quote(db)
+    wallet = await wallet_service.get_wallet(db, character.id)
+    recent = await exchange_service.recent_orders(db)
+    return {
+        "lot": exchange_service.LOT,
+        "max_lots": exchange_service.MAX_LOTS,
+        "buy_lot": q.buy_lot, "sell_lot": q.sell_lot,
+        "buy_series": q.buy_series, "sell_series": q.sell_series,
+        "start_lot": bc.EXCHANGE_BASE_BUY_PRICE * exchange_service.LOT,
+        "gold": wallet.farm_currency, "gems": wallet.donate_currency,
+        "tax": int(guild_service.perk(character, "_tax")),
+        "mine": [_order(o) for o in await exchange_service.my_orders(db, character.id)],
+        # Лента рынка без имён: курс - общий, кто торговал - не важно.
+        "recent": [_order(o) for o in recent],
+    }
+
+
+async def handle_get(request: web.Request) -> web.Response:
+    async with request.app[SESSION_FACTORY_KEY]() as db:
+        character = await onboarding_svc.get_character(db, request[VK_USER_ID_KEY])
+        if character is None:
+            return _error("character_not_found", 404)
+        state = await _state(db, character)
+        # quote() берёт строку курса под блокировкой - отпускаем сразу.
+        await db.commit()
+    return web.json_response(state)
+
+
+async def handle_post(request: web.Request) -> web.Response:
+    try:
+        body = await request.json()
+    except Exception:
+        return _error("bad_request")
+    if not isinstance(body, dict):
+        return _error("bad_request")
+    direction, lots = body.get("direction"), body.get("lots")
+    if direction not in ("buy", "sell"):
+        return _error("bad_request")
+    async with request.app[SESSION_FACTORY_KEY]() as db:
+        character = await onboarding_svc.get_character(db, request[VK_USER_ID_KEY])
+        if character is None:
+            return _error("character_not_found", 404)
+        try:
+            if direction == "buy":
+                order = await exchange_service.buy(db, character, lots)
+            else:
+                order = await exchange_service.sell(db, character, lots)
+        except exchange_service.ExchangeError as exc:
+            await db.rollback()
+            return _error(str(exc), 409)
+        await db.commit()
+        state = await _state(db, character)
+        await db.commit()
+    state["done"] = _order(order)
+    if direction == "sell":
+        state["done"]["net"] = guild_service.after_tax(character, order.gold_amount)
+    return web.json_response(state)
+
+
+def register_routes(app: web.Application) -> None:
+    app.router.add_get("/api/miniapp/exchange", handle_get)
+    app.router.add_post("/api/miniapp/exchange", handle_post)

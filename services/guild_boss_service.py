@@ -171,6 +171,7 @@ class BossGrant:
     character_id: int
     damage: int
     gold: int
+    net_gold: int = 0
 
 
 @dataclass
@@ -206,7 +207,10 @@ async def distribute(db: AsyncSession, boss: GuildBoss) -> BossResult:
         if gold:
             await wallet_service.deposit(db, character_id, "farm", gold)
         await guild_service.add_contribution(db, character_id, max(1, round(50 * dealt / total)))
-        result.granted.append(BossGrant(character_id, dealt, gold))
+        member = await db.get(Character, character_id)
+        result.granted.append(BossGrant(
+            character_id, dealt, gold, guild_service.after_tax(member, gold) if member else gold,
+        ))
     status = "повержен" if boss.status == "killed" else "уходит недобитым"
     await guild_service.log(
         db, boss.guild_id, "boss",

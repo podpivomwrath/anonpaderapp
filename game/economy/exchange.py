@@ -77,13 +77,16 @@ class Exchange:
 
     @staticmethod
     def _block_of(position: int) -> int:
-        # объём может уйти в минус (донатеры продали больше, чем куплено) —
-        # цена ниже базовой не опускается
-        return max(position // bc.EXCHANGE_BLOCK_SIZE, 0)
+        # Объём уходит в минус, когда игроки продали самоцветов больше, чем
+        # купили: тогда и цена ниже стартовой - до пола EXCHANGE_MIN_*.
+        return position // bc.EXCHANGE_BLOCK_SIZE
 
     @classmethod
     def buy_price_at(cls, position: int) -> int:
-        return bc.EXCHANGE_BASE_BUY_PRICE + bc.EXCHANGE_PRICE_STEP * cls._block_of(position)
+        return max(
+            bc.EXCHANGE_BASE_BUY_PRICE + bc.EXCHANGE_PRICE_STEP * cls._block_of(position),
+            bc.EXCHANGE_MIN_BUY_PRICE,
+        )
 
     @classmethod
     def sell_price_at(cls, position: int) -> int:
@@ -91,11 +94,7 @@ class Exchange:
 
     @classmethod
     def buy_cost(cls, net_sold: int, amount: int) -> int:
-        """Стоимость покупки amount доната: ступенчато по блокам вверх.
-
-        При position < 0 цена базовая (блок 0), поэтому граница первого
-        «настоящего» блока (BLOCK_SIZE) корректна и для отрицательной зоны.
-        """
+        """Стоимость покупки amount: ступенчато по блокам вверх."""
         total, position, remaining = 0, net_sold, amount
         while remaining > 0:
             block_end = (cls._block_of(position) + 1) * bc.EXCHANGE_BLOCK_SIZE
@@ -107,13 +106,9 @@ class Exchange:
 
     @classmethod
     def sell_gain(cls, net_sold: int, amount: int) -> int:
-        """Выручка за продажу amount доната: ступенчато по блокам вниз."""
+        """Выручка за продажу amount: ступенчато по блокам вниз."""
         total, position, remaining = 0, net_sold, amount
         while remaining > 0:
-            if position <= 0:
-                # ниже нулевой отметки цена не опускается
-                total += remaining * cls.sell_price_at(0)
-                break
             block_start = cls._block_of(position - 1) * bc.EXCHANGE_BLOCK_SIZE
             take = min(remaining, position - block_start)
             total += take * cls.sell_price_at(position - 1)
@@ -125,7 +120,7 @@ class Exchange:
         net_sold = await self._state.get_net_sold()
         return ExchangeQuote(
             buy_price=self.buy_price_at(net_sold),
-            sell_price=self.sell_price_at(net_sold - 1 if net_sold > 0 else 0),
+            sell_price=self.sell_price_at(net_sold - 1),
             net_sold=net_sold,
             block=self._block_of(net_sold),
         )

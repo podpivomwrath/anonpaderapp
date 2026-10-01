@@ -355,6 +355,8 @@ async def _boss_finished(result) -> None:
     for peer in peers:
         got = personal.get(peer)
         extra = f"\nТвой урон: {got.damage}, золото: +{got.gold}." if got else ""
+        if got and got.net_gold != got.gold:
+            extra += f" После налога: {got.net_gold}."
         await send(peer, text + extra)
         await asyncio.sleep(0.05)
     for peer in fighting:
