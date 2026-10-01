@@ -35,6 +35,10 @@ const SECTIONS = [
   { id: 'exchange', label: 'Биржа' },
 ];
 
+// Общий справочник по игре - статья в группе. Ссылка наружу, а не раздел:
+// текст правится в редакторе статей VK без пересборки мини-аппа.
+const GUIDE_URL = 'https://vk.com/@-240167847-putevoditel-mechenogo';
+
 /** Из чего сложилась Мощь - подсказка к числу в шапке. */
 function powerHint(parts) {
   if (!parts) return 'Мощь';
@@ -123,6 +127,15 @@ export default function Hub() {
         {title}
         <PanelHeaderButton aria-label="Обновить" disabled={refreshing} onClick={refresh}>
           {refreshing ? <Spinner size="s" /> : <span aria-hidden="true">🔄</span>}
+        </PanelHeaderButton>
+        <PanelHeaderButton
+          aria-label="Путеводитель"
+          title="Путеводитель Меченого"
+          href={GUIDE_URL}
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          <span aria-hidden="true">📖</span>
         </PanelHeaderButton>
       </span>
     </PanelHeader>
