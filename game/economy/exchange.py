@@ -1,16 +1,18 @@
-"""Биржа фарм↔донат валюты. Игра выступает ДИЛЕРОМ (не P2P ордербук).
+"""Биржа самоцветов. Игра выступает ДИЛЕРОМ (не P2P ордербук).
 
-Принципы (п.10 дизайна):
-  - цена покупки доната растёт ступенчато и ЛИНЕЙНО за каждый блок в
-    EXCHANGE_BLOCK_SIZE донат-валюты (по чистому объёму, проданному игрокам);
-  - спред фиксирован: sell = buy - EXCHANGE_SPREAD, поэтому round-trip
-    (купить → продать) математически убыточен;
-  - никаких дневных лимитов: рынок саморегулируется двумя типами участников
-    (фармилы и донатеры двигают чистый объём в разные стороны);
-  - донат не влияет на исход операций — только игровая валюта и время.
+Принципы:
+  - торгуют только лотами по EXCHANGE_BLOCK_SIZE;
+  - цена лота растёт и падает в ПРОЦЕНТАХ (сложный процент) от чистого
+    объёма, купленного игроками: каждый купленный лот поднимает цену
+    следующего на EXCHANGE_LOT_GROWTH, каждый проданный - опускает;
+  - продажа лота - на EXCHANGE_SPREAD_PCT дешевле его покупки на шаг ниже,
+    поэтому round-trip (купить -> продать) убыточен на любом объёме, а
+    сговор нескольких аккаунтов вместе тоже в минусе;
+  - у цены есть пол (EXCHANGE_MIN_LOT_PRICE), спред действует и на нём;
+  - никаких дневных лимитов: курс выстраивают сами игроки.
 
-Live-состояние (чистый проданный объём) — в Redis; история сделок — в
-exchange_orders (Postgres).
+Состояние курса (чистый объём) - строка exchange_state
+(services/exchange_service.py); история сделок - exchange_orders.
 """
 
 from dataclasses import dataclass
@@ -20,7 +22,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from game.combat import balance_config as bc
 from models import ExchangeOrder, OrderDirection
-from services.wallet_service import NotEnoughCurrency, charge, deposit
+from services.wallet_service import charge, deposit
 
 
 class ExchangeStateStore(Protocol):
@@ -61,8 +63,8 @@ class RedisExchangeState:
 
 @dataclass
 class ExchangeQuote:
-    buy_price: int    # золота за 1 донат при покупке (текущий блок)
-    sell_price: int   # золота за 1 донат при продаже (текущий блок)
+    buy_price: int    # золота за следующий лот при покупке
+    sell_price: int   # золота за следующий лот при продаже
     net_sold: int     # чистый объём, проданный игрокам
     block: int
 
@@ -76,53 +78,51 @@ class Exchange:
     # --- Цены ---
 
     @staticmethod
-    def _block_of(position: int) -> int:
-        # Объём уходит в минус, когда игроки продали самоцветов больше, чем
-        # купили: тогда и цена ниже стартовой - до пола EXCHANGE_MIN_*.
+    def _lot_of(position: int) -> int:
+        """Ступень курса: сколько лотов игроки купили сверх проданного (бывает
+        и отрицательной - тогда курс ниже стартового)."""
         return position // bc.EXCHANGE_BLOCK_SIZE
+
+    @staticmethod
+    def lot_buy_price(level: int) -> int:
+        """Цена покупки лота на ступени level."""
+        price = bc.EXCHANGE_START_LOT_PRICE * (1 + bc.EXCHANGE_LOT_GROWTH) ** level
+        return max(round(price), bc.EXCHANGE_MIN_LOT_PRICE)
+
+    @classmethod
+    def lot_sell_price(cls, level: int) -> int:
+        """Выручка за лот, проданный со ступени level (курс уходит на level-1):
+        цена покупки на ступени ниже минус спред. Значит, лот, купленный на
+        level-1, продаётся обратно всегда дешевле, чем был куплен."""
+        return round(cls.lot_buy_price(level - 1) * (1 - bc.EXCHANGE_SPREAD_PCT))
 
     @classmethod
     def buy_price_at(cls, position: int) -> int:
-        return max(
-            bc.EXCHANGE_BASE_BUY_PRICE + bc.EXCHANGE_PRICE_STEP * cls._block_of(position),
-            bc.EXCHANGE_MIN_BUY_PRICE,
-        )
+        return cls.lot_buy_price(cls._lot_of(position))
 
     @classmethod
     def sell_price_at(cls, position: int) -> int:
-        return max(cls.buy_price_at(position) - bc.EXCHANGE_SPREAD, bc.EXCHANGE_MIN_SELL_PRICE)
+        return cls.lot_sell_price(cls._lot_of(position))
 
     @classmethod
     def buy_cost(cls, net_sold: int, amount: int) -> int:
-        """Стоимость покупки amount: ступенчато по блокам вверх."""
-        total, position, remaining = 0, net_sold, amount
-        while remaining > 0:
-            block_end = (cls._block_of(position) + 1) * bc.EXCHANGE_BLOCK_SIZE
-            take = min(remaining, block_end - position)
-            total += take * cls.buy_price_at(position)
-            position += take
-            remaining -= take
-        return total
+        """Стоимость amount самоцветов (кратно лоту): лот за лотом вверх."""
+        level = cls._lot_of(net_sold)
+        return sum(cls.lot_buy_price(level + i) for i in range(amount // bc.EXCHANGE_BLOCK_SIZE))
 
     @classmethod
     def sell_gain(cls, net_sold: int, amount: int) -> int:
-        """Выручка за продажу amount: ступенчато по блокам вниз."""
-        total, position, remaining = 0, net_sold, amount
-        while remaining > 0:
-            block_start = cls._block_of(position - 1) * bc.EXCHANGE_BLOCK_SIZE
-            take = min(remaining, position - block_start)
-            total += take * cls.sell_price_at(position - 1)
-            position -= take
-            remaining -= take
-        return total
+        """Выручка за amount самоцветов (кратно лоту): лот за лотом вниз."""
+        level = cls._lot_of(net_sold)
+        return sum(cls.lot_sell_price(level - i) for i in range(amount // bc.EXCHANGE_BLOCK_SIZE))
 
     async def quote(self) -> ExchangeQuote:
         net_sold = await self._state.get_net_sold()
         return ExchangeQuote(
             buy_price=self.buy_price_at(net_sold),
-            sell_price=self.sell_price_at(net_sold - 1),
+            sell_price=self.sell_price_at(net_sold),
             net_sold=net_sold,
-            block=self._block_of(net_sold),
+            block=self._lot_of(net_sold),
         )
 
     # --- Сделки ---
@@ -131,8 +131,8 @@ class Exchange:
         self, db: AsyncSession, character_id: int, amount: int
     ) -> ExchangeOrder:
         """Игрок покупает донат-валюту за золото."""
-        if amount <= 0:
-            raise ValueError("Объём должен быть положительным")
+        if amount <= 0 or amount % bc.EXCHANGE_BLOCK_SIZE:
+            raise ValueError("Объём - целые лоты")
         net_sold = await self._state.get_net_sold()
         cost = self.buy_cost(net_sold, amount)
 
@@ -158,8 +158,8 @@ class Exchange:
         self, db: AsyncSession, character_id: int, amount: int
     ) -> ExchangeOrder:
         """Игрок продаёт донат-валюту за золото."""
-        if amount <= 0:
-            raise ValueError("Объём должен быть положительным")
+        if amount <= 0 or amount % bc.EXCHANGE_BLOCK_SIZE:
+            raise ValueError("Объём - целые лоты")
         net_sold = await self._state.get_net_sold()
         gain = self.sell_gain(net_sold, amount)
 

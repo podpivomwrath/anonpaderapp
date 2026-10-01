@@ -298,6 +298,22 @@ async def run() -> None:
         id="guild_season", max_instances=1, coalesce=True,
     )
 
+    # Биржа: точка графика - курс на закрытие дня, раз в сутки после полуночи.
+    async def _exchange_snapshot() -> None:
+        from services import exchange_service
+
+        try:
+            async with get_session_factory()() as db:
+                await exchange_service.snapshot_day(db, exchange_service.yesterday_msk())
+                await db.commit()
+        except Exception:
+            logger.exception("Биржа: снимок дня не записан")
+
+    respawn_scheduler.add_job(
+        _exchange_snapshot, "cron", hour=0, minute=2, timezone="Europe/Moscow",
+        id="exchange_snapshot", max_instances=1, coalesce=True,
+    )
+
     # Маунты (патч 25, п.7): нападения/прибытия/live-отсчёт — свой job,
     # интервал из game/economy/mount_config.py (игровая тонкая настройка, не
     # деплой-параметр окружения, поэтому не в Settings).

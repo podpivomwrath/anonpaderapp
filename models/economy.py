@@ -1,6 +1,6 @@
-from datetime import datetime
+from datetime import date, datetime
 
-from sqlalchemy import BigInteger, DateTime, ForeignKey, String, func
+from sqlalchemy import BigInteger, Date, DateTime, ForeignKey, String, func
 from sqlalchemy.orm import Mapped, mapped_column
 
 from models.base import Base
@@ -47,3 +47,16 @@ class ExchangeState(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True)
     net_sold: Mapped[int] = mapped_column(BigInteger, default=0)
+
+
+class ExchangeDaily(Base):
+    """Курс на закрытие дня (МСК) - точка графика биржи. Пишется раз в сутки
+    сразу после полуночи (задача exchange_snapshot в main.py)."""
+
+    __tablename__ = "exchange_daily"
+
+    day: Mapped[date] = mapped_column(Date, primary_key=True)
+    buy_lot: Mapped[int] = mapped_column(BigInteger)
+    sell_lot: Mapped[int] = mapped_column(BigInteger)
+    bought_lots: Mapped[int] = mapped_column(default=0)
+    sold_lots: Mapped[int] = mapped_column(default=0)

@@ -1,4 +1,4 @@
-"""Биржа: линейный шаг цены за блок, фикс-спред, убыточный round-trip."""
+"""Биржа: курс в процентах за лот, спред, отсутствие выгоды от кругов и сговора."""
 
 import pytest
 
@@ -6,88 +6,87 @@ from game.combat import balance_config as bc
 from game.economy.exchange import Exchange, InMemoryExchangeState
 from services.wallet_service import NotEnoughCurrency, get_wallet
 
-BASE = bc.EXCHANGE_BASE_BUY_PRICE
-STEP = bc.EXCHANGE_PRICE_STEP
-BLOCK = bc.EXCHANGE_BLOCK_SIZE
+LOT = bc.EXCHANGE_BLOCK_SIZE
+START = bc.EXCHANGE_START_LOT_PRICE
+G = bc.EXCHANGE_LOT_GROWTH
 
 
-def test_price_grows_linearly_per_block() -> None:
-    assert Exchange.buy_price_at(0) == BASE
-    assert Exchange.buy_price_at(BLOCK - 1) == BASE
-    assert Exchange.buy_price_at(BLOCK) == BASE + STEP          # ступенька
-    assert Exchange.buy_price_at(5 * BLOCK) == BASE + 5 * STEP  # линейно
+def test_start_price_is_5000_per_lot() -> None:
+    assert Exchange.buy_cost(0, LOT) == START == 5000
 
 
-def test_buy_cost_steps_across_blocks() -> None:
-    # первый блок целиком по базовой цене
-    assert Exchange.buy_cost(0, BLOCK) == BLOCK * BASE
-    # полтора блока: 100 по BASE + 50 по BASE+STEP
-    assert Exchange.buy_cost(0, BLOCK + 50) == BLOCK * BASE + 50 * (BASE + STEP)
-    # покупка из середины блока
-    assert Exchange.buy_cost(BLOCK // 2, BLOCK) == (
-        (BLOCK // 2) * BASE + (BLOCK - BLOCK // 2) * (BASE + STEP)
-    )
+def test_price_moves_in_percent() -> None:
+    assert Exchange.lot_buy_price(1) == round(START * (1 + G))
+    assert Exchange.lot_buy_price(10) == round(START * (1 + G) ** 10)
+    assert Exchange.lot_buy_price(-10) == round(START * (1 + G) ** -10)
+    # каждый следующий лот дороже предыдущего на одну и ту же долю
+    ratio = Exchange.lot_buy_price(51) / Exchange.lot_buy_price(50)
+    assert abs(ratio - (1 + G)) < 0.001
 
 
-def test_fixed_spread() -> None:
-    assert Exchange.buy_price_at(0) - Exchange.sell_price_at(0) == bc.EXCHANGE_SPREAD
+def test_floor() -> None:
+    assert Exchange.lot_buy_price(-10_000) == bc.EXCHANGE_MIN_LOT_PRICE
+    assert Exchange.lot_sell_price(-10_000) < bc.EXCHANGE_MIN_LOT_PRICE
 
 
-def test_round_trip_is_lossy_math() -> None:
-    """Купить → продать = гарантированный минус (п.10)."""
-    for net_sold in (0, 50, 250, 1000):
-        for amount in (1, 10, 150):
-            cost = Exchange.buy_cost(net_sold, amount)
-            gain = Exchange.sell_gain(net_sold + amount, amount)
-            assert gain < cost, (net_sold, amount)
+def test_sell_is_spread_below_buy_one_step_down() -> None:
+    for level in (-200, -1, 0, 1, 37, 300):
+        assert Exchange.lot_sell_price(level) == round(
+            Exchange.lot_buy_price(level - 1) * (1 - bc.EXCHANGE_SPREAD_PCT)
+        )
+
+
+def test_no_profitable_round_trip_anywhere() -> None:
+    """Купить k лотов и продать их обратно - всегда минус, на любом уровне
+    курса и объёме, включая пол."""
+    for level in range(-400, 400, 9):
+        net = level * LOT
+        for lots in (1, 2, 5, 10, 50):
+            cost = Exchange.buy_cost(net, lots * LOT)
+            gain = Exchange.sell_gain(net + lots * LOT, lots * LOT)
+            assert gain < cost, (level, lots)
+
+
+def test_collusion_loses_in_total() -> None:
+    """Б заранее купил, А разгоняет цену, Б продаёт на вершине, А сбрасывает:
+    вместе они в минусе - биржа денег не создаёт."""
+    for start in (-100, 0, 100):
+        for pre in (1, 5, 20):
+            for push in (1, 10, 50):
+                net = start * LOT
+                b_cost = Exchange.buy_cost(net, pre * LOT)
+                net += pre * LOT
+                a_cost = Exchange.buy_cost(net, push * LOT)
+                net += push * LOT
+                b_gain = Exchange.sell_gain(net, pre * LOT)
+                net -= pre * LOT
+                a_gain = Exchange.sell_gain(net, push * LOT)
+                assert (b_gain - b_cost) + (a_gain - a_cost) < 0, (start, pre, push)
 
 
 async def test_buy_and_sell_flow(db_session, make_character) -> None:
     character = await make_character(farm=100_000)
     exchange = Exchange(InMemoryExchangeState())
-
-    order = await exchange.buy_donate(db_session, character.id, 50)
+    order = await exchange.buy_donate(db_session, character.id, LOT)
     wallet = await get_wallet(db_session, character.id)
-    assert wallet.donate_currency == 50
-    assert wallet.farm_currency == 100_000 - order.gold_amount
-    assert order.gold_amount == 50 * BASE
-
-    # round-trip убыточен и на живом кошельке
-    await exchange.sell_donate(db_session, character.id, 50)
+    assert wallet.donate_currency == LOT and order.gold_amount == START
+    await exchange.sell_donate(db_session, character.id, LOT)
     wallet = await get_wallet(db_session, character.id)
-    assert wallet.donate_currency == 0
-    assert wallet.farm_currency < 100_000
+    assert wallet.donate_currency == 0 and wallet.farm_currency < 100_000
+
+
+async def test_only_whole_lots(db_session, make_character) -> None:
+    character = await make_character(farm=100_000)
+    exchange = Exchange(InMemoryExchangeState())
+    with pytest.raises(ValueError):
+        await exchange.buy_donate(db_session, character.id, 150)
 
 
 async def test_buy_without_gold_fails(db_session, make_character) -> None:
     character = await make_character(farm=10)
     exchange = Exchange(InMemoryExchangeState())
     with pytest.raises(NotEnoughCurrency):
-        await exchange.buy_donate(db_session, character.id, 100)
-
-
-async def test_quote_moves_with_volume(db_session, make_character) -> None:
-    character = await make_character(farm=10_000_000)
-    exchange = Exchange(InMemoryExchangeState())
-    q0 = await exchange.quote()
-    await exchange.buy_donate(db_session, character.id, BLOCK * 3)
-    q1 = await exchange.quote()
-    assert q1.buy_price == q0.buy_price + 3 * STEP
-    assert q1.block == 3
-
-
-def test_start_price_is_5000_per_lot() -> None:
-    assert Exchange.buy_cost(0, BLOCK) == 5000
-
-
-def test_price_falls_when_players_sell_but_has_floor() -> None:
-    assert Exchange.buy_price_at(-BLOCK) == BASE - STEP
-    assert Exchange.buy_price_at(-10_000 * BLOCK) == bc.EXCHANGE_MIN_BUY_PRICE
-    assert Exchange.sell_price_at(-10_000 * BLOCK) == bc.EXCHANGE_MIN_SELL_PRICE
-    # Продажа из нуля идёт по нисходящим ступеням.
-    assert Exchange.sell_gain(0, 2 * BLOCK) == BLOCK * (BASE - STEP - bc.EXCHANGE_SPREAD) + BLOCK * (
-        BASE - 2 * STEP - bc.EXCHANGE_SPREAD
-    )
+        await exchange.buy_donate(db_session, character.id, LOT)
 
 
 async def test_service_lots_and_course(db_session, make_character) -> None:
@@ -95,16 +94,16 @@ async def test_service_lots_and_course(db_session, make_character) -> None:
 
     character = await make_character(farm=100_000, donate=500)
     q0 = await exchange_service.quote(db_session)
-    assert q0.buy_lot == 5000 and q0.buy_series[1] == 5000 + 5000 + BLOCK * STEP
+    assert q0.buy_lot == START and q0.buy_series[1] == START + Exchange.lot_buy_price(1)
     with pytest.raises(exchange_service.ExchangeError):
         await exchange_service.buy(db_session, character, 0)
     order = await exchange_service.buy(db_session, character, 2)
     assert order.amount == 200 and order.gold_amount == q0.buy_series[1]
     q1 = await exchange_service.quote(db_session)
-    assert q1.buy_lot > q0.buy_lot
+    assert q1.buy_lot == Exchange.lot_buy_price(2)
     await exchange_service.sell(db_session, character, 3)
     q2 = await exchange_service.quote(db_session)
-    assert q2.net_sold == -BLOCK and q2.buy_lot < q0.buy_lot
+    assert q2.net_sold == -LOT and q2.buy_lot < START
     with pytest.raises(exchange_service.ExchangeError, match="самоцветов"):
         await exchange_service.sell(db_session, character, 50)
 
@@ -120,3 +119,20 @@ async def test_sell_gems_is_taxed_by_guild(db_session, make_character) -> None:
     wallet = await get_wallet(db_session, leader.id)
     assert wallet.farm_currency == order.gold_amount - order.gold_amount // 10
     assert guild_service.gold_label(leader, 1000) == "1000 золота (после налога 900)"
+
+
+async def test_daily_snapshot(db_session, make_character) -> None:
+    from datetime import timedelta
+
+    from services import exchange_service
+
+    character = await make_character(farm=100_000)
+    await exchange_service.buy(db_session, character, 2)
+    today = exchange_service.yesterday_msk() + timedelta(days=1)
+    row = await exchange_service.snapshot_day(db_session, today)
+    assert row.bought_lots == 2 and row.buy_lot == Exchange.lot_buy_price(2)
+    # Вчера сделок не было, а курс на его конец - до сегодняшних покупок.
+    row = await exchange_service.snapshot_day(db_session, today - timedelta(days=1))
+    assert row.bought_lots == 0 and row.buy_lot == START
+    chart = await exchange_service.daily_chart(db_session)
+    assert [r.day for r in chart] == [today - timedelta(days=1), today]

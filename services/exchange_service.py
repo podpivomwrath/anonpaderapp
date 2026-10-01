@@ -10,13 +10,15 @@
 """
 
 from dataclasses import dataclass
+from datetime import date, datetime, time, timedelta
+from zoneinfo import ZoneInfo
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from game.combat import balance_config as bc
 from game.economy.exchange import Exchange
-from models import Character, ExchangeOrder, ExchangeState, OrderDirection
+from models import Character, ExchangeDaily, ExchangeOrder, ExchangeState, OrderDirection
 from services import wallet_service
 
 LOT = bc.EXCHANGE_BLOCK_SIZE
@@ -124,3 +126,52 @@ async def recent_orders(db: AsyncSession, limit: int = 40) -> list[ExchangeOrder
 
 def is_buy(order: ExchangeOrder) -> bool:
     return order.direction == OrderDirection.BUY
+
+
+# --- График: курс на закрытие дня ----------------------------------------------
+
+_TZ = ZoneInfo("Europe/Moscow")
+
+
+def _day_bounds(day: date) -> tuple[datetime, datetime]:
+    start = datetime.combine(day, time.min, tzinfo=_TZ)
+    return start, start + timedelta(days=1)
+
+
+async def snapshot_day(db: AsyncSession, day: date) -> ExchangeDaily:
+    """Курс на конец дня day (МСК) и объём сделок за день. Курс на конец дня
+    - текущий, отмотанный назад на сделки, прошедшие после полуночи: задача
+    бежит чуть позже полуночи, и сделки этих минут в прошлый день не идут."""
+    start, end = _day_bounds(day)
+    net = await DbExchangeState(db).get_net_sold()
+    later = (await db.scalars(select(ExchangeOrder).where(ExchangeOrder.created_at >= end))).all()
+    for order in later:
+        net -= order.amount if order.direction == OrderDirection.BUY else -order.amount
+    orders = (
+        await db.scalars(
+            select(ExchangeOrder).where(ExchangeOrder.created_at >= start, ExchangeOrder.created_at < end)
+        )
+    ).all()
+    level = Exchange._lot_of(net)
+    row = await db.get(ExchangeDaily, day)
+    if row is None:
+        row = ExchangeDaily(day=day, buy_lot=0, sell_lot=0)
+        db.add(row)
+    row.buy_lot = Exchange.lot_buy_price(level)
+    row.sell_lot = Exchange.lot_sell_price(level)
+    row.bought_lots = sum(o.amount for o in orders if o.direction == OrderDirection.BUY) // LOT
+    row.sold_lots = sum(o.amount for o in orders if o.direction != OrderDirection.BUY) // LOT
+    await db.flush()
+    return row
+
+
+async def daily_chart(db: AsyncSession, days: int = 60) -> list[ExchangeDaily]:
+    return list(
+        reversed(
+            (await db.scalars(select(ExchangeDaily).order_by(ExchangeDaily.day.desc()).limit(days))).all()
+        )
+    )
+
+
+def yesterday_msk() -> date:
+    return datetime.now(_TZ).date() - timedelta(days=1)

@@ -1,6 +1,6 @@
 """Эндпоинты биржи: /api/miniapp/exchange.
 
-GET - курс, цены 1..10 лотов подряд, кошелёк, свои и последние сделки.
+GET - курс, цены 1..10 лотов подряд, кошелёк, свои сделки, дневной график.
 POST {"direction": "buy"|"sell", "lots": N} - сделка; в ответ то же, что GET.
 Личность - только из request[VK_USER_ID_KEY].
 """
@@ -30,18 +30,23 @@ def _order(order) -> dict:
 async def _state(db, character) -> dict:
     q = await exchange_service.quote(db)
     wallet = await wallet_service.get_wallet(db, character.id)
-    recent = await exchange_service.recent_orders(db)
     return {
         "lot": exchange_service.LOT,
         "max_lots": exchange_service.MAX_LOTS,
         "buy_lot": q.buy_lot, "sell_lot": q.sell_lot,
         "buy_series": q.buy_series, "sell_series": q.sell_series,
-        "start_lot": bc.EXCHANGE_BASE_BUY_PRICE * exchange_service.LOT,
+        "start_lot": bc.EXCHANGE_START_LOT_PRICE,
+        "growth_pct": round(bc.EXCHANGE_LOT_GROWTH * 100, 2),
+        "spread_pct": round(bc.EXCHANGE_SPREAD_PCT * 100, 2),
         "gold": wallet.farm_currency, "gems": wallet.donate_currency,
         "tax": int(guild_service.perk(character, "_tax")),
         "mine": [_order(o) for o in await exchange_service.my_orders(db, character.id)],
-        # Лента рынка без имён: курс - общий, кто торговал - не важно.
-        "recent": [_order(o) for o in recent],
+        # График - по дням, обновляется раз в сутки (снимок после полуночи).
+        "chart": [
+            {"day": d.day.isoformat(), "buy": d.buy_lot, "sell": d.sell_lot,
+             "bought": d.bought_lots, "sold": d.sold_lots}
+            for d in await exchange_service.daily_chart(db)
+        ],
     }
 
 

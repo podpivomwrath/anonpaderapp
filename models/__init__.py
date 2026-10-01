@@ -7,7 +7,7 @@ from models.character import Character, CharacterBuffPreset, CharacterStats
 from models.combat import CombatParticipant, CombatSession
 from models.consumable import CharacterConsumable
 from models.dailies import CharacterDaily, CharacterTitle
-from models.economy import ExchangeOrder, ExchangeState, Wallet
+from models.economy import ExchangeDaily, ExchangeOrder, ExchangeState, Wallet
 from models.enums import (
     BaseClass,
     CombatStatus,
@@ -79,6 +79,7 @@ __all__ = [
     "CombatSession",
     "CombatStatus",
     "CombatType",
+    "ExchangeDaily",
     "ExchangeOrder",
     "ExchangeState",
     "Group",
