@@ -410,3 +410,64 @@ desaturated palette of ash grey, rust brown and dried blood, drifting ash in
 the air, moody overcast light, no text, no watermark, no logo, no modern
 objects, horizontal 3:2 composition
 ```
+
+---
+
+# Групповые события
+
+`content/events/group_scenes.json`. Картинка приходит всем участникам с
+первой сценой. Отличие от соло: в кадре место для **нескольких** путников -
+со спины или в тени, лиц нет, как везде. Готовый id - полем `"image"` у
+события в `content/events/group_scenes.json`.
+
+## 📦 Схрон дезертиров — `g_deserters_cache`
+
+```
+an opened wooden chest wrapped in oiled leather lying under the roots of an
+uprooted tree, coins, a few small vials and a heavy wrapped bundle inside,
+several hooded travellers crouching around it seen from behind, hands
+hovering over the chest but nobody touching it yet, tense stillness, dark
+fantasy scene illustration, painterly semi-realistic, muted desaturated
+palette of ash grey, rust brown and dried blood, drifting ash in the air,
+moody overcast light, no text, no watermark, no logo, no modern objects,
+horizontal 3:2 composition
+```
+
+## 🗳 Развилка над оврагом — `g_ravine_fork`
+
+```
+a path ending at the edge of a deep ravine, a rickety bridge of lashed poles
+spanning it, the black mouth of a tunnel far below, a narrow trail winding
+away along the ridge, a small group of hooded travellers standing at the edge
+seen from behind, each looking a different way, dark fantasy scene
+illustration, painterly semi-realistic, muted desaturated palette of ash
+grey, rust brown and dried blood, drifting ash in the air, moody overcast
+light, no text, no watermark, no logo, no modern objects, horizontal 3:2
+composition
+```
+
+## 🪨 Завал — `g_rockfall`
+
+```
+inside an old collapsed mine gallery, cracked timber beams bowing under the
+weight of the ceiling, dust raining down, the exit buried under a pile of
+rocks with a thin line of grey daylight above it, silhouettes of several
+travellers bracing the beams with their shoulders while another pulls stones
+away, faces hidden in shadow, dark fantasy scene illustration, painterly
+semi-realistic, muted desaturated palette of ash grey, rust brown and dried
+blood, drifting dust in the air, dim light from above, no text, no
+watermark, no logo, no modern objects, horizontal 3:2 composition
+```
+
+## 🌫 Трясина — `g_bog`
+
+```
+a fog-covered bog at dusk, a hooded traveller sunk to the waist in black mud
+reaching out with one hand, two or three other hooded figures at the edge of
+firm ground seen from behind, one stepping forward with a rope, one turning
+away toward abandoned bags lying on a hummock, dark fantasy scene
+illustration, painterly semi-realistic, muted desaturated palette of ash
+grey, rust brown and dried blood, drifting ash in the air, moody overcast
+light, no text, no watermark, no logo, no modern objects, horizontal 3:2
+composition
+```

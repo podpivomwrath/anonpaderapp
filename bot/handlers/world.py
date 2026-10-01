@@ -38,6 +38,7 @@ from bot.handlers import inventory as inventory_handlers
 from bot.handlers import pvp as pvp_handlers
 from bot.handlers import raid_combat as raid_combat_handlers
 from bot.handlers import scene_events as scene_event_handlers
+from bot.handlers import group_events as group_event_handlers
 from bot.handlers import stats_window
 from bot.handlers import world_boss as world_boss_handlers
 from bot.keyboards import fishing as fishing_kb
@@ -581,7 +582,8 @@ async def explore(message: Message) -> None:
                 snapshot.members, character.pos_x, character.pos_y
             )
             if len(cohort) > 1:
-                if group_combat_handlers.is_group_fighting(snapshot.id):
+                if group_combat_handlers.is_group_fighting(snapshot.id) or \
+                        group_event_handlers.has_group_event(snapshot.id):
                     await message.answer("Твоя группа уже в деле. Дождись, пока они закончат.")
                     return
                 cohort_ids = {m.id for m in cohort}
@@ -618,11 +620,17 @@ async def explore(message: Message) -> None:
                             pass
                     await message.answer(notice, keyboard=group_ready_keyboard())
                     return
-                # Все участники на клетке готовы — только бои в групповом
-                # исследовании (без событий/обрывков Песни/пепла, патч 51, ч.3).
+                # Все участники на клетке готовы: групповое событие (решают
+                # все разом) или, чаще, групповой бой. Обрывков Песни и пепла
+                # в групповом исследовании нет (патч 51, ч.3).
                 group_explore_service.clear(snapshot.id)
                 region = region_for(character.pos_x, character.pos_y)
                 dist = grid.monolith_distance(character.pos_x, character.pos_y)
+                if await group_event_handlers.maybe_start(
+                    db, snapshot.id, snapshot.leader_character_id, cohort, region, dist,
+                    grid.ring_tier(character.pos_x, character.pos_y), _rng,
+                ):
+                    return
                 await group_combat_handlers.start_ready_group(
                     db, snapshot.id, cohort, region, dist, _rng,
                 )
