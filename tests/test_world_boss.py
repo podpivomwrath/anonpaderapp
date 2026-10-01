@@ -301,15 +301,25 @@ async def test_escaped_boss_leaves_and_pays_a_part(db_session, make_character) -
 
 
 def test_end_text_agrees_with_the_boss_name() -> None:
-    """«Праматерь корней пал!» пришло на проде - род берётся из контента."""
+    """«Праматерь корней пал!» пришло на проде - род берётся из контента.
+    Теперь босс - Праотец (на картинке мужская фигура), а женский род
+    проверяем на синтетическом определении."""
     from types import SimpleNamespace
 
     from bot import world_boss_texts
+    from game.world import world_boss
     from services.world_boss_service import Granted
 
     got = Granted(character_id=1, damage=10)
     killed = SimpleNamespace(boss_id="root_foremother", status="killed", hp=0, max_hp=10)
-    assert "Праматерь корней пала!" in world_boss_texts.end_text(killed, got, 10)
+    assert "Праотец корней пал!" in world_boss_texts.end_text(killed, got, 10)
+    feminine = world_boss.boss_def("root_foremother").model_copy(update={"name": "Праматерь", "feminine": True})
+    original = world_boss.boss_def
+    world_boss.boss_def = lambda boss_id: feminine
+    try:
+        assert "Праматерь пала!" in world_boss_texts.end_text(killed, got, 10)
+    finally:
+        world_boss.boss_def = original
     killed.boss_id = "vein_grabber"
     assert "Жилохват пал!" in world_boss_texts.end_text(killed, got, 10)
     left = SimpleNamespace(boss_id="faceless_procession", status="escaped", hp=5, max_hp=10)
