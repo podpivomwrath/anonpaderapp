@@ -16,7 +16,7 @@ def _pct(hp: int, max_hp: int) -> int:
 
 
 def _where(boss) -> str:
-    return f"кольцо {wbc.RING_NAMES[boss.ring]}, клетка ({boss.x};{boss.y})"
+    return f"кольцо {wbc.RING_NAMES[boss.ring]}, клетка ({boss.x}; {boss.y})"
 
 
 def _time_left(boss, now: datetime | None = None) -> str:

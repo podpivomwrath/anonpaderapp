@@ -142,11 +142,16 @@ def render_tick(
         "",
         _SEP,
     ]
-    for c in session.combatants.values():
-        if c.side != viewer_side and c.alive:
-            bar = display.health_bar(c.current_hp, c.max_hp, mode)
-            parts.append(f"{c.name}: {bar}{_mark_suffix(session, c, viewer_side)}")
-    parts.append(_SEP)
+    enemy_bars = [
+        f"{c.name}: {display.health_bar(c.current_hp, c.max_hp, mode)}{_mark_suffix(session, c, viewer_side)}"
+        for c in session.combatants.values()
+        if c.side != viewer_side and c.alive
+    ]
+    # Противники пали - их полосок нет, и второй разделитель подряд был бы
+    # пустым блоком между двумя линиями.
+    if enemy_bars:
+        parts += enemy_bars
+        parts.append(_SEP)
     for c in session.combatants.values():
         if c.side == viewer_side and c.alive:
             parts.append(f"{c.name}: {display.health_bar(c.current_hp, c.max_hp, mode)}")

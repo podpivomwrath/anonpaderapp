@@ -129,7 +129,7 @@ async def test_travel_combat_active_shows_target_marker(db_session, character_at
     await _set_progress(db_session, character, "ridge_1_2", act=1, status="active")
     stats = await db_session.get(CharacterStats, character.id)
     result = await story_service.visit_mentor(db_session, character, stats)
-    assert "(-10;25)" in result.text
+    assert "(-10; 25)" in result.text
     assert "Осыпающиеся террасы" in result.text
 
     # патч 21: показанный (не резолвящий) визит помечает шаг увиденным
@@ -169,7 +169,7 @@ async def test_no_level_gate_travel_combat_available_regardless_of_level(
     await _set_progress(db_session, character, "ridge_2_1", act=2, status="active")
     stats = await db_session.get(CharacterStats, character.id)
     result = await story_service.visit_mentor(db_session, character, stats)
-    assert "(-7;19)" in result.text
+    assert "(-7; 19)" in result.text
     assert "Забытый редут" in result.text
 
 

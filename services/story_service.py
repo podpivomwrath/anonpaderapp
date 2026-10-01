@@ -102,7 +102,7 @@ def _format_assign(quest: StoryQuestDef, character: Character) -> str:
     if quest.target_x is not None and quest.target_y is not None:
         direction = compass_direction(character.pos_x, character.pos_y, quest.target_x, quest.target_y)
         text += (
-            f"\n\n📍 Ориентир: ({quest.target_x};{quest.target_y}) - {quest.target_label} · {direction}"
+            f"\n\n📍 Ориентир: ({quest.target_x}; {quest.target_y}) - {quest.target_label} · {direction}"
         )
     return text
 

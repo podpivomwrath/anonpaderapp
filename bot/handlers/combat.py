@@ -461,7 +461,7 @@ async def on_battle_finished(session_id: int, result: TickResult) -> None:
     if result.winner_side == 0:
         # ux-patch-10 п.1: итоги боя — отдельное сообщение, сводка локации —
         # ВСЕГДА отдельным вторым сообщением, с кнопками следующего действия.
-        text = "🏆 Победа! Тварь оседает пеплом."
+        text = "🏆 Победа!"
         xp_line = display.xp_delta_line(outcome.xp_gained, outcome.xp_multiplier, outcome.xp_premium_applied)
         if xp_line:  # на 60 уровне опыта нет - и строки нет
             text += f"\n{xp_line}"

@@ -276,7 +276,7 @@ async def _finish(
         # мини-аппе рулеткой. Не продаётся ни за что (см. lootbox_config.py).
         await lootbox_service.grant_chest(db, character, character.daily_streak)
         notice_parts.append(
-            f"🗃️ Пепельный ларец - в сумке. День стрика: {character.daily_streak}\n"
+            f"🗃️ Пепельный ларец - в сумке. День серии: {character.daily_streak}\n"
             f"Открыть его можно в мини-аппе: Инвентарь → Редкости."
         )
 

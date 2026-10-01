@@ -615,7 +615,7 @@ def _chests_payload(chests) -> list[dict]:
         "name": lootbox_service.CHEST_NAME,
         "count": len(chests),
         "icon": lootbox_service.CHEST_ICON,
-        "description": "Ларец за день стрика ежедневок. Что внутри - решает рулетка при открытии.",
+        "description": "Ларец за день серии ежедневок. Что внутри - решает рулетка при открытии.",
         "grades": [{"name": g.name, "icon": f"chest:{g.id}", "grade": g.id,
                     "chance": round(100 * g.chance / total, 1)} for g in grades],
     }]

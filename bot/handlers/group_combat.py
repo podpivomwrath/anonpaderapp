@@ -674,7 +674,7 @@ async def on_group_battle_finished(session_id: int, result: TickResult) -> None:
         if cid in survivor_ids:
             pos = positions.get(cid, (0, 0))
             await _bot_api.messages.send(
-                peer_id=p.peer_id, message="🏆 Группа побеждает! Тварь оседает пеплом.", random_id=0,
+                peer_id=p.peer_id, message="🏆 Группа побеждает!", random_id=0,
                 keyboard=movement_keyboard(*pos, p.peer_id, has_mount=has_mount_by_cid.get(cid, False)),
             )
         elif cid in dead_ids and cid in defeats:
