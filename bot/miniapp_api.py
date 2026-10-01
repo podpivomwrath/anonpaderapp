@@ -97,6 +97,8 @@ def _character_payload(
         "region": character.region,
         "region_title": REGION_TITLES.get(character.region, "-") if character.region else "-",
         "level": character.level,
+        # Гильдии: вкладка видна с 20 уровня - и всегда тому, кто уже в гильдии.
+        "in_guild": character.guild_id is not None,
         # Патч 111: Мощь - одно число силы персонажа (services/power_service.py).
         "power": power.total if power is not None else None,
         "power_parts": {

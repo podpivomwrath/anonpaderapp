@@ -90,10 +90,12 @@ async def _no_guild_state(db, character: Character) -> dict:
             {"guild_id": g.id, "name": g.name, "tag": g.tag, "level": g.level, "kind": i.kind}
             for i, g in invites
         ],
+        "join_min_level": gc.JOIN_MIN_LEVEL,
         "directory": [
-            {"id": g.id, "name": g.name, "tag": g.tag, "level": g.level, "members": count,
-             "cap": gc.member_cap(g.level), "crown": guild_season_service.has_crown(g)}
-            for g, count in directory
+            {"id": e.guild.id, "name": e.guild.name, "tag": e.guild.tag, "level": e.guild.level,
+             "members": e.members, "cap": gc.member_cap(e.guild.level), "pve": e.pve, "pvp": e.pvp,
+             "fame_total": e.guild.fame_total, "crown": guild_season_service.has_crown(e.guild)}
+            for e in directory
         ],
     }
 

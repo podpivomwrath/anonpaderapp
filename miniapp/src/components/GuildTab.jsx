@@ -70,10 +70,21 @@ function NumberInput({ value, onChange, placeholder }) {
 
 // --- Без гильдии -----------------------------------------------------------------
 
+// Топ гильдий: сортирует клиент - гильдий десятки, ответ один.
+const DIRECTORY_SORTS = [
+  { id: 'members', label: 'Участники', key: (g) => g.members },
+  { id: 'pve', label: 'PvE', key: (g) => g.pve },
+  { id: 'pvp', label: 'PvP', key: (g) => g.pvp },
+  { id: 'level', label: 'Уровень', key: (g) => g.level },
+];
+
 function NoGuild({ state, run, busy }) {
   const [name, setName] = useState('');
   const [tag, setTag] = useState('');
+  const [sort, setSort] = useState('members');
   const canFound = state.level >= state.found_min_level && state.gems >= state.found_cost;
+  const key = DIRECTORY_SORTS.find((s) => s.id === sort).key;
+  const sorted = [...state.directory].sort((a, b) => key(b) - key(a) || b.fame_total - a.fame_total);
   return (
     <>
       {state.rejoin_wait_hours > 0 && (
@@ -97,12 +108,20 @@ function NoGuild({ state, run, busy }) {
           ))}
         </Group>
       )}
-      <Group header={<Header>🏰 Гильдии</Header>}>
+      <Group header={<Header>🏆 Топ гильдий</Header>}>
+        <Tabs className="guild-tabs">
+          {DIRECTORY_SORTS.map((s) => (
+            <TabsItem key={s.id} selected={sort === s.id} onClick={() => setSort(s.id)}>{s.label}</TabsItem>
+          ))}
+        </Tabs>
         {state.directory.length === 0 && <Div style={{ opacity: 0.8 }}>Гильдий пока нет - стань первым.</Div>}
-        {state.directory.map((g) => (
+        {sorted.map((g, i) => (
           <SimpleCell
             key={g.id}
-            subtitle={`${g.level} ур. · ${g.members}/${g.cap} участников`}
+            multiline
+            subtitle={
+              `${g.level} ур. · 👥 ${g.members}/${g.cap} · ⚔️ PvE ${money(g.pve)} · 🩸 PvP ${money(g.pvp)}`
+            }
             after={(
               <Button size="s" mode="secondary" disabled={busy || g.members >= g.cap}
                 onClick={() => run('apply', { guild_id: g.id }, 'Заявка отправлена.')}>
@@ -110,9 +129,12 @@ function NoGuild({ state, run, busy }) {
               </Button>
             )}
           >
-            {g.crown ? '👑 ' : ''}[{g.tag}] {g.name}
+            {i + 1}. {g.crown ? '👑 ' : ''}[{g.tag}] {g.name}
           </SimpleCell>
         ))}
+        <Div className="craft-hint">
+          PvE - сколько мобов убили все участники вместе, PvP - сколько побед у всех вместе.
+        </Div>
       </Group>
       <Group header={<Header>Основать гильдию</Header>}>
         <Div className="guild-form">

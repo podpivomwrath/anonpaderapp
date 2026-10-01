@@ -12,6 +12,8 @@
 #: Самоцветы, не золото: основание должно быть решением, а не прихотью.
 FOUND_COST_GEMS = 1000
 FOUND_MIN_LEVEL = 20
+#: Вкладка гильдий и вступление - с этого уровня.
+JOIN_MIN_LEVEL = 20
 NAME_MIN_LEN = 3
 NAME_MAX_LEN = 24
 TAG_MIN_LEN = 2

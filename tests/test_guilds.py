@@ -75,7 +75,7 @@ async def test_found_costs_gems_and_level(db_session, make_character) -> None:
 
 async def test_invite_accept_and_rejoin_cooldown(db_session, make_character) -> None:
     guild, leader = await _found(db_session, make_character)
-    newbie = await make_character(level=10)
+    newbie = await make_character(level=20)
     member = await guild_service.membership(db_session, leader.id)
     assert member is not None
     target = await guild_service.invite(db_session, leader, newbie.name)
@@ -91,7 +91,7 @@ async def test_invite_accept_and_rejoin_cooldown(db_session, make_character) -> 
 
 async def test_application_flow(db_session, make_character) -> None:
     guild, leader = await _found(db_session, make_character)
-    applicant = await make_character(level=12)
+    applicant = await make_character(level=22)
     await guild_service.apply(db_session, applicant, guild.id)
     apps = await guild_service.applications_of(db_session, guild.id)
     assert [c.id for _i, c in apps] == [applicant.id]
@@ -606,3 +606,18 @@ async def test_api_state_and_actions(db_session, make_character) -> None:
         await api._act(db_session, loner, 1, {"action": "deposit", "currency": "gold", "amount": "x"})
     tree = guild_tree_service.payload(guild)
     assert len(tree["nodes"]) == len(guild_tree.build())
+
+
+async def test_join_level_and_directory_sums(db_session, make_character) -> None:
+    guild, leader = await _found(db_session, make_character)
+    leader.mobs_killed, leader.pvp_wins = 100, 3
+    member = await _add(db_session, make_character, guild)
+    member.mobs_killed, member.pvp_wins = 50, 2
+    young = await make_character(level=gc.JOIN_MIN_LEVEL - 1)
+    with pytest.raises(GuildError, match="уровня"):
+        await guild_service.apply(db_session, young, guild.id)
+    with pytest.raises(GuildError, match="уровня"):
+        await guild_service.invite(db_session, leader, young.name)
+    await db_session.flush()
+    entry = (await guild_service.directory(db_session))[0]
+    assert (entry.members, entry.pve, entry.pvp) == (2, 150, 5)

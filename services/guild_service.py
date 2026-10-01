@@ -230,6 +230,8 @@ def rejoin_wait_hours(character: Character, now: datetime | None = None) -> floa
 def _check_free(character: Character) -> None:
     if character.guild_id is not None:
         raise GuildError("Ты уже в гильдии.")
+    if character.level < gc.JOIN_MIN_LEVEL:
+        raise GuildError(f"В гильдии вступают с {gc.JOIN_MIN_LEVEL} уровня.")
     wait = rejoin_wait_hours(character)
     if wait > 0:
         raise GuildError(f"После ухода из гильдии вступить можно через {max(1, round(wait))} ч.")
@@ -294,6 +296,8 @@ async def invite(db: AsyncSession, actor: Character, target_name: str) -> Charac
         raise GuildError("Такого персонажа нет.")
     if target.guild_id is not None:
         raise GuildError("Он уже в гильдии.")
+    if target.level < gc.JOIN_MIN_LEVEL:
+        raise GuildError(f"В гильдии вступают с {gc.JOIN_MIN_LEVEL} уровня.")
     if await member_count(db, guild.id) >= gc.member_cap(guild.level):
         raise GuildError("В гильдии нет мест.")
     await _upsert_invite(db, guild.id, target.id, "invite", actor.id)
@@ -846,9 +850,35 @@ def tree_points_available(guild: Guild) -> int:
     return (guild.level - 1) * gc.TREE_POINTS_PER_LEVEL - spent
 
 
-async def directory(db: AsyncSession, query: str | None = None, limit: int = 30) -> list[tuple[Guild, int]]:
-    stmt = select(Guild).order_by(Guild.level.desc(), Guild.fame_total.desc()).limit(limit)
-    if query:
-        stmt = stmt.where(func.lower(Guild.name).contains(query.strip().lower()))
-    guilds = (await db.scalars(stmt)).all()
-    return [(g, await member_count(db, g.id)) for g in guilds]
+@dataclass
+class DirectoryEntry:
+    guild: Guild
+    members: int
+    #: Сумма убийств мобов всех участников (PvE-активность).
+    pve: int
+    #: Сумма побед в PvP всех участников.
+    pvp: int
+
+
+async def directory(db: AsyncSession) -> list[DirectoryEntry]:
+    """Все гильдии с суммами по участникам - для топа. Сортирует клиент:
+    гильдий десятки, а четыре сортировки одного списка незачем гонять
+    четырьмя запросами."""
+    totals = {
+        guild_id: (count, pve, pvp)
+        for guild_id, count, pve, pvp in (
+            await db.execute(
+                select(
+                    Character.guild_id, func.count(Character.id),
+                    func.coalesce(func.sum(Character.mobs_killed), 0),
+                    func.coalesce(func.sum(Character.pvp_wins), 0),
+                ).where(Character.guild_id.isnot(None)).group_by(Character.guild_id)
+            )
+        ).all()
+    }
+    result = []
+    for guild in (await db.scalars(select(Guild))).all():
+        count, pve, pvp = totals.get(guild.id, (0, 0, 0))
+        result.append(DirectoryEntry(guild, int(count), int(pve), int(pvp)))
+    result.sort(key=lambda e: (-e.guild.level, -e.guild.fame_total))
+    return result

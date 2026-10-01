@@ -41,6 +41,8 @@ const SECTIONS = [
 // текст правится в редакторе статей VK без пересборки мини-аппа.
 const GUIDE_URL = 'https://vk.com/@-240167847-putevoditel-mechenogo';
 
+const GUILD_MIN_LEVEL = 20;
+
 /** Из чего сложилась Мощь - подсказка к числу в шапке. */
 function powerHint(parts) {
   if (!parts) return 'Мощь';
@@ -109,9 +111,12 @@ export default function Hub() {
     }
   }, [load]);
 
+  // Гильдии - с 20 уровня; кто уже в гильдии, видит вкладку всегда.
+  const guildOpen = character && (character.level >= GUILD_MIN_LEVEL || character.in_guild);
+  const visible = guildOpen ? SECTIONS : SECTIONS.filter((s) => s.id !== 'guild');
   const sections = character?.is_admin
-    ? [...SECTIONS, { id: 'admin', label: 'Админ' }]
-    : SECTIONS;
+    ? [...visible, { id: 'admin', label: 'Админ' }]
+    : visible;
   const current = sections.find((s) => s.id === activeTab) || sections[0];
 
   // Бургер слева, «обновить» рядом с заголовком: справа шапку перекрывают
