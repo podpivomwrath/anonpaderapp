@@ -145,20 +145,19 @@ export default function MapTab() {
     return () => observer.disconnect();
   }, [status]);
 
-  // Весь мир (~0.92 ширины картинки) целиком влезает в окно - дальше
-  // отдалять незачем.
-  const minScale = Math.min(size.width, size.height) / 0.96;
+  // Пергамент тёмной карты нарисован до самых краёв, поэтому картинка
+  // накрывает всё окно целиком (cover): на широком экране обрезаются верх и
+  // низ пергамента, пустых полос по бокам нет.
+  const minScale = Math.max(size.width, size.height);
   const clampScale = useCallback((s) => clamp(s, minScale, MAX_SCALE), [minScale]);
-  // Камеру не уводим за край мира: центр окна может отойти от Монолита
-  // ровно настолько, чтобы край мира доходил до края окна. На полном
-  // отдалении это ноль - карта стоит по центру.
+  // Камеру не уводим за край картинки: окно всегда целиком на карте.
   const clampView = useCallback((v) => {
-    const reachU = Math.max(0, 0.47 - size.width / 2 / v.scale);
-    const reachV = Math.max(0, 0.47 - size.height / 2 / v.scale);
+    const halfU = Math.min(0.5, size.width / 2 / v.scale);
+    const halfV = Math.min(0.5, size.height / 2 / v.scale);
     return {
       scale: v.scale,
-      cu: clamp(v.cu, MAP_CENTER.u - reachU, MAP_CENTER.u + reachU),
-      cv: clamp(v.cv, MAP_CENTER.v - reachV, MAP_CENTER.v + reachV),
+      cu: clamp(v.cu, halfU, 1 - halfU),
+      cv: clamp(v.cv, halfV, 1 - halfV),
     };
   }, [size]);
 
@@ -169,9 +168,9 @@ export default function MapTab() {
   useEffect(() => {
     if (!mapState) return;
     if (!view || fittedRef.current) {
-      setView({ cu: MAP_CENTER.u, cv: MAP_CENTER.v, scale: minScale });
+      setView(clampView({ cu: MAP_CENTER.u, cv: MAP_CENTER.v, scale: minScale }));
     }
-  }, [mapState, minScale]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [mapState, minScale, clampView]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const catalog = mapState?.catalog;
   const playerPos = mapState ? { x: mapState.pos_x, y: mapState.pos_y } : null;
