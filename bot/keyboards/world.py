@@ -36,6 +36,9 @@ BTN_DAILIES = "📜 Задания"
 # market_quarter_keyboard ниже.
 BTN_TAVERN = "🍺 Таверна"
 BTN_MARKET_QUARTER = "🏪 Торговый"  # патч 41: было "Торговый квартал" — резалось
+# Долгий путь (AFK) - у каждого города свой, кнопка только в родном городе.
+VOYAGE_BUTTONS = {"docks": "⛵ В море", "ridge": "🧗 К вершинам", "scorched": "🛞 В пустошь", "woods": "🌲 В лес"}
+BTN_VOYAGE_RETURN = "⚓ Вернуться"
 BTN_SQUARE_BACK = "← Площадь"  # патч 41: было "← Главная площадь"
 
 
@@ -103,6 +106,9 @@ def city_square_keyboard(
     if not is_foreign:
         items.append((BTN_TAVERN, KeyboardButtonColor.SECONDARY, None))
     items.append((BTN_MARKET_QUARTER, KeyboardButtonColor.SECONDARY, None))
+    home = getattr(character, "region", None)
+    if not is_foreign and home in VOYAGE_BUTTONS:
+        items.append((VOYAGE_BUTTONS[home], KeyboardButtonColor.PRIMARY, None))
     add_paired(kb, items)
     add_miniapp_button(kb)
     return kb.get_json()
@@ -329,4 +335,12 @@ def combat_keyboard(base_class: str, cooldowns: dict[str, int], subclass_id: str
     items.append((BTN_ITEM, KeyboardButtonColor.SECONDARY, None))
     items.append((BTN_FLEE, KeyboardButtonColor.NEGATIVE, None))
     add_paired(kb, items)
+    return kb.get_json()
+
+
+def voyage_keyboard() -> str:
+    """В долгом пути: только «Вернуться» и профиль - остального нет."""
+    kb = Keyboard(one_time=False)
+    kb.add(Text(BTN_VOYAGE_RETURN), color=KeyboardButtonColor.POSITIVE)
+    add_miniapp_button(kb)
     return kb.get_json()

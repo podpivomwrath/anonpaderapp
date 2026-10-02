@@ -269,6 +269,14 @@ async def run() -> None:
     # Час ночной: пересчёт задевает бонусы, и лучше, чтобы он случался не
     # посреди вечерней игры.
     crown_handlers.setup(bot.api)
+    # Долгие путешествия (AFK): кто в пути - из базы; события - раз в минуту.
+    from bot.handlers import voyage as voyage_handlers
+
+    voyage_handlers.setup(bot.api)
+    await voyage_handlers.load_away()
+    respawn_scheduler.add_job(
+        voyage_handlers.tick_job, "interval", seconds=60, id="voyage_tick", max_instances=1, coalesce=True,
+    )
     respawn_scheduler.add_job(
         crown_handlers.recompute_and_notify, "cron", hour=3, minute=0,
         id="crowns_daily", max_instances=1, coalesce=True,

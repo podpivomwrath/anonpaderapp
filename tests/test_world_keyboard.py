@@ -140,3 +140,13 @@ def test_market_quarter_foreign_hides_elixir_and_market_keeps_appraiser_inventor
 def test_market_quarter_rows_bounded() -> None:
     rows = _rows(market_quarter_keyboard(is_foreign=False))
     assert len(rows) <= 6
+
+
+def test_square_home_city_shows_its_voyage_only() -> None:
+    from bot.keyboards.world import VOYAGE_BUTTONS
+
+    home = FakeCharacter()
+    home.region = "docks"
+    assert VOYAGE_BUTTONS["docks"] in _labels(city_square_keyboard(home, is_foreign=False))
+    assert VOYAGE_BUTTONS["docks"] not in _labels(city_square_keyboard(home, is_foreign=True))
+    assert len(_rows(city_square_keyboard(home, has_mount=True, is_foreign=False))) <= 6

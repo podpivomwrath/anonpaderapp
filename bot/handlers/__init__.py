@@ -33,12 +33,15 @@ from bot.handlers.stats_window import labeler as stats_window_labeler
 from bot.handlers.transfer import labeler as transfer_labeler
 from bot.handlers.world import labeler as world_labeler
 from bot.handlers.world_boss import labeler as world_boss_labeler
+from bot.handlers.voyage import labeler as voyage_labeler
 
 LABELERS = [
     # Патч 110: события со сценами - сразу после онбординга. Ответ на загадку
     # приходит свободным текстом и должен попасть сюда раньше команд и
     # промокодов (правило срабатывает, только пока загадка ждёт ответа).
-    onboarding_labeler, raid_archive_labeler, scene_events_labeler, group_events_labeler, world_labeler, combat_labeler, group_combat_labeler, pvp_labeler, appraiser_labeler,
+    # Долгий путь (AFK): пока игрок в пути, его сообщения перехватываются
+    # раньше всех - кроме онбординга (он ловит только FSM создания).
+    onboarding_labeler, voyage_labeler, raid_archive_labeler, scene_events_labeler, group_events_labeler, world_labeler, combat_labeler, group_combat_labeler, pvp_labeler, appraiser_labeler,
     inventory_labeler, list_keeper_labeler, presets_labeler, elixir_shop_labeler,
     dailies_labeler, mounts_labeler, stats_window_labeler, moderation_labeler, basic_labeler,
     # Патч 53: рейд — до fallback/promo, как и остальные боевые/меню лейблеры.

@@ -50,6 +50,7 @@ from models.subclass_trial import CharacterTrialProgress, CharacterUnlockedBuff
 from models.transfer import TransferLog
 from models.trophy import CharacterTrophy
 from models.user import User
+from models.voyage import CharacterVoyage
 from models.world_boss import WorldBoss, WorldBossContribution, WorldBossMeter
 
 __all__ = [
@@ -77,6 +78,7 @@ __all__ = [
     "CharacterTrialProgress",
     "CharacterTrophy",
     "CharacterUnlockedBuff",
+    "CharacterVoyage",
     "CombatParticipant",
     "CombatSession",
     "CombatStatus",
