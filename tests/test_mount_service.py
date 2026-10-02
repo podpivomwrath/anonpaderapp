@@ -228,3 +228,21 @@ async def test_active_travel_finds_traveling_and_ambushed_not_completed(db_sessi
     travel.status = "completed"
     await db_session.flush()
     assert await mount_service.active_travel(db_session, character.id) is None
+
+
+async def test_stop_travel_keeps_current_cell(db_session, make_character) -> None:
+    character = await make_character(level=10)
+    character.pos_x = character.pos_y = 0
+    travel = _build_travel(character_id=character.id)
+    db_session.add(travel)
+    await db_session.flush()
+    mount_service.advance(travel, character, NeverAmbush(), now=NOW + timedelta(seconds=22))
+    assert await mount_service.stop_travel(db_session, travel, character)
+    assert travel.status == "stopped" and (character.pos_x, character.pos_y) == (3, 0)
+    assert await mount_service.active_travel(db_session, character.id) is None
+    # посреди боя-нападения не остановиться, после победы - можно
+    fight = _build_travel(character_id=character.id, status="ambushed")
+    db_session.add(fight)
+    await db_session.flush()
+    assert not await mount_service.stop_travel(db_session, fight, character)
+    assert await mount_service.stop_travel(db_session, fight, character, after_ambush=True)

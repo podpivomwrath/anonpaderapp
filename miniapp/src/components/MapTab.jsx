@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Div, Spinner, Placeholder, Button, IconButton } from '@vkontakte/vkui';
-import { getMapState, sendMountFromMap } from '../api.js';
+import { getMapState, sendMountFromMap, stopTravel } from '../api.js';
 import mapBase from '../assets/world-map-drawn-2048.webp';
 import mapDetail from '../assets/world-map-drawn-4096.webp';
 import lensFrame from '../assets/lens-frame.webp';
@@ -106,6 +106,7 @@ export default function MapTab() {
   const [selected, setSelected] = useState(null); // {x, y}
   const [sendFlow, setSendFlow] = useState(null); // {step: 'pick'|'confirm', mount}
   const [banner, setBanner] = useState(null);
+  const [stopping, setStopping] = useState(false);
 
   const pointers = useRef(new Map());
   const dragRef = useRef(null);
@@ -484,6 +485,19 @@ export default function MapTab() {
     }
   };
 
+  const stop = async () => {
+    setStopping(true);
+    try {
+      await stopTravel();
+      setBanner(`⏹ Остановка на (${mapState.pos_x}; ${mapState.pos_y}).`);
+    } catch (err) {
+      setBanner(err.message || 'Не удалось остановиться.');
+    } finally {
+      setStopping(false);
+      load();
+    }
+  };
+
   useEffect(() => {
     if (!banner) return undefined;
     const id = setTimeout(() => setBanner(null), 4000);
@@ -739,9 +753,20 @@ export default function MapTab() {
 
         {isTraveling && (
           <div className="map-travel-banner">
-            {mapState.mount_travel
-              ? `🐎 В пути к (${mapState.mount_travel.to_x}; ${mapState.mount_travel.to_y})`
-              : `🚶 В пути к (${mapState.foot_travel.to_x}; ${mapState.foot_travel.to_y})`}
+            {mapState.mount_travel ? (
+              <>
+                <span>
+                  {mapState.mount_travel.mount_id === 'trade_cart' ? '🐂' : '🐎'} Сейчас ({mapState.pos_x}; {mapState.pos_y})
+                  {' → '}({mapState.mount_travel.to_x}; {mapState.mount_travel.to_y})
+                </span>
+                {/* Сойти с пути на текущей клетке - как кнопка в чате. */}
+                <button className="map-travel-banner__stop" disabled={stopping} onClick={stop}>
+                  ⏹ Остановиться
+                </button>
+              </>
+            ) : (
+              `🚶 В пути к (${mapState.foot_travel.to_x}; ${mapState.foot_travel.to_y})`
+            )}
           </div>
         )}
         {worldBoss && !isTraveling && (

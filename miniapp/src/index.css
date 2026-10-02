@@ -638,6 +638,27 @@ body {
   font-size: 12px;
 }
 
+/* Плашка пути: где сейчас, куда, и кнопка остановки рядом. */
+.map-travel-banner:has(.map-travel-banner__stop) {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.map-travel-banner__stop {
+  padding: 3px 8px;
+  border: 1px solid #c81e3a88;
+  border-radius: 5px;
+  background: rgba(200, 30, 58, 0.25);
+  color: #f2d9dc;
+  font: inherit;
+  cursor: pointer;
+}
+
+.map-travel-banner__stop:disabled {
+  opacity: 0.5;
+}
+
 .map-toast {
   position: absolute;
   left: 50%;

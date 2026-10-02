@@ -198,19 +198,21 @@ async def start_travel_and_notify(
 
     Коммит делает вызывающий: у карты и чата разные транзакционные границы.
     """
-    await mount_service.start_travel(db, character, mount_id, to_x, to_y, _rng, now)
+    travel = await mount_service.start_travel(db, character, mount_id, to_x, to_y, _rng, now)
     cells = grid.cells_between(character.pos_x, character.pos_y, to_x, to_y)
     seconds = mount_service.total_travel_seconds(mount_id, cells)
     await db.commit()
     await notify_travel_started(
         peer_id, to_x, to_y, seconds,
         mount_service.trip_ambush_chance(mount_id, character.pos_x, character.pos_y, to_x, to_y),
+        travel=travel,
     )
     return seconds
 
 
 async def notify_travel_started(
     peer_id: int, to_x: int, to_y: int, seconds: float, ambush_chance: float, icon: str = "🐎",
+    travel=None,
 ) -> None:
     """Сообщение о начале пути на маунте + клавиатура ожидания — общая точка
     для обоих способов отправки маунта (патч 31, фикс 1): из чата (coord_input
@@ -241,6 +243,7 @@ async def notify_travel_started(
         # а в логах не было ни строчки.
         logger.exception("Не удалось отправить в чат сообщение о начале пути ({})", peer_id)
         return
+    # Это же сообщение дальше правится по мере движения (scan): где ты сейчас.
     try:
         _travel_message[peer_id] = int(resp)
     except (TypeError, ValueError):
@@ -252,7 +255,43 @@ def _travel_text(travel, now: datetime) -> str:
     path = mount_service.path_of(travel)
     x, y = path[travel.cell_index - 1] if travel.cell_index else (travel.from_x, travel.from_y)
     icon = "🐂" if travel.mount_id == tc.CART_MOUNT_ID else "🐎"
-    return f"{icon} В пути: ({x}; {y}) → ({travel.to_x}; {travel.to_y}), осталось {_format_seconds(left)}."
+    cells = mount_service.cells_left(travel)
+    return (
+        f"{icon} В пути: ({x}; {y}) → ({travel.to_x}; {travel.to_y}), "
+        f"осталось {cells} кл., {_format_seconds(left)}."
+    )
+
+
+# Сообщение «в пути» - одно на поездку: сообщение о начале пути правится по
+# мере движения (текущая клетка, сколько осталось). Кнопки «Остановиться» и
+# «Осмотреться» - на обычной клавиатуре внизу (kb.mount_travel_keyboard).
+
+
+async def send_progress(peer_id: int, travel) -> None:
+    """Новое сообщение «в пути» (после боя-нападения) - дальше правится оно."""
+    if _bot_api is None:
+        return
+    try:
+        resp = await _bot_api.messages.send(
+            peer_id=peer_id, message=_travel_text(travel, datetime.now(timezone.utc)), random_id=0,
+            keyboard=kb.mount_travel_keyboard(),
+        )
+        _travel_message[peer_id] = int(resp)
+    except Exception:  # noqa: BLE001
+        logger.exception("Не удалось отправить сообщение пути ({})", peer_id)
+
+
+async def close_progress(peer_id: int, text: str) -> None:
+    """Путь кончился (прибытие, нападение, остановка): итог вместо отсчёта."""
+    msg_id = _travel_message.pop(peer_id, None)
+    _countdown_edited.pop(peer_id, None)
+    _progress_cell.pop(peer_id, None)
+    if msg_id is None or _bot_api is None:
+        return
+    try:
+        await _bot_api.messages.edit(peer_id=peer_id, message_id=msg_id, message=text)
+    except Exception:  # noqa: BLE001
+        logger.debug("Не удалось закрыть сообщение пути для {}", peer_id)
 
 
 async def offer_continue(peer_id: int, travel_id: int) -> None:
@@ -324,14 +363,89 @@ async def continue_travel(message: Message) -> None:
         await mount_service.resume_travel(db, travel)
         await db.commit()
 
-    resp = await _bot_api.messages.send(
-        peer_id=peer_id, message=_travel_text(travel, datetime.now(timezone.utc)),
-        random_id=0, keyboard=kb.mount_travel_keyboard(),
+    await send_progress(peer_id, travel)
+
+
+async def stop_and_notify(peer_id: int, travel_id: int | None = None) -> str | None:
+    """Остановиться там, где стоишь: одна точка для кнопки в чате, «Остаться
+    здесь» после боя и кнопки на карте мини-аппа. None - остановились,
+    иначе текст отказа."""
+    from models import MountTravel
+
+    after_ambush = travel_id is not None and _pending_continue.get(peer_id) == travel_id
+    if in_any_battle(peer_id) or pvp_handlers.has_active_battle(peer_id):
+        return "Сначала разберись с боем."
+    async with get_session_factory()() as db:
+        character = await onboarding_svc.get_character(db, peer_id)
+        if character is None:
+            return "Персонаж не найден."
+        travel = await mount_service.active_travel(db, character.id)
+        if travel is None or (travel_id is not None and travel.id != travel_id):
+            return "Ты сейчас не в пути."
+        if not await mount_service.stop_travel(db, travel, character, after_ambush=after_ambush):
+            return "Сейчас не остановиться."
+        await db.commit()
+    _pending_continue.pop(peer_id, None)
+    await close_progress(peer_id, f"⏹ Остановка на ({character.pos_x}; {character.pos_y}).")
+    await send_cell_screen(peer_id, "⏹ Ты сходишь с пути.")
+    return None
+
+
+async def send_cell_screen(peer_id: int, header: str) -> None:
+    """Экран клетки, где персонаж стоит: город - площадь, иначе сводка
+    клетки с клавиатурой движения (как после прибытия)."""
+    async with get_session_factory()() as db:
+        character = await onboarding_svc.get_character(db, peer_id)
+        if character is None:
+            return
+        stats = await _stats(db, character.id)
+        wallet = await wallet_service.get_wallet(db, character.id)
+        gear_bonus = await item_service.compute_gear_bonus(db, character.id)
+        quest_line = await story_service.quest_summary_line(db, character)
+        group_block = await group_texts.group_summary_block(db, character.id)
+        has_mount = await mount_service.has_any_mount(db, character.id)
+        region = grid.city_region_at(character.pos_x, character.pos_y)
+        if region is not None:
+            await screen_service.set_screen(db, character, None)
+            is_foreign = region != character.region
+            mentor_badge = not is_foreign and await story_service.mentor_badge_active(db, character)
+            await db.commit()
+            await _bot_api.messages.send(
+                peer_id=peer_id, message=f"{header}\n\n{REGION_TITLES[region]}", random_id=0,
+                attachment=hub_attachment(region),
+                keyboard=kb.city_square_keyboard(character, mentor_badge, has_mount=has_mount, is_foreign=is_foreign),
+            )
+            return
+        await db.commit()
+    text = f"{header}\n\n" + location_summary(
+        character, stats, _rng, wallet.farm_currency, gear_bonus.get("vit", 0), quest_line,
+        wallet.donate_currency, group_block,
     )
-    try:
-        _travel_message[peer_id] = int(resp)
-    except (TypeError, ValueError):
-        pass
+    await _bot_api.messages.send(
+        peer_id=peer_id, message=text, random_id=0, attachment=location_attachment(character),
+        keyboard=kb.movement_keyboard(character.pos_x, character.pos_y, peer_id, has_mount=has_mount),
+    )
+    await world_handlers.send_cell_buttons(peer_id, character)
+
+
+@labeler.message(text=[kb.BTN_STOP_TRAVEL])
+@activity_action
+async def stop_button(message: Message) -> None:
+    reason = await stop_and_notify(message.peer_id)
+    if reason is not None:
+        await message.answer(reason)
+
+
+@labeler.message(payload_contains={"type": "stop_travel"})
+@activity_action
+async def stay_here(message: Message) -> None:
+    payload = message.get_payload_json() or {}
+    travel_id = payload.get("travel")
+    if not isinstance(travel_id, int):
+        return
+    reason = await stop_and_notify(message.peer_id, travel_id)
+    if reason is not None:
+        await message.answer(reason)
 
 
 def is_paused(peer_id: int) -> bool:
@@ -344,6 +458,8 @@ def is_paused(peer_id: int) -> bool:
 # peer_id -> когда последний раз правили сообщение «в пути»: скан идёт раз в
 # пару секунд (значок на карте не должен отставать), а VK править чаще не к чему.
 _countdown_edited: dict[int, datetime] = {}
+# peer_id -> клетка пути, показанная в сообщении: правим сразу, как она сменилась.
+_progress_cell: dict[int, int] = {}
 
 
 async def scan() -> None:
@@ -452,16 +568,22 @@ async def scan() -> None:
                 continue
 
             if _live_countdown:
+                # Правим сообщение «в пути», как только сменилась клетка (но не
+                # чаще раза в TRAVEL_EDIT_MIN_SECONDS), и раз в отсчёт - время.
                 last = _countdown_edited.get(peer_id)
-                if last is None or (now - last).total_seconds() >= mc.TRAVEL_COUNTDOWN_UPDATE_SECONDS:
+                since = (now - last).total_seconds() if last is not None else None
+                moved = _progress_cell.get(peer_id) != travel.cell_index
+                if since is None or since >= mc.TRAVEL_COUNTDOWN_UPDATE_SECONDS or (
+                    moved and since >= mc.TRAVEL_EDIT_MIN_SECONDS
+                ):
                     _countdown_edited[peer_id] = now
+                    _progress_cell[peer_id] = travel.cell_index
                     countdowns.append((peer_id, travel))
 
         await db.commit()
 
     for peer_id, character, stats, gear_bonus, buff_modifiers, travel_id, encounter in ambush_starts:
-        _travel_message.pop(peer_id, None)
-        _countdown_edited.pop(peer_id, None)
+        await close_progress(peer_id, f"⚠ Путь прерван нападением на ({character.pos_x}; {character.pos_y}).")
         await _bot_api.messages.send(
             peer_id=peer_id,
             message=f"⚠ ({character.pos_x}; {character.pos_y}): на пути внезапно возникает опасность - ты встаёшь.",
@@ -473,8 +595,7 @@ async def scan() -> None:
 
     for (peer_id, character, stats, farm_currency, donate_currency, quest_line, gear_bonus,
          region, mentor_badge, is_foreign, group_block, cart_line, has_mount) in arrivals:
-        _travel_message.pop(peer_id, None)
-        _countdown_edited.pop(peer_id, None)
+        await close_progress(peer_id, f"🏁 Путь окончен: ({character.pos_x}; {character.pos_y}).")
         if region is not None:
             text = (
                 foreign_city_entry_text(REGION_TITLES[region]) if is_foreign

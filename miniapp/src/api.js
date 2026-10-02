@@ -235,6 +235,10 @@ export function sendMountFromMap(mountId, x, y) {
   });
 }
 
+export function stopTravel() {
+  return request('/map/stop_travel', { method: 'POST' });
+}
+
 // --- Мастерская (патч 72) ---
 
 export const getCraft = () => request('/craft');

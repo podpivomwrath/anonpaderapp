@@ -221,6 +221,24 @@ def _blocked_reason(character: Character, peer_id: int) -> str | None:
     return None
 
 
+async def handle_post_stop_travel(request: web.Request) -> web.Response:
+    """Остановиться на текущей клетке пути - та же точка, что кнопка в чате
+    (bot/handlers/mounts.py::stop_and_notify): в чат придёт экран клетки."""
+    vk_user_id = request[VK_USER_ID_KEY]
+    async with request.app[SESSION_FACTORY_KEY]() as db:
+        character = await _load_character(db, vk_user_id)
+        if character is None:
+            return web.json_response({"error": "character_not_found"}, status=404)
+        travel = await mount_service.active_travel(db, character.id)
+        travel_id = travel.id if travel is not None else None
+    if travel_id is None:
+        return web.json_response({"error": "Ты сейчас не в пути."}, status=409)
+    reason = await mounts_handlers.stop_and_notify(vk_user_id, travel_id)
+    if reason is not None:
+        return web.json_response({"error": reason}, status=409)
+    return web.json_response({"ok": True})
+
+
 async def handle_post_send_mount(request: web.Request) -> web.Response:
     vk_user_id = request[VK_USER_ID_KEY]
     try:
@@ -277,3 +295,4 @@ async def handle_post_send_mount(request: web.Request) -> web.Response:
 def register_routes(app: web.Application) -> None:
     app.router.add_get("/api/miniapp/map/state", handle_get_state)
     app.router.add_post("/api/miniapp/map/send_mount", handle_post_send_mount)
+    app.router.add_post("/api/miniapp/map/stop_travel", handle_post_stop_travel)

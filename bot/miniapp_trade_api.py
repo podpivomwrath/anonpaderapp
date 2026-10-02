@@ -218,6 +218,7 @@ async def handle_post(request: web.Request) -> web.Response:
 
             await mounts_handlers.notify_travel_started(
                 request[VK_USER_ID_KEY], travel_started.to_x, travel_started.to_y, seconds, chance, icon="🐂",
+                travel=travel_started,
             )
         state = await _state(db, character)
         await db.commit()

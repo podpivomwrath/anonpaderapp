@@ -245,6 +245,8 @@ def movement_keyboard(
 
 
 BTN_CONTINUE_TRAVEL = "🐎 Продолжить путь"  # патч 25, п.7
+BTN_STOP_TRAVEL = "⏹ Остановиться"  # движение по клеткам: сойти с пути там, где стоишь
+BTN_STAY_HERE = "⏹ Остаться здесь"  # после боя-нападения: не продолжать путь
 
 
 def mount_travel_keyboard() -> str:
@@ -252,6 +254,7 @@ def mount_travel_keyboard() -> str:
     текущей - кто тут ещё - можно. Остальное ждёт прибытия."""
     kb = Keyboard(one_time=False)
     kb.add(Text(BTN_LOOK_AROUND), color=KeyboardButtonColor.SECONDARY)
+    kb.add(Text(BTN_STOP_TRAVEL), color=KeyboardButtonColor.NEGATIVE)
     add_miniapp_button(kb)
     return kb.get_json()
 
@@ -262,6 +265,10 @@ def continue_travel_keyboard(travel_id: int) -> str:
     kb.add(
         Text(BTN_CONTINUE_TRAVEL, payload={"type": "continue_travel", "travel": travel_id}),
         color=KeyboardButtonColor.POSITIVE,
+    )
+    kb.add(
+        Text(BTN_STAY_HERE, payload={"type": "stop_travel", "travel": travel_id}),
+        color=KeyboardButtonColor.SECONDARY,
     )
     return kb.get_json()
 
