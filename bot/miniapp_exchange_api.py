@@ -10,7 +10,7 @@ from aiohttp import web
 from bot.app_keys import SESSION_FACTORY_KEY
 from bot.miniapp_auth import VK_USER_ID_KEY
 from game.combat import balance_config as bc
-from services import exchange_service, guild_service, wallet_service
+from services import exchange_service, wallet_service
 from services import onboarding_service as onboarding_svc
 
 
@@ -39,7 +39,6 @@ async def _state(db, character) -> dict:
         "growth_pct": round(bc.EXCHANGE_LOT_GROWTH * 100, 2),
         "spread_pct": round(bc.EXCHANGE_SPREAD_PCT * 100, 2),
         "gold": wallet.farm_currency, "gems": wallet.donate_currency,
-        "tax": int(guild_service.perk(character, "_tax")),
         "mine": [_order(o) for o in await exchange_service.my_orders(db, character.id)],
         # График - по дням, обновляется раз в сутки (снимок после полуночи).
         # Курс уже взят под разделяемой блокировкой в quote(): повторный
@@ -91,8 +90,6 @@ async def handle_post(request: web.Request) -> web.Response:
         state = await _state(db, character)
         await db.commit()
     state["done"] = _order(order)
-    if direction == "sell":
-        state["done"]["net"] = guild_service.after_tax(character, order.gold_amount)
     return web.json_response(state)
 
 

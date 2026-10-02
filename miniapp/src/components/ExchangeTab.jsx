@@ -38,8 +38,7 @@ export default function ExchangeTab({ onWallet }) {
         ok: true,
         text: direction === 'buy'
           ? `Куплено ${money(done.gems)} 💎 за ${money(done.gold)} золота.`
-          : `Продано ${money(done.gems)} 💎 за ${money(done.gold)} золота`
-            + (done.net !== undefined && done.net !== done.gold ? ` (после налога гильдии ${money(done.net)})` : '') + '.',
+          : `Продано ${money(done.gems)} 💎 за ${money(done.gold)} золота.`,
       });
     } catch (err) {
       setNotice({ ok: false, text: err.message });
@@ -58,7 +57,6 @@ export default function ExchangeTab({ onWallet }) {
   const buyCost = data.buy_series[lots - 1];
   const sellGain = data.sell_series[lots - 1];
   const gems = lots * data.lot;
-  const net = data.tax ? sellGain - Math.floor((sellGain * data.tax) / 100) : sellGain;
 
   return (
     <>
@@ -102,9 +100,6 @@ export default function ExchangeTab({ onWallet }) {
           <Button size="l" stretched mode="secondary" disabled={busy || data.gems < gems} onClick={() => trade('sell')}>
             Продать {money(gems)} 💎 за {money(sellGain)} золота
           </Button>
-          {data.tax > 0 && (
-            <p className="craft-hint">Налог гильдии {data.tax}%: с продажи на руки придёт {money(net)}.</p>
-          )}
           {lots > 1 && (
             <p className="craft-hint">Цена за несколько лотов уже учитывает сдвиг курса после каждого лота.</p>
           )}

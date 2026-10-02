@@ -117,17 +117,19 @@ async def test_service_lots_and_course(db_session, make_character) -> None:
         await exchange_service.sell(db_session, character, 50)
 
 
-async def test_sell_gems_is_taxed_by_guild(db_session, make_character) -> None:
+async def test_exchange_is_not_taxed_by_guild(db_session, make_character) -> None:
+    """Налог гильдии биржу не касается: выручка с продажи приходит целиком."""
     from game.economy import guild_config as gc
+    from models import Guild
     from services import exchange_service, guild_service
 
     leader = await make_character(level=30, donate=gc.FOUND_COST_GEMS + 100)
-    await guild_service.create(db_session, leader, "Торговцы", "ТРГ")
+    guild = await guild_service.create(db_session, leader, "Торговцы", "ТРГ")
     await guild_service.set_tax(db_session, leader, 10)
     order = await exchange_service.sell(db_session, leader, 1)
     wallet = await get_wallet(db_session, leader.id)
-    assert wallet.farm_currency == order.gold_amount - order.gold_amount // 10
-    assert guild_service.gold_label(leader, 1000) == "1000 золота (после налога 900)"
+    assert wallet.farm_currency == order.gold_amount
+    assert (await db_session.get(Guild, guild.id)).tax_collected == 0
 
 
 async def test_daily_snapshot(db_session, make_character) -> None:

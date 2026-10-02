@@ -167,7 +167,8 @@ class Exchange:
         gain = self.sell_gain(net_sold, amount)
 
         await charge(db, character_id, "donate", amount)
-        await deposit(db, character_id, "farm", gain)
+        # Биржу налог гильдии не касается (решение владельца): выручка целиком.
+        await deposit(db, character_id, "farm", gain, taxable=False)
         await self._state.add_net_sold(-amount)
 
         order = ExchangeOrder(
