@@ -31,15 +31,22 @@ DARK_MYSTIC = register(
 )
 
 
+def _party(ctx: SkillContext) -> list:
+    """Вся своя сторона, включая самого мистика. Раньше он выбирал, кого
+    лечить, только среди союзников: в группе себя не лечил никогда, даже
+    будучи самым раненым (жалоба игроков)."""
+    return [*ctx.session.alive_allies_of(ctx.actor), ctx.actor]
+
+
 def _lowest_hp_ally_or_self(ctx: SkillContext):
-    allies = ctx.session.alive_allies_of(ctx.actor)
-    return min(allies, key=lambda c: c.current_hp / c.max_hp) if allies else ctx.actor
+    """Самый раненый по доле HP на своей стороне - мистик или союзник."""
+    return min(_party(ctx), key=lambda c: c.current_hp / c.max_hp)
 
 
 def _allies_by_hp(ctx: SkillContext) -> list:
-    """Живые союзники по возрастанию доли HP: «Разделённому пакту» нужен
-    ВТОРОЙ по тяжести раненый, «Кругу тьмы» - все сразу."""
-    return sorted(ctx.session.alive_allies_of(ctx.actor), key=lambda c: c.current_hp / c.max_hp)
+    """Своя сторона (с мистиком) по возрастанию доли HP: «Разделённому
+    пакту» нужен ВТОРОЙ по тяжести раненый, «Кругу тьмы» - все сразу."""
+    return sorted(_party(ctx), key=lambda c: c.current_hp / c.max_hp)
 
 
 def _pay_hp(actor, pct: float, *, from_max: bool = False) -> int:
@@ -127,7 +134,8 @@ def blood_pact(ctx: SkillContext) -> None:
             )
     # «Круг тьмы» (бафф): раз в N ходов пакт лечит вдобавок всех союзников.
     interval = int(actor.buff_modifiers.get("circle_interval", 0))
-    if interval and ranked and ctx.session.tick_number % interval == 0:
+    # Только в группе, как и было: в одиночку бафф не срабатывает.
+    if interval and ctx.session.alive_allies_of(actor) and ctx.session.tick_number % interval == 0:
         share = actor.buff_modifiers.get("circle_pct", bc.DARK_MYSTIC_CIRCLE_PCT)
         circle_heal = round(heal * share)
         if circle_heal > 0:
@@ -223,6 +231,8 @@ def circle_of_dark(ctx: SkillContext) -> None:
     )
     allies = ctx.session.alive_allies_of(actor)
     if allies:
+        # Круг - плата своим HP ради союзников: себя он не лечит намеренно,
+        # иначе плата съедалась бы собственным лечением.
         for ally in allies:
             ctx.heals.append(PendingHeal(source_id=actor.id, target_id=ally.id, amount=round(power), label="исцеляет кругом тьмы"))
     else:

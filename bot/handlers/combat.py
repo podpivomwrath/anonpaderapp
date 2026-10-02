@@ -718,6 +718,9 @@ async def use_item(message: Message) -> None:
     text = "🎒 Что использовать?"
     if limit_reached and any(d.category == "combat" for d, _ in stock):
         text += "\n\nБольше твоё тело не выдержит за один бой - боевые эликсиры недоступны."
+    # Открытие окна - всегда новым сообщением внизу: иначе правилось бы
+    # окно из прошлого боя, давно уехавшее вверх, и нажатие казалось мёртвым.
+    editable_message.clear("combat_item", peer_id)
     await editable_message.send_or_edit(
         _bot_api, "combat_item", peer_id, text, combat_items_keyboard(visible)
     )

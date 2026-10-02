@@ -1052,6 +1052,9 @@ async def pvp_open_target(message: Message) -> None:
     current = combatants.get(current_id) if current_id is not None else None
     lines.append(f"Текущая цель: {current.name if current is not None else '-'}")
 
+    # Открытие окна - всегда новым сообщением внизу: иначе правилось бы
+    # окно из прошлого боя, давно уехавшее вверх, и нажатие казалось мёртвым.
+    editable_message.clear("pvp_target", peer_id)
     await editable_message.send_or_edit(
         _bot_api, "pvp_target", peer_id, "\n".join(lines), pvp_target_keyboard(enemy_ids),
     )
@@ -1165,6 +1168,9 @@ async def pvp_open_items(message: Message) -> None:
     text = "🎒 Что использовать?"
     if limit_reached and any(d.category == "combat" for d, _ in stock):
         text += "\n\nБольше твоё тело не выдержит за один бой - боевые эликсиры недоступны."
+    # Открытие окна - всегда новым сообщением внизу: иначе правилось бы
+    # окно из прошлого боя, давно уехавшее вверх, и нажатие казалось мёртвым.
+    editable_message.clear("pvp_combat_item", peer_id)
     await editable_message.send_or_edit(
         _bot_api, "pvp_combat_item", peer_id, text, pvp_items_keyboard(visible)
     )

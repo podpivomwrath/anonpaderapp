@@ -256,3 +256,15 @@ def test_echo_is_noop_without_allies() -> None:
     enemy = combatant(2, side=1, agility=0, vitality=500)
     resolve_tick(make_session(healer, enemy), {1: skill("dark_mystic_blood_pact", 2)}, rng)
     assert enemy.effect_total(EffectKind.SHIELD_POOL) == 0
+
+
+def test_pact_heals_the_mystic_when_he_is_the_most_wounded() -> None:
+    """В группе мистик лечит самого раненого на своей стороне - и себя тоже.
+    Раньше он выбирал только среди союзников и себя не лечил никогда."""
+    healer = mystic()
+    healer.current_hp = healer.max_hp // 4
+    ally = combatant(3, side=0)
+    ally.current_hp = ally.max_hp * 9 // 10
+    enemy = combatant(2, side=1, agility=0, vitality=500)
+    result = resolve_tick(make_session(healer, ally, enemy), {1: skill("dark_mystic_blood_pact", 2)}, NoCritRng())
+    assert heal_to(result, healer.id) > 0 and heal_to(result, ally.id) == 0
