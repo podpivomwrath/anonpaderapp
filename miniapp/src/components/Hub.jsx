@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import ClassIcon from './ClassIcon.jsx';
 import CrownPicker from './CrownPicker.jsx';
+import TitlePicker from './TitlePicker.jsx';
 import {
   Panel, PanelHeader, PanelHeaderButton, Placeholder, Spinner, Div, Button,
 } from '@vkontakte/vkui';
@@ -63,6 +64,7 @@ export default function Hub() {
   const [activeTab, setActiveTab] = useState('character');
   const [menuOpen, setMenuOpen] = useState(false);
   const [crownOpen, setCrownOpen] = useState(false);
+  const [titleOpen, setTitleOpen] = useState(false);
   const [character, setCharacter] = useState(null);
   const [status, setStatus] = useState('loading'); // loading | ready | error
   const [ban, setBan] = useState(null);
@@ -74,6 +76,18 @@ export default function Hub() {
     window.addEventListener('account-banned', onBan);
     return () => window.removeEventListener('account-banned', onBan);
   }, []);
+
+  // Фон живёт вне хаба (BackgroundScene) и должен знать, какой экран открыт.
+  useEffect(() => {
+    document.body.dataset.view = activeTab;
+  }, [activeTab]);
+
+  // Фон может попросить перечитать персонажа (у него появился титул).
+  useEffect(() => {
+    const refresh = () => load({ silent: true });
+    window.addEventListener('character-refresh', refresh);
+    return () => window.removeEventListener('character-refresh', refresh);
+  });
 
   // Патч 72: из инвентаря можно прыгнуть сразу в мастерскую - событие вместо
   // проброса колбэка через три слоя. Раздел один, слушатель один.
@@ -223,6 +237,14 @@ export default function Hub() {
         </>
       )}
 
+      {titleOpen && (
+        <TitlePicker
+          titles={character.titles || []}
+          onChange={(res) => setCharacter((prev) => ({ ...prev, ...res }))}
+          onClose={() => setTitleOpen(false)}
+        />
+      )}
+
       {crownOpen && (
         <CrownPicker
           menu={character.crown_menu || []}
@@ -267,7 +289,21 @@ export default function Hub() {
         <div className="hub-banner__text">
         <p className="hub-banner__name">
           {character.name}
-          {character.title ? ` «${character.title}»` : ''}
+          {/* Титул - кнопка, когда есть из чего выбирать (как эмблема венца).
+              Без активного титула, но с открытыми - тусклая подсказка, иначе
+              снятый титул нечем было бы вернуть. */}
+          {character.titles?.length ? (
+            <>
+              {' '}
+              <button
+                type="button"
+                className={`hub-banner__title title-tier title-tier--${character.title ? character.title_tier : 'none'}`}
+                onClick={() => setTitleOpen(true)}
+              >
+                {character.title ? `«${character.title}»` : '«без титула»'}
+              </button>
+            </>
+          ) : character.title ? ` «${character.title}»` : ''}
         </p>
         <p className="hub-banner__meta">
           {character.base_class_title}

@@ -1582,3 +1582,62 @@ body::before {
 .scene--calm .scene__mist {
   animation: none;
 }
+
+/* Секрет «Внимательный» (BackgroundScene, useEmber): трещина вспыхивает и
+   гаснет, рядом на пару мгновений проступает шёпот. */
+.scene__glow--woke {
+  animation: scene-ember-woke 6s ease-out forwards;
+}
+
+@keyframes scene-ember-woke {
+  0% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+  12% { opacity: 1; transform: translate(-50%, -50%) scale(2.6); }
+  100% { opacity: 0.15; transform: translate(-50%, -50%) scale(1); }
+}
+
+.scene__whisper {
+  position: absolute;
+  transform: translate(-100%, -50%);
+  white-space: nowrap;
+  font-family: 'Cormorant SC', Forum, serif;
+  font-size: 15px;
+  line-height: 1.35;
+  text-align: right;
+  color: rgba(255, 190, 170, 0.92);
+  text-shadow: 0 0 10px rgba(200, 30, 40, 0.7);
+  animation: scene-whisper 6s ease-in-out forwards;
+}
+
+@keyframes scene-whisper {
+  0%, 100% { opacity: 0; }
+  15%, 75% { opacity: 1; }
+}
+
+/* --- Титул в шапке и его тиры ------------------------------------------- */
+/* Кнопка выглядит как часть имени: тот же шрифт, без рамки и фона. */
+.hub-banner__title {
+  font: inherit;
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: pointer;
+  color: inherit;
+}
+
+.hub-banner__title:hover {
+  text-decoration: underline dotted;
+  text-underline-offset: 4px;
+}
+
+/* Цвета - как редкость предметов: синий редкий, фиолетовый эпический,
+   жёлтый легендарный. Обычный - цвет текста. */
+.title-tier--rare { color: #7fa8e6; }
+.title-tier--epic { color: #b48ce6; }
+.title-tier--legendary {
+  color: #f0c64e;
+  text-shadow: 0 0 8px rgba(240, 198, 78, 0.35);
+}
+.title-tier--none {
+  color: rgba(255, 255, 255, 0.35);
+  font-size: 0.75em;
+}

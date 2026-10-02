@@ -53,6 +53,18 @@ export function submitStats(increments) {
   });
 }
 
+export function setTitle(titleId) {
+  return request('/title', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ title_id: titleId }),
+  });
+}
+
+export function glance() {
+  return request('/glance', { method: 'POST' });
+}
+
 export function getTrials() {
   return request('/trials');
 }

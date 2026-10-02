@@ -38,6 +38,7 @@ from services import (
     song_service,
     story_service,
     stat_alloc_service,
+    title_service,
     trial_service,
     trophy_service,
 )
@@ -72,7 +73,7 @@ async def _load_character(session: AsyncSession, vk_user_id: int) -> Character |
 
 def _character_payload(
     character: Character, gear_bonus: dict[str, int] | None = None, wallet=None, is_admin: bool = False,
-    power=None,
+    power=None, titles: list[dict] | None = None,
 ) -> dict:
     stats = character.stats
     derived = derived_stats_service.compute(character, stats, gear_bonus)
@@ -80,6 +81,9 @@ def _character_payload(
         "name": character.name,
         "is_admin": is_admin,
         "title": daily_service.title_name(character),
+        # Тир - цвет титула в шапке; titles - открытые титулы для подменю.
+        "title_tier": title_service.tier_of(character.active_title_id) if daily_service.title_name(character) else None,
+        "titles": titles or [],
         "base_class": character.base_class,
         "base_class_title": CLASS_TITLES.get(character.base_class, character.base_class),
         "subclass": character.subclass,
@@ -168,9 +172,10 @@ async def handle_get_character(request: web.Request) -> web.Response:
         gear_bonus = await item_service.compute_gear_bonus(session, character.id)
         wallet = await get_wallet(session, character.id)
         power = await power_service.power_of(session, character)
+        titles = await title_service.menu(session, character)
         await session.commit()
         return web.json_response(
-            _character_payload(character, gear_bonus, wallet, _is_admin(request, vk_user_id), power)
+            _character_payload(character, gear_bonus, wallet, _is_admin(request, vk_user_id), power, titles)
         )
 
 
@@ -219,9 +224,10 @@ async def handle_post_stats(request: web.Request) -> web.Response:
         gear_bonus = await item_service.compute_gear_bonus(session, character.id)
         wallet = await get_wallet(session, character.id)
         power = await power_service.power_of(session, character)
+        titles = await title_service.menu(session, character)
         await session.commit()
         return web.json_response(
-            _character_payload(character, gear_bonus, wallet, _is_admin(request, vk_user_id), power)
+            _character_payload(character, gear_bonus, wallet, _is_admin(request, vk_user_id), power, titles)
         )
 
 
@@ -292,6 +298,49 @@ async def handle_post_crown_frame(request: web.Request) -> web.Response:
             "crown_frame": crown_service.frame_board(character),
             "crown_menu": crown_service.menu(character),
         })
+
+
+async def handle_post_title(request: web.Request) -> web.Response:
+    """Какой титул носить. {"title_id": "chronicler"} или {"title_id": null} - без титула."""
+    try:
+        body = await request.json()
+    except Exception:
+        return web.json_response({"error": "bad_request"}, status=400)
+    if not isinstance(body, dict):
+        return web.json_response({"error": "bad_request"}, status=400)
+    title_id = body.get("title_id")
+    if title_id is not None and not isinstance(title_id, str):
+        return web.json_response({"error": "bad_request"}, status=400)
+    session_factory = request.app[SESSION_FACTORY_KEY]
+    async with session_factory() as session:
+        character = await _load_character(session, request[VK_USER_ID_KEY])
+        if character is None:
+            return web.json_response({"error": "character_not_found"}, status=404)
+        if not await title_service.set_active(session, character, title_id):
+            return web.json_response({"error": "title_locked"}, status=400)
+        titles = await title_service.menu(session, character)
+        await session.commit()
+        return web.json_response({
+            "title": daily_service.title_name(character),
+            "title_tier": title_service.tier_of(character.active_title_id),
+            "titles": titles,
+        })
+
+
+async def handle_post_glance(request: web.Request) -> web.Response:
+    """Секрет «Внимательный»: мини-апп зовёт сюда после 100 нажатий подряд на
+    трещину Монолита. Проверить сами нажатия сервер не может - это пасхалка
+    без силы, титул только для вида. Повторный вызов ничего не меняет."""
+    session_factory = request.app[SESSION_FACTORY_KEY]
+    async with session_factory() as session:
+        character = await _load_character(session, request[VK_USER_ID_KEY])
+        if character is None:
+            return web.json_response({"error": "character_not_found"}, status=404)
+        fresh = not await title_service.has_unlocked(session, character.id, "attentive")
+        if fresh:
+            await title_service.unlock(session, character, "attentive")
+            await session.commit()
+    return web.json_response({"ok": True, "fresh": fresh})
 
 
 async def handle_get_leaderboard(request: web.Request) -> web.Response:
@@ -849,6 +898,8 @@ def register_routes(app: web.Application) -> None:
     app.router.add_get("/api/miniapp/character", handle_get_character)
     app.router.add_post("/api/miniapp/stats", handle_post_stats)
     app.router.add_post("/api/miniapp/crown-frame", handle_post_crown_frame)
+    app.router.add_post("/api/miniapp/glance", handle_post_glance)
+    app.router.add_post("/api/miniapp/title", handle_post_title)
     app.router.add_get("/api/miniapp/trials", handle_get_trials)
     app.router.add_get("/api/miniapp/inventory", handle_get_inventory)
     app.router.add_post("/api/miniapp/equip", handle_post_equip)

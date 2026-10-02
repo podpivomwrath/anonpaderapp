@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import bgWide from '../assets/bg-wide.webp';
+import { glance } from '../api.js';
 
 /**
  * Живой фон (патч 106): мерцание у основания Монолита, дрейф тумана и
@@ -37,6 +38,49 @@ function coverGeometry() {
   const imgH = IMAGE_H * scale;
   const left = (w - imgW) / 2; // background-position: center top
   return { x: left + GLOW.x * imgW, y: GLOW.y * imgH, width: imgW * 0.03, height: imgW * 0.075 };
+}
+
+// Секрет: 100 нажатий подряд по тлеющей трещине на экране персонажа - титул
+// «Внимательный». Ничем не подсказывается: ни курсора-руки, ни отклика на
+// нажатие до самой сотни. Пауза дольше EMBER_GAP или нажатие мимо трещины
+// сбрасывает счёт. Сцена лежит под интерфейсом (pointer-events: none),
+// поэтому нажатие ловится на window и сверяется с рамкой свечения - она
+// сама пересчитана под размер окна и сдвинута параллаксом.
+const EMBER_TAPS = 100;
+const EMBER_GAP = 3000;
+const NOT_EMPTY = 'button, a, input, textarea, select, label, [role="button"], [role="tab"], .vkuiGroup';
+
+function useEmber(wide, sceneRef) {
+  const [woke, setWoke] = useState(false);
+  useEffect(() => {
+    if (!wide) return undefined;
+    let taps = 0;
+    let last = 0;
+    let sent = false;
+    const onDown = (e) => {
+      if (sent || document.body.dataset.view !== 'character') return;
+      if (e.target instanceof Element && e.target.closest(NOT_EMPTY)) return;
+      const ember = sceneRef.current?.querySelector('.scene__glow');
+      if (!ember) return;
+      const r = ember.getBoundingClientRect();
+      const inside = e.clientX >= r.left && e.clientX <= r.right && e.clientY >= r.top && e.clientY <= r.bottom;
+      const now = e.timeStamp;
+      taps = inside && now - last < EMBER_GAP ? taps + 1 : inside ? 1 : 0;
+      last = now;
+      if (taps < EMBER_TAPS) return;
+      sent = true;
+      glance()
+        .then((res) => {
+          setWoke(true);
+          if (res.fresh) window.dispatchEvent(new CustomEvent('character-refresh'));
+          setTimeout(() => setWoke(false), 6000);
+        })
+        .catch(() => { sent = false; taps = 0; });
+    };
+    window.addEventListener('pointerdown', onDown, { passive: true });
+    return () => window.removeEventListener('pointerdown', onDown);
+  }, [wide, sceneRef]);
+  return woke;
 }
 
 function useMedia(query) {
@@ -85,15 +129,23 @@ export default function BackgroundScene() {
     };
   }, [wide, calm]);
 
+  // Нажатия по трещине (см. useEmber ниже).
+  const woke = useEmber(wide, sceneRef);
+
   if (!wide) return null;
 
   return createPortal(
     <div className={`scene${calm ? ' scene--calm' : ''}`} ref={sceneRef} aria-hidden="true">
       <div className="scene__image" style={{ backgroundImage: `url(${bgWide})` }}>
         <div
-          className="scene__glow"
+          className={`scene__glow${woke ? ' scene__glow--woke' : ''}`}
           style={{ left: glow.x, top: glow.y, width: glow.width, height: glow.height }}
         />
+        {woke && (
+          <div className="scene__whisper" style={{ left: glow.x - glow.width, top: glow.y }}>
+            Трещина затихает<br />под твоим взглядом.<br />Титул «Внимательный».
+          </div>
+        )}
       </div>
       <div className="scene__mist scene__mist--far" />
       <div className="scene__mist scene__mist--near" />
