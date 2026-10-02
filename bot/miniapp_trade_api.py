@@ -96,11 +96,43 @@ async def _state(db, character) -> dict:
                 for o in offers if o.buy is not None or o.sell is not None
             ],
         }
+    def route(x: int, y: int) -> dict | None:
+        """Путь повозки отсюда: клетки, время, шанс хотя бы одного нападения."""
+        if cart is None:
+            return None
+        cells = grid.cells_between(character.pos_x, character.pos_y, x, y)
+        return {
+            "cells": cells, "seconds": cells * trade_service.part_value(cart, "horses"),
+            "ambush": mount_service.trip_ambush_chance(
+                tc.CART_MOUNT_ID, character.pos_x, character.pos_y, x, y, trade_service.trip_ambush(cart),
+            ),
+        }
+
+    level = cart.trade_level if cart is not None else 1
+    cities = []
+    for r, (x, y) in wc.CITY_COORDS.items():
+        city_offers = await trade_service.offers(db, trade_service.Place("city", REGION_TITLES[r], city=r), now)
+        sells = [
+            {**_good(o.good), "price": o.buy, "locked": level < tc.TIER_MIN_TRADE_LEVEL[o.good.tier],
+             "min_level": tc.TIER_MIN_TRADE_LEVEL[o.good.tier]}
+            for o in city_offers if o.buy is not None
+        ]
+        buys = sorted(
+            ({**_good(o.good), "price": o.sell, "deficit": o.good.city in tc.DEFICIT[r]}
+             for o in city_offers if o.sell is not None),
+            key=lambda g: (not g["deficit"], -g["price"]),
+        )
+        cities.append({
+            "region": r, "title": REGION_TITLES[r], "x": x, "y": y,
+            # Чьи товары здесь в дефиците - готовой строкой.
+            "wants": ", ".join(REGION_TITLES[d] for d in sorted(tc.DEFICIT[r])),
+            "sells": sells, "buys": buys, "route": route(x, y),
+        })
     caravans = []
     for c in await trade_service.active_caravans(db, now):
         expires = c.expires_at if c.expires_at.tzinfo else c.expires_at.replace(tzinfo=timezone.utc)
         caravans.append({
-            "id": c.id, "x": c.x, "y": c.y,
+            "id": c.id, "x": c.x, "y": c.y, "route": route(c.x, c.y),
             "minutes_left": max(int((expires - now).total_seconds() // 60), 0),
             "buys": [{**_good(tc.GOODS_BY_ID[g]), "left": n, "price": trade_service.caravan_sell_price(tc.GOODS_BY_ID[g])} for g, n in c.buys.items()],
             "sells": [{**_good(tc.GOODS_BY_ID[g]), "left": n, "price": trade_service.caravan_buy_price(tc.GOODS_BY_ID[g])} for g, n in c.sells.items()],
@@ -109,14 +141,7 @@ async def _state(db, character) -> dict:
         "level": character.level, "min_level": tc.TRADE_MIN_LEVEL, "cart_price": tc.CART_PRICE,
         "gold": wallet.farm_currency, "pos": [character.pos_x, character.pos_y],
         "cart": cart_info, "place": place_info, "caravans": caravans,
-        "cities": [
-            {
-                "region": r, "title": REGION_TITLES[r], "x": x, "y": y,
-                # Чьи товары здесь в дефиците - готовой строкой.
-                "wants": ", ".join(REGION_TITLES[d] for d in sorted(tc.DEFICIT[r])),
-            }
-            for r, (x, y) in wc.CITY_COORDS.items()
-        ],
+        "cities": cities,
     }
 
 

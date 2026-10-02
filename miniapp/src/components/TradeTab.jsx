@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Button, Div, Group, Header, Placeholder, SimpleCell, Spinner } from '@vkontakte/vkui';
 import { getTrade, tradeAction } from '../api.js';
+import TradeDestination from './TradeDestination.jsx';
 
 // Торговля: повозка, Торговый дом города (или караван), куда везти.
 // Цены и правила считает сервер (services/trade_service.py) - здесь только
@@ -20,6 +21,7 @@ export default function TradeTab({ onWallet }) {
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState(null);
   const [counts, setCounts] = useState({});
+  const [dest, setDest] = useState(null);
 
   const load = useCallback(() => {
     getTrade().then((d) => { setData(d); setStatus('ready'); }).catch(() => setStatus('error'));
@@ -170,34 +172,39 @@ export default function TradeTab({ onWallet }) {
         </Group>
       )}
 
-      {cart.here && (
-        <Group header={<Header>🧭 Куда везти</Header>}>
-          {data.cities.filter((c) => c.x !== data.pos[0] || c.y !== data.pos[1]).map((c) => {
-            const cells = Math.max(Math.abs(c.x - data.pos[0]), Math.abs(c.y - data.pos[1]));
-            return (
-              <SimpleCell
-                key={c.region}
-                subtitle={`${cells} клеток · ${minutes(cells * cart.step_seconds)} · ждёт: ${c.wants}`}
-                after={<Button size="s" disabled={busy} onClick={() => act('send', { x: c.x, y: c.y })}>В путь</Button>}
-              >
-                {c.title}
-              </SimpleCell>
-            );
-          })}
-          {data.caravans.map((c) => {
-            const cells = Math.max(Math.abs(c.x - data.pos[0]), Math.abs(c.y - data.pos[1]));
-            return (
-              <SimpleCell
-                key={c.id}
-                subtitle={`${cells} клеток · ${minutes(cells * cart.step_seconds)} · уйдёт через ${c.minutes_left} мин · берёт: ${c.buys.map((g) => `${g.emoji} ${money(g.price)}`).join(', ')} · отдаёт: ${c.sells.map((g) => `${g.emoji} ${money(g.price)}`).join(', ')}`}
-                after={<Button size="s" mode="secondary" disabled={busy} onClick={() => act('send', { x: c.x, y: c.y })}>В путь</Button>}
-              >
-                🐪 Караван ({c.x}; {c.y})
-              </SimpleCell>
-            );
-          })}
-          <Div><p className="craft-hint">Путь напрямик через центр короче, но опаснее: чем ближе к Монолиту, тем чаще нападают.</p></Div>
-        </Group>
+      <Group header={<Header>🧭 Куда везти</Header>}>
+        {data.cities.map((c) => (
+          <SimpleCell
+            key={c.region}
+            onClick={() => setDest({ ...c, kind: 'city' })}
+            subtitle={c.route?.cells === 0 ? 'ты здесь' : `${c.route?.cells} клеток · ${minutes(c.route?.seconds || 0)} · ждёт: ${c.wants}`}
+            after="›"
+          >
+            {c.title}
+          </SimpleCell>
+        ))}
+        {data.caravans.map((c) => (
+          <SimpleCell
+            key={c.id}
+            onClick={() => setDest({ ...c, kind: 'caravan', title: '🐪 Караван' })}
+            subtitle={`${c.route?.cells} клеток · ${minutes(c.route?.seconds || 0)} · уйдёт через ${c.minutes_left} мин`}
+            after="›"
+          >
+            🐪 Караван ({c.x}; {c.y})
+          </SimpleCell>
+        ))}
+        <Div><p className="craft-hint">Нажми на город или караван - что там продают и покупают. Путь напрямик через центр короче, но опаснее.</p></Div>
+      </Group>
+
+      {dest && (
+        <TradeDestination
+          dest={dest}
+          cargo={cart.cargo}
+          canGo={cart.here}
+          busy={busy}
+          onGo={async () => { await act('send', { x: dest.x, y: dest.y }); setDest(null); }}
+          onClose={() => setDest(null)}
+        />
       )}
 
       {cart.here && place?.kind === 'city' && (
@@ -235,16 +242,6 @@ export default function TradeTab({ onWallet }) {
         </Group>
       )}
 
-      {!cart.here && !cart.traveling && (
-        <Group header={<Header>🐪 Караваны</Header>}>
-          {data.caravans.length === 0 && <Div><p className="craft-hint">Сейчас на дорогах нет караванов.</p></Div>}
-          {data.caravans.map((c) => (
-            <SimpleCell key={c.id} subtitle={`уйдёт через ${c.minutes_left} мин`}>
-              🐪 ({c.x}; {c.y})
-            </SimpleCell>
-          ))}
-        </Group>
-      )}
     </>
   );
 }
