@@ -43,6 +43,25 @@ async def _guild_tax(db: AsyncSession, character_id: int, amount: int) -> int:
     return cut
 
 
+async def _lock_taxing_guild(db: AsyncSession, character_id: int) -> None:
+    """Порядок блокировок: гильдия раньше кошелька. Начисление с налогом
+    сначала обновляет гильдию, потом кошелёк. Списание шло наоборот - кошелёк,
+    а налог на последующем начислении (продажа на бирже, ставка в кости,
+    перевод) трогал гильдию уже потом. Два таких параллельных события одного
+    игрока ловили взаимную блокировку, и Postgres обрывал одно из них.
+    Поэтому списание с члена гильдии с налогом сперва берёт строку гильдии.
+    Режим - FOR NO KEY UPDATE, как у самого UPDATE налога: обычный FOR UPDATE
+    конфликтует со ссылками на гильдию (вставка гильдейского дейлика при
+    смене дня) и сам рождал взаимные блокировки - стресс-тест биржи это ловил."""
+    from models import Character, Guild
+
+    await db.execute(
+        select(Guild.id).join(Character, Character.guild_id == Guild.id)
+        .where(Character.id == character_id, Guild.gold_tax > 0)
+        .with_for_update(of=Guild, key_share=True)
+    )
+
+
 class NotEnoughCurrency(Exception):
     """Недостаточно валюты для операции."""
 
@@ -63,6 +82,7 @@ async def get_wallet(db: AsyncSession, character_id: int) -> Wallet:
 async def charge(db: AsyncSession, character_id: int, currency: str, amount: int) -> Wallet:
     """Списывает валюту ('farm' | 'donate'); кидает NotEnoughCurrency."""
     wallet = await get_wallet(db, character_id)  # строка обязана существовать
+    await _lock_taxing_guild(db, character_id)
     column = _column(currency)
     result = await db.execute(
         update(Wallet)

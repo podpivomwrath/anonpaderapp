@@ -42,7 +42,10 @@ async def _state(db, character) -> dict:
         "tax": int(guild_service.perk(character, "_tax")),
         "mine": [_order(o) for o in await exchange_service.my_orders(db, character.id)],
         # График - по дням, обновляется раз в сутки (снимок после полуночи).
-        "chart": await exchange_service.chart_points(db),
+        # Курс уже взят под разделяемой блокировкой в quote(): повторный
+        # FOR SHARE той же строки, пока в очереди ждёт сделка, Postgres
+        # считает взаимной блокировкой - поэтому net передаём, а не перечитываем.
+        "chart": await exchange_service.chart_points(db, net=q.net_sold),
     }
 
 
@@ -51,6 +54,7 @@ async def handle_get(request: web.Request) -> web.Response:
         character = await onboarding_svc.get_character(db, request[VK_USER_ID_KEY])
         if character is None:
             return _error("character_not_found", 404)
+        await db.commit()  # см. handle_post: вход игрока - своей транзакцией
         state = await _state(db, character)
         # quote() берёт строку курса под блокировкой - отпускаем сразу.
         await db.commit()
@@ -71,6 +75,10 @@ async def handle_post(request: web.Request) -> web.Response:
         character = await onboarding_svc.get_character(db, request[VK_USER_ID_KEY])
         if character is None:
             return _error("character_not_found", 404)
+        # Вход игрока (смена дня, гильдейские задания, last_active_at) пишет
+        # свои строки - фиксируем его отдельно: сделка начинается без чужих
+        # блокировок и первым делом берёт курс, а не ждёт его, держа что-то.
+        await db.commit()
         try:
             if direction == "buy":
                 order = await exchange_service.buy(db, character, lots)

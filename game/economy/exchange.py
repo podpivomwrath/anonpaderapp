@@ -85,9 +85,12 @@ class Exchange:
 
     @staticmethod
     def lot_buy_price(level: int) -> int:
-        """Цена покупки лота на ступени level."""
+        """Цена покупки лота на ступени level. Потолок нужен не для игры (до
+        него не дойти никаким золотом), а чтобы степень не переполняла float
+        и сумма лотов влезала в BIGINT кошелька."""
+        level = max(min(level, 5000), -5000)
         price = bc.EXCHANGE_START_LOT_PRICE * (1 + bc.EXCHANGE_LOT_GROWTH) ** level
-        return max(round(price), bc.EXCHANGE_MIN_LOT_PRICE)
+        return min(max(round(price), bc.EXCHANGE_MIN_LOT_PRICE), bc.EXCHANGE_MAX_LOT_PRICE)
 
     @classmethod
     def lot_sell_price(cls, level: int) -> int:

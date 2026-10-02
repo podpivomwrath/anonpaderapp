@@ -215,6 +215,7 @@ EXCHANGE_START_LOT_PRICE = 5000     # золота за лот на старте
 EXCHANGE_LOT_GROWTH = 0.03          # +3% к цене за каждый лот чистого спроса
 EXCHANGE_SPREAD_PCT = 0.20          # продажа на 20% дешевле покупки
 EXCHANGE_MIN_LOT_PRICE = 500        # пол цены лота: ниже рынок не проваливается
+EXCHANGE_MAX_LOT_PRICE = 10**12     # технический потолок: 50 лотов влезают в BIGINT
 
 # --- Механики подклассов ---
 PROVOKE_PVP_DAMAGE_REDUCTION = 0.30     # PvP-провокация: урон по другим целям -30%

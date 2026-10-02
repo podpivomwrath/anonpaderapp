@@ -29,6 +29,15 @@ def test_floor() -> None:
     assert Exchange.lot_sell_price(-10_000) < bc.EXCHANGE_MIN_LOT_PRICE
 
 
+def test_extreme_levels_do_not_overflow() -> None:
+    """Курс на запредельных ступенях не роняет float и влезает в BIGINT."""
+    for level in (10**6, 10**400, -(10**400)):
+        buy = Exchange.lot_buy_price(level)
+        assert bc.EXCHANGE_MIN_LOT_PRICE <= buy <= bc.EXCHANGE_MAX_LOT_PRICE
+        assert Exchange.lot_sell_price(level) < buy
+    assert Exchange.buy_cost(10**9 * LOT, 50 * LOT) < 2**63
+
+
 def test_sell_is_spread_below_buy_one_step_down() -> None:
     for level in (-200, -1, 0, 1, 37, 300):
         assert Exchange.lot_sell_price(level) == round(

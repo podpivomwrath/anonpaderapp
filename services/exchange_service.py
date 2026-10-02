@@ -31,14 +31,17 @@ class ExchangeError(Exception):
 
 class DbExchangeState:
     """Состояние курса в базе. get_net_sold берёт строку под блокировкой -
-    она держится до конца транзакции сделки."""
+    она держится до конца транзакции сделки. shared=True - для чтения курса
+    (просмотр, график): такие читатели не мешают друг другу, но ждут
+    идущую сделку и не дают ей сдвинуть курс посреди их подсчёта."""
 
-    def __init__(self, db: AsyncSession) -> None:
+    def __init__(self, db: AsyncSession, shared: bool = False) -> None:
         self._db = db
+        self._shared = shared
 
     async def _row(self) -> ExchangeState:
         row = await self._db.scalar(
-            select(ExchangeState).where(ExchangeState.id == 1).with_for_update()
+            select(ExchangeState).where(ExchangeState.id == 1).with_for_update(read=self._shared)
             .execution_options(populate_existing=True)
         )
         if row is None:
@@ -69,7 +72,7 @@ class Quote:
 
 
 async def quote(db: AsyncSession, lots: int = 10) -> Quote:
-    net = await DbExchangeState(db).get_net_sold()
+    net = await DbExchangeState(db, shared=True).get_net_sold()
     buy = [Exchange.buy_cost(net, LOT * n) for n in range(1, lots + 1)]
     sell = [Exchange.sell_gain(net, LOT * n) for n in range(1, lots + 1)]
     return Quote(net, buy[0], sell[0], buy, sell)
@@ -143,7 +146,7 @@ async def snapshot_day(db: AsyncSession, day: date) -> ExchangeDaily:
     - текущий, отмотанный назад на сделки, прошедшие после полуночи: задача
     бежит чуть позже полуночи, и сделки этих минут в прошлый день не идут."""
     start, end = _day_bounds(day)
-    net = await DbExchangeState(db).get_net_sold()
+    net = await DbExchangeState(db, shared=True).get_net_sold()
     later = (await db.scalars(select(ExchangeOrder).where(ExchangeOrder.created_at >= end))).all()
     for order in later:
         net -= order.amount if order.direction == OrderDirection.BUY else -order.amount
@@ -197,19 +200,22 @@ def today_start_msk() -> datetime:
     return datetime.combine(datetime.now(_TZ).date(), time.min, tzinfo=_TZ)
 
 
-async def chart_points(db: AsyncSession, days: int = 14) -> list[dict]:
+async def chart_points(db: AsyncSession, days: int = 14, net: int | None = None) -> list[dict]:
     """Точки графика: каждая сделка (курс сразу после неё) и закрытие каждого
     дня - только по ЗАКРЫТЫМ дням: график обновляется раз в сутки.
 
     Курс в сделке не хранится - он восстанавливается обратным ходом от
-    текущего объёма: покупка сдвинула его вверх, продажа - вниз."""
+    текущего объёма: покупка сдвинула его вверх, продажа - вниз. Обратный
+    ход - по id, а не по created_at: created_at - начало транзакции, и сделка,
+    дольше ждавшая блокировку курса, может получить время раньше той, что
+    прошла до неё; id выдаётся уже под блокировкой, в порядке исполнения."""
     cutoff = today_start_msk()
     since = cutoff - timedelta(days=days)
-    net = await DbExchangeState(db).get_net_sold()
+    if net is None:
+        net = await DbExchangeState(db, shared=True).get_net_sold()
     orders = (
         await db.scalars(
-            select(ExchangeOrder).where(ExchangeOrder.created_at >= since)
-            .order_by(ExchangeOrder.created_at.desc(), ExchangeOrder.id.desc())
+            select(ExchangeOrder).where(ExchangeOrder.created_at >= since).order_by(ExchangeOrder.id.desc())
         )
     ).all()
     points = []
