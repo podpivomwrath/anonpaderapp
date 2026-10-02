@@ -82,13 +82,6 @@ export default function Hub() {
     document.body.dataset.view = activeTab;
   }, [activeTab]);
 
-  // Фон может попросить перечитать персонажа (у него появился титул).
-  useEffect(() => {
-    const refresh = () => load({ silent: true });
-    window.addEventListener('character-refresh', refresh);
-    return () => window.removeEventListener('character-refresh', refresh);
-  });
-
   // Патч 72: из инвентаря можно прыгнуть сразу в мастерскую - событие вместо
   // проброса колбэка через три слоя. Раздел один, слушатель один.
   useEffect(() => {
@@ -112,6 +105,13 @@ export default function Hub() {
         if (!silent) setStatus('error');
       });
   }, []);
+
+  // Фон может попросить перечитать персонажа (у него появился титул).
+  useEffect(() => {
+    const onRefresh = () => load({ silent: true });
+    window.addEventListener('character-refresh', onRefresh);
+    return () => window.removeEventListener('character-refresh', onRefresh);
+  }, [load]);
 
   // Вкладки грузят свои данные сами при монтировании, поэтому обновление
   // карточки персонажа их не тронуло бы. Смена ключа перемонтирует активную
