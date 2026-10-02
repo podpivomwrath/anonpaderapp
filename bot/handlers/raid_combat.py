@@ -116,6 +116,8 @@ class RaidBattle:
     #: ход, с которого продолжается нумерация: три этапа поля читаются как
     #: один бой, и счётчик хода не должен сбрасываться на единицу.
     tick_offset: int = 0
+    #: ходов на текущем этапе - на RAID_STAGE_TURN_LIMIT босс бьёт ультимативно
+    stage_ticks: int = 0
     #: строки, которые этап выкладывает на доску до первого хода
     opening_lines: list[str] = field(default_factory=list)
 
@@ -201,6 +203,7 @@ def _build_player_combatants(state: CombatSessionState, member_inputs: list[Memb
 
 
 def _start_stage_session(battle_id: int, battle: RaidBattle) -> CombatSessionState:
+    battle.stage_ticks = 0
     state = CombatSessionState(session_id=battle_id, mode=CombatMode.PVE, is_raid=True)
     _build_player_combatants(state, battle.member_inputs)
 
@@ -828,6 +831,7 @@ async def on_raid_tick_resolved(session_id: int, tick: int, result: TickResult) 
         return
     _declared_this_tick.pop(session_id, None)
     _record_contribution(battle, result)
+    battle.stage_ticks += 1
     state = _engine.sessions.get(session_id)
     extra_lines: list[str] = []
     scripted_death_ids: list[int] = []
@@ -951,6 +955,13 @@ async def on_raid_tick_resolved(session_id: int, tick: int, result: TickResult) 
         return
     if result.finished:
         battle.tick_offset = tick
+    elif battle.stage_ticks >= rc.RAID_STAGE_TURN_LIMIT:
+        # Предел этапа: босс больше не ждёт и бьёт ультимативно - вся группа
+        # гибнет. Не навык из списка, а сценарный конец: раньше одиночка мог
+        # тянуть этап сотнями ходов на зельях (решение владельца 2026-10-02).
+        _engine.abort_session(session_id)
+        await _finish_wipe(session_id, battle, rc.RAID_ULTIMATE_TEXT[battle.raid_id])
+        return
     if frozen_ids:
         # Последней строкой: следующий ход движок откроет только после
         # возврата из этого колбэка, а пропуск надо объявить уже в нём.
