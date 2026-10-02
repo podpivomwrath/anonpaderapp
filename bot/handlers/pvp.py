@@ -440,15 +440,25 @@ async def look_around(message: Message) -> None:
             await message.answer("☠ Сначала очнись.")
             return
         # Патч 58-59: озёра и рудники первых двух колец — мирные, как города.
-        if _is_safe_craft_cell(character):
-            return
-        # Патч 33, ч.2: города полностью мирные — кнопка и так не показывается
-        # в городских клавиатурах (bot/keyboards/world.py), это защита от
-        # устаревшей клавиатуры.
-        if grid.city_region_at(character.pos_x, character.pos_y) is not None:
+        # Патч 33, ч.2: в городских клавиатурах кнопки нет - это защита от
+        # устаревшей клавиатуры. Раньше здесь молча выходили, а на мирной
+        # шахте или озере кнопка на клавиатуре есть: нажатие уходило в
+        # пустоту (жалоба игрока). Теперь показываем, кто рядом, без номеров -
+        # нападать здесь всё равно нельзя.
+        if _is_safe_craft_cell(character) or grid.city_region_at(character.pos_x, character.pos_y) is not None:
+            solo, _battles = await _scene_at(db, character)
+            await message.answer(_peaceful_scene_text(solo))
             return
         solo, battles = await _scene_at(db, character)
     await message.answer(_scene_text(solo, battles))
+
+
+def _peaceful_scene_text(solo: list[Character]) -> str:
+    if not solo:
+        return "👁 Ты оглядываешься.\n\nТы один. Место мирное - здесь не нападают."
+    lines = ["👁 Ты оглядываешься. Место мирное - здесь не нападают.", "", "Рядом:"]
+    lines += [f"• {_class_line(c)}" for c in solo]
+    return "\n".join(lines)
 
 
 @labeler.message(text=["/топ", "/top"])
