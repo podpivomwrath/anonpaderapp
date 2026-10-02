@@ -47,6 +47,7 @@ from bot.pvp_texts import (
     AFK_TARGET_TEXT,
     ALONE_ON_CELL,
     CITY_NO_PVP_TEXT,
+    GATES_NO_PVP_TEXT,
     LAKE_NO_PVP_TEXT,
     NOTHING_TO_TAKE,
     SIEGE_NO_PVP_TEXT,
@@ -446,7 +447,7 @@ async def look_around(message: Message) -> None:
         # шахте или озере кнопка на клавиатуре есть: нажатие уходило в
         # пустоту (жалоба игрока). Теперь показываем, кто рядом, без номеров -
         # нападать здесь всё равно нельзя.
-        if _is_safe_craft_cell(character) or grid.city_region_at(character.pos_x, character.pos_y) is not None:
+        if _is_safe_craft_cell(character) or grid.pvp_forbidden(character.pos_x, character.pos_y):
             solo, _battles = await _scene_at(db, character)
             await message.answer(_peaceful_scene_text(solo))
             return
@@ -514,6 +515,9 @@ async def attack_command(message: Message, target: str) -> None:
             return
         if grid.city_region_at(character.pos_x, character.pos_y) is not None:
             await message.answer(CITY_NO_PVP_TEXT)
+            return
+        if grid.at_city_gates(character.pos_x, character.pos_y):
+            await message.answer(GATES_NO_PVP_TEXT)
             return
         if await guild_siege_service.lock_at(db, character.pos_x, character.pos_y) is not None:
             await message.answer(SIEGE_NO_PVP_TEXT)

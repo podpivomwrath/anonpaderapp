@@ -68,6 +68,20 @@ def city_region_at(x: int, y: int) -> str | None:
     return None
 
 
+def at_city_gates(x: int, y: int) -> bool:
+    """Клетка вплотную к городу (одна из 8 соседних). Под защитой от PvP,
+    как сам город: иначе выходящего из ворот ждали прямо на первой клетке,
+    а входящего - пока он делает последний шаг к городу. Мобы тут есть."""
+    return any(
+        max(abs(x - cx), abs(y - cy)) == 1 for cx, cy in wc.CITY_COORDS.values()
+    )
+
+
+def pvp_forbidden(x: int, y: int) -> bool:
+    """Город или клетка у его ворот: игроки здесь не нападают друг на друга."""
+    return city_region_at(x, y) is not None or at_city_gates(x, y)
+
+
 def in_bounds(x: int, y: int) -> bool:
     """Клетка (x;y) - внутри круга мира (патч 108)."""
     return monolith_distance(x, y) <= wc.WORLD_RADIUS
