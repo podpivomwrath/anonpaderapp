@@ -84,7 +84,7 @@ async def buy(db: AsyncSession, character: Character) -> CharacterVoyage:
         raise VoyageError(f"{trip.gear}: {vc.VOYAGE_PRICE} золота.") from None
     voyage = CharacterVoyage(
         character_id=character.id, region=character.region, endurance=1, haul=1, guide=1,
-        status="home", hours_done=0, trip_xp=0, trip_gold=0, voyages_total=0,
+        status="home", hours_done=0, trip_xp=0, trip_gold=0, trip_items={}, voyages_total=0,
     )
     db.add(voyage)
     await db.flush()
@@ -136,6 +136,7 @@ async def start(db: AsyncSession, character: Character, now: datetime | None = N
     voyage.hours_done = 0
     voyage.trip_xp = 0
     voyage.trip_gold = 0
+    voyage.trip_items = {}
     await db.flush()
     return voyage
 
@@ -169,28 +170,53 @@ def _roll_event(voyage: CharacterVoyage, rng: random.Random) -> tuple[str, int, 
 async def _reward(
     db: AsyncSession, character: Character, stats: CharacterStats, voyage: CharacterVoyage, kind: str,
 ) -> tuple[list[str], int, int, int]:
-    """Начисляет награду события. (строки, опыт, золото, новых уровней)."""
+    """Начисляет награду события. (строки, опыт, золото, новых уровней);
+    найденные вещи сразу копятся в voyage.trip_items для итога похода."""
+    from game.combat import balance_config as bc
+
     haul = 1 + part_value(voyage, "haul") / 100
     lines, xp, gold, levels = [], 0, 0, 0
+    gold_kind = kind if kind in vc.GOLD_BASE else None
     if kind in vc.XP_MOBS:
-        amount = round(experience_service.xp_per_mob(character.level) * vc.XP_MOBS[kind] * haul)
-        up = experience_service.add_experience(character, stats, amount)
-        xp, levels = up.xp_awarded, up.levels_gained
-        if xp:
-            lines.append(f"+{xp} опыта")
-    if kind in vc.GOLD_BASE:
-        gold = round(vc.GOLD_BASE[kind] * (1 + character.level / 30) * haul)
+        if character.level >= bc.MAX_LEVEL:
+            # На потолке опыт не копится - событие «за опыт» платит золотом,
+            # иначе для максимальных персонажей больше половины часов пустые.
+            gold_kind = gold_kind or ("big" if kind == "big" else "gold")
+        else:
+            amount = round(experience_service.xp_per_mob(character.level) * vc.XP_MOBS[kind] * haul)
+            up = experience_service.add_experience(character, stats, amount)
+            xp, levels = up.xp_awarded, up.levels_gained
+            if xp:
+                lines.append(f"+{xp} опыта")
+    if gold_kind is not None:
+        gold = round(vc.GOLD_BASE[gold_kind] * (1 + character.level / 30) * haul)
         await wallet_service.deposit(db, character.id, "farm", gold)
-        lines.append(f"+{gold} золота")
+        lines.append(f"+{vc.money(gold)} золота")
+    found: dict[str, int] = {}
     if kind in vc.TROPHY_OF:
         trophy_id, count = vc.TROPHY_OF[kind]
         await trophy_service.grant_specific(db, character.id, trophy_id, count)
-        trophy = trophy_service.trophy_def(trophy_id)
-        lines.append(f"{trophy.emoji} {trophy.name}" + (f" ×{count}" if count > 1 else ""))
+        lines.append(_item_label(trophy_id, count))
+        found[trophy_id] = count
     if kind == "chest":
         await lootbox_service.grant_chest(db, character, 0)
-        lines.append(f"🎁 {lootbox_service.CHEST_NAME}")
+        lines.append(_item_label("chest", 1))
+        found["chest"] = 1
+    if found:
+        items = dict(voyage.trip_items or {})
+        for key, count in found.items():
+            items[key] = items.get(key, 0) + count
+        voyage.trip_items = items
     return lines, xp, gold, levels
+
+
+def _item_label(key: str, count: int) -> str:
+    if key == "chest":
+        name = f"🎁 {lootbox_service.CHEST_NAME}"
+    else:
+        trophy = trophy_service.trophy_def(key)
+        name = f"{trophy.emoji} {trophy.name}" if trophy else key
+    return name + (f" ×{count}" if count > 1 else "")
 
 
 @dataclass
@@ -228,7 +254,7 @@ async def tick(db: AsyncSession, rng: random.Random | None = None, now: datetime
             trip = vc.VOYAGES[voyage.region]
             body = f"{trip.emoji} Час {voyage.hours_done} из {hours}. {vc.TIER_TITLES[tier]}{text}"
             if lines:
-                body += "\n" + " · ".join(lines)
+                body += f" ({', '.join(lines)})"
             notices.append(Notice(character.id, body, levels=levels, new_level=character.level))
             voyage.next_event_at = _aware(voyage.next_event_at) + timedelta(minutes=vc.EVENT_INTERVAL_MINUTES)
             if voyage.hours_done >= hours or voyage.next_event_at > _aware(voyage.ends_at) + timedelta(seconds=1):
@@ -239,11 +265,22 @@ async def tick(db: AsyncSession, rng: random.Random | None = None, now: datetime
 
 def _finish(voyage: CharacterVoyage, early: bool) -> str:
     trip = vc.VOYAGES[voyage.region]
-    got = [f"+{voyage.trip_xp} опыта" if voyage.trip_xp else "", f"+{voyage.trip_gold} золота" if voyage.trip_gold else ""]
-    got = ", ".join(x for x in got if x)
-    summary = f"За поход: событий {voyage.hours_done}" + (f", {got}" if got else "") + "."
     if voyage.hours_done == 0:
         summary = "В пути не случилось ничего: до первой вести не прошло и часа."
+    else:
+        rows = [f"📊 Итог похода - событий: {voyage.hours_done}"]
+        if voyage.trip_xp:
+            rows.append(f"✨ Опыт: +{vc.money(voyage.trip_xp)}")
+        if voyage.trip_gold:
+            rows.append(f"💰 Золото: +{vc.money(voyage.trip_gold)}")
+        items = voyage.trip_items or {}
+        # Реликвии - в порядке ценности, ларец последним.
+        order = [t.id for t in trophy_service.trophy_defs_ordered()] + ["chest"]
+        for key in sorted(items, key=lambda k: order.index(k) if k in order else len(order)):
+            rows.append(_item_label(key, items[key]))
+        if len(rows) == 1:
+            rows.append("Ничего ценного.")
+        summary = "\n".join(rows)
     voyage.status = "home"
     voyage.next_event_at = None
     voyage.voyages_total += 1

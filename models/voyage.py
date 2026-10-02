@@ -7,7 +7,7 @@ ends_at - когда кончится запас хода. Числа - game/eco
 
 from datetime import datetime
 
-from sqlalchemy import BigInteger, DateTime, ForeignKey, Integer, String
+from sqlalchemy import JSON, BigInteger, DateTime, ForeignKey, Integer, String
 from sqlalchemy.orm import Mapped, mapped_column
 
 from models.base import Base
@@ -30,6 +30,8 @@ class CharacterVoyage(Base):
     hours_done: Mapped[int] = mapped_column(Integer, default=0)
     trip_xp: Mapped[int] = mapped_column(BigInteger, default=0)
     trip_gold: Mapped[int] = mapped_column(BigInteger, default=0)
+    #: Найдено за поход: {id реликвии или "chest": штук} - для итога.
+    trip_items: Mapped[dict] = mapped_column(JSON, default=dict)
     #: Последнее событие («тир:номер») - чтобы одно и то же не выпало подряд.
     last_event: Mapped[str | None] = mapped_column(String(24), nullable=True)
     voyages_total: Mapped[int] = mapped_column(Integer, default=0)

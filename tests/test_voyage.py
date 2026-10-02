@@ -52,7 +52,7 @@ async def test_hourly_events_rewards_and_end(db_session, character_at) -> None:
     notices = await voyage_service.tick(db_session, random.Random(2), now=NOW + timedelta(hours=9))
     assert [n.finished for n in notices] == [False] * 7 + [True]
     assert voyage.status == "home" and voyage.hours_done == 8 and voyage.voyages_total == 1
-    assert "За поход" in notices[-1].text and (voyage.trip_xp > 0 or voyage.trip_gold > 0)
+    assert "Итог похода" in notices[-1].text and (voyage.trip_xp > 0 or voyage.trip_gold > 0)
 
 
 async def test_come_back_any_time(db_session, character_at) -> None:
@@ -93,3 +93,32 @@ async def test_legendary_events_are_rare_but_happen(db_session, character_at) ->
     tiers = [voyage_service._roll_event(voyage, rng)[0] for _ in range(5000)]
     share = tiers.count("legendary") / len(tiers)
     assert 0.01 < share < 0.035
+
+
+async def test_hour_shows_reward_in_brackets_and_summary_lists_everything(db_session, character_at, monkeypatch) -> None:
+    c = await traveler(character_at)
+    voyage = await voyage_service.buy(db_session, c)
+    await voyage_service.start(db_session, c, now=NOW)
+    events = iter([("notable", 0, "Остов корабля.", "clot"), ("legendary", 0, "Сундук.", "chest"),
+                   ("common", 0, "Соль.", "gold")])
+    monkeypatch.setattr(voyage_service, "_roll_event", lambda v, rng: next(events))
+    notices = await voyage_service.tick(db_session, random.Random(1), now=NOW + timedelta(hours=3, minutes=1))
+    assert "Остов корабля. (🔵 Сгусток скверны ×2)" in notices[0].text
+    assert notices[1].text.endswith("(🎁 Пепельный ларец)")
+    assert "золота)" in notices[2].text
+    text = await voyage_service.come_back(db_session, c)
+    assert "📊 Итог похода - событий: 3" in text and "💰 Золото: +" in text
+    assert "🔵 Сгусток скверны ×2" in text and "🎁 Пепельный ларец" in text
+    assert voyage.trip_items == {"taint_clot": 2, "chest": 1}
+
+
+async def test_max_level_gets_gold_instead_of_xp(db_session, character_at) -> None:
+    from game.combat import balance_config as bc
+
+    c = await traveler(character_at, level=bc.MAX_LEVEL)
+    voyage = await voyage_service.buy(db_session, c)
+    from models import CharacterStats
+    from sqlalchemy import select
+    stats = await db_session.scalar(select(CharacterStats).where(CharacterStats.character_id == c.id))
+    lines, xp, gold, _ = await voyage_service._reward(db_session, c, stats, voyage, "xp")
+    assert xp == 0 and gold > 0 and lines == [f"+{gold} золота"]
