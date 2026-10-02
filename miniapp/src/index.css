@@ -1847,3 +1847,74 @@ body::before {
     transform: translateX(-50%);
   }
 }
+
+/* Подсказка топа: «?» у названия и окно с правилами венцов. */
+.top-header {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.top-help {
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  text-transform: none;
+  letter-spacing: 0;
+  border-radius: 50%;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  background: transparent;
+  color: rgba(255, 255, 255, 0.75);
+  font: 600 13px/1 inherit;
+  cursor: pointer;
+}
+
+.top-help:hover {
+  border-color: #c81e3a;
+  color: #fff;
+}
+
+.top-help-sheet {
+  padding: 12px 16px calc(14px + env(safe-area-inset-bottom, 0px));
+}
+
+.top-help-sheet__title {
+  display: block;
+  font-size: 17px;
+  margin-bottom: 6px;
+}
+
+.top-help-sheet__line {
+  margin: 6px 0;
+  line-height: 1.4;
+}
+
+.top-help-sheet__rules {
+  margin: 4px 0;
+  padding-left: 18px;
+  line-height: 1.4;
+}
+
+.top-help-sheet__rules li + li {
+  margin-top: 4px;
+}
+
+.top-help-sheet__close {
+  flex: 1;
+  padding: 10px;
+  border: 0;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.08);
+  color: #fff;
+  font: inherit;
+  cursor: pointer;
+}
+
+@media (min-width: 720px) {
+  .top-help-sheet {
+    left: 50%;
+    right: auto;
+    width: min(620px, 100%);
+    transform: translateX(-50%);
+  }
+}

@@ -35,6 +35,8 @@ export default function TopsTab() {
   const [boards, setBoards] = useState(DEFAULT_BOARDS);
   const [top, setTop] = useState([]);
   const [status, setStatus] = useState('loading'); // loading | ready | error
+  const [crown, setCrown] = useState(null);
+  const [helpOpen, setHelpOpen] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -43,6 +45,7 @@ export default function TopsTab() {
       .then((res) => {
         if (cancelled) return;
         setTop(res.top || []);
+        setCrown(res.crown || null);
         if (res.boards?.length) setBoards(res.boards);
         setStatus('ready');
       })
@@ -85,7 +88,21 @@ export default function TopsTab() {
       )}
 
       {status === 'ready' && top.length > 0 && (
-        <Group header={<Header>{current?.title || 'Топ'}</Header>}>
+        <Group
+          header={(
+            <Header>
+              <span className="top-header">
+                {current?.title || 'Топ'}
+                {crown && (
+                  // Подсказка: за что место в этом топе и что даёт венец первого.
+                  <button type="button" className="top-help" onClick={() => setHelpOpen(true)} aria-label="Что даёт этот топ">
+                    ?
+                  </button>
+                )}
+              </span>
+            </Header>
+          )}
+        >
           {top.map((e) => (
             <div className="stat-row top-row" key={e.rank}>
               <span className="stat-row__label">
@@ -95,7 +112,7 @@ export default function TopsTab() {
                   subclass={e.subclass}
                   baseClass={e.base_class}
                   crown={e.rank === 1 ? board : null}
-                  size={28}
+                  size={40}
                 />
                 {/* Имя, титул и Мощь переносятся внутри своей колонки: на
                     телефоне в одну строку они наезжали на достижение справа. */}
@@ -113,6 +130,35 @@ export default function TopsTab() {
             </div>
           ))}
         </Group>
+      )}
+      {helpOpen && crown && (
+        <>
+          <div className="nav-scrim" onClick={() => setHelpOpen(false)} aria-hidden="true" />
+          <div className="crown-sheet top-help-sheet" role="dialog" aria-label="Венцы">
+            <b className="top-help-sheet__title">{current?.title}</b>
+            <p className="top-help-sheet__line"><span className="craft-hint">Место в топе:</span> {crown.rule}</p>
+            <p className="top-help-sheet__line">
+              👑 Первое место носит венец «{crown.title}»: <b>{crown.effect}</b>, и рамку венца вокруг значка класса.
+            </p>
+            <div className="trade-dest__section">Правила венцов</div>
+            <ul className="top-help-sheet__rules">
+              <li>Венец только у первого места. Второе и третье не дают ни бонуса, ни рамки.</li>
+              <li>Венцы пересчитываются раз в сутки, в 6 утра по Москве: бонус не меняется посреди боя.</li>
+              <li>Можно держать несколько венцов сразу - их бонусы действуют вместе. Рамку носишь одну: выбор - нажатием на значок класса в шапке профиля.</li>
+              <li>Если тебя обогнали, венец уходит новому первому при следующем пересчёте, и тебе придёт об этом сообщение.</li>
+              <li>Бонус венца никогда не помогает в том, за что его дали: за бои платят добычей, за добычу - временем. Иначе лидер оставался бы первым навсегда.</li>
+            </ul>
+            <div className="trade-dest__section">Все венцы</div>
+            {crown.all.map((c) => (
+              <p key={c.title} className="top-help-sheet__line">
+                {c.board} - «{c.title}»: {c.effect}
+              </p>
+            ))}
+            <div className="trade-dest__actions">
+              <button type="button" className="top-help-sheet__close" onClick={() => setHelpOpen(false)}>Понятно</button>
+            </div>
+          </div>
+        </>
       )}
     </>
   );

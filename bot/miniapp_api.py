@@ -365,12 +365,25 @@ async def handle_get_leaderboard(request: web.Request) -> web.Response:
             for e in entries:
                 if e.character_id is not None:
                     powers[e.character_id] = await power_service.power_by_id(session, e.character_id)
+        from game.economy import crown_config as cc
+
         return web.json_response({
             "board": board_id,
             "boards": [
                 {"id": b, "title": leaderboard_service.BOARD_TITLES[b]}
                 for b in leaderboard_service.BOARDS
             ],
+            # Подсказка «?»: за что место и что даёт венец первого места.
+            "crown": {
+                "rule": leaderboard_service.BOARD_RULES[board_id],
+                "title": cc.CROWN_TITLES[board_id],
+                "effect": cc.CROWN_EFFECTS[board_id],
+                "all": [
+                    {"board": leaderboard_service.BOARD_TITLES[b], "title": cc.CROWN_TITLES[b],
+                     "effect": cc.CROWN_EFFECTS[b]}
+                    for b in leaderboard_service.BOARDS
+                ],
+            },
             "top": [
                 {"rank": e.rank, "name": e.name, "value": e.value,
                  "title": e.title, "title_tier": e.title_tier, "premium": e.premium,
