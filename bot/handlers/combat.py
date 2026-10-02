@@ -45,6 +45,7 @@ from game.combat.session import (
 )
 from game.combat.tick_engine import TickEngine
 from bot.world_summary import location_attachment, location_summary
+from game.combat import consumable_limit
 from game.economy import elixir_config as ec
 from game.world import encounters, grid
 from game.world import flavor as world_flavor
@@ -715,7 +716,9 @@ async def use_item(message: Message) -> None:
 
     limit_reached = player.combat_elixirs_used >= ec.ELIXIR_PER_BATTLE_LIMIT
     visible = [(d, count) for d, count in stock if d.category == "heal" or not limit_reached]
-    text = "🎒 Что использовать?"
+    if consumable_limit.left(player) <= 0:
+        visible = []
+    text = consumable_limit.items_header(player)
     if limit_reached and any(d.category == "combat" for d, _ in stock):
         text += "\n\nБольше твоё тело не выдержит за один бой - боевые эликсиры недоступны."
     # Открытие окна - всегда новым сообщением внизу: иначе правилось бы
@@ -744,6 +747,9 @@ async def use_combat_item(message: Message) -> None:
         # Патч 30, баг 2: бой активен — без клавиатуры игрок теряет кнопки.
         await message.answer("Скован - не до зелий сейчас. ❄️", keyboard=_combat_kb(state, peer_id))
         return
+    if consumable_limit.left(player) <= 0:
+        await message.answer(consumable_limit.EXHAUSTED_TEXT, keyboard=_combat_kb(state, peer_id))
+        return
     if elixir.category == "combat" and player.combat_elixirs_used >= ec.ELIXIR_PER_BATTLE_LIMIT:
         await message.answer("Больше твоё тело не выдержит за один бой.", keyboard=_combat_kb(state, peer_id))
         return
@@ -757,6 +763,7 @@ async def use_combat_item(message: Message) -> None:
     if not consumed:
         await message.answer("Этого зелья больше нет в сумке.", keyboard=_combat_kb(state, peer_id))
         return
+    consumable_limit.spend(player)
 
     await editable_message.send_or_edit(
         _bot_api, "combat_item", peer_id, f"Использовано: {elixir.emoji} {elixir.name}.", no_keyboard()

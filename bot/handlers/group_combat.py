@@ -45,6 +45,7 @@ from game.combat.session import (
 )
 from game.combat.skills import DEFENSIVE_SKILLS
 from game.combat.tick_engine import TickEngine
+from game.combat import consumable_limit
 from game.economy import elixir_config as ec
 from models import Character, CharacterStats
 from services import (
@@ -511,7 +512,9 @@ async def group_open_items(message: Message) -> None:
 
     limit_reached = combatant.combat_elixirs_used >= ec.ELIXIR_PER_BATTLE_LIMIT
     visible = [(d, count) for d, count in stock if d.category == "heal" or not limit_reached]
-    text = "🎒 Что использовать?"
+    if consumable_limit.left(combatant) <= 0:
+        visible = []
+    text = consumable_limit.items_header(combatant)
     if limit_reached and any(d.category == "combat" for d, _ in stock):
         text += "\n\nБольше твоё тело не выдержит за один бой - боевые эликсиры недоступны."
     # Открытие окна - всегда новым сообщением внизу: иначе правилось бы
@@ -546,6 +549,9 @@ async def group_use_item(message: Message) -> None:
     if combatant.has_effect(EffectKind.FREEZE):
         await message.answer("Скован - не до зелий сейчас. ❄️", keyboard=battle_kb)
         return
+    if consumable_limit.left(combatant) <= 0:
+        await message.answer(consumable_limit.EXHAUSTED_TEXT, keyboard=battle_kb)
+        return
     if elixir.category == "combat" and combatant.combat_elixirs_used >= ec.ELIXIR_PER_BATTLE_LIMIT:
         await message.answer("Больше твоё тело не выдержит за один бой.", keyboard=battle_kb)
         return
@@ -559,6 +565,7 @@ async def group_use_item(message: Message) -> None:
     if not consumed:
         await message.answer("Этого зелья больше нет в сумке.", keyboard=battle_kb)
         return
+    consumable_limit.spend(combatant)
 
     await editable_message.send_or_edit(
         _bot_api, "group_pve_item", peer_id, f"Использовано: {elixir.emoji} {elixir.name}.", no_keyboard()
