@@ -157,10 +157,25 @@ async def handle_get_state(request: web.Request) -> web.Response:
             for cell, guild in await guild_territory_service.all_cells(db)
         ]
 
+        # Торговля: караваны на карте и повозка, если она стоит не при игроке.
+        from services import trade_service
+
+        caravans = [
+            {"x": c.x, "y": c.y, "buys": len(c.buys or {}), "sells": len(c.sells or {})}
+            for c in await trade_service.active_caravans(db)
+        ]
+        cart_row = await trade_service.get_cart(db, character.id)
+        cart_mark = None
+        if cart_row is not None and (cart_row.cart_x, cart_row.cart_y) != (character.pos_x, character.pos_y):
+            if await trade_service.cart_travel(db, character.id) is None:
+                cart_mark = {"x": cart_row.cart_x, "y": cart_row.cart_y}
+
         return web.json_response(
             {
                 "pos_x": character.pos_x, "pos_y": character.pos_y,
                 "guild_cells": guild_cells,
+                "caravans": caravans,
+                "cart": cart_mark,
                 "is_dead": death_service.is_dead(character),
                 "foot_travel": foot_travel,
                 "mount_travel": mount_travel,

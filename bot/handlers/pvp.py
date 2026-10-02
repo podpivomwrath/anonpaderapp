@@ -88,6 +88,7 @@ from services import (
     premium_service,
     preset_service,
     pvp_service,
+    trade_service,
     trophy_service,
 )
 from services import onboarding_service as onboarding_svc
@@ -1347,6 +1348,10 @@ async def _finish_duel(battle: Battle, winner_cid: int, loser_cid: int) -> None:
         # Патч 59: добыча прерывается, но начатый кусок возвращается в жилу —
         # победитель прерывает работу, а не уничтожает общий ресурс.
         await mining_service.cancel_dig(db, loser)
+        # Торговля: торговца в пути в кольцах 3-5 грабят - часть груза
+        # уходит победителю золотом; повозку с остатком гонят домой.
+        robbed, robbed_gold = await trade_service.rob(db, winner, loser)
+        await trade_service.after_pvp_death(db, loser)
         death_service.apply_pvp_death(loser)
         await admin_service.log_death(db, loser, "pvp")
         respawn_handlers.register_pvp_death(loser_p.peer_id)
@@ -1363,6 +1368,8 @@ async def _finish_duel(battle: Battle, winner_cid: int, loser_cid: int) -> None:
         line = _format_transfer_line(moved)
         if line:
             win_text += f"\n\n{line}"
+    if robbed:
+        win_text += f"\n\n🐂 Ты грабишь повозку: {trade_service.lost_text(robbed)} - сбыто за {robbed_gold} золота."
     daily_notice = dailies_texts.progress_notice(daily_progress)
     if daily_notice:
         win_text += f"\n\n{daily_notice}"
@@ -1373,6 +1380,8 @@ async def _finish_duel(battle: Battle, winner_cid: int, loser_cid: int) -> None:
     for c in daily_progress.completed:
         await stats_window.notify_levelup(winner_p.peer_id, c.levels_gained, c.new_level)
     lose_text = f"☠ Тебя побеждает {winner_p.name}. Ты уходишь во тьму."
+    if robbed:
+        lose_text += f"\n\n🐂 Повозку ограбили: {trade_service.lost_text(robbed)}. Остаток пригонят в родной город."
     if fish_lost:
         # Потерю садка нужно назвать вслух: рыба не переходит победителю, и
         # без строки игрок решил бы, что улов просто пропал из-за бага.

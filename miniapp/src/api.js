@@ -284,3 +284,12 @@ export const exchangeTrade = (direction, lots) =>
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ direction, lots }),
   });
+
+export const getTrade = () => request('/trade');
+
+export const tradeAction = (action, params = {}) =>
+  request('/trade', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ action, ...params }),
+  });

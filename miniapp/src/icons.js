@@ -56,6 +56,11 @@ export const SECTION_ICONS = {
     emoji: '💱',
     path: 'M5 9h12l-3-3 M19 15H7l3 3',
   },
+  // Торговля — повозка: кузов на двух колёсах.
+  trade: {
+    emoji: '🐂',
+    path: 'M3 7h13v8H3z M16 10h3l2 3v2h-5 M7 18a2 2 0 1 0 0-.01 M17 18a2 2 0 1 0 0-.01',
+  },
   // Админ — щит.
   admin: {
     emoji: '🛡️',

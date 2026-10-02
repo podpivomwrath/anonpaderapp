@@ -139,30 +139,37 @@ def _is_safe_cell(x: int, y: int) -> bool:
     )
 
 
-def cell_ambush_chance(mount_id: str, x: int, y: int) -> float:
-    """Шанс нападения при входе на клетку (x;y) верхом."""
-    trip = ambush_chance(mount_id)
+def cell_ambush_chance(mount_id: str, x: int, y: int, trip: float | None = None) -> float:
+    """Шанс нападения при входе на клетку (x;y) верхом. trip - шанс за
+    поездку, если он не от маунта (у повозки - от охраны)."""
+    trip = ambush_chance(mount_id) if trip is None else trip
     if trip <= 0 or _is_safe_cell(x, y):
         return 0.0
     per_cell = 1 - (1 - trip) ** (1 / mc.AMBUSH_REF_CELLS)
     return min(per_cell * mc.RING_AMBUSH_MULT[grid.ring_tier(x, y)], 0.5)
 
 
-def trip_ambush_chance(mount_id: str, from_x: int, from_y: int, to_x: int, to_y: int) -> float:
+def trip_ambush_chance(
+    mount_id: str, from_x: int, from_y: int, to_x: int, to_y: int, trip: float | None = None,
+) -> float:
     """Шанс хотя бы одного нападения на этом маршруте - для подсказки игроку."""
     safe = 1.0
     for x, y in grid.line_path(from_x, from_y, to_x, to_y)[:-1]:
-        safe *= 1 - cell_ambush_chance(mount_id, x, y)
+        safe *= 1 - cell_ambush_chance(mount_id, x, y, trip)
     return 1 - safe
 
 
 async def start_travel(
     db: AsyncSession, character: Character, mount_id: str, to_x: int, to_y: int,
-    rng: random.Random | None = None, now: datetime | None = None,
+    rng: random.Random | None = None, now: datetime | None = None, step_seconds: float | None = None,
 ) -> MountTravel:
+    """step_seconds - шаг, если он не от маунта (у повозки - от лошадей)."""
     now = now or datetime.now(timezone.utc)
     cells = grid.cells_between(character.pos_x, character.pos_y, to_x, to_y)
-    seconds = total_travel_seconds(mount_id, cells)
+    if step_seconds is not None:
+        seconds = cells * step_seconds
+    else:
+        seconds = total_travel_seconds(mount_id, cells)
     step = seconds / cells if cells else 0.0
     travel = MountTravel(
         character_id=character.id, mount_id=mount_id,
@@ -221,7 +228,7 @@ class StepResult:
 
 def advance(
     travel: MountTravel, character: Character, rng: random.Random,
-    now: datetime | None = None, paused: bool = False,
+    now: datetime | None = None, paused: bool = False, trip_chance: float | None = None,
 ) -> StepResult:
     """Шаги, которые уже пора сделать. paused - персонаж занят (бой,
     исследование): поездка ждёт его, шаг откладывается, а не теряется.
@@ -256,7 +263,7 @@ def advance(
             result.arrived = True
             break
         travel.next_cell_at += timedelta(seconds=travel.step_seconds)
-        if rng.random() < cell_ambush_chance(travel.mount_id, x, y):
+        if rng.random() < cell_ambush_chance(travel.mount_id, x, y, trip_chance):
             travel.status = "ambushed"
             travel.ambush_at = now
             result.ambushed = True

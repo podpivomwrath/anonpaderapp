@@ -573,11 +573,22 @@ async def on_battle_finished(session_id: int, result: TickResult) -> None:
             # патч 25, п.7: смерть в бою нападения отменяет поездку
             from models import MountTravel
 
+            from game.economy import trade_config as tc
+            from models import Character
+            from services import trade_service
+
+            cart_line = None
             async with get_session_factory()() as db:
                 travel = await db.get(MountTravel, travel_id)
                 if travel is not None:
                     await mount_service.cancel_travel(db, travel)
+                    if travel.mount_id == tc.CART_MOUNT_ID:
+                        # С повозкой: часть груза пропала, остаток - в родном городе.
+                        character = await db.get(Character, travel.character_id)
+                        cart_line = await trade_service.on_death(db, character, _rng)
                     await db.commit()
+            if cart_line:
+                await _bot_api.messages.send(peer_id=peer_id, message=cart_line, random_id=0)
 
 
 @labeler.message(payload_contains={"type": "item_choice"})

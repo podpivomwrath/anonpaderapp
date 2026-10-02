@@ -465,6 +465,16 @@ body {
   color: #ffe066;
 }
 
+/* Торговля: караван и оставленная повозка. */
+.map-pin--caravan {
+  border-color: #e0a64a;
+  box-shadow: 0 0 10px rgba(224, 166, 74, 0.55);
+}
+
+.map-pin--cart {
+  border-color: #b98b5a;
+}
+
 .map-pin--player {
   background: radial-gradient(circle, #ffe066 0 28%, rgba(255, 224, 102, 0.15) 32% 100%);
   border: 2px solid #ffe066;
@@ -1686,4 +1696,61 @@ body::before {
 
 .top-title {
   font-size: 0.9em;
+}
+
+/* --- Торговля ------------------------------------------------------------- */
+.trade-xp {
+  height: 6px;
+  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.08);
+  overflow: hidden;
+  margin-bottom: 6px;
+}
+
+.trade-xp__bar {
+  height: 100%;
+  background: linear-gradient(90deg, #b98b5a, #e0a64a);
+}
+
+.trade-cargo {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.trade-chip {
+  padding: 2px 8px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.06);
+  font-size: 13px;
+}
+
+/* Градации товара - цветом, как у руды и предметов. */
+.trade-tier--2 { color: #7fa8e6; }
+.trade-tier--3 { color: #b48ce6; }
+.trade-tier--4 { color: #f0c64e; }
+
+.trade-offer {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  border-top: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.trade-offer__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 10px;
+}
+
+.trade-offer__name {
+  font-weight: 600;
+}
+
+.trade-offer__row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
 }

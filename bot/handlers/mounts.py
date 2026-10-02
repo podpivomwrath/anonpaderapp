@@ -34,6 +34,7 @@ from bot.world_texts import foreign_city_entry_text, hub_attachment
 from bot.world_summary import location_attachment, location_summary
 from game.world import encounters, grid
 from game.economy import mount_config as mc
+from game.economy import trade_config as tc
 from game.world import world_config as wc
 from game.world.location_types import region_for
 from models import Character, CharacterStats, User
@@ -44,6 +45,7 @@ from services import (
     scene_event_service,
     screen_service,
     story_service,
+    trade_service,
     wallet_service,
 )
 from services import onboarding_service as onboarding_svc
@@ -207,7 +209,9 @@ async def start_travel_and_notify(
     return seconds
 
 
-async def notify_travel_started(peer_id: int, to_x: int, to_y: int, seconds: float, ambush_chance: float) -> None:
+async def notify_travel_started(
+    peer_id: int, to_x: int, to_y: int, seconds: float, ambush_chance: float, icon: str = "🐎",
+) -> None:
     """Сообщение о начале пути на маунте + клавиатура ожидания — общая точка
     для обоих способов отправки маунта (патч 31, фикс 1): из чата (coord_input
     выше) и с карты мини-аппа (bot/miniapp_map_api.py::handle_post_send_mount,
@@ -223,7 +227,7 @@ async def notify_travel_started(peer_id: int, to_x: int, to_y: int, seconds: flo
     if _bot_api is None:
         return
     text = (
-        f"🐎 Путь начат: ({to_x}; {to_y}), {_format_seconds(seconds)}.\n"
+        f"{icon} Путь начат: ({to_x}; {to_y}), {_format_seconds(seconds)}.\n"
         f"Шанс нападения в пути: {round(ambush_chance * 100)}%."
     )
     try:
@@ -247,7 +251,8 @@ def _travel_text(travel, now: datetime) -> str:
     left = mount_service.remaining_seconds(travel, now)
     path = mount_service.path_of(travel)
     x, y = path[travel.cell_index - 1] if travel.cell_index else (travel.from_x, travel.from_y)
-    return f"🐎 В пути: ({x}; {y}) → ({travel.to_x}; {travel.to_y}), осталось {_format_seconds(left)}."
+    icon = "🐂" if travel.mount_id == tc.CART_MOUNT_ID else "🐎"
+    return f"{icon} В пути: ({x}; {y}) → ({travel.to_x}; {travel.to_y}), осталось {_format_seconds(left)}."
 
 
 async def offer_continue(peer_id: int, travel_id: int) -> None:
@@ -256,16 +261,23 @@ async def offer_continue(peer_id: int, travel_id: int) -> None:
     resume_travel пересчитает arrives_at от момента нажатия кнопки)."""
     from models import MountTravel
 
+    cart_line = None
     async with get_session_factory()() as db:
         travel = await db.get(MountTravel, travel_id)
         if travel is None:
             return
         left = mount_service.frozen_remaining_seconds(travel)
+        if travel.mount_id == tc.CART_MOUNT_ID:
+            # Повозка: каждое нападение бьёт по обшивке.
+            character = await db.get(Character, travel.character_id)
+            cart_line = await trade_service.on_ambush_won(db, character, _rng)
+            await db.commit()
 
     _pending_continue[peer_id] = travel_id
     await _bot_api.messages.send(
         peer_id=peer_id,
-        message=f"Нападавший повержен. Дорога зовёт дальше - осталось {_format_seconds(left)}.",
+        message=f"Нападавший повержен. Дорога зовёт дальше - осталось {_format_seconds(left)}."
+        + (f"\n{cart_line}" if cart_line else ""),
         random_id=0,
         keyboard=kb.continue_travel_keyboard(travel_id),
     )
@@ -374,7 +386,13 @@ async def scan() -> None:
                 # поездка кончилась вместе с ним.
                 await mount_service.cancel_travel(db, travel)
                 continue
-            step = mount_service.advance(travel, character, _rng, now, paused=is_paused(peer_id))
+            trip = None
+            if travel.mount_id == tc.CART_MOUNT_ID:
+                cart = await trade_service.get_cart(db, character.id)
+                trip = trade_service.trip_ambush(cart) if cart is not None else None
+            step = mount_service.advance(
+                travel, character, _rng, now, paused=is_paused(peer_id), trip_chance=trip,
+            )
             if step.moved:
                 from bot.handlers import guild as guild_handlers  # избегаем цикла импортов
 
@@ -399,6 +417,9 @@ async def scan() -> None:
             if step.arrived:
                 from services import daily_service, trial_service
 
+                if travel.mount_id == tc.CART_MOUNT_ID:
+                    await trade_service.on_arrival(db, character)
+
                 if character.subclass is not None:
                     await trial_service.record_cell_moved(db, character)
                 await daily_service.record_cell_moved(db, character)
@@ -416,9 +437,17 @@ async def scan() -> None:
                     await screen_service.set_screen(db, character, None)
                     is_foreign = region != character.region
                     mentor_badge = not is_foreign and await story_service.mentor_badge_active(db, character)
+                cart_line = None
+                if travel.mount_id == tc.CART_MOUNT_ID:
+                    caravan = await trade_service.caravan_at(db, character.pos_x, character.pos_y, now)
+                    if region is not None or caravan is not None:
+                        cart_line = "🐂 Повозка на месте. Торговля - в мини-аппе, раздел «Торговля»."
+                    else:
+                        cart_line = "🐂 Повозка с тобой. Торговать здесь не с кем - вези в город или к каравану."
+                has_mount = await mount_service.has_any_mount(db, character.id)
                 arrivals.append(
                     (peer_id, character, stats, wallet.farm_currency, wallet.donate_currency,
-                     quest_line, gear_bonus, region, mentor_badge, is_foreign, group_block)
+                     quest_line, gear_bonus, region, mentor_badge, is_foreign, group_block, cart_line, has_mount)
                 )
                 continue
 
@@ -435,7 +464,7 @@ async def scan() -> None:
         _countdown_edited.pop(peer_id, None)
         await _bot_api.messages.send(
             peer_id=peer_id,
-            message=f"🐎 ({character.pos_x}; {character.pos_y}): на пути внезапно возникает опасность - маунт встаёт.",
+            message=f"⚠ ({character.pos_x}; {character.pos_y}): на пути внезапно возникает опасность - ты встаёшь.",
             random_id=0,
         )
         await combat_handlers.start_mount_ambush_encounter(
@@ -443,30 +472,30 @@ async def scan() -> None:
         )
 
     for (peer_id, character, stats, farm_currency, donate_currency, quest_line, gear_bonus,
-         region, mentor_badge, is_foreign, group_block) in arrivals:
+         region, mentor_badge, is_foreign, group_block, cart_line, has_mount) in arrivals:
         _travel_message.pop(peer_id, None)
         _countdown_edited.pop(peer_id, None)
         if region is not None:
             text = (
                 foreign_city_entry_text(REGION_TITLES[region]) if is_foreign
                 else f"🐎 Ты прибываешь к воротам: {REGION_TITLES[region]}"
-            )
+            ) + (f"\n\n{cart_line}" if cart_line else "")
             await _bot_api.messages.send(
                 peer_id=peer_id,
                 message=text,
                 random_id=0,
                 attachment=hub_attachment(region),
-                keyboard=kb.city_square_keyboard(character, mentor_badge, has_mount=True, is_foreign=is_foreign),
+                keyboard=kb.city_square_keyboard(character, mentor_badge, has_mount=has_mount, is_foreign=is_foreign),
             )
             continue
         vit_bonus = gear_bonus.get("vit", 0)
         text = "🐎 Ты прибываешь на место.\n\n" + location_summary(
             character, stats, _rng, farm_currency, vit_bonus, quest_line, donate_currency, group_block,
-        )
+        ) + (f"\n\n{cart_line}" if cart_line else "")
         await _bot_api.messages.send(
             peer_id=peer_id, message=text, random_id=0,
             attachment=location_attachment(character),
-            keyboard=kb.movement_keyboard(character.pos_x, character.pos_y, peer_id, has_mount=True),
+            keyboard=kb.movement_keyboard(character.pos_x, character.pos_y, peer_id, has_mount=has_mount),
         )
         # Патч 58: прибытие на маунте — такой же вход на клетку, как пеший,
         # и кнопка «К воде» обязана приходить и здесь. Раньше не приходила:

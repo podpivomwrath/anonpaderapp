@@ -12,6 +12,7 @@ import CharacterTab from './CharacterTab.jsx';
 import CraftTab from './CraftTab.jsx';
 import DailiesTab from './DailiesTab.jsx';
 import ExchangeTab from './ExchangeTab.jsx';
+import TradeTab from './TradeTab.jsx';
 import GuildTab from './GuildTab.jsx';
 import InventoryTab from './InventoryTab.jsx';
 import MapTab from './MapTab.jsx';
@@ -36,6 +37,7 @@ const SECTIONS = [
   { id: 'map', label: 'Карта' },
   { id: 'guild', label: 'Гильдия' },
   { id: 'tops', label: 'Топы' },
+  { id: 'trade', label: 'Торговля' },
   { id: 'exchange', label: 'Биржа' },
 ];
 
@@ -351,6 +353,9 @@ export default function Hub() {
         {activeTab === 'map' && <MapTab />}
         {activeTab === 'tops' && <TopsTab />}
         {activeTab === 'guild' && <GuildTab />}
+        {activeTab === 'trade' && (
+          <TradeTab onWallet={(w) => setCharacter((prev) => ({ ...prev, ...w }))} />
+        )}
         {activeTab === 'exchange' && (
           <ExchangeTab onWallet={(w) => setCharacter((prev) => ({ ...prev, ...w }))} />
         )}

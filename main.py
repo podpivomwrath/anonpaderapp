@@ -319,6 +319,26 @@ async def run() -> None:
         next_run_time=datetime.now(timezone.utc),
     )
 
+    # Торговля: караваны появляются на карте сами (не больше CARAVAN_MAX).
+    async def _caravan_tick() -> None:
+        from services import trade_service
+
+        try:
+            async with get_session_factory()() as db:
+                caravan = await trade_service.caravan_tick(db)
+                await db.commit()
+            if caravan is not None:
+                logger.info("Торговля: караван на ({}; {})", caravan.x, caravan.y)
+        except Exception:
+            logger.exception("Торговля: караван не появился")
+
+    from game.economy import trade_config as tc
+
+    respawn_scheduler.add_job(
+        _caravan_tick, "interval", minutes=tc.CARAVAN_CHECK_MINUTES,
+        id="caravan_tick", max_instances=1, coalesce=True,
+    )
+
     # Маунты (патч 25, п.7): нападения/прибытия/live-отсчёт — свой job,
     # интервал из game/economy/mount_config.py (игровая тонкая настройка, не
     # деплой-параметр окружения, поэтому не в Settings).

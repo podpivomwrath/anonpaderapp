@@ -529,6 +529,8 @@ export default function MapTab() {
       g.status === 'claiming' ? '🚩' : (g.base_tier === 'citadel' ? '🏯' : '🏰'),
       `[${g.tag}] ${g.status === 'claiming' ? 'закладка знамени' : 'земля гильдии'}`, 0.8,
     ]),
+    ...(mapState.caravans || []).map((c) => [c.x, c.y, 'map-pin--caravan', '🐪', 'Караван: торгует, пока стоит', 1]),
+    ...(mapState.cart ? [[mapState.cart.x, mapState.cart.y, 'map-pin--cart', '🐂', 'Твоя повозка', 0.9]] : []),
     ...(travelTarget ? [[travelTarget.to_x, travelTarget.to_y, 'map-pin--route', '⚑', 'Цель пути', 1]] : []),
     ...(playerPin ? [[playerPin.x, playerPin.y, 'map-pin--player', '', 'Ты здесь', 1.1]] : []),
   ];
