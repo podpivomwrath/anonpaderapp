@@ -22,8 +22,12 @@ def empty_keyboard() -> str:
 
 
 def classes_keyboard() -> str:
+    # Стопкой, по одной в ряд: втроём в ряду на телефоне VK резал подписи
+    # до «⚔️ Путь Ста...» и «🔮 Путь Оск...» - та же беда, что у регионов.
     kb = Keyboard(one_time=True)
-    for label in CLASS_BUTTONS:
+    for i, label in enumerate(CLASS_BUTTONS):
+        if i:
+            kb.row()
         kb.add(Text(label), color=KeyboardButtonColor.PRIMARY)
     return kb.get_json()
 
