@@ -50,6 +50,8 @@ class BoardEntry:
     #: (правило пресетов, патч 57).
     value: str
     title: str | None = None
+    #: Тир титула (цвет в мини-аппе), см. title_service.TITLE_TIERS.
+    title_tier: str | None = None
     premium: bool = False
     #: Нужны мини-аппу (значок класса в строке) и crown_service (кто первый).
     #: Раньше строка топа несла только имя, и опознать по ней персонажа было
@@ -107,6 +109,7 @@ async def _character_board(
         BoardEntry(
             rank=i, name=name, value=value_fn(value, losses),
             title=title_service.name_of(title_id) if title_id else None,
+            title_tier=title_service.tier_of(title_id),
             premium=_premium(premium_until, now),
             character_id=character_id, base_class=base_class, subclass=subclass,
         )
@@ -210,6 +213,7 @@ async def fish_weight_board(db: AsyncSession, limit: int = 10) -> list[BoardEntr
             rank=len(entries) + 1, name=name,
             value=f"{fishing.format_kg(grams)} · {emoji}{label}",
             title=title_service.name_of(title_id) if title_id else None,
+            title_tier=title_service.tier_of(title_id),
             premium=_premium(premium_until, now),
             character_id=character_id, base_class=base_class, subclass=subclass,
         ))

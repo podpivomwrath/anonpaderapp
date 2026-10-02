@@ -1266,6 +1266,12 @@ body::before {
     max-width: none;
   }
 
+  /* Топы шире остальных: в строке имя, титул и Мощь слева и достижение
+     справа - в 560 пикселей они наезжали друг на друга. */
+  .hub-content--tops {
+    max-width: 760px;
+  }
+
   .hub-banner {
     margin-top: 12px;
     border-radius: 14px;
@@ -1640,4 +1646,37 @@ body::before {
 .title-tier--none {
   color: rgba(255, 255, 255, 0.35);
   font-size: 0.75em;
+}
+
+/* Строка топа: слева имя, титул и Мощь (переносятся внутри своей колонки),
+   справа достижение - не сжимается и не уступает место левой части. */
+.top-row .stat-row__label {
+  flex: 1;
+  min-width: 0;
+}
+
+.top-row .stat-row__value {
+  max-width: 55%;
+  text-align: right;
+}
+
+.top-who {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 2px 8px;
+  min-width: 0;
+}
+
+.top-who .power-chip {
+  margin-left: 0;
+}
+
+.top-name,
+.top-title {
+  white-space: nowrap;
+}
+
+.top-title {
+  font-size: 0.9em;
 }

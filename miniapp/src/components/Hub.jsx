@@ -336,7 +336,9 @@ export default function Hub() {
         className={
           activeTab === 'map'
             ? 'hub-content hub-content--drawer hub-content--wide'
-            : 'hub-content hub-content--drawer'
+            : activeTab === 'tops'
+              ? 'hub-content hub-content--drawer hub-content--tops'
+              : 'hub-content hub-content--drawer'
         }
         key={reloadKey}
       >

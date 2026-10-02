@@ -87,7 +87,7 @@ export default function TopsTab() {
       {status === 'ready' && top.length > 0 && (
         <Group header={<Header>{current?.title || 'Топ'}</Header>}>
           {top.map((e) => (
-            <div className="stat-row" key={e.rank}>
+            <div className="stat-row top-row" key={e.rank}>
               <span className="stat-row__label">
                 {/* Венец только у первого места: рамка и есть награда за
                     него, второму и третьему не достаётся ничего (патч 91). */}
@@ -97,10 +97,17 @@ export default function TopsTab() {
                   crown={e.rank === 1 ? board : null}
                   size={28}
                 />
-                {e.rank}. {e.premium && '💠 '}
-                {e.name}
-                {/* Патч 111: Мощь - только в боевых топах (сервер шлёт её там). */}
-                {e.power != null && <span className="power-chip" title="Мощь">⚔ {money(e.power)}</span>}
+                {/* Имя, титул и Мощь переносятся внутри своей колонки: на
+                    телефоне в одну строку они наезжали на достижение справа. */}
+                <span className="top-who">
+                  <span className="top-name">{e.rank}. {e.premium && '💠 '}{e.name}</span>
+                  {/* Титул - цветом своего тира, как в шапке профиля. */}
+                  {e.title && (
+                    <span className={`top-title title-tier title-tier--${e.title_tier || 'common'}`}>«{e.title}»</span>
+                  )}
+                  {/* Патч 111: Мощь - только в боевых топах (сервер шлёт её там). */}
+                  {e.power != null && <span className="power-chip" title="Мощь">⚔ {money(e.power)}</span>}
+                </span>
               </span>
               <span className="stat-row__value">{e.value}</span>
             </div>

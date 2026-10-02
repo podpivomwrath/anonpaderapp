@@ -373,7 +373,7 @@ async def handle_get_leaderboard(request: web.Request) -> web.Response:
             ],
             "top": [
                 {"rank": e.rank, "name": e.name, "value": e.value,
-                 "title": e.title, "premium": e.premium,
+                 "title": e.title, "title_tier": e.title_tier, "premium": e.premium,
                  # Значок класса в строке. Подкласс есть не у всех (до 30
                  # уровня его нет вовсе), поэтому клиенту отдаются оба, а
                  # он показывает подкласс, если тот выбран.
