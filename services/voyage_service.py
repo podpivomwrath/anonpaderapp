@@ -239,7 +239,11 @@ async def tick(db: AsyncSession, rng: random.Random | None = None, now: datetime
 
 def _finish(voyage: CharacterVoyage, early: bool) -> str:
     trip = vc.VOYAGES[voyage.region]
-    summary = f"За поход: +{voyage.trip_xp} опыта, +{voyage.trip_gold} золота, событий {voyage.hours_done}."
+    got = [f"+{voyage.trip_xp} опыта" if voyage.trip_xp else "", f"+{voyage.trip_gold} золота" if voyage.trip_gold else ""]
+    got = ", ".join(x for x in got if x)
+    summary = f"За поход: событий {voyage.hours_done}" + (f", {got}" if got else "") + "."
+    if voyage.hours_done == 0:
+        summary = "В пути не случилось ничего: до первой вести не прошло и часа."
     voyage.status = "home"
     voyage.next_event_at = None
     voyage.voyages_total += 1

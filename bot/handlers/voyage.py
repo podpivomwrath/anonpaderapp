@@ -62,14 +62,14 @@ def _menu_text(character, voyage) -> str:
     trip = voyage_service.voyage_of(character)
     lines = [f"{trip.emoji} {trip.title}", ""]
     if voyage is None:
-        lines.append(f"{trip.gear}: {vc.VOYAGE_PRICE} золота.")
+        lines.append(f"{trip.gear}: {vc.money(vc.VOYAGE_PRICE)} золота.")
     else:
         for part in vc.PARTS:
             emoji, name = vc.part_name(trip.region, part.id)
             level = getattr(voyage, part.id)
             cost = voyage_service.upgrade_cost(voyage, part.id)
-            nxt = f" → {part.values[level]} за {cost}" if cost else " · предел"
-            lines.append(f"{emoji} {name} {level}/{len(part.values)}: {part.values[level - 1]} {part.unit}{nxt}")
+            nxt = f" (дальше {vc.fmt(part.id, part.values[level])} за {vc.money(cost)})" if cost else " · предел"
+            lines.append(f"{emoji} {name} {level}/{len(part.values)}: {vc.fmt(part.id, part.values[level - 1])}{nxt}")
     lines += ["", "Раз в час - событие и небольшая награда. Вернуться можно в любой момент."]
     return "\n".join(lines)
 
@@ -78,7 +78,7 @@ def _menu_keyboard(character, voyage) -> str:
     trip = voyage_service.voyage_of(character)
     k = Keyboard(inline=True)
     if voyage is None:
-        k.add(Text(f"Купить: {vc.VOYAGE_PRICE}", payload={"type": "voyage_buy"}), color=KeyboardButtonColor.POSITIVE)
+        k.add(Text(f"Купить: {vc.money(vc.VOYAGE_PRICE)}", payload={"type": "voyage_buy"}), color=KeyboardButtonColor.POSITIVE)
         return k.get_json()
     k.add(Text(f"{trip.emoji} Отправиться", payload={"type": "voyage_go"}), color=KeyboardButtonColor.POSITIVE)
     for part in vc.PARTS:
@@ -86,7 +86,7 @@ def _menu_keyboard(character, voyage) -> str:
         if cost:
             emoji, name = vc.part_name(trip.region, part.id)
             k.row()
-            k.add(Text(f"{emoji} {name}: {cost}", payload={"type": "voyage_up", "part": part.id}),
+            k.add(Text(f"{emoji} {name}: {vc.money(cost)}", payload={"type": "voyage_up", "part": part.id}),
                   color=KeyboardButtonColor.SECONDARY)
     return k.get_json()
 

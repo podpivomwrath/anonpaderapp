@@ -60,7 +60,7 @@ async def test_come_back_any_time(db_session, character_at) -> None:
     await voyage_service.buy(db_session, c)
     await voyage_service.start(db_session, c, now=NOW)
     text = await voyage_service.come_back(db_session, c)
-    assert "опушке" in text and "За поход" in text
+    assert "опушке" in text and "не прошло и часа" in text
     with pytest.raises(voyage_service.VoyageError):
         await voyage_service.come_back(db_session, c)
 
