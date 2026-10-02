@@ -247,6 +247,15 @@ def movement_keyboard(
 BTN_CONTINUE_TRAVEL = "🐎 Продолжить путь"  # патч 25, п.7
 
 
+def mount_travel_keyboard() -> str:
+    """В пути верхом: персонаж реально едет по клеткам, и оглядеться на
+    текущей - кто тут ещё - можно. Остальное ждёт прибытия."""
+    kb = Keyboard(one_time=False)
+    kb.add(Text(BTN_LOOK_AROUND), color=KeyboardButtonColor.SECONDARY)
+    add_miniapp_button(kb)
+    return kb.get_json()
+
+
 def continue_travel_keyboard(travel_id: int) -> str:
     """Кнопка продолжения пути после победы над нападением (патч 25, п.7)."""
     kb = Keyboard(inline=True)

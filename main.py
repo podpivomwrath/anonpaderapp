@@ -324,7 +324,8 @@ async def run() -> None:
     # деплой-параметр окружения, поэтому не в Settings).
     mount_scheduler = AsyncIOScheduler()
     mount_scheduler.add_job(
-        mounts_handlers.scan, "interval", seconds=mc.TRAVEL_COUNTDOWN_UPDATE_SECONDS, id="mount_scan",
+        mounts_handlers.scan, "interval", seconds=mc.TRAVEL_STEP_SCAN_SECONDS, id="mount_scan",
+        max_instances=1, coalesce=True,
     )
     mount_scheduler.start()
 

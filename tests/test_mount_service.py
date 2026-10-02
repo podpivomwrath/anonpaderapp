@@ -111,47 +111,97 @@ async def test_start_travel_zero_distance_never_ambushes(db_session, character_a
     assert travel.ambush_at is None  # cells=0 — нападать негде
 
 
-async def test_start_travel_ambush_window_between_start_and_arrival(db_session, character_at) -> None:
-    character = await character_at(0, 0, level=10)
-    travel = await mount_service.start_travel(
-        db_session, character, "ashen_steed", 10, 0, AlwaysAmbush(), now=NOW
-    )
-    assert travel.ambush_at is not None
-    assert NOW < travel.ambush_at < travel.arrives_at
-    assert travel.ambush_done is False
+# --- Движение по клеткам ---
+
+
+def test_line_path_steps_to_neighbours_and_ends_at_target() -> None:
+    from game.world import grid
+
+    for a, b in [((0, 30), (30, 0)), ((0, 30), (0, -30)), ((-3, 2), (5, -7)), ((4, 4), (4, 5))]:
+        path = grid.line_path(*a, *b)
+        assert len(path) == grid.cells_between(*a, *b)
+        assert path[-1] == b
+        prev = a
+        for cell in path:
+            assert max(abs(cell[0] - prev[0]), abs(cell[1] - prev[1])) == 1
+            assert grid.in_bounds(*cell)
+            prev = cell
 
 
 def _build_travel(**overrides) -> MountTravel:
     defaults = dict(
         character_id=1, mount_id="ashen_steed", from_x=0, from_y=0, to_x=10, to_y=0,
         started_at=NOW, arrives_at=NOW + timedelta(seconds=70),
-        ambush_at=NOW + timedelta(seconds=20), ambush_done=False, status="traveling",
+        ambush_at=None, ambush_done=True, status="traveling",
+        step_seconds=7.0, cell_index=0, next_cell_at=NOW + timedelta(seconds=7),
     )
     defaults.update(overrides)
     return MountTravel(**defaults)
 
 
-def test_frozen_remaining_seconds_uses_ambush_window() -> None:
+async def test_start_travel_sets_up_steps(db_session, character_at) -> None:
+    character = await character_at(0, 0, level=10)
+    travel = await mount_service.start_travel(db_session, character, "ashen_steed", 10, 0, now=NOW)
+    assert travel.step_seconds == 7.0 and travel.cell_index == 0
+    assert travel.next_cell_at == NOW + timedelta(seconds=7)
+
+
+async def test_advance_moves_character_cell_by_cell(make_character) -> None:
+    character = await make_character(level=10)
+    character.pos_x = character.pos_y = 0
     travel = _build_travel()
-    assert mount_service.frozen_remaining_seconds(travel) == 50.0  # 70 - 20
+    step = mount_service.advance(travel, character, NeverAmbush(), now=NOW + timedelta(seconds=15))
+    assert step.moved and not step.arrived
+    assert travel.cell_index == 2 and (character.pos_x, character.pos_y) == (2, 0)
+    assert mount_service.remaining_seconds(travel, now=NOW + timedelta(seconds=15)) == 6 + 7 * 7
+    step = mount_service.advance(travel, character, NeverAmbush(), now=NOW + timedelta(seconds=100))
+    assert step.arrived and travel.status == "completed" and (character.pos_x, character.pos_y) == (10, 0)
 
 
-def test_frozen_remaining_seconds_without_ambush_falls_back_to_remaining() -> None:
-    travel = _build_travel(ambush_at=None)
-    left = mount_service.frozen_remaining_seconds(travel, now=NOW)
-    assert left == mount_service.remaining_seconds(travel, now=NOW)
-
-
-async def test_resume_travel_preserves_remaining_time_from_ambush(db_session) -> None:
-    travel = _build_travel(status="ambushed", ambush_done=True)
+async def test_ambush_stops_on_the_cell_and_resume_continues_from_it(db_session, make_character) -> None:
+    character = await make_character(level=10)
+    travel = _build_travel(character_id=character.id)
     db_session.add(travel)
     await db_session.flush()
-
-    resume_at = NOW + timedelta(seconds=500)  # бой шёл долго — не должен влиять на остаток
-    await mount_service.resume_travel(db_session, travel, now=resume_at)
-
+    step = mount_service.advance(travel, character, AlwaysAmbush(), now=NOW + timedelta(seconds=30))
+    assert step.ambushed and travel.status == "ambushed"
+    assert travel.cell_index == 1 and (character.pos_x, character.pos_y) == (1, 0)
+    assert mount_service.frozen_remaining_seconds(travel) == 9 * 7.0
+    later = NOW + timedelta(seconds=500)  # бой шёл долго - в счёт дороги не идёт
+    await mount_service.resume_travel(db_session, travel, now=later)
     assert travel.status == "traveling"
-    assert travel.arrives_at == resume_at + timedelta(seconds=50)  # 70 - 20 сохранено
+    assert travel.next_cell_at == later + timedelta(seconds=7)
+    assert travel.arrives_at == later + timedelta(seconds=63)
+
+
+async def test_paused_travel_waits_instead_of_skipping(make_character) -> None:
+    character = await make_character(level=10)
+    character.pos_x = character.pos_y = 0
+    travel = _build_travel()
+    at = NOW + timedelta(seconds=60)
+    step = mount_service.advance(travel, character, NeverAmbush(), now=at, paused=True)
+    assert not step.moved and travel.cell_index == 0
+    assert travel.next_cell_at == at + timedelta(seconds=7)
+
+
+async def test_legacy_travel_without_steps_arrives_by_timer(make_character) -> None:
+    character = await make_character(level=10)
+    travel = _build_travel(next_cell_at=None, arrives_at=NOW)
+    step = mount_service.advance(travel, character, NeverAmbush(), now=NOW + timedelta(seconds=1))
+    assert step.arrived and (character.pos_x, character.pos_y) == (10, 0)
+
+
+def test_ambush_chance_by_ring_and_safe_cells() -> None:
+    outer = mount_service.cell_ambush_chance("ashen_steed", 25, 3)
+    middle = mount_service.cell_ambush_chance("ashen_steed", 10, 0)
+    center = mount_service.cell_ambush_chance("ashen_steed", 1, 0)
+    assert 0 < outer < middle < center
+    assert mount_service.cell_ambush_chance("ashen_steed", 0, 30) == 0  # город
+    assert mount_service.cell_ambush_chance("admin_ashen_herald", 10, 0) == 0
+    # через центр к противоположному городу опаснее, чем вдоль края к соседнему
+    across = mount_service.trip_ambush_chance("ashen_steed", 0, 30, 0, -30)
+    around = mount_service.trip_ambush_chance("ashen_steed", 0, 30, 30, 0)
+    assert across > around > 0
 
 
 async def test_cancel_travel_sets_status(db_session) -> None:
@@ -178,37 +228,3 @@ async def test_active_travel_finds_traveling_and_ambushed_not_completed(db_sessi
     travel.status = "completed"
     await db_session.flush()
     assert await mount_service.active_travel(db_session, character.id) is None
-
-
-async def test_scan_splits_ambushed_arrived_and_still_traveling(db_session, make_character) -> None:
-    due_ambush = await make_character(level=10)
-    due_arrival = await make_character(level=10)
-    still_going = await make_character(level=10)
-
-    db_session.add(_build_travel(
-        character_id=due_ambush.id, ambush_done=False, ambush_at=NOW - timedelta(seconds=1),
-        arrives_at=NOW + timedelta(seconds=999),
-    ))
-    db_session.add(_build_travel(
-        character_id=due_arrival.id, ambush_at=None, ambush_done=True,
-        arrives_at=NOW - timedelta(seconds=1),
-    ))
-    db_session.add(_build_travel(
-        character_id=still_going.id, ambush_at=None, ambush_done=True,
-        arrives_at=NOW + timedelta(seconds=999),
-    ))
-    await db_session.flush()
-
-    # SQLite (тестовая БД) не хранит tzinfo — прочитанные строки возвращаются
-    # наивными; сравниваем с наивным "now" той же точки времени (на
-    # Postgres в проде datetime(timezone=True) переживает round-trip как есть).
-    result = await mount_service.scan(db_session, now=NOW.replace(tzinfo=None))
-
-    assert [t.character_id for t in result.ambushed] == [due_ambush.id]
-    assert result.ambushed[0].status == "ambushed"
-    assert result.ambushed[0].ambush_done is True
-
-    assert [t.character_id for t in result.arrived] == [due_arrival.id]
-    assert result.arrived[0].status == "completed"
-
-    assert [t.character_id for t in result.still_traveling] == [still_going.id]

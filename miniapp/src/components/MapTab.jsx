@@ -67,6 +67,34 @@ function formatSeconds(seconds) {
   return `~${Math.round(seconds)} сек.`;
 }
 
+/**
+ * Где значок в пути верхом прямо сейчас. Сервер присылает путь (со стартовой
+ * клеткой), номер клетки, на которой персонаж стоит, и сколько секунд до
+ * следующего шага - на момент опроса. Между опросами шаги досчитываются
+ * здесь же, а внутри шага значок едет к следующей клетке плавно.
+ * rest - клетки впереди, для пунктира. null - не верхом.
+ */
+function ridePos(travel, fetchedAt) {
+  if (!travel?.path?.length) return null;
+  const { path, step_seconds: step } = travel;
+  let idx = Math.min(travel.cell_index, path.length - 1);
+  let progress = 0;
+  if (!travel.paused && travel.next_cell_in != null && step > 0) {
+    let left = travel.next_cell_in - (performance.now() - fetchedAt) / 1000;
+    while (left < 0 && idx < path.length - 1) {
+      idx += 1;
+      left += step;
+    }
+    if (idx < path.length - 1) progress = 1 - Math.min(Math.max(left / step, 0), 1);
+  }
+  const [x0, y0] = path[idx];
+  const [x1, y1] = path[Math.min(idx + 1, path.length - 1)];
+  return {
+    pos: { x: x0 + (x1 - x0) * progress, y: y0 + (y1 - y0) * progress },
+    rest: path.slice(idx + 1),
+  };
+}
+
 export default function MapTab() {
   const containerRef = useRef(null);
   const [size, setSize] = useState({ width: 360, height: 420 });
@@ -95,7 +123,9 @@ export default function MapTab() {
   const load = useCallback(() => {
     getMapState()
       .then((data) => {
-        setMapState(data);
+        // Момент получения - от него карта сама ведёт значок по пути до
+        // следующего опроса (см. ridePos ниже).
+        setMapState({ ...data, fetchedAt: performance.now() });
         setStatus('ready');
       })
       .catch(() => setStatus('error'));
@@ -108,6 +138,16 @@ export default function MapTab() {
     const id = setInterval(load, 5000);
     return () => clearInterval(id);
   }, [load]);
+
+  // Пока едешь верхом, значок ползёт между клетками плавно: раз в 200 мс
+  // перерисовка, позиция считается от последнего опроса (ridePos).
+  const riding = Boolean(mapState?.mount_travel && !mapState.mount_travel.paused);
+  const [, setFrame] = useState(0);
+  useEffect(() => {
+    if (!riding) return undefined;
+    const id = setInterval(() => setFrame((n) => n + 1), 200);
+    return () => clearInterval(id);
+  }, [riding]);
 
   // Контейнер появляется только в ветке ready - поэтому эффекты завязаны на
   // status (иначе мерили бы null и навсегда остались бы с размером по умолчанию).
@@ -173,7 +213,11 @@ export default function MapTab() {
   }, [mapState, minScale, clampView]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const catalog = mapState?.catalog;
+  const ride = mapState ? ridePos(mapState.mount_travel, mapState.fetchedAt) : null;
+  // Клетка, где персонаж стоит (по ней считаются расстояния и подсказки), и
+  // где рисуется значок: верхом он едет между клетками плавно.
   const playerPos = mapState ? { x: mapState.pos_x, y: mapState.pos_y } : null;
+  const playerPin = ride ? ride.pos : playerPos;
   const questTarget = mapState?.quest_target ?? null;
   const worldBoss = mapState?.world_boss ?? null;
   // Гильдии: владения и закладки знамён.
@@ -463,6 +507,11 @@ export default function MapTab() {
   // метки закрывали бы рисунок - рассматривать детали там линзой.
   const markerPx = clamp(cellPx * 1.3, 11, 30);
   const travelTarget = mapState.mount_travel || mapState.foot_travel;
+  // Пунктир пути: верхом - от значка по оставшимся клеткам (клетки на
+  // картинке искривлены кольцами, прямая линия резала бы их); пешком - прямо.
+  const routeCells = ride
+    ? [[ride.pos.x, ride.pos.y], ...ride.rest]
+    : travelTarget && playerPos ? [[playerPos.x, playerPos.y], [travelTarget.to_x, travelTarget.to_y]] : [];
 
   const pins = [
     ...(catalog.lakes || []).map((l) => [l.x, l.y, 'map-pin--lake', '🎣', l.name, 0.8]),
@@ -481,13 +530,13 @@ export default function MapTab() {
       `[${g.tag}] ${g.status === 'claiming' ? 'закладка знамени' : 'земля гильдии'}`, 0.8,
     ]),
     ...(travelTarget ? [[travelTarget.to_x, travelTarget.to_y, 'map-pin--route', '⚑', 'Цель пути', 1]] : []),
-    ...(playerPos ? [[playerPos.x, playerPos.y, 'map-pin--player', '', 'Ты здесь', 1.1]] : []),
+    ...(playerPin ? [[playerPin.x, playerPin.y, 'map-pin--player', '', 'Ты здесь', 1.1]] : []),
   ];
 
   /** Метка в точке (sx, sy); size - её размер в пикселях. */
   const pinAt = ([x, y, className, content, title], sx, sy, px) => (
     <div
-      key={`${className}:${x}:${y}`}
+      key={className === 'map-pin--player' ? className : `${className}:${x}:${y}`}
       className={`map-pin ${className}`}
       style={{ left: sx - px / 2, top: sy - px / 2, width: px, height: px, fontSize: px * 0.62 }}
       title={title}
@@ -574,11 +623,12 @@ export default function MapTab() {
                 const cls = `map-guild-cell${g.own ? ' map-guild-cell--own' : ''}${g.status === 'claiming' ? ' map-guild-cell--claiming' : ''}`;
                 return <rect key={`g:${g.x}:${g.y}`} className={cls} x={s.x - px / 2} y={s.y - px / 2} width={px} height={px} rx={3} />;
               })}
-              {travelTarget && playerPos && (() => {
-                const a = cellScreen(playerPos.x, playerPos.y);
-                const b = cellScreen(travelTarget.to_x, travelTarget.to_y);
-                return <line className="map-route" x1={a.x} y1={a.y} x2={b.x} y2={b.y} />;
-              })()}
+              {routeCells.length > 1 && (
+                <polyline
+                  className="map-route"
+                  points={routeCells.map(([x, y]) => { const p = cellScreen(x, y); return `${p.x},${p.y}`; }).join(' ')}
+                />
+              )}
               {[[hovered, 'map-cell-hover'], [selected, 'map-cell-selected']].filter(([c]) => c).map(([c, cls]) => {
                 const s = cellScreen(c.x, c.y);
                 const px = Math.max(cellSizeAt(monolithDistance(c.x, c.y)) * view.scale, 10);
@@ -614,6 +664,16 @@ export default function MapTab() {
               />
               <svg className="map-lens__grid" width={lensD} height={lensD}>
                 <path className="map-grid map-grid--lens" d={lensGridPath} />
+                {/* Пунктир пути и в линзе - раньше его здесь не было. */}
+                {routeCells.length > 1 && (
+                  <polyline
+                    className="map-route map-route--lens"
+                    points={routeCells.map(([x, y]) => {
+                      const p = cellScreen(x, y);
+                      return `${lensD / 2 + (p.x - lensPoint.x) * lens.mag},${lensD / 2 + (p.y - lensPoint.y) * lens.mag}`;
+                    }).join(' ')}
+                  />
+                )}
               </svg>
               {/* Прицел: центр линзы - ровно та точка, куда уйдёт клик
                   (содержимое линзы всегда сдвинуто так, даже у края карты). */}

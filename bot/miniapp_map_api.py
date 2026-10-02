@@ -9,6 +9,7 @@
 """
 
 import random
+from datetime import datetime, timezone
 
 from aiohttp import web
 from sqlalchemy import select
@@ -105,6 +106,18 @@ async def handle_get_state(request: web.Request) -> web.Response:
                 "remaining_seconds": mount_service.frozen_remaining_seconds(travel_row)
                 if travel_row.status == "ambushed"
                 else mount_service.remaining_seconds(travel_row),
+                # Движение по клеткам: карта ведёт значок по пути сама между
+                # опросами. path - со стартовой клеткой, персонаж стоит на
+                # path[cell_index]; paused - занят (бой, нападение), не едет.
+                "path": [[travel_row.from_x, travel_row.from_y]]
+                + [list(c) for c in mount_service.path_of(travel_row)],
+                "cell_index": travel_row.cell_index,
+                "step_seconds": travel_row.step_seconds,
+                "next_cell_in": max(
+                    (travel_row.next_cell_at.replace(tzinfo=travel_row.next_cell_at.tzinfo or timezone.utc)
+                     - datetime.now(timezone.utc)).total_seconds(), 0.0,
+                ) if travel_row.next_cell_at is not None else None,
+                "paused": travel_row.status != "traveling" or mounts_handlers.is_paused(vk_user_id),
             }
 
         quest_target = None

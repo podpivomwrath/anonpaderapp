@@ -29,6 +29,18 @@ def cells_between(x1: int, y1: int, x2: int, y2: int) -> int:
     return max(abs(x2 - x1), abs(y2 - y1))
 
 
+def line_path(x1: int, y1: int, x2: int, y2: int) -> list[tuple[int, int]]:
+    """Клетки пути от (x1;y1) к (x2;y2) по 8 направлениям, без стартовой и с
+    конечной. Длина ровно cells_between, каждый шаг - в соседнюю клетку.
+    Прямая между двумя точками круга целиком лежит в круге, поэтому край
+    мира путь не пересекает."""
+    n = cells_between(x1, y1, x2, y2)
+    return [
+        (x1 + round((x2 - x1) * i / n), y1 + round((y2 - y1) * i / n))
+        for i in range(1, n + 1)
+    ]
+
+
 def zone_level_range(dist: int) -> tuple[int, int]:
     return wc.ZONE_TABLE[wc.ring_tier_for_dist(dist) - 1][2]
 

@@ -3,9 +3,8 @@
 Путешествие хранится в БД (mount_travels), не в памяти — переживает
 перезапуск бота. Батч-сканер (scan) вызывается периодически из main.py по
 образцу bot/handlers/respawn.py::scan: один общий job на всех, не задача на
-игрока. Шанс нападения разыгрывается ОДИН раз при старте поездки (не при
-каждом тике скана) — если выпало, момент нападения фиксируется случайно
-строго между стартом и прибытием.
+игрока. Поездка идёт по клеткам: персонаж реально переходит с клетки на
+клетку, нападение разыгрывается на каждой (см. «Путешествие» ниже).
 """
 
 import random
@@ -99,6 +98,13 @@ async def has_any_mount(db: AsyncSession, character_id: int) -> bool:
 
 
 # --- Путешествие ---
+#
+# Поездка идёт по клеткам (grid.line_path): каждые step_seconds персонаж
+# реально переходит на следующую клетку - его координаты в базе меняются,
+# его видно в «Осмотреться» на этой клетке, моб нападает по ЭТОЙ клетке.
+# Нападение разыгрывается на каждой новой клетке; шанс за всю поездку на
+# ~REF_CELLS клеток в среднем равен ambush_chance маунта, а по кольцу он
+# растёт к центру (RING_AMBUSH_MULT). На мирных клетках не нападают.
 
 
 async def active_travel(db: AsyncSession, character_id: int) -> MountTravel | None:
@@ -119,53 +125,84 @@ def total_travel_seconds(mount_id: str, cells: int) -> float:
     return cells * seconds_per_cell(mount_id)
 
 
+def path_of(travel: MountTravel) -> list[tuple[int, int]]:
+    return grid.line_path(travel.from_x, travel.from_y, travel.to_x, travel.to_y)
+
+
+def _is_safe_cell(x: int, y: int) -> bool:
+    from services import fishing_service, mining_service  # избегаем цикла импортов
+
+    return (
+        grid.city_region_at(x, y) is not None
+        or fishing_service.is_safe_lake(x, y)
+        or mining_service.is_safe_mine(x, y)
+    )
+
+
+def cell_ambush_chance(mount_id: str, x: int, y: int) -> float:
+    """Шанс нападения при входе на клетку (x;y) верхом."""
+    trip = ambush_chance(mount_id)
+    if trip <= 0 or _is_safe_cell(x, y):
+        return 0.0
+    per_cell = 1 - (1 - trip) ** (1 / mc.AMBUSH_REF_CELLS)
+    return min(per_cell * mc.RING_AMBUSH_MULT[grid.ring_tier(x, y)], 0.5)
+
+
+def trip_ambush_chance(mount_id: str, from_x: int, from_y: int, to_x: int, to_y: int) -> float:
+    """Шанс хотя бы одного нападения на этом маршруте - для подсказки игроку."""
+    safe = 1.0
+    for x, y in grid.line_path(from_x, from_y, to_x, to_y)[:-1]:
+        safe *= 1 - cell_ambush_chance(mount_id, x, y)
+    return 1 - safe
+
+
 async def start_travel(
     db: AsyncSession, character: Character, mount_id: str, to_x: int, to_y: int,
-    rng: random.Random, now: datetime | None = None,
+    rng: random.Random | None = None, now: datetime | None = None,
 ) -> MountTravel:
     now = now or datetime.now(timezone.utc)
     cells = grid.cells_between(character.pos_x, character.pos_y, to_x, to_y)
     seconds = total_travel_seconds(mount_id, cells)
-    arrives_at = now + timedelta(seconds=seconds)
-
-    ambush_at = None
-    # Нападение — "не в начале и не в конце": окно 10%-90% пути.
-    if cells > 0 and rng.random() < ambush_chance(mount_id):
-        offset = rng.uniform(seconds * 0.1, seconds * 0.9)
-        ambush_at = now + timedelta(seconds=offset)
-
+    step = seconds / cells if cells else 0.0
     travel = MountTravel(
         character_id=character.id, mount_id=mount_id,
         from_x=character.pos_x, from_y=character.pos_y, to_x=to_x, to_y=to_y,
-        started_at=now, arrives_at=arrives_at, ambush_at=ambush_at,
-        ambush_done=ambush_at is None, status="traveling",
+        started_at=now, arrives_at=now + timedelta(seconds=seconds),
+        ambush_at=None, ambush_done=True, status="traveling",
+        step_seconds=step, cell_index=0, next_cell_at=now + timedelta(seconds=step),
     )
     db.add(travel)
     await db.flush()
     return travel
 
 
+def cells_left(travel: MountTravel) -> int:
+    return max(grid.cells_between(travel.from_x, travel.from_y, travel.to_x, travel.to_y) - travel.cell_index, 0)
+
+
 def remaining_seconds(travel: MountTravel, now: datetime | None = None) -> float:
+    """До прибытия: остаток текущего шага плюс целые шаги после него."""
     now = now or datetime.now(timezone.utc)
-    return max((travel.arrives_at - now).total_seconds(), 0.0)
+    left = cells_left(travel)
+    if left == 0 or travel.next_cell_at is None:
+        return max((travel.arrives_at - now).total_seconds(), 0.0)
+    current = max((travel.next_cell_at - now).total_seconds(), 0.0)
+    return current + (left - 1) * travel.step_seconds
 
 
 def frozen_remaining_seconds(travel: MountTravel, now: datetime | None = None) -> float:
-    """Оставшееся время пути, «замороженное» в момент нападения (до
-    resume_travel) — для текста предложения «Продолжить путь»."""
-    if travel.ambush_at is None:
-        return remaining_seconds(travel, now)
-    return max((travel.arrives_at - travel.ambush_at).total_seconds(), 0.0)
+    """Оставшийся путь, пока поездка стоит (нападение): все клетки целиком."""
+    if travel.status == "ambushed":
+        return cells_left(travel) * travel.step_seconds
+    return remaining_seconds(travel, now)
 
 
 async def resume_travel(db: AsyncSession, travel: MountTravel, now: datetime | None = None) -> None:
-    """Победа в бою нападения (патч 25, п.7): оставшееся время пути
-    сохраняется — бой не идёт в счёт дороги."""
+    """Победа в бою нападения: путь продолжается с той клетки, где напали."""
     now = now or datetime.now(timezone.utc)
-    if travel.ambush_at is not None:
-        remaining = max((travel.arrives_at - travel.ambush_at).total_seconds(), 0.0)
-        travel.arrives_at = now + timedelta(seconds=remaining)
     travel.status = "traveling"
+    travel.next_cell_at = now + timedelta(seconds=travel.step_seconds)
+    travel.arrives_at = now + timedelta(seconds=cells_left(travel) * travel.step_seconds)
     await db.flush()
 
 
@@ -176,30 +213,51 @@ async def cancel_travel(db: AsyncSession, travel: MountTravel) -> None:
 
 
 @dataclass
-class ScanResult:
-    ambushed: list[MountTravel]
-    arrived: list[MountTravel]
-    still_traveling: list[MountTravel]
+class StepResult:
+    moved: bool = False      # перешёл хотя бы на одну клетку
+    ambushed: bool = False   # на новой клетке напали - поездка встала
+    arrived: bool = False    # дошёл до цели
 
 
-async def scan(db: AsyncSession, now: datetime | None = None) -> ScanResult:
-    """Батч-проход (main.py, периодический job): кто наткнулся на нападение,
-    кто уже прибыл, у кого просто идёт время (для live-отсчёта). Строки со
-    status="ambushed" (бой ещё не разрешён) сюда не попадают — ждут исхода боя."""
+def advance(
+    travel: MountTravel, character: Character, rng: random.Random,
+    now: datetime | None = None, paused: bool = False,
+) -> StepResult:
+    """Шаги, которые уже пора сделать. paused - персонаж занят (бой,
+    исследование): поездка ждёт его, шаг откладывается, а не теряется.
+    После простоя бота догоняет все пропущенные клетки, на каждой разыгрывая
+    нападение, - пропущенное время не даёт проскочить опасный участок."""
     now = now or datetime.now(timezone.utc)
-    rows = (
-        await db.scalars(select(MountTravel).where(MountTravel.status == "traveling"))
-    ).all()
-    ambushed, arrived, still = [], [], []
-    for row in rows:
-        if not row.ambush_done and row.ambush_at is not None and now >= row.ambush_at:
-            row.ambush_done = True
-            row.status = "ambushed"
-            ambushed.append(row)
-        elif now >= row.arrives_at:
-            row.status = "completed"
-            arrived.append(row)
-        else:
-            still.append(row)
-    await db.flush()
-    return ScanResult(ambushed=ambushed, arrived=arrived, still_traveling=still)
+    result = StepResult()
+    if travel.status != "traveling":
+        return result
+    if travel.next_cell_at is None:
+        # Поездка, начатая до движения по клеткам: доезжает по старому таймеру.
+        if now >= travel.arrives_at and not paused:
+            character.pos_x, character.pos_y = travel.to_x, travel.to_y
+            travel.status = "completed"
+            result.moved = result.arrived = True
+        return result
+    if paused:
+        if now >= travel.next_cell_at:
+            travel.next_cell_at = now + timedelta(seconds=travel.step_seconds)
+            travel.arrives_at = travel.next_cell_at + timedelta(
+                seconds=(cells_left(travel) - 1) * travel.step_seconds
+            )
+        return result
+    path = path_of(travel)
+    while travel.status == "traveling" and now >= travel.next_cell_at:
+        travel.cell_index += 1
+        x, y = path[travel.cell_index - 1]
+        character.pos_x, character.pos_y = x, y
+        result.moved = True
+        if travel.cell_index >= len(path):
+            travel.status = "completed"
+            result.arrived = True
+            break
+        travel.next_cell_at += timedelta(seconds=travel.step_seconds)
+        if rng.random() < cell_ambush_chance(travel.mount_id, x, y):
+            travel.status = "ambushed"
+            travel.ambush_at = now
+            result.ambushed = True
+    return result

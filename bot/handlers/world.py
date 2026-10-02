@@ -110,6 +110,11 @@ from services import (
 from services import onboarding_service as onboarding_svc
 from services.db import get_session_factory
 
+# Поездка верхом идёт по клеткам сама (bot/handlers/mounts.py::scan): пеший
+# шаг, исследование или отдых посреди неё увели бы персонажа с пути.
+MOUNT_BUSY_TEXT = "🐎 Ты в пути верхом - маунт несёт тебя к цели. Оглядеться можно: «👁 Осмотреться»."
+
+
 labeler = BotLabeler()
 
 _travel_scheduler: PeerScheduler | None = None
@@ -573,6 +578,9 @@ async def explore(message: Message) -> None:
         if movement_service.is_traveling(character, now):
             left = movement_service.remaining_seconds(character, now)
             await message.answer(f"🚶 В пути... осталось ~{left:.0f} сек.")
+            return
+        if await mount_service.active_travel(db, character.id) is not None:
+            await message.answer(MOUNT_BUSY_TEXT)
             return
         if grid.city_region_at(character.pos_x, character.pos_y) is not None:
             await message.answer("В городе безопасно. Исследовать можно только за воротами.")
@@ -1073,6 +1081,9 @@ async def rest(message: Message) -> None:
         if peer_id in _exploring or movement_service.is_traveling(character, now):
             await message.answer("Сначала закончи то, что начал.")
             return
+        if await mount_service.active_travel(db, character.id) is not None:
+            await message.answer(MOUNT_BUSY_TEXT)
+            return
 
     _resting.add(peer_id)
     # Патч 50: Метка Хранителя — отдых вдвое быстрее.
@@ -1158,6 +1169,9 @@ async def move(message: Message) -> None:
         if movement_service.is_traveling(character, now):
             left = movement_service.remaining_seconds(character, now)
             await message.answer(f"🚶 В пути... осталось ~{left:.0f} сек.")
+            return
+        if await mount_service.active_travel(db, character.id) is not None:
+            await message.answer(MOUNT_BUSY_TEXT)
             return
         direction = kb.resolve_direction(character.pos_x, character.pos_y, message.text)
         if direction is None:

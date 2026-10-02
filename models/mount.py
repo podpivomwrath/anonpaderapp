@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, String, UniqueConstraint, func
+from sqlalchemy import Boolean, DateTime, Float, ForeignKey, Integer, String, UniqueConstraint, func
 from sqlalchemy.orm import Mapped, mapped_column
 
 from models.base import Base
@@ -51,3 +51,10 @@ class MountTravel(Base):
     ambush_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     ambush_done: Mapped[bool] = mapped_column(Boolean, default=False)
     status: Mapped[str] = mapped_column(String(16), default="traveling")
+    # Движение по клеткам: персонаж реально стоит на клетке path[cell_index-1]
+    # (0 - ещё на старте), следующий шаг - в next_cell_at, шаг длится
+    # step_seconds. Путь не хранится: он однозначно считается из from/to
+    # (game/world/grid.py::line_path).
+    step_seconds: Mapped[float] = mapped_column(Float, default=10.0, server_default="10")
+    cell_index: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+    next_cell_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)

@@ -33,6 +33,7 @@ from bot.onboarding_texts import REGION_TITLES
 from bot.world_texts import foreign_city_entry_text, hub_attachment
 from bot.world_summary import location_attachment, location_summary
 from game.world import encounters, grid
+from game.economy import mount_config as mc
 from game.world import world_config as wc
 from game.world.location_types import region_for
 from models import Character, CharacterStats, User
@@ -200,7 +201,8 @@ async def start_travel_and_notify(
     seconds = mount_service.total_travel_seconds(mount_id, cells)
     await db.commit()
     await notify_travel_started(
-        peer_id, to_x, to_y, seconds, mount_service.ambush_chance(mount_id)
+        peer_id, to_x, to_y, seconds,
+        mount_service.trip_ambush_chance(mount_id, character.pos_x, character.pos_y, to_x, to_y),
     )
     return seconds
 
@@ -226,7 +228,7 @@ async def notify_travel_started(peer_id: int, to_x: int, to_y: int, seconds: flo
     )
     try:
         resp = await _bot_api.messages.send(
-            peer_id=peer_id, message=text, random_id=0, keyboard=kb.waiting_keyboard()
+            peer_id=peer_id, message=text, random_id=0, keyboard=kb.mount_travel_keyboard()
         )
     except Exception:  # noqa: BLE001 - сеть/VK могут бросить что угодно
         # Поездка на этот момент УЖЕ записана в БД, и падение отправки не
@@ -243,7 +245,9 @@ async def notify_travel_started(peer_id: int, to_x: int, to_y: int, seconds: flo
 
 def _travel_text(travel, now: datetime) -> str:
     left = mount_service.remaining_seconds(travel, now)
-    return f"🐎 В пути... осталось {_format_seconds(left)}."
+    path = mount_service.path_of(travel)
+    x, y = path[travel.cell_index - 1] if travel.cell_index else (travel.from_x, travel.from_y)
+    return f"🐎 В пути: ({x}; {y}) → ({travel.to_x}; {travel.to_y}), осталось {_format_seconds(left)}."
 
 
 async def offer_continue(peer_id: int, travel_id: int) -> None:
@@ -310,7 +314,7 @@ async def continue_travel(message: Message) -> None:
 
     resp = await _bot_api.messages.send(
         peer_id=peer_id, message=_travel_text(travel, datetime.now(timezone.utc)),
-        random_id=0, keyboard=kb.waiting_keyboard(),
+        random_id=0, keyboard=kb.mount_travel_keyboard(),
     )
     try:
         _travel_message[peer_id] = int(resp)
@@ -318,12 +322,30 @@ async def continue_travel(message: Message) -> None:
         pass
 
 
+def is_paused(peer_id: int) -> bool:
+    """Персонаж занят - поездка ждёт: бой (свой или PvP, в том числе когда
+    на него напали в пути), исследование, отдых. Иначе он уезжал бы с
+    клетки посреди боя."""
+    return in_any_battle(peer_id) or pvp_handlers.has_active_battle(peer_id) or world_handlers.is_busy(peer_id)
+
+
+# peer_id -> когда последний раз правили сообщение «в пути»: скан идёт раз в
+# пару секунд (значок на карте не должен отставать), а VK править чаще не к чему.
+_countdown_edited: dict[int, datetime] = {}
+
+
 async def scan() -> None:
-    """Батч-проход (main.py, периодический job): кто наткнулся на нападение,
-    кто прибыл, у кого просто идёт время (live-отсчёт). Один job на всех —
-    по образцу bot/handlers/respawn.py::scan."""
+    """Батч-проход (main.py, раз в TRAVEL_STEP_SCAN_SECONDS): двигает всех в
+    пути по клеткам, разыгрывает нападения на новых клетках, завершает
+    прибывших и обновляет отсчёт. Один job на всех - по образцу
+    bot/handlers/respawn.py::scan."""
     if _bot_api is None:
         return
+    from sqlalchemy import select
+
+    from models import MountTravel
+    from services import death_service
+
     now = datetime.now(timezone.utc)
     sf = get_session_factory()
 
@@ -332,86 +354,88 @@ async def scan() -> None:
     countdowns = []
 
     async with sf() as db:
-        result = await mount_service.scan(db, now)
-        all_ids = {t.character_id for t in (result.ambushed + result.arrived + result.still_traveling)}
+        rows = (await db.scalars(select(MountTravel).where(MountTravel.status == "traveling"))).all()
         vkid_map: dict[int, int] = {}
-        if all_ids:
-            from sqlalchemy import select
-
-            rows = (
+        if rows:
+            vkid_map = dict((
                 await db.execute(
-                    select(Character.id, User.vk_id)
-                    .join(User, User.id == Character.user_id)
-                    .where(Character.id.in_(all_ids))
+                    select(Character.id, User.vk_id).join(User, User.id == Character.user_id)
+                    .where(Character.id.in_({t.character_id for t in rows}))
                 )
-            ).all()
-            vkid_map = dict(rows)
+            ).all())
 
-        for travel in result.ambushed:
+        for travel in rows:
             peer_id = vkid_map.get(travel.character_id)
             character = await db.get(Character, travel.character_id)
             if peer_id is None or character is None:
                 continue
-            stats = await _stats(db, character.id)
-            gear_bonus = await item_service.compute_gear_bonus(db, character.id)
-            buff_modifiers = await scene_event_service.solo_modifiers(
-                db, character, await preset_service.resolve_active_modifiers(db, character),
-            )
-            dist = grid.monolith_distance(travel.to_x, travel.to_y)
-            # Патч 32, баг 4: регион — по клетке нападения (куда едет маунт),
-            # не по домашнему региону игрока (см. bot/handlers/combat.py).
-            cell_region = region_for(travel.to_x, travel.to_y)
-            encounter = encounters.spawn_mob(
-                combat_handlers.MOB_ID, cell_region, character.level, dist, _rng
-            )
-            ambush_starts.append((peer_id, character, stats, gear_bonus, buff_modifiers, travel.id, encounter))
-
-        for travel in result.arrived:
-            peer_id = vkid_map.get(travel.character_id)
-            character = await db.get(Character, travel.character_id)
-            if peer_id is None or character is None:
+            if death_service.is_dead(character, now):
+                # Погиб в пути не от нападения маунта (например, в PvP) -
+                # поездка кончилась вместе с ним.
+                await mount_service.cancel_travel(db, travel)
                 continue
-            character.pos_x, character.pos_y = travel.to_x, travel.to_y
-            from services import daily_service, trial_service
+            step = mount_service.advance(travel, character, _rng, now, paused=is_paused(peer_id))
+            if step.moved:
+                from bot.handlers import guild as guild_handlers  # избегаем цикла импортов
 
-            if character.subclass is not None:
-                await trial_service.record_cell_moved(db, character)
-            await daily_service.record_cell_moved(db, character)
-            from bot.handlers import guild as guild_handlers  # избегаем цикла импортов
+                # Башня гильдии замечает и тех, кто проезжает мимо.
+                await guild_handlers.on_arrival(db, character)
 
-            await guild_handlers.on_arrival(db, character)
-            stats = await _stats(db, character.id)
-            wallet = await wallet_service.get_wallet(db, character.id)
-            gear_bonus = await item_service.compute_gear_bonus(db, character.id)
-            quest_line = await story_service.quest_summary_line(db, character)
-            group_block = await group_texts.group_summary_block(db, character.id)
-            region = grid.city_region_at(travel.to_x, travel.to_y)
-            mentor_badge = False
-            is_foreign = False
-            if region is not None:
-                # Патч 39: прибытие в город на маунте — всегда корневой экран
-                # (площадь), а не сохранённый квартал.
-                await screen_service.set_screen(db, character, None)
-                is_foreign = region != character.region
-                mentor_badge = not is_foreign and await story_service.mentor_badge_active(db, character)
-            arrivals.append(
-                (peer_id, character, stats, wallet.farm_currency, wallet.donate_currency,
-                 quest_line, gear_bonus, region, mentor_badge, is_foreign, group_block)
-            )
+            if step.ambushed:
+                stats = await _stats(db, character.id)
+                gear_bonus = await item_service.compute_gear_bonus(db, character.id)
+                buff_modifiers = await scene_event_service.solo_modifiers(
+                    db, character, await preset_service.resolve_active_modifiers(db, character),
+                )
+                # Моб - по клетке, где напали: персонаж и правда на ней стоит.
+                dist = grid.monolith_distance(character.pos_x, character.pos_y)
+                cell_region = region_for(character.pos_x, character.pos_y)
+                encounter = encounters.spawn_mob(
+                    combat_handlers.MOB_ID, cell_region, character.level, dist, _rng
+                )
+                ambush_starts.append((peer_id, character, stats, gear_bonus, buff_modifiers, travel.id, encounter))
+                continue
 
-        if _live_countdown:
-            for travel in result.still_traveling:
-                peer_id = vkid_map.get(travel.character_id)
-                if peer_id is not None:
+            if step.arrived:
+                from services import daily_service, trial_service
+
+                if character.subclass is not None:
+                    await trial_service.record_cell_moved(db, character)
+                await daily_service.record_cell_moved(db, character)
+                stats = await _stats(db, character.id)
+                wallet = await wallet_service.get_wallet(db, character.id)
+                gear_bonus = await item_service.compute_gear_bonus(db, character.id)
+                quest_line = await story_service.quest_summary_line(db, character)
+                group_block = await group_texts.group_summary_block(db, character.id)
+                region = grid.city_region_at(travel.to_x, travel.to_y)
+                mentor_badge = False
+                is_foreign = False
+                if region is not None:
+                    # Патч 39: прибытие в город на маунте — всегда корневой экран
+                    # (площадь), а не сохранённый квартал.
+                    await screen_service.set_screen(db, character, None)
+                    is_foreign = region != character.region
+                    mentor_badge = not is_foreign and await story_service.mentor_badge_active(db, character)
+                arrivals.append(
+                    (peer_id, character, stats, wallet.farm_currency, wallet.donate_currency,
+                     quest_line, gear_bonus, region, mentor_badge, is_foreign, group_block)
+                )
+                continue
+
+            if _live_countdown:
+                last = _countdown_edited.get(peer_id)
+                if last is None or (now - last).total_seconds() >= mc.TRAVEL_COUNTDOWN_UPDATE_SECONDS:
+                    _countdown_edited[peer_id] = now
                     countdowns.append((peer_id, travel))
 
         await db.commit()
 
     for peer_id, character, stats, gear_bonus, buff_modifiers, travel_id, encounter in ambush_starts:
         _travel_message.pop(peer_id, None)
+        _countdown_edited.pop(peer_id, None)
         await _bot_api.messages.send(
             peer_id=peer_id,
-            message="🐎 На пути внезапно возникает опасность - маунт спотыкается и встаёт.",
+            message=f"🐎 ({character.pos_x}; {character.pos_y}): на пути внезапно возникает опасность - маунт встаёт.",
             random_id=0,
         )
         await combat_handlers.start_mount_ambush_encounter(
@@ -421,6 +445,7 @@ async def scan() -> None:
     for (peer_id, character, stats, farm_currency, donate_currency, quest_line, gear_bonus,
          region, mentor_badge, is_foreign, group_block) in arrivals:
         _travel_message.pop(peer_id, None)
+        _countdown_edited.pop(peer_id, None)
         if region is not None:
             text = (
                 foreign_city_entry_text(REGION_TITLES[region]) if is_foreign

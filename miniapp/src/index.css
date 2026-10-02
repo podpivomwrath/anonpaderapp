@@ -407,10 +407,17 @@ body {
 }
 
 .map-route {
+  fill: none;
   stroke: #ffe066;
   stroke-width: 2;
   stroke-dasharray: 6 6;
+  stroke-linejoin: round;
   opacity: 0.8;
+}
+
+.map-route--lens {
+  stroke-width: 2.5;
+  stroke-dasharray: 8 7;
 }
 
 .map-pins {
