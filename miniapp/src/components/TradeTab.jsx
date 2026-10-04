@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Button, Div, Group, Header, Placeholder, SimpleCell, Spinner } from '@vkontakte/vkui';
 import { getTrade, tradeAction } from '../api.js';
-import TradeDestination from './TradeDestination.jsx';
+import ItemIcon from './ItemIcon.jsx';
+import TradeDestination, { GoodName } from './TradeDestination.jsx';
 
 // Торговля: повозка, Торговый дом города (или караван), куда везти.
 // Цены и правила считает сервер (services/trade_service.py) - здесь только
@@ -9,7 +10,6 @@ import TradeDestination from './TradeDestination.jsx';
 // значок - на вкладке «Карта».
 
 const money = (v) => Number(v ?? 0).toLocaleString('ru-RU');
-const TIER_CLASS = { 1: '', 2: 'trade-tier--2', 3: 'trade-tier--3', 4: 'trade-tier--4' };
 
 function minutes(seconds) {
   return seconds >= 60 ? `~${Math.round(seconds / 60)} мин` : `~${Math.round(seconds)} сек`;
@@ -65,10 +65,13 @@ export default function TradeTab({ onWallet }) {
         {noticeBlock}
         <Group header={<Header>🐂 Торговый обоз</Header>}>
           <Div>
-            <p className="guild-line">
-              Покупай товар там, где его производят, и вези туда, где его не хватает. Повозка едет по клеткам
-              сама; в пути на неё нападают, а в глубине мира (кольца 3-5) её могут ограбить игроки.
-            </p>
+            <div className="trade-intro">
+              <ItemIcon icon="trade:cart" size={64} />
+              <p className="guild-line">
+                Покупай товар там, где его производят, и вези туда, где его не хватает. Повозка едет по клеткам
+                сама; в пути на неё нападают, а в глубине мира (кольца 3-5) её могут ограбить игроки.
+              </p>
+            </div>
             {data.level < data.min_level ? (
               <p className="craft-hint">Торговля открывается с {data.min_level} уровня.</p>
             ) : place?.kind === 'city' ? (
@@ -112,8 +115,8 @@ export default function TradeTab({ onWallet }) {
           {cart.cargo.length > 0 ? (
             <div className="trade-cargo">
               {cart.cargo.map((g) => (
-                <span key={g.id} className={`trade-chip ${TIER_CLASS[g.tier]}`}>
-                  {g.emoji} {g.name} ×{g.count}
+                <span key={g.id} className="trade-chip">
+                  <GoodName g={g} size={20} count={g.count} />
                 </span>
               ))}
             </div>
@@ -132,7 +135,7 @@ export default function TradeTab({ onWallet }) {
             return (
               <Div key={o.id} className="trade-offer">
                 <div className="trade-offer__head">
-                  <span className={`trade-offer__name ${TIER_CLASS[o.tier]}`}>{o.emoji} {o.name}</span>
+                  <span className="trade-offer__name"><GoodName g={o} size={32} /></span>
                   <span className="craft-hint">
                     {o.tier_name} · {o.city_title}
                     {o.deficit ? ' · дефицит' : ''}

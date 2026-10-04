@@ -96,6 +96,14 @@ BASE_FILES = {
     "base:weapon:Жезл": "предмет_жезл.png",
 }
 
+#: У этих эликсиров позже поменялось описание действия, а вместе с ним и
+#: промт - по тексту картинку уже не найти, хотя она та же.
+ELIXIR_FILES = {
+    "elixir:ashen_fever": "028_эликсир_пепельная_лихорадка.png",
+    "elixir:ashen_haze": "033_эликсир_пепельный_морок.png",
+    "elixir:shard_blood": "034_эликсир_осколочная_кровь.png",
+}
+
 #: Картинки, которых нет в контенте игры: значки базовых классов и рамки
 #: венцов топ-1 (патч 91). Промты для них написаны руками
 #: (tools/crown_art_prompts.md), из контента они не выводятся, поэтому и
@@ -186,7 +194,7 @@ def main() -> None:
             continue
         row = find(by_prompt, record["prompt"])
         if row is None:
-            hint = SUBCLASS_FILES.get(key) or BASE_FILES.get(key)
+            hint = SUBCLASS_FILES.get(key) or BASE_FILES.get(key) or ELIXIR_FILES.get(key)
             if hint is None and key in BACKGROUNDS:
                 hint = BACKGROUNDS[key][2]
             if hint is not None and (SRC / hint).exists():

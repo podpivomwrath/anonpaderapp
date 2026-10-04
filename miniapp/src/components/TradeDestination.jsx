@@ -1,4 +1,6 @@
 import { Button } from '@vkontakte/vkui';
+import { itemIcon } from '../itemIcons.js';
+import ItemIcon from './ItemIcon.jsx';
 
 // Окно направления (город или караван): что там продают и покупают, по
 // каким ценам сейчас, сколько ехать и насколько опасно. Открывается
@@ -11,10 +13,21 @@ function duration(seconds) {
   return seconds >= 60 ? `~${Math.round(seconds / 60)} мин` : `~${Math.round(seconds)} сек`;
 }
 
+// Товар: картинка, а пока её нет - эмодзи.
+export function GoodName({ g, size = 22, count }) {
+  const key = `good:${g.id}`;
+  return (
+    <span className={`trade-good ${TIER_CLASS[g.tier]}`}>
+      {itemIcon(key) ? <ItemIcon icon={key} size={size} /> : g.emoji}
+      <span>{g.name}{count != null ? ` ×${count}` : ''}</span>
+    </span>
+  );
+}
+
 function GoodRow({ g, price, note, have }) {
   return (
     <div className="trade-dest__row">
-      <span className={`trade-dest__good ${TIER_CLASS[g.tier]}`}>{g.emoji} {g.name}</span>
+      <span className="trade-dest__good"><GoodName g={g} /></span>
       <span className="trade-dest__note">
         {note}
         {have ? <span className="trade-dest__have"> · у тебя {have}</span> : null}

@@ -1746,6 +1746,29 @@ body::before {
   font-size: 13px;
 }
 
+/* Товар: картинка и имя в одну строку. */
+.trade-good {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  vertical-align: middle;
+}
+
+.trade-chip .trade-good {
+  gap: 4px;
+}
+
+.trade-intro {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.trade-intro .guild-line {
+  margin-top: 0;
+  min-width: 0;
+}
+
 /* Градации товара - цветом, как у руды и предметов. */
 .trade-tier--2 { color: #7fa8e6; }
 .trade-tier--3 { color: #b48ce6; }
@@ -1761,7 +1784,7 @@ body::before {
 .trade-offer__head {
   display: flex;
   flex-wrap: wrap;
-  align-items: baseline;
+  align-items: center;
   gap: 4px 10px;
 }
 
@@ -1801,7 +1824,7 @@ body::before {
 
 .trade-dest__row {
   display: flex;
-  align-items: baseline;
+  align-items: center;
   gap: 8px;
   padding: 5px 4px;
   border-top: 1px solid rgba(255, 255, 255, 0.04);
