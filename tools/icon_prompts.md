@@ -275,7 +275,7 @@ small glass vial of an alchemical draught called «Большое исцелен
 **🔥 Пепельная лихорадка**
 
 ```
-small glass vial of an alchemical draught called «Пепельная лихорадка», hand-blown uneven glass, wax-sealed stopper, cloth label. Effect: 3 хода урон нарастает: +10% / +20% / +30%. Каждый из этих ходов теряешь 5% макс. HP, muted violet accents, the liquid inside visually hints at the effect, dark fantasy game item icon, single object centered, slight 3/4 angle, painterly semi-realistic, muted desaturated palette of ash grey, rust brown and dried blood, weathered and worn surfaces, soft rim light from the upper left, deep neutral background, no text, no watermark, no border, square 1:1 composition, crisp readable silhouette at small size
+small glass vial of an alchemical draught called «Пепельная лихорадка», hand-blown uneven glass, wax-sealed stopper, cloth label. Effect: 3 хода урон нарастает: +10% / +20% / +30%. Каждый из этих ходов теряешь 5% максимального здоровья, muted violet accents, the liquid inside visually hints at the effect, dark fantasy game item icon, single object centered, slight 3/4 angle, painterly semi-realistic, muted desaturated palette of ash grey, rust brown and dried blood, weathered and worn surfaces, soft rim light from the upper left, deep neutral background, no text, no watermark, no border, square 1:1 composition, crisp readable silhouette at small size
 ```
 
 **💀 Последний вздох**
@@ -305,13 +305,13 @@ small glass vial of an alchemical draught called «Второе сердце», 
 **🌫️ Пепельный морок**
 
 ```
-small glass vial of an alchemical draught called «Пепельный морок», hand-blown uneven glass, wax-sealed stopper, cloth label. Effect: 2 хода: удары по тебе с фиксированным шансом уклонения 80%, muted violet accents, the liquid inside visually hints at the effect, dark fantasy game item icon, single object centered, slight 3/4 angle, painterly semi-realistic, muted desaturated palette of ash grey, rust brown and dried blood, weathered and worn surfaces, soft rim light from the upper left, deep neutral background, no text, no watermark, no border, square 1:1 composition, crisp readable silhouette at small size
+small glass vial of an alchemical draught called «Пепельный морок», hand-blown uneven glass, wax-sealed stopper, cloth label. Effect: 2 хода: уклоняешься от ударов с шансом 80%, независимо от ловкости, muted violet accents, the liquid inside visually hints at the effect, dark fantasy game item icon, single object centered, slight 3/4 angle, painterly semi-realistic, muted desaturated palette of ash grey, rust brown and dried blood, weathered and worn surfaces, soft rim light from the upper left, deep neutral background, no text, no watermark, no border, square 1:1 composition, crisp readable silhouette at small size
 ```
 
 **⚡ Осколочная кровь**
 
 ```
-small glass vial of an alchemical draught called «Осколочная кровь», hand-blown uneven glass, wax-sealed stopper, cloth label. Effect: 3 хода: каждая твоя атака наносит дополнительный осколочный урон, не зависящий от урона по статам, muted violet accents, the liquid inside visually hints at the effect, dark fantasy game item icon, single object centered, slight 3/4 angle, painterly semi-realistic, muted desaturated palette of ash grey, rust brown and dried blood, weathered and worn surfaces, soft rim light from the upper left, deep neutral background, no text, no watermark, no border, square 1:1 composition, crisp readable silhouette at small size
+small glass vial of an alchemical draught called «Осколочная кровь», hand-blown uneven glass, wax-sealed stopper, cloth label. Effect: 3 хода: каждая твоя атака наносит дополнительный осколочный урон, который не зависит от характеристик, muted violet accents, the liquid inside visually hints at the effect, dark fantasy game item icon, single object centered, slight 3/4 angle, painterly semi-realistic, muted desaturated palette of ash grey, rust brown and dried blood, weathered and worn surfaces, soft rim light from the upper left, deep neutral background, no text, no watermark, no border, square 1:1 composition, crisp readable silhouette at small size
 ```
 
 
@@ -769,5 +769,112 @@ two arrows curving into each other, flat monochrome UI icon, single weight line 
 
 ```
 a plain shield, flat monochrome UI icon, single weight line art, no fill, no gradient, no text, square 1:1, centred with even padding, legible at 22x22 pixels
+```
+
+
+## Товары торговли
+
+Ремесло «Торговля» (game/economy/trade_config.py). Товар, а не ящик: в списке Торгового дома иконка должна отличаться от соседней. Градация - цветом акцента, как у руды. Раздел в КОНЦЕ файла намеренно: иконки привязаны к предметам по номеру промта, и вставка в середину сдвинула бы номера уже нарисованных.
+
+**🪨 Сланцевая плитка (обычный, ridge)**
+
+```
+a trade good called «Сланцевая плитка»: a neat stack of split grey slate roof tiles tied with twine, cold off-white accents, merchant's wares ready for the road, dark fantasy game item icon, single object centered, slight 3/4 angle, painterly semi-realistic, muted desaturated palette of ash grey, rust brown and dried blood, weathered and worn surfaces, soft rim light from the upper left, deep neutral background, no text, no watermark, no border, square 1:1 composition, crisp readable silhouette at small size
+```
+
+**🧶 Горная шерсть (добротный, ridge)**
+
+```
+a trade good called «Горная шерсть»: a fat bundle of coarse undyed mountain wool, loosely twisted, pale steel-blue accents, merchant's wares ready for the road, dark fantasy game item icon, single object centered, slight 3/4 angle, painterly semi-realistic, muted desaturated palette of ash grey, rust brown and dried blood, weathered and worn surfaces, soft rim light from the upper left, deep neutral background, no text, no watermark, no border, square 1:1 composition, crisp readable silhouette at small size
+```
+
+**🔔 Кряжевая бронза (редкий, ridge)**
+
+```
+a trade good called «Кряжевая бронза»: a small cast bronze bell and two bronze ingots, muted violet accents, merchant's wares ready for the road, dark fantasy game item icon, single object centered, slight 3/4 angle, painterly semi-realistic, muted desaturated palette of ash grey, rust brown and dried blood, weathered and worn surfaces, soft rim light from the upper left, deep neutral background, no text, no watermark, no border, square 1:1 composition, crisp readable silhouette at small size
+```
+
+**🖼 Храмовые образа (драгоценный, ridge)**
+
+```
+a trade good called «Храмовые образа»: a folded wooden triptych of faded temple paintings with chipped gilt edges, burnt amber accents, merchant's wares ready for the road, dark fantasy game item icon, single object centered, slight 3/4 angle, painterly semi-realistic, muted desaturated palette of ash grey, rust brown and dried blood, weathered and worn surfaces, soft rim light from the upper left, deep neutral background, no text, no watermark, no border, square 1:1 composition, crisp readable silhouette at small size
+```
+
+**🧂 Чёрная соль (обычный, docks)**
+
+```
+a trade good called «Чёрная соль»: a rough sack spilling coarse black salt crystals, cold off-white accents, merchant's wares ready for the road, dark fantasy game item icon, single object centered, slight 3/4 angle, painterly semi-realistic, muted desaturated palette of ash grey, rust brown and dried blood, weathered and worn surfaces, soft rim light from the upper left, deep neutral background, no text, no watermark, no border, square 1:1 composition, crisp readable silhouette at small size
+```
+
+**🐟 Вяленая рыба (добротный, docks)**
+
+```
+a trade good called «Вяленая рыба»: a string of three dried salted fish hanging from a cord, pale steel-blue accents, merchant's wares ready for the road, dark fantasy game item icon, single object centered, slight 3/4 angle, painterly semi-realistic, muted desaturated palette of ash grey, rust brown and dried blood, weathered and worn surfaces, soft rim light from the upper left, deep neutral background, no text, no watermark, no border, square 1:1 composition, crisp readable silhouette at small size
+```
+
+**🪢 Смолёный канат (редкий, docks)**
+
+```
+a trade good called «Смолёный канат»: a thick coil of dark tar-soaked ship rope, muted violet accents, merchant's wares ready for the road, dark fantasy game item icon, single object centered, slight 3/4 angle, painterly semi-realistic, muted desaturated palette of ash grey, rust brown and dried blood, weathered and worn surfaces, soft rim light from the upper left, deep neutral background, no text, no watermark, no border, square 1:1 composition, crisp readable silhouette at small size
+```
+
+**🦪 Пепельный жемчуг (драгоценный, docks)**
+
+```
+a trade good called «Пепельный жемчуг»: a small open shell holding a single ash-grey pearl, burnt amber accents, merchant's wares ready for the road, dark fantasy game item icon, single object centered, slight 3/4 angle, painterly semi-realistic, muted desaturated palette of ash grey, rust brown and dried blood, weathered and worn surfaces, soft rim light from the upper left, deep neutral background, no text, no watermark, no border, square 1:1 composition, crisp readable silhouette at small size
+```
+
+**⚫ Угольные брикеты (обычный, scorched)**
+
+```
+a trade good called «Угольные брикеты»: a wooden crate of pressed coal briquettes, sooty, cold off-white accents, merchant's wares ready for the road, dark fantasy game item icon, single object centered, slight 3/4 angle, painterly semi-realistic, muted desaturated palette of ash grey, rust brown and dried blood, weathered and worn surfaces, soft rim light from the upper left, deep neutral background, no text, no watermark, no border, square 1:1 composition, crisp readable silhouette at small size
+```
+
+**🍶 Дымчатое стекло (добротный, scorched)**
+
+```
+a trade good called «Дымчатое стекло»: a stoppered smoky glass bottle with swirled grey glass, pale steel-blue accents, merchant's wares ready for the road, dark fantasy game item icon, single object centered, slight 3/4 angle, painterly semi-realistic, muted desaturated palette of ash grey, rust brown and dried blood, weathered and worn surfaces, soft rim light from the upper left, deep neutral background, no text, no watermark, no border, square 1:1 composition, crisp readable silhouette at small size
+```
+
+**🌶 Жгучие пряности (редкий, scorched)**
+
+```
+a trade good called «Жгучие пряности»: a small cloth pouch spilling dried red chili pods and dark spice powder, muted violet accents, merchant's wares ready for the road, dark fantasy game item icon, single object centered, slight 3/4 angle, painterly semi-realistic, muted desaturated palette of ash grey, rust brown and dried blood, weathered and worn surfaces, soft rim light from the upper left, deep neutral background, no text, no watermark, no border, square 1:1 composition, crisp readable silhouette at small size
+```
+
+**🏮 Тлеющие угли-ловцы (драгоценный, scorched)**
+
+```
+a trade good called «Тлеющие угли-ловцы»: a perforated iron lantern holding a slowly smouldering ember, burnt amber accents, merchant's wares ready for the road, dark fantasy game item icon, single object centered, slight 3/4 angle, painterly semi-realistic, muted desaturated palette of ash grey, rust brown and dried blood, weathered and worn surfaces, soft rim light from the upper left, deep neutral background, no text, no watermark, no border, square 1:1 composition, crisp readable silhouette at small size
+```
+
+**🪵 Корабельный тёс (обычный, woods)**
+
+```
+a trade good called «Корабельный тёс»: a short stack of pale planed ship planks bound with rope, cold off-white accents, merchant's wares ready for the road, dark fantasy game item icon, single object centered, slight 3/4 angle, painterly semi-realistic, muted desaturated palette of ash grey, rust brown and dried blood, weathered and worn surfaces, soft rim light from the upper left, deep neutral background, no text, no watermark, no border, square 1:1 composition, crisp readable silhouette at small size
+```
+
+**🌿 Сонные травы (добротный, woods)**
+
+```
+a trade good called «Сонные травы»: a hanging bundle of dried pale sleep herbs tied with string, pale steel-blue accents, merchant's wares ready for the road, dark fantasy game item icon, single object centered, slight 3/4 angle, painterly semi-realistic, muted desaturated palette of ash grey, rust brown and dried blood, weathered and worn surfaces, soft rim light from the upper left, deep neutral background, no text, no watermark, no border, square 1:1 composition, crisp readable silhouette at small size
+```
+
+**🍯 Янтарная смола (редкий, woods)**
+
+```
+a trade good called «Янтарная смола»: a clay jar brimming with golden amber resin, a drip running down the side, muted violet accents, merchant's wares ready for the road, dark fantasy game item icon, single object centered, slight 3/4 angle, painterly semi-realistic, muted desaturated palette of ash grey, rust brown and dried blood, weathered and worn surfaces, soft rim light from the upper left, deep neutral background, no text, no watermark, no border, square 1:1 composition, crisp readable silhouette at small size
+```
+
+**🌳 Сердцевина шепчущего древа (драгоценный, woods)**
+
+```
+a trade good called «Сердцевина шепчущего древа»: a carved block of dark twisting heartwood with a faint green glow in the grain, burnt amber accents, merchant's wares ready for the road, dark fantasy game item icon, single object centered, slight 3/4 angle, painterly semi-realistic, muted desaturated palette of ash grey, rust brown and dried blood, weathered and worn surfaces, soft rim light from the upper left, deep neutral background, no text, no watermark, no border, square 1:1 composition, crisp readable silhouette at small size
+```
+
+**🐂 Торговая повозка**
+
+```
+a small covered two-wheeled merchant cart with patched canvas and iron-rimmed wheels, a few crates lashed to the back, cold off-white accents, no animal harnessed, seen from the side and slightly above, dark fantasy game item icon, single object centered, slight 3/4 angle, painterly semi-realistic, muted desaturated palette of ash grey, rust brown and dried blood, weathered and worn surfaces, soft rim light from the upper left, deep neutral background, no text, no watermark, no border, square 1:1 composition, crisp readable silhouette at small size
 ```
 

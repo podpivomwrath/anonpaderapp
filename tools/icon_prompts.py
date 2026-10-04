@@ -459,6 +459,61 @@ def subclasses() -> None:
         )
 
 
+#: Вид товара по-английски: русское название генератору мало что говорит.
+GOOD_LOOK = {
+    "ridge_slate": "a neat stack of split grey slate roof tiles tied with twine",
+    "ridge_wool": "a fat bundle of coarse undyed mountain wool, loosely twisted",
+    "ridge_bronze": "a small cast bronze bell and two bronze ingots",
+    "ridge_icons": "a folded wooden triptych of faded temple paintings with chipped gilt edges",
+    "docks_salt": "a rough sack spilling coarse black salt crystals",
+    "docks_fish": "a string of three dried salted fish hanging from a cord",
+    "docks_rope": "a thick coil of dark tar-soaked ship rope",
+    "docks_pearl": "a small open shell holding a single ash-grey pearl",
+    "scorched_coal": "a wooden crate of pressed coal briquettes, sooty",
+    "scorched_glass": "a stoppered smoky glass bottle with swirled grey glass",
+    "scorched_spice": "a small cloth pouch spilling dried red chili pods and dark spice powder",
+    "scorched_ember": "a perforated iron lantern holding a slowly smouldering ember",
+    "woods_timber": "a short stack of pale planed ship planks bound with rope",
+    "woods_herbs": "a hanging bundle of dried pale sleep herbs tied with string",
+    "woods_resin": "a clay jar brimming with golden amber resin, a drip running down the side",
+    "woods_heartwood": "a carved block of dark twisting heartwood with a faint green glow in the grain",
+}
+
+
+def trade() -> None:
+    section(
+        "Товары торговли",
+        "Ремесло «Торговля» (game/economy/trade_config.py). Товар, а не ящик: "
+        "в списке Торгового дома иконка должна отличаться от соседней. "
+        "Градация - цветом акцента, как у руды. Раздел в КОНЦЕ файла "
+        "намеренно: иконки привязаны к предметам по номеру промта, и вставка "
+        "в середину сдвинула бы номера уже нарисованных.",
+    )
+    sys.path.insert(0, str(ROOT))
+    from game.economy import trade_config as tc
+
+    for good in tc.GOODS:
+        entry(
+            f"{good.emoji} {good.name} ({tc.TIER_NAMES[good.tier]}, {good.city})",
+            prompt(
+                f"a trade good called «{good.name}»: {GOOD_LOOK[good.id]}",
+                ACCENT.get(good.tier, ACCENT[1]),
+                "merchant's wares ready for the road",
+            ),
+            key=f"good:{good.id}",
+        )
+    entry(
+        "🐂 Торговая повозка",
+        prompt(
+            "a small covered two-wheeled merchant cart with patched canvas and iron-rimmed wheels, "
+            "a few crates lashed to the back",
+            ACCENT[1],
+            "no animal harnessed, seen from the side and slightly above",
+        ),
+        key="trade:cart",
+    )
+
+
 def main() -> None:
     print("# Промты для генерации иконок\n")
     print(
@@ -483,6 +538,7 @@ def main() -> None:
     background()
     subclasses()
     sections_ui()
+    trade()
 
 
 if __name__ == "__main__":

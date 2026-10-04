@@ -226,6 +226,7 @@ class Notice:
     finished: bool = False
     levels: int = 0
     new_level: int = 0
+    image: str = ""
 
 
 async def tick(db: AsyncSession, rng: random.Random | None = None, now: datetime | None = None) -> list[Notice]:
@@ -255,7 +256,8 @@ async def tick(db: AsyncSession, rng: random.Random | None = None, now: datetime
             body = f"{trip.emoji} Час {voyage.hours_done} из {hours}. {vc.TIER_TITLES[tier]}{text}"
             if lines:
                 body += f" ({', '.join(lines)})"
-            notices.append(Notice(character.id, body, levels=levels, new_level=character.level))
+            image = vc.LEGENDARY_IMAGES.get((voyage.region, index), "") if tier == "legendary" else ""
+            notices.append(Notice(character.id, body, levels=levels, new_level=character.level, image=image))
             voyage.next_event_at = _aware(voyage.next_event_at) + timedelta(minutes=vc.EVENT_INTERVAL_MINUTES)
             if voyage.hours_done >= hours or voyage.next_event_at > _aware(voyage.ends_at) + timedelta(seconds=1):
                 notices.append(Notice(character.id, _finish(voyage, early=False), finished=True))

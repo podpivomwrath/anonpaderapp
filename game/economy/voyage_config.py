@@ -237,6 +237,13 @@ def money(n: int) -> str:
     return f"{n:,}".replace(",", " ")
 
 
+# Картинки (id фото в альбоме), промты - tools/voyage_trade_art_prompts.md.
+# Пустая строка - картинки ещё нет, сообщение уходит без неё.
+VOYAGE_IMAGES = {"docks": "", "ridge": "", "scorched": "", "woods": ""}
+# (город, номер в списке legendary) -> id фото: легендарная весть - с картинкой.
+LEGENDARY_IMAGES = {(region, i): "" for region in VOYAGE_IMAGES for i in range(3)}
+
+
 def part_name(region: str, part_id: str) -> tuple[str, str]:
     """(эмодзи, название) части снаряжения в этом городе."""
     return VOYAGES[region].parts[part_id]

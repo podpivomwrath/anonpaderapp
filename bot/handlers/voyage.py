@@ -51,6 +51,12 @@ async def load_away() -> None:
             _away.update(vk)
 
 
+def _photo(photo_id: str) -> str | None:
+    from bot.vk_media import photo_attachment
+
+    return photo_attachment(photo_id) if photo_id else None
+
+
 def is_away(peer_id: int) -> bool:
     return peer_id in _away
 
@@ -169,6 +175,7 @@ async def go(message: Message) -> None:
     await message.answer(
         f"{trip.start}\n\nВ пути до {hours} ч. Раз в час - весть с дороги. Вернуться можно в любой момент.",
         keyboard=kb.voyage_keyboard(),
+        attachment=_photo(vc.VOYAGE_IMAGES.get(voyage.region, "")),
     )
 
 
@@ -239,6 +246,7 @@ async def tick_job() -> None:
             else:
                 await _bot_api.messages.send(
                     peer_id=peer_id, message=notice.text, random_id=0, keyboard=kb.voyage_keyboard(),
+                    attachment=_photo(notice.image),
                 )
                 if notice.levels:
                     await stats_window.notify_levelup(peer_id, notice.levels, notice.new_level)

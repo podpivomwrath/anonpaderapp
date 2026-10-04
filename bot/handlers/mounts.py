@@ -30,6 +30,7 @@ from bot.handlers import pvp as pvp_handlers
 from bot.handlers import world as world_handlers
 from bot.keyboards import world as kb
 from bot.onboarding_texts import REGION_TITLES
+from bot.vk_media import photo_attachment
 from bot.world_texts import foreign_city_entry_text, hub_attachment
 from bot.world_summary import location_attachment, location_summary
 from game.world import encounters, grid
@@ -52,6 +53,8 @@ from services import onboarding_service as onboarding_svc
 from services.db import get_session_factory
 
 labeler = BotLabeler()
+
+CART_READY_LINE = "🐂 Повозка на месте. Торговля - в мини-аппе, раздел «Торговля»."
 
 _bot_api = None
 _dispenser = None
@@ -557,7 +560,7 @@ async def scan() -> None:
                 if travel.mount_id == tc.CART_MOUNT_ID:
                     caravan = await trade_service.caravan_at(db, character.pos_x, character.pos_y, now)
                     if region is not None or caravan is not None:
-                        cart_line = "🐂 Повозка на месте. Торговля - в мини-аппе, раздел «Торговля»."
+                        cart_line = CART_READY_LINE
                     else:
                         cart_line = "🐂 Повозка с тобой. Торговать здесь не с кем - вези в город или к каравану."
                 has_mount = await mount_service.has_any_mount(db, character.id)
@@ -615,7 +618,12 @@ async def scan() -> None:
         ) + (f"\n\n{cart_line}" if cart_line else "")
         await _bot_api.messages.send(
             peer_id=peer_id, message=text, random_id=0,
-            attachment=location_attachment(character),
+            # Доехал до каравана - кадр встречи с ним, если картинка уже есть.
+            attachment=(
+                photo_attachment(tc.CARAVAN_PHOTO_ID)
+                if cart_line == CART_READY_LINE and tc.CARAVAN_PHOTO_ID
+                else location_attachment(character)
+            ),
             keyboard=kb.movement_keyboard(character.pos_x, character.pos_y, peer_id, has_mount=has_mount),
         )
         # Патч 58: прибытие на маунте — такой же вход на клетку, как пеший,
