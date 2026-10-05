@@ -180,7 +180,7 @@ export default function TradeTab({ onWallet }) {
           <SimpleCell
             key={c.region}
             onClick={() => setDest({ ...c, kind: 'city' })}
-            subtitle={c.route?.cells === 0 ? 'ты здесь' : `${c.route?.cells} клеток · ${minutes(c.route?.seconds || 0)} · ждёт: ${c.wants}`}
+            subtitle={c.route?.cells === 0 ? 'повозка здесь' : `${c.route?.cells} клеток · ${minutes(c.route?.seconds || 0)} · ждёт: ${c.wants}`}
             after="›"
           >
             {c.title}
@@ -190,7 +190,7 @@ export default function TradeTab({ onWallet }) {
           <SimpleCell
             key={c.id}
             onClick={() => setDest({ ...c, kind: 'caravan', title: '🐪 Караван' })}
-            subtitle={`${c.route?.cells} клеток · ${minutes(c.route?.seconds || 0)} · уйдёт через ${c.minutes_left} мин`}
+            subtitle={`${c.route?.cells === 0 ? 'повозка здесь' : `${c.route?.cells} клеток · ${minutes(c.route?.seconds || 0)}`} · уйдёт через ${c.minutes_left} мин`}
             after="›"
           >
             🐪 Караван ({c.x}; {c.y})

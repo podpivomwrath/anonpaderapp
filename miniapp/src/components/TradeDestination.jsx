@@ -53,7 +53,7 @@ export default function TradeDestination({ dest, cargo, canGo, busy, onGo, onClo
         </div>
         <p className="craft-hint">
           {here
-            ? 'Ты здесь.'
+            ? 'Повозка здесь.'
             : route
               ? `${route.cells} клеток · ${duration(route.seconds)} · нападение в пути ~${Math.round(route.ambush * 100)}%`
               : ''}

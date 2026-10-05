@@ -97,14 +97,15 @@ async def _state(db, character) -> dict:
             ],
         }
     def route(x: int, y: int) -> dict | None:
-        """Путь повозки отсюда: клетки, время, шанс хотя бы одного нападения."""
+        """Путь повозки от её клетки (отправить её можно только оттуда, а
+        игрок мог отойти): клетки, время, шанс хотя бы одного нападения."""
         if cart is None:
             return None
-        cells = grid.cells_between(character.pos_x, character.pos_y, x, y)
+        cells = grid.cells_between(cart.cart_x, cart.cart_y, x, y)
         return {
             "cells": cells, "seconds": cells * trade_service.part_value(cart, "horses"),
             "ambush": mount_service.trip_ambush_chance(
-                tc.CART_MOUNT_ID, character.pos_x, character.pos_y, x, y, trade_service.trip_ambush(cart),
+                tc.CART_MOUNT_ID, cart.cart_x, cart.cart_y, x, y, trade_service.trip_ambush(cart),
             ),
         }
 
