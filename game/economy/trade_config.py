@@ -146,4 +146,4 @@ CARAVAN_SELL_MULT = 0.70          # продаёт 1-2 товара дешевл
 CARAVAN_STOCK = 12                # ящиков на каждый товар
 # Картинка встречи с караваном (промт - tools/voyage_trade_art_prompts.md);
 # пусто - сообщение о прибытии уходит с обычной картинкой клетки.
-CARAVAN_PHOTO_ID = ""
+CARAVAN_PHOTO_ID = "457239214"

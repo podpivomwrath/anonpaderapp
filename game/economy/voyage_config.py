@@ -239,9 +239,22 @@ def money(n: int) -> str:
 
 # Картинки (id фото в альбоме), промты - tools/voyage_trade_art_prompts.md.
 # Пустая строка - картинки ещё нет, сообщение уходит без неё.
-VOYAGE_IMAGES = {"docks": "", "ridge": "", "scorched": "", "woods": ""}
+VOYAGE_IMAGES = {"docks": "457239198", "ridge": "457239199", "scorched": "457239200", "woods": "457239201"}
 # (город, номер в списке legendary) -> id фото: легендарная весть - с картинкой.
-LEGENDARY_IMAGES = {(region, i): "" for region in VOYAGE_IMAGES for i in range(3)}
+LEGENDARY_IMAGES = {
+    ("docks", 0): "457239202",
+    ("docks", 1): "457239203",
+    ("docks", 2): "457239204",
+    ("ridge", 0): "457239205",
+    ("ridge", 1): "457239206",
+    ("ridge", 2): "457239207",
+    ("scorched", 0): "457239208",
+    ("scorched", 1): "457239209",
+    ("scorched", 2): "457239210",
+    ("woods", 0): "457239211",
+    ("woods", 1): "457239212",
+    ("woods", 2): "457239213",
+}
 
 
 def part_name(region: str, part_id: str) -> tuple[str, str]:
