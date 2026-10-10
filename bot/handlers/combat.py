@@ -551,9 +551,12 @@ async def on_battle_finished(session_id: int, result: TickResult) -> None:
             _pending_item_choice[peer_id] = new_item.id
             announcement = item_service.format_drop_announcement(new_item)
             comparison = item_service.format_comparison(old_item, new_item)
+            wearable = item_service.can_wear(new_item, character.level)
+            if not wearable:
+                comparison += f"\n\n🔒 Надеть можно с {item_service.required_level(new_item)} уровня."
             await editable_message.send_or_edit(
                 _bot_api, "item_choice", peer_id, f"{announcement}\n\n{comparison}",
-                item_choice_keyboard(new_item.id),
+                item_choice_keyboard(new_item.id, can_equip=wearable),
             )
             return
 
@@ -621,8 +624,11 @@ async def item_choice(message: Message) -> None:
         )
         if action == "equip":
             new_item = await db.get(Item, pending_item_id)
-            old_item = await item_service.equip_item(db, character.id, pending_item_id)
-            confirm_text = f"Надето. {item_service.stat_delta_line(old_item, new_item)}"
+            try:
+                old_item = await item_service.equip_item(db, character.id, pending_item_id)
+                confirm_text = f"Надето. {item_service.stat_delta_line(old_item, new_item)}"
+            except item_service.LevelTooLow as exc:
+                confirm_text = f"{exc} Убрано в инвентарь."
         else:
             confirm_text = "Убрано в инвентарь."
         wallet = await wallet_service.get_wallet(db, character.id)

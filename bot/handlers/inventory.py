@@ -197,12 +197,15 @@ async def equip_from_inventory(message: Message) -> None:
         if entry is None or entry.equipped:
             return
         new_item = await db.get(Item, item_id)
-        old_item = await item_service.equip_item(db, character.id, item_id)
+        try:
+            old_item = await item_service.equip_item(db, character.id, item_id)
+            head = f"Надето. {item_service.stat_delta_line(old_item, new_item)}"
+        except item_service.LevelTooLow as exc:
+            head = str(exc)
         await db.commit()
         text, items = await _render_list(db, character, page)
 
-    delta_line = item_service.stat_delta_line(old_item, new_item)
-    full_text = f"Надето. {delta_line}\n\n{text}"
+    full_text = f"{head}\n\n{text}"
     await editable_message.send_or_edit(_bot_api, _NS, peer_id, full_text, inventory_keyboard(items, page))
 
 

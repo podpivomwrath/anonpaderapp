@@ -58,7 +58,7 @@ async def test_power_is_current_not_best_ever(db_session, make_character) -> Non
     assert (await power_service.power_of(db_session, me)).total == naked
     assert not await item_service.unequip_item(db_session, me.id, strong.id), "уже снята"
 
-    weak = Item(name="Слабая", slot="weapon", base_stats={"str": 10}, rarity="common", ilvl=10)
+    weak = Item(name="Слабая", slot="weapon", base_stats={"str": 10}, rarity="common", ilvl=1)
     db_session.add(weak)
     await db_session.flush()
     db_session.add(Inventory(character_id=me.id, item_id=weak.id, equipped=False))

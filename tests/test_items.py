@@ -1,3 +1,4 @@
+import pytest
 """Базовая экипировка (патч 11, блок 2): генерация, дроп, инвентарь, продажа."""
 
 import random
@@ -188,6 +189,7 @@ async def test_grant_random_item_ignores_item_drop_chance(db_session, character_
 
 async def test_equip_item_swaps_old_out(db_session, character_at) -> None:
     character = await character_at(0, 30, base_class="warrior")
+    character.level = 20  # вещи 20 ур. - надеть можно только с 20-го
     first = await item_service.grant_from_kill(db_session, character, 20, FixedRng(0.0))
     await item_service.equip_item(db_session, character.id, first.id)
 
@@ -206,8 +208,26 @@ async def test_equip_item_swaps_old_out(db_session, character_at) -> None:
     assert inventory[second.id] is True
 
 
+async def test_equip_item_above_level_is_refused(db_session, character_at) -> None:
+    """Вещь выше уровня персонажа не надевается - ни новая, ни на смену."""
+    character = await character_at(0, 30, base_class="warrior")
+    character.level = 19
+    item = await item_service.grant_from_kill(db_session, character, 20, FixedRng(0.0))
+    with pytest.raises(item_service.LevelTooLow) as exc:
+        await item_service.equip_item(db_session, character.id, item.id)
+    assert exc.value.need == 20
+    equipped = await item_service.get_equipped(db_session, character.id)
+    assert equipped["weapon"] is None
+
+    character.level = 20  # ровно её уровень - уже можно
+    await item_service.equip_item(db_session, character.id, item.id)
+    equipped = await item_service.get_equipped(db_session, character.id)
+    assert equipped["weapon"].id == item.id
+
+
 async def test_gear_bonus_sums_equipped_items(db_session, character_at) -> None:
     character = await character_at(0, 30, base_class="mage")
+    character.level = 20  # вещи 20 ур. - надеть можно только с 20-го
     item = await item_service.grant_from_kill(db_session, character, 20, FixedRng(0.0))
     await item_service.equip_item(db_session, character.id, item.id)
 
@@ -243,6 +263,7 @@ async def test_sell_item_applies_price_multiplier(db_session, character_at) -> N
 
 async def test_sell_item_equipped_rejected(db_session, character_at) -> None:
     character = await character_at(0, 30, farm=0)
+    character.level = 20  # вещи 20 ур. - надеть можно только с 20-го
     item = await item_service.grant_from_kill(db_session, character, 20, FixedRng(0.0))
     await item_service.equip_item(db_session, character.id, item.id)
 
@@ -395,6 +416,7 @@ def test_format_drop_announcement_includes_emoji_and_level() -> None:
 
 async def test_derived_stats_include_gear_bonus(db_session, character_at) -> None:
     character = await character_at(0, 30, base_class="mage")
+    character.level = 20  # вещи 20 ур. - надеть можно только с 20-го
     stats = await _stats(db_session, character)
     without_gear = derived_stats_service.compute(character, stats)
 

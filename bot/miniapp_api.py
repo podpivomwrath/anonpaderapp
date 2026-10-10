@@ -615,7 +615,7 @@ def _transfer_command(item) -> str | None:
     return transfer_service.command_for(item)
 
 
-def _inventory_payload(items: list) -> dict:
+def _inventory_payload(items: list, level: int | None = None) -> dict:
     return {
         "items": [
             {
@@ -629,6 +629,11 @@ def _inventory_payload(items: list) -> dict:
                 "base_stats": item.base_stats,
                 "power": item_service.item_power(item),
                 "equipped": equipped,
+                # Вещь выше уровня персонажа: с какого уровня её можно надеть.
+                "need_level": (
+                    item_service.required_level(item)
+                    if level is not None and not item_service.can_wear(item, level) else None
+                ),
                 # Патч 72: можно ли отнести в мастерскую и что с ним там уже
                 # сделали. Решает СЕРВЕР: клиент однажды уже пересказывал
                 # серверное правило своими словами и врал (патч 57).
@@ -656,7 +661,11 @@ def _inventory_payload(items: list) -> dict:
 async def _full_inventory(session, character_id: int) -> dict:
     """Экипировка + реликвии + расходники - один ответ и для показа, и после
     «Надеть»: иначе после надевания реликвии и расходники пропадали бы."""
-    payload = _inventory_payload(await item_service.get_inventory(session, character_id))
+    character = await session.get(Character, character_id)
+    payload = _inventory_payload(
+        await item_service.get_inventory(session, character_id),
+        character.level if character is not None else None,
+    )
     payload["trophies"] = _trophies_payload(await trophy_service.get_stock(session, character_id))
     payload["consumables"] = _consumables_payload(await elixir_service.get_stock(session, character_id))
     payload["chests"] = _chests_payload(await lootbox_service.closed_chests(session, character_id))
@@ -740,7 +749,11 @@ async def handle_post_equip(request: web.Request) -> web.Response:
         entry = await item_service.get_inventory_entry(session, character.id, item_id)
         if entry is None or entry.equipped:
             return web.json_response({"error": "cannot_equip"}, status=400)
-        await item_service.equip_item(session, character.id, item_id)
+        try:
+            await item_service.equip_item(session, character.id, item_id)
+        except item_service.LevelTooLow as exc:
+            await session.rollback()
+            return web.json_response({"error": str(exc)}, status=400)
         await session.commit()
         return web.json_response(await _full_inventory(session, character.id))
 

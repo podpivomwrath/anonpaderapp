@@ -238,15 +238,38 @@ async def get_inventory_entry(
     )
 
 
+class LevelTooLow(Exception):
+    """Вещь выше уровня персонажа - надеть нельзя."""
+
+    def __init__(self, need: int):
+        self.need = need
+        super().__init__(f"Не по силам: эту вещь можно надеть с {need} уровня.")
+
+
+def required_level(item: Item) -> int | None:
+    """С какого уровня персонажа вещь можно надеть: её уровень (ilvl).
+    У уникальных и служебных вещей уровня нет - ограничения тоже."""
+    return item.ilvl
+
+
+def can_wear(item: Item, level: int) -> bool:
+    need = required_level(item)
+    return need is None or need <= level
+
+
 async def equip_item(db: AsyncSession, character_id: int, item_id: int) -> Item | None:
     """Надевает предмет (должен принадлежать персонажу); снимает старый в том же
-    слоте (падает в инвентарь, не пропадает). Возвращает снятый предмет (или None)."""
+    слоте (падает в инвентарь, не пропадает). Возвращает снятый предмет (или None).
+    Вещь выше уровня персонажа - LevelTooLow."""
     row = await get_inventory_entry(db, character_id, item_id)
     if row is None:
         return None
     new_item = await db.get(Item, item_id)
     if new_item is None:
         return None
+    character = await db.get(Character, character_id)
+    if character is not None and not can_wear(new_item, character.level):
+        raise LevelTooLow(required_level(new_item))
 
     old_item = None
     equipped_rows = (

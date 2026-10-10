@@ -59,6 +59,7 @@ function itemSubtitle(item) {
   else if (item.ilvl) parts.push(`ур. ${item.ilvl}`);
   const stats = statsLine(item.base_stats);
   if (stats) parts.push(stats);
+  if (item.need_level && !item.equipped) parts.push(`🔒 надеть с ${item.need_level} ур.`);
   return parts.join(' · ');
 }
 
@@ -411,6 +412,7 @@ export default function InventoryTab({ onCharacterUpdate }) {
             <Button
               mode="secondary" size="s"
               loading={equippingId === item.id}
+              disabled={Boolean(item.need_level)}
               onClick={() => handleEquip(item.id)}
             >
               Надеть

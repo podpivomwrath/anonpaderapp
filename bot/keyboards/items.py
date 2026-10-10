@@ -25,14 +25,16 @@ def no_keyboard() -> str:
     return Keyboard(inline=True).get_json()
 
 
-def item_choice_keyboard(item_id: int) -> str:
-    """[Надеть] / [В инвентарь] — окно сравнения после дропа предмета."""
+def item_choice_keyboard(item_id: int, can_equip: bool = True) -> str:
+    """[Надеть] / [В инвентарь] — окно сравнения после дропа предмета.
+    Вещь выше уровня персонажа - без «Надеть»."""
     kb = Keyboard(inline=True)
-    kb.add(
-        Text(BTN_EQUIP, payload={"type": "item_choice", "action": "equip", "item": item_id}),
-        color=KeyboardButtonColor.POSITIVE,
-    )
-    kb.row()
+    if can_equip:
+        kb.add(
+            Text(BTN_EQUIP, payload={"type": "item_choice", "action": "equip", "item": item_id}),
+            color=KeyboardButtonColor.POSITIVE,
+        )
+        kb.row()
     kb.add(
         Text(BTN_KEEP, payload={"type": "item_choice", "action": "keep", "item": item_id}),
         color=KeyboardButtonColor.SECONDARY,

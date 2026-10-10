@@ -314,11 +314,22 @@ async def test_inventory_lists_dropped_items(client, session_factory) -> None:
 
 async def test_equip_marks_item_equipped(client, session_factory) -> None:
     character = await _make_character(session_factory, vk_id=401)
-    item_id = await _grant_item(session_factory, character.id)
+    item_id = await _grant_item(session_factory, character.id, ilvl=1)
     resp = await client.post("/api/miniapp/equip", params=_signed_query(401), json={"item_id": item_id})
     assert resp.status == 200
     data = await resp.json()
     assert data["items"][0]["equipped"] is True
+
+
+async def test_equip_above_level_rejected_and_marked(client, session_factory) -> None:
+    character = await _make_character(session_factory, vk_id=403)
+    need = character.level + 1
+    item_id = await _grant_item(session_factory, character.id, ilvl=need)
+    listing = await (await client.get("/api/miniapp/inventory", params=_signed_query(403))).json()
+    assert listing["items"][0]["need_level"] == need
+    resp = await client.post("/api/miniapp/equip", params=_signed_query(403), json={"item_id": item_id})
+    assert resp.status == 400
+    assert str(need) in (await resp.json())["error"]
 
 
 async def test_equip_unknown_item_rejected(client, session_factory) -> None:
