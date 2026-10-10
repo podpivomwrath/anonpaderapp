@@ -22,7 +22,9 @@ from bot.handlers import world as world_handlers
 from bot.miniapp_auth import VK_USER_ID_KEY
 from game.content_loader import load_location_types
 from game.economy import fishing, mining
+from game.economy import fishing_config as fc
 from game.economy import mining_config as mc
+from game.economy import rift_config as rfc
 from game.world import grid, scene_events, world_boss
 from game.world import world_config as wc
 from models import Character, User
@@ -66,7 +68,8 @@ _STATIC_CATALOG = {
     # каждое движение карты.
     "lakes": [
         {"id": lake.id, "x": lake.x, "y": lake.y, "tier": lake.tier,
-         "name": lake.name, "safe": fishing.is_safe_lake(lake.x, lake.y)}
+         "name": lake.name, "safe": fishing.is_safe_lake(lake.x, lake.y),
+         "need": fc.LAKE_REQUIRED_LEVEL.get(lake.tier, 1)}
         for lake in fishing.all_lakes()
     ],
     # Патч 59: рудники. Координаты статичны и едут каталогом, а вот СКОЛЬКО в
@@ -74,7 +77,8 @@ _STATIC_CATALOG = {
     # динамической части ответа (см. handle_get_state).
     "mines": [
         {"id": mine.id, "x": mine.x, "y": mine.y, "tier": mine.tier,
-         "name": mine.name, "safe": mining.is_safe_mine(mine.x, mine.y)}
+         "name": mine.name, "safe": mining.is_safe_mine(mine.x, mine.y),
+         "need": mc.MINE_REQUIRED_LEVEL.get(mine.tier, 1)}
         for mine in mining.all_mines()
     ],
     "mine_ore_cap": mc.MINE_ORE_CAP,
@@ -164,6 +168,18 @@ async def handle_get_state(request: web.Request) -> web.Response:
             {"x": c.x, "y": c.y, "buys": len(c.buys or {}), "sells": len(c.sells or {})}
             for c in await trade_service.active_caravans(db)
         ]
+        # Разломы: видят все. Свободен / ждут у входа / внутри - для окна клетки.
+        from services import rift_service
+
+        rifts = []
+        for r in await rift_service.active_rifts(db):
+            t = rfc.RIFT_TYPES[r.kind]
+            lo, hi = rfc.BANDS[r.ring]
+            rifts.append({
+                "x": r.x, "y": r.y, "name": t.name, "emoji": t.emoji, "hint": t.hint,
+                "min_level": lo, "max_level": hi, "max_size": t.max_size,
+                "minutes_left": rift_service.minutes_left(r), "state": r.state,
+            })
         cart_row = await trade_service.get_cart(db, character.id)
         cart_mark = None
         if cart_row is not None and (cart_row.cart_x, cart_row.cart_y) != (character.pos_x, character.pos_y):
@@ -175,6 +191,12 @@ async def handle_get_state(request: web.Request) -> web.Response:
                 "pos_x": character.pos_x, "pos_y": character.pos_y,
                 "guild_cells": guild_cells,
                 "caravans": caravans,
+                "rifts": rifts,
+                # Для окна клетки: хватает ли уровня у озера, рудника, разлома.
+                "levels": {
+                    "level": character.level, "fishing": character.fishing_level,
+                    "mining": character.mining_level,
+                },
                 "cart": cart_mark,
                 "is_dead": death_service.is_dead(character),
                 "foot_travel": foot_travel,

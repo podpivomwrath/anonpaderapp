@@ -50,6 +50,7 @@ from models.subclass_trial import CharacterTrialProgress, CharacterUnlockedBuff
 from models.transfer import TransferLog
 from models.trophy import CharacterTrophy
 from models.user import User
+from models.rift import Rift, RiftMeter
 from models.voyage import CharacterVoyage
 from models.world_boss import WorldBoss, WorldBossContribution, WorldBossMeter
 
@@ -123,6 +124,8 @@ __all__ = [
     "TradeMarket",
     "TransferLog",
     "User",
+    "Rift",
+    "RiftMeter",
     "WorldBoss",
     "WorldBossContribution",
     "WorldBossMeter",

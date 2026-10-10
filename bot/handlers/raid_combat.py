@@ -26,6 +26,7 @@ from bot.keyboards.items import no_keyboard
 from bot.keyboards.world import movement_keyboard
 from game.combat import balance_config as bc
 from game.combat import battle_log, display, elixir_effects, raid_archive, raid_bosses, raid_field
+from game.combat import rift as rift_combat
 from game.combat.resolver import TickResult
 from game.combat.session import (
     ActionType,
@@ -43,6 +44,7 @@ from game.economy import elixir_config as ec
 from game.economy import raid_config as rc
 from game.economy import raid_archive_config as ac
 from game.economy import raid_field_config as fc
+from game.economy import rift_config as rfc
 from models import Character
 from services import (
     daily_service,
@@ -123,6 +125,22 @@ class RaidBattle:
 
     # --- Рейд «Безликий архив»: этапы 1-2 без боя (bot/handlers/raid_archive.py) ---
     leader_id: int | None = None
+
+    # --- Разломы (services/rift_service.py): тип, уровень, клетка ---
+    rift_id: int | None = None
+    rift_kind: str | None = None
+    rift_level: int = 0
+    rift_ring: int = 1
+    #: клетка, куда участники возвращаются после боя (у рейдов - Монолит)
+    home: tuple[int, int] = rc.MONOLITH_COORDS
+
+    @property
+    def is_rift(self) -> bool:
+        return self.rift_id is not None
+
+    @property
+    def final_stage(self) -> int:
+        return rift_combat.stage_count(self.rift_kind) if self.is_rift else 3
 
     @property
     def is_field(self) -> bool:
@@ -207,7 +225,7 @@ def _start_stage_session(battle_id: int, battle: RaidBattle) -> CombatSessionSta
     state = CombatSessionState(session_id=battle_id, mode=CombatMode.PVE, is_raid=True)
     _build_player_combatants(state, battle.member_inputs)
 
-    if battle.is_field or battle.is_archive:
+    if battle.is_field or battle.is_archive or battle.is_rift:
         _build_field_stage(battle, state)
     elif battle.stage == 1:
         mobs = raid_bosses.build_stage1_mobs(start_id=20_000_000)
@@ -244,7 +262,11 @@ def _build_field_stage(battle: RaidBattle, state: CombatSessionState) -> None:
     """Этап «Безмогильного поля». id противников - свой диапазон на этап,
     как у театра: объекты и скелеты нумеруются дальше от него. У архива
     боевой только третий этап - Архивариус."""
-    if battle.is_archive:
+    if battle.is_rift:
+        stage = rift_combat.build_stage(
+            battle.rift_kind, battle.stage, 21_000_000 + battle.stage * 100_000, battle.rift_level, battle.rift_ring,
+        )
+    elif battle.is_archive:
         stage = raid_archive.ArchiveStage(start_id=20_600_000)
     elif battle.stage == 1:
         stage = raid_field.FogStage(start_id=20_300_000)
@@ -296,6 +318,10 @@ _ARCHIVE_LOOT_MULT = {1: ac.STAGE1_LOOT_MULT, 2: ac.STAGE2_LOOT_MULT, 3: ac.STAG
 
 def _texts(battle: RaidBattle):
     """Модуль текстов рейда: пролог, эпилог, поражение, картинки."""
+    if battle.is_rift:
+        from bot.rift_texts import RiftTexts
+
+        return RiftTexts(battle.rift_kind)
     if battle.is_field:
         return ft
     if battle.is_archive:
@@ -304,6 +330,8 @@ def _texts(battle: RaidBattle):
 
 
 def _appear_text(battle: RaidBattle) -> str:
+    if battle.is_rift:
+        return _texts(battle).appear_text(battle.stage)
     if battle.is_archive:
         return at.STAGE3_APPEAR_TEXT
     return (_FIELD_APPEAR_TEXT if battle.is_field else _STAGE_APPEAR_TEXT)[battle.stage]
@@ -314,6 +342,11 @@ def _stage_attachment(battle: RaidBattle) -> str | None:
 
 
 def _loot_mult(battle: RaidBattle) -> int:
+    if battle.is_rift:
+        # Босс - последний множитель, сколько бы этапов ни было до него.
+        if battle.stage == battle.final_stage:
+            return rfc.STAGE_LOOT_MULT[-1]
+        return rfc.STAGE_LOOT_MULT[battle.stage - 1]
     if battle.is_archive:
         return _ARCHIVE_LOOT_MULT[battle.stage]
     return (_FIELD_LOOT_MULT if battle.is_field else _STAGE_LOOT_MULT)[battle.stage]
@@ -334,7 +367,10 @@ def _unique_id(battle: RaidBattle) -> str:
 async def start_raid(
     group_id: int | None, member_inputs: list[MemberCombatInput], rng: random.Random, *,
     run_id: int | None = None, raid_id: str = rc.RAID_PUPPET_THEATRE_ID, leader_id: int | None = None,
+    rift=None,
 ) -> None:
+    """rift - строка разлома (models.Rift) с уже выставленным level: бой
+    разлома идёт тем же путём, что и рейды 60 уровня."""
     global _next_battle_id
     battle_id = _next_battle_id
     _next_battle_id -= 1
@@ -350,6 +386,11 @@ async def start_raid(
         group_id=group_id, participants=participants, member_inputs=member_inputs, rng=rng,
         run_id=run_id, raid_id=raid_id, leader_id=leader_id,
     )
+    if rift is not None:
+        battle.raid_id = f"rift:{rift.kind}"
+        battle.rift_id, battle.rift_kind = rift.id, rift.kind
+        battle.rift_level, battle.rift_ring = rift.level, rift.ring
+        battle.home = (rift.x, rift.y)
     _battles[battle_id] = battle
     for cid, p in participants.items():
         _peer_battle[p.peer_id] = battle_id
@@ -960,7 +1001,11 @@ async def on_raid_tick_resolved(session_id: int, tick: int, result: TickResult) 
         # гибнет. Не навык из списка, а сценарный конец: раньше одиночка мог
         # тянуть этап сотнями ходов на зельях (решение владельца 2026-10-02).
         _engine.abort_session(session_id)
-        await _finish_wipe(session_id, battle, rc.RAID_ULTIMATE_TEXT[battle.raid_id])
+        ultimate = (
+            rfc.RIFT_TYPES[battle.rift_kind].ultimate_text if battle.is_rift
+            else rc.RAID_ULTIMATE_TEXT[battle.raid_id]
+        )
+        await _finish_wipe(session_id, battle, ultimate)
         return
     if frozen_ids:
         # Последней строкой: следующий ход движок откроет только после
@@ -978,7 +1023,7 @@ async def _stage_rewards(battle: RaidBattle, alive_char_ids: list[int]) -> dict[
             character = await db.get(Character, cid)
             if character is not None:
                 characters.append(character)
-        mob_level = raid_bosses.BOSS_LEVEL
+        mob_level = battle.rift_level if battle.is_rift else raid_bosses.BOSS_LEVEL
         rewards = await raid_combat_service.reward_mob_kill(
             db, characters, mob_level, battle.rng, _loot_mult(battle),
         )
@@ -993,6 +1038,10 @@ async def _stage_rewards(battle: RaidBattle, alive_char_ids: list[int]) -> dict[
                 lines.append(drop_line)
             for item in r.items_dropped:
                 lines.append(item_service.format_drop_announcement(item))
+            if battle.is_rift:
+                gold_owner = next((c for c in characters if c.id == r.character_id), None)
+                if gold_owner is not None:
+                    lines.append(await _rift_gold(db, battle, gold_owner))
             if r.raid_key_dropped:
                 lines.append(raid_key_texts.raid_key_drop_line())
             if r.group_kick is not None and r.group_kick.kicked_character_id == r.character_id:
@@ -1010,7 +1059,7 @@ async def _stage_rewards(battle: RaidBattle, alive_char_ids: list[int]) -> dict[
                 await stats_window.notify_levelup(p.peer_id, r.levels_gained, r.new_level)
         for character in characters:
             await quest_service.record_kill(db, character)
-        if battle.stage == 3:
+        if battle.stage == 3 and not battle.is_rift:
             # Хирург и Генерал - «выше уровнем» для испытаний (см.
             # SURGEON_TRIAL_LEVEL). Засчитывается всем, кто в рейде:
             # победа общая, как и рейд.
@@ -1037,6 +1086,8 @@ async def _auto_skip(battle_id: int, character_ids: list[int]) -> None:
 
 def _field_after_tick(battle: RaidBattle, state: CombatSessionState, result: TickResult):
     stage = battle.field_stage
+    if getattr(stage, "rift", False):
+        return stage.after_tick(state, result, battle.rng)
     if isinstance(stage, raid_archive.ArchiveStage):
         return stage.after_tick(state, result, battle.rng)
     if isinstance(stage, raid_field.FogStage):
@@ -1087,19 +1138,22 @@ async def _advance_or_finish(session_id: int, battle: RaidBattle) -> None:
     """Этап зачищен (сторона игроков победила). stage<3 — пауза 5-10 сек +
     переход к следующему этапу; stage==3 — рейд пройден целиком."""
     stage_cleared = battle.stage
-    if stage_cleared >= 3:
+    if stage_cleared >= battle.final_stage:
         await _finish_victory(session_id, battle)
         return
 
     texts = _texts(battle)
-    transition_text = texts.STAGE1_TO_STAGE2_TEXT if stage_cleared == 1 else texts.STAGE2_TO_STAGE3_TEXT
+    if battle.is_rift:
+        transition_text = texts.transition_text(stage_cleared)
+    else:
+        transition_text = texts.STAGE1_TO_STAGE2_TEXT if stage_cleared == 1 else texts.STAGE2_TO_STAGE3_TEXT
     for p in battle.participants.values():
         await _bot_api.messages.send(
             peer_id=p.peer_id, message=transition_text, random_id=0, keyboard=kb.raid_waiting_keyboard(),
         )
     # Поле - один длинный бой: пауза короче театрального антракта.
     pause = (
-        (fc.STAGE_PAUSE_MIN_SECONDS, fc.STAGE_PAUSE_MAX_SECONDS) if battle.is_field
+        (fc.STAGE_PAUSE_MIN_SECONDS, fc.STAGE_PAUSE_MAX_SECONDS) if battle.is_field or battle.is_rift
         else (rc.STAGE_TRANSITION_PAUSE_MIN_SECONDS, rc.STAGE_TRANSITION_PAUSE_MAX_SECONDS)
     )
     await asyncio.sleep(battle.rng.uniform(*pause))
@@ -1164,8 +1218,53 @@ async def _grant_stage_clear_bonus(battle: RaidBattle) -> None:
             pass
 
 
+async def _rift_gold(db, battle: RaidBattle, character: Character) -> str:
+    """Золото разлома за этап - в «мобах» кольца, как у событий."""
+    from services import guild_service, scene_event_service, wallet_service
+
+    if battle.stage == battle.final_stage:
+        mobs = rfc.STAGE_GOLD_MOBS[-1]
+    else:
+        mobs = rfc.STAGE_GOLD_MOBS[battle.stage - 1]
+    amount = scene_event_service.gold_amount(character, mobs)
+    await wallet_service.deposit(db, character.id, "farm", amount)
+    return f"💰 +{guild_service.gold_label(character, amount)}"
+
+
+async def _grant_rift_legendaries(battle: RaidBattle) -> None:
+    """Легендарная вещь (2 - у разлома на 5) случайным участникам всего
+    захода, включая павших: победа общая. Уровень вещи - уровень разлома,
+    но не выше уровня получателя: надеть её он должен сразу."""
+    count = rfc.RIFT_TYPES[battle.rift_kind].legendaries
+    async with get_session_factory()() as db:
+        candidates = [c for c in [await db.get(Character, cid) for cid in battle.participants] if c is not None]
+        if not candidates:
+            return
+        winners = battle.rng.sample(candidates, min(count, len(candidates)))
+        while len(winners) < count:
+            winners.append(battle.rng.choice(candidates))  # меньше людей, чем вещей
+        drops = []
+        for winner in winners:
+            item = await raid_combat_service.grant_guaranteed_item(
+                db, winner, min(battle.rift_level, winner.level), battle.rng, "legendary",
+            )
+            drops.append((winner, item))
+        await db.commit()
+    names = ", ".join(f"{w.name} - {item.name}" for w, item in drops)
+    for cid, p in battle.participants.items():
+        lines = [item_service.format_drop_announcement(item) for w, item in drops if w.id == cid]
+        lines.append(f"🟠 Легендарная добыча разлома: {names}.")
+        try:
+            await _bot_api.messages.send(peer_id=p.peer_id, message="\n\n".join(lines), random_id=0)
+        except Exception:
+            logger.exception("Разлом: не доставлена добыча {}", p.peer_id)
+
+
 async def _finish_victory(session_id: int, battle: RaidBattle) -> None:
-    await _grant_stage_clear_bonus(battle)
+    if battle.is_rift:
+        await _grant_rift_legendaries(battle)
+    else:
+        await _grant_stage_clear_bonus(battle)
     texts = _texts(battle)
     await _cleanup_and_return(session_id, battle, texts.EPILOGUE_TEXT, defeated=False)
 
@@ -1220,7 +1319,7 @@ async def _cleanup_and_return(session_id: int, battle: RaidBattle, text: str, *,
             character = await db.get(Character, cid)
             if character is None:
                 continue
-            character.pos_x, character.pos_y = rc.MONOLITH_COORDS
+            character.pos_x, character.pos_y = battle.home
             combatant = combatants.get(cid)
             survived = combatant is not None and combatant.alive and not defeated
             if survived:
@@ -1229,6 +1328,10 @@ async def _cleanup_and_return(session_id: int, battle: RaidBattle, text: str, *,
                 defeats[cid] = (await encounter_service.resolve_defeat(db, character), character.respawn_at)
         from services import raid_service
         await raid_service.finish_run(db, battle.run_id)
+        if battle.is_rift:
+            from services import rift_service
+
+            await rift_service.finish_run(db, battle.rift_id, cleared=not defeated)
         await db.commit()
 
     # Таблица итогов ОДНА на всех и уходит каждому - и в победе, и в
@@ -1245,7 +1348,7 @@ async def _cleanup_and_return(session_id: int, battle: RaidBattle, text: str, *,
         if cid in has_mount_by_cid:
             await _bot_api.messages.send(
                 peer_id=p.peer_id, message=text, random_id=0,
-                keyboard=movement_keyboard(*rc.MONOLITH_COORDS, p.peer_id, has_mount=has_mount_by_cid.get(cid, False)),
+                keyboard=movement_keyboard(*battle.home, p.peer_id, has_mount=has_mount_by_cid.get(cid, False)),
             )
             # Сводка клетки (0; 0), как после любого боя: без неё игрок
             # оставался с эпилогом и не видел, где стоит (живой прогон рейда).
@@ -1261,5 +1364,5 @@ async def _cleanup_and_return(session_id: int, battle: RaidBattle, text: str, *,
             # ОДНОГО сообщения и оставался с боевой клавиатурой мёртвого боя.
             await _bot_api.messages.send(
                 peer_id=p.peer_id, message=text, random_id=0,
-                keyboard=movement_keyboard(*rc.MONOLITH_COORDS, p.peer_id, has_mount=False),
+                keyboard=movement_keyboard(*battle.home, p.peer_id, has_mount=False),
             )

@@ -98,6 +98,7 @@ from services import (
     scene_event_service,
     quest_service,
     raid_service,
+    rift_service,
     screen_service,
     song_service,
     story_service,
@@ -323,6 +324,9 @@ async def send_cell_buttons(peer_id: int, character) -> None:
     await mining_service_abandon(character)
     await maybe_send_mine_button(peer_id, character)
     await world_boss_handlers.maybe_send_here_button(peer_id, character)
+    from bot.handlers import rift as rift_handlers  # цикл импортов
+
+    await rift_handlers.maybe_send_here_button(peer_id, character)
 
 
 async def _deliver_daily_notice(peer_id: int, character) -> None:
@@ -791,6 +795,8 @@ async def handle_explore_done(peer_id: int) -> None:
         # Патч 104: тот же принцип для мировых боссов - счётчик наполняет
         # активность всего сервера.
         new_boss = await world_boss_service.record_exploration(db, _rng)
+        # Разломы: тот же счётчик активности, но без объявления.
+        await rift_service.record_exploration(db, _rng)
         daily_progress = await daily_service.record_exploration(db, character)
         guild_outcome = await guild_territory_service.on_exploration(db, character)
         await db.commit()

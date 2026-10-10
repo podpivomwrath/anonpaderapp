@@ -481,6 +481,28 @@ body {
   border-color: #b98b5a;
 }
 
+/* Разлом: фиолетовое свечение; занятый - тусклее, без пульса. */
+.map-pin--rift {
+  border: 2px solid #b06bff;
+  background: rgba(30, 8, 50, 0.85);
+  animation: map-rift-glow 2.4s ease-in-out infinite;
+}
+
+.map-pin--rift-busy {
+  opacity: 0.65;
+  animation: none;
+}
+
+.map-card__line--hint {
+  opacity: 0.75;
+  font-size: 0.92em;
+}
+
+@keyframes map-rift-glow {
+  0%, 100% { box-shadow: 0 0 6px 1px rgba(176, 107, 255, 0.5); }
+  50% { box-shadow: 0 0 14px 4px rgba(176, 107, 255, 0.85); }
+}
+
 .map-pin--player {
   background: radial-gradient(circle, #ffe066 0 28%, rgba(255, 224, 102, 0.15) 32% 100%);
   border: 2px solid #ffe066;
@@ -498,7 +520,7 @@ body {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .map-pin--player, .map-pin--boss { animation: none; }
+  .map-pin--player, .map-pin--boss, .map-pin--rift { animation: none; }
 }
 
 .map-loading {

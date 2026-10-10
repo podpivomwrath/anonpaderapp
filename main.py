@@ -290,6 +290,18 @@ async def run() -> None:
         id="world_boss_expire", max_instances=1, coalesce=True,
     )
 
+    # Разломы: ожидание у входа, запуск боя, исчезновение - раз в 3 секунды.
+    # Появление двигают исследования. Держатели разломов после перезапуска -
+    # обратно в хаб: ожидание и бой жили в памяти.
+    from bot.handlers import rift as rift_handlers
+
+    rift_handlers.setup(bot.api)
+    await rift_handlers.recover_on_start()
+    respawn_scheduler.add_job(
+        rift_handlers.tick_job, "interval", seconds=3,
+        id="rift_tick", max_instances=1, coalesce=True,
+    )
+
     # Гильдии: стройка, закладки, осады и Страж - раз в 30 секунд; шахты -
     # раз в 5 минут; сезон и снимок владений - раз в сутки ночью.
     guild_handlers.setup(bot.api)

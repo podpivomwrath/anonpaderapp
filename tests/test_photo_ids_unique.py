@@ -30,6 +30,7 @@ CODE = (
     "bot/raid_archive_texts.py",
     "game/economy/voyage_config.py",
     "game/economy/trade_config.py",
+    "game/economy/rift_config.py",
 )
 PHOTO_ID = re.compile(r'"(\d{9})"')
 

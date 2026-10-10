@@ -516,6 +516,8 @@ export default function MapTab() {
   }
 
   const info = selected ? cellInfo(catalog, selected.x, selected.y, playerPos, questTarget, worldBoss) : null;
+  const levels = mapState.levels || { level: 0, fishing: 0, mining: 0 };
+  const cellRift = info ? (mapState.rifts || []).find((r) => r.x === info.x && r.y === info.y) || null : null;
   const center = view ? toScreen(MAP_CENTER.u, MAP_CENTER.v) : null;
   // Метки растут с клеткой: на телефоне карта целиком мелкая, и крупные
   // метки закрывали бы рисунок - рассматривать детали там линзой.
@@ -545,6 +547,10 @@ export default function MapTab() {
     ]),
     ...(mapState.caravans || []).map((c) => [c.x, c.y, 'map-pin--caravan', '🐪', 'Караван: торгует, пока стоит', 1]),
     ...(mapState.cart ? [[mapState.cart.x, mapState.cart.y, 'map-pin--cart', '🐂', 'Твоя повозка', 0.9]] : []),
+    ...(mapState.rifts || []).map((r) => [
+      r.x, r.y, `map-pin--rift${r.state !== 'free' ? ' map-pin--rift-busy' : ''}`, '🌀',
+      `${r.name} · ${r.min_level}-${r.max_level} ур.`, 1.2,
+    ]),
     ...(travelTarget ? [[travelTarget.to_x, travelTarget.to_y, 'map-pin--route', '⚑', 'Цель пути', 1]] : []),
     ...(playerPin ? [[playerPin.x, playerPin.y, 'map-pin--player', '', 'Ты здесь', 1.1]] : []),
   ];
@@ -737,6 +743,7 @@ export default function MapTab() {
             <MapTooltipContent
               info={cellInfo(catalog, hovered.x, hovered.y, playerPos, questTarget, worldBoss)}
               mineOre={mapState.mine_ore}
+              rift={(mapState.rifts || []).find((r) => r.x === hovered.x && r.y === hovered.y)}
             />
           </div>
         )}
@@ -786,12 +793,34 @@ export default function MapTab() {
           {!info.isMonolith && !info.isCity && <p className="map-card__line">{info.typeName}</p>}
           <p className="map-card__line">Уровень мобов: {info.levelRange[0]}-{info.levelRange[1]}</p>
           <p className="map-card__line">До Монолита: {info.dist} {cellsWord(info.dist)}</p>
-          {info.lake && <p className="map-card__line">🎣 {info.lake.name}{info.lake.safe ? ' · без PvP' : ''}</p>}
-          {info.mine && (
+          {info.lake && (
             <p className="map-card__line">
-              ⛏ {info.mine.name} · руды {mapState.mine_ore?.[info.mine.id] || 0}{info.mine.safe ? ' · без PvP' : ''}
+              🎣 {info.lake.name} · тир {info.lake.tier} · рыбалка с {info.lake.need} ур.
+              {levelNote(levels.fishing, info.lake.need)}{info.lake.safe ? ' · без PvP' : ''}
             </p>
           )}
+          {info.mine && (
+            <p className="map-card__line">
+              ⛏ {info.mine.name} · тир {info.mine.tier} · горное дело с {info.mine.need} ур.
+              {levelNote(levels.mining, info.mine.need)} · руды {mapState.mine_ore?.[info.mine.id] || 0}
+              {info.mine.safe ? ' · без PvP' : ''}
+            </p>
+          )}
+          {cellRift && (
+            <>
+              <p className="map-card__line">
+                🌀 Разлом: {cellRift.emoji} {cellRift.name} · {cellRift.min_level}-{cellRift.max_level} ур.
+                {levels.level < cellRift.min_level || levels.level > cellRift.max_level ? ' (тебе не по уровню)' : ''}
+              </p>
+              <p className="map-card__line">
+                До {cellRift.max_size} игроков · {RIFT_STATE[cellRift.state] || ''}
+                {cellRift.state === 'free' ? ` · закроется через ${cellRift.minutes_left} мин` : ''}
+              </p>
+              <p className="map-card__line map-card__line--hint">{cellRift.hint}</p>
+            </>
+          )}
+          {info.isMonolith && <p className="map-card__line">Рейды: прикоснись к Монолиту, нужен Ключ Монолита.</p>}
+          {info.isCity && <p className="map-card__line">Город · без PvP · торговля, лавки, долгий путь из родного.</p>}
           {info.boss && <p className="map-card__line">💀 {info.boss.name} · ур. {info.boss.level} · {info.boss.hp_percent}%</p>}
           {(() => {
             const g = guildCells.find((c) => c.x === info.x && c.y === info.y);
@@ -856,7 +885,14 @@ export default function MapTab() {
   );
 }
 
-function MapTooltipContent({ info, mineOre }) {
+const RIFT_STATE = { free: 'свободен', waiting: 'у входа ждёт группа', running: 'внутри группа' };
+
+/** «(у тебя N)», если уровня профессии не хватает. */
+function levelNote(have, need) {
+  return have != null && have < need ? ` (у тебя ${have})` : '';
+}
+
+function MapTooltipContent({ info, mineOre, rift }) {
   return (
     <>
       <p className="map-tooltip__coords">({info.x}; {info.y})</p>
@@ -876,6 +912,11 @@ function MapTooltipContent({ info, mineOre }) {
         </p>
       )}
       {info.boss && <p className="map-tooltip__line">💀 {info.boss.name} · {info.boss.hp_percent}%</p>}
+      {rift && (
+        <p className="map-tooltip__line">
+          🌀 {rift.name} · {rift.min_level}-{rift.max_level} ур. · {RIFT_STATE[rift.state] || ''}
+        </p>
+      )}
     </>
   );
 }
