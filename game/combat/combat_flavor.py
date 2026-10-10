@@ -46,8 +46,8 @@ def render_hit(
     if missed:
         what = "атаки" if label in _VERB_LABELS else f"способности «{label}»"
         return f"{target_name} уклоняется от {what} {source_name}."
-    pct_before = display.hp_percent(hp_before, max_hp, mode)
-    pct_after = display.hp_percent(hp_after, max_hp, mode)
+    pct_before = display.hp_text(hp_before, max_hp, mode)
+    pct_after = display.hp_text(hp_after, max_hp, mode)
     crit_suffix = " (крит!)" if crit else ""
     delta = f"({target_name}: {pct_before} → {pct_after})"
     if is_dot:

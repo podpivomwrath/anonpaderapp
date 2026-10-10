@@ -12,6 +12,28 @@ BAR_WIDTH = 10
 # режимы точности
 MODE_PVP = "pvp"          # целые проценты (и обычный PvE)
 MODE_PVE_RAID = "pve_raid"  # один знак после запятой
+# Бой против мобов и рейды: HP числом (просьба игроков, 2026-10). Проценты
+# остаются только в PvP - там они нарочно скрывают точное HP от противника.
+MODE_PVE_NUM = "pve_num"
+
+
+def _hp_number(current: float, maximum: float) -> int:
+    """Целое HP с той же защитой, что и у процентов: живой не показывается
+    с 0, раненый - с полным здоровьем."""
+    top = round(maximum)
+    value = round(max(current, 0))
+    if value <= 0 and current > 0:
+        value = 1
+    if value >= top and current < maximum:
+        value = top - 1
+    return value
+
+
+def hp_text(current: float, maximum: float, mode: str = MODE_PVP) -> str:
+    """HP для строки лога: числом в PvE (MODE_PVE_NUM), процентом в PvP."""
+    if mode == MODE_PVE_NUM:
+        return str(_hp_number(current, maximum))
+    return hp_percent(current, maximum, mode)
 
 
 def hp_percent(current: float, maximum: float, mode: str = MODE_PVP) -> str:
@@ -45,7 +67,11 @@ def health_bar(current: float, maximum: float, mode: str = MODE_PVP) -> str:
         filled = 1
     if filled == BAR_WIDTH and current < maximum:
         filled = BAR_WIDTH - 1
-    return BAR_FILLED * filled + BAR_EMPTY * (BAR_WIDTH - filled) + " " + hp_percent(current, maximum, mode)
+    value = (
+        f"{_hp_number(current, maximum)}/{round(maximum)}" if mode == MODE_PVE_NUM
+        else hp_percent(current, maximum, mode)
+    )
+    return BAR_FILLED * filled + BAR_EMPTY * (BAR_WIDTH - filled) + " " + value
 
 
 def hp_delta_line(hp_before: float, hp_after: float, max_hp: float, mode: str = MODE_PVP) -> str:
@@ -53,8 +79,8 @@ def hp_delta_line(hp_before: float, hp_after: float, max_hp: float, mode: str = 
     `(-34 HP · 82% → 68%)` / `(+142 HP · 61% → 100%)`. Используется и в бою,
     и в событиях/отдыхе — единообразие важнее, чем принадлежность модулю."""
     delta = round(hp_after - hp_before)
-    before = hp_percent(hp_before, max_hp, mode)
-    after = hp_percent(hp_after, max_hp, mode)
+    before = hp_text(hp_before, max_hp, mode)
+    after = hp_text(hp_after, max_hp, mode)
     return f"({delta:+d} HP · {before} → {after})"
 
 

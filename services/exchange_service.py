@@ -137,7 +137,10 @@ _TZ = ZoneInfo("Europe/Moscow")
 
 
 def _day_bounds(day: date) -> tuple[datetime, datetime]:
-    start = datetime.combine(day, time.min, tzinfo=_TZ)
+    # В UTC: момент тот же, но SQLite (тесты) отбрасывает пояс без перевода, и
+    # московская полночь сравнивалась бы с временем в UTC - с 00 до 03 МСК
+    # день съезжал. Postgres сравнивает верно в любом поясе.
+    start = datetime.combine(day, time.min, tzinfo=_TZ).astimezone(timezone.utc)
     return start, start + timedelta(days=1)
 
 
@@ -197,7 +200,7 @@ async def fill_missing_days(db: AsyncSession, first_day: date | None = None) -> 
 
 
 def today_start_msk() -> datetime:
-    return datetime.combine(datetime.now(_TZ).date(), time.min, tzinfo=_TZ)
+    return datetime.combine(datetime.now(_TZ).date(), time.min, tzinfo=_TZ).astimezone(timezone.utc)
 
 
 async def chart_points(db: AsyncSession, days: int = 14, net: int | None = None) -> list[dict]:

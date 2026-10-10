@@ -204,7 +204,7 @@ class TickResult:
 
 
 def _display_mode(session: CombatSessionState) -> str:
-    return display.MODE_PVE_RAID if session.is_raid else display.MODE_PVP
+    return display.MODE_PVE_NUM if session.mode == CombatMode.PVE else display.MODE_PVP
 
 
 def _run_offensive(ctx: SkillContext, cid: int, action: DeclaredAction, session, result) -> None:
@@ -594,7 +594,7 @@ def resolve_tick(
             _apply_last_breath_guard(combatant, result)
             result.lines.append(
                 f"🔥 Пепельная лихорадка жжёт {combatant.name} "
-                f"{display.hp_delta_line(before_hp, combatant.current_hp, combatant.max_hp)}"
+                f"{display.hp_delta_line(before_hp, combatant.current_hp, combatant.max_hp, _display_mode(session))}"
             )
             step = round(effect.value / ec.ASHEN_FEVER_DAMAGE_BONUS_STEP)
             effect.value = ec.ASHEN_FEVER_DAMAGE_BONUS_STEP * (step + 1)
@@ -613,7 +613,7 @@ def resolve_tick(
                 combatant.current_hp = min(combatant.current_hp + heal, combatant.max_hp)
                 result.lines.append(
                     f"🛡️ Второе сердце {combatant.name} обращается в исцеление "
-                    f"{display.hp_delta_line(before_hp, combatant.current_hp, combatant.max_hp)}"
+                    f"{display.hp_delta_line(before_hp, combatant.current_hp, combatant.max_hp, _display_mode(session))}"
                 )
                 effect.value = 0
 

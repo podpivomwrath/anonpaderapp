@@ -269,6 +269,12 @@ body {
   font-variant-numeric: tabular-nums;
 }
 
+/* Бонус стата от надетого снаряжения. */
+.stat-row__gear {
+  color: #8fcf7a;
+  font-size: 0.85em;
+}
+
 .buff-detail {
   padding: 0 16px 12px 16px;
   margin-top: -6px;

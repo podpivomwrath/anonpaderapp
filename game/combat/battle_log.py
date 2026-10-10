@@ -14,13 +14,13 @@ game/combat/resolver.py::RenderedHit/RenderedHeal) для урона/лечен�
 
 from game.combat import combat_flavor, display
 from game.combat.resolver import RenderedHeal, RenderedHit, TickResult
-from game.combat.session import CombatSessionState, EffectKind
+from game.combat.session import CombatMode, CombatSessionState, EffectKind
 
 _SEP = "━━━━━━━━━━━━━━"
 
 
 def _mode(session: CombatSessionState) -> str:
-    return display.MODE_PVE_RAID if session.is_raid else display.MODE_PVP
+    return display.MODE_PVE_NUM if session.mode == CombatMode.PVE else display.MODE_PVP
 
 
 def _action_word(label: str) -> str:
@@ -34,8 +34,8 @@ def _hit_line(hit: RenderedHit, source_name: str, target_name: str, mode: str) -
         # выглядел так, будто нажатие не сработало.
         return f"{source_name} → {word} по {target_name} - промах, {target_name} уклоняется"
     crit = " (крит!)" if hit.crit else ""
-    before = display.hp_percent(hit.hp_before, hit.max_hp, mode)
-    after = display.hp_percent(hit.hp_after, hit.max_hp, mode)
+    before = display.hp_text(hit.hp_before, hit.max_hp, mode)
+    after = display.hp_text(hit.hp_after, hit.max_hp, mode)
     return f"{source_name} → {word} по {target_name} - {hit.amount} урона{crit} ({target_name}: {before} → {after})"
 
 
@@ -44,8 +44,8 @@ def _dot_line(hit: RenderedHit, target_name: str) -> str:
 
 
 def _heal_line(heal: RenderedHeal, source_name: str, target_name: str, mode: str) -> str:
-    before = display.hp_percent(heal.hp_before, heal.max_hp, mode)
-    after = display.hp_percent(heal.hp_after, heal.max_hp, mode)
+    before = display.hp_text(heal.hp_before, heal.max_hp, mode)
+    after = display.hp_text(heal.hp_after, heal.max_hp, mode)
     who = "" if source_name == target_name else f"{target_name}: "
     return f"{source_name} → {heal.label} - восполнено {heal.amount} HP ({who}{before} → {after})"
 

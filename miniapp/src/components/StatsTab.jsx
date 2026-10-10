@@ -145,13 +145,24 @@ export default function StatsTab({ character, onCharacterUpdate }) {
               >
                 −
               </Button>
-              <span className="stat-row__value">{previewStats[stat.key]}</span>
+              <span className="stat-row__value">
+                {previewStats[stat.key]}
+                {character.gear_bonus?.[stat.key] ? (
+                  <span className="stat-row__gear" title="от снаряжения"> +{character.gear_bonus[stat.key]}</span>
+                ) : null}
+              </span>
               <Button mode="secondary" size="s" disabled={remaining <= 0} onClick={() => increment(stat.key)}>
                 +
               </Button>
             </div>
           </div>
         ))}
+        {Object.values(character.gear_bonus || {}).some(Boolean) && (
+          <Caption level="1" style={{ padding: '0 16px 12px', opacity: 0.7 }}>
+            Зелёное <span className="stat-row__gear">+N</span> - от надетого снаряжения. Оно уже учтено в
+            предпросмотре ниже и в бою: урон и навыки растут от основного стата, здоровье - от выносливости.
+          </Caption>
+        )}
       </Group>
 
       {character.fishing && (

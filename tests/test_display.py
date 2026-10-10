@@ -62,3 +62,10 @@ def test_gold_delta_line_format() -> None:
 
 def test_max_hp_delta_line_format() -> None:
     assert display.max_hp_delta_line(520, 542) == "(Макс. здоровье: 520 → 542)"
+
+
+def test_pve_hp_is_a_number_and_pvp_stays_percent() -> None:
+    assert display.health_bar(312, 450, display.MODE_PVE_NUM).endswith(" 312/450")
+    assert display.hp_text(0.4, 450, display.MODE_PVE_NUM) == "1"  # живой - не 0
+    assert display.hp_text(449.6, 450, display.MODE_PVE_NUM) == "449"  # раненый - не полное
+    assert display.hp_text(312, 450, display.MODE_PVP) == "69%"

@@ -307,18 +307,26 @@ TRAIL_MAX_CELLS = 7
 
 def pick_trail_cell(rng: random.Random, x: int, y: int) -> tuple[int, int] | None:
     """Клетка следа: 3-7 клеток пути, в том же кольце или ближе к центру,
-    не город и не Монолит."""
+    не город и не Монолит.
+
+    Центр (кольцо 5) - всего клетки на расстоянии 1 от Монолита: на 3+
+    клетки в нём не уйти, и след из центра раньше молча не появлялся. Если
+    подходящих клеток нет, след ведёт в соседнее внешнее кольцо."""
     ring = grid.ring_tier(x, y)
-    options = [
-        (cx, cy)
-        for cx in range(x - TRAIL_MAX_CELLS, x + TRAIL_MAX_CELLS + 1)
-        for cy in range(y - TRAIL_MAX_CELLS, y + TRAIL_MAX_CELLS + 1)
-        if TRAIL_MIN_CELLS <= grid.cells_between(x, y, cx, cy) <= TRAIL_MAX_CELLS
-        and grid.in_bounds(cx, cy)
-        and grid.ring_tier(cx, cy) >= ring
-        and grid.city_region_at(cx, cy) is None
-        and (cx, cy) != (0, 0)
-    ]
+
+    def cells(min_ring: int) -> list[tuple[int, int]]:
+        return [
+            (cx, cy)
+            for cx in range(x - TRAIL_MAX_CELLS, x + TRAIL_MAX_CELLS + 1)
+            for cy in range(y - TRAIL_MAX_CELLS, y + TRAIL_MAX_CELLS + 1)
+            if TRAIL_MIN_CELLS <= grid.cells_between(x, y, cx, cy) <= TRAIL_MAX_CELLS
+            and grid.in_bounds(cx, cy)
+            and grid.ring_tier(cx, cy) >= min_ring
+            and grid.city_region_at(cx, cy) is None
+            and (cx, cy) != (0, 0)
+        ]
+
+    options = cells(ring) or cells(ring - 1)
     return rng.choice(options) if options else None
 
 

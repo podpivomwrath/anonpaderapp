@@ -138,6 +138,18 @@ def test_trail_cell_is_near_in_world_and_not_outward() -> None:
             assert grid.ring_tier(cx, cy) >= grid.ring_tier(x, y)
 
 
+def test_trail_from_center_leads_to_next_ring() -> None:
+    """В центре (кольцо 5) нет клеток на 3+ шага - след ведёт в кольцо 4,
+    а не пропадает молча."""
+    rng = random.Random(7)
+    for x, y in [(0, 0), (1, 1), (-1, 0)]:
+        for _ in range(30):
+            cell = se.pick_trail_cell(rng, x, y)
+            assert cell is not None and cell != (0, 0)
+            assert se.TRAIL_MIN_CELLS <= grid.cells_between(x, y, *cell) <= se.TRAIL_MAX_CELLS
+            assert grid.ring_tier(*cell) == 4
+
+
 # --- Исходы -----------------------------------------------------------------------
 
 
