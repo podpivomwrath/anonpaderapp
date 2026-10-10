@@ -205,13 +205,16 @@ export default function MapTab() {
   // Стартовая камера - вся карта целиком: рассматривают её линзой. Пока её
   // не приблизили щипком, она следует за размером окна (сначала размер ещё
   // не измерен, потом меняется при повороте телефона).
+  // Только при загрузке и смене размера окна - НЕ на каждом опросе раз в
+  // 5 секунд: раньше сдвинутая карта через пару секунд прыгала в центр.
   const fittedRef = useRef(true);
+  const hasState = Boolean(mapState);
   useEffect(() => {
-    if (!mapState) return;
+    if (!hasState) return;
     if (!view || fittedRef.current) {
       setView(clampView({ cu: MAP_CENTER.u, cv: MAP_CENTER.v, scale: minScale }));
     }
-  }, [mapState, minScale, clampView]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [hasState, minScale, clampView]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const catalog = mapState?.catalog;
   const ride = mapState ? ridePos(mapState.mount_travel, mapState.fetchedAt) : null;
@@ -382,6 +385,8 @@ export default function MapTab() {
         clearLongPress();
       }
       if (dragRef.current.moved) {
+        // Карту сдвинули руками - больше не подгоняем её под окно сами.
+        fittedRef.current = false;
         const start = dragRef.current.start;
         setView(clampView({ ...start, cu: start.cu - dx / start.scale, cv: start.cv - dy / start.scale }));
         setHovered(null);

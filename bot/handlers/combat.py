@@ -622,7 +622,10 @@ async def item_choice(message: Message) -> None:
         stats = await db.scalar(
             select(CharacterStats).where(CharacterStats.character_id == character.id)
         )
-        if action == "equip":
+        if action == "equip" and in_any_battle(peer_id):
+            # Окно добычи осталось от прошлого боя, а игрок уже в новом.
+            confirm_text = f"{item_service.IN_BATTLE_TEXT} Вещь в инвентаре."
+        elif action == "equip":
             new_item = await db.get(Item, pending_item_id)
             try:
                 old_item = await item_service.equip_item(db, character.id, pending_item_id)

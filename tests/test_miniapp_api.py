@@ -321,6 +321,23 @@ async def test_equip_marks_item_equipped(client, session_factory) -> None:
     assert data["items"][0]["equipped"] is True
 
 
+async def test_no_gear_change_in_battle(client, session_factory, monkeypatch) -> None:
+    """В бою не переодеваются: ни надеть, ни снять."""
+    import bot.battle_keyboard as battle_keyboard
+
+    character = await _make_character(session_factory, vk_id=404)
+    item_id = await _grant_item(session_factory, character.id, ilvl=1)
+    monkeypatch.setattr(battle_keyboard, "in_any_battle", lambda peer: peer == 404)
+    resp = await client.post("/api/miniapp/equip", params=_signed_query(404), json={"item_id": item_id})
+    assert resp.status == 409
+    assert "В бою" in (await resp.json())["error"]
+    resp = await client.post("/api/miniapp/unequip", params=_signed_query(404), json={"item_id": item_id})
+    assert resp.status == 409
+    monkeypatch.setattr(battle_keyboard, "in_any_battle", lambda peer: False)
+    resp = await client.post("/api/miniapp/equip", params=_signed_query(404), json={"item_id": item_id})
+    assert resp.status == 200
+
+
 async def test_equip_above_level_rejected_and_marked(client, session_factory) -> None:
     character = await _make_character(session_factory, vk_id=403)
     need = character.level + 1

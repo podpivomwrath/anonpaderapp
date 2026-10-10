@@ -746,6 +746,10 @@ async def handle_post_equip(request: web.Request) -> web.Response:
         character = await _load_character(session, vk_user_id)
         if character is None:
             return web.json_response({"error": "character_not_found"}, status=404)
+        from bot.battle_keyboard import in_any_battle
+
+        if in_any_battle(vk_user_id):
+            return web.json_response({"error": item_service.IN_BATTLE_TEXT}, status=409)
         entry = await item_service.get_inventory_entry(session, character.id, item_id)
         if entry is None or entry.equipped:
             return web.json_response({"error": "cannot_equip"}, status=400)
@@ -775,6 +779,10 @@ async def handle_post_unequip(request: web.Request) -> web.Response:
         character = await _load_character(session, vk_user_id)
         if character is None:
             return web.json_response({"error": "character_not_found"}, status=404)
+        from bot.battle_keyboard import in_any_battle
+
+        if in_any_battle(vk_user_id):
+            return web.json_response({"error": item_service.IN_BATTLE_TEXT}, status=409)
         if not await item_service.unequip_item(session, character.id, item_id):
             return web.json_response({"error": "cannot_unequip"}, status=400)
         await session.commit()

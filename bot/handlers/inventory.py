@@ -98,6 +98,11 @@ async def view_item(message: Message) -> None:
     if not isinstance(item_id, int):
         return
     page = _page_of(payload)
+    from bot.battle_keyboard import active_battle_keyboard, in_any_battle
+
+    if in_any_battle(peer_id):
+        await message.answer(item_service.IN_BATTLE_TEXT, keyboard=active_battle_keyboard(peer_id))
+        return
 
     async with get_session_factory()() as db:
         character = await onboarding_svc.get_character(db, message.from_id)

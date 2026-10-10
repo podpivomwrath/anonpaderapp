@@ -301,7 +301,7 @@ export default function InventoryTab({ onCharacterUpdate }) {
         }
       }
     } catch (err) {
-      setErrorMsg(err?.message === 'cannot_unequip' ? 'Эта вещь уже не надета.' : 'Не удалось снять предмет.');
+      setErrorMsg(err?.message === 'cannot_unequip' ? 'Эта вещь уже не надета.' : (err?.message?.includes(' ') ? err.message : 'Не удалось снять предмет.'));
     } finally {
       setEquippingId(null);
     }
