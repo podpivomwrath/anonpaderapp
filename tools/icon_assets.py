@@ -104,6 +104,15 @@ ELIXIR_FILES = {
     "elixir:shard_blood": "034_эликсир_осколочная_кровь.png",
 }
 
+#: Замена неудачной иконки (tools/icon_fix_prompts.md): если файл уже лежит
+#: в img/, он берётся ВМЕСТО найденного по промту. Нет файла - старая
+#: иконка остаётся, пока новую не нарисуют.
+OVERRIDE_FILES = {
+    "base:legs:Обмотки": "предмет_обмотки.png",
+    "base:legs:Поножи": "предмет_поножи.png",
+    "good:ridge_icons": "товар_храмовые_образа_2.png",
+}
+
 #: Картинки, которых нет в контенте игры: значки базовых классов и рамки
 #: венцов топ-1 (патч 91). Промты для них написаны руками
 #: (tools/crown_art_prompts.md), из контента они не выводятся, поэтому и
@@ -193,6 +202,9 @@ def main() -> None:
         if key is None or key.startswith(SKIP_PREFIXES) or key in SKIP_KEYS:
             continue
         row = find(by_prompt, record["prompt"])
+        override = OVERRIDE_FILES.get(key)
+        if override is not None and (SRC / override).exists():
+            row = {"filename": override}
         if row is None:
             hint = SUBCLASS_FILES.get(key) or BASE_FILES.get(key) or ELIXIR_FILES.get(key)
             if hint is None and key in BACKGROUNDS:
