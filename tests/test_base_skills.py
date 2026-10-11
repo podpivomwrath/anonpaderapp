@@ -256,6 +256,25 @@ def test_warcry_boosts_own_damage() -> None:
     assert boosted == round(plain * 1.3)
 
 
+def test_self_buff_skills_show_in_battle_log() -> None:
+    """Навык без урона на себя - своя строка в логе, в разделе своей стороны.
+    Раньше Боевой клич и Дымовая завеса из лога пропадали: удара нет,
+    а эффект строки не давал."""
+    from game.combat import battle_log
+
+    for skill_id, what in (("warrior_warcry", "урон +30%"), ("rogue_smoke", "уклонение")):
+        a = combatant(1, side=0)
+        a.name = "Кричащий"
+        b = combatant(2, side=1, vitality=500)
+        state = make_session(a, b)
+        result = resolve_tick(state, {1: skill(skill_id, 2)}, NoCritRng())
+        text = battle_log.render_tick(state, result, viewer_side=0)
+        line = next(x for x in text.split("\n") if x.startswith("Кричащий →"))
+        assert what in line
+        ours, theirs = text.split("ПРОТИВНИК")[:2] if "ПРОТИВНИК" in text else (text, "")
+        assert "Кричащий →" in ours and "Кричащий →" not in theirs
+
+
 def test_blood_seal_vulnerability() -> None:
     rng = NoCritRng()
     mage = combatant(1, side=0, intellect=100)

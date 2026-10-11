@@ -75,10 +75,16 @@ def _make_handler(skill: BaseSkillDef):
             actor.apply_effect(
                 EffectKind.DAMAGE_BUFF, skill.effect_value, skill.effect_duration, actor.id
             )
+            ctx.lines.append(combat_flavor.self_buff_line(
+                actor.name, skill.name, "урон", skill.effect_value, skill.effect_duration,
+            ))
         elif skill.effect == "self_dodge_buff":
             actor.apply_effect(
                 EffectKind.DODGE, skill.effect_value, skill.effect_duration, actor.id
             )
+            ctx.lines.append(combat_flavor.self_buff_line(
+                actor.name, skill.name, "уклонение", skill.effect_value, skill.effect_duration,
+            ))
         elif skill.effect == "target_vuln":
             if target is not None:
                 target.apply_effect(

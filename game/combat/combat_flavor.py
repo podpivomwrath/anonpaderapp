@@ -56,6 +56,13 @@ def render_hit(
     return f"{source_name} {verb} - {amount} урона{crit_suffix}. {delta}"
 
 
+def self_buff_line(actor_name: str, skill_name: str, what: str, value: float, turns: int) -> str:
+    """Навык без урона, усиливающий самого бойца (Боевой клич, Дымовая
+    завеса). Без строки он молча пропадал из лога: удар есть только у
+    атакующих навыков, а эффект на себя отдельной строки не давал."""
+    return f"{actor_name} → {skill_name}: {what} +{round(value * 100)}% на {turns} хода"
+
+
 def control_resisted_line(target_name: str) -> str:
     return f"{target_name} сопротивляется контролю."
 

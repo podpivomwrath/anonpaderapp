@@ -86,6 +86,9 @@ def _make_handler(skill: SubclassSkillDef):
             actor.apply_effect(
                 EffectKind.DODGE, skill.effect_value, skill.effect_duration, actor.id
             )
+            ctx.lines.append(combat_flavor.self_buff_line(
+                actor.name, skill.name, "уклонение", skill.effect_value, skill.effect_duration,
+            ))
         elif skill.effect == "target_vuln":
             if target is not None:
                 # Патч 56, Отравитель: «Токсичная кровь» усиливает Уязвимость,
