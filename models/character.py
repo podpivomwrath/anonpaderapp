@@ -79,6 +79,11 @@ class Character(Base):
     # на каждом обращении завершённого персонажа; для метрик удержания в админке.
     last_active_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
+    # Мини-апп: что игрок уже видел (вступление, тур, подсказки вкладок) и
+    # звук. На сервере, а не в браузере: с двух устройств вступление не
+    # должно показаться дважды. Ключи - bot/miniapp_api.UI_FLAGS.
+    ui_flags: Mapped[dict] = mapped_column(JSON, default=dict)
+
     # Бан администратором (патч 27). banned_until = NULL и is_banned = True — бан бессрочный.
     is_banned: Mapped[bool] = mapped_column(Boolean, default=False)
     ban_reason: Mapped[str | None] = mapped_column(String(256), nullable=True)

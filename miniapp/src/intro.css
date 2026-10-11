@@ -1,0 +1,409 @@
+/* Вступление, тур, подсказки разделов, переходы (2026-10). Отдельным файлом:
+   index.css и так длинный, а это один связный слой «первого знакомства». */
+
+/* --- Пепел ------------------------------------------------------------------ */
+
+.ash-layer {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
+/* --- Вступление --------------------------------------------------------------- */
+
+.intro {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  background: #050304;
+  color: #ece4dc;
+  overflow: hidden;
+  cursor: pointer;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.intro__bg {
+  position: absolute;
+  inset: -4%;
+  background: radial-gradient(ellipse at 50% 40%, #2a0d0c 0%, #0b0606 55%, #050304 100%) center / cover no-repeat;
+  animation: intro-bg-in 1.6s ease-out both, intro-drift 14s ease-in-out both;
+}
+
+.intro__bg--crack {
+  animation: intro-bg-in 0.4s ease-out both, intro-shake 0.9s ease-out 0.05s both, intro-drift 14s ease-in-out both;
+}
+
+.intro__shade {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, rgba(5, 3, 4, 0.15) 0%, rgba(5, 3, 4, 0.35) 45%, rgba(5, 3, 4, 0.92) 100%);
+}
+
+.intro__flash {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(circle at 50% 42%, rgba(255, 70, 40, 0.85), rgba(120, 10, 10, 0.25) 45%, transparent 70%);
+  animation: intro-flash 1.4s ease-out both;
+  pointer-events: none;
+}
+
+.intro__text {
+  position: absolute;
+  left: 50%;
+  bottom: calc(14% + env(safe-area-inset-bottom, 0px));
+  transform: translateX(-50%);
+  width: min(560px, calc(100% - 48px));
+  margin: 0;
+  font-family: Forum, 'Times New Roman', serif;
+  font-size: clamp(21px, 5.4vw, 30px);
+  line-height: 1.45;
+  text-align: center;
+  text-wrap: balance;
+  text-shadow: 0 2px 18px rgba(0, 0, 0, 0.9), 0 0 2px rgba(0, 0, 0, 0.8);
+}
+
+.intro__text--final {
+  font-family: 'Cormorant SC', Forum, serif;
+  font-size: clamp(26px, 7vw, 40px);
+  letter-spacing: 0.03em;
+  color: #f3d3c8;
+  text-shadow: 0 0 22px rgba(200, 30, 30, 0.6), 0 2px 18px rgba(0, 0, 0, 0.9);
+}
+
+/* Слово проступает, как чернила: из размытия и с багровым отсветом. */
+.intro__word {
+  display: inline-block;
+  white-space: pre;
+  opacity: 0;
+  filter: blur(6px);
+  animation: intro-ink 0.9s ease-out forwards;
+}
+
+.intro__text--done .intro__word {
+  animation: none;
+  opacity: 1;
+  filter: none;
+}
+
+.intro__dots {
+  position: absolute;
+  left: 50%;
+  bottom: calc(5% + env(safe-area-inset-bottom, 0px));
+  transform: translateX(-50%);
+  display: flex;
+  gap: 8px;
+}
+
+.intro__dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: rgba(236, 228, 220, 0.25);
+  transition: background 0.4s, transform 0.4s;
+}
+
+.intro__dot--on {
+  background: #c8352a;
+  transform: scale(1.3);
+}
+
+.intro__skip {
+  position: absolute;
+  top: calc(14px + env(safe-area-inset-top, 0px));
+  right: 16px;
+  padding: 8px 14px;
+  border: 1px solid rgba(236, 228, 220, 0.25);
+  border-radius: 18px;
+  background: rgba(0, 0, 0, 0.35);
+  color: rgba(236, 228, 220, 0.8);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.intro__start {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 28px;
+  border: 0;
+  background: radial-gradient(ellipse at 50% 45%, #1d0807 0%, #050304 65%);
+  color: #ece4dc;
+  font: inherit;
+  cursor: pointer;
+}
+
+/* Знак-метка: тлеющая трещина, дышит. */
+.intro__sigil {
+  width: 6px;
+  height: 92px;
+  border-radius: 3px;
+  background: linear-gradient(180deg, transparent, #ff5a3c 30%, #c8352a 70%, transparent);
+  box-shadow: 0 0 22px 6px rgba(200, 40, 30, 0.55);
+  animation: intro-breathe 2.6s ease-in-out infinite;
+}
+
+.intro__start-text {
+  font-family: 'Cormorant SC', Forum, serif;
+  font-size: 20px;
+  letter-spacing: 0.12em;
+  opacity: 0.85;
+  animation: intro-fade 2.6s ease-in-out infinite;
+}
+
+.intro--choice {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: default;
+  background: radial-gradient(ellipse at 50% 40%, #1d0807 0%, #050304 70%);
+}
+
+.intro__choice {
+  position: relative;
+  width: min(420px, calc(100% - 40px));
+  text-align: center;
+  animation: intro-bg-in 0.8s ease-out both;
+}
+
+.intro__choice-title {
+  margin: 0 0 10px;
+  font-family: 'Cormorant SC', Forum, serif;
+  font-size: 28px;
+  letter-spacing: 0.08em;
+}
+
+.intro__choice-text {
+  margin: 0 0 24px;
+  font-size: 15px;
+  line-height: 1.5;
+  opacity: 0.8;
+}
+
+.intro__choice-buttons {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.intro__btn {
+  padding: 13px 18px;
+  border: 1px solid rgba(236, 228, 220, 0.25);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.04);
+  color: #ece4dc;
+  font: inherit;
+  font-size: 16px;
+  cursor: pointer;
+}
+
+.intro__btn--main {
+  border-color: #c8352a;
+  background: linear-gradient(180deg, #7a1d17, #4a0f0c);
+  box-shadow: 0 0 18px rgba(200, 40, 30, 0.35);
+}
+
+@keyframes intro-ink {
+  0% { opacity: 0; filter: blur(6px); color: #ff6a4a; transform: translateY(6px); }
+  60% { opacity: 1; filter: blur(0); color: #f0b8a8; }
+  100% { opacity: 1; filter: none; transform: none; }
+}
+
+@keyframes intro-bg-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes intro-drift {
+  from { transform: scale(1.0); }
+  to { transform: scale(1.08) translateY(-1%); }
+}
+
+@keyframes intro-shake {
+  0%, 100% { translate: 0 0; }
+  15% { translate: -6px 3px; }
+  30% { translate: 5px -4px; }
+  45% { translate: -4px 2px; }
+  60% { translate: 3px -2px; }
+  80% { translate: -1px 1px; }
+}
+
+@keyframes intro-flash {
+  0% { opacity: 0; }
+  12% { opacity: 1; }
+  100% { opacity: 0; }
+}
+
+@keyframes intro-breathe {
+  0%, 100% { opacity: 0.6; transform: scaleY(0.92); }
+  50% { opacity: 1; transform: scaleY(1.04); }
+}
+
+@keyframes intro-fade {
+  0%, 100% { opacity: 0.5; }
+  50% { opacity: 0.95; }
+}
+
+/* --- Тур -------------------------------------------------------------------------- */
+
+.tour {
+  position: fixed;
+  inset: 0;
+  z-index: 900;
+}
+
+.tour__dim {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.72);
+}
+
+/* Подсветка: прозрачная рамка, а всё вокруг - её тень. */
+.tour__spot {
+  position: fixed;
+  border-radius: 12px;
+  border: 1px solid rgba(200, 53, 42, 0.8);
+  box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.72), 0 0 18px rgba(200, 53, 42, 0.5);
+  transition: top 0.35s ease, left 0.35s ease, width 0.35s ease, height 0.35s ease;
+  pointer-events: none;
+}
+
+.tour__card {
+  position: fixed;
+  left: 50%;
+  translate: -50% 0;
+  width: min(380px, calc(100% - 32px));
+  padding: 16px 18px 12px;
+  border: 1px solid rgba(200, 160, 120, 0.35);
+  border-radius: 14px;
+  background: linear-gradient(180deg, #241a14, #160f0c);
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.6);
+  color: #ece4dc;
+  animation: tour-in 0.35s ease-out both;
+}
+
+.tour__title {
+  margin: 0 0 6px;
+  font-family: 'Cormorant SC', Forum, serif;
+  font-size: 19px;
+  letter-spacing: 0.04em;
+  color: #f0c9a8;
+}
+
+.tour__text {
+  margin: 0 0 12px;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.tour__row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.tour__count {
+  flex: 1;
+  font-size: 12px;
+  opacity: 0.55;
+  font-variant-numeric: tabular-nums;
+}
+
+.tour__skip,
+.tour__next {
+  padding: 8px 14px;
+  border-radius: 10px;
+  font: inherit;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.tour__skip {
+  border: 0;
+  background: transparent;
+  color: rgba(236, 228, 220, 0.6);
+}
+
+.tour__next {
+  border: 1px solid #c8352a;
+  background: #5a1611;
+  color: #fff;
+}
+
+@keyframes tour-in {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: none; }
+}
+
+/* --- Подсказка раздела ------------------------------------------------------------ */
+
+.tab-hint {
+  display: flex;
+  align-items: flex-end;
+  gap: 12px;
+  margin: 8px 12px 4px;
+  padding: 12px 14px;
+  border: 1px solid rgba(200, 160, 120, 0.3);
+  border-radius: 12px;
+  background: linear-gradient(180deg, rgba(48, 34, 24, 0.92), rgba(30, 21, 15, 0.92));
+  color: #ece4dc;
+  animation: tour-in 0.35s ease-out both;
+}
+
+.tab-hint__list {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+  padding-left: 18px;
+  font-size: 13.5px;
+  line-height: 1.5;
+}
+
+.tab-hint__list li + li {
+  margin-top: 4px;
+}
+
+.tab-hint__ok {
+  flex: none;
+  padding: 7px 12px;
+  border: 1px solid rgba(200, 53, 42, 0.8);
+  border-radius: 10px;
+  background: #4a120e;
+  color: #fff;
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+/* --- Переход между разделами ------------------------------------------------------- */
+
+.tab-enter {
+  animation: tab-enter 0.28s ease-out both;
+}
+
+@keyframes tab-enter {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: none; }
+}
+
+.hub-tools {
+  display: inline-flex;
+  align-items: center;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tab-enter,
+  .tour__card,
+  .tab-hint,
+  .intro__bg,
+  .intro__flash,
+  .intro__sigil,
+  .intro__start-text { animation: none; }
+  .intro__word { animation-duration: 0.01s; }
+}

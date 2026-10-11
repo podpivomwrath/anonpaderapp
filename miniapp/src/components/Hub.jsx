@@ -1,11 +1,16 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import bridge from '@vkontakte/vk-bridge';
 import ClassIcon from './ClassIcon.jsx';
+import IntroScene from './IntroScene.jsx';
+import TabHint, { TAB_HINTS } from './TabHint.jsx';
+import Tour from './Tour.jsx';
+import { playTab, setSoundEnabled, unlock } from '../sound.js';
 import CrownPicker from './CrownPicker.jsx';
 import TitlePicker from './TitlePicker.jsx';
 import {
   Panel, PanelHeader, PanelHeaderButton, Placeholder, Spinner, Div, Button,
 } from '@vkontakte/vkui';
-import { getCharacter } from '../api.js';
+import { getCharacter, saveUi } from '../api.js';
 import NavIcon from './NavIcon.jsx';
 import AdminTab from './AdminTab.jsx';
 import CharacterTab from './CharacterTab.jsx';
@@ -47,6 +52,15 @@ const GUIDE_URL = 'https://vk.com/@-240167847-putevoditel-mechenogo';
 
 const GUILD_MIN_LEVEL = 20;
 
+// Вступление показывается, пока ui.intro меньше этой версии: поднять число -
+// и все увидят его снова (так оно и показано всем после обновления).
+const INTRO_VERSION = 1;
+
+/** Лёгкий отклик телефона на смену раздела. Вне ВК - молча ничего. */
+function haptic() {
+  bridge.send('VKWebAppTapticImpactOccurred', { style: 'light' }).catch(() => {});
+}
+
 /** Из чего сложилась Мощь - подсказка к числу в шапке. */
 function powerHint(parts) {
   if (!parts) return 'Мощь';
@@ -72,6 +86,24 @@ export default function Hub() {
   const [ban, setBan] = useState(null);
   const [refreshing, setRefreshing] = useState(false);
   const [reloadKey, setReloadKey] = useState(0);
+  // Мини-апп: что уже видел (вступление, тур, подсказки) и звук - с сервера.
+  const [ui, setUi] = useState(null);
+  const [soundOn, setSoundOn] = useState(true);
+
+  const persistUi = useCallback((body) => {
+    saveUi(body).then((res) => res?.ui && setUi(res.ui)).catch(() => {});
+  }, []);
+
+  const activeRef = useRef(activeTab);
+  useEffect(() => { activeRef.current = activeTab; }, [activeTab]);
+  const openTab = useCallback((id) => {
+    if (activeRef.current !== id) {
+      playTab(id);
+      haptic();
+    }
+    setActiveTab(id);
+    setMenuOpen(false);
+  }, []);
 
   useEffect(() => {
     const onBan = (event) => setBan(event.detail);
@@ -87,10 +119,10 @@ export default function Hub() {
   // Патч 72: из инвентаря можно прыгнуть сразу в мастерскую - событие вместо
   // проброса колбэка через три слоя. Раздел один, слушатель один.
   useEffect(() => {
-    const open = () => { setActiveTab('craft'); setMenuOpen(false); };
+    const open = () => openTab('craft');
     window.addEventListener('open-craft', open);
     return () => window.removeEventListener('open-craft', open);
-  }, []);
+  }, [openTab]);
 
   // silent=true - обновление на месте: экран не гасим и спиннер вместо всего
   // хаба не показываем, иначе кнопка «обновить» каждый раз мигала бы пустотой.
@@ -101,6 +133,7 @@ export default function Hub() {
     return getCharacter()
       .then((data) => {
         setCharacter(data);
+        setUi((prev) => prev || data.ui || {});
         setStatus('ready');
       })
       .catch(() => {
@@ -128,6 +161,39 @@ export default function Hub() {
     }
   }, [load]);
 
+  useEffect(() => {
+    if (!ui) return;
+    const on = ui.sound !== false;
+    setSoundOn(on);
+    setSoundEnabled(on);
+  }, [ui?.sound]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const toggleSound = () => {
+    unlock();
+    const on = !soundOn;
+    setSoundOn(on);
+    setSoundEnabled(on);
+    setUi((prev) => ({ ...(prev || {}), sound: on }));
+    persistUi({ set: { sound: on } });
+  };
+
+  const showIntro = Boolean(ui) && (ui.intro || 0) < INTRO_VERSION;
+  const showTour = Boolean(ui) && !showIntro && !ui.tour;
+  const finishIntro = (withSound) => {
+    unlock();
+    setSoundEnabled(withSound);
+    setUi((prev) => ({ ...(prev || {}), intro: INTRO_VERSION, sound: withSound }));
+    persistUi({ set: { intro: INTRO_VERSION, sound: withSound } });
+  };
+  const finishTour = () => {
+    setUi((prev) => ({ ...(prev || {}), tour: 1 }));
+    persistUi({ set: { tour: 1 } });
+  };
+  const hintSeen = (tab) => {
+    setUi((prev) => ({ ...(prev || {}), hints: [...((prev && prev.hints) || []), tab] }));
+    persistUi({ hint: tab });
+  };
+
   // Гильдии - с 20 уровня; кто уже в гильдии, видит вкладку всегда.
   const guildOpen = character && (character.level >= GUILD_MIN_LEVEL || character.in_guild);
   const visible = guildOpen ? SECTIONS : SECTIONS.filter((s) => s.id !== 'guild');
@@ -141,16 +207,26 @@ export default function Hub() {
   const header = (title) => (
     <PanelHeader
       before={
-        <PanelHeaderButton aria-label="Разделы" onClick={() => setMenuOpen((open) => !open)}>
-          <span aria-hidden="true" style={{ fontSize: 20 }}>{menuOpen ? '✕' : '☰'}</span>
-        </PanelHeaderButton>
+        <span data-tour="menu">
+          <PanelHeaderButton aria-label="Разделы" onClick={() => setMenuOpen((open) => !open)}>
+            <span aria-hidden="true" style={{ fontSize: 20 }}>{menuOpen ? '✕' : '☰'}</span>
+          </PanelHeaderButton>
+        </span>
       }
     >
       <span className="hub-brand" aria-hidden="true">Монолит</span>
       <span className="hub-header">
         {title}
+        <span className="hub-tools" data-tour="tools">
         <PanelHeaderButton aria-label="Обновить" disabled={refreshing} onClick={refresh}>
           {refreshing ? <Spinner size="s" /> : <span aria-hidden="true">🔄</span>}
+        </PanelHeaderButton>
+        <PanelHeaderButton
+          aria-label={soundOn ? 'Выключить звук' : 'Включить звук'}
+          title={soundOn ? 'Звук включён' : 'Звук выключен'}
+          onClick={toggleSound}
+        >
+          <span aria-hidden="true">{soundOn ? '🔊' : '🔇'}</span>
         </PanelHeaderButton>
         <PanelHeaderButton
           aria-label="Путеводитель"
@@ -161,6 +237,7 @@ export default function Hub() {
         >
           <span aria-hidden="true">📖</span>
         </PanelHeaderButton>
+        </span>
       </span>
     </PanelHeader>
   );
@@ -229,7 +306,7 @@ export default function Hub() {
                 className={
                   section.id === activeTab ? 'nav-drawer__item nav-drawer__item--active' : 'nav-drawer__item'
                 }
-                onClick={() => { setActiveTab(section.id); setMenuOpen(false); }}
+                onClick={() => openTab(section.id)}
               >
                 <NavIcon id={section.id} />
                 <span className="nav-drawer__label">{section.label}</span>
@@ -259,7 +336,7 @@ export default function Hub() {
       {/* Карта - на всю площадь страницы: карточка персонажа там только
           отнимала бы место у мира. */}
       {activeTab !== 'map' && (
-      <div className="hub-banner">
+      <div className="hub-banner" data-tour="banner">
         {/* Эмблема пути. Стоит у имени, а не у слова «Тёмный мистик»:
             подкласс выбирают один раз и навсегда, и в шапке он часть того,
             КТО ты, а не ещё одна строка характеристик. */}
@@ -344,6 +421,11 @@ export default function Hub() {
         }
         key={reloadKey}
       >
+        {!showIntro && !showTour && TAB_HINTS[activeTab] && !(ui?.hints || []).includes(activeTab) && (
+          <TabHint tab={activeTab} onClose={() => hintSeen(activeTab)} />
+        )}
+        {/* Раздел появляется плавно: ключ по разделу перезапускает анимацию. */}
+        <div key={activeTab} className="tab-enter">
         {activeTab === 'character' && (
           <CharacterTab character={character} onCharacterUpdate={setCharacter} />
         )}
@@ -360,7 +442,11 @@ export default function Hub() {
           <ExchangeTab onWallet={(w) => setCharacter((prev) => ({ ...prev, ...w }))} />
         )}
         {activeTab === 'admin' && character.is_admin && <AdminTab />}
+        </div>
       </div>
+
+      {showIntro && <IntroScene onDone={finishIntro} />}
+      {showTour && <Tour onDone={finishTour} />}
     </Panel>
   );
 }

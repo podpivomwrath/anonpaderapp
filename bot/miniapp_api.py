@@ -140,6 +140,8 @@ def _character_payload(
         # вложении очка и без этого поля считал бы "после" без бонусов
         # экипировки, расходясь с "до" (derived ниже, который её уже учитывает).
         "gear_bonus": gear_bonus or {},
+        # Что игрок уже видел в мини-аппе и включён ли звук (handle_post_ui).
+        "ui": dict(character.ui_flags or {}),
         "derived": {
             "max_hp": derived.max_hp,
             "damage": derived.damage,
@@ -325,6 +327,45 @@ async def handle_post_title(request: web.Request) -> web.Response:
             "title_tier": title_service.tier_of(character.active_title_id),
             "titles": titles,
         })
+
+
+#: Флаги мини-аппа, которые клиент может выставить: что игрок уже видел и
+#: звук. Остальное отбрасывается - это не хранилище для чего попало.
+UI_FLAGS = {"intro": int, "tour": int, "sound": bool}
+UI_HINTS_MAX = 32
+
+
+async def handle_post_ui(request: web.Request) -> web.Response:
+    """{"set": {"intro": 1, "sound": false}, "hint": "map"} - отметить, что
+    игрок видел вступление, тур или подсказку вкладки; выбрать звук."""
+    try:
+        body = await request.json()
+    except Exception:
+        return web.json_response({"error": "bad_request"}, status=400)
+    if not isinstance(body, dict):
+        return web.json_response({"error": "bad_request"}, status=400)
+    updates = body.get("set") or {}
+    hint = body.get("hint")
+    if not isinstance(updates, dict) or (hint is not None and not isinstance(hint, str)):
+        return web.json_response({"error": "bad_request"}, status=400)
+    session_factory = request.app[SESSION_FACTORY_KEY]
+    async with session_factory() as session:
+        character = await _load_character(session, request[VK_USER_ID_KEY])
+        if character is None:
+            return web.json_response({"error": "character_not_found"}, status=404)
+        flags = dict(character.ui_flags or {})
+        for key, kind in UI_FLAGS.items():
+            value = updates.get(key)
+            if isinstance(value, kind) and not (kind is int and isinstance(value, bool)):
+                flags[key] = value
+        if hint and len(hint) <= 24:
+            hints = list(flags.get("hints") or [])
+            if hint not in hints and len(hints) < UI_HINTS_MAX:
+                hints.append(hint)
+            flags["hints"] = hints
+        character.ui_flags = flags  # новый dict: JSON-поле не следит за изменением на месте
+        await session.commit()
+        return web.json_response({"ui": flags})
 
 
 async def handle_post_glance(request: web.Request) -> web.Response:
@@ -934,6 +975,7 @@ def register_routes(app: web.Application) -> None:
     app.router.add_post("/api/miniapp/crown-frame", handle_post_crown_frame)
     app.router.add_post("/api/miniapp/glance", handle_post_glance)
     app.router.add_post("/api/miniapp/title", handle_post_title)
+    app.router.add_post("/api/miniapp/ui", handle_post_ui)
     app.router.add_get("/api/miniapp/trials", handle_get_trials)
     app.router.add_get("/api/miniapp/inventory", handle_get_inventory)
     app.router.add_post("/api/miniapp/equip", handle_post_equip)

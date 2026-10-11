@@ -349,6 +349,21 @@ async def test_equip_above_level_rejected_and_marked(client, session_factory) ->
     assert str(need) in (await resp.json())["error"]
 
 
+async def test_ui_flags_saved_and_filtered(client, session_factory) -> None:
+    """Вступление, тур, подсказки и звук - на сервере; лишние ключи
+    отбрасываются, подсказка не дублируется."""
+    await _make_character(session_factory, vk_id=405)
+    first = await (await client.get("/api/miniapp/character", params=_signed_query(405))).json()
+    assert first["ui"] == {}
+    resp = await client.post("/api/miniapp/ui", params=_signed_query(405),
+                             json={"set": {"intro": 1, "sound": False, "evil": "x", "tour": True}})
+    assert (await resp.json())["ui"] == {"intro": 1, "sound": False}  # tour: bool вместо int - мимо
+    for _ in range(2):
+        await client.post("/api/miniapp/ui", params=_signed_query(405), json={"hint": "map"})
+    again = await (await client.get("/api/miniapp/character", params=_signed_query(405))).json()
+    assert again["ui"] == {"intro": 1, "sound": False, "hints": ["map"]}
+
+
 async def test_equip_unknown_item_rejected(client, session_factory) -> None:
     await _make_character(session_factory, vk_id=402)
     resp = await client.post("/api/miniapp/equip", params=_signed_query(402), json={"item_id": 999})

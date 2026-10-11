@@ -61,6 +61,16 @@ export function setTitle(titleId) {
   });
 }
 
+// Что игрок уже видел (вступление, тур, подсказка вкладки) и звук.
+// {set: {intro: 1, sound: false}} или {hint: 'map'}.
+export function saveUi(body) {
+  return request('/ui', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+}
+
 export function glance() {
   return request('/glance', { method: 'POST' });
 }
