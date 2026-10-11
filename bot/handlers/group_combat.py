@@ -89,6 +89,11 @@ class GroupBattle:
     participants: dict[int, Participant]  # character_id -> Participant
     mob_ids: set[int]
     last_combatants: dict[int, object] = field(default_factory=dict)
+    #: Сюжетный враг в групповом бою (2026-10-11): его смерть засчитывает
+    #: квест всем участникам, у кого этот шаг сюжета активен; остальным он -
+    #: обычный моб.
+    story_mob_id: int | None = None
+    story_quest_id: str | None = None
 
 
 _battles: dict[int, GroupBattle] = {}
@@ -173,7 +178,10 @@ async def start_ready_group(db, group_id, members, region, dist, rng) -> None:
 
 async def start_group_encounter(
     group_id: int, members_input: list[MemberCombatInput], region: str, dist: int, rng: random.Random,
+    *, mob_encounters: list | None = None, story_quest_id: str | None = None,
 ) -> None:
+    """mob_encounters - готовые противники (сюжетный бой группы): первый -
+    сюжетный враг квеста story_quest_id. Без них - обычная пачка клетки."""
     global _next_battle_id
     battle_id = _next_battle_id
     _next_battle_id -= 1
@@ -202,9 +210,10 @@ async def start_group_encounter(
             base_class=m.character.base_class, subclass_id=m.character.subclass,
         )
 
-    mob_encounters = group_combat_service.spawn_mobs(
-        [m.character for m in members_input], region, dist, rng, start_id=10_000_000,
-    )
+    if mob_encounters is None:
+        mob_encounters = group_combat_service.spawn_mobs(
+            [m.character for m in members_input], region, dist, rng, start_id=10_000_000,
+        )
     for enc in mob_encounters:
         state.add(enc.combatant)
 
@@ -212,6 +221,9 @@ async def start_group_encounter(
         group_id=group_id, participants=participants,
         mob_ids={enc.combatant.id for enc in mob_encounters},
     )
+    if story_quest_id is not None and mob_encounters:
+        battle.story_mob_id = mob_encounters[0].combatant.id
+        battle.story_quest_id = story_quest_id
     _battles[battle_id] = battle
     _active_group_ids.add(group_id)
     for p in participants.values():
@@ -671,9 +683,32 @@ async def on_group_tick_resolved(session_id: int, tick: int, result: TickResult)
                 # квестовый прогресс "убей N" — по одному разу за моба, каждому живому
                 for character in characters:
                     await quest_service.record_kill(db, character)
+                if mob_id == battle.story_mob_id:
+                    for cid, line in (await _story_kill(db, battle)).items():
+                        notices[cid] = f"{notices[cid]}\n{line}" if notices.get(cid) else line
             await db.commit()
 
     await _broadcast_board(session_id, battle, result, notices)
+
+
+async def _story_kill(db, battle: GroupBattle) -> dict[int, str]:
+    """Сюжетный враг пал: шаг засчитан всем участникам, у кого он активен -
+    и живым, и павшим в этом бою (победа общая). Остальным он был обычным
+    мобом - награда за него уже выдана выше."""
+    from bot.world_texts import mentor_name
+    from services import story_service
+
+    lines: dict[int, str] = {}
+    for cid in battle.participants:
+        character = await db.get(Character, cid)
+        if character is None:
+            continue
+        quest = await story_service.current_quest_def(db, character)
+        if quest is None or quest.id != battle.story_quest_id:
+            continue
+        await story_service.mark_ready(db, character, battle.story_quest_id)
+        lines[cid] = f"📜 Цель задания выполнена. {mentor_name(character.region)} ждёт тебя в городе."
+    return lines
 
 
 async def on_group_battle_finished(session_id: int, result: TickResult) -> None:
