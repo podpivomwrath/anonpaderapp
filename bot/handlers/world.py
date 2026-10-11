@@ -348,102 +348,75 @@ async def _check_still_dead(db, character, now: datetime) -> bool:
     return death_service.is_dead(character, now)
 
 
-async def _start_group_story(db, character, quest, level: int, mult: float, image) -> bool:
-    """Сюжетный бой всей группой: те, кто стоит на этой клетке и свободен.
-    Шаг засчитывается всем, у кого он активен (group_combat._story_kill),
-    остальным сюжетный враг - обычный моб. False - один на клетке или
-    согрупники заняты: бой соло, как раньше."""
-    from bot.activity import ActivityBusy, blocked_reason, transition
-    from bot.handlers import group_combat as group_combat_handlers
+STORY_NEAR_HINT = "📜 Цель задания где-то рядом. Исследуй местность - первый же бой выведет на неё."
 
-    group = await group_service.get_group_snapshot(db, character.id)
-    if group is None:
-        return False
-    members = []
-    peers = []
-    for member in group_explore_service.co_located_members(group.members, character.pos_x, character.pos_y):
-        peer = await onboarding_svc.vk_id_for_character(db, member.id)
-        if peer is None:
-            continue
-        if member.id != character.id:
-            if await blocked_reason(db, member, peer) is not None:
-                continue
-            from bot.handlers import rift as rift_handlers, voyage as voyage_handlers
 
-            if rift_handlers.is_waiting(peer) or voyage_handlers.is_away(peer):
-                continue
-        members.append(member)
-        peers.append(peer)
-    if len(members) < 2:
-        return False
-    story_enemy = encounters.spawn_named_enemy(
-        10_000_000, quest.named_enemy.name, quest.named_enemy.flavor,
+def _story_enemy(quest, character, participant_id: int):
+    """Сюжетный враг шага quest. Патч 36: уровень - по клетке цели (как у
+    обычных мобов), а не по уровню игрока: прокачанный игрок, вернувшийся за
+    старым шагом, не должен получать врага своего уровня."""
+    mult = quest.named_enemy.stat_mult or sc.NAMED_ENEMY_STAT_MULT_DEFAULT
+    target_x = quest.target_x if quest.target_x is not None else character.pos_x
+    target_y = quest.target_y if quest.target_y is not None else character.pos_y
+    level = grid.mob_level_at(target_x, target_y, character.level)
+    image = quest.named_enemy.image or encounters.base_mob_image(quest.named_enemy.base_mob_id)
+    return encounters.spawn_named_enemy(
+        participant_id, quest.named_enemy.name, quest.named_enemy.flavor,
         level, mult, image=image, base_mob_id=quest.named_enemy.base_mob_id,
     )
-    region = region_for(character.pos_x, character.pos_y)
-    dist = grid.monolith_distance(character.pos_x, character.pos_y)
-    plain = encounters.spawn_mob(10_000_001, region, character.level, dist, _rng)
-    try:
-        with transition(peers):
-            inputs = await group_combat_handlers.build_member_inputs(db, members)
-            await db.commit()
-            await group_combat_handlers.start_group_encounter(
-                group.id, inputs, region, dist, _rng,
-                mob_encounters=[story_enemy, plain], story_quest_id=quest.id,
-            )
-    except ActivityBusy:
-        return False
-    return True
+
+
+async def story_fight_quest(db, character):
+    """Сюжетный шаг с врагом, если игрок в зоне его цели (2026-10-11: враг
+    выходит в первом бою исследования, а не по прибытии). None - нет такого."""
+    quest = await story_service.check_zone_trigger(db, character)
+    if quest is None or quest.named_enemy is None:
+        return None
+    return quest
+
+
+async def group_story_mobs(db, cohort: list, rng) -> tuple[list, str] | None:
+    """Групповое исследование в зоне цели у кого-то из группы: первый бой -
+    сюжетный враг этого шага и обычный моб клетки. Шаг засчитывается всем, у
+    кого он активен (group_combat._story_kill), остальным враг - обычный
+    моб. Цепочки погони (несколько боёв подряд) - только соло."""
+    for member in cohort:
+        quest = await story_fight_quest(db, member)
+        if quest is None or quest.chain_length > 1:
+            continue
+        region = region_for(member.pos_x, member.pos_y)
+        dist = grid.monolith_distance(member.pos_x, member.pos_y)
+        plain = encounters.spawn_mob(10_000_001, region, member.level, dist, rng)
+        return [_story_enemy(quest, member, 10_000_000), plain], quest.id
+    return None
 
 
 async def _maybe_trigger_story(peer_id: int, db, character, stats) -> bool:
-    """Патч 18: игрок вошёл в радиус цели активного сюжетного шага — показать
-    сцену прибытия и начать сюжетный бой (если задан named_enemy) вместо
-    обычной сводки клетки. True — триггер сработал, вызывающий не должен
-    показывать обычную карту в этом ответе."""
+    """Патч 18: игрок вошёл в радиус цели активного сюжетного шага.
+
+    Шаг с врагом (2026-10-11) больше не начинает бой по прибытии: враг
+    выйдет в первом бою исследования. Здесь только подсказка, а сводка
+    клетки показывается как обычно (False). Шаг без врага - сцена прибытия,
+    и цель достигнута сразу (True - обычную сводку вызывающий не шлёт)."""
     quest = await story_service.check_zone_trigger(db, character)
     if quest is None:
+        return False
+    if quest.named_enemy is not None:
+        await _bot_api.messages.send(peer_id=peer_id, message=STORY_NEAR_HINT, random_id=0)
         return False
     if quest.arrival_text:
         await _bot_api.messages.send(
             peer_id=peer_id, message=story_service.format_text(quest.arrival_text, character), random_id=0
         )
-    if quest.named_enemy is not None:
-        gear_bonus = await item_service.compute_gear_bonus(db, character.id)
-        buff_modifiers = await scene_event_service.solo_modifiers(
-            db, character, await preset_service.resolve_active_modifiers(db, character),
-        )
-        mult = quest.named_enemy.stat_mult or sc.NAMED_ENEMY_STAT_MULT_DEFAULT
-        # Патч 36: уровень квестового врага — по клетке цели (как у обычных
-        # мобов), не напрямую по уровню игрока — раньше сильно прокачанный
-        # игрок, вернувшийся за старым сюжетным шагом, получал named-врага
-        # своего текущего уровня вместо уровня, уместного для той локации.
-        target_x = quest.target_x if quest.target_x is not None else character.pos_x
-        target_y = quest.target_y if quest.target_y is not None else character.pos_y
-        level = grid.mob_level_at(target_x, target_y, character.level)
-        image = quest.named_enemy.image or encounters.base_mob_image(quest.named_enemy.base_mob_id)
-        encounter = encounters.spawn_named_enemy(
-            combat_handlers.MOB_ID, quest.named_enemy.name, quest.named_enemy.flavor,
-            level, mult, image=image, base_mob_id=quest.named_enemy.base_mob_id,
-        )
-        # В группе (2026-10-11): рядом свободные согрупники - бой общий,
-        # сюжетный враг и обычный моб клетки. Цепочки погони - соло, как были.
-        if quest.chain_length <= 1 and await _start_group_story(db, character, quest, level, mult, image):
-            return True
-        await combat_handlers.start_story_encounter(
-            peer_id, character, stats, gear_bonus, buff_modifiers,
-            quest.id, quest.chain_length, encounter,
-        )
-    else:
-        # сцена без боя — цель считается достигнутой сразу
-        await story_service.mark_ready(db, character, quest.id)
-        await db.commit()
-        # патч 21, п.1: игрок не в разговоре с наставником — пингуем сами
-        await _bot_api.messages.send(
-            peer_id=peer_id,
-            message=f"📜 {mentor_name(character.region)} ждёт тебя в городе.",
-            random_id=0,
-        )
+    # сцена без боя — цель считается достигнутой сразу
+    await story_service.mark_ready(db, character, quest.id)
+    await db.commit()
+    # патч 21, п.1: игрок не в разговоре с наставником — пингуем сами
+    await _bot_api.messages.send(
+        peer_id=peer_id,
+        message=f"📜 {mentor_name(character.region)} ждёт тебя в городе.",
+        random_id=0,
+    )
     return True
 
 
@@ -711,8 +684,10 @@ async def explore(message: Message) -> None:
                     grid.ring_tier(character.pos_x, character.pos_y), _rng,
                 ):
                     return
+                story = await group_story_mobs(db, cohort, _rng)
                 await group_combat_handlers.start_ready_group(
                     db, snapshot.id, cohort, region, dist, _rng,
+                    mob_encounters=story[0] if story else None, story_quest_id=story[1] if story else None,
                 )
                 return
 
@@ -913,6 +888,19 @@ async def handle_explore_done(peer_id: int) -> None:
         await stats_window.notify_levelup(peer_id, c.levels_gained, c.new_level)
 
     if outcome_kind == "combat":
+        # В зоне цели сюжетного шага первый же бой - его враг (2026-10-11).
+        async with get_session_factory()() as story_db:
+            quest = await story_fight_quest(story_db, character)
+        if quest is not None:
+            if quest.arrival_text:
+                await _bot_api.messages.send(
+                    peer_id=peer_id, message=story_service.format_text(quest.arrival_text, character), random_id=0,
+                )
+            await combat_handlers.start_story_encounter(
+                peer_id, character, stats, gear_bonus, buff_modifiers,
+                quest.id, quest.chain_length, _story_enemy(quest, character, combat_handlers.MOB_ID),
+            )
+            return
         await combat_handlers.start_encounter(peer_id, character, stats, gear_bonus, buff_modifiers)
         return
 

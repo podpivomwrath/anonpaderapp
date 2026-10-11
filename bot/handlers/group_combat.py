@@ -158,7 +158,8 @@ async def build_member_inputs(db, members: list[Character]) -> list[MemberCombat
     return result
 
 
-async def start_ready_group(db, group_id, members, region, dist, rng) -> None:
+async def start_ready_group(db, group_id, members, region, dist, rng, *,
+                            mob_encounters: list | None = None, story_quest_id: str | None = None) -> None:
     from bot.activity import transition, blocked_reason, ActivityBusy
     peers = [await onboarding_svc.vk_id_for_character(db, c.id) for c in members]
     if any(p is None for p in peers):
@@ -173,7 +174,8 @@ async def start_ready_group(db, group_id, members, region, dist, rng) -> None:
         inputs = await build_member_inputs(db, members)
         await db.commit()
         await db.close()
-        await start_group_encounter(group_id, inputs, region, dist, rng)
+        await start_group_encounter(group_id, inputs, region, dist, rng,
+                                    mob_encounters=mob_encounters, story_quest_id=story_quest_id)
 
 
 async def start_group_encounter(

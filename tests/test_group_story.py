@@ -32,3 +32,25 @@ async def test_story_kill_marks_only_quest_holders(db_session, make_character) -
     assert "Цель задания выполнена" in lines[holder.id]
     assert (await story_service.get_progress(db_session, holder)).status == "ready"
     assert (await story_service.get_progress(db_session, other)).status == "active"
+
+
+async def test_story_enemy_waits_for_explore_combat(db_session, character_at) -> None:
+    """2026-10-11: в зоне цели шаг с врагом находится для боя исследования;
+    вне зоны - нет."""
+    import random
+
+    from bot.handlers import world
+
+    near = await character_at(-10, 25, region="ridge", level=20)
+    far = await character_at(0, 30, region="ridge", level=20)
+    for c in (near, far):
+        await _progress(db_session, c, "ridge_1_2")
+    quest = await world.story_fight_quest(db_session, near)
+    assert quest is not None and quest.id == "ridge_1_2"
+    assert await world.story_fight_quest(db_session, far) is None
+
+    mobs, quest_id = await world.group_story_mobs(db_session, [far, near], random.Random(1))
+    assert quest_id == "ridge_1_2"
+    assert mobs[0].combatant.name == quest.named_enemy.name  # первым - сюжетный враг
+    assert len(mobs) == 2 and mobs[1].combatant.id != mobs[0].combatant.id
+    assert await world.group_story_mobs(db_session, [far], random.Random(1)) is None
