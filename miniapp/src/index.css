@@ -1546,6 +1546,225 @@ body::before {
   }
 }
 
+/* --- Вскрытие ларца (2026-10-11) ---------------------------------------------
+   Ларец трясётся всё сильнее и светится цветом градации, потом вспышка,
+   лучи, искры - и награды вылетают по одной. Цвет - одна переменная --rc. */
+
+.roulette--dusty, .chest-stage--dusty, .loot-drop--dusty { --rc: #b5bac0; --rc-deep: #8f959c; }
+.roulette--dim, .chest-stage--dim, .loot-drop--dim { --rc: #5d97ee; --rc-deep: #3d7bd9; }
+.roulette--crimson, .chest-stage--crimson, .loot-drop--crimson { --rc: #b56bef; --rc-deep: #9b3dd9; }
+.roulette--searing, .chest-stage--searing, .loot-drop--searing { --rc: #f09a48; --rc-deep: #e8842a; }
+.roulette--tear, .chest-stage--tear, .loot-drop--tear { --rc: #f2d465; --rc-deep: #e8c547; }
+
+/* Окно рулетки при вскрытии вспыхивает рамкой своей градации. */
+.roulette--burst {
+  border-color: var(--rc-deep);
+  animation: roulette-frame 1.6s ease-out;
+}
+
+@keyframes roulette-frame {
+  0% { box-shadow: 0 20px 60px rgba(0, 0, 0, 0.6), 0 0 0 0 var(--rc); }
+  15% { box-shadow: 0 20px 60px rgba(0, 0, 0, 0.6), 0 0 60px 6px var(--rc); }
+  100% { box-shadow: 0 20px 60px rgba(0, 0, 0, 0.6), 0 0 24px 0 transparent; }
+}
+
+.chest-stage {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 168px;
+  overflow: hidden;
+  cursor: pointer;
+}
+
+.chest-stage__chest {
+  position: relative;
+  z-index: 3;
+  animation: chest-arrive 0.45s cubic-bezier(0.3, 1.35, 0.5, 1) backwards;
+}
+
+.chest-stage__chest .item-icon {
+  width: 104px;
+  height: 104px;
+  border-radius: 16px;
+  box-shadow: 0 0 0 2px var(--rc-deep), 0 0 22px var(--rc-deep);
+}
+
+/* Тряска нарастает: амплитуда и частота растут к концу. */
+.chest-stage--shake .chest-stage__chest {
+  animation:
+    chest-arrive 0.45s cubic-bezier(0.3, 1.35, 0.5, 1) backwards,
+    chest-shake 1.5s linear 0.1s both;
+}
+
+.chest-stage__glow {
+  position: absolute;
+  z-index: 1;
+  width: 150px;
+  height: 150px;
+  border-radius: 50%;
+  background: radial-gradient(circle, var(--rc) 0%, transparent 65%);
+  opacity: 0.25;
+}
+
+.chest-stage--shake .chest-stage__glow {
+  animation: chest-glow-build 1.5s ease-in both;
+}
+
+.chest-stage--burst .chest-stage__glow {
+  animation: chest-glow-burst 1.2s ease-out both;
+}
+
+.chest-stage--burst .chest-stage__chest {
+  animation: chest-pop 0.7s cubic-bezier(0.3, 1.35, 0.5, 1) both;
+}
+
+.chest-stage__flash {
+  position: absolute;
+  inset: 0;
+  z-index: 4;
+  background: radial-gradient(circle at 50% 50%, #fff 0%, var(--rc) 30%, transparent 70%);
+  pointer-events: none;
+  animation: chest-flash 0.6s ease-out both;
+}
+
+.chest-stage__rays {
+  position: absolute;
+  z-index: 0;
+  width: 420px;
+  height: 420px;
+  -webkit-mask-image: radial-gradient(circle, #000 0%, transparent 62%);
+  mask-image: radial-gradient(circle, #000 0%, transparent 62%);
+  opacity: 0;
+  animation: chest-rays 3.2s ease-out both;
+}
+
+/* Вращение - на слое внутри: у самого блока transform занят масштабом. */
+.chest-stage__rays::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: repeating-conic-gradient(from 0deg, var(--rc) 0deg 6deg, transparent 6deg 24deg);
+  animation: chest-rays-spin 14s linear infinite;
+}
+
+.chest-stage__spark {
+  position: absolute;
+  z-index: 5;
+  left: 50%;
+  top: 50%;
+  border-radius: 50%;
+  background: var(--rc);
+  box-shadow: 0 0 6px var(--rc), 0 0 12px var(--rc-deep);
+  animation: chest-spark 0.9s cubic-bezier(0.15, 0.7, 0.3, 1) both;
+}
+
+@keyframes chest-arrive {
+  from { opacity: 0; transform: scale(0.4) translateY(30px); }
+}
+
+@keyframes chest-shake {
+  0% { transform: rotate(0) translate(0, 0); }
+  8% { transform: rotate(-3deg) translate(-1px, 0); }
+  16% { transform: rotate(3deg) translate(1px, 0); }
+  24% { transform: rotate(-4deg) translate(-2px, -1px); }
+  32% { transform: rotate(4deg) translate(2px, 0); }
+  40% { transform: rotate(-6deg) translate(-3px, -2px); }
+  46% { transform: rotate(6deg) translate(3px, 0); }
+  52% { transform: rotate(-8deg) translate(-4px, -3px) scale(1.03); }
+  58% { transform: rotate(8deg) translate(4px, 0) scale(1.03); }
+  63% { transform: rotate(-10deg) translate(-5px, -4px) scale(1.05); }
+  68% { transform: rotate(10deg) translate(5px, -1px) scale(1.05); }
+  72% { transform: rotate(-12deg) translate(-6px, -6px) scale(1.07); }
+  76% { transform: rotate(12deg) translate(6px, -2px) scale(1.07); }
+  80% { transform: rotate(-13deg) translate(-6px, -8px) scale(1.09); }
+  84% { transform: rotate(13deg) translate(6px, -3px) scale(1.09); }
+  88% { transform: rotate(-14deg) translate(-7px, -10px) scale(1.11); }
+  92% { transform: rotate(14deg) translate(7px, -4px) scale(1.12); }
+  96% { transform: rotate(-8deg) translate(-3px, -12px) scale(1.14); }
+  100% { transform: rotate(0) translate(0, -14px) scale(1.16); }
+}
+
+@keyframes chest-glow-build {
+  from { opacity: 0.15; transform: scale(0.7); }
+  to { opacity: 0.85; transform: scale(1.35); }
+}
+
+@keyframes chest-glow-burst {
+  0% { opacity: 1; transform: scale(1.4); }
+  100% { opacity: 0.45; transform: scale(1.9); }
+}
+
+@keyframes chest-pop {
+  0% { transform: translateY(-14px) scale(1.16); filter: brightness(2.2); }
+  35% { transform: translateY(-22px) scale(1.25); filter: brightness(1.6); }
+  100% { transform: translateY(0) scale(1); filter: brightness(1.1); }
+}
+
+@keyframes chest-flash {
+  0% { opacity: 0; }
+  15% { opacity: 1; }
+  100% { opacity: 0; }
+}
+
+@keyframes chest-rays {
+  0% { opacity: 0; transform: scale(0.3); }
+  25% { opacity: 0.55; }
+  100% { opacity: 0.22; transform: scale(1); }
+}
+
+@keyframes chest-rays-spin {
+  to { transform: rotate(360deg); }
+}
+
+@keyframes chest-spark {
+  0% { opacity: 1; transform: translate(-50%, -50%) rotate(var(--a)) translateX(0) scale(1.4); }
+  100% { opacity: 0; transform: translate(-50%, -50%) rotate(var(--a)) translateX(var(--d)) scale(0.3); }
+}
+
+/* Награды вылетают из ларца сверху и с отскоком встают в ряд. */
+.loot-drops {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+}
+
+.loot-drop {
+  padding: 7px 12px;
+  border: 1px solid var(--rc-deep);
+  border-radius: 10px;
+  background: linear-gradient(180deg, #1d1e23, #141518);
+  box-shadow: 0 0 12px var(--rc-deep), inset 0 -14px 18px -14px var(--rc);
+  color: #f3eee8;
+  font-size: 14px;
+  animation: loot-drop 0.6s cubic-bezier(0.3, 1.4, 0.5, 1) backwards;
+}
+
+@keyframes loot-drop {
+  0% { opacity: 0; transform: translate(var(--from-x, 0), -90px) scale(0.3); }
+  60% { opacity: 1; }
+}
+
+.roulette__take {
+  align-self: stretch;
+  animation: roulette-reveal 0.4s ease-out backwards;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .chest-stage__chest,
+  .chest-stage__glow,
+  .chest-stage__rays,
+  .chest-stage__rays::before,
+  .chest-stage__spark,
+  .chest-stage__flash,
+  .loot-drop,
+  .roulette__take,
+  .roulette--burst { animation: none !important; }
+  .chest-stage__spark, .chest-stage__flash { display: none; }
+}
+
 /* --- Живой фон (патч 106) ----------------------------------------------------
    Сцена рисуется компонентом BackgroundScene только на широком экране; тогда
    статичная картинка body::before не нужна - иначе под сценой лежала бы

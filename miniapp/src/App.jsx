@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 import bridge from '@vkontakte/vk-bridge';
 import { AppRoot, ConfigProvider, SplitLayout, SplitCol, Tabs, TabsItem } from '@vkontakte/vkui';
 import BackgroundScene from './components/BackgroundScene.jsx';
+import ChestRoulette from './components/ChestRoulette.jsx';
 import Hub from './components/Hub.jsx';
 import IntroScene from './components/IntroScene.jsx';
 import TabHint from './components/TabHint.jsx';
@@ -76,6 +77,29 @@ function App() {
           {hints
             ? <TabHint tab="dailies" onClose={() => { window.location.hash = 'hints-done'; }} />
             : <Tour onDone={() => { window.location.hash = 'tour-done'; }} />}
+        </AppRoot>
+      </ConfigProvider>
+    );
+  }
+
+  // #chest-<градация> - вскрытие ларца на подставной ленте.
+  if (import.meta.env.DEV && window.location.hash.startsWith('#chest')) {
+    const grade = window.location.hash.split('-')[1] || 'crimson';
+    const names = { dusty: 'Пыльный', dim: 'Тусклый', crimson: 'Багровый', searing: 'Раскалённый', tear: 'Слеза раскола' };
+    const grades = Object.keys(names);
+    const strip = Array.from({ length: 44 }, (_, i) => {
+      const g = i === 38 ? grade : grades[i % grades.length];
+      return { grade: g, grade_name: names[g], icon: `chest:${g}`, label: 'Малое исцеление ×2-3' };
+    });
+    return (
+      <ConfigProvider colorScheme={COLOR_SCHEME}>
+        <AppRoot>
+          <ChestRoulette
+            strip={strip}
+            winIndex={38}
+            result={{ grade, grade_name: names[grade], lines: ['🟣 Кровяной осколок ×3', '💰 420 золота'] }}
+            onClose={() => { window.location.hash = 'chest-closed'; }}
+          />
         </AppRoot>
       </ConfigProvider>
     );
