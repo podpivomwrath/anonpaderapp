@@ -250,6 +250,11 @@ async def _dispatch(peer_id: int, p: Pending, payload: dict) -> None:
             if not await scene_event_service.can_afford(db, character, choice.cost) or \
                     not await scene_event_service.pay(db, character, choice.cost):
                 await db.rollback()
+                # После отката объекты «протухают», и первое же чтение поля
+                # грузило бы его лениво - в async это MissingGreenlet, событие
+                # падало (2026-10-11). Перечитываем явно.
+                await db.refresh(character)
+                await db.refresh(stats)
                 text, keyboard = await _render(db, character, stats, p, peer_id)
                 await _send(peer_id, "Нечем заплатить.\n\n" + text, keyboard)
                 return

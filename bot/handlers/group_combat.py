@@ -14,11 +14,13 @@ id (отрицательные, как battle_id в bot/handlers/pvp.py) от pe
 import random
 from dataclasses import dataclass, field
 
+from loguru import logger
 from sqlalchemy import select
 from vkbottle.bot import BotLabeler, Message
 
 from bot import dailies_texts, editable_message, group_texts, raid_key_texts
 from bot.handlers import respawn as respawn_handlers
+from bot.battle_keyboard import answer_battle_gone
 from bot.handlers import stats_window
 from bot.keyboards.group_combat import (
     BTN_GROUP_ATTACK,
@@ -330,11 +332,10 @@ async def group_skill(message: Message) -> None:
         return
     peer_id = message.peer_id
     battle_id = _peer_battle.get(peer_id)
-    if battle_id is None:
+    if battle_id is None or _battles.get(battle_id) is None:
+        await _group_action(message, DeclaredAction(type=ActionType.SKILL, skill_id=skill_id))
         return
-    battle = _battles.get(battle_id)
-    if battle is None:
-        return
+    battle = _battles[battle_id]
     cid = _character_id_for_peer(battle, peer_id)
     if cid is None:
         return
@@ -348,13 +349,34 @@ async def group_skill(message: Message) -> None:
     await _group_action(message, DeclaredAction(type=ActionType.SKILL, skill_id=skill_id))
 
 
+def _drop_stale(battle_id: int) -> None:
+    """Бой есть в памяти обработчика, а движок его уже не знает - снять все
+    привязки, иначе участники навсегда «в бою» (/застрял групповой бой не
+    прерывает намеренно)."""
+    battle = _battles.pop(battle_id, None)
+    _declared_this_tick.pop(battle_id, None)
+    for peer, bid in list(_peer_battle.items()):
+        if bid == battle_id:
+            _peer_battle.pop(peer, None)
+    if battle is not None:
+        _active_group_ids.discard(battle.group_id)
+        for p in battle.participants.values():
+            _chosen_target.pop(p.character_id, None)
+
+
 async def _group_action(message: Message, action: DeclaredAction) -> None:
     peer_id = message.peer_id
     battle_id = _peer_battle.get(peer_id)
     if battle_id is None:
+        # Кнопка боя, которого нет (перезапуск, бой окончен): молчать нельзя -
+        # игрок остался бы со старой клавиатурой (battle_keyboard.answer_battle_gone).
+        await answer_battle_gone(message)
         return
     battle = _battles.get(battle_id)
-    if battle is None:
+    if battle is None or (_engine is not None and battle_id not in _engine.sessions):
+        logger.warning("Групповой бой {} без сессии движка - снимаю зависшее состояние", battle_id)
+        _drop_stale(battle_id)
+        await answer_battle_gone(message)
         return
     cid = _character_id_for_peer(battle, peer_id)
     if cid is None:

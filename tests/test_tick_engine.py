@@ -248,3 +248,24 @@ async def test_dead_player_cannot_declare(recorder: Recorder) -> None:
     engine.start_session(state)
     with pytest.raises(ValueError):
         await engine.declare_action(1, 1, attack(2))
+
+
+async def test_failing_tick_callback_does_not_freeze_battle() -> None:
+    """Разбор хода упал (БД, рассылка) - следующий ход всё равно открыт.
+    Раньше бой замирал навсегда, и игрок застревал «в бою» (2026-10-11)."""
+    calls = []
+
+    async def boom(session_id, tick, result):
+        calls.append(tick)
+        raise RuntimeError("statement timeout")
+
+    engine = TickEngine(InMemoryActionStore(), rng=NoCritRng(), on_tick_resolved=boom)
+    p1 = combatant(1, side=0)
+    wolf = combatant(3, side=1, kind="mob", name="Волк", vitality=200)
+    state = make_state(CombatMode.PVE, p1, wolf)
+    engine.start_session(state)
+    await engine.declare_action(1, 1, attack(3))
+    assert calls == [1]
+    assert state.tick_number == 2  # ход открыт - можно бить дальше
+    await engine.declare_action(1, 1, attack(3))
+    assert calls == [1, 2]

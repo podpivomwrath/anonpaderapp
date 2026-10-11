@@ -9,13 +9,16 @@
 окно, а не плодят новые.
 """
 
+import asyncio
+
+from loguru import logger
 from sqlalchemy import select
 from vkbottle.bot import BotLabeler, Message
 
 from bot import editable_message
 from bot.keyboards.stats_window import no_keyboard, stats_alloc_keyboard
 from bot.keyboards.world import BTN_STATS
-from models import CharacterStats
+from models import Character, CharacterStats, User
 from services import daily_service
 from services import onboarding_service as onboarding_svc
 from services import stat_alloc_service as sas
@@ -54,20 +57,48 @@ async def _send_or_edit(peer_id: int, text: str, keyboard: str | None) -> None:
     await editable_message.send_or_edit(_bot_api, _NS, peer_id, text, keyboard)
 
 
+#: Через столько окно нового уровня открывается после начисления опыта.
+LEVELUP_DELAY_SECONDS = 1.5
+
+
 async def notify_levelup(peer_id: int, levels_gained: int, new_level: int) -> None:
     """Единая точка входа для ЛЮБОГО источника опыта (патч 14, ч.2.3: килл,
     квест, событие) — если начисление вызвало левелап, открывает/обновляет
     окно распределения статов. Источники опыта не должны сами решать, звать
-    им это или нет — они просто передают сюда levels_gained/new_level."""
+    им это или нет — они просто передают сюда levels_gained/new_level.
+
+    ОТЛОЖЕННО и в своей задаче (2026-10-11). Групповой бой и рейд звали это
+    изнутри ещё открытой транзакции награды, которая держит строку
+    персонажа, - а окно читало персонажа через get_character, тот писал
+    last_active_at в ту же строку и ждал блокировку. Взаимная блокировка
+    до таймаута, исключение рушило разбор хода, и бой оставался в памяти
+    полумёртвым: игрок «в бою», но ходы не проходят и /застрял не помогает.
+    Теперь вызывающий не ждёт окна вовсе, а окно открывается после его
+    коммита и персонажа только читает."""
     if levels_gained > 0:
-        await open_or_update_window(peer_id, sas.levelup_header(new_level))
+        asyncio.get_running_loop().create_task(_levelup_later(peer_id, sas.levelup_header(new_level)))
+
+
+async def _levelup_later(peer_id: int, header: str) -> None:
+    await asyncio.sleep(LEVELUP_DELAY_SECONDS)
+    try:
+        await open_or_update_window(peer_id, header)
+    except Exception:
+        logger.exception("Окно нового уровня не открылось {}", peer_id)
+
+
+async def _read_character(db, peer_id: int) -> Character | None:
+    """Персонаж без записи last_active_at - чтение блокировок не ждёт."""
+    return await db.scalar(
+        select(Character).join(User, User.id == Character.user_id).where(User.vk_id == peer_id)
+    )
 
 
 async def open_or_update_window(peer_id: int, header: str) -> None:
     """Открывает окно распределения; если для игрока уже открыто — редактирует
     его (несколько левелапов подряд не плодят новых окон, патч 11)."""
     async with get_session_factory()() as db:
-        character = await onboarding_svc.get_character(db, peer_id)
+        character = await _read_character(db, peer_id)
         if character is None or character.creation_state is not None:
             return
         stats = await _get_stats(db, character.id)

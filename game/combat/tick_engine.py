@@ -255,7 +255,14 @@ class TickEngine:
                 logger.info("  {}", line)
 
             if self.on_tick_resolved is not None:
-                await self.on_tick_resolved(session_id, tick, result)
+                # Ошибка разбора хода (рассылка, награда, БД) не должна
+                # замораживать бой: без этого следующий ход не открывался и
+                # бой не закрывался никогда - игрок навсегда «в бою», а
+                # /застрял из рейда и группового боя не выводит (2026-10-11).
+                try:
+                    await self.on_tick_resolved(session_id, tick, result)
+                except Exception:
+                    logger.exception("Сессия {}: разбор хода {} упал - бой продолжается", session_id, tick)
 
             if self.sessions.get(session_id) is not state:
                 return  # callback aborted/replaced this battle (e.g. a scripted raid wipe)
@@ -270,6 +277,9 @@ class TickEngine:
                     "ничья" if result.draw else f"победила сторона {result.winner_side}",
                 )
                 if self.on_battle_finished is not None:
-                    await self.on_battle_finished(session_id, result)
+                    try:
+                        await self.on_battle_finished(session_id, result)
+                    except Exception:
+                        logger.exception("Сессия {}: итог боя упал", session_id)
             else:
                 self._open_tick(state)
