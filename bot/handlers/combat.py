@@ -809,6 +809,38 @@ def pop_mount_ambush(peer_id: int) -> int | None:
     return _mount_ambush.pop(peer_id, None)
 
 
+async def _release_encounter(peer_id: int) -> str | None:
+    """Бой закрыт не победой и не смертью (побег, прерывание PvP): снять ВСЕ
+    его отметки. Раньше побег чистил только часть, и остаток портил
+    следующий бой: старая привязка к поездке - бот принимал обычный бой за
+    нападение и предлагал продолжить чужую поездку, а сама поездка навсегда
+    висела «в засаде»; сюжетная - случайный бой засчитывался за квест;
+    бонус события - доставался не тому бою (2026-10-11, жалоба про Виво).
+
+    Поездка, на которой напали, останавливается на текущей клетке - как
+    «Остаться здесь» после нападения. Вернёт строку об этом или None."""
+    _encounter_class.pop(peer_id, None)
+    _last_player_hp.pop(peer_id, None)
+    _battle_trackers.pop(peer_id, None)
+    _story_encounter.pop(peer_id, None)
+    _event_bonus.pop(peer_id, None)
+    _encounter_mob_level.pop(peer_id, None)
+    travel_id = _mount_ambush.pop(peer_id, None)
+    if travel_id is None:
+        return None
+    from models import MountTravel
+    from services.onboarding_service import get_character
+
+    async with get_session_factory()() as db:
+        travel = await db.get(MountTravel, travel_id)
+        character = await get_character(db, peer_id)
+        if travel is None or character is None:
+            return None
+        stopped = await mount_service.stop_travel(db, travel, character, after_ambush=True)
+        await db.commit()
+    return f"Поездка прервана - ты остаёшься на ({character.pos_x}; {character.pos_y})." if stopped else None
+
+
 async def interrupt_for_pvp(peer_id: int) -> None:
     """Прерывает активный PvE-бой без наград/штрафа — жертву атаковали в
     открытом PvP (патч 22, п.3). HP на момент прерывания сохраняется в БД
@@ -821,9 +853,7 @@ async def interrupt_for_pvp(peer_id: int) -> None:
         return
     hp = _engine.sessions[peer_id].combatants[PLAYER_ID].current_hp
     _engine.abort_session(peer_id)
-    _encounter_class.pop(peer_id, None)
-    _last_player_hp.pop(peer_id, None)
-    _battle_trackers.pop(peer_id, None)
+    await _release_encounter(peer_id)
     await _persist_hp(peer_id, hp)
 
 
@@ -843,12 +873,13 @@ async def flee(message: Message) -> None:
         # сохраняем остаток HP игрока перед выходом из боя
         hp = _engine.sessions[peer_id].combatants[PLAYER_ID].current_hp
         _engine.abort_session(peer_id)
-        _encounter_class.pop(peer_id, None)
-        _last_player_hp.pop(peer_id, None)
+        travel_line = await _release_encounter(peer_id)
         await _persist_hp(peer_id, hp)
         pos_x, pos_y, has_mount = await _get_position(peer_id)
-        await message.answer("🏃 Ты срываешься прочь - и темнота глотает твой след.",
-                             keyboard=movement_keyboard(pos_x, pos_y, peer_id, has_mount=has_mount))
+        text = "🏃 Ты срываешься прочь - и темнота глотает твой след."
+        if travel_line:
+            text += f"\n{travel_line}"
+        await message.answer(text, keyboard=movement_keyboard(pos_x, pos_y, peer_id, has_mount=has_mount))
         return
     # Патч 30, баг 2: бой продолжается — без клавиатуры игрок теряет кнопки
     # до того, как declare_action(SKIP) ниже вызовет резолв следующего хода.
