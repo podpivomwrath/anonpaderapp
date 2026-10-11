@@ -123,8 +123,8 @@ export default function ChestRoulette({ strip, winIndex, result, onClose }) {
                   className={`roulette__card roulette__card--${card.grade}${phase === 'win' && index === winIndex ? ' roulette__card--win' : ''}`}
                 >
                   <ItemIcon icon={card.icon} alt={card.grade_name} size={56} />
+                  {/* Содержимое на ленте не показываем: награда - сюрприз вскрытия. */}
                   <span className="roulette__grade">{card.grade_name}</span>
-                  <span className="roulette__label">{card.label}</span>
                 </div>
               ))}
             </div>

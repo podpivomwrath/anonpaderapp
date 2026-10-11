@@ -1460,7 +1460,7 @@ body::before {
   flex-direction: column;
   align-items: center;
   gap: 6px;
-  min-height: 148px;
+  min-height: 104px;
   padding: 10px 8px;
   border: 1px solid var(--card-color, #ffffff22);
   border-radius: 12px;
@@ -1536,7 +1536,7 @@ body::before {
 @media (max-width: 480px) {
   .roulette__card {
     flex-basis: 96px;
-    min-height: 132px;
+    min-height: 96px;
   }
 }
 
