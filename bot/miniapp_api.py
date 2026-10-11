@@ -541,6 +541,8 @@ async def handle_get_dailies(request: web.Request) -> web.Response:
                     "complete": song_complete,
                     "read": song_read,
                 },
+                # Летопись: титулы - открытые и как получить остальные.
+                "titles": await title_service.catalog(session, character),
                 "dailies": {
                     "quests": [
                         {

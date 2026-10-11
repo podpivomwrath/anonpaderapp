@@ -434,3 +434,72 @@
   overflow: visible;
   text-overflow: clip;
 }
+
+/* --- Летопись (вкладка «Задания» → «Сюжет») ------------------------------------------
+   Песнь и титулы свёрнуты: длинные строфы занимали полэкрана. */
+.chronicle-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 12px 16px;
+  border: 0;
+  border-top: 1px solid rgba(255, 255, 255, 0.05);
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.chronicle-row__title {
+  flex: 1;
+  min-width: 0;
+}
+
+.chronicle-row__note {
+  opacity: 0.6;
+  font-size: 14px;
+  font-variant-numeric: tabular-nums;
+}
+
+.chronicle-row__arrow {
+  opacity: 0.5;
+  font-size: 20px;
+  line-height: 1;
+  transition: transform 0.2s ease;
+}
+
+.chronicle-row__arrow--open {
+  transform: rotate(90deg);
+}
+
+.chronicle-body {
+  padding: 0 16px 12px;
+  animation: tour-in 0.25s ease-out both;
+}
+
+.chronicle-line {
+  margin: 0 0 10px;
+  line-height: 1.5;
+}
+
+.chronicle-line--hidden {
+  opacity: 0.45;
+}
+
+.chronicle-title {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 6px 0;
+}
+
+.chronicle-title--locked {
+  opacity: 0.55;
+}
+
+.chronicle-title__how {
+  font-size: 13px;
+  opacity: 0.75;
+}

@@ -6,6 +6,7 @@ import Hub from './components/Hub.jsx';
 import IntroScene from './components/IntroScene.jsx';
 import TabHint from './components/TabHint.jsx';
 import Tour from './components/Tour.jsx';
+import { ChronicleSection } from './components/DailiesTab.jsx';
 
 // Патч 77: тема ВСЕГДА тёмная, за клиентом ВК больше не следуем.
 //
@@ -47,6 +48,18 @@ function App() {
           </div>
           <div className="hub-banner" data-tour="banner" style={{ padding: 16 }}>Имя персонажа · Маг · Ур. 9</div>
           <TabHint tab="map" onClose={() => {}} />
+          <ChronicleSection
+            song={{ read: true, complete: true, fragments: [
+              { index: 0, seen: true, text: 'Когда-то было солнце. Так писали в старых книгах. / Теперь лишь зарево вдали - и никаких улыбок.' },
+              { index: 1, seen: false, text: '' },
+            ] }}
+            titles={[
+              { id: 'attentive', name: 'Внимательный', tier: 'legendary', unlocked: true },
+              { id: 'chronicler', name: 'Летописец', tier: 'rare', unlocked: true },
+              { id: 'relentless', name: 'Неотступный', tier: 'legendary', unlocked: false, how: '365 дней серии ежедневных заданий' },
+              { id: 'x', name: '???', tier: 'legendary', unlocked: false, secret: true },
+            ]}
+          />
           <Tabs>
             {['Обзор', 'Состав', 'Задания', 'Казна', 'Земли', 'Древо', 'Осады'].map((label, i) => (
               <TabsItem key={label} selected={i === 1}>{label}</TabsItem>

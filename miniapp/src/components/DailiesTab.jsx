@@ -45,14 +45,50 @@ function StoryTab({ story }) {
   );
 }
 
-function SongSection({ song }) {
+/** Строка летописи: нажатие раскрывает содержимое. */
+function ChronicleRow({ icon, title, note, open, onToggle, children }) {
   return (
-    <Group header={<Header>🩶 Пепельная Песнь {song.read ? '(прочитана)' : song.complete ? '(собрана)' : ''}</Header>}>
-      {song.fragments.map((f) => (
-        <Div key={f.index} style={{ opacity: f.seen ? 1 : 0.5 }}>
-          <p style={{ marginBottom: 0 }}>{f.seen ? f.text : '???'}</p>
-        </Div>
-      ))}
+    <div className="chronicle-item">
+      <button type="button" className="chronicle-row" onClick={onToggle} aria-expanded={open}>
+        <span className="chronicle-row__title">{icon} {title}</span>
+        <span className="chronicle-row__note">{note}</span>
+        <span className={open ? 'chronicle-row__arrow chronicle-row__arrow--open' : 'chronicle-row__arrow'}>›</span>
+      </button>
+      {open && <div className="chronicle-body">{children}</div>}
+    </div>
+  );
+}
+
+// Летопись: Пепельная Песнь и титулы свёрнуты и открываются по нажатию.
+// Сюда же ложатся будущие достижения - отдельной строкой каждое.
+export function ChronicleSection({ song, titles }) {
+  const [open, setOpen] = useState(null);
+  const toggle = (id) => setOpen((cur) => (cur === id ? null : id));
+  const seen = song.fragments.filter((f) => f.seen).length;
+  const songNote = song.read ? 'прочитана' : song.complete ? 'собрана' : `${seen} / ${song.fragments.length}`;
+  const openedTitles = (titles || []).filter((t) => t.unlocked).length;
+  return (
+    <Group header={<Header>📖 Летопись</Header>}>
+      <ChronicleRow icon="🩶" title="Пепельная Песнь" note={songNote} open={open === 'song'} onToggle={() => toggle('song')}>
+        {song.fragments.map((f) => (
+          <p key={f.index} className={f.seen ? 'chronicle-line' : 'chronicle-line chronicle-line--hidden'}>
+            {f.seen ? f.text : '???'}
+          </p>
+        ))}
+      </ChronicleRow>
+      <ChronicleRow
+        icon="🏷" title="Титулы" note={`${openedTitles} / ${(titles || []).length}`}
+        open={open === 'titles'} onToggle={() => toggle('titles')}
+      >
+        {(titles || []).map((t) => (
+          <div key={t.id} className={t.unlocked ? 'chronicle-title' : 'chronicle-title chronicle-title--locked'}>
+            <span className={t.unlocked ? `title-tier title-tier--${t.tier}` : ''}>«{t.name}»</span>
+            <span className="chronicle-title__how">
+              {t.unlocked ? 'открыт' : t.secret ? 'тайный - условие не раскрывается' : t.how}
+            </span>
+          </div>
+        ))}
+      </ChronicleRow>
     </Group>
   );
 }
@@ -192,7 +228,7 @@ export default function DailiesTab() {
       {section === 'story' && (
         <>
           <StoryTab story={data.story} />
-          <SongSection song={data.song} />
+          <ChronicleSection song={data.song} titles={data.titles} />
         </>
       )}
       {section === 'dailies' && <DailyQuestsTab dailies={data.dailies} />}

@@ -54,6 +54,33 @@ async def menu(db: AsyncSession, character: Character) -> list[dict]:
     ]
 
 
+#: Как получить - для летописи в мини-аппе. Тайный титул без подсказки:
+#: пока не открыт, он виден как «???».
+TITLE_HOW = {
+    "relentless": "365 дней серии ежедневных заданий",
+    "chronicler": "Собрать Пепельную Песнь целиком",
+    "season_lords": "Быть в лучшей гильдии сезона",
+}
+
+
+async def catalog(db: AsyncSession, character: Character) -> list[dict]:
+    """Все титулы для летописи: открытые - с тиром, закрытые - с условием,
+    тайные закрытые - без имени. Сначала открытые, внутри - по редкости."""
+    opened = set(await unlocked_ids(db, character.id))
+    rows = []
+    for t in TITLE_NAMES:
+        unlocked = t in opened
+        secret = t not in TITLE_HOW
+        rows.append({
+            "id": t, "tier": tier_of(t), "unlocked": unlocked,
+            "name": TITLE_NAMES[t] if unlocked or not secret else "???",
+            "how": TITLE_HOW.get(t) if not unlocked else None,
+            "secret": secret and not unlocked,
+        })
+    rows.sort(key=lambda r: (not r["unlocked"], -TIER_ORDER.index(r["tier"])))
+    return rows
+
+
 async def set_active(db: AsyncSession, character: Character, title_id: str | None) -> bool:
     """Носить титул (или None - без титула). Только из открытых."""
     if title_id is not None and (title_id not in TITLE_NAMES or not await has_unlocked(db, character.id, title_id)):
