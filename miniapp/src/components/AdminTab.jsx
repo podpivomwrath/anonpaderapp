@@ -755,6 +755,7 @@ const REWARD_TYPE_OPTIONS = [
   { value: 'trophy', label: 'Трофей' },
   { value: 'elixir', label: 'Зелье/эликсир' },
   { value: 'raid_keys', label: '🗝 Ключи Монолита' },
+  { value: 'lootbox', label: '🗃️ Пепельные ларцы' },
   { value: 'premium', label: '💠 Метка Хранителя' },
   { value: 'mount', label: '🐎 Маунт' },
 ];
@@ -764,7 +765,7 @@ function emptyReward() {
 }
 
 function rewardToPayload(r) {
-  if (r.type === 'gold' || r.type === 'gems' || r.type === 'xp' || r.type === 'raid_keys') {
+  if (r.type === 'gold' || r.type === 'gems' || r.type === 'xp' || r.type === 'raid_keys' || r.type === 'lootbox') {
     return { type: r.type, amount: parseInt(r.amount, 10) || 0 };
   }
   if (r.type === 'trophy') {
@@ -787,6 +788,7 @@ function rewardSummary(r) {
   if (r.type === 'gems') return `💎 ${r.amount ?? 0} самоцветов`;
   if (r.type === 'xp') return `✨ ${r.amount ?? 0} опыта`;
   if (r.type === 'raid_keys') return `🗝 ${r.amount ?? 0} ключей`;
+  if (r.type === 'lootbox') return `🗃️ ${r.amount ?? 0} ларцов`;
   if (r.type === 'trophy') return `Трофей ${r.trophy_id || '?'} ×${r.amount ?? 0}`;
   if (r.type === 'elixir') return `Зелье ${r.elixir_id || '?'} ×${r.amount ?? 0}`;
   if (r.type === 'premium') return `💠 Премиум на ${r.days} дн.`;
@@ -801,8 +803,8 @@ function RewardRow({ reward, onChange, onRemove }) {
       <FormItem top="Тип награды">
         <Select value={reward.type} onChange={set('type')} options={REWARD_TYPE_OPTIONS} />
       </FormItem>
-      {(reward.type === 'gold' || reward.type === 'gems' || reward.type === 'xp' || reward.type === 'raid_keys') && (
-        <FormItem top="Количество">
+      {(reward.type === 'gold' || reward.type === 'gems' || reward.type === 'xp' || reward.type === 'raid_keys' || reward.type === 'lootbox') && (
+        <FormItem top={reward.type === 'lootbox' ? 'Сколько ларцов (до 50)' : 'Количество'}>
           <Input type="number" value={reward.amount} onChange={set('amount')} />
         </FormItem>
       )}

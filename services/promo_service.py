@@ -19,11 +19,17 @@ from services import (
     elixir_service,
     experience_service,
     group_service,
+    lootbox_service,
     mount_service,
     premium_service,
     trophy_service,
     wallet_service,
 )
+
+
+#: Ларцов за одну активацию - не больше: опечатка в админке («500» вместо
+#: «5») иначе высыпала бы сотни ларцов в сумку.
+MAX_PROMO_CHESTS = 50
 
 
 def normalize_code(raw: str) -> str:
@@ -54,6 +60,10 @@ async def create_code(
         raise PromoValidationError("Такой код уже существует")
     if not rewards:
         raise PromoValidationError("Нужна хотя бы одна награда")
+    for reward in rewards:
+        if isinstance(reward, dict) and reward.get("type") == "lootbox":
+            if not 1 <= int(reward.get("amount") or 0) <= MAX_PROMO_CHESTS:
+                raise PromoValidationError(f"Ларцов - от 1 до {MAX_PROMO_CHESTS}")
     promo = PromoCode(
         code=normalized, rewards=rewards, max_activations=max_activations,
         one_per_player=one_per_player, expires_at=expires_at, created_by=admin_vk_id,
@@ -212,6 +222,16 @@ async def _apply_reward(
         if granted < amount:
             return f"Ключей Монолита выдано: {granted} из {amount} (достигнут лимит {cap}).", None
         return f"🗝 Ключ Монолита ×{granted}", None
+    if rtype == "lootbox":
+        # Закрытые Пепельные ларцы в сумку - открываются рулеткой в мини-аппе,
+        # шансы градаций по серии ежедневок игрока, как у ларца за серию.
+        amount = int(reward.get("amount", 0))
+        if amount <= 0:
+            return None, None
+        amount = min(amount, MAX_PROMO_CHESTS)
+        for _ in range(amount):
+            await lootbox_service.grant_chest(db, character, character.daily_streak)
+        return f"🗃️ {lootbox_service.CHEST_NAME} ×{amount}", None
     if rtype == "premium":
         days = int(reward.get("days", 0))
         if days <= 0:

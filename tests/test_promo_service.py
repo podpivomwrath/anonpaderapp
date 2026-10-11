@@ -9,7 +9,7 @@ import pytest
 
 from game.combat import balance_config as bc
 from game.economy import raid_key_config as rc
-from services import premium_service, promo_service
+from services import lootbox_service, premium_service, promo_service
 from services.promo_service import PromoValidationError
 
 
@@ -164,6 +164,26 @@ async def test_activate_raid_keys_over_cap_partial_grant(db_session, make_charac
     assert outcome.status == "success"
     assert character.raid_keys == rc.RAID_KEY_CAP
     assert outcome.lines == [f"Ключей Монолита выдано: 1 из 2 (достигнут лимит {rc.RAID_KEY_CAP})."]
+
+
+async def test_activate_lootbox_puts_closed_chests_in_bag(db_session, make_character) -> None:
+    await promo_service.create_code(db_session, 1, "chests", [{"type": "lootbox", "amount": 3}], None, True, None)
+    character = await make_character()
+    character.daily_streak = 9
+    outcome = await promo_service.activate_code(db_session, character, "chests")
+    assert outcome.status == "success"
+    assert outcome.lines == ["🗃️ Пепельный ларец ×3"]
+    chests = await lootbox_service.closed_chests(db_session, character.id)
+    assert len(chests) == 3
+    assert all(c.streak == 9 for c in chests)
+
+
+@pytest.mark.parametrize("amount", [0, promo_service.MAX_PROMO_CHESTS + 1])
+async def test_create_code_rejects_lootbox_amount_out_of_range(db_session, amount) -> None:
+    with pytest.raises(PromoValidationError):
+        await promo_service.create_code(
+            db_session, 1, "badchests", [{"type": "lootbox", "amount": amount}], None, True, None,
+        )
 
 
 async def test_activate_mount_already_owned(db_session, make_character) -> None:
