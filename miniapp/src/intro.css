@@ -341,66 +341,47 @@
   to { opacity: 1; transform: none; }
 }
 
-/* --- Подсказка раздела ------------------------------------------------------------ */
-
-.tab-hint {
-  display: flex;
-  align-items: flex-end;
-  gap: 12px;
-  margin: 8px 12px 4px;
-  padding: 12px 14px;
-  border: 1px solid rgba(200, 160, 120, 0.3);
-  border-radius: 12px;
-  background: linear-gradient(180deg, rgba(48, 34, 24, 0.92), rgba(30, 21, 15, 0.92));
-  color: #ece4dc;
-  animation: tour-in 0.35s ease-out both;
-}
-
-.tab-hint__list {
-  flex: 1;
-  min-width: 0;
-  margin: 0;
-  padding-left: 18px;
-  font-size: 13.5px;
-  line-height: 1.5;
-}
-
-.tab-hint__list li + li {
-  margin-top: 4px;
-}
-
-.tab-hint__ok {
-  flex: none;
-  padding: 7px 12px;
-  border: 1px solid rgba(200, 53, 42, 0.8);
-  border-radius: 10px;
-  background: #4a120e;
-  color: #fff;
-  font: inherit;
-  font-size: 13px;
-  cursor: pointer;
-}
-
-/* --- Переход между разделами ------------------------------------------------------- */
-
-.tab-enter {
-  animation: tab-enter 0.28s ease-out both;
-}
-
-@keyframes tab-enter {
-  from { opacity: 0; transform: translateY(8px); }
-  to { opacity: 1; transform: none; }
-}
+/* Сама анимация перехода - в motion.css. */
 
 .hub-tools {
   display: inline-flex;
   align-items: center;
 }
 
+/* «?» - подсказки раздела заново. На широком экране в правом углу шапки, на
+   высоте «Монолита»; на узком угол закрыт кнопками ВК - там «?» среди 🔄 🔊 📖. */
+.help-btn--corner {
+  position: absolute;
+  right: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+}
+
+.help-btn--inline { display: none; }
+
+@media (max-width: 559px) {
+  .help-btn--corner { display: none; }
+  .help-btn--inline { display: inline-flex; }
+}
+
+.help-btn__glyph {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border: 1px solid rgba(200, 160, 120, 0.55);
+  border-radius: 50%;
+  font-family: 'Cormorant SC', Forum, serif;
+  font-size: 16px;
+  font-weight: 600;
+  line-height: 1;
+  color: #f0c9a8;
+  box-shadow: 0 0 8px rgba(200, 53, 42, 0.35);
+}
+
 @media (prefers-reduced-motion: reduce) {
-  .tab-enter,
   .tour__card,
-  .tab-hint,
   .intro__bg,
   .intro__flash,
   .intro__sigil,
@@ -476,7 +457,6 @@
 
 .chronicle-body {
   padding: 0 16px 12px;
-  animation: tour-in 0.25s ease-out both;
 }
 
 .chronicle-line {

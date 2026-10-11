@@ -1,0 +1,222 @@
+/* --- Движение интерфейса (2026-10-11) -----------------------------------------------
+   Только CSS: переходы разделов, каскад карточек, шторка и всплывающие окна,
+   отклик нажатия, вспышки чисел, волна нового уровня, раскрытие по высоте.
+
+   Заполнение анимаций - backwards, а не both: после окончания у элемента не
+   остаётся transform. Иначе любой position: fixed внутри раздела (окно вещи
+   в инвентаре) считал бы раздел своей рамкой и съезжал вместе с прокруткой. */
+
+:root {
+  --ease-out: cubic-bezier(0.22, 0.8, 0.24, 1);
+  --ease-spring: cubic-bezier(0.3, 1.35, 0.5, 1);
+}
+
+/* Раздел въезжает с той стороны, где он стоит в меню. */
+.tab-enter--fwd { animation: tab-in-fwd 0.34s var(--ease-out) backwards; }
+.tab-enter--back { animation: tab-in-back 0.34s var(--ease-out) backwards; }
+
+@keyframes tab-in-fwd {
+  from { opacity: 0; transform: translateX(22px); }
+}
+
+@keyframes tab-in-back {
+  from { opacity: 0; transform: translateX(-22px); }
+}
+
+/* Каскад: блоки раздела проявляются по очереди, а не все разом. Работает и
+   на подгрузке - блок анимируется, когда появляется. */
+.hub-content .vkuiGroup__host {
+  animation: rise-in 0.42s var(--ease-out) backwards;
+}
+
+.hub-content .vkuiGroup__host:nth-of-type(2) { animation-delay: 0.05s; }
+.hub-content .vkuiGroup__host:nth-of-type(3) { animation-delay: 0.1s; }
+.hub-content .vkuiGroup__host:nth-of-type(4) { animation-delay: 0.15s; }
+.hub-content .vkuiGroup__host:nth-of-type(5) { animation-delay: 0.2s; }
+.hub-content .vkuiGroup__host:nth-of-type(n+6) { animation-delay: 0.24s; }
+
+/* Строки списков - тем же приёмом, но мельче и быстрее. */
+.hub-content .vkuiSimpleCell__host,
+.hub-content .stat-row {
+  animation: row-in 0.3s var(--ease-out) backwards;
+}
+
+.hub-content .vkuiSimpleCell__host:nth-child(2), .hub-content .stat-row:nth-child(2) { animation-delay: 0.03s; }
+.hub-content .vkuiSimpleCell__host:nth-child(3), .hub-content .stat-row:nth-child(3) { animation-delay: 0.06s; }
+.hub-content .vkuiSimpleCell__host:nth-child(4), .hub-content .stat-row:nth-child(4) { animation-delay: 0.09s; }
+.hub-content .vkuiSimpleCell__host:nth-child(5), .hub-content .stat-row:nth-child(5) { animation-delay: 0.12s; }
+.hub-content .vkuiSimpleCell__host:nth-child(6), .hub-content .stat-row:nth-child(6) { animation-delay: 0.15s; }
+.hub-content .vkuiSimpleCell__host:nth-child(7), .hub-content .stat-row:nth-child(7) { animation-delay: 0.18s; }
+.hub-content .vkuiSimpleCell__host:nth-child(n+8), .hub-content .stat-row:nth-child(n+8) { animation-delay: 0.2s; }
+
+@keyframes rise-in {
+  from { opacity: 0; transform: translateY(12px); }
+}
+
+@keyframes row-in {
+  from { opacity: 0; transform: translateY(6px); }
+}
+
+/* --- Шторка разделов ------------------------------------------------------------ */
+
+.nav-scrim {
+  animation: scrim-in 0.22s ease-out backwards;
+}
+
+.nav-layer .nav-drawer {
+  animation: drawer-in 0.28s var(--ease-out) backwards;
+}
+
+.nav-layer .nav-drawer__item {
+  animation: row-in-side 0.3s var(--ease-out) backwards;
+  animation-delay: calc(0.04s + var(--i, 0) * 0.025s);
+}
+
+.nav-layer--closing .nav-scrim {
+  animation: scrim-out 0.18s ease-in forwards;
+}
+
+.nav-layer--closing .nav-drawer {
+  animation: drawer-out 0.18s ease-in forwards;
+}
+
+@keyframes scrim-in { from { opacity: 0; } }
+@keyframes scrim-out { to { opacity: 0; } }
+@keyframes drawer-in { from { transform: translateX(-100%); } }
+@keyframes drawer-out { to { transform: translateX(-100%); } }
+
+@keyframes row-in-side {
+  from { opacity: 0; transform: translateX(-10px); }
+}
+
+/* Значок бургера сменяется поворотом, а не скачком. */
+.menu-glyph {
+  display: inline-block;
+  animation: glyph-in 0.25s var(--ease-out) backwards;
+}
+
+@keyframes glyph-in {
+  from { opacity: 0; transform: rotate(-90deg) scale(0.6); }
+}
+
+/* --- Всплывающие окна снизу (вещь, титул, рамка, количество) ---------------------- */
+
+.crown-sheet {
+  animation: sheet-up 0.32s var(--ease-out) backwards;
+}
+
+@keyframes sheet-up {
+  from { transform: translateY(100%); }
+}
+
+/* --- Отклик нажатия ---------------------------------------------------------------- */
+
+.nav-drawer__item,
+.crown-sheet__item,
+.chronicle-row,
+.hub-banner__emblem,
+.hub-banner__title,
+.vkuiButton__host {
+  transition: transform 0.14s var(--ease-out), background-color 0.2s ease;
+}
+
+.nav-drawer__item:active,
+.crown-sheet__item:active,
+.chronicle-row:active,
+.hub-banner__emblem:active,
+.hub-banner__title:active,
+.vkuiButton__host:active {
+  transform: scale(0.97);
+}
+
+/* --- Числа ------------------------------------------------------------------------- */
+
+.count-up {
+  display: inline-block;
+  font-variant-numeric: tabular-nums;
+  transition: color 0.6s ease, text-shadow 0.6s ease;
+}
+
+.count-up--up {
+  color: #8fe39a;
+  text-shadow: 0 0 10px rgba(110, 220, 120, 0.55);
+  animation: count-pop 0.45s var(--ease-spring);
+}
+
+.count-up--down {
+  color: #ff8a80;
+  text-shadow: 0 0 10px rgba(230, 70, 60, 0.55);
+}
+
+@keyframes count-pop {
+  40% { transform: scale(1.12); }
+}
+
+/* --- Новый уровень: волна света по шапке ------------------------------------------ */
+
+.hub-banner {
+  position: relative;
+  overflow: hidden;
+}
+
+.hub-banner--levelup::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(100deg, transparent 30%, rgba(255, 200, 150, 0.35) 50%, transparent 70%);
+  animation: banner-sweep 1.4s var(--ease-out) forwards;
+}
+
+.hub-banner--levelup {
+  animation: banner-glow 1.8s ease-out;
+}
+
+@keyframes banner-sweep {
+  from { transform: translateX(-100%); }
+  to { transform: translateX(100%); }
+}
+
+@keyframes banner-glow {
+  20% { box-shadow: inset 0 0 40px rgba(255, 120, 60, 0.45); }
+}
+
+/* --- Раскрытие по высоте (летопись) ------------------------------------------------ */
+
+.fold {
+  display: grid;
+  grid-template-rows: 0fr;
+  opacity: 0;
+  transition: grid-template-rows 0.32s var(--ease-out), opacity 0.25s ease;
+}
+
+.fold--open {
+  grid-template-rows: 1fr;
+  opacity: 1;
+}
+
+.fold__inner {
+  min-height: 0;
+  overflow: hidden;
+}
+
+/* --- Меньше движения: в системе включено «уменьшить движение» -------------------- */
+
+@media (prefers-reduced-motion: reduce) {
+  .tab-enter--fwd,
+  .tab-enter--back,
+  .hub-content .vkuiGroup__host,
+  .hub-content .vkuiSimpleCell__host,
+  .hub-content .stat-row,
+  .nav-scrim,
+  .nav-layer .nav-drawer,
+  .nav-layer .nav-drawer__item,
+  .menu-glyph,
+  .crown-sheet,
+  .count-up--up,
+  .hub-banner--levelup,
+  .hub-banner--levelup::after { animation: none; }
+  .fold { transition: none; }
+  .nav-layer--closing .nav-scrim,
+  .nav-layer--closing .nav-drawer { animation: none; opacity: 0; }
+}

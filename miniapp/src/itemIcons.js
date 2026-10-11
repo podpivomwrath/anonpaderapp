@@ -47,7 +47,13 @@ const ICONS = {
   'class:mage': new URL('./assets/items/class_mage.webp', import.meta.url).href,
   'class:rogue': new URL('./assets/items/class_rogue.webp', import.meta.url).href,
   'class:warrior': new URL('./assets/items/class_warrior.webp', import.meta.url).href,
+  'craft:archivist_mask:dps': new URL('./assets/items/craft_archivist_mask_dps.webp', import.meta.url).href,
+  'craft:archivist_mask:support': new URL('./assets/items/craft_archivist_mask_support.webp', import.meta.url).href,
+  'craft:archivist_mask:tank': new URL('./assets/items/craft_archivist_mask_tank.webp', import.meta.url).href,
   'craft:dps': new URL('./assets/items/craft_dps.webp', import.meta.url).href,
+  'craft:general_cuirass:dps': new URL('./assets/items/craft_general_cuirass_dps.webp', import.meta.url).href,
+  'craft:general_cuirass:support': new URL('./assets/items/craft_general_cuirass_support.webp', import.meta.url).href,
+  'craft:general_cuirass:tank': new URL('./assets/items/craft_general_cuirass_tank.webp', import.meta.url).href,
   'craft:support': new URL('./assets/items/craft_support.webp', import.meta.url).href,
   'craft:tank': new URL('./assets/items/craft_tank.webp', import.meta.url).href,
   'crown:fish_weight': new URL('./assets/items/crown_fish_weight.webp', import.meta.url).href,
@@ -131,6 +137,8 @@ const ICONS = {
   'trophy:heart_spike': new URL('./assets/items/trophy_heart_spike.webp', import.meta.url).href,
   'trophy:monolith_tear': new URL('./assets/items/trophy_monolith_tear.webp', import.meta.url).href,
   'trophy:taint_clot': new URL('./assets/items/trophy_taint_clot.webp', import.meta.url).href,
+  'unique:archivist_mask': new URL('./assets/items/unique_archivist_mask.webp', import.meta.url).href,
+  'unique:general_cuirass': new URL('./assets/items/unique_general_cuirass.webp', import.meta.url).href,
   'unique:surgeon_scalpel': new URL('./assets/items/unique_surgeon_scalpel.webp', import.meta.url).href,
 };
 

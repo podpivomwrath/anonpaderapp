@@ -3,8 +3,9 @@ import bridge from '@vkontakte/vk-bridge';
 import ClassIcon from './ClassIcon.jsx';
 import IntroScene from './IntroScene.jsx';
 import TabHint, { TAB_HINTS } from './TabHint.jsx';
-import Tour from './Tour.jsx';
-import { playTab, setSoundEnabled, unlock } from '../sound.js';
+import Tour, { HEADER_STEPS } from './Tour.jsx';
+import { playTab, preloadTab, setSoundEnabled, unlock } from '../sound.js';
+import CountUp from './CountUp.jsx';
 import CrownPicker from './CrownPicker.jsx';
 import TitlePicker from './TitlePicker.jsx';
 import {
@@ -94,22 +95,68 @@ export default function Hub() {
     saveUi(body).then((res) => res?.ui && setUi(res.ui)).catch(() => {});
   }, []);
 
+  // Шторка уезжает, а не пропадает: сначала класс закрытия, потом снятие.
+  const [menuClosing, setMenuClosing] = useState(false);
+  const closeTimer = useRef(0);
+  const closeMenu = useCallback(() => {
+    setMenuClosing(true);
+    clearTimeout(closeTimer.current);
+    closeTimer.current = setTimeout(() => {
+      setMenuOpen(false);
+      setMenuClosing(false);
+    }, 180);
+  }, []);
+  const toggleMenu = () => {
+    if (menuOpen && !menuClosing) closeMenu();
+    else {
+      clearTimeout(closeTimer.current);
+      setMenuClosing(false);
+      setMenuOpen(true);
+      preloadTab();
+    }
+  };
+
+  // «?» в шапке: подсказки активного раздела ещё раз (на «Персонаже» - и шапки).
+  const [replay, setReplay] = useState(null);
+
+  // Раздел въезжает с той стороны, где он стоит в меню: ниже по списку -
+  // справа, выше - слева. Так переход читается как движение по меню.
+  const [direction, setDirection] = useState('fwd');
   const activeRef = useRef(activeTab);
   useEffect(() => { activeRef.current = activeTab; }, [activeTab]);
   const openTab = useCallback((id) => {
-    if (activeRef.current !== id) {
-      playTab(id);
+    const prev = activeRef.current;
+    if (prev !== id) {
+      playTab();
       haptic();
+      const order = [...SECTIONS.map((s) => s.id), 'admin'];
+      setDirection(order.indexOf(id) < order.indexOf(prev) ? 'back' : 'fwd');
     }
     setActiveTab(id);
-    setMenuOpen(false);
-  }, []);
+    setReplay(null);
+    closeMenu();
+  }, [closeMenu]);
 
   useEffect(() => {
     const onBan = (event) => setBan(event.detail);
     window.addEventListener('account-banned', onBan);
     return () => window.removeEventListener('account-banned', onBan);
   }, []);
+
+  // Новый уровень - волна света по шапке. Только при росте уровня за время
+  // открытого мини-аппа: при загрузке сравнивать не с чем.
+  const [levelUp, setLevelUp] = useState(false);
+  const lastLevel = useRef(null);
+  const level = character?.level;
+  useEffect(() => {
+    if (level == null) return undefined;
+    const before = lastLevel.current;
+    lastLevel.current = level;
+    if (before == null || level <= before) return undefined;
+    setLevelUp(true);
+    const timer = setTimeout(() => setLevelUp(false), 1800);
+    return () => clearTimeout(timer);
+  }, [level]);
 
   // Фон живёт вне хаба (BackgroundScene) и должен знать, какой экран открыт.
   useEffect(() => {
@@ -179,6 +226,8 @@ export default function Hub() {
 
   const showIntro = Boolean(ui) && (ui.intro || 0) < INTRO_VERSION;
   const showTour = Boolean(ui) && !showIntro && !ui.tour;
+  const firstVisit = TAB_HINTS[activeTab] && !(ui?.hints || []).includes(activeTab);
+  const showHint = Boolean(ui) && !showIntro && !showTour && (replay === activeTab || firstVisit);
   const finishIntro = (withSound) => {
     unlock();
     setSoundEnabled(withSound);
@@ -208,8 +257,10 @@ export default function Hub() {
     <PanelHeader
       before={
         <span data-tour="menu">
-          <PanelHeaderButton aria-label="Разделы" onClick={() => setMenuOpen((open) => !open)}>
-            <span aria-hidden="true" style={{ fontSize: 20 }}>{menuOpen ? '✕' : '☰'}</span>
+          <PanelHeaderButton aria-label="Разделы" onClick={toggleMenu}>
+            <span aria-hidden="true" className="menu-glyph" key={menuOpen && !menuClosing ? 'x' : 'm'}>
+              {menuOpen && !menuClosing ? '✕' : '☰'}
+            </span>
           </PanelHeaderButton>
         </span>
       }
@@ -228,6 +279,12 @@ export default function Hub() {
         >
           <span aria-hidden="true">{soundOn ? '🔊' : '🔇'}</span>
         </PanelHeaderButton>
+        {/* На узком экране правый угол шапки закрыт кнопками ВК - «?» здесь. */}
+        <span className="help-btn help-btn--inline" data-tour="help">
+          <PanelHeaderButton aria-label="Подсказки раздела" title="Подсказки раздела" onClick={() => setReplay(activeRef.current)}>
+            <span aria-hidden="true" className="help-btn__glyph">?</span>
+          </PanelHeaderButton>
+        </span>
         <PanelHeaderButton
           aria-label="Путеводитель"
           title="Путеводитель Меченого"
@@ -238,6 +295,12 @@ export default function Hub() {
           <span aria-hidden="true">📖</span>
         </PanelHeaderButton>
         </span>
+      </span>
+      {/* «?» в правом углу на высоте «Монолита» - где угол свободен. */}
+      <span className="help-btn help-btn--corner" data-tour="help">
+        <PanelHeaderButton aria-label="Подсказки раздела" title="Подсказки раздела" onClick={() => setReplay(activeRef.current)}>
+          <span aria-hidden="true" className="help-btn__glyph">?</span>
+        </PanelHeaderButton>
       </span>
     </PanelHeader>
   );
@@ -296,13 +359,14 @@ export default function Hub() {
       {header(current.label)}
 
       {menuOpen && (
-        <>
-          <div className="nav-scrim" onClick={() => setMenuOpen(false)} aria-hidden="true" />
+        <div className={menuClosing ? 'nav-layer nav-layer--closing' : 'nav-layer'}>
+          <div className="nav-scrim" onClick={closeMenu} aria-hidden="true" />
           <nav className="nav-drawer" aria-label="Разделы">
-            {sections.map((section) => (
+            {sections.map((section, index) => (
               <button
                 type="button"
                 key={section.id}
+                style={{ '--i': index }}
                 className={
                   section.id === activeTab ? 'nav-drawer__item nav-drawer__item--active' : 'nav-drawer__item'
                 }
@@ -313,7 +377,7 @@ export default function Hub() {
               </button>
             ))}
           </nav>
-        </>
+        </div>
       )}
 
       {titleOpen && (
@@ -336,7 +400,7 @@ export default function Hub() {
       {/* Карта - на всю площадь страницы: карточка персонажа там только
           отнимала бы место у мира. */}
       {activeTab !== 'map' && (
-      <div className="hub-banner" data-tour="banner">
+      <div className={levelUp ? 'hub-banner hub-banner--levelup' : 'hub-banner'} data-tour="banner">
         {/* Эмблема пути. Стоит у имени, а не у слова «Тёмный мистик»:
             подкласс выбирают один раз и навсегда, и в шапке он часть того,
             КТО ты, а не ещё одна строка характеристик. */}
@@ -393,7 +457,8 @@ export default function Hub() {
           <p className="hub-banner__meta">
             {/* Патч 74: разряды и без подписей. Подписи занимали половину
                 строки, а «Золото»/«Самоцветы» и так читаются по значку. */}
-            💰 {money(character.farm_currency)} · 💎 {money(character.donate_currency)}
+            💰 <CountUp value={character.farm_currency} format={money} /> · 💎{' '}
+            <CountUp value={character.donate_currency} format={money} />
           </p>
         )}
         </div>
@@ -402,7 +467,7 @@ export default function Hub() {
         {character.power != null && (
           <div className="hub-banner__power" title={powerHint(character.power_parts)}>
             <span className="hub-banner__power-label">Мощь</span>
-            <span className="hub-banner__power-value">{money(character.power)}</span>
+            <span className="hub-banner__power-value"><CountUp value={character.power} format={money} /></span>
           </div>
         )}
       </div>
@@ -421,11 +486,8 @@ export default function Hub() {
         }
         key={reloadKey}
       >
-        {!showIntro && !showTour && TAB_HINTS[activeTab] && !(ui?.hints || []).includes(activeTab) && (
-          <TabHint tab={activeTab} onClose={() => hintSeen(activeTab)} />
-        )}
         {/* Раздел появляется плавно: ключ по разделу перезапускает анимацию. */}
-        <div key={activeTab} className="tab-enter">
+        <div key={activeTab} className={`tab-enter tab-enter--${direction}`}>
         {activeTab === 'character' && (
           <CharacterTab character={character} onCharacterUpdate={setCharacter} />
         )}
@@ -447,6 +509,16 @@ export default function Hub() {
 
       {showIntro && <IntroScene onDone={finishIntro} />}
       {showTour && <Tour onDone={finishTour} />}
+      {showHint && (
+        <TabHint
+          tab={activeTab}
+          before={replay === 'character' ? HEADER_STEPS : []}
+          onClose={() => {
+            setReplay(null);
+            if (!(ui?.hints || []).includes(activeTab)) hintSeen(activeTab);
+          }}
+        />
+      )}
     </Panel>
   );
 }

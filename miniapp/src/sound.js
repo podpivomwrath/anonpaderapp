@@ -1,7 +1,7 @@
 /**
  * Звук мини-аппа: только переходы между разделами и вступление (решение
- * владельца). Без файлов - синтез Web Audio: нечего грузить, нет вопроса
- * лицензий, и звук не утяжеляет первое открытие.
+ * владельца). Вступление и треск Монолита - синтез Web Audio, смена раздела -
+ * короткий файл (см. playTab).
  *
  * Браузеры (iOS особенно) не дают играть звук до первого касания: контекст
  * создаётся и «будится» в unlock(), который зовут из обработчика нажатия.
@@ -60,42 +60,44 @@ function envelope(param, t, peak, attack, release) {
   param.exponentialRampToValueAtTime(0.0001, t + attack + release);
 }
 
-// У каждого раздела свой тон шороха: переход узнаётся на слух, но звук
-// остаётся тем же «перелистыванием» - без мелодий.
-const TAB_TONE = {
-  character: 1.0, dailies: 1.12, inventory: 0.9, craft: 0.8, map: 1.25,
-  guild: 0.85, tops: 1.18, trade: 1.05, exchange: 1.3, admin: 0.7,
-};
+// Звук смены раздела - файлом из public/sfx (2026-10-11). Синтезированный
+// шорох владельцу не понравился; файл выбирают из готовых библиотек.
+// Нет файла - переход молча: ни ошибки, ни запасного звука.
+const TAB_SAMPLE = `${import.meta.env.BASE_URL}sfx/tab.mp3`;
+const TAB_VOLUME = 0.5;
 
-/** Переход в раздел: короткий шорох пергамента и глухой удар. */
-export function playTab(tabId) {
+const samples = new Map();
+
+/** Загрузить и раскодировать один раз; неудача - null навсегда. */
+function sample(c, url) {
+  if (!samples.has(url)) {
+    samples.set(url, fetch(url)
+      .then((res) => (res.ok ? res.arrayBuffer() : Promise.reject(new Error(res.status))))
+      .then((data) => new Promise((resolve, reject) => c.decodeAudioData(data, resolve, reject)))
+      .catch(() => null));
+  }
+  return samples.get(url);
+}
+
+/** Переход в раздел. */
+export function playTab() {
   const c = ready();
   if (!c) return;
-  const t = c.currentTime;
-  const tone = TAB_TONE[tabId] || 1;
+  sample(c, TAB_SAMPLE).then((buffer) => {
+    if (!buffer || !ready()) return;
+    const src = c.createBufferSource();
+    src.buffer = buffer;
+    const g = c.createGain();
+    g.gain.value = TAB_VOLUME;
+    src.connect(g).connect(master);
+    src.start();
+  });
+}
 
-  const noise = c.createBufferSource();
-  noise.buffer = noiseBuffer(c, 0.3);
-  const band = c.createBiquadFilter();
-  band.type = 'bandpass';
-  band.Q.value = 0.9;
-  band.frequency.setValueAtTime(900 * tone, t);
-  band.frequency.exponentialRampToValueAtTime(2600 * tone, t + 0.18);
-  const ng = c.createGain();
-  envelope(ng.gain, t, 0.22, 0.02, 0.22);
-  noise.connect(band).connect(ng).connect(master);
-  noise.start(t);
-  noise.stop(t + 0.3);
-
-  const thump = c.createOscillator();
-  thump.type = 'sine';
-  thump.frequency.setValueAtTime(110 * tone, t);
-  thump.frequency.exponentialRampToValueAtTime(55 * tone, t + 0.18);
-  const tg = c.createGain();
-  envelope(tg.gain, t, 0.18, 0.005, 0.2);
-  thump.connect(tg).connect(master);
-  thump.start(t);
-  thump.stop(t + 0.25);
+/** Заранее подтянуть звук раздела, чтобы первый переход не запаздывал. */
+export function preloadTab() {
+  const c = ready();
+  if (c) sample(c, TAB_SAMPLE);
 }
 
 /** Гул вступления: низкий тон и ветер. Возвращает «остановить». */

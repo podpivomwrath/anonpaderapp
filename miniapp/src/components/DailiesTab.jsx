@@ -54,7 +54,12 @@ function ChronicleRow({ icon, title, note, open, onToggle, children }) {
         <span className="chronicle-row__note">{note}</span>
         <span className={open ? 'chronicle-row__arrow chronicle-row__arrow--open' : 'chronicle-row__arrow'}>›</span>
       </button>
-      {open && <div className="chronicle-body">{children}</div>}
+      {/* Тело всегда в разметке и раскрывается по высоте - плавно в обе стороны. */}
+      <div className={open ? 'fold fold--open' : 'fold'} aria-hidden={!open}>
+        <div className="fold__inner">
+          <div className="chronicle-body">{children}</div>
+        </div>
+      </div>
     </div>
   );
 }

@@ -36,7 +36,8 @@ function App() {
     });
   }, []);
 
-  if (import.meta.env.DEV && window.location.hash === '#tour') {
+  if (import.meta.env.DEV && ['#tour', '#hints'].includes(window.location.hash)) {
+    const hints = window.location.hash === '#hints';
     // Макет шапки с теми же data-tour, что в Hub - проверить подсветку тура.
     return (
       <ConfigProvider colorScheme={COLOR_SCHEME}>
@@ -45,9 +46,15 @@ function App() {
             <span data-tour="menu" style={{ fontSize: 22 }}>☰</span>
             <span>Персонаж</span>
             <span data-tour="tools">🔄 🔊 📖</span>
+            <span data-tour="help">?</span>
           </div>
           <div className="hub-banner" data-tour="banner" style={{ padding: 16 }}>Имя персонажа · Маг · Ур. 9</div>
-          <TabHint tab="map" onClose={() => {}} />
+          <div className="hub-content"><div className="tab-enter tab-enter--fwd">
+          <Tabs>
+            {['Сюжет', 'Ежедневные', 'Вход'].map((label, i) => (
+              <TabsItem key={label} selected={i === 0}>{label}</TabsItem>
+            ))}
+          </Tabs>
           <ChronicleSection
             song={{ read: true, complete: true, fragments: [
               { index: 0, seen: true, text: 'Когда-то было солнце. Так писали в старых книгах. / Теперь лишь зарево вдали - и никаких улыбок.' },
@@ -65,7 +72,10 @@ function App() {
               <TabsItem key={label} selected={i === 1}>{label}</TabsItem>
             ))}
           </Tabs>
-          <Tour onDone={() => { window.location.hash = 'tour-done'; }} />
+          </div></div>
+          {hints
+            ? <TabHint tab="dailies" onClose={() => { window.location.hash = 'hints-done'; }} />
+            : <Tour onDone={() => { window.location.hash = 'tour-done'; }} />}
         </AppRoot>
       </ConfigProvider>
     );
