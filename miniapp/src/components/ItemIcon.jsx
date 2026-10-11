@@ -13,8 +13,20 @@ import { itemIcon } from '../itemIcons.js';
  */
 // Новой боссовой вещи картинку рисуют позже, чем выходит сам рейд - до
 // тех пор вместо пустого места знак уникальной редкости.
+//
+// Пустая рамка вместо вещи выглядела как ошибка (Панцирь Тавра, 2026-10-11),
+// поэтому сначала - базовая вещь того же вида: панцирь для Панциря Тавра и
+// его ковки, маска для Маски Архивариуса. Рамка - если и этого нет.
+const UNIQUE_STAND_IN = {
+  general_cuirass: 'base:armor:Панцирь',
+  archivist_mask: 'base:helmet:Маска',
+};
+
 function fallbackFor(icon) {
-  return icon.startsWith('unique:') || icon.startsWith('craft:') ? itemIcon('rarity:unique') : null;
+  if (!icon.startsWith('unique:') && !icon.startsWith('craft:')) return null;
+  const source = icon.split(':')[1];
+  const standIn = UNIQUE_STAND_IN[source];
+  return (standIn && itemIcon(standIn)) || itemIcon('rarity:unique');
 }
 
 export default function ItemIcon({ icon, rarity, alt = '', size = 36 }) {
