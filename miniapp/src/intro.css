@@ -407,3 +407,30 @@
   .intro__start-text { animation: none; }
   .intro__word { animation-duration: 0.01s; }
 }
+
+/* --- Вкладки внутри разделов (2026-10-11) -------------------------------------------
+   VKUI делит ряд поровну и режет подписи многоточием: на телефоне в «Топах»
+   и «Гильдии» оставалось «О…», «З…». Теперь ряд прокручивается вбок, а
+   каждая подпись видна целиком. Когда вкладки помещаются, они по-прежнему
+   растягиваются на всю ширину. */
+.vkuiTabs__in {
+  overflow-x: auto;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+}
+
+.vkuiTabs__in::-webkit-scrollbar {
+  display: none;
+}
+
+.vkuiTabsItem__modeDefault {
+  flex: 1 0 auto;
+  max-width: none;
+  padding-left: 14px;
+  padding-right: 14px;
+}
+
+.vkuiTabsItem__label {
+  overflow: visible;
+  text-overflow: clip;
+}

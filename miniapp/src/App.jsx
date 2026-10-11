@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 import bridge from '@vkontakte/vk-bridge';
-import { AppRoot, ConfigProvider, SplitLayout, SplitCol } from '@vkontakte/vkui';
+import { AppRoot, ConfigProvider, SplitLayout, SplitCol, Tabs, TabsItem } from '@vkontakte/vkui';
 import BackgroundScene from './components/BackgroundScene.jsx';
 import Hub from './components/Hub.jsx';
 import IntroScene from './components/IntroScene.jsx';
@@ -47,6 +47,11 @@ function App() {
           </div>
           <div className="hub-banner" data-tour="banner" style={{ padding: 16 }}>Имя персонажа · Маг · Ур. 9</div>
           <TabHint tab="map" onClose={() => {}} />
+          <Tabs>
+            {['Обзор', 'Состав', 'Задания', 'Казна', 'Земли', 'Древо', 'Осады'].map((label, i) => (
+              <TabsItem key={label} selected={i === 1}>{label}</TabsItem>
+            ))}
+          </Tabs>
           <Tour onDone={() => { window.location.hash = 'tour-done'; }} />
         </AppRoot>
       </ConfigProvider>

@@ -95,6 +95,11 @@ function ridePos(travel, fetchedAt) {
   };
 }
 
+// Телефон и планшет: лупы нет совсем (2026-10-11, решение владельца) - она
+// сильно грузила слабые устройства. Там только одна карта и щипок.
+const TOUCH_DEVICE = typeof window !== 'undefined'
+  && Boolean(window.matchMedia?.('(pointer: coarse)').matches);
+
 export default function MapTab() {
   const containerRef = useRef(null);
   const [size, setSize] = useState({ width: 360, height: 420 });
@@ -215,6 +220,13 @@ export default function MapTab() {
       setView(clampView({ cu: MAP_CENTER.u, cv: MAP_CENTER.v, scale: minScale }));
     }
   }, [hasState, minScale, clampView]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Окно выросло (на телефоне высота дорисовывается не сразу), а карту уже
+  // трогали - подгонка выше не сработает. Масштаб всё равно не меньше
+  // «закрыть всё окно»: иначе снизу оставалась чёрная полоса.
+  useEffect(() => {
+    if (view && view.scale < minScale) setView(clampView({ ...view, scale: minScale }));
+  }, [minScale, clampView]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const catalog = mapState?.catalog;
   const ride = mapState ? ridePos(mapState.mount_travel, mapState.fetchedAt) : null;
@@ -338,9 +350,9 @@ export default function MapTab() {
       const p = localPoint(e);
       dragRef.current = { start: view, x: p.x, y: p.y, moved: false };
       pinchRef.current = null;
-      if (isTouchRef.current) {
-        // Телефон: линза по долгому нажатию, а если она включена кнопкой -
-        // сразу. Пока держишь палец, он водит линзой, а не двигает карту.
+      if (isTouchRef.current && !TOUCH_DEVICE) {
+        // Сенсорный экран на ПК: линза по долгому нажатию, а если она
+        // включена кнопкой - сразу. На телефоне линзы нет (TOUCH_DEVICE).
         clearLongPress();
         const start = () => { setDetailUsed(true); setTouchLens(true); setLensPoint(p); };
         if (lens.on) start();
@@ -754,12 +766,14 @@ export default function MapTab() {
         )}
 
         <div className="map-controls">
-          <IconButton
-            className={`map-controls__btn${lens.on ? ' map-controls__btn--on' : ''}`}
-            onClick={toggleLens} aria-label="Линза" title="Линза: колесо мыши - увеличение ×2…×4"
-          >
-            🔍
-          </IconButton>
+          {!TOUCH_DEVICE && (
+            <IconButton
+              className={`map-controls__btn${lens.on ? ' map-controls__btn--on' : ''}`}
+              onClick={toggleLens} aria-label="Линза" title="Линза: колесо мыши - увеличение ×2…×4"
+            >
+              🔍
+            </IconButton>
+          )}
           <IconButton className="map-controls__btn" onClick={recenterOnPlayer} aria-label="К себе">◎</IconButton>
         </div>
 
