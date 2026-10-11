@@ -292,6 +292,21 @@ async def check_zone_trigger(db: AsyncSession, character: Character) -> StoryQue
     return quest
 
 
+async def namesake_hint(db: AsyncSession, character: Character, mob_name: str) -> str | None:
+    """Побеждён обычный моб с именем сюжетного врага активного шага - строка,
+    где настоящий. Иначе None. У 17 сюжетных врагов есть тёзки в бестиарии,
+    и игроки ждали зачёта за обычного (2026-10-11)."""
+    quest = await current_quest_def(db, character)
+    if quest is None or quest.named_enemy is None or quest.target_x is None or quest.target_y is None:
+        return None
+    if quest.named_enemy.name.lower() != (mob_name or "").lower():
+        return None
+    return (
+        f"📜 Это обычный {quest.named_enemy.name}. Тот, что нужен по заданию, - у "
+        f"({quest.target_x}; {quest.target_y}): исследуй местность там."
+    )
+
+
 async def mark_ready(db: AsyncSession, character: Character, quest_id: str) -> None:
     """Вызывать после победы в сюжетном бою (последнем в цепочке, если их
     несколько) — цель достигнута, ждём разговора с наставником."""

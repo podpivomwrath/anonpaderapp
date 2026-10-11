@@ -360,10 +360,16 @@ def _story_enemy(quest, character, participant_id: int):
     target_y = quest.target_y if quest.target_y is not None else character.pos_y
     level = grid.mob_level_at(target_x, target_y, character.level)
     image = quest.named_enemy.image or encounters.base_mob_image(quest.named_enemy.base_mob_id)
-    return encounters.spawn_named_enemy(
+    encounter = encounters.spawn_named_enemy(
         participant_id, quest.named_enemy.name, quest.named_enemy.flavor,
         level, mult, image=image, base_mob_id=quest.named_enemy.base_mob_id,
     )
+    # У большинства сюжетных врагов есть обычный моб с тем же именем
+    # (Стеклодув, Головня, Корневая матерь...): игроки били тёзку и ждали
+    # зачёта. Сюжетный - с пометкой и в бою, и в описании (2026-10-11).
+    encounter.combatant.name = f"📜 {quest.named_enemy.name}"
+    encounter.flavor = f"📜 Цель задания «{quest.title}».\n\n{encounter.flavor}"
+    return encounter
 
 
 async def story_fight_quest(db, character):

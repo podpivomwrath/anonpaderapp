@@ -80,6 +80,9 @@ _encounter_class: dict[int, str] = {}
 _last_player_hp: dict[int, int] = {}
 # peer_id -> уровень моба текущей встречи (для опыта за килл)
 _encounter_mob_level: dict[int, int] = {}
+# peer_id -> имя моба текущей встречи: победа над тёзкой сюжетного врага
+# получает подсказку, где настоящий (2026-10-11)
+_encounter_mob_name: dict[int, str] = {}
 # peer_id -> id предмета, ожидающего решения Надеть/В инвентарь (патч 11, блок 2)
 _pending_item_choice: dict[int, int] = {}
 # peer_id -> сводка текущего боя для трекера классовых испытаний (патч 12)
@@ -230,6 +233,7 @@ async def start_encounter(
     state.add(encounter.combatant)
     _encounter_class[peer_id] = character.base_class
     _encounter_mob_level[peer_id] = encounter.combatant.level
+    _encounter_mob_name[peer_id] = encounter.combatant.name
     _last_player_hp[peer_id] = player.current_hp
     _battle_trackers[peer_id] = BattleTracker(
         PLAYER_ID, MOB_ID, encounter.combatant.level, player.max_hp, player.current_hp
@@ -373,6 +377,7 @@ async def on_battle_finished(session_id: int, result: TickResult) -> None:
         return
     _encounter_class.pop(peer_id, None)
     mob_level = _encounter_mob_level.pop(peer_id, 1)
+    mob_name = _encounter_mob_name.pop(peer_id, None)
     final_hp = _last_player_hp.pop(peer_id, None)
     tracker = _battle_trackers.pop(peer_id, None)
     story_state = _story_encounter.pop(peer_id, None)  # (quest_id, остаток цепочки), патч 18
@@ -421,6 +426,10 @@ async def on_battle_finished(session_id: int, result: TickResult) -> None:
                 # последний бой цепочки (или обычный одиночный сюжетный бой) —
                 # цель достигнута, ждём разговора с наставником
                 await story_service.mark_ready(db, character, story_state[0])
+            if story_state is None and mob_name:
+                namesake = await story_service.namesake_hint(db, character, mob_name)
+                if namesake:
+                    event_lines.append(namesake)
             if event_bonus:
                 bonus = await scene_event_service.apply_result(
                     db, character, stats, SceneResult(reward=event_bonus), _rng,
@@ -825,6 +834,7 @@ async def _release_encounter(peer_id: int) -> str | None:
     _story_encounter.pop(peer_id, None)
     _event_bonus.pop(peer_id, None)
     _encounter_mob_level.pop(peer_id, None)
+    _encounter_mob_name.pop(peer_id, None)
     travel_id = _mount_ambush.pop(peer_id, None)
     if travel_id is None:
         return None

@@ -51,6 +51,16 @@ async def test_story_enemy_waits_for_explore_combat(db_session, character_at) ->
 
     mobs, quest_id = await world.group_story_mobs(db_session, [far, near], random.Random(1))
     assert quest_id == "ridge_1_2"
-    assert mobs[0].combatant.name == quest.named_enemy.name  # первым - сюжетный враг
+    assert mobs[0].combatant.name == f"📜 {quest.named_enemy.name}"  # первым - сюжетный враг, с пометкой
     assert len(mobs) == 2 and mobs[1].combatant.id != mobs[0].combatant.id
     assert await world.group_story_mobs(db_session, [far], random.Random(1)) is None
+
+
+async def test_namesake_hint_points_to_real_target(db_session, make_character) -> None:
+    """Обычный моб с именем сюжетного врага - подсказка, где настоящий."""
+    character = await make_character(region="scorched", level=20)
+    await _progress(db_session, character, "scorched_2_2")  # Стеклодув у (-2; -17)
+    hint = await story_service.namesake_hint(db_session, character, "Стеклодув")
+    assert hint is not None and "(-2; -17)" in hint
+    assert await story_service.namesake_hint(db_session, character, "Головня") is None
+    assert await story_service.namesake_hint(db_session, character, "📜 Стеклодув") is None

@@ -63,6 +63,7 @@ from services import (
     vitals_service,
 )
 from services import onboarding_service as onboarding_svc
+from services import story_service
 from services.db import get_session_factory
 
 labeler = BotLabeler()
@@ -678,6 +679,10 @@ async def on_group_tick_resolved(session_id: int, tick: int, result: TickResult)
                         for c in daily_progress.completed:
                             await stats_window.notify_levelup(p.peer_id, c.levels_gained, c.new_level)
                             await group_texts.notify_group_kick(_bot_api, c.group_kick)
+                    if character is not None and mob_id != battle.story_mob_id:
+                        namesake = await story_service.namesake_hint(db, character, mob_name)
+                        if namesake:
+                            lines.append(namesake)
                     notices[r.character_id] = "\n".join(lines)
                     if r.levels_gained > 0:
                         await stats_window.notify_levelup(p.peer_id, r.levels_gained, r.new_level)
