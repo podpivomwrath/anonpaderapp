@@ -151,7 +151,7 @@ export default function ChestRoulette({ strip, winIndex, result, onClose }) {
               />
             ))}
             <div className="chest-stage__chest">
-              <ItemIcon icon={`chest:${grade}`} alt="" size={104} />
+              <ItemIcon icon={`chest:${grade}`} alt="Пепельный ларец" size={104} />
             </div>
           </div>
         )}
