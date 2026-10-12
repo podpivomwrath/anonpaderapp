@@ -35,6 +35,7 @@ from services.db import get_session_factory
 # а не сервиса, т.к. нужен show_location для полного контекста (город/клетка/в
 # пути/мёртв). Однонаправленно: world.py onboarding.py не импортирует.
 from bot.handlers import world as world_handlers
+from bot import text_match
 
 labeler = BotLabeler()
 labeler.vbml_ignore_case = True  # команды без учёта регистра: «Пригласить» = «пригласить»
@@ -156,7 +157,9 @@ async def nickname_input(message: Message) -> None:
 
 @labeler.message(state=CreationState.CLASS_SELECT, text=list(texts.CLASS_BUTTONS))
 async def class_view(message: Message) -> None:
-    class_id = texts.CLASS_BUTTONS[message.text]
+    class_id = text_match.lookup(texts.CLASS_BUTTONS, message.text)
+    if class_id is None:
+        return
     async with get_session_factory()() as db:
         character = await svc.get_character(db, message.from_id)
         await svc.set_state(db, character, svc.STATE_CLASS_CONFIRM)
@@ -230,7 +233,9 @@ async def _back_to_class_select(message: Message) -> None:
 
 @labeler.message(state=CreationState.REGION_SELECT, text=list(texts.REGION_BUTTONS))
 async def region_view(message: Message) -> None:
-    region_id = texts.REGION_BUTTONS[message.text]
+    region_id = text_match.lookup(texts.REGION_BUTTONS, message.text)
+    if region_id is None:
+        return
     async with get_session_factory()() as db:
         character = await svc.get_character(db, message.from_id)
         await svc.set_state(db, character, svc.STATE_REGION_CONFIRM)

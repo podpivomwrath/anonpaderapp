@@ -2,7 +2,8 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import bridge from '@vkontakte/vk-bridge';
 import ClassIcon from './ClassIcon.jsx';
 import IntroScene from './IntroScene.jsx';
-import TabHint, { TAB_HINTS } from './TabHint.jsx';
+import TabHint from './TabHint.jsx';
+import { TAB_HINTS } from './tabHints.js';
 import Tour from './Tour.jsx';
 import Spotlight from './Spotlight.jsx';
 import { guideSteps } from './guide.js';
@@ -24,7 +25,6 @@ import TradeTab from './TradeTab.jsx';
 import GuildTab from './GuildTab.jsx';
 import InventoryTab from './InventoryTab.jsx';
 import MapTab from './MapTab.jsx';
-import StubTab from './StubTab.jsx';
 import TopsTab from './TopsTab.jsx';
 
 // Патч 14, ч.1: было 5 вкладок (Характеристики/Инвентарь/Пресеты/Испытания/

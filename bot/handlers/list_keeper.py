@@ -38,6 +38,7 @@ from bot.keyboards.world import BTN_KEEPER, tavern_keyboard
 from bot.vk_media import photo_attachment
 from bot.onboarding_texts import CLASS_BUTTONS
 from bot.world_texts import FOREIGN_NPC_REJECTION, mentor_name
+from bot import text_match
 from game.classes.base import REGISTRY
 from game.combat import balance_config as bc
 from game.combat import display
@@ -245,7 +246,9 @@ async def offer_fallback(message: Message) -> None:
 @labeler.message(state=SubclassSelectState.PATH_SELECT, text=list(ALL_SUBCLASS_TITLES))
 async def path_view(message: Message) -> None:
     peer_id = message.peer_id
-    subclass_id = ALL_SUBCLASS_TITLES[message.text]
+    subclass_id = text_match.lookup(ALL_SUBCLASS_TITLES, message.text)
+    if subclass_id is None:
+        return
     async with get_session_factory()() as db:
         character = await onboarding_svc.get_character(db, message.from_id)
         if character is None or character.subclass is not None:
@@ -408,7 +411,10 @@ async def remake_pick_class(message: Message) -> None:
 
 @labeler.message(state=SubclassSelectState.REMAKE_CLASS, text=list(CLASS_BUTTONS))
 async def remake_apply_class(message: Message) -> None:
-    new_class = CLASS_BUTTONS[message.text]
+    picked = text_match.canonical(CLASS_BUTTONS, message.text)
+    if picked is None:
+        return
+    new_class = CLASS_BUTTONS[picked]
     async with get_session_factory()() as db:
         character = await onboarding_svc.get_character(db, message.from_id)
         if character is None or character.creation_state is not None:
@@ -419,7 +425,7 @@ async def remake_apply_class(message: Message) -> None:
         await db.commit()
     await _dispenser.delete(message.peer_id)
     await message.answer(
-        f"- Переписано. - Перо идёт по странице. - Теперь ты {message.text}.\n\n"
+        f"- Переписано. - Перо идёт по странице. - Теперь ты {picked}.\n\n"
         "Подкласс и пресеты стёрты, характеристики ждут распределения.",
         keyboard=tavern_keyboard(character), attachment=KEEPER_ATTACHMENT,
     )
@@ -429,11 +435,14 @@ async def remake_apply_class(message: Message) -> None:
     state=SubclassSelectState.REMAKE_MENU, text=[BTN_REMAKE_SUBCLASS, BTN_REMAKE_STATS]
 )
 async def remake_confirm_ask(message: Message) -> None:
+    action = text_match.canonical([BTN_REMAKE_SUBCLASS, BTN_REMAKE_STATS], message.text)
+    if action is None:
+        return
     await _dispenser.set(
-        message.peer_id, SubclassSelectState.REMAKE_CONFIRM, pending_action=message.text
+        message.peer_id, SubclassSelectState.REMAKE_CONFIRM, pending_action=action
     )
     await message.answer(
-        f"{_REMAKE_WARNINGS[message.text]}\n\nПереписываем?",
+        f"{_REMAKE_WARNINGS[action]}\n\nПереписываем?",
         keyboard=remake_confirm_keyboard(),
     )
 

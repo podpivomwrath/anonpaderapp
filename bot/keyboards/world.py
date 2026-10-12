@@ -13,6 +13,7 @@ from bot import ash_handful_state
 from bot.keyboards import combat_modes
 from bot.keyboards.layout import add_paired
 from bot.onboarding_texts import REGION_TITLES
+from bot import text_match
 from config import get_settings
 from game.combat import balance_config as bc
 from game.combat.base_skills import skills_for_character
@@ -197,7 +198,7 @@ def resolve_direction(x: int, y: int, text: str) -> tuple[int, int] | None:
     ушёл). Направление за границей карты теперь резолвится как обычно —
     легальность самого хода проверяет вызывающий (grid.in_bounds)."""
     for arrow, (dx, dy) in _DIRECTION_DELTAS.items():
-        if _direction_label(x, y, dx, dy, arrow) == text:
+        if text_match.same(_direction_label(x, y, dx, dy, arrow), text):
             return dx, dy
     return None
 

@@ -19,6 +19,7 @@ from vkbottle.dispatch.rules.base import FuncRule
 from bot.activity import activity_action
 from bot.battle_keyboard import in_any_battle
 from bot.keyboards import world as kb
+from bot import text_match
 from game.economy import voyage_config as vc
 from models import User
 from services import onboarding_service as onboarding_svc
@@ -104,7 +105,7 @@ async def open_menu(message: Message) -> None:
         character = await onboarding_svc.get_character(db, message.from_id)
         if character is None or character.creation_state is not None:
             return
-        if kb.VOYAGE_BUTTONS.get(character.region) != message.text:
+        if not text_match.same(kb.VOYAGE_BUTTONS.get(character.region), message.text):
             await message.answer("Этот путь начинается не отсюда.")
             return
         voyage = await voyage_service.get(db, character.id)

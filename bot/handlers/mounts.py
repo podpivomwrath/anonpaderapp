@@ -374,8 +374,6 @@ async def stop_and_notify(peer_id: int, travel_id: int | None = None) -> str | N
     """Остановиться там, где стоишь: одна точка для кнопки в чате, «Остаться
     здесь» после боя и кнопки на карте мини-аппа. None - остановились,
     иначе текст отказа."""
-    from models import MountTravel
-
     after_ambush = travel_id is not None and _pending_continue.get(peer_id) == travel_id
     if in_any_battle(peer_id) or pvp_handlers.has_active_battle(peer_id):
         return "Сначала разберись с боем."

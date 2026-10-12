@@ -1673,6 +1673,10 @@ async def force_unstick(db, character, peer_id: int, *, admin_override: bool = F
     # даже если PvP не даёт прервать сам бой, застрявший вложенный экран
     # (скупщик/лавка/инвентарь) сбрасывается.
     await screen_service.set_screen(db, character, None)
+    # Ниже interrupt_for_pvp и маунт пишут строку персонажа СВОИМИ сессиями.
+    # Пока эта держит её изменённой (экран, время активности), они ждали её
+    # до таймаута базы - и /застрял сам застревал (2026-10-11, дважды).
+    await db.commit()
     if (raid_combat_handlers.has_active_battle(peer_id)
             or group_combat_handlers.has_active_group_battle(peer_id)):
         return True  # restore the battle UI; never escape a raid via /stuck

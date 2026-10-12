@@ -20,6 +20,7 @@ from bot.activity import activity_action, blocked_reason
 from bot.battle_keyboard import in_any_battle
 
 from bot.keyboards.world import BTN_LOOK_AROUND, add_miniapp_button
+from bot import text_match
 from models import Character
 from services import death_service, group_service, rift_service
 from services import onboarding_service as onboarding_svc
@@ -50,7 +51,7 @@ def _passes_through(message: Message) -> bool:
     if in_any_battle(message.peer_id) or message.peer_id in pvp._pending_join_prompt:
         return True
     text = (message.text or "").strip().lower()
-    if text.startswith(("/напасть", "/attack")) or message.text == BTN_LOOK_AROUND:
+    if text.startswith(("/напасть", "/attack")) or text_match.same(message.text, BTN_LOOK_AROUND):
         return True
     payload = message.get_payload_json() or {}
     return isinstance(payload, dict) and str(payload.get("type", "")).startswith("pvp")
@@ -135,7 +136,6 @@ async def maybe_send_here_button(peer_id: int, character) -> None:
 @labeler.message(payload_contains={"type": "rift_enter"})
 @activity_action
 async def enter(message: Message) -> None:
-    peer_id = message.peer_id
     rift_id = (message.get_payload_json() or {}).get("rift")
     if not isinstance(rift_id, int):
         return

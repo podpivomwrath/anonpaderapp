@@ -5,7 +5,7 @@ import Spotlight from './Spotlight.jsx';
  * подсказки разделов (TabHint) - при первом заходе и по «?».
  */
 
-export const HEADER_STEPS = [
+const HEADER_STEPS = [
   {
     target: 'banner',
     title: 'Это ты',
