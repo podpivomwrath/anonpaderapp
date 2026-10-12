@@ -112,7 +112,10 @@ export default function CraftTab() {
     );
   }
 
-  const item = data.items.find((i) => i.id === itemId) || data.items[0];
+  // Улучшать можно только выкованное: вещь прямо с босса сначала куют
+  // под роль во вкладке «Крафт», и только потом она попадает сюда.
+  const items = subtab === 'upgrade' ? data.items.filter((i) => i.spec) : data.items;
+  const item = items.find((i) => i.id === itemId) || items[0];
   // В ковку идёт только руда, которая реально поднимет процент: остальная
   // упёрлась бы в тот же потолок и сгорела впустую.
   const craftGroups = byOreType(data.ore.filter((o) => o.craft_efficiency !== null));
@@ -142,8 +145,15 @@ export default function CraftTab() {
         ))}
       </Tabs>
 
+      {!item && (
+        <Placeholder icon={<div style={{ fontSize: 44 }}>🔨</div>}>
+          Улучшать пока нечего. Сначала выкуй вещь во вкладке «Крафт» - инструменты можно готовить уже сейчас.
+        </Placeholder>
+      )}
+
+      {item && (
       <Group header={<Header>Предмет</Header>}>
-        {data.items.map((row) => (
+        {items.map((row) => (
           <SimpleCell
             key={row.id}
             before={<ItemIcon icon={row.icon} rarity={row.rarity} alt={row.name} />}
@@ -155,6 +165,7 @@ export default function CraftTab() {
           </SimpleCell>
         ))}
       </Group>
+      )}
 
       {notice && (
         <Div className={notice.ok ? 'craft-notice craft-notice--ok' : 'craft-notice craft-notice--bad'}>
@@ -248,6 +259,7 @@ export default function CraftTab() {
         </>
       ) : (
         <>
+          {item && (
           <Group header={<Header>Эффективность</Header>}>
             {item.efficiency === null ? (
               <Div>Сначала выкуй предмет - улучшать пока нечего.</Div>
@@ -264,6 +276,7 @@ export default function CraftTab() {
               </SimpleCell>
             )}
           </Group>
+          )}
 
           <Group header={<Header>Инструменты</Header>}>
             {data.tools.length === 0 && <Div>Инструментов нет - выкуй ниже.</Div>}
@@ -275,7 +288,7 @@ export default function CraftTab() {
                   <Button
                     size="s"
                     disabled={
-                      busy || item.efficiency === null || !item.next_efficiency
+                      busy || !item || item.efficiency === null || !item.next_efficiency
                       || tool.ceiling < item.next_efficiency
                     }
                     onClick={() => run(() => upgradeCraft(item.id, tool.ceiling))}
