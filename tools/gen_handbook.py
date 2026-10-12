@@ -137,8 +137,9 @@ def skill_mechanics() -> dict[str, str]:
             f"Бьёт ещё двух противников на {pct(_s('elementalist_lightning').effect_value)} "
             "от основного урона.",
         "elementalist_convergence":
-            f"Если на цели горит Горение этого элементалиста - урон больше на "
-            f"{pct(_s('elementalist_convergence').effect_value)}. По цели под контролем "
+            f"Если на цели горит Горение (своё или союзника) - урон больше на "
+            f"{pct(_s('elementalist_convergence').effect_value)}, один раз: несколько огней "
+            f"не суммируются. По цели под контролем "
             f"или вышедшей из-под него в последний ход - ГАРАНТИРОВАННЫЙ КРИТ. Считается "
             "любой контроль, в том числе наложенный союзником.",
         "dark_mystic_blood_pact":

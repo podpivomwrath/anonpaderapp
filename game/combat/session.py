@@ -91,6 +91,12 @@ class Stats:
         }[key]
 
 
+#: Метка Горения на DOT-эффекте. Горение, яд и DoT'ы мобов - один и тот же
+#: EffectKind.DOT, отличаются только источником; Схождению стихий нужно именно
+#: Горение (от любого игрока), а не любой периодический урон.
+BURN_TAG = "burn"
+
+
 @dataclass
 class Effect:
     kind: EffectKind
@@ -98,6 +104,7 @@ class Effect:
     remaining_ticks: int
     source_id: int
     stacks: int = 1
+    tag: str | None = None
 
 
 @dataclass
@@ -233,17 +240,28 @@ class CombatantState:
     def effect_from(self, kind: EffectKind, source_id: int) -> Effect | None:
         return next((e for e in self.effects if e.kind == kind and e.source_id == source_id), None)
 
+    def has_burning(self) -> bool:
+        """Горит ли цель (Горение от любого источника)."""
+        # getattr: соло-бои переживают перезапуск pickle-снимком, и эффект из
+        # снимка, сделанного кодом до появления tag, этого поля не имеет.
+        return any(e.kind == EffectKind.DOT and getattr(e, "tag", None) == BURN_TAG for e in self.effects)
+
     def apply_effect(
-        self, kind: EffectKind, value: float, duration: int, source_id: int
+        self, kind: EffectKind, value: float, duration: int, source_id: int, tag: str | None = None
     ) -> None:
         """Наложить временный эффект. Non-stacking: повторное применение того же
-        вида от того же источника ОБНОВЛЯЕТ значение и длительность, не суммирует."""
+        вида от того же источника ОБНОВЛЯЕТ значение и длительность, не суммирует.
+        tag - метка вида эффекта (см. BURN_TAG)."""
         for effect in self.effects:
             if effect.kind == kind and effect.source_id == source_id:
                 effect.value = value
                 effect.remaining_ticks = max(effect.remaining_ticks, duration)
+                if tag is not None:
+                    effect.tag = tag
                 return
-        self.effects.append(Effect(kind=kind, value=value, remaining_ticks=duration, source_id=source_id))
+        self.effects.append(
+            Effect(kind=kind, value=value, remaining_ticks=duration, source_id=source_id, tag=tag)
+        )
 
     def is_on_cooldown(self, skill_id: str) -> bool:
         return self.cooldowns.get(skill_id, 0) > 0

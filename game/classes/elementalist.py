@@ -1,14 +1,15 @@
 """Элементалист — Маг, ДД (стихийный урон), дотягивается до Саппорта (контроль).
 
-Кит патча 39, ч.3: Огненная плеть вешает Горение (EffectKind.DOT, магнитуда —
-доля от урона самого удара), Ледяные оковы — дженерик оглушение (effect="stun"
-в JSON, регистрируется в subclass_skills.py), Цепь молний бьёт по трём целям
-разом, Схождение стихий усиливается Горением и критует гарантированно по
+Кит патча 39, ч.3: Огненная плеть вешает Горение (EffectKind.DOT с меткой
+BURN_TAG, магнитуда — доля от урона самого удара), Ледяные оковы — дженерик
+оглушение (effect="stun" в JSON, регистрируется в subclass_skills.py), Цепь
+молний бьёт по трём целям разом, Схождение стихий усиливается Горением (от
+любого игрока, один раз) и критует гарантированно по
 замороженной цели (упрощение: проверяем ТЕКУЩИЙ FREEZE, а не историю за
 последние 2 хода — движок не хранит историю контроля дольше текущего эффекта)."""
 
 from game.classes.base import Role, SubclassDef, register
-from game.combat.session import EffectKind
+from game.combat.session import BURN_TAG, EffectKind
 from game.combat.skills import (
     SkillContext,
     compute_hit,
@@ -56,7 +57,7 @@ def fire_whip(ctx: SkillContext) -> None:
     if hit.missed or hit.amount <= 0:
         return
     burn_value = max(hit.amount * skill.effect_value, 1.0)
-    target.apply_effect(EffectKind.DOT, burn_value, skill.effect_duration, actor.id)
+    target.apply_effect(EffectKind.DOT, burn_value, skill.effect_duration, actor.id, tag=BURN_TAG)
     ctx.lines.append(f"{target.name} охвачен пламенем 🔥")
 
     # Патч 49, ч.2: «Огненный дождь» — Горение распространяется на других
@@ -65,7 +66,9 @@ def fire_whip(ctx: SkillContext) -> None:
     if spread_pct > 0:
         others = [e for e in ctx.session.alive_enemies_of(actor) if e.id != target.id]
         for other in others:
-            other.apply_effect(EffectKind.DOT, burn_value * spread_pct, skill.effect_duration, actor.id)
+            other.apply_effect(
+                EffectKind.DOT, burn_value * spread_pct, skill.effect_duration, actor.id, tag=BURN_TAG,
+            )
             ctx.lines.append(f"{other.name} охвачен перекинувшимся пламенем 🔥")
 
 
@@ -94,8 +97,9 @@ def chain_lightning(ctx: SkillContext) -> None:
 
 @offensive_skill("elementalist_convergence")
 def convergence(ctx: SkillContext) -> None:
-    """Схождение стихий: 210% урона. Есть Горение от этого элементалиста —
-    +60% урона; цель заморожена — гарантированный крит."""
+    """Схождение стихий: 210% урона. Цель горит (Горение от ЛЮБОГО игрока,
+    своё или союзника) — +60% урона, один раз: несколько огней не суммируются;
+    цель заморожена — гарантированный крит."""
     skill = SUBCLASS_SKILL_DEFS["elementalist_convergence"]
     actor = ctx.actor
     set_cooldown(actor, skill.id, skill.cd, ctx.rng)
@@ -103,7 +107,7 @@ def convergence(ctx: SkillContext) -> None:
     if target is None:
         return
     multiplier = skill.multiplier * element_damage_multiplier(actor, None)
-    if target.effect_from(EffectKind.DOT, actor.id) is not None:
+    if target.has_burning():
         multiplier *= 1.0 + skill.effect_value
     # По холоду бьём гарантированным критом: цель либо ещё стоит, либо только
     # что оттуда вышла (EffectKind.CHILLED - окно после любого контроля, хоть

@@ -187,26 +187,61 @@ def test_chain_lightning_hits_three_targets() -> None:
     assert e3.current_hp < e3.max_hp
 
 
-def test_convergence_bonus_with_burning_target() -> None:
-    rng = NoCritRng()
+def _convergence_damage(*effects) -> int:
+    """Урон одного Схождения по свежей цели с заданными эффектами."""
+    from game.combat.session import Effect
+
     ele = combatant(1, side=0, subclass_id="elementalist")
-    burning_enemy = combatant(2, side=1, vitality=500)
-    burning_enemy.effects.append(
-        __import__("game.combat.session", fromlist=["Effect"]).Effect(
-            kind=EffectKind.DOT, value=1, remaining_ticks=3, source_id=1
-        )
+    enemy = combatant(2, side=1, vitality=500)
+    # Источники эффектов - настоящие союзники в сессии (резолвер ищет источник DoT).
+    allies = [combatant(sid, side=0, subclass_id="elementalist") for sid in (98, 99)]
+    for kind, source_id, tag in effects:
+        enemy.effects.append(Effect(kind=kind, value=1, remaining_ticks=3, source_id=source_id, tag=tag))
+    state = make_session(ele, enemy, *allies)
+    result = resolve_tick(state, {1: skill("elementalist_convergence", 2)}, NoCritRng())
+    # Только сам удар Схождения: тики горения/яда в этот ход не в счёт.
+    return sum(h.amount for h in result.hit_renders if not h.is_tick and h.source_id == 1)
+
+
+def test_convergence_bonus_with_burning_target() -> None:
+    """Своё Горение усиливает Схождение (как и раньше)."""
+    from game.combat.session import BURN_TAG
+
+    assert _convergence_damage((EffectKind.DOT, 1, BURN_TAG)) > _convergence_damage()
+
+
+def test_convergence_bonus_from_allys_burning() -> None:
+    """Горение ЛЮБОГО игрока усиливает Схождение, не только своё (репорт Степы)."""
+    from game.combat.session import BURN_TAG
+
+    ally_burn = _convergence_damage((EffectKind.DOT, 99, BURN_TAG))
+    own_burn = _convergence_damage((EffectKind.DOT, 1, BURN_TAG))
+    assert ally_burn > _convergence_damage()
+    assert ally_burn == own_burn
+
+
+def test_convergence_bonus_does_not_stack_with_several_burns() -> None:
+    """Несколько огней - один бонус: достаточно, чтобы один игрок поджёг."""
+    from game.combat.session import BURN_TAG
+
+    one = _convergence_damage((EffectKind.DOT, 1, BURN_TAG))
+    several = _convergence_damage(
+        (EffectKind.DOT, 1, BURN_TAG), (EffectKind.DOT, 98, BURN_TAG), (EffectKind.DOT, 99, BURN_TAG),
     )
-    state1 = make_session(ele, burning_enemy)
-    resolve_tick(state1, {1: skill("elementalist_convergence", 2)}, rng)
-    burn_damage = burning_enemy.max_hp - burning_enemy.current_hp
+    assert several == one
 
-    ele2 = combatant(3, side=0, subclass_id="elementalist")
-    plain_enemy = combatant(4, side=1, vitality=500)
-    state2 = make_session(ele2, plain_enemy)
-    resolve_tick(state2, {3: skill("elementalist_convergence", 4)}, rng)
-    plain_damage = plain_enemy.max_hp - plain_enemy.current_hp
 
-    assert burn_damage > plain_damage
+def test_convergence_ignores_poison_and_other_dots() -> None:
+    """Яд и прочие DoT'ы - не Горение: бонуса нет."""
+    assert _convergence_damage((EffectKind.DOT, 99, None)) == _convergence_damage()
+
+
+def test_fire_whip_marks_its_dot_as_burning() -> None:
+    ele = combatant(1, side=0, subclass_id="elementalist")
+    enemy = combatant(2, side=1, vitality=500)
+    state = make_session(ele, enemy)
+    resolve_tick(state, {1: skill("elementalist_fire", 2)}, NoCritRng())
+    assert enemy.has_burning()
 
 
 # --- Тёмный мистик: Оберег / Иссушение / Круг тьмы ---
