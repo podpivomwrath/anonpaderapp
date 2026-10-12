@@ -248,7 +248,14 @@ function OverviewSection() {
   );
 }
 
-function ActionForm({ playerId, onDone }) {
+// Тексты отказов обнуления персонажа (bot/miniapp_admin_api.py, reset_character).
+const RESET_ERRORS = {
+  name_mismatch: 'Ник не совпал - персонаж не тронут.',
+  in_battle: 'Игрок сейчас в бою (PvE/PvP/рейд/группа). Дождитесь конца боя.',
+  guild_leader: 'Игрок - глава гильдии. Сначала передайте главу другому или распустите гильдию.',
+};
+
+function ActionForm({ playerId, playerName, onDone }) {
   const [action, setAction] = useState('grant_currency');
   const [fields, setFields] = useState({});
   const [busy, setBusy] = useState(false);
@@ -279,6 +286,9 @@ function ActionForm({ playerId, onDone }) {
         params.y = parseInt(fields.y, 10) || 0;
       } else if (action === 'reset_stats') {
         params.confirm = true;
+      } else if (action === 'reset_character') {
+        params.confirm = true;
+        params.confirm_name = fields.confirm_name || '';
       } else if (action === 'ban') {
         params.reason = fields.reason || '';
         params.confirm = true;
@@ -289,7 +299,7 @@ function ActionForm({ playerId, onDone }) {
       // Патч 34, ч.3: тестовые предметы - только себе (services/admin_service.py::NotSelfTarget).
       const message = e.message === 'self_only'
         ? 'Тестовые предметы можно выдать только себе.'
-        : e.message || 'Ошибка';
+        : RESET_ERRORS[e.message] || e.message || 'Ошибка';
       setError(message);
     } finally {
       setBusy(false);
@@ -314,6 +324,7 @@ function ActionForm({ playerId, onDone }) {
             { value: 'restore_hp', label: 'Восстановить HP + снять респавн' },
             { value: 'reset_activity', label: 'Сбросить активности (аналог /застрял)' },
             { value: 'reset_stats', label: 'Сбросить статы' },
+            { value: 'reset_character', label: '🗑 Обнулить персонажа (начать заново)' },
             { value: 'ban', label: 'Забанить' },
             { value: 'unban', label: 'Разбанить' },
           ]}
@@ -374,10 +385,28 @@ function ActionForm({ playerId, onDone }) {
           <Textarea value={fields.reason || ''} onChange={set('reason')} />
         </FormItem>
       )}
+      {action === 'reset_character' && (
+        <>
+          <Div style={{ color: 'var(--vkui--color_text_negative)' }}>
+            Персонаж, инвентарь, золото, самоцветы, рыба, трофеи и прогресс будут удалены
+            безвозвратно. Аккаунт останется: игрок начнёт заново с создания персонажа.
+          </Div>
+          <FormItem top={`Для подтверждения введите ник: ${playerName}`}>
+            <Input value={fields.confirm_name || ''} onChange={set('confirm_name')} placeholder={playerName} />
+          </FormItem>
+        </>
+      )}
 
       {error && <Div style={{ color: 'var(--vkui--color_text_negative)' }}>{error}</Div>}
       <Div>
-        <Button size="l" stretched loading={busy} onClick={run}>Выполнить</Button>
+        <Button
+          size="l" stretched loading={busy} onClick={run}
+          appearance={action === 'reset_character' ? 'negative' : 'accent'}
+          disabled={action === 'reset_character'
+            && (fields.confirm_name || '').trim().toLowerCase() !== (playerName || '').trim().toLowerCase()}
+        >
+          {action === 'reset_character' ? 'Обнулить персонажа' : 'Выполнить'}
+        </Button>
       </Div>
     </Group>
   );
@@ -641,7 +670,7 @@ function PlayerCard({ card, onRefresh }) {
       </Fold>
 
       <GrantSection playerId={card.id} onDone={onRefresh} />
-      <ActionForm playerId={card.id} onDone={onRefresh} />
+      <ActionForm playerId={card.id} playerName={card.name} onDone={onRefresh} />
     </>
   );
 }
@@ -652,10 +681,24 @@ function PlayerSection() {
   const [card, setCard] = useState(null);
   const [status, setStatus] = useState('idle');
   const [errorMsg, setErrorMsg] = useState(null);
+  const [notice, setNotice] = useState(null);
+
+  // Ответ действия - обновлённая карточка; после обнуления персонажа карточки
+  // нет (reset: true) - убираем её и показываем итог.
+  const handleCardUpdate = (updated) => {
+    if (updated && updated.reset) {
+      setCard(null);
+      setResults(null);
+      setNotice(`Персонаж «${updated.name}» (vk_id ${updated.vk_id}) обнулён. Игрок начнёт заново.`);
+      return;
+    }
+    setCard(updated);
+  };
 
   const search = async () => {
     setStatus('loading');
     setErrorMsg(null);
+    setNotice(null);
     setCard(null);
     try {
       const res = await searchAdminPlayers(query);
@@ -701,6 +744,7 @@ function PlayerSection() {
         {errorMsg && (
           <Div style={{ color: 'var(--vkui--color_text_negative)' }}>{errorMsg}</Div>
         )}
+        {notice && <Div>✅ {notice}</Div>}
         {status === 'ready' && results && results.length === 0 && (
           <Div style={{ opacity: 0.7 }}>Игрок не найден.</Div>
         )}
@@ -713,7 +757,7 @@ function PlayerSection() {
           </div>
         ))}
       </Group>
-      {card && <PlayerCard card={card} onRefresh={setCard} />}
+      {card && <PlayerCard card={card} onRefresh={handleCardUpdate} />}
     </>
   );
 }

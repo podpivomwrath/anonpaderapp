@@ -12,7 +12,9 @@ from aiohttp import web
 
 from bot.app_keys import SESSION_FACTORY_KEY, SETTINGS_KEY
 from bot.handlers import combat as combat_handlers
+from bot.handlers import group_combat as group_combat_handlers
 from bot.handlers import pvp as pvp_handlers
+from bot.handlers import raid_combat as raid_combat_handlers
 from bot.handlers import world as world_handlers
 from bot.miniapp_auth import VK_USER_ID_KEY
 from config import Settings
@@ -21,6 +23,7 @@ from models import Character
 from services import (
     admin_grant_service,
     admin_service,
+    character_reset_service,
     maintenance_service,
     mining_service,
     naming,
@@ -104,7 +107,18 @@ async def handle_get_player(request: web.Request) -> web.Response:
     return web.json_response(card)
 
 
-CONFIRM_REQUIRED = {"ban", "set_level", "reset_stats"}
+CONFIRM_REQUIRED = {"ban", "set_level", "reset_stats", "reset_character"}
+
+
+def _in_any_battle(peer_id: int) -> bool:
+    """Любой бой в памяти бота (PvE, PvP, рейд, группа): удалять игрока из
+    живого боя нельзя - движок боя держит на него ссылку."""
+    return (
+        combat_handlers.has_active_encounter(peer_id)
+        or pvp_handlers.has_active_battle(peer_id)
+        or raid_combat_handlers.has_active_battle(peer_id)
+        or group_combat_handlers.has_active_group_battle(peer_id)
+    )
 
 
 async def handle_post_action(request: web.Request) -> web.Response:
@@ -137,6 +151,8 @@ async def handle_post_action(request: web.Request) -> web.Response:
             return web.json_response({"error": "not_found"}, status=404)
 
         granted = None
+        reset_info = None
+        reset_peer_id = None
         try:
             if action == "grant_currency":
                 currency = body.get("currency")
@@ -184,6 +200,25 @@ async def handle_post_action(request: web.Request) -> web.Response:
                 await admin_service.log_reset_activity(db, admin_vk_id, character)
             elif action == "reset_stats":
                 await admin_service.reset_stats(db, admin_vk_id, character)
+            elif action == "reset_character":
+                # Полное обнуление: игрок начнёт заново с онбординга. Защита от
+                # промаха по кнопке: ник в теле обязан совпасть с ником персонажа.
+                confirm_name = body.get("confirm_name")
+                if (
+                    not isinstance(confirm_name, str)
+                    or confirm_name.strip().casefold() != character.name.strip().casefold()
+                ):
+                    return web.json_response({"error": "name_mismatch"}, status=400)
+                reset_peer_id = await onboarding_svc.vk_id_for_character(db, character.id)
+                if reset_peer_id is not None:
+                    # Снимаем путь/отдых/исследование/бой (force_unstick сам коммитит
+                    # перед вложенными сессиями), рейд и групповой бой он не
+                    # прерывает - их проверяем ниже и отказываем.
+                    await world_handlers.force_unstick(db, character, reset_peer_id, admin_override=True)
+                    if _in_any_battle(reset_peer_id):
+                        return web.json_response({"error": "in_battle"}, status=409)
+                await admin_service.reset_activity_db(db, character)
+                reset_info = await character_reset_service.reset_character(db, admin_vk_id, character.id)
             elif action == "ban":
                 reason = body.get("reason")
                 if not isinstance(reason, str) or not reason.strip():
@@ -206,6 +241,9 @@ async def handle_post_action(request: web.Request) -> web.Response:
                 granted = await admin_grant_service.grant(db, admin_vk_id, character, key, amount, ilvl, _rng)
             else:
                 return web.json_response({"error": "unknown_action"}, status=400)
+        except character_reset_service.ResetBlocked as e:
+            await db.rollback()
+            return web.json_response({"error": e.code, "message": e.message}, status=409)
         except admin_grant_service.GrantError as e:
             return web.json_response({"error": str(e)}, status=400)
         except ValueError:
@@ -215,6 +253,15 @@ async def handle_post_action(request: web.Request) -> web.Response:
             return web.json_response({"error": "self_only"}, status=400)
 
         await db.commit()
+        if reset_info is not None:
+            # Персонажа больше нет - карточки не будет. Игроку сообщаем, что делать
+            # дальше: его следующее сообщение запустит онбординг.
+            if reset_peer_id is not None:
+                await world_handlers.send_plain_notice(
+                    reset_peer_id,
+                    "🔄 Твой персонаж обнулён администратором. Напиши любое сообщение - начнёшь заново.",
+                )
+            return web.json_response({"reset": True, **reset_info})
         card = await admin_service.player_card(db, character_id)
         if granted is not None:
             card["granted"] = granted

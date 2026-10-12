@@ -18,10 +18,12 @@ from aiohttp.test_utils import TestClient, TestServer
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
 import bot.handlers.combat as combat_handlers
+import bot.handlers.world as world_handlers
+import bot.miniapp_admin_api as admin_api
 from bot.app_keys import SESSION_FACTORY_KEY
 from bot.webhook import create_app
 from config import Settings
-from models import Base, Character, CharacterStats, User, Wallet
+from models import AdminAction, Base, Character, CharacterStats, User, Wallet
 from services import admin_service
 
 MINIAPP_SECRET = "test_miniapp_secret"
@@ -345,3 +347,88 @@ async def test_bug_reports_list_and_close(client, session_factory) -> None:
     assert resp.status == 200
     data = await resp.json()
     assert data["status"] == "closed"
+
+
+# --- Обнуление персонажа (reset_character) ---
+
+
+@pytest.fixture
+def no_live_state(monkeypatch):
+    """force_unstick трогает память бота (бои, исследование), живую только внутри
+    main.create_bot, - здесь заменяем заглушкой; бой по умолчанию «не идёт»."""
+    calls: list[int] = []
+
+    async def fake_unstick(db, character, peer_id, *, admin_override=False):
+        calls.append(peer_id)
+        return False
+
+    monkeypatch.setattr(world_handlers, "force_unstick", fake_unstick)
+    monkeypatch.setattr(admin_api, "_in_any_battle", lambda peer_id: False)
+    return calls
+
+
+async def _reset(client, cid, **body):
+    return await client.post(
+        f"/api/miniapp/admin/player/{cid}/action",
+        params=_signed_query(ADMIN_VK_ID),
+        json={"action": "reset_character", **body},
+    )
+
+
+async def test_reset_character_forbidden_for_non_admin(client, session_factory, no_live_state) -> None:
+    cid = await _make_player(session_factory)
+    resp = await client.post(
+        f"/api/miniapp/admin/player/{cid}/action",
+        params=_signed_query(PLAYER_VK_ID),
+        json={"action": "reset_character", "confirm": True, "confirm_name": f"Игрок{PLAYER_VK_ID}"},
+    )
+    assert resp.status == 403
+
+
+async def test_reset_character_requires_confirm(client, session_factory, no_live_state) -> None:
+    cid = await _make_player(session_factory)
+    resp = await _reset(client, cid, confirm_name=f"Игрок{PLAYER_VK_ID}")
+    assert resp.status == 400
+    assert (await resp.json())["error"] == "confirmation_required"
+    async with session_factory() as db:
+        assert await db.get(Character, cid) is not None
+
+
+async def test_reset_character_wrong_name_changes_nothing(client, session_factory, no_live_state) -> None:
+    cid = await _make_player(session_factory)
+    resp = await _reset(client, cid, confirm=True, confirm_name="Кто-то другой")
+    assert resp.status == 400
+    assert (await resp.json())["error"] == "name_mismatch"
+    async with session_factory() as db:
+        assert await db.get(Character, cid) is not None
+
+
+async def test_reset_character_refused_during_battle(client, session_factory, monkeypatch, no_live_state) -> None:
+    monkeypatch.setattr(admin_api, "_in_any_battle", lambda peer_id: True)
+    cid = await _make_player(session_factory)
+    resp = await _reset(client, cid, confirm=True, confirm_name=f"Игрок{PLAYER_VK_ID}")
+    assert resp.status == 409
+    assert (await resp.json())["error"] == "in_battle"
+    async with session_factory() as db:
+        assert await db.get(Character, cid) is not None
+
+
+async def test_reset_character_removes_character_keeps_account_and_logs(
+    client, session_factory, no_live_state,
+) -> None:
+    cid = await _make_player(session_factory)
+    resp = await _reset(client, cid, confirm=True, confirm_name=f"игрок{PLAYER_VK_ID}")  # регистр не важен
+    assert resp.status == 200
+    data = await resp.json()
+    assert data["reset"] is True and data["vk_id"] == PLAYER_VK_ID
+    assert no_live_state == [PLAYER_VK_ID]  # активности сняты перед удалением
+
+    async with session_factory() as db:
+        assert await db.get(Character, cid) is None
+        # Аккаунт остаётся: следующее сообщение игрока запустит онбординг.
+        from sqlalchemy import select
+        assert await db.scalar(select(User).where(User.vk_id == PLAYER_VK_ID)) is not None
+        action = await db.scalar(select(AdminAction).where(AdminAction.action_type == "reset_character"))
+        assert action is not None
+        assert action.old_value["name"] == f"Игрок{PLAYER_VK_ID}"
+        assert action.target_character_id is None  # SET NULL: журнал пережил удаление
