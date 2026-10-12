@@ -37,6 +37,7 @@ from services.db import get_session_factory
 from bot.handlers import world as world_handlers
 
 labeler = BotLabeler()
+labeler.vbml_ignore_case = True  # команды без учёта регистра: «Пригласить» = «пригласить»
 
 _dispenser = None  # bot.state_dispenser, устанавливается в setup()
 

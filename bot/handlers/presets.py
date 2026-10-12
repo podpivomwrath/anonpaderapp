@@ -18,6 +18,7 @@ from services.preset_service import PresetValidationError
 from services.db import get_session_factory
 
 labeler = BotLabeler()
+labeler.vbml_ignore_case = True  # команды без учёта регистра: «Пригласить» = «пригласить»
 
 _NS = "presets"
 _bot_api = None

@@ -25,6 +25,7 @@ from services import stat_alloc_service as sas
 from services.db import get_session_factory
 
 labeler = BotLabeler()
+labeler.vbml_ignore_case = True  # команды без учёта регистра: «Пригласить» = «пригласить»
 
 _NS = "stats_window"
 

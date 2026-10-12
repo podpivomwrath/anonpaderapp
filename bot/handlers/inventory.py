@@ -27,6 +27,7 @@ from services import onboarding_service as onboarding_svc
 from services.db import get_session_factory
 
 labeler = BotLabeler()
+labeler.vbml_ignore_case = True  # команды без учёта регистра: «Пригласить» = «пригласить»
 
 _NS = "inventory"
 _bot_api = None

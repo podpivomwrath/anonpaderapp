@@ -30,6 +30,7 @@ from game import archive_riddles, raid_puzzles
 from game.economy import raid_archive_config as ac
 
 labeler = BotLabeler()
+labeler.vbml_ignore_case = True  # команды без учёта регистра: «Пригласить» = «пригласить»
 _rng = random.Random()
 
 

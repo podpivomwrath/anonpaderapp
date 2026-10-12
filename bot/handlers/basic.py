@@ -9,6 +9,7 @@ from services.db import get_session_factory
 from services.user_service import get_profile_text
 
 labeler = BotLabeler()
+labeler.vbml_ignore_case = True  # команды без учёта регистра: «Пригласить» = «пригласить»
 
 
 @labeler.message(text=["/profile", "profile", "профиль", "Профиль"])

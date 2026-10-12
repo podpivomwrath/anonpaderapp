@@ -110,6 +110,7 @@ def _is_safe_craft_cell(character) -> bool:
 
 
 labeler = BotLabeler()
+labeler.vbml_ignore_case = True  # команды без учёта регистра: «Пригласить» = «пригласить»
 
 _duel_engine: DuelEngine | None = None
 _mass_engine: TickEngine | None = None

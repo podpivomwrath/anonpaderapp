@@ -13,6 +13,7 @@ from services.db import get_session_factory
 from services.onboarding_service import get_character
 
 labeler = BotLabeler()
+labeler.vbml_ignore_case = True  # команды без учёта регистра: «Пригласить» = «пригласить»
 
 
 @labeler.message()

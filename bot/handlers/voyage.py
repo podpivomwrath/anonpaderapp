@@ -26,6 +26,7 @@ from services import voyage_service
 from services.db import get_session_factory
 
 labeler = BotLabeler()
+labeler.vbml_ignore_case = True  # команды без учёта регистра: «Пригласить» = «пригласить»
 _bot_api = None
 _rng = random.Random()
 _away: set[int] = set()

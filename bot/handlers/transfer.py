@@ -23,6 +23,7 @@ from services import onboarding_service, transfer_service
 from services.db import get_session_factory
 
 labeler = BotLabeler()
+labeler.vbml_ignore_case = True  # команды без учёта регистра: «Пригласить» = «пригласить»
 _bot_api = None
 
 PENDING_TTL_SECONDS = 180

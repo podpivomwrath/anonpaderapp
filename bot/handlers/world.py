@@ -117,6 +117,7 @@ MOUNT_BUSY_TEXT = "🐎 Ты в пути верхом - маунт несёт т
 
 
 labeler = BotLabeler()
+labeler.vbml_ignore_case = True  # команды без учёта регистра: «Пригласить» = «пригласить»
 
 _travel_scheduler: PeerScheduler | None = None
 _explore_scheduler: PeerScheduler | None = None

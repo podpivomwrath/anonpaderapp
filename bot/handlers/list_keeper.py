@@ -57,6 +57,7 @@ from services.db import get_session_factory
 from services.wallet_service import NotEnoughCurrency
 
 labeler = BotLabeler()
+labeler.vbml_ignore_case = True  # команды без учёта регистра: «Пригласить» = «пригласить»
 
 _bot_api = None
 _dispenser = None  # bot.state_dispenser, устанавливается в setup()
