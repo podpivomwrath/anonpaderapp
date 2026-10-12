@@ -113,6 +113,7 @@ class CombatantState:
     max_hp: int
     current_hp: int
     subclass_id: str | None = None
+    base_class: str | None = None  # у персонажа - для пассивок базового класса
     # Мерж stat_modifiers всех баффов активного пресета (патч 14, ч.3) — читается
     # умениями подкласса по имени ключа (full_block_chance, damage_bonus, ...).
     buff_modifiers: dict[str, float] = field(default_factory=dict)
@@ -272,10 +273,15 @@ def build_combatant(
     subclass_id: str | None = None,
     tier: str | None = None,
     buff_modifiers: dict[str, float] | None = None,
+    base_class: str | None = None,
 ) -> CombatantState:
-    """Собирает участника, считая HP/тир по формулам v2."""
+    """Собирает участника, считая HP/тир по формулам v2. base_class - у
+    персонажа: до подкласса даёт пассивку класса - здоровье воина здесь, крит
+    разбойника в compute_hit (по combatant.base_class), см. bc.BASE_CLASS_*."""
     tier = tier or formulas.tier_for_level(level)
     max_hp = round(formulas.hp(level, stats.vitality, formulas.tier_multiplier(tier)))
+    if kind == "character":
+        max_hp = round(max_hp * formulas.class_hp_mult(base_class, subclass_id))
     return CombatantState(
         id=id,
         side=side,
@@ -288,6 +294,7 @@ def build_combatant(
         max_hp=max_hp,
         current_hp=max_hp,
         subclass_id=subclass_id,
+        base_class=base_class,
         buff_modifiers=buff_modifiers or {},
     )
 

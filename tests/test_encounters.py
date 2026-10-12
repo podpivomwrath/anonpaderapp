@@ -71,13 +71,13 @@ def test_mob_level_clamped_into_zone(player_level: int, expected: int) -> None:
 
 
 def test_mob_level_respects_zone_floor() -> None:
-    """Игрок ниже зоны → моб на нижней границе зоны (зашёл рано)."""
+    """Игрок ниже зоны → моб СЕРЕДИНЫ зоны (2026-10-12; было - нижняя граница)."""
 
     class FakeMob:
         zone_min = 40
         zone_max = 45
 
-    assert encounters.mob_level_for_player(5, FakeMob) == 40
+    assert encounters.mob_level_for_player(5, FakeMob) == 42
     assert encounters.mob_level_for_player(42, FakeMob) == 42
     assert encounters.mob_level_for_player(60, FakeMob) == 45
 
@@ -136,21 +136,21 @@ def test_spawn_mob_picks_from_region_pool() -> None:
 def test_spawn_mob_picks_from_current_ring_not_home_region_pool() -> None:
     """dist=20 -> кольцо 16-30 (ZONE_TABLE: dist 25-39), патч 15: моб приходит
     из соответствующего файла бестиария, даже если игрок 5 уровня (уровень
-    клампится ВВЕРХ до 16)."""
+    поднимается до середины кольца, 23)."""
     rng = random.Random(7)
     bestiary = load_bestiary()
     ring16_30_names = {m.name for m in bestiary["ridge"] if (m.zone_min, m.zone_max) == (16, 30)}
     enc = encounters.spawn_mob(2, "ridge", player_level=5, dist=20, rng=rng)
     assert enc.combatant.name in ring16_30_names
-    assert enc.combatant.level == 16  # clamp вверх — зашёл рано
+    assert enc.combatant.level == 23  # середина кольца 16-30 - зашёл рано
 
 
 def test_spawn_mob_low_level_player_in_high_ring_clamps_to_ring_floor() -> None:
     """Патч 15, техзаметки: игрок 5 уровня, зашедший в кольцо 46-60 (dist 3-11),
-    должен встретить моба 46 уровня (нижняя граница), а не своего уровня."""
+    должен встретить моба середины кольца (53), а не своего уровня и не 46."""
     rng = random.Random(11)
     enc = encounters.spawn_mob(2, "ridge", player_level=5, dist=4, rng=rng)
-    assert enc.combatant.level == 46
+    assert enc.combatant.level == 53
 
 
 def test_spawn_mob_uses_content_primary_stat() -> None:

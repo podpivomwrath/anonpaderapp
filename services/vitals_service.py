@@ -13,6 +13,7 @@ def max_hp(character: Character, stats: CharacterStats, vit_bonus: int = 0) -> i
     tier = formulas.tier_for_level(character.level)
     return round(
         formulas.hp(character.level, stats.vitality + vit_bonus, formulas.tier_multiplier(tier))
+        * formulas.class_hp_mult(getattr(character, "base_class", None), getattr(character, "subclass", None))
     )
 
 

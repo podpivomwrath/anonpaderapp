@@ -25,6 +25,10 @@ const WEAPON_BASE_PER_TIER = 10;
 const K_DMG = { str: 2.0, int: 2.0, agi: 1.5 };
 
 const CRIT_PER_AGI = 0.003;
+// Пассивки базовых классов до подкласса - зеркало
+// game/combat/balance_config.py::BASE_CLASS_HP_MULT / BASE_CLASS_CRIT_BONUS.
+const BASE_CLASS_HP_MULT = { warrior: 1.1 };
+const BASE_CLASS_CRIT_BONUS = { rogue: 0.1 };
 const CRIT_CAP = 0.6;
 
 const MITIGATION_PER_VIT = 0.002;
@@ -75,7 +79,7 @@ export function tierForLevel(level) {
 // сервере (services/derived_stats_service.py::compute). Без этого "до"
 // (derived с сервера, уже учитывает экипировку) и "после" (этот предпросмотр)
 // расходились у любого игрока с надетыми вещами.
-export function computeDerived({ level, baseClass, stats, gearBonus = {} }) {
+export function computeDerived({ level, baseClass, subclass = null, stats, gearBonus = {} }) {
   const tierMult = TIER_MULTIPLIERS[tierForLevel(level)];
   const primaryStat = PRIMARY_STAT_BY_CLASS[baseClass] ?? 'str';
 
@@ -87,9 +91,11 @@ export function computeDerived({ level, baseClass, stats, gearBonus = {} }) {
   const primaryValue = { str, agi, int: int_ }[primaryStat] ?? 0;
   const kDmg = K_DMG[primaryStat];
 
-  const maxHp = roundHalfToEven(HP_BASE + HP_PER_LEVEL * level + HP_PER_VIT * vit + HP_PER_TIER * tierMult);
+  const hpMult = subclass ? 1 : (BASE_CLASS_HP_MULT[baseClass] ?? 1);
+  const critBonus = subclass ? 0 : (BASE_CLASS_CRIT_BONUS[baseClass] ?? 0);
+  const maxHp = roundHalfToEven((HP_BASE + HP_PER_LEVEL * level + HP_PER_VIT * vit + HP_PER_TIER * tierMult) * hpMult);
   const damage = roundHalfToEven((WEAPON_BASE_PER_TIER * tierMult + kDmg * primaryValue) * 10) / 10;
-  const critChance = Math.min(CRIT_PER_AGI * agi, CRIT_CAP);
+  const critChance = Math.min(Math.min(CRIT_PER_AGI * agi, CRIT_CAP) + critBonus, 1);
   const mitigation = Math.min(MITIGATION_PER_VIT * vit, MITIGATION_CAP);
   const controlResist = Math.min(CONTROL_RESIST_PER_WIL * wil, CONTROL_RESIST_CAP);
   const supportPower = SUPPORT_POWER_PER_WIL * wil;

@@ -214,6 +214,7 @@ async def start_encounter(
         id=PLAYER_ID, side=0, kind="character", name=character.name,
         level=character.level, stats=stats, primary_stat=primary,
         subclass_id=character.subclass, buff_modifiers=buff_modifiers,
+        base_class=character.base_class,
     )
     # HP переносится между боями (отдых/респавн лечат) — не всегда полное
     player.current_hp = vitals_service.current_hp(character, char_stats, bonus.get("vit", 0))
@@ -500,6 +501,7 @@ async def on_battle_finished(session_id: int, result: TickResult) -> None:
             old_tier = formulas.tier_for_level(old_level)
             old_max_hp = round(
                 formulas.hp(old_level, stats.vitality + vit_bonus, formulas.tier_multiplier(old_tier))
+                * formulas.class_hp_mult(getattr(character, "base_class", None), getattr(character, "subclass", None))
             )
             new_max_hp = vitals_service.max_hp(character, stats, vit_bonus)
             text += "\n\n" + world_flavor.levelup_line(new_level, _rng)

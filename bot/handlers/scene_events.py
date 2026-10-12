@@ -20,7 +20,7 @@ from vkbottle import Keyboard, KeyboardButtonColor, Text
 from vkbottle.bot import BotLabeler, Message
 from vkbottle.dispatch.rules import ABCRule
 
-from bot import dailies_texts, group_texts
+from bot import dailies_texts, group_texts, pending_activity
 from bot.handlers import stats_window
 from bot.keyboards.world import waiting_keyboard
 from bot.vk_media import photo_attachment
@@ -35,7 +35,9 @@ from services.db import get_session_factory
 labeler = BotLabeler()
 labeler.vbml_ignore_case = True  # команды без учёта регистра: «Пригласить» = «пригласить»
 _rng = random.Random()
-_tokens = itertools.count(1)
+# Токен кнопок - не с единицы: после перезапуска счётчик начинался заново, и
+# старая кнопка с тем же номером могла сработать в чужом, новом событии.
+_tokens = itertools.count(int(time.time() * 1000))
 
 #: VK обрезает подпись кнопки длиннее 40 символов - режем сами, аккуратно.
 LABEL_LIMIT = 40
@@ -71,6 +73,40 @@ def cancel(peer_id: int) -> None:
     p = _pending.pop(peer_id, None)
     if p is not None and p.task is not None:
         p.task.cancel()
+    if p is not None:
+        _forget_later(peer_id)
+
+
+def _forget_later(peer_id: int) -> None:
+    """Стереть сохранённую сцену из синхронного кода (cancel)."""
+    try:
+        asyncio.get_running_loop().create_task(pending_activity.forget_scene(peer_id))
+    except RuntimeError:
+        pass  # вне цикла событий (тесты) - сохранения и не было
+
+
+async def _remember(peer_id: int, p: "Pending") -> None:
+    await pending_activity.remember_scene(peer_id, p.event_id, p.scene_id, p.token)
+
+
+async def _restore(peer_id: int, token) -> "Pending | None":
+    """Нажатие кнопки события, которого нет в памяти (бот перезапускался):
+    сцена из Redis под тем же токеном - восстановить и продолжить. Таймер и
+    загадка после перезапуска уже истекли - их ход решит обычная логика
+    (deadline 0 - время вышло)."""
+    if peer_id in _pending or not isinstance(token, int):
+        return None
+    saved = await pending_activity.recall_scene(peer_id)
+    if saved is None or saved[0] != token:
+        return None
+    _token, event_id, scene_id = saved
+    event = se.event_by_id(event_id)
+    if event is None or scene_id not in event.scenes:
+        await pending_activity.forget_scene(peer_id)
+        return None
+    restored = Pending(event_id=event_id, scene_id=scene_id, token=token)
+    _pending[peer_id] = restored
+    return restored
 
 
 def _api():
@@ -187,10 +223,12 @@ async def start(peer_id: int, event: SceneEvent) -> None:
     cancel(peer_id)
     p = Pending(event_id=event.id, scene_id=event.start, token=next(_tokens))
     _pending[peer_id] = p
+    await _remember(peer_id, p)
     async with get_session_factory()() as db:
         character, stats = await _load(db, peer_id)
         if character is None:
             _pending.pop(peer_id, None)
+            await pending_activity.forget_scene(peer_id)
             return
         text, keyboard = await _render(db, character, stats, p, peer_id)
     attachment = photo_attachment(event.image) if event.image else None
@@ -218,6 +256,8 @@ async def on_button(message: Message) -> None:
     peer_id = message.peer_id
     payload = message.get_payload_json() or {}
     p = _claim(peer_id, payload.get("t"))
+    if p is None and await _restore(peer_id, payload.get("t")) is not None:
+        p = _claim(peer_id, payload.get("t"))
     if p is None:
         return
     try:
@@ -310,6 +350,7 @@ async def _resolve(peer_id, db, character, stats, p: Pending, result: SceneResul
         )
         await db.commit()
         _pending.pop(peer_id, None)
+        await pending_activity.forget_scene(peer_id)
         await _send(peer_id, "\n\n".join(lines) or "Бой!", waiting_keyboard())
         await _notify(peer_id, applied)
         from bot.handlers import combat as combat_handlers
@@ -322,6 +363,7 @@ async def _resolve(peer_id, db, character, stats, p: Pending, result: SceneResul
 
     if result.next:
         p.scene_id = result.next
+        await _remember(peer_id, p)
         p.step, p.bank, p.riddle, p.currency, p.stake = 0, 0.0, None, None, None
         text, keyboard = await _render(db, character, stats, p, peer_id)
         await db.commit()
@@ -332,6 +374,7 @@ async def _resolve(peer_id, db, character, stats, p: Pending, result: SceneResul
     await scene_event_service.finish_event(db, character, applied)
     await db.commit()
     _pending.pop(peer_id, None)
+    await pending_activity.forget_scene(peer_id)
     await _epilogue(peer_id, lines, applied)
 
 

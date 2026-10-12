@@ -46,6 +46,20 @@ def crit_chance(agi: int) -> float:
     return min(bc.CRIT_PER_AGI * agi, bc.CRIT_CAP)
 
 
+def class_hp_mult(base_class: str | None, subclass: str | None) -> float:
+    """Пассивка базового класса к здоровью - до выбора подкласса."""
+    if subclass is not None or base_class is None:
+        return 1.0
+    return bc.BASE_CLASS_HP_MULT.get(base_class, 1.0)
+
+
+def class_crit_bonus(base_class: str | None, subclass: str | None) -> float:
+    """Пассивка базового класса к шансу крита - до выбора подкласса."""
+    if subclass is not None or base_class is None:
+        return 0.0
+    return bc.BASE_CLASS_CRIT_BONUS.get(base_class, 0.0)
+
+
 def mitigation(vit: int) -> float:
     return min(bc.MITIGATION_PER_VIT * vit, bc.MITIGATION_CAP)
 

@@ -47,7 +47,7 @@ def zone_level_range(dist: int) -> tuple[int, int]:
 
 def mob_level_at(x: int, y: int, player_level: int) -> int:
     """Уровень, который имел бы обычный моб на этой клетке —
-    clamp(player_level, zone_min, zone_max), та же формула, что и у обычных
+    wc.ring_mob_level (середина кольца, если игрок ниже него), та же формула, что и у обычных
     мобов (game/world/encounters.py::mob_level_for_player), только по
     произвольным координатам, а не по конкретному мобу бестиария.
 
@@ -57,7 +57,7 @@ def mob_level_at(x: int, y: int, player_level: int) -> int:
     персонажем в старую локацию давал противника/награду не по месту, а по
     текущему уровню персонажа. Эта функция — общая точка привязки к клетке."""
     zone_min, zone_max = zone_level_range(monolith_distance(x, y))
-    return max(zone_min, min(player_level, zone_max))
+    return wc.ring_mob_level(player_level, zone_min, zone_max)
 
 
 def city_region_at(x: int, y: int) -> str | None:

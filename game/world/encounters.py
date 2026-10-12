@@ -78,9 +78,9 @@ def _scale_stats_split(stats: Stats, hp_mult: float, dmg_mult: float) -> Stats:
 
 
 def mob_level_for_player(player_level: int, mob: StarterRingMob) -> int:
-    """clamp(player_level, zone_min, zone_max) — моб равен игроку внутри зоны,
-    но не ниже нижней границы (зашёл рано) и не выше потолка зоны."""
-    return max(mob.zone_min, min(player_level, mob.zone_max))
+    """Моб равен игроку внутри зоны и не выше её потолка; зашёл в кольцо выше
+    своего уровня - середина кольца (wc.ring_mob_level)."""
+    return wc.ring_mob_level(player_level, mob.zone_min, mob.zone_max)
 
 
 @dataclass

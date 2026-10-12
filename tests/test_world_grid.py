@@ -81,5 +81,7 @@ def test_mob_level_at_clamps_into_zone() -> None:
 def test_mob_level_at_matches_zone_level_range() -> None:
     for dist in (0, 5, 12, 20, 28):
         zone_min, zone_max = grid.zone_level_range(dist)
-        assert grid.mob_level_at(dist, 0, player_level=1) == zone_min
+        # ниже кольца - середина кольца (2026-10-12); в I кольце 1 ур. и так внутри
+        expected = zone_min if zone_min <= 1 else (zone_min + zone_max) // 2
+        assert grid.mob_level_at(dist, 0, player_level=1) == expected
         assert grid.mob_level_at(dist, 0, player_level=999) == zone_max

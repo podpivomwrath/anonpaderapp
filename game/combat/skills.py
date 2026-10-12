@@ -276,6 +276,7 @@ def compute_hit(
     # (следующий удар после крита критует гарантированно).
     crit_chance = formulas.crit_chance(actor.stats.agility)
     crit_chance += actor.buff_modifiers.get("crit_chance_bonus", 0.0)
+    crit_chance += formulas.class_crit_bonus(actor.base_class, actor.subclass_id)  # пассивка разбойника до подкласса
     if target.has_effect(EffectKind.MARK):
         for mark in target.effects_of(EffectKind.MARK):
             crit_chance += actor.buff_modifiers.get("mark_ally_crit_bonus", 0.0) if mark.source_id != actor.id else 0.0

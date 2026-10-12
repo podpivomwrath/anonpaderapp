@@ -49,9 +49,11 @@ def compute(
     k_dmg = formulas.k_dmg_for(primary_stat)
 
     return DerivedStats(
-        max_hp=round(formulas.hp(character.level, vitality, tier_mult)),
+        max_hp=round(formulas.hp(character.level, vitality, tier_mult)
+                     * formulas.class_hp_mult(character.base_class, character.subclass)),
         damage=round(formulas.damage(tier_mult, primary_value, k_dmg), 1),
-        crit_chance=formulas.crit_chance(agility),
+        crit_chance=min(formulas.crit_chance(agility)
+                        + formulas.class_crit_bonus(character.base_class, character.subclass), 1.0),
         mitigation=formulas.mitigation(vitality),
         control_resist=formulas.control_resist(will),
         support_power=formulas.support_power(will),

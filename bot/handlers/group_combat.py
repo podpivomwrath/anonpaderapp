@@ -206,6 +206,7 @@ async def start_group_encounter(
             id=m.character.id, side=0, kind="character", name=m.character.name,
             level=m.character.level, stats=stats, primary_stat=primary,
             subclass_id=m.character.subclass, buff_modifiers=m.buff_modifiers,
+            base_class=m.character.base_class,
         )
         combatant.current_hp = vitals_service.current_hp(m.character, m.stats, bonus.get("vit", 0))
         state.add(combatant)

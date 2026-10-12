@@ -67,6 +67,17 @@ def ring_bounds(tier: int) -> tuple[int, int]:
     return lo, hi
 
 
+def ring_mob_level(player_level: int, zone_min: int, zone_max: int) -> int:
+    """Уровень моба кольца для игрока. Внутри кольца - уровень игрока (не выше
+    потолка). Зашёл в кольцо выше своего уровня - СЕРЕДИНА кольца, а не нижняя
+    граница (2026-10-12, решение владельца): кольца не закрыты, но выбор, где
+    фармить, должен чего-то стоить - 15-й уровень во II кольце встречает 23-й,
+    а не 16-й, как раньше."""
+    if player_level < zone_min:
+        return (zone_min + zone_max) // 2
+    return min(player_level, zone_max)
+
+
 def ring_tier_for_dist(dist: int) -> int:
     """За краем мира (dist > WORLD_RADIUS) - внешнее кольцо, а не центр:
     клетка, куда игрок попасть не должен, не может давать эндгейм."""

@@ -112,7 +112,7 @@ def make_fighter(
     fighter = build_combatant(
         id=cid, side=side, kind="character", name=f"{name}#{cid}", level=level,
         stats=build_stats(base_class, primary, level, role), primary_stat=primary,
-        subclass_id=subclass_id, buff_modifiers=dict(buff_modifiers or {}),
+        subclass_id=subclass_id, buff_modifiers=dict(buff_modifiers or {}), base_class=base_class,
     )
     fighter.sim_skills = _skills_for(subclass_id, base_class)
     fighter.sim_role = role

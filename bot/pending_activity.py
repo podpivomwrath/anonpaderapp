@@ -48,6 +48,44 @@ async def forget(kind: str, peer_id: int) -> None:
     await _redis.delete(_key(kind, peer_id))
 
 
+# --- Открытое событие исследования (2026-10-12) ---------------------------
+# Сцена события («Раненый путник», «Снова пусто»...) ждёт нажатия, пока
+# игрок не ответит - хоть через час. Жила она только в памяти, и после
+# деплоя кнопка молча переставала работать (игрок Ruskiq: событие в 05:20,
+# два нажатия в 06:07 - тишина). Здесь - какая сцена открыта и под каким
+# токеном; токен совпал - сцена восстанавливается и нажатие срабатывает.
+# Ключ не pending:*: восстановление занятий (pending()) его не трогает.
+SCENE_TTL_SECONDS = 24 * 3600
+
+
+def _scene_key(peer_id: int) -> str:
+    return f"scene:{peer_id}"
+
+
+async def remember_scene(peer_id: int, event_id: str, scene_id: str, token: int) -> None:
+    if _redis is None:
+        return
+    await _redis.set(_scene_key(peer_id), f"{token}|{event_id}|{scene_id}", ex=SCENE_TTL_SECONDS)
+
+
+async def recall_scene(peer_id: int) -> tuple[int, str, str] | None:
+    """(токен, событие, сцена) открытого события или None."""
+    if _redis is None:
+        return None
+    raw = await _redis.get(_scene_key(peer_id))
+    if raw is None:
+        return None
+    raw = raw.decode() if isinstance(raw, bytes) else raw
+    token, event_id, scene_id = raw.split("|", 2)
+    return int(token), event_id, scene_id
+
+
+async def forget_scene(peer_id: int) -> None:
+    if _redis is None:
+        return
+    await _redis.delete(_scene_key(peer_id))
+
+
 async def pending() -> list[tuple[str, int, float]]:
     """(вид, peer_id, сколько секунд осталось; 0 - уже пора)."""
     if _redis is None:

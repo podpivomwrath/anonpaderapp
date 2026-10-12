@@ -289,6 +289,7 @@ async def _build_combatant_for(db, character: Character) -> CombatantState:
         id=character.id, side=0, kind="character", name=character.name,
         level=character.level, stats=stats, primary_stat=primary,
         subclass_id=character.subclass, buff_modifiers=buff_modifiers,
+        base_class=character.base_class,
     )
 
 
@@ -817,6 +818,7 @@ async def start_siege_battle(
                     id=combatant.id, side=side, kind="character", name=combatant.name,
                     level=combatant.level, stats=combatant.stats, primary_stat=combatant.primary_stat,
                     subclass_id=combatant.subclass_id, buff_modifiers=combatant.buff_modifiers,
+                    base_class=combatant.base_class,
                 )
                 rebuilt.incoming_hit_hook = guild_siege_service.siege_guard(character)
                 state.add(rebuilt)
