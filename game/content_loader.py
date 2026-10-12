@@ -3,7 +3,7 @@
 import json
 from pathlib import Path
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 CONTENT_DIR = Path(__file__).resolve().parent.parent / "content"
 
@@ -582,6 +582,18 @@ class StoryQuestDef(BaseModel):
     transition_text: str = ""
     xp_reward: int = 0
     gold_reward: int = 0
+
+    @model_validator(mode="after")
+    def _gate_level_in_title(self) -> "StoryQuestDef":
+        # Квест выбора подкласса стоит на паузе до 30 уровня - без подписи
+        # игроки не понимали, чего ждать. Уровень из конфига, не из текста.
+        if self.kind == "subclass_gate":
+            from game.combat.balance_config import SUBCLASS_UNLOCK_MIN_LEVEL
+
+            suffix = f" ({SUBCLASS_UNLOCK_MIN_LEVEL} уровень)"
+            if not self.title.endswith(suffix):
+                self.title += suffix
+        return self
 
 
 class StoryActDef(BaseModel):
