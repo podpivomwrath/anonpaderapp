@@ -517,8 +517,9 @@ def _describe_dark_mystic_blood_pact_plus(b: BuffDef) -> str:
 
 def _describe_dark_mystic_self_denial(b: BuffDef) -> str:
     return (
-        f"Кровавый пакт дополнительно тратит {_pct(bc.DARK_MYSTIC_SELF_DENIAL_EXTRA_HP)} текущего "
-        f"здоровья, но бьёт и лечит на {_pct(bc.DARK_MYSTIC_SELF_DENIAL_BONUS)} сильнее."
+        f"Кровавый пакт дополнительно тратит {_pct(bc.DARK_MYSTIC_SELF_DENIAL_EXTRA_HP)} максимального "
+        f"здоровья, но бьёт и лечит на {_pct(bc.DARK_MYSTIC_SELF_DENIAL_BONUS)} сильнее. "
+        f"Работает, пока здоровья больше {_pct(bc.DARK_MYSTIC_SELF_DENIAL_MIN_HP)}."
     )
 
 
