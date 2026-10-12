@@ -281,6 +281,82 @@ async def test_bag_capacity_blocks_catch_instead_of_dropping_fish(
     assert character.fishing_pending_fish == "monolith_catfish"
 
 
+@pytest.mark.asyncio
+async def test_last_fish_may_exceed_capacity(db_session, make_character) -> None:
+    """В садке есть место хоть на грамм - рыба ложится целиком, вес может выйти
+    за лимит (11/10 кг). Не теряем крупный улов из-за нескольких граммов."""
+    from datetime import datetime, timedelta, timezone
+
+    character = await make_character()
+    character.fishing_level = 1
+    capacity = fishing.bag_capacity_grams(character.fishing_level)
+    db_session.add(CharacterFish(
+        character_id=character.id, fish_id="monolith_catfish", grade="common",
+        total_grams=capacity - 1,
+    ))
+    await db_session.flush()
+
+    character.fishing_pending_fish = "monolith_catfish"
+    character.fishing_pending_grams = 3000
+    now = datetime.now(timezone.utc)
+    character.fishing_cast_at = now - timedelta(seconds=10)
+    character.fishing_bite_at = now - timedelta(seconds=1)
+
+    lake = fishing.lake_at(1, 0)
+    # Обрыв леской разыгрывается отдельно от лимита - гоняем, пока рыба не
+    # удержится (rng фиксирован, но защищаемся от смены кривой обрыва).
+    result = None
+    for seed in range(50):
+        character.fishing_pending_fish = "monolith_catfish"
+        character.fishing_pending_grams = 3000
+        character.fishing_cast_at = now - timedelta(seconds=10)
+        character.fishing_bite_at = now - timedelta(seconds=1)
+        result = await fishing_service.strike(
+            db_session, character, lake, random.Random(seed), now=now
+        )
+        if result.landed:
+            break
+    assert result is not None and result.landed is True
+    assert result.bag_full is False
+    assert await fishing_service.bag_total_grams(db_session, character.id) > capacity
+
+
+@pytest.mark.asyncio
+async def test_bag_over_capacity_blocks_next_catch(db_session, make_character) -> None:
+    """Садок уже выше лимита (последняя рыба переполнила) - следующая не влезает."""
+    from datetime import datetime, timedelta, timezone
+
+    character = await make_character()
+    character.fishing_level = 1
+    capacity = fishing.bag_capacity_grams(character.fishing_level)
+    db_session.add(CharacterFish(
+        character_id=character.id, fish_id="monolith_catfish", grade="common",
+        total_grams=capacity + 1000,
+    ))
+    await db_session.flush()
+
+    now = datetime.now(timezone.utc)
+    character.fishing_pending_fish = "monolith_catfish"
+    character.fishing_pending_grams = 500
+    character.fishing_cast_at = now - timedelta(seconds=10)
+    character.fishing_bite_at = now - timedelta(seconds=1)
+
+    lake = fishing.lake_at(1, 0)
+    result = None
+    for seed in range(50):
+        character.fishing_pending_fish = "monolith_catfish"
+        character.fishing_pending_grams = 500
+        character.fishing_cast_at = now - timedelta(seconds=10)
+        character.fishing_bite_at = now - timedelta(seconds=1)
+        result = await fishing_service.strike(
+            db_session, character, lake, random.Random(seed), now=now
+        )
+        if result.bag_full:
+            break
+    assert result is not None and result.bag_full is True
+    assert await fishing_service.bag_total_grams(db_session, character.id) == capacity + 1000
+
+
 # --- Сквозной цикл ------------------------------------------------------------
 
 @pytest.mark.asyncio
