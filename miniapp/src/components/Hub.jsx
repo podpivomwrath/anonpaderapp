@@ -297,7 +297,7 @@ export default function Hub() {
         <span data-tour="menu">
           <PanelHeaderButton aria-label="Разделы" onClick={toggleMenu}>
             <span aria-hidden="true" className="menu-glyph" key={menuOpen && !menuClosing ? 'x' : 'm'}>
-              {menuOpen && !menuClosing ? '✕' : '☰'}
+              <NavIcon id={menuOpen && !menuClosing ? 'close' : 'menu'} className="hub-icon" />
             </span>
           </PanelHeaderButton>
         </span>
@@ -308,19 +308,19 @@ export default function Hub() {
         {title}
         <span className="hub-tools" data-tour="tools">
         <PanelHeaderButton aria-label="Обновить" disabled={refreshing} onClick={refresh}>
-          {refreshing ? <Spinner size="s" /> : <span aria-hidden="true">🔄</span>}
+          {refreshing ? <Spinner size="s" /> : <NavIcon id="refresh" className="hub-icon" />}
         </PanelHeaderButton>
         <PanelHeaderButton
           aria-label={soundOn ? 'Выключить звук' : 'Включить звук'}
           title={soundOn ? 'Звук включён' : 'Звук выключен'}
           onClick={toggleSound}
         >
-          <span aria-hidden="true">{soundOn ? '🔊' : '🔇'}</span>
+          <NavIcon id={soundOn ? 'soundOn' : 'soundOff'} className="hub-icon" />
         </PanelHeaderButton>
         {/* На узком экране правый угол шапки закрыт кнопками ВК - «?» здесь. */}
         <span className="help-btn help-btn--inline" data-tour="help">
           <PanelHeaderButton aria-label="Гайд по мини-аппу" title="Гайд по мини-аппу" onClick={() => startGuide()}>
-            <span aria-hidden="true" className="help-btn__glyph">?</span>
+            <NavIcon id="help" className="hub-icon" />
           </PanelHeaderButton>
         </span>
         <PanelHeaderButton
@@ -330,7 +330,7 @@ export default function Hub() {
           target="_blank"
           rel="noopener noreferrer"
         >
-          <span aria-hidden="true">📖</span>
+          <NavIcon id="guide" className="hub-icon" />
         </PanelHeaderButton>
         <PanelHeaderButton
           aria-label="Чат игроков"
@@ -339,14 +339,14 @@ export default function Hub() {
           target="_blank"
           rel="noopener noreferrer"
         >
-          <span aria-hidden="true">💬</span>
+          <NavIcon id="chat" className="hub-icon" />
         </PanelHeaderButton>
         </span>
       </span>
       {/* «?» в правом углу на высоте «Монолита» - где угол свободен. */}
       <span className="help-btn help-btn--corner" data-tour="help">
         <PanelHeaderButton aria-label="Гайд по мини-аппу" title="Гайд по мини-аппу" onClick={() => startGuide()}>
-          <span aria-hidden="true" className="help-btn__glyph">?</span>
+          <NavIcon id="help" className="hub-icon" />
         </PanelHeaderButton>
       </span>
     </PanelHeader>

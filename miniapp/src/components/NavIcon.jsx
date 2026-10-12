@@ -1,4 +1,4 @@
-import { SECTION_ICONS } from '../icons.js';
+import { HEADER_ICONS, SECTION_ICONS } from '../icons.js';
 
 /**
  * Иконка раздела: встроенный SVG, красится currentColor.
@@ -8,13 +8,13 @@ import { SECTION_ICONS } from '../icons.js';
  * ломали одинарные кавычки внутри data-URL, который собирает Vite. Здесь
  * контур - часть разметки, и обе проблемы отпадают.
  */
-export default function NavIcon({ id, size = 22 }) {
-  const icon = SECTION_ICONS[id];
+export default function NavIcon({ id, size = 22, className = '' }) {
+  const icon = SECTION_ICONS[id] || HEADER_ICONS[id];
   if (!icon) return null;
   if (icon.path) {
     return (
       <svg
-        className="nav-icon"
+        className={`nav-icon ${className}`.trim()}
         viewBox="0 0 24 24"
         width={size}
         height={size}

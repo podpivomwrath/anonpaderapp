@@ -365,21 +365,21 @@
   .help-btn--inline { display: inline-flex; }
 }
 
-.help-btn__glyph {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 24px;
-  height: 24px;
-  border: 1px solid rgba(200, 160, 120, 0.55);
-  border-radius: 50%;
-  font-family: 'Cormorant SC', Forum, serif;
-  font-size: 16px;
-  font-weight: 600;
-  line-height: 1;
-  color: #f0c9a8;
-  box-shadow: 0 0 8px rgba(200, 53, 42, 0.35);
+/* Иконки шапки - контур цвета старой меди с тлеющим отсветом, как у
+   надписи «Монолит». Тап - отсвет разгорается. */
+.hub-icon {
+  width: 22px;
+  height: 22px;
+  color: #e6c19c;
+  filter: drop-shadow(0 0 3px rgba(200, 53, 42, 0.45));
+  transition: color 0.2s ease, filter 0.2s ease, transform 0.2s ease;
 }
+.vkuiPanelHeaderButton__host:hover .hub-icon,
+.vkuiPanelHeaderButton__host:active .hub-icon {
+  color: #ffe2c4;
+  filter: drop-shadow(0 0 6px rgba(220, 70, 50, 0.75));
+}
+.vkuiPanelHeaderButton__host:active .hub-icon { transform: scale(0.9); }
 
 @media (prefers-reduced-motion: reduce) {
   .tour__card,
