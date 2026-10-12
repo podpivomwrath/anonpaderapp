@@ -82,6 +82,8 @@ def render_tick(
     result: TickResult,
     viewer_side: int = 0,
     enemy_lines: list[str] | None = None,
+    title: str = "⚔️ БОЙ",
+    side_titles: tuple[str, str] | None = None,
 ) -> str:
     """Личный боевой лог этого хода с точки зрения стороны viewer_side —
     ВСЕГДА показывает "своя сторона" первой, "противник" второй, независимо
@@ -90,7 +92,11 @@ def render_tick(
     enemy_lines — сценарные реплики рейд-босса (готовит инструмент, добивает,
     меняет фазу). Это ДЕЙСТВИЯ противника, поэтому им место в его разделе;
     раньше рейд клеил их над всей доской, и «Инструмент находит цель» висело
-    выше строки «⚔️ БОЙ - ход N», будто относилось к прошлому ходу."""
+    выше строки «⚔️ БОЙ - ход N», будто относилось к прошлому ходу.
+
+    title / side_titles — для массового боя (осада): заголовок вместо «БОЙ» и
+    названия сторон по номеру стороны. Разделы тогда подписаны названием, но
+    «своя сторона» всё равно первой; без side_titles всё как раньше."""
     mode = _mode(session)
     own: list[str] = []
     enemy: list[str] = []
@@ -131,13 +137,18 @@ def render_tick(
     if enemy_lines:
         enemy[:0] = enemy_lines
 
-    header = f"⚔️ БОЙ - ход {session.tick_number}"
+    header = f"{title} - ход {session.tick_number}"
+    if side_titles is not None and viewer_side in (0, 1):
+        own_title = f"👥 {side_titles[viewer_side]} (ВАША СТОРОНА)"
+        enemy_title = f"💀 {side_titles[1 - viewer_side]}"
+    else:
+        own_title, enemy_title = "👥 ВАША СТОРОНА", "💀 ПРОТИВНИК"
     parts = [
         header, "",
-        "👥 ВАША СТОРОНА",
+        own_title,
         *(own or ["Без изменений."]),
         "",
-        "💀 ПРОТИВНИК",
+        enemy_title,
         *(enemy or ["Без изменений."]),
         "",
         _SEP,

@@ -53,7 +53,7 @@ from bot.pvp_texts import (
     SIEGE_NO_PVP_TEXT,
 )
 from game.combat import balance_config as bc
-from game.combat import display, elixir_effects
+from game.combat import battle_log, display, elixir_effects
 from game.combat.base_skills import BASE_SKILL_DEFS
 from game.combat.duel_engine import DuelEngine, DuelResult, DuelState
 from game.combat.resolver import TickResult
@@ -1435,6 +1435,17 @@ def _render_mass(session: CombatSessionState, lines: list[str]) -> str:
     return "\n".join([header, *side_lines, "", log])
 
 
+def _render_mass_tick(session: CombatSessionState, result: TickResult, viewer_side: int, battle: Battle) -> str:
+    """Итоги хода массового боя глазами стороны viewer_side - тот же формат, что
+    у PvE и рейдов (game/combat/battle_log.py): разделы «ваша сторона» и
+    «противник», у осады - с названиями сторон."""
+    titles = battle.side_titles if battle.side_titles else None
+    return battle_log.render_tick(
+        session, result, viewer_side=viewer_side,
+        title="🏰 ОСАДА" if titles else "⚔️ БОЙ", side_titles=titles,
+    )
+
+
 async def on_mass_tick_resolved(session_id: int, tick: int, result: TickResult) -> None:
     battle = _battles.get(session_id)
     if battle is None:
@@ -1450,7 +1461,17 @@ async def on_mass_tick_resolved(session_id: int, tick: int, result: TickResult) 
     session = _mass_engine.sessions.get(session_id)
     if session is not None:
         battle.last_combatants = dict(session.combatants)
-    text = _render_mass(session, result.lines) if session is not None else "\n".join(result.lines)
+    # Лог хода - у каждой стороны свой вид («ВАША СТОРОНА» / «ПРОТИВНИК»): общий
+    # текст со всеми событиями в одну строку не давал понять, кто за кого бьёт.
+    text_by_side: dict[int, str] = {}
+
+    def _board_for(cid: int) -> str:
+        if session is None:
+            return "\n".join(result.lines)
+        side = battle.side_of.get(cid, 0)
+        if side not in text_by_side:
+            text_by_side[side] = _render_mass_tick(session, result, side, battle)
+        return text_by_side[side]
 
     # Патч 38: у кого цель погибла в этот тик — автопереключение на первого
     # живого противника + личное уведомление (не в общий боевой лог, у
@@ -1481,7 +1502,7 @@ async def on_mass_tick_resolved(session_id: int, tick: int, result: TickResult) 
             if combatant is not None and combatant.alive
             else pvp_waiting_keyboard()
         )
-        personal_text = text
+        personal_text = _board_for(cid)
         notice = switch_notices.get(cid)
         if notice:
             personal_text = f"{notice}\n\n{personal_text}"
