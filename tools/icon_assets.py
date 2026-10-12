@@ -110,6 +110,7 @@ ELIXIR_FILES = {
 OVERRIDE_FILES = {
     "base:legs:Обмотки": "предмет_обмотки.png",
     "base:legs:Поножи": "предмет_поножи.png",
+    "base:legs:Шоссы": "предмет_шоссы.png",
     "good:ridge_icons": "товар_храмовые_образа_2.png",
 }
 

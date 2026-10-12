@@ -37,3 +37,12 @@ leg armour called «Поножи»: a full pair of iron leg plates from hip to a
 ```
 a trade good called «Храмовые образа»: a folded wooden triptych of faded temple paintings showing a red monolith and hooded faceless pilgrims kneeling before it, chipped gilt edges, no christian imagery, no saints, no halos, burnt amber accents, merchant's wares ready for the road, dark fantasy game item icon, single object centered, slight 3/4 angle, painterly semi-realistic, muted desaturated palette of ash grey, rust brown and dried blood, weathered and worn surfaces, soft rim light from the upper left, deep neutral background, no text, no watermark, no border, square 1:1 composition, crisp readable silhouette at small size
 ```
+
+## Шоссы (штаны) - `предмет_шоссы.png` (2026-10-12)
+
+Сейчас: кольчужные штаны вместе со ступнями - читаются как штаны с
+ботинками. Касается всех шоссов, в том числе «Осколочных».
+
+```
+leg armour called «Шоссы»: a pair of chain mail leggings of riveted iron rings from hip to ankle, laced to a leather belt at the top, shown as empty leggings standing upright, the mail ending in open cuffs at the ankle, no feet, no foot covering, no shoes, no boots, battered and field-repaired, scavenged look, cold off-white accents, dark fantasy game item icon, single object centered, slight 3/4 angle, painterly semi-realistic, muted desaturated palette of ash grey, rust brown and dried blood, weathered and worn surfaces, soft rim light from the upper left, deep neutral background, no text, no watermark, no border, square 1:1 composition, crisp readable silhouette at small size
+```
