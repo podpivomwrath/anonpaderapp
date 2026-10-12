@@ -6,6 +6,7 @@
 сообщением + сохраняется в bug_reports.
 """
 
+import json
 from datetime import datetime, timedelta, timezone
 
 from sqlalchemy import select
@@ -28,7 +29,12 @@ labeler.vbml_ignore_case = True  # команды без учёта регист
 _bot_api = None
 
 BUG_CONFIRM = "🐞 Репорт отправлен. Спасибо - Пепельные Земли станут чуть менее сломанными."
-BUG_ASK_TEXT = "Опиши проблему: /баг <текст>"
+BUG_ASK_TEXT = (
+    "Опиши проблему: /баг <текст>\n"
+    "Скриншот, картинку или видео прикрепи к этому же сообщению."
+)
+#: Подпись репорта, в котором есть только вложение.
+BUG_ONLY_ATTACHMENT = "(без текста - см. вложение)"
 BUG_RATE_LIMITED = "🐞 Репортов многовато за последний час - попробуй чуть позже."
 
 
@@ -131,8 +137,31 @@ async def bug_report_with_text(message: Message, text: str) -> None:
 
 @labeler.message(text=["/баг", "/bug"])
 async def bug_report_no_text(message: Message) -> None:
+    # Одна картинка или видео с подписью «/баг» - уже репорт.
+    if _attachments_summary(message):
+        await _handle_bug_report(message, BUG_ONLY_ATTACHMENT)
+        return
     # Патч 30, баг 2: справочные команды не должны стирать боевую клавиатуру.
     await message.answer(BUG_ASK_TEXT, keyboard=active_battle_keyboard(message.peer_id))
+
+
+def _attachments_summary(message: Message) -> list[dict]:
+    """Скриншоты, видео и файлы из сообщения с /баг (2026-10-12). Ссылка на
+    фото - самый большой размер; видео и файлы - их идентификатор VK. Само
+    сообщение пересылается администратору целиком, это - след в базе."""
+    out = []
+    for att in message.attachments or []:
+        kind = getattr(att.type, "value", att.type)
+        if kind == "photo" and att.photo:
+            sizes = att.photo.sizes or []
+            best = max(sizes, key=lambda z: (z.width or 0) * (z.height or 0), default=None)
+            out.append({"type": "photo", "url": best.url if best else None})
+        elif kind == "video" and att.video:
+            v = att.video
+            out.append({"type": "video", "id": f"video{v.owner_id}_{v.id}"})
+        elif kind == "doc" and att.doc:
+            out.append({"type": "doc", "url": att.doc.url, "title": att.doc.title})
+    return out
 
 
 async def _handle_bug_report(message: Message, text: str) -> None:
@@ -164,6 +193,9 @@ async def _handle_bug_report(message: Message, text: str) -> None:
 
         snapshot = await _build_snapshot(db, character, peer_id)
         snapshot["vk_id"] = message.from_id
+        attachments = _attachments_summary(message)
+        if attachments:
+            snapshot["attachments"] = attachments
         report = await admin_service.create_bug_report(db, character.id, text, snapshot)
         await db.commit()
         report_id = report.id
@@ -172,7 +204,17 @@ async def _handle_bug_report(message: Message, text: str) -> None:
     settings = get_settings()
     if settings.admin_vk_id and _bot_api is not None:
         try:
-            await _bot_api.messages.send(peer_id=settings.admin_vk_id, message=formatted, random_id=0)
+            # Скриншоты и видео доходят пересылкой самого сообщения игрока.
+            forward = None
+            if snapshot.get("attachments") and message.conversation_message_id:
+                forward = json.dumps({
+                    "peer_id": peer_id,
+                    "conversation_message_ids": [message.conversation_message_id],
+                })
+                formatted += f"\n📎 Вложений: {len(snapshot['attachments'])} (пересланы ниже)"
+            await _bot_api.messages.send(
+                peer_id=settings.admin_vk_id, message=formatted, random_id=0, forward=forward,
+            )
         except Exception:
             from loguru import logger
             logger.exception("Не удалось отправить репорт бага #{} администратору", report_id)

@@ -11,10 +11,13 @@
 код промо, и без явного порядка функция приглашения могла бы быть перехвачена
 угадавшим совпадение промокодом."""
 
+import asyncio
+
 from vkbottle.bot import BotLabeler, Message
 
 from bot.keyboards.group import group_invite_keyboard, leave_confirm_keyboard
 from bot import group_texts
+from game.world import grid
 from services import group_explore_service
 from services import group_service as gs
 from services import onboarding_service as onboarding_svc
@@ -272,3 +275,60 @@ async def kick_by_name(message: Message, name: str) -> None:
     from bot.handlers import world as world_handlers
 
     await world_handlers.send_ready_hint(hint_peers)
+
+
+# --- Вести группе (2026-10-12) ---------------------------------------------------
+
+
+async def _member_peers(db, members) -> list[int]:
+    peers = []
+    for member in members:
+        vk_id = await onboarding_svc.vk_id_for_character(db, member.id)
+        if vk_id is not None:
+            peers.append(vk_id)
+    return peers
+
+
+def _send_later(peers: list[int], text: str) -> None:
+    """Вести не держат сессию и вызывающего: отправка - отдельной задачей."""
+    if not peers or _bot_api is None:
+        return
+
+    async def run() -> None:
+        for peer in peers:
+            try:
+                await _bot_api.messages.send(peer_id=peer, message=text, random_id=0)
+            except Exception:
+                pass
+
+    asyncio.get_running_loop().create_task(run())
+
+
+async def notify_arrival(db, character) -> None:
+    """Участник группы пришёл на клетку, где стоят другие из его группы, - они
+    узнают. В городе молчим: там стоит полгруппы сразу, и каждый вход на
+    площадь был бы вестью."""
+    if grid.city_region_at(character.pos_x, character.pos_y) is not None:
+        return
+    snapshot = await gs.get_group_snapshot(db, character.id)
+    if snapshot is None:
+        return
+    here = [
+        m for m in snapshot.members
+        if m.id != character.id and (m.pos_x, m.pos_y) == (character.pos_x, character.pos_y)
+    ]
+    peers = await _member_peers(db, here)
+    _send_later(peers, f"👥 {character.name} теперь на твоей клетке ({character.pos_x}; {character.pos_y}).")
+
+
+async def notify_attacked(db, victim, attacker) -> None:
+    """На участника группы напал игрок - узнаёт вся группа, где бы ни была."""
+    snapshot = await gs.get_group_snapshot(db, victim.id)
+    if snapshot is None:
+        return
+    others = [m for m in snapshot.members if m.id not in (victim.id, attacker.id)]
+    peers = await _member_peers(db, others)
+    _send_later(
+        peers,
+        f"⚔️ На {victim.name} из твоей группы напал {attacker.name} - клетка ({victim.pos_x}; {victim.pos_y}).",
+    )

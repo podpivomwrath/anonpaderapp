@@ -194,7 +194,7 @@ def calibrate(hours: float, seed: int) -> dict[str, float]:
     for fish_id, (lo, hi, per_kg) in fc.FISH_STATS.items():
         definition = fishing.fish_def(fish_id)
         tier = definition.tier if definition else 1
-        # Безымянное (тир 6) не принадлежит ни одному озеру — масштабируем его
+        # Безымянная тварь (тир 6) не принадлежит ни одному озеру — масштабируем его
         # по самому дорогому тиру, иначе оно осталось бы некалиброванным.
         scale = scales.get(tier, scales[5])
         # Дробная цена за килограмм: она нигде не показывается игроку (в игре

@@ -497,10 +497,10 @@ a freshwater fish called «Слеза глубины», full body side view, wet
 a freshwater fish called «Монолитов сом», full body side view, wet scales, caught and lifeless, deep crimson accents, faint inner glow, anatomically plausible but subtly wrong, as if the water it came from is sick, dark fantasy game item icon, single object centered, slight 3/4 angle, painterly semi-realistic, muted desaturated palette of ash grey, rust brown and dried blood, weathered and worn surfaces, soft rim light from the upper left, deep neutral background, no text, no watermark, no border, square 1:1 composition, crisp readable silhouette at small size
 ```
 
-**🔴 Безымянное (тир 6)**
+**🔴 Безымянная тварь (тир 6)**
 
 ```
-a freshwater fish called «Безымянное», full body side view, wet scales, caught and lifeless, deep crimson accents, unsettling inner glow, anatomically plausible but subtly wrong, as if the water it came from is sick, dark fantasy game item icon, single object centered, slight 3/4 angle, painterly semi-realistic, muted desaturated palette of ash grey, rust brown and dried blood, weathered and worn surfaces, soft rim light from the upper left, deep neutral background, no text, no watermark, no border, square 1:1 composition, crisp readable silhouette at small size
+a freshwater fish called «Безымянная тварь», full body side view, wet scales, caught and lifeless, deep crimson accents, unsettling inner glow, anatomically plausible but subtly wrong, as if the water it came from is sick, dark fantasy game item icon, single object centered, slight 3/4 angle, painterly semi-realistic, muted desaturated palette of ash grey, rust brown and dried blood, weathered and worn surfaces, soft rim light from the upper left, deep neutral background, no text, no watermark, no border, square 1:1 composition, crisp readable silhouette at small size
 ```
 
 

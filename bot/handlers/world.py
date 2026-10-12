@@ -33,6 +33,7 @@ from bot.battle_keyboard import active_battle_keyboard, in_any_battle
 from bot.handlers import appraiser as appraiser_handlers
 from bot.handlers import combat as combat_handlers
 from bot.handlers import elixir_shop as elixir_shop_handlers
+from bot.handlers import group as group_handlers
 from bot.handlers import group_combat as group_combat_handlers
 from bot.handlers import inventory as inventory_handlers
 from bot.handlers import pvp as pvp_handlers
@@ -1287,6 +1288,7 @@ async def handle_arrival(peer_id: int) -> None:
             await trial_service.record_cell_moved(db, character)
         await daily_service.record_cell_moved(db, character)
         await guild_handlers.on_arrival(db, character)
+        await group_handlers.notify_arrival(db, character)
         await db.commit()
         await _deliver_daily_notice(peer_id, character)
         region = grid.city_region_at(character.pos_x, character.pos_y)

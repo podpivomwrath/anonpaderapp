@@ -11,6 +11,17 @@ import './background.css'
 import './motion.css'
 import App from './App.jsx'
 
+// Масштаб страницы щипком выключен целиком: у карты и древа гильдии свой зум,
+// а родной зум страницы на экране древа (там прокрутка страницы заперта)
+// красил весь мини-апп в чёрное (репорт #35, 2026-10-12). iOS не слушает
+// user-scalable=no в метатеге, поэтому жесты гасим и здесь.
+const blockPageZoom = (e) => e.preventDefault()
+document.addEventListener('gesturestart', blockPageZoom, { passive: false })
+document.addEventListener('gesturechange', blockPageZoom, { passive: false })
+document.addEventListener('touchmove', (e) => {
+  if (e.touches.length > 1 && !e.target.closest?.('.guild-tree, .map-viewport')) e.preventDefault()
+}, { passive: false })
+
 createRoot(document.getElementById('root')).render(
   <StrictMode>
     <App />

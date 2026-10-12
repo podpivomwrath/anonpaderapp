@@ -602,6 +602,9 @@ async def _start_forced_duel_impl(
     _peer_battle[attacker_peer_id] = session_id
     _peer_battle[victim_peer_id] = session_id
 
+    from bot.handlers import group as group_handlers  # избегаем цикла импортов
+
+    await group_handlers.notify_attacked(db, victim, attacker)
     first_id = _duel_engine.start_duel(session_id, attacker_combatant, victim_combatant)
     duel = _duel_engine.duels[session_id]
     intro = f"⚔️ {attacker.name} нападает на {victim.name}! Первым ходит {duel.combatants[first_id].name}."
