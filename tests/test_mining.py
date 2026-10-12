@@ -501,30 +501,6 @@ async def test_starting_a_new_dig_resets_the_old_one_and_returns_its_ore(
     assert await mining_service.ore_in_mine(db_session, EASY_MINE) == 2
 
 
-@pytest.mark.asyncio
-async def test_restart_cancels_digs_and_returns_their_ore(
-    db_session, make_character
-) -> None:
-    """Рестарт выносит игрока наверх, а значит он из забоя ушёл — добыча
-    сбрасывается по общему правилу. Руда при этом не пропадает."""
-    character = await make_character()
-    character.pos_x, character.pos_y = 3, 27
-    character.screen = "mine"
-    db_session.add(MineVein(mine_id=EASY_MINE, ore_count=2))
-    await db_session.flush()
-    mine = mining.mine_by_id(EASY_MINE)
-    await mining_service.start_dig(db_session, character, mine, random.Random(0))
-    assert await mining_service.ore_in_mine(db_session, EASY_MINE) == 1
-
-    released = await mining_service.release_after_restart(db_session)
-    await db_session.refresh(character)
-
-    assert released == [character.id], "нужно знать, КОГО предупреждать"
-    assert character.screen is None
-    assert not mining_service.is_digging(character)
-    assert await mining_service.ore_in_mine(db_session, EASY_MINE) == 2
-
-
 def test_dig_state_has_no_pause_left() -> None:
     """Пауза снята как механика — на персонаже не должно остаться её следов."""
     from models import Character
@@ -639,41 +615,6 @@ async def test_refill_tops_up_every_vein_without_touching_the_journal(
         sa_select(MiningEvent).where(MiningEvent.kind == "spawn")
     )).scalars().all()
     assert spawns == [], "пополнение админки не должно писаться как спавн"
-
-
-@pytest.mark.asyncio
-async def test_restart_reports_who_to_warn(db_session, make_character) -> None:
-    """Отмена добычи обязана быть громкой: молча снятый таймер неотличим от
-    зависшего, и игрок досиживает обещанные минуты впустую. Ровно это и
-    случилось на проде после одного из деплоев."""
-    digger = await make_character()
-    digger.pos_x, digger.pos_y = 3, 27
-    idle = await make_character()
-    db_session.add(MineVein(mine_id=EASY_MINE, ore_count=1))
-    await db_session.flush()
-    mine = mining.mine_by_id(EASY_MINE)
-    await mining_service.start_dig(db_session, digger, mine, random.Random(0))
-
-    released = await mining_service.release_after_restart(db_session)
-
-    assert released == [digger.id]
-    assert idle.id not in released, "спокойных игроков предупреждать не о чем"
-
-
-@pytest.mark.asyncio
-async def test_event_vein_diggers_are_told_apart(db_session, make_character) -> None:
-    """Жилу из исследования после рестарта не вернуть - ей нужен свой текст,
-    без «спустись и начни заново» (main.py). Копающий в руднике - не из них."""
-    in_mine = await make_character()
-    in_mine.pos_x, in_mine.pos_y = 3, 27
-    in_vein = await make_character()
-    in_vein.pos_x, in_vein.pos_y = 10, 5
-    db_session.add(MineVein(mine_id=EASY_MINE, ore_count=1))
-    await db_session.flush()
-    await mining_service.start_dig(db_session, in_mine, mining.mine_by_id(EASY_MINE), random.Random(0))
-    await mining_service.start_dig(db_session, in_vein, None, random.Random(0))
-
-    assert await mining_service.event_vein_diggers(db_session) == {in_vein.id}
 
 
 # --- Порог уровня на вид руды (патч 62) ---------------------------------------

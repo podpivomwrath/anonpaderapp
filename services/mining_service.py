@@ -373,51 +373,6 @@ async def total_ore(db: AsyncSession, character_id: int) -> int:
 
 # --- Обслуживание -------------------------------------------------------------
 
-async def event_vein_diggers(db: AsyncSession) -> set[int]:
-    """Кто прямо сейчас копает жилу из исследования (у неё нет рудника).
-
-    Спрашивать ДО release_after_restart: тот обнуляет добычу. Нужно для
-    текста после рестарта - в жилу «спуститься заново» нельзя, её больше нет.
-    """
-    rows = await db.execute(
-        select(Character.id).where(
-            Character.mining_ends_at.is_not(None), Character.mining_mine_id.is_(None),
-        )
-    )
-    return set(rows.scalars().all())
-
-
-async def release_after_restart(db: AsyncSession) -> list[int]:
-    """После рестарта бота выбрасывает копающих наверх и ОТМЕНЯЕТ их добычу.
-
-    Возврата к прерванной добыче в игре нет: ушёл из забоя — начинаешь
-    заново. Рестарт выносит игрока наверх, значит он из забоя ушёл, и правило
-    применяется без исключений. Цена — только потраченное время: начатые куски
-    возвращаются в жилы, уничтожать общий ресурс рестарт не должен.
-
-    Экран сбрасывается только тем, кто стоял в руднике: чужой сохранённый
-    экран (скупщик, лавка) трогать незачем.
-
-    Возвращает id персонажей, у которых добыча была прервана — их обязательно
-    надо предупредить. Молчаливая отмена выглядит как зависший таймер: игрок
-    продолжает ждать обещанные минуты, а ждать уже нечего (так и случилось на
-    проде после одного из деплоев).
-    """
-    diggers = (
-        await db.execute(
-            select(Character).where(Character.mining_ends_at.is_not(None))
-        )
-    ).scalars().all()
-    for character in diggers:
-        await cancel_dig(db, character)
-
-    await db.execute(
-        update(Character).where(Character.screen == "mine").values(screen=None)
-    )
-    await db.commit()
-    return [character.id for character in diggers]
-
-
 # --- Статистика для админки ---------------------------------------------------
 
 async def stats(db: AsyncSession, hours: int = 24) -> dict:

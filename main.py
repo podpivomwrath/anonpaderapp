@@ -46,7 +46,7 @@ from game.economy import mount_config as mc
 from game.world.scheduler import PeerScheduler
 from services.db import dispose_engine, get_session_factory
 from models import Character
-from services import mining_service, onboarding_service, raid_service
+from services import onboarding_service, raid_service
 
 
 def create_bot(settings: Settings) -> Bot:
@@ -105,11 +105,10 @@ async def run() -> None:
         raise RuntimeError("Для режима callback нужен VK_CONFIRMATION_CODE (см. README).")
 
     # Recover receipts before accepting any event or starting scheduled jobs.
+    # Добычу здесь больше не сбрасываем: её таймеры заводятся заново ниже
+    # (mining_handlers.resume_after_restart). Старый сброс шёл раньше и
+    # обнулял всё, так что возобновлять было нечего (2026-10-12).
     async with get_session_factory()() as db:
-        vein_diggers = await mining_service.event_vein_diggers(db)
-        released = await mining_service.release_after_restart(db)
-        if released:
-            logger.info("После рестарта прервана добыча у {} игроков", len(released))
         recovered = await raid_service.recover_interrupted(db)
         await db.commit()
     if recovered:
@@ -140,19 +139,6 @@ async def run() -> None:
                 except Exception:
                     logger.exception("Не удалось предупредить игрока {} ({})", peer, what)
 
-    await _notify_interrupted(
-        [cid for cid in released if cid not in vein_diggers],
-        "⛏ Сервер перезапустился, и добыча прервалась. "
-        "Начатая порода вернулась в жилу - спустись и начни заново.",
-        "добыча",
-    )
-    # Жила из исследования - не рудник: после рестарта её нет, и звать
-    # «спуститься заново» некуда.
-    await _notify_interrupted(
-        [cid for cid in released if cid in vein_diggers],
-        "⛏ Сервер перезапустился, и добыча прервалась.",
-        "добыча в жиле",
-    )
     await _notify_interrupted(
         recovered,
         "Рейд прерван перезапуском сервера. Ключ возвращён лидеру; "
