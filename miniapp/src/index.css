@@ -639,6 +639,67 @@ body {
   box-shadow: 0 0 0 2px #c8962e inset;
 }
 
+/* --- Упрощённая карта (2026-10-12) -------------------------------------------
+   Для слабых телефонов, по кнопке. Сетка-картинка лежит поверх карты и едет
+   вместе с ней; метки пульсируют прозрачностью - свечение (box-shadow)
+   телефон перерисовывал каждый кадр; у клетки и пути без теней. */
+.map-controls {
+  align-items: flex-end;
+}
+
+.map-simple-toggle {
+  padding: 6px 9px;
+  border: 1px solid rgba(242, 217, 220, 0.25);
+  border-radius: 6px;
+  background: rgba(20, 12, 12, 0.85);
+  color: #f2d9dc;
+  font: inherit;
+  font-size: 12px;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.map-simple-toggle--on {
+  border-color: #c8962e;
+  color: #f3dca6;
+}
+
+.map-grid-raster {
+  pointer-events: none;
+}
+
+/* Посреди жеста слой выходит за окно - сетка должна быть и за краем. */
+.map-viewport--simple .map-overlay {
+  overflow: visible;
+}
+
+.map-viewport--simple .map-pin--player,
+.map-viewport--simple .map-pin--boss,
+.map-viewport--simple .map-pin--rift {
+  box-shadow: none;
+  animation: map-pulse-lite 1.6s ease-in-out infinite;
+}
+
+.map-viewport--simple .map-pin--rift-busy {
+  animation: none;
+}
+
+.map-viewport--simple .map-cell-selected,
+.map-viewport--simple .map-ring {
+  filter: none;
+}
+
+@keyframes map-pulse-lite {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.55; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .map-viewport--simple .map-pin--player,
+  .map-viewport--simple .map-pin--boss,
+  .map-viewport--simple .map-pin--rift { animation: none; }
+}
+
 .map-controls__btn {
   width: 32px;
   height: 32px;

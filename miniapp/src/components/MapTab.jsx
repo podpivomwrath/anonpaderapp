@@ -100,6 +100,22 @@ function ridePos(travel, fetchedAt) {
 const TOUCH_DEVICE = typeof window !== 'undefined'
   && Boolean(window.matchMedia?.('(pointer: coarse)').matches);
 
+// Упрощённая карта (2026-10-12) - по кнопке, для слабых телефонов. По
+// умолчанию карта прежняя. Выбор хранится на устройстве, а не на сервере:
+// тормозит конкретный телефон, на ПК тот же игрок хочет полную карту.
+//  - сетка на отдалении нарисована один раз в картинку (GRID_RASTER) и едет
+//    вместе с картой; векторная - только при приближении, где её мало;
+//  - во время жеста сдвигается один слой (transform), без перерисовки
+//    раздела; новое положение применяется, когда палец отпущен;
+//  - метки пульсируют прозрачностью, без свечения, и без теней у клетки.
+const SIMPLE_KEY = 'map-simple';
+const GRID_RASTER = 2048;
+const GRID_VECTOR_FROM = 1600; // масштаб, с которого сетка снова векторная
+
+function readSimple() {
+  try { return localStorage.getItem(SIMPLE_KEY) === '1'; } catch { return false; }
+}
+
 export default function MapTab() {
   const containerRef = useRef(null);
   const [size, setSize] = useState({ width: 360, height: 420 });
@@ -118,6 +134,18 @@ export default function MapTab() {
   const pinchRef = useRef(null);
   const isTouchRef = useRef(false);
 
+  const [simple, setSimple] = useState(readSimple);
+  const toggleSimple = () => {
+    setSimple((on) => {
+      try { localStorage.setItem(SIMPLE_KEY, on ? '0' : '1'); } catch { /* приватный режим */ }
+      return !on;
+    });
+  };
+  const stageRef = useRef(null);
+  const gridCanvasRef = useRef(null);
+  // Положение камеры посреди жеста в упрощённом режиме - ещё не в state.
+  const liveRef = useRef(null);
+
   // Линза: включена ли (кнопка 🔍 / колесо), увеличение, точка под ней и
   // режим «удерживаю палец» на телефоне.
   const [lens, setLens] = useState({ on: false, mag: LENS_DEFAULT });
@@ -131,7 +159,14 @@ export default function MapTab() {
       .then((data) => {
         // Момент получения - от него карта сама ведёт значок по пути до
         // следующего опроса (см. ridePos ниже).
-        setMapState({ ...data, fetchedAt: performance.now() });
+        // Каталог в каждом опросе тот же, но новым объектом - и сетка (23
+        // тысячи точек) пересчитывалась раз в 5 секунд. Не изменился - тот же.
+        setMapState((prev) => ({
+          ...data,
+          catalog: prev && JSON.stringify(prev.catalog) === JSON.stringify(data.catalog)
+            ? prev.catalog : data.catalog,
+          fetchedAt: performance.now(),
+        }));
         setStatus('ready');
       })
       .catch(() => setStatus('error'));
@@ -286,14 +321,61 @@ export default function MapTab() {
     return lines;
   }, [catalog]);
 
+  const rasterGrid = Boolean(simple && view && view.scale < GRID_VECTOR_FROM);
   const gridPath = useMemo(() => {
-    if (!view) return '';
+    if (!view || rasterGrid) return '';
     return gridLines.map((line) => line.map(([u, v], i) => {
       const sx = (u - view.cu) * view.scale + size.width / 2;
       const sy = (v - view.cv) * view.scale + size.height / 2;
       return `${i ? 'L' : 'M'}${sx.toFixed(1)} ${sy.toFixed(1)}`;
     }).join('')).join('');
-  }, [gridLines, view, size]);
+  }, [gridLines, view, size, rasterGrid]);
+
+  // Сетка-картинка для упрощённой карты: рисуется один раз на каталог.
+  const hasView = Boolean(view);
+  useEffect(() => {
+    const canvas = gridCanvasRef.current;
+    if (!simple || !canvas || !gridLines.length) return;
+    const ctx = canvas.getContext('2d');
+    ctx.clearRect(0, 0, GRID_RASTER, GRID_RASTER);
+    ctx.strokeStyle = 'rgba(40, 28, 18, 0.3)';
+    ctx.lineWidth = 1.4;
+    ctx.beginPath();
+    for (const line of gridLines) {
+      line.forEach(([u, v], i) => {
+        if (i) ctx.lineTo(u * GRID_RASTER, v * GRID_RASTER);
+        else ctx.moveTo(u * GRID_RASTER, v * GRID_RASTER);
+      });
+    }
+    ctx.stroke();
+  }, [simple, gridLines, hasView, status]);
+
+  // Новое положение камеры уже в state - временный сдвиг слоя больше не нужен.
+  // До отрисовки, иначе на кадр карта встала бы в двойной сдвиг.
+  useLayoutEffect(() => {
+    if (stageRef.current) stageRef.current.style.transform = '';
+  }, [view]);
+
+  /** Упрощённая карта посреди жеста: сдвинуть и масштабировать слой целиком
+   *  от зафиксированной камеры view к next, ничего не перерисовывая. */
+  const showLive = (next) => {
+    liveRef.current = next;
+    const el = stageRef.current;
+    if (!el || !view) return;
+    const k = next.scale / view.scale;
+    const tx = (view.cu - next.cu) * next.scale;
+    const ty = (view.cv - next.cv) * next.scale;
+    el.style.transformOrigin = `${size.width / 2}px ${size.height / 2}px`;
+    el.style.transform = `translate(${tx}px, ${ty}px) scale(${k})`;
+  };
+  const moveCamera = (next) => (simple ? showLive(next) : setView(next));
+  const cameraNow = () => liveRef.current || view;
+  const commitLive = () => {
+    if (!liveRef.current) return;
+    const next = liveRef.current;
+    liveRef.current = null;
+    setView(next);
+  };
 
   const cellAtScreen = (sx, sy) => {
     const m = toMap(sx, sy);
@@ -313,7 +395,7 @@ export default function MapTab() {
       u: base.cu + (sx - size.width / 2) / base.scale,
       v: base.cv + (sy - size.height / 2) / base.scale,
     };
-    setView(clampView({
+    moveCamera(clampView({
       scale,
       cu: anchor.u - (sx - size.width / 2) / scale,
       cv: anchor.v - (sy - size.height / 2) / scale,
@@ -348,7 +430,7 @@ export default function MapTab() {
     pointers.current.set(e.pointerId, localPoint(e));
     if (pointers.current.size === 1 && view) {
       const p = localPoint(e);
-      dragRef.current = { start: view, x: p.x, y: p.y, moved: false };
+      dragRef.current = { start: cameraNow(), x: p.x, y: p.y, moved: false };
       pinchRef.current = null;
       if (isTouchRef.current && !TOUCH_DEVICE) {
         // Сенсорный экран на ПК: линза по долгому нажатию, а если она
@@ -366,7 +448,7 @@ export default function MapTab() {
       pinchRef.current = {
         dist: Math.hypot(a.x - b.x, a.y - b.y) || 1,
         mid: { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 },
-        start: view,
+        start: cameraNow(),
       };
     }
   };
@@ -400,8 +482,8 @@ export default function MapTab() {
         // Карту сдвинули руками - больше не подгоняем её под окно сами.
         fittedRef.current = false;
         const start = dragRef.current.start;
-        setView(clampView({ ...start, cu: start.cu - dx / start.scale, cv: start.cv - dy / start.scale }));
-        setHovered(null);
+        moveCamera(clampView({ ...start, cu: start.cu - dx / start.scale, cv: start.cv - dy / start.scale }));
+        if (!simple) setHovered(null);
       }
       return;
     }
@@ -436,7 +518,10 @@ export default function MapTab() {
       setSelected(cell);
       setSendFlow(null);
     }
-    if (pointers.current.size === 0) dragRef.current = null;
+    if (pointers.current.size === 0) {
+      dragRef.current = null;
+      commitLive();
+    }
   };
 
   // Колесо: React вешает onWheel пассивным, preventDefault там не работает -
@@ -624,7 +709,7 @@ export default function MapTab() {
     <div className="map-tab">
       <div
         ref={containerRef}
-        className={`map-viewport${lensVisible && !touchLens ? ' map-viewport--lens' : ''}`}
+        className={`map-viewport${lensVisible && !touchLens ? ' map-viewport--lens' : ''}${simple ? ' map-viewport--simple' : ''}`}
         style={fillHeight ? { height: fillHeight } : undefined}
         onPointerDown={handlePointerDown}
         onPointerMove={handlePointerMove}
@@ -633,7 +718,7 @@ export default function MapTab() {
         onPointerLeave={() => { setHovered(null); if (!touchLens) setLensPoint(null); }}
       >
         {view && (
-          <div className="map-stage">
+          <div className="map-stage" ref={stageRef}>
             <img
               className="map-image"
               src={mapBase}
@@ -646,6 +731,20 @@ export default function MapTab() {
                 transform: `translate(${size.width / 2 - view.cu * view.scale}px, ${size.height / 2 - view.cv * view.scale}px)`,
               }}
             />
+            {simple && (
+              <canvas
+                ref={gridCanvasRef}
+                className="map-image map-grid-raster"
+                width={GRID_RASTER}
+                height={GRID_RASTER}
+                style={{
+                  width: view.scale,
+                  height: view.scale,
+                  visibility: rasterGrid ? 'visible' : 'hidden',
+                  transform: `translate(${size.width / 2 - view.cu * view.scale}px, ${size.height / 2 - view.cv * view.scale}px)`,
+                }}
+              />
+            )}
 
             <svg className="map-overlay" width={size.width} height={size.height}>
               {DRAW_RINGS && ringBorders(catalog).map((r, i) => (
@@ -775,6 +874,15 @@ export default function MapTab() {
             </IconButton>
           )}
           <IconButton className="map-controls__btn" onClick={recenterOnPlayer} aria-label="К себе">◎</IconButton>
+          <button
+            type="button"
+            className={`map-simple-toggle${simple ? ' map-simple-toggle--on' : ''}`}
+            onClick={toggleSimple}
+            aria-pressed={simple}
+            title="Облегчённая отрисовка для слабых телефонов"
+          >
+            {simple ? '✓ Упрощённая карта' : 'Упрощённая карта'}
+          </button>
         </div>
 
         {isTraveling && (
