@@ -3,7 +3,9 @@ import bridge from '@vkontakte/vk-bridge';
 import ClassIcon from './ClassIcon.jsx';
 import IntroScene from './IntroScene.jsx';
 import TabHint, { TAB_HINTS } from './TabHint.jsx';
-import Tour, { HEADER_STEPS } from './Tour.jsx';
+import Tour from './Tour.jsx';
+import Spotlight from './Spotlight.jsx';
+import { guideSteps } from './guide.js';
 import { playTab, preloadTab, setSoundEnabled, unlock } from '../sound.js';
 import CountUp from './CountUp.jsx';
 import CrownPicker from './CrownPicker.jsx';
@@ -116,8 +118,9 @@ export default function Hub() {
     }
   };
 
-  // «?» в шапке: подсказки активного раздела ещё раз (на «Персонаже» - и шапки).
-  const [replay, setReplay] = useState(null);
+  // «?» в шапке - полный гайд: сам ходит по разделам, подсвечивает и
+  // объясняет. {from, steps}; по окончании - обратно в раздел, откуда начали.
+  const [guide, setGuide] = useState(null);
 
   // Раздел въезжает с той стороны, где он стоит в меню: ниже по списку -
   // справа, выше - слева. Так переход читается как движение по меню.
@@ -133,7 +136,6 @@ export default function Hub() {
       setDirection(order.indexOf(id) < order.indexOf(prev) ? 'back' : 'fwd');
     }
     setActiveTab(id);
-    setReplay(null);
     closeMenu();
   }, [closeMenu]);
 
@@ -227,7 +229,7 @@ export default function Hub() {
   const showIntro = Boolean(ui) && (ui.intro || 0) < INTRO_VERSION;
   const showTour = Boolean(ui) && !showIntro && !ui.tour;
   const firstVisit = TAB_HINTS[activeTab] && !(ui?.hints || []).includes(activeTab);
-  const showHint = Boolean(ui) && !showIntro && !showTour && (replay === activeTab || firstVisit);
+  const showHint = Boolean(ui) && !showIntro && !showTour && !guide && firstVisit;
   const finishIntro = (withSound) => {
     unlock();
     setSoundEnabled(withSound);
@@ -250,6 +252,31 @@ export default function Hub() {
     ? [...visible, { id: 'admin', label: 'Админ' }]
     : visible;
   const current = sections.find((s) => s.id === activeTab) || sections[0];
+
+  // Гайд переключает разделы молча (без звука и вибрации) и заодно
+  // засчитывает короткие подсказки этих разделов - он их уже объяснил.
+  const guideNavigate = (tab) => {
+    const prev = activeRef.current;
+    if (prev === tab) return;
+    const order = [...SECTIONS.map((s) => s.id), 'admin'];
+    setDirection(order.indexOf(tab) < order.indexOf(prev) ? 'back' : 'fwd');
+    activeRef.current = tab;
+    setActiveTab(tab);
+    if (TAB_HINTS[tab] && !(ui?.hints || []).includes(tab)) hintSeen(tab);
+  };
+  const startGuide = () => {
+    if (menuOpen) closeMenu();
+    setGuide({
+      from: activeRef.current,
+      started: Date.now(),
+      steps: guideSteps(activeRef.current, sections.map((s) => s.id)),
+    });
+  };
+  const endGuide = () => {
+    const from = guide?.from;
+    setGuide(null);
+    if (from) guideNavigate(from);
+  };
 
   // Бургер слева, «обновить» рядом с заголовком: справа шапку перекрывают
   // крестик ВК и меню приложения - на телефоне туда просто не попасть.
@@ -281,7 +308,7 @@ export default function Hub() {
         </PanelHeaderButton>
         {/* На узком экране правый угол шапки закрыт кнопками ВК - «?» здесь. */}
         <span className="help-btn help-btn--inline" data-tour="help">
-          <PanelHeaderButton aria-label="Подсказки раздела" title="Подсказки раздела" onClick={() => setReplay(activeRef.current)}>
+          <PanelHeaderButton aria-label="Гайд по мини-аппу" title="Гайд по мини-аппу" onClick={() => startGuide()}>
             <span aria-hidden="true" className="help-btn__glyph">?</span>
           </PanelHeaderButton>
         </span>
@@ -298,7 +325,7 @@ export default function Hub() {
       </span>
       {/* «?» в правом углу на высоте «Монолита» - где угол свободен. */}
       <span className="help-btn help-btn--corner" data-tour="help">
-        <PanelHeaderButton aria-label="Подсказки раздела" title="Подсказки раздела" onClick={() => setReplay(activeRef.current)}>
+        <PanelHeaderButton aria-label="Гайд по мини-аппу" title="Гайд по мини-аппу" onClick={() => startGuide()}>
           <span aria-hidden="true" className="help-btn__glyph">?</span>
         </PanelHeaderButton>
       </span>
@@ -509,14 +536,14 @@ export default function Hub() {
 
       {showIntro && <IntroScene onDone={finishIntro} />}
       {showTour && <Tour onDone={finishTour} />}
-      {showHint && (
-        <TabHint
-          tab={activeTab}
-          before={replay === 'character' ? HEADER_STEPS : []}
-          onClose={() => {
-            setReplay(null);
-            if (!(ui?.hints || []).includes(activeTab)) hintSeen(activeTab);
-          }}
+      {showHint && <TabHint tab={activeTab} onClose={() => hintSeen(activeTab)} />}
+      {guide && (
+        <Spotlight
+          key={guide.started}
+          steps={guide.steps}
+          onNavigate={guideNavigate}
+          onDone={endGuide}
+          label="Гайд по мини-аппу"
         />
       )}
     </Panel>

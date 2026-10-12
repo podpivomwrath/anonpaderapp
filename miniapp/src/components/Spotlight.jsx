@@ -49,7 +49,7 @@ function frameOf(el) {
   return { top, left: r.left - PAD, width: r.width + PAD * 2, height: Math.max(bottom - top, 40) };
 }
 
-export default function Spotlight({ steps, onDone, label }) {
+export default function Spotlight({ steps, onDone, label, onNavigate }) {
   const [step, setStep] = useState(0);
   const [rect, setRect] = useState(null);
   const [searching, setSearching] = useState(true);
@@ -62,13 +62,30 @@ export default function Spotlight({ steps, onDone, label }) {
     setSearching(Boolean(current.target));
     setRect(null);
 
+    // Шаг полного гайда сам открывает раздел (tab) и вкладку в нём (sub).
+    if (current.tab && onNavigate) onNavigate(current.tab);
+    let subDone = !current.sub;
+
     const began = Date.now();
+    // Необязательный блок в уже открытом разделе: данные загружены, и раз его
+    // нет сразу - его нет вовсе. Ждать полные 2.5 с под тёмным экраном незачем.
+    const sameTab = step > 0 && steps[step - 1].tab === current.tab
+      && (steps[step - 1].sub || '') === (current.sub || '');
+    const waitMs = current.optional && sameTab ? 600 : WAIT_MS;
     let poll = 0;
     let settle = 0;
     let again = 0;
     const look = () => {
       if (stopped) return;
-      el = findTarget(current.target);
+      if (!subDone) {
+        const tab = [...document.querySelectorAll('.tab-enter [role="tab"]')]
+          .find((t) => t.textContent.trim() === current.sub);
+        if (tab) {
+          if (tab.getAttribute('aria-selected') !== 'true') tab.click();
+          subDone = true;
+        }
+      }
+      el = subDone ? findTarget(current.target) : null;
       if (el) {
         // Блоки раздела въезжают каскадом - через полсекунды они на месте.
         again = setTimeout(measure, 700);
@@ -83,13 +100,20 @@ export default function Spotlight({ steps, onDone, label }) {
         }
         return;
       }
-      if (!current.target || Date.now() - began > WAIT_MS) {
+      if (!current.target || Date.now() - began > waitMs) {
+        // Блока у игрока нет (не в гильдии, нет венца) - шаг молча пропускаем.
+        if (current.optional && current.target) {
+          if (step + 1 >= steps.length) onDone();
+          else setStep(step + 1);
+          return;
+        }
         setSearching(false);
         return;
       }
       poll = setTimeout(look, 150);
     };
-    look();
+    // Раздел или вкладку только что переключили - дать им отрисоваться.
+    poll = setTimeout(look, current.tab || current.sub ? 90 : 0);
 
     window.addEventListener('resize', measure);
     window.addEventListener('scroll', measure, true);
@@ -101,9 +125,13 @@ export default function Spotlight({ steps, onDone, label }) {
       window.removeEventListener('resize', measure);
       window.removeEventListener('scroll', measure, true);
     };
-  }, [current.target, step]);
+  }, [current.target, step]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const next = () => (step + 1 >= steps.length ? onDone() : setStep(step + 1));
+  // Полный гайд: «Раздел ›» - сразу к следующей главе.
+  const nextChapter = current.chapter
+    ? steps.findIndex((s, i) => i > step && s.chapterIndex !== current.chapterIndex)
+    : -1;
 
   // Карточка - под подсветкой, если та в верхней части экрана, иначе над ней.
   const below = rect && rect.top + rect.height < window.innerHeight * 0.6;
@@ -121,9 +149,16 @@ export default function Spotlight({ steps, onDone, label }) {
           <p className="tour__title">{current.title}</p>
           <p className="tour__text">{current.text}</p>
           <div className="tour__row">
-            <span className="tour__count">{step + 1} / {steps.length}</span>
+            <span className="tour__count">
+              {current.chapter
+                ? `${current.chapter} · ${current.chapterStep + 1}/${current.chapterSize}`
+                : `${step + 1} / ${steps.length}`}
+            </span>
+            {nextChapter > 0 && (
+              <button type="button" className="tour__skip" onClick={() => setStep(nextChapter)}>Раздел ›</button>
+            )}
             {steps.length > 1 && (
-              <button type="button" className="tour__skip" onClick={onDone}>Пропустить</button>
+              <button type="button" className="tour__skip" onClick={onDone}>{current.chapter ? 'Закрыть' : 'Пропустить'}</button>
             )}
             <button type="button" className="tour__next" onClick={next}>
               {step + 1 >= steps.length ? 'Понятно' : 'Дальше'}
