@@ -4,8 +4,11 @@ _pending_events в bot/handlers/world.py), не в БД: эфемерная ко
 попытки исследования, переживать рестарт бота не обязана.
 
 Участвуют ТОЛЬКО участники группы, находящиеся на ОДНОЙ клетке с нажавшим
-[🔍 Исследовать] (кохорт фиксируется в момент старта очереди — присоединившиеся
-позже физически на клетке считаются "опоздавшими", см. cancel/start_or_join)."""
+[🔍 Исследовать]. Кохорт сверяется с группой при КАЖДОМ нажатии (2026-10-12):
+раньше он фиксировался при старте очереди, и игрок, вышедший из группы, так
+и оставался в нём - остальные ждали его вечно, а отменивший участие и
+нажавший снова получал «группа уже в деле» (инцидент Кирамус/Ruskiq/
+ТайноДернул: у одного упала сеть, он вышел, двое застряли)."""
 
 from dataclasses import dataclass, field
 
@@ -31,37 +34,37 @@ def get_queue(group_id: int) -> ReadyQueue | None:
 
 def start_or_join(
     group_id: int, cell: tuple[int, int], cohort_ids: set[int], character_id: int,
-) -> ReadyQueue | None:
+) -> ReadyQueue:
     """Первый нажавший [🔍 Исследовать] создаёт очередь на весь кохорт (все
-    участники группы на этой клетке в этот момент); последующие нажатия из
-    ТОГО ЖЕ кохорта присоединяются. None — character_id не входит в уже
-    существующий кохорт (опоздавший или уже отменивший участие) — вызывающий
-    код должен ответить блокирующим сообщением, не трогая очередь."""
+    участники группы на этой клетке в этот момент); следующие нажатия
+    присоединяются. cohort_ids - кто СЕЙЧАС в группе и на клетке: ушедшие из
+    группы или с клетки из очереди выпадают, а нажавший - всегда в ней, даже
+    если раньше отменил участие или пришёл позже."""
     existing = _queues.get(group_id)
-    if existing is not None:
-        if character_id not in existing.cohort:
-            return None
-        existing.ready.add(character_id)
+    if existing is not None and existing.cell == cell:
+        existing.cohort = (existing.cohort & set(cohort_ids)) | {character_id}
+        existing.ready = (existing.ready & existing.cohort) | {character_id}
         return existing
     queue = ReadyQueue(group_id=group_id, cell=cell, cohort=set(cohort_ids), ready={character_id})
     _queues[group_id] = queue
     return queue
 
 
-def cancel(group_id: int, character_id: int) -> None:
-    """Убирает character_id из очереди — И из кохорта (патч 51, ч.3: "то же
-    для игрока, отменившего участие и решившего исследовать заново, пока
-    группа занята" — повторное нажатие должно считаться опоздавшим, не
-    молча пересоздавать участие). Очередь остальных не сбрасывается —
-    счётчик просто уменьшается; если кохорт опустел целиком, очередь
-    удаляется."""
+def cancel(group_id: int, character_id: int) -> set[int]:
+    """Игрок отменил участие или ушёл из группы: убрать его из очереди и из
+    кохорта, чтобы остальные не ждали. Нажмёт снова - вернётся (start_or_join).
+
+    Возвращает готовых, если без него очередь собралась целиком: им надо
+    сказать нажать ещё раз - сам по себе бой не начнётся. Иначе пусто."""
     queue = _queues.get(group_id)
     if queue is None:
-        return
+        return set()
     queue.ready.discard(character_id)
     queue.cohort.discard(character_id)
     if not queue.cohort:
         _queues.pop(group_id, None)
+        return set()
+    return set(queue.ready) if is_ready_to_start(queue) else set()
 
 
 def is_ready_to_start(queue: ReadyQueue) -> bool:

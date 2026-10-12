@@ -15,6 +15,7 @@ from vkbottle.bot import BotLabeler, Message
 
 from bot.keyboards.group import group_invite_keyboard, leave_confirm_keyboard
 from bot import group_texts
+from services import group_explore_service
 from services import group_service as gs
 from services import onboarding_service as onboarding_svc
 from services.db import get_session_factory
@@ -176,12 +177,14 @@ async def leave_confirm(message: Message) -> None:
         character = await onboarding_svc.get_character(db, message.from_id)
         if character is None or character.creation_state is not None:
             return
+        membership = await gs.get_membership(db, character.id)
         try:
             result = await gs.leave_group(db, character.id)
         except gs.GroupError as exc:
             await message.answer(str(exc))
             return
         await db.commit()
+        hint_peers = await _drop_from_explore_queue(db, membership, character.id, result.dissolved)
         remaining_peer_ids = []
         for cid in result.remaining_member_character_ids:
             vk_id = await onboarding_svc.vk_id_for_character(db, cid)
@@ -210,6 +213,24 @@ async def leave_confirm(message: Message) -> None:
             await _bot_api.messages.send(peer_id=vk_id, message=text, random_id=0)
         except Exception:
             pass
+    from bot.handlers import world as world_handlers
+
+    await world_handlers.send_ready_hint(hint_peers)
+
+
+async def _drop_from_explore_queue(db, membership, character_id: int, dissolved: bool) -> list[int]:
+    """Ушедший из группы выпадает из очереди группового исследования - иначе
+    остальные ждут его вечно. Распалась - очереди больше нет. Возвращает, кому
+    сказать «нажми ещё раз» (очередь собралась без него)."""
+    if membership is None:
+        return []
+    if dissolved:
+        group_explore_service.clear(membership.group_id)
+        return []
+    from bot.handlers import world as world_handlers
+
+    ready = group_explore_service.cancel(membership.group_id, character_id)
+    return await world_handlers.ready_hint_peers(db, ready)
 
 
 @labeler.message(payload_contains={"type": "group_leave_cancel"})
@@ -227,12 +248,16 @@ async def kick_by_name(message: Message, name: str) -> None:
         if target is None:
             await message.answer(NOT_FOUND_TEXT)
             return
+        membership = await gs.get_membership(db, target.id)
         try:
-            await gs.kick_member(db, leader, target.id)
+            kicked = await gs.kick_member(db, leader, target.id)
         except gs.GroupError as exc:
             await message.answer(str(exc))
             return
         await db.commit()
+        hint_peers = await _drop_from_explore_queue(
+            db, membership, target.id, kicked.dissolved,
+        )
         target_peer_id = await onboarding_svc.vk_id_for_character(db, target.id)
         target_name = target.name
 
@@ -244,3 +269,6 @@ async def kick_by_name(message: Message, name: str) -> None:
             )
         except Exception:
             pass
+    from bot.handlers import world as world_handlers
+
+    await world_handlers.send_ready_hint(hint_peers)

@@ -644,9 +644,6 @@ async def explore(message: Message) -> None:
                 queue = group_explore_service.start_or_join(
                     snapshot.id, (character.pos_x, character.pos_y), cohort_ids, character.id,
                 )
-                if queue is None:
-                    await message.answer("Твоя группа уже в деле. Дождись, пока они закончат.")
-                    return
                 notice = f"👥 {character.name} готов к исследованию ({len(queue.ready)}/{len(queue.cohort)})."
                 if not group_explore_service.is_ready_to_start(queue):
                     other_peer_ids = []
@@ -721,6 +718,24 @@ async def explore(message: Message) -> None:
     await pending_activity.remember("explore", peer_id, delay)
 
 
+QUEUE_READY_HINT = "👥 Все, кто остался на клетке, готовы - нажми «🔍 Исследовать», чтобы начать."
+
+
+async def ready_hint_peers(db, character_ids: set[int]) -> list[int]:
+    """Кому сказать «нажми ещё раз»: очередь собралась без ушедшего, но сама
+    по себе не стартует - старт идёт от нажатия."""
+    peers = [await onboarding_svc.vk_id_for_character(db, cid) for cid in character_ids]
+    return [p for p in peers if p is not None]
+
+
+async def send_ready_hint(peer_ids: list[int]) -> None:
+    for their_peer_id in peer_ids:
+        try:
+            await _bot_api.messages.send(peer_id=their_peer_id, message=QUEUE_READY_HINT, random_id=0)
+        except Exception:
+            pass
+
+
 @labeler.message(payload_contains={"type": "group_explore_cancel"})
 async def group_explore_cancel(message: Message) -> None:
     peer_id = message.peer_id
@@ -731,12 +746,14 @@ async def group_explore_cancel(message: Message) -> None:
         snapshot = await group_service.get_group_snapshot(db, character.id)
         if snapshot is None:
             return
-        group_explore_service.cancel(snapshot.id, character.id)
+        ready = group_explore_service.cancel(snapshot.id, character.id)
+        hint_peers = await ready_hint_peers(db, ready)
         has_mount = await mount_service.has_any_mount(db, character.id)
     await message.answer(
-        "Ты вышел из очереди исследования.",
+        "Ты вышел из очереди исследования. Передумаешь - нажми «🔍 Исследовать» снова.",
         keyboard=kb.movement_keyboard(character.pos_x, character.pos_y, peer_id, has_mount=has_mount),
     )
+    await send_ready_hint(hint_peers)
 
 
 @labeler.message(text=[kb.BTN_ASH_HANDFUL])

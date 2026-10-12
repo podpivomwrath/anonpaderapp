@@ -27,13 +27,11 @@ def test_ready_when_all_cohort_pressed() -> None:
     assert ges.is_ready_to_start(queue) is True
 
 
-def test_late_arrival_not_in_cohort_returns_none() -> None:
+def test_late_arrival_who_presses_joins_without_blocking_others() -> None:
     ges.start_or_join(group_id=1, cell=(5, 5), cohort_ids={1, 2}, character_id=1)
-    result = ges.start_or_join(group_id=1, cell=(5, 5), cohort_ids={1, 2, 3}, character_id=3)
-    assert result is None
-    # очередь не тронута
-    queue = ges.get_queue(1)
-    assert queue.cohort == {1, 2}
+    queue = ges.start_or_join(group_id=1, cell=(5, 5), cohort_ids={1, 2, 3}, character_id=3)
+    assert queue.cohort == {1, 2, 3}
+    assert queue.ready == {1, 3}
 
 
 def test_cancel_removes_from_ready_and_cohort_without_resetting_others() -> None:
@@ -45,13 +43,39 @@ def test_cancel_removes_from_ready_and_cohort_without_resetting_others() -> None
     assert queue.ready == {2}  # участник 2 остаётся готов, не сброшен
 
 
-def test_cancel_then_repress_is_treated_as_late_arrival() -> None:
-    ges.start_or_join(group_id=1, cell=(5, 5), cohort_ids={1, 2}, character_id=1)
-    ges.start_or_join(group_id=1, cell=(5, 5), cohort_ids={1, 2}, character_id=2)
+def test_cancel_then_repress_rejoins() -> None:
+    ges.start_or_join(group_id=1, cell=(5, 5), cohort_ids={1, 2, 3}, character_id=1)
     ges.cancel(group_id=1, character_id=1)
-    # 1 передумал и снова жмёт "Исследовать" — но группа (2) уже "занята"
-    result = ges.start_or_join(group_id=1, cell=(5, 5), cohort_ids={1, 2}, character_id=1)
-    assert result is None
+    queue = ges.start_or_join(group_id=1, cell=(5, 5), cohort_ids={1, 2, 3}, character_id=1)
+    assert queue.ready == {1}
+    assert 1 in queue.cohort
+
+
+def test_cancel_reports_ready_players_when_queue_completes_without_leaver() -> None:
+    ges.start_or_join(group_id=1, cell=(5, 5), cohort_ids={1, 2, 3}, character_id=1)
+    ges.start_or_join(group_id=1, cell=(5, 5), cohort_ids={1, 2, 3}, character_id=2)
+    assert ges.cancel(group_id=1, character_id=3) == {1, 2}
+    assert ges.cancel(group_id=1, character_id=2) == {1}
+
+
+def test_incident_member_left_group_does_not_block_the_rest() -> None:
+    """2026-10-12: К и Р готовы, Т (сеть упала) вышел из группы, К отменил и
+    нажал снова. Раньше очередь ждала ушедшего Т, а К получал «группа уже в
+    деле». Теперь кохорт сверяется с группой при нажатии."""
+    k, r, t = 7, 59, 55
+    ges.start_or_join(group_id=1, cell=(17, -14), cohort_ids={k, r, t}, character_id=k)
+    ges.start_or_join(group_id=1, cell=(17, -14), cohort_ids={k, r, t}, character_id=r)
+    # Т вышел из группы - на клетке в группе теперь двое
+    queue = ges.start_or_join(group_id=1, cell=(17, -14), cohort_ids={k, r}, character_id=k)
+    assert queue.cohort == {k, r}
+    assert ges.is_ready_to_start(queue)
+
+
+def test_queue_on_another_cell_starts_fresh() -> None:
+    ges.start_or_join(group_id=1, cell=(5, 5), cohort_ids={1, 2}, character_id=1)
+    queue = ges.start_or_join(group_id=1, cell=(6, 5), cohort_ids={1, 2}, character_id=2)
+    assert queue.cell == (6, 5)
+    assert queue.ready == {2}
 
 
 def test_cancel_by_sole_cohort_member_clears_queue() -> None:
