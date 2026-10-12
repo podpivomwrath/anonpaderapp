@@ -236,8 +236,14 @@ def compute_hit(
     extra_dodge = target.buff_modifiers.get("dodge_bonus", 0.0)
     if target.dodged_last_tick:
         extra_dodge += target.buff_modifiers.get("slip_away_bonus", 0.0)
+    # Пепельный морок обещает 80% «независимо от ловкости», а общий потолок
+    # 65% срезал его (2026-10-12, жалоба игрока). Самый сильный отдельный
+    # эффект уворота поднимает потолок до себя: морок даёт свои 80%, но
+    # сумма с ловкостью и Дымовой завесой выше них не уходит.
+    strongest_effect = max((e.value for e in target.effects_of(EffectKind.DODGE)), default=0.0)
     total_dodge = min(
-        stat_dodge + target.effect_total(EffectKind.DODGE) + extra_dodge, bc.DODGE_HARD_CAP
+        stat_dodge + target.effect_total(EffectKind.DODGE) + extra_dodge,
+        max(bc.DODGE_HARD_CAP, min(strongest_effect, bc.DODGE_EFFECT_CAP)),
     )
     # Патч 103, «Знает, где ты»: против такого бойца уворот цели не работает
     # вовсе - ни стат, ни эффекты, ни «Второй шанс» Клинка теней.

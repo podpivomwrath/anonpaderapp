@@ -39,8 +39,12 @@ def render_hit(
     hp_after: float,
     max_hp: float,
     mode: str = display.MODE_PVP,
+    shielded: int = 0,
 ) -> str:
     """`[Имя] использует [Навык] на [Цель] — X урона. (Цель: A% → B%)`.
+    shielded - сколько из удара съел щит: тогда X - полный удар и суффикс
+    «(щит поглотил N)». Раньше писалось «0 урона» отдельно от строки щита,
+    и игроки решали, что урон в барьер считается неправильно (2026-10-12).
     Промах — `[Цель] уклоняется от [способности/атаки] [Имя]`; крит —
     суффикс `(крит!)`; периодический урон (ДоТ) — отдельная фраза без глагола."""
     if missed:
@@ -49,11 +53,13 @@ def render_hit(
     pct_before = display.hp_text(hp_before, max_hp, mode)
     pct_after = display.hp_text(hp_after, max_hp, mode)
     crit_suffix = " (крит!)" if crit else ""
+    shield_suffix = f" (щит поглотил {shielded})" if shielded > 0 else ""
+    amount += max(shielded, 0)
     delta = f"({target_name}: {pct_before} → {pct_after})"
     if is_dot:
-        return f"{target_name} теряет {amount} HP от эффекта «{label}». {delta}"
+        return f"{target_name} теряет {amount} HP от эффекта «{label}»{shield_suffix}. {delta}"
     verb = f"атакует {target_name}" if label in _VERB_LABELS else f"использует {label} на {target_name}"
-    return f"{source_name} {verb} - {amount} урона{crit_suffix}. {delta}"
+    return f"{source_name} {verb} - {amount} урона{crit_suffix}{shield_suffix}. {delta}"
 
 
 def self_buff_line(actor_name: str, skill_name: str, what: str, value: float, turns: int) -> str:

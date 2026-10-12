@@ -53,6 +53,7 @@ const SECTIONS = [
 // Общий справочник по игре - статья в группе. Ссылка наружу, а не раздел:
 // текст правится в редакторе статей VK без пересборки мини-аппа.
 const GUIDE_URL = 'https://vk.com/@-240167847-putevoditel-mechenogo';
+const PLAYERS_CHAT_URL = 'https://vk.me/join/xuy8wXu8_zoubce24lDXooe6aB_sV1eB3zE=';
 
 const GUILD_MIN_LEVEL = 20;
 
@@ -330,6 +331,15 @@ export default function Hub() {
           rel="noopener noreferrer"
         >
           <span aria-hidden="true">📖</span>
+        </PanelHeaderButton>
+        <PanelHeaderButton
+          aria-label="Чат игроков"
+          title="Чат игроков"
+          href={PLAYERS_CHAT_URL}
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          <span aria-hidden="true">💬</span>
         </PanelHeaderButton>
         </span>
       </span>

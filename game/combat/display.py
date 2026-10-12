@@ -74,6 +74,15 @@ def health_bar(current: float, maximum: float, mode: str = MODE_PVP) -> str:
     return BAR_FILLED * filled + BAR_EMPTY * (BAR_WIDTH - filled) + " " + value
 
 
+def shield_suffix(combatant) -> str:
+    """« 🛡️3006» - остаток щитов рядом с полоской HP (однотиковый щит и
+    «Второе сердце»/Оберег). Без щита - пусто. Раньше остаток не было видно
+    нигде, и игроки решали, что зелье не сработало (2026-10-12)."""
+    pool = sum(e.value for e in combatant.effects if e.kind.value == "shield_pool")
+    total = round(max(getattr(combatant, "shield", 0), 0) + max(pool, 0))
+    return f" 🛡️{total}" if total > 0 else ""
+
+
 def hp_delta_line(hp_before: float, hp_after: float, max_hp: float, mode: str = MODE_PVP) -> str:
     """Единая числовая скобка для любого изменения HP (патч 13, ч.2):
     `(-34 HP · 82% → 68%)` / `(+142 HP · 61% → 100%)`. Используется и в бою,

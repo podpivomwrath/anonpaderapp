@@ -349,15 +349,17 @@ class DuelEngine:
             # Щиты (однотиковый + «Второе сердце») считаются общим правилом:
             # раньше этот блок жил своей жизнью, и патчу 52 пришлось отдельно
             # добавлять сюда SHIELD_POOL, которого движок не знал.
+            # Сколько съел щит, видно в самой строке удара (shielded), поэтому
+            # отдельные строки щитов не нужны.
             amount = shared_rules.absorb_by_shields(
-                target, hit.amount, result.lines,
+                target, hit.amount, [],
                 pierce=shared_rules.poison_shield_pierce(actor) if hit.is_dot else 0.0,
             )
             target.current_hp -= amount
             result.lines.append(combat_flavor.render_hit(
                 actor.name, target.name, label=hit.label, amount=amount, crit=hit.crit,
                 missed=False, is_dot=hit.is_dot, hp_before=before, hp_after=target.current_hp,
-                max_hp=target.max_hp,
+                max_hp=target.max_hp, shielded=hit.amount - amount,
             ))
             _apply_last_breath_guard(target, result)
             # Страж, «Отражение»: доля срезанного блоком урона возвращается

@@ -452,6 +452,30 @@ async def test_finished_dig_does_NOT_return_the_ore(db_session, make_character) 
     assert await mining_service.total_ore(db_session, character.id) == 1
 
 @pytest.mark.asyncio
+async def test_resitting_does_not_reroll_dig_time(db_session, make_character) -> None:
+    """Перезаход в забой не перебрасывает время куска (2026-10-12: игроки
+    вставали и садились, пока не выпадет минимум). Новое время - только после
+    добытого куска."""
+    character = await make_character()
+    character.pos_x, character.pos_y = 3, 27
+    db_session.add(MineVein(mine_id=EASY_MINE, ore_count=8))
+    await db_session.flush()
+    mine = mining.mine_by_id(EASY_MINE)
+
+    rolls = set()
+    for seed in range(5):
+        started = await mining_service.start_dig(db_session, character, mine, random.Random(seed))
+        rolls.add(round(started.seconds, 6))
+        await mining_service.cancel_dig(db_session, character)
+    assert len(rolls) == 1
+
+    await mining_service.start_dig(db_session, character, mine, random.Random(0))
+    await mining_service.finish_dig(db_session, character, random.Random(0))
+    after = await mining_service.start_dig(db_session, character, mine, random.Random(0))
+    assert round(after.seconds, 6) not in rolls
+
+
+@pytest.mark.asyncio
 async def test_starting_a_new_dig_resets_the_old_one_and_returns_its_ore(
     db_session, make_character
 ) -> None:

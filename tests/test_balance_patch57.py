@@ -55,7 +55,9 @@ def test_stacked_dodge_cannot_exceed_hard_cap() -> None:
 
     class AlwaysHitRng(NoCritRng):
         def random(self) -> float:
-            return bc.DODGE_HARD_CAP + 0.01  # чуть выше потолка - удар обязан пройти
+            # чуть выше потолка - удар обязан пройти; сильный эффект поднимает
+            # потолок, но не выше DODGE_EFFECT_CAP
+            return bc.DODGE_EFFECT_CAP + 0.01
 
     blade = combatant(1, side=0, subclass_id="shadow_blade", agility=200)
     blade.buff_modifiers = {"dodge_bonus": 1.0, "slip_away_bonus": 1.0}

@@ -143,7 +143,8 @@ def render_tick(
         _SEP,
     ]
     enemy_bars = [
-        f"{c.name}: {display.health_bar(c.current_hp, c.max_hp, mode)}{_mark_suffix(session, c, viewer_side)}"
+        f"{c.name}: {display.health_bar(c.current_hp, c.max_hp, mode)}{display.shield_suffix(c)}"
+        f"{_mark_suffix(session, c, viewer_side)}"
         for c in session.combatants.values()
         if c.side != viewer_side and c.alive
     ]
@@ -154,5 +155,5 @@ def render_tick(
         parts.append(_SEP)
     for c in session.combatants.values():
         if c.side == viewer_side and c.alive:
-            parts.append(f"{c.name}: {display.health_bar(c.current_hp, c.max_hp, mode)}")
+            parts.append(f"{c.name}: {display.health_bar(c.current_hp, c.max_hp, mode)}{display.shield_suffix(c)}")
     return "\n".join(parts)

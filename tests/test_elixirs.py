@@ -247,6 +247,43 @@ def test_ashen_haze_grants_dodge_chance() -> None:
     assert hit.missed is True
 
 
+def test_ashen_haze_lasts_two_turns_and_gives_full_80_percent() -> None:
+    """2026-10-12, жалоба игрока: морок держался 1 ход (лишние -1 к
+    длительности) и упирался в общий потолок 65% вместо обещанных 80%."""
+    player = combatant(1, side=0, agility=0)
+    mob = combatant(2, side=1, kind="mob")
+    elixir_effects.apply_combat_elixir(player, "ashen_haze")
+    state = make_session(player, mob)
+
+    class _Roll(random.Random):
+        def random(self) -> float:
+            return ec.ASHEN_HAZE_DODGE_CHANCE - 0.01  # 79% - выше старого потолка 65%
+
+    assert compute_hit(mob, player, _Roll()).missed is True
+    for _ in range(2):
+        assert player.has_effect(EffectKind.DODGE)
+        resolve_tick(state, {1: skip(2), 2: skip(1)}, random.Random(0))
+    assert not player.has_effect(EffectKind.DODGE)
+
+
+def test_second_heart_shield_shown_next_to_hp_and_in_hit_line() -> None:
+    """2026-10-12: остаток щита виден рядом с HP, а строка удара пишет полный
+    удар с пометкой щита вместо «0 урона»."""
+    from game.combat import display
+
+    player = combatant(1, side=0, agility=0)
+    mob = combatant(2, side=1, kind="mob")
+    elixir_effects.apply_combat_elixir(player, "second_heart")
+    shield = round(player.max_hp * ec.SECOND_HEART_SHIELD_PCT_MAX_HP)
+    assert display.shield_suffix(player) == f" 🛡️{shield}"
+
+    state = make_session(player, mob)
+    result = resolve_tick(state, {1: skip(2), 2: attack(1)}, NoCritRng())
+    line = next(ln for ln in result.lines if "щит поглотил" in ln)
+    assert " 0 урона" not in line
+    assert display.shield_suffix(player) != f" 🛡️{shield}"  # остаток уменьшился
+
+
 # --- Патч 34, ч.1: уворот от Ловкости, складывается с внешними источниками ---
 
 

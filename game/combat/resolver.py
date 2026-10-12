@@ -427,6 +427,7 @@ def resolve_tick(
     # «Двойного укола» выглядел так, будто не наносил урона, хотя фактически
     # урон суммировался в damage_taken корректно.
     applied_by_hit: dict[int, int] = {}
+    shielded_by_hit: dict[int, int] = {}
     for hit in ctx.hits:
         target = session.combatants[hit.target_id]
         amount = hit.amount
@@ -457,7 +458,11 @@ def resolve_tick(
             shared_rules.poison_shield_pierce(session.combatants.get(hit.source_id))
             if hit.is_dot else 0.0
         )
-        amount = shared_rules.absorb_by_shields(target, amount, result.lines, pierce=pierce)
+        # Сколько съел щит, пишется в строке удара (render_hit, shielded) -
+        # отдельные строки щитов больше не нужны.
+        before_shields = amount
+        amount = shared_rules.absorb_by_shields(target, amount, [], pierce=pierce)
+        shielded_by_hit[id(hit)] = before_shields - amount
         # Страж, «Отражение» (патч 56) - общее с дуэлью правило.
         reflected = shared_rules.block_reflect_amount(target, hit.blocked)
         if reflected and hit.source_id != target.id:
@@ -542,6 +547,7 @@ def resolve_tick(
                 source.name, target.name,
                 label=hit.label, amount=applied, crit=hit.crit, missed=hit.missed, is_dot=hit.is_dot,
                 hp_before=h_before, hp_after=h_after, max_hp=target.max_hp, mode=mode,
+                shielded=shielded_by_hit.get(id(hit), 0),
             )
         )
         result.hit_renders.append(
@@ -611,6 +617,10 @@ def resolve_tick(
                 heal = round(effect.value)
                 before_hp = combatant.current_hp
                 combatant.current_hp = min(combatant.current_hp + heal, combatant.max_hp)
+                if combatant.current_hp == before_hp:
+                    # здоровье полное - строка «+0 HP» только путает
+                    effect.value = 0
+                    continue
                 result.lines.append(
                     f"🛡️ Второе сердце {combatant.name} обращается в исцеление "
                     f"{display.hp_delta_line(before_hp, combatant.current_hp, combatant.max_hp, _display_mode(session))}"

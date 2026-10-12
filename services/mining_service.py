@@ -19,6 +19,7 @@
    Уход с клетки обнуляет и то и другое (см. abandon_dig).
 """
 
+import hashlib
 import random
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
@@ -255,7 +256,19 @@ async def start_dig(
     else:
         tier, event_vein = mining.ring_tier(character.pos_x, character.pos_y), True
 
-    seconds = mining.roll_dig_seconds(rng, tier, character.mining_level, event_vein)
+    # Время куска не перебрасывается перезаходом: бросок зависит от
+    # персонажа, места и числа уже добытых кусков, а оно растёт только с
+    # законченной добычей. Раньше игроки садились, видели «16 мин», вставали
+    # и садились снова, пока не выпадет минимум (2026-10-12).
+    place = mine.id if mine is not None else f"{character.pos_x}:{character.pos_y}"
+    digs = await db.scalar(
+        select(func.count()).select_from(MiningEvent).where(
+            MiningEvent.character_id == character.id, MiningEvent.kind == "dig"
+        )
+    )
+    seed = hashlib.sha256(f"{character.id}:{place}:{digs}".encode()).digest()
+    roll_rng = random.Random(int.from_bytes(seed[:8], "big"))
+    seconds = mining.roll_dig_seconds(roll_rng, tier, character.mining_level, event_vein)
     seconds *= crown_service.mining_multiplier(character)  # венец «Жила», патч 91
     from services import guild_service
 

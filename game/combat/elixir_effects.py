@@ -41,12 +41,11 @@ def apply_combat_elixir(actor: CombatantState, elixir_id: str) -> str:
         return f"🛡️ Второе сердце укрывает тебя щитом ({shield_amount} поглощения)."
 
     if elixir_id == "ashen_haze":
-        # DODGE — обычная (не мгновенная) семантика тика в резолвере; -1 к
-        # длительности компенсирует применение как "бесплатного действия"
-        # (см. game/combat/resolver.py::_IMMEDIATE_EFFECT_KINDS).
+        # Эликсир пьётся ДО хода, поэтому эффект для резолвера уже «старый»
+        # и тикает в первый же ход. Прежние -1 к длительности давали морок на
+        # 1 ход вместо обещанных 2 (2026-10-12, жалоба игрока).
         actor.apply_effect(
-            EffectKind.DODGE, ec.ASHEN_HAZE_DODGE_CHANCE,
-            max(ec.ASHEN_HAZE_DURATION - 1, 1), actor.id,
+            EffectKind.DODGE, ec.ASHEN_HAZE_DODGE_CHANCE, ec.ASHEN_HAZE_DURATION, actor.id,
         )
         return "🌫️ Морок укрывает тебя пеплом - удары будут находить лишь его."
 
