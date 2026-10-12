@@ -269,8 +269,9 @@ def test_self_buff_skills_show_in_battle_log() -> None:
         state = make_session(a, b)
         result = resolve_tick(state, {1: skill(skill_id, 2)}, NoCritRng())
         text = battle_log.render_tick(state, result, viewer_side=0)
-        line = next(x for x in text.split("\n") if x.startswith("Кричащий →"))
-        assert what in line
+        # У завесы теперь и удар (2026-10-12): строк две - удар и уклонение.
+        lines = [x for x in text.split("\n") if x.startswith("Кричащий →")]
+        assert any(what in x for x in lines), lines
         ours, theirs = text.split("ПРОТИВНИК")[:2] if "ПРОТИВНИК" in text else (text, "")
         assert "Кричащий →" in ours and "Кричащий →" not in theirs
 

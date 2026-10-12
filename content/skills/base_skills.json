@@ -48,7 +48,7 @@
     {
       "id": "rogue_smoke",
       "name": "Дымовая завеса",
-      "multiplier": 0,
+      "multiplier": 0.8,
       "cd": 5,
       "effect": "self_dodge_buff",
       "effect_value": 0.4,
@@ -60,7 +60,7 @@
     {
       "id": "mage_shard_volley",
       "name": "Осколочный залп",
-      "multiplier": 1.75,
+      "multiplier": 1.45,
       "cd": 2,
       "effect": null,
       "flavor": "Крошево Монолита срывается с ладони роем багровых игл."
@@ -79,7 +79,7 @@
       "multiplier": 0.9,
       "cd": 4,
       "effect": "target_vuln",
-      "effect_value": 0.25,
+      "effect_value": 0.35,
       "effect_duration": 2,
       "flavor": "Знак, вспыхивающий на коже жертвы. Метка для всего, что бьёт."
     }
