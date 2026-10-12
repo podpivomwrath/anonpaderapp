@@ -223,7 +223,7 @@ class DeepStage(_BossStage):
             if players:
                 victim = rng.choice(players)
                 out.frozen.append(victim.id)
-                out.lines.append(f"🌊 Корень утягивает {victim.name} под воду: ход пропущен.")
+                out.lines.append(f"🌊 Корень утягивает {victim.name} под воду: следующий ход пропущен.")
         return out
 
 

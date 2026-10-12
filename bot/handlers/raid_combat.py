@@ -983,8 +983,8 @@ async def on_raid_tick_resolved(session_id: int, tick: int, result: TickResult) 
         _declared_this_tick.setdefault(session_id, set()).update(frozen_ids)
         for cid in frozen_ids:
             held = (
-                "📖 Каталог сковал тебя: этот ход ты пропускаешь." if battle.is_archive
-                else "🦴 Руки держат крепко: этот ход ты пропускаешь."
+                "📖 Каталог сковал тебя: в следующем ходу ты пропускаешь." if battle.is_archive
+                else "🦴 Руки держат крепко: в следующем ходу ты пропускаешь."
             )
             notices[cid] = f"{notices[cid]}\n{held}" if notices.get(cid) else held
     await _broadcast_board(session_id, battle, result, notices, boss_lines=extra_lines)
