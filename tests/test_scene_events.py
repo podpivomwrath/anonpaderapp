@@ -128,26 +128,28 @@ def test_riddle_answers() -> None:
     assert se.answer_matches("Ёлка", ["елка"])
 
 
-def test_trail_cell_is_near_in_world_and_not_outward() -> None:
+def test_trail_cell_is_near_and_never_in_a_harder_ring() -> None:
+    """2026-10-12: след ведёт в то же кольцо или легче (дальше от центра),
+    в более сложное - никогда."""
     rng = random.Random(5)
     for x, y in [(0, 28), (-20, 3), (5, -5), (29, 0)]:
         for _ in range(30):
             cx, cy = se.pick_trail_cell(rng, x, y)
             assert se.TRAIL_MIN_CELLS <= grid.cells_between(x, y, cx, cy) <= se.TRAIL_MAX_CELLS
             assert grid.in_bounds(cx, cy) and grid.city_region_at(cx, cy) is None
-            assert grid.ring_tier(cx, cy) >= grid.ring_tier(x, y)
+            assert grid.ring_tier(cx, cy) <= grid.ring_tier(x, y)
 
 
-def test_trail_from_center_leads_to_next_ring() -> None:
-    """В центре (кольцо 5) нет клеток на 3+ шага - след ведёт в кольцо 4,
-    а не пропадает молча."""
+def test_trail_from_center_leads_outward() -> None:
+    """В центре (кольцо 5) нет клеток на 3+ шага - след ведёт наружу, а не
+    пропадает молча."""
     rng = random.Random(7)
     for x, y in [(0, 0), (1, 1), (-1, 0)]:
         for _ in range(30):
             cell = se.pick_trail_cell(rng, x, y)
             assert cell is not None and cell != (0, 0)
             assert se.TRAIL_MIN_CELLS <= grid.cells_between(x, y, *cell) <= se.TRAIL_MAX_CELLS
-            assert grid.ring_tier(*cell) == 4
+            assert grid.ring_tier(*cell) < 5
 
 
 # --- Исходы -----------------------------------------------------------------------

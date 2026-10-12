@@ -306,27 +306,24 @@ TRAIL_MAX_CELLS = 7
 
 
 def pick_trail_cell(rng: random.Random, x: int, y: int) -> tuple[int, int] | None:
-    """Клетка следа: 3-7 клеток пути, в том же кольце или ближе к центру,
-    не город и не Монолит.
+    """Клетка следа: 3-7 клеток пути, в том же кольце или ДАЛЬШЕ от центра
+    (легче), не город и не Монолит.
 
-    Центр (кольцо 5) - всего клетки на расстоянии 1 от Монолита: на 3+
-    клетки в нём не уйти, и след из центра раньше молча не появлялся. Если
-    подходящих клеток нет, след ведёт в соседнее внешнее кольцо."""
+    Раньше след вёл в то же кольцо или ближе к центру, и событие уводило
+    игрока туда, где мобы ему не по силам. Решение владельца 2026-10-12:
+    события могут отправлять на более лёгкие кольца, на более сложные - нет.
+    Из центра (кольцо 5) след поэтому всегда уходит наружу."""
     ring = grid.ring_tier(x, y)
-
-    def cells(min_ring: int) -> list[tuple[int, int]]:
-        return [
-            (cx, cy)
-            for cx in range(x - TRAIL_MAX_CELLS, x + TRAIL_MAX_CELLS + 1)
-            for cy in range(y - TRAIL_MAX_CELLS, y + TRAIL_MAX_CELLS + 1)
-            if TRAIL_MIN_CELLS <= grid.cells_between(x, y, cx, cy) <= TRAIL_MAX_CELLS
-            and grid.in_bounds(cx, cy)
-            and grid.ring_tier(cx, cy) >= min_ring
-            and grid.city_region_at(cx, cy) is None
-            and (cx, cy) != (0, 0)
-        ]
-
-    options = cells(ring) or cells(ring - 1)
+    options = [
+        (cx, cy)
+        for cx in range(x - TRAIL_MAX_CELLS, x + TRAIL_MAX_CELLS + 1)
+        for cy in range(y - TRAIL_MAX_CELLS, y + TRAIL_MAX_CELLS + 1)
+        if TRAIL_MIN_CELLS <= grid.cells_between(x, y, cx, cy) <= TRAIL_MAX_CELLS
+        and grid.in_bounds(cx, cy)
+        and grid.ring_tier(cx, cy) <= ring
+        and grid.city_region_at(cx, cy) is None
+        and (cx, cy) != (0, 0)
+    ]
     return rng.choice(options) if options else None
 
 
