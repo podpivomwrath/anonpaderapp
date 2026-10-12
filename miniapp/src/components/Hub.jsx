@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import bridge from '@vkontakte/vk-bridge';
 import ClassIcon from './ClassIcon.jsx';
 import IntroScene from './IntroScene.jsx';
+import NewPlayer from './NewPlayer.jsx';
 import TabHint from './TabHint.jsx';
 import { TAB_HINTS } from './tabHints.js';
 import Tour from './Tour.jsx';
@@ -85,7 +86,9 @@ export default function Hub() {
   const [crownOpen, setCrownOpen] = useState(false);
   const [titleOpen, setTitleOpen] = useState(false);
   const [character, setCharacter] = useState(null);
-  const [status, setStatus] = useState('loading'); // loading | ready | error
+  const [status, setStatus] = useState('loading'); // loading | ready | error | newbie
+  // Персонажа нет (или создание брошено): страница новичка, а не ошибка.
+  const [newbie, setNewbie] = useState({ inCreation: false, checking: false });
   const [ban, setBan] = useState(null);
   const [refreshing, setRefreshing] = useState(false);
   const [reloadKey, setReloadKey] = useState(0);
@@ -185,7 +188,14 @@ export default function Hub() {
         setUi((prev) => prev || data.ui || {});
         setStatus('ready');
       })
-      .catch(() => {
+      .catch((err) => {
+        if (err?.message === 'character_not_found') {
+          setNewbie((prev) => ({
+            inCreation: Boolean(err.details?.in_creation), checking: false, stillMissing: prev.checking,
+          }));
+          setStatus('newbie');
+          return;
+        }
         if (!silent) setStatus('error');
       });
   }, []);
@@ -360,6 +370,20 @@ export default function Hub() {
           <Spinner size="l" />
         </Div>
       </Panel>
+    );
+  }
+
+  if (status === 'newbie') {
+    return (
+      <NewPlayer
+        inCreation={newbie.inCreation}
+        checking={newbie.checking}
+        stillMissing={newbie.stillMissing}
+        onRetry={() => {
+          setNewbie((prev) => ({ ...prev, checking: true }));
+          load({ silent: true });
+        }}
+      />
     );
   }
 

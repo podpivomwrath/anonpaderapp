@@ -195,6 +195,19 @@ async def test_character_derived_and_gear_bonus_include_equipped_gear(client, se
 async def test_character_not_found(client) -> None:
     resp = await client.get("/api/miniapp/character", params=_signed_query(999))
     assert resp.status == 404
+    assert (await resp.json()) == {"error": "character_not_found", "in_creation": False}
+
+
+async def test_character_in_creation_is_reported(client, session_factory) -> None:
+    """Начал создание и бросил - мини-апп зовёт вернуться в диалог и закончить."""
+    character = await _make_character(session_factory, vk_id=998)
+    async with session_factory() as session:
+        row = await session.get(Character, character.id)
+        row.creation_state = "class_select"
+        await session.commit()
+    resp = await client.get("/api/miniapp/character", params=_signed_query(998))
+    assert resp.status == 404
+    assert (await resp.json())["in_creation"] is True
 
 
 # --- POST /api/miniapp/stats ---

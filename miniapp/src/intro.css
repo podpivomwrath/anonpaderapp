@@ -484,3 +484,135 @@
   font-size: 13px;
   opacity: 0.75;
 }
+
+/* --- Страница новичка (2026-10-12) -----------------------------------------------
+   Персонажа ещё нет: вместо ошибки - объяснение, как его создать в диалоге. */
+.newbie {
+  position: relative;
+  min-height: 100vh;
+  min-height: 100dvh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px 16px;
+  overflow: hidden;
+  background: #050304;
+  color: #ece4dc;
+}
+
+.newbie__bg {
+  position: absolute;
+  inset: -4%;
+  background-size: cover;
+  background-position: center;
+  opacity: 0.35;
+  filter: saturate(0.8);
+  animation: intro-bg-in 1.6s ease-out both;
+}
+
+.newbie__card {
+  position: relative;
+  z-index: 2;
+  width: min(460px, 100%);
+  padding: 24px 22px 20px;
+  border: 1px solid rgba(200, 160, 120, 0.3);
+  border-radius: 16px;
+  background: linear-gradient(180deg, rgba(36, 26, 20, 0.92), rgba(18, 12, 10, 0.94));
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.6);
+  animation: tour-in 0.5s ease-out both;
+}
+
+.newbie__eyebrow {
+  margin: 0 0 6px;
+  font-family: 'Cormorant SC', Forum, serif;
+  font-size: 13px;
+  letter-spacing: 0.3em;
+  color: #c8352a;
+}
+
+.newbie__title {
+  margin: 0 0 10px;
+  font-family: 'Cormorant SC', Forum, serif;
+  font-weight: 600;
+  font-size: 26px;
+  line-height: 1.15;
+  color: #f0c9a8;
+}
+
+.newbie__lead {
+  margin: 0 0 14px;
+  font-size: 15px;
+  line-height: 1.55;
+  color: rgba(236, 228, 220, 0.88);
+}
+
+.newbie__steps {
+  margin: 0 0 18px;
+  padding-left: 22px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  font-size: 14.5px;
+  line-height: 1.45;
+}
+
+.newbie__steps li {
+  animation: row-in 0.35s ease-out backwards;
+  animation-delay: calc(0.3s + var(--i, 0) * 0.08s);
+}
+
+.newbie__steps b {
+  color: #f3e6d6;
+}
+
+.newbie__notice {
+  margin: 0 0 12px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid rgba(200, 53, 42, 0.5);
+  background: rgba(90, 22, 17, 0.4);
+  font-size: 14px;
+}
+
+.newbie__primary,
+.newbie__secondary {
+  display: block;
+  width: 100%;
+  padding: 13px 16px;
+  border-radius: 12px;
+  font: inherit;
+  font-size: 15.5px;
+  text-align: center;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.newbie__primary {
+  border: 1px solid #c8352a;
+  background: #5a1611;
+  color: #fff;
+  box-shadow: 0 0 18px rgba(200, 53, 42, 0.35);
+}
+
+.newbie__secondary {
+  margin-top: 10px;
+  border: 1px solid rgba(236, 228, 220, 0.25);
+  background: transparent;
+  color: #ece4dc;
+}
+
+.newbie__secondary:disabled {
+  opacity: 0.6;
+}
+
+.newbie__link {
+  display: block;
+  margin-top: 14px;
+  font-size: 13.5px;
+  text-align: center;
+  color: rgba(240, 201, 168, 0.85);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .newbie__bg, .newbie__card, .newbie__steps li { animation: none; }
+}

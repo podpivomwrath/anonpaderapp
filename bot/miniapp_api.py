@@ -170,7 +170,16 @@ async def handle_get_character(request: web.Request) -> web.Response:
     async with session_factory() as session:
         character = await _load_character(session, vk_user_id)
         if character is None:
-            return web.json_response({"error": "character_not_found"}, status=404)
+            # Новичок без персонажа видит в мини-аппе страницу «создай персонажа
+            # в диалоге», а не ошибку (2026-10-12). in_creation - начал и
+            # бросил на полпути: ему - «вернись и продолжи».
+            in_creation = await session.scalar(
+                select(Character.id).join(User, User.id == Character.user_id)
+                .where(User.vk_id == vk_user_id, Character.creation_state.is_not(None))
+            ) is not None
+            return web.json_response(
+                {"error": "character_not_found", "in_creation": in_creation}, status=404,
+            )
         gear_bonus = await item_service.compute_gear_bonus(session, character.id)
         wallet = await get_wallet(session, character.id)
         power = await power_service.power_of(session, character)
