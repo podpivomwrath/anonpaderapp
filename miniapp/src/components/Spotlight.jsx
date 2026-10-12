@@ -64,26 +64,35 @@ export default function Spotlight({ steps, onDone, label, onNavigate }) {
 
     // Шаг полного гайда сам открывает раздел (tab) и вкладку в нём (sub).
     if (current.tab && onNavigate) onNavigate(current.tab);
-    let subDone = !current.sub;
+    // sub - подпись вкладки или путь по вложенным вкладкам: ['Казна', 'Сдать'].
+    const subPath = current.sub ? [].concat(current.sub) : [];
+    let subIndex = 0;
+    let subDone = subPath.length === 0;
 
     const began = Date.now();
     // Необязательный блок в уже открытом разделе: данные загружены, и раз его
     // нет сразу - его нет вовсе. Ждать полные 2.5 с под тёмным экраном незачем.
     const sameTab = step > 0 && steps[step - 1].tab === current.tab
-      && (steps[step - 1].sub || '') === (current.sub || '');
+      && String(steps[step - 1].sub || '') === String(current.sub || '');
     const waitMs = current.optional && sameTab ? 600 : WAIT_MS;
     let poll = 0;
     let settle = 0;
     let again = 0;
     const look = () => {
       if (stopped) return;
-      if (!subDone) {
+      while (!subDone) {
         const tab = [...document.querySelectorAll('.tab-enter [role="tab"]')]
-          .find((t) => t.textContent.trim() === current.sub);
-        if (tab) {
-          if (tab.getAttribute('aria-selected') !== 'true') tab.click();
-          subDone = true;
+          .find((t) => t.textContent.trim() === subPath[subIndex]);
+        if (!tab) break;
+        if (tab.getAttribute('aria-selected') !== 'true') {
+          tab.click();
+          // Вложенные вкладки появятся после отрисовки - следующий заход.
+          subIndex += 1;
+          subDone = subIndex >= subPath.length;
+          break;
         }
+        subIndex += 1;
+        subDone = subIndex >= subPath.length;
       }
       el = subDone ? findTarget(current.target) : null;
       if (el) {
@@ -128,9 +137,11 @@ export default function Spotlight({ steps, onDone, label, onNavigate }) {
   }, [current.target, step]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const next = () => (step + 1 >= steps.length ? onDone() : setStep(step + 1));
-  // Полный гайд: «Раздел ›» - сразу к следующей главе.
+  // Гайд раздела: «Вкладка ›» - сразу к следующей вкладке раздела.
+  const subKey = (s) => String([].concat(s.sub || '')[0]);
   const nextChapter = current.chapter
-    ? steps.findIndex((s, i) => i > step && s.chapterIndex !== current.chapterIndex)
+    ? steps.findIndex((s, i) => i > step
+      && (s.chapterIndex !== current.chapterIndex || subKey(s) !== subKey(current)))
     : -1;
 
   // Карточка - под подсветкой, если та в верхней части экрана, иначе над ней.
@@ -155,7 +166,7 @@ export default function Spotlight({ steps, onDone, label, onNavigate }) {
                 : `${step + 1} / ${steps.length}`}
             </span>
             {nextChapter > 0 && (
-              <button type="button" className="tour__skip" onClick={() => setStep(nextChapter)}>Раздел ›</button>
+              <button type="button" className="tour__skip" onClick={() => setStep(nextChapter)}>Вкладка ›</button>
             )}
             {steps.length > 1 && (
               <button type="button" className="tour__skip" onClick={onDone}>{current.chapter ? 'Закрыть' : 'Пропустить'}</button>

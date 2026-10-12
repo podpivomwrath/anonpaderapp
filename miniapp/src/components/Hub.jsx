@@ -280,7 +280,10 @@ export default function Hub() {
     setGuide({
       from: activeRef.current,
       started: Date.now(),
-      steps: guideSteps(activeRef.current, sections.map((s) => s.id)),
+      steps: (() => {
+        const steps = guideSteps(activeRef.current, { inGuild: character?.in_guild });
+        return steps.length ? steps : [{ target: null, title: 'Гайд', text: 'Для этого раздела гайда пока нет.' }];
+      })(),
     });
   };
   const endGuide = () => {
