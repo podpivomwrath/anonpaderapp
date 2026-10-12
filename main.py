@@ -1,6 +1,7 @@
 """Точка входа: aiohttp-сервер (Callback API) + vkbottle + тик-движок."""
 
 import asyncio
+import signal
 from datetime import datetime, timezone
 import sys
 from pathlib import Path
@@ -27,7 +28,7 @@ from bot.handlers import promo as promo_handlers
 from bot.handlers import pvp as pvp_handlers
 from bot.handlers import fishing as fishing_handlers
 from bot.handlers import mining as mining_handlers
-from bot import pending_activity
+from bot import pending_activity, restart_safety
 from bot.handlers import crowns as crown_handlers
 from bot.handlers import raid as raid_handlers
 from bot.handlers import raid_combat as raid_combat_handlers
@@ -249,6 +250,10 @@ async def run() -> None:
     # занятие не заканчивалось никогда.
     pending_activity.setup(redis)
     resumed = await world_handlers.resume_after_restart()
+    # Рыбалка и добыча: их состояние в базе, таймеры - в памяти (2026-10-12).
+    resumed["fishing"] = await fishing_handlers.resume_after_restart()
+    resumed["mining"] = await mining_handlers.resume_after_restart()
+    resumed["battles"] = await restart_safety.restore_solo_battles(redis)
     if any(resumed.values()):
         logger.info("После рестарта возобновлено: {}", resumed)
 
@@ -380,12 +385,31 @@ async def run() -> None:
     logger.info("Сервер запущен: http://{}:{}{}", settings.host, settings.port, WEBHOOK_PATH)
     logger.info("Health-check:   http://{}:{}/health", settings.host, settings.port)
 
+    # Остановка по SIGTERM (docker stop при деплое): без обработчика процесс с
+    # PID 1 сигнал игнорировал, через 10 секунд его убивали, и finally ниже не
+    # выполнялся вовсе - соло-бои некуда было сохранить (2026-10-12).
+    stop = asyncio.Event()
+    loop = asyncio.get_running_loop()
+    for sig in (signal.SIGTERM, signal.SIGINT):
+        try:
+            loop.add_signal_handler(sig, stop.set)
+        except (NotImplementedError, RuntimeError):
+            pass  # Windows: локальный запуск, Ctrl+C и так завершает
+    busy_task = asyncio.create_task(restart_safety.publish_busy_loop(redis))
+
     try:
         if settings.bot_mode == "polling":
             await run_polling(bot)  # LongPoll-цикл вместо ожидания вебхуков
         else:
-            await asyncio.Event().wait()  # события приходят в вебхук
+            await stop.wait()  # события приходят в вебхук; ждём сигнала остановки
     finally:
+        busy_task.cancel()
+        try:
+            saved = await restart_safety.save_solo_battles(redis)
+            if saved:
+                logger.info("Сохранено соло-боёв до перезапуска: {}", saved)
+        except Exception:
+            logger.exception("Соло-бои не сохранились")
         mount_scheduler.shutdown(wait=False)
         respawn_scheduler.shutdown(wait=False)
         rest_scheduler.shutdown()

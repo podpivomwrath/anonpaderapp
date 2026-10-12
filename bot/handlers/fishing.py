@@ -56,6 +56,48 @@ def setup(bot_api, scheduler: PeerScheduler | None = None) -> None:
     _bite_scheduler = scheduler
 
 
+#: После перезапуска поклёвка приходит через столько секунд, а окно
+#: подсечки отсчитывается заново - игрок не виноват, что бот перезапускался.
+RESUME_BITE_DELAY_SECONDS = 3
+
+
+async def resume_after_restart() -> int:
+    """Забросы, у которых перезапуск унёс таймер поклёвки (2026-10-12).
+
+    Заброс целиком лежит в базе, пропадала только задача «клюёт!». Поклёвка
+    ещё впереди - будильник на её время. Уже прошла или прошла и окно
+    подсечки (бот лежал) - поклёвка заново через пару секунд и с полным
+    окном: иначе игрок после каждого деплоя терял рыбу ни за что."""
+    from datetime import datetime, timedelta, timezone
+
+    from sqlalchemy import select
+
+    from models import Character, User
+
+    if _bite_scheduler is None:
+        return 0
+    now = datetime.now(timezone.utc)
+    resumed = 0
+    async with get_session_factory()() as db:
+        rows = (await db.execute(
+            select(User.vk_id, Character)
+            .join(Character, Character.user_id == User.id)
+            .where(Character.fishing_cast_at.is_not(None), Character.fishing_bite_at.is_not(None),
+                   Character.fishing_pending_fish.is_not(None))
+        )).all()
+        for peer_id, character in rows:
+            bite_at = character.fishing_bite_at
+            if bite_at.tzinfo is None:
+                bite_at = bite_at.replace(tzinfo=timezone.utc)
+            if bite_at <= now + timedelta(seconds=1):
+                bite_at = now + timedelta(seconds=RESUME_BITE_DELAY_SECONDS)
+                character.fishing_bite_at = bite_at
+            _bite_scheduler.schedule(peer_id, max((bite_at - now).total_seconds(), 0.0))
+            resumed += 1
+        await db.commit()
+    return resumed
+
+
 async def on_bite(peer_id: int) -> None:
     """Сработал таймер поклёвки: шлём сообщение с кнопкой подсечки.
 

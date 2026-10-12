@@ -115,6 +115,52 @@ def setup(engine: TickEngine, bot_api) -> None:
     _bot_api = bot_api
 
 
+# --- Перезапуск бота (2026-10-12, bot/restart_safety.py) ----------------------
+# Всё, что соло-бою нужно, чтобы продолжиться после перезапуска: состояние
+# движка и отметки этого модуля по peer_id. Выбор «надеть/в сумку» не
+# сохраняется - это уже не бой.
+_SNAPSHOT_MAPS = (
+    "_encounter_class", "_last_player_hp", "_encounter_mob_level", "_encounter_mob_name",
+    "_battle_trackers", "_story_encounter", "_mount_ambush", "_event_bonus",
+)
+
+
+def solo_snapshots() -> dict[int, dict]:
+    """Идущие соло-бои с тварями: peer_id -> всё для restore_solo. Заход к
+    мировому боссу не сохраняется - его итог считается по урону сам."""
+    if _engine is None:
+        return {}
+    out = {}
+    for peer_id, state in _engine.sessions.items():
+        if peer_id in _world_boss or state.mode != CombatMode.PVE or state.is_raid:
+            continue
+        data = {"state": state}
+        for name in _SNAPSHOT_MAPS:
+            registry = globals()[name]
+            if peer_id in registry:
+                data[name] = registry[peer_id]
+        out[peer_id] = data
+    return out
+
+
+async def restore_solo(peer_id: int, data: dict) -> bool:
+    """Вернуть сохранённый бой и показать игроку доску с кнопками."""
+    if _engine is None or has_active_encounter(peer_id):
+        return False
+    state = data["state"]
+    for name in _SNAPSHOT_MAPS:
+        if name in data:
+            globals()[name][peer_id] = data[name]
+    _engine.restore_session(state)
+    if _bot_api is not None:
+        await _bot_api.messages.send(
+            peer_id=peer_id, random_id=0,
+            message="⚔️ Бот обновился - бой продолжается с того же хода.\n\n" + _render(state, None),
+            keyboard=_combat_kb(state, peer_id),
+        )
+    return True
+
+
 def has_active_encounter(peer_id: int) -> bool:
     return _engine is not None and peer_id in _engine.sessions
 

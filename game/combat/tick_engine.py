@@ -139,6 +139,16 @@ class TickEngine:
         self._resolve_locks[state.session_id] = asyncio.Lock()
         self._open_tick(state)
 
+    def restore_session(self, state: CombatSessionState) -> None:
+        """Бой, сохранённый перед перезапуском (bot/restart_safety.py): ход уже
+        открыт - номер тика тот же, просто вернуть в реестр. Только соло PvE:
+        у него нет таймера хода, который пришлось бы заводить заново."""
+        if state.mode != CombatMode.PVE or state.is_raid:
+            raise ValueError("Восстанавливается только соло-бой с тварью")
+        self.sessions[state.session_id] = state
+        self._generations[state.session_id] = uuid4().hex
+        self._resolve_locks[state.session_id] = asyncio.Lock()
+
     def abort_session(self, session_id: int) -> None:
         """Немедленно прерывает сессию без резолва тика и колбэков (побег из PvE)."""
         self.sessions.pop(session_id, None)

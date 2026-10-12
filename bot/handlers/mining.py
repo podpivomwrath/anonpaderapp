@@ -60,6 +60,32 @@ def _cancel_finish(peer_id: int) -> None:
         _dig_scheduler.cancel(peer_id)
 
 
+async def resume_after_restart() -> int:
+    """Добычи, у которых перезапуск унёс таймер (2026-10-12). Конец добычи
+    лежит в базе - будильник заводится на него заново, а прошедший срок
+    срабатывает сразу. Раньше игрок оставался «в забое» без руды."""
+    from datetime import datetime, timezone
+
+    from sqlalchemy import select
+
+    from models import Character, User
+
+    if _dig_scheduler is None:
+        return 0
+    now = datetime.now(timezone.utc)
+    async with get_session_factory()() as db:
+        rows = (await db.execute(
+            select(User.vk_id, Character.mining_ends_at)
+            .join(Character, Character.user_id == User.id)
+            .where(Character.mining_ends_at.is_not(None))
+        )).all()
+    for peer_id, ends_at in rows:
+        if ends_at.tzinfo is None:
+            ends_at = ends_at.replace(tzinfo=timezone.utc)
+        _dig_scheduler.schedule(peer_id, max((ends_at - now).total_seconds(), 1.0))
+    return len(rows)
+
+
 async def on_dig_done(peer_id: int) -> None:
     """Сработал таймер: выдаём руду и возвращаем обычную клавиатуру рудника."""
     if _bot_api is None:
