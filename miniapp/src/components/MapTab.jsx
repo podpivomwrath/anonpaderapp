@@ -5,7 +5,7 @@ import mapBase from '../assets/world-map-drawn-2048.webp';
 import mapDetail from '../assets/world-map-drawn-4096.webp';
 import lensFrame from '../assets/lens-frame.webp';
 import {
-  DRAW_RINGS, MAP_CENTER, cellInfo, cellSizeAt, cellToMap, cellsBetween, clamp, mapToCell,
+  DRAW_RINGS, MAP_CENTER, REGION_TITLES, cellInfo, cellSizeAt, cellToMap, cellsBetween, clamp, mapToCell,
   monolithDistance, ringBorders,
 } from '../mapCatalog.js';
 
@@ -280,6 +280,9 @@ export default function MapTab() {
   const worldBoss = mapState?.world_boss ?? null;
   // Гильдии: владения и закладки знамён.
   const guildCells = mapState?.guild_cells ?? [];
+  // Города (2026-10-13): на рисованной карте их клетки было не найти -
+  // подсветка клетки и значок.
+  const cityCells = Object.entries(catalog?.city_coords || {}).map(([region, [x, y]]) => ({ region, x, y }));
 
   const toScreen = useCallback((u, v) => ({
     x: (u - view.cu) * view.scale + size.width / 2,
@@ -639,6 +642,7 @@ export default function MapTab() {
     : travelTarget && playerPos ? [[playerPos.x, playerPos.y], [travelTarget.to_x, travelTarget.to_y]] : [];
 
   const pins = [
+    ...cityCells.map((c) => [c.x, c.y, 'map-pin--city', '🏛', `${REGION_TITLES[c.region] || 'Город'} · город`, 1.15]),
     ...(catalog.lakes || []).map((l) => [l.x, l.y, 'map-pin--lake', '🎣', l.name, 0.8]),
     ...(catalog.mines || []).map((m) => [
       m.x, m.y, `map-pin--mine${(mapState.mine_ore?.[m.id] || 0) > 0 ? '' : ' map-pin--empty'}`,
@@ -764,6 +768,11 @@ export default function MapTab() {
                 />
               ))}
               <path className="map-grid" d={gridPath} />
+              {cityCells.map((c) => {
+                const s = cellScreen(c.x, c.y);
+                const px = Math.max(cellSizeAt(monolithDistance(c.x, c.y)) * view.scale, 10);
+                return <rect key={`c:${c.region}`} className="map-city-cell" x={s.x - px / 2} y={s.y - px / 2} width={px} height={px} rx={3} />;
+              })}
               {guildCells.map((g) => {
                 const s = cellScreen(g.x, g.y);
                 const px = Math.max(cellSizeAt(monolithDistance(g.x, g.y)) * view.scale, 8);

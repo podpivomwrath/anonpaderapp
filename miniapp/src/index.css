@@ -471,6 +471,19 @@ body {
   color: #ffe066;
 }
 
+/* Города: светлая подсветка клетки и значок - на рисованной карте их не
+   было видно (2026-10-13). */
+.map-city-cell {
+  fill: rgba(255, 214, 140, 0.22);
+  stroke: rgba(255, 224, 170, 0.9);
+  stroke-width: 1.6;
+}
+
+.map-pin--city {
+  border: 2px solid #e8c27a;
+  background: rgba(40, 28, 10, 0.88);
+}
+
 /* Торговля: караван и оставленная повозка. */
 .map-pin--caravan {
   border-color: #e0a64a;
