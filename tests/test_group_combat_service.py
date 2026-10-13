@@ -76,3 +76,14 @@ async def character_pos(make_character, x, y, **kwargs):
     character.pos_x = x
     character.pos_y = y
     return character
+
+
+def test_group_kills_share() -> None:
+    """2026-10-13: убийства в группе - мобы на игроков, округлено, минимум 1."""
+    from services.group_combat_service import group_kills_share
+
+    assert group_kills_share(3, 4) == 1   # 0,75 -> 1
+    assert group_kills_share(1, 5) == 1   # меньше 1 не бывает
+    assert group_kills_share(6, 2) == 3
+    assert group_kills_share(5, 2) == 3   # 2,5 -> 3
+    assert group_kills_share(0, 3) == 0

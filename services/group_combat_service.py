@@ -51,6 +51,16 @@ class MobKillReward:
     elixir_line: str | None = None
 
 
+def group_kills_share(mobs_killed: int, players: int) -> int:
+    """Сколько убийств в рейтинг идёт каждому участнику группового боя:
+    убитые мобы на число игроков, округлено, но не меньше 1, если убит хоть
+    кто-то (2026-10-13, решение владельца: раньше каждый моб шёл в счёт
+    каждому выжившему целиком)."""
+    if mobs_killed <= 0 or players <= 0:
+        return 0
+    return max(1, int(mobs_killed / players + 0.5))  # обычное округление: 2,5 -> 3
+
+
 async def reward_mob_kill(
     db: AsyncSession, alive_members: list[Character], mob_level: int, rng: random.Random,
 ) -> list[MobKillReward]:
@@ -81,8 +91,8 @@ async def reward_mob_kill(
         group_kick = None
         if levelup.levels_gained > 0:
             group_kick = await group_service.enforce_level_gap(db, character)
-        # Патч 58: см. комментарий в services/encounter_service.py.
-        character.mobs_killed += 1
+        # Счётчик убийств в группе - не здесь, а в конце боя: убитые мобы
+        # делятся на число игроков (2026-10-13, см. group_kills_share).
         trophies = await trophy_service.grant_from_kill(db, character, rng)
         item = await item_service.grant_from_kill(db, character, mob_level, rng)
         raid_key_dropped = await raid_key_service.maybe_grant(db, character, rng)

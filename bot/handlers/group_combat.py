@@ -756,6 +756,9 @@ async def on_group_battle_finished(session_id: int, result: TickResult) -> None:
     # о ходах по каждому участнику у группы нет - засчитываем победу с
     # уровнем самого сильного моба и здоровьем на конец боя.
     mob_level = max((c.level for c in combatants.values() if c.kind == "mob"), default=0)
+    kills_each = group_combat_service.group_kills_share(
+        sum(1 for c in combatants.values() if c.kind == "mob" and not c.alive), len(battle.participants),
+    )
     battle_dailies: dict[int, object] = {}
     async with get_session_factory()() as db:
         has_mount_by_cid = {}
@@ -765,6 +768,7 @@ async def on_group_battle_finished(session_id: int, result: TickResult) -> None:
             character = await db.get(Character, cid)
             if character is None:
                 continue
+            character.mobs_killed += kills_each
             positions[cid] = (character.pos_x, character.pos_y)
             if cid in survivor_ids:
                 has_mount_by_cid[cid] = await mount_service.has_any_mount(db, cid)
