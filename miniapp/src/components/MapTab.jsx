@@ -282,7 +282,7 @@ export default function MapTab() {
   const guildCells = mapState?.guild_cells ?? [];
   // Города (2026-10-13): на рисованной карте их клетки было не найти -
   // подсветка клетки и значок.
-  const cityCells = Object.entries(catalog?.city_coords || {}).map(([region, [x, y]]) => ({ region, x, y }));
+  const cityCells = Object.entries(catalog?.city_coords || {}).map(([region, [x, y]]) => ({ region, x, y, title: REGION_TITLES[region] }));
 
   const toScreen = useCallback((u, v) => ({
     x: (u - view.cu) * view.scale + size.width / 2,
@@ -642,7 +642,7 @@ export default function MapTab() {
     : travelTarget && playerPos ? [[playerPos.x, playerPos.y], [travelTarget.to_x, travelTarget.to_y]] : [];
 
   const pins = [
-    ...cityCells.map((c) => [c.x, c.y, 'map-pin--city', '🏛', `${REGION_TITLES[c.region] || 'Город'} · город`, 1.15]),
+    ...cityCells.map((c) => [c.x, c.y, 'map-pin--city', '🏛', `${c.title} · город`, 1.15]),
     ...(catalog.lakes || []).map((l) => [l.x, l.y, 'map-pin--lake', '🎣', l.name, 0.8]),
     ...(catalog.mines || []).map((m) => [
       m.x, m.y, `map-pin--mine${(mapState.mine_ore?.[m.id] || 0) > 0 ? '' : ' map-pin--empty'}`,

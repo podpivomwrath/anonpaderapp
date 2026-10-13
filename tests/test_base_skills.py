@@ -239,12 +239,13 @@ def test_warcry_boosts_own_damage() -> None:
     a = combatant(1, side=0, strength=100)
     b = combatant(2, side=1, vitality=500)
     state = make_session(a, b)
-    resolve_tick(state, {1: skill("warrior_warcry", 2)}, rng)  # ход 1: клич, урона нет
-    assert b.current_hp == b.max_hp
+    resolve_tick(state, {1: skill("warrior_warcry", 2)}, rng)  # ход 1: клич - удар 120%
+    cry_hit = b.max_hp - b.current_hp
     assert a.has_effect(EffectKind.DAMAGE_BUFF)
 
+    before = b.current_hp
     resolve_tick(state, {1: attack(2)}, rng)  # ход 2: атака с баффом
-    boosted = b.max_hp - b.current_hp
+    boosted = before - b.current_hp
 
     # эталон без клича
     a2 = combatant(3, side=0, strength=100)
@@ -253,7 +254,9 @@ def test_warcry_boosts_own_damage() -> None:
     resolve_tick(s2, {3: attack(4)}, rng)
     plain = b2.max_hp - b2.current_hp
 
-    assert boosted == round(plain * 1.3)
+    assert boosted == round(plain * 1.2)
+    # сам клич баффом не усилен: 120% обычного удара
+    assert abs(cry_hit - plain * 1.2) <= 1
 
 
 def test_self_buff_skills_show_in_battle_log() -> None:
@@ -262,7 +265,7 @@ def test_self_buff_skills_show_in_battle_log() -> None:
     а эффект строки не давал."""
     from game.combat import battle_log
 
-    for skill_id, what in (("warrior_warcry", "урон +30%"), ("rogue_smoke", "уклонение")):
+    for skill_id, what in (("warrior_warcry", "урон +20%"), ("rogue_smoke", "уклонение")):
         a = combatant(1, side=0)
         a.name = "Кричащий"
         b = combatant(2, side=1, vitality=500)

@@ -20,10 +20,10 @@
     {
       "id": "warrior_warcry",
       "name": "Боевой клич",
-      "multiplier": 0,
+      "multiplier": 1.2,
       "cd": 5,
       "effect": "self_damage_buff",
-      "effect_value": 0.3,
+      "effect_value": 0.2,
       "effect_duration": 2,
       "flavor": "Рёв, от которого стынет чужая кровь и вскипает своя."
     }

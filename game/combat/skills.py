@@ -167,7 +167,7 @@ def outgoing_multiplier(actor: CombatantState, target: CombatantState) -> float:
     damage_bonus активного пресета (патч 14, ч.3 — напр. Тяжёлая рука/Кровавая ярость),
     Пепельная лихорадка (патч 16 — эскалирующий бонус, value обновляется по ходам)."""
     mult = 1.0 - min(actor.effect_total(EffectKind.WEAKEN), 0.9)
-    mult *= 1.0 + actor.effect_total(EffectKind.DAMAGE_BUFF)  # Боевой клич +30%
+    mult *= 1.0 + actor.effect_total(EffectKind.DAMAGE_BUFF)  # Боевой клич +20%
     mult *= 1.0 + actor.buff_modifiers.get("damage_bonus", 0.0)
     mult *= 1.0 + actor.effect_total(EffectKind.ASHEN_FEVER)
     mult *= 1.0 + actor.effect_total(EffectKind.ELEMENTAL_FLOW)  # Стихийный поток (патч 46, ч.1)
