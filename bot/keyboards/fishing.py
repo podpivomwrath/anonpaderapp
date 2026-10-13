@@ -7,6 +7,8 @@
 
 from vkbottle import Keyboard, KeyboardButtonColor, Text
 
+from bot.keyboards.world import add_miniapp_button
+
 from bot.fishing_texts import BTN_BAG, BTN_CAST, BTN_FISH, BTN_LEAVE_LAKE, BTN_STRIKE
 
 
@@ -17,6 +19,7 @@ def lake_keyboard() -> str:
     kb.row()
     kb.add(Text(BTN_BAG), color=KeyboardButtonColor.SECONDARY)
     kb.add(Text(BTN_LEAVE_LAKE), color=KeyboardButtonColor.SECONDARY)
+    add_miniapp_button(kb)
     return kb.get_json()
 
 
@@ -29,6 +32,7 @@ def casting_keyboard() -> str:
     планировщик (bot/handlers/fishing.py::_on_bite)."""
     kb = Keyboard(one_time=True)
     kb.add(Text(BTN_LEAVE_LAKE), color=KeyboardButtonColor.SECONDARY)
+    add_miniapp_button(kb)
     return kb.get_json()
 
 
@@ -39,6 +43,7 @@ def bite_keyboard() -> str:
     kb.add(Text(BTN_STRIKE), color=KeyboardButtonColor.PRIMARY)
     kb.row()
     kb.add(Text(BTN_LEAVE_LAKE), color=KeyboardButtonColor.SECONDARY)
+    add_miniapp_button(kb)
     return kb.get_json()
 
 
@@ -47,6 +52,7 @@ def bag_keyboard() -> str:
     kb.add(Text(BTN_CAST), color=KeyboardButtonColor.POSITIVE)
     kb.row()
     kb.add(Text(BTN_LEAVE_LAKE), color=KeyboardButtonColor.SECONDARY)
+    add_miniapp_button(kb)
     return kb.get_json()
 
 

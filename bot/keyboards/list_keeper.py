@@ -2,6 +2,8 @@
 
 from vkbottle import Keyboard, KeyboardButtonColor, Text
 
+from bot.keyboards.world import add_miniapp_button
+
 BTN_PAY = "Заплатить 20 000"
 BTN_LEAVE = "Уйти"
 BTN_CHOOSE_PATH = "Выбрать этот путь"
@@ -24,6 +26,7 @@ def offer_keyboard() -> str:
     kb.add(Text(BTN_PAY), color=KeyboardButtonColor.POSITIVE)
     kb.row()
     kb.add(Text(BTN_LEAVE), color=KeyboardButtonColor.SECONDARY)
+    add_miniapp_button(kb)
     return kb.get_json()
 
 
@@ -31,6 +34,7 @@ def paths_keyboard(titles: list[str]) -> str:
     kb = Keyboard(one_time=True)
     for title in titles:
         kb.add(Text(title), color=KeyboardButtonColor.PRIMARY)
+    add_miniapp_button(kb)
     return kb.get_json()
 
 
@@ -39,6 +43,7 @@ def path_view_keyboard() -> str:
     kb.add(Text(BTN_CHOOSE_PATH), color=KeyboardButtonColor.POSITIVE)
     kb.row()
     kb.add(Text(BTN_OTHER_PATH), color=KeyboardButtonColor.SECONDARY)
+    add_miniapp_button(kb)
     return kb.get_json()
 
 
@@ -47,6 +52,7 @@ def path_confirm_keyboard() -> str:
     kb.add(Text(BTN_CONFIRM_PATH), color=KeyboardButtonColor.POSITIVE)
     kb.row()
     kb.add(Text(BTN_THINK_MORE), color=KeyboardButtonColor.SECONDARY)
+    add_miniapp_button(kb)
     return kb.get_json()
 
 
@@ -62,6 +68,7 @@ def remake_keyboard(has_subclass: bool) -> str:
     kb.add(Text(BTN_REMAKE_STATS), color=KeyboardButtonColor.PRIMARY)
     kb.row()
     kb.add(Text(BTN_REMAKE_CANCEL), color=KeyboardButtonColor.SECONDARY)
+    add_miniapp_button(kb)
     return kb.get_json()
 
 
@@ -70,6 +77,7 @@ def remake_confirm_keyboard() -> str:
     kb.add(Text(BTN_REMAKE_CONFIRM), color=KeyboardButtonColor.NEGATIVE)
     kb.row()
     kb.add(Text(BTN_REMAKE_CANCEL), color=KeyboardButtonColor.SECONDARY)
+    add_miniapp_button(kb)
     return kb.get_json()
 
 
@@ -79,6 +87,7 @@ def base_class_keyboard(titles: list[str]) -> str:
         kb.add(Text(title), color=KeyboardButtonColor.PRIMARY)
         kb.row()
     kb.add(Text(BTN_REMAKE_CANCEL), color=KeyboardButtonColor.SECONDARY)
+    add_miniapp_button(kb)
     return kb.get_json()
 
 
@@ -88,4 +97,5 @@ def trials_keyboard() -> str:
     kb.add(Text(BTN_REMAKE), color=KeyboardButtonColor.SECONDARY)
     kb.row()
     kb.add(Text(BTN_KEEPER_LEAVE), color=KeyboardButtonColor.SECONDARY)
+    add_miniapp_button(kb)
     return kb.get_json()

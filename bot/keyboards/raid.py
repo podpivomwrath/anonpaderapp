@@ -7,6 +7,8 @@ bot/keyboards/group_combat.py — vkbottle диспетчерит по перв�
 
 from vkbottle import Keyboard, KeyboardButtonColor, Text
 
+from bot.keyboards.world import add_miniapp_button
+
 from bot.keyboards import combat_modes
 from bot.keyboards.layout import add_paired
 from bot.raid_texts import BTN_RAID_BACK, BTN_RAID_CANCEL_READY, BTN_TOUCH_MONOLITH, RAID_TITLES
@@ -37,6 +39,7 @@ def raid_list_keyboard() -> str:
         kb.add(Text(title, payload={"type": "raid_pick", "raid": raid_id}))
         kb.row()
     kb.add(Text(BTN_RAID_BACK, payload={"type": "raid_list_back"}))
+    add_miniapp_button(kb)
     return kb.get_json()
 
 

@@ -763,6 +763,9 @@ async def collect_ash_handful(message: Message) -> None:
     собрано/сгорело при следующем «Исследовать») молча игнорируется."""
     peer_id = message.peer_id
     if not ash_handful_state.is_pending(peer_id):
+        # Кнопка живёт в чате и после «Исследовать» остаётся видна - ответить,
+        # а не молчать.
+        await message.answer(ASH_BURNED_LINE)
         return
     async with get_session_factory()() as db:
         character = await onboarding_svc.get_character(db, message.from_id)
@@ -1077,6 +1080,8 @@ async def event_choice(message: Message) -> None:
         attachment=location_attachment(character),
         keyboard=kb.movement_keyboard(character.pos_x, character.pos_y, peer_id, has_mount=has_mount),
     )
+    if ash_handful_state.is_pending(peer_id):
+        await message.answer(kb.ASH_OFFER_TEXT, keyboard=kb.ash_handful_keyboard())
     await _maybe_send_monolith_button(peer_id, character)
 
 

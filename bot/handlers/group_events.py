@@ -25,7 +25,7 @@ from vkbottle.bot import BotLabeler, Message
 
 from bot.activity import ActivityBusy
 from bot.handlers import scene_events as scene_event_handlers
-from bot.keyboards.world import waiting_keyboard
+from bot.keyboards.world import add_miniapp_button, waiting_keyboard
 from bot.vk_media import photo_attachment
 from game.world import group_events as ge
 from models import Character, CharacterStats
@@ -109,6 +109,7 @@ def _keyboard(scene: GroupScene, cid: int) -> str:
         kb.row()
     if kb.buttons and not kb.buttons[-1]:
         kb.buttons.pop()
+    add_miniapp_button(kb)
     return kb.get_json()
 
 

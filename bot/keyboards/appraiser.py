@@ -141,6 +141,7 @@ def sell_confirm_keyboard(confirm_payload: dict) -> str:
     kb.add(Text("Да, продать", payload=confirm_payload), color=KeyboardButtonColor.POSITIVE)
     kb.row()
     kb.add(Text("Отмена", payload={"type": "appraiser_gear"}), color=KeyboardButtonColor.NEGATIVE)
+    add_miniapp_button(kb)
     return kb.get_json()
 
 

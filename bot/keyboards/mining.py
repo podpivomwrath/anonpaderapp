@@ -7,6 +7,8 @@
 
 from vkbottle import Keyboard, KeyboardButtonColor, Text
 
+from bot.keyboards.world import add_miniapp_button
+
 from bot.mining_texts import (
     BTN_ABANDON,
     BTN_DIG,
@@ -29,6 +31,7 @@ def mine_keyboard(has_ore: bool) -> str:
         kb.row()
     kb.add(Text(BTN_ORE), color=KeyboardButtonColor.SECONDARY)
     kb.add(Text(BTN_LEAVE_MINE), color=KeyboardButtonColor.SECONDARY)
+    add_miniapp_button(kb)
     return kb.get_json()
 
 
@@ -42,12 +45,14 @@ def digging_keyboard() -> str:
     """
     kb = Keyboard(one_time=True)
     kb.add(Text(BTN_ABANDON), color=KeyboardButtonColor.NEGATIVE)
+    add_miniapp_button(kb)
     return kb.get_json()
 
 
 def ore_keyboard() -> str:
     kb = Keyboard(one_time=True)
     kb.add(Text(BTN_LEAVE_MINE), color=KeyboardButtonColor.SECONDARY)
+    add_miniapp_button(kb)
     return kb.get_json()
 
 

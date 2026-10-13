@@ -9,7 +9,6 @@
 
 from vkbottle import Keyboard, KeyboardButtonColor, OpenLink, Text
 
-from bot import ash_handful_state
 from bot.keyboards import combat_modes
 from bot.keyboards.layout import add_paired
 from bot.onboarding_texts import REGION_TITLES
@@ -208,8 +207,8 @@ def movement_keyboard(
 ) -> str:
     """Карта (патч 25, п.1: компактная раскладка): крест перемещения с
     Исследовать в центре, часто используемые Отдых/Осмотреться сразу под
-    ним, редкие/условные (Горстка пепла/Маунт) — отдельными рядами только
-    когда актуальны, справочное (мини-апп) — внизу отдельно. Вход в город —
+    ним, Маунт — отдельным рядом, когда он есть (Горстка пепла с 2026-10-13 -
+    кнопкой в чате, ash_handful_keyboard), справочное (мини-апп) — внизу отдельно. Вход в город —
     автоматически при прибытии.
 
     Патч 17: направления за краем мира не показываются;
@@ -244,10 +243,20 @@ def movement_keyboard(
     extras: list[tuple[str, KeyboardButtonColor, dict | None]] = []
     if has_mount:
         extras.append((BTN_MOUNT, KeyboardButtonColor.SECONDARY, None))
-    if peer_id is not None and ash_handful_state.is_pending(peer_id):
-        extras.append((BTN_ASH_HANDFUL, KeyboardButtonColor.SECONDARY, None))
     add_paired(kb, extras)
     add_miniapp_button(kb)
+    return kb.get_json()
+
+
+ASH_OFFER_TEXT = "🌫 В пепле у ног что-то темнеет. Подбери, пока не пошёл дальше."
+
+
+def ash_handful_keyboard() -> str:
+    """Горстка пепла - кнопкой прямо в чате, под отдельным сообщением после
+    сводки локации (2026-10-13; раньше жила в нижней клавиатуре карты и
+    теснила её). «Исследовать» её сжигает, как и прежде."""
+    kb = Keyboard(inline=True)
+    kb.add(Text(BTN_ASH_HANDFUL, payload={"type": "ash_handful"}), color=KeyboardButtonColor.SECONDARY)
     return kb.get_json()
 
 

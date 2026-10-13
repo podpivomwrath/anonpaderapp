@@ -55,4 +55,5 @@ def elixir_quantity_keyboard(elixir: ElixirDef, farm_currency: int) -> str:
         items.append((f"×{qty} - {total} зол.", KeyboardButtonColor.POSITIVE, {"type": "buy_elixir_qty", "id": elixir.id, "qty": qty}))
     add_paired(kb, items)
     kb.add(Text(BTN_BACK, payload={"type": "elixir_shop_item_back"}), color=KeyboardButtonColor.SECONDARY)
+    add_miniapp_button(kb)
     return kb.get_json()

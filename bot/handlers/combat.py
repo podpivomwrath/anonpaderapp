@@ -15,9 +15,11 @@ from bot.handlers import stats_window
 from bot.keyboards.combat_items import combat_items_keyboard
 from bot.keyboards.items import item_choice_keyboard, no_keyboard
 from bot.keyboards.world import (
+    ASH_OFFER_TEXT,
     BTN_ATTACK,
     BTN_FLEE,
     BTN_ITEM,
+    ash_handful_keyboard,
     combat_keyboard,
     empty_keyboard,
     movement_keyboard,
@@ -628,6 +630,10 @@ async def on_battle_finished(session_id: int, result: TickResult) -> None:
             random_id=0, attachment=location_attachment(character),
             keyboard=movement_keyboard(character.pos_x, character.pos_y, peer_id, has_mount=has_mount),
         )
+        if ash_handful_state.is_pending(peer_id):
+            await _bot_api.messages.send(
+                peer_id=peer_id, message=ASH_OFFER_TEXT, random_id=0, keyboard=ash_handful_keyboard(),
+            )
     elif on_defeat_hook is not None:
         # смерть: убрать кнопки, атмосферный текст (+ штраф опыта); респавн — автоматически
         await on_defeat_hook(peer_id, respawn_at, xp_lost)
@@ -710,6 +716,10 @@ async def item_choice(message: Message) -> None:
         attachment=location_attachment(character),
         keyboard=movement_keyboard(character.pos_x, character.pos_y, peer_id, has_mount=has_mount),
     )
+    if ash_handful_state.is_pending(peer_id):
+        await _bot_api.messages.send(
+            peer_id=peer_id, message=ASH_OFFER_TEXT, random_id=0, keyboard=ash_handful_keyboard(),
+        )
 
 
 # --- Действия игрока ---
