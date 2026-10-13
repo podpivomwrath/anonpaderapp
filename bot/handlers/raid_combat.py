@@ -216,7 +216,7 @@ def _build_player_combatants(state: CombatSessionState, member_inputs: list[Memb
             id=m.character.id, side=0, kind="character", name=m.character.name,
             level=m.character.level, stats=stats, primary_stat=primary,
             subclass_id=m.character.subclass, buff_modifiers=m.buff_modifiers,
-            base_class=m.character.base_class,
+            base_class=m.character.base_class, gear_vit=bonus.get("vit", 0),
         )
         # Между этапами HP восстанавливается ПОЛНОСТЬЮ, включая погибших на
         # предыдущем этапе (текст патча) — новый CombatantState стартует с

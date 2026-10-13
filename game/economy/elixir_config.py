@@ -17,11 +17,24 @@ ELIXIR_PRICES = {
 }
 
 # --- Лечебные зелья (тратят ход в бою, вне боя — мгновенно) ---
-HEAL_PCT = {
-    "heal_small": 0.30,
-    "heal_medium": 0.55,
-    "heal_large": 1.0,
+# Лечение = фикс + доля максимального здоровья (2026-10-13, решение
+# владельца): было 30/55/100% - Большое лечило полностью, и 10 зелий за бой
+# давали десять запасов здоровья. Фикс держит зелья заметными у новичков,
+# малая доля режет лечение на высоких уровнях в 3-5 раз.
+HEAL_FORMULA: dict[str, tuple[int, float]] = {
+    "heal_small": (50, 0.08),
+    "heal_medium": (100, 0.12),
+    "heal_large": (200, 0.15),
 }
+
+
+def heal_amount(item_id: str | None, max_hp: int) -> int | None:
+    """Сколько лечит зелье бойцу с max_hp; None - это не лечебное зелье."""
+    formula = HEAL_FORMULA.get(item_id) if item_id else None
+    if formula is None:
+        return None
+    flat, pct = formula
+    return round(flat + max_hp * pct)
 
 # --- Боевые эликсиры (бесплатное действие, лимит за бой) ---
 ELIXIR_PER_BATTLE_LIMIT = 2

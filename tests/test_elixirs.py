@@ -125,7 +125,7 @@ def test_heal_item_consumes_turn_and_heals_pct_max_hp() -> None:
         {3: DeclaredAction(type=ActionType.ITEM, item_id="heal_medium", target_id=3)},
         rng,
     )
-    expected_heal = round(p_heal.max_hp * ec.HEAL_PCT["heal_medium"])
+    expected_heal = ec.heal_amount("heal_medium", p_heal.max_hp)
     assert p_heal.current_hp == min(hp_after_skip + expected_heal, p_heal.max_hp)
 
 
@@ -368,3 +368,17 @@ def test_shard_blood_adds_flat_damage_per_hit() -> None:
 def test_combat_elixirs_used_counter_starts_at_zero() -> None:
     player = combatant(1, side=0)
     assert player.combat_elixirs_used == 0
+
+
+def test_heal_potion_formula_from_white_hp() -> None:
+    """2026-10-13: фикс + % от здоровья без выносливости экипировки."""
+    from game.combat.session import Stats, build_combatant, white_max_hp
+
+    naked = build_combatant(1, 0, "character", "А", 40, Stats(strength=50, agility=50, intellect=50, vitality=60, will=50), "str")
+    geared = build_combatant(2, 0, "character", "Б", 40, Stats(strength=50, agility=50, intellect=50, vitality=160, will=50),
+                             "str", gear_vit=100)
+    assert geared.max_hp > naked.max_hp
+    assert white_max_hp(geared) == naked.max_hp  # экипировка в лечение не идёт
+    assert ec.heal_amount("heal_large", white_max_hp(geared)) == round(200 + naked.max_hp * 0.15)
+    assert ec.heal_amount("heal_small", 1000) == 130
+    assert ec.heal_amount("ashen_fever", 1000) is None

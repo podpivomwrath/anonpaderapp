@@ -133,6 +133,9 @@ class CombatantState:
     current_hp: int
     subclass_id: str | None = None
     base_class: str | None = None  # у персонажа - для пассивок базового класса
+    #: Выносливость от экипировки (2026-10-13): зелья лечат от «белого»
+    #: здоровья, без неё - см. white_max_hp.
+    gear_vit: int = 0
     # Мерж stat_modifiers всех баффов активного пресета (патч 14, ч.3) — читается
     # умениями подкласса по имени ключа (full_block_chance, damage_bonus, ...).
     buff_modifiers: dict[str, float] = field(default_factory=dict)
@@ -308,10 +311,12 @@ def build_combatant(
     tier: str | None = None,
     buff_modifiers: dict[str, float] | None = None,
     base_class: str | None = None,
+    gear_vit: int = 0,
 ) -> CombatantState:
     """Собирает участника, считая HP/тир по формулам v2. base_class - у
     персонажа: до подкласса даёт пассивку класса - здоровье воина здесь, крит
-    разбойника в compute_hit (по combatant.base_class), см. bc.BASE_CLASS_*."""
+    разбойника в compute_hit (по combatant.base_class), см. bc.BASE_CLASS_*.
+    gear_vit - сколько выносливости в stats от экипировки (для зелий)."""
     tier = tier or formulas.tier_for_level(level)
     max_hp = round(formulas.hp(level, stats.vitality, formulas.tier_multiplier(tier)))
     if kind == "character":
@@ -330,7 +335,21 @@ def build_combatant(
         subclass_id=subclass_id,
         base_class=base_class,
         buff_modifiers=buff_modifiers or {},
+        gear_vit=gear_vit,
     )
+
+
+def white_max_hp(c: CombatantState) -> int:
+    """Максимум здоровья без выносливости экипировки - от него лечат зелья
+    (2026-10-13, решение владельца). Здоровье линейно по выносливости, и
+    класс с тиром его только умножают - поэтому пропорцией от max_hp."""
+    gear = getattr(c, "gear_vit", 0) or 0
+    if gear <= 0 or c.max_hp <= 0:
+        return c.max_hp
+    tm = formulas.tier_multiplier(c.tier)
+    full = formulas.hp(c.level, c.stats.vitality, tm)
+    bare = formulas.hp(c.level, max(0, c.stats.vitality - gear), tm)
+    return max(1, round(c.max_hp * bare / full)) if full > 0 else c.max_hp
 
 
 @dataclass

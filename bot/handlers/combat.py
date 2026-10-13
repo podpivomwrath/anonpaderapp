@@ -279,7 +279,7 @@ async def start_encounter(
         id=PLAYER_ID, side=0, kind="character", name=character.name,
         level=character.level, stats=stats, primary_stat=primary,
         subclass_id=character.subclass, buff_modifiers=buff_modifiers,
-        base_class=character.base_class,
+        base_class=character.base_class, gear_vit=bonus.get("vit", 0),
     )
     # HP переносится между боями (отдых/респавн лечат) — не всегда полное
     player.current_hp = vitals_service.current_hp(character, char_stats, bonus.get("vit", 0))
