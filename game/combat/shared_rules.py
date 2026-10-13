@@ -49,8 +49,8 @@ def absorb_by_shields(
     *,
     pierce: float = 0.0,
 ) -> int:
-    """Проводит урон через однотиковый щит и через «Второе сердце», возвращает
-    то, что дошло до здоровья.
+    """Проводит урон через однотиковый щит и через все долгие щиты (Второе
+    сердце, Оберег, свиток, щиты мобов), возвращает то, что дошло до здоровья.
 
     pierce > 0 (яд под «Токсикологией») уменьшает ПОГЛОЩАЕМУЮ ДОЛЮ УРОНА, а не
     размер щита: пробитая часть проходит всегда, даже сквозь огромный щит.
@@ -66,15 +66,27 @@ def absorb_by_shields(
         budget -= absorbed
         if absorbed:
             lines.append(f"Щит {target.name} поглощает {absorbed} урона 🛡")
-    pool = target.effects_of(EffectKind.SHIELD_POOL)
-    if pool and budget > 0:
-        first = pool[0]
-        pool_absorbed = min(int(first.value), budget)
-        first.value -= pool_absorbed
+    # Долгие щиты - все по очереди, первым тот, что истекает раньше
+    # (2026-10-13). Раньше урон брал только первый щит в списке: сверх него
+    # шёл в здоровье при живом втором щите, а опустевший щит висел первым до
+    # конца срока и закрывал собой остальные.
+    pool = sorted(
+        (e for e in target.effects_of(EffectKind.SHIELD_POOL) if e.value > 0),
+        key=lambda e: e.remaining_ticks,
+    )
+    for shield in pool:
+        if budget <= 0:
+            break
+        pool_absorbed = min(int(shield.value), budget)
+        shield.value -= pool_absorbed
         amount -= pool_absorbed
         budget -= pool_absorbed
         if pool_absorbed:
-            lines.append(f"🛡️ {shield_name(first)} {target.name} поглощает {pool_absorbed} урона")
+            lines.append(f"🛡️ {shield_name(shield)} {target.name} поглощает {pool_absorbed} урона")
+    # Пустые щиты снимаем сразу: в остатке у здоровья их и так не видно.
+    target.effects = [
+        e for e in target.effects if not (e.kind == EffectKind.SHIELD_POOL and e.value <= 0)
+    ]
     return amount
 
 

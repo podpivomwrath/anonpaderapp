@@ -78,3 +78,21 @@ def test_last_breath_turns_shown_to_any_class() -> None:
     owner.subclass_id = None
     owner.apply_effect(EffectKind.LAST_BREATH, 1.0, 2, owner.id)
     assert "Последний вздох (ещё 2 х.)" in battle_log.class_line(state.combatants, owner.id)
+
+
+def test_damage_flows_through_all_shields() -> None:
+    """2026-10-13: урон идёт через все щиты по очереди (первым - истекающий
+    раньше), пустые снимаются и не закрывают собой остальные."""
+    from game.combat.session import SECOND_HEART_TAG, WARD_TAG
+    from game.combat.shared_rules import absorb_by_shields
+
+    _state, owner, _ally, _mob = _session("dark_mystic")
+    owner.apply_effect(EffectKind.SHIELD_POOL, 50.0, 1, owner.id, tag=WARD_TAG)
+    owner.apply_effect(EffectKind.SHIELD_POOL, 100.0, 3, owner.id, tag=SECOND_HEART_TAG)
+    lines: list[str] = []
+    assert absorb_by_shields(owner, 120, lines) == 0  # 50 Оберег + 70 Второе сердце
+    assert "Оберег" in lines[0] and "Второе сердце" in lines[1]
+    left = owner.effects_of(EffectKind.SHIELD_POOL)
+    assert len(left) == 1 and left[0].value == 30  # пустой Оберег снят
+    assert absorb_by_shields(owner, 50, []) == 20
+    assert not owner.effects_of(EffectKind.SHIELD_POOL)
