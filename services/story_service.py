@@ -287,7 +287,8 @@ async def check_zone_trigger(db: AsyncSession, character: Character) -> StoryQue
         return None
     dx = character.pos_x - quest.target_x
     dy = character.pos_y - quest.target_y
-    if grid.cells_between(0, 0, dx, dy) > sc.STORY_TRIGGER_RADIUS:
+    radius = sc.STORY_ENEMY_RADIUS if quest.named_enemy is not None else sc.STORY_TRIGGER_RADIUS
+    if grid.cells_between(0, 0, dx, dy) > radius:
         return None
     return quest
 

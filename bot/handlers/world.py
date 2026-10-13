@@ -371,7 +371,7 @@ async def _check_still_dead(db, character, now: datetime) -> bool:
     return death_service.is_dead(character, now)
 
 
-STORY_NEAR_HINT = "📜 Цель задания где-то рядом. Исследуй местность - первый же бой выведет на неё."
+STORY_NEAR_HINT = "📜 Цель задания здесь. Исследуй местность - первый же бой выведет на неё."
 
 
 def _story_enemy(quest, character, participant_id: int):

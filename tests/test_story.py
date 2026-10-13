@@ -188,20 +188,15 @@ async def test_region_completed_after_last_quest(db_session, make_character) -> 
 # --- Зона-триггер (check_zone_trigger) ---
 
 
-async def test_zone_trigger_fires_within_radius(db_session, character_at) -> None:
-    character = await character_at(-9, 24, region="ridge", level=20)  # dist=1 до (-10;25)
+async def test_zone_trigger_fires_only_on_the_target_cell(db_session, character_at) -> None:
+    """Шаг с сюжетным врагом - только на самой клетке цели (2026-10-13):
+    в радиусе враг выходил там, где игроку не по силам."""
+    character = await character_at(-10, 25, region="ridge", level=20)
     await _set_progress(db_session, character, "ridge_1_2", act=1, status="active")
     quest = await story_service.check_zone_trigger(db_session, character)
-    assert quest is not None
-    assert quest.id == "ridge_1_2"
+    assert quest is not None and quest.id == "ridge_1_2"
 
-
-async def test_zone_trigger_respects_radius_boundary(db_session, character_at) -> None:
-    character = await character_at(-10 + sc.STORY_TRIGGER_RADIUS, 25, region="ridge", level=20)
-    await _set_progress(db_session, character, "ridge_1_2", act=1, status="active")
-    assert await story_service.check_zone_trigger(db_session, character) is not None
-
-    character.pos_x += 1  # на клетку дальше радиуса
+    character.pos_x += 1  # соседняя клетка - уже нет
     assert await story_service.check_zone_trigger(db_session, character) is None
 
 
