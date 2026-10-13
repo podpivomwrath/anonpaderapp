@@ -306,6 +306,8 @@ async def sell(db: AsyncSession, character: Character, good_id, count, rng: rand
             raise TradeError(f"Каравану нужно ещё только {left} ящ.")
         total = caravan_sell_price(good) * count
         place.caravan.buys = {**place.caravan.buys, good.id: left - count}
+    # Уровень торговли: +1% к продаже за уровень (до +25%).
+    total = round(total * (1 + tc.sell_bonus(cart.trade_level)))
     # Себестоимость проданных ящиков - средняя по уплаченному за этот товар.
     paid_all = (cart.paid or {}).get(good.id, 0)
     cost = round(paid_all * count / have) if have else 0

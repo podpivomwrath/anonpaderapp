@@ -77,6 +77,7 @@ async def _state(db, character) -> dict:
             "repair_cost": trade_service.repair_cost(cart),
             "cargo": cargo, "crates": trade_service.crates(cart), "capacity": trade_service.capacity(cart),
             "trade_level": cart.trade_level, "trade_xp": cart.trade_xp, "xp_next": tc.xp_to_next(cart.trade_level),
+            "sell_bonus_pct": round(tc.sell_bonus(cart.trade_level) * 100),
             "profit_total": cart.profit_total, "trip_ambush": trade_service.trip_ambush(cart),
             "step_seconds": trade_service.part_value(cart, "horses"),
         }
@@ -88,7 +89,9 @@ async def _state(db, character) -> dict:
             "kind": place.kind, "title": place.title,
             "offers": [
                 {
-                    **_good(o.good), "buy": o.buy, "sell": o.sell, "stock": o.stock,
+                    **_good(o.good), "buy": o.buy, "stock": o.stock,
+                    # Цена продажи - уже с бонусом уровня торговли игрока.
+                    "sell": tc.with_sell_bonus(o.sell, cart.trade_level if cart is not None else 0),
                     "locked": cart is not None and cart.trade_level < tc.TIER_MIN_TRADE_LEVEL[o.good.tier],
                     "min_level": tc.TIER_MIN_TRADE_LEVEL[o.good.tier],
                     "deficit": place.kind == "city" and o.good.city in tc.DEFICIT[place.city],
@@ -119,7 +122,7 @@ async def _state(db, character) -> dict:
             for o in city_offers if o.buy is not None
         ]
         buys = sorted(
-            ({**_good(o.good), "price": o.sell, "deficit": o.good.city in tc.DEFICIT[r]}
+            ({**_good(o.good), "price": tc.with_sell_bonus(o.sell, level), "deficit": o.good.city in tc.DEFICIT[r]}
              for o in city_offers if o.sell is not None),
             key=lambda g: (not g["deficit"], -g["price"]),
         )

@@ -93,7 +93,7 @@ export default function TradeTab({ onWallet }) {
     <>
       {noticeBlock}
 
-      <Group header={<Header>🐂 Повозка · торговля {cart.trade_level} ур.</Header>}>
+      <Group header={<Header>🐂 Повозка · торговля {cart.trade_level} ур.{cart.sell_bonus_pct ? ` · +${cart.sell_bonus_pct}% к продаже` : ''}</Header>}>
         <Div>
           <div className="trade-xp">
             <div className="trade-xp__bar" style={{ width: `${Math.round((100 * cart.trade_xp) / cart.xp_next)}%` }} />

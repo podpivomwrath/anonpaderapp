@@ -87,6 +87,20 @@ MAX_PRESSURE = 0.45    # насыщение не опускает цену ни�
 XP_PER_CRATE = {1: 4, 2: 9, 3: 20, 4: 45}
 
 
+#: Каждый уровень торговли - +1% к цене продажи, потолок +25% (2026-10-13,
+#: решение владельца: раньше уровни между порогами товаров не давали ничего).
+SELL_BONUS_PER_LEVEL = 0.01
+SELL_BONUS_MAX = 0.25
+
+
+def sell_bonus(level: int) -> float:
+    return min(SELL_BONUS_MAX, SELL_BONUS_PER_LEVEL * max(level, 0))
+
+
+def with_sell_bonus(price: int | None, level: int) -> int | None:
+    return None if price is None else round(price * (1 + sell_bonus(level)))
+
+
 def xp_to_next(level: int) -> int:
     return 60 + 40 * level
 

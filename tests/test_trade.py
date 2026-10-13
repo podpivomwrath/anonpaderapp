@@ -164,7 +164,8 @@ async def test_caravan_trade(db_session, character_at) -> None:
     with pytest.raises(trade_service.TradeError, match="только 2"):
         await trade_service.sell(db_session, c, "ridge_slate", 3)
     deal = await trade_service.sell(db_session, c, "ridge_slate", 2, NoLuck())
-    assert deal.gold == 2 * trade_service.caravan_sell_price(tc.GOODS_BY_ID["ridge_slate"])
+    # +1% за уровень торговли (уровень 1 - +1%)
+    assert deal.gold == round(2 * trade_service.caravan_sell_price(tc.GOODS_BY_ID["ridge_slate"]) * 1.01)
     assert caravan.buys["ridge_slate"] == 0
     bought = await trade_service.buy(db_session, c, "docks_salt", 2)
     assert bought.gold == 2 * trade_service.caravan_buy_price(tc.GOODS_BY_ID["docks_salt"])
@@ -199,3 +200,12 @@ async def test_cart_ambush_follows_guard(db_session, character_at) -> None:
 
     step = mount_service.advance(travel, c, Always(), trip_chance=trade_service.trip_ambush(cart))
     assert step.ambushed  # клетка (0;29) не мирная - нападение разыгралось с шансом охраны
+
+
+def test_trade_level_sell_bonus() -> None:
+    """2026-10-13: каждый уровень торговли - +1% к продаже, потолок +25%."""
+    assert tc.sell_bonus(1) == 0.01
+    assert abs(tc.sell_bonus(8) - 0.08) < 1e-9
+    assert tc.sell_bonus(40) == 0.25
+    assert tc.with_sell_bonus(200, 10) == 220
+    assert tc.with_sell_bonus(None, 10) is None
