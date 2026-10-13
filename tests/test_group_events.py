@@ -327,3 +327,17 @@ def test_siege_full_climb_ends_with_the_final_prize() -> None:
     expected = sum(stage.options[1].gain for stage in event.stages) + event.final.reward
     assert abs(out.results[1].reward - expected) < 1e-9
     assert out.results[1].item
+
+
+def test_pot_stake_text_and_chance() -> None:
+    """2026-10-13: ставка в котёл - числом в сообщении; шанс от числа поставивших."""
+    from bot.handlers.group_events import _STAKE_RE
+    from game.world import group_events as _ge
+
+    for ok in ("100", " 1 500 ", "250 зол", "0", "84 золота"):
+        assert _STAKE_RE.match(ok), ok
+    for bad in ("сто", "/топ", "12:5", "-5", ""):
+        assert not _STAKE_RE.match(bad), bad
+    pot = _ge.event_by_id("g_bone_pot")
+    assert round(_ge.pot_chance(pot, 1), 2) == 0.43
+    assert _ge.pot_chance(pot, 10) == pot.pot_max

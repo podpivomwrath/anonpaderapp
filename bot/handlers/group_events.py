@@ -16,20 +16,23 @@ game/world/group_events.py, награды - services/scene_event_service.py.
 import asyncio
 import itertools
 import random
+import re
 from dataclasses import dataclass, field
 
 from loguru import logger
 from sqlalchemy import select
 from vkbottle import Keyboard, KeyboardButtonColor, Text
 from vkbottle.bot import BotLabeler, Message
+from vkbottle.dispatch.rules.base import FuncRule
 
 from bot.activity import ActivityBusy
 from bot.handlers import scene_events as scene_event_handlers
 from bot.keyboards.world import add_miniapp_button, waiting_keyboard
 from bot.vk_media import photo_attachment
 from game.world import group_events as ge
+from game.world import scene_events as se
 from models import Character, CharacterStats
-from services import death_service, scene_event_service, wallet_service
+from services import death_service, guild_service, scene_event_service, wallet_service
 from services import onboarding_service as onboarding_svc
 from services.db import get_session_factory
 
@@ -59,6 +62,8 @@ class GroupScene:
     victim_id: int | None = None
     state: dict = field(default_factory=dict)
     choices: dict[int, str | None] = field(default_factory=dict)
+    #: Котёл: вписанные ставки в золоте (id персонажа -> золото, 0 - не ставит)
+    pot_stakes: dict[int, int] = field(default_factory=dict)
     resolving: bool = False
     task: asyncio.Task | None = None
 
@@ -152,6 +157,13 @@ async def start(group_id: int, event: ge.GroupEvent, members: dict[int, Member],
             parts.append(ge.round_prompt(event, scene.state))
         if victim is not None:
             parts.append(event.victim_text if cid == victim.character_id else f"В трясине: {victim.name}.")
+        if event.mechanic == "pot":
+            parts.append(
+                f"⏱ {ge.POT_STAKE_SECONDS} сек. Впиши ставку в золоте одним числом "
+                f"(0 - не ставить). Можно передумать и вписать заново."
+            )
+            await _send(m.peer_id, "\n\n".join(parts), waiting_keyboard(), attachment)
+            continue
         parts.append(f"⏱ {ge.DECISION_SECONDS} сек. Решают все.")
         await _send(m.peer_id, "\n\n".join(parts), _keyboard(scene, cid), attachment)
     _arm_timer(scene)
@@ -162,8 +174,10 @@ def _arm_timer(scene: GroupScene) -> None:
 
 
 async def _timer(group_id: int, token: int) -> None:
+    scene = _scenes.get(group_id)
+    seconds = ge.POT_STAKE_SECONDS if scene is not None and scene.event.mechanic == "pot" else ge.DECISION_SECONDS
     try:
-        await asyncio.sleep(ge.DECISION_SECONDS)
+        await asyncio.sleep(seconds)
     except asyncio.CancelledError:
         return
     scene = _scenes.get(group_id)
@@ -171,6 +185,96 @@ async def _timer(group_id: int, token: int) -> None:
         return
     scene.task = None
     await _resolve(scene)
+
+
+def _pot_scene_of(peer_id: int) -> "GroupScene | None":
+    for scene in _scenes.values():
+        if scene.event.mechanic == "pot" and not scene.resolving and any(
+            m.peer_id == peer_id for m in scene.members.values()
+        ):
+            return scene
+    return None
+
+
+_STAKE_RE = re.compile(r"^\s*\d[\d\s]{0,9}\s*(зол\w*)?\s*$", re.IGNORECASE)
+
+
+@labeler.message(FuncRule(lambda message: bool(
+    _STAKE_RE.match(message.text or "") and _pot_scene_of(message.peer_id) is not None
+)))
+async def on_pot_stake(message: Message) -> None:
+    """Ставка в Котёл костей - числом в золоте (2026-10-13)."""
+    scene = _pot_scene_of(message.peer_id)
+    if scene is None:
+        return
+    cid = next(c for c, m in scene.members.items() if m.peer_id == message.peer_id)
+    amount = int("".join(ch for ch in message.text if ch.isdigit()) or 0)
+    async with get_session_factory()() as db:
+        character = await db.get(Character, cid)
+        wallet = await wallet_service.get_wallet(db, cid)
+        cap = scene_event_service.gold_amount(character, ge.POT_MAX_UNITS) if character else 0
+    if amount > cap:
+        await message.answer(f"Старуха качает головой: больше {cap} золота в котёл не берёт.")
+        return
+    if amount > wallet.farm_currency:
+        await message.answer(f"У тебя столько нет - в кошельке {wallet.farm_currency} золота.")
+        return
+    scene.pot_stakes[cid] = amount
+    done = len(scene.pot_stakes)
+    text = f"Ставка: {amount} золота." if amount else "Ты не ставишь."
+    await message.answer(f"{text} Ждём остальных ({done}/{len(scene.members)}).")
+    if done >= len(scene.members) and scene.task is not None:
+        scene.task.cancel()
+        scene.task = None
+        await _resolve(scene)
+
+
+async def _finish_pot(scene: GroupScene) -> None:
+    """Котёл со ставками числом: шанс от числа поставивших, выигрыш - ставка
+    назад без налога и столько же сверху (налог гильдии - только с выигрыша,
+    как в костях; раньше облагалась вся удвоенная сумма)."""
+    event = scene.event
+    personal: dict[int, list[str]] = {cid: [] for cid in scene.members}
+    stakers: dict[int, int] = {}
+    async with get_session_factory()() as db:
+        for cid, amount in scene.pot_stakes.items():
+            if amount <= 0:
+                continue
+            character = await db.get(Character, cid)
+            if character is None or death_service.is_dead(character):
+                continue
+            try:
+                await wallet_service.charge(db, cid, "farm", amount)
+            except wallet_service.NotEnoughCurrency:
+                personal[cid].append("Денег на ставку уже нет - котёл тебя не взял.")
+                continue
+            stakers[cid] = amount
+        summary: list[str] = []
+        if not stakers:
+            summary.append("Котёл пуст - никто не поставил.")
+        else:
+            chance = ge.pot_chance(event, len(stakers))
+            won, mine, theirs = se.roll_dice(_rng, chance)
+            names = ", ".join(
+                f"{scene.members[c].name} - {a}" for c, a in sorted(stakers.items(), key=lambda x: scene.members[x[0]].name)
+            )
+            summary.append(f"💰 В котле: {names} золота")
+            summary.append(f"🎲 Шанс {round(chance * 100)}%. Вы: {mine[0]} и {mine[1]}, кости: {theirs[0]} и {theirs[1]}.")
+            for cid, amount in stakers.items():
+                character = await db.get(Character, cid)
+                if won:
+                    await wallet_service.deposit(db, cid, "farm", amount, taxable=False)
+                    await wallet_service.deposit(db, cid, "farm", amount)
+                    net = guild_service.after_tax(character, amount)
+                    tail = f" (после налога гильдии +{net})" if net != amount else ""
+                    personal[cid].append(f"{event.win_text} +{amount} золота{tail}")
+                else:
+                    personal[cid].append(f"{event.lose_text} −{amount} золота")
+        await db.commit()
+    for cid, m in scene.members.items():
+        text = "\n\n".join(p for p in (event.title, "\n".join(summary), "\n".join(personal[cid])) if p)
+        await _send(m.peer_id, text, waiting_keyboard())
+        await scene_event_handlers._epilogue(m.peer_id, [], None)
 
 
 @labeler.message(payload_contains={"type": "gscene"})
@@ -210,7 +314,10 @@ async def _resolve(scene: GroupScene) -> None:
     scene.resolving = True
     continues = False
     try:
-        continues = await _finish(scene)
+        if scene.event.mechanic == "pot":
+            await _finish_pot(scene)
+        else:
+            continues = await _finish(scene)
     except Exception:
         logger.exception("Групповое событие {} упало на итоге", scene.event_id)
         for m in scene.members.values():

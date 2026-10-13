@@ -56,6 +56,17 @@ RESCUE_PULL, RESCUE_LEAVE = "pull", "leave"
 VOLUNTEER, SILENT = "volunteer", "silent"
 NEST_CLIMB, NEST_LEAVE = "climb", "leave"
 NO_STAKE = "0"
+#: Котёл костей (2026-10-13): ставка вписывается сообщением в золоте, без
+#: кнопок. Столько секунд на ставку, потом котёл бросает.
+POT_STAKE_SECONDS = 15
+#: Потолок ставки - в «мобах» клетки (scene_event_service.gold_unit): при
+#: четверых в котле шанс 55% и ставка выгодна, без потолка котёл стал бы
+#: печатным станком.
+POT_MAX_UNITS = 10
+
+
+def pot_chance(event, stakers: int) -> float:
+    return min(event.pot_max, event.pot_chance + event.pot_per_staker * stakers)
 
 
 class Option(BaseModel):
