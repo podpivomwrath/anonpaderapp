@@ -28,7 +28,7 @@ from bot.handlers import promo as promo_handlers
 from bot.handlers import pvp as pvp_handlers
 from bot.handlers import fishing as fishing_handlers
 from bot.handlers import mining as mining_handlers
-from bot import pending_activity, restart_safety
+from bot import pending_activity, restart_safety, silent_guard
 from bot.handlers import crowns as crown_handlers
 from bot.handlers import raid as raid_handlers
 from bot.handlers import raid_combat as raid_combat_handlers
@@ -54,6 +54,9 @@ def create_bot(settings: Settings) -> Bot:
     for labeler in LABELERS:
         bot.labeler.load(labeler)
     moderation_handlers.setup_middleware(bot)  # патч 27: бан-гейт РАНЬШЕ всех остальных middleware
+    # 2026-10-13: страховка от «немых» кнопок - после бан-гейта (забаненному не отвечаем)
+    silent_guard.install(bot.api)
+    silent_guard.setup_middleware(bot)
     onboarding.setup(bot)  # диспенсер состояний + восстановление FSM из БД
     list_keeper.setup(bot)  # патч 12: FSM выбора подкласса + восстановление
     mounts_handlers.setup(bot, bot.api, settings.respawn_live_countdown)  # патч 25, п.7: FSM координат
