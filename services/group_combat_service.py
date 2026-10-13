@@ -13,15 +13,16 @@ from dataclasses import dataclass, field
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from game.world import encounters
 from models import Character, CharacterStats
 from services import (
+    elixir_service,
     experience_service,
     group_service,
     item_service,
     raid_key_service,
     trophy_service,
 )
-from game.world import encounters
 
 
 def spawn_mobs(
@@ -47,6 +48,7 @@ class MobKillReward:
     item_dropped: object = None
     raid_key_dropped: bool = False
     group_kick: "group_service.LevelGapKick | None" = None
+    elixir_line: str | None = None
 
 
 async def reward_mob_kill(
@@ -84,13 +86,14 @@ async def reward_mob_kill(
         trophies = await trophy_service.grant_from_kill(db, character, rng)
         item = await item_service.grant_from_kill(db, character, mob_level, rng)
         raid_key_dropped = await raid_key_service.maybe_grant(db, character, rng)
+        elixir_line = await elixir_service.grant_heal_from_kill(db, character, rng)
         rewards.append(
             MobKillReward(
                 character_id=character.id, xp_gained=levelup.xp_awarded,
                 xp_premium_applied=levelup.premium_applied,
                 levels_gained=levelup.levels_gained, new_level=levelup.new_level,
                 trophies=trophies, item_dropped=item, raid_key_dropped=raid_key_dropped,
-                group_kick=group_kick,
+                group_kick=group_kick, elixir_line=elixir_line,
             )
         )
     return rewards

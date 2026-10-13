@@ -680,6 +680,8 @@ async def on_group_tick_resolved(session_id: int, tick: int, result: TickResult)
                         lines.append(drop_line)
                     if r.item_dropped is not None:
                         lines.append(item_service.format_drop_announcement(r.item_dropped))
+                    if r.elixir_line:
+                        lines.append(r.elixir_line)
                     if r.raid_key_dropped:
                         lines.append(raid_key_texts.raid_key_drop_line())
                     if r.group_kick is not None and r.group_kick.kicked_character_id == r.character_id:

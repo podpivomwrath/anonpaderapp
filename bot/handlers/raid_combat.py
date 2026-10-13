@@ -1073,6 +1073,7 @@ async def _stage_rewards(battle: RaidBattle, alive_char_ids: list[int]) -> dict[
                 lines.append(drop_line)
             for item in r.items_dropped:
                 lines.append(item_service.format_drop_announcement(item))
+            lines.extend(r.elixir_lines)
             if battle.is_rift:
                 gold_owner = next((c for c in characters if c.id == r.character_id), None)
                 if gold_owner is not None:

@@ -28,6 +28,20 @@ HEAL_FORMULA: dict[str, tuple[int, float]] = {
 }
 
 
+# Лечебные зелья в добыче с мобов (2026-10-13, решение владельца): иногда,
+# и чем ближе к Монолиту - тем крупнее. Кольцо - по клетке боя: 1 - внешнее
+# (старт), 5 - центр. Вес: (малое, среднее, большое).
+HEAL_DROP_CHANCE = 0.06
+HEAL_DROP_BY_RING: dict[int, tuple[int, int, int]] = {
+    1: (85, 15, 0),
+    2: (55, 40, 5),
+    3: (25, 55, 20),
+    4: (10, 45, 45),
+    5: (0, 30, 70),
+}
+HEAL_IDS = ("heal_small", "heal_medium", "heal_large")
+
+
 def heal_amount(item_id: str | None, max_hp: int) -> int | None:
     """Сколько лечит зелье бойцу с max_hp; None - это не лечебное зелье."""
     formula = HEAL_FORMULA.get(item_id) if item_id else None

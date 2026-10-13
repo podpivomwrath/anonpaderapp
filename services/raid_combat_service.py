@@ -19,6 +19,7 @@ from game.economy import item_config as ic
 from game.economy import item_gen
 from models import Character, CharacterStats, Inventory, Item
 from services import (
+    elixir_service,
     experience_service,
     group_service,
     item_service,
@@ -40,6 +41,7 @@ class MobKillReward:
     items_dropped: list[Item] = field(default_factory=list)
     raid_key_dropped: bool = False
     group_kick: "group_service.LevelGapKick | None" = None
+    elixir_lines: list[str] = field(default_factory=list)
 
 
 async def reward_mob_kill(
@@ -87,13 +89,18 @@ async def reward_mob_kill(
             if await raid_key_service.maybe_grant(db, character, rng):
                 raid_key_dropped = True
 
+        # Лечебное зелье - по броску на каждый бросок добычи, как трофеи.
+        elixir_lines = [
+            line for line in [await elixir_service.grant_heal_from_kill(db, character, rng) for _ in range(loot_mult)]
+            if line
+        ]
         rewards.append(
             MobKillReward(
                 character_id=character.id, xp_gained=levelup.xp_awarded,
                 xp_premium_applied=levelup.premium_applied,
                 levels_gained=levelup.levels_gained, new_level=levelup.new_level,
                 trophies=trophies_total, items_dropped=items_dropped,
-                raid_key_dropped=raid_key_dropped, group_kick=group_kick,
+                raid_key_dropped=raid_key_dropped, group_kick=group_kick, elixir_lines=elixir_lines,
             )
         )
     return rewards

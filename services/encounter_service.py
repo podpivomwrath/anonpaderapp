@@ -13,6 +13,7 @@ from services import (
     admin_service,
     daily_service,
     death_service,
+    elixir_service,
     experience_service,
     group_service,
     item_service,
@@ -39,6 +40,7 @@ class VictoryOutcome:
     daily_completed: list = field(default_factory=list)  # патч 23 — daily_service.DailyCompletion
     daily_streak_notice: str | None = None  # патч 23 — текст рубежа стрика ежедневок, если сработал
     raid_key_dropped: bool = False  # патч 45, ч.4 — Ключ Монолита
+    elixir_line: str | None = None  # 2026-10-13: лечебное зелье с моба
     xp_premium_applied: bool = False  # патч 51, ч.1 — был ли применён бонус +50% Метки Хранителя
     group_kick: "group_service.LevelGapKick | None" = None  # патч 51, ч.2 — исключён из группы левелапом
 
@@ -103,6 +105,7 @@ async def resolve_victory(
     trophies = await _guild_trophy_bonus(db, character, trophies, rng)
     item = await item_service.grant_from_kill(db, character, mob_level, rng)
     raid_key_dropped = await raid_key_service.maybe_grant(db, character, rng)
+    elixir_line = await elixir_service.grant_heal_from_kill(db, character, rng)
 
     unlocked: list[str] = []
     if character.subclass is not None:
@@ -128,7 +131,7 @@ async def resolve_victory(
             quest_label=None, quest_progress=None, quest_target=None, quest_ready=False,
             trophies_gained=trophies, item_dropped=item, unlocked_buffs=unlocked,
             daily_completed=daily_completed, daily_streak_notice=daily_streak_notice,
-            raid_key_dropped=raid_key_dropped, group_kick=group_kick,
+            raid_key_dropped=raid_key_dropped, group_kick=group_kick, elixir_line=elixir_line,
         )
     return VictoryOutcome(
         xp_gained=levelup.xp_awarded, xp_multiplier=xp_mult, xp_premium_applied=levelup.premium_applied,
@@ -136,7 +139,7 @@ async def resolve_victory(
         quest_label=progress.progress_label, quest_progress=progress.progress, quest_target=progress.target_count,
         quest_ready=progress.status == "ready", trophies_gained=trophies, item_dropped=item,
         unlocked_buffs=unlocked, daily_completed=daily_completed, daily_streak_notice=daily_streak_notice,
-        raid_key_dropped=raid_key_dropped, group_kick=group_kick,
+        raid_key_dropped=raid_key_dropped, group_kick=group_kick, elixir_line=elixir_line,
     )
 
 

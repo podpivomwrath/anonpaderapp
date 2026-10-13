@@ -382,3 +382,23 @@ def test_heal_potion_formula_from_white_hp() -> None:
     assert ec.heal_amount("heal_large", white_max_hp(geared)) == round(200 + naked.max_hp * 0.15)
     assert ec.heal_amount("heal_small", 1000) == 130
     assert ec.heal_amount("ashen_fever", 1000) is None
+
+
+async def test_heal_potions_drop_by_ring(db_session, make_character) -> None:
+    """2026-10-13: с мобов иногда падает лечебное зелье, крупнее ближе к центру."""
+    import random as _random
+
+    from game.world import world_config as wc
+
+    outer = await make_character(level=10)
+    outer.pos_x, outer.pos_y = wc.ring_bounds(1)[0], 0
+    center = await make_character(level=60)
+    center.pos_x, center.pos_y = 1, 0
+    rng = _random.Random(3)
+    got_outer = [await elixir_service.grant_heal_from_kill(db_session, outer, rng) for _ in range(400)]
+    got_center = [await elixir_service.grant_heal_from_kill(db_session, center, rng) for _ in range(400)]
+    outer_lines = [x for x in got_outer if x]
+    center_lines = [x for x in got_center if x]
+    assert 5 <= len(outer_lines) <= 50  # «иногда», ~6%
+    assert not any("Большое" in x for x in outer_lines)
+    assert not any("Малое" in x for x in center_lines)

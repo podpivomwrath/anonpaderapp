@@ -28,6 +28,21 @@ def elixir_defs_ordered() -> list[ElixirDef]:
     return list(_defs().values())
 
 
+async def grant_heal_from_kill(db: AsyncSession, character: Character, rng) -> str | None:
+    """Иногда с моба падает лечебное зелье - размер по кольцу клетки боя.
+    Строка для итогов боя или None."""
+    if rng.random() >= ec.HEAL_DROP_CHANCE or character.pos_x is None:
+        return None
+    from game.world import grid
+
+    ring = grid.ring_tier(character.pos_x, character.pos_y)
+    weights = ec.HEAL_DROP_BY_RING.get(ring, ec.HEAL_DROP_BY_RING[1])
+    elixir_id = rng.choices(ec.HEAL_IDS, weights=weights)[0]
+    await grant(db, character.id, elixir_id, 1)
+    edef = elixir_def(elixir_id)
+    return f"{edef.emoji} {edef.name} - в сумку" if edef else None
+
+
 def shop_elixirs() -> list[ElixirDef]:
     """Что продаёт лавка: всё, кроме свитков - те только из ларца разлома."""
     return [e for e in _defs().values() if e.category != "scroll"]

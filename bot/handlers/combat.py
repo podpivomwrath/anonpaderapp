@@ -551,6 +551,8 @@ async def on_battle_finished(session_id: int, result: TickResult) -> None:
         drop_line = trophy_service.format_drop_line(outcome.trophies_gained)
         if drop_line is not None:
             text += f"\n{drop_line}"
+        if outcome.elixir_line:
+            text += f"\n{outcome.elixir_line}"
         if outcome.raid_key_dropped:
             text += f"\n{raid_key_texts.raid_key_drop_line()}"
         for line in event_lines:
