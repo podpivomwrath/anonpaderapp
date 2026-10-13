@@ -712,6 +712,39 @@ body {
   .map-viewport--simple .map-pin--rift { animation: none; }
 }
 
+/* 2026-10-13: упрощённая карта убирает все тени и фильтры на карте и вокруг
+   неё (у слабых телефонов кончалась видеопамять, и VK рисовал кашу вместо
+   шрифтов). Пульсирует только метка игрока - прозрачностью; босс, разлом и
+   след стоят ровно, их выделяет рамка. */
+.map-viewport--simple .map-pin,
+.map-simple-on .map-toast,
+.map-simple-on .map-travel-banner,
+.map-simple-on .map-card {
+  box-shadow: none;
+  filter: none;
+}
+
+.map-viewport--simple .map-pin--boss,
+.map-viewport--simple .map-pin--rift,
+.map-viewport--simple .map-pin--trail {
+  animation: none;
+}
+
+.map-viewport--simple .map-cell-selected,
+.map-viewport--simple .map-cell-hover {
+  filter: none;
+}
+
+/* Размытие под шапкой и шторкой пересчитывается на каждый сдвиг карты под
+   ними - в упрощённом режиме вместо него плотная подложка. */
+.map-simple-on .vkuiPanelHeader__trnsp .vkuiPanelHeader__in,
+.map-simple-on .vkuiPanelHeader__in,
+.map-simple-on .nav-drawer {
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  background: rgb(16, 17, 19);
+}
+
 .map-controls__btn {
   width: 32px;
   height: 32px;

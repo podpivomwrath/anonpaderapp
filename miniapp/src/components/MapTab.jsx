@@ -141,6 +141,13 @@ export default function MapTab() {
       return !on;
     });
   };
+  // Класс на корне страницы: упрощённый режим снимает и размытие шапки над
+  // картой. Ушёл с вкладки карты - шапка снова как была.
+  useEffect(() => {
+    const root = document.documentElement;
+    root.classList.toggle('map-simple-on', simple);
+    return () => root.classList.remove('map-simple-on');
+  }, [simple]);
   const stageRef = useRef(null);
   const gridCanvasRef = useRef(null);
   // Положение камеры посреди жеста в упрощённом режиме - ещё не в state.
