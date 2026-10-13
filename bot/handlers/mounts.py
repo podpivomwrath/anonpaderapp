@@ -22,7 +22,7 @@ from vkbottle.dispatch.rules.base import FuncRule
 from datetime import datetime, timezone
 
 from loguru import logger
-from vkbottle import BaseStateGroup
+from vkbottle import BaseMiddleware, BaseStateGroup
 from vkbottle.bot import BotLabeler, Message
 
 from bot import group_texts
@@ -91,11 +91,28 @@ class MountCoordState(BaseStateGroup):
     COORD_INPUT = "mount_coord_input"
 
 
+class CoordCancelMiddleware(BaseMiddleware[Message]):
+    """Любое сообщение, не похожее на координаты (кнопка, команда, промокод),
+    отменяет ожидание координат маунта - и само обрабатывается как обычно.
+    Раньше ожидание висело дальше, и следующее число бот принимал за
+    координаты (2026-10-13)."""
+
+    async def pre(self) -> None:
+        if _dispenser is None:
+            return
+        state = await _dispenser.get(self.event.peer_id)
+        if state is None or state.state != MountCoordState.COORD_INPUT:
+            return
+        if self.event.payload or not _COORD_LIKE_RE.match(self.event.text or ""):
+            await _dispenser.delete(self.event.peer_id)
+
+
 def setup(bot, bot_api, live_countdown: bool = True) -> None:
     global _bot_api, _dispenser, _live_countdown
     _bot_api = bot_api
     _dispenser = bot.state_dispenser
     _live_countdown = live_countdown
+    bot.labeler.message_view.register_middleware(CoordCancelMiddleware)
 
 
 async def _stats(db, character_id: int) -> CharacterStats:

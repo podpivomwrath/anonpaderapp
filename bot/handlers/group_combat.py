@@ -745,6 +745,13 @@ async def on_group_battle_finished(session_id: int, result: TickResult) -> None:
             positions[cid] = (character.pos_x, character.pos_y)
             if cid in survivor_ids:
                 has_mount_by_cid[cid] = await mount_service.has_any_mount(db, cid)
+                # HP после боя остаётся как есть, как в соло (2026-10-13):
+                # раньше группа шла в следующий бой с полным HP без отдыха.
+                # Кто хочет - отдыхает, кто нет - сразу жмёт готовность.
+                stats = await db.scalar(select(CharacterStats).where(CharacterStats.character_id == cid))
+                if stats is not None:
+                    vit_bonus = (await item_service.compute_gear_bonus(db, cid)).get("vit", 0)
+                    vitals_service.set_hp(character, stats, combatants[cid].current_hp, vit_bonus)
             else:
                 defeats[cid] = (await encounter_service.resolve_defeat(db, character), character.respawn_at)
         await db.commit()
