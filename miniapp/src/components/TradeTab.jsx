@@ -134,12 +134,20 @@ export default function TradeTab({ onWallet }) {
             const n = count(o.id);
             return (
               <Div key={o.id} className="trade-offer">
+                {/* Что с товаром можно сделать ЗДЕСЬ - меткой сверху, разными
+                    цветами (2026-10-13: игроки не отличали «купить» от
+                    «продать», а недоступная продажа выглядела выключенной). */}
+                <div className="trade-offer__tags">
+                  {o.buy != null && <span className="trade-tag trade-tag--buy">🛒 Здесь продают - можно купить</span>}
+                  {o.sell != null && <span className="trade-tag trade-tag--sell">💰 Здесь скупают - можно продать</span>}
+                </div>
                 <div className="trade-offer__head">
                   <span className="trade-offer__name"><GoodName g={o} size={32} /></span>
                   <span className="craft-hint">
                     {o.tier_name} · {o.city_title}
                     {o.deficit ? ' · дефицит' : ''}
                     {o.stock != null ? ` · осталось ${o.stock}` : ''}
+                    {inCart ? ` · в повозке ${inCart}` : ''}
                   </span>
                 </div>
                 <div className="trade-offer__row">
@@ -148,25 +156,31 @@ export default function TradeTab({ onWallet }) {
                     <span className="exchange-lots__value">{n}</span>
                     <Button size="s" mode="secondary" onClick={() => setCount(o.id, n + 1)}>+</Button>
                   </div>
-                  {o.buy != null && (
-                    <Button
-                      size="s"
-                      disabled={busy || o.locked || free < n || data.gold < o.buy * n}
-                      onClick={() => act('buy', { good: o.id, count: n })}
-                    >
-                      {o.locked ? `с ${o.min_level} ур. торговли` : `Купить · ${money(o.buy)}/ящ`}
+                </div>
+                <div className="trade-offer__actions">
+                  {o.buy != null && (() => {
+                    const why = o.locked ? `Нужен ${o.min_level} ур. торговли`
+                      : free < n ? 'Нет места в повозке'
+                        : data.gold < o.buy * n ? 'Не хватает золота' : null;
+                    return why ? (
+                      <span className="trade-why">🛒 {money(o.buy)}/ящ - {why}</span>
+                    ) : (
+                      <Button size="m" className="trade-btn trade-btn--buy" disabled={busy}
+                        onClick={() => act('buy', { good: o.id, count: n })}>
+                        🛒 Купить {n} · {n > 1 ? '~' : ''}{money(o.buy * n)} зол.
+                      </Button>
+                    );
+                  })()}
+                  {o.sell != null && (inCart >= n ? (
+                    <Button size="m" className="trade-btn trade-btn--sell" disabled={busy}
+                      onClick={() => act('sell', { good: o.id, count: n })}>
+                      💰 Продать {n} · {n > 1 ? '~' : ''}{money(o.sell * n)} зол.
                     </Button>
-                  )}
-                  {o.sell != null && (
-                    <Button
-                      size="s"
-                      mode="secondary"
-                      disabled={busy || inCart < n}
-                      onClick={() => act('sell', { good: o.id, count: n })}
-                    >
-                      Продать · {money(o.sell)}/ящ{inCart ? ` (есть ${inCart})` : ''}
-                    </Button>
-                  )}
+                  ) : (
+                    <span className="trade-why">
+                      💰 {money(o.sell)}/ящ - {inCart ? `в повозке только ${inCart}` : 'нет в повозке'}
+                    </span>
+                  ))}
                 </div>
               </Div>
             );

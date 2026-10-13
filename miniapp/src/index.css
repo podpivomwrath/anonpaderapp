@@ -2192,6 +2192,45 @@ body::before {
   gap: 8px;
 }
 
+/* Купить / продать: метка над товаром и кнопки разного цвета. */
+.trade-offer__tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.trade-tag {
+  font-size: 0.8em;
+  padding: 2px 8px;
+  border-radius: 999px;
+  border: 1px solid currentColor;
+}
+
+.trade-tag--buy { color: #7fd18a; }
+.trade-tag--sell { color: #f0c64e; }
+
+.trade-offer__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.trade-btn.vkuiButton {
+  flex: 1 1 140px;
+  color: #12100c;
+  font-weight: 600;
+}
+
+.trade-btn--buy.vkuiButton { background: #5fb36b; }
+.trade-btn--sell.vkuiButton { background: #e0b23e; }
+
+.trade-why {
+  flex: 1 1 140px;
+  font-size: 0.85em;
+  opacity: 0.7;
+  padding: 6px 0;
+}
+
 /* Окно направления торговли. */
 .trade-dest {
   max-height: 80vh;
