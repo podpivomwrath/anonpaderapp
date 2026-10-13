@@ -22,6 +22,7 @@ from game.world import grid
 from models import Character
 from services import (
     admin_grant_service,
+    admin_journal_text,
     admin_service,
     admin_systems_service,
     character_reset_service,
@@ -329,8 +330,11 @@ async def handle_get_journal(request: web.Request) -> web.Response:
     limit = min(int(request.query.get("limit", 50)), 200)
     offset = int(request.query.get("offset", 0))
     session_factory = request.app[SESSION_FACTORY_KEY]
+    settings: Settings = request.app[SETTINGS_KEY]
     async with session_factory() as db:
         actions = await admin_service.action_journal(db, limit, offset)
+        targets = await _character_names(db, [a.target_character_id for a in actions if a.target_character_id])
+        actors = await _actor_labels(db, settings, {a.admin_vk_id for a in actions})
         return web.json_response(
             {
                 "actions": [
@@ -339,11 +343,49 @@ async def handle_get_journal(request: web.Request) -> web.Response:
                         "target_character_id": a.target_character_id,
                         "old_value": a.old_value, "new_value": a.new_value, "note": a.note,
                         "created_at": a.created_at.isoformat(),
+                        # Обычным языком (2026-10-13): кто и что сделал.
+                        "who": actors.get(a.admin_vk_id, f"vk {a.admin_vk_id}"),
+                        "text": admin_journal_text.describe(a, targets.get(a.target_character_id)),
                     }
                     for a in actions
                 ]
             }
         )
+
+
+async def _character_names(db, character_ids: list[int]) -> dict[int, str]:
+    from sqlalchemy import select
+
+    from models import Character
+
+    if not character_ids:
+        return {}
+    rows = await db.execute(select(Character.id, Character.name).where(Character.id.in_(set(character_ids))))
+    return {cid: name for cid, name in rows.all()}
+
+
+async def _actor_labels(db, settings: Settings, vk_ids: set[int]) -> dict[int, str]:
+    """«Админ» или «Модератор <ник персонажа>»."""
+    from sqlalchemy import select
+
+    from models import Character, User
+
+    labels: dict[int, str] = {}
+    others = [v for v in vk_ids if v != settings.admin_vk_id]
+    names: dict[int, str] = {}
+    if others:
+        rows = await db.execute(
+            select(User.vk_id, Character.name).join(Character, Character.user_id == User.id)
+            .where(User.vk_id.in_(others))
+        )
+        names = {vk: name for vk, name in rows.all()}
+    for vk in vk_ids:
+        if vk == settings.admin_vk_id:
+            labels[vk] = "Админ"
+        else:
+            role = "Модератор" if staff.is_moderator(vk) else "Бывший модератор"
+            labels[vk] = f"{role} {names.get(vk, f'vk {vk}')}"
+    return labels
 
 
 async def handle_get_bug_reports(request: web.Request) -> web.Response:

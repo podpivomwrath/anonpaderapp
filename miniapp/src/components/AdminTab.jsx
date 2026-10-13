@@ -757,8 +757,8 @@ function PlayerCard({ card, onRefresh }) {
         {card.recent_admin_actions.map((a, i) => (
           <StatRow
             key={i}
-            label={`${a.action_type} · ${new Date(a.created_at).toLocaleString('ru')}`}
-            value={a.note || '-'}
+            label={a.text || a.action_type}
+            value={new Date(a.created_at).toLocaleString('ru')}
           />
         ))}
       </Fold>
@@ -875,9 +875,9 @@ function JournalSection() {
       {actions.map((a) => (
         <Div key={a.id} style={{ borderBottom: '1px solid var(--vkui--color_separator_primary)', paddingBottom: 8 }}>
           <p style={{ marginBottom: 4 }}>
-            <b>{a.action_type}</b> · персонаж #{a.target_character_id ?? '-'} · {new Date(a.created_at).toLocaleString('ru')}
+            <b>{a.who || 'Админ'}</b> {a.text || a.action_type}
           </p>
-          {a.note && <p style={{ opacity: 0.8, marginBottom: 0 }}>{a.note}</p>}
+          <Caption level="1" style={{ opacity: 0.6 }}>{new Date(a.created_at).toLocaleString('ru')}</Caption>
         </Div>
       ))}
     </Group>

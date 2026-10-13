@@ -36,6 +36,7 @@ from models import (
     User,
     Wallet,
 )
+from services import admin_journal_text
 from services import (
     daily_service,
     death_service,
@@ -431,6 +432,8 @@ async def player_card(db: AsyncSession, character_id: int) -> dict | None:
         "recent_admin_actions": [
             {
                 "action_type": a.action_type, "note": a.note, "created_at": a.created_at.isoformat(),
+                # обычным языком (2026-10-13), см. services/admin_journal_text.py
+                "text": admin_journal_text.describe(a, character.name),
             }
             for a in recent_actions
         ],
