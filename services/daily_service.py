@@ -131,7 +131,10 @@ async def _assign_new_dailies(db: AsyncSession, character: Character, today: dat
     count = dc.DAILY_QUEST_COUNT_PREMIUM if premium_service.is_premium(character) else dc.DAILY_QUEST_COUNT
     chosen = _rng.sample(pool, min(count, len(pool)))
     for qdef in chosen:
-        db.add(CharacterDaily(character_id=character.id, quest_id=qdef.id, progress=0, completed=False, date=today))
+        db.add(CharacterDaily(
+            character_id=character.id, quest_id=qdef.id, progress=0, completed=False, date=today,
+            target=dc.scaled_target(qdef.base_target, character.level),
+        ))
     await db.flush()
 
 
@@ -235,6 +238,16 @@ def _guild_gold_label(character: Character, gold: int) -> str:
     return guild_service.gold_label(character, gold)
 
 
+def _row_target(row: CharacterDaily, qdef: DailyQuestDef, character: Character) -> int:
+    """Цель задания на этот день: зафиксирована при выдаче. У выполненной
+    старой строки - достигнутый прогресс, иначе по текущему уровню."""
+    if row.target:
+        return row.target
+    if row.completed and row.progress:
+        return row.progress
+    return dc.scaled_target(qdef.base_target, character.level)
+
+
 async def _apply_delta(
     db: AsyncSession, character: Character, row: CharacterDaily, delta: int,
 ) -> DailyCompletion | None:
@@ -243,7 +256,8 @@ async def _apply_delta(
     qdef = quest_def(row.quest_id)
     if qdef is None:
         return None
-    target = dc.scaled_target(qdef.base_target, character.level)
+    target = _row_target(row, qdef, character)
+    row.target = target
     row.progress = min(row.progress + delta, target)
     if row.progress < target:
         return None
@@ -490,7 +504,7 @@ async def get_dailies_overview(
         qdef = quest_def(row.quest_id)
         if qdef is None:
             continue
-        target = dc.scaled_target(qdef.base_target, character.level)
+        target = _row_target(row, qdef, character)
         quests.append(
             DailyQuestState(
                 quest_id=qdef.id, title=qdef.title, progress_label=qdef.progress_label,

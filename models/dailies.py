@@ -26,6 +26,9 @@ class CharacterDaily(Base):
     progress: Mapped[int] = mapped_column(default=0)
     completed: Mapped[bool] = mapped_column(Boolean, default=False)
     date: Mapped[date] = mapped_column(Date, index=True)
+    #: Цель на день - по уровню при выдаче (2026-10-13): рост уровня днём не
+    #: поднимает планку уже выданных заданий. NULL - строки до миграции 0055.
+    target: Mapped[int | None] = mapped_column(nullable=True)
 
 
 class CharacterTitle(Base):

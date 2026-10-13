@@ -77,7 +77,7 @@ from game.economy import fishing as game_fishing
 from game.economy import premium_config as pc
 from game.world import grid
 from models import Character, CharacterStats
-from services import pts_service
+from services import pts_service, trial_service
 from services import (
     admin_service,
     daily_service,
@@ -1458,6 +1458,8 @@ async def _finish_duel(battle: Battle, winner_cid: int, loser_cid: int) -> None:
         respawn_handlers.register_pvp_death(loser_p.peer_id)
         await pvp_service.log_battle(db, "duel", [winner_cid, loser_cid], [winner_cid])
         daily_progress = await daily_service.record_pvp_win(db, winner)
+        # Испытания «победи выше уровнем» засчитывают и PvP (2026-10-13).
+        trial_buffs = await trial_service.record_level_kill(db, winner, loser.level) if winner.subclass else []
         winner_pos = (winner.pos_x, winner.pos_y)
         winner_has_mount = await mount_service.has_any_mount(db, winner.id)
         await db.commit()
@@ -1476,6 +1478,8 @@ async def _finish_duel(battle: Battle, winner_cid: int, loser_cid: int) -> None:
     daily_notice = dailies_texts.progress_notice(daily_progress)
     if daily_notice:
         win_text += f"\n\n{daily_notice}"
+    for buff_id in trial_buffs:
+        win_text += f"\n\n📖 Испытание пройдено. Открыт бафф: {trial_service.buff_name(buff_id)}."
     await _bot_api.messages.send(
         peer_id=winner_p.peer_id, message=win_text, random_id=0,
         keyboard=kb.movement_keyboard(*winner_pos, winner_p.peer_id, has_mount=winner_has_mount),
@@ -1674,6 +1678,23 @@ async def on_mass_battle_finished(session_id: int, result: TickResult) -> None:
             await admin_service.log_death(db, victim, "pvp")
             respawn_handlers.register_pvp_death(battle.participants[victim_cid].peer_id)
 
+        # Испытания «победи выше уровнем»: павший враг выше тебя, по которому
+        # ты попал (2026-10-13).
+        trial_lines: dict[int, list[str]] = {}
+        for cid in winner_ids:
+            me = characters.get(cid)
+            if me is None or me.subclass is None:
+                continue
+            top = max(
+                (characters[v].level for v in dead_ids
+                 if v in characters and battle.damage_by_pair.get((cid, v), 0) > 0),
+                default=0,
+            )
+            if top > me.level:
+                trial_lines[cid] = [
+                    f"📖 Испытание пройдено. Открыт бафф: {trial_service.buff_name(b)}."
+                    for b in await trial_service.record_level_kill(db, me, top)
+                ]
         await pvp_service.log_battle(db, "mass", list(battle.participants), winner_ids)
         has_mount_by_cid = {
             cid: await mount_service.has_any_mount(db, cid) for cid in survivor_ids if cid in characters
@@ -1711,6 +1732,8 @@ async def on_mass_battle_finished(session_id: int, result: TickResult) -> None:
             daily_notice = dailies_texts.progress_notice(daily_progress) if daily_progress else None
             if daily_notice:
                 text += f"\n\n{daily_notice}"
+            if trial_lines.get(cid):
+                text += "\n\n" + "\n".join(trial_lines[cid])
             pos = positions.get(cid, (0, 0))
             await _bot_api.messages.send(
                 peer_id=participant.peer_id, message=text, random_id=0,

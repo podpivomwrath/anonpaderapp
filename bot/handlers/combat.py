@@ -503,15 +503,18 @@ async def on_battle_finished(session_id: int, result: TickResult) -> None:
                 namesake = await story_service.namesake_hint(db, character, mob_name)
                 if namesake:
                     event_lines.append(namesake)
+            bonus_levels = 0
             if event_bonus:
                 bonus = await scene_event_service.apply_result(
                     db, character, stats, SceneResult(reward=event_bonus), _rng,
                 )
                 event_lines += bonus.lines
+                # Опыт бонуса тоже поднимает уровень - иначе левелап молчал.
+                bonus_levels = bonus.levels_gained
             event_lines += await scene_event_service.finish_fight_effects(db, character.id)
             await db.commit()
-            new_level = outcome.new_level
-            levels = outcome.levels_gained
+            new_level = character.level
+            levels = outcome.levels_gained + bonus_levels
             buff_modifiers = await scene_event_service.solo_modifiers(
                 db, character, await preset_service.resolve_active_modifiers(db, character),
             )

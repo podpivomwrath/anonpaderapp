@@ -16,7 +16,7 @@ from sqlalchemy import select
 from vkbottle.bot import BotLabeler, Message
 
 from bot import editable_message
-from bot.keyboards.stats_window import no_keyboard, stats_alloc_keyboard
+from bot.keyboards.stats_window import levelup_keyboard, no_keyboard, stats_alloc_keyboard
 from bot.keyboards.world import BTN_STATS
 from models import Character, CharacterStats, User
 from services import daily_service
@@ -81,11 +81,28 @@ async def notify_levelup(peer_id: int, levels_gained: int, new_level: int) -> No
 
 
 async def _levelup_later(peer_id: int, header: str) -> None:
+    """Новый уровень: окно распределения не навязываем (2026-10-13) - только
+    строка и кнопка «Распределить»; можно и в мини-аппе. Уже открытое окно
+    обновляется на месте, как раньше."""
     await asyncio.sleep(LEVELUP_DELAY_SECONDS)
     try:
-        await open_or_update_window(peer_id, header)
+        if peer_id in _window_header:
+            await open_or_update_window(peer_id, header)
+            return
+        async with get_session_factory()() as db:
+            character = await _read_character(db, peer_id)
+            if character is None or character.creation_state is not None:
+                return
+            unspent = (await _get_stats(db, character.id)).unspent_points
+        if unspent <= 0:
+            await _bot_api.messages.send(peer_id=peer_id, message=header, random_id=0)
+            return
+        await _bot_api.messages.send(
+            peer_id=peer_id, message=f"{header} Свободных очков: {unspent}.",
+            random_id=0, keyboard=levelup_keyboard(),
+        )
     except Exception:
-        logger.exception("Окно нового уровня не открылось {}", peer_id)
+        logger.exception("Весть о новом уровне не ушла {}", peer_id)
 
 
 async def _read_character(db, peer_id: int) -> Character | None:
@@ -131,6 +148,11 @@ async def open_stats_button(message: Message) -> None:
         character = await onboarding_svc.get_character(db, message.from_id)
         if character is None or character.creation_state is not None:
             return
+    await open_or_update_window(message.peer_id, header="📊 Характеристики")
+
+
+@labeler.message(payload_contains={"type": "stat_alloc_open"})
+async def stat_alloc_open(message: Message) -> None:
     await open_or_update_window(message.peer_id, header="📊 Характеристики")
 
 

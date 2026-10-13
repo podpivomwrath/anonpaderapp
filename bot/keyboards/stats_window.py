@@ -33,6 +33,15 @@ def stats_alloc_keyboard() -> str:
     return kb.get_json()
 
 
+BTN_OPEN = "📊 Распределить"
+
+
+def levelup_keyboard() -> str:
+    kb = Keyboard(inline=True)
+    kb.add(Text(BTN_OPEN, payload={"type": "stat_alloc_open"}), color=KeyboardButtonColor.POSITIVE)
+    return kb.get_json()
+
+
 def no_keyboard() -> str:
     """Снять инлайн-кнопки с уже отредактированного сообщения (после Готово)."""
     return Keyboard(inline=True).get_json()
