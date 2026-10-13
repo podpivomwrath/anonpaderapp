@@ -18,7 +18,7 @@ class FakeApi:
 async def test_wrapped_request_marks_peer_as_answered() -> None:
     api = FakeApi()
     silent_guard.install(api)
-    started = time.monotonic()
+    started = time.time()
     assert not silent_guard.answered_since(4242, started)
     await api.request("messages.send", {"peer_id": 4242, "message": "x"})
     assert silent_guard.answered_since(4242, started)
@@ -28,7 +28,7 @@ async def test_wrapped_request_marks_peer_as_answered() -> None:
 async def test_broadcast_peer_ids_are_marked_too() -> None:
     api = FakeApi()
     silent_guard.install(api)
-    started = time.monotonic()
+    started = time.time()
     await api.request("messages.send", {"peer_ids": "11,12", "message": "x"})
     assert silent_guard.answered_since(11, started) and silent_guard.answered_since(12, started)
 
@@ -76,12 +76,32 @@ async def test_unanswered_message_gets_fresh_keyboard(monkeypatch) -> None:
 
     monkeypatch.setattr(dbmod, "get_session_factory", lambda: (lambda: FakeSession()))
 
-    await silent_guard._check_later(777, 777, time.monotonic())
+    await silent_guard._check_later(777, 777, time.time())
     assert sent and sent[0]["keyboard"] == "KB" and sent[0]["message"] == silent_guard.STALE_TEXT
 
     # Ответ был - страховка молчит.
     sent.clear()
-    started = time.monotonic()
+    started = time.time()
     await api.request("messages.send", {"peer_id": 778})
     await silent_guard._check_later(778, 778, started)
     assert sent == []
+
+
+async def test_start_is_taken_from_message_date_not_from_pre(monkeypatch) -> None:
+    """vkbottle вызывает pre и post на разных экземплярах middleware: время из
+    pre терялось, и страховка срабатывала после обычных ответов у всех
+    (13.10). Начало - дата сообщения ВК."""
+    import asyncio
+    from types import SimpleNamespace
+
+    seen = []
+
+    async def fake_check(peer_id, from_id, started):
+        seen.append(started)
+
+    monkeypatch.setattr(silent_guard, "_check_later", fake_check)
+    event = SimpleNamespace(from_id=5, peer_id=5, date=1_700_000_000)
+    middleware = silent_guard.SilentGuardMiddleware(event)
+    await middleware.post()
+    await asyncio.sleep(0)
+    assert seen == [1_700_000_000.0]

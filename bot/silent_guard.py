@@ -35,7 +35,7 @@ def install(api) -> None:
 
     async def request(method, data, version=None):
         if method in ("messages.send", "messages.edit"):
-            now = time.monotonic()
+            now = time.time()
             peer = data.get("peer_id")
             if peer is not None:
                 _last_out[int(peer)] = now
@@ -66,7 +66,7 @@ async def _check_later(peer_id: int, from_id: int, started: float) -> None:
         return
     logger.info(
         "Страховка кнопок: {} без ответа (начало {:.2f}, последний ответ {:.2f}, сейчас {:.2f})",
-        peer_id, started, _last_out.get(peer_id, 0.0), time.monotonic(),
+        peer_id, started, _last_out.get(peer_id, 0.0), time.time(),
     )
     try:
         async with get_session_factory()() as db:
@@ -80,17 +80,18 @@ async def _check_later(peer_id: int, from_id: int, started: float) -> None:
 
 
 class SilentGuardMiddleware(BaseMiddleware[Message]):
-    async def pre(self) -> None:
-        self._started = time.monotonic()
+    """Начало отсчёта - дата самого сообщения ВК (секунды, время по часам),
+    а не время в pre(): vkbottle вызывает pre и post на РАЗНЫХ экземплярах
+    middleware, и сохранённое в pre терялось. Так страховка 13.10 минут десять
+    слала лишнее «Кнопки обновлены» всем подряд после обычных ответов."""
 
     async def post(self) -> None:
         event = self.event
         # Только личный диалог с игроком: в беседах бот молчит на чужие реплики.
         if event.from_id <= 0 or event.peer_id != event.from_id:
             return
-        asyncio.get_running_loop().create_task(
-            _check_later(event.peer_id, event.from_id, getattr(self, "_started", time.monotonic()))
-        )
+        started = float(getattr(event, "date", 0) or 0) or time.time()
+        asyncio.get_running_loop().create_task(_check_later(event.peer_id, event.from_id, started))
 
 
 def setup_middleware(bot) -> None:
