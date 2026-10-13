@@ -379,8 +379,8 @@ def test_heal_potion_formula_from_white_hp() -> None:
                              "str", gear_vit=100)
     assert geared.max_hp > naked.max_hp
     assert white_max_hp(geared) == naked.max_hp  # экипировка в лечение не идёт
-    assert ec.heal_amount("heal_large", white_max_hp(geared)) == round(200 + naked.max_hp * 0.15)
-    assert ec.heal_amount("heal_small", 1000) == 130
+    assert ec.heal_amount("heal_large", white_max_hp(geared)) == round(200 + naked.max_hp * 0.32)
+    assert ec.heal_amount("heal_small", 1000) == 170
     assert ec.heal_amount("ashen_fever", 1000) is None
 
 
