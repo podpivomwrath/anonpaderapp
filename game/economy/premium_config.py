@@ -1,8 +1,9 @@
 """Метка Хранителя — премиум-аккаунт (патч 50). Числа — сюда, не хардкодить.
 
 Принципиально: премиум НЕ даёт силовых преимуществ (статы/урон/HP/PvP) —
-только скорость, удобство, объём. Не продаётся нигде — только промокодом
-администратора (services/promo_service.py). Единая проверка активности —
+только скорость, удобство, объём. Выдаётся промокодом администратора
+(services/promo_service.py) и продаётся за самоцветы в магазине мини-аппа
+(services/shop_service.py, с 2026-10-13). Единая проверка активности —
 services/premium_service.py::is_premium.
 """
 
@@ -42,3 +43,22 @@ EXPIRED_TEXT = f"{PREMIUM_BADGE} {PREMIUM_NAME} погасла. Хранител
 
 # Допустимые длительности активации промокодом (Часть 2) — дни.
 ALLOWED_DURATIONS_DAYS = (3, 7, 30)
+
+# --- Магазин мини-аппа (2026-10-13) ------------------------------------------
+# Метку можно купить за самоцветы на 1-30 дней. Цена - гладкая кривая
+# 50 * дни ** k: 1 день - 50, 30 дней - 800; чем длиннее срок, тем дешевле
+# день (50 -> ~27). Округление до 5 - «красивые» числа на ползунке.
+SHOP_MIN_DAYS = 1
+SHOP_MAX_DAYS = 30
+SHOP_PRICE_1_DAY = 50
+SHOP_PRICE_MAX_DAYS = 800
+
+
+def shop_price(days: int) -> int:
+    """Цена Метки на days дней в самоцветах."""
+    import math
+
+    if days >= SHOP_MAX_DAYS:
+        return SHOP_PRICE_MAX_DAYS
+    k = math.log(SHOP_PRICE_MAX_DAYS / SHOP_PRICE_1_DAY) / math.log(SHOP_MAX_DAYS)
+    return max(SHOP_PRICE_1_DAY, round(SHOP_PRICE_1_DAY * days ** k / 5) * 5)

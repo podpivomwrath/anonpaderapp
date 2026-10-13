@@ -299,3 +299,66 @@
 .price-chart__key--buy { background: #e8a33d; }
 .price-chart__key--sell { background: #c9636b; }
 .price-chart__legend { display: flex; gap: 14px; flex-wrap: wrap; font-size: 12px; margin-top: 4px; align-items: center; }
+
+/* --- Магазин (2026-10-13) -------------------------------------------------------- */
+
+.shop-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 12px;
+  padding: 0 12px 12px;
+}
+.shop-card {
+  position: relative;
+  aspect-ratio: 1 / 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 12px;
+  border-radius: 14px;
+  border: 1px solid rgba(200, 160, 120, 0.35);
+  background: radial-gradient(circle at 50% 30%, rgba(120, 40, 34, 0.45), rgba(16, 12, 12, 0.92));
+  color: inherit;
+  font: inherit;
+  text-align: center;
+  cursor: pointer;
+  box-shadow: 0 0 14px rgba(200, 53, 42, 0.18) inset;
+  transition: transform 0.15s ease, box-shadow 0.2s ease;
+}
+.shop-card:active { transform: scale(0.97); box-shadow: 0 0 18px rgba(220, 70, 50, 0.4) inset; }
+.shop-card__emoji { font-size: 40px; line-height: 1; filter: drop-shadow(0 0 8px rgba(120, 180, 255, 0.45)); }
+.shop-card__title { font-size: 14px; }
+.shop-card__price { font-size: 13px; opacity: 0.8; font-variant-numeric: tabular-nums; }
+.shop-card__badge {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-size: 11px;
+  background: rgba(80, 160, 110, 0.25);
+  border: 1px solid rgba(110, 200, 140, 0.5);
+}
+.shop-notice { margin: 6px 0 0; color: #9fdcb0; }
+
+.shop-sheet { padding: 16px 16px calc(16px + env(safe-area-inset-bottom)); }
+.shop-sheet__head { display: flex; align-items: center; gap: 12px; margin-bottom: 8px; }
+.shop-sheet__emoji { font-size: 36px; line-height: 1; }
+.shop-sheet__title { font-size: 17px; }
+.shop-sheet__active { margin: 2px 0 0; font-size: 12px; color: #9fdcb0; }
+.shop-sheet__perks { margin: 6px 0 8px; padding-left: 18px; font-size: 14px; line-height: 1.45; }
+.shop-sheet__slider { margin: 12px 0; }
+.shop-sheet__days {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  font-size: 18px;
+  font-variant-numeric: tabular-nums;
+  margin-bottom: 6px;
+}
+.shop-sheet__slider input[type='range'] { width: 100%; accent-color: #c8352a; }
+.shop-sheet__scale { display: flex; justify-content: space-between; font-size: 12px; opacity: 0.6; }
+.shop-sheet__error { color: #ff8a80; margin: 6px 0; font-size: 14px; }
+.shop-sheet__actions { display: flex; flex-direction: column; gap: 8px; margin-top: 8px; }

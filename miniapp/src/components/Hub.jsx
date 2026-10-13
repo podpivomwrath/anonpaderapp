@@ -22,6 +22,7 @@ import CharacterTab from './CharacterTab.jsx';
 import CraftTab from './CraftTab.jsx';
 import DailiesTab from './DailiesTab.jsx';
 import ExchangeTab from './ExchangeTab.jsx';
+import ShopTab from './ShopTab.jsx';
 import TradeTab from './TradeTab.jsx';
 import GuildTab from './GuildTab.jsx';
 import InventoryTab from './InventoryTab.jsx';
@@ -48,6 +49,7 @@ const SECTIONS = [
   { id: 'tops', label: 'Топы' },
   { id: 'trade', label: 'Торговля' },
   { id: 'exchange', label: 'Биржа' },
+  { id: 'shop', label: 'Магазин' },
 ];
 
 // Общий справочник по игре - статья в группе. Ссылка наружу, а не раздел:
@@ -566,6 +568,12 @@ export default function Hub() {
         )}
         {activeTab === 'exchange' && (
           <ExchangeTab onWallet={(w) => setCharacter((prev) => ({ ...prev, ...w }))} />
+        )}
+        {activeTab === 'shop' && (
+          <ShopTab
+            onWallet={(w) => setCharacter((prev) => ({ ...prev, ...w }))}
+            onBought={() => load({ silent: true })}
+          />
         )}
         {activeTab === 'admin' && character.is_admin && <AdminTab />}
         </div>

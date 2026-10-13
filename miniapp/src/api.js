@@ -307,3 +307,14 @@ export const tradeAction = (action, params = {}) =>
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ action, ...params }),
   });
+
+// --- Магазин (2026-10-13) ---
+
+export const getShop = () => request('/shop');
+
+export const buyShop = (item, days) =>
+  request('/shop', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ item, days }),
+  });
