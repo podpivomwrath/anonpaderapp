@@ -1,13 +1,11 @@
-"""Клавиатуры экипировки (патч 11, блок 2): окно сравнения при дропе, инвентарь.
+"""Клавиатуры экипировки (патч 11, блок 2): инвентарь. Окна «Надеть?»
+после боя больше нет (2026-10-13): вещь сразу в сумке.
 
 Окна редактируются на месте (патч 13, ч.1), не плодят новых сообщений
-(см. bot/handlers/combat.py::item_choice, bot/handlers/inventory.py).
+(см. bot/handlers/inventory.py).
 
 Патч 37: инвентарь — отдельный ЭКРАН (bot/screens.py), клавиатура ОБЫЧНАЯ
-(не inline) и заменяет городскую целиком, [← Назад] — последней кнопкой.
-item_choice_keyboard — окно сравнения при дропе — остаётся INLINE: это
-модальная подсказка поверх текущего экрана (бой/исследование), а не переход
-на новый экран навигации, дерева экранов патча 37 не касается."""
+(не inline) и заменяет городскую целиком, [← Назад] — последней кнопкой."""
 
 from vkbottle import Keyboard, KeyboardButtonColor, Text
 
@@ -16,31 +14,12 @@ from bot.keyboards.world import add_miniapp_button
 from models import Item
 
 BTN_EQUIP = "Надеть"
-BTN_KEEP = "В инвентарь"
 BTN_SELL_GEAR = "🎒 Снаряжение"  # патч 41: было "Продать снаряжение"
 
 
 def no_keyboard() -> str:
     """Снять инлайн-кнопки с уже отредактированного сообщения (окно закрыто)."""
     return Keyboard(inline=True).get_json()
-
-
-def item_choice_keyboard(item_id: int, can_equip: bool = True) -> str:
-    """[Надеть] / [В инвентарь] — окно сравнения после дропа предмета.
-    Вещь выше уровня персонажа - без «Надеть»."""
-    kb = Keyboard(inline=True)
-    if can_equip:
-        kb.add(
-            Text(BTN_EQUIP, payload={"type": "item_choice", "action": "equip", "item": item_id}),
-            color=KeyboardButtonColor.POSITIVE,
-        )
-        kb.row()
-    kb.add(
-        Text(BTN_KEEP, payload={"type": "item_choice", "action": "keep", "item": item_id}),
-        color=KeyboardButtonColor.SECONDARY,
-    )
-    add_miniapp_button(kb)
-    return kb.get_json()
 
 
 BTN_BACK = "← Назад"

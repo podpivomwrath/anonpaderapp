@@ -13,7 +13,7 @@ from vkbottle.bot import BotLabeler, Message
 from bot import ash_handful_state, dailies_texts, editable_message, group_texts, raid_key_texts
 from bot.handlers import stats_window
 from bot.keyboards.combat_items import combat_items_keyboard, page_of
-from bot.keyboards.items import item_choice_keyboard, no_keyboard
+from bot.keyboards.items import no_keyboard
 from bot.keyboards.world import (
     ASH_OFFER_TEXT,
     BTN_ATTACK,
@@ -87,7 +87,6 @@ _encounter_mob_level: dict[int, int] = {}
 # получает подсказку, где настоящий (2026-10-11)
 _encounter_mob_name: dict[int, str] = {}
 # peer_id -> id предмета, ожидающего решения Надеть/В инвентарь (патч 11, блок 2)
-_pending_item_choice: dict[int, int] = {}
 # peer_id -> сводка текущего боя для трекера классовых испытаний (патч 12)
 _battle_trackers: dict[int, BattleTracker] = {}
 # peer_id -> (quest_id, оставшихся боёв в цепочке) для сюжетных встреч (патч 18)
@@ -556,11 +555,11 @@ async def on_battle_finished(session_id: int, result: TickResult) -> None:
             text += f"\n{raid_key_texts.raid_key_drop_line()}"
         for line in event_lines:
             text += f"\n{line}"
-        if weaker_drop:
-            text += (
-                f"\n{item_service.format_drop_announcement(outcome.item_dropped)}."
-                " Слабее надетого - убрано в сумку."
-            )
+        if outcome.item_dropped is not None:
+            # Вещь сразу в сумке, без окна «Надеть?» (2026-10-13, решение
+            # владельца): надевают из профиля мини-аппа.
+            where = "Слабее надетого - убрано в сумку." if weaker_drop else "В сумке - надеть можно в профиле."
+            text += f"\n{item_service.format_drop_announcement(outcome.item_dropped)}. {where}"
         if outcome.quest_progress is not None:
             text += f"\n📜 {outcome.quest_label}: {outcome.quest_progress}/{outcome.quest_target}"
             if outcome.quest_ready:
@@ -615,33 +614,9 @@ async def on_battle_finished(session_id: int, result: TickResult) -> None:
         if travel_id is not None:
             # патч 25, п.7: бой-нападение в пути на маунте — не сводка карты
             # (персонаж физически "в дороге"), а предложение продолжить путь.
-            # Предмет (если выпал) просто уже в инвентаре — без интерактивного
-            # окна сравнения, чтобы не плодить развилки посреди поездки.
-            if outcome.item_dropped is not None and not weaker_drop:
-                await _bot_api.messages.send(
-                    peer_id=peer_id,
-                    message=item_service.format_drop_announcement(outcome.item_dropped),
-                    random_id=0,
-                )
             from bot.handlers import mounts as mount_handlers  # избегаем цикла импортов
 
             await mount_handlers.offer_continue(peer_id, travel_id)
-            return
-
-        if outcome.item_dropped is not None and not weaker_drop:
-            # ux-patch-11: окно сравнения — сводка локации откладывается до
-            # решения игрока (Надеть/В инвентарь), как event_choice в патче 9.
-            new_item = outcome.item_dropped
-            _pending_item_choice[peer_id] = new_item.id
-            announcement = item_service.format_drop_announcement(new_item)
-            comparison = item_service.format_comparison(old_item, new_item)
-            wearable = item_service.can_wear(new_item, character.level)
-            if not wearable:
-                comparison += f"\n\n🔒 Надеть можно с {item_service.required_level(new_item)} уровня."
-            await editable_message.send_or_edit(
-                _bot_api, "item_choice", peer_id, f"{announcement}\n\n{comparison}",
-                item_choice_keyboard(new_item.id, can_equip=wearable),
-            )
             return
 
         if ash_service.roll_appears(_rng):
@@ -681,69 +656,6 @@ async def on_battle_finished(session_id: int, result: TickResult) -> None:
                     await db.commit()
             if cart_line:
                 await _bot_api.messages.send(peer_id=peer_id, message=cart_line, random_id=0)
-
-
-@labeler.message(payload_contains={"type": "item_choice"})
-async def item_choice(message: Message) -> None:
-    """Ответ на окно сравнения (патч 11): payload несёт item_id — устаревшее
-    нажатие (после уже разрешённого дропа) молча игнорируется, как event_choice."""
-    peer_id = message.peer_id
-    pending_item_id = _pending_item_choice.get(peer_id)
-    if pending_item_id is None:
-        return
-    payload = message.get_payload_json() or {}
-    if payload.get("item") != pending_item_id:
-        return
-    action = payload.get("action")
-    if action not in ("equip", "keep"):
-        return
-    _pending_item_choice.pop(peer_id, None)
-
-    async with get_session_factory()() as db:
-        from services.onboarding_service import get_character  # избегаем цикла импортов
-        from sqlalchemy import select
-        from models import CharacterStats, Item
-
-        character = await get_character(db, peer_id)
-        if character is None:
-            return
-        stats = await db.scalar(
-            select(CharacterStats).where(CharacterStats.character_id == character.id)
-        )
-        if action == "equip" and in_any_battle(peer_id):
-            # Окно добычи осталось от прошлого боя, а игрок уже в новом.
-            confirm_text = f"{item_service.IN_BATTLE_TEXT} Вещь в инвентаре."
-        elif action == "equip":
-            new_item = await db.get(Item, pending_item_id)
-            try:
-                old_item = await item_service.equip_item(db, character.id, pending_item_id)
-                confirm_text = f"Надето. {item_service.stat_delta_line(old_item, new_item)}"
-            except item_service.LevelTooLow as exc:
-                confirm_text = f"{exc} Убрано в инвентарь."
-        else:
-            confirm_text = "Убрано в инвентарь."
-        wallet = await wallet_service.get_wallet(db, character.id)
-        farm_currency, donate_currency = wallet.farm_currency, wallet.donate_currency
-        vit_bonus = (await item_service.compute_gear_bonus(db, character.id)).get("vit", 0)
-        quest_line = await story_service.quest_summary_line(db, character)
-        group_block = await group_texts.group_summary_block(db, character.id)
-        has_mount = await mount_service.has_any_mount(db, character.id)
-        await db.commit()
-
-    # патч 13, ч.1: окно сравнения редактируется в финальный вид на месте;
-    # ux-patch-10 п.1: сводка локации — всегда ОТДЕЛЬНОЕ следующее сообщение.
-    await editable_message.send_or_edit(_bot_api, "item_choice", peer_id, confirm_text, no_keyboard())
-    if ash_service.roll_appears(_rng):
-        ash_handful_state.mark(peer_id)
-    await message.answer(
-        location_summary(character, stats, _rng, farm_currency, vit_bonus, quest_line, donate_currency, group_block),
-        attachment=location_attachment(character),
-        keyboard=movement_keyboard(character.pos_x, character.pos_y, peer_id, has_mount=has_mount),
-    )
-    if ash_handful_state.is_pending(peer_id):
-        await _bot_api.messages.send(
-            peer_id=peer_id, message=ASH_OFFER_TEXT, random_id=0, keyboard=ash_handful_keyboard(),
-        )
 
 
 # --- Действия игрока ---
