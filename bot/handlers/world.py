@@ -871,10 +871,12 @@ async def handle_explore_done(peer_id: int) -> None:
         # Патч 110: след события обрывается на этой клетке - вместо обычного
         # исхода его финал. Событие со сценами - средний/глубокий слой.
         scene_event = None
+        scene_mult = 1.0
         trail = await scene_event_service.take_trail_here(db, character)
         if trail is not None:
             trail_def = scene_events.content().trails.get(trail.kind)
             scene_event = scene_events.event_by_id(trail_def.finale) if trail_def else None
+            scene_mult = scene_events.trail_reward_mult(trail.cells)
         elif outcome_kind == "event":
             tier = scene_events.roll_tier(_rng)
             if tier != "light":
@@ -975,7 +977,7 @@ async def handle_explore_done(peer_id: int) -> None:
 
     if outcome_kind == "scene":
         await _drop_pending_event(peer_id)
-        await scene_event_handlers.start(peer_id, scene_event)
+        await scene_event_handlers.start(peer_id, scene_event, scene_mult)
         return
     scene_event_handlers.cancel(peer_id)
 

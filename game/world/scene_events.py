@@ -301,12 +301,34 @@ def answer_matches(text: str, answers: list[str]) -> bool:
 
 # --- Следы ------------------------------------------------------------------------
 
-TRAIL_MIN_CELLS = 3
-TRAIL_MAX_CELLS = 7
+#: 2026-10-13, решение владельца: след вёл на 3-7 клеток, и награда того не
+#: стоила. Теперь 2-5, а награда финала растёт с длиной следа.
+TRAIL_MIN_CELLS = 2
+TRAIL_MAX_CELLS = 5
+#: +20% к награде финала за каждую клетку сверх минимума: 2 кл. - x1.0,
+#: 5 кл. - x1.6.
+TRAIL_REWARD_PER_CELL = 0.2
+
+
+def trail_reward_mult(cells: int | None) -> float:
+    if not cells:
+        return 1.0
+    return round(1.0 + TRAIL_REWARD_PER_CELL * max(0, cells - TRAIL_MIN_CELLS), 2)
+
+
+def scaled_result(result: "SceneResult", mult: float) -> "SceneResult":
+    """Награды исхода (опыт, трофеи, золото, награда за элиту) x mult.
+    Урон, руда и прочее не трогаем."""
+    if mult == 1.0:
+        return result
+    return result.model_copy(update={
+        "reward": result.reward * mult, "xp": result.xp * mult,
+        "gold": result.gold * mult, "bonus": result.bonus * mult,
+    })
 
 
 def pick_trail_cell(rng: random.Random, x: int, y: int) -> tuple[int, int] | None:
-    """Клетка следа: 3-7 клеток пути, в том же кольце или ДАЛЬШЕ от центра
+    """Клетка следа: 2-5 клеток пути, в том же кольце или ДАЛЬШЕ от центра
     (легче), не город и не Монолит.
 
     Раньше след вёл в то же кольцо или ближе к центру, и событие уводило
@@ -321,6 +343,9 @@ def pick_trail_cell(rng: random.Random, x: int, y: int) -> tuple[int, int] | Non
         if TRAIL_MIN_CELLS <= grid.cells_between(x, y, cx, cy) <= TRAIL_MAX_CELLS
         and grid.in_bounds(cx, cy)
         and grid.ring_tier(cx, cy) <= ring
+        # Из центра - всегда наружу: при следе в 2 клетки он мог остаться
+        # у самого Монолита.
+        and (ring < 5 or grid.ring_tier(cx, cy) < 5)
         and grid.city_region_at(cx, cy) is None
         and (cx, cy) != (0, 0)
     ]

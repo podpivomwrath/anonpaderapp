@@ -26,6 +26,9 @@ class EventTrail(Base):
     y: Mapped[int] = mapped_column()
     #: Номер отрезка у ложного следа (1 - первый).
     stage: Mapped[int] = mapped_column(default=1)
+    #: Длина следа в клетках (2026-10-13): от неё множитель награды финала.
+    #: None - след из прежней версии, множитель 1.
+    cells: Mapped[int | None] = mapped_column(nullable=True)
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 

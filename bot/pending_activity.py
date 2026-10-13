@@ -62,22 +62,24 @@ def _scene_key(peer_id: int) -> str:
     return f"scene:{peer_id}"
 
 
-async def remember_scene(peer_id: int, event_id: str, scene_id: str, token: int) -> None:
+async def remember_scene(peer_id: int, event_id: str, scene_id: str, token: int, mult: float = 1.0) -> None:
     if _redis is None:
         return
-    await _redis.set(_scene_key(peer_id), f"{token}|{event_id}|{scene_id}", ex=SCENE_TTL_SECONDS)
+    await _redis.set(_scene_key(peer_id), f"{token}|{event_id}|{scene_id}|{mult}", ex=SCENE_TTL_SECONDS)
 
 
-async def recall_scene(peer_id: int) -> tuple[int, str, str] | None:
-    """(токен, событие, сцена) открытого события или None."""
+async def recall_scene(peer_id: int) -> tuple[int, str, str, float] | None:
+    """(токен, событие, сцена, множитель награды) открытого события или None.
+    Записи прежнего формата - без множителя (1.0)."""
     if _redis is None:
         return None
     raw = await _redis.get(_scene_key(peer_id))
     if raw is None:
         return None
     raw = raw.decode() if isinstance(raw, bytes) else raw
-    token, event_id, scene_id = raw.split("|", 2)
-    return int(token), event_id, scene_id
+    parts = raw.split("|")
+    mult = float(parts[3]) if len(parts) > 3 else 1.0
+    return int(parts[0]), parts[1], parts[2], mult
 
 
 async def forget_scene(peer_id: int) -> None:

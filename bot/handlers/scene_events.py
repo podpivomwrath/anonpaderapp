@@ -59,6 +59,7 @@ class Pending:
     stake: int | None = None     # dice: введённая ставка
     deadline: float = 0.0    # timer / riddle: time.monotonic()
     busy: bool = False       # идёт обработка нажатия - второе нажатие не пускаем
+    reward_mult: float = 1.0  # финал следа: награда растёт с его длиной
     task: asyncio.Task | None = None
 
 
@@ -86,7 +87,7 @@ def _forget_later(peer_id: int) -> None:
 
 
 async def _remember(peer_id: int, p: "Pending") -> None:
-    await pending_activity.remember_scene(peer_id, p.event_id, p.scene_id, p.token)
+    await pending_activity.remember_scene(peer_id, p.event_id, p.scene_id, p.token, p.reward_mult)
 
 
 async def _restore(peer_id: int, token) -> "Pending | None":
@@ -99,12 +100,12 @@ async def _restore(peer_id: int, token) -> "Pending | None":
     saved = await pending_activity.recall_scene(peer_id)
     if saved is None or saved[0] != token:
         return None
-    _token, event_id, scene_id = saved
+    _token, event_id, scene_id, mult = saved
     event = se.event_by_id(event_id)
     if event is None or scene_id not in event.scenes:
         await pending_activity.forget_scene(peer_id)
         return None
-    restored = Pending(event_id=event_id, scene_id=scene_id, token=token)
+    restored = Pending(event_id=event_id, scene_id=scene_id, token=token, reward_mult=mult)
     _pending[peer_id] = restored
     return restored
 
@@ -218,10 +219,11 @@ def _money(currency: str, amount: int) -> str:
     return f"{amount} 💎" if currency == "gems" else f"{amount} золота"
 
 
-async def start(peer_id: int, event: SceneEvent) -> None:
-    """Начать событие: первая сцена с заголовком."""
+async def start(peer_id: int, event: SceneEvent, reward_mult: float = 1.0) -> None:
+    """Начать событие: первая сцена с заголовком. reward_mult - финал
+    следа: награды исходов умножаются на него."""
     cancel(peer_id)
-    p = Pending(event_id=event.id, scene_id=event.start, token=next(_tokens))
+    p = Pending(event_id=event.id, scene_id=event.start, token=next(_tokens), reward_mult=reward_mult)
     _pending[peer_id] = p
     await _remember(peer_id, p)
     async with get_session_factory()() as db:
@@ -338,7 +340,7 @@ def _choice_result(choice, totals: dict[str, int]) -> tuple[SceneResult, list[st
 
 async def _resolve(peer_id, db, character, stats, p: Pending, result: SceneResult | None,
                    pre: list[str], applied=None) -> None:
-    result = result or SceneResult()
+    result = se.scaled_result(result or SceneResult(), getattr(p, "reward_mult", 1.0))
     applied = await scene_event_service.apply_result(db, character, stats, result, _rng, applied)
     lines = pre + applied.lines
 

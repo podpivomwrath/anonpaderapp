@@ -141,8 +141,8 @@ def test_trail_cell_is_near_and_never_in_a_harder_ring() -> None:
 
 
 def test_trail_from_center_leads_outward() -> None:
-    """В центре (кольцо 5) нет клеток на 3+ шага - след ведёт наружу, а не
-    пропадает молча."""
+    """Из центра (кольцо 5) след ведёт наружу, а не пропадает молча и не
+    остаётся у Монолита."""
     rng = random.Random(7)
     for x, y in [(0, 0), (1, 1), (-1, 0)]:
         for _ in range(30):
@@ -270,3 +270,21 @@ async def test_cold_trail_is_reported_once(db_session, character_at) -> None:
     await db_session.flush()
     assert any("замело" in line for line in await ses.summary_lines(db_session, me))
     assert await ses.summary_lines(db_session, me) == []
+
+
+def test_trail_is_short_and_pays_for_distance() -> None:
+    """2026-10-13: след 2-5 клеток, награда финала растёт с длиной."""
+    import random as _random
+
+    from game.world import grid as _grid
+    from game.world import scene_events as _se
+
+    rng = _random.Random(7)
+    for _ in range(50):
+        cell = _se.pick_trail_cell(rng, 20, 0)
+        assert 2 <= _grid.cells_between(20, 0, *cell) <= 5
+    assert _se.trail_reward_mult(2) == 1.0
+    assert _se.trail_reward_mult(5) == 1.6
+    assert _se.trail_reward_mult(None) == 1.0
+    scaled = _se.scaled_result(_se.SceneResult(reward=2.5, bonus=3.0, gold=1.0), 1.6)
+    assert (scaled.reward, scaled.bonus, scaled.gold) == pytest.approx((4.0, 4.8, 1.6))

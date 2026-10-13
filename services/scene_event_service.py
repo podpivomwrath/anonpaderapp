@@ -421,16 +421,19 @@ async def create_trail(db: AsyncSession, character: Character, kind: str, rng: r
     cell = scene_events.pick_trail_cell(rng, character.pos_x, character.pos_y)
     if cell is None:
         return None
+    cells = grid.cells_between(character.pos_x, character.pos_y, *cell)
     await db.execute(delete(EventTrail).where(EventTrail.character_id == character.id))
     db.add(EventTrail(
-        character_id=character.id, kind=kind, x=cell[0], y=cell[1], stage=stage,
+        character_id=character.id, kind=kind, x=cell[0], y=cell[1], stage=stage, cells=cells,
         expires_at=_now() + timedelta(minutes=trail_def.minutes),
     ))
     await db.flush()
     direction = story_service.compass_direction(character.pos_x, character.pos_y, *cell)
+    mult = scene_events.trail_reward_mult(cells)
+    reward = f" Путь долгий - и добыча богаче (x{mult:g})." if mult > 1 else ""
     return (
         f"{trail_def.emoji} {trail_def.hint} {direction}, клетка ({cell[0]}; {cell[1]}). "
-        f"Остынет через {trail_def.minutes} мин."
+        f"Остынет через {trail_def.minutes} мин.{reward}"
     )
 
 
