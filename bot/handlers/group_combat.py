@@ -334,6 +334,9 @@ async def _broadcast_board(
         target_line = _target_line(battle_id, battle, cid)
         if target_line and combatant is not None and combatant.alive:
             personal = f"{personal}\n{target_line}"
+        own = battle_log.class_line(state.combatants, cid) if state is not None else None
+        if own:
+            personal = f"{personal}\n{own}"
         await _bot_api.messages.send(peer_id=p.peer_id, message=personal, random_id=0, keyboard=keyboard)
 
 

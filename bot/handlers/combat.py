@@ -244,7 +244,7 @@ def _render(state: CombatSessionState, result: TickResult | None = None) -> str:
     просто в соло-бою в каждом разделе ровно по одной строке. result=None —
     доска ДО первого хода (открытие боя/после использования предмета без
     резолва тика) — пустой TickResult даёт "Без изменений." в обоих разделах."""
-    return battle_log.render_tick(state, result or TickResult(), viewer_side=0)
+    return battle_log.render_tick(state, result or TickResult(), viewer_side=0, owner_id=PLAYER_ID)
 
 
 async def start_encounter(

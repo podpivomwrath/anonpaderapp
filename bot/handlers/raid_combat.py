@@ -556,6 +556,10 @@ async def _broadcast_board(
         target_line = _target_line(battle_id, battle, cid)
         if target_line and combatant is not None and combatant.alive:
             personal = f"{personal}\n{target_line}"
+        raid_state = _engine.sessions.get(battle_id)
+        own = battle_log.class_line(raid_state.combatants, cid) if raid_state is not None else None
+        if own:
+            personal = f"{personal}\n{own}"
         # Личное, а не общее: патч 71 по ошибке заменил здесь personal на text,
         # и с тех пор опыт, дроп, ключ, испытание и строка цели до игрока
         # не доходили вовсе.

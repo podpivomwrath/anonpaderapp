@@ -358,9 +358,24 @@ async def _afk_target_named(db, character: Character, target: str) -> bool:
     )
 
 
-def _class_line(c: Character) -> str:
+async def _guild_tags(db, characters: list[Character]) -> dict[int, str]:
+    """guild_id -> тег для «Осмотреться» (2026-10-13, просьба игроков)."""
+    from sqlalchemy import select
+
+    from models import Guild
+
+    ids = {c.guild_id for c in characters if c.guild_id is not None}
+    if not ids:
+        return {}
+    rows = await db.execute(select(Guild.id, Guild.tag).where(Guild.id.in_(ids)))
+    return {gid: tag for gid, tag in rows.all()}
+
+
+def _class_line(c: Character, tags: dict[int, str] | None = None) -> str:
     title = daily_service.title_name(c)
-    name = f"{premium_service.badge(c)}{c.name} «{title}»" if title else f"{premium_service.badge(c)}{c.name}"
+    tag = (tags or {}).get(c.guild_id)
+    prefix = f"{premium_service.badge(c)}[{tag}] " if tag else premium_service.badge(c)
+    name = f"{prefix}{c.name} «{title}»" if title else f"{prefix}{c.name}"
     return f"{name} · {c.level} ур. · {pvp_service.class_title(c)}"
 
 
@@ -375,13 +390,13 @@ def _battle_scene_line(battle: Battle) -> str:
 # VK тут не при чём даже на людной клетке. Длина сообщения теоретически растёт
 # с числом игроков на клетке, но лимит VK на текст (4096 симв.) недостижим на
 # практике при разумной плотности игроков.
-def _scene_text(solo: list[Character], battles: list[tuple[int, Battle]]) -> str:
+def _scene_text(solo: list[Character], battles: list[tuple[int, Battle]], tags: dict[int, str] | None = None) -> str:
     if not solo and not battles:
         return ALONE_ON_CELL
     lines = ["👁 Ты оглядываешься.", "", "Здесь есть кто-то ещё:"]
     idx = 1
     for c in solo:
-        lines.append(f"{idx}. {_class_line(c)}")
+        lines.append(f"{idx}. {_class_line(c, tags)}")
         idx += 1
     for _, battle in battles:
         lines.append(f"{idx}. {_battle_scene_line(battle)}")
@@ -452,17 +467,18 @@ async def look_around(message: Message) -> None:
         # нападать здесь всё равно нельзя.
         if _is_safe_craft_cell(character) or grid.pvp_forbidden(character.pos_x, character.pos_y):
             solo, _battles = await _scene_at(db, character)
-            await message.answer(_peaceful_scene_text(solo))
+            await message.answer(_peaceful_scene_text(solo, await _guild_tags(db, solo)))
             return
         solo, battles = await _scene_at(db, character)
-    await message.answer(_scene_text(solo, battles))
+        tags = await _guild_tags(db, solo)
+    await message.answer(_scene_text(solo, battles, tags))
 
 
-def _peaceful_scene_text(solo: list[Character]) -> str:
+def _peaceful_scene_text(solo: list[Character], tags: dict[int, str] | None = None) -> str:
     if not solo:
         return "👁 Ты оглядываешься.\n\nТы один. Место мирное - здесь не нападают."
     lines = ["👁 Ты оглядываешься. Место мирное - здесь не нападают.", "", "Рядом:"]
-    lines += [f"• {_class_line(c)}" for c in solo]
+    lines += [f"• {_class_line(c, tags)}" for c in solo]
     return "\n".join(lines)
 
 
@@ -1282,6 +1298,9 @@ async def on_duel_turn_resolved(session_id: int, turn: int, result: DuelResult) 
             if duel is not None
             else "\n".join(result.lines)
         )
+        own = battle_log.class_line(duel.combatants, p.character_id) if duel is not None else None
+        if own and not result.finished:
+            text += f"\n\n{own}"
         if result.finished or combatant is None:
             keyboard = kb.waiting_keyboard()
         elif p.character_id == next_actor_id:
@@ -1509,6 +1528,9 @@ async def on_mass_tick_resolved(session_id: int, tick: int, result: TickResult) 
         target_line = _target_line(session_id, battle, cid)
         if target_line:
             personal_text = f"{personal_text}\n{target_line}"
+        own = battle_log.class_line(session.combatants, cid) if session is not None else None
+        if own:
+            personal_text = f"{personal_text}\n{own}"
         await _bot_api.messages.send(
             peer_id=participant.peer_id, message=personal_text, random_id=0, keyboard=keyboard,
         )

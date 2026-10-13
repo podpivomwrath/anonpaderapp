@@ -32,7 +32,8 @@ def _hit_line(hit: RenderedHit, source_name: str, target_name: str, mode: str) -
     if hit.missed:
         # Промах называет то, чем били: навык, промахнувшийся «атакой»,
         # выглядел так, будто нажатие не сработало.
-        return f"{source_name} → {word} по {target_name} - промах, {target_name} уклоняется"
+        mark = f" 🎯 Метка добычи ×{hit.marked}" if hit.marked else ""
+        return f"{source_name} → {word} по {target_name} - промах, {target_name} уклоняется{mark}"
     crit = " (крит!)" if hit.crit else ""
     before = display.hp_text(hit.hp_before, hit.max_hp, mode)
     after = display.hp_text(hit.hp_after, hit.max_hp, mode)
@@ -60,13 +61,16 @@ def _guess_side(session: CombatSessionState, line: str) -> int | None:
     return None
 
 
-def _mark_suffix(session: CombatSessionState, target, viewer_side: int) -> str:
+def _mark_suffix(session: CombatSessionState, target, viewer_side: int, owner_id: int | None = None) -> str:
     """Патч 56, «Клеймо охоты» Клинка теней: стаки Метки добычи видны не только
-    её владельцу, но и всей его стороне. Без баффа - пустая строка, сводка
-    выглядит ровно как раньше."""
+    её владельцу, но и всей его стороне. owner_id (2026-10-13) - чья это доска:
+    свои метки владелец видит всегда, без баффа (соло-бой, личная строка в
+    групповом)."""
     watchers = [
         c for c in session.combatants.values()
-        if c.side == viewer_side and c.alive and c.buff_modifiers.get("mark_visible_to_allies", 0.0) > 0
+        if c.side == viewer_side and c.alive and (
+            c.buff_modifiers.get("mark_visible_to_allies", 0.0) > 0 or c.id == owner_id
+        )
     ]
     if not watchers:
         return ""
@@ -77,6 +81,75 @@ def _mark_suffix(session: CombatSessionState, target, viewer_side: int) -> str:
     return f" - Метка добычи ×{stacks}" if stacks else ""
 
 
+def _turns(n: int) -> str:
+    return f"ещё {n} х." if n > 0 else "последний ход"
+
+
+def class_line(combatants, owner_id: int) -> str | None:
+    """Свои классовые механики бойца одной строкой-блоком под доской боя
+    (2026-10-13, просьба игроков: Клинок сбивался со счёта Меток на боссах,
+    Отравитель - со стаков яда). Только то, что повесил сам owner_id.
+    combatants - словарь бойцов (CombatSessionState или дуэль). None - нечего
+    показывать: подкласса нет или ничего не висит."""
+    from game.combat.session import BURN_TAG
+
+    combatants = dict(combatants)
+    owner = combatants.get(owner_id)
+    if owner is None or not owner.alive or not owner.subclass_id:
+        return None
+    sub = owner.subclass_id
+    enemies = [c for c in combatants.values() if c.alive and c.side != owner.side]
+    allies = [c for c in combatants.values() if c.alive and c.side == owner.side]
+
+    def mine(c, kind, burn=None):
+        return [e for e in c.effects_of(kind) if e.source_id == owner_id
+                and (burn is None or (getattr(e, "tag", None) == BURN_TAG) == burn)]
+
+    parts: list[str] = []
+    if sub == "shadow_blade":
+        for c in enemies:
+            stacks = sum(e.stacks for e in mine(c, EffectKind.MARK))
+            if stacks:
+                parts.append(f"🎯 Метка добычи: {c.name} ×{stacks}")
+    elif sub == "poisoner":
+        for c in enemies:
+            poison = mine(c, EffectKind.DOT, burn=False)
+            if poison:
+                stacks = sum(e.stacks for e in poison)
+                parts.append(f"☠ Яд: {c.name} ×{stacks} ({_turns(max(e.remaining_ticks for e in poison))})")
+    elif sub == "elementalist":
+        for c in enemies:
+            burn = mine(c, EffectKind.DOT, burn=True)
+            if burn:
+                parts.append(f"🔥 Горит: {c.name} ({_turns(max(e.remaining_ticks for e in burn))})")
+            frozen = mine(c, EffectKind.FREEZE)
+            if frozen:
+                parts.append(f"❄ Скован: {c.name} ({_turns(max(e.remaining_ticks for e in frozen))})")
+    elif sub == "blood_knight":
+        for c in enemies:
+            seal = mine(c, EffectKind.BLOOD_SEAL)
+            if seal:
+                parts.append(f"🩸 Кровавая печать: {c.name} ({_turns(max(e.remaining_ticks for e in seal))})")
+    elif sub == "guardian":
+        stance = owner.effects_of(EffectKind.BLOCK_STANCE)
+        if stance:
+            parts.append(f"🛡 Глухая оборона ({_turns(max(e.remaining_ticks for e in stance))})")
+        cap = owner.effects_of(EffectKind.DAMAGE_CAP)
+        if cap:
+            parts.append(f"🪨 Несокрушимый ({_turns(max(e.remaining_ticks for e in cap))})")
+        taunted = [c.name for c in enemies if getattr(c, "taunted_by", None) == owner_id]
+        if taunted:
+            parts.append("📣 Провокация: " + ", ".join(taunted))
+    elif sub == "dark_mystic":
+        for c in allies:
+            ward = mine(c, EffectKind.SHIELD_POOL)
+            left = round(sum(e.value for e in ward))
+            if ward and left > 0:
+                who = "ты" if c.id == owner_id else c.name
+                parts.append(f"🛡 Оберег: {who} - {left} ({_turns(max(e.remaining_ticks for e in ward))})")
+    return "\n".join(parts) if parts else None
+
+
 def render_tick(
     session: CombatSessionState,
     result: TickResult,
@@ -84,6 +157,7 @@ def render_tick(
     enemy_lines: list[str] | None = None,
     title: str = "⚔️ БОЙ",
     side_titles: tuple[str, str] | None = None,
+    owner_id: int | None = None,
 ) -> str:
     """Личный боевой лог этого хода с точки зрения стороны viewer_side —
     ВСЕГДА показывает "своя сторона" первой, "противник" второй, независимо
@@ -167,4 +241,7 @@ def render_tick(
     for c in session.combatants.values():
         if c.side == viewer_side and c.alive:
             parts.append(f"{c.name}: {display.health_bar(c.current_hp, c.max_hp, mode)}{display.shield_suffix(c)}")
+    own_line = class_line(session.combatants, owner_id) if owner_id is not None else None
+    if own_line:
+        parts.append(own_line)
     return "\n".join(parts)

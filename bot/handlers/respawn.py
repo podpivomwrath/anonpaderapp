@@ -150,6 +150,18 @@ async def scan() -> None:
             keyboard=kb.city_square_keyboard(),
         )
 
+    # Смерть в PvP (дуэль, массовый бой, осада) приходила только строкой
+    # «Тебя побеждает …» - без таймера возрождения (2026-10-13, жалоба
+    # игроков). Сообщение смерти с отсчётом шлём здесь, при первом скане:
+    # PvP регистрирует смерть внутри открытой транзакции, слать оттуда нельзя.
+    for peer_id, respawn_at in to_update:
+        if peer_id in _pvp_death_pending and peer_id not in _death_message:
+            try:
+                await register_death(peer_id, respawn_at)
+            except Exception:
+                logger.warning("Не удалось показать отсчёт PvP-смерти {}", peer_id)
+                _death_message[peer_id] = 0  # не долбить VK каждый скан
+
     if _live_countdown:
         for peer_id, respawn_at in to_update:
             msg_id = _death_message.get(peer_id)

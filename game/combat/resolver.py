@@ -153,6 +153,8 @@ class RenderedHit:
     # впитанное посчитать уже нечем: исходная величина удара к этому моменту
     # нигде не хранится. Нужно сводке рейда (bot/handlers/raid_combat.py).
     absorbed: int = 0
+    #: стаков Метки добычи после уворота (см. PendingHit.marked)
+    marked: int = 0
 
 
 @dataclass
@@ -557,6 +559,7 @@ def resolve_tick(
                 is_tick=hit.is_tick,
                 hp_before=h_before, hp_after=h_after, max_hp=target.max_hp,
                 absorbed=hit.blocked + max(hit.amount - applied, 0),
+                marked=hit.marked,
             )
         )
     for heal in ctx.heals:

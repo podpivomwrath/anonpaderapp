@@ -41,6 +41,9 @@ class PendingHit:
     is_dot: bool = False
     is_tick: bool = False
     blocked: int = 0      # патч 56: сколько урона срезал блок цели («Отражение» Стража)
+    #: «Голод клинка»: уворот поставил Метку добычи промахнувшемуся - стаков
+    #: после этого (0 - метки не было). Для строки уворота в логе.
+    marked: int = 0
 
 
 @dataclass
@@ -257,19 +260,22 @@ def compute_hit(
         target.dodged_this_tick = True
         # «Голод клинка»: каждый удачный уворот добавляет стак Метки добычи
         # атакующему-жертве. Без баффа - нет-оп.
+        marked = 0
         if target.buff_modifiers.get("mark_on_dodge", 0.0) > 0:
             mark = actor.effect_from(EffectKind.MARK, target.id)
             if mark is not None:
                 mark.stacks = min(mark.stacks + 1, bc.SHADOW_BLADE_MARK_MAX_STACKS)
                 mark.remaining_ticks = max(mark.remaining_ticks, bc.SHADOW_BLADE_MARK_DURATION)
+                marked = mark.stacks
             else:
                 actor.effects.append(
                     Effect(kind=EffectKind.MARK, value=1.0,
                            remaining_ticks=bc.SHADOW_BLADE_MARK_DURATION,
                            source_id=target.id, stacks=1)
                 )
+                marked = 1
         return PendingHit(
-            source_id=actor.id, target_id=target.id, amount=0, label=label, missed=True
+            source_id=actor.id, target_id=target.id, amount=0, label=label, missed=True, marked=marked,
         )
 
     base = formulas.damage(
