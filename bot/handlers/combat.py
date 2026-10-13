@@ -304,6 +304,12 @@ async def start_encounter(
             if fresh is not None:
                 await trial_service.record_combat_started(db, fresh)
                 await db.commit()
+    if peer_id not in _world_boss:
+        # Эффекты событий («ещё N боёв») списываются при ВХОДЕ в бой; их
+        # модификаторы уже в бойце (buff_modifiers от вызывающего).
+        async with get_session_factory()() as db:
+            await scene_event_service.start_fight_effects(db, character.id)
+            await db.commit()
     _engine.start_session(state)
     # флейвор моба перед боем + боевой интерфейс
     await _bot_api.messages.send(
@@ -493,7 +499,7 @@ async def on_battle_finished(session_id: int, result: TickResult) -> None:
                     db, character, stats, SceneResult(reward=event_bonus), _rng,
                 )
                 event_lines += bonus.lines
-            event_lines += await scene_event_service.tick_effects(db, character.id)
+            event_lines += await scene_event_service.finish_fight_effects(db, character.id)
             await db.commit()
             new_level = outcome.new_level
             levels = outcome.levels_gained
@@ -504,7 +510,7 @@ async def on_battle_finished(session_id: int, result: TickResult) -> None:
             group_block = await group_texts.group_summary_block(db, character.id)
         else:  # моб выиграл или ничья — смерть игрока (авто-респавн по таймеру)
             defeat = await encounter_service.resolve_defeat(db, character)
-            await scene_event_service.tick_effects(db, character.id)
+            await scene_event_service.finish_fight_effects(db, character.id)
             await db.commit()
             respawn_at = character.respawn_at
             xp_lost = defeat.xp_lost

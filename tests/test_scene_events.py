@@ -203,18 +203,51 @@ async def test_damage_never_kills(db_session, character_at) -> None:
     assert me.respawn_at is None
 
 
-async def test_effect_modifies_solo_fights_and_ticks_out(db_session, character_at) -> None:
+async def test_effect_spent_on_entering_fight_and_works_through_last_one(db_session, character_at) -> None:
+    """2026-10-13: бой списывается при ВХОДЕ, а не на выходе. Эффект на N боёв
+    работает ровно N боёв; в последнем он уже списан (в статусе его нет), но
+    до конца боя ещё действует, и уходит с концом боя."""
     me = await character_at(0, 28)
     stats = await _stats(db_session, me)
     await ses.apply_result(db_session, me, stats, SceneResult(effect="ash_blessing"), random.Random())
-    mods = await ses.solo_modifiers(db_session, me, {"damage_bonus": 0.05})
-    assert mods["damage_bonus"] == pytest.approx(0.15)
     fights = se.content().effects["ash_blessing"].fights
-    for _ in range(fights - 1):
-        assert await ses.tick_effects(db_session, me.id) == []
-    assert await ses.tick_effects(db_session, me.id)  # закончился - строка об этом
+    for n in range(fights):
+        mods = await ses.solo_modifiers(db_session, me, {"damage_bonus": 0.05})
+        assert mods["damage_bonus"] == pytest.approx(0.15), f"бой {n + 1}: эффект должен работать"
+        await ses.start_fight_effects(db_session, me.id)
+        left = dict(await ses.active_effects(db_session, me.id)).get("ash_blessing", 0)
+        assert left == fights - n - 1  # статус уже без этого боя
+        ended = await ses.finish_fight_effects(db_session, me.id)
+        assert bool(ended) == (n == fights - 1)  # «прошло» - только после последнего
     assert await db_session.scalar(select(CharacterEventEffect)) is None
     assert await ses.solo_modifiers(db_session, me, {}) == {}
+
+
+async def test_last_fight_keeps_trophy_bonus_until_it_ends(db_session, character_at) -> None:
+    me = await character_at(0, 28)
+    stats = await _stats(db_session, me)
+    await ses.apply_result(db_session, me, stats, SceneResult(effect="scavenger_mark"), random.Random())
+    fights = se.content().effects["scavenger_mark"].fights
+    for _ in range(fights - 1):
+        await ses.start_fight_effects(db_session, me.id)
+        await ses.finish_fight_effects(db_session, me.id)
+    await ses.start_fight_effects(db_session, me.id)  # последний бой: уже 0 в счётчике
+    assert await ses.trophy_bonus(db_session, me.id) > 0  # но бонус трофеев при победе ещё есть
+    await ses.finish_fight_effects(db_session, me.id)
+    assert await ses.trophy_bonus(db_session, me.id) == 0
+
+
+async def test_aborted_fight_leftover_is_cleared_on_next_fight(db_session, character_at) -> None:
+    """Бой оборвался (побег, рестарт) - конца боя не было; ноль убирается при
+    входе в следующий бой и больше не действует."""
+    me = await character_at(0, 28)
+    stats = await _stats(db_session, me)
+    await ses.apply_result(db_session, me, stats, SceneResult(effect="ash_blessing"), random.Random())
+    fights = se.content().effects["ash_blessing"].fights
+    for _ in range(fights):
+        await ses.start_fight_effects(db_session, me.id)  # ни одного finish
+    await ses.start_fight_effects(db_session, me.id)
+    assert await db_session.scalar(select(CharacterEventEffect)) is None
 
 
 async def test_trail_lifecycle(db_session, character_at) -> None:

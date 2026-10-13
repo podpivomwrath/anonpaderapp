@@ -360,8 +360,13 @@ async def solo_modifiers(db: AsyncSession, character: Character, base: dict[str,
 
 
 async def trophy_bonus(db: AsyncSession, character_id: int) -> float:
+    """Бонус трофеев идущего боя - включая эффекты, чей последний бой этот
+    (fights_left уже 0 после списания при входе, см. start_fight_effects)."""
     effects = scene_events.content().effects
-    return sum(effects[eid].trophy_bonus for eid, _ in await active_effects(db, character_id))
+    rows = (await db.scalars(select(CharacterEventEffect).where(
+        CharacterEventEffect.character_id == character_id,
+    ))).all()
+    return sum(effects[r.effect_id].trophy_bonus for r in rows if r.effect_id in effects)
 
 
 async def extra_kill_trophies(db: AsyncSession, character: Character, rng: random.Random) -> dict[str, int]:
@@ -371,19 +376,38 @@ async def extra_kill_trophies(db: AsyncSession, character: Character, rng: rando
     return drop
 
 
-async def tick_effects(db: AsyncSession, character_id: int) -> list[str]:
-    """Один одиночный бой с мобом прошёл. Возвращает строки о закончившихся."""
+async def start_fight_effects(db: AsyncSession, character_id: int) -> None:
+    """Бой начался - бой списывается СРАЗУ (2026-10-13, решение владельца:
+    считать при входе, а не при выходе; иначе бой, брошенный побегом или
+    оборванный, не тратил эффект).
+
+    Модификаторы этого боя вызывающий уже взял (solo_modifiers - до вызова).
+    Эффект с последним боем остаётся строкой с fights_left = 0 до конца боя:
+    так при победе ещё работает его бонус трофеев. Нули, оставшиеся от
+    оборванного прошлого боя, здесь же и убираются."""
     rows = (await db.scalars(select(CharacterEventEffect).where(
         CharacterEventEffect.character_id == character_id,
+    ))).all()
+    for row in rows:
+        if row.fights_left <= 0:
+            await db.delete(row)
+        else:
+            row.fights_left -= 1
+    await db.flush()
+
+
+async def finish_fight_effects(db: AsyncSession, character_id: int) -> list[str]:
+    """Бой закончился: эффекты, чей последний бой был этот, уходят.
+    Возвращает строки «… - прошло.»."""
+    rows = (await db.scalars(select(CharacterEventEffect).where(
+        CharacterEventEffect.character_id == character_id, CharacterEventEffect.fights_left <= 0,
     ))).all()
     ended = []
     effects = scene_events.content().effects
     for row in rows:
-        row.fights_left -= 1
-        if row.fights_left <= 0:
-            if row.effect_id in effects:
-                ended.append(f"{effects[row.effect_id].emoji} {effects[row.effect_id].name} - прошло.")
-            await db.delete(row)
+        if row.effect_id in effects:
+            ended.append(f"{effects[row.effect_id].emoji} {effects[row.effect_id].name} - прошло.")
+        await db.delete(row)
     await db.flush()
     return ended
 
