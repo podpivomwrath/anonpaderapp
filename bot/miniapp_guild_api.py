@@ -222,10 +222,6 @@ async def _state(db, character: Character) -> dict:
     place = next((i + 1 for i, (g, _p) in enumerate(standings) if g.id == guild.id), None)
     boss = await guild_boss_service.active_boss(db, guild.id)
     my_ore = await mining_service.get_ore(db, character.id)
-    my_items = [
-        item for item, equipped in await item_service.get_inventory(db, character.id)
-        if not equipped and not item.bound and not item.admin_only
-    ]
     stored = await guild_service.stored_items(db, guild.id)
     here_cell = await guild_territory_service.cell_at(db, character.pos_x, character.pos_y) \
         if character.pos_x is not None else None
@@ -287,7 +283,6 @@ async def _state(db, character: Character) -> dict:
             "ore": [_ore_line(o.ore_id, o.grade, o.count) for o in await guild_service.ore_stock(db, guild.id)],
             "items": [_warehouse_item(i, character.level) for i in stored],
             "my_ore": [_ore_line(d.id, grade, count) for d, grade, count in my_ore if count > 0],
-            "my_items": [_warehouse_item(i, character.level) for i in my_items],
         },
         "slots": {
             "cells": len(held_cells), "cells_max": gc.cell_slots(guild.level),
@@ -407,8 +402,6 @@ async def _act(db, character: Character, vk_user_id: int, body: dict) -> list:
             db, character, _str(body, "ore_id"), _str(body, "grade"), _int(body, "count"),
             to if isinstance(to, int) else None,
         )
-    elif action == "deposit_item":
-        await guild_service.deposit_item(db, character, _int(body, "item_id"))
     elif action == "withdraw_item":
         to = body.get("to")
         await guild_service.withdraw_item(db, character, _int(body, "item_id"), to if isinstance(to, int) else None)

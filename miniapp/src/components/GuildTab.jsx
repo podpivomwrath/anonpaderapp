@@ -416,7 +416,7 @@ function Treasury({ state, run, busy }) {
       <Div>
         <p className="guild-line">💰 Казна: {money(guild.treasury_gold)} · 💎 {money(guild.treasury_gems)}</p>
         <p className="craft-hint">
-          📦 Склад: руда {warehouse.ore_total}/{warehouse.capacity.ore}, вещи {warehouse.items.length}/{warehouse.capacity.items}
+          📦 Склад: руда {warehouse.ore_total}/{warehouse.capacity.ore}{warehouse.items.length ? `, вещи ${warehouse.items.length}` : ''}
           {warehouse.ore_full ? ' · полон, шахты стоят' : ''}
         </p>
         <p className="craft-hint">
@@ -474,20 +474,6 @@ function Treasury({ state, run, busy }) {
               })}
             </Folder>
           ))}
-        </Group>
-        <Group header={<Header>Сдать снаряжение</Header>}>
-          {warehouse.my_items.length === 0 && <Div style={{ opacity: 0.8 }}>В сумке нечего сдать.</Div>}
-          {groupItems(warehouse.my_items).map((g) => (
-            <Folder key={g.id} title={g.title} count={g.rows.length}>
-              {g.rows.map((i) => (
-                <SimpleCell key={i.id} multiline before={<ItemIcon icon={i.icon} rarity={i.rarity} alt={i.name} />}
-                  subtitle={itemSubtitle(i)} after={(
-                    <Button size="s" disabled={busy} onClick={() => run('deposit_item', { item_id: i.id }, 'Сдано на склад.')}>Сдать</Button>
-                  )}>{i.name}</SimpleCell>
-              ))}
-            </Folder>
-          ))}
-          <Div className="craft-hint">Надетые и привязанные вещи и реликвии на склад не кладут.</Div>
         </Group>
       </>
     );
@@ -557,8 +543,8 @@ function Treasury({ state, run, busy }) {
           </Folder>
         ))}
       </Group>
+      {warehouse.items.length > 0 && (
       <Group header={<Header>Снаряжение на складе</Header>}>
-        {warehouse.items.length === 0 && <Div style={{ opacity: 0.8 }}>Пусто.</Div>}
         {groupItems(warehouse.items).map((g) => (
           <Folder key={g.id} title={g.title} count={g.rows.length}>
             {g.rows.map((i) => (
@@ -571,6 +557,7 @@ function Treasury({ state, run, busy }) {
         ))}
         {!canGive && <Div className="craft-hint">Выдают со склада глава и казначеи.</Div>}
       </Group>
+      )}
     </>
   );
 }
