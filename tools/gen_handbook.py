@@ -76,9 +76,9 @@ def skill_mechanics() -> dict[str, str]:
             f"Провокация на {turns(bc.PROVOKE_PVP_DURATION_TICKS)}: в PvE мобы переключаются на "
             f"Стража, в PvP чужие цели получают на {pct(bc.PROVOKE_PVP_DAMAGE_REDUCTION)} меньше урона.",
         "guardian_block":
-            f"Снижает входящий урон на {pct(_s('guardian_block').effect_value)} и лечит на "
-            f"{pct(bc.GUARDIAN_BLOCK_HEAL_PCT)} максимума здоровья за каждый срезанный блоком "
-            f"удар. Держится {turns(_s('guardian_block').effect_duration)}.",
+            f"Каждый удар по тебе слабее на {pct(_s('guardian_block').effect_value)}, и за каждый "
+            f"такой удар лечишься на {pct(bc.GUARDIAN_BLOCK_HEAL_PCT)} максимума здоровья. "
+            f"Действует в ход применения и ещё {turns(_s('guardian_block').effect_duration)}.",
         "guardian_stonegrip":
             "Оглушает цель. Как и любой контроль, оставляет после себя след «по холоду» - "
             "союзный Элементалист успевает добить Схождением с гарантированным критом.",
