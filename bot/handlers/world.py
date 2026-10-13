@@ -470,6 +470,19 @@ async def _render_city_screen(db, character, screen: str | None) -> tuple[str, s
     return text, kb.city_square_keyboard(character, mentor_badge, has_mount=has_mount, is_foreign=is_foreign)
 
 
+async def _announce_daily(peer_id: int, progress) -> None:
+    """Ежедневное задание выполнено шагом - сказать об этом и о новом уровне.
+    Раньше прогресс задания «пройди N клеток» отбрасывался: награда и
+    уровень приходили молча (2026-10-13, жалоба про Бубылду)."""
+    if progress is None:
+        return
+    notice = dailies_texts.progress_notice(progress)
+    if notice:
+        await _bot_api.messages.send(peer_id=peer_id, message=notice, random_id=0)
+    for c in progress.completed:
+        await stats_window.notify_levelup(peer_id, c.levels_gained, c.new_level)
+
+
 async def location_summary_parts(db, character, peer_id: int) -> tuple[str, str | None, str]:
     """Сводка клетки карты целиком: текст, картинка, клавиатура перемещения.
     Для тех, кто возвращает игрока на карту вне обычного показа локации
@@ -501,8 +514,9 @@ async def show_location(message: Message, db, character) -> None:
     if movement_service.resolve_arrival(character, now):
         if character.subclass is not None:
             await trial_service.record_cell_moved(db, character)
-        await daily_service.record_cell_moved(db, character)
+        daily_progress = await daily_service.record_cell_moved(db, character)
         await db.commit()
+        await _announce_daily(message.peer_id, daily_progress)
 
     if movement_service.is_traveling(character, now):
         left = movement_service.remaining_seconds(character, now)
@@ -1284,8 +1298,9 @@ async def move(message: Message) -> None:
         if movement_service.resolve_arrival(character, now):
             if character.subclass is not None:
                 await trial_service.record_cell_moved(db, character)
-            await daily_service.record_cell_moved(db, character)
+            daily_progress = await daily_service.record_cell_moved(db, character)
             await db.commit()
+            await _announce_daily(message.peer_id, daily_progress)
             await show_location(message, db, character)
             return
         if movement_service.is_traveling(character, now):
@@ -1337,11 +1352,12 @@ async def handle_arrival(peer_id: int) -> None:
             return  # игрок уже сам разрешил прибытие более ранним действием
         if character.subclass is not None:
             await trial_service.record_cell_moved(db, character)
-        await daily_service.record_cell_moved(db, character)
+        daily_progress = await daily_service.record_cell_moved(db, character)
         await guild_handlers.on_arrival(db, character)
         await group_handlers.notify_arrival(db, character)
         await db.commit()
         await _deliver_daily_notice(peer_id, character)
+        await _announce_daily(peer_id, daily_progress)
         region = grid.city_region_at(character.pos_x, character.pos_y)
         if region is not None:
             # Патч 39: прибытие в город — всегда корневой экран (площадь).

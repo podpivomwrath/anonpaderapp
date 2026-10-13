@@ -51,6 +51,8 @@ STAT_LABELS = {
     "wil": "✨ Воля",
 }
 STAT_NAMES = {"str": "Сила", "agi": "Ловкость", "int": "Интеллект", "vit": "Выносливость", "wil": "Воля"}
+#: Коротко - для строк, где вещей много (передача, списки).
+STAT_SHORT = {"str": "Сил.", "agi": "Лов.", "int": "Инт.", "vit": "Вын.", "wil": "Вол."}
 
 _bases: dict[str, list[ItemBaseDef]] | None = None
 _rarities: dict[str, ItemRarityDef] | None = None

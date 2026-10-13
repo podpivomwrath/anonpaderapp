@@ -94,7 +94,10 @@ def is_transferable(item: Item, equipped: bool) -> str | None:
 
 
 def _item_label(item: Item) -> str:
-    stats = " ".join(f"{k.upper()}+{v}" for k, v in (item.base_stats or {}).items())
+    # Коротко и по-русски (2026-10-13: было «VIT+13»).
+    stats = " ".join(
+        f"{item_service.STAT_SHORT.get(k, k)}+{v}" for k, v in (item.base_stats or {}).items()
+    )
     return f"{item_service.format_item_label(item)} {stats}".strip()
 
 

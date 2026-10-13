@@ -519,6 +519,7 @@ async def scan() -> None:
 
     ambush_starts = []
     arrivals = []
+    daily_announce = []
     countdowns = []
 
     async with sf() as db:
@@ -581,7 +582,9 @@ async def scan() -> None:
 
                 if character.subclass is not None:
                     await trial_service.record_cell_moved(db, character)
-                await daily_service.record_cell_moved(db, character)
+                # Прогресс задания «пройди N клеток» - объявить после коммита,
+                # иначе награда и уровень приходили молча (2026-10-13).
+                daily_announce.append((peer_id, await daily_service.record_cell_moved(db, character)))
                 stats = await _stats(db, character.id)
                 wallet = await wallet_service.get_wallet(db, character.id)
                 gear_bonus = await item_service.compute_gear_bonus(db, character.id)
@@ -636,6 +639,10 @@ async def scan() -> None:
             peer_id, character, stats, gear_bonus, buff_modifiers, travel_id, encounter,
         )
 
+    from bot.handlers import world as world_handlers  # избегаем цикла импортов
+
+    for daily_peer, daily_progress in daily_announce:
+        await world_handlers._announce_daily(daily_peer, daily_progress)
     for (peer_id, character, stats, farm_currency, donate_currency, quest_line, gear_bonus,
          region, mentor_badge, is_foreign, group_block, cart_line, has_mount) in arrivals:
         await close_progress(peer_id, f"🏁 Путь окончен: ({character.pos_x}; {character.pos_y}).")
