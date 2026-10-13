@@ -20,7 +20,10 @@ def apply_combat_elixir(actor: CombatantState, elixir_id: str) -> str:
 
     if elixir_id == "last_breath":
         actor.apply_effect(EffectKind.LAST_BREATH, 1.0, ec.LAST_BREATH_DURATION, actor.id)
-        return "💀 Дыхание задерживается на самой грани. Смерть подождёт - один раз."
+        return (
+            f"💀 Дыхание задерживается на самой грани. Смерть подождёт - один раз, "
+            f"{ec.LAST_BREATH_DURATION} хода."
+        )
 
     if elixir_id == "blood_for_blood":
         actor.apply_effect(

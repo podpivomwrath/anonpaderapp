@@ -95,7 +95,7 @@ def class_line(combatants, owner_id: int) -> str | None:
 
     combatants = dict(combatants)
     owner = combatants.get(owner_id)
-    if owner is None or not owner.alive or not owner.subclass_id:
+    if owner is None or not owner.alive:
         return None
     sub = owner.subclass_id
     enemies = [c for c in combatants.values() if c.alive and c.side != owner.side]
@@ -106,6 +106,11 @@ def class_line(combatants, owner_id: int) -> str | None:
                 and (burn is None or (getattr(e, "tag", None) == BURN_TAG) == burn)]
 
     parts: list[str] = []
+    # «Последний вздох» держится 3 хода - игроки думали, что до первого
+    # смертельного удара (2026-10-13). Показываем остаток любому классу.
+    breath = owner.effects_of(EffectKind.LAST_BREATH)
+    if breath:
+        parts.append(f"💀 Последний вздох ({_turns(max(e.remaining_ticks for e in breath))})")
     if sub == "shadow_blade":
         for c in enemies:
             stacks = sum(e.stacks for e in mine(c, EffectKind.MARK))

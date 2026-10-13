@@ -70,3 +70,11 @@ def test_shield_lines_name_their_source() -> None:
     assert "Оберег" in lines[0] and "Второе сердце" not in lines[0]
     line = battle_log.class_line(state.combatants, owner.id)
     assert "Оберег: ты - 70" in line
+
+
+def test_last_breath_turns_shown_to_any_class() -> None:
+    """«Последний вздох» действует 3 хода - остаток виден под доской боя."""
+    state, owner, _ally, _mob = _session("poisoner")
+    owner.subclass_id = None
+    owner.apply_effect(EffectKind.LAST_BREATH, 1.0, 2, owner.id)
+    assert "Последний вздох (ещё 2 х.)" in battle_log.class_line(state.combatants, owner.id)
