@@ -68,7 +68,7 @@ async def test_blood_chests_open_by_kind(db_session, make_character) -> None:
     )
     assert 1 <= got <= 3
     strip, win = lootbox_service.roulette_strip(result, 1, rng)
-    assert strip[win]["icon"].startswith("ore:")
+    assert {card["icon"] for card in strip} == {"chest:ore"}  # на ленте - ларец, не добыча
     _chest, supply = await lootbox_service.open_owned(db_session, character, None, rng, lootbox_service.SUPPLY)
     assert supply.kind == "supply" and supply.lines
     left = await lootbox_service.closed_chests(db_session, character.id)

@@ -259,14 +259,11 @@ def _part_preview(part: LootboxRewardPart) -> str:
 
 
 def _card_icon(grade: LootboxGradeDef, kind: str, option: list[LootboxRewardPart] | None) -> str:
-    """Карточка Пепельного - ларец своей градации; у ларцов разлома - сама
-    добыча: руда или зелье (у них по одной картинке ларца на вид)."""
-    first = option[0] if option else None
-    if kind != ASHEN and first is not None:
-        if first.type == "ore":
-            return f"ore:{first.ore_id}"
-        if first.type == "elixir":
-            return f"elixir:{first.elixir_id}"
+    """Карточка ленты - сам ларец, а не добыча: у Пепельного - ларец своей
+    градации, у ларцов разлома - картинка ларца этого вида (цвет градации
+    даёт рамка карточки). Добыча показывается только при вскрытии."""
+    if kind != ASHEN:
+        return CHEST_KINDS[kind].icon
     return f"chest:{grade.id}"
 
 
