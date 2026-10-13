@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import bridge from '@vkontakte/vk-bridge';
 import { Div, Spinner, Placeholder, Button, IconButton } from '@vkontakte/vkui';
 import { getMapState, sendMountFromMap, stopTravel } from '../api.js';
 import mapBase from '../assets/world-map-drawn-2048.webp';
@@ -141,6 +142,14 @@ export default function MapTab() {
       return !on;
     });
   };
+  // Айфон: свайп слева направо - это «назад» VK, и он сворачивал мини-апп
+  // посреди перетаскивания карты (2026-10-13). На вкладке карты жест
+  // отключаем, ушёл с неё - возвращаем. На Android и ПК метод просто
+  // отвечает ошибкой, её глотаем.
+  useEffect(() => {
+    bridge.send('VKWebAppSetSwipeSettings', { history: false }).catch(() => {});
+    return () => { bridge.send('VKWebAppSetSwipeSettings', { history: true }).catch(() => {}); };
+  }, []);
   // Класс на корне страницы: упрощённый режим снимает и размытие шапки над
   // картой. Ушёл с вкладки карты - шапка снова как была.
   useEffect(() => {
