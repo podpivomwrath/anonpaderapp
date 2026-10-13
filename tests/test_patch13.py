@@ -24,6 +24,11 @@ class _FakeMessages:
         if self._outer.edit_raises:
             raise RuntimeError("сообщение недоступно для правки")
 
+    async def delete(self, **kwargs) -> None:
+        self._outer.delete_calls.append(kwargs)
+        if self._outer.edit_raises:
+            raise RuntimeError("сообщение уже не удалить")
+
     async def send(self, **kwargs) -> int:
         self._outer.send_calls.append(kwargs)
         # Патч 33, баг 1: два НЕЗАВИСИМЫХ режима отказа VK — битый attachment
@@ -44,6 +49,7 @@ class FakeBotApi:
         send_raises_with_attachment: bool = False,
     ) -> None:
         self.edit_calls: list[dict] = []
+        self.delete_calls: list[dict] = []
         self.send_calls: list[dict] = []
         self.edit_raises = edit_raises
         self.send_raises_with_keyboard = send_raises_with_keyboard
@@ -60,22 +66,26 @@ async def test_send_or_edit_first_call_sends_new_message() -> None:
     editable_message.clear("ns", 1)
 
 
-async def test_send_or_edit_second_call_edits_same_message() -> None:
+async def test_second_call_sends_new_window_below_and_deletes_old() -> None:
+    """2026-10-13: правка на месте случалась ВЫШЕ нажатия игрока и была не
+    видна (Nova у скупщика). Теперь окно - новое сообщение внизу, прежнее
+    удаляется: в чате по-прежнему одно окно."""
     api = FakeBotApi()
     await editable_message.send_or_edit(api, "ns2", 1, "текст 1", "kb")
     await editable_message.send_or_edit(api, "ns2", 1, "текст 2", "kb")
-    assert len(api.send_calls) == 1  # только первый раз
-    assert len(api.edit_calls) == 1
-    assert api.edit_calls[0]["message"] == "текст 2"
+    assert [c["message"] for c in api.send_calls] == ["текст 1", "текст 2"]
+    assert api.edit_calls == []
+    assert api.delete_calls == [{"message_ids": [101], "delete_for_all": True}]
     editable_message.clear("ns2", 1)
 
 
-async def test_send_or_edit_falls_back_to_send_when_edit_fails() -> None:
+async def test_failed_delete_does_not_break_the_window() -> None:
     api = FakeBotApi(edit_raises=True)
     await editable_message.send_or_edit(api, "ns3", 1, "текст 1", "kb")
     await editable_message.send_or_edit(api, "ns3", 1, "текст 2", "kb")
-    assert len(api.send_calls) == 2  # edit упал — открыли новое взамен
-    assert len(api.edit_calls) == 1
+    assert len(api.send_calls) == 2
+    await editable_message.send_or_edit(api, "ns3", 1, "текст 3", "kb")
+    assert api.delete_calls[-1]["message_ids"] == [102]  # отслеживается последнее окно
     editable_message.clear("ns3", 1)
 
 
@@ -226,15 +236,13 @@ def test_remark_pick_returns_plain_text() -> None:
 
 
 
-async def test_edit_goes_by_the_id_that_send_returned() -> None:
-    """messages.send с peer_id возвращает message_id, и править надо по нему.
-    Правка по conversation_message_id с этим числом на проде падала всегда:
-    окна приходили новыми сообщениями, отсчёты смерти и пути не обновлялись."""
+async def test_old_window_is_deleted_by_the_id_that_send_returned() -> None:
+    """messages.send с peer_id возвращает message_id, и удалять прежнее окно
+    надо по нему, а не по conversation_message_id (это другое число)."""
     api = FakeBotApi()
     await editable_message.send_or_edit(api, "ns_id", 1, "текст 1", "kb")
     await editable_message.send_or_edit(api, "ns_id", 1, "текст 2", "kb")
-    assert api.edit_calls[0].get("message_id") == 101
-    assert "conversation_message_id" not in api.edit_calls[0]
+    assert api.delete_calls[0]["message_ids"] == [101]
     editable_message.clear("ns_id", 1)
 
 

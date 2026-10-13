@@ -16,9 +16,30 @@ labeler = BotLabeler()
 labeler.vbml_ignore_case = True  # команды без учёта регистра: «Пригласить» = «пригласить»
 
 
+#: Ответ на нажатие/текст, который никто не понял.
+STALE_TEXT = "Эта кнопка устарела - кнопки обновлены."
+
+
 @labeler.message()
 async def fallback(message: Message) -> None:
+    from datetime import datetime, timezone
+
+    from bot.handlers import world as world_handlers
+
     async with get_session_factory()() as db:
         character = await get_character(db, message.from_id)
-    if character is None:
-        await handle_start(message)
+        if character is None:
+            await handle_start(message)
+            return
+        # Только личный диалог: в беседе (peer_id беседы != from_id) бот
+        # ответил бы на каждую реплику игроков.
+        if character.creation_state is not None or message.peer_id != message.from_id:
+            return
+        # Нажатие, которое никто не обработал, - почти всегда кнопка из
+        # старой клавиатуры (после рестарта, после смены экрана). Раньше бот
+        # молчал, и игрок жал её снова и снова (2026-10-13). Теперь - свежая
+        # клавиатура под текущее состояние.
+        keyboard = await world_handlers._current_keyboard(
+            db, character, message.peer_id, datetime.now(timezone.utc),
+        )
+    await message.answer(STALE_TEXT, keyboard=keyboard)
