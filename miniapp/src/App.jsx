@@ -32,9 +32,16 @@ const DEV_INTRO = import.meta.env.DEV && window.location.hash === '#intro';
 
 function App() {
   useEffect(() => {
-    bridge.send('VKWebAppInit').catch(() => {
-      // не в среде VK (локальная разработка вне iframe) - просто игнорируем
-    });
+    bridge.send('VKWebAppInit')
+      // Айфон: свайп слева направо - системное «назад» VK, и оно сворачивало
+      // мини-апп посреди перетаскивания карты (2026-10-13). Своей истории
+      // переходов у нас нет, так что жест отключаем на всё время работы -
+      // и только после Init, раньше VK вызов не примет. Android и ПК
+      // отвечают ошибкой, её глотаем.
+      .then(() => bridge.send('VKWebAppSetSwipeSettings', { history: false }))
+      .catch(() => {
+        // не в среде VK (локальная разработка вне iframe) - просто игнорируем
+      });
   }, []);
 
   if (import.meta.env.DEV && ['#tour', '#hints'].includes(window.location.hash)) {

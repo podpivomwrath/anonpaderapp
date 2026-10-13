@@ -17,6 +17,10 @@
 	# Если мини-апп хостится отдельно (напр. Vercel), этот блок просто не используется —
 	# VK Mini App всё равно откроет внешний VITE_API_BASE_URL.
 	handle {
+		# Страница-оболочка не кэшируется: айфоны держали старую сборку и не
+		# видели исправлений. Файлы сборки с хэшем в имени кэшируются как раньше.
+		@shell not path /assets/*
+		header @shell Cache-Control "no-cache"
 		root * /srv/miniapp
 		try_files {path} /index.html
 		file_server
