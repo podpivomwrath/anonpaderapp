@@ -707,67 +707,74 @@ async def explore(message: Message) -> None:
                             pass
                     await message.answer(notice, keyboard=group_ready_keyboard())
                     return
-                # Все участники на клетке готовы: групповое событие (решают
-                # все разом) или, чаще, групповой бой. Пепла в групповом
-                # исследовании нет (патч 51, ч.3).
-                group_explore_service.clear(snapshot.id)
-                # Гильдии: групповое исследование - тоже исследование клетки
-                # для каждого (десятина владельцу, закладка знамени).
-                # Обрывки Песни и замечания (2026-10-13): раньше группа шла
-                # сразу в событие или бой, и лор не видел никто - Песнь в
-                # группе не собиралась. Теперь каждый получает своё «ты
-                # осматриваешься» со своим обрывком, и тот идёт в его Песнь.
-                look_around: list[tuple[int, str]] = []
-                explore_dailies: list[tuple[int, object]] = []
-                for m in cohort:
-                    member_character = await db.get(Character, m.id)
-                    if member_character is None:
-                        continue
-                    member_peer_id = await onboarding_svc.vk_id_for_character(db, m.id)
-                    if member_peer_id is not None and member_peer_id in _resting:
-                        # Страховка: группа ушла - отдых не доигрывается.
-                        _resting.discard(member_peer_id)
-                        await pending_activity.forget("rest", member_peer_id)
-                    await guild_territory_service.on_exploration(db, member_character)
-                    # Ежедневки «исследуй» - и в группе, каждому (2026-10-13).
-                    member_daily = await daily_service.record_exploration(db, member_character)
-                    text = "🔍 Группа осматривается вокруг..."
-                    member_peer = await onboarding_svc.vk_id_for_character(db, m.id)
-                    # Несобранная горстка сгорает при новом исследовании - и в группе.
-                    if member_peer is not None and ash_handful_state.clear(member_peer):
-                        text = f"{ASH_BURNED_LINE}\n\n{text}"
-                    fragment = flavor.explore_fragment(_rng)
-                    if fragment is not None:
-                        text += f"\n\n{fragment.text}"
-                        if fragment.song_index is not None:
-                            await song_service.record_seen(db, member_character, fragment.song_index)
-                    if member_peer is not None:
-                        look_around.append((member_peer, text))
-                        explore_dailies.append((member_peer, member_daily))
-                # Сеть - только после фиксации (см. выше про idle in transaction).
-                await db.commit()
-                for member_peer, member_daily in explore_dailies:
-                    await _announce_daily(member_peer, member_daily)
-                for member_peer, text in look_around:
-                    try:
-                        await _bot_api.messages.send(
-                            peer_id=member_peer, message=text, random_id=0, keyboard=kb.waiting_keyboard(),
-                        )
-                    except Exception:
-                        pass
-                region = region_for(character.pos_x, character.pos_y)
-                dist = grid.monolith_distance(character.pos_x, character.pos_y)
-                if await group_event_handlers.maybe_start(
-                    db, snapshot.id, snapshot.leader_character_id, cohort, region, dist,
-                    grid.ring_tier(character.pos_x, character.pos_y), _rng,
-                ):
+                # Состав - из очереди, а не все на клетке (2026-10-13):
+                # отменивший участие оставался в составе, и его утаскивало
+                # в событие. Без отменивших готов один - идёт сам.
+                cohort = [m for m in cohort if m.id in queue.cohort]
+                if len(cohort) <= 1:
+                    group_explore_service.clear(snapshot.id)
+                if len(cohort) > 1:
+                    # Все участники на клетке готовы: групповое событие (решают
+                    # все разом) или, чаще, групповой бой. Пепла в групповом
+                    # исследовании нет (патч 51, ч.3).
+                    group_explore_service.clear(snapshot.id)
+                    # Гильдии: групповое исследование - тоже исследование клетки
+                    # для каждого (десятина владельцу, закладка знамени).
+                    # Обрывки Песни и замечания (2026-10-13): раньше группа шла
+                    # сразу в событие или бой, и лор не видел никто - Песнь в
+                    # группе не собиралась. Теперь каждый получает своё «ты
+                    # осматриваешься» со своим обрывком, и тот идёт в его Песнь.
+                    look_around: list[tuple[int, str]] = []
+                    explore_dailies: list[tuple[int, object]] = []
+                    for m in cohort:
+                        member_character = await db.get(Character, m.id)
+                        if member_character is None:
+                            continue
+                        member_peer_id = await onboarding_svc.vk_id_for_character(db, m.id)
+                        if member_peer_id is not None and member_peer_id in _resting:
+                            # Страховка: группа ушла - отдых не доигрывается.
+                            _resting.discard(member_peer_id)
+                            await pending_activity.forget("rest", member_peer_id)
+                        await guild_territory_service.on_exploration(db, member_character)
+                        # Ежедневки «исследуй» - и в группе, каждому (2026-10-13).
+                        member_daily = await daily_service.record_exploration(db, member_character)
+                        text = "🔍 Группа осматривается вокруг..."
+                        member_peer = await onboarding_svc.vk_id_for_character(db, m.id)
+                        # Несобранная горстка сгорает при новом исследовании - и в группе.
+                        if member_peer is not None and ash_handful_state.clear(member_peer):
+                            text = f"{ASH_BURNED_LINE}\n\n{text}"
+                        fragment = flavor.explore_fragment(_rng)
+                        if fragment is not None:
+                            text += f"\n\n{fragment.text}"
+                            if fragment.song_index is not None:
+                                await song_service.record_seen(db, member_character, fragment.song_index)
+                        if member_peer is not None:
+                            look_around.append((member_peer, text))
+                            explore_dailies.append((member_peer, member_daily))
+                    # Сеть - только после фиксации (см. выше про idle in transaction).
+                    await db.commit()
+                    for member_peer, member_daily in explore_dailies:
+                        await _announce_daily(member_peer, member_daily)
+                    for member_peer, text in look_around:
+                        try:
+                            await _bot_api.messages.send(
+                                peer_id=member_peer, message=text, random_id=0, keyboard=kb.waiting_keyboard(),
+                            )
+                        except Exception:
+                            pass
+                    region = region_for(character.pos_x, character.pos_y)
+                    dist = grid.monolith_distance(character.pos_x, character.pos_y)
+                    if await group_event_handlers.maybe_start(
+                        db, snapshot.id, snapshot.leader_character_id, cohort, region, dist,
+                        grid.ring_tier(character.pos_x, character.pos_y), _rng,
+                    ):
+                        return
+                    story = await group_story_mobs(db, cohort, _rng)
+                    await group_combat_handlers.start_ready_group(
+                        db, snapshot.id, cohort, region, dist, _rng,
+                        mob_encounters=story[0] if story else None, story_quest_id=story[1] if story else None,
+                    )
                     return
-                story = await group_story_mobs(db, cohort, _rng)
-                await group_combat_handlers.start_ready_group(
-                    db, snapshot.id, cohort, region, dist, _rng,
-                    mob_encounters=story[0] if story else None, story_quest_id=story[1] if story else None,
-                )
-                return
 
         # ux-patch-5: обрывок Песни / событие — ВНУТРЬ сообщения исследования
         # (~50%), отдельным сообщением больше не шлём.
