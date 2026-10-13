@@ -7,6 +7,11 @@ from game.economy import rift_config as rc
 from models import Rift
 
 BTN_CANCEL = "✖ Отменить вход"
+BLOOD_TITLE = "🩸 Кровавый разлом"
+BLOOD_ENTRY = (
+    "Едва вы переступаете край, трещина наливается багровым. Разлом почуял силу "
+    "и отвечает тем же: внутри всё злее и крепче, чем было."
+)
 
 
 def _photo(photo_id: str) -> str | None:
@@ -27,10 +32,12 @@ def size_line(kind: str) -> str:
 class RiftTexts:
     """Тексты одного типа в форме модуля текстов рейда."""
 
-    def __init__(self, kind: str) -> None:
+    def __init__(self, kind: str, blood: bool = False) -> None:
         self.kind = kind
         self.t = rc.RIFT_TYPES[kind]
         self.PROLOGUE_TEXT = f"{title(kind)}\n\n{self.t.entry_text}"
+        if blood:
+            self.PROLOGUE_TEXT = f"{BLOOD_TITLE}: {self.t.name}\n\n{self.t.entry_text}\n\n{BLOOD_ENTRY}"
         self.EPILOGUE_TEXT = f"🌀 Разлом пройден.\n{self.t.victory_text}"
         self.RAID_DEFEAT_TEXT = f"🌀 Разлом не пройден.\n{self.t.defeat_text}"
 
@@ -62,13 +69,17 @@ def here_text(rift: Rift, minutes: int) -> str:
         f"🌀 Здесь разлом: {title(rift.kind)}\n"
         f"Уровни {lo}-{hi} · {size_line(rift.kind)} · закроется через {minutes} мин.\n"
         f"{t.hint}\n\n"
-        "Вход - вся группа на клетке, лидер жмёт «Войти». Минуту вы ждёте у входа, "
+        + (f"Войдёт кто-то {rc.BLOOD_LEVEL} уровня - заход станет кровавым: противники заметно сильнее.\n\n"
+           if hi >= rc.BLOOD_LEVEL else "")
+        + "Вход - вся группа на клетке, лидер жмёт «Войти». Минуту вы ждёте у входа, "
         "и в это время на вас могут напасть."
     )
 
 
 def busy_text(rift: Rift) -> str:
     what = "внутри уже группа" if rift.state == "running" else "у входа ждёт группа"
+    if rift.state == "running" and (rift.level or 0) >= rc.BLOOD_LEVEL:
+        return f"{BLOOD_TITLE}: {rc.RIFT_TYPES[rift.kind].name} - {what}."
     return f"🌀 Здесь разлом: {title(rift.kind)} - {what}."
 
 

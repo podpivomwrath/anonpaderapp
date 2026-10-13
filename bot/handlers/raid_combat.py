@@ -132,6 +132,8 @@ class RaidBattle:
     rift_kind: str | None = None
     rift_level: int = 0
     rift_ring: int = 1
+    #: кровавый заход (в группе 60-й) - противники сильнее
+    rift_blood: bool = False
     #: клетка, куда участники возвращаются после боя (у рейдов - Монолит)
     home: tuple[int, int] = rc.MONOLITH_COORDS
 
@@ -267,6 +269,7 @@ def _build_field_stage(battle: RaidBattle, state: CombatSessionState) -> None:
     if battle.is_rift:
         stage = rift_combat.build_stage(
             battle.rift_kind, battle.stage, 21_000_000 + battle.stage * 100_000, battle.rift_level, battle.rift_ring,
+            blood=getattr(battle, "rift_blood", False),
         )
     elif battle.is_archive:
         stage = raid_archive.ArchiveStage(start_id=20_600_000)
@@ -323,7 +326,7 @@ def _texts(battle: RaidBattle):
     if battle.is_rift:
         from bot.rift_texts import RiftTexts
 
-        return RiftTexts(battle.rift_kind)
+        return RiftTexts(battle.rift_kind, blood=getattr(battle, "rift_blood", False))
     if battle.is_field:
         return ft
     if battle.is_archive:
@@ -392,6 +395,9 @@ async def start_raid(
         battle.raid_id = f"rift:{rift.kind}"
         battle.rift_id, battle.rift_kind = rift.id, rift.kind
         battle.rift_level, battle.rift_ring = rift.level, rift.ring
+        from services import rift_service  # цикл импортов
+
+        battle.rift_blood = rift_service.is_blood(rift)
         battle.home = (rift.x, rift.y)
     _battles[battle_id] = battle
     for cid, p in participants.items():

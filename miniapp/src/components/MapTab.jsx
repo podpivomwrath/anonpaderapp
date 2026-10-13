@@ -650,8 +650,10 @@ export default function MapTab() {
     ...(mapState.caravans || []).map((c) => [c.x, c.y, 'map-pin--caravan', '🐪', 'Караван: торгует, пока стоит', 1]),
     ...(mapState.cart ? [[mapState.cart.x, mapState.cart.y, 'map-pin--cart', '🐂', 'Твоя повозка', 0.9]] : []),
     ...(mapState.rifts || []).map((r) => [
-      r.x, r.y, `map-pin--rift${r.state !== 'free' ? ' map-pin--rift-busy' : ''}`, '🌀',
-      `${r.name} · ${r.min_level}-${r.max_level} ур.`, 1.2,
+      r.x, r.y,
+      r.blood ? 'map-pin--rift map-pin--rift-blood' : `map-pin--rift${r.state !== 'free' ? ' map-pin--rift-busy' : ''}`,
+      r.blood ? '🩸' : '🌀',
+      `${r.blood ? 'Кровавый разлом: ' : ''}${r.name} · ${r.min_level}-${r.max_level} ур.`, 1.2,
     ]),
     ...(travelTarget ? [[travelTarget.to_x, travelTarget.to_y, 'map-pin--route', '⚑', 'Цель пути', 1]] : []),
     ...(playerPin ? [[playerPin.x, playerPin.y, 'map-pin--player', '', 'Ты здесь', 1.1]] : []),
@@ -936,7 +938,7 @@ export default function MapTab() {
           {cellRift && (
             <>
               <p className="map-card__line">
-                🌀 Разлом: {cellRift.emoji} {cellRift.name} · {cellRift.min_level}-{cellRift.max_level} ур.
+                {cellRift.blood ? '🩸 Кровавый разлом' : '🌀 Разлом'}: {cellRift.emoji} {cellRift.name} · {cellRift.min_level}-{cellRift.max_level} ур.
                 {levels.level < cellRift.min_level || levels.level > cellRift.max_level ? ' (тебе не по уровню)' : ''}
               </p>
               <p className="map-card__line">
@@ -1041,7 +1043,7 @@ function MapTooltipContent({ info, mineOre, rift }) {
       {info.boss && <p className="map-tooltip__line">💀 {info.boss.name} · {info.boss.hp_percent}%</p>}
       {rift && (
         <p className="map-tooltip__line">
-          🌀 {rift.name} · {rift.min_level}-{rift.max_level} ур. · {RIFT_STATE[rift.state] || ''}
+          {rift.blood ? '🩸 Кровавый: ' : '🌀 '}{rift.name} · {rift.min_level}-{rift.max_level} ур. · {RIFT_STATE[rift.state] || ''}
         </p>
       )}
     </>

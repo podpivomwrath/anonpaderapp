@@ -179,6 +179,7 @@ async def handle_get_state(request: web.Request) -> web.Response:
                 "x": r.x, "y": r.y, "name": t.name, "emoji": t.emoji, "hint": t.hint,
                 "min_level": lo, "max_level": hi, "max_size": t.max_size,
                 "minutes_left": rift_service.minutes_left(r), "state": r.state,
+                "blood": rift_service.is_blood(r),
             })
         cart_row = await trade_service.get_cart(db, character.id)
         cart_mark = None

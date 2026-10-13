@@ -228,3 +228,23 @@ def test_deep_one_enrages_and_drags() -> None:
         frozen += stage.after_tick(session, TickResult(), random.Random(1)).frozen
     assert stage.boss(session).buff_modifiers["damage_bonus"] > 0
     assert len(frozen) == 1
+
+
+async def test_blood_rift_only_while_a_sixty_is_inside(db_session, make_character) -> None:
+    """Кровавый разлом: вошёл 60-й - противники сильнее; группа погибла или
+    прошла - разлом снова обычный."""
+    rift = await _rift(db_session, ring=4, kind="ash_crypt")
+    assert not rift_service.is_blood(rift)
+    young = await _at(await make_character(), rift, 50)
+    await rift_service.start_run(db_session, rift, [young])
+    assert not rift_service.is_blood(rift)  # 50-й - обычный заход
+    await rift_service.finish_run(db_session, rift.id, cleared=False, now=NOW)
+    old = await _at(await make_character(), rift, 60)
+    await rift_service.start_run(db_session, rift, [young, old])
+    assert rift_service.is_blood(rift)
+    await rift_service.finish_run(db_session, rift.id, cleared=False, now=NOW)
+    assert not rift_service.is_blood(rift)
+
+    plain = rift_combat.build_stage("ash_crypt", 2, 1000, 60, 4)
+    blood = rift_combat.build_stage("ash_crypt", 2, 1000, 60, 4, blood=True)
+    assert blood.power == (plain.power[0] * rc.BLOOD_HP, plain.power[1] * rc.BLOOD_DMG)

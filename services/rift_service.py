@@ -45,6 +45,13 @@ def band(rift: Rift) -> tuple[int, int]:
     return rc.BANDS[rift.ring]
 
 
+def is_blood(rift: Rift) -> bool:
+    """Кровавый заход: внутри группа, и старший в ней - 60-й. Уровень захода
+    сбрасывается вместе с группой (_release), так что после гибели или
+    прохождения разлом снова обычный."""
+    return rift.state == RUNNING and (rift.level or 0) >= rc.BLOOD_LEVEL
+
+
 def level_fits(level: int, rift: Rift) -> bool:
     lo, hi = band(rift)
     return lo <= level <= hi

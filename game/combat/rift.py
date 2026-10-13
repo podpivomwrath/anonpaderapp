@@ -285,9 +285,10 @@ def stage_count(kind: str) -> int:
     return len(STAGES[kind])
 
 
-def build_stage(kind: str, stage: int, start_id: int, level: int, ring: int):
-    """stage - с единицы."""
+def build_stage(kind: str, stage: int, start_id: int, level: int, ring: int, blood: bool = False):
+    """stage - с единицы. blood - кровавый заход: противники сильнее."""
     size = rc.RIFT_TYPES[kind].max_size
     built = STAGES[kind][stage - 1](start_id, level, ring, size)
-    built.power = rc.TYPE_POWER[kind]
+    hp, dmg = rc.TYPE_POWER[kind]
+    built.power = (hp * rc.BLOOD_HP, dmg * rc.BLOOD_DMG) if blood else (hp, dmg)
     return built
