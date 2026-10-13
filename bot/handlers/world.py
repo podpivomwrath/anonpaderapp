@@ -710,12 +710,15 @@ async def explore(message: Message) -> None:
                         continue
                     await guild_territory_service.on_exploration(db, member_character)
                     text = "🔍 Группа осматривается вокруг..."
+                    member_peer = await onboarding_svc.vk_id_for_character(db, m.id)
+                    # Несобранная горстка сгорает при новом исследовании - и в группе.
+                    if member_peer is not None and ash_handful_state.clear(member_peer):
+                        text = f"{ASH_BURNED_LINE}\n\n{text}"
                     fragment = flavor.explore_fragment(_rng)
                     if fragment is not None:
                         text += f"\n\n{fragment.text}"
                         if fragment.song_index is not None:
                             await song_service.record_seen(db, member_character, fragment.song_index)
-                    member_peer = await onboarding_svc.vk_id_for_character(db, m.id)
                     if member_peer is not None:
                         look_around.append((member_peer, text))
                 # Сеть - только после фиксации (см. выше про idle in transaction).
