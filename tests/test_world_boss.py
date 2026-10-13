@@ -342,3 +342,24 @@ async def test_announcement_reaches_offline_players_of_fitting_level(db_session,
     away_vk = await db_session.scalar(select(User.vk_id).where(User.id == away.user_id))
     strong_vk = await db_session.scalar(select(User.vk_id).where(User.id == too_strong.user_id))
     assert away_vk in recipients and strong_vk not in recipients
+
+
+async def test_boss_ring_follows_active_players_now(db_session, make_character) -> None:
+    """Босс - туда, где игроки сейчас: в поле по клетке (если босс кольца им
+    по уровню), в городе и не по уровню - по уровню; ушедшие давно не в счёт."""
+    from game.world import world_config as wc
+
+    def put(c, ring, minutes_ago):
+        c.pos_x, c.pos_y = wc.ring_bounds(ring)[0], 0
+        c.last_active_at = NOW - timedelta(minutes=minutes_ago)
+
+    for _ in range(2):
+        put(await make_character(level=25), 2, 3)  # двое во II, только что
+    put(await make_character(level=50), 1, 3)  # 50-й в I: там ему не по уровню -> III
+    put(await make_character(level=60), 4, 400)  # давно ушёл
+    town = await make_character(level=60, region="ridge")
+    town.pos_x, town.pos_y = wc.CITY_COORDS["ridge"]
+    town.last_active_at = NOW - timedelta(minutes=1)  # в городе -> по уровню, IV
+    await db_session.flush()
+    assert await svc._players_by_ring(db_session, NOW) == {2: 2, 3: 1, 4: 1}
+    assert await svc._players_by_ring(db_session, NOW + timedelta(hours=2)) == {2: 2, 3: 1, 4: 2}

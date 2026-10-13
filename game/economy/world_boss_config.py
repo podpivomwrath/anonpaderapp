@@ -47,6 +47,9 @@ RINGS: dict[int, tuple[int, tuple[int, int]]] = {
 
 RING_NAMES = {1: "I", 2: "II", 3: "III", 4: "IV"}
 
+#: «Активен сейчас» для выбора кольца: был в игре за эти минуты.
+ACTIVE_NOW_MINUTES = 20
+
 #: Здоровье босса по кольцу = средний урон захода ЖИВОГО игрока уровня
 #: босса x ATTEMPTS_TO_KILL.
 #:

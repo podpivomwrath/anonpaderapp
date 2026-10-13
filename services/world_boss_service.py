@@ -17,7 +17,8 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from game.economy import world_boss_config as wbc
-from game.world import world_boss
+from game.world import grid, world_boss
+from game.world import world_config as wc
 from models import (
     Character,
     CharacterStats,
@@ -72,9 +73,34 @@ async def _lock(db: AsyncSession, boss_pk: int) -> WorldBoss | None:
 # --- Появление ------------------------------------------------------------------
 
 
+def _ring_now(level: int, x: int | None, y: int | None) -> int | None:
+    """Кольцо, к которому игрок сейчас ближе всего: в поле - где стоит (центр
+    - к IV), если босс этого кольца ему по уровню; в городе, без клетки или
+    не по уровню - самое внешнее кольцо, куда его пускает уровень (город во
+    внешнем кольце, и 40-й на площади не должен тянуть босса к новичкам)."""
+    if x is not None and y is not None and (x, y) not in wc.CITY_COORDS.values():
+        ring = min(grid.ring_tier(x, y), max(wbc.RINGS))
+        if world_boss.can_attack(level, ring):
+            return ring
+    return world_boss.ring_of_level(level)
+
+
 async def _players_by_ring(db: AsyncSession, now: datetime) -> dict[int, int]:
-    """Сколько игроков за сутки было в игре - по самому внешнему кольцу, куда
-    их пускает уровень. Нужно, чтобы босс чаще вставал там, где играют."""
+    """Босс - туда, где актив прямо сейчас (2026-10-13, решение владельца, как
+    у разломов): доля кольца = доля игроков, что были в игре последние
+    ACTIVE_NOW_MINUTES и стоят на нём. Сейчас никого - по суточным игрокам,
+    по самому внешнему кольцу, куда их пускает уровень."""
+    rows = (await db.execute(select(Character.level, Character.pos_x, Character.pos_y).where(
+        Character.creation_state.is_(None),
+        Character.last_active_at >= now - timedelta(minutes=wbc.ACTIVE_NOW_MINUTES),
+    ))).all()
+    counts: dict[int, int] = {}
+    for level, x, y in rows:
+        ring = _ring_now(level, x, y)
+        if ring is not None:
+            counts[ring] = counts.get(ring, 0) + 1
+    if counts:
+        return counts
     levels = (
         await db.execute(
             select(Character.level).where(
@@ -83,7 +109,6 @@ async def _players_by_ring(db: AsyncSession, now: datetime) -> dict[int, int]:
             )
         )
     ).scalars().all()
-    counts: dict[int, int] = {}
     for level in levels:
         ring = world_boss.ring_of_level(level)
         if ring is not None:
