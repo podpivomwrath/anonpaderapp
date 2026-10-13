@@ -83,6 +83,19 @@ def shield_suffix(combatant) -> str:
     return f" 🛡️{total}" if total > 0 else ""
 
 
+def vuln_suffix(combatant) -> str:
+    """« 💢+35% (2 х.)» - уязвимость на цели рядом с полоской HP: сколько
+    урона сверху и сколько ходов ещё (2026-10-13: Свиток уязвимости
+    накладывался молча). Отрицательная «уязвимость» - это защита моба, её
+    здесь не показываем."""
+    vuln = [e for e in combatant.effects if e.kind.value == "vulnerability" and e.value > 0]
+    if not vuln:
+        return ""
+    total = round(sum(e.value for e in vuln) * 100)
+    turns = max(e.remaining_ticks for e in vuln)
+    return f" 💢+{total}% ({turns} х.)" if turns > 0 else f" 💢+{total}%"
+
+
 def hp_delta_line(hp_before: float, hp_after: float, max_hp: float, mode: str = MODE_PVP) -> str:
     """Единая числовая скобка для любого изменения HP (патч 13, ч.2):
     `(-34 HP · 82% → 68%)` / `(+142 HP · 61% → 100%)`. Используется и в бою,

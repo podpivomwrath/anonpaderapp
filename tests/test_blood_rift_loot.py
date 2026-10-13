@@ -43,13 +43,13 @@ def test_scrolls_hit_the_whole_side() -> None:
     everyone = {c.id: c for c in (a, b, m1, m2)}
     a.current_hp = b.current_hp = 1
     elixir_effects.apply_combat_elixir(a, "scroll_healing", everyone)
-    assert a.current_hp == 1 + round(a.max_hp * 0.3) and b.current_hp == 1 + round(b.max_hp * 0.3)
+    assert a.current_hp == 1 + round(a.max_hp * 0.5) and b.current_hp == 1 + round(b.max_hp * 0.5)
     line = elixir_effects.apply_combat_elixir(a, "scroll_ward", everyone)
     assert "Свиток оберега" in line
     assert all(c.effects_of(EffectKind.SHIELD_POOL) for c in (a, b))
     assert not m1.effects_of(EffectKind.SHIELD_POOL)
     elixir_effects.apply_combat_elixir(a, "scroll_vulnerability", everyone)
-    assert m1.effect_total(EffectKind.VULNERABILITY) == 0.35 and m2.effect_total(EffectKind.VULNERABILITY) == 0.35
+    assert m1.effect_total(EffectKind.VULNERABILITY) == 0.5 and m2.effect_total(EffectKind.VULNERABILITY) == 0.5
     assert a.effect_total(EffectKind.VULNERABILITY) == 0
 
 
@@ -92,3 +92,15 @@ def test_flee_is_harder_from_stronger_mobs() -> None:
     assert flee_chance(20, 10) == 0.5  # слабее - как раньше
     assert abs(flee_chance(20, 25) - 0.35) < 1e-9
     assert flee_chance(10, 40) == 0.10  # не ниже 10%
+
+
+def test_vulnerability_shown_next_to_hp() -> None:
+    from game.combat import display
+
+    a = combatant(1, side=0)
+    m = combatant(2, side=1, kind="mob")
+    elixir_effects.apply_combat_elixir(a, "scroll_vulnerability", {1: a, 2: m})
+    assert display.vuln_suffix(m) == " 💢+50% (2 х.)"
+    assert display.vuln_suffix(a) == ""
+    m.apply_effect(EffectKind.VULNERABILITY, -0.2, 99, m.id)  # защита моба - не уязвимость
+    assert display.vuln_suffix(m) == " 💢+50% (2 х.)"

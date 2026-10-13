@@ -234,7 +234,7 @@ def render_tick(
     ]
     enemy_bars = [
         f"{c.name}: {display.health_bar(c.current_hp, c.max_hp, mode)}{display.shield_suffix(c)}"
-        f"{_mark_suffix(session, c, viewer_side)}"
+        f"{display.vuln_suffix(c)}{_mark_suffix(session, c, viewer_side)}"
         for c in session.combatants.values()
         if c.side != viewer_side and c.alive
     ]

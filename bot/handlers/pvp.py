@@ -695,8 +695,8 @@ def _render_duel(
     a_id, b_id = duel.order
     a, b = duel.combatants[a_id], duel.combatants[b_id]
     header = f"⚔️ ДУЭЛЬ - ход {duel.turn_number}"
-    a_line = f"{a.name}: {display.health_bar(a.current_hp, a.max_hp)}{display.shield_suffix(a)}"
-    b_line = f"{b.name}: {display.health_bar(b.current_hp, b.max_hp)}{display.shield_suffix(b)}"
+    a_line = f"{a.name}: {display.health_bar(a.current_hp, a.max_hp)}{display.shield_suffix(a)}{display.vuln_suffix(a)}"
+    b_line = f"{b.name}: {display.health_bar(b.current_hp, b.max_hp)}{display.shield_suffix(b)}{display.vuln_suffix(b)}"
     actor_id = next_actor_id if next_actor_id is not None else duel.current_actor_id
     turn_line = "" if finished else f"Ходит: {duel.combatants[actor_id].name}"
     log = " ".join(lines) if lines else "Бой начался."
