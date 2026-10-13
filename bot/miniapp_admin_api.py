@@ -1,6 +1,6 @@
 """Админ-эндпоинты мини-аппа (патч 27, ч.1-2): /api/miniapp/admin/*.
 
-Каждый хендлер НЕЗАВИСИМО проверяет request[VK_USER_ID_KEY] == settings.admin_vk_id
+Каждый хендлер НЕЗАВИСИМО проверяет доступ: админ (settings.admin_vk_id) или модератор (services/staff.py)
 (положенное miniapp_auth_middleware после проверки подписи — см. bot/miniapp_auth.py)
 и возвращает 403 без каких-либо данных при несовпадении. Не полагаться на то,
 что вкладка скрыта на фронтенде — см. safe-rollout секцию патча."""
@@ -29,6 +29,7 @@ from services import (
     mining_service,
     naming,
     promo_service,
+    staff,
 )
 from services import onboarding_service as onboarding_svc
 
@@ -38,7 +39,8 @@ _rng = random.Random()
 def _is_admin(request: web.Request) -> bool:
     settings: Settings = request.app[SETTINGS_KEY]
     vk_user_id = request.get(VK_USER_ID_KEY)
-    return bool(settings.admin_vk_id) and vk_user_id == settings.admin_vk_id
+    # Админ или модератор (services/staff.py): доступ к панели одинаковый.
+    return staff.has_panel_access(settings, vk_user_id)
 
 
 def _forbidden() -> web.Response:
@@ -180,7 +182,8 @@ async def handle_post_action(request: web.Request) -> web.Response:
 
     action = body.get("action")
     settings: Settings = request.app[SETTINGS_KEY]
-    admin_vk_id = settings.admin_vk_id
+    # В журнал - тот, кто нажал: админ или модератор.
+    admin_vk_id = request[VK_USER_ID_KEY]
 
     if action in CONFIRM_REQUIRED and not body.get("confirm"):
         return web.json_response({"error": "confirmation_required"}, status=400)
@@ -514,7 +517,7 @@ async def handle_post_promo_codes(request: web.Request) -> web.Response:
     async with session_factory() as db:
         try:
             promo = await promo_service.create_code(
-                db, settings.admin_vk_id, code, rewards, max_activations, bool(one_per_player), expires_at,
+                db, request[VK_USER_ID_KEY], code, rewards, max_activations, bool(one_per_player), expires_at,
             )
         except promo_service.PromoValidationError as exc:
             return web.json_response({"error": str(exc)}, status=400)
@@ -534,7 +537,7 @@ async def handle_delete_promo_code(request: web.Request) -> web.Response:
     settings: Settings = request.app[SETTINGS_KEY]
     session_factory = request.app[SESSION_FACTORY_KEY]
     async with session_factory() as db:
-        deleted = await promo_service.delete_code(db, settings.admin_vk_id, promo_id)
+        deleted = await promo_service.delete_code(db, request[VK_USER_ID_KEY], promo_id)
         if not deleted:
             return web.json_response({"error": "not_found"}, status=404)
         await db.commit()

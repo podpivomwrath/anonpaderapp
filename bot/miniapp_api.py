@@ -161,7 +161,9 @@ def _is_admin(request: web.Request, vk_user_id: int) -> bool:
     /api/miniapp/admin/* эндпоинт (bot/miniapp_admin_api.py) перепроверяет
     vk_id самостоятельно, этот флаг обмануть бесполезно."""
     settings: Settings = request.app[SETTINGS_KEY]
-    return bool(settings.admin_vk_id) and vk_user_id == settings.admin_vk_id
+    from services import staff
+
+    return staff.has_panel_access(settings, vk_user_id)
 
 
 async def handle_get_character(request: web.Request) -> web.Response:

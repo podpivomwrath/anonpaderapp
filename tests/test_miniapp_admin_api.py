@@ -128,6 +128,33 @@ async def test_overview_ok_for_admin(client, session_factory) -> None:
     assert "progression" in data and "retention" in data and "economy" in data and "combat" in data
 
 
+async def test_moderator_has_same_panel_access_and_is_logged_as_self(client, session_factory, monkeypatch) -> None:
+    """2026-10-13: модератор видит панель как админ, а действие пишется в
+    журнал под ЕГО vk_id, не админа. Обычный игрок по-прежнему получает 403."""
+    from sqlalchemy import select
+
+    from models import AdminAction
+    from services import staff
+
+    moderator = 777
+    monkeypatch.setattr(staff, "MODERATOR_VK_IDS", frozenset({moderator}))
+    character_id = await _make_player(session_factory)
+
+    resp = await client.get("/api/miniapp/admin/overview", params=_signed_query(moderator))
+    assert resp.status == 200
+    resp = await client.post(
+        f"/api/miniapp/admin/player/{character_id}/action", params=_signed_query(moderator),
+        json={"action": "grant_currency", "currency": "farm", "amount": 50},
+    )
+    assert resp.status == 200
+    async with session_factory() as session:
+        action = (await session.execute(select(AdminAction))).scalars().one()
+    assert action.admin_vk_id == moderator
+
+    resp = await client.get("/api/miniapp/admin/overview", params=_signed_query(PLAYER_VK_ID))
+    assert resp.status == 403
+
+
 async def test_overview_is_human_readable_and_has_systems(client, session_factory) -> None:
     """2026-10-13: в обзоре нет технических id (warrior, ridge), есть блоки
     по системам игры - гильдии, рыбалка и добыча, рейды, торговля, биржа, репорты."""
