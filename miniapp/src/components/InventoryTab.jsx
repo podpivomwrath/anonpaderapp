@@ -50,7 +50,7 @@ function statsLine(baseStats) {
     .join(', ');
 }
 
-function itemSubtitle(item) {
+export function itemSubtitle(item) {
   const parts = [];
   // Редкость словом. Эмодзи-кружок из названия убран (патч 79): цвет теперь
   // несёт свечение рамки, а в подписи слово читается быстрее оттенка.

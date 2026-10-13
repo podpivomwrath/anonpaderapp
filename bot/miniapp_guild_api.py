@@ -75,6 +75,18 @@ def _perms(member) -> dict:
     }
 
 
+def _warehouse_item(item, level: int) -> dict:
+    """Вещь склада - те же поля, что в инвентаре (2026-10-13): иконка с
+    рамкой редкости, редкость словом, уровень/качество, статы, замок."""
+    return {
+        "id": item.id, "name": item.name, "slot": naming.slot_title(item.slot), "rarity": item.rarity,
+        "rarity_title": naming.rarity_title(item.rarity), "icon": naming.item_icon_key(item),
+        "ilvl": item.ilvl, "base_stats": item.base_stats or {}, "stats": item.base_stats or {},
+        "craft_efficiency": item.craft_efficiency,
+        "need_level": None if item_service.can_wear(item, level) else item_service.required_level(item),
+    }
+
+
 async def _no_guild_state(db, character: Character) -> dict:
     wallet = await wallet_service.get_wallet(db, character.id)
     invites = await guild_service.invites_for(db, character.id)
@@ -273,17 +285,9 @@ async def _state(db, character: Character) -> dict:
             # Шахта в полный склад не копает - это надо видеть, а не гадать.
             "ore_full": await guild_service.ore_total(db, guild.id) >= cap.ore,
             "ore": [_ore_line(o.ore_id, o.grade, o.count) for o in await guild_service.ore_stock(db, guild.id)],
-            "items": [
-                {"id": i.id, "name": i.name, "slot": naming.slot_title(i.slot), "rarity": i.rarity,
-                 "icon": naming.item_icon_key(i), "stats": i.base_stats or {}}
-                for i in stored
-            ],
+            "items": [_warehouse_item(i, character.level) for i in stored],
             "my_ore": [_ore_line(d.id, grade, count) for d, grade, count in my_ore if count > 0],
-            "my_items": [
-                {"id": i.id, "name": i.name, "slot": naming.slot_title(i.slot), "rarity": i.rarity,
-                 "icon": naming.item_icon_key(i)}
-                for i in my_items
-            ],
+            "my_items": [_warehouse_item(i, character.level) for i in my_items],
         },
         "slots": {
             "cells": len(held_cells), "cells_max": gc.cell_slots(guild.level),

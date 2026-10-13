@@ -4,6 +4,8 @@ import {
 } from '@vkontakte/vkui';
 import { getGuild, guildAction } from '../api.js';
 import GuildTree from './GuildTree.jsx';
+import ItemIcon from './ItemIcon.jsx';
+import { itemSubtitle } from './InventoryTab.jsx';
 
 // Гильдии. Всё управление - здесь: состав, казна и склад, земли и стройка,
 // древо, осады. В чате остаётся то, что происходит в поле.
@@ -478,9 +480,10 @@ function Treasury({ state, run, busy }) {
           {groupItems(warehouse.my_items).map((g) => (
             <Folder key={g.id} title={g.title} count={g.rows.length}>
               {g.rows.map((i) => (
-                <SimpleCell key={i.id} after={(
-                  <Button size="s" disabled={busy} onClick={() => run('deposit_item', { item_id: i.id }, 'Сдано на склад.')}>Сдать</Button>
-                )}>{i.name}</SimpleCell>
+                <SimpleCell key={i.id} multiline before={<ItemIcon icon={i.icon} rarity={i.rarity} alt={i.name} />}
+                  subtitle={itemSubtitle(i)} after={(
+                    <Button size="s" disabled={busy} onClick={() => run('deposit_item', { item_id: i.id }, 'Сдано на склад.')}>Сдать</Button>
+                  )}>{i.name}</SimpleCell>
               ))}
             </Folder>
           ))}
@@ -559,9 +562,10 @@ function Treasury({ state, run, busy }) {
         {groupItems(warehouse.items).map((g) => (
           <Folder key={g.id} title={g.title} count={g.rows.length}>
             {g.rows.map((i) => (
-              <SimpleCell key={i.id} after={canGive && (
-                <Button size="s" mode="secondary" disabled={busy} onClick={() => run('withdraw_item', { item_id: i.id, to: target }, 'Выдано.')}>Выдать</Button>
-              )}>{i.name}</SimpleCell>
+              <SimpleCell key={i.id} multiline before={<ItemIcon icon={i.icon} rarity={i.rarity} alt={i.name} />}
+                subtitle={itemSubtitle(i)} after={canGive && (
+                  <Button size="s" mode="secondary" disabled={busy} onClick={() => run('withdraw_item', { item_id: i.id, to: target }, 'Выдано.')}>Выдать</Button>
+                )}>{i.name}</SimpleCell>
             ))}
           </Folder>
         ))}
