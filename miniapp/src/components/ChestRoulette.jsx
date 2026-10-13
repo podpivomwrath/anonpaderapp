@@ -103,6 +103,7 @@ export default function ChestRoulette({ strip, winIndex, result, onClose }) {
   // Ларцы кровавого разлома (2026-10-13): своё имя и одна картинка ларца на
   // вид; у Пепельного - картинка своей градации.
   const title = result.title || 'Пепельный ларец';
+  const lootChest = Boolean(result.kind && result.kind !== 'ashen');
   // Своей картинки ларца ещё нет - Пепельный того же цвета градации.
   const chestIcon = result.chest_icon && itemIcon(result.chest_icon) ? result.chest_icon : `chest:${grade}`;
 
@@ -130,7 +131,9 @@ export default function ChestRoulette({ strip, winIndex, result, onClose }) {
                 >
                   <ItemIcon icon={card.icon} alt={card.grade_name} size={56} />
                   {/* Содержимое на ленте не показываем: награда - сюрприз вскрытия. */}
-                  <span className="roulette__grade">{card.grade_name}</span>
+                  {/* Ларцы разлома: только ларец и свечение карточки, без
+                      подписи - у Ларца руды она называла бы руду. */}
+                  {!lootChest && <span className="roulette__grade">{card.grade_name}</span>}
                 </div>
               ))}
             </div>
