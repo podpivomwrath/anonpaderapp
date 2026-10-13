@@ -94,20 +94,53 @@ async def held_by(db: AsyncSession, character_id: int) -> Rift | None:
 # --- Появление ----------------------------------------------------------------
 
 
+def _band_ring(level: int) -> int | None:
+    return next((ring for ring, (lo, hi) in rc.BANDS.items() if lo <= level <= hi), None)
+
+
+def _ring_of(level: int, x: int, y: int, region: str | None) -> int | None:
+    """Кольцо, где игрок сейчас: в поле - по клетке (центр - к IV), в городе -
+    по уровню (город стоит во внешнем кольце, и 40-й на площади не должен
+    тянуть разломы к новичкам). Ниже 10 уровня в разлом не пускают - не в счёт."""
+    if level < rc.BANDS[1][0]:
+        return None
+    if x is None or y is None:
+        return _band_ring(level)
+    if (x, y) in wc.CITY_COORDS.values():  # любой город, не только родной
+        return _band_ring(level)
+    return min(grid.ring_tier(x, y), max(rc.BANDS))
+
+
 async def _players_by_ring(db: AsyncSession, now: datetime) -> dict[int, int]:
+    """Разлом - туда, где актив прямо сейчас (2026-10-13, решение владельца):
+    доля разломов кольца = доля игроков, что были в игре последние
+    ACTIVE_NOW_MINUTES и стоят на нём. Никого сейчас нет - по суточным
+    игрокам подходящих уровней."""
+    rows = (await db.execute(select(
+        Character.level, Character.pos_x, Character.pos_y, Character.region,
+    ).where(
+        Character.creation_state.is_(None),
+        Character.last_active_at >= now - timedelta(minutes=rc.ACTIVE_NOW_MINUTES),
+    ))).all()
+    counts: dict[int, int] = {}
+    for level, x, y, region in rows:
+        ring = _ring_of(level, x, y, region)
+        if ring is not None:
+            counts[ring] = counts.get(ring, 0) + 1
+    if counts:
+        return counts
     levels = (await db.scalars(select(Character.level).where(
         Character.creation_state.is_(None), Character.last_active_at >= now - timedelta(days=1),
     ))).all()
-    counts: dict[int, int] = {}
     for level in levels:
-        for ring, (lo, hi) in rc.BANDS.items():
-            if lo <= level <= hi:
-                counts[ring] = counts.get(ring, 0) + 1
+        ring = _band_ring(level)
+        if ring is not None:
+            counts[ring] = counts.get(ring, 0) + 1
     return counts
 
 
 def _pick_ring(rng: random.Random, players_by_ring: dict[int, int]) -> int:
-    """Чаще там, где за сутки были игроки нужных уровней; никого - любое."""
+    """Пропорционально активу кольца; никого - любое."""
     rings = sorted(rc.BANDS)
     weights = [players_by_ring.get(r, 0) for r in rings]
     return rng.choices(rings, weights=weights)[0] if any(weights) else rng.choice(rings)

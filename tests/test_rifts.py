@@ -50,6 +50,30 @@ async def test_explorations_fill_meter_and_cap_active(db_session) -> None:
 # --- Вход ----------------------------------------------------------------------------
 
 
+async def test_ring_follows_active_players_now(db_session, make_character) -> None:
+    """Кольцо разлома - где игроки сейчас: в поле по клетке, в городе по уровню,
+    ушедшие давно не в счёт; никого сейчас - по суточным уровням."""
+    from game.world import world_config as wc
+
+    def put(c, ring, minutes_ago):
+        lo, _hi = wc.ring_bounds(ring)
+        c.pos_x, c.pos_y = lo, 0
+        c.last_active_at = NOW - timedelta(minutes=minutes_ago)
+
+    for _ in range(3):
+        put(await make_character(level=40), 3, 5)  # трое в III, только что
+    put(await make_character(level=20), 2, 300)  # ушёл 5 часов назад
+    town = await make_character(level=50, region="ridge")
+    town.pos_x, town.pos_y = wc.CITY_COORDS["ridge"]
+    town.last_active_at = NOW - timedelta(minutes=1)
+    put(await make_character(level=5), 1, 1)  # ниже 10 - не в счёт
+    await db_session.flush()
+    assert await rift_service._players_by_ring(db_session, NOW) == {3: 3, 4: 1}
+
+    later = NOW + timedelta(hours=2)  # сейчас никого - по суточным уровням
+    assert await rift_service._players_by_ring(db_session, later) == {2: 1, 3: 3, 4: 1}
+
+
 async def test_entry_rules(db_session, make_character) -> None:
     rift = await _rift(db_session, ring=2, kind="ash_crypt")  # 16-30, до 3
     a = await _at(await make_character(), rift, 20)
