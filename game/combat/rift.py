@@ -146,12 +146,18 @@ class MatriarchStage(_BossStage):
             if self.ticks - born >= rc.SHARD_FUSE:
                 _kill(shard)
                 del self.shards[sid]
-                out.lines.append("💥 Осколок взрывается! Каменная крошка бьёт по всем.")
+                hits = []
                 for player in _players(session):
-                    player.current_hp -= max(1, round(player.max_hp * rc.SHARD_BLAST))
+                    before = player.current_hp
+                    blast = max(1, round(player.max_hp * rc.SHARD_BLAST))
+                    player.current_hp -= blast
                     if player.current_hp <= 0:
                         player.current_hp = 0
                         out.deaths.append(player.id)
+                    # Кому сколько: раньше строка была без чисел, и погибший
+                    # от взрыва не понимал, от чего умер (2026-10-13).
+                    hits.append(f"{player.name} - {blast} урона ({player.name}: {before} → {player.current_hp})")
+                out.lines.append("💥 Осколок взрывается! Каменная крошка бьёт по всем: " + "; ".join(hits))
         if self.ticks % rc.SHARD_EVERY == 0:
             shard = self._mob("Осколок", rc.SHARD_HP, 0.0, label="царапает")
             shard.scripted_hit = lambda mob, s, r: []

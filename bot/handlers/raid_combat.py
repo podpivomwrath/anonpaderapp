@@ -987,6 +987,9 @@ async def on_raid_tick_resolved(session_id: int, tick: int, result: TickResult) 
     if scripted_death_ids and state is not None:
         alive_players_left = [c for c in state.combatants.values() if c.kind == "character" and c.alive]
         if not alive_players_left:
+            # Последний ход - всем, до конца захода: иначе погибший от
+            # взрыва или фазы босса не видел, от чего умер (2026-10-13).
+            await _broadcast_board(session_id, battle, result, boss_lines=extra_lines)
             # Вайп сценарной гибелью — TickEngine об этом не узнает сам
             # (HP обнулён В ОБХОД resolve_tick), поэтому завершаем ЯВНО:
             # abort_session — единственный ПУБЛИЧНЫЙ метод движка для этого
