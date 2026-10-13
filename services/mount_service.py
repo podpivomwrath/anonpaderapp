@@ -18,6 +18,7 @@ from game.content_loader import MountDef, load_mounts
 from game.economy import mount_config as mc
 from game.world import grid
 from models import Character, CharacterMount, MountTravel
+from services import vitals_service
 
 _mounts: dict[str, MountDef] | None = None
 
@@ -281,6 +282,7 @@ def advance(
         # Поездка, начатая до движения по клеткам: доезжает по старому таймеру.
         if now >= travel.arrives_at and not paused:
             character.pos_x, character.pos_y = travel.to_x, travel.to_y
+            vitals_service.heal_in_city(character)
             travel.status = "completed"
             result.moved = result.arrived = True
         return result
@@ -296,6 +298,7 @@ def advance(
         travel.cell_index += 1
         x, y = path[travel.cell_index - 1]
         character.pos_x, character.pos_y = x, y
+        vitals_service.heal_in_city(character)
         result.moved = True
         if travel.cell_index >= len(path):
             travel.status = "completed"

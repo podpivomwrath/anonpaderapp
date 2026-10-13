@@ -9,6 +9,15 @@ from game.combat import formulas
 from models import Character, CharacterStats
 
 
+def heal_in_city(character: Character) -> None:
+    """В городе здоровье восстанавливается само и молча (2026-10-13, решение
+    владельца): вызывать там, где персонаж приходит на клетку."""
+    from game.world import grid
+
+    if character.pos_x is not None and grid.city_region_at(character.pos_x, character.pos_y) is not None:
+        character.current_hp = None  # NULL - полное здоровье
+
+
 def max_hp(character: Character, stats: CharacterStats, vit_bonus: int = 0) -> int:
     tier = formulas.tier_for_level(character.level)
     return round(

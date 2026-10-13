@@ -39,3 +39,17 @@ def test_fast_enough() -> None:
     started = time.perf_counter()
     grid.safe_path(-25, -5, 25, 5)
     assert time.perf_counter() - started < 1.0
+
+
+def test_city_heals_silently() -> None:
+    """2026-10-13: пришёл в город - здоровье полное (NULL), вне города - как было."""
+    from types import SimpleNamespace
+
+    from services import vitals_service
+
+    hurt = SimpleNamespace(pos_x=wc.CITY_COORDS["ridge"][0], pos_y=wc.CITY_COORDS["ridge"][1], current_hp=12)
+    vitals_service.heal_in_city(hurt)
+    assert hurt.current_hp is None
+    field = SimpleNamespace(pos_x=10, pos_y=10, current_hp=12)
+    vitals_service.heal_in_city(field)
+    assert field.current_hp == 12
