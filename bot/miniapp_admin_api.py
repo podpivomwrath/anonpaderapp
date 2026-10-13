@@ -23,6 +23,7 @@ from models import Character
 from services import (
     admin_grant_service,
     admin_service,
+    admin_systems_service,
     character_reset_service,
     maintenance_service,
     mining_service,
@@ -50,15 +51,55 @@ async def handle_get_overview(request: web.Request) -> web.Response:
     session_factory = request.app[SESSION_FACTORY_KEY]
     async with session_factory() as db:
         stats = await admin_service.overview_stats(db)
-        return web.json_response(
-            {
-                "players": stats.players,
-                "progression": stats.progression,
-                "retention": stats.retention,
-                "economy": stats.economy,
-                "combat": stats.combat,
-            }
-        )
+        systems = await admin_systems_service.systems_stats(db)
+    return web.json_response(
+        {
+            "players": stats.players,
+            "progression": _humanize_progression(stats.progression),
+            "retention": stats.retention,
+            "economy": _humanize_economy(stats.economy),
+            "combat": stats.combat,
+            "systems": systems,
+        }
+    )
+
+
+def _titled(counts: dict, title) -> dict:
+    """{технический id: n} -> {название: n}; неизвестный id остаётся как есть."""
+    out: dict[str, int] = {}
+    for key, n in counts.items():
+        name = title(key) or key
+        out[name] = out.get(name, 0) + n
+    return out
+
+
+def _humanize_progression(progression: dict) -> dict:
+    """Классы, подклассы и регионы в обзоре - по-русски, а не warrior/ridge
+    (2026-10-13: в обзоре висели технические id)."""
+    from bot.onboarding_texts import REGION_TITLES
+    from game.classes.base import REGISTRY
+    from services.naming import BASE_CLASS_TITLES
+
+    def subclass_title(sid):
+        sub = REGISTRY.get(sid)
+        return sub.title if sub is not None else None
+
+    return {
+        **progression,
+        "by_class": _titled(progression.get("by_class", {}), BASE_CLASS_TITLES.get),
+        "by_subclass": _titled(progression.get("by_subclass", {}), subclass_title),
+        "by_region": _titled(progression.get("by_region", {}), REGION_TITLES.get),
+    }
+
+
+def _humanize_economy(economy: dict) -> dict:
+    from services import trophy_service
+
+    def trophy_title(tid):
+        trophy = trophy_service.trophy_def(tid)
+        return f"{trophy.emoji} {trophy.name}" if trophy is not None else None
+
+    return {**economy, "trophies_in_circulation": _titled(economy.get("trophies_in_circulation", {}), trophy_title)}
 
 
 async def handle_get_search(request: web.Request) -> web.Response:

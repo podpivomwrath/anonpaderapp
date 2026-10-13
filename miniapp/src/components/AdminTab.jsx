@@ -199,7 +199,7 @@ function OverviewSection() {
   if (status === 'loading') return <Div style={{ display: 'flex', justifyContent: 'center', paddingTop: 24 }}><Spinner size="l" /></Div>;
   if (status === 'error' || !data) return <Placeholder>Не удалось загрузить обзор.</Placeholder>;
 
-  const { players, progression, retention, economy, combat } = data;
+  const { players, progression, retention, economy, combat, systems = [] } = data;
   return (
     <>
       <Group header={<Header>👥 Игроки</Header>}>
@@ -217,6 +217,9 @@ function OverviewSection() {
         {Object.entries(progression.by_class).map(([cls, count]) => (
           <StatRow key={cls} label={`Класс: ${cls}`} value={count} />
         ))}
+        {Object.entries(progression.by_subclass || {}).map(([sub, count]) => (
+          <StatRow key={sub} label={`Подкласс: ${sub}`} value={count} />
+        ))}
         {Object.entries(progression.by_region).map(([region, count]) => (
           <StatRow key={region} label={`Регион: ${region}`} value={count} />
         ))}
@@ -231,19 +234,25 @@ function OverviewSection() {
         )}
       </Group>
       <Group header={<Header>💰 Экономика</Header>}>
-        <StatRow label="Золота всего" value={economy.total_gold} />
-        <StatRow label="Самоцветов всего" value={economy.total_gems} />
+        <StatRow label="Золота у игроков" value={economy.total_gold} />
+        <StatRow label="Самоцветов у игроков" value={economy.total_gems} />
         {Object.entries(economy.trophies_in_circulation).map(([id, count]) => (
-          <StatRow key={id} label={`Трофей: ${id}`} value={count} />
+          <StatRow key={id} label={id} value={count} />
         ))}
       </Group>
       <Group header={<Header>⚔️ Бой</Header>}>
         <StatRow label="Смертей за 24ч" value={combat.deaths_24h} />
         <StatRow label="PvP-боёв за 24ч" value={combat.pvp_battles_24h} />
         {Object.entries(combat.deaths_by_zone_24h).map(([zone, count]) => (
-          <StatRow key={zone} label={`Зона ${zone} ур.`} value={count} />
+          <StatRow key={zone} label={`Смертей в зоне ${zone} ур.`} value={count} />
         ))}
       </Group>
+      {/* Системы игры (2026-10-13): блоки и подписи готовит сервер. */}
+      {systems.map((block) => (
+        <Group key={block.title} header={<Header>{block.title}</Header>}>
+          {block.rows.map((row) => <StatRow key={row.label} label={row.label} value={row.value} />)}
+        </Group>
+      ))}
     </>
   );
 }

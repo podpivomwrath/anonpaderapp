@@ -128,6 +128,21 @@ async def test_overview_ok_for_admin(client, session_factory) -> None:
     assert "progression" in data and "retention" in data and "economy" in data and "combat" in data
 
 
+async def test_overview_is_human_readable_and_has_systems(client, session_factory) -> None:
+    """2026-10-13: в обзоре нет технических id (warrior, ridge), есть блоки
+    по системам игры - гильдии, рыбалка и добыча, рейды, торговля, биржа, репорты."""
+    await _make_player(session_factory)
+    resp = await client.get("/api/miniapp/admin/overview", params=_signed_query(ADMIN_VK_ID))
+    data = await resp.json()
+    assert data["progression"]["by_class"] == {"Воин": 1}
+    assert "ridge" not in data["progression"]["by_region"]
+    assert len(data["progression"]["by_region"]) == 1
+    titles = [block["title"] for block in data["systems"]]
+    assert any("Гильдии" in t for t in titles) and any("Биржа" in t for t in titles)
+    for block in data["systems"]:
+        assert block["rows"] and all({"label", "value"} <= set(row) for row in block["rows"])
+
+
 async def test_search_forbidden_for_non_admin(client) -> None:
     resp = await client.get(
         "/api/miniapp/admin/search", params={**_signed_query(PLAYER_VK_ID), "q": "Игрок"}
