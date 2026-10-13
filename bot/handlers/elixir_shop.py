@@ -41,7 +41,7 @@ def _catalog_text(counts: dict[str, int]) -> str:
     # Без пустого элемента: строки и так склеиваются через пустую строку, а
     # лишний "" давал три пустых строки после приветствия старухи.
     lines = [shop_intro()]
-    for elixir in elixir_service.elixir_defs_ordered():
+    for elixir in elixir_service.shop_elixirs():
         owned = counts.get(elixir.id, 0)
         owned_suffix = f" (у тебя: {owned})" if owned else ""
         price = elixir_service.price(elixir.id)
@@ -68,7 +68,7 @@ async def open_shop(message: Message) -> None:
 
     await editable_message.send_or_edit(
         _bot_api, _NS, peer_id, _catalog_text(counts),
-        shop_keyboard(elixir_service.elixir_defs_ordered()),
+        shop_keyboard(elixir_service.shop_elixirs()),
         attachment=shop_attachment(),
     )
 
@@ -119,7 +119,7 @@ async def elixir_shop_select(message: Message) -> None:
             counts = await _owned_counts(db, character.id)
             text = f"{shop_not_enough_gold()}\n\n{_catalog_text(counts)}"
             await editable_message.send_or_edit(
-                _bot_api, _NS, peer_id, text, shop_keyboard(elixir_service.elixir_defs_ordered()),
+                _bot_api, _NS, peer_id, text, shop_keyboard(elixir_service.shop_elixirs()),
                 attachment=shop_attachment(),
             )
             return
@@ -143,7 +143,7 @@ async def elixir_shop_item_back(message: Message) -> None:
 
     await editable_message.send_or_edit(
         _bot_api, _NS, peer_id, _catalog_text(counts),
-        shop_keyboard(elixir_service.elixir_defs_ordered()),
+        shop_keyboard(elixir_service.shop_elixirs()),
         attachment=shop_attachment(),
     )
 
@@ -168,7 +168,7 @@ async def buy_elixir_qty(message: Message) -> None:
             counts = await _owned_counts(db, character.id)
             text = f"{shop_not_enough_gold()}\n\n{_catalog_text(counts)}"
             await editable_message.send_or_edit(
-                _bot_api, _NS, peer_id, text, shop_keyboard(elixir_service.elixir_defs_ordered()),
+                _bot_api, _NS, peer_id, text, shop_keyboard(elixir_service.shop_elixirs()),
                 attachment=shop_attachment(),
             )
             return
@@ -180,7 +180,7 @@ async def buy_elixir_qty(message: Message) -> None:
     confirm = shop_bought_bulk(elixir.name, qty, spent, total, new_count)
     text = f"{confirm}\n\n{_catalog_text(counts)}"
     await editable_message.send_or_edit(
-        _bot_api, _NS, peer_id, text, shop_keyboard(elixir_service.elixir_defs_ordered()),
+        _bot_api, _NS, peer_id, text, shop_keyboard(elixir_service.shop_elixirs()),
         attachment=shop_attachment(),
     )
 
@@ -191,4 +191,4 @@ async def rebuild(db, character) -> tuple[str, str] | None:
     if character.screen != "elixir_shop":
         return None
     counts = await _owned_counts(db, character.id)
-    return _catalog_text(counts), shop_keyboard(elixir_service.elixir_defs_ordered())
+    return _catalog_text(counts), shop_keyboard(elixir_service.shop_elixirs())

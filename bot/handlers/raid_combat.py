@@ -14,6 +14,7 @@ from dataclasses import dataclass, field
 from loguru import logger
 from vkbottle.bot import BotLabeler, Message
 
+from bot.keyboards.combat_items import page_of
 from bot import dailies_texts, editable_message, group_texts, raid_key_texts, raid_texts as rt
 from bot import raid_archive_texts as at
 from bot import raid_field_texts as ft
@@ -745,6 +746,7 @@ async def raid_target_back(message: Message) -> None:
 # --- Предметы в бою ---
 
 
+@labeler.message(payload_contains={"type": "raid_items_page"})
 @labeler.message(payload_contains={"type": "raid_open_items"})
 async def raid_open_items(message: Message) -> None:
     peer_id = message.peer_id
@@ -782,12 +784,16 @@ async def raid_open_items(message: Message) -> None:
     if consumable_limit.left(combatant) <= 0:
         visible = []
     text = consumable_limit.items_header(combatant)
-    if limit_reached and any(d.category == "combat" for d, _ in stock):
+    if limit_reached and any(d.category != "heal" for d, _ in stock):
         text += "\n\nБольше твоё тело не выдержит за один бой - боевые эликсиры недоступны."
     # Открытие окна - всегда новым сообщением внизу: иначе правилось бы
     # окно из прошлого боя, давно уехавшее вверх, и нажатие казалось мёртвым.
-    editable_message.clear("raid_item", peer_id)
-    await editable_message.send_or_edit(_bot_api, "raid_item", peer_id, text, kb.raid_items_keyboard(visible))
+    page = page_of(message)
+    if page is None:
+        editable_message.clear("raid_item", peer_id)
+    await editable_message.send_or_edit(
+        _bot_api, "raid_item", peer_id, text, kb.raid_items_keyboard(visible, page or 0),
+    )
 
 
 @labeler.message(payload_contains={"type": "raid_use_item"})
@@ -820,7 +826,7 @@ async def raid_use_item(message: Message) -> None:
     if consumable_limit.left(combatant) <= 0:
         await message.answer(consumable_limit.EXHAUSTED_TEXT, keyboard=battle_kb)
         return
-    if elixir.category == "combat" and combatant.combat_elixirs_used >= ec.ELIXIR_PER_BATTLE_LIMIT:
+    if elixir.category != "heal" and combatant.combat_elixirs_used >= ec.ELIXIR_PER_BATTLE_LIMIT:
         await message.answer("Больше твоё тело не выдержит за один бой.", keyboard=battle_kb)
         return
 
@@ -848,8 +854,10 @@ async def raid_use_item(message: Message) -> None:
             _declared_this_tick.get(battle_id, set()).discard(cid)
         return
 
-    line = elixir_effects.apply_combat_elixir(combatant, elixir_id)
+    line = elixir_effects.apply_combat_elixir(combatant, elixir_id, _live_state(battle_id, battle))
     combatant.combat_elixirs_used += 1
+    if elixir.category == "scroll":
+        await _tell_others(battle, cid, f"{p.name}: {line}")
     text = f"{line} Твой ход.\n\n{_render_board(_engine.sessions.get(battle_id))}"
     await _bot_api.messages.send(
         peer_id=peer_id, message=text, random_id=0,
@@ -1272,9 +1280,36 @@ async def _grant_rift_legendaries(battle: RaidBattle) -> None:
             logger.exception("Разлом: не доставлена добыча {}", p.peer_id)
 
 
+async def _grant_blood_chests(battle: RaidBattle) -> None:
+    """Кровавый разлом пройден (2026-10-13): каждому участнику захода,
+    включая павших, - Ларец руды и Ларец расходников. Открываются в сумке
+    мини-аппа рулеткой, как Пепельный."""
+    from services import lootbox_service
+
+    async with get_session_factory()() as db:
+        for cid in battle.participants:
+            character = await db.get(Character, cid)
+            if character is None:
+                continue
+            for kind in (lootbox_service.ORE, lootbox_service.SUPPLY):
+                await lootbox_service.grant_chest(db, character, character.daily_streak or 1, kind)
+        await db.commit()
+    text = (
+        "🩸 Кровавый разлом отдаёт своё: ⛏ Ларец руды и 🧪 Ларец расходников - "
+        "в сумке, открыть в мини-аппе."
+    )
+    for p in battle.participants.values():
+        try:
+            await _bot_api.messages.send(peer_id=p.peer_id, message=text, random_id=0)
+        except Exception:
+            logger.exception("Разлом: не доставлены ларцы {}", p.peer_id)
+
+
 async def _finish_victory(session_id: int, battle: RaidBattle) -> None:
     if battle.is_rift:
         await _grant_rift_legendaries(battle)
+        if getattr(battle, "rift_blood", False):
+            await _grant_blood_chests(battle)
     else:
         await _grant_stage_clear_bonus(battle)
     texts = _texts(battle)
@@ -1378,3 +1413,15 @@ async def _cleanup_and_return(session_id: int, battle: RaidBattle, text: str, *,
                 peer_id=p.peer_id, message=text, random_id=0,
                 keyboard=movement_keyboard(*battle.home, p.peer_id, has_mount=False),
             )
+
+
+async def _tell_others(battle, cid: int, text: str) -> None:
+    """Свиток действует на всю сторону (или на всех врагов) - видеть это
+    должны все в бою, а не только прочитавший."""
+    for other_id, other in battle.participants.items():
+        if other_id == cid:
+            continue
+        try:
+            await _bot_api.messages.send(peer_id=other.peer_id, message=text, random_id=0)
+        except Exception:
+            logger.warning("Свиток: не доставлено {}", other.peer_id)

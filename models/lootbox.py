@@ -22,6 +22,9 @@ class CharacterLootbox(Base):
     character_id: Mapped[int] = mapped_column(
         ForeignKey("characters.id", ondelete="CASCADE"), index=True
     )
+    #: вид: ashen - Пепельный (стрик ежедневок и прочее), ore и supply -
+    #: ларцы кровавого разлома (2026-10-13). Свои градации у каждого.
+    kind: Mapped[str] = mapped_column(String(16), default="ashen", server_default="ashen")
     #: closed - лежит в сумке; opened - открыт
     status: Mapped[str] = mapped_column(String(8), default="opened")
     #: день стрика ежедневок, за который выдан: от него шансы градаций

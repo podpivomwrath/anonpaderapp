@@ -101,7 +101,8 @@ BURN_TAG = "burn"
 #: Без метки (мобы, страница архива, снимки старых боёв) - просто «Щит».
 SECOND_HEART_TAG = "second_heart"
 WARD_TAG = "ward"
-SHIELD_NAMES = {SECOND_HEART_TAG: "Второе сердце", WARD_TAG: "Оберег"}
+SCROLL_WARD_TAG = "scroll_ward"
+SHIELD_NAMES = {SECOND_HEART_TAG: "Второе сердце", WARD_TAG: "Оберег", SCROLL_WARD_TAG: "Свиток оберега"}
 
 
 def shield_name(effect) -> str:

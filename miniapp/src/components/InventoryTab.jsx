@@ -228,12 +228,12 @@ export default function InventoryTab({ onCharacterUpdate }) {
     setChests(res.chests || []);
   }
 
-  async function handleOpenChest() {
+  async function handleOpenChest(kind) {
     if (opening) return;
     setOpening(true);
     setErrorMsg(null);
     try {
-      setRoulette(await openChest());
+      setRoulette(await openChest(kind));
     } catch (err) {
       setErrorMsg(err?.message === 'no_chest' ? 'Ларцов в сумке больше нет.' : 'Не удалось открыть ларец.');
     } finally {
@@ -445,7 +445,7 @@ export default function InventoryTab({ onCharacterUpdate }) {
     if (kind === 'consumable') after = <div className="inventory-actions">{quantityButton(entry)}</div>;
     if (kind === 'chest') {
       after = (
-        <Button mode="primary" size="s" loading={opening} onClick={handleOpenChest}>
+        <Button mode="primary" size="s" loading={opening} onClick={() => handleOpenChest(entry.kind)}>
           Открыть
         </Button>
       );

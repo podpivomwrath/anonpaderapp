@@ -608,7 +608,7 @@ async def handle_get_dailies(request: web.Request) -> web.Response:
         )
 
 
-_ELIXIR_CATEGORY_TITLES = {"heal": "Лечебное", "combat": "Боевой эликсир"}
+_ELIXIR_CATEGORY_TITLES = {"heal": "Лечебное", "combat": "Боевой эликсир", "scroll": "Свиток"}
 
 
 def _unique_flavor(item) -> str | None:
@@ -731,21 +731,30 @@ _chest_rng = random.SystemRandom()
 
 
 def _chests_payload(chests) -> list[dict]:
-    """Ларцы - одной стопкой: до открытия они одинаковые, открывается
-    самый старый. Шансы градаций - для подсказки."""
-    if not chests:
-        return []
-    grades = lootbox_service.grade_catalog()
-    total = sum(g.chance for g in grades) or 1
-    return [{
-        "id": "ash_chest",
-        "name": lootbox_service.CHEST_NAME,
-        "count": len(chests),
-        "icon": lootbox_service.CHEST_ICON,
-        "description": "Ларец за день серии ежедневок. Что внутри - решает рулетка при открытии.",
-        "grades": [{"name": g.name, "icon": f"chest:{g.id}", "grade": g.id,
-                    "chance": round(100 * g.chance / total, 1)} for g in grades],
-    }]
+    """Ларцы - стопкой на вид: до открытия ларцы одного вида одинаковые,
+    открывается самый старый. Шансы градаций - для подсказки."""
+    counts: dict[str, int] = {}
+    for chest in chests:
+        kind = chest.kind or lootbox_service.ASHEN
+        counts[kind] = counts.get(kind, 0) + 1
+    out = []
+    for kind, info in lootbox_service.CHEST_KINDS.items():
+        if not counts.get(kind):
+            continue
+        grades = lootbox_service.grade_catalog(kind)
+        total = sum(g.chance for g in grades) or 1
+        out.append({
+            # id "ash_chest" у Пепельного - прежний, на него завязан клиент.
+            "id": "ash_chest" if kind == lootbox_service.ASHEN else f"chest_{kind}",
+            "kind": kind,
+            "name": info.name,
+            "count": counts[kind],
+            "icon": info.icon,
+            "description": info.description,
+            "grades": [{"name": g.name, "icon": f"chest:{g.id}", "grade": g.id,
+                        "chance": round(100 * g.chance / total, 1)} for g in grades],
+        })
+    return out
 
 
 async def handle_post_chest_open(request: web.Request) -> web.Response:
@@ -757,7 +766,14 @@ async def handle_post_chest_open(request: web.Request) -> web.Response:
         if character is None:
             return web.json_response({"error": "character_not_found"}, status=404)
         try:
-            chest, result = await lootbox_service.open_owned(session, character, None, _chest_rng)
+            body = await request.json() if request.can_read_body else {}
+        except Exception:
+            body = {}
+        kind = body.get("kind") if isinstance(body, dict) else None
+        if kind not in lootbox_service.CHEST_KINDS:
+            kind = lootbox_service.ASHEN
+        try:
+            chest, result = await lootbox_service.open_owned(session, character, None, _chest_rng, kind)
         except lootbox_service.ChestGone:
             await session.rollback()
             return web.json_response({"error": "no_chest"}, status=409)
@@ -767,7 +783,11 @@ async def handle_post_chest_open(request: web.Request) -> web.Response:
         return web.json_response({
             "strip": strip,
             "win_index": win_index,
-            "result": {"grade": result.grade.id, "grade_name": result.grade.name, "lines": result.lines},
+            "result": {
+                "grade": result.grade.id, "grade_name": result.grade.name, "lines": result.lines,
+                "kind": kind, "title": lootbox_service.CHEST_KINDS[kind].name,
+                "chest_icon": lootbox_service.CHEST_KINDS[kind].icon if kind != lootbox_service.ASHEN else None,
+            },
             "inventory": inventory,
         })
 

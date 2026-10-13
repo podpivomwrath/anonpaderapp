@@ -18,6 +18,7 @@ from loguru import logger
 from sqlalchemy import select
 from vkbottle.bot import BotLabeler, Message
 
+from bot.keyboards.combat_items import page_of
 from bot import ash_handful_state, dailies_texts, editable_message, group_texts, raid_key_texts
 from bot.handlers import respawn as respawn_handlers
 from bot.battle_keyboard import answer_battle_gone
@@ -522,6 +523,7 @@ async def group_target_back(message: Message) -> None:
 # --- Предметы в бою (лечебные тратят ход; боевые эликсиры — бесплатны, лимит/бой) ---
 
 
+@labeler.message(payload_contains={"type": "group_pve_items_page"})
 @labeler.message(text=[BTN_GROUP_ITEM])
 async def group_open_items(message: Message) -> None:
     peer_id = message.peer_id
@@ -558,12 +560,16 @@ async def group_open_items(message: Message) -> None:
     if consumable_limit.left(combatant) <= 0:
         visible = []
     text = consumable_limit.items_header(combatant)
-    if limit_reached and any(d.category == "combat" for d, _ in stock):
+    if limit_reached and any(d.category != "heal" for d, _ in stock):
         text += "\n\nБольше твоё тело не выдержит за один бой - боевые эликсиры недоступны."
     # Открытие окна - всегда новым сообщением внизу: иначе правилось бы
     # окно из прошлого боя, давно уехавшее вверх, и нажатие казалось мёртвым.
-    editable_message.clear("group_pve_item", peer_id)
-    await editable_message.send_or_edit(_bot_api, "group_pve_item", peer_id, text, group_items_keyboard(visible))
+    page = page_of(message)
+    if page is None:
+        editable_message.clear("group_pve_item", peer_id)
+    await editable_message.send_or_edit(
+        _bot_api, "group_pve_item", peer_id, text, group_items_keyboard(visible, page or 0),
+    )
 
 
 @labeler.message(payload_contains={"type": "group_pve_use_item"})
@@ -595,7 +601,7 @@ async def group_use_item(message: Message) -> None:
     if consumable_limit.left(combatant) <= 0:
         await message.answer(consumable_limit.EXHAUSTED_TEXT, keyboard=battle_kb)
         return
-    if elixir.category == "combat" and combatant.combat_elixirs_used >= ec.ELIXIR_PER_BATTLE_LIMIT:
+    if elixir.category != "heal" and combatant.combat_elixirs_used >= ec.ELIXIR_PER_BATTLE_LIMIT:
         await message.answer("Больше твоё тело не выдержит за один бой.", keyboard=battle_kb)
         return
 
@@ -623,8 +629,10 @@ async def group_use_item(message: Message) -> None:
             _declared_this_tick.get(battle_id, set()).discard(cid)
         return
 
-    line = elixir_effects.apply_combat_elixir(combatant, elixir_id)
+    line = elixir_effects.apply_combat_elixir(combatant, elixir_id, _live_state(battle_id, battle))
     combatant.combat_elixirs_used += 1
+    if elixir.category == "scroll":
+        await _tell_others(battle, cid, f"{p.name}: {line}")
     text = f"{line} Твой ход.\n\n{_render_board(_engine.sessions.get(battle_id))}"
     await _bot_api.messages.send(
         peer_id=peer_id, message=text, random_id=0,
@@ -763,10 +771,11 @@ async def on_group_battle_finished(session_id: int, result: TickResult) -> None:
     for cid, p in battle.participants.items():
         if cid in survivor_ids:
             pos = positions.get(cid, (0, 0))
-            await _bot_api.messages.send(
-                peer_id=p.peer_id, message="🏆 Группа побеждает!", random_id=0,
-                keyboard=movement_keyboard(*pos, p.peer_id, has_mount=has_mount_by_cid.get(cid, False)),
-            )
+            keyboard = movement_keyboard(*pos, p.peer_id, has_mount=has_mount_by_cid.get(cid, False))
+            await _bot_api.messages.send(peer_id=p.peer_id, message="🏆 Группа побеждает!", random_id=0)
+            # Сводка клетки, как после соло-победы (2026-10-13): раньше после
+            # группового боя её не было вовсе - только строка о победе.
+            await _send_location_summary(cid, p.peer_id, keyboard)
             # Горстка пепла - каждому своя (2026-10-13): у одного выпала,
             # у другого нет, как после соло-победы.
             if ash_service.roll_appears(_rng):
@@ -777,3 +786,35 @@ async def on_group_battle_finished(session_id: int, result: TickResult) -> None:
         elif cid in dead_ids and cid in defeats:
             defeat, respawn_at = defeats[cid]
             await respawn_handlers.register_death(p.peer_id, respawn_at, defeat.xp_lost)
+
+
+async def _tell_others(battle, cid: int, text: str) -> None:
+    """Свиток действует на всю сторону (или на всех врагов) - видеть это
+    должны все в бою, а не только прочитавший."""
+    for other_id, other in battle.participants.items():
+        if other_id == cid:
+            continue
+        try:
+            await _bot_api.messages.send(peer_id=other.peer_id, message=text, random_id=0)
+        except Exception:
+            logger.warning("Свиток: не доставлено {}", other.peer_id)
+
+
+async def _send_location_summary(character_id: int, peer_id: int, fallback_keyboard: str) -> None:
+    from bot.handlers import world as world_handlers  # избегаем цикла импортов
+
+    try:
+        async with get_session_factory()() as db:
+            character = await db.get(Character, character_id)
+            if character is None:
+                raise LookupError(character_id)
+            text, attachment, keyboard = await world_handlers.location_summary_parts(db, character, peer_id)
+        await _bot_api.messages.send(
+            peer_id=peer_id, message=text, random_id=0, attachment=attachment, keyboard=keyboard,
+        )
+    except Exception:
+        # Сводка не собралась - кнопки движения всё равно нужны.
+        logger.exception("Групповой бой: не удалось отправить сводку локации {}", peer_id)
+        await _bot_api.messages.send(
+            peer_id=peer_id, message="Осматриваешься после боя.", random_id=0, keyboard=fallback_keyboard,
+        )

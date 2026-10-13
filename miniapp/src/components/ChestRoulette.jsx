@@ -99,12 +99,16 @@ export default function ChestRoulette({ strip, winIndex, result, onClose }) {
   const opening = phase === 'shake' || phase === 'burst';
   const done = phase === 'burst';
   const grade = result.grade;
+  // Ларцы кровавого разлома (2026-10-13): своё имя и одна картинка ларца на
+  // вид; у Пепельного - картинка своей градации.
+  const title = result.title || 'Пепельный ларец';
+  const chestIcon = result.chest_icon || `chest:${grade}`;
 
   return (
     <>
       <div className="nav-scrim roulette-scrim" aria-hidden="true" />
-      <div className={`roulette roulette--${grade}${done ? ' roulette--burst' : ''}`} role="dialog" aria-label="Пепельный ларец">
-        <div className="roulette__title">Пепельный ларец</div>
+      <div className={`roulette roulette--${grade}${done ? ' roulette--burst' : ''}`} role="dialog" aria-label={title}>
+        <div className="roulette__title">{title}</div>
 
         {!opening && (
           <div className="roulette__viewport" ref={viewportRef}>
@@ -151,7 +155,7 @@ export default function ChestRoulette({ strip, winIndex, result, onClose }) {
               />
             ))}
             <div className="chest-stage__chest">
-              <ItemIcon icon={`chest:${grade}`} alt="Пепельный ларец" size={104} />
+              <ItemIcon icon={chestIcon} alt={title} size={104} />
             </div>
           </div>
         )}
@@ -160,7 +164,7 @@ export default function ChestRoulette({ strip, winIndex, result, onClose }) {
           {done ? (
             <>
               <b className={`roulette__result-grade roulette__result-grade--${grade}`}>
-                {result.grade_name} ларец
+                {result.title ? result.grade_name : `${result.grade_name} ларец`}
               </b>
               <div className="loot-drops">
                 {result.lines.map((line, i) => (

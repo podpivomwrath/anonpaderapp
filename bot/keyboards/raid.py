@@ -90,14 +90,10 @@ def raid_target_keyboard(target_ids: list[int]) -> str:
     return kb.get_json()
 
 
-def raid_items_keyboard(stock: list) -> str:
-    kb = Keyboard(inline=True)
-    for idx, (elixir, count) in enumerate(stock):
-        label = f"{elixir.emoji} {elixir.name} ×{count}"
-        kb.add(Text(label, payload={"type": "raid_use_item", "id": elixir.id}), color=KeyboardButtonColor.SECONDARY)
-        if idx % 2 == 1:
-            kb.row()
-    return kb.get_json()
+def raid_items_keyboard(stock: list, page: int = 0) -> str:
+    from bot.keyboards.combat_items import paged_items_keyboard
+
+    return paged_items_keyboard(stock, "raid_use_item", "raid_items_page", page)
 
 
 def raid_waiting_keyboard() -> str:

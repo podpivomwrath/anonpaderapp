@@ -24,6 +24,7 @@ from datetime import datetime, timezone
 from sqlalchemy import select
 from vkbottle.bot import BotLabeler, Message
 
+from bot.keyboards.combat_items import page_of
 from bot import dailies_texts, editable_message
 from bot.activity import ActivityBusy, activity_action, blocked_reason, transition
 from bot.battle_keyboard import active_battle_keyboard, answer_battle_gone, in_any_battle
@@ -1154,6 +1155,7 @@ async def pvp_target_back(message: Message) -> None:
 # {"type": "use_item"} — см. докстринг bot/keyboards/pvp.py. ---
 
 
+@labeler.message(payload_contains={"type": "pvp_items_page"})
 @labeler.message(text=[BTN_PVP_ITEM])
 async def pvp_open_items(message: Message) -> None:
     peer_id = message.peer_id
@@ -1191,13 +1193,15 @@ async def pvp_open_items(message: Message) -> None:
     if consumable_limit.left(combatant) <= 0:
         visible = []
     text = consumable_limit.items_header(combatant)
-    if limit_reached and any(d.category == "combat" for d, _ in stock):
+    if limit_reached and any(d.category != "heal" for d, _ in stock):
         text += "\n\nБольше твоё тело не выдержит за один бой - боевые эликсиры недоступны."
     # Открытие окна - всегда новым сообщением внизу: иначе правилось бы
     # окно из прошлого боя, давно уехавшее вверх, и нажатие казалось мёртвым.
-    editable_message.clear("pvp_combat_item", peer_id)
+    page = page_of(message)
+    if page is None:
+        editable_message.clear("pvp_combat_item", peer_id)
     await editable_message.send_or_edit(
-        _bot_api, "pvp_combat_item", peer_id, text, pvp_items_keyboard(visible)
+        _bot_api, "pvp_combat_item", peer_id, text, pvp_items_keyboard(visible, page or 0)
     )
 
 
@@ -1231,7 +1235,7 @@ async def pvp_use_item(message: Message) -> None:
     if consumable_limit.left(combatant) <= 0:
         await message.answer(consumable_limit.EXHAUSTED_TEXT, keyboard=battle_kb)
         return
-    if elixir.category == "combat" and combatant.combat_elixirs_used >= ec.ELIXIR_PER_BATTLE_LIMIT:
+    if elixir.category != "heal" and combatant.combat_elixirs_used >= ec.ELIXIR_PER_BATTLE_LIMIT:
         await message.answer("Больше твоё тело не выдержит за один бой.", keyboard=battle_kb)
         return
 
@@ -1265,8 +1269,10 @@ async def pvp_use_item(message: Message) -> None:
         return
 
     # Боевой эликсир — бесплатное действие: эффект сразу, ход не тратится.
-    line = elixir_effects.apply_combat_elixir(combatant, elixir_id)
+    line = elixir_effects.apply_combat_elixir(combatant, elixir_id, _live_state(battle_id, battle))
     combatant.combat_elixirs_used += 1
+    if elixir.category == "scroll":
+        await _tell_others(battle, cid, f"{participant.name}: {line}")
     text = f"{line} Твой ход.\n\n{_battle_board_text(battle_id, battle, [])}"
     await _bot_api.messages.send(
         peer_id=peer_id, message=text, random_id=0,
@@ -1653,3 +1659,15 @@ async def on_mass_battle_finished(session_id: int, result: TickResult) -> None:
                 message="☠ Тебя одолели в бою. Ты уходишь во тьму.",
                 random_id=0, keyboard=kb.waiting_keyboard(),
             )
+
+
+async def _tell_others(battle, cid: int, text: str) -> None:
+    """Свиток действует на всю сторону (или на всех врагов) - видеть это
+    должны все в бою, а не только прочитавший."""
+    for other_id, other in battle.participants.items():
+        if other_id == cid:
+            continue
+        try:
+            await _bot_api.messages.send(peer_id=other.peer_id, message=text, random_id=0)
+        except Exception:
+            pass  # игрок закрыл диалог с ботом - свиток всё равно сработал

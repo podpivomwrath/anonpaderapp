@@ -1,0 +1,82 @@
+[
+  {
+    "id": "dusty",
+    "emoji": "⚪",
+    "name": "Бурое железо",
+    "chance": 0.4,
+    "options": [
+      [
+        {
+          "type": "ore",
+          "ore_id": "brown_iron",
+          "min": 1,
+          "max": 3
+        }
+      ]
+    ]
+  },
+  {
+    "id": "dim",
+    "emoji": "🔵",
+    "name": "Соляной кварц",
+    "chance": 0.28,
+    "options": [
+      [
+        {
+          "type": "ore",
+          "ore_id": "salt_quartz",
+          "min": 1,
+          "max": 3
+        }
+      ]
+    ]
+  },
+  {
+    "id": "crimson",
+    "emoji": "🟣",
+    "name": "Скверный колчедан",
+    "chance": 0.18,
+    "options": [
+      [
+        {
+          "type": "ore",
+          "ore_id": "taint_pyrite",
+          "min": 1,
+          "max": 3
+        }
+      ]
+    ]
+  },
+  {
+    "id": "searing",
+    "emoji": "🟠",
+    "name": "Пепельное серебро",
+    "chance": 0.1,
+    "options": [
+      [
+        {
+          "type": "ore",
+          "ore_id": "ashen_silver",
+          "min": 1,
+          "max": 3
+        }
+      ]
+    ]
+  },
+  {
+    "id": "tear",
+    "emoji": "🔴",
+    "name": "Багряный сросток",
+    "chance": 0.04,
+    "options": [
+      [
+        {
+          "type": "ore",
+          "ore_id": "crimson_cluster",
+          "min": 1,
+          "max": 3
+        }
+      ]
+    ]
+  }
+]

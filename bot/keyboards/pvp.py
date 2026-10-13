@@ -77,22 +77,10 @@ def pvp_combat_keyboard(
     return kb.get_json()
 
 
-def pvp_items_keyboard(stock: list[tuple[ElixirDef, int]]) -> str:
-    """Список зелий/эликсиров в PvP-бою (патч 30) — payload {"type":
-    "pvp_use_item"}, НАМЕРЕННО отличный от PvE {"type":"use_item"}
-    (bot/keyboards/combat_items.py) по той же причине, что и BTN_PVP_ATTACK."""
-    kb = Keyboard(inline=True)
-    for idx, (elixir, count) in enumerate(stock):
-        label = f"{elixir.emoji} {elixir.name} ×{count}"
-        kb.add(
-            Text(label, payload={"type": "pvp_use_item", "id": elixir.id}),
-            color=KeyboardButtonColor.SECONDARY,
-        )
-        if idx % 2 == 1:
-            kb.row()
-    if len(stock) % 2 == 1:
-        kb.row()
-    return kb.get_json()
+def pvp_items_keyboard(stock: list[tuple[ElixirDef, int]], page: int = 0) -> str:
+    from bot.keyboards.combat_items import paged_items_keyboard
+
+    return paged_items_keyboard(stock, "pvp_use_item", "pvp_items_page", page)
 
 
 def pvp_target_keyboard(enemy_ids: list[int]) -> str:

@@ -6,11 +6,47 @@
 эта функция только накладывает эффект и возвращает строку для чата.
 """
 
-from game.combat.session import SECOND_HEART_TAG, CombatantState, EffectKind
+from game.combat.session import SCROLL_WARD_TAG, SECOND_HEART_TAG, CombatantState, EffectKind
 from game.economy import elixir_config as ec
 
 
-def apply_combat_elixir(actor: CombatantState, elixir_id: str) -> str:
+def _apply_scroll(actor: CombatantState, elixir_id: str, combatants) -> str:
+    """Свитки (2026-10-13): на всю сторону бойца или на всех врагов. Без
+    списка бойцов (вызов из старого кода) - только на себя."""
+    everyone = list((combatants or {actor.id: actor}).values())
+    allies = [c for c in everyone if c.alive and c.side == actor.side]
+    enemies = [c for c in everyone if c.alive and c.side != actor.side]
+    if elixir_id == "scroll_healing":
+        healed = []
+        for c in allies:
+            before = c.current_hp
+            c.current_hp = min(c.max_hp, c.current_hp + round(c.max_hp * ec.SCROLL_HEAL_PCT))
+            if c.current_hp > before:
+                healed.append(f"{c.name} +{c.current_hp - before}")
+        tail = ", ".join(healed) if healed else "все и так целы"
+        return f"📜 Свиток лечения вспыхивает - раны затягиваются ({tail})."
+    if elixir_id == "scroll_ward":
+        for c in allies:
+            c.apply_effect(
+                EffectKind.SHIELD_POOL, float(round(c.max_hp * ec.SCROLL_WARD_PCT)),
+                ec.SCROLL_WARD_DURATION, actor.id, tag=SCROLL_WARD_TAG,
+            )
+        names = ", ".join(c.name for c in allies)
+        return f"📜 Свиток оберега укрывает щитом на {ec.SCROLL_WARD_DURATION} хода: {names}."
+    if elixir_id == "scroll_vulnerability":
+        for c in enemies:
+            c.apply_effect(
+                EffectKind.VULNERABILITY, ec.SCROLL_VULNERABILITY, ec.SCROLL_VULNERABILITY_DURATION, actor.id,
+            )
+        pct = round(ec.SCROLL_VULNERABILITY * 100)
+        return f"📜 Свиток уязвимости: {ec.SCROLL_VULNERABILITY_DURATION} хода враги получают на {pct}% больше урона."
+    return "Свиток рассыпается пеплом."
+
+
+def apply_combat_elixir(actor: CombatantState, elixir_id: str, combatants=None) -> str:
+    """combatants - все бойцы боя (id -> боец): нужны свиткам."""
+    if elixir_id.startswith("scroll_"):
+        return _apply_scroll(actor, elixir_id, combatants)
     if elixir_id == "ashen_fever":
         actor.apply_effect(
             EffectKind.ASHEN_FEVER, ec.ASHEN_FEVER_DAMAGE_BONUS_STEP,

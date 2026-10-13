@@ -38,8 +38,9 @@ def attack(target_id: int) -> DeclaredAction:
 
 def test_elixir_content_loads_ten_entries_matching_prices() -> None:
     defs = load_elixirs()
-    assert len(defs) == 10
-    assert set(defs) == set(ec.ELIXIR_PRICES)
+    sold = {eid for eid, d in defs.items() if d.category != "scroll"}
+    assert len(sold) == 10
+    assert sold == set(ec.ELIXIR_PRICES)  # свитков в лавке нет - и цены у них нет
     heal_ids = {eid for eid, d in defs.items() if d.category == "heal"}
     assert heal_ids == {"heal_small", "heal_medium", "heal_large"}
 

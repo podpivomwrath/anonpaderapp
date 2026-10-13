@@ -1,0 +1,146 @@
+[
+  {
+    "id": "dusty",
+    "emoji": "⚪",
+    "name": "Пыльный",
+    "chance": 0.45,
+    "options": [
+      [
+        {
+          "type": "elixir",
+          "elixir_id": "heal_small",
+          "min": 1,
+          "max": 3
+        }
+      ],
+      [
+        {
+          "type": "elixir",
+          "elixir_id": "heal_medium",
+          "min": 1,
+          "max": 3
+        }
+      ]
+    ]
+  },
+  {
+    "id": "dim",
+    "emoji": "🔵",
+    "name": "Тусклый",
+    "chance": 0.28,
+    "options": [
+      [
+        {
+          "type": "elixir",
+          "elixir_id": "heal_large",
+          "min": 1,
+          "max": 3
+        }
+      ],
+      [
+        {
+          "type": "elixir",
+          "elixir_id": "ashen_fever",
+          "min": 1,
+          "max": 3
+        }
+      ],
+      [
+        {
+          "type": "elixir",
+          "elixir_id": "blood_clarity",
+          "min": 1,
+          "max": 3
+        }
+      ]
+    ]
+  },
+  {
+    "id": "crimson",
+    "emoji": "🟣",
+    "name": "Багровый",
+    "chance": 0.17,
+    "options": [
+      [
+        {
+          "type": "elixir",
+          "elixir_id": "blood_for_blood",
+          "min": 1,
+          "max": 3
+        }
+      ],
+      [
+        {
+          "type": "elixir",
+          "elixir_id": "ashen_haze",
+          "min": 1,
+          "max": 3
+        }
+      ],
+      [
+        {
+          "type": "elixir",
+          "elixir_id": "shard_blood",
+          "min": 1,
+          "max": 3
+        }
+      ]
+    ]
+  },
+  {
+    "id": "searing",
+    "emoji": "🟠",
+    "name": "Раскалённый",
+    "chance": 0.08,
+    "options": [
+      [
+        {
+          "type": "elixir",
+          "elixir_id": "last_breath",
+          "min": 1,
+          "max": 3
+        }
+      ],
+      [
+        {
+          "type": "elixir",
+          "elixir_id": "second_heart",
+          "min": 1,
+          "max": 3
+        }
+      ]
+    ]
+  },
+  {
+    "id": "tear",
+    "emoji": "🟡",
+    "name": "Свиток",
+    "chance": 0.02,
+    "options": [
+      [
+        {
+          "type": "elixir",
+          "elixir_id": "scroll_healing",
+          "min": 1,
+          "max": 1
+        }
+      ],
+      [
+        {
+          "type": "elixir",
+          "elixir_id": "scroll_ward",
+          "min": 1,
+          "max": 1
+        }
+      ],
+      [
+        {
+          "type": "elixir",
+          "elixir_id": "scroll_vulnerability",
+          "min": 1,
+          "max": 1
+        }
+      ]
+    ]
+  }
+]

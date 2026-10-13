@@ -187,6 +187,8 @@ def elixirs() -> None:
         "содержимым, пробкой и цветом.",
     )
     for row in load("items/elixirs.json"):
+        if row["category"] == "scroll":
+            continue  # свитки - промты руками, tools/blood_rift_loot_prompts.md
         entry(
             f"{row['emoji']} {row['name']}",
             prompt(

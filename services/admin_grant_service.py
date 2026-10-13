@@ -133,6 +133,8 @@ def catalog() -> list[dict]:
         {"id": "crafted", "title": "⚒ Кованое оружие", "entries": crafted},
         {"id": "rarities", "title": "🗃️ Редкости", "entries": [
             _entry("chest", f"🗃️ {lootbox_service.CHEST_NAME}"),
+            _entry("chest:ore", f"⛏ {lootbox_service.CHEST_KINDS['ore'].name}"),
+            _entry("chest:supply", f"🧪 {lootbox_service.CHEST_KINDS['supply'].name}"),
         ]},
         {"id": "relics", "title": "💀 Реликвии", "entries": [
             _entry(f"trophy:{t.id}", f"{t.emoji} {t.name}") for t in trophy_service.trophy_defs_ordered()
@@ -235,8 +237,11 @@ async def grant(
                 craft_base_stats=base, bound=True,
             ))
     elif kind == "chest":
+        chest_kind = rest[0] if rest else lootbox_service.ASHEN
         for _ in range(amount):
-            db.add(CharacterLootbox(character_id=character.id, status="closed", streak=character.daily_streak))
+            db.add(CharacterLootbox(
+                character_id=character.id, status="closed", streak=character.daily_streak, kind=chest_kind,
+            ))
     elif kind == "trophy":
         await trophy_service.grant_specific(db, character.id, rest[0], amount)
     elif kind == "elixir":

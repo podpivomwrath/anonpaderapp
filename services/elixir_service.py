@@ -28,6 +28,11 @@ def elixir_defs_ordered() -> list[ElixirDef]:
     return list(_defs().values())
 
 
+def shop_elixirs() -> list[ElixirDef]:
+    """Что продаёт лавка: всё, кроме свитков - те только из ларца разлома."""
+    return [e for e in _defs().values() if e.category != "scroll"]
+
+
 def elixir_def(elixir_id: str) -> ElixirDef | None:
     return _defs().get(elixir_id)
 

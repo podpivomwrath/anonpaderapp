@@ -23,29 +23,54 @@ from bot import raid_key_texts
 from game.content_loader import LootboxGradeDef, LootboxRewardPart, load_lootbox_grades
 from game.economy import dailies_config as dc
 from game.economy import lootbox_config as lc
+from game.economy import mining
 from models import Character, CharacterLootbox
-from services import elixir_service, raid_key_service, trophy_service, wallet_service
+from services import elixir_service, mining_service, raid_key_service, trophy_service, wallet_service
 
-_grades: list[LootboxGradeDef] | None = None
-
-
-def _load() -> list[LootboxGradeDef]:
-    global _grades
-    if _grades is None:
-        _grades = load_lootbox_grades()
-    return _grades
+ASHEN, ORE, SUPPLY = "ashen", "ore", "supply"
 
 
-def grade_catalog() -> list[LootboxGradeDef]:
+@dataclass(frozen=True)
+class ChestKind:
+    file: str
+    name: str
+    icon: str
+    description: str
+
+
+#: Виды ларцов (2026-10-13: ларцы кровавого разлома). Градации у каждого
+#: свои - content/lootbox/<file>.json; ids градаций общие (dusty..tear),
+#: от них цвет карточек рулетки.
+CHEST_KINDS: dict[str, ChestKind] = {
+    ASHEN: ChestKind("ashen_chest", "Пепельный ларец", "chest:dusty",
+                     "Ларец за день серии ежедневок. Что внутри - решает рулетка при открытии."),
+    ORE: ChestKind("ore_chest", "Ларец руды", "chest:ore",
+                   "Добыча кровавого разлома: 1-3 руды, чем реже карточка - тем ценнее руда."),
+    SUPPLY: ChestKind("supply_chest", "Ларец расходников", "chest:supply",
+                      "Добыча кровавого разлома: 1-3 зелья, а с самой редкой карточки - свиток, "
+                      "которого больше нигде не достать."),
+}
+
+_grades: dict[str, list[LootboxGradeDef]] = {}
+
+
+def _load(kind: str = ASHEN) -> list[LootboxGradeDef]:
+    if kind not in _grades:
+        _grades[kind] = load_lootbox_grades(name=CHEST_KINDS[kind].file)
+    return _grades[kind]
+
+
+def grade_catalog(kind: str = ASHEN) -> list[LootboxGradeDef]:
     """Все градации в порядке содержимого файла (для мини-аппа: подписи к
     счётчику "по градациям за всё время")."""
-    return _load()
+    return _load(kind)
 
 
-def _chances(daily_streak: int) -> dict[str, float]:
-    grades = _load()
+def _chances(daily_streak: int, kind: str = ASHEN) -> dict[str, float]:
+    grades = _load(kind)
     chances = {g.id: g.chance for g in grades}
-    if not lc.STREAK_CHANCE_BOOST_ENABLED:
+    # Буст от стрика ежедневок - только у Пепельного: он и выдаётся за стрик.
+    if kind != ASHEN or not lc.STREAK_CHANCE_BOOST_ENABLED:
         return chances
     mult = lc.boost_multiplier(daily_streak)
     if mult == 1.0:
@@ -59,9 +84,9 @@ def _chances(daily_streak: int) -> dict[str, float]:
     return chances
 
 
-def roll_grade(rng: random.Random, daily_streak: int) -> LootboxGradeDef:
-    chances = _chances(daily_streak)
-    grades = _load()
+def roll_grade(rng: random.Random, daily_streak: int, kind: str = ASHEN) -> LootboxGradeDef:
+    chances = _chances(daily_streak, kind)
+    grades = _load(kind)
     total = sum(chances.values())
     roll = rng.uniform(0, total)
     cumulative = 0.0
@@ -98,6 +123,14 @@ async def _apply_part(db: AsyncSession, character: Character, part: LootboxRewar
             edef = elixir_service.elixir_def(elixir_id)
             names.append(f"{edef.emoji} {edef.name}" if edef is not None else elixir_id)
         return ", ".join(names)
+    if part.type == "ore":
+        # Качество - как у добытчика этого игрока в руднике того же тира.
+        amount = rng.randint(part.min, part.max)
+        ore = mining.ore_def(part.ore_id)
+        grade_id, grade_title = mining.roll_grade(rng, ore.tier if ore else 1, character.mining_level or 1)
+        await mining_service.add_ore(db, character.id, part.ore_id, grade_id, amount)
+        name = f"{ore.emoji} {ore.name}" if ore is not None else part.ore_id
+        return f"{name} ({grade_title}) ×{amount}"
     if part.type == "trophy":
         amount = rng.randint(part.min, part.max)
         await trophy_service.grant_specific(db, character.id, part.trophy_id, amount)
@@ -111,17 +144,20 @@ async def _apply_part(db: AsyncSession, character: Character, part: LootboxRewar
 class LootboxOpenResult:
     grade: LootboxGradeDef
     lines: list[str]
+    kind: str = ASHEN
+    option: list[LootboxRewardPart] | None = None
 
 
 async def _roll_and_apply(
-    db: AsyncSession, character: Character, daily_streak: int, rng: random.Random,
+    db: AsyncSession, character: Character, daily_streak: int, rng: random.Random, kind: str = ASHEN,
 ) -> LootboxOpenResult:
-    grade = roll_grade(rng, daily_streak)
+    grade = roll_grade(rng, daily_streak, kind)
     option = rng.choice(grade.options)
     lines = [await _apply_part(db, character, part, rng) for part in option]
-    if await raid_key_service.maybe_grant(db, character, rng):
+    # Ключ Монолита - шанс только Пепельного ларца.
+    if kind == ASHEN and await raid_key_service.maybe_grant(db, character, rng):
         lines.append(raid_key_texts.RAID_KEY_NAME)
-    return LootboxOpenResult(grade=grade, lines=lines)
+    return LootboxOpenResult(grade=grade, lines=lines, kind=kind, option=option)
 
 
 async def open_chest(
@@ -144,19 +180,22 @@ CHEST_NAME = "Пепельный ларец"
 CHEST_ICON = "chest:dusty"
 
 
-async def grant_chest(db: AsyncSession, character: Character, daily_streak: int) -> CharacterLootbox:
-    chest = CharacterLootbox(character_id=character.id, status="closed", streak=daily_streak)
+async def grant_chest(
+    db: AsyncSession, character: Character, daily_streak: int, kind: str = ASHEN,
+) -> CharacterLootbox:
+    chest = CharacterLootbox(character_id=character.id, status="closed", streak=daily_streak, kind=kind)
     db.add(chest)
     await db.flush()
     return chest
 
 
-async def closed_chests(db: AsyncSession, character_id: int) -> list[CharacterLootbox]:
-    return list((await db.scalars(
-        select(CharacterLootbox).where(
-            CharacterLootbox.character_id == character_id, CharacterLootbox.status == "closed",
-        ).order_by(CharacterLootbox.id)
-    )).all())
+async def closed_chests(db: AsyncSession, character_id: int, kind: str | None = None) -> list[CharacterLootbox]:
+    query = select(CharacterLootbox).where(
+        CharacterLootbox.character_id == character_id, CharacterLootbox.status == "closed",
+    )
+    if kind is not None:
+        query = query.where(CharacterLootbox.kind == kind)
+    return list((await db.scalars(query.order_by(CharacterLootbox.id))).all())
 
 
 class ChestGone(Exception):
@@ -164,14 +203,15 @@ class ChestGone(Exception):
 
 
 async def open_owned(
-    db: AsyncSession, character: Character, chest_id: int | None, rng: random.Random,
+    db: AsyncSession, character: Character, chest_id: int | None, rng: random.Random, kind: str = ASHEN,
 ) -> tuple[CharacterLootbox, LootboxOpenResult]:
-    """Открывает закрытый ларец персонажа (chest_id=None - самый старый).
+    """Открывает закрытый ларец персонажа (chest_id=None - самый старый
+    ларец вида kind).
 
     Сначала условный UPDATE closed -> opened: два нажатия «Открыть» не
     откроют один ларец дважды - второе не найдёт закрытого."""
     if chest_id is None:
-        chests = await closed_chests(db, character.id)
+        chests = await closed_chests(db, character.id, kind)
         if not chests:
             raise ChestGone()
         chest_id = chests[0].id
@@ -186,7 +226,9 @@ async def open_owned(
     if not claimed.rowcount:
         raise ChestGone()
     chest = await db.get(CharacterLootbox, chest_id)
-    result = await _roll_and_apply(db, character, chest.streak or character.daily_streak, rng)
+    result = await _roll_and_apply(
+        db, character, chest.streak or character.daily_streak, rng, chest.kind or ASHEN,
+    )
     chest.grade = result.grade.id
     chest.reward_summary = "; ".join(result.lines)[:256]
     await db.flush()
@@ -210,11 +252,27 @@ def _part_preview(part: LootboxRewardPart) -> str:
     if part.type == "trophy":
         tdef = trophy_service.trophy_def(part.trophy_id)
         return f"{tdef.name if tdef else part.trophy_id} ×{span}"
+    if part.type == "ore":
+        ore = mining.ore_def(part.ore_id)
+        return f"{ore.name if ore else part.ore_id} ×{span}"
     return part.type
 
 
-def _card(grade: LootboxGradeDef, label: str) -> dict:
-    return {"grade": grade.id, "grade_name": grade.name, "icon": f"chest:{grade.id}", "label": label}
+def _card_icon(grade: LootboxGradeDef, kind: str, option: list[LootboxRewardPart] | None) -> str:
+    """Карточка Пепельного - ларец своей градации; у ларцов разлома - сама
+    добыча: руда или зелье (у них по одной картинке ларца на вид)."""
+    first = option[0] if option else None
+    if kind != ASHEN and first is not None:
+        if first.type == "ore":
+            return f"ore:{first.ore_id}"
+        if first.type == "elixir":
+            return f"elixir:{first.elixir_id}"
+    return f"chest:{grade.id}"
+
+
+def _card(grade: LootboxGradeDef, label: str, kind: str = ASHEN,
+          option: list[LootboxRewardPart] | None = None) -> dict:
+    return {"grade": grade.id, "grade_name": grade.name, "icon": _card_icon(grade, kind, option), "label": label}
 
 
 ROULETTE_LENGTH = 44
@@ -222,6 +280,7 @@ ROULETTE_WIN_INDEX = 38
 
 
 def roulette_strip(result: LootboxOpenResult, daily_streak: int, rng: random.Random) -> tuple[list[dict], int]:
+    kind = result.kind
     """Лента карточек для рулетки и место выигрыша в ней.
 
     Карточки-обманки тянутся с теми же шансами, что настоящий ролл: чаще
@@ -230,10 +289,10 @@ def roulette_strip(result: LootboxOpenResult, daily_streak: int, rng: random.Ran
     решён сервером - рулетка его только показывает."""
     strip = []
     for _ in range(ROULETTE_LENGTH):
-        grade = roll_grade(rng, daily_streak)
+        grade = roll_grade(rng, daily_streak, kind)
         option = rng.choice(grade.options)
-        strip.append(_card(grade, ", ".join(_part_preview(p) for p in option)))
-    strip[ROULETTE_WIN_INDEX] = _card(result.grade, ", ".join(result.lines))
+        strip.append(_card(grade, ", ".join(_part_preview(p) for p in option), kind, option))
+    strip[ROULETTE_WIN_INDEX] = _card(result.grade, ", ".join(result.lines), kind, result.option)
     return strip, ROULETTE_WIN_INDEX
 
 
@@ -250,7 +309,8 @@ async def recent_history(db: AsyncSession, character_id: int, limit: int = 10) -
     rows = (
         await db.execute(
             select(CharacterLootbox)
-            .where(CharacterLootbox.character_id == character_id, CharacterLootbox.status == "opened")
+            .where(CharacterLootbox.character_id == character_id, CharacterLootbox.status == "opened",
+                   CharacterLootbox.kind == ASHEN)
             .order_by(CharacterLootbox.opened_at.desc())
             .limit(limit)
         )
@@ -273,7 +333,8 @@ async def grade_counts(db: AsyncSession, character_id: int) -> dict[str, int]:
     rows = (
         await db.execute(
             select(CharacterLootbox.grade, func.count())
-            .where(CharacterLootbox.character_id == character_id, CharacterLootbox.status == "opened")
+            .where(CharacterLootbox.character_id == character_id, CharacterLootbox.status == "opened",
+                   CharacterLootbox.kind == ASHEN)
             .group_by(CharacterLootbox.grade)
         )
     ).all()

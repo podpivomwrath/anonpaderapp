@@ -131,6 +131,12 @@ EXTRA_FILES = {
     "crown:fishing": "рамка_топ1_рыбалка_мастер_лески.png",
     "crown:fish_weight": "рамка_топ1_рекорд_рыбы_трофей.png",
     "crown:mining": "рамка_топ1_горное_дело_жила.png",
+    # Добыча кровавого разлома (tools/blood_rift_loot_prompts.md)
+    "chest:ore": "ларец_руды.png",
+    "chest:supply": "ларец_расходников.png",
+    "elixir:scroll_healing": "свиток_лечения.png",
+    "elixir:scroll_ward": "свиток_оберега.png",
+    "elixir:scroll_vulnerability": "свиток_уязвимости.png",
 }
 
 BG_OUT = ROOT / "miniapp" / "src" / "assets"

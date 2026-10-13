@@ -49,7 +49,7 @@ def _assert_within_reply_limits(kb_json: str) -> None:
 
 
 def test_shop_keyboard_full_catalog_stays_within_reply_limits_and_is_not_inline() -> None:
-    elixirs = list(load_elixirs().values())
+    elixirs = [e for e in load_elixirs().values() if e.category != "scroll"]  # свитков в лавке нет
     assert len(elixirs) == 10  # весь каталог патча 16 — уже под завязку
     kb_json = shop_keyboard(elixirs)
     assert json.loads(kb_json)["inline"] is False

@@ -222,7 +222,7 @@ class ElixirDef(BaseModel):
     id: str
     name: str
     emoji: str
-    category: str  # "heal" | "combat"
+    category: str  # "heal" | "combat" | "scroll" (свитки - только из ларца кровавого разлома)
     description: str = ""
 
 
@@ -659,6 +659,7 @@ class LootboxRewardPart(BaseModel):
     type: str
     trophy_id: str | None = None
     elixir_id: str | None = None
+    ore_id: str | None = None  # type=ore: ларец руды кровавого разлома
     min: int = 0
     max: int = 0
 
@@ -675,10 +676,12 @@ class LootboxGradeDef(BaseModel):
     options: list[list[LootboxRewardPart]]
 
 
-def load_lootbox_grades(content_dir: Path = CONTENT_DIR) -> list[LootboxGradeDef]:
+def load_lootbox_grades(content_dir: Path = CONTENT_DIR, name: str = "ashen_chest") -> list[LootboxGradeDef]:
+    """name - файл градаций: ashen_chest (Пепельный), ore_chest и
+    supply_chest (ларцы кровавого разлома)."""
     return [
         LootboxGradeDef(**raw)
-        for raw in _load_json(content_dir / "lootbox" / "ashen_chest.json")
+        for raw in _load_json(content_dir / "lootbox" / f"{name}.json")
     ]
 
 

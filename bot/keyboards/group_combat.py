@@ -58,20 +58,10 @@ def group_target_keyboard(mob_ids: list[int]) -> str:
     return kb.get_json()
 
 
-def group_items_keyboard(stock: list) -> str:
-    """Список зелий/эликсиров в групповом PvE-бою — payload {"type":
-    "group_pve_use_item"}, НАМЕРЕННО отличный и от соло-PvE ({"type":"use_item"}),
-    и от PvP ({"type":"pvp_use_item"}) по той же причине, что и BTN_GROUP_ATTACK."""
-    kb = Keyboard(inline=True)
-    for idx, (elixir, count) in enumerate(stock):
-        label = f"{elixir.emoji} {elixir.name} ×{count}"
-        kb.add(
-            Text(label, payload={"type": "group_pve_use_item", "id": elixir.id}),
-            color=KeyboardButtonColor.SECONDARY,
-        )
-        if idx % 2 == 1:
-            kb.row()
-    return kb.get_json()
+def group_items_keyboard(stock: list, page: int = 0) -> str:
+    from bot.keyboards.combat_items import paged_items_keyboard
+
+    return paged_items_keyboard(stock, "group_pve_use_item", "group_pve_items_page", page)
 
 
 def group_waiting_keyboard() -> str:

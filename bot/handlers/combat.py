@@ -12,7 +12,7 @@ from vkbottle.bot import BotLabeler, Message
 
 from bot import ash_handful_state, dailies_texts, editable_message, group_texts, raid_key_texts
 from bot.handlers import stats_window
-from bot.keyboards.combat_items import combat_items_keyboard
+from bot.keyboards.combat_items import combat_items_keyboard, page_of
 from bot.keyboards.items import item_choice_keyboard, no_keyboard
 from bot.keyboards.world import (
     ASH_OFFER_TEXT,
@@ -779,6 +779,7 @@ async def use_skill(message: Message) -> None:
         pass
 
 
+@labeler.message(payload_contains={"type": "combat_items_page"})
 @labeler.message(text=[BTN_ITEM])
 async def use_item(message: Message) -> None:
     """Патч 16: список зелий/эликсиров с количеством. Под контролем — кнопка
@@ -810,13 +811,15 @@ async def use_item(message: Message) -> None:
     if consumable_limit.left(player) <= 0:
         visible = []
     text = consumable_limit.items_header(player)
-    if limit_reached and any(d.category == "combat" for d, _ in stock):
+    if limit_reached and any(d.category != "heal" for d, _ in stock):
         text += "\n\nБольше твоё тело не выдержит за один бой - боевые эликсиры недоступны."
     # Открытие окна - всегда новым сообщением внизу: иначе правилось бы
     # окно из прошлого боя, давно уехавшее вверх, и нажатие казалось мёртвым.
-    editable_message.clear("combat_item", peer_id)
+    page = page_of(message)
+    if page is None:
+        editable_message.clear("combat_item", peer_id)
     await editable_message.send_or_edit(
-        _bot_api, "combat_item", peer_id, text, combat_items_keyboard(visible)
+        _bot_api, "combat_item", peer_id, text, combat_items_keyboard(visible, page or 0)
     )
 
 
@@ -841,7 +844,7 @@ async def use_combat_item(message: Message) -> None:
     if consumable_limit.left(player) <= 0:
         await message.answer(consumable_limit.EXHAUSTED_TEXT, keyboard=_combat_kb(state, peer_id))
         return
-    if elixir.category == "combat" and player.combat_elixirs_used >= ec.ELIXIR_PER_BATTLE_LIMIT:
+    if elixir.category != "heal" and player.combat_elixirs_used >= ec.ELIXIR_PER_BATTLE_LIMIT:
         await message.answer("Больше твоё тело не выдержит за один бой.", keyboard=_combat_kb(state, peer_id))
         return
 
@@ -876,7 +879,7 @@ async def use_combat_item(message: Message) -> None:
     # Патч 30, баг 2, исправление 2: явно указываем, что ход ещё не сделан —
     # иначе игрок может решить, что бой завис (клавиатура-то есть, но неясно,
     # ждётся ли от него ещё действие).
-    line = elixir_effects.apply_combat_elixir(player, elixir_id)
+    line = elixir_effects.apply_combat_elixir(player, elixir_id, state.combatants)
     player.combat_elixirs_used += 1
     await _bot_api.messages.send(
         peer_id=peer_id, message=f"{line} Твой ход.\n\n{_render(state)}", random_id=0,
