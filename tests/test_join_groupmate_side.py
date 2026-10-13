@@ -29,3 +29,20 @@ async def test_groupmate_side(monkeypatch) -> None:
 
     monkeypatch.setattr(group_service, "get_group_snapshot", alone)
     assert await pvp._groupmate_side(None, me, _battle({2: 1})) is None
+
+
+async def test_no_attacking_a_groupmate(db_session, make_character) -> None:
+    from services import group_service
+    from models import Group, GroupMember
+
+    a = await make_character(level=20)
+    b = await make_character(level=20)
+    c = await make_character(level=20)
+    group = Group(leader_character_id=a.id)
+    db_session.add(group)
+    await db_session.flush()
+    db_session.add_all([GroupMember(group_id=group.id, character_id=a.id), GroupMember(group_id=group.id, character_id=b.id)])
+    await db_session.flush()
+    assert await pvp._same_group(db_session, a, b.id)
+    assert not await pvp._same_group(db_session, a, c.id)
+    assert await group_service.get_membership(db_session, c.id) is None

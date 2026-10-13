@@ -430,6 +430,18 @@ async def _resolve_target(db, character: Character, target: str):
     return None, None
 
 
+GROUPMATE_NO_PVP_TEXT = "Это твой согруппник - на своих не нападают."
+
+
+async def _same_group(db, character, other_id: int) -> bool:
+    """Нападать на согруппника нельзя (2026-10-13, решение владельца)."""
+    from services import group_service
+
+    mine = await group_service.get_membership(db, character.id)
+    theirs = await group_service.get_membership(db, other_id)
+    return mine is not None and theirs is not None and mine.group_id == theirs.group_id
+
+
 async def _groupmate_side(db, character, battle: Battle) -> int | None:
     """Сторона (1/2), на которой бьются согруппники персонажа. None - их в
     бою нет или они на обеих сторонах."""
@@ -565,6 +577,10 @@ async def attack_command(message: Message, target: str) -> None:
                 await message.answer(AFK_TARGET_TEXT)
             else:
                 await message.answer("Здесь нет такой цели.")
+            return
+
+        if victim is not None and await _same_group(db, character, victim.id):
+            await message.answer(GROUPMATE_NO_PVP_TEXT)
             return
 
         if battle_entry is not None:
@@ -743,6 +759,10 @@ async def _handle_join_choice(message: Message, battle_id, side) -> None:
         if (character.pos_x, character.pos_y) != battle.location:
             await message.answer("Ты уже не на той клетке.")
             return
+        # Против согруппника не вступают: его сторона - и твоя.
+        mate_side = await _groupmate_side(db, character, battle)
+        if mate_side is not None and battle.side_guilds is None:
+            side = mate_side
         if battle.side_guilds is not None:
             if character.guild_id not in battle.side_guilds:
                 await message.answer("Это осада - чужим в ней места нет.")
