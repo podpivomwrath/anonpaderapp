@@ -430,6 +430,19 @@ async def _resolve_target(db, character: Character, target: str):
     return None, None
 
 
+async def _groupmate_side(db, character, battle: Battle) -> int | None:
+    """Сторона (1/2), на которой бьются согруппники персонажа. None - их в
+    бою нет или они на обеих сторонах."""
+    from services import group_service
+
+    group = await group_service.get_group_snapshot(db, character.id)
+    if group is None:
+        return None
+    mates = {m.id for m in group.members if m.id != character.id}
+    sides = {battle.side_of.get(cid, 0) for cid in battle.participants if cid in mates}
+    return next(iter(sides)) + 1 if len(sides) == 1 else None
+
+
 def _battle_roster_text(battle_id: int, battle: Battle) -> str:
     combatants = _live_state(battle_id, battle)
     by_side: dict[int, list[str]] = {0: [], 1: []}
@@ -556,6 +569,13 @@ async def attack_command(message: Message, target: str) -> None:
 
         if battle_entry is not None:
             battle_id, battle = battle_entry
+            # Согруппник уже в бою - сразу на его сторону, без вопроса
+            # (2026-10-13). Согруппники на обеих сторонах - спрашиваем.
+            side = await _groupmate_side(db, character, battle)
+            if side is not None:
+                await db.commit()  # своя сессия у вступления ждала бы эту строку
+                await _handle_join_choice(message, battle_id, side)
+                return
             _pending_join_prompt[peer_id] = battle_id
             await message.answer(
                 f"{_battle_roster_text(battle_id, battle)}\n\nК кому присоединиться? Напиши 1 или 2.",
