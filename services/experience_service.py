@@ -64,6 +64,7 @@ class LevelUp:
 
 def add_experience(
     character: Character, stats: CharacterStats, amount: int, apply_premium: bool = True,
+    game_gain: bool = True,
 ) -> LevelUp:
     """Начисляет опыт в текущий уровень, обрабатывает левелап(ы) в цикле.
 
@@ -88,6 +89,11 @@ def add_experience(
         # записывали и тут же обнуляли, а игроку показывали «+105 опыта».
         # Ноль в xp_awarded - сигнал текстам не печатать строку опыта.
         return LevelUp(levels_gained=0, new_level=character.level)
+    if game_gain and amount > 0:
+        # Облегчение прогрессии (2026-10-13, решение владельца): требования к
+        # уровню прежние, весь игровой опыт x1.25 - уровни ~на 20% быстрее.
+        # Ручная выдача (админ, промокод) - ровно то число, что задано.
+        amount = round(amount * bc.XP_GAIN_MULT)
     premium_applied = apply_premium and amount > 0 and premium_service.is_premium(character)
     if premium_applied:
         amount = round(amount * pc.PREMIUM_XP_MULTIPLIER)

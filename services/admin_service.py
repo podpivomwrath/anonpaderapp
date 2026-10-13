@@ -475,7 +475,7 @@ async def grant_xp(db: AsyncSession, admin_vk_id: int, character: Character, amo
     before = {"level": character.level, "experience": character.experience}
     # apply_premium=False (патч 50): админ явно задаёт число — премиум-
     # множитель здесь неуместен, в отличие от игровых источников опыта.
-    result = experience_service.add_experience(character, stats, amount, apply_premium=False)
+    result = experience_service.add_experience(character, stats, amount, apply_premium=False, game_gain=False)
     after = {"level": character.level, "experience": character.experience}
     await log_action(
         db, admin_vk_id, "grant_xp", character.id, old_value=before, new_value=after, note=f"amount={amount}"

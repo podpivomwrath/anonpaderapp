@@ -11,6 +11,15 @@ from game.combat.session import CombatantState, Stats, build_combatant
 from models import Base, Character, CharacterStats, User, Wallet
 
 
+@pytest.fixture(autouse=True)
+def _plain_xp_gain(monkeypatch):
+    """Тесты сверяют точные числа опыта, написанные до облегчения прогрессии
+    (XP_GAIN_MULT, 2026-10-13). Сам множитель проверяет tests/test_xp_gain.py."""
+    from game.combat import balance_config as bc
+
+    monkeypatch.setattr(bc, "XP_GAIN_MULT", 1.0)
+
+
 @pytest.fixture
 async def db_session():
     engine = create_async_engine("sqlite+aiosqlite://")

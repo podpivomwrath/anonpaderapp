@@ -44,6 +44,7 @@ class MobKillReward:
 
 async def reward_mob_kill(
     db: AsyncSession, alive_members: list[Character], mob_level: int, rng: random.Random, loot_mult: int,
+    xp_mobs: float | None = None,
 ) -> list[MobKillReward]:
     """Как group_combat_service.reward_mob_kill, но опыт умножен на
     loot_mult, а трофеи/предметы/ключ — loot_mult НЕЗАВИСИМЫХ бросков
@@ -54,7 +55,12 @@ async def reward_mob_kill(
     base_total = experience_service.xp_per_mob(mob_level) * loot_mult
     rewards: list[MobKillReward] = []
     for character in alive_members:
-        share = base_total * (character.level / total_levels)
+        if xp_mobs is not None:
+            # Разлом (2026-10-13): опыт не делится - каждому как за xp_mobs
+            # обычных мобов уровня разлома.
+            share = experience_service.xp_per_mob(mob_level) * xp_mobs
+        else:
+            share = base_total * (character.level / total_levels)
         mult = experience_service.mob_xp_level_diff_multiplier(mob_level, character.level)
         xp_amount = round(share * mult)
         stats = await db.scalar(
