@@ -23,6 +23,10 @@ const UNIQUE_STAND_IN = {
 };
 
 function fallbackFor(icon) {
+  // Ларцы и свитки кровавого разлома (2026-10-13): пока своих картинок нет -
+  // Пепельный ларец и знак легендарной редкости, а не пустое место.
+  if (icon.startsWith('chest:')) return itemIcon('chest:dusty');
+  if (icon.startsWith('elixir:scroll_')) return itemIcon('rarity:legendary');
   if (!icon.startsWith('unique:') && !icon.startsWith('craft:')) return null;
   const source = icon.split(':')[1];
   const standIn = UNIQUE_STAND_IN[source];

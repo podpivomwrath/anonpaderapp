@@ -2,6 +2,7 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import bridge from '@vkontakte/vk-bridge';
 import { Button } from '@vkontakte/vkui';
 import ItemIcon from './ItemIcon.jsx';
+import { itemIcon } from '../itemIcons.js';
 
 /**
  * Рулетка Пепельного ларца (патч 106).
@@ -102,7 +103,8 @@ export default function ChestRoulette({ strip, winIndex, result, onClose }) {
   // Ларцы кровавого разлома (2026-10-13): своё имя и одна картинка ларца на
   // вид; у Пепельного - картинка своей градации.
   const title = result.title || 'Пепельный ларец';
-  const chestIcon = result.chest_icon || `chest:${grade}`;
+  // Своей картинки ларца ещё нет - Пепельный того же цвета градации.
+  const chestIcon = result.chest_icon && itemIcon(result.chest_icon) ? result.chest_icon : `chest:${grade}`;
 
   return (
     <>
