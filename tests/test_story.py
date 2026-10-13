@@ -3,7 +3,6 @@
 import pytest
 
 from game.content_loader import load_story_line
-from game.economy import story_config as sc
 from models import CharacterStats, CharacterStoryProgress
 from services import story_service
 
