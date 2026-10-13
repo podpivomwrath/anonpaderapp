@@ -77,6 +77,7 @@ from game.economy import fishing as game_fishing
 from game.economy import premium_config as pc
 from game.world import grid
 from models import Character, CharacterStats
+from services import pts_service
 from services import (
     admin_service,
     daily_service,
@@ -522,10 +523,16 @@ async def leaderboard_command(message: Message) -> None:
     for entry in entries:
         badge = pc.PREMIUM_BADGE + " " if entry.premium else ""
         name = f"{badge}{entry.name} «{entry.title}»" if entry.title else f"{badge}{entry.name}"
-        lines.append(f"{entry.rank}. {name} - {entry.wins} побед / {entry.losses} поражений")
+        lines.append(
+            f"{entry.rank}. {name} - {entry.pts} PTS · {pts_service.rank_name(entry.pts)}"
+            f" · {entry.wins} / {entry.losses}"
+        )
     if rank > len(entries):
         lines.append("-")
-        lines.append(f"Ты: {rank} место - {character.pvp_wins} / {character.pvp_losses}")
+        lines.append(
+            f"Ты: {rank} место - {character.pts} PTS · {pts_service.rank_name(character.pts)}"
+            f" · {character.pvp_wins} / {character.pvp_losses}"
+        )
     await message.answer("\n".join(lines))
 
 
@@ -1427,6 +1434,12 @@ async def _finish_duel(battle: Battle, winner_cid: int, loser_cid: int) -> None:
             return
         pvp_service.record_win(winner)
         pvp_service.record_loss(loser)
+        await pts_service.season_rollover(db)
+        await db.refresh(winner, ["pts", "pts_season"])
+        await db.refresh(loser, ["pts", "pts_season"])
+        pts_delta, pts_reason = pts_service.apply_duel(winner, loser)
+        winner_pts_line = pts_service.delta_line(pts_delta, winner, pts_reason)
+        loser_pts_line = pts_service.delta_line(-pts_delta, loser) if pts_delta else ""
         no_reward = pvp_service.no_reward_for_kill(winner.level, loser.level)
         moved = {} if no_reward else await trophy_service.transfer_all(db, loser.id, winner.id)
         # Патч 58: рыба из садка ПРОПАДАЕТ, а не переходит победителю.
@@ -1458,6 +1471,8 @@ async def _finish_duel(battle: Battle, winner_cid: int, loser_cid: int) -> None:
             win_text += f"\n\n{line}"
     if robbed:
         win_text += f"\n\n🐂 Ты грабишь повозку: {trade_service.lost_text(robbed)} - сбыто за {robbed_gold} золота."
+    if winner_pts_line:
+        win_text += f"\n\n{winner_pts_line}"
     daily_notice = dailies_texts.progress_notice(daily_progress)
     if daily_notice:
         win_text += f"\n\n{daily_notice}"
@@ -1468,6 +1483,8 @@ async def _finish_duel(battle: Battle, winner_cid: int, loser_cid: int) -> None:
     for c in daily_progress.completed:
         await stats_window.notify_levelup(winner_p.peer_id, c.levels_gained, c.new_level)
     lose_text = f"☠ Тебя побеждает {winner_p.name}. Ты уходишь во тьму."
+    if loser_pts_line:
+        lose_text += f"\n\n{loser_pts_line}"
     if robbed:
         lose_text += f"\n\n🐂 Повозку ограбили: {trade_service.lost_text(robbed)}. Остаток пригонят в родной город."
     if fish_lost:
@@ -1620,6 +1637,15 @@ async def on_mass_battle_finished(session_id: int, result: TickResult) -> None:
                 if cid in characters:
                     pvp_service.record_loss(characters[cid])
 
+        # PTS: каждая гибель - очки тем, кто бил жертву, по доле урона. Ничья -
+        # без PTS (2026-10-13).
+        pts_deltas: dict[int, int] = {}
+        if not result.draw:
+            await pts_service.season_rollover(db)
+            for character in characters.values():
+                await db.refresh(character, ["pts", "pts_season"])
+            pts_deltas = pts_service.apply_mass(characters, dead_ids, battle.damage_by_pair, battle.side_of)
+        pts_lines = {cid: pts_service.delta_line(d, characters[cid]) for cid, d in pts_deltas.items()}
         transfer_lines: dict[int, list[str]] = {}
         for victim_cid in dead_ids:
             victim = characters.get(victim_cid)
@@ -1679,6 +1705,8 @@ async def on_mass_battle_finished(session_id: int, result: TickResult) -> None:
             lines = transfer_lines.get(cid, [])
             if lines:
                 text += "\n\n" + "\n".join(lines)
+            if pts_lines.get(cid):
+                text += f"\n\n{pts_lines[cid]}"
             daily_progress = daily_progress_by_cid.get(cid)
             daily_notice = dailies_texts.progress_notice(daily_progress) if daily_progress else None
             if daily_notice:
@@ -1696,7 +1724,8 @@ async def on_mass_battle_finished(session_id: int, result: TickResult) -> None:
         elif cid in dead_ids:
             await _bot_api.messages.send(
                 peer_id=participant.peer_id,
-                message="☠ Тебя одолели в бою. Ты уходишь во тьму.",
+                message="☠ Тебя одолели в бою. Ты уходишь во тьму."
+                + (f"\n\n{pts_lines[cid]}" if pts_lines.get(cid) else ""),
                 random_id=0, keyboard=kb.waiting_keyboard(),
             )
 

@@ -452,38 +452,6 @@ async def handle_get_leaderboard(request: web.Request) -> web.Response:
         })
 
 
-async def handle_get_pvp_leaderboard(request: web.Request) -> web.Response:
-    """Патч 22: топ-10 по PvP-победам + место игрока, если он вне десятки.
-
-    Патч 58: мини-апп перешёл на общий /leaderboard. Этот эндпоинт оставлен
-    намеренно — у игроков могут быть закешированы старые сборки фронтенда,
-    и их экран не должен ломаться до обновления кеша.
-    """
-    vk_user_id = request[VK_USER_ID_KEY]
-    session_factory = request.app[SESSION_FACTORY_KEY]
-    async with session_factory() as session:
-        character = await _load_character(session, vk_user_id)
-        if character is None:
-            return web.json_response({"error": "character_not_found"}, status=404)
-        entries = await pvp_service.leaderboard(session, limit=10)
-        rank = await pvp_service.rank_of(session, character)
-        return web.json_response(
-            {
-                "top": [
-                    {
-                        "rank": e.rank, "name": e.name, "wins": e.wins, "losses": e.losses,
-                        "title": e.title, "premium": e.premium,
-                    }
-                    for e in entries
-                ],
-                "you": {
-                    "rank": rank, "wins": character.pvp_wins, "losses": character.pvp_losses,
-                    "premium": premium_service.is_premium(character),
-                },
-            }
-        )
-
-
 async def _story_payload(session: AsyncSession, character: Character) -> dict:
     """Патч 23: секция «Сюжет» вкладки «Задания» — текущий активный квест
     (первый региональный квест «убей 10» читается через quest_service, как в
@@ -1022,6 +990,5 @@ def register_routes(app: web.Application) -> None:
     app.router.add_post("/api/miniapp/presets", handle_post_presets)
     app.router.add_post("/api/miniapp/presets/switch", handle_post_preset_switch)
     app.router.add_post("/api/miniapp/presets/buy_slot", handle_post_preset_buy_slot)
-    app.router.add_get("/api/miniapp/pvp_leaderboard", handle_get_pvp_leaderboard)
     app.router.add_get("/api/miniapp/leaderboard", handle_get_leaderboard)
     app.router.add_get("/api/miniapp/dailies", handle_get_dailies)

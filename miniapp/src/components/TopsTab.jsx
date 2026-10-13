@@ -15,7 +15,7 @@ function money(value) {
 // готовой: клиент однажды уже пересказывал серверное правило своими словами и
 // соврал (правило пресетов, патч 57).
 const DEFAULT_BOARDS = [
-  { id: 'pvp', title: '⚔️ PvP' },
+  { id: 'pvp', title: '🏅 Рейтинг PvP' },
   { id: 'kills', title: '💀 Убийства' },
   { id: 'fishing', title: '🎣 Рыбалка' },
   { id: 'fish_weight', title: '🐟 Рекорды по рыбе' },
@@ -23,7 +23,7 @@ const DEFAULT_BOARDS = [
 ];
 
 const EMPTY_HINTS = {
-  pvp: 'Пока никто не побеждал в PvP.',
+  pvp: 'В этом сезоне ещё никто не дрался в PvP.',
   kills: 'Пока никто не убил ни одного моба.',
   fishing: 'Пока никто не поднял уровень рыбалки.',
   fish_weight: 'Пока никто ничего не поймал.',

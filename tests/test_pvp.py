@@ -194,11 +194,13 @@ async def test_record_win_loss_and_leaderboard_ordering(db_session, make_charact
     pvp_service.record_loss(b)
     await db_session.flush()
 
+    a.pts, b.pts = 1040, 1060
+    await db_session.flush()
+
     entries = await pvp_service.leaderboard(db_session, limit=10)
-    # a: 2W/1L, b: 2W/2L, c: 0W/0L — при равенстве побед меньше поражений выше
-    assert entries[0].name == a.name
-    assert entries[1].name == b.name
-    assert entries[-1].name == c.name
+    # 2026-10-13: топ - по PTS, и только те, кто дрался (c - нет)
+    assert [e.name for e in entries] == [b.name, a.name]
+    assert c.name not in [e.name for e in entries]
 
 
 async def test_rank_of(db_session, make_character) -> None:

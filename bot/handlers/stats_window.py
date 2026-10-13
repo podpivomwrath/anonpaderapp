@@ -114,6 +114,7 @@ async def open_or_update_window(peer_id: int, header: str) -> None:
             peer_id=peer_id,
             message=sas.render_readonly(
                 header, char_stats, character.pvp_wins, character.pvp_losses, daily_service.title_name(character),
+                pts=character.pts,
             ),
             random_id=0,
         )
@@ -180,6 +181,7 @@ async def stat_alloc_cancel(message: Message) -> None:
         _clear(peer_id)
         text = sas.render_readonly(
             header, char_stats, character.pvp_wins, character.pvp_losses, daily_service.title_name(character),
+                pts=character.pts,
         )
         await _send_or_edit(peer_id, text, no_keyboard())
         return
@@ -200,10 +202,10 @@ async def stat_alloc_done(message: Message) -> None:
                 return
             stats = await _get_stats(db, character.id)
             char_stats = sas.snapshot(stats)
-            pvp_wins, pvp_losses = character.pvp_wins, character.pvp_losses
+            pvp_wins, pvp_losses, pts = character.pvp_wins, character.pvp_losses, character.pts
             title = daily_service.title_name(character)
         _clear(peer_id)
-        text = sas.render_readonly(header, char_stats, pvp_wins, pvp_losses, title)
+        text = sas.render_readonly(header, char_stats, pvp_wins, pvp_losses, title, pts=pts)
         await _send_or_edit(peer_id, text, no_keyboard())
         return
 

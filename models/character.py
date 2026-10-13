@@ -50,6 +50,10 @@ class Character(Base):
     # PvP-статистика (патч 22) — победы/поражения в открытом PvP на карте
     pvp_wins: Mapped[int] = mapped_column(default=0)
     pvp_losses: Mapped[int] = mapped_column(default=0)
+    # Рейтинг PvP (2026-10-13): PTS и сезон-месяц, к которому они относятся
+    # (services/pts_service.py). Топ PvP - по PTS.
+    pts: Mapped[int] = mapped_column(default=1000, server_default="1000")
+    pts_season: Mapped[str | None] = mapped_column(String(7), nullable=True)
 
     # Стрики и ежедневный цикл (патч 23) — даты в московской зоне (см.
     # game.economy.dailies_config.DAILY_RESET_TZ), не UTC.
@@ -249,5 +253,6 @@ class CharacterBuffPreset(Base):
 Index("uq_characters_name_lower", func.lower(Character.name), unique=True)
 # Патч 22: быстрая выборка топа PvP (ORDER BY pvp_wins DESC)
 Index("ix_characters_pvp_wins", Character.pvp_wins.desc())
+Index("ix_characters_pts", Character.pts.desc())
 
 from models.user import User

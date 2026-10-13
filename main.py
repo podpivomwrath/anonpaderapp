@@ -75,6 +75,16 @@ async def run_polling(bot: Bot) -> None:
                 logger.exception("Ошибка обработки события {}", update.get("type"))
 
 
+async def _pts_season_job() -> None:
+    """Рейтинг PvP: в начале месяца - новый сезон (services/pts_service.py)."""
+    from services import pts_service
+    from services.db import get_session_factory
+
+    async with get_session_factory()() as db:
+        await pts_service.season_rollover(db)
+        await db.commit()
+
+
 async def run() -> None:
     settings = get_settings()
     logger.remove()
@@ -310,6 +320,11 @@ async def run() -> None:
     respawn_scheduler.add_job(
         guild_handlers.season_job, "cron", hour=0, minute=5, timezone="Europe/Moscow",
         id="guild_season", max_instances=1, coalesce=True,
+    )
+    # Рейтинг PvP: в начале месяца - новый сезон, PTS сжимаются к 1 000.
+    respawn_scheduler.add_job(
+        _pts_season_job, "cron", hour=0, minute=7, timezone="Europe/Moscow",
+        id="pts_season", max_instances=1, coalesce=True,
     )
 
     # Биржа: точка графика - курс на закрытие дня (снимки закрытых дней).

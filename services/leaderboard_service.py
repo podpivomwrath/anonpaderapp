@@ -32,7 +32,7 @@ BOARDS = (BOARD_PVP, BOARD_KILLS, BOARD_FISHING, BOARD_FISH_WEIGHT, BOARD_MINING
 COMBAT_BOARDS = (BOARD_PVP, BOARD_KILLS)
 
 BOARD_TITLES = {
-    BOARD_PVP: "⚔️ PvP",
+    BOARD_PVP: "🏅 Рейтинг PvP",
     BOARD_KILLS: "💀 Убийства",
     BOARD_FISHING: "🎣 Рыбалка",
     BOARD_FISH_WEIGHT: "🐟 Рекорды по рыбе",
@@ -43,7 +43,11 @@ BOARD_TITLES = {
 #: За что место в топе - для подсказки «?» в мини-аппе. Ровно то, что
 #: сортирует загрузчик доски ниже: правку сортировки править и здесь.
 BOARD_RULES = {
-    BOARD_PVP: "Побеждённые в PvP. При равных победах выше тот, у кого меньше поражений.",
+    BOARD_PVP: (
+        "Рейтинг PTS. Победа над равным - около 20, над сильным - больше, над слабым - меньше, "
+        "а за жертву на 5+ уровней ниже - ничего. Сезон - месяц: в начале сезона рейтинг "
+        "сжимается вполовину к 1 000."
+    ),
     BOARD_KILLS: "Убитые мобы за всё время.",
     BOARD_FISHING: "Уровень рыбалки (от 2-го). При равном уровне выше тот, кто взял его раньше.",
     BOARD_FISH_WEIGHT: "Самая тяжёлая рыба, пойманная игроком: по одной лучшей от каждого.",
@@ -132,16 +136,40 @@ async def _character_board(
 
 
 async def pvp_board(db: AsyncSession, limit: int = 10) -> list[BoardEntry]:
-    return await _character_board(
-        db, Character.pvp_wins,
-        lambda wins, losses: f"{wins} "
-                             f"{_plural(wins, 'победа', 'победы', 'побед')} · {losses} "
-                             f"{_plural(losses, 'поражение', 'поражения', 'поражений')}",
-        limit,
-        # У PvP меньшее число поражений — осмысленный признак, тут его и
-        # оставляем: одинаковые победы при разных поражениях это не ничья.
-        tiebreak=(Character.pvp_losses.asc(), Character.id.asc()),
-    )
+    """Топ PvP по рейтингу PTS (2026-10-13). В топе - только те, кто дрался:
+    у всех остальных стартовые 1 000, и десяток новичков - не топ."""
+    from services import pts_service
+
+    await pts_service.season_rollover(db)
+    now = datetime.now(timezone.utc)
+    rows = (
+        await db.execute(
+            select(
+                Character.name, Character.pts, Character.active_title_id, Character.premium_until,
+                Character.pvp_wins, Character.pvp_losses,
+                Character.id, Character.base_class, Character.subclass,
+            )
+            .where(
+                Character.creation_state.is_(None),
+                (Character.pvp_wins + Character.pvp_losses) > 0,
+            )
+            .order_by(Character.pts.desc(), Character.pvp_wins.desc(), Character.id.asc())
+            .limit(limit)
+        )
+    ).all()
+    return [
+        BoardEntry(
+            rank=i, name=name,
+            value=f"{pts} PTS · {pts_service.rank_name(pts)} · {wins} / {losses}",
+            title=title_service.name_of(title_id) if title_id else None,
+            title_tier=title_service.tier_of(title_id),
+            premium=_premium(premium_until, now),
+            character_id=character_id, base_class=base_class, subclass=subclass,
+        )
+        for i, (
+            name, pts, title_id, premium_until, wins, losses, character_id, base_class, subclass,
+        ) in enumerate(rows, start=1)
+    ]
 
 
 async def kills_board(db: AsyncSession, limit: int = 10) -> list[BoardEntry]:

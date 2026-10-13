@@ -101,20 +101,24 @@ class LeaderboardEntry:
     losses: int
     title: str | None = None
     premium: bool = False  # патч 50: Метка Хранителя — бейдж 💠 в топе
+    pts: int = 1000
 
 
 async def leaderboard(db: AsyncSession, limit: int = 10) -> list[LeaderboardEntry]:
-    """Топ-10 (или limit) по победам, при равенстве — по меньшему числу
-    поражений (патч 22, п.7). title (патч 23) — активный титул, если задан."""
+    """Топ-10 (или limit) по рейтингу PTS (2026-10-13; было - по победам).
+    Только те, кто дрался. title (патч 23) — активный титул, если задан."""
+    from services import pts_service
+
+    await pts_service.season_rollover(db)
     now = datetime.now(timezone.utc)
     rows = (
         await db.execute(
             select(
                 Character.name, Character.pvp_wins, Character.pvp_losses,
-                Character.active_title_id, Character.premium_until,
+                Character.active_title_id, Character.premium_until, Character.pts,
             )
-            .where(Character.creation_state.is_(None))
-            .order_by(Character.pvp_wins.desc(), Character.pvp_losses.asc())
+            .where(Character.creation_state.is_(None), (Character.pvp_wins + Character.pvp_losses) > 0)
+            .order_by(Character.pts.desc(), Character.pvp_wins.desc(), Character.id.asc())
             .limit(limit)
         )
     ).all()
@@ -122,9 +126,9 @@ async def leaderboard(db: AsyncSession, limit: int = 10) -> list[LeaderboardEntr
         LeaderboardEntry(
             rank=i, name=name, wins=wins, losses=losses,
             title=title_service.name_of(title_id) if title_id else None,
-            premium=premium_until is not None and premium_until > now,
+            premium=premium_until is not None and premium_until > now, pts=pts,
         )
-        for i, (name, wins, losses, title_id, premium_until) in enumerate(rows, start=1)
+        for i, (name, wins, losses, title_id, premium_until, pts) in enumerate(rows, start=1)
     ]
 
 
@@ -134,11 +138,9 @@ async def rank_of(db: AsyncSession, character: Character) -> int:
     better = await db.scalar(
         select(func.count()).select_from(Character).where(
             Character.creation_state.is_(None),
-            (Character.pvp_wins > character.pvp_wins)
-            | (
-                (Character.pvp_wins == character.pvp_wins)
-                & (Character.pvp_losses < character.pvp_losses)
-            ),
+            (Character.pvp_wins + Character.pvp_losses) > 0,
+            (Character.pts > character.pts)
+            | ((Character.pts == character.pts) & (Character.pvp_wins > character.pvp_wins)),
         )
     )
     return (better or 0) + 1
