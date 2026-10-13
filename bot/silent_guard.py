@@ -64,6 +64,10 @@ async def _check_later(peer_id: int, from_id: int, started: float) -> None:
 
     if active_battle_keyboard(peer_id) is not None:
         return
+    logger.info(
+        "Страховка кнопок: {} без ответа (начало {:.2f}, последний ответ {:.2f}, сейчас {:.2f})",
+        peer_id, started, _last_out.get(peer_id, 0.0), time.monotonic(),
+    )
     try:
         async with get_session_factory()() as db:
             character = await get_character(db, from_id)
