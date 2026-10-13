@@ -83,3 +83,12 @@ def test_supply_chest_scroll_only_on_the_rarest_card() -> None:
         assert has_scroll == (g.id == "tear"), g.id
     ore_grades = lootbox_service.grade_catalog(lootbox_service.ORE)
     assert all(p.max <= 3 for g in ore_grades for opt in g.options for p in opt)
+
+
+def test_flee_is_harder_from_stronger_mobs() -> None:
+    from bot.handlers.combat import flee_chance
+
+    assert flee_chance(20, 20) == 0.5
+    assert flee_chance(20, 10) == 0.5  # слабее - как раньше
+    assert abs(flee_chance(20, 25) - 0.35) < 1e-9
+    assert flee_chance(10, 40) == 0.10  # не ниже 10%

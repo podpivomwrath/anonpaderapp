@@ -107,6 +107,16 @@ PLAYER_ID = 1
 MOB_ID = 2
 
 FLEE_SUCCESS_CHANCE = 0.5
+# Побег от моба выше уровнем труднее (2026-10-13, решение владельца): за
+# каждый уровень разницы -3%, но не ниже 10%. Моб своего уровня и слабее -
+# прежние 50%.
+FLEE_PENALTY_PER_LEVEL = 0.03
+FLEE_MIN_CHANCE = 0.10
+
+
+def flee_chance(player_level: int, mob_level: int) -> float:
+    gap = max(0, mob_level - player_level)
+    return max(FLEE_MIN_CHANCE, FLEE_SUCCESS_CHANCE - FLEE_PENALTY_PER_LEVEL * gap)
 
 VICTORY_PHOTO_ID = "457239033"  # иллюстрация победы над мобом (альбом группы VK)
 
@@ -955,7 +965,10 @@ async def flee(message: Message) -> None:
 
         await world_boss_handlers.leave(peer_id)
         return
-    if _rng.random() < FLEE_SUCCESS_CHANCE:
+    state = _engine.sessions[peer_id]
+    player, mob = state.combatants.get(PLAYER_ID), state.combatants.get(MOB_ID)
+    chance = flee_chance(player.level, mob.level) if player and mob else FLEE_SUCCESS_CHANCE
+    if _rng.random() < chance:
         # сохраняем остаток HP игрока перед выходом из боя
         hp = _engine.sessions[peer_id].combatants[PLAYER_ID].current_hp
         _engine.abort_session(peer_id)
@@ -969,8 +982,9 @@ async def flee(message: Message) -> None:
         return
     # Патч 30, баг 2: бой продолжается — без клавиатуры игрок теряет кнопки
     # до того, как declare_action(SKIP) ниже вызовет резолв следующего хода.
+    stronger = " Оно сильнее тебя - от такого не уходят легко." if chance < FLEE_SUCCESS_CHANCE else ""
     await message.answer(
-        "🏃 Уйти не вышло - оно снова между тобой и спасением.",
+        f"🏃 Уйти не вышло - оно снова между тобой и спасением.{stronger}",
         keyboard=_combat_kb(_engine.sessions[peer_id], peer_id),
     )
     try:
