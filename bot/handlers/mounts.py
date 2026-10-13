@@ -17,6 +17,8 @@ from bot.battle_keyboard import in_any_battle
 
 import random
 import re
+
+from vkbottle.dispatch.rules.base import FuncRule
 from datetime import datetime, timezone
 
 from loguru import logger
@@ -67,7 +69,22 @@ _travel_message: dict[int, int] = {}
 # peer_id -> id поездки, ожидающей подтверждения "Продолжить путь"
 _pending_continue: dict[int, int] = {}
 
-_COORD_RE = re.compile(r"^\s*(-?\d+)\s*[:;]\s*(-?\d+)\s*$")
+_COORD_RE = re.compile(r"^\s*(-?\d+)\s*(?:[:;,]\s*|\s+)(-?\d+)\s*$")
+#: «12-20» - только когда оба числа без минуса: «-27-14» неоднозначно.
+_COORD_DASH_RE = re.compile(r"^\s*(\d+)\s*-\s*(\d+)\s*$")
+#: Похоже на координаты - цифры и разделители, без букв. Только такие
+#: сообщения перехватывает ожидание координат: раньше оно глотало всё подряд,
+#: и кнопки «Статы»/«Руда», промокоды и команды отвечали «Не понял
+#: координаты» (2026-10-13, переписка игроков).
+_COORD_LIKE_RE = re.compile(r"^[\s\d:;,\-]+$")
+
+
+def parse_coords(text: str) -> tuple[int, int] | None:
+    match = _COORD_RE.match(text or "") or _COORD_DASH_RE.match(text or "")
+    return (int(match.group(1)), int(match.group(2))) if match else None
+
+
+_looks_like_coords = FuncRule(lambda message: bool(_COORD_LIKE_RE.match(message.text or "")))
 
 
 class MountCoordState(BaseStateGroup):
@@ -148,7 +165,7 @@ async def open_mounts(message: Message) -> None:
     )
 
 
-@labeler.message(TEXT_ONLY, state=MountCoordState.COORD_INPUT)
+@labeler.message(TEXT_ONLY, _looks_like_coords, state=MountCoordState.COORD_INPUT)
 @activity_action
 async def coord_input(message: Message) -> None:
     peer_id = message.peer_id
@@ -156,11 +173,11 @@ async def coord_input(message: Message) -> None:
     if mount_id is None:
         await _dispenser.delete(peer_id)
         return
-    match = _COORD_RE.match(message.text or "")
-    if match is None:
-        await message.answer("Не понял координаты. Формат: X:Y (например 12:-20).")
+    coords = parse_coords(message.text)
+    if coords is None:
+        await message.answer("Не понял координаты. Формат: X:Y или X Y (например 12:-20).")
         return
-    to_x, to_y = int(match.group(1)), int(match.group(2))
+    to_x, to_y = coords
 
     async with get_session_factory()() as db:
         character = await onboarding_svc.get_character(db, message.from_id)

@@ -142,6 +142,27 @@ _pending_events: dict[int, str] = {}
 _pending_fish_offers: dict[int, float] = {}
 
 
+async def _pending_event_id(peer_id: int) -> str | None:
+    """Событие с выбором, ждущее ответа: из памяти, а после рестарта - из
+    Redis (bot/pending_activity.remember_event) вместе с ценой рыбака."""
+    if peer_id in _pending_events:
+        return _pending_events[peer_id]
+    saved = await pending_activity.recall_event(peer_id)
+    if saved is None:
+        return None
+    event_id, fish_multiplier = saved
+    _pending_events[peer_id] = event_id
+    if fish_multiplier is not None:
+        _pending_fish_offers[peer_id] = fish_multiplier
+    return event_id
+
+
+async def _drop_pending_event(peer_id: int) -> None:
+    _pending_events.pop(peer_id, None)
+    _pending_fish_offers.pop(peer_id, None)
+    await pending_activity.forget_event(peer_id)
+
+
 @dataclass
 class _FishOffer:
     multiplier: float
@@ -926,7 +947,7 @@ async def handle_explore_done(peer_id: int) -> None:
         return
 
     if outcome_kind == "scene":
-        _pending_events.pop(peer_id, None)
+        await _drop_pending_event(peer_id)
         await scene_event_handlers.start(peer_id, scene_event)
         return
     scene_event_handlers.cancel(peer_id)
@@ -977,6 +998,9 @@ async def handle_explore_done(peer_id: int) -> None:
         # которую сейчас увидит игрок, и по ней потом и продаём.
         _pending_fish_offers[peer_id] = fish_offer.multiplier
         body = body.format(gold=fish_offer.gold, weight=fish_offer.weight_label)
+    await pending_activity.remember_event(
+        peer_id, event.id, fish_offer.multiplier if fish_offer is not None else None,
+    )
     text = f"{event.title}" + chr(10) * 2 + body
     await _bot_api.messages.send(
         peer_id=peer_id, message=text, random_id=0,
@@ -991,7 +1015,7 @@ async def event_choice(message: Message) -> None:
     с _pending_events — устаревшее нажатие (после уже разрешённого события
     или повторный клик) молча игнорируется."""
     peer_id = message.peer_id
-    pending_event_id = _pending_events.get(peer_id)
+    pending_event_id = await _pending_event_id(peer_id)
     if pending_event_id is None:
         return
     payload = message.get_payload_json() or {}
@@ -1001,8 +1025,8 @@ async def event_choice(message: Message) -> None:
     choice_idx = payload.get("choice")
     if event is None or not isinstance(choice_idx, int) or not (0 <= choice_idx < len(event.choices)):
         return
-    _pending_events.pop(peer_id, None)
-    fish_multiplier = _pending_fish_offers.pop(peer_id, None)
+    fish_multiplier = _pending_fish_offers.get(peer_id)
+    await _drop_pending_event(peer_id)
 
     async with get_session_factory()() as db:
         character = await onboarding_svc.get_character(db, peer_id)
@@ -1092,10 +1116,10 @@ async def read_song(message: Message) -> None:
     """Патч 25, п.6: доп. выбор у Пепельного алтаря — только если Песнь
     собрана полностью и ещё не прочитана (устаревшее нажатие игнорируется)."""
     peer_id = message.peer_id
-    pending_event_id = _pending_events.get(peer_id)
+    pending_event_id = await _pending_event_id(peer_id)
     if pending_event_id != "ash_altar":
         return
-    _pending_events.pop(peer_id, None)
+    await _drop_pending_event(peer_id)
 
     async with get_session_factory()() as db:
         character = await onboarding_svc.get_character(db, peer_id)

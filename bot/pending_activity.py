@@ -86,6 +86,43 @@ async def forget_scene(peer_id: int) -> None:
     await _redis.delete(_scene_key(peer_id))
 
 
+# События исследования с выбором (осколок, шкатулка, алтарь, путник...):
+# какое событие ждёт ответа и, у «Рыбака у воды», по какой цене. Раньше жили
+# только в памяти: рестарт - и кнопки выбора молча не работали (2026-10-13,
+# игрок 74337389: событие в 06:49:43, рестарт в 06:49:55).
+EVENT_TTL_SECONDS = 3600
+
+
+def _event_key(peer_id: int) -> str:
+    return f"evt:{peer_id}"
+
+
+async def remember_event(peer_id: int, event_id: str, fish_multiplier: float | None) -> None:
+    if _redis is None:
+        return
+    mult = "" if fish_multiplier is None else f"{fish_multiplier:.6f}"
+    await _redis.set(_event_key(peer_id), f"{event_id}|{mult}", ex=EVENT_TTL_SECONDS)
+
+
+async def recall_event(peer_id: int) -> tuple[str, float | None] | None:
+    if _redis is None:
+        return None
+    # Забрать и удалить разом: два быстрых нажатия после рестарта не должны
+    # оба получить событие (иначе награда дважды). Дальше оно живёт в памяти.
+    raw = await _redis.getdel(_event_key(peer_id))
+    if raw is None:
+        return None
+    raw = raw.decode() if isinstance(raw, bytes) else raw
+    event_id, mult = raw.split("|", 1)
+    return event_id, (float(mult) if mult else None)
+
+
+async def forget_event(peer_id: int) -> None:
+    if _redis is None:
+        return
+    await _redis.delete(_event_key(peer_id))
+
+
 async def pending() -> list[tuple[str, int, float]]:
     """(вид, peer_id, сколько секунд осталось; 0 - уже пора)."""
     if _redis is None:
