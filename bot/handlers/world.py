@@ -718,11 +718,14 @@ async def explore(message: Message) -> None:
                 # группе не собиралась. Теперь каждый получает своё «ты
                 # осматриваешься» со своим обрывком, и тот идёт в его Песнь.
                 look_around: list[tuple[int, str]] = []
+                explore_dailies: list[tuple[int, object]] = []
                 for m in cohort:
                     member_character = await db.get(Character, m.id)
                     if member_character is None:
                         continue
                     await guild_territory_service.on_exploration(db, member_character)
+                    # Ежедневки «исследуй» - и в группе, каждому (2026-10-13).
+                    member_daily = await daily_service.record_exploration(db, member_character)
                     text = "🔍 Группа осматривается вокруг..."
                     member_peer = await onboarding_svc.vk_id_for_character(db, m.id)
                     # Несобранная горстка сгорает при новом исследовании - и в группе.
@@ -735,8 +738,11 @@ async def explore(message: Message) -> None:
                             await song_service.record_seen(db, member_character, fragment.song_index)
                     if member_peer is not None:
                         look_around.append((member_peer, text))
+                        explore_dailies.append((member_peer, member_daily))
                 # Сеть - только после фиксации (см. выше про idle in transaction).
                 await db.commit()
+                for member_peer, member_daily in explore_dailies:
+                    await _announce_daily(member_peer, member_daily)
                 for member_peer, text in look_around:
                     try:
                         await _bot_api.messages.send(

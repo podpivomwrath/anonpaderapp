@@ -34,6 +34,7 @@ from bot.keyboards.group_combat import (
 )
 from bot.keyboards.items import no_keyboard
 from bot.keyboards.world import ASH_OFFER_TEXT, ash_handful_keyboard, movement_keyboard
+from game.combat.battle_report import BattleReport
 from game.combat import balance_config as bc
 from game.combat import battle_log, display, elixir_effects
 from game.combat.resolver import TickResult
@@ -751,6 +752,11 @@ async def on_group_battle_finished(session_id: int, result: TickResult) -> None:
     survivor_ids = [cid for cid in battle.participants if cid in combatants and combatants[cid].alive]
     dead_ids = [cid for cid in battle.participants if cid in combatants and not combatants[cid].alive]
 
+    # Ежедневки на бои (2026-10-13: в группе не засчитывались вовсе). Отчёта
+    # о ходах по каждому участнику у группы нет - засчитываем победу с
+    # уровнем самого сильного моба и здоровьем на конец боя.
+    mob_level = max((c.level for c in combatants.values() if c.kind == "mob"), default=0)
+    battle_dailies: dict[int, object] = {}
     async with get_session_factory()() as db:
         has_mount_by_cid = {}
         positions = {}
@@ -762,6 +768,13 @@ async def on_group_battle_finished(session_id: int, result: TickResult) -> None:
             positions[cid] = (character.pos_x, character.pos_y)
             if cid in survivor_ids:
                 has_mount_by_cid[cid] = await mount_service.has_any_mount(db, cid)
+                me = combatants[cid]
+                report = BattleReport(
+                    won=True, mob_level=mob_level, max_hp=me.max_hp,
+                    hp_min_pct=me.current_hp / me.max_hp if me.max_hp else 1.0,
+                    only_skills=False, only_basic_attack=False,
+                )
+                battle_dailies[cid] = await daily_service.record_battle(db, character, report)
                 # HP после боя остаётся как есть, как в соло (2026-10-13):
                 # раньше группа шла в следующий бой с полным HP без отдыха.
                 # Кто хочет - отдыхает, кто нет - сразу жмёт готовность.
@@ -778,6 +791,13 @@ async def on_group_battle_finished(session_id: int, result: TickResult) -> None:
             pos = positions.get(cid, (0, 0))
             keyboard = movement_keyboard(*pos, p.peer_id, has_mount=has_mount_by_cid.get(cid, False))
             await _bot_api.messages.send(peer_id=p.peer_id, message="🏆 Группа побеждает!", random_id=0)
+            daily = battle_dailies.get(cid)
+            if daily is not None:
+                notice = dailies_texts.progress_notice(daily)
+                if notice:
+                    await _bot_api.messages.send(peer_id=p.peer_id, message=notice, random_id=0)
+                for c in daily.completed:
+                    await stats_window.notify_levelup(p.peer_id, c.levels_gained, c.new_level)
             # Сводка клетки, как после соло-победы (2026-10-13): раньше после
             # группового боя её не было вовсе - только строка о победе.
             await _send_location_summary(cid, p.peer_id, keyboard)
