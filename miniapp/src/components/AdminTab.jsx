@@ -7,6 +7,7 @@ import {
   getAdminOverview, searchAdminPlayers, getAdminPlayer, postAdminAction, getAdminJournal,
   getAdminPromoCodes, createAdminPromoCode, deleteAdminPromoCode, getAdminPromoCodeActivations,
   resetAdminActivities, getAdminMiningStats, refillAdminMining, getAdminCatalog,
+  getAdminBugReports, setAdminBugReportStatus,
 } from '../api.js';
 
 // Патч 27, ч.2: вкладка «Админ» - видна только если character.is_admin
@@ -14,16 +15,15 @@ import {
 // перепроверяет заново (403 при несовпадении vk_id) - эта вкладка не
 // является источником прав, только удобство отображения.
 //
-// Патч 31, п.4: раздел «Баги» убран из интерфейса - репорты приходят в ЛС
-// администратору от бота, этого достаточно. Таблица bug_reports и её API
-// (bot/miniapp_admin_api.py, api.js::getAdminBugReports/setAdminBugReportStatus)
-// не тронуты - данные продолжают сохраняться для истории.
+// Раздел «Баги» убирали в патче 31 (репорты и так приходят в ЛС), вернули
+// 2026-10-13: без него репорт нельзя было отметить разобранным.
 const SECTIONS = [
   { id: 'overview', label: 'Обзор' },
   { id: 'player', label: 'Игрок' },
   { id: 'journal', label: 'Журнал' },
   { id: 'mining', label: '⛏ Руда' },
   { id: 'promo', label: '🎟 Промокоды' },
+  { id: 'bugs', label: '🐞 Баги' },
 ];
 
 function StatRow({ label, value }) {
@@ -181,6 +181,91 @@ function MiningSection() {
           )}
         </Div>
       </Group>
+    </>
+  );
+}
+
+// Баг-репорты (вернулись 2026-10-13): репорты по-прежнему приходят в ЛС, а
+// здесь их разбирают - без статусов счётчик «не разобрано» в обзоре только рос.
+const BUG_FILTERS = [
+  { id: 'new', label: 'Новые' },
+  { id: 'in_progress', label: 'В работе' },
+  { id: 'closed', label: 'Разобраны' },
+];
+const BUG_ACTIONS = {
+  new: [['in_progress', 'В работу'], ['closed', '✅ Разобран']],
+  in_progress: [['closed', '✅ Разобран'], ['new', 'Вернуть в новые']],
+  closed: [['new', 'Открыть снова']],
+};
+
+function BugsSection() {
+  const [filter, setFilter] = useState('new');
+  const [reports, setReports] = useState(null);
+  const [busyId, setBusyId] = useState(null);
+  const [error, setError] = useState(null);
+
+  useEffect(() => {
+    setReports(null);
+    setError(null);
+    getAdminBugReports(filter)
+      .then((res) => setReports(res.reports))
+      .catch(() => setError('Не удалось загрузить репорты.'));
+  }, [filter]);
+
+  const move = async (id, status) => {
+    setBusyId(id);
+    try {
+      await setAdminBugReportStatus(id, status);
+      // Репорт ушёл в другой фильтр - из этого списка убираем.
+      setReports((list) => list.filter((r) => r.id !== id));
+    } catch {
+      setError('Не удалось сменить статус.');
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  return (
+    <>
+      <Group>
+        <Tabs>
+          {BUG_FILTERS.map((f) => (
+            <TabsItem key={f.id} selected={filter === f.id} onClick={() => setFilter(f.id)}>{f.label}</TabsItem>
+          ))}
+        </Tabs>
+      </Group>
+      {error && <Div style={{ color: 'var(--vkui--color_text_negative)' }}>{error}</Div>}
+      {reports === null && !error && <Div style={{ display: 'flex', justifyContent: 'center' }}><Spinner size="m" /></Div>}
+      {reports && reports.length === 0 && <Placeholder>Здесь пусто.</Placeholder>}
+      {reports && reports.map((r) => {
+        const snap = r.snapshot || {};
+        const attachments = snap.attachments || [];
+        return (
+          <Group key={r.id} header={<Header>#{r.id} · {snap.name || 'без персонажа'} · {new Date(r.created_at).toLocaleString('ru')}</Header>}>
+            <Div>
+              <Caption level="1" style={{ opacity: 0.7 }}>
+                {snap.level ? `${snap.level} ур. · ${snap.class_title || ''} · ` : ''}
+                {snap.pos_x != null ? `(${snap.pos_x}; ${snap.pos_y}) · ` : ''}
+                {snap.state || ''}{snap.vk_id ? ` · vk ${snap.vk_id}` : ''}
+              </Caption>
+              <p style={{ whiteSpace: 'pre-wrap', margin: '8px 0' }}>{r.text}</p>
+              {attachments.map((a, i) => (
+                (a.url || a.id)
+                  ? <p key={i} style={{ margin: '2px 0' }}><a href={a.url || `https://vk.com/${a.id}`} target="_blank" rel="noopener noreferrer">📎 {a.title || ({ photo: 'Скриншот', video: 'Видео' }[a.type] || 'Файл')}</a></p>
+                  : <p key={i} style={{ margin: '2px 0' }}>📎 {a.type === 'video' ? 'Видео' : a.type} {a.id || ''}</p>
+              ))}
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 8 }}>
+                {(BUG_ACTIONS[r.status] || []).map(([status, label]) => (
+                  <Button key={status} size="s" mode={status === 'closed' ? 'primary' : 'secondary'}
+                    disabled={busyId === r.id} onClick={() => move(r.id, status)}>
+                    {label}
+                  </Button>
+                ))}
+              </div>
+            </Div>
+          </Group>
+        );
+      })}
     </>
   );
 }
@@ -1059,6 +1144,7 @@ export default function AdminTab() {
       {section === 'journal' && <JournalSection />}
       {section === 'mining' && <MiningSection />}
       {section === 'promo' && <PromoSection />}
+      {section === 'bugs' && <BugsSection />}
     </>
   );
 }
