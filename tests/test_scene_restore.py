@@ -94,3 +94,24 @@ def test_mount_coords_accept_natural_formats_and_ignore_words() -> None:
     assert mounts.parse_coords("12:-20") == (12, -20)
     for word in ("preal", "📊 Статы", "Босс", "🪨 Руда"):
         assert not mounts._COORD_LIKE_RE.match(word)
+
+
+async def test_button_cancels_mount_coord_wait() -> None:
+    """Кнопка или команда снимает ожидание координат; число - нет.
+    (str != StateRepresentation у vkbottle всегда True - сравнение строкой.)"""
+    from types import SimpleNamespace as NS
+
+    from vkbottle import BuiltinStateDispenser
+
+    from bot.handlers import mounts
+
+    dispenser = BuiltinStateDispenser()
+    old = mounts._dispenser
+    mounts._dispenser = dispenser
+    try:
+        for text, payload, kept in (("📊 Статы", None, False), ("5 5", None, True), ("x", '{"type":"a"}', False)):
+            await dispenser.set(7, mounts.MountCoordState.COORD_INPUT, mount_id="m")
+            await mounts.CoordCancelMiddleware(NS(peer_id=7, payload=payload, text=text)).pre()
+            assert (await dispenser.get(7) is not None) is kept, text
+    finally:
+        mounts._dispenser = old

@@ -101,7 +101,8 @@ class CoordCancelMiddleware(BaseMiddleware[Message]):
         if _dispenser is None:
             return
         state = await _dispenser.get(self.event.peer_id)
-        if state is None or state.state != MountCoordState.COORD_INPUT:
+        # Строкой: str != StateRepresentation у vkbottle даёт True всегда.
+        if state is None or str(state.state) != str(MountCoordState.COORD_INPUT):
             return
         if self.event.payload or not _COORD_LIKE_RE.match(self.event.text or ""):
             await _dispenser.delete(self.event.peer_id)
