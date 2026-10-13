@@ -18,7 +18,7 @@ from bot.activity import activity_action, blocked_reason
 from bot.keyboards import mining as kb
 from bot.keyboards.world import movement_keyboard
 from game.world.scheduler import PeerScheduler
-from services import guild_quest_service, mining_service, mount_service, screen_service
+from services import experience_service, guild_quest_service, mining_service, mount_service, screen_service
 from services import onboarding_service as onboarding_svc
 from services.db import get_session_factory
 
@@ -111,6 +111,7 @@ async def on_dig_done(peer_id: int) -> None:
         guild_lines = (
             await guild_quest_service.record(db, character, "ore", 1) if result is not None else []
         )
+        char_xp = await experience_service.grant_activity_xp(db, character, "ore") if result is not None else None
         mine = mining_service.mine_at(character)
         left = await mining_service.ore_in_mine(db, mine.id) if mine else 0
         on_mine_screen = character.screen == "mine"
@@ -119,12 +120,19 @@ async def on_dig_done(peer_id: int) -> None:
     if result is None:
         return
     text = mt.dig_result_text(result)
+    xp_line = experience_service.activity_xp_line(char_xp) if char_xp else ""
+    if xp_line:
+        text += f"\n{xp_line}"
     if guild_lines:
         text += "\n\n" + "\n".join(guild_lines)
     keyboard = kb.mine_keyboard(left > 0) if on_mine_screen else None
     await _bot_api.messages.send(
         peer_id=peer_id, message=text, random_id=0, keyboard=keyboard,
     )
+    if char_xp is not None and char_xp.levels_gained:
+        from bot.handlers import stats_window  # избегаем цикла импортов
+
+        await stats_window.notify_levelup(peer_id, char_xp.levels_gained, char_xp.new_level)
 
 
 async def _enter_mine(message: Message) -> None:

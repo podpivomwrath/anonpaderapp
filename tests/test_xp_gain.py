@@ -32,3 +32,15 @@ async def test_rift_xp_is_per_member_not_split(db_session, make_character) -> No
     rewards = await raid_combat_service.reward_mob_kill(db_session, [a, b], 30, random.Random(1), 2, xp_mobs=10)
     one_mob = experience_service.xp_per_mob(30)
     assert all(r.xp_gained == one_mob * 10 for r in rewards)  # босс - как 10 обычных, каждому
+
+
+async def test_activity_xp(db_session, make_character) -> None:
+    """2026-10-13: рыба 0,15 моба, руда - моб, ящик - 0,1 моба своего уровня."""
+    c = await make_character(level=10)
+    one_mob = experience_service.xp_per_mob(10)
+    assert (await experience_service.grant_activity_xp(db_session, c, "ore")).xp_awarded == one_mob
+    assert (await experience_service.grant_activity_xp(db_session, c, "fish")).xp_awarded == round(one_mob * 0.15)
+    assert (await experience_service.grant_activity_xp(db_session, c, "crate", 5)).xp_awarded == round(one_mob * 0.5)
+    assert experience_service.activity_xp_line(
+        await experience_service.grant_activity_xp(db_session, c, "ore")
+    ).startswith("✨ +")

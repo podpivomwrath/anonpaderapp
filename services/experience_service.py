@@ -126,6 +126,25 @@ def add_experience(
     )
 
 
+async def grant_activity_xp(db, character: Character, kind: str, count: int = 1) -> LevelUp:
+    """Опыт персонажа за мирное занятие (рыба, руда, ящик) - в долях моба
+    своего уровня (bc.ACTIVITY_XP_MOBS), по общим правилам начисления."""
+    from sqlalchemy import select
+
+    stats = await db.scalar(select(CharacterStats).where(CharacterStats.character_id == character.id))
+    amount = round(xp_per_mob(character.level) * bc.ACTIVITY_XP_MOBS[kind] * count)
+    if stats is None or amount <= 0:
+        return LevelUp(levels_gained=0, new_level=character.level)
+    return add_experience(character, stats, amount)
+
+
+def activity_xp_line(levelup: LevelUp) -> str:
+    """«✨ +12 опыта» - пусто, если опыта нет (60 уровень)."""
+    if not levelup.xp_awarded:
+        return ""
+    return f"✨ +{levelup.xp_awarded} опыта" + (" (💠 +50%)" if levelup.premium_applied else "")
+
+
 def apply_death_penalty(character: Character) -> int:
     """Штраф смерти: теряется доля опыта ТЕКУЩЕГО уровня (без понижения уровня,
     не ниже 0). Возвращает величину потери для лорного сообщения.

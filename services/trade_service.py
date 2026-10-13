@@ -238,6 +238,7 @@ class Deal:
     level_up: int | None = None
     chests: int = 0
     lines: list[str] = field(default_factory=list)
+    char_levelup: object = None  # опыт персонажа за проданные ящики
 
 
 async def buy(db: AsyncSession, character: Character, good_id, count) -> Deal:
@@ -324,6 +325,9 @@ async def sell(db: AsyncSession, character: Character, good_id, count, rng: rand
     deal = Deal(good, count, total, profit=total - cost)
     cart.profit_total += max(deal.profit, 0)
     deal.xp = tc.XP_PER_CRATE[good.tier] * count
+    from services import experience_service
+
+    deal.char_levelup = await experience_service.grant_activity_xp(db, character, "crate", count)
     cart.trade_xp += deal.xp
     while cart.trade_xp >= tc.xp_to_next(cart.trade_level):
         cart.trade_xp -= tc.xp_to_next(cart.trade_level)

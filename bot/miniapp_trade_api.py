@@ -167,6 +167,10 @@ def _deal_text(deal, selling: bool) -> str:
     text = f"Продано: {g.emoji} {g.name} ×{deal.count} за {deal.gold} золота (прибыль {deal.profit:+d})."
     if deal.level_up:
         text += f" Уровень торговли: {deal.level_up}!"
+    if deal.char_levelup is not None and deal.char_levelup.xp_awarded:
+        text += f" ✨ +{deal.char_levelup.xp_awarded} опыта."
+        if deal.char_levelup.levels_gained:
+            text += f" Уровень персонажа: {deal.char_levelup.new_level}!"
     if deal.chests:
         text += f" 🎁 В ящиках нашёлся Пепельный ларец ×{deal.chests}!"
     return text

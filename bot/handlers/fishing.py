@@ -20,7 +20,7 @@ from bot.keyboards.world import movement_keyboard
 from game.economy import fishing
 from game.economy import fishing_config as fc
 from game.world.scheduler import PeerScheduler
-from services import guild_quest_service
+from services import experience_service, guild_quest_service
 from services import (
     fishing_service,
     item_service,
@@ -219,6 +219,7 @@ async def strike(message: Message) -> None:
 
         result = await fishing_service.strike(db, character, lake, _rng)
         guild_lines = await guild_quest_service.record(db, character, "fish", 1) if result.landed else []
+        char_xp = await experience_service.grant_activity_xp(db, character, "fish") if result.landed else None
         grams = await fishing_service.bag_total_grams(db, character.id)
         capacity = fishing.bag_capacity_grams(character.fishing_level)
         await db.commit()
@@ -237,11 +238,18 @@ async def strike(message: Message) -> None:
             body += f"\n⬆️ Уровень рыбалки: {result.new_level}"
     else:
         body = ft.catch_text(result)
+        xp_line = experience_service.activity_xp_line(char_xp) if char_xp else ""
+        if xp_line:
+            body += f"\n{xp_line}"
 
     text = f"{body}\n\n{ft.SEP}\n{ft.bag_line(grams, capacity)}\n{ft.SEP}"
     if guild_lines:
         text += "\n\n" + "\n".join(guild_lines)
     await message.answer(text, keyboard=kb.lake_keyboard())
+    if char_xp is not None and char_xp.levels_gained:
+        from bot.handlers import stats_window  # избегаем цикла импортов
+
+        await stats_window.notify_levelup(message.peer_id, char_xp.levels_gained, char_xp.new_level)
 
 
 async def _resolve_junk(db, character) -> tuple[str, str]:
