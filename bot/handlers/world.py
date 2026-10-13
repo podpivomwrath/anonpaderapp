@@ -694,15 +694,39 @@ async def explore(message: Message) -> None:
                     await message.answer(notice, keyboard=group_ready_keyboard())
                     return
                 # Все участники на клетке готовы: групповое событие (решают
-                # все разом) или, чаще, групповой бой. Обрывков Песни и пепла
-                # в групповом исследовании нет (патч 51, ч.3).
+                # все разом) или, чаще, групповой бой. Пепла в групповом
+                # исследовании нет (патч 51, ч.3).
                 group_explore_service.clear(snapshot.id)
                 # Гильдии: групповое исследование - тоже исследование клетки
                 # для каждого (десятина владельцу, закладка знамени).
+                # Обрывки Песни и замечания (2026-10-13): раньше группа шла
+                # сразу в событие или бой, и лор не видел никто - Песнь в
+                # группе не собиралась. Теперь каждый получает своё «ты
+                # осматриваешься» со своим обрывком, и тот идёт в его Песнь.
+                look_around: list[tuple[int, str]] = []
                 for m in cohort:
                     member_character = await db.get(Character, m.id)
-                    if member_character is not None:
-                        await guild_territory_service.on_exploration(db, member_character)
+                    if member_character is None:
+                        continue
+                    await guild_territory_service.on_exploration(db, member_character)
+                    text = "🔍 Группа осматривается вокруг..."
+                    fragment = flavor.explore_fragment(_rng)
+                    if fragment is not None:
+                        text += f"\n\n{fragment.text}"
+                        if fragment.song_index is not None:
+                            await song_service.record_seen(db, member_character, fragment.song_index)
+                    member_peer = await onboarding_svc.vk_id_for_character(db, m.id)
+                    if member_peer is not None:
+                        look_around.append((member_peer, text))
+                # Сеть - только после фиксации (см. выше про idle in transaction).
+                await db.commit()
+                for member_peer, text in look_around:
+                    try:
+                        await _bot_api.messages.send(
+                            peer_id=member_peer, message=text, random_id=0, keyboard=kb.waiting_keyboard(),
+                        )
+                    except Exception:
+                        pass
                 region = region_for(character.pos_x, character.pos_y)
                 dist = grid.monolith_distance(character.pos_x, character.pos_y)
                 if await group_event_handlers.maybe_start(
