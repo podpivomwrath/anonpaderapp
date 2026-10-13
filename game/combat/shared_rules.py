@@ -15,8 +15,13 @@ PvE и групповой PvP) и дуэльного (game/combat/duel_engine.py
 """
 
 from game.combat import balance_config as bc
-from game.combat.session import CombatantState, CombatSessionState, Effect, EffectKind
-
+from game.combat.session import (
+    CombatantState,
+    CombatSessionState,
+    Effect,
+    EffectKind,
+    shield_name,
+)
 
 # --- Яд ---
 
@@ -69,7 +74,7 @@ def absorb_by_shields(
         amount -= pool_absorbed
         budget -= pool_absorbed
         if pool_absorbed:
-            lines.append(f"🛡️ Второе сердце {target.name} поглощает {pool_absorbed} урона")
+            lines.append(f"🛡️ {shield_name(first)} {target.name} поглощает {pool_absorbed} урона")
     return amount
 
 

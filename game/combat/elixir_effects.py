@@ -6,7 +6,7 @@
 эта функция только накладывает эффект и возвращает строку для чата.
 """
 
-from game.combat.session import CombatantState, EffectKind
+from game.combat.session import SECOND_HEART_TAG, CombatantState, EffectKind
 from game.economy import elixir_config as ec
 
 
@@ -36,7 +36,8 @@ def apply_combat_elixir(actor: CombatantState, elixir_id: str) -> str:
     if elixir_id == "second_heart":
         shield_amount = round(actor.max_hp * ec.SECOND_HEART_SHIELD_PCT_MAX_HP)
         actor.apply_effect(
-            EffectKind.SHIELD_POOL, float(shield_amount), ec.SECOND_HEART_DURATION, actor.id
+            EffectKind.SHIELD_POOL, float(shield_amount), ec.SECOND_HEART_DURATION, actor.id,
+            tag=SECOND_HEART_TAG,
         )
         return f"🛡️ Второе сердце укрывает тебя щитом ({shield_amount} поглощения)."
 

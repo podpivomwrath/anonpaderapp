@@ -53,3 +53,20 @@ def test_dodge_line_shows_mark_from_blade_hunger() -> None:
     mob = combatant(2, side=1, kind="mob")
     hit = compute_hit(mob, blade, random.Random(1), "бьёт")
     assert hit.missed and hit.marked == 1
+
+
+def test_shield_lines_name_their_source() -> None:
+    """Оберег мистика в логе - «Оберег», а не «Второе сердце»; эликсир и свой
+    Оберег на одном бойце - два отдельных щита."""
+    from game.combat.session import SECOND_HEART_TAG, WARD_TAG
+    from game.combat.shared_rules import absorb_by_shields
+
+    state, owner, _ally, _mob = _session("dark_mystic")
+    owner.apply_effect(EffectKind.SHIELD_POOL, 100.0, 3, owner.id, tag=WARD_TAG)
+    owner.apply_effect(EffectKind.SHIELD_POOL, 50.0, 3, owner.id, tag=SECOND_HEART_TAG)
+    assert len(owner.effects_of(EffectKind.SHIELD_POOL)) == 2
+    lines: list[str] = []
+    absorb_by_shields(owner, 30, lines)
+    assert "Оберег" in lines[0] and "Второе сердце" not in lines[0]
+    line = battle_log.class_line(state.combatants, owner.id)
+    assert "Оберег: ты - 70" in line

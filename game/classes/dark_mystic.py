@@ -11,7 +11,7 @@ HP, массовое исцеление союзников (вне группы 
 from game.classes.base import Role, SubclassDef, register
 from game.combat import balance_config as bc
 from game.combat import formulas
-from game.combat.session import EffectKind
+from game.combat.session import WARD_TAG, EffectKind
 from game.combat.skills import PendingHeal, SkillContext, compute_hit, offensive_skill
 from game.combat.subclass_skills import SUBCLASS_SKILL_DEFS
 
@@ -173,7 +173,7 @@ def ward(ctx: SkillContext) -> None:
     )
     if steadfast > 0:
         actor.cooldowns[skill.id] = skill.cd + bc.DARK_MYSTIC_STEADFAST_WARD_CD
-    ward_target.apply_effect(EffectKind.SHIELD_POOL, absorb, skill.effect_duration, actor.id)
+    ward_target.apply_effect(EffectKind.SHIELD_POOL, absorb, skill.effect_duration, actor.id, tag=WARD_TAG)
     ctx.lines.append(f"{actor.name} накрывает {ward_target.name} Оберегом (+{absorb} поглощения)")
 
     # «Передача оберега»: тем же навыком накрывается и самый израненный союзник,
@@ -182,7 +182,7 @@ def ward(ctx: SkillContext) -> None:
     if transfer > 0:
         extra = next((c for c in _allies_by_hp(ctx) if c.id != ward_target.id), None)
         if extra is not None:
-            extra.apply_effect(EffectKind.SHIELD_POOL, absorb, skill.effect_duration, actor.id)
+            extra.apply_effect(EffectKind.SHIELD_POOL, absorb, skill.effect_duration, actor.id, tag=WARD_TAG)
             ctx.lines.append(f"{actor.name} передаёт Оберег: {extra.name} (+{absorb} поглощения)")
 
 

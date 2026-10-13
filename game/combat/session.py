@@ -96,6 +96,17 @@ class Stats:
 #: Горение (от любого игрока), а не любой периодический урон.
 BURN_TAG = "burn"
 
+#: Метки щитов SHIELD_POOL (2026-10-13): эликсир, Оберег мистика и щиты
+#: мобов - один EffectKind, и лог называл «Вторым сердцем» любой из них.
+#: Без метки (мобы, страница архива, снимки старых боёв) - просто «Щит».
+SECOND_HEART_TAG = "second_heart"
+WARD_TAG = "ward"
+SHIELD_NAMES = {SECOND_HEART_TAG: "Второе сердце", WARD_TAG: "Оберег"}
+
+
+def shield_name(effect) -> str:
+    return SHIELD_NAMES.get(getattr(effect, "tag", None), "Щит")
+
 
 @dataclass
 class Effect:
@@ -253,6 +264,10 @@ class CombatantState:
         вида от того же источника ОБНОВЛЯЕТ значение и длительность, не суммирует.
         tag - метка вида эффекта (см. BURN_TAG)."""
         for effect in self.effects:
+            # Щиты с разными метками не сливаются: мистик со своим Оберегом
+            # выпил «Второе сердце» - это два щита, а не один перезаписанный.
+            if kind == EffectKind.SHIELD_POOL and getattr(effect, "tag", None) != tag:
+                continue
             if effect.kind == kind and effect.source_id == source_id:
                 effect.value = value
                 effect.remaining_ticks = max(effect.remaining_ticks, duration)

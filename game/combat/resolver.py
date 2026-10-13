@@ -21,12 +21,14 @@ import game.combat.subclass_skills as subclass_skills  # регистрация 
 from game.combat import balance_config as bc
 from game.combat import combat_flavor, control, display, formulas, shared_rules
 from game.combat.session import (
+    WARD_TAG,
     ActionType,
     CombatantState,
     CombatMode,
     CombatSessionState,
     DeclaredAction,
     EffectKind,
+    shield_name,
 )
 from game.combat.skills import (
     DEFENSIVE_SKILLS,
@@ -519,7 +521,7 @@ def resolve_tick(
             ally = min(candidates, key=lambda c: c.current_hp / c.max_hp)
             ally.apply_effect(
                 EffectKind.SHIELD_POOL, round(overflow * echo),
-                bc.DARK_MYSTIC_ECHO_DURATION, source.id,
+                bc.DARK_MYSTIC_ECHO_DURATION, source.id, tag=WARD_TAG,
             )
             ctx.lines.append(f"{source.name}: отголосок лечения укрывает {ally.name}")
 
@@ -614,7 +616,7 @@ def resolve_tick(
             if id(effect) in preexisting_effects or effect.kind in _IMMEDIATE_EFFECT_KINDS:
                 effect.remaining_ticks -= 1
 
-        # Второе сердце (патч 16): щит не пробит за отведённые ходы — остаток лечит
+        # Щит (Второе сердце, Оберег; патч 16) не пробит за отведённые ходы - остаток лечит
         for effect in combatant.effects_of(EffectKind.SHIELD_POOL):
             if effect.remaining_ticks <= 0 and effect.value > 0 and combatant.alive:
                 heal = round(effect.value)
@@ -625,7 +627,7 @@ def resolve_tick(
                     effect.value = 0
                     continue
                 result.lines.append(
-                    f"🛡️ Второе сердце {combatant.name} обращается в исцеление "
+                    f"🛡️ {shield_name(effect)} {combatant.name} обращается в исцеление "
                     f"{display.hp_delta_line(before_hp, combatant.current_hp, combatant.max_hp, _display_mode(session))}"
                 )
                 effect.value = 0
