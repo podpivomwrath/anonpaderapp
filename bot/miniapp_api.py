@@ -750,6 +750,8 @@ def _chests_payload(chests) -> list[dict]:
             "name": info.name,
             "count": counts[kind],
             "icon": info.icon,
+            # Ларцы кровавого разлома - легендарное свечение вокруг иконки.
+            "rarity": None if kind == lootbox_service.ASHEN else "legendary",
             "description": info.description,
             "grades": [{"name": g.name, "icon": f"chest:{g.id}", "grade": g.id,
                         "chance": round(100 * g.chance / total, 1)} for g in grades],
