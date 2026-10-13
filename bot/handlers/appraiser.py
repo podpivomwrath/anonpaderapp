@@ -107,6 +107,14 @@ async def appraiser_root(message: Message) -> None:
     )
 
 
+async def _back_to_root(db, character, mult: float, prefix: str) -> tuple[str, str]:
+    """После «Продать всё» - сразу к выбору раздела (2026-10-13): в
+    опустевшем разделе делать уже нечего."""
+    await screen_service.set_screen(db, character, "appraiser")
+    await db.commit()
+    return (f"{prefix}\n\n{_intro(mult)}" if prefix else _intro(mult)), appraiser_root_keyboard()
+
+
 @labeler.message(payload_contains={"type": "appraiser_back"})
 async def appraiser_back(message: Message) -> None:
     """Патч 39: выход из скупщика целиком — обратно в Торговый квартал
@@ -182,9 +190,11 @@ async def sell_trophies(message: Message) -> None:
         daily_progress = await daily_service.record_sell_gold(db, character, gold)
         total = (await wallet_service.get_wallet(db, character.id)).farm_currency
         await db.commit()
-        text, kb = await _render_trophies(
-            db, character, mult, prefix=appraiser_sold(gold, total, guild_service.after_tax(character, gold)) if gold > 0 else "",
-        )
+        sold = appraiser_sold(gold, total, guild_service.after_tax(character, gold)) if gold > 0 else ""
+        if trophy_id == SELL_ALL_ID:
+            text, kb = await _back_to_root(db, character, mult, sold)
+        else:
+            text, kb = await _render_trophies(db, character, mult, prefix=sold)
 
     await editable_message.send_or_edit(_bot_api, _NS, peer_id, text, kb, attachment=appraiser_attachment())
 
@@ -271,11 +281,15 @@ async def _sell_now(peer_id: int, from_id: int, rarity_id: str | None) -> None:
         daily_progress = await daily_service.record_sell_gold(db, character, gold)
         total = (await wallet_service.get_wallet(db, character.id)).farm_currency
         await db.commit()
-        text, kb = await _render_gear_main(
-            db, character, mult, prefix=appraiser_sold(gold, total, guild_service.after_tax(character, gold)) if gold > 0 else "",
-        )
+        sold = appraiser_sold(gold, total, guild_service.after_tax(character, gold)) if gold > 0 else ""
+        if rarity_id is None:
+            text, kb = await _back_to_root(db, character, mult, sold)
+        else:
+            text, kb = await _render_gear_main(db, character, mult, prefix=sold)
 
-    await editable_message.send_or_edit(_bot_api, _NS, peer_id, text, kb)
+    await editable_message.send_or_edit(
+        _bot_api, _NS, peer_id, text, kb, attachment=appraiser_attachment() if rarity_id is None else None,
+    )
 
     if gold > 0:
         daily_notice = dailies_texts.progress_notice(daily_progress)
@@ -506,13 +520,12 @@ async def sell_fish(message: Message) -> None:
         daily_progress = await daily_service.record_sell_gold(db, character, gold)
         total = (await wallet_service.get_wallet(db, character.id)).farm_currency
         await db.commit()
-        text, kb = await _render_fish(db, character)
-
-    if gold:
-        text = (
+        sold = (
             f"Продано {game_fishing.format_kg(grams)} рыбы за {guild_service.gold_label(character, gold, 'зол.')} "
-            f"(всего: {total})" + chr(10) * 2 + text
-        )
+            f"(всего: {total})"
+        ) if gold else ""
+        mult = _price_multiplier(character, grid.city_region_at(character.pos_x, character.pos_y))
+        text, kb = await _back_to_root(db, character, mult, sold)
     await editable_message.send_or_edit(
         _bot_api, _NS, peer_id, text, kb, attachment=appraiser_attachment()
     )
