@@ -774,11 +774,6 @@ async def collect_ash_handful(message: Message) -> None:
         stats = await _get_stats(db, character.id)
         result = await ash_service.collect(db, character, stats, _rng)
         ash_handful_state.clear(peer_id)
-        wallet = await wallet_service.get_wallet(db, character.id)
-        farm_currency, donate_currency = wallet.farm_currency, wallet.donate_currency
-        gear_bonus = await item_service.compute_gear_bonus(db, character.id)
-        quest_line = await story_service.quest_summary_line(db, character)
-        group_block = await group_texts.group_summary_block(db, character.id)
         has_mount = await mount_service.has_any_mount(db, character.id)
         await db.commit()
 
@@ -795,15 +790,13 @@ async def collect_ash_handful(message: Message) -> None:
         text += f"\n{raid_key_texts.raid_key_drop_line()}"
     if result.group_kick is not None and result.group_kick.kicked_character_id == character.id:
         text += f"\n\n{group_texts.level_gap_kick_self_line()}"
-    await message.answer(text, keyboard=kb.waiting_keyboard())
+    # Сводку локации заново не шлём: игрок на той же клетке, она только что
+    # была выше (2026-10-13). Клавиатура карты остаётся рабочей.
+    await message.answer(
+        text, keyboard=kb.movement_keyboard(character.pos_x, character.pos_y, peer_id, has_mount=has_mount),
+    )
     await stats_window.notify_levelup(peer_id, result.levels_gained, result.new_level)
     await group_texts.notify_group_kick(_bot_api, result.group_kick)
-    await message.answer(
-        _map_text(character, stats, farm_currency, gear_bonus, quest_line, donate_currency, group_block),
-        attachment=location_attachment(character),
-        keyboard=kb.movement_keyboard(character.pos_x, character.pos_y, peer_id, has_mount=has_mount),
-    )
-    await _maybe_send_monolith_button(peer_id, character)
 
 
 async def handle_explore_done(peer_id: int) -> None:
