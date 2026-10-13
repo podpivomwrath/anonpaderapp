@@ -62,6 +62,7 @@ from services import (
     mount_service,
     preset_service,
     quest_service,
+    scene_event_service,
     trophy_service,
     vitals_service,
 )
@@ -155,7 +156,13 @@ async def build_member_inputs(db, members: list[Character]) -> list[MemberCombat
             select(CharacterStats).where(CharacterStats.character_id == character.id)
         )
         gear_bonus = await item_service.compute_gear_bonus(db, character.id)
-        buff_modifiers = await preset_service.resolve_active_modifiers(db, character)
+        # Эффекты событий («ещё N боёв») - и в групповом бою, рейде, разломе
+        # (2026-10-13: раньше не действовали и не списывались). Списываются
+        # при входе в бой, как в соло; вызывающий коммитит.
+        buff_modifiers = await scene_event_service.solo_modifiers(
+            db, character, await preset_service.resolve_active_modifiers(db, character),
+        )
+        await scene_event_service.start_fight_effects(db, character.id)
         peer_id = await onboarding_svc.vk_id_for_character(db, character.id)
         if peer_id is None:
             continue
@@ -769,6 +776,7 @@ async def on_group_battle_finished(session_id: int, result: TickResult) -> None:
             if character is None:
                 continue
             character.mobs_killed += kills_each
+            await scene_event_service.finish_fight_effects(db, cid)
             positions[cid] = (character.pos_x, character.pos_y)
             if cid in survivor_ids:
                 has_mount_by_cid[cid] = await mount_service.has_any_mount(db, cid)

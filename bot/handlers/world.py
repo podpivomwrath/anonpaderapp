@@ -723,6 +723,11 @@ async def explore(message: Message) -> None:
                     member_character = await db.get(Character, m.id)
                     if member_character is None:
                         continue
+                    member_peer_id = await onboarding_svc.vk_id_for_character(db, m.id)
+                    if member_peer_id is not None and member_peer_id in _resting:
+                        # Страховка: группа ушла - отдых не доигрывается.
+                        _resting.discard(member_peer_id)
+                        await pending_activity.forget("rest", member_peer_id)
                     await guild_territory_service.on_exploration(db, member_character)
                     # Ежедневки «исследуй» - и в группе, каждому (2026-10-13).
                     member_daily = await daily_service.record_exploration(db, member_character)
@@ -1226,6 +1231,15 @@ async def rest(message: Message) -> None:
         if await mount_service.active_travel(db, character.id) is not None:
             await message.answer(MOUNT_BUSY_TEXT)
             return
+        # Отдых - выход из очереди группового исследования (2026-10-13): иначе
+        # группа уходила исследовать с отдыхающим, а отдых кончался посреди.
+        hint_peers: list[int] = []
+        rest_snapshot = await group_service.get_group_snapshot(db, character.id)
+        if rest_snapshot is not None:
+            queue = group_explore_service.get_queue(rest_snapshot.id)
+            if queue is not None and character.id in queue.ready:
+                still_ready = group_explore_service.cancel(rest_snapshot.id, character.id)
+                hint_peers = await ready_hint_peers(db, still_ready)
 
     _resting.add(peer_id)
     # Патч 50: Метка Хранителя — отдых вдвое быстрее.
@@ -1235,6 +1249,9 @@ async def rest(message: Message) -> None:
         delay = _rng.uniform(wc.REST_SECONDS_MIN, wc.REST_SECONDS_MAX)
     # отдых — кнопки убираем на время (чистка шума)
     await message.answer(flavor.rest_start(), keyboard=kb.waiting_keyboard())
+    if hint_peers:
+        await message.answer("Ты вышел из очереди группового исследования.")
+        await send_ready_hint(hint_peers)
     _rest_scheduler.schedule(peer_id, delay)
     await pending_activity.remember("rest", peer_id, delay)
 
