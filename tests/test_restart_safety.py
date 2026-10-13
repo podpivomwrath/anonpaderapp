@@ -116,3 +116,23 @@ def test_busy_counter_counts_group_battles(monkeypatch) -> None:
     monkeypatch.setattr(group_events, "_scenes", {})
     assert restart_safety.busy_battles() == 3
     assert bc.MAX_LEVEL  # модуль баланса доступен - импорты на месте
+
+
+async def test_stuck_does_not_abort_solo_battle(engine, db_session, make_character, monkeypatch) -> None:
+    """2026-10-13: /застрял в соло-бою не выводит из боя (лазейка - бросить
+    проигрышный бой без штрафа), а только обновляет его. Админский сброс
+    (admin_override) прерывает по-прежнему - он не менялся."""
+    from bot import pending_activity
+    from bot.handlers import world
+
+    async def no_redis(*args, **kwargs):
+        return None
+
+    monkeypatch.setattr(pending_activity, "forget", no_redis)
+    eng, _api = engine
+    eng.start_session(_solo_fight(991))
+    character = await make_character()
+
+    assert await world.force_unstick(db_session, character, 991) is True
+    assert combat.has_active_encounter(991)
+    assert "БОЙ" in combat.board_text(991)

@@ -1477,6 +1477,7 @@ async def quest_reminder(message: Message) -> None:
 
 
 STUCK_LINE = "Ты встряхиваешься и приходишь в себя."
+STUCK_BATTLE_LINE = "Бой продолжается - кнопки обновлены."
 
 
 def is_busy(peer_id: int) -> bool:
@@ -1685,7 +1686,12 @@ async def force_unstick(db, character, peer_id: int, *, admin_override: bool = F
             return True
         pvp_handlers.force_defeat(peer_id)
     if combat_handlers.has_active_encounter(peer_id):
-        # безнаградный/безштрафной аборт — тот же путь, что и прерывание PvE открытым PvP
+        # Игрок сам себе - бой НЕ прерывается (2026-10-13): безнаградный и
+        # безштрафной аборт был лазейкой - проигрышный бой бросали через
+        # /застрял. Вызывающий пересылает доску и боевые кнопки.
+        if not admin_override:
+            return True
+        # Админ - безнаградный/безштрафной аборт, как прерывание PvE открытым PvP
         await combat_handlers.interrupt_for_pvp(peer_id)
         travel_id = combat_handlers.pop_mount_ambush(peer_id)
         if travel_id is not None:
@@ -1724,7 +1730,10 @@ async def stuck_command(message: Message) -> None:
             return
         if await force_unstick(db, character, peer_id):
             await db.commit()  # патч 37: сброс character.screen должен сохраниться и в PvP-ветке
-            await message.answer(STUCK_LINE, keyboard=active_battle_keyboard(peer_id))
+            # В бою /застрял не выводит из боя, а обновляет его: доска и кнопки.
+            board = combat_handlers.board_text(peer_id)
+            text = f"{STUCK_BATTLE_LINE}\n\n{board}" if board else STUCK_BATTLE_LINE
+            await message.answer(text, keyboard=active_battle_keyboard(peer_id))
             return
         now = datetime.now(timezone.utc)
         await db.commit()

@@ -230,6 +230,14 @@ def rebuild_keyboard(peer_id: int) -> str | None:
     return _combat_kb(_engine.sessions[peer_id], peer_id)
 
 
+def board_text(peer_id: int) -> str | None:
+    """Доска текущего соло-боя - для /застрял: бой не прерывается, игрок
+    получает его состояние заново. None - не в бою."""
+    if not has_active_encounter(peer_id):
+        return None
+    return _render(_engine.sessions[peer_id])
+
+
 def _render(state: CombatSessionState, result: TickResult | None = None) -> str:
     """Патч 51, ч.5: единый формат лога с разделами "своя сторона"/
     "противник" — тот же рендер, что и групповой PvE (game/combat/battle_log.py),
