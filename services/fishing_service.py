@@ -257,14 +257,20 @@ async def _update_record(
         )
     )
     if record is None:
+        # Первый улов вида - запоминаем вес, но рекордом не называем: у
+        # мелочи это «рекорд» на каждом новом виде (2026-10-13).
         db.add(CharacterFishRecord(
             character_id=character_id, fish_id=fish_id, weight_grams=grams
         ))
-        return True
+        return False
     if grams > record.weight_grams:
+        # Рекорд - только если вырос ВИДИМЫЙ вес: вес в тексте округлён до
+        # 0,1 кг, и «0,1 кг - Личный рекорд!» при прежних 0,1 кг смешил.
+        # Точный вес всё равно запоминаем.
+        visible = fishing.format_kg(grams) != fishing.format_kg(record.weight_grams)
         record.weight_grams = grams
         record.caught_at = datetime.now(timezone.utc)
-        return True
+        return visible
     return False
 
 
