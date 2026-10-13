@@ -438,12 +438,16 @@ async def _dice(peer_id, db, character, stats, p: Pending, scene: Scene, action:
         return
     won, mine, theirs = se.roll_dice(_rng, scene.win_chance)
     if won:
-        await wallet_service.deposit(db, character.id, wallet_column, p.stake * 2)
+        # Своя ставка возвращается без налога, налог гильдии - только с
+        # выигрыша. Раньше облагалась вся удвоенная сумма: при налоге 50%
+        # победа возвращала ровно ставку, и выиграть было нельзя (2026-10-13).
+        await wallet_service.deposit(db, character.id, wallet_column, p.stake, taxable=False)
+        await wallet_service.deposit(db, character.id, wallet_column, p.stake)
+    net = guild_service.after_tax(character, p.stake) if p.currency == "gold" else p.stake
     line = (
         f"🎲 Ты: {mine[0]} и {mine[1]}, он: {theirs[0]} и {theirs[1]}.\n"
         + (f"{scene.win_text} +{_money(p.currency, p.stake)}"
-           + (f" (после налога гильдии на руки {guild_service.after_tax(character, p.stake * 2)} из {p.stake * 2})"
-              if won and p.currency == "gold" and guild_service.after_tax(character, p.stake * 2) != p.stake * 2 else "")
+           + (f" (после налога гильдии +{net})" if net != p.stake else "")
            if won
            else f"{scene.lose_text} −{_money(p.currency, p.stake)}")
     )
