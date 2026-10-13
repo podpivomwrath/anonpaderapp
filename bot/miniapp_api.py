@@ -342,7 +342,9 @@ async def handle_post_title(request: web.Request) -> web.Response:
 
 #: Флаги мини-аппа, которые клиент может выставить: что игрок уже видел и
 #: звук. Остальное отбрасывается - это не хранилище для чего попало.
-UI_FLAGS = {"intro": int, "tour": int, "sound": bool}
+# safe_route (2026-10-13) - безопасный путь верхом: включают на карте,
+# действует и при отправке маунта из чата.
+UI_FLAGS = {"intro": int, "tour": int, "sound": bool, "safe_route": bool}
 UI_HINTS_MAX = 32
 
 

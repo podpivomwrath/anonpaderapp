@@ -41,6 +41,56 @@ def line_path(x1: int, y1: int, x2: int, y2: int) -> list[tuple[int, int]]:
     ]
 
 
+#: Штраф безопасного пути за шаг на клетку кольца опаснее цели - за каждое
+#: кольцо сверх. Такой, что любой обход дешевле, чем зайти внутрь.
+SAFE_PATH_PENALTY = 1000
+
+
+def safe_path(x1: int, y1: int, x2: int, y2: int) -> list[tuple[int, int]]:
+    """Безопасный путь (2026-10-13): клетки без стартовой и с конечной, по 8
+    направлениям, не заходя в кольца опаснее кольца цели (ближе к центру).
+    Если старт сам в таком кольце - выходит из него кратчайшим путём. Обход
+    дольше прямой; путь всегда находится - внутри мира всё связно."""
+    import heapq
+
+    limit = ring_tier(x2, y2)
+    start, goal = (x1, y1), (x2, y2)
+    if start == goal:
+        return []
+    best = {start: 0}
+    came: dict[tuple[int, int], tuple[int, int]] = {}
+    queue = [(0, 0, 0, start)]
+    order = 0
+    while queue:
+        cost, _, _, cell = heapq.heappop(queue)
+        if cell == goal:
+            break
+        if cost > best.get(cell, cost):
+            continue
+        cx, cy = cell
+        for dx in (-1, 0, 1):
+            for dy in (-1, 0, 1):
+                if not dx and not dy:
+                    continue
+                nxt = (cx + dx, cy + dy)
+                if not in_bounds(*nxt):
+                    continue
+                step = 1 + SAFE_PATH_PENALTY * max(0, ring_tier(*nxt) - limit)
+                new = cost + step
+                if new < best.get(nxt, new + 1):
+                    best[nxt] = new
+                    came[nxt] = cell
+                    order += 1
+                    # Тай-брейк - ближе к цели: путь ровнее, без петель.
+                    heapq.heappush(queue, (new, cells_between(*nxt, *goal), order, nxt))
+    path = []
+    cell = goal
+    while cell != start:
+        path.append(cell)
+        cell = came[cell]
+    return path[::-1]
+
+
 def zone_level_range(dist: int) -> tuple[int, int]:
     return wc.ZONE_TABLE[wc.ring_tier_for_dist(dist) - 1][2]
 

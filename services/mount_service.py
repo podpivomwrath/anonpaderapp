@@ -125,7 +125,18 @@ def total_travel_seconds(mount_id: str, cells: int) -> float:
     return cells * seconds_per_cell(mount_id)
 
 
+def route(from_x: int, from_y: int, to_x: int, to_y: int, safe: bool = False) -> list[tuple[int, int]]:
+    """Клетки пути без стартовой: прямая или безопасный обход (не заходит в
+    кольца опаснее кольца цели)."""
+    if safe:
+        return grid.safe_path(from_x, from_y, to_x, to_y)
+    return grid.line_path(from_x, from_y, to_x, to_y)
+
+
 def path_of(travel: MountTravel) -> list[tuple[int, int]]:
+    saved = getattr(travel, "path", None)
+    if saved:
+        return [tuple(c) for c in saved]
     return grid.line_path(travel.from_x, travel.from_y, travel.to_x, travel.to_y)
 
 
@@ -151,10 +162,12 @@ def cell_ambush_chance(mount_id: str, x: int, y: int, trip: float | None = None)
 
 def trip_ambush_chance(
     mount_id: str, from_x: int, from_y: int, to_x: int, to_y: int, trip: float | None = None,
+    path: list[tuple[int, int]] | None = None,
 ) -> float:
-    """Шанс хотя бы одного нападения на этом маршруте - для подсказки игроку."""
+    """Шанс хотя бы одного нападения на этом маршруте - для подсказки игроку.
+    path - свой маршрут (безопасный путь), иначе прямая."""
     safe = 1.0
-    for x, y in grid.line_path(from_x, from_y, to_x, to_y)[:-1]:
+    for x, y in (path if path is not None else grid.line_path(from_x, from_y, to_x, to_y))[:-1]:
         safe *= 1 - cell_ambush_chance(mount_id, x, y, trip)
     return 1 - safe
 
@@ -162,10 +175,13 @@ def trip_ambush_chance(
 async def start_travel(
     db: AsyncSession, character: Character, mount_id: str, to_x: int, to_y: int,
     rng: random.Random | None = None, now: datetime | None = None, step_seconds: float | None = None,
+    safe: bool = False,
 ) -> MountTravel:
-    """step_seconds - шаг, если он не от маунта (у повозки - от лошадей)."""
+    """step_seconds - шаг, если он не от маунта (у повозки - от лошадей).
+    safe - безопасный путь в обход колец опаснее цели (дольше прямой)."""
     now = now or datetime.now(timezone.utc)
-    cells = grid.cells_between(character.pos_x, character.pos_y, to_x, to_y)
+    path = route(character.pos_x, character.pos_y, to_x, to_y, safe) if safe else None
+    cells = len(path) if path is not None else grid.cells_between(character.pos_x, character.pos_y, to_x, to_y)
     if step_seconds is not None:
         seconds = cells * step_seconds
     else:
@@ -177,6 +193,7 @@ async def start_travel(
         started_at=now, arrives_at=now + timedelta(seconds=seconds),
         ambush_at=None, ambush_done=True, status="traveling",
         step_seconds=step, cell_index=0, next_cell_at=now + timedelta(seconds=step),
+        path=[list(c) for c in path] if path is not None else None,
     )
     db.add(travel)
     await db.flush()
@@ -184,7 +201,7 @@ async def start_travel(
 
 
 def cells_left(travel: MountTravel) -> int:
-    return max(grid.cells_between(travel.from_x, travel.from_y, travel.to_x, travel.to_y) - travel.cell_index, 0)
+    return max(len(path_of(travel)) - travel.cell_index, 0)
 
 
 def remaining_seconds(travel: MountTravel, now: datetime | None = None) -> float:

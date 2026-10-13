@@ -217,13 +217,15 @@ async def coord_input(message: Message) -> None:
         if (to_x, to_y) == (character.pos_x, character.pos_y):
             await message.answer("Ты уже здесь. Назови другую клетку.")
             return
-        seconds = await start_travel_and_notify(db, character, peer_id, mount_id, to_x, to_y, now)
+        # Безопасный путь - как выбран на карте мини-аппа (настройка персонажа).
+        safe = bool((character.ui_flags or {}).get("safe_route"))
+        seconds = await start_travel_and_notify(db, character, peer_id, mount_id, to_x, to_y, now, safe=safe)
         assert seconds is not None  # гейты выше уже всё проверили
 
 
 async def start_travel_and_notify(
     db, character, peer_id: int, mount_id: str, to_x: int, to_y: int,
-    now: datetime | None = None,
+    now: datetime | None = None, safe: bool = False,
 ) -> float:
     """Начать поездку и сказать об этом в чат — ОДНА точка для обоих способов
     отправки маунта: из чата (coord_input) и с карты мини-аппа
@@ -237,21 +239,22 @@ async def start_travel_and_notify(
 
     Коммит делает вызывающий: у карты и чата разные транзакционные границы.
     """
-    travel = await mount_service.start_travel(db, character, mount_id, to_x, to_y, _rng, now)
-    cells = grid.cells_between(character.pos_x, character.pos_y, to_x, to_y)
-    seconds = mount_service.total_travel_seconds(mount_id, cells)
+    from_x, from_y = character.pos_x, character.pos_y
+    path = mount_service.route(from_x, from_y, to_x, to_y, safe)
+    travel = await mount_service.start_travel(db, character, mount_id, to_x, to_y, _rng, now, safe=safe)
+    seconds = mount_service.total_travel_seconds(mount_id, len(path))
     await db.commit()
     await notify_travel_started(
         peer_id, to_x, to_y, seconds,
-        mount_service.trip_ambush_chance(mount_id, character.pos_x, character.pos_y, to_x, to_y),
-        travel=travel,
+        mount_service.trip_ambush_chance(mount_id, from_x, from_y, to_x, to_y, path=path),
+        travel=travel, safe=safe,
     )
     return seconds
 
 
 async def notify_travel_started(
     peer_id: int, to_x: int, to_y: int, seconds: float, ambush_chance: float, icon: str = "🐎",
-    travel=None,
+    travel=None, safe: bool = False,
 ) -> None:
     """Сообщение о начале пути на маунте + клавиатура ожидания — общая точка
     для обоих способов отправки маунта (патч 31, фикс 1): из чата (coord_input
@@ -268,7 +271,7 @@ async def notify_travel_started(
     if _bot_api is None:
         return
     text = (
-        f"{icon} Путь начат: ({to_x}; {to_y}), {_format_seconds(seconds)}.\n"
+        f"{icon} Путь начат{' безопасной дорогой' if safe else ''}: ({to_x}; {to_y}), {_format_seconds(seconds)}.\n"
         f"Шанс нападения в пути: {round(ambush_chance * 100)}%."
     )
     try:

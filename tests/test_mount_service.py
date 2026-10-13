@@ -246,3 +246,17 @@ async def test_stop_travel_keeps_current_cell(db_session, make_character) -> Non
     await db_session.flush()
     assert not await mount_service.stop_travel(db_session, fight, character)
     assert await mount_service.stop_travel(db_session, fight, character, after_ambush=True)
+
+
+async def test_safe_travel_keeps_its_route(db_session, character_at) -> None:
+    """Безопасный путь (2026-10-13): маршрут хранится в поездке, по нему -
+    клетки, время и движение; в кольца опаснее цели не заходит."""
+    from game.world import grid
+
+    character = await character_at(-20, 0, level=10)
+    travel = await mount_service.start_travel(db_session, character, "ashen_steed", 20, 0, now=NOW, safe=True)
+    path = mount_service.path_of(travel)
+    assert travel.path and len(path) > grid.cells_between(-20, 0, 20, 0)
+    assert mount_service.cells_left(travel) == len(path)
+    assert max(grid.ring_tier(*c) for c in path) <= grid.ring_tier(20, 0)
+    assert travel.arrives_at == NOW + timedelta(seconds=7.0 * len(path))

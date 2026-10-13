@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Div, Spinner, Placeholder, Button, IconButton } from '@vkontakte/vkui';
-import { getMapState, sendMountFromMap, stopTravel } from '../api.js';
+import { getMapRoute, getMapState, saveUi, sendMountFromMap, stopTravel } from '../api.js';
 import mapBase from '../assets/world-map-drawn-2048.webp';
 import mapDetail from '../assets/world-map-drawn-4096.webp';
 import lensFrame from '../assets/lens-frame.webp';
@@ -116,6 +116,10 @@ function readSimple() {
   try { return localStorage.getItem(SIMPLE_KEY) === '1'; } catch { return false; }
 }
 
+// Безопасный путь верхом (2026-10-13): переключатель при отправке маунта.
+// Хранится на сервере (настройка персонажа) - отправка из чата тоже идёт
+// безопасным путём, если он включён. Путь в обход колец опаснее цели - дольше.
+
 export default function MapTab() {
   const containerRef = useRef(null);
   const [size, setSize] = useState({ width: 360, height: 420 });
@@ -126,6 +130,14 @@ export default function MapTab() {
   const [hovered, setHovered] = useState(null); // {x, y, sx, sy}
   const [selected, setSelected] = useState(null); // {x, y}
   const [sendFlow, setSendFlow] = useState(null); // {step: 'pick'|'confirm', mount}
+  const [safeRouteLocal, setSafeRoute] = useState(null);  // null - как на сервере
+  const [routePreview, setRoutePreview] = useState(null); // {key, cells, path, mounts}
+  const safeRoute = safeRouteLocal ?? Boolean(mapState?.safe_route);
+  const toggleSafeRoute = () => {
+    const next = !safeRoute;
+    setSafeRoute(next);
+    saveUi({ set: { safe_route: next } }).catch(() => { /* не сохранилось - выбор остаётся до перезагрузки */ });
+  };
   const [banner, setBanner] = useState(null);
   const [stopping, setStopping] = useState(false);
 
@@ -583,11 +595,23 @@ export default function MapTab() {
   const isTraveling = Boolean(mapState?.foot_travel || mapState?.mount_travel);
   const canSendMount = mapState && !mapState.is_dead && !isTraveling && mapState.mounts.length > 0;
 
+  // Путь для окна отправки - с сервера: безопасный обход считает он.
+  const routeKey = sendFlow && selected ? `${selected.x}:${selected.y}:${safeRoute ? 1 : 0}` : null;
+  useEffect(() => {
+    if (!routeKey || !selected) return undefined;
+    let alive = true;
+    getMapRoute(selected.x, selected.y, safeRoute)
+      .then((data) => { if (alive) setRoutePreview({ key: routeKey, ...data }); })
+      .catch(() => { if (alive) setRoutePreview(null); });
+    return () => { alive = false; };
+  }, [routeKey]); // eslint-disable-line react-hooks/exhaustive-deps
+  const preview = routePreview && routePreview.key === routeKey ? routePreview : null;
+
   const confirmSend = async () => {
     if (!selected || !sendFlow?.mount) return;
     try {
-      await sendMountFromMap(sendFlow.mount.mount_id, selected.x, selected.y);
-      setBanner(`🐎 Путь начат: (${selected.x}; ${selected.y}).`);
+      await sendMountFromMap(sendFlow.mount.mount_id, selected.x, selected.y, safeRoute);
+      setBanner(`🐎 Путь начат${safeRoute ? ' безопасной дорогой' : ''}: (${selected.x}; ${selected.y}).`);
       setSendFlow(null);
       setSelected(null);
       load();
@@ -639,7 +663,8 @@ export default function MapTab() {
   // картинке искривлены кольцами, прямая линия резала бы их); пешком - прямо.
   const routeCells = ride
     ? [[ride.pos.x, ride.pos.y], ...ride.rest]
-    : travelTarget && playerPos ? [[playerPos.x, playerPos.y], [travelTarget.to_x, travelTarget.to_y]] : [];
+    : travelTarget && playerPos ? [[playerPos.x, playerPos.y], [travelTarget.to_x, travelTarget.to_y]]
+      : preview ? preview.path : [];
 
   const pins = [
     ...cityCells.map((c) => [c.x, c.y, 'map-pin--city', '🏛', `${c.title} · город`, 1.15]),
@@ -994,14 +1019,30 @@ export default function MapTab() {
             </p>
           )}
 
+          {sendFlow && (
+            <button
+              type="button"
+              className={`map-safe-toggle${safeRoute ? ' map-safe-toggle--on' : ''}`}
+              onClick={toggleSafeRoute}
+              aria-pressed={safeRoute}
+            >
+              {safeRoute ? '✓ 🛡 Безопасный путь' : '🛡 Безопасный путь'}
+              <span className="map-safe-toggle__hint">
+                {safeRoute ? 'в обход колец опаснее цели - дольше' : 'напрямую, через любые кольца'}
+              </span>
+            </button>
+          )}
           {sendFlow?.step === 'pick' && (
             <div className="map-card__mounts">
               {mapState.mounts.map((m) => {
-                const cells = cellsBetween(playerPos.x, playerPos.y, info.x, info.y);
+                const cells = preview ? preview.cells : cellsBetween(playerPos.x, playerPos.y, info.x, info.y);
+                const est = preview?.mounts?.[m.mount_id];
                 return (
                   <button key={m.mount_id} className="map-card__mount-option" onClick={() => setSendFlow({ step: 'confirm', mount: m })}>
                     <span>{m.emoji} {m.name}</span>
-                    <span className="map-card__mount-meta">{formatSeconds(m.seconds_per_cell * cells)} · риск {Math.round(m.ambush_chance * 100)}%</span>
+                    <span className="map-card__mount-meta">
+                      {formatSeconds(est ? est.seconds : m.seconds_per_cell * cells)} · риск {Math.round((est ? est.ambush : m.ambush_chance) * 100)}%
+                    </span>
                   </button>
                 );
               })}
@@ -1010,12 +1051,14 @@ export default function MapTab() {
           )}
 
           {sendFlow?.step === 'confirm' && (() => {
-            const cells = cellsBetween(playerPos.x, playerPos.y, info.x, info.y);
+            const cells = preview ? preview.cells : cellsBetween(playerPos.x, playerPos.y, info.x, info.y);
+            const est = preview?.mounts?.[sendFlow.mount.mount_id];
             return (
               <div className="map-card__confirm">
                 <p className="map-card__line">
-                  Путь: {cells} {cellsWord(cells)} · {sendFlow.mount.name} · {formatSeconds(sendFlow.mount.seconds_per_cell * cells)} ·{' '}
-                  риск нападения {Math.round(sendFlow.mount.ambush_chance * 100)}%
+                  Путь: {cells} {cellsWord(cells)} · {sendFlow.mount.name} ·{' '}
+                  {formatSeconds(est ? est.seconds : sendFlow.mount.seconds_per_cell * cells)} ·{' '}
+                  риск нападения {Math.round((est ? est.ambush : sendFlow.mount.ambush_chance) * 100)}%
                 </p>
                 <div className="map-card__confirm-actions">
                   <Button size="m" stretched onClick={confirmSend}>Подтвердить</Button>

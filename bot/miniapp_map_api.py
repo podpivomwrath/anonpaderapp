@@ -202,6 +202,7 @@ async def handle_get_state(request: web.Request) -> web.Response:
                 "is_dead": death_service.is_dead(character),
                 "foot_travel": foot_travel,
                 "mount_travel": mount_travel,
+                "safe_route": bool((character.ui_flags or {}).get("safe_route")),
                 "quest_target": quest_target,
                 "world_boss": world_boss_mark,
                 "trail": trail_mark,
@@ -273,6 +274,7 @@ async def handle_post_send_mount(request: web.Request) -> web.Response:
 
     mount_id = body.get("mount_id")
     x, y = body.get("x"), body.get("y")
+    safe = body.get("safe") is True
     if not isinstance(mount_id, str) or not isinstance(x, int) or not isinstance(y, int):
         return web.json_response({"error": "bad_request"}, status=400)
 
@@ -300,7 +302,7 @@ async def handle_post_send_mount(request: web.Request) -> web.Response:
         # а не два похожих куска. Раньше карта повторяла эти шаги у себя, и
         # игрок, отправивший маунта с карты, не получал в чат ничего.
         seconds = await mounts_handlers.start_travel_and_notify(
-            db, character, vk_user_id, mount_id, x, y
+            db, character, vk_user_id, mount_id, x, y, safe=safe,
         )
         travel = await mount_service.active_travel(db, character.id)
         ambush_chance = mount_service.ambush_chance(mount_id)
@@ -315,7 +317,40 @@ async def handle_post_send_mount(request: web.Request) -> web.Response:
     )
 
 
+async def handle_get_route(request: web.Request) -> web.Response:
+    """Предпросмотр пути на карте: клетки и шанс нападения для каждого
+    маунта. safe=1 - безопасный путь в обход колец опаснее цели."""
+    vk_user_id = request[VK_USER_ID_KEY]
+    try:
+        x, y = int(request.query["x"]), int(request.query["y"])
+    except (KeyError, ValueError):
+        return web.json_response({"error": "bad_request"}, status=400)
+    safe = request.query.get("safe") == "1"
+    session_factory = request.app[SESSION_FACTORY_KEY]
+    async with session_factory() as db:
+        character = await _load_character(db, vk_user_id)
+        if character is None:
+            return web.json_response({"error": "character_not_found"}, status=404)
+        if not grid.in_bounds(x, y) or (x, y) == (character.pos_x, character.pos_y):
+            return web.json_response({"error": "bad_request"}, status=400)
+        fx, fy = character.pos_x, character.pos_y
+        path = mount_service.route(fx, fy, x, y, safe)
+        owned = await mount_service.owned_mounts(db, character.id)
+    return web.json_response({
+        "cells": len(path),
+        "path": [[fx, fy]] + [list(c) for c in path],
+        "mounts": {
+            m.mount_id: {
+                "seconds": mount_service.total_travel_seconds(m.mount_id, len(path)),
+                "ambush": mount_service.trip_ambush_chance(m.mount_id, fx, fy, x, y, path=path),
+            }
+            for m in owned
+        },
+    })
+
+
 def register_routes(app: web.Application) -> None:
+    app.router.add_get("/api/miniapp/map/route", handle_get_route)
     app.router.add_get("/api/miniapp/map/state", handle_get_state)
     app.router.add_post("/api/miniapp/map/send_mount", handle_post_send_mount)
     app.router.add_post("/api/miniapp/map/stop_travel", handle_post_stop_travel)

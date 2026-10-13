@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from sqlalchemy import Boolean, DateTime, Float, ForeignKey, Integer, String, UniqueConstraint, func
+from sqlalchemy import JSON, Boolean, DateTime, Float, ForeignKey, Integer, String, UniqueConstraint, func
 from sqlalchemy.orm import Mapped, mapped_column
 
 from models.base import Base
@@ -50,6 +50,9 @@ class MountTravel(Base):
     # None — на эту поездку нападение не выпало (шанс не сыгран при старте)
     ambush_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     ambush_done: Mapped[bool] = mapped_column(Boolean, default=False)
+    #: Клетки пути без стартовой, с конечной ([[x, y], ...]). None - прямая
+    #: (grid.line_path); заполнен у безопасного пути (2026-10-13).
+    path: Mapped[list | None] = mapped_column(JSON, nullable=True)
     status: Mapped[str] = mapped_column(String(16), default="traveling")
     # Движение по клеткам: персонаж реально стоит на клетке path[cell_index-1]
     # (0 - ещё на старте), следующий шаг - в next_cell_at, шаг длится

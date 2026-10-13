@@ -237,12 +237,18 @@ export function getMapState() {
   return request('/map/state');
 }
 
-export function sendMountFromMap(mountId, x, y) {
+export function sendMountFromMap(mountId, x, y, safe = false) {
   return request('/map/send_mount', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ mount_id: mountId, x, y }),
+    body: JSON.stringify({ mount_id: mountId, x, y, safe }),
   });
+}
+
+// Предпросмотр пути верхом: клетки, время и риск по каждому маунту.
+// safe - безопасный путь в обход колец опаснее цели.
+export function getMapRoute(x, y, safe) {
+  return request(`/map/route?x=${x}&y=${y}&safe=${safe ? 1 : 0}`);
 }
 
 export function stopTravel() {

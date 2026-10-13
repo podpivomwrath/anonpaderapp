@@ -893,6 +893,33 @@ body {
   opacity: 0.7;
 }
 
+/* Переключатель безопасного пути в окне отправки маунта. */
+.map-safe-toggle {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  width: 100%;
+  margin: 6px 0;
+  padding: 8px 10px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 240, 225, 0.25);
+  background: rgba(20, 16, 14, 0.6);
+  color: inherit;
+  text-align: left;
+  font: inherit;
+  cursor: pointer;
+}
+
+.map-safe-toggle--on {
+  border-color: #6fbf73;
+  background: rgba(30, 60, 32, 0.55);
+}
+
+.map-safe-toggle__hint {
+  font-size: 0.85em;
+  opacity: 0.7;
+}
+
 .map-card__mounts {
   display: flex;
   flex-direction: column;
