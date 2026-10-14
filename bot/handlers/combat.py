@@ -790,24 +790,17 @@ async def use_combat_item(message: Message) -> None:
         _bot_api, "combat_item", peer_id, f"Использовано: {elixir.emoji} {elixir.name}.", no_keyboard()
     )
 
-    if elixir.category == "heal":
-        # Лечебное зелье (патч 16) — тратит ход, как обычное действие
-        try:
-            await _engine.declare_action(
-                peer_id, PLAYER_ID,
-                DeclaredAction(type=ActionType.ITEM, item_id=elixir_id, target_id=PLAYER_ID),
-            )
-        except (KeyError, ValueError):
-            pass
-        return
-
     # Боевой эликсир (патч 16) — бесплатное действие: эффект накладывается
     # СРАЗУ, ход не тратится, игрок продолжает как обычно (атака/навык).
     # Патч 30, баг 2, исправление 2: явно указываем, что ход ещё не сделан —
     # иначе игрок может решить, что бой завис (клавиатура-то есть, но неясно,
     # ждётся ли от него ещё действие).
-    line = elixir_effects.apply_combat_elixir(player, elixir_id, state.combatants)
-    player.combat_elixirs_used += 1
+    if elixir.category == "heal":
+        # Лечебное зелье - тоже без траты хода (2026-10-14).
+        line = elixir_effects.drink_heal(player, elixir_id)
+    else:
+        line = elixir_effects.apply_combat_elixir(player, elixir_id, state.combatants)
+        player.combat_elixirs_used += 1
     await _bot_api.messages.send(
         peer_id=peer_id, message=f"{line} Твой ход.\n\n{_render(state)}", random_id=0,
         keyboard=_combat_kb(state, peer_id),

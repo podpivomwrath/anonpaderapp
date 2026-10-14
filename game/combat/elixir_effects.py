@@ -10,6 +10,20 @@ from game.combat.session import SCROLL_WARD_TAG, SECOND_HEART_TAG, CombatantStat
 from game.economy import elixir_config as ec
 
 
+def drink_heal(actor: CombatantState, elixir_id: str) -> str:
+    """Лечебное зелье - тоже бесплатное действие (2026-10-14, решение
+    владельца): лечит сразу, ход не тратится. Раньше шло действием хода."""
+    from game.combat.session import white_max_hp
+
+    amount = ec.heal_amount(elixir_id, white_max_hp(actor)) or 0
+    before = actor.current_hp
+    actor.current_hp = min(actor.max_hp, before + amount)
+    healed = actor.current_hp - before
+    if healed <= 0:
+        return "🧪 Зелье выпито, но ты и так цел."
+    return f"🧪 Зелье лечит: +{healed} HP ({actor.current_hp}/{actor.max_hp})."
+
+
 def _apply_scroll(actor: CombatantState, elixir_id: str, combatants) -> str:
     """Свитки (2026-10-13): на всю сторону бойца или на всех врагов. Без
     списка бойцов (вызов из старого кода) - только на себя."""

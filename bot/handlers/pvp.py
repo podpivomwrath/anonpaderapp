@@ -1301,24 +1301,14 @@ async def pvp_use_item(message: Message) -> None:
         _bot_api, "pvp_combat_item", peer_id, f"Использовано: {elixir.emoji} {elixir.name}.", no_keyboard()
     )
 
+    # Боевой эликсир и (с 2026-10-14) лечебное зелье - бесплатное действие:
+    # эффект сразу, ход не тратится.
     if elixir.category == "heal":
-        # Лечебное зелье — тратит ход, как обычное действие (см. _pvp_action:
-        # здесь НЕ вызываем его напрямую — цель для ITEM всегда сам актёр,
-        # а _pvp_action всегда подставляет ВРАЖЕСКУЮ цель для не-defensive).
-        action = DeclaredAction(type=ActionType.ITEM, item_id=elixir_id, target_id=cid)
-        try:
-            if battle.battle_type == "duel":
-                await _duel_engine.act(battle_id, cid, action)
-            else:
-                await _mass_engine.declare_action(battle_id, cid, action)
-        except (KeyError, ValueError):
-            pass
-        return
-
-    # Боевой эликсир — бесплатное действие: эффект сразу, ход не тратится.
-    line = elixir_effects.apply_combat_elixir(combatant, elixir_id, _live_state(battle_id, battle))
-    combatant.combat_elixirs_used += 1
-    if elixir.category == "scroll":
+        line = elixir_effects.drink_heal(combatant, elixir_id)
+    else:
+        line = elixir_effects.apply_combat_elixir(combatant, elixir_id, _live_state(battle_id, battle))
+        combatant.combat_elixirs_used += 1
+    if elixir.category in ("scroll", "heal"):
         await _tell_others(battle, cid, f"{participant.name}: {line}")
     text = f"{line} Твой ход.\n\n{_battle_board_text(battle_id, battle, [])}"
     await _bot_api.messages.send(

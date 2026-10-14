@@ -865,17 +865,12 @@ async def raid_use_item(message: Message) -> None:
         _bot_api, "raid_item", peer_id, f"Использовано: {elixir.emoji} {elixir.name}.", no_keyboard()
     )
 
+    # Лечебное зелье - тоже без траты хода (2026-10-14).
     if elixir.category == "heal":
-        action = DeclaredAction(type=ActionType.ITEM, item_id=elixir_id, target_id=cid)
-        _declared_this_tick.setdefault(battle_id, set()).add(cid)
-        try:
-            await _engine.declare_action(battle_id, cid, action)
-        except (KeyError, ValueError):
-            _declared_this_tick.get(battle_id, set()).discard(cid)
-        return
-
-    line = elixir_effects.apply_combat_elixir(combatant, elixir_id, _live_state(battle_id, battle))
-    combatant.combat_elixirs_used += 1
+        line = elixir_effects.drink_heal(combatant, elixir_id)
+    else:
+        line = elixir_effects.apply_combat_elixir(combatant, elixir_id, _live_state(battle_id, battle))
+        combatant.combat_elixirs_used += 1
     if elixir.category == "scroll":
         await _tell_others(battle, cid, f"{p.name}: {line}")
     text = f"{line} Твой ход.\n\n{_render_board(_engine.sessions.get(battle_id))}"
