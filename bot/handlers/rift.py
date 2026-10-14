@@ -40,6 +40,48 @@ def setup(bot_api) -> None:
     _bot_api = bot_api
 
 
+@labeler.message(text=["/разломы", "/разлом", "/rifts", "разломы"])
+async def rifts_command(message: Message) -> None:
+    """Активные разломы: где, какие уровни, босс и что с ним сейчас (2026-10-14)."""
+    from datetime import datetime, timezone
+
+    from bot.handlers import raid_combat
+    from bot.handlers import world as world_handlers  # избегаем цикла импортов
+    from game.economy import rift_config as rc
+
+    async with get_session_factory()() as db:
+        character = await onboarding_svc.get_character(db, message.from_id)
+        if character is None or character.creation_state is not None:
+            return
+        rifts = await rift_service.active_rifts(db)
+        keyboard = await world_handlers._current_keyboard(
+            db, character, message.peer_id, datetime.now(timezone.utc),
+        )
+    if not rifts:
+        await message.answer("🌀 Сейчас на карте нет ни одного разлома.", keyboard=keyboard)
+        return
+    blocks = []
+    for r in rifts:
+        t = rc.RIFT_TYPES[r.kind]
+        lo, hi = rc.BANDS[r.ring]
+        blood = rift_service.is_blood(r)
+        head = f"{'🩸' if blood else t.emoji} {t.name}{' (кровавый)' if blood else ''} - ({r.x}; {r.y}), ур. {lo}-{hi}"
+        if r.state == rift_service.RUNNING:
+            progress = raid_combat.rift_progress(r.id)
+            if progress is not None and progress[0] >= progress[1]:
+                status = f"⚔️ Бьют босса: {t.boss}"
+            elif progress is not None:
+                status = f"⚔️ Группа внутри, этап {progress[0]} из {progress[1]}. Босс: {t.boss}"
+            else:
+                status = f"⚔️ Группа внутри. Босс: {t.boss}"
+        elif r.state == rift_service.WAITING:
+            status = f"⏳ Группа собирается у входа. Босс: {t.boss}"
+        else:
+            status = f"🕯 Ждёт захода, исчезнет через {rift_service.minutes_left(r)} мин. Босс: {t.boss}"
+        blocks.append(f"{head}\n{status}")
+    await message.answer("🌀 Разломы на карте:\n\n" + "\n\n".join(blocks), keyboard=keyboard)
+
+
 def is_waiting(peer_id: int) -> bool:
     return peer_id in _waiting
 

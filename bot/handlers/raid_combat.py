@@ -160,6 +160,14 @@ class RaidBattle:
 
 
 _battles: dict[int, RaidBattle] = {}
+
+
+def rift_progress(rift_id: int) -> tuple[int, int] | None:
+    """(этап, всего этапов) идущего захода разлома; None - боя в памяти нет."""
+    for battle in _battles.values():
+        if battle.rift_id == rift_id:
+            return battle.stage, battle.final_stage
+    return None
 _peer_battle: dict[int, int] = {}
 _declared_this_tick: dict[int, set[int]] = {}
 _chosen_target: dict[int, int] = {}
