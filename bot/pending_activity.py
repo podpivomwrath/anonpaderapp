@@ -125,6 +125,43 @@ async def forget_event(peer_id: int) -> None:
     await _redis.delete(_event_key(peer_id))
 
 
+# --- Мелкая жила из исследования (2026-10-14) ------------------------------
+# Кнопка «Копать жилу» - одноразовая: раньше старую кнопку можно было жать
+# снова и снова, и каждая добыча давала руду. Теперь жила - токен в кнопке;
+# копать можно, только пока токен совпадает с выданным, и он сгорает при
+# первой добыче. В Redis - чтобы жила пережила деплой; без Redis - в памяти.
+VEIN_TTL_SECONDS = 24 * 3600
+_veins: dict[int, str] = {}
+
+
+def _vein_key(peer_id: int) -> str:
+    return f"vein:{peer_id}"
+
+
+async def offer_vein(peer_id: int, token: str) -> None:
+    _veins[peer_id] = token
+    if _redis is not None:
+        await _redis.set(_vein_key(peer_id), token, ex=VEIN_TTL_SECONDS)
+
+
+async def take_vein(peer_id: int, token: str | None) -> bool:
+    """Забрать жилу: True ровно один раз на выданный токен."""
+    if not token:
+        return False
+    if _redis is None:
+        if _veins.get(peer_id) != token:
+            return False
+        del _veins[peer_id]
+        return True
+    raw = await _redis.getdel(_vein_key(peer_id))
+    raw = raw.decode() if isinstance(raw, bytes) else raw
+    if raw is not None and raw != token:
+        # Нажали старую кнопку - текущую жилу не сжигаем.
+        await _redis.set(_vein_key(peer_id), raw, ex=VEIN_TTL_SECONDS)
+    _veins.pop(peer_id, None)
+    return raw == token
+
+
 async def pending() -> list[tuple[str, int, float]]:
     """(вид, peer_id, сколько секунд осталось; 0 - уже пора)."""
     if _redis is None:

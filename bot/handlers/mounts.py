@@ -550,6 +550,15 @@ async def scan() -> None:
             step = mount_service.advance(
                 travel, character, _rng, now, paused=is_paused(peer_id), trip_chance=trip,
             )
+            if step.cells:
+                from services import daily_service
+
+                # «Странник»: каждая клетка верхом засчитывается (2026-10-14;
+                # раньше - одна клетка за всю поездку). Гильдейским заданиям -
+                # по-прежнему одна за поездку, по прибытии.
+                daily_announce.append((peer_id, await daily_service.record_cell_moved(
+                    db, character, step.cells, guild_cells=1 if step.arrived else 0,
+                )))
             if step.moved:
                 from bot.handlers import guild as guild_handlers  # избегаем цикла импортов
 
@@ -575,16 +584,13 @@ async def scan() -> None:
                 continue
 
             if step.arrived:
-                from services import daily_service, trial_service
+                from services import trial_service
 
                 if travel.mount_id == tc.CART_MOUNT_ID:
                     await trade_service.on_arrival(db, character)
 
                 if character.subclass is not None:
                     await trial_service.record_cell_moved(db, character)
-                # Прогресс задания «пройди N клеток» - объявить после коммита,
-                # иначе награда и уровень приходили молча (2026-10-13).
-                daily_announce.append((peer_id, await daily_service.record_cell_moved(db, character)))
                 stats = await _stats(db, character.id)
                 wallet = await wallet_service.get_wallet(db, character.id)
                 gear_bonus = await item_service.compute_gear_bonus(db, character.id)

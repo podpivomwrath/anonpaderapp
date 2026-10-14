@@ -146,6 +146,7 @@ class CombatantState:
     block_reduction: float = 0.0    # доля срезаемого входящего урона
     mitigation_penalty: float = 0.0  # штраф к митигации (групповой щит стража)
     taunted_by: int | None = None   # PvE-форс цели для моба
+    taunt_left: int = 0             # сколько ещё тиков держится taunted_by
 
     effects: list[Effect] = field(default_factory=list)
     # Кулдауны навыков в ходах боя {skill_id: осталось}; сбрасываются между
@@ -296,7 +297,11 @@ class CombatantState:
         self.shield = 0
         self.block_reduction = 0.0
         self.mitigation_penalty = 0.0
-        self.taunted_by = None
+        # Провокация держится taunt_left тиков (2026-10-14: раньше слетала
+        # после первого же тика, хотя навык обещает 2 хода).
+        self.taunt_left = max(0, self.taunt_left - 1)
+        if self.taunt_left == 0:
+            self.taunted_by = None
 
 
 def build_combatant(

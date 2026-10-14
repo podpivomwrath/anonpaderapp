@@ -14,6 +14,7 @@ import random
 from vkbottle.bot import BotLabeler, Message
 
 from bot import mining_texts as mt
+from bot import pending_activity
 from bot.activity import activity_action, blocked_reason
 from bot.keyboards import mining as kb
 from bot.keyboards.world import movement_keyboard
@@ -307,6 +308,11 @@ async def dig_event_vein(message: Message) -> None:
         reason = await blocked_reason(db, character, message.peer_id)
         if reason:
             await message.answer(reason)
+            return
+        # Жила одноразовая (2026-10-14): старая кнопка больше не копает.
+        token = (message.get_payload_json() or {}).get("t")
+        if not await pending_activity.take_vein(message.peer_id, token):
+            await message.answer(mt.VEIN_GONE_TEXT)
             return
         started = await mining_service.start_dig(db, character, None, _rng)
         await screen_service.set_screen(db, character, "mine")

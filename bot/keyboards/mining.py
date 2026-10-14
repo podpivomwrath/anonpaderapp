@@ -65,12 +65,12 @@ def approach_mine_keyboard() -> str:
     return kb.get_json()
 
 
-def event_vein_keyboard(event_id: str) -> str:
+def event_vein_keyboard(event_id: str, token: str = "") -> str:
     """Мелкая жила в исследовании: добыча начинается прямо из события, своего
     экрана у неё нет — она исчезает при любом выходе."""
     kb = Keyboard(inline=True)
     kb.add(
-        Text(BTN_DIG_VEIN, payload={"type": "dig_vein", "event": event_id}),
+        Text(BTN_DIG_VEIN, payload={"type": "dig_vein", "event": event_id, "t": token}),
         color=KeyboardButtonColor.POSITIVE,
     )
     return kb.get_json()

@@ -51,9 +51,12 @@ def shield_bash(ctx: SkillContext) -> None:
 
     enemies = ctx.session.alive_enemies_of(actor)
     if ctx.session.mode == CombatMode.PVE:
+        # Те же 2 хода (+«Несгибаемый»), что и в PvP.
+        taunt_ticks = bc.PROVOKE_PVP_DURATION_TICKS + int(actor.buff_modifiers.get("provoke_duration_bonus", 0))
         for enemy in enemies:
             if enemy.kind == "mob":
                 enemy.taunted_by = actor.id
+                enemy.taunt_left = taunt_ticks
         ctx.lines.append(f"{actor.name} провоцирует врагов - цели мобов форсированы!")
     else:
         # Патч 47: «Несгибаемый» — +provoke_duration_bonus ходов; 0 без баффа.

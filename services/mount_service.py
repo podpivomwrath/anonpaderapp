@@ -262,6 +262,7 @@ async def cancel_travel(db: AsyncSession, travel: MountTravel) -> None:
 @dataclass
 class StepResult:
     moved: bool = False      # перешёл хотя бы на одну клетку
+    cells: int = 0           # сколько клеток пройдено за этот шаг
     ambushed: bool = False   # на новой клетке напали - поездка встала
     arrived: bool = False    # дошёл до цели
 
@@ -285,6 +286,7 @@ def advance(
             vitals_service.heal_in_city(character)
             travel.status = "completed"
             result.moved = result.arrived = True
+            result.cells = 1
         return result
     if paused:
         if now >= travel.next_cell_at:
@@ -300,6 +302,7 @@ def advance(
         character.pos_x, character.pos_y = x, y
         vitals_service.heal_in_city(character)
         result.moved = True
+        result.cells += 1
         if travel.cell_index >= len(path):
             travel.status = "completed"
             result.arrived = True

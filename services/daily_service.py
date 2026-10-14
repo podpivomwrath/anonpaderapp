@@ -399,16 +399,20 @@ async def record_trophies(
     return await _with_guild(db, character, "trophies", sum(trophies.values()), result)
 
 
-async def record_cell_moved(db: AsyncSession, character: Character) -> DailyProgressResult:
+async def record_cell_moved(
+    db: AsyncSession, character: Character, cells: int = 1, guild_cells: int | None = None,
+) -> DailyProgressResult:
+    """cells - пройдено клеток (верхом - сколько проехал за шаг, 2026-10-14);
+    guild_cells - сколько засчитать гильдейским заданиям (по умолчанию столько же)."""
     completions = []
     for row in await _active_dailies(db, character):
         qdef = quest_def(row.quest_id)
         if qdef is not None and qdef.condition_type == "cells_moved":
-            completion = await _apply_delta(db, character, row, 1)
+            completion = await _apply_delta(db, character, row, cells)
             if completion:
                 completions.append(completion)
     result = await _finish(db, character, completions)
-    return await _with_guild(db, character, "cells", 1, result)
+    return await _with_guild(db, character, "cells", cells if guild_cells is None else guild_cells, result)
 
 
 async def record_exploration(db: AsyncSession, character: Character) -> DailyProgressResult:

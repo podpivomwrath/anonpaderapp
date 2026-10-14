@@ -1026,12 +1026,14 @@ async def handle_explore_done(peer_id: int) -> None:
             keyboard=kb.movement_keyboard(character.pos_x, character.pos_y, peer_id,
                                           has_mount=has_mount),
         )
+        vein_token = f"{random.getrandbits(48):x}"
+        await pending_activity.offer_vein(peer_id, vein_token)
         await _bot_api.messages.send(
             peer_id=peer_id,
             message=f"{event.title}" + chr(10) * 2 + event.text,
             random_id=0,
             attachment=event_attachment(event.id),
-            keyboard=mining_kb.event_vein_keyboard(event.id),
+            keyboard=mining_kb.event_vein_keyboard(event.id, vein_token),
         )
         return
 
