@@ -226,3 +226,15 @@ async def test_reset_stats_returns_points_and_keeps_subclass(
     assert character.subclass == "guardian"               # подкласс на месте
     assert stats.strength == bc.STARTING_STATS["warrior"]["STR"]
     assert stats.unspent_points == bc.STAT_POINTS_PER_LEVEL * 9
+
+
+async def test_editing_existing_preset_is_free(db_session, make_character) -> None:
+    """2026-10-16: пересбор уже созданного пресета бесплатный, создание - платное."""
+    character = await make_character(farm=bc.PRESET_CHANGE_COST_FARM, subclass="guardian")
+    second_set = ["guardian_heavy_hand", "guardian_reflection", "guardian_provoker_mark"]
+    await _unlock(db_session, character, *set(OK_SET) | set(second_set))
+    preset = await save_preset(db_session, character, "Танк", OK_SET, CATALOG)
+    assert (await get_wallet(db_session, character.id)).farm_currency == 0
+    await save_preset(db_session, character, "ДД", second_set, CATALOG, preset_id=preset.id)
+    assert preset.buff_ids == second_set and preset.name == "ДД"
+    assert (await get_wallet(db_session, character.id)).farm_currency == 0

@@ -94,7 +94,8 @@ async def save_preset(
     catalog: dict[str, BuffDef],
     preset_id: int | None = None,
 ) -> CharacterBuffPreset:
-    """Создание нового пресета или изменение состава — платно (уровень 2).
+    """Создание нового пресета - платно, изменение состава уже созданного -
+    бесплатно (2026-10-16).
     Новый пресет нельзя создать сверх купленных слотов (патч 14, ч.3)."""
     unlocked = await trial_service.unlocked_buff_ids(db, character.id)
     validate_preset(buff_ids, character.subclass, catalog, unlocked)
@@ -114,7 +115,10 @@ async def save_preset(
                 "Нет свободных слотов пресетов - купи ещё один в разделе «Персонаж»"
             )
 
-    await charge(db, character.id, "farm", bc.PRESET_CHANGE_COST_FARM)
+    # Создание нового пресета платное, пересбор уже созданного - бесплатно
+    # (2026-10-16, решение владельца).
+    if preset_id is None:
+        await charge(db, character.id, "farm", bc.PRESET_CHANGE_COST_FARM)
 
     if preset_id is not None:
         preset = await db.get(CharacterBuffPreset, preset_id)
