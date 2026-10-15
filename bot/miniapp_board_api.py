@@ -10,7 +10,7 @@ from datetime import datetime, timedelta, timezone
 from zoneinfo import ZoneInfo
 
 from aiohttp import web
-from sqlalchemy import select
+from sqlalchemy import func, select
 
 from bot.app_keys import SESSION_FACTORY_KEY
 from bot.miniapp_auth import VK_USER_ID_KEY
@@ -79,6 +79,11 @@ async def handle_get(request: web.Request) -> web.Response:
         # Кто не дрался, в таблице не стоит - и места у него нет.
         fought = (character.pvp_wins or 0) + (character.pvp_losses or 0) > 0
         my_rank = await pvp_service.rank_of(db, character) if fought else None
+        rated_total = await db.scalar(
+            select(func.count()).select_from(Character).where(
+                Character.creation_state.is_(None), (Character.pvp_wins + Character.pvp_losses) > 0,
+            )
+        )
         revenge = None
         if pk_service.revenge_bonus(character, character.revenge_target_id or -1, now):
             target = await db.get(Character, character.revenge_target_id)
@@ -91,7 +96,7 @@ async def handle_get(request: web.Request) -> web.Response:
         data = {
             "season": _season(now),
             "me": {
-                "pts": character.pts, "rank": pts_service.rank_name(character.pts), "place": my_rank,
+                "pts": character.pts, "rank": pts_service.rank_name(character.pts), "place": my_rank, "rated_total": rated_total or 0, "fought": fought,
                 "marks": my_marks, "bounty": character.pk_bounty or 0,
                 "next_decay_min": _next_decay_minutes(character, now) if my_marks else None,
                 "consequences": pk_service.consequences(my_marks) if my_marks else None,

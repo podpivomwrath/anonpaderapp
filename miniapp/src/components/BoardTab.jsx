@@ -67,8 +67,11 @@ function Wanted({ data }) {
           </div>
         ))}
       </Group>
-      <Group header={<Header>Как работает клеймо</Header>}>
-        <Div className="craft-hint">
+      {/* Правила свёрнуты - развёрнутые занимали полэкрана (2026-10-15). */}
+      <Group>
+        <details className="board-rules">
+          <summary>Как работает клеймо</summary>
+          <div className="craft-hint">
           <p><b>Когда даётся метка.</b> Ты убил в PvP игрока, у которого уровень меньше твоего на {rules.level_gap} или больше. Пример: тебе 30 уровень, убил игрока 25 уровня или ниже - метка. Убил 26 уровня - метки нет.</p>
           <p><b>Сколько держится.</b> Каждая метка исчезает сама через {rules.decay_hours} ч, играешь ты или нет. 3 метки исчезнут через {rules.decay_hours * 3} ч.</p>
           <p><b>Что грозит</b> (всё складывается):</p>
@@ -79,7 +82,8 @@ function Wanted({ data }) {
           <p>• {rules.city_ban_from}+ - в город не пускают, после смерти появляешься у ворот.</p>
           <p><b>Тому, кого убили:</b> {rules.revenge_hours} ч его урон по убийце на {rules.revenge_pct}% больше.</p>
           <p><b>Охота на клеймёных:</b> за убийство игрока с клеймом метку не дают, даже если он намного слабее. PTS за него начисляются при любой разнице уровней.</p>
-        </Div>
+          </div>
+        </details>
       </Group>
     </>
   );
@@ -89,7 +93,12 @@ function Rating({ data }) {
   const { me, rating } = data;
   return (
     <Group header={<Header>Рейтинг PvP · сезон {data.season.name}</Header>}>
-      <Div className="craft-hint">Ты: {me.place ? `${me.place} место · ` : ''}{money(me.pts)} PTS · {me.rank}</Div>
+      {/* Своё место видно всегда, даже за пределами двадцатки (2026-10-15). */}
+      <Div className="craft-hint">
+        {me.place
+          ? <>Ты: <b>{me.place} место</b> из {me.rated_total} · {money(me.pts)} PTS · {me.rank}</>
+          : <>Тебя пока нет в рейтинге: ты попадёшь в него после первого PvP-боя. Сейчас у тебя {money(me.pts)} PTS · {me.rank}.</>}
+      </Div>
       {rating.length === 0 && (
         <Placeholder icon={<div style={{ fontSize: 48 }}>🕯️</div>}>В этом сезоне ещё никто не дрался в PvP.</Placeholder>
       )}

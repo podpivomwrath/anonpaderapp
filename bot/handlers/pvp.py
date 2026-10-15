@@ -533,7 +533,11 @@ async def leaderboard_command(message: Message) -> None:
             f"{entry.rank}. {name} - {entry.pts} PTS · {pts_service.rank_name(entry.pts)}"
             f" · {entry.wins} / {entry.losses}"
         )
-    if rank > len(entries):
+    if (character.pvp_wins or 0) + (character.pvp_losses or 0) == 0:
+        # Без боёв в таблице не стоят - и место не выдумываем (2026-10-15).
+        lines.append("-")
+        lines.append(f"Тебя пока нет в рейтинге: попадёшь после первого PvP-боя. У тебя {character.pts} PTS.")
+    elif rank > len(entries):
         lines.append("-")
         lines.append(
             f"Ты: {rank} место - {character.pts} PTS · {pts_service.rank_name(character.pts)}"

@@ -2378,3 +2378,17 @@ body::before {
     transform: translateX(-50%);
   }
 }
+
+/* «Доска»: свёрнутые правила клейма (2026-10-15). */
+.board-rules {
+  padding: 4px 16px 12px;
+}
+.board-rules summary {
+  cursor: pointer;
+  padding: 10px 0;
+  font-weight: 600;
+  list-style-position: inside;
+}
+.board-rules p {
+  margin: 0 0 8px;
+}
