@@ -421,6 +421,7 @@ async def handle_get_leaderboard(request: web.Request) -> web.Response:
                     powers[e.character_id] = await power_service.power_by_id(session, e.character_id)
         from game.economy import crown_config as cc
 
+        frames = await crown_service.frames_by_id(session, [e.character_id for e in entries])
         return web.json_response({
             "board": board_id,
             "boards": [
@@ -446,7 +447,9 @@ async def handle_get_leaderboard(request: web.Request) -> web.Response:
                  # он показывает подкласс, если тот выбран.
                  "base_class": e.base_class, "subclass": e.subclass,
                  # Патч 111: Мощь рядом с ником - только в боевых топах.
-                 "power": powers.get(e.character_id)}
+                 "power": powers.get(e.character_id),
+                 # Рамка венца, которую носит игрок (своя у каждого).
+                 "crown_frame": frames.get(e.character_id)}
                 for e in entries
             ],
         })

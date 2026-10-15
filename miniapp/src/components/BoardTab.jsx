@@ -54,7 +54,7 @@ function Wanted({ data }) {
         {wanted.map((w) => (
           <div className="stat-row top-row" key={w.id}>
             <span className="stat-row__label">
-              <ClassIcon subclass={w.subclass} baseClass={w.base_class} size={40} />
+              <ClassIcon subclass={w.subclass} baseClass={w.base_class} crown={w.crown_frame || null} size={40} />
               <span className="top-who">
                 <span className="top-name">🩸{w.marks} {w.name}</span>
                 <span className="craft-hint">
@@ -105,8 +105,8 @@ function Rating({ data }) {
       {rating.map((e) => (
         <div className="stat-row top-row" key={e.rank}>
           <span className="stat-row__label">
-            {/* Венец PvP у первого места - как в «Топах» (рамка и есть награда). */}
-            <ClassIcon subclass={e.subclass} baseClass={e.base_class} crown={e.rank === 1 ? 'pvp' : null} size={40} />
+            {/* Рамка венца, которую носит игрок (своя у каждого). */}
+            <ClassIcon subclass={e.subclass} baseClass={e.base_class} crown={e.crown_frame || null} size={40} />
             <span className="top-who">
               <span className="top-name">{e.rank}. {e.premium && '💠 '}{e.name}</span>
               {e.title && <span className={`top-title title-tier title-tier--${e.title_tier || 'common'}`}>«{e.title}»</span>}

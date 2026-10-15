@@ -106,12 +106,12 @@ export default function TopsTab() {
           {top.map((e) => (
             <div className="stat-row top-row" key={e.rank}>
               <span className="stat-row__label">
-                {/* Венец только у первого места: рамка и есть награда за
-                    него, второму и третьему не достаётся ничего (патч 91). */}
+                {/* Рамка венца - та, что игрок носит (2026-10-15): у каждого,
+                    у кого есть венец, а не только у первого места доски. */}
                 <ClassIcon
                   subclass={e.subclass}
                   baseClass={e.base_class}
-                  crown={e.rank === 1 ? board : null}
+                  crown={e.crown_frame || null}
                   size={40}
                 />
                 {/* Имя, титул и Мощь переносятся внутри своей колонки: на

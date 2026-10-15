@@ -17,7 +17,7 @@ from bot.miniapp_auth import VK_USER_ID_KEY
 from game.economy import pk_config as pkc
 from game.economy import pts_config as ptc
 from models import Character
-from services import leaderboard_service, pk_service, pts_service, pvp_service
+from services import crown_service, leaderboard_service, pk_service, pts_service, pvp_service
 from services import onboarding_service as onboarding_svc
 
 MONTHS = ["январь", "февраль", "март", "апрель", "май", "июнь", "июль", "август",
@@ -93,6 +93,12 @@ async def handle_get(request: web.Request) -> web.Response:
                 "bonus_pct": round(pkc.REVENGE_BONUS * 100),
             }
         my_marks = pk_service.marks(character, now)
+        wanted = await _wanted(db, now)
+        frames = await crown_service.frames_by_id(
+            db, [e.character_id for e in rating] + [w["id"] for w in wanted],
+        )
+        for w in wanted:
+            w["crown_frame"] = frames.get(w["id"])
         data = {
             "season": _season(now),
             "me": {
@@ -109,11 +115,12 @@ async def handle_get(request: web.Request) -> web.Response:
                 "city_ban_from": pkc.CITY_BAN_FROM, "revenge_pct": round(pkc.REVENGE_BONUS * 100),
                 "revenge_hours": pkc.REVENGE_HOURS,
             },
-            "wanted": await _wanted(db, now),
+            "wanted": wanted,
             "rating": [
                 {"rank": e.rank, "name": e.name, "value": e.value, "premium": e.premium,
                  "base_class": e.base_class, "subclass": e.subclass,
-                 "title": e.title, "title_tier": e.title_tier}
+                 "title": e.title, "title_tier": e.title_tier,
+                 "crown_frame": frames.get(e.character_id)}
                 for e in rating
             ],
         }

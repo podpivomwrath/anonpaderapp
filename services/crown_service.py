@@ -86,6 +86,17 @@ def frame_board(character: Character) -> str | None:
     return held[0] if held else None
 
 
+async def frames_by_id(db: AsyncSession, character_ids) -> dict[int, str | None]:
+    """Рамка венца каждого персонажа - для любых списков с аватарками
+    (топы, «Доска»): у каждого своя выбранная рамка, а не только у первого
+    места (2026-10-15, просьба владельца)."""
+    ids = {i for i in character_ids if i is not None}
+    if not ids:
+        return {}
+    rows = (await db.scalars(select(Character).where(Character.id.in_(ids)))).all()
+    return {c.id: frame_board(c) for c in rows}
+
+
 def set_frame(character: Character, board: str | None) -> bool:
     """board=None - снять рамку. False, если такого венца у игрока нет."""
     if board is None:
