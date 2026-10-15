@@ -8,7 +8,7 @@
 	encode gzip
 
 	# API бота и вебхук VK — всегда на bot:8080, статику не отдаём под этими путями
-	@backend path /api/miniapp/* /vk/callback /health
+	@backend path /api/* /vk/callback /health
 	handle @backend {
 		reverse_proxy bot:8080
 	}

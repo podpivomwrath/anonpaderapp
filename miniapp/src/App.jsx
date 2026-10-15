@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import bridge from '@vkontakte/vk-bridge';
 import { AppRoot, ConfigProvider, SplitLayout, SplitCol, Tabs, TabsItem } from '@vkontakte/vkui';
 import BackgroundScene from './components/BackgroundScene.jsx';
@@ -8,6 +8,8 @@ import IntroScene from './components/IntroScene.jsx';
 import TabHint from './components/TabHint.jsx';
 import Tour from './components/Tour.jsx';
 import { ChronicleSection } from './components/DailiesTab.jsx';
+import WebLogin, { completeWebLogin } from './components/WebLogin.jsx';
+import { IN_VK, webToken } from './api.js';
 
 // Патч 77: тема ВСЕГДА тёмная, за клиентом ВК больше не следуем.
 //
@@ -31,6 +33,21 @@ const COLOR_SCHEME = 'dark';
 const DEV_INTRO = import.meta.env.DEV && window.location.hash === '#intro';
 
 function App() {
+  // Сайт: без ключа сессии - экран входа через VK ID (2026-10-15).
+  const [webReady, setWebReady] = useState(IN_VK || Boolean(webToken()));
+  const [webError, setWebError] = useState(null);
+
+  useEffect(() => {
+    if (IN_VK) return undefined;
+    // Возврат с id.vk.com: в адресе code - обменять на ключ сессии.
+    completeWebLogin()
+      .then((done) => { if (done) setWebReady(true); })
+      .catch((e) => setWebError(e.message || 'login_failed'));
+    const relogin = () => setWebReady(false);
+    window.addEventListener('web-login-required', relogin);
+    return () => window.removeEventListener('web-login-required', relogin);
+  }, []);
+
   useEffect(() => {
     bridge.send('VKWebAppInit')
       // Айфон: свайп слева направо - системное «назад» VK, и оно сворачивало
@@ -117,6 +134,17 @@ function App() {
       <ConfigProvider colorScheme={COLOR_SCHEME}>
         <AppRoot>
           <IntroScene onDone={(sound) => { window.location.hash = `done-${sound}`; }} />
+        </AppRoot>
+      </ConfigProvider>
+    );
+  }
+
+  if (!webReady) {
+    return (
+      <ConfigProvider colorScheme={COLOR_SCHEME}>
+        <BackgroundScene />
+        <AppRoot className="hub">
+          <WebLogin error={webError} />
         </AppRoot>
       </ConfigProvider>
     );

@@ -69,6 +69,9 @@ class Settings(BaseSettings):
     # Пока нигде не используется кодом — задел на будущие серверные вызовы VK API
     # от имени приложения (Service Token), сохранён про запас.
     vk_service_key: str = Field(default="", description="Сервисный ключ приложения VK (Service Token)")
+    # Веб-версия на своём домене (2026-10-15): ID приложения VK ID для входа
+    # на сайте (id.vk.com). Пусто - вход на сайте выключен.
+    vk_id_client_id: str = Field(default="", description="ID приложения VK ID для входа на сайте")
 
     # --- Админка (патч 27) ---
     # Единственный администратор — сверяется с verified vk_id на каждом запросе.

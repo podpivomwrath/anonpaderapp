@@ -6,7 +6,38 @@
  */
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || '';
-const LAUNCH_PARAMS = window.location.search; // включает ведущий "?" либо пуст
+const SEARCH = new URLSearchParams(window.location.search);
+// Внутри VK в адресе подписанные launch-параметры. Без них это сайт
+// (monolithgame.ru, 2026-10-15): вход через VK ID и ключ сессии в
+// Authorization - те же запросы, те же данные.
+export const IN_VK = SEARCH.has('vk_user_id') && SEARCH.has('sign');
+const LAUNCH_PARAMS = IN_VK ? window.location.search : ''; // включает ведущий "?" либо пуст
+const WEB_TOKEN_KEY = 'monolith_web_token';
+
+export function webToken() {
+  try { return localStorage.getItem(WEB_TOKEN_KEY); } catch { return null; }
+}
+
+export function setWebToken(token) {
+  try {
+    if (token) localStorage.setItem(WEB_TOKEN_KEY, token);
+    else localStorage.removeItem(WEB_TOKEN_KEY);
+  } catch { /* приватный режим - вход живёт до закрытия вкладки */ }
+}
+
+export async function getWebConfig() {
+  const res = await fetch(`${API_BASE}/api/web/config`);
+  return res.json();
+}
+
+export async function webLogin(body) {
+  const res = await fetch(`${API_BASE}/api/web/login`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
+  });
+  const data = await res.json().catch(() => ({ error: 'bad_response' }));
+  if (!res.ok) throw new Error(data.error || `http_${res.status}`);
+  return data;
+}
 
 function buildUrl(path) {
   // Патч 34, ч.2, доп. фикс: слепая конкатенация path + LAUNCH_PARAMS ломалась,
@@ -25,14 +56,23 @@ async function request(path, options) {
   // ngrok-skip-browser-warning: без него бесплатный ngrok-туннель (альфа-тест,
   // см. README) отдаёт HTML-заглушку вместо JSON на первый запрос из вебвью.
   // Безвредно для любого другого хостинга - заголовок просто игнорируется.
+  const token = IN_VK ? null : webToken();
   const res = await fetch(url, {
     ...options,
-    headers: { 'ngrok-skip-browser-warning': 'true', ...(options?.headers || {}) },
+    headers: {
+      'ngrok-skip-browser-warning': 'true',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...(options?.headers || {}),
+    },
   });
   const data = await res.json().catch(() => ({ error: 'bad_response' }));
   if (!res.ok) {
     const error = new Error(data.error || `http_${res.status}`);
     error.details = data;
+    if (!IN_VK && ['web_session_expired', 'invalid_signature'].includes(data.error)) {
+      setWebToken(null);
+      window.dispatchEvent(new CustomEvent('web-login-required'));
+    }
     if (data.error === 'account_banned') {
       window.dispatchEvent(new CustomEvent('account-banned', { detail: data }));
     }

@@ -83,18 +83,27 @@ async def miniapp_auth_middleware(
     settings: Settings = request.app[SETTINGS_KEY]
     params = dict(request.query)
 
-    if not verify_launch_params(params, settings.vk_miniapp_secret):
-        logger.warning("Miniapp: неверная подпись launch-параметров, путь={}", request.path)
-        return web.json_response({"error": "invalid_signature"}, status=403)
+    # Сайт (bot/web_auth.py): ключ сессии VK ID вместо launch-параметров.
+    from bot.web_auth import bearer_user
 
-    if not _launch_params_fresh(params):
-        logger.warning("Miniapp: просроченные launch-параметры, путь={}", request.path)
-        return web.json_response({"error": "launch_params_expired"}, status=403)
+    web_user = bearer_user(request) if "sign" not in params else None
+    if web_user is not None:
+        vk_user_id = web_user
+    elif request.headers.get("Authorization", "").startswith("Bearer ") and "sign" not in params:
+        return web.json_response({"error": "web_session_expired"}, status=403)
+    else:
+        if not verify_launch_params(params, settings.vk_miniapp_secret):
+            logger.warning("Miniapp: неверная подпись launch-параметров, путь={}", request.path)
+            return web.json_response({"error": "invalid_signature"}, status=403)
 
-    try:
-        vk_user_id = int(params["vk_user_id"])
-    except (KeyError, ValueError):
-        return web.json_response({"error": "invalid_signature"}, status=403)
+        if not _launch_params_fresh(params):
+            logger.warning("Miniapp: просроченные launch-параметры, путь={}", request.path)
+            return web.json_response({"error": "launch_params_expired"}, status=403)
+
+        try:
+            vk_user_id = int(params["vk_user_id"])
+        except (KeyError, ValueError):
+            return web.json_response({"error": "invalid_signature"}, status=403)
 
     request[VK_USER_ID_KEY] = vk_user_id
     from sqlalchemy import select
@@ -133,5 +142,5 @@ async def miniapp_cors_middleware(
     # ngrok-skip-browser-warning (патч альфа-теста, см. miniapp/src/api.js) —
     # без него бесплатный ngrok-туннель возвращает межстраничную заглушку
     # вместо ответа на preflight, и браузер режет запрос ещё до отправки.
-    response.headers["Access-Control-Allow-Headers"] = "Content-Type, ngrok-skip-browser-warning"
+    response.headers["Access-Control-Allow-Headers"] = "Content-Type, Authorization, ngrok-skip-browser-warning"
     return response

@@ -26,6 +26,7 @@ from bot.miniapp_shop_api import register_routes as register_shop_routes
 from bot.miniapp_board_api import register_routes as register_board_routes
 from bot.miniapp_trade_api import register_routes as register_trade_routes
 from bot.miniapp_auth import miniapp_auth_middleware, miniapp_cors_middleware
+from bot.web_auth import register_routes as register_web_auth_routes
 from bot.miniapp_map_api import register_routes as register_miniapp_map_routes
 from config import Settings
 from services.db import get_session_factory
@@ -107,6 +108,7 @@ def create_app(settings: Settings, route_event: RouteEvent, redis=None) -> web.A
     app.router.add_post(WEBHOOK_PATH, handle_callback)
     app.router.add_get("/health", handle_health)
     register_miniapp_routes(app)
+    register_web_auth_routes(app)
     register_craft_routes(app)
     register_guild_routes(app)
     register_exchange_routes(app)

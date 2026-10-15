@@ -143,6 +143,19 @@ async def test_valid_signature_returns_character(client, session_factory) -> Non
     assert "derived" in data and "max_hp" in data["derived"]
 
 
+async def test_web_session_token_returns_character(client, session_factory, settings) -> None:
+    """Сайт (2026-10-15): ключ сессии VK ID в Authorization вместо подписи."""
+    from bot import web_auth
+
+    await _make_character(session_factory, vk_id=222)
+    token = web_auth.make_token(settings, 222)
+    resp = await client.get("/api/miniapp/character", headers={"Authorization": f"Bearer {token}"})
+    assert resp.status == 200
+    assert (await resp.json())["name"] == "Герой222"
+    bad = await client.get("/api/miniapp/character", headers={"Authorization": "Bearer 222.9999999999.x"})
+    assert bad.status == 403 and (await bad.json())["error"] == "web_session_expired"
+
+
 async def test_tampered_signature_rejected(client, session_factory) -> None:
     await _make_character(session_factory, vk_id=112)
     query = _signed_query(112)
