@@ -35,12 +35,16 @@ def weekly_metrics(guild_id: int, week) -> list[str]:
     return rng.sample(_metrics(), gc.WEEKLY_QUESTS)
 
 
+def _meta(metric: str) -> tuple[str, str, int, int]:
+    return gc.QUEST_METRICS.get(metric) or gc.RETIRED_QUEST_METRICS.get(metric) or (metric, metric, 0, 0)
+
+
 def title_of(metric: str) -> str:
-    return gc.QUEST_METRICS[metric][0]
+    return _meta(metric)[0]
 
 
 def label_of(metric: str) -> str:
-    return gc.QUEST_METRICS[metric][1]
+    return _meta(metric)[1]
 
 
 async def ensure_dailies(db: AsyncSession, character: Character) -> list[GuildDaily]:

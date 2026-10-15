@@ -70,14 +70,6 @@
     "base_target": 8
   },
   {
-    "id": "marked_hunter",
-    "title": "Охотник на Меченых",
-    "progress_label": "Победить в PvP-боях",
-    "condition_type": "pvp_win",
-    "base_target": 3,
-    "min_level": 15
-  },
-  {
     "id": "survivor",
     "title": "Уцелевший",
     "progress_label": "Выжить в боях, опустившись ниже 25% здоровья",

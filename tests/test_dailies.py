@@ -220,13 +220,13 @@ async def test_sell_gold_tracks_amount(db_session, make_character) -> None:
     assert row.progress == 300
 
 
-async def test_pvp_quest_excluded_below_min_level(db_session, make_character) -> None:
-    low_level = await make_character(level=1)
-    high_level = await make_character(level=dc.PVP_QUEST_MIN_LEVEL)
-    low_pool = daily_service._eligible_pool(low_level)
-    high_pool = daily_service._eligible_pool(high_level)
-    assert "marked_hunter" not in {q.id for q in low_pool}
-    assert "marked_hunter" in {q.id for q in high_pool}
+async def test_no_pvp_kill_quests_in_pools(db_session, make_character) -> None:
+    """2026-10-15: заданий на убийство игроков нет ни в ежедневках, ни в гильдии."""
+    from game.economy import guild_config as gc
+
+    high_level = await make_character(level=60)
+    assert "pvp_win" not in {q.condition_type for q in daily_service._eligible_pool(high_level)}
+    assert "pvp_win" not in gc.QUEST_METRICS
 
 
 async def test_daily_streak_milestone_grants_reward(db_session, make_character) -> None:
