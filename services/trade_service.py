@@ -1,27 +1,30 @@
-"""Ремесло «Торговля»: повозка, Торговый дом, караваны, потери груза.
+"""Ремесло «Торговля»: торговая фирма и её повозки (2026-10-15).
 
-Числа - game/economy/trade_config.py. Повозка ездит тем же движением по
-клеткам, что и маунт (services/mount_service.py, mount_id = CART_MOUNT_ID):
-шаг - от лошадей, шанс нападения - от охраны.
+Игрок управляет фирмой удалённо: закупает товар города, где стоит
+повозка, выбирает город назначения и путь и отправляет повозку. Она едет
+сама (персонаж свободен), по прибытии продаёт весь груз по цене на месте и
+встаёт в этом городе. Нападения в пути разыгрываются при отправке и
+применяются по прибытии (обшивка, потеря части груза) - без боя.
 
-Все деньги - через атомарный кошелёк (wallet_service), груз и давление
-рынка - под блокировкой строк: два одновременных нажатия не продадут один
-ящик дважды и не купят по одной цене.
+Числа - game/economy/trade_config.py. Деньги - через атомарный кошелёк
+(wallet_service), груз и давление рынка - под блокировкой строк.
 """
 
 import math
 import random
+import re
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 
-from sqlalchemy import select, update
+from sqlalchemy import func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from game.economy import faction_config as fc
 from game.economy import trade_config as tc
 from game.world import grid
 from game.world import world_config as wc
-from models import Character, CharacterCart, CharacterOre, MountTravel, TradeCaravan, TradeMarket
-from services import lootbox_service, mount_service, wallet_service
+from models import Character, CharacterOre, TradeCart, TradeFirm, TradeMarket, TradeTrip
+from services import faction_service, lootbox_service, wallet_service
 
 
 class TradeError(Exception):
@@ -36,328 +39,190 @@ def _aware(dt: datetime) -> datetime:
     return dt if dt.tzinfo else dt.replace(tzinfo=timezone.utc)
 
 
-# --- Повозка ---
+def city_title(city: str) -> str:
+    from bot.onboarding_texts import REGION_TITLES  # избегаем цикла импортов
+
+    return REGION_TITLES[city]
 
 
-async def get_cart(db: AsyncSession, character_id: int, lock: bool = False) -> CharacterCart | None:
-    query = select(CharacterCart).where(CharacterCart.character_id == character_id)
+# --- Фирма ---
+
+_NAME_RE = re.compile(r"^[0-9A-Za-zА-Яа-яЁё][0-9A-Za-zА-Яа-яЁё \-]*$")
+
+
+def clean_name(name) -> str:
+    return re.sub(r"\s+", " ", name).strip() if isinstance(name, str) else ""
+
+
+async def get_firm(db: AsyncSession, character_id: int, lock: bool = False) -> TradeFirm | None:
+    query = select(TradeFirm).where(TradeFirm.character_id == character_id)
     if lock:
         query = query.with_for_update().execution_options(populate_existing=True)
     return await db.scalar(query)
 
 
-def part_value(cart: CharacterCart, part_id: str):
+async def _check_name(db: AsyncSession, name: str) -> str:
+    from services import onboarding_service
+
+    name = clean_name(name)
+    if not tc.FIRM_NAME_MIN <= len(name) <= tc.FIRM_NAME_MAX:
+        raise TradeError(f"Название - от {tc.FIRM_NAME_MIN} до {tc.FIRM_NAME_MAX} символов.")
+    if not _NAME_RE.match(name):
+        raise TradeError("В названии - только буквы, цифры, пробел и дефис.")
+    if onboarding_service.contains_banned_word(name):
+        raise TradeError("Такое название не пройдёт - выбери другое.")
+    if await db.scalar(select(TradeFirm.character_id).where(TradeFirm.name_key == name.lower())) is not None:
+        raise TradeError("Фирма с таким названием уже есть.")
+    return name
+
+
+def _home(character: Character) -> str:
+    if character.region not in fc.CITIES:
+        raise TradeError("Сначала закончи создание персонажа.")
+    return character.region
+
+
+async def buy_firm(db: AsyncSession, character: Character, name) -> TradeFirm:
+    if character.level < tc.TRADE_MIN_LEVEL:
+        raise TradeError(f"Торговать можно с {tc.TRADE_MIN_LEVEL} уровня.")
+    home = _home(character)
+    if await get_firm(db, character.id) is not None:
+        raise TradeError("Фирма у тебя уже есть.")
+    name = await _check_name(db, name)
+    try:
+        await wallet_service.charge(db, character.id, "farm", tc.FIRM_PRICE)
+    except wallet_service.NotEnoughCurrency:
+        raise TradeError(f"Фирма стоит {tc.FIRM_PRICE} золота.") from None
+    firm = TradeFirm(
+        character_id=character.id, name=name, name_key=name.lower(), trade_level=1, trade_xp=0,
+        profit_total=0, notify_arrival=True, notify_orders=False,
+    )
+    db.add(firm)
+    db.add(_new_cart(character.id, 1, home))
+    await db.flush()
+    return firm
+
+
+async def name_firm(db: AsyncSession, character: Character, name) -> TradeFirm:
+    """Название для фирмы, перенесённой со старой повозки. Менять пока нельзя."""
+    firm = await get_firm(db, character.id, lock=True)
+    if firm is None:
+        raise TradeError("Фирмы нет.")
+    if firm.name:
+        raise TradeError("Название уже есть - менять его пока нельзя.")
+    name = await _check_name(db, name)
+    firm.name, firm.name_key = name, name.lower()
+    await db.flush()
+    return firm
+
+
+async def require_firm(db: AsyncSession, character: Character, lock: bool = False) -> TradeFirm:
+    firm = await get_firm(db, character.id, lock=lock)
+    if firm is None:
+        raise TradeError("Сначала открой торговую фирму.")
+    if not firm.name:
+        raise TradeError("Сначала дай фирме название.")
+    return firm
+
+
+async def set_notify(db: AsyncSession, character: Character, arrival=None, orders=None) -> TradeFirm:
+    firm = await require_firm(db, character, lock=True)
+    if isinstance(arrival, bool):
+        firm.notify_arrival = arrival
+    if isinstance(orders, bool):
+        firm.notify_orders = orders
+    await db.flush()
+    return firm
+
+
+# --- Повозки ---
+
+
+def _new_cart(character_id: int, slot: int, city: str) -> TradeCart:
+    return TradeCart(
+        character_id=character_id, slot=slot, city=city, status="idle", ambushes=0,
+        horses=1, body=1, plating=1, guard=1, durability=tc.PARTS_BY_ID["plating"].values[0],
+        cargo={}, paid={},
+    )
+
+
+async def carts(db: AsyncSession, character_id: int) -> list[TradeCart]:
+    return list((await db.scalars(
+        select(TradeCart).where(TradeCart.character_id == character_id).order_by(TradeCart.slot)
+    )).all())
+
+
+async def get_cart(db: AsyncSession, character_id: int, slot, lock: bool = True) -> TradeCart:
+    if not isinstance(slot, int) or isinstance(slot, bool):
+        raise TradeError("Нет такой повозки.")
+    query = select(TradeCart).where(TradeCart.character_id == character_id, TradeCart.slot == slot)
+    if lock:
+        query = query.with_for_update().execution_options(populate_existing=True)
+    cart = await db.scalar(query)
+    if cart is None:
+        raise TradeError("Нет такой повозки.")
+    return cart
+
+
+def part_value(cart: TradeCart, part_id: str):
     part = tc.PARTS_BY_ID[part_id]
-    return part.values[getattr(cart, part_id) - 1]
+    return part.values[min(getattr(cart, part_id), len(part.values)) - 1]
 
 
-def capacity(cart: CharacterCart) -> int:
+def capacity(cart: TradeCart) -> int:
     return part_value(cart, "body")
 
 
-def crates(cart: CharacterCart) -> int:
+def crates(cart: TradeCart) -> int:
     return sum((cart.cargo or {}).values())
 
 
-def max_durability(cart: CharacterCart) -> int:
+def max_durability(cart: TradeCart) -> int:
     return part_value(cart, "plating")
 
 
-def trip_ambush(cart: CharacterCart) -> float:
-    return tc.CART_TRIP_AMBUSH * part_value(cart, "guard")
+def next_slot_need(count: int) -> tuple[int, int] | None:
+    """(уровень торговли, золото) для следующей повозки; None - предел."""
+    return tc.CART_SLOTS.get(count + 1) if count < tc.MAX_CARTS else None
 
 
-async def cart_travel(db: AsyncSession, character_id: int) -> MountTravel | None:
-    travel = await mount_service.active_travel(db, character_id)
-    return travel if travel is not None and travel.mount_id == tc.CART_MOUNT_ID else None
-
-
-def _city_here(character: Character) -> str | None:
-    return grid.city_region_at(character.pos_x, character.pos_y)
-
-
-async def buy_cart(db: AsyncSession, character: Character) -> CharacterCart:
-    if character.level < tc.TRADE_MIN_LEVEL:
-        raise TradeError(f"Торговать можно с {tc.TRADE_MIN_LEVEL} уровня.")
-    if _city_here(character) is None:
-        raise TradeError("Повозку продают в Торговом доме города.")
-    if await get_cart(db, character.id) is not None:
-        raise TradeError("Повозка у тебя уже есть.")
+async def buy_cart(db: AsyncSession, character: Character) -> TradeCart:
+    firm = await require_firm(db, character, lock=True)
+    have = await db.scalar(select(func.count()).select_from(TradeCart).where(TradeCart.character_id == character.id))
+    need = next_slot_need(have)
+    if need is None:
+        raise TradeError(f"У фирмы уже {tc.MAX_CARTS} повозки - больше не нужно.")
+    level, gold = need
+    if firm.trade_level < level:
+        raise TradeError(f"Повозка №{have + 1} - с {level} уровня торговли.")
     try:
-        await wallet_service.charge(db, character.id, "farm", tc.CART_PRICE)
+        await wallet_service.charge(db, character.id, "farm", gold)
     except wallet_service.NotEnoughCurrency:
-        raise TradeError(f"Повозка стоит {tc.CART_PRICE} золота.") from None
-    cart = CharacterCart(
-        character_id=character.id, cart_x=character.pos_x, cart_y=character.pos_y,
-        horses=1, body=1, plating=1, guard=1, durability=tc.PARTS_BY_ID["plating"].values[0],
-        cargo={}, paid={}, trade_level=1, trade_xp=0, profit_total=0,
-    )
+        raise TradeError(f"Повозка №{have + 1} стоит {gold} золота.") from None
+    cart = _new_cart(character.id, have + 1, _home(character))
     db.add(cart)
     await db.flush()
     return cart
 
 
-async def _require_cart_here(db: AsyncSession, character: Character, lock: bool = True) -> CharacterCart:
-    cart = await get_cart(db, character.id, lock=lock)
-    if cart is None:
-        raise TradeError("У тебя нет повозки. Её продают в Торговом доме любого города.")
-    if await cart_travel(db, character.id) is not None:
+def _require_idle(cart: TradeCart) -> None:
+    if cart.status != "idle":
         raise TradeError("Повозка в пути.")
-    if (cart.cart_x, cart.cart_y) != (character.pos_x, character.pos_y):
-        raise TradeError(f"Повозка осталась в ({cart.cart_x}; {cart.cart_y}). Торговать можно только рядом с ней.")
-    return cart
 
 
-# --- Цены ---
-
-
-async def _market_row(db: AsyncSession, city: str, good_id: str, lock: bool, now: datetime) -> TradeMarket:
-    query = select(TradeMarket).where(TradeMarket.city == city, TradeMarket.good_id == good_id)
-    if lock:
-        query = query.with_for_update().execution_options(populate_existing=True)
-    row = await db.scalar(query)
-    if row is None:
-        row = TradeMarket(city=city, good_id=good_id, pressure=0.0, updated_at=now)
-        db.add(row)
-        await db.flush()
-    hours = max((now - _aware(row.updated_at)).total_seconds() / 3600, 0.0)
-    if hours > 0 and row.pressure:
-        row.pressure = max(row.pressure - tc.RECOVERY_PER_HOUR * hours, 0.0)
-    row.updated_at = now
-    return row
-
-
-def _sell_mult(city: str, good: tc.Good) -> float:
-    return tc.SELL_MULT_DEFICIT if good.city in tc.DEFICIT[city] else tc.SELL_MULT_NORMAL
-
-
-def city_buy_price(city: str, good: tc.Good, pressure: float) -> int | None:
-    """Цена ящика у производителя (игрок покупает). Только свои товары."""
-    if good.city != city:
-        return None
-    return round(tc.TIER_BASE_PRICE[good.tier] * tc.BUY_MULT * (1 + min(pressure, tc.MAX_PRESSURE)))
-
-
-def city_sell_price(city: str, good: tc.Good, pressure: float) -> int | None:
-    """Сколько город платит за ящик (игрок продаёт). Своё не покупает."""
-    if good.city == city:
-        return None
-    return round(tc.TIER_BASE_PRICE[good.tier] * _sell_mult(city, good) * (1 - min(pressure, tc.MAX_PRESSURE)))
-
-
-def caravan_buy_price(good: tc.Good) -> int:
-    """Караван продаёт игроку."""
-    return round(tc.TIER_BASE_PRICE[good.tier] * tc.CARAVAN_SELL_MULT)
-
-
-def caravan_sell_price(good: tc.Good) -> int:
-    """Караван покупает у игрока."""
-    return round(tc.TIER_BASE_PRICE[good.tier] * tc.CARAVAN_BUY_MULT)
-
-
-# --- Место торговли ---
-
-
-@dataclass
-class Place:
-    kind: str                      # "city" | "caravan"
-    title: str
-    city: str | None = None
-    caravan: TradeCaravan | None = None
-
-
-async def caravan_at(db: AsyncSession, x: int, y: int, now: datetime | None = None, lock: bool = False) -> TradeCaravan | None:
-    now = now or _now()
-    query = select(TradeCaravan).where(TradeCaravan.x == x, TradeCaravan.y == y, TradeCaravan.expires_at > now)
-    if lock:
-        query = query.with_for_update().execution_options(populate_existing=True)
-    return await db.scalar(query)
-
-
-async def place_here(db: AsyncSession, character: Character, lock: bool = False) -> Place | None:
-    city = _city_here(character)
-    if city is not None:
-        from bot.onboarding_texts import REGION_TITLES  # избегаем цикла импортов
-
-        return Place("city", f"Торговый дом · {REGION_TITLES[city]}", city=city)
-    caravan = await caravan_at(db, character.pos_x, character.pos_y, lock=lock)
-    if caravan is not None:
-        return Place("caravan", f"Караван на ({caravan.x}; {caravan.y})", caravan=caravan)
-    return None
-
-
-@dataclass
-class Offer:
-    good: tc.Good
-    buy: int | None        # игрок может купить по этой цене
-    sell: int | None       # игрок может продать по этой цене
-    stock: int | None = None   # остаток у каравана
-
-
-async def offers(db: AsyncSession, place: Place, now: datetime | None = None) -> list[Offer]:
-    now = now or _now()
-    out = []
-    if place.kind == "city":
-        for good in tc.GOODS:
-            row = await _market_row(db, place.city, good.id, lock=False, now=now)
-            out.append(Offer(good, city_buy_price(place.city, good, row.pressure), city_sell_price(place.city, good, row.pressure)))
-        return out
-    caravan = place.caravan
-    for good_id, left in (caravan.sells or {}).items():
-        good = tc.GOODS_BY_ID[good_id]
-        out.append(Offer(good, caravan_buy_price(good), None, left))
-    for good_id, left in (caravan.buys or {}).items():
-        good = tc.GOODS_BY_ID[good_id]
-        out.append(Offer(good, None, caravan_sell_price(good), left))
-    return out
-
-
-# --- Сделки ---
-
-
-def _check_count(count) -> int:
-    if not isinstance(count, int) or isinstance(count, bool) or not 1 <= count <= 50:
-        raise TradeError("Ящиков - от 1 до 50 за раз.")
-    return count
-
-
-def _good(good_id) -> tc.Good:
-    good = tc.GOODS_BY_ID.get(good_id) if isinstance(good_id, str) else None
-    if good is None:
-        raise TradeError("Такого товара нет.")
-    return good
-
-
-@dataclass
-class Deal:
-    good: tc.Good
-    count: int
-    gold: int
-    profit: int = 0
-    xp: int = 0
-    level_up: int | None = None
-    chests: int = 0
-    lines: list[str] = field(default_factory=list)
-    char_levelup: object = None  # опыт персонажа за проданные ящики
-
-
-async def buy(db: AsyncSession, character: Character, good_id, count) -> Deal:
-    good, count = _good(good_id), _check_count(count)
-    cart = await _require_cart_here(db, character)
-    if cart.trade_level < tc.TIER_MIN_TRADE_LEVEL[good.tier]:
-        raise TradeError(
-            f"{tc.TIER_NAMES[good.tier].capitalize()} товар - с {tc.TIER_MIN_TRADE_LEVEL[good.tier]} уровня торговли."
-        )
-    if crates(cart) + count > capacity(cart):
-        raise TradeError(f"В кузов влезет ещё {capacity(cart) - crates(cart)} ящ. (всего {capacity(cart)}).")
-    place = await place_here(db, character, lock=True)
-    now = _now()
-    if place is None:
-        raise TradeError("Покупать можно в Торговом доме города или у каравана.")
-    if place.kind == "city":
-        if good.city != place.city:
-            raise TradeError("Этот товар здесь не производят - его продают в своём городе.")
-        row = await _market_row(db, place.city, good.id, lock=True, now=now)
-        total = 0
-        for _ in range(count):
-            total += city_buy_price(place.city, good, row.pressure)
-            row.pressure += tc.SATURATION_PER_CRATE
-    else:
-        left = (place.caravan.sells or {}).get(good.id)
-        if left is None:
-            raise TradeError("Караван этот товар не продаёт.")
-        if left < count:
-            raise TradeError(f"У каравана осталось {left} ящ.")
-        total = caravan_buy_price(good) * count
-        place.caravan.sells = {**place.caravan.sells, good.id: left - count}
-    try:
-        await wallet_service.charge(db, character.id, "farm", total)
-    except wallet_service.NotEnoughCurrency:
-        raise TradeError(f"Не хватает золота: {count} ящ. стоят {total}.") from None
-    cart.cargo = {**(cart.cargo or {}), good.id: (cart.cargo or {}).get(good.id, 0) + count}
-    cart.paid = {**(cart.paid or {}), good.id: (cart.paid or {}).get(good.id, 0) + total}
-    await db.flush()
-    return Deal(good, count, total)
-
-
-async def sell(db: AsyncSession, character: Character, good_id, count, rng: random.Random | None = None) -> Deal:
-    good, count = _good(good_id), _check_count(count)
-    rng = rng or random.Random()
-    cart = await _require_cart_here(db, character)
-    have = (cart.cargo or {}).get(good.id, 0)
-    if have < count:
-        raise TradeError(f"В повозке {have} ящ. этого товара.")
-    place = await place_here(db, character, lock=True)
-    now = _now()
-    if place is None:
-        raise TradeError("Продавать можно в Торговом доме города или каравану.")
-    if place.kind == "city":
-        if good.city == place.city:
-            raise TradeError("Свой товар город не покупает - вези туда, где его нет.")
-        row = await _market_row(db, place.city, good.id, lock=True, now=now)
-        total = 0
-        for _ in range(count):
-            total += city_sell_price(place.city, good, row.pressure)
-            row.pressure += tc.SATURATION_PER_CRATE
-    else:
-        left = (place.caravan.buys or {}).get(good.id)
-        if left is None:
-            raise TradeError("Караван этот товар не покупает.")
-        if left < count:
-            raise TradeError(f"Каравану нужно ещё только {left} ящ.")
-        total = caravan_sell_price(good) * count
-        place.caravan.buys = {**place.caravan.buys, good.id: left - count}
-    # Уровень торговли: +1% к продаже за уровень (до +25%).
-    total = round(total * (1 + tc.sell_bonus(cart.trade_level)))
-    # Себестоимость проданных ящиков - средняя по уплаченному за этот товар.
-    paid_all = (cart.paid or {}).get(good.id, 0)
-    cost = round(paid_all * count / have) if have else 0
-    cargo = dict(cart.cargo)
-    paid = dict(cart.paid or {})
-    if have == count:
-        cargo.pop(good.id, None)
-        paid.pop(good.id, None)
-    else:
-        cargo[good.id] = have - count
-        paid[good.id] = paid_all - cost
-    cart.cargo, cart.paid = cargo, paid
-    await wallet_service.deposit(db, character.id, "farm", total)
-    deal = Deal(good, count, total, profit=total - cost)
-    cart.profit_total += max(deal.profit, 0)
-    deal.xp = tc.XP_PER_CRATE[good.tier] * count
-    from services import experience_service
-
-    deal.char_levelup = await experience_service.grant_activity_xp(db, character, "crate", count)
-    cart.trade_xp += deal.xp
-    while cart.trade_xp >= tc.xp_to_next(cart.trade_level):
-        cart.trade_xp -= tc.xp_to_next(cart.trade_level)
-        cart.trade_level += 1
-        deal.level_up = cart.trade_level
-    chance = tc.CHEST_CHANCE_PER_CRATE[good.tier]
-    for _ in range(count):
-        if rng.random() < chance:
-            await lootbox_service.grant_chest(db, character, 0)
-            deal.chests += 1
-    await db.flush()
-    return deal
-
-
-# --- Улучшения и ремонт ---
-
-
-def upgrade_cost(cart: CharacterCart, part_id: str) -> tuple[int, str, int] | None:
+def upgrade_cost(cart: TradeCart, part_id: str) -> tuple[int, str, int] | None:
     level = getattr(cart, part_id)
     if level >= len(tc.PARTS_BY_ID[part_id].values):
         return None
     return tc.UPGRADE_COST[level - 1]
 
 
-async def upgrade(db: AsyncSession, character: Character, part_id) -> CharacterCart:
+async def upgrade(db: AsyncSession, character: Character, slot, part_id) -> TradeCart:
     if part_id not in tc.PARTS_BY_ID:
         raise TradeError("Нет такой части повозки.")
-    if _city_here(character) is None:
-        raise TradeError("Улучшать повозку можно в городе.")
-    cart = await _require_cart_here(db, character)
+    await require_firm(db, character)
+    cart = await get_cart(db, character.id, slot)
+    _require_idle(cart)
     cost = upgrade_cost(cart, part_id)
     if cost is None:
         raise TradeError("Эта часть уже улучшена до предела.")
@@ -379,20 +244,19 @@ async def upgrade(db: AsyncSession, character: Character, part_id) -> CharacterC
         raise TradeError(f"Нужно {gold} золота.") from None
     setattr(cart, part_id, getattr(cart, part_id) + 1)
     if part_id == "plating":
-        # Новая обшивка ставится целой.
-        cart.durability = max_durability(cart)
+        cart.durability = max_durability(cart)  # новая обшивка ставится целой
     await db.flush()
     return cart
 
 
-def repair_cost(cart: CharacterCart) -> int:
-    return (max_durability(cart) - cart.durability) * tc.REPAIR_PER_POINT
+def repair_cost(cart: TradeCart) -> int:
+    return max(max_durability(cart) - cart.durability, 0) * tc.REPAIR_PER_POINT
 
 
-async def repair(db: AsyncSession, character: Character) -> int:
-    if _city_here(character) is None:
-        raise TradeError("Чинить повозку можно в городе.")
-    cart = await _require_cart_here(db, character)
+async def repair(db: AsyncSession, character: Character, slot) -> int:
+    await require_firm(db, character)
+    cart = await get_cart(db, character.id, slot)
+    _require_idle(cart)
     cost = repair_cost(cart)
     if cost <= 0:
         raise TradeError("Обшивка цела.")
@@ -405,35 +269,196 @@ async def repair(db: AsyncSession, character: Character) -> int:
     return cost
 
 
-# --- Поездка ---
+# --- Цены ---
 
 
-async def send(db: AsyncSession, character: Character, to_x, to_y) -> MountTravel:
-    if not isinstance(to_x, int) or not isinstance(to_y, int) or isinstance(to_x, bool) or isinstance(to_y, bool):
-        raise TradeError("Неверная точка.")
-    if not grid.in_bounds(to_x, to_y):
-        raise TradeError(f"Мир кончается в {wc.WORLD_RADIUS} клетках от Монолита.")
-    cart = await _require_cart_here(db, character)
-    if (to_x, to_y) == (character.pos_x, character.pos_y):
-        raise TradeError("Повозка уже здесь.")
-    from services import pk_service
-
-    if grid.city_region_at(to_x, to_y) is not None and pk_service.city_banned(character):
-        raise TradeError(pk_service.CITY_BAN_TEXT)
-    if await mount_service.active_travel(db, character.id) is not None:
-        raise TradeError("Ты уже в пути.")
-    return await mount_service.start_travel(
-        db, character, tc.CART_MOUNT_ID, to_x, to_y, step_seconds=part_value(cart, "horses"),
-    )
+async def market_row(db: AsyncSession, city: str, good_id: str, lock: bool, now: datetime) -> TradeMarket:
+    query = select(TradeMarket).where(TradeMarket.city == city, TradeMarket.good_id == good_id)
+    if lock:
+        query = query.with_for_update().execution_options(populate_existing=True)
+    row = await db.scalar(query)
+    if row is None:
+        row = TradeMarket(city=city, good_id=good_id, pressure=0.0, updated_at=now)
+        db.add(row)
+        await db.flush()
+    hours = max((now - _aware(row.updated_at)).total_seconds() / 3600, 0.0)
+    if hours > 0 and row.pressure:
+        row.pressure = max(row.pressure - tc.RECOVERY_PER_HOUR * hours, 0.0)
+    row.updated_at = now
+    return row
 
 
-def _lose(cart: CharacterCart, share: float, rng: random.Random) -> dict[str, int]:
+def sell_mult(city: str, good: tc.Good) -> float:
+    return tc.SELL_MULT_DEFICIT if good.city in tc.DEFICIT[city] else tc.SELL_MULT_FAR
+
+
+def city_buy_price(city: str, good: tc.Good, pressure: float) -> int | None:
+    """Цена ящика у производителя (фирма покупает). Только свои товары."""
+    if good.city != city:
+        return None
+    return round(tc.TIER_BASE_PRICE[good.tier] * tc.BUY_MULT * (1 + min(pressure, tc.MAX_PRESSURE)))
+
+
+def city_sell_price(city: str, good: tc.Good, pressure: float) -> int | None:
+    """Сколько город платит за ящик (до бонуса уровня торговли). Своё не покупает."""
+    if good.city == city:
+        return None
+    return round(tc.TIER_BASE_PRICE[good.tier] * sell_mult(city, good) * (1 - min(pressure, tc.MAX_PRESSURE)))
+
+
+async def pressures(db: AsyncSession, now: datetime | None = None) -> dict[tuple[str, str], float]:
+    """Давление по всем (город, товар) сейчас - для показа цен."""
+    now = now or _now()
+    out = {}
+    for row in (await db.scalars(select(TradeMarket))).all():
+        hours = max((now - _aware(row.updated_at)).total_seconds() / 3600, 0.0)
+        out[(row.city, row.good_id)] = max(row.pressure - tc.RECOVERY_PER_HOUR * hours, 0.0)
+    return out
+
+
+# --- Путь ---
+
+
+def path(from_city: str, to_city: str, route: str) -> list[tuple[int, int]]:
+    a, b = wc.CITY_COORDS[from_city], wc.CITY_COORDS[to_city]
+    return grid.safe_path(*a, *b) if route == "safe" else grid.line_path(*a, *b)
+
+
+def trip_seconds(cart: TradeCart, cells: int, route: str) -> float:
+    mult = tc.SAFE_ROUTE_TIME_MULT if route == "safe" else 1.0
+    return cells * part_value(cart, "horses") * mult
+
+
+def cell_ambush(x: int, y: int, guard: float) -> float:
+    from services import mount_service
+
+    if mount_service._is_safe_cell(x, y):
+        return 0.0
+    per_cell = 1 - (1 - tc.CART_TRIP_AMBUSH) ** (1 / tc.AMBUSH_REF_CELLS)
+    return min(per_cell * tc.CART_RING_MULT[grid.ring_tier(x, y)] * guard, 0.5)
+
+
+def ambush_chance(cart: TradeCart, cells: list[tuple[int, int]]) -> float:
+    """Шанс хотя бы одного нападения за путь - для подсказки игроку."""
+    guard = part_value(cart, "guard")
+    safe = 1.0
+    for x, y in cells[:-1]:
+        safe *= 1 - cell_ambush(x, y, guard)
+    return 1 - safe
+
+
+def roll_ambushes(cart: TradeCart, cells: list[tuple[int, int]], rng: random.Random) -> int:
+    guard = part_value(cart, "guard")
+    return sum(rng.random() < cell_ambush(x, y, guard) for x, y in cells[:-1])
+
+
+def position(cart: TradeCart, now: datetime | None = None) -> tuple[int, int]:
+    """Где повозка сейчас (для карты): в пути - по доле прошедшего времени."""
+    if cart.status != "traveling" or cart.to_city is None:
+        return wc.CITY_COORDS[cart.city]
+    now = now or _now()
+    cells = path(cart.city, cart.to_city, cart.route or "short")
+    total = (_aware(cart.arrives_at) - _aware(cart.departed_at)).total_seconds()
+    done = (now - _aware(cart.departed_at)).total_seconds()
+    share = min(max(done / total, 0.0), 1.0) if total > 0 else 1.0
+    index = min(int(share * len(cells)), len(cells)) - 1
+    return cells[index] if index >= 0 else wc.CITY_COORDS[cart.city]
+
+
+# --- Отправка ---
+
+
+def _good(good_id) -> tc.Good:
+    good = tc.GOODS_BY_ID.get(good_id) if isinstance(good_id, str) else None
+    if good is None:
+        raise TradeError("Такого товара нет.")
+    return good
+
+
+@dataclass
+class Dispatch:
+    cart: TradeCart
+    cost: int
+    crates: int
+    seconds: float
+
+
+async def dispatch(
+    db: AsyncSession, character: Character, slot, to_city, route, goods,
+    rng: random.Random | None = None, now: datetime | None = None,
+) -> Dispatch:
+    """Закупка в городе повозки и отправка в to_city. goods - {good_id: ящиков}
+    (может быть пусто - перегнать повозку порожняком)."""
+    rng = rng or random.Random()
+    now = now or _now()
+    firm = await require_firm(db, character)
+    cart = await get_cart(db, character.id, slot)
+    _require_idle(cart)
+    if to_city not in fc.CITIES:
+        raise TradeError("Нет такого города.")
+    if to_city == cart.city:
+        raise TradeError("Повозка уже в этом городе.")
+    if route not in tc.ROUTES:
+        raise TradeError("Выбери путь.")
+    if cart.durability <= 0:
+        raise TradeError("Обшивка выбита - сначала почини повозку.")
+    if not isinstance(goods, dict):
+        raise TradeError("Неверный заказ.")
+    order: list[tuple[tc.Good, int]] = []
+    for good_id, count in goods.items():
+        if not isinstance(count, int) or isinstance(count, bool) or count < 0:
+            raise TradeError("Неверное число ящиков.")
+        if count == 0:
+            continue
+        good = _good(good_id)
+        if good.city != cart.city:
+            raise TradeError(f"{good.name} здесь не производят.")
+        if firm.trade_level < tc.TIER_MIN_TRADE_LEVEL[good.tier]:
+            raise TradeError(
+                f"{tc.TIER_NAMES[good.tier].capitalize()} товар - с {tc.TIER_MIN_TRADE_LEVEL[good.tier]} уровня торговли."
+            )
+        order.append((good, count))
+    total_crates = sum(n for _, n in order)
+    if total_crates > capacity(cart):
+        raise TradeError(f"В кузов влезет {capacity(cart)} ящ.")
+
+    cargo: dict[str, int] = {}
+    paid: dict[str, int] = {}
+    total = 0
+    for good, count in order:
+        row = await market_row(db, cart.city, good.id, lock=True, now=now)
+        cost = 0
+        for _ in range(count):
+            cost += city_buy_price(cart.city, good, row.pressure)
+            row.pressure += tc.SATURATION_PER_CRATE
+        cargo[good.id], paid[good.id] = count, cost
+        total += cost
+    if total:
+        try:
+            await wallet_service.charge(db, character.id, "farm", total)
+        except wallet_service.NotEnoughCurrency:
+            raise TradeError(f"Не хватает золота: закупка стоит {total}.") from None
+
+    cells = path(cart.city, to_city, route)
+    seconds = trip_seconds(cart, len(cells), route)
+    cart.cargo, cart.paid = cargo, paid
+    cart.status, cart.to_city, cart.route = "traveling", to_city, route
+    cart.departed_at, cart.arrives_at = now, now + timedelta(seconds=seconds)
+    cart.ambushes = roll_ambushes(cart, cells, rng)
+    await db.flush()
+    return Dispatch(cart, total, total_crates, seconds)
+
+
+# --- Прибытие ---
+
+
+def _lose(cart: TradeCart, share: float, rng: random.Random) -> dict[str, int]:
     """Теряет долю ящиков (с округлением вверх), случайно по товарам."""
     cargo = dict(cart.cargo or {})
+    paid = dict(cart.paid or {})
     total = sum(cargo.values())
     n = min(math.ceil(total * share), total)
     lost: dict[str, int] = {}
-    paid = dict(cart.paid or {})
     for _ in range(n):
         good_id = rng.choice([g for g, c in cargo.items() if c > 0])
         per = paid.get(good_id, 0) / cargo[good_id] if cargo[good_id] else 0
@@ -451,111 +476,123 @@ def lost_text(lost: dict[str, int]) -> str:
     return ", ".join(f"{tc.GOODS_BY_ID[g].emoji} {tc.GOODS_BY_ID[g].name} ×{n}" for g, n in lost.items())
 
 
-async def on_arrival(db: AsyncSession, character: Character) -> CharacterCart | None:
-    cart = await get_cart(db, character.id, lock=True)
-    if cart is not None:
-        cart.cart_x, cart.cart_y = character.pos_x, character.pos_y
-    return cart
+@dataclass
+class Arrival:
+    character_id: int
+    slot: int
+    firm_name: str
+    to_city: str
+    notify: bool = True
+    crates: int = 0
+    revenue: int = 0
+    profit: int = 0
+    ambushes: int = 0
+    broke: bool = False
+    lost: dict = field(default_factory=dict)
+    durability: int = 0
+    max_durability: int = 0
+    chests: int = 0
+    level_up: int | None = None
+    prosperity: int = 0
+    char_levelup: object = None
+
+    def text(self) -> str:
+        lines = [f"🐂 Повозка №{self.slot} фирмы «{self.firm_name}» прибыла в {city_title(self.to_city)}."]
+        if self.crates:
+            lines.append(f"💰 Продано {self.crates} ящ. за {self.revenue} золота, прибыль {self.profit:+d}.")
+        if self.ambushes:
+            lines.append(f"⚔ В пути напали {self.ambushes} раз(а), обшивка {self.durability}/{self.max_durability}.")
+        if self.lost:
+            lines.append(f"💥 Обшивка выбита, рассыпалось: {lost_text(self.lost)}.")
+        if self.chests:
+            lines.append(f"🎁 В ящиках нашёлся Пепельный ларец ×{self.chests}!")
+        if self.level_up:
+            lines.append(f"📈 Уровень торговли: {self.level_up}!")
+        if self.char_levelup is not None and getattr(self.char_levelup, "xp_awarded", 0):
+            lines.append(f"✨ +{self.char_levelup.xp_awarded} опыта.")
+        return "\n".join(lines)
 
 
-async def on_ambush_won(db: AsyncSession, character: Character, rng: random.Random | None = None) -> str | None:
-    """Отбился в пути: обшивка теряет единицу прочности, выбита - часть
-    груза рассыпается. Возвращает строку для игрока."""
+async def arrive(
+    db: AsyncSession, cart: TradeCart, rng: random.Random | None = None, now: datetime | None = None,
+) -> Arrival:
+    """Повозка доехала: нападения бьют по обшивке, груз продаётся по цене
+    на месте, опыт, ларцы, процветание родного города торговца."""
     rng = rng or random.Random()
-    cart = await get_cart(db, character.id, lock=True)
-    if cart is None:
-        return None
-    cart.durability = max(cart.durability - 1, 0)
-    if cart.durability > 0:
-        return f"🛡 Обшивка повозки держится: ещё {cart.durability} нападений."
-    lost = _lose(cart, tc.LOSS_ON_BREAK, rng)
+    now = _aware(now or _now())
+    character = await db.get(Character, cart.character_id)
+    firm = await get_firm(db, cart.character_id, lock=True)
+    out = Arrival(cart.character_id, cart.slot, firm.name or "", cart.to_city, notify=firm.notify_arrival)
+    out.ambushes = cart.ambushes or 0
+    for _ in range(out.ambushes):
+        if cart.durability > 0:
+            cart.durability -= 1
+            if cart.durability > 0:
+                continue
+        out.broke = True
+        for good_id, n in _lose(cart, tc.LOSS_ON_BREAK, rng).items():
+            out.lost[good_id] = out.lost.get(good_id, 0) + n
+    out.durability, out.max_durability = cart.durability, max_durability(cart)
+
+    revenue = cost = raw = 0
+    level = firm.trade_level
+    for good_id, count in (cart.cargo or {}).items():
+        good = tc.GOODS_BY_ID[good_id]
+        row = await market_row(db, cart.to_city, good_id, lock=True, now=now)
+        for _ in range(count):
+            revenue += round(city_sell_price(cart.to_city, good, row.pressure) * (1 + tc.sell_bonus(level)))
+            row.pressure += tc.SATURATION_PER_CRATE
+        cost += (cart.paid or {}).get(good_id, 0)
+        out.crates += count
+        firm.trade_xp += tc.XP_PER_CRATE[good.tier] * count
+        raw += fc.POINTS_PER_CRATE[good.tier] * count
+        for _ in range(count):
+            if rng.random() < tc.CHEST_CHANCE_PER_CRATE[good.tier]:
+                out.chests += 1
+    out.revenue, out.profit = revenue, revenue - cost
+    if revenue:
+        await wallet_service.deposit(db, character.id, "farm", revenue)
+    firm.profit_total += max(out.profit, 0)
+    while firm.trade_xp >= tc.xp_to_next(firm.trade_level):
+        firm.trade_xp -= tc.xp_to_next(firm.trade_level)
+        firm.trade_level += 1
+        out.level_up = firm.trade_level
+    for _ in range(out.chests):
+        await lootbox_service.grant_chest(db, character, 0)
+    if out.crates:
+        from services import experience_service
+
+        out.char_levelup = await experience_service.grant_activity_xp(db, character, "crate", out.crates)
+        out.prosperity = await faction_service.contribute(db, character, level, raw, now)
+
+    db.add(TradeTrip(
+        character_id=cart.character_id, slot=cart.slot, from_city=cart.city, to_city=cart.to_city,
+        route=cart.route or "short", crates=out.crates, revenue=revenue, profit=out.profit,
+        ambushes=out.ambushes, lost=out.lost, arrived_at=now,
+    ))
+    cart.city = cart.to_city
+    cart.status, cart.to_city, cart.route = "idle", None, None
+    cart.departed_at = cart.arrives_at = None
+    cart.ambushes = 0
+    cart.cargo, cart.paid = {}, {}
     await db.flush()
-    if not lost:
-        return "🛡 Обшивка выбита - почини её в городе."
-    return f"💥 Обшивка выбита, часть груза рассыпалась: {lost_text(lost)}. Почини повозку в городе."
+    return out
 
 
-async def on_death(db: AsyncSession, character: Character, rng: random.Random | None = None) -> str | None:
-    """Погиб в пути с повозкой: часть груза пропала, повозку с остатком
-    находят и пригоняют в родной город."""
-    rng = rng or random.Random()
-    cart = await get_cart(db, character.id, lock=True)
-    if cart is None:
-        return None
-    lost = _lose(cart, tc.LOSS_ON_DEATH, rng)
-    home = wc.CITY_COORDS.get(character.region) or (cart.cart_x, cart.cart_y)
-    cart.cart_x, cart.cart_y = home
-    await db.flush()
-    lost_line = f" Пропало: {lost_text(lost)}." if lost else ""
-    return f"🐂 Повозку с остатком груза пригнали в родной город.{lost_line}"
+async def tick(db: AsyncSession, rng: random.Random | None = None, now: datetime | None = None) -> list[Arrival]:
+    """Все повозки, чьё время прибытия подошло. Строки берутся с SKIP LOCKED:
+    второй одновременный тик их не тронет."""
+    now = _aware(now or _now())
+    due = (await db.scalars(
+        select(TradeCart).where(TradeCart.status == "traveling", TradeCart.arrives_at <= now)
+        .order_by(TradeCart.arrives_at).limit(50)
+        .with_for_update(skip_locked=True).execution_options(populate_existing=True)
+    )).all()
+    return [await arrive(db, cart, rng, now) for cart in due]
 
 
-async def rob(db: AsyncSession, winner: Character, loser: Character, rng: random.Random | None = None) -> tuple[dict, int]:
-    """Победа в PvP над торговцем в пути (кольца 3-5): победитель забирает
-    долю груза и сбывает её за долю базовой цены. ({товар: ящ}, золото)."""
-    rng = rng or random.Random()
-    if grid.ring_tier(loser.pos_x, loser.pos_y) < tc.ROB_MIN_RING:
-        return {}, 0
-    if await cart_travel(db, loser.id) is None:
-        return {}, 0
-    cart = await get_cart(db, loser.id, lock=True)
-    if cart is None or not cart.cargo:
-        return {}, 0
-    lost = _lose(cart, tc.ROB_SHARE, rng)
-    gold = round(sum(tc.TIER_BASE_PRICE[tc.GOODS_BY_ID[g].tier] * n for g, n in lost.items()) * tc.ROB_GOLD_SHARE)
-    if gold:
-        await wallet_service.deposit(db, winner.id, "farm", gold)
-    await db.flush()
-    return lost, gold
-
-
-async def after_pvp_death(db: AsyncSession, loser: Character) -> None:
-    """Торговец пал в PvP в пути: поездка кончена, повозку с остатком
-    пригоняют в родной город (груз уже поделён в rob, второй раз не теряется)."""
-    travel = await cart_travel(db, loser.id)
-    if travel is None:
-        return
-    await mount_service.cancel_travel(db, travel)
-    cart = await get_cart(db, loser.id, lock=True)
-    if cart is not None:
-        cart.cart_x, cart.cart_y = wc.CITY_COORDS.get(loser.region) or (cart.cart_x, cart.cart_y)
-    await db.flush()
-
-
-# --- Караваны ---
-
-
-async def active_caravans(db: AsyncSession, now: datetime | None = None) -> list[TradeCaravan]:
-    now = now or _now()
-    return list((await db.scalars(select(TradeCaravan).where(TradeCaravan.expires_at > now).order_by(TradeCaravan.id))).all())
-
-
-async def caravan_tick(db: AsyncSession, rng: random.Random | None = None, now: datetime | None = None) -> TradeCaravan | None:
-    """Раз в CARAVAN_CHECK_MINUTES: если караванов меньше максимума - с
-    шансом появляется новый на случайной клетке колец 2-3."""
-    rng = rng or random.Random()
-    now = now or _now()
-    if len(await active_caravans(db, now)) >= tc.CARAVAN_MAX or rng.random() >= tc.CARAVAN_SPAWN_CHANCE:
-        return None
-    return await spawn_caravan(db, rng, now)
-
-
-async def spawn_caravan(db: AsyncSession, rng: random.Random, now: datetime | None = None) -> TradeCaravan:
-    now = now or _now()
-    cells = [
-        (x, y) for x, y in grid.all_cells()
-        if grid.ring_tier(x, y) in tc.CARAVAN_RINGS and not mount_service._is_safe_cell(x, y)
-    ]
-    x, y = rng.choice(cells)
-    goods = list(tc.GOODS)
-    rng.shuffle(goods)
-    buys = {g.id: tc.CARAVAN_STOCK for g in goods[:rng.randint(1, 2)]}
-    rest = [g for g in goods if g.id not in buys]
-    sells = {g.id: tc.CARAVAN_STOCK for g in rest[:rng.randint(1, 2)]}
-    caravan = TradeCaravan(
-        x=x, y=y, buys=buys, sells=sells, created_at=now,
-        expires_at=now + timedelta(minutes=tc.CARAVAN_LIFETIME_MINUTES),
-    )
-    db.add(caravan)
-    await db.flush()
-    return caravan
+async def recent_trips(db: AsyncSession, character_id: int, limit: int = 20) -> list[TradeTrip]:
+    return list((await db.scalars(
+        select(TradeTrip).where(TradeTrip.character_id == character_id)
+        .order_by(TradeTrip.arrived_at.desc(), TradeTrip.id.desc()).limit(limit)
+    )).all())

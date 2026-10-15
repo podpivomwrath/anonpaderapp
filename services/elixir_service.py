@@ -71,10 +71,10 @@ async def buy_bulk(db: AsyncSession, character: Character, elixir_id: str, qty: 
     """Покупка N штук разом (патч 39, ч.4) — списывает золото ОДНИМ платежом
     (wallet_service.charge кидает NotEnoughCurrency, если не хватает), +qty к
     стеку. Возвращает потраченное золото."""
-    from services import pk_service
+    from services import faction_service
 
-    # Пепельное клеймо 5+: в лавке всё на 50% дороже.
-    cost = round(price(elixir_id) * pk_service.shop_mult(character)) * qty
+    # Пепельное клеймо 5+ и процветание города (2026-10-15).
+    cost = round(price(elixir_id) * await faction_service.shop_mult(db, character)) * qty
     await wallet_service.charge(db, character.id, "farm", cost)
     row = await _get_row(db, character.id, elixir_id)
     if row is None:

@@ -384,24 +384,14 @@ async def run() -> None:
         next_run_time=datetime.now(timezone.utc),
     )
 
-    # Торговля: караваны появляются на карте сами (не больше CARAVAN_MAX).
-    async def _caravan_tick() -> None:
-        from services import trade_service
+    # Торговые фирмы: повозки, чьё время прибытия подошло, продают груз и
+    # шлют весть владельцу.
+    from bot.handlers import trade as trade_handlers
 
-        try:
-            async with get_session_factory()() as db:
-                caravan = await trade_service.caravan_tick(db)
-                await db.commit()
-            if caravan is not None:
-                logger.info("Торговля: караван на ({}; {})", caravan.x, caravan.y)
-        except Exception:
-            logger.exception("Торговля: караван не появился")
-
-    from game.economy import trade_config as tc
-
+    trade_handlers.setup(bot.api)
     respawn_scheduler.add_job(
-        _caravan_tick, "interval", minutes=tc.CARAVAN_CHECK_MINUTES,
-        id="caravan_tick", max_instances=1, coalesce=True,
+        trade_handlers.tick_job, "interval", seconds=trade_handlers.TICK_SECONDS,
+        id="trade_tick", max_instances=1, coalesce=True,
     )
 
     # Маунты (патч 25, п.7): нападения/прибытия/live-отсчёт — свой job,

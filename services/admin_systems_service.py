@@ -19,7 +19,6 @@ from game.economy.exchange import Exchange
 from models import (
     BugReport,
     Character,
-    CharacterCart,
     CharacterFish,
     CharacterLootbox,
     CharacterVoyage,
@@ -34,7 +33,8 @@ from models import (
     PromoActivation,
     RaidRun,
     Rift,
-    TradeCaravan,
+    TradeCart,
+    TradeFirm,
     WorldBoss,
 )
 
@@ -100,14 +100,14 @@ async def systems_stats(db: AsyncSession) -> list[dict]:
     ]
 
     # --- Торговля, походы, маунты ---
-    carts = await _count(db, CharacterCart)
-    trade_profit = await db.scalar(select(func.coalesce(func.sum(CharacterCart.profit_total), 0)))
-    caravans = await _count(db, TradeCaravan, TradeCaravan.expires_at > now)
+    firms = await _count(db, TradeFirm)
+    trade_profit = await db.scalar(select(func.coalesce(func.sum(TradeFirm.profit_total), 0)))
+    carts_out = await _count(db, TradeCart, TradeCart.status == "traveling")
     voyages = await _count(db, CharacterVoyage, CharacterVoyage.status == "away")
     riding = await _count(db, MountTravel, MountTravel.status.in_(("traveling", "ambushed")))
     road_block = [
-        _row("Повозок куплено / прибыль торговцев всего", f"{carts} / {int(trade_profit or 0)}"),
-        _row("Караванов на карте", caravans),
+        _row("Торговых фирм / прибыль торговцев всего", f"{firms} / {int(trade_profit or 0)}"),
+        _row("Повозок в пути сейчас", carts_out),
         _row("В долгом походе сейчас", voyages),
         _row("В пути на маунте сейчас", riding),
     ]

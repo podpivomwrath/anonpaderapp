@@ -594,8 +594,9 @@ export default function MapTab() {
       g.status === 'claiming' ? '🚩' : (g.base_tier === 'citadel' ? '🏯' : '🏰'),
       `[${g.tag}] ${g.status === 'claiming' ? 'закладка знамени' : 'земля гильдии'}`, 0.8,
     ]),
-    ...(mapState.caravans || []).map((c) => [c.x, c.y, 'map-pin--caravan', '🐪', 'Караван: торгует, пока стоит', 1]),
-    ...(mapState.cart ? [[mapState.cart.x, mapState.cart.y, 'map-pin--cart', '🐂', 'Твоя повозка', 0.9]] : []),
+    // Повозки торговой фирмы в пути - там, где они сейчас (стоящие ждут в городах).
+    ...(mapState.carts || []).filter((c) => c.traveling)
+      .map((c) => [c.x, c.y, 'map-pin--cart', '🐂', `Твоя повозка №${c.num} в пути`, 0.9]),
     ...(mapState.rifts || []).map((r) => [
       r.x, r.y,
       r.blood ? 'map-pin--rift map-pin--rift-blood' : `map-pin--rift${r.state !== 'free' ? ' map-pin--rift-busy' : ''}`,
@@ -739,7 +740,7 @@ export default function MapTab() {
             {mapState.mount_travel ? (
               <>
                 <span>
-                  {mapState.mount_travel.mount_id === 'trade_cart' ? '🐂' : '🐎'} Сейчас ({mapState.pos_x}; {mapState.pos_y})
+                  🐎 Сейчас ({mapState.pos_x}; {mapState.pos_y})
                   {' → '}({mapState.mount_travel.to_x}; {mapState.mount_travel.to_y})
                 </span>
                 {/* Сойти с пути на текущей клетке - как кнопка в чате. */}

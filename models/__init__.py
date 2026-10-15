@@ -46,7 +46,7 @@ from models.raid import RaidLobby, RaidLobbyMember, RaidRun
 from models.scene_event import CharacterEventEffect, EventTrail
 from models.song import CharacterSongFragment
 from models.story import CharacterStoryProgress
-from models.trade import CharacterCart, TradeCaravan, TradeMarket
+from models.trade import FactionState, TradeCart, TradeContribution, TradeFirm, TradeMarket, TradeTrip
 from models.subclass_trial import CharacterTrialProgress, CharacterUnlockedBuff
 from models.transfer import TransferLog
 from models.trophy import CharacterTrophy
@@ -62,7 +62,6 @@ __all__ = [
     "BugReport",
     "Character",
     "CharacterBuffPreset",
-    "CharacterCart",
     "CharacterConsumable",
     "CharacterDaily",
     "CharacterDeath",
@@ -121,8 +120,12 @@ __all__ = [
     "RaidLobbyMember",
     "RaidRun",
     "Region",
-    "TradeCaravan",
+    "FactionState",
+    "TradeCart",
+    "TradeContribution",
+    "TradeFirm",
     "TradeMarket",
+    "TradeTrip",
     "TransferLog",
     "User",
     "Rift",

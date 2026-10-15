@@ -237,18 +237,12 @@ async def stop_travel(
 ) -> bool:
     """Остановиться на клетке, где персонаж сейчас стоит. На ходу - всегда;
     после боя-нападения (after_ambush, бой уже выигран) - вместо «Продолжить
-    путь». Повозка встаёт там же."""
+    путь»."""
     allowed = ("traveling", "ambushed") if after_ambush else ("traveling",)
     if travel.status not in allowed:
         return False
     travel.status = "stopped"
     travel.arrives_at = now or datetime.now(timezone.utc)
-    from game.economy import trade_config as tc  # избегаем цикла импортов
-
-    if travel.mount_id == tc.CART_MOUNT_ID:
-        from services import trade_service
-
-        await trade_service.on_arrival(db, character)
     await db.flush()
     return True
 

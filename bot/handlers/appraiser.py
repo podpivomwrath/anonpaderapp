@@ -43,7 +43,7 @@ from game.economy import fishing_config as fc
 from services import guild_service
 from services import daily_service, fishing_service, item_service, screen_service
 from services import onboarding_service as onboarding_svc
-from services import pk_service
+from services import faction_service
 from services import trophy_service
 from services import wallet_service
 from services.db import get_session_factory
@@ -143,8 +143,8 @@ async def appraiser_back(message: Message) -> None:
 
 
 async def _render_trophies(db, character, mult: float, prefix: str = "") -> tuple[str, str]:
-    # Пепельное клеймо 5+: за реликвии вдвое меньше.
-    mult *= pk_service.relic_mult(character)
+    # Пепельное клеймо 5+ и процветание города (2026-10-15).
+    mult *= await faction_service.relic_mult(db, character)
     stock = await trophy_service.get_stock(db, character.id)
     if not stock:
         text = appraiser_empty()
@@ -152,7 +152,8 @@ async def _render_trophies(db, character, mult: float, prefix: str = "") -> tupl
         lines = "\n".join(
             f"{d.emoji} {d.name} ×{count} - {round(d.sell_price * mult) * count} зол." for d, count in stock
         )
-        text = lines
+        note = await faction_service.city_line(db, character, relics=True)
+        text = f"{note}\n\n{lines}" if note else lines
     if prefix:
         text = f"{prefix}\n\n{text}"
     return text, appraiser_trophies_keyboard(stock)
@@ -186,7 +187,7 @@ async def sell_trophies(message: Message) -> None:
         if character is None or character.creation_state is not None:
             return
         mult = _price_multiplier(character, grid.city_region_at(character.pos_x, character.pos_y))
-        relic_mult = mult * pk_service.relic_mult(character)
+        relic_mult = mult * await faction_service.relic_mult(db, character)
         if trophy_id == SELL_ALL_ID:
             gold = await trophy_service.sell_all(db, character, relic_mult)
         else:

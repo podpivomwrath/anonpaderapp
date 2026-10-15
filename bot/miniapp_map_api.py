@@ -165,13 +165,6 @@ async def handle_get_state(request: web.Request) -> web.Response:
             for cell, guild in await guild_territory_service.all_cells(db)
         ]
 
-        # Торговля: караваны на карте и повозка, если она стоит не при игроке.
-        from services import trade_service
-
-        caravans = [
-            {"x": c.x, "y": c.y, "buys": len(c.buys or {}), "sells": len(c.sells or {})}
-            for c in await trade_service.active_caravans(db)
-        ]
         # Разломы: видят все. Свободен / ждут у входа / внутри - для окна клетки.
         from services import rift_service
 
@@ -185,24 +178,25 @@ async def handle_get_state(request: web.Request) -> web.Response:
                 "minutes_left": rift_service.minutes_left(r), "state": r.state,
                 "blood": rift_service.is_blood(r),
             })
-        cart_row = await trade_service.get_cart(db, character.id)
-        cart_mark = None
-        if cart_row is not None and (cart_row.cart_x, cart_row.cart_y) != (character.pos_x, character.pos_y):
-            if await trade_service.cart_travel(db, character.id) is None:
-                cart_mark = {"x": cart_row.cart_x, "y": cart_row.cart_y}
+        # Повозки торговой фирмы игрока: в пути - на клетке, где они сейчас.
+        from services import trade_service
+
+        cart_marks = []
+        for cart in await trade_service.carts(db, character.id):
+            x, y = trade_service.position(cart)
+            cart_marks.append({"x": x, "y": y, "num": cart.slot, "traveling": cart.status == "traveling"})
 
         return web.json_response(
             {
                 "pos_x": character.pos_x, "pos_y": character.pos_y,
                 "guild_cells": guild_cells,
-                "caravans": caravans,
                 "rifts": rifts,
                 # Для окна клетки: хватает ли уровня у озера, рудника, разлома.
                 "levels": {
                     "level": character.level, "fishing": character.fishing_level,
                     "mining": character.mining_level,
                 },
-                "cart": cart_mark,
+                "carts": cart_marks,
                 "is_dead": death_service.is_dead(character),
                 "foot_travel": foot_travel,
                 "mount_travel": mount_travel,

@@ -297,11 +297,20 @@ def mining_part() -> str:
 
 
 def trade_part() -> str:
+    from game.economy import faction_config as fc
+
     parts = ["    <h3>Торговля</h3>", f'    <p class="levels">с {tc.TRADE_MIN_LEVEL} уровня</p>']
     parts.append(p(
-        f"Повозку покупают в Торговом доме любого города за {money(tc.CART_PRICE)} золота. Дальше всё - в "
-        "мини-аппе, вкладка «Торговля». Принцип простой: покупаешь товар там, где его делают, и везёшь туда, "
-        "где его не хватает. Повозка едет по карте сама, клетка за клеткой; торговать можно только рядом с ней."
+        f"Торговая фирма стоит {money(tc.FIRM_PRICE)} золота, у неё уникальное название. Всё управление - в "
+        "мини-аппе, вкладка «Фракция». Персонаж никуда не едет: повозки ездят сами, а ты в это время "
+        "занимаешься чем хочешь. Каждую повозку отправляешь сам, на одно плечо: закупаешь товар города, где "
+        "она стоит, выбираешь город и путь - по прибытии она продаёт весь груз по цене на месте и ждёт там."
+    ))
+    parts.append(p(
+        f"В фирме до {tc.MAX_CARTS} повозок. "
+        + "; ".join(f"повозка №{slot} - с {lvl} уровня торговли за {money(gold)} золота"
+                    for slot, (lvl, gold) in tc.CART_SLOTS.items())
+        + "."
     ))
 
     parts.append("    <h4>Товары и цены</h4>")
@@ -311,31 +320,24 @@ def trade_part() -> str:
         rows.append([
             f"{g.emoji} {E(g.name)}", E(REGION_TITLES.get(g.city, g.city)), tc.TIER_NAMES[g.tier],
             str(tc.TIER_MIN_TRADE_LEVEL[g.tier]), money(round(base * tc.BUY_MULT)),
-            money(round(base * tc.SELL_MULT_DEFICIT)),
+            money(round(base * tc.SELL_MULT_DEFICIT)), money(round(base * tc.SELL_MULT_FAR)),
         ])
     parts.append(table(
-        ["Товар", "Где делают", "Сорт", "Ур. торговли", "Купить", "Продать в нехватке"], rows, (3, 4, 5),
+        ["Товар", "Где делают", "Сорт", "Ур. торговли", "Купить", "У соседа", "Напротив"], rows, (3, 4, 5, 6),
     ))
-    deficit = "; ".join(
-        f"в {E(REGION_TITLES[c])} - товары " + " и ".join(E(REGION_TITLES[n]) for n in sorted(needs))
-        for c, needs in tc.DEFICIT.items()
-    )
     parts.append(p(
-        f"Цены за ящик. Город-производитель продаёт за {pct(tc.BUY_MULT)} базы. Город, которому товара не "
-        f"хватает, покупает за {pct(tc.SELL_MULT_DEFICIT)}, остальные - за {pct(tc.SELL_MULT_NORMAL)}. "
-        f"Куда что везти дороже всего: {deficit}. Выгоднее возить вдоль края карты к соседу, а не через Монолит."
+        f"Цены за ящик. Город-производитель продаёт за {pct(tc.BUY_MULT)} базы. Соседний город (у него "
+        f"нехватка) платит {pct(tc.SELL_MULT_DEFICIT)}, город напротив - {pct(tc.SELL_MULT_FAR)}: путь туда "
+        "вдвое длиннее. Свой товар город не покупает."
     ))
     parts.append(ul([
-        f"Рынок насыщается: каждый проданный ящик сбивает цену на {pct(tc.SATURATION_PER_CRATE)}, "
-        f"за час она восстанавливается на {pct(tc.RECOVERY_PER_HOUR)}. Цена не падает ниже "
-        f"{pct(1 - tc.MAX_PRESSURE)} и не растёт выше {pct(1 + tc.MAX_PRESSURE)}. Один маршрут быстро выдыхается.",
-        f"🐪 Караваны появляются на {tc.CARAVAN_LIFETIME_MINUTES} минут в кольцах "
-        + "-".join(RING[r] for r in tc.CARAVAN_RINGS)
-        + f" (не больше {tc.CARAVAN_MAX} разом): скупают 1-2 товара в {num(tc.CARAVAN_BUY_MULT)} раза дороже "
-        f"и продают дешевле города, по {tc.CARAVAN_STOCK} ящиков.",
+        f"Рынок насыщается: каждый ящик сбивает цену продажи на {pct(tc.SATURATION_PER_CRATE)} и поднимает "
+        f"цену закупки на столько же; за час рынок отходит на {pct(tc.RECOVERY_PER_HOUR)}. Цена не падает ниже "
+        f"{pct(1 - tc.MAX_PRESSURE)} и не растёт выше {pct(1 + tc.MAX_PRESSURE)}. Чередуй товары и города.",
         "Опыт торговли - за каждый проданный ящик: "
         + ", ".join(f"{tc.TIER_NAMES[t]} - {x}" for t, x in tc.XP_PER_CRATE.items())
-        + f". До следующего уровня нужно 60 + 40 × текущий уровень (со 1-го на 2-й - {tc.xp_to_next(1)}).",
+        + f". До следующего уровня нужно 60 + 40 × текущий уровень. Каждый уровень - "
+        f"+{pct(tc.SELL_BONUS_PER_LEVEL)} к выручке, до +{pct(tc.SELL_BONUS_MAX)}.",
         "С каждого проданного ящика - шанс на 🗃️ Пепельный ларец: "
         + ", ".join(f"{tc.TIER_NAMES[t]} {pct(c)}" for t, c in tc.CHEST_CHANCE_PER_CRATE.items()) + ".",
     ]))
@@ -355,15 +357,30 @@ def trade_part() -> str:
         + f". Ремонт обшивки - {money(tc.REPAIR_PER_POINT)} золота за единицу прочности."
     ))
 
-    parts.append("    <h4>Риски в пути</h4>")
+    parts.append("    <h4>Пути и риски</h4>")
     parts.append(ul([
-        f"За поездку (около 30 клеток) на повозку нападают с шансом {pct(tc.CART_TRIP_AMBUSH)}; охрана "
-        "умножает его вниз до ×" + num(tc.PARTS_BY_ID["guard"].values[-1]) + ".",
-        f"Погиб в бою - теряешь {pct(tc.LOSS_ON_DEATH)} груза. Нападение выбило обшивку - {pct(tc.LOSS_ON_BREAK)}.",
-        f"С кольца {RING[tc.ROB_MIN_RING]} и глубже тебя могут ограбить игроки: победитель забирает "
-        f"{pct(tc.ROB_SHARE)} груза и сбывает его за {pct(tc.ROB_GOLD_SHARE)} базовой цены. "
-        "В кольцах I-II грабежа нет.",
+        "Короткий путь - напрямик: быстрее, но ближе к центру мира нападают чаще. Через Монолит к городу "
+        "напротив - больше половины рейсов с нападением.",
+        f"Безопасный путь - вдоль края мира: нападений мало, но едешь в {num(tc.SAFE_ROUTE_TIME_MULT)} раза дольше.",
+        "Охрана снижает шанс нападения до ×" + num(tc.PARTS_BY_ID["guard"].values[-1]) + ". Боя нет: каждое "
+        f"нападение снимает единицу обшивки, выбитая обшивка - рассыпается {pct(tc.LOSS_ON_BREAK)} груза. "
+        "С выбитой обшивкой повозку не отправить - сначала ремонт.",
     ]))
+
+    parts.append("    <h4>Процветание городов</h4>")
+    parts.append(p(
+        "Каждый проданный ящик приносит очки процветания РОДНОМУ городу торговца, куда бы он ни возил: "
+        + ", ".join(f"{tc.TIER_NAMES[t]} - {x}" for t, x in fc.POINTS_PER_CRATE.items())
+        + f". Один торговец даёт не больше {fc.DAILY_CAP_BASE} очков в сутки, +{fc.DAILY_CAP_PER_10_LEVELS} "
+        f"за каждые 10 уровней торговли. Процветание само падает на {pct(fc.DECAY_PER_DAY)} в сутки."
+    ))
+    rows = [
+        [f"{t.emoji} {E(t.name)}", money(t.min_points), f"{round((t.elixir_mult - 1) * 100):+d}%",
+         f"{round((t.relic_mult - 1) * 100):+d}%"]
+        for t in fc.TIERS
+    ]
+    parts.append(table(["Ступень", "От очков", "Зелья в лавке", "Реликвии у скупщика"], rows, (1,)))
+    parts.append(p("Скидки и надбавки действуют для всех, кто торгует в этом городе."))
     return "\n".join(parts)
 
 
