@@ -1392,6 +1392,10 @@ async def move(message: Message) -> None:
 
 async def handle_arrival(peer_id: int) -> None:
     """Колбэк планировщика: время в пути истекло — показываем клетку/город (без боя)."""
+    if in_any_battle(peer_id):
+        # В пути втянули в бой (PvP отменяет шаг) - сводка клетки с кнопками
+        # движения перебила бы кнопки боя.
+        return
     async with get_session_factory()() as db:
         character = await onboarding_svc.get_character(db, peer_id)
         if character is None:

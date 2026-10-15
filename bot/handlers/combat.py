@@ -6,6 +6,7 @@
 """
 
 import random
+import time
 
 from vkbottle import BaseStateGroup  # noqa: F401  (совместимость импортов)
 from vkbottle.bot import BotLabeler, Message
@@ -666,8 +667,15 @@ async def on_battle_finished(session_id: int, result: TickResult) -> None:
 # --- Действия игрока ---
 
 
+#: Побег - в два нажатия (2026-10-15): первое показывает шанс, второе в
+#: течение FLEE_CONFIRM_SECONDS бежит. Любое другое действие отменяет.
+FLEE_CONFIRM_SECONDS = 15
+_flee_confirm: dict[int, float] = {}
+
+
 @labeler.message(text=[BTN_ATTACK])
 async def attack(message: Message) -> None:
+    _flee_confirm.pop(message.peer_id, None)
     if not has_active_encounter(message.peer_id):
         await _no_encounter(message)
         return
@@ -681,6 +689,7 @@ async def attack(message: Message) -> None:
 
 @labeler.message(payload_contains={"type": "skill"})
 async def use_skill(message: Message) -> None:
+    _flee_confirm.pop(message.peer_id, None)
     if not has_active_encounter(message.peer_id):
         await _no_encounter(message)
         return
@@ -869,15 +878,28 @@ async def flee(message: Message) -> None:
     if not has_active_encounter(peer_id):
         await _no_encounter(message)
         return
+    state = _engine.sessions.get(peer_id)
+    player = state.combatants.get(PLAYER_ID) if state else None
+    mob = state.combatants.get(MOB_ID) if state else None
+    chance = flee_chance(player.level, mob.level) if player and mob else FLEE_SUCCESS_CHANCE
+    asked = _flee_confirm.pop(peer_id, None)
+    if asked is None or time.monotonic() - asked > FLEE_CONFIRM_SECONDS:
+        _flee_confirm[peer_id] = time.monotonic()
+        if peer_id in _world_boss:
+            ask = "🏃 Точно уйти от босса? Нанесённый урон засчитан, но бой для тебя закончится."
+        else:
+            ask = (f"🏃 Точно бежать? Шанс уйти: {round(chance * 100)}%. "
+                   f"Не выйдет - ход пропадёт.")
+        ask += "\nНажми «🏃 Побег» ещё раз, чтобы подтвердить."
+        keyboard = _combat_kb(state, peer_id) if state is not None else None
+        await message.answer(ask, keyboard=keyboard)
+        return
     if peer_id in _world_boss:
         # От босса уходят всегда: он не держит и не бьёт в спину.
         from bot.handlers import world_boss as world_boss_handlers  # избегаем цикла импортов
 
         await world_boss_handlers.leave(peer_id)
         return
-    state = _engine.sessions[peer_id]
-    player, mob = state.combatants.get(PLAYER_ID), state.combatants.get(MOB_ID)
-    chance = flee_chance(player.level, mob.level) if player and mob else FLEE_SUCCESS_CHANCE
     if _rng.random() < chance:
         # сохраняем остаток HP игрока перед выходом из боя
         hp = _engine.sessions[peer_id].combatants[PLAYER_ID].current_hp

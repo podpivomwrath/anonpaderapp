@@ -89,6 +89,7 @@ from services import (
     item_service,
     mining_service,
     mount_service,
+    movement_service,
     premium_service,
     preset_service,
     pvp_service,
@@ -708,6 +709,16 @@ async def _start_forced_duel_impl(
 ) -> None:
     from bot.handlers import group_combat
 
+    # Напали в пути на соседнюю клетку - шаг сорван, бой здесь. Иначе
+    # прибытие посреди боя присылало сводку клетки с кнопками движения,
+    # и кнопок боя у жертвы не было (2026-10-15, жалоба игрока).
+    if movement_service.is_traveling(victim):
+        movement_service.cancel_travel(victim)
+        await db.commit()
+    ride = await mount_service.active_travel(db, victim.id)
+    if ride is not None and await mount_service.stop_travel(db, ride, victim):
+        await db.commit()
+
     if combat_handlers.has_active_encounter(victim_peer_id):
         await combat_handlers.interrupt_for_pvp(victim_peer_id)
         await _bot_api.messages.send(
@@ -727,7 +738,10 @@ async def _start_forced_duel_impl(
             await db.refresh(member)
             if death_service.is_dead(member) or (member.pos_x, member.pos_y) != (attacker.pos_x, attacker.pos_y):
                 continue
+            if movement_service.is_traveling(member):
+                movement_service.cancel_travel(member)
             defenders.append((member, peer))
+        await db.commit()
         if len(defenders) > 1:
             await _start_group_ambush(db, attacker, attacker_peer_id, victim, defenders)
             return
