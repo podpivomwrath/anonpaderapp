@@ -478,6 +478,12 @@ body {
   border-color: #b98b5a;
 }
 
+/* Цель взятого заказа - красная рамка. */
+.map-pin--hunt {
+  border-color: #e0453a;
+  box-shadow: 0 0 8px rgba(224, 69, 58, 0.7);
+}
+
 /* Разлом: фиолетовое свечение; занятый - тусклее, без пульса. */
 .map-pin--rift {
   border: 2px solid #b06bff;
@@ -2382,4 +2388,26 @@ body::before {
   width: 100%;
   box-sizing: border-box;
   margin-top: 8px;
+}
+
+/* Заказы на игроков: выбор числа убийств и колонка цены с кнопкой. */
+.contract-kills {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin: 6px 0;
+}
+
+.contract-kills__n {
+  align-items: center;
+  min-width: 40px;
+  padding: 6px 10px;
+}
+
+.contract-side {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
 }

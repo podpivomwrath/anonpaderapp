@@ -170,6 +170,11 @@ async def on_pvp_kill(
     victim_branded = marks(victim, now) > 0
     if victim_branded or killer.level - victim.level < pc.LEVEL_GAP:
         return out
+    # Заказ на игрока (2026-10-16): охота по взятому заказу клейма не даёт.
+    from services import contract_service
+
+    if await contract_service.hunts(db, killer.id, victim.id, now):
+        return out
 
     out.branded = True
     if not killer.pk_marks:

@@ -349,7 +349,11 @@ async def _scene_at(db, character: Character) -> tuple[list[Character], list[tup
     # Патч 33, ч.3: AFK (нет действий AFK_TIMEOUT_MINUTES) исключён из
     # «Осмотреться»/нумерации целей — уже идущий бой это НЕ трогает (busy_ids
     # выше — отдельная причина, AFK-статус там не проверяется намеренно).
-    solo = [c for c in others if c.id not in busy_ids and not pvp_service.is_afk(c)]
+    # Заказ (2026-10-16): от взявшего заказ цель в АФК не прячется.
+    from services import contract_service
+
+    hunted = await contract_service.hunted_ids(db, character.id)
+    solo = [c for c in others if c.id not in busy_ids and (not pvp_service.is_afk(c) or c.id in hunted)]
     return solo, battles
 
 
@@ -560,15 +564,30 @@ async def look_around(message: Message) -> None:
         # шахте или озере кнопка на клавиатуре есть: нажатие уходило в
         # пустоту (жалоба игрока). Теперь показываем, кто рядом, без номеров -
         # нападать здесь всё равно нельзя.
-        if _is_safe_craft_cell(character) or grid.pvp_forbidden(character.pos_x, character.pos_y):
+        safe_craft = _is_safe_craft_cell(character)
+        if safe_craft or grid.pvp_forbidden(character.pos_x, character.pos_y):
             solo, _battles = await _scene_at(db, character)
-            await message.answer(_peaceful_scene_text(solo, await _guild_tags(db, solo)))
-            return
-        solo, battles = await _scene_at(db, character)
+            hunted = await _hunted_here(db, character, solo) if safe_craft and not grid.pvp_forbidden(
+                character.pos_x, character.pos_y) else []
+            if not hunted:
+                await message.answer(_peaceful_scene_text(solo, await _guild_tags(db, solo)))
+                return
+            # Заказ: мирная клетка цель не спасает - охотнику видна только она.
+            solo, battles = hunted, []
+        else:
+            solo, battles = await _scene_at(db, character)
         tags = await _guild_tags(db, solo)
         busy = await _busy_marks(db, solo)
         _remember_look(peer_id, character, solo, battles)
     await message.answer(_scene_text(solo, battles, tags, busy))
+
+
+async def _hunted_here(db, character, solo: list[Character]) -> list[Character]:
+    """Цели взятых заказов среди тех, кто на клетке."""
+    from services import contract_service
+
+    hunted = await contract_service.hunted_ids(db, character.id)
+    return [c for c in solo if c.id in hunted]
 
 
 def _peaceful_scene_text(solo: list[Character], tags: dict[int, str] | None = None) -> str:
@@ -636,9 +655,7 @@ async def attack_command(message: Message, target: str) -> None:
         # Патч 58: озёра первых двух колец — первые мирные клетки вне
         # городов. Проверка стоит рядом с городской намеренно: это одно и то
         # же правило «здесь не нападают», и разъезжаться им нельзя.
-        if _is_safe_craft_cell(character):
-            await message.answer(LAKE_NO_PVP_TEXT)
-            return
+        safe_craft = _is_safe_craft_cell(character)
         if grid.city_region_at(character.pos_x, character.pos_y) is not None:
             await message.answer(CITY_NO_PVP_TEXT)
             return
@@ -661,6 +678,15 @@ async def attack_command(message: Message, target: str) -> None:
             else:
                 await message.answer("Здесь нет такой цели.")
             return
+
+        if safe_craft:
+            # Мирная клетка (озеро, рудник): нападать можно только на цель
+            # взятого заказа (2026-10-16), в чужие бои здесь не вступают.
+            from services import contract_service
+
+            if victim is None or victim.id not in await contract_service.hunted_ids(db, character.id):
+                await message.answer(LAKE_NO_PVP_TEXT)
+                return
 
         if victim is not None and await _same_group(db, character, victim.id):
             await message.answer(GROUPMATE_NO_PVP_TEXT)
@@ -1577,6 +1603,10 @@ async def _finish_duel(battle: Battle, winner_cid: int, loser_cid: int) -> None:
         pvp_service.record_win(winner)
         pvp_service.record_loss(loser)
         pk = await pk_service.on_pvp_kill(db, winner, loser)
+        # Заказ на игрока (2026-10-16): после клейма - оно смотрит, взят ли заказ.
+        from services import contract_service
+
+        payout = await contract_service.on_kill(db, loser, [winner.id])
         await pts_service.season_rollover(db)
         await db.refresh(winner, ["pts", "pts_season"])
         await db.refresh(loser, ["pts", "pts_season"])
@@ -1621,6 +1651,8 @@ async def _finish_duel(battle: Battle, winner_cid: int, loser_cid: int) -> None:
         win_text += f"\n\n📖 Испытание пройдено. Открыт бафф: {trial_service.buff_name(buff_id)}."
     if pk.killer_lines:
         win_text += "\n\n" + "\n".join(pk.killer_lines)
+    if payout.hunter_lines.get(winner_cid):
+        win_text += "\n\n" + "\n".join(payout.hunter_lines[winner_cid])
     await _bot_api.messages.send(
         peer_id=winner_p.peer_id, message=win_text, random_id=0,
         keyboard=kb.movement_keyboard(*winner_pos, winner_p.peer_id, has_mount=winner_has_mount),
@@ -1630,6 +1662,8 @@ async def _finish_duel(battle: Battle, winner_cid: int, loser_cid: int) -> None:
     lose_text = f"☠ Тебя побеждает {winner_p.name}. Ты уходишь во тьму."
     if pk.victim_lines:
         lose_text += "\n\n" + "\n".join(pk.victim_lines)
+    if payout.victim_lines:
+        lose_text += "\n\n" + "\n".join(payout.victim_lines)
     if loser_pts_line:
         lose_text += f"\n\n{loser_pts_line}"
     if fish_lost:
@@ -1643,6 +1677,21 @@ async def _finish_duel(battle: Battle, winner_cid: int, loser_cid: int) -> None:
         peer_id=loser_p.peer_id, message=lose_text,
         random_id=0, keyboard=kb.waiting_keyboard(),
     )
+    await _notify_orderers(payout.orderer_notes)
+
+
+async def _notify_orderers(notes: list[tuple[int, str]]) -> None:
+    """Заказчику - что убийство по его заказу выполнено (без имён охотников)."""
+    if not notes:
+        return
+    async with get_session_factory()() as db:
+        peers = {cid: await onboarding_svc.vk_id_for_character(db, cid) for cid, _ in notes}
+    for cid, text in notes:
+        if peers.get(cid):
+            try:
+                await _bot_api.messages.send(peer_id=peers[cid], message=text, random_id=0)
+            except Exception:  # noqa: BLE001 - заказчик закрыл диалог с ботом
+                pass
 
 
 # --- Массовый бой: рендер + колбэки тик-движка ---
@@ -1794,6 +1843,7 @@ async def on_mass_battle_finished(session_id: int, result: TickResult) -> None:
         transfer_lines: dict[int, list[str]] = {}
         pk_lines: dict[int, list[str]] = {}
         pk_outcomes: dict[int, list] = {}
+        orderer_notes: list[tuple[int, str]] = []
         for victim_cid in dead_ids:
             victim = characters.get(victim_cid)
             if victim is None:
@@ -1809,6 +1859,14 @@ async def on_mass_battle_finished(session_id: int, result: TickResult) -> None:
                     pk = await pk_service.on_pvp_kill(db, characters[attacker_cid], victim)
                     pk_outcomes.setdefault(attacker_cid, []).append(pk)
                     pk_lines.setdefault(victim_cid, []).extend(pk.victim_lines)
+                # Заказ на игрока: доля - каждому взявшему заказ, кто бил цель.
+                from services import contract_service
+
+                payout = await contract_service.on_kill(db, victim, hitters)
+                for hunter_cid, hunter_lines in payout.hunter_lines.items():
+                    pk_lines.setdefault(hunter_cid, []).extend(hunter_lines)
+                pk_lines.setdefault(victim_cid, []).extend(payout.victim_lines)
+                orderer_notes.extend(payout.orderer_notes)
             shares: dict[int, float] = {}
             for attacker_cid in survivor_ids:
                 dmg = battle.damage_by_pair.get((attacker_cid, victim_cid), 0)
@@ -1915,6 +1973,7 @@ async def on_mass_battle_finished(session_id: int, result: TickResult) -> None:
                 + ("\n\n" + "\n".join(pk_lines[cid]) if pk_lines.get(cid) else ""),
                 random_id=0, keyboard=kb.waiting_keyboard(),
             )
+    await _notify_orderers(orderer_notes)
 
 
 async def _tell_others(battle, cid: int, text: str) -> None:

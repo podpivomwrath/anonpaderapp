@@ -8,6 +8,7 @@
 from bot.handlers.appraiser import labeler as appraiser_labeler
 from bot.handlers.basic import labeler as basic_labeler
 from bot.handlers.combat import labeler as combat_labeler
+from bot.handlers.contracts import labeler as contracts_labeler
 from bot.handlers.dailies import labeler as dailies_labeler
 from bot.handlers.elixir_shop import labeler as elixir_shop_labeler
 from bot.handlers.fallback import labeler as fallback_labeler
@@ -69,6 +70,8 @@ LABELERS = [
     # регистрируется СТРОГО ДО promo_labeler, чтобы угадавший совпадение
     # промокод не перехватил приглашение.
     group_labeler,
+    # Заказы на игроков (2026-10-16): «/заказ» - до promo/fallback.
+    contracts_labeler,
     # Передача: «передать ...» с пересланным сообщением - до promo/fallback.
     transfer_labeler,
     # Патч 50: промокоды — TEXT_ONLY, без state/payload гейта, поэтому

@@ -410,6 +410,15 @@ async def run() -> None:
         trade_handlers.week_job, "cron", day_of_week="mon", hour=0, minute=3, timezone="Europe/Moscow",
         id="faction_week", max_instances=1, coalesce=True, next_run_time=datetime.now(timezone.utc),
     )
+    # Заказы на игроков: истёкшие сгорают (2026-10-16).
+    from bot.handlers import contracts as contracts_handlers
+    from game.economy import contract_config
+
+    contracts_handlers.setup(bot.api)
+    respawn_scheduler.add_job(
+        contracts_handlers.expire_job, "interval", minutes=contract_config.EXPIRE_CHECK_MINUTES,
+        id="contracts_expire", max_instances=1, coalesce=True,
+    )
     # Доля налога с переводов первым поставщикам - раз в сутки.
     respawn_scheduler.add_job(
         trade_handlers.payout_job, "cron", hour=0, minute=10, timezone="Europe/Moscow",

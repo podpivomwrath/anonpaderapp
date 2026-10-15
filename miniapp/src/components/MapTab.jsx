@@ -594,6 +594,8 @@ export default function MapTab() {
       g.status === 'claiming' ? '🚩' : (g.base_tier === 'citadel' ? '🏯' : '🏰'),
       `[${g.tag}] ${g.status === 'claiming' ? 'закладка знамени' : 'земля гильдии'}`, 0.8,
     ]),
+    // Цели взятых заказов (2026-10-16): видны, пока вне городов.
+    ...(mapState.hunts || []).map((h) => [h.x, h.y, 'map-pin--hunt', '🎯', `Цель заказа: ${h.name}, ${h.level} ур.`, 1.1]),
     // Повозки торговой фирмы в пути - там, где они сейчас (стоящие ждут в городах).
     ...(mapState.carts || []).filter((c) => c.traveling)
       .map((c) => [c.x, c.y, 'map-pin--cart', '🐂', `Твоя повозка №${c.num} в пути`, 0.9]),

@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Div, Group, Header, Placeholder, Spinner, Tabs, TabsItem } from '@vkontakte/vkui';
 import { getBoard } from '../api.js';
 import ClassIcon from './ClassIcon.jsx';
+import ContractsSection from './ContractsSection.jsx';
 
 /**
  * «Доска» (2026-10-15): всё PvP в одном месте - розыск (Пепельное клеймо и
@@ -12,6 +13,7 @@ import ClassIcon from './ClassIcon.jsx';
 
 const SECTIONS = [
   { id: 'wanted', title: '🩸 Розыск' },
+  { id: 'contracts', title: '📜 Заказы' },
   { id: 'rating', title: '🏅 Рейтинг' },
   { id: 'season', title: '📅 Сезон' },
 ];
@@ -177,6 +179,7 @@ export default function BoardTab() {
         <Placeholder icon={<div style={{ fontSize: 48 }}>🕯️</div>}>Не удалось загрузить доску.</Placeholder>
       )}
       {status === 'ready' && section === 'wanted' && <Wanted data={data} />}
+      {section === 'contracts' && <ContractsSection />}
       {status === 'ready' && section === 'rating' && <Rating data={data} />}
       {status === 'ready' && section === 'season' && <Season data={data} />}
     </>

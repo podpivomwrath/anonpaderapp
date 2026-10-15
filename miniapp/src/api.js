@@ -424,3 +424,13 @@ export function postAdminDonations(params) {
     body: JSON.stringify(params),
   });
 }
+
+// --- Заказы на игроков (2026-10-16): вкладка «Заказы» на «Доске» ---
+export const getContracts = () => request('/contracts');
+
+export const contractAction = (action, params = {}) =>
+  request('/contracts', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ action, ...params }),
+  });

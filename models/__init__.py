@@ -46,6 +46,7 @@ from models.raid import RaidLobby, RaidLobbyMember, RaidRun
 from models.scene_event import CharacterEventEffect, EventTrail
 from models.song import CharacterSongFragment
 from models.story import CharacterStoryProgress
+from models.contract import Contract, ContractTaker
 from models.donation import Donation
 from models.trade import (
     FactionPayout, FactionState, FactionWeek, TradeCart, TradeContribution, TradeFirm, TradeMarket, TradeOrder, TradeTrip,
@@ -64,6 +65,8 @@ __all__ = [
     "BaseClass",
     "BugReport",
     "Character",
+    "Contract",
+    "ContractTaker",
     "Donation",
     "CharacterBuffPreset",
     "CharacterConsumable",

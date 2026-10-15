@@ -125,5 +125,100 @@ async def handle_get(request: web.Request) -> web.Response:
     return web.json_response(data)
 
 
+# --- Заказы на игроков (2026-10-16) ---
+
+
+async def _contracts_state(db, character, now: datetime) -> dict:
+    from game.economy import contract_config as cc
+    from models import Wallet
+    from services import contract_service, power_service
+
+    contracts = await contract_service.active_contracts(db, now)
+    mine_taken = await contract_service.taken_ids(db, character.id)
+    counts = await contract_service.taker_counts(db, [c.id for c in contracts])
+    frames = await crown_service.frames_by_id(db, list({c.target_id for c in contracts}))
+    wallet = await db.get(Wallet, character.id)
+    items = []
+    for c in contracts:
+        target = await db.get(Character, c.target_id)
+        if target is None:
+            continue
+        expires = c.expires_at if c.expires_at.tzinfo else c.expires_at.replace(tzinfo=timezone.utc)
+        taken = c.id in mine_taken
+        items.append({
+            "id": c.id, "target_id": target.id, "name": target.name, "level": target.level,
+            "base_class": target.base_class, "subclass": target.subclass,
+            "crown_frame": frames.get(target.id),
+            "power": (await power_service.power_of(db, target)).total,
+            "kills_left": c.kills_left, "kills_total": c.kills_total, "price": c.price,
+            "minutes_left": max(int((expires - now).total_seconds() // 60), 0),
+            "hunters": counts.get(c.id, 0), "taken": taken,
+            "mine": c.orderer_id == character.id, "on_me": target.id == character.id,
+            # Где цель - только тем, кто взял заказ.
+            "where": contract_service.location_text(target) if taken else None,
+        })
+    return {
+        "gems": wallet.donate_currency if wallet is not None else 0,
+        "rules": {
+            "min_kills": cc.MIN_KILLS, "max_kills": cc.MAX_KILLS, "min_price": cc.MIN_PRICE,
+            "hours": cc.HOURS, "target_min_level": cc.TARGET_MIN_LEVEL,
+        },
+        "contracts": items,
+    }
+
+
+async def handle_get_contracts(request: web.Request) -> web.Response:
+    now = datetime.now(timezone.utc)
+    async with request.app[SESSION_FACTORY_KEY]() as db:
+        character = await onboarding_svc.get_character(db, request[VK_USER_ID_KEY])
+        if character is None:
+            return web.json_response({"error": "character_not_found"}, status=404)
+        state = await _contracts_state(db, character, now)
+        await db.commit()
+    return web.json_response(state)
+
+
+async def handle_post_contracts(request: web.Request) -> web.Response:
+    """{"action": "create", "name", "kills", "price"} | {"action": "take", "id"}."""
+    from services import contract_service
+
+    try:
+        body = await request.json()
+    except Exception:
+        return web.json_response({"error": "bad_request"}, status=400)
+    if not isinstance(body, dict) or body.get("action") not in ("create", "take"):
+        return web.json_response({"error": "bad_request"}, status=400)
+    created = None
+    async with request.app[SESSION_FACTORY_KEY]() as db:
+        character = await onboarding_svc.get_character(db, request[VK_USER_ID_KEY])
+        if character is None:
+            return web.json_response({"error": "character_not_found"}, status=404)
+        await db.commit()
+        try:
+            if body["action"] == "create":
+                created = await contract_service.create(
+                    db, character, body.get("name"), body.get("kills"), body.get("price"),
+                )
+                done = f"📜 Заказ оформлен: {created.kills_total} убийств по 💎{created.price}. Заказчик никому не виден."
+            else:
+                contract = await contract_service.take(db, character, body.get("id"))
+                target = await db.get(Character, contract.target_id)
+                done = f"🎯 Заказ на {target.name} взят. Где цель - на карте и по команде /заказ."
+            await db.commit()
+        except contract_service.ContractError as exc:
+            await db.rollback()
+            return web.json_response({"error": str(exc)}, status=409)
+        state = await _contracts_state(db, character, datetime.now(timezone.utc))
+        await db.commit()
+    if created is not None:
+        from bot.handlers import contracts as contracts_handlers  # избегаем цикла импортов
+
+        await contracts_handlers.notify_target(created.target_id, created.kills_total)
+    state["done"] = done
+    return web.json_response(state)
+
+
 def register_routes(app: web.Application) -> None:
     app.router.add_get("/api/miniapp/board", handle_get)
+    app.router.add_get("/api/miniapp/contracts", handle_get_contracts)
+    app.router.add_post("/api/miniapp/contracts", handle_post_contracts)

@@ -181,6 +181,14 @@ async def handle_get_state(request: web.Request) -> web.Response:
         # Повозки торговой фирмы игрока: в пути - на клетке, где они сейчас.
         from services import trade_service
 
+        # Заказы (2026-10-16): цели взятых заказов - там, где они сейчас (вне городов).
+        from services import contract_service
+
+        hunt_marks = []
+        for target_id in await contract_service.hunted_ids(db, character.id):
+            target = await db.get(Character, target_id)
+            if target is not None and contract_service.visible_on_map(target):
+                hunt_marks.append({"x": target.pos_x, "y": target.pos_y, "name": target.name, "level": target.level})
         cart_marks = []
         for cart in await trade_service.carts(db, character.id):
             x, y = trade_service.position(cart)
@@ -197,6 +205,7 @@ async def handle_get_state(request: web.Request) -> web.Response:
                     "mining": character.mining_level,
                 },
                 "carts": cart_marks,
+                "hunts": hunt_marks,
                 "is_dead": death_service.is_dead(character),
                 "foot_travel": foot_travel,
                 "mount_travel": mount_travel,
