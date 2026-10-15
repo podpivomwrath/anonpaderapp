@@ -28,6 +28,7 @@ import GuildTab from './GuildTab.jsx';
 import InventoryTab from './InventoryTab.jsx';
 import MapTab from './MapTab.jsx';
 import TopsTab from './TopsTab.jsx';
+import BoardTab from './BoardTab.jsx';
 
 // Патч 14, ч.1: было 5 вкладок (Характеристики/Инвентарь/Пресеты/Испытания/
 // Биржа) - Характеристики+Пресеты+Испытания объединены в «Персонаж».
@@ -47,6 +48,7 @@ const SECTIONS = [
   { id: 'map', label: 'Карта' },
   { id: 'guild', label: 'Гильдия' },
   { id: 'tops', label: 'Топы' },
+  { id: 'board', label: 'Доска' },
   { id: 'trade', label: 'Торговля' },
   { id: 'exchange', label: 'Биржа' },
   { id: 'shop', label: 'Магазин' },
@@ -562,6 +564,7 @@ export default function Hub() {
         {activeTab === 'craft' && <CraftTab />}
         {activeTab === 'map' && <MapTab />}
         {activeTab === 'tops' && <TopsTab />}
+        {activeTab === 'board' && <BoardTab />}
         {activeTab === 'guild' && <GuildTab />}
         {activeTab === 'trade' && (
           <TradeTab onWallet={(w) => setCharacter((prev) => ({ ...prev, ...w }))} />

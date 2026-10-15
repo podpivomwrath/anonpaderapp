@@ -132,6 +132,11 @@ export function buyPresetSlot() {
 
 // Патч 58: общие топы. board - id доски, перечень которых приходит в
 // ответе (клиент свой список не хранит, чтобы он не разъехался с сервером).
+// Вкладка «Доска» (2026-10-15): розыск, рейтинг, сезон, последние бои.
+export async function getBoard() {
+  return request('/board');
+}
+
 export async function getLeaderboard(board) {
   return request(`/leaderboard?board=${encodeURIComponent(board)}`);
 }

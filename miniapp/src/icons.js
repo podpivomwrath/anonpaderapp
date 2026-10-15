@@ -51,6 +51,11 @@ export const SECTION_ICONS = {
     emoji: '🏆',
     path: 'M8 4h8v5a4 4 0 0 1-8 0V4z M16 5h3v2a3 3 0 0 1-3 3 M8 5H5v2a3 3 0 0 0 3 3 M12 13v4 M9 20h6',
   },
+  // Доска — объявление на столбе: лист с гвоздём.
+  board: {
+    emoji: '📜',
+    path: 'M5 4h14v13H5z M12 2v3 M8 9h8 M8 12h8 M8 15h5 M12 17v5',
+  },
   // Биржа — встречные стрелки.
   exchange: {
     emoji: '💱',
