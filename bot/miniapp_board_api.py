@@ -1,9 +1,8 @@
 """Вкладка «Доска» мини-аппа: /api/miniapp/board (2026-10-15).
 
-Всё PvP в одном месте: розыск (клеймёные убийцы слабых и награда за их
-голову), рейтинг PTS и сезон с рангами. Последние бои
-не отдаём: кто с кем дрался - личное дело игроков (решение владельца). Позже сюда же -
-награда за голову, назначенная игроками.
+Всё PvP в одном месте: розыск (клеймёные убийцы слабых и их метки),
+рейтинг PTS и сезон с рангами. Последние бои не отдаём: кто с кем дрался -
+личное дело игроков (решение владельца). Награды за голову нет (2026-10-16).
 """
 
 from datetime import datetime, timedelta, timezone
@@ -56,12 +55,12 @@ async def _wanted(db, now: datetime) -> list[dict]:
         out.append({
             "id": c.id, "name": c.name, "level": c.level,
             "base_class": c.base_class, "subclass": c.subclass,
-            "marks": n, "bounty": c.pk_bounty or 0,
+            "marks": n,
             "next_decay_min": _next_decay_minutes(c, now),
             "city_banned": n >= pkc.CITY_BAN_FROM,
             "pos": [c.pos_x, c.pos_y] if c.pos_x is not None else None,
         })
-    out.sort(key=lambda w: (-w["marks"], -w["bounty"]))
+    out.sort(key=lambda w: -w["marks"])
     return out
 
 
@@ -103,14 +102,13 @@ async def handle_get(request: web.Request) -> web.Response:
             "season": _season(now),
             "me": {
                 "pts": character.pts, "rank": pts_service.rank_name(character.pts), "place": my_rank, "rated_total": rated_total or 0, "fought": fought,
-                "marks": my_marks, "bounty": character.pk_bounty or 0,
+                "marks": my_marks,
                 "next_decay_min": _next_decay_minutes(character, now) if my_marks else None,
                 "consequences": pk_service.consequences(my_marks) if my_marks else None,
                 "revenge": revenge,
             },
             "rules": {
                 "level_gap": pkc.LEVEL_GAP, "decay_hours": pkc.DECAY_HOURS,
-                "bounty_from": pkc.BOUNTY_FROM, "bounty_pct_per_mark": round(pkc.BOUNTY_SHARE_PER_MARK * 100),
                 "costly_from": pkc.COSTLY_DEATH_FROM, "city_penalty_from": pkc.CITY_PENALTY_FROM,
                 "city_ban_from": pkc.CITY_BAN_FROM, "revenge_pct": round(pkc.REVENGE_BONUS * 100),
                 "revenge_hours": pkc.REVENGE_HOURS,

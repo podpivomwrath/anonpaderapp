@@ -1799,8 +1799,7 @@ async def on_mass_battle_finished(session_id: int, result: TickResult) -> None:
             if victim is None:
                 continue
             victim_costly = pk_service.costly_death(victim)
-            # Пепельное клеймо: каждый, кто бил жертву, отвечает за её смерть;
-            # награда за голову - тому, кто нанёс больше всех.
+            # Пепельное клеймо: каждый, кто бил жертву, отвечает за её смерть.
             hitters = sorted(
                 (a for a in survivor_ids if battle.damage_by_pair.get((a, victim_cid), 0) > 0 and a in characters),
                 key=lambda a: -battle.damage_by_pair.get((a, victim_cid), 0),
