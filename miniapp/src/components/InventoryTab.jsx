@@ -3,7 +3,7 @@ import bridge from '@vkontakte/vk-bridge';
 import {
   Button, Div, Group, Header, Placeholder, SimpleCell, Spinner, Text,
 } from '@vkontakte/vkui';
-import { equipItem, getCharacter, getInventory, openChest, unequipItem } from '../api.js';
+import { IN_VK, equipItem, getCharacter, getInventory, openChest, unequipItem } from '../api.js';
 import ChestRoulette from './ChestRoulette.jsx';
 import ItemIcon from './ItemIcon.jsx';
 
@@ -69,12 +69,30 @@ function kg(grams) {
 }
 
 // Буфер обмена в ВК надёжен только через мост: navigator.clipboard в
-// веб-вью клиента часто запрещён.
+// веб-вью клиента часто запрещён. На сайте моста нет - его вызов не
+// завершался, и копирование молча не происходило; там пишем напрямую,
+// а если браузер запретил - через скрытое поле и execCommand.
+function legacyCopy(text) {
+  const area = document.createElement('textarea');
+  area.value = text;
+  area.setAttribute('readonly', '');
+  area.style.position = 'fixed';
+  area.style.opacity = '0';
+  document.body.appendChild(area);
+  area.select();
+  try { document.execCommand('copy'); } catch { /* текст всё равно виден в окне */ }
+  area.remove();
+}
+
 async function copyText(text) {
+  if (!IN_VK) {
+    try { await navigator.clipboard.writeText(text); } catch { legacyCopy(text); }
+    return;
+  }
   try {
     await bridge.send('VKWebAppCopyText', { text });
   } catch {
-    try { await navigator.clipboard.writeText(text); } catch { /* текст всё равно виден в окне */ }
+    try { await navigator.clipboard.writeText(text); } catch { legacyCopy(text); }
   }
 }
 
