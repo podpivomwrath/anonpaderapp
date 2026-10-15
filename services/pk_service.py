@@ -108,8 +108,8 @@ def city_banned(character: Character) -> bool:
 
 
 CITY_BAN_TEXT = (
-    "🛡 Стража скрещивает копья: «Пепельное клеймо видно издалека. Таким, как ты, "
-    "в город хода нет». Метки сходят по одной за 5 часов."
+    "🛡 Стража не пускает тебя в город: у тебя 20 или больше меток клейма. "
+    "Каждая метка исчезает сама через 5 часов - когда их станет меньше 20, пустят."
 )
 
 
@@ -122,15 +122,15 @@ def revenge_bonus(attacker: Character, target_id: int, now: datetime | None = No
 
 def consequences(n: int) -> str:
     """Чем грозит клеймо на n метках - одной строкой."""
-    parts = ["все видят 🩸 у твоего имени"]
+    parts = ["все видят 🩸 рядом с твоим именем"]
     if n >= pc.BOUNTY_FROM:
-        parts.append("на тебя назначена награда из твоего же золота")
+        parts.append("за твою голову назначена награда из твоего же золота - её получит тот, кто тебя убьёт")
     if n >= pc.COSTLY_DEATH_FROM:
-        parts.append("смерть отнимает больше опыта, а трофеи с тебя заберёт даже тот, кто намного сильнее")
+        parts.append("при смерти теряешь в 1,5 раза больше опыта (даже в PvP), и твои трофеи заберёт любой победитель")
     if n >= pc.CITY_PENALTY_FROM:
-        parts.append("в лавке всё на 50% дороже, скупщик платит за реликвии вдвое меньше")
+        parts.append("зелья в лавке в 1,5 раза дороже, скупщик платит за реликвии в 2 раза меньше")
     if n >= pc.CITY_BAN_FROM:
-        parts.append("стража не пускает в город")
+        parts.append("в город не пускают")
     return "; ".join(parts) + "."
 
 
@@ -175,15 +175,22 @@ async def on_pvp_kill(
         if frozen > 0:
             await wallet_service.charge(db, killer.id, "farm", frozen)
             killer.pk_bounty = (killer.pk_bounty or 0) + frozen
-    line = f"🩸 Пепельное клеймо: {n} (сходит по одной метке за {pc.DECAY_HOURS} ч). Пока оно на тебе: {consequences(n)}"
+    line = (
+        f"🩸 Ты убил того, кто слабее тебя на {pc.LEVEL_GAP}+ уровней, и получил метку клейма. "
+        f"Сейчас меток: {n}. Каждая исчезает сама через {pc.DECAY_HOURS} ч. "
+        f"Пока метки на тебе: {consequences(n)}"
+    )
     if frozen:
-        line += f"\n💰 В награду за твою голову ушло {frozen} золота (всего {killer.pk_bounty}). Метки сойдут - вернётся."
+        line += (
+            f"\n💰 Из твоего кошелька в награду за твою голову ушло {frozen} золота (всего награда {killer.pk_bounty}). "
+            f"Если тебя не убьют, пока метки не исчезнут, золото вернётся."
+        )
     out.killer_lines.append(line)
 
     victim.revenge_target_id = killer.id
     victim.revenge_until = now + timedelta(hours=pc.REVENGE_HOURS)
     out.victim_lines.append(
-        f"🩸 {killer.name} поднял руку на того, кто слабее, и получил клеймо. "
-        f"Право мести: {pc.REVENGE_HOURS} ч твой урон по нему на {round(pc.REVENGE_BONUS * 100)}% выше."
+        f"🩸 {killer.name} убил тебя, хотя он сильнее на {pc.LEVEL_GAP}+ уровней, и получил метку клейма. "
+        f"Право мести: следующие {pc.REVENGE_HOURS} ч твой урон по {killer.name} на {round(pc.REVENGE_BONUS * 100)}% больше."
     )
     return out
