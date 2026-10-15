@@ -38,7 +38,7 @@ CROWN_TITLES: dict[str, str] = {
 #: Разогнаться этот бонус не может: у эффективности жёсткий потолок 120%.
 #: Чемпион приходит к потолку раньше остальных, но не забирается выше.
 CRAFT_ORE_CUT = 0.25      # pvp: руда на инструменты и перековку
-MOB_GOLD_BONUS = 0.10     # kills: золото с мобов
+MOB_GOLD_BONUS = 0.10     # kills: выручка за реликвии (золото с мобов приходит через них)
 FISH_SALE_BONUS = 0.10    # fishing: выручка за улов
 TRAVEL_CUT = 0.10         # fish_weight: время перехода
 MINING_CUT = 0.10         # mining: время добычи
@@ -46,7 +46,7 @@ MINING_CUT = 0.10         # mining: время добычи
 #: Человеческое описание — одной строкой, для сообщения и мини-аппа.
 CROWN_EFFECTS: dict[str, str] = {
     "pvp": f"-{CRAFT_ORE_CUT:.0%} руды в мастерской",
-    "kills": f"+{MOB_GOLD_BONUS:.0%} золота с мобов",
+    "kills": f"+{MOB_GOLD_BONUS:.0%} к выручке за реликвии у скупщика",
     "fishing": f"+{FISH_SALE_BONUS:.0%} к выручке за улов",
     "fish_weight": f"-{TRAVEL_CUT:.0%} времени перехода",
     "mining": f"-{MINING_CUT:.0%} времени добычи",

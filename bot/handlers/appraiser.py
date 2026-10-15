@@ -145,6 +145,8 @@ async def appraiser_back(message: Message) -> None:
 async def _render_trophies(db, character, mult: float, prefix: str = "") -> tuple[str, str]:
     # Пепельное клеймо 5+ и процветание города (2026-10-15).
     mult *= await faction_service.relic_mult(db, character)
+    # Венец «по убийствам» и гильдия - их доля входит в цену при продаже.
+    mult *= trophy_service.display_multiplier(character)
     stock = await trophy_service.get_stock(db, character.id)
     if not stock:
         text = appraiser_empty()

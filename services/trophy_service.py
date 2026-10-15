@@ -123,6 +123,12 @@ async def _lock_rows(
     return list((await db.execute(query)).scalars().all())
 
 
+def display_multiplier(character: Character) -> float:
+    """Венец и гильдия - те же множители, что при продаже: цены в списке у
+    скупщика обязаны совпадать с тем, что реально придёт (2026-10-16)."""
+    return crown_service.mob_gold_multiplier(character) * _guild_sell_multiplier(character)
+
+
 def _guild_sell_multiplier(character: Character) -> float:
     from services import guild_service
 
