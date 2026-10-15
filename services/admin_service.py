@@ -278,15 +278,23 @@ async def search_characters(db: AsyncSession, query: str, limit: int = 20) -> li
     query = query.strip()
     if not query:
         return []
+    from sqlalchemy import and_, or_
+
     conditions = [Character.name.ilike(f"%{query}%")]
     if query.isdigit():
         conditions.append(User.vk_id == int(query))
+    # Имя и фамилия в VK (2026-10-15): каждое слово запроса - в имени или
+    # фамилии, порядок любой: «Иван Петров» и «Петров Иван» найдут одного.
+    words = query.split()
+    conditions.append(and_(*[
+        or_(User.vk_first_name.ilike(f"%{w}%"), User.vk_last_name.ilike(f"%{w}%")) for w in words
+    ]))
     rows = (
         await db.execute(
             select(Character)
             .join(User, User.id == Character.user_id)
             .where(Character.creation_state.is_(None))
-            .where(conditions[0] if len(conditions) == 1 else (conditions[0] | conditions[1]))
+            .where(or_(*conditions))
             .limit(limit)
         )
     ).scalars().all()
@@ -331,6 +339,7 @@ async def player_card(db: AsyncSession, character_id: int) -> dict | None:
     return {
         "id": character.id,
         "vk_id": user.vk_id if user is not None else None,
+        "vk_name": " ".join(p for p in (user.vk_first_name, user.vk_last_name) if p) if user is not None else None,
         "name": character.name,
         "title": title_service.active_title_name(character),
         "level": character.level,

@@ -114,10 +114,14 @@ async def handle_get_search(request: web.Request) -> web.Response:
         characters = await admin_service.search_characters(db, query)
         results = []
         for c in characters:
-            vk_id = await onboarding_svc.vk_id_for_character(db, c.id)
+            from models import User
+
+            user = await db.get(User, c.user_id)
+            vk_id = user.vk_id if user is not None else None
             results.append(
                 {
                     "id": c.id, "vk_id": vk_id, "name": c.name, "level": c.level,
+                    "vk_name": " ".join(p for p in (user.vk_first_name, user.vk_last_name) if p) if user else None,
                     "class_title": admin_service.class_title(c), "region": c.region,
                     "region_title": naming.region_title(c.region),
                     "is_banned": c.is_banned,
@@ -335,6 +339,7 @@ async def handle_get_journal(request: web.Request) -> web.Response:
         actions = await admin_service.action_journal(db, limit, offset)
         targets = await _character_names(db, [a.target_character_id for a in actions if a.target_character_id])
         actors = await _actor_labels(db, settings, {a.admin_vk_id for a in actions})
+        actor_ids = await _actor_character_ids(db, {a.admin_vk_id for a in actions})
         return web.json_response(
             {
                 "actions": [
@@ -345,6 +350,8 @@ async def handle_get_journal(request: web.Request) -> web.Response:
                         "created_at": a.created_at.isoformat(),
                         # Обычным языком (2026-10-13): кто и что сделал.
                         "who": actors.get(a.admin_vk_id, f"vk {a.admin_vk_id}"),
+                        "who_character_id": actor_ids.get(a.admin_vk_id),
+                        "target_name": targets.get(a.target_character_id),
                         "text": admin_journal_text.describe(a, targets.get(a.target_character_id)),
                     }
                     for a in actions
@@ -362,6 +369,19 @@ async def _character_names(db, character_ids: list[int]) -> dict[int, str]:
         return {}
     rows = await db.execute(select(Character.id, Character.name).where(Character.id.in_(set(character_ids))))
     return {cid: name for cid, name in rows.all()}
+
+
+async def _actor_character_ids(db, vk_ids: set[int]) -> dict[int, int]:
+    from sqlalchemy import select
+
+    from models import Character, User
+
+    if not vk_ids:
+        return {}
+    rows = await db.execute(
+        select(User.vk_id, Character.id).join(Character, Character.user_id == User.id).where(User.vk_id.in_(vk_ids))
+    )
+    return {vk: cid for vk, cid in rows.all()}
 
 
 async def _actor_labels(db, settings: Settings, vk_ids: set[int]) -> dict[int, str]:

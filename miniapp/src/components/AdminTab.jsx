@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { createContext, useContext, useEffect, useState } from 'react';
 import {
   Tabs, TabsItem, Group, Header, Div, Spinner, Placeholder, Button, Input, FormItem, Select, Textarea, Checkbox,
   Caption, SimpleCell,
@@ -17,6 +17,32 @@ import {
 //
 // Раздел «Баги» убирали в патче 31 (репорты и так приходят в ЛС), вернули
 // 2026-10-13: без него репорт нельзя было отметить разобранным.
+// Имя игрока в панели - ссылка на его карточку в разделе «Игрок»
+// (2026-10-15). Только здесь: в самой игре имена ссылками не бывают.
+const OpenPlayerContext = createContext(null);
+
+function PlayerLink({ id, name }) {
+  const openPlayer = useContext(OpenPlayerContext);
+  if (!id || !openPlayer) return <>{name}</>;
+  return (
+    <span
+      role="link" tabIndex={0}
+      onClick={() => openPlayer(id)}
+      onKeyDown={(e) => { if (e.key === 'Enter') openPlayer(id); }}
+      style={{ color: 'var(--vkui--color_text_accent)', cursor: 'pointer', textDecoration: 'underline' }}
+    >
+      {name}
+    </span>
+  );
+}
+
+// Текст журнала с именем цели внутри: имя - ссылкой.
+function TextWithPlayer({ text, name, id }) {
+  if (!name || !id || !text || !text.includes(name)) return <>{text}</>;
+  const at = text.indexOf(name);
+  return <>{text.slice(0, at)}<PlayerLink id={id} name={name} />{text.slice(at + name.length)}</>;
+}
+
 const SECTIONS = [
   { id: 'overview', label: 'Обзор' },
   { id: 'player', label: 'Игрок' },
@@ -241,7 +267,7 @@ function BugsSection() {
         const snap = r.snapshot || {};
         const attachments = snap.attachments || [];
         return (
-          <Group key={r.id} header={<Header>#{r.id} · {snap.name || 'без персонажа'} · {new Date(r.created_at).toLocaleString('ru')}</Header>}>
+          <Group key={r.id} header={<Header>#{r.id} · {snap.name ? <PlayerLink id={r.character_id} name={snap.name} /> : 'без персонажа'} · {new Date(r.created_at).toLocaleString('ru')}</Header>}>
             <Div>
               <Caption level="1" style={{ opacity: 0.7 }}>
                 {snap.level ? `${snap.level} ур. · ${snap.class_title || ''} · ` : ''}
@@ -656,6 +682,12 @@ function PlayerCard({ card, onRefresh }) {
       <Fold title={<>{card.is_premium ? '💠 ' : ''}{card.name}{card.title ? ` «${card.title}»` : ''} (vk_id {card.vk_id})</>}>
         <StatRow label="Ник" value={card.name} />
         <StatRow label="vk_id" value={card.vk_id ?? '-'} />
+        <StatRow
+          label="Страница VK"
+          value={card.vk_id
+            ? <a href={`https://vk.com/id${card.vk_id}`} target="_blank" rel="noopener noreferrer">{card.vk_name || `id${card.vk_id}`}</a>
+            : '-'}
+        />
         <StatRow label="Создан" value={card.created_at ? new Date(card.created_at).toLocaleString('ru') : '-'} />
         <StatRow label="Последняя активность" value={card.last_active_at ? new Date(card.last_active_at).toLocaleString('ru') : '-'} />
         <StatRow label="Титул" value={card.title || '-'} />
@@ -769,7 +801,7 @@ function PlayerCard({ card, onRefresh }) {
   );
 }
 
-function PlayerSection() {
+function PlayerSection({ requestedId }) {
   const [query, setQuery] = useState('');
   const [results, setResults] = useState(null); // null - поиска ещё не было
   const [card, setCard] = useState(null);
@@ -819,15 +851,20 @@ function PlayerSection() {
     }
   };
 
+  useEffect(() => {
+    if (requestedId) openCard(requestedId.id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [requestedId]);
+
   return (
     <>
-      <Group header={<Header>Поиск (ник или vk_id)</Header>}>
+      <Group header={<Header>Поиск (ник, имя и фамилия в VK или vk_id)</Header>}>
         <FormItem>
           <Input
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             onKeyDown={(e) => { if (e.key === 'Enter') search(); }}
-            placeholder="Валгар или 123456789"
+            placeholder="Валгар, Иван Петров или 123456789"
           />
         </FormItem>
         <Div>
@@ -845,7 +882,7 @@ function PlayerSection() {
         {results && results.map((r) => (
           <div className="stat-row" key={r.id} onClick={() => openCard(r.id)} style={{ cursor: 'pointer' }}>
             <span className="stat-row__label">
-              {r.is_banned ? '🚫 ' : ''}{r.name} (vk_id {r.vk_id})
+              {r.is_banned ? '🚫 ' : ''}{r.name}{r.vk_name ? ` · ${r.vk_name}` : ''} (vk_id {r.vk_id})
             </span>
             <span className="stat-row__value">ур. {r.level}</span>
           </div>
@@ -875,7 +912,10 @@ function JournalSection() {
       {actions.map((a) => (
         <Div key={a.id} style={{ borderBottom: '1px solid var(--vkui--color_separator_primary)', paddingBottom: 8 }}>
           <p style={{ marginBottom: 4 }}>
-            <b>{a.who || 'Админ'}</b> {a.text || a.action_type}
+            <b>{a.who_character_id
+              ? <TextWithPlayer text={a.who || 'Админ'} name={(a.who || '').replace(/^(Бывший модератор|Модератор) /, '')} id={a.who_character_id} />
+              : (a.who || 'Админ')}</b>{' '}
+            <TextWithPlayer text={a.text || a.action_type} name={a.target_name} id={a.target_character_id} />
           </p>
           <Caption level="1" style={{ opacity: 0.6 }}>{new Date(a.created_at).toLocaleString('ru')}</Caption>
         </Div>
@@ -1089,7 +1129,7 @@ function PromoCodeRow({ promo, onDeleted }) {
           {activations && activations.length === 0 && <Div style={{ opacity: 0.7 }}>Пока никто не активировал.</Div>}
           {activations && activations.map((a, i) => (
             <p key={i} style={{ fontSize: 13, margin: '2px 0' }}>
-              {a.character_name} · {new Date(a.activated_at).toLocaleString('ru')}
+              <PlayerLink id={a.character_id} name={a.character_name} /> · {new Date(a.activated_at).toLocaleString('ru')}
             </p>
           ))}
         </div>
@@ -1129,9 +1169,13 @@ function PromoSection() {
 
 export default function AdminTab() {
   const [section, setSection] = useState('overview');
+  const [requested, setRequested] = useState(null);
+  // Новый объект на каждое нажатие - повторный клик по тому же имени тоже
+  // откроет карточку.
+  const openPlayer = (id) => { setRequested({ id }); setSection('player'); };
 
   return (
-    <>
+    <OpenPlayerContext.Provider value={openPlayer}>
       <Tabs>
         {SECTIONS.map((s) => (
           <TabsItem key={s.id} selected={section === s.id} onClick={() => setSection(s.id)}>
@@ -1140,11 +1184,11 @@ export default function AdminTab() {
         ))}
       </Tabs>
       {section === 'overview' && <><OverviewSection /><MaintenanceSection /></>}
-      {section === 'player' && <PlayerSection />}
+      {section === 'player' && <PlayerSection requestedId={requested} />}
       {section === 'journal' && <JournalSection />}
       {section === 'mining' && <MiningSection />}
       {section === 'promo' && <PromoSection />}
       {section === 'bugs' && <BugsSection />}
-    </>
+    </OpenPlayerContext.Provider>
   );
 }

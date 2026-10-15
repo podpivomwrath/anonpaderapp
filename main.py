@@ -2,7 +2,7 @@
 
 import asyncio
 import signal
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 import sys
 from pathlib import Path
 
@@ -85,6 +85,16 @@ async def _pts_season_job() -> None:
     async with get_session_factory()() as db:
         await pts_service.season_rollover(db)
         await db.commit()
+
+
+async def _vk_names_job(api) -> None:
+    """Имена игроков из VK для поиска в админ-панели (services/vk_names_service.py)."""
+    from services import vk_names_service
+    from services.db import get_session_factory
+
+    async with get_session_factory()() as db:
+        if await vk_names_service.refresh(db, api):
+            await db.commit()
 
 
 async def _pk_settle_job() -> None:
@@ -340,6 +350,10 @@ async def run() -> None:
     respawn_scheduler.add_job(
         _pts_season_job, "cron", hour=0, minute=7, timezone="Europe/Moscow",
         id="pts_season", max_instances=1, coalesce=True,
+    )
+    respawn_scheduler.add_job(
+        _vk_names_job, "interval", minutes=10, args=[bot.api], id="vk_names",
+        max_instances=1, coalesce=True, next_run_time=datetime.now(timezone.utc) + timedelta(seconds=30),
     )
     respawn_scheduler.add_job(
         _pk_settle_job, "interval", minutes=10, id="pk_settle", max_instances=1, coalesce=True,

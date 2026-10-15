@@ -78,6 +78,39 @@ async def test_search_by_vk_id(db_session, make_character) -> None:
     assert results[0].id == character.id
 
 
+async def test_search_by_vk_first_and_last_name(db_session, make_character) -> None:
+    """2026-10-15: поиск по имени и фамилии в VK, порядок слов любой."""
+    character = await make_character()
+    other = await make_character()
+    user = await db_session.get(User, character.user_id)
+    user.vk_first_name, user.vk_last_name = "Иван", "Петров"
+    await db_session.flush()
+    # Регистр не важен на Postgres; тестовая SQLite не знает регистра кириллицы.
+    for q in ("Иван Петров", "Петров Иван", "Петр"):
+        results = await admin_service.search_characters(db_session, q)
+        assert [c.id for c in results] == [character.id], q
+    assert other.id not in [c.id for c in await admin_service.search_characters(db_session, "Иван Сидоров")]
+    card = await admin_service.player_card(db_session, character.id)
+    assert card["vk_name"] == "Иван Петров"
+
+
+async def test_vk_names_refresh_fills_names(db_session, make_character) -> None:
+    from types import SimpleNamespace
+
+    from services import vk_names_service
+
+    character = await make_character()
+    user = await db_session.get(User, character.user_id)
+
+    class Users:
+        async def get(self, user_ids):
+            return [SimpleNamespace(id=i, first_name="Анна", last_name="Котова") for i in user_ids]
+
+    updated = await vk_names_service.refresh(db_session, SimpleNamespace(users=Users()))
+    assert updated >= 1
+    assert (user.vk_first_name, user.vk_last_name) == ("Анна", "Котова") and user.vk_names_at is not None
+
+
 async def test_search_empty_query_returns_nothing(db_session, make_character) -> None:
     await make_character()
     assert await admin_service.search_characters(db_session, "   ") == []
