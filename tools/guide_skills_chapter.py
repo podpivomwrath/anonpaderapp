@@ -94,7 +94,7 @@ def formulas_part() -> str:
     ["Уклонение от обычной атаки", f"{num(bc.DODGE_PER_AGI * 100)}% за каждое очко Ловкости", f"{pct(bc.DODGE_STAT_CAP)} от Ловкости, {pct(bc.DODGE_HARD_CAP)} вместе с навыками и эффектами"],
     ["Уклонение от навыка", f"в {round(1 / bc.ABILITY_DODGE_RATIO)} раза реже, чем от обычной атаки", "-"],
     ["Снижение урона по тебе", f"{num(bc.MITIGATION_PER_VIT * 100)}% за каждое очко Выносливости", pct(bc.MITIGATION_CAP)],
-    ["Шанс устоять против оглушения и заморозки", f"{num(bc.CONTROL_RESIST_PER_WIL * 100)}% за каждое очко Воли", pct(bc.CONTROL_RESIST_CAP)],
+    ["Шанс устоять против оглушения и заморозки (только PvP: мобы не контролируют)", f"{num(bc.CONTROL_RESIST_PER_WIL * 100)}% за каждое очко Воли", pct(bc.CONTROL_RESIST_CAP)],
     ["Сила поддержки (Оберег и Круг тьмы Тёмного мистика)", f"{num(bc.SUPPORT_POWER_PER_WIL * 100)}% от макс. HP за каждое очко Воли", "нет"],
 ])}
     <p>Множитель уровня зависит от уровня персонажа:</p>
