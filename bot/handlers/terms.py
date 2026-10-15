@@ -50,8 +50,11 @@ async def _docs_for(peer_id: int) -> str | None:
             parts.append(await uploader.upload(str(path), peer_id=peer_id, title=f"{title}.pdf"))
         except Exception:  # noqa: BLE001 - без файлов окно всё равно работает: ссылки в тексте
             logger.warning("Соглашение: не загрузился {} для {}", doc_id, peer_id)
-    _attachments[peer_id] = ",".join(parts)
-    return _attachments[peer_id] or None
+    joined = ",".join(parts)
+    # Неполный набор не запоминаем - в следующий показ окна догрузим.
+    if len(parts) == len(terms_service.DOCS):
+        _attachments[peer_id] = joined
+    return joined or None
 
 
 async def send_gate(peer_id: int) -> None:
