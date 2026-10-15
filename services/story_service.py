@@ -22,6 +22,7 @@ from game.combat import display
 from game.content_loader import StoryLineDef, StoryQuestDef, load_story_line
 from game.economy import story_config as sc
 from game.world import grid
+from game.world import world_config as wc
 from models import Character, CharacterStats, CharacterStoryProgress
 from services import experience_service, group_service, quest_service, wallet_service
 
@@ -104,6 +105,10 @@ def _format_assign(quest: StoryQuestDef, character: Character) -> str:
         text += (
             f"\n\n📍 Ориентир: ({quest.target_x}; {quest.target_y}) - {quest.target_label} · {direction}"
         )
+        # Рекомендуемый уровень (2026-10-15): уровень мобов клетки цели -
+        # сюжетный враг такого же уровня, только крепче обычного.
+        lvl = wc.cell_base_level(grid.monolith_distance(quest.target_x, quest.target_y))
+        text += f"\n⚔️ Рекомендуемый уровень: {lvl}+"
     return text
 
 
