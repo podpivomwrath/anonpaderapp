@@ -373,3 +373,17 @@ async def test_get_trial_states_empty_without_subclass(db_session, make_characte
     character = await make_character()
     assert await trial_service.get_trial_states(db_session, character) == []
     assert await trial_service.record_battle(db_session, character, _report()) == []
+
+
+async def test_group_win_counts_location_trial(db_session, make_character):
+    """2026-10-15: «Дойди до Кострищ культа и победи там» засчитывается и
+    победой группы (раньше группа испытания не двигала - жалоба Archon)."""
+    from services import trial_service
+
+    c = await make_character(level=32)
+    c.subclass = "dark_mystic"
+    c.pos_x, c.pos_y = -8, -9  # Кострища культа
+    unlocked = await trial_service.record_group_win(db_session, c)
+    assert "dark_mystic_echo" in unlocked
+    c.pos_x, c.pos_y = 0, 28  # не Кострища - ничего
+    assert "dark_mystic_echo" not in await trial_service.record_group_win(db_session, c)

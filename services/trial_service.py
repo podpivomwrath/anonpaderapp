@@ -218,6 +218,26 @@ async def record_battle(db: AsyncSession, character: Character, report: BattleRe
     return unlocked
 
 
+async def record_group_win(db: AsyncSession, character: Character) -> list[str]:
+    """Победа в групповом PvE-бою (2026-10-15): раньше группа не двигала
+    испытания вовсе, и «дойди до места и победи там» не засчитывалось
+    тем, кто ходит группой. Засчитываем только испытания места - у
+    остальных условия про криты, серии и навыки считаются по соло-бою."""
+    from game.world import location_types
+
+    if character.pos_x is None or character.pos_y is None:
+        return []
+    loc = location_types.location_type_at(character.pos_x, character.pos_y)
+    unlocked: list[str] = []
+    for trial in await _active_trials(db, character):
+        if trial.condition_type != "reach_location_win":
+            continue
+        buff = await _apply_delta(db, character.id, trial, int(loc.id == trial.params.get("location_type")))
+        if buff:
+            unlocked.append(buff)
+    return unlocked
+
+
 async def record_defeat(db: AsyncSession, character: Character) -> None:
     """Поражение сбрасывает стрики «подряд» — не только бой без отдыха."""
     for trial in await _active_trials(db, character):

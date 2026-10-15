@@ -63,6 +63,7 @@ from services import (
     preset_service,
     quest_service,
     scene_event_service,
+    trial_service,
     trophy_service,
     vitals_service,
 )
@@ -774,6 +775,7 @@ async def on_group_battle_finished(session_id: int, result: TickResult) -> None:
         sum(1 for c in combatants.values() if c.kind == "mob" and not c.alive), len(battle.participants),
     )
     battle_dailies: dict[int, object] = {}
+    trial_buffs: dict[int, list[str]] = {}
     async with get_session_factory()() as db:
         has_mount_by_cid = {}
         positions = {}
@@ -794,6 +796,8 @@ async def on_group_battle_finished(session_id: int, result: TickResult) -> None:
                     only_skills=False, only_basic_attack=False,
                 )
                 battle_dailies[cid] = await daily_service.record_battle(db, character, report)
+                if character.subclass is not None:
+                    trial_buffs[cid] = await trial_service.record_group_win(db, character)
                 # HP после боя остаётся как есть, как в соло (2026-10-13):
                 # раньше группа шла в следующий бой с полным HP без отдыха.
                 # Кто хочет - отдыхает, кто нет - сразу жмёт готовность.
@@ -810,6 +814,11 @@ async def on_group_battle_finished(session_id: int, result: TickResult) -> None:
             pos = positions.get(cid, (0, 0))
             keyboard = movement_keyboard(*pos, p.peer_id, has_mount=has_mount_by_cid.get(cid, False))
             await _bot_api.messages.send(peer_id=p.peer_id, message="🏆 Группа побеждает!", random_id=0)
+            for buff_id in trial_buffs.get(cid, []):
+                await _bot_api.messages.send(
+                    peer_id=p.peer_id, random_id=0,
+                    message=f"📖 Испытание пройдено. Открыт бафф: {trial_service.buff_name(buff_id)}.",
+                )
             if cid in raised_ids:
                 await _bot_api.messages.send(
                     peer_id=p.peer_id, random_id=0,
