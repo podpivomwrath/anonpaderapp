@@ -245,7 +245,10 @@ def render_tick(
         parts.append(_SEP)
     for c in session.combatants.values():
         if c.side == viewer_side and c.alive:
-            parts.append(f"{c.name}: {display.health_bar(c.current_hp, c.max_hp, mode)}{display.shield_suffix(c)}")
+            parts.append(
+                f"{c.name}: {display.health_bar(c.current_hp, c.max_hp, mode)}{display.shield_suffix(c)}"
+                f"{display.vuln_suffix(c)}"
+            )
     own_line = class_line(session.combatants, owner_id) if owner_id is not None else None
     if own_line:
         parts.append(own_line)

@@ -322,3 +322,32 @@ async def dig_event_vein(message: Message) -> None:
     await message.answer(
         mt.dig_started_text(started.seconds), keyboard=kb.digging_keyboard()
     )
+
+
+def _region_title(region: str | None) -> str:
+    from bot.onboarding_texts import REGION_TITLES
+
+    return REGION_TITLES.get(region, "центр мира") if region else "центр мира"
+
+
+@labeler.message(regex=r"(?i)^\s*/(?:руда|ore)\s*(\d*)\s*$")
+async def ring_list_command(message: Message, match: tuple) -> None:
+    """/руда1 - рудники первого кольца: где, сколько руды сейчас (2026-10-15)."""
+    from game.economy import mining as mining_rules
+
+    ring = int(match[0]) if match and match[0] else 0
+    rings = sorted({m.tier for m in mining_rules.all_mines()})
+    if ring not in rings:
+        await message.answer(
+            "Напиши номер кольца: " + ", ".join(f"/руда{r}" for r in rings)
+            + ". Первое - внешнее (1-15 ур.), дальше ближе к Монолиту."
+        )
+        return
+    lines = []
+    async with get_session_factory()() as db:
+        for m in mining_rules.all_mines():
+            if m.tier != ring:
+                continue
+            left = await mining_service.ore_in_mine(db, m.id)
+            lines.append(f"⛏ {m.name} ({m.x}; {m.y}) - {_region_title(m.region)}, руды: {left}")
+    await message.answer(f"Рудники {ring}-го кольца:\n\n" + "\n".join(lines))

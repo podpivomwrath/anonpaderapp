@@ -93,7 +93,7 @@ def vuln_suffix(combatant) -> str:
         return ""
     total = round(sum(e.value for e in vuln) * 100)
     turns = max(e.remaining_ticks for e in vuln)
-    return f" 💢уязвима +{total}% ({turns} х.)" if turns > 0 else f" 💢уязвима +{total}%"
+    return f" 💢уязвимость +{total}% ({turns} х.)" if turns > 0 else f" 💢уязвимость +{total}%"
 
 
 def hp_delta_line(hp_before: float, hp_after: float, max_hp: float, mode: str = MODE_PVP) -> str:

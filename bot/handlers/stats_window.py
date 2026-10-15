@@ -244,3 +244,23 @@ async def stat_alloc_done(message: Message) -> None:
     if result.applied_total < result.requested_total:
         note = f"Часть очков уже была вложена в другом месте. Закреплено: {result.applied_total}."
     await _send_or_edit(peer_id, sas.render_final(result.char_stats, note), no_keyboard())
+    await _restore_keyboard(peer_id)
+
+
+async def _restore_keyboard(peer_id: int) -> None:
+    """Окно статов - инлайн-сообщение, и после него у игрока пропадала
+    нижняя панель (в шахте - кнопка «Копать», 2026-10-15). Возвращаем
+    клавиатуру текущего состояния отдельной короткой строкой."""
+    from datetime import datetime, timezone
+
+    from bot.handlers import world as world_handlers  # избегаем цикла импортов
+
+    try:
+        async with get_session_factory()() as db:
+            character = await _read_character(db, peer_id)
+            if character is None:
+                return
+            keyboard = await world_handlers._current_keyboard(db, character, peer_id, datetime.now(timezone.utc))
+        await _bot_api.messages.send(peer_id=peer_id, message="✅ Очки распределены.", random_id=0, keyboard=keyboard)
+    except Exception:
+        logger.exception("Клавиатура после окна статов не вернулась {}", peer_id)

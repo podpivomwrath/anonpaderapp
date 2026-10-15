@@ -104,6 +104,8 @@ class CoordCancelMiddleware(BaseMiddleware[Message]):
         # Строкой: str != StateRepresentation у vkbottle даёт True всегда.
         if state is None or str(state.state) != str(MountCoordState.COORD_INPUT):
             return
+        if "mount_route_toggle" in str(self.event.payload or ""):
+            return  # переключатель пути - часть того же выбора
         if self.event.payload or not _COORD_LIKE_RE.match(self.event.text or ""):
             await _dispenser.delete(self.event.peer_id)
 
@@ -174,13 +176,51 @@ async def open_mounts(message: Message) -> None:
         # (маунты — фиксированный контент-каталог, не накопительный инвентарь).
         mount = owned[0]
         pos_x, pos_y = character.pos_x, character.pos_y
+        safe = bool((character.ui_flags or {}).get("safe_route"))
 
     await _dispenser.set(peer_id, MountCoordState.COORD_INPUT, mount_id=mount.mount_id)
     await message.answer(
         f"{mount.emoji} {mount.name} готов в путь.\n"
         f"Ты в ({pos_x}; {pos_y}). Куда направиться? Пришли координаты в формате X:Y "
-        f"(не дальше {wc.WORLD_RADIUS} клеток от Монолита, например 12:-20)."
+        f"(не дальше {wc.WORLD_RADIUS} клеток от Монолита, например 12:-20).\n\n"
+        f"{_route_line(safe)}",
+        keyboard=_route_keyboard(safe),
     )
+
+
+def _route_line(safe: bool) -> str:
+    return (
+        "🛡 Путь: безопасный - в обход колец опаснее цели, дольше."
+        if safe else "➡️ Путь: прямой - кратчайший, через любые кольца."
+    )
+
+
+def _route_keyboard(safe: bool) -> str:
+    from vkbottle import Keyboard, KeyboardButtonColor, Text
+
+    keyboard = Keyboard(inline=True)
+    keyboard.add(
+        Text("➡️ Сделать прямым" if safe else "🛡 Сделать безопасным", payload={"type": "mount_route_toggle"}),
+        color=KeyboardButtonColor.SECONDARY,
+    )
+    return keyboard.get_json()
+
+
+@labeler.message(payload_contains={"type": "mount_route_toggle"})
+async def route_toggle(message: Message) -> None:
+    """Прямой/безопасный путь из чата (2026-10-15) - та же настройка, что
+    переключатель на карте мини-аппа (ui_flags.safe_route). Ожидание
+    координат не сбрасывается (см. CoordCancelMiddleware)."""
+    async with get_session_factory()() as db:
+        character = await onboarding_svc.get_character(db, message.from_id)
+        if character is None or character.creation_state is not None:
+            return
+        flags = dict(character.ui_flags or {})
+        flags["safe_route"] = not bool(flags.get("safe_route"))
+        character.ui_flags = flags  # новый dict: JSON-поле не следит за изменением на месте
+        safe = flags["safe_route"]
+        await db.commit()
+    await message.answer(f"{_route_line(safe)} Пришли координаты.", keyboard=_route_keyboard(safe))
 
 
 @labeler.message(TEXT_ONLY, _looks_like_coords, state=MountCoordState.COORD_INPUT)
@@ -553,11 +593,10 @@ async def scan() -> None:
             if step.cells:
                 from services import daily_service
 
-                # «Странник»: каждая клетка верхом засчитывается (2026-10-14;
-                # раньше - одна клетка за всю поездку). Гильдейским заданиям -
-                # по-прежнему одна за поездку, по прибытии.
+                # «Странник» и гильдейское задание на клетки: каждая клетка
+                # верхом засчитывается (2026-10-14/15; раньше - одна за поездку).
                 daily_announce.append((peer_id, await daily_service.record_cell_moved(
-                    db, character, step.cells, guild_cells=1 if step.arrived else 0,
+                    db, character, step.cells,
                 )))
             if step.moved:
                 from bot.handlers import guild as guild_handlers  # избегаем цикла импортов

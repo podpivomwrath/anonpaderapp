@@ -222,11 +222,11 @@ async def on_pot_stake(message: Message) -> None:
     scene.pot_stakes[cid] = amount
     done = len(scene.pot_stakes)
     text = f"Ставка: {amount} золота." if amount else "Ты не ставишь."
-    await message.answer(f"{text} Ждём остальных ({done}/{len(scene.members)}).")
-    if done >= len(scene.members) and scene.task is not None:
-        scene.task.cancel()
-        scene.task = None
-        await _resolve(scene)
+    # Котёл бросает только по окончании отсчёта (2026-10-15): раньше бросал,
+    # как только вписали все, и передумать было уже нельзя.
+    await message.answer(
+        f"{text} Можно вписать другое число до конца отсчёта. Вписали: {done}/{len(scene.members)}."
+    )
 
 
 async def _finish_pot(scene: GroupScene) -> None:

@@ -269,7 +269,7 @@ async def _resolve_junk(db, character) -> tuple[str, str]:
     if roll < fc.JUNK_RAID_KEY_CHANCE + fc.JUNK_ITEM_CHANCE:
         item = await item_service.grant_random_item(db, character, character.level, _rng)
         if item is not None:
-            return (f"⚔️ Со дна поднимается {item.name}. Кто-то её там оставил.",
+            return (f"⚔️ Крючок вытаскивает со дна находку: {item.name}. Кто-то оставил это там.",
                     kb.lake_keyboard())
     if roll < fc.JUNK_RAID_KEY_CHANCE + fc.JUNK_ITEM_CHANCE + fc.JUNK_CHEST_CHANCE:
         drop = await trophy_service.grant_from_event(db, character, _rng)
@@ -322,3 +322,24 @@ async def leave_lake(message: Message) -> None:
             character.pos_x, character.pos_y, message.peer_id, has_mount
         ),
     )
+
+
+@labeler.message(regex=r"(?i)^\s*/(?:рыба|fish)\s*(\d*)\s*$")
+async def ring_list_command(message: Message, match: tuple) -> None:
+    """/рыба1 - озёра первого кольца (2026-10-15)."""
+    from bot.onboarding_texts import REGION_TITLES
+    from game.economy import fishing as fishing_rules
+
+    ring = int(match[0]) if match and match[0] else 0
+    rings = sorted({lake.tier for lake in fishing_rules.all_lakes()})
+    if ring not in rings:
+        await message.answer(
+            "Напиши номер кольца: " + ", ".join(f"/рыба{r}" for r in rings)
+            + ". Первое - внешнее (1-15 ур.), дальше ближе к Монолиту."
+        )
+        return
+    lines = [
+        f"🎣 {lake.name} ({lake.x}; {lake.y}) - {REGION_TITLES.get(lake.region, 'центр мира')}"
+        for lake in fishing_rules.all_lakes() if lake.tier == ring
+    ]
+    await message.answer(f"Озёра {ring}-го кольца:\n\n" + "\n".join(lines))

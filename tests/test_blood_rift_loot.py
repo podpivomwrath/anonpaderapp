@@ -100,7 +100,7 @@ def test_vulnerability_shown_next_to_hp() -> None:
     a = combatant(1, side=0)
     m = combatant(2, side=1, kind="mob")
     elixir_effects.apply_combat_elixir(a, "scroll_vulnerability", {1: a, 2: m})
-    assert display.vuln_suffix(m) == " 💢уязвима +50% (2 х.)"
+    assert display.vuln_suffix(m) == " 💢уязвимость +50% (2 х.)"
     assert display.vuln_suffix(a) == ""
     m.apply_effect(EffectKind.VULNERABILITY, -0.2, 99, m.id)  # защита моба - не уязвимость
-    assert display.vuln_suffix(m) == " 💢уязвима +50% (2 х.)"
+    assert display.vuln_suffix(m) == " 💢уязвимость +50% (2 х.)"
