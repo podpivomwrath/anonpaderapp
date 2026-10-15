@@ -38,6 +38,15 @@ export async function getWebConfig() {
   return res.json();
 }
 
+export async function demoLogin(login, password) {
+  const res = await fetch(`${API_BASE}/api/web/demo_login`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ login, password }),
+  });
+  const data = await res.json().catch(() => ({ error: 'bad_response' }));
+  if (!res.ok) throw new Error(data.error || `http_${res.status}`);
+  return data;
+}
+
 export async function webLogin(body) {
   const res = await fetch(`${API_BASE}/api/web/login`, {
     method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),

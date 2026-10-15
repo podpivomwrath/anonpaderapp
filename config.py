@@ -72,6 +72,12 @@ class Settings(BaseSettings):
     # Веб-версия на своём домене (2026-10-15): ID приложения VK ID для входа
     # на сайте (id.vk.com). Пусто - вход на сайте выключен.
     vk_id_client_id: str = Field(default="", description="ID приложения VK ID для входа на сайте")
+    # Демо-вход по логину и паролю (2026-10-15, проверка ЮKassa): открывает
+    # отдельного демо-персонажа, не связанного ни с кем из игроков. Пусто -
+    # вход выключен.
+    demo_login: str = Field(default="", description="Логин демо-входа на сайт")
+    demo_password: str = Field(default="", description="Пароль демо-входа на сайт")
+    demo_vk_id: int = Field(default=900000000001, description="vk_id демо-персонажа")
     # ЮKassa (2026-10-15): shopId и секретный ключ магазина. Пусто - покупка
     # самоцветов за рубли выключена. Вписывает владелец сам.
     yookassa_shop_id: str = Field(default="", description="shopId магазина ЮKassa")

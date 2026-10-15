@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
-import { Button, Div, Placeholder, Spinner } from '@vkontakte/vkui';
-import { getWebConfig, setWebToken, webLogin } from '../api.js';
+import { Button, Div, FormItem, Input, Placeholder, Spinner } from '@vkontakte/vkui';
+import { demoLogin, getWebConfig, setWebToken, webLogin } from '../api.js';
 
 /**
  * Вход на сайте (monolithgame.ru) через VK ID - OAuth 2.1 с PKCE
@@ -73,12 +73,48 @@ const ERRORS = {
   web_login_disabled: 'Вход на сайте ещё не включён.',
 };
 
+// Вход по логину и паролю - только демо-персонаж для проверки сайта
+// платёжным сервисом (2026-10-15); игроки входят через VK ID.
+function DemoLoginForm() {
+  const [login, setLogin] = useState('');
+  const [password, setPassword] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState(null);
+
+  const submit = async (e) => {
+    e.preventDefault();
+    setBusy(true);
+    setError(null);
+    try {
+      const { token } = await demoLogin(login, password);
+      setWebToken(token);
+      window.location.replace('/');
+    } catch (err) {
+      setError(err.message === 'bad_credentials' ? 'Неверный логин или пароль.' : 'Не удалось войти.');
+      setBusy(false);
+    }
+  };
+
+  return (
+    <form onSubmit={submit} style={{ maxWidth: 320, margin: '0 auto', textAlign: 'left' }}>
+      <FormItem top="Логин"><Input value={login} onChange={(e) => setLogin(e.target.value)} autoComplete="username" /></FormItem>
+      <FormItem top="Пароль"><Input type="password" value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="current-password" /></FormItem>
+      {error && <Div style={{ color: 'var(--vkui--color_text_negative)' }}>{error}</Div>}
+      <FormItem><Button type="submit" size="l" stretched loading={busy} disabled={!login || !password}>Войти</Button></FormItem>
+    </form>
+  );
+}
+
 export default function WebLogin({ error }) {
   const [clientId, setClientId] = useState(undefined);
+  const [demo, setDemo] = useState(false);
+  const [showDemo, setShowDemo] = useState(false);
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
-    getWebConfig().then((c) => setClientId(c.vk_id_client_id || null)).catch(() => setClientId(null));
+    getWebConfig()
+      .then((c) => { setClientId(c.vk_id_client_id || null); setDemo(Boolean(c.demo_login)); })
+      .catch(() => setClientId(null));
   }, []);
 
   return (
@@ -94,6 +130,10 @@ export default function WebLogin({ error }) {
       Тот же персонаж, что и в игре ВКонтакте: войди через свой аккаунт VK.
       {error && <Div style={{ color: 'var(--vkui--color_text_negative)' }}>{ERRORS[error] || 'Не удалось войти.'}</Div>}
       {clientId === null && <Div style={{ opacity: 0.7 }}>{ERRORS.web_login_disabled}</Div>}
+      {demo && !showDemo && (
+        <Div><Button mode="tertiary" size="s" onClick={() => setShowDemo(true)}>Вход по логину и паролю</Button></Div>
+      )}
+      {showDemo && <DemoLoginForm />}
     </Placeholder>
   );
 }

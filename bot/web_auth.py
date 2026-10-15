@@ -96,7 +96,10 @@ async def _exchange_code(settings: Settings, body: dict) -> int | None:
 
 async def handle_config(request: web.Request) -> web.Response:
     settings: Settings = request.app[SETTINGS_KEY]
-    return web.json_response({"vk_id_client_id": settings.vk_id_client_id or None})
+    return web.json_response({
+        "vk_id_client_id": settings.vk_id_client_id or None,
+        "demo_login": bool(settings.demo_login and settings.demo_password),
+    })
 
 
 async def handle_login(request: web.Request) -> web.Response:
@@ -119,6 +122,30 @@ async def handle_login(request: web.Request) -> web.Response:
     return web.json_response({"token": make_token(settings, vk_user_id), "vk_user_id": vk_user_id})
 
 
+async def handle_demo_login(request: web.Request) -> web.Response:
+    """Вход по логину и паролю в демо-персонажа (проверка ЮKassa). Пускает
+    только в settings.demo_vk_id - к настоящим игрокам этот вход не ведёт."""
+    import asyncio
+
+    settings: Settings = request.app[SETTINGS_KEY]
+    if not settings.demo_login or not settings.demo_password:
+        return web.json_response({"error": "demo_disabled"}, status=503)
+    try:
+        body = await request.json()
+    except Exception:
+        return web.json_response({"error": "bad_request"}, status=400)
+    login = str((body or {}).get("login", "")).strip()
+    password = str((body or {}).get("password", ""))
+    ok = hmac.compare_digest(login.encode(), settings.demo_login.encode()) & hmac.compare_digest(
+        password.encode(), settings.demo_password.encode(),
+    )
+    if not ok:
+        await asyncio.sleep(1.0)  # перебор паролей - медленно
+        return web.json_response({"error": "bad_credentials"}, status=401)
+    return web.json_response({"token": make_token(settings, settings.demo_vk_id)})
+
+
 def register_routes(app: web.Application) -> None:
     app.router.add_get("/api/web/config", handle_config)
     app.router.add_post("/api/web/login", handle_login)
+    app.router.add_post("/api/web/demo_login", handle_demo_login)

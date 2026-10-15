@@ -23,3 +23,25 @@ def test_token_roundtrip_and_tamper():
 def test_no_secret_no_sessions():
     token = web_auth.make_token(_settings(), 5, now=1)
     assert web_auth.verify_token(_settings(secret=""), token, now=2) is None
+
+
+async def test_demo_login_only_opens_demo_character():
+    from aiohttp.test_utils import TestClient, TestServer
+
+    from bot.webhook import create_app
+    from config import Settings
+
+    async def route(event):
+        pass
+
+    settings = Settings(_env_file=None, vk_miniapp_secret="s", demo_login="checker", demo_password="pw-123")
+    client = TestClient(TestServer(create_app(settings, route)))
+    await client.start_server()
+    try:
+        bad = await client.post("/api/web/demo_login", json={"login": "checker", "password": "nope"})
+        assert bad.status == 401
+        ok = await client.post("/api/web/demo_login", json={"login": "checker", "password": "pw-123"})
+        token = (await ok.json())["token"]
+        assert web_auth.verify_token(settings, token) == settings.demo_vk_id
+    finally:
+        await client.close()
