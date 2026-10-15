@@ -126,7 +126,7 @@ def consequences(n: int) -> str:
     if n >= pc.BOUNTY_FROM:
         parts.append("на тебя назначена награда из твоего же золота")
     if n >= pc.COSTLY_DEATH_FROM:
-        parts.append("смерть отнимает больше опыта, а трофеи с тебя заберёт любой")
+        parts.append("смерть отнимает больше опыта, а трофеи с тебя заберёт даже тот, кто намного сильнее")
     if n >= pc.CITY_PENALTY_FROM:
         parts.append("в лавке всё на 50% дороже, скупщик платит за реликвии вдвое меньше")
     if n >= pc.CITY_BAN_FROM:

@@ -1430,7 +1430,6 @@ async def _finish_duel(battle: Battle, winner_cid: int, loser_cid: int) -> None:
             return
         pvp_service.record_win(winner)
         pvp_service.record_loss(loser)
-        loser_branded = pk_service.marks(loser) > 0
         pk = await pk_service.on_pvp_kill(db, winner, loser)
         await pts_service.season_rollover(db)
         await db.refresh(winner, ["pts", "pts_season"])
@@ -1438,8 +1437,9 @@ async def _finish_duel(battle: Battle, winner_cid: int, loser_cid: int) -> None:
         pts_delta, pts_reason = pts_service.apply_duel(winner, loser)
         winner_pts_line = pts_service.delta_line(pts_delta, winner, pts_reason)
         loser_pts_line = pts_service.delta_line(-pts_delta, loser) if pts_delta else ""
-        # С клеймёного трофеи забирает любой, даже сильно младший.
-        no_reward = pvp_service.no_reward_for_kill(winner.level, loser.level) and not loser_branded
+        # Клеймо 3+: защита «слабого не обирают» снята - трофеи с него заберёт
+        # и тот, кто старше на 10+ уровней.
+        no_reward = pvp_service.no_reward_for_kill(winner.level, loser.level) and not pk_service.costly_death(loser)
         moved = {} if no_reward else await trophy_service.transfer_all(db, loser.id, winner.id)
         # Патч 58: рыба из садка ПРОПАДАЕТ, а не переходит победителю.
         # Иначе охотиться на рыбаков было бы выгоднее, чем рыбачить —
@@ -1659,7 +1659,7 @@ async def on_mass_battle_finished(session_id: int, result: TickResult) -> None:
             victim = characters.get(victim_cid)
             if victim is None:
                 continue
-            victim_branded = pk_service.marks(victim) > 0
+            victim_costly = pk_service.costly_death(victim)
             # Пепельное клеймо: каждый, кто бил жертву, отвечает за её смерть;
             # награда за голову - тому, кто нанёс больше всех.
             hitters = sorted(
@@ -1678,7 +1678,7 @@ async def on_mass_battle_finished(session_id: int, result: TickResult) -> None:
                     continue
                 attacker = characters.get(attacker_cid)
                 if attacker is None or (
-                    pvp_service.no_reward_for_kill(attacker.level, victim.level) and not victim_branded
+                    pvp_service.no_reward_for_kill(attacker.level, victim.level) and not victim_costly
                 ):
                     continue
                 shares[attacker_cid] = dmg
