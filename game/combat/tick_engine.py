@@ -3,7 +3,7 @@
 Режимы отличаются ТОЛЬКО таймером и условием завершения хода (п.3.1):
   - PVE: таймера нет — тик ждёт, пока все живые игроки-участники не объявят
     действие;
-  - PVP_GROUP: таймер хода 1 минута (APScheduler). Если все участники обеих
+  - PVP_GROUP: таймер хода 30 секунд (APScheduler). Если все участники обеих
     сторон объявили раньше — досрочный резолв. Кто не успел — пропускает ход.
 
 Объявленные-но-не-резолвленные действия хранятся в ActionStore (Redis в
@@ -107,7 +107,7 @@ class TickEngine:
         # хода 1 минута, как групповой PvP (не походил — пропуск, без
         # вылета из боя). Соло PvE (is_raid=False) остаётся БЕЗ таймера —
         # моба не с кем координировать, спешить некуда.
-        self.group_pve_window_seconds = group_pve_window_seconds or bc.PVP_GROUP_TURN_SECONDS
+        self.group_pve_window_seconds = group_pve_window_seconds or bc.PVE_GROUP_TURN_SECONDS
         self.rng = rng or random.Random()
         self.scheduler = scheduler or AsyncIOScheduler()
         self.on_tick_resolved = on_tick_resolved

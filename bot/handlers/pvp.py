@@ -905,7 +905,7 @@ async def _convert_duel_to_mass(session_id: int, battle: Battle) -> None:
     for p in battle.participants.values():
         target_line = _target_line(session_id, battle, p.character_id)
         board = "⚔️ В бой вступает третий! Теперь это массовая схватка - все стороны действуют " \
-            "одновременно, ход - 1 минута.\n\n" + _render_mass(state, [])
+            "одновременно, ход - 30 секунд.\n\n" + _render_mass(state, [])
         if target_line:
             board += f"\n{target_line}"
         await _bot_api.messages.send(
