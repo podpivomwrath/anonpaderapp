@@ -388,17 +388,6 @@ body {
   stroke-width: 0.6;
 }
 
-.map-grid--lens {
-  stroke: rgba(40, 28, 18, 0.35);
-  stroke-width: 1;
-}
-
-.map-lens__grid {
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-}
-
 .map-cell-hover {
   fill: rgba(255, 240, 225, 0.1);
   stroke: rgba(255, 240, 225, 0.6);
@@ -419,11 +408,6 @@ body {
   stroke-dasharray: 6 6;
   stroke-linejoin: round;
   opacity: 0.8;
-}
-
-.map-route--lens {
-  stroke-width: 2.5;
-  stroke-dasharray: 8 7;
 }
 
 .map-pins {
@@ -588,76 +572,6 @@ body {
   flex-direction: column;
   gap: 6px;
   z-index: 4;
-}
-
-/* Патч 112: линза. Окно - круг с увеличенной картой и метками, поверх -
-   бронзовая оправа (картинка с прозрачностью), чуть больше окна. */
-.map-viewport--lens {
-  cursor: none;
-}
-
-.map-lens {
-  position: absolute;
-  z-index: 5;
-  pointer-events: none;
-}
-
-.map-lens__glass {
-  position: absolute;
-  inset: 0;
-  border-radius: 50%;
-  overflow: hidden;
-  /* Тёмная, а не цвета пергамента: за рваным краем карты прозрачно, и
-     светлая заливка выглядела бы продолжением бумаги. */
-  background: #17181b;
-  /* Край стекла темнее середины - как у настоящей линзы. */
-  box-shadow: inset 0 0 22px 6px rgba(20, 12, 8, 0.45);
-}
-
-.map-lens__cell {
-  position: absolute;
-  box-sizing: border-box;
-  border: 2px solid rgba(160, 20, 30, 0.85);
-  border-radius: 4px;
-  background: rgba(200, 40, 40, 0.08);
-}
-
-/* Прицел в центре линзы: тонкий плюс цвета туши со светлой обводкой -
-   читается и на тёмной штриховке, и на пустом пергаменте. */
-.map-lens__cross {
-  position: absolute;
-  left: 50%;
-  top: 50%;
-  width: 18px;
-  height: 18px;
-  transform: translate(-50%, -50%);
-  z-index: 2;
-  pointer-events: none;
-  background:
-    linear-gradient(rgba(120, 10, 20, 0.95), rgba(120, 10, 20, 0.95)) center / 2px 100% no-repeat,
-    linear-gradient(rgba(120, 10, 20, 0.95), rgba(120, 10, 20, 0.95)) center / 100% 2px no-repeat;
-  filter: drop-shadow(0 0 1px rgba(255, 245, 230, 0.95)) drop-shadow(0 0 1px rgba(255, 245, 230, 0.95));
-}
-
-.map-lens__frame {
-  position: absolute;
-  left: 50%;
-  top: 50%;
-  transform: translate(-50%, -50%);
-  pointer-events: none;
-  filter: drop-shadow(0 6px 10px rgba(0, 0, 0, 0.55));
-}
-
-.map-lens__mag {
-  position: absolute;
-  left: 50%;
-  bottom: -30px;
-  transform: translateX(-50%);
-  padding: 1px 8px;
-  border-radius: 8px;
-  font-size: 12px;
-  background: rgba(20, 12, 12, 0.85);
-  color: #f2d9dc;
 }
 
 .map-controls__btn--on {

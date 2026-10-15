@@ -2,8 +2,6 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 import { Div, Spinner, Placeholder, Button, IconButton } from '@vkontakte/vkui';
 import { getMapRoute, getMapState, saveUi, sendMountFromMap, stopTravel } from '../api.js';
 import mapBase from '../assets/world-map-drawn-2048.webp';
-import mapDetail from '../assets/world-map-drawn-4096.webp';
-import lensFrame from '../assets/lens-frame.webp';
 import {
   DRAW_RINGS, MAP_CENTER, REGION_TITLES, cellInfo, cellSizeAt, cellToMap, cellsBetween, clamp, mapToCell,
   monolithDistance, ringBorders,
@@ -18,27 +16,17 @@ import {
  * клетку определяет нажатие (mapToCell). Метки - обычные элементы поверх,
  * их размер не зависит от зума.
  *
- * Патч 112: рисованная карта и линза. Карта стоит целиком, рассматривать её
- * - линзой: на компьютере она ездит за курсором (кнопка 🔍 или колесо), на
- * телефоне появляется по долгому нажатию и висит над пальцем. В линзе -
- * детальная картинка 4096, она грузится только при первом открытии.
+ * Патч 112: рисованная карта. 2026-10-15: линзу убрали (работала плохо) -
+ * карта обычная: перетаскивание, колесо мыши и щипок приближают. Картинка
+ * одна (2048): детальную 4096 для линзы тоже убрали, чтобы карта грузилась быстрее.
  */
 
 const DRAG_THRESHOLD_PX = 5;
 const MAX_SCALE = 4400;          // щипком на телефоне - клетка до ~60 px
 const CELL_K = 0.0143;           // средний размер клетки на картинке (доля ширины)
 
-// Линза: увеличение от ×2 до ×4 шагом 0.1 (колесо мыши).
-const LENS_MIN = 2;
-const LENS_MAX = 4;
-const LENS_STEP = 0.1;
-const LENS_DEFAULT = 2.5;
-const LENS_D_DESKTOP = 240;      // диаметр окна линзы, px
-const LENS_D_TOUCH = 176;
-// Окно линзы относительно картинки оправы: внутренний край кольца - 0.765
-// от половины её размера (замерено по прозрачности, tools/map_art_prompt.md).
-const LENS_FRAME_RATIO = 0.765;
-const LONG_PRESS_MS = 300;
+//: Шаг приближения колесом мыши.
+const WHEEL_ZOOM = 1.15;
 
 const ERROR_MESSAGES = {
   dead: 'Сначала очнись.',
@@ -94,11 +82,6 @@ function ridePos(travel, fetchedAt) {
     rest: path.slice(idx + 1),
   };
 }
-
-// Телефон и планшет: лупы нет совсем (2026-10-11, решение владельца) - она
-// сильно грузила слабые устройства. Там только одна карта и щипок.
-const TOUCH_DEVICE = typeof window !== 'undefined'
-  && Boolean(window.matchMedia?.('(pointer: coarse)').matches);
 
 // Упрощённая карта (2026-10-12) - по кнопке, для слабых телефонов. По
 // умолчанию карта прежняя. Выбор хранится на устройстве, а не на сервере:
@@ -164,14 +147,6 @@ export default function MapTab() {
   const gridCanvasRef = useRef(null);
   // Положение камеры посреди жеста в упрощённом режиме - ещё не в state.
   const liveRef = useRef(null);
-
-  // Линза: включена ли (кнопка 🔍 / колесо), увеличение, точка под ней и
-  // режим «удерживаю палец» на телефоне.
-  const [lens, setLens] = useState({ on: false, mag: LENS_DEFAULT });
-  const [lensPoint, setLensPoint] = useState(null); // {x, y} в пикселях окна карты
-  const [touchLens, setTouchLens] = useState(false);
-  const [detailUsed, setDetailUsed] = useState(false);
-  const longPressRef = useRef(null);
 
   const load = useCallback(() => {
     getMapState()
@@ -435,16 +410,6 @@ export default function MapTab() {
   // выбор клетки.
   const isOverlayTarget = (e) => Boolean(e.target.closest?.('.map-controls, .map-travel-banner'));
 
-  const clearLongPress = () => {
-    if (longPressRef.current) clearTimeout(longPressRef.current);
-    longPressRef.current = null;
-  };
-
-  const showLens = () => {
-    setDetailUsed(true);
-    setLens((cur) => ({ ...cur, on: true }));
-  };
-
   const handlePointerDown = (e) => {
     if (isOverlayTarget(e)) return;
     isTouchRef.current = e.pointerType === 'touch';
@@ -454,17 +419,7 @@ export default function MapTab() {
       const p = localPoint(e);
       dragRef.current = { start: cameraNow(), x: p.x, y: p.y, moved: false };
       pinchRef.current = null;
-      if (isTouchRef.current && !TOUCH_DEVICE) {
-        // Сенсорный экран на ПК: линза по долгому нажатию, а если она
-        // включена кнопкой - сразу. На телефоне линзы нет (TOUCH_DEVICE).
-        clearLongPress();
-        const start = () => { setDetailUsed(true); setTouchLens(true); setLensPoint(p); };
-        if (lens.on) start();
-        else longPressRef.current = setTimeout(start, LONG_PRESS_MS);
-      }
     } else if (pointers.current.size === 2 && view) {
-      clearLongPress();
-      setTouchLens(false);
       dragRef.current = null;
       const [a, b] = [...pointers.current.values()];
       pinchRef.current = {
@@ -488,17 +443,11 @@ export default function MapTab() {
       return;
     }
 
-    if (touchLens && pointers.current.size === 1) {
-      setLensPoint(p);
-      return;
-    }
-
     if (pointers.current.size === 1 && dragRef.current) {
       const dx = p.x - dragRef.current.x;
       const dy = p.y - dragRef.current.y;
       if (Math.hypot(dx, dy) > DRAG_THRESHOLD_PX) {
         dragRef.current.moved = true;
-        clearLongPress();
       }
       if (dragRef.current.moved) {
         // Карту сдвинули руками - больше не подгоняем её под окно сами.
@@ -510,27 +459,14 @@ export default function MapTab() {
       return;
     }
 
-    // Наведение мышью без нажатия - лёгкая подсказка; линза едет за курсором.
+    // Наведение мышью без нажатия - лёгкая подсказка.
     if (!isTouchRef.current && pointers.current.size === 0) {
       const cell = cellAtScreen(p.x, p.y);
       setHovered(cell ? { ...cell, sx: p.x, sy: p.y } : null);
-      if (lens.on) setLensPoint(p);
     }
   };
 
   const handlePointerUp = (e) => {
-    clearLongPress();
-    if (touchLens) {
-      // Отпустил палец под линзой - выбрана клетка под её центром.
-      pointers.current.delete(e.pointerId);
-      setTouchLens(false);
-      const p = localPoint(e);
-      setSelected(cellAtScreen(p.x, p.y));
-      setSendFlow(null);
-      setLensPoint(null);
-      if (pointers.current.size === 0) dragRef.current = null;
-      return;
-    }
     const tap = pointers.current.size === 1 && dragRef.current && !dragRef.current.moved;
     pointers.current.delete(e.pointerId);
     if (pointers.current.size < 2) pinchRef.current = null;
@@ -553,34 +489,9 @@ export default function MapTab() {
     if (!view) return;
     e.preventDefault();
     const p = localPoint(e);
-    setLensPoint(p);
-    if (!lens.on) {
-      // Первое движение колеса только показывает линзу.
-      showLens();
-      return;
-    }
-    const step = e.deltaY < 0 ? LENS_STEP : -LENS_STEP;
-    if (step < 0 && lens.mag <= LENS_MIN) {
-      // Отдаление дальше ×2 - линза убирается; следующее колесо вернёт её.
-      setLens((cur) => ({ ...cur, on: false }));
-      setLensPoint(null);
-      return;
-    }
-    setLens((cur) => ({
-      ...cur,
-      mag: Math.round(clamp(cur.mag + step, LENS_MIN, LENS_MAX) * 10) / 10,
-    }));
-  };
-
-  const toggleLens = () => {
-    if (lens.on) {
-      setLens((cur) => ({ ...cur, on: false }));
-      setLensPoint(null);
-      return;
-    }
-    showLens();
-    // До первого движения мыши линза стоит в центре карты.
-    if (!isTouchRef.current) setLensPoint({ x: size.width / 2, y: size.height / 2 });
+    fittedRef.current = false;
+    zoomAt(e.deltaY < 0 ? WHEEL_ZOOM : 1 / WHEEL_ZOOM, p.x, p.y, cameraNow());
+    commitLive();
   };
   useEffect(() => {
     const el = containerRef.current;
@@ -707,53 +618,17 @@ export default function MapTab() {
     </div>
   );
 
-  // --- Линза ---
-  const lensVisible = Boolean(view && lensPoint && (touchLens || (lens.on && !isTouchRef.current)));
-  const lensD = touchLens ? LENS_D_TOUCH : LENS_D_DESKTOP;
-  let lensBox = null;
-  if (lensVisible) {
-    // На телефоне окно висит над пальцем - иначе палец его и закроет.
-    const cx = clamp(lensPoint.x, lensD / 2, size.width - lensD / 2);
-    const rawY = touchLens ? lensPoint.y - lensD * 0.8 : lensPoint.y;
-    const cy = clamp(rawY, lensD / 2, size.height - lensD / 2);
-    const m = toMap(lensPoint.x, lensPoint.y);
-    const S = view.scale * lens.mag;
-    lensBox = { cx, cy, S, m };
-  }
-
-  // Сетка в линзе: те же кривые, только в координатах окна линзы и лишь
-  // рядом с ней (весь мир пересчитывать на каждое движение мыши незачем).
-  let lensGridPath = '';
-  if (lensBox) {
-    const reach = (lensD / 2 + 4) / lensBox.S;
-    lensGridPath = gridLines.map((line) => {
-      let d = '';
-      let open = false;
-      for (const [u, v] of line) {
-        if (Math.abs(u - lensBox.m.u) > reach || Math.abs(v - lensBox.m.v) > reach) {
-          open = false;
-          continue;
-        }
-        const lx = lensD / 2 + (u - lensBox.m.u) * lensBox.S;
-        const ly = lensD / 2 + (v - lensBox.m.v) * lensBox.S;
-        d += `${open ? 'L' : 'M'}${lx.toFixed(1)} ${ly.toFixed(1)}`;
-        open = true;
-      }
-      return d;
-    }).join('');
-  }
-
   return (
     <div className="map-tab">
       <div
         ref={containerRef}
-        className={`map-viewport${lensVisible && !touchLens ? ' map-viewport--lens' : ''}${simple ? ' map-viewport--simple' : ''}`}
+        className={`map-viewport${simple ? ' map-viewport--simple' : ''}`}
         style={fillHeight ? { height: fillHeight } : undefined}
         onPointerDown={handlePointerDown}
         onPointerMove={handlePointerMove}
         onPointerUp={handlePointerUp}
         onPointerCancel={handlePointerUp}
-        onPointerLeave={() => { setHovered(null); if (!touchLens) setLensPoint(null); }}
+        onPointerLeave={() => setHovered(null)}
       >
         {view && (
           <div className="map-stage" ref={stageRef}>
@@ -826,67 +701,6 @@ export default function MapTab() {
           </div>
         )}
 
-        {lensBox && (
-          <div
-            className="map-lens"
-            style={{ left: lensBox.cx - lensD / 2, top: lensBox.cy - lensD / 2, width: lensD, height: lensD }}
-          >
-            <div className="map-lens__glass">
-              <img
-                className="map-image"
-                src={detailUsed ? mapDetail : mapBase}
-                alt=""
-                draggable={false}
-                style={{
-                  width: lensBox.S,
-                  height: lensBox.S,
-                  transform: `translate(${lensD / 2 - lensBox.m.u * lensBox.S}px, ${lensD / 2 - lensBox.m.v * lensBox.S}px)`,
-                }}
-              />
-              <svg className="map-lens__grid" width={lensD} height={lensD}>
-                <path className="map-grid map-grid--lens" d={lensGridPath} />
-                {/* Пунктир пути и в линзе - раньше его здесь не было. */}
-                {routeCells.length > 1 && (
-                  <polyline
-                    className="map-route map-route--lens"
-                    points={routeCells.map(([x, y]) => {
-                      const p = cellScreen(x, y);
-                      return `${lensD / 2 + (p.x - lensPoint.x) * lens.mag},${lensD / 2 + (p.y - lensPoint.y) * lens.mag}`;
-                    }).join(' ')}
-                  />
-                )}
-              </svg>
-              {/* Прицел: центр линзы - ровно та точка, куда уйдёт клик
-                  (содержимое линзы всегда сдвинуто так, даже у края карты). */}
-              <span className="map-lens__cross" aria-hidden="true" />
-              {(() => {
-                const cell = cellAtScreen(lensPoint.x, lensPoint.y);
-                if (!cell) return null;
-                const sc = cellScreen(cell.x, cell.y);
-                const px = cellSizeAt(monolithDistance(cell.x, cell.y)) * lensBox.S;
-                const lx = lensD / 2 + (sc.x - lensPoint.x) * lens.mag;
-                const ly = lensD / 2 + (sc.y - lensPoint.y) * lens.mag;
-                return <div className="map-lens__cell" style={{ left: lx - px / 2, top: ly - px / 2, width: px, height: px }} />;
-              })()}
-              {pins.map((pin) => {
-                const sc = cellScreen(pin[0], pin[1]);
-                const lx = lensD / 2 + (sc.x - lensPoint.x) * lens.mag;
-                const ly = lensD / 2 + (sc.y - lensPoint.y) * lens.mag;
-                if (Math.hypot(lx - lensD / 2, ly - lensD / 2) > lensD / 2 + 20) return null;
-                return pinAt(pin, lx, ly, clamp(markerPx * pin[5] * 1.4, 18, 34));
-              })}
-            </div>
-            <img
-              className="map-lens__frame"
-              src={lensFrame}
-              alt=""
-              draggable={false}
-              style={{ width: lensD / LENS_FRAME_RATIO, height: lensD / LENS_FRAME_RATIO }}
-            />
-            {!touchLens && <span className="map-lens__mag">×{lens.mag.toFixed(1)}</span>}
-          </div>
-        )}
-
         {!imageReady && (
           <div className="map-loading"><Spinner size="m" /></div>
         )}
@@ -895,7 +709,7 @@ export default function MapTab() {
           <div
             className="map-tooltip"
             style={{
-              left: clamp(hovered.sx + (lensBox && !touchLens ? lensD / 2 + 14 : 14), 0, size.width - 190),
+              left: clamp(hovered.sx + 14, 0, size.width - 190),
               top: clamp(hovered.sy + 14, 0, size.height - 100),
             }}
           >
@@ -908,14 +722,6 @@ export default function MapTab() {
         )}
 
         <div className="map-controls">
-          {!TOUCH_DEVICE && (
-            <IconButton
-              className={`map-controls__btn${lens.on ? ' map-controls__btn--on' : ''}`}
-              onClick={toggleLens} aria-label="Линза" title="Линза: колесо мыши - увеличение ×2…×4"
-            >
-              🔍
-            </IconButton>
-          )}
           <IconButton className="map-controls__btn" onClick={recenterOnPlayer} aria-label="К себе">◎</IconButton>
           <button
             type="button"
