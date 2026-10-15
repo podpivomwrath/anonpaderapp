@@ -25,6 +25,14 @@ export function setWebToken(token) {
   } catch { /* приватный режим - вход живёт до закрытия вкладки */ }
 }
 
+// Демо-вход по ссылке (2026-10-15, проверка ЮKassa): #login=<ключ сессии>
+// - ключ подписан сервером, как после входа через VK ID. Из адреса его
+// сразу убираем, чтобы не остался в истории и не ушёл дальше скриншотом.
+if (!IN_VK && window.location.hash.startsWith('#login=')) {
+  setWebToken(decodeURIComponent(window.location.hash.slice('#login='.length)));
+  window.history.replaceState(null, '', '/');
+}
+
 export async function getWebConfig() {
   const res = await fetch(`${API_BASE}/api/web/config`);
   return res.json();
