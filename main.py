@@ -88,16 +88,16 @@ async def _pts_season_job() -> None:
 
 
 async def _pk_settle_job() -> None:
-    """Пепельное клеймо: записать сошедшие метки и вернуть награду за голову
-    тем, у кого меток не осталось (services/pk_service.py)."""
+    """Пепельное клеймо: записать сошедшие метки и снять награду за голову
+    с тех, у кого меток не осталось (services/pk_service.py)."""
     from services import pk_service
     from services.db import get_session_factory
 
     async with get_session_factory()() as db:
-        refunds = await pk_service.settle_all(db)
+        cleared = await pk_service.settle_all(db)
         await db.commit()
-    if refunds:
-        logger.info("Клеймо: вернули награду {}", refunds)
+    if cleared:
+        logger.info("Клеймо сошло: {}", cleared)
 
 
 async def run() -> None:

@@ -2,8 +2,12 @@
 
 Правила и числа - game/economy/pk_config.py. Метки сходят сами, по одной за
 DECAY_HOURS: считаем это лениво (marks), а в базу «сход» записывает settle -
-он же возвращает награду за голову, когда меток не осталось. settle зовут
+он же снимает награду за голову, когда меток не осталось. settle зовут
 при каждом изменении клейма и периодическая задача (settle_all).
+
+Награда за голову (2026-10-15, решение владельца) - только обещание: в
+момент убийства у клеймёного ничего не списывается. Золото уходит из его
+кошелька охотнику, когда охотник его убьёт.
 """
 
 from dataclasses import dataclass, field
@@ -50,30 +54,24 @@ def _normalize(character: Character, now: datetime) -> None:
     character.pk_marks_at = None if character.pk_marks == 0 else started + gone * _PERIOD
 
 
-async def settle(db: AsyncSession, character: Character, now: datetime | None = None) -> int:
-    """Записать сошедшие метки; без меток - вернуть награду за голову.
-    Возвращает вернувшееся золото."""
+async def settle(db: AsyncSession, character: Character, now: datetime | None = None) -> None:
+    """Записать сошедшие метки; без меток награды за голову больше нет."""
     now = now or _now()
     _normalize(character, now)
-    if character.pk_marks > 0 or not character.pk_bounty:
-        return 0
-    refund, character.pk_bounty = character.pk_bounty, 0
-    # Своё же золото - без налога гильдии.
-    await wallet_service.deposit(db, character.id, "farm", refund, taxable=False)
-    return refund
+    if character.pk_marks <= 0:
+        character.pk_bounty = 0
 
 
-async def settle_all(db: AsyncSession, now: datetime | None = None) -> list[tuple[int, int]]:
-    """Периодически: у кого метки сошли - записать и вернуть награду.
-    Возвращает (id персонажа, вернувшееся золото) для оповещения."""
+async def settle_all(db: AsyncSession, now: datetime | None = None) -> int:
+    """Периодически: записать сошедшие метки. Возвращает, у скольких
+    клеймо сошло совсем."""
     now = now or _now()
     rows = (await db.scalars(select(Character).where(Character.pk_marks > 0))).all()
-    refunds = []
+    cleared = 0
     for character in rows:
-        refund = await settle(db, character, now)
-        if refund:
-            refunds.append((character.id, refund))
-    return refunds
+        await settle(db, character, now)
+        cleared += character.pk_marks == 0
+    return cleared
 
 
 def badge(character: Character, now: datetime | None = None) -> str:
@@ -124,7 +122,7 @@ def consequences(n: int) -> str:
     """Чем грозит клеймо на n метках - одной строкой."""
     parts = ["все видят 🩸 рядом с твоим именем"]
     if n >= pc.BOUNTY_FROM:
-        parts.append("за твою голову назначена награда из твоего же золота - её получит тот, кто тебя убьёт")
+        parts.append("за твою голову назначена награда: кто тебя убьёт, получит её из твоего кошелька")
     if n >= pc.COSTLY_DEATH_FROM:
         parts.append("при смерти теряешь в 1,5 раза больше опыта (даже в PvP), и твои трофеи заберёт любой победитель")
     if n >= pc.CITY_PENALTY_FROM:
@@ -155,10 +153,16 @@ async def on_pvp_kill(
 
     victim_branded = marks(victim, now) > 0
     if victim_branded and victim.pk_bounty:
-        out.bounty_claimed, victim.pk_bounty = victim.pk_bounty, 0
-        await wallet_service.deposit(db, killer.id, "farm", out.bounty_claimed)
-        out.killer_lines.append(f"💰 Награда за голову {victim.name}: +{out.bounty_claimed} золота.")
-        out.victim_lines.append(f"💰 Награду за твою голову ({out.bounty_claimed} золота) забрал {killer.name}.")
+        # Списываем только при смерти и не больше, чем в кошельке сейчас.
+        wallet = await wallet_service.get_wallet(db, victim.id)
+        claimed = min(victim.pk_bounty, max(wallet.farm_currency, 0))
+        victim.pk_bounty = 0
+        if claimed > 0:
+            await wallet_service.charge(db, victim.id, "farm", claimed)
+            await wallet_service.deposit(db, killer.id, "farm", claimed)
+            out.bounty_claimed = claimed
+            out.killer_lines.append(f"💰 Награда за голову {victim.name}: +{claimed} золота.")
+            out.victim_lines.append(f"💰 Награду за твою голову ({claimed} золота) {killer.name} забрал из твоего кошелька.")
 
     if victim_branded or killer.level - victim.level < pc.LEVEL_GAP:
         return out
@@ -168,22 +172,23 @@ async def on_pvp_kill(
         killer.pk_marks_at = now
     killer.pk_marks = (killer.pk_marks or 0) + 1
     n = killer.pk_marks
-    frozen = 0
+    added = 0
     if n >= pc.BOUNTY_FROM:
+        # Ничего не списываем: это обещание, его заберёт охотник.
         wallet = await wallet_service.get_wallet(db, killer.id)
-        frozen = int(wallet.farm_currency * min(pc.BOUNTY_SHARE_PER_MARK * n, pc.BOUNTY_SHARE_MAX))
-        if frozen > 0:
-            await wallet_service.charge(db, killer.id, "farm", frozen)
-            killer.pk_bounty = (killer.pk_bounty or 0) + frozen
+        added = int(wallet.farm_currency * min(pc.BOUNTY_SHARE_PER_MARK * n, pc.BOUNTY_SHARE_MAX))
+        if added > 0:
+            killer.pk_bounty = (killer.pk_bounty or 0) + added
     line = (
         f"🩸 Ты убил того, кто слабее тебя на {pc.LEVEL_GAP}+ уровней, и получил метку клейма. "
         f"Сейчас меток: {n}. Каждая исчезает сама через {pc.DECAY_HOURS} ч. "
         f"Пока метки на тебе: {consequences(n)}"
     )
-    if frozen:
+    if added:
         line += (
-            f"\n💰 Из твоего кошелька в награду за твою голову ушло {frozen} золота (всего награда {killer.pk_bounty}). "
-            f"Если тебя не убьют, пока метки не исчезнут, золото вернётся."
+            f"\n💰 Награда за твою голову выросла на {added} золота (всего {killer.pk_bounty}). "
+            f"Сейчас ничего не списано: золото из твоего кошелька заберёт тот, кто тебя убьёт. "
+            f"Метки исчезнут раньше - награда сгорит."
         )
     out.killer_lines.append(line)
 

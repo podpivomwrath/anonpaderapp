@@ -25,30 +25,42 @@ async def test_close_levels_no_brand(db_session, make_character):
     assert not out.branded and killer.pk_marks == 0
 
 
-async def test_second_mark_freezes_bounty_and_hunter_claims_it(db_session, make_character):
+async def test_second_mark_sets_bounty_without_charging_and_hunter_takes_it(db_session, make_character):
+    """2026-10-15: награда - обещание, при убийстве ничего не списывается;
+    охотник забирает её из кошелька клеймёного при его смерти."""
     killer = await make_character(level=30, farm=1000)
     weak = await make_character(level=10)
     await pk_service.on_pvp_kill(db_session, killer, weak, NOW)
     await pk_service.on_pvp_kill(db_session, killer, weak, NOW)
     assert killer.pk_marks == 2
     assert killer.pk_bounty == 100  # 5% x 2 метки от 1000
-    assert (await wallet_service.get_wallet(db_session, killer.id)).farm_currency == 900
+    assert (await wallet_service.get_wallet(db_session, killer.id)).farm_currency == 1000
 
     hunter = await make_character(level=10)  # младше на 20 - и всё равно без клейма
     out = await pk_service.on_pvp_kill(db_session, hunter, killer, NOW)
     assert out.bounty_claimed == 100 and not out.branded and hunter.pk_marks == 0
     assert killer.pk_bounty == 0
+    assert (await wallet_service.get_wallet(db_session, killer.id)).farm_currency == 900
 
 
-async def test_marks_decay_and_bounty_returns(db_session, make_character):
+async def test_hunter_gets_no_more_than_victim_has(db_session, make_character):
+    killer = await make_character(level=30, farm=30)
+    killer.pk_marks, killer.pk_marks_at, killer.pk_bounty = 2, NOW, 100
+    hunter = await make_character(level=30)
+    out = await pk_service.on_pvp_kill(db_session, hunter, killer, NOW)
+    assert out.bounty_claimed == 30
+    assert (await wallet_service.get_wallet(db_session, killer.id)).farm_currency == 0
+
+
+async def test_marks_decay_and_bounty_burns(db_session, make_character):
     killer = await make_character(level=30, farm=1000)
     weak = await make_character(level=10)
     await pk_service.on_pvp_kill(db_session, killer, weak, NOW)
     await pk_service.on_pvp_kill(db_session, killer, weak, NOW)
     assert pk_service.marks(killer, NOW + timedelta(hours=4)) == 2
     assert pk_service.marks(killer, NOW + timedelta(hours=5)) == 1
-    refund = await pk_service.settle(db_session, killer, NOW + timedelta(hours=10))
-    assert killer.pk_marks == 0 and refund == 100
+    await pk_service.settle(db_session, killer, NOW + timedelta(hours=10))
+    assert killer.pk_marks == 0 and killer.pk_bounty == 0
     assert (await wallet_service.get_wallet(db_session, killer.id)).farm_currency == 1000
 
 
