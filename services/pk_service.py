@@ -55,10 +55,13 @@ def _normalize(character: Character, now: datetime) -> None:
 
 
 async def settle(db: AsyncSession, character: Character, now: datetime | None = None) -> None:
-    """Записать сошедшие метки; без меток награды за голову больше нет."""
+    """Записать сошедшие метки. Клеймо сошло, а голову так никто и не взял -
+    залог награды возвращается в кошелёк (без налога гильдии: это его же золото)."""
     now = now or _now()
     _normalize(character, now)
     if character.pk_marks <= 0:
+        if character.pk_bounty:
+            await wallet_service.deposit(db, character.id, "farm", character.pk_bounty, taxable=False)
         character.pk_bounty = 0
 
 
@@ -166,7 +169,7 @@ BOARD_HINT = "Подробности - во вкладке «Доска»."
 
 
 def _bounty_line(added: int, total: int) -> str:
-    return f"💰 Награда за твою голову выросла на {added} золота (всего {total})."
+    return f"💰 В залог за твою голову ушло {added} золота (всего {total}). Сойдут метки - вернётся."
 
 
 async def on_pvp_kill(
@@ -182,16 +185,13 @@ async def on_pvp_kill(
 
     victim_branded = marks(victim, now) > 0
     if victim_branded and victim.pk_bounty:
-        # Списываем только при смерти и не больше, чем в кошельке сейчас.
-        wallet = await wallet_service.get_wallet(db, victim.id)
-        claimed = min(victim.pk_bounty, max(wallet.farm_currency, 0))
+        # Награда уже лежит в залоге (списана при метке) - охотник берёт её целиком.
+        claimed = victim.pk_bounty
         victim.pk_bounty = 0
-        if claimed > 0:
-            await wallet_service.charge(db, victim.id, "farm", claimed)
-            await wallet_service.deposit(db, killer.id, "farm", claimed)
-            out.bounty_claimed = claimed
-            out.killer_lines.append(f"💰 Награда за голову {victim.name}: +{claimed} золота.")
-            out.victim_lines.append(f"💰 Награду за твою голову ({claimed} золота) {killer.name} забрал из твоего кошелька.")
+        await wallet_service.deposit(db, killer.id, "farm", claimed)
+        out.bounty_claimed = claimed
+        out.killer_lines.append(f"💰 Награда за голову {victim.name}: +{claimed} золота.")
+        out.victim_lines.append(f"💰 Награду за твою голову ({claimed} золота) забрал {killer.name}.")
 
     if victim_branded or killer.level - victim.level < pc.LEVEL_GAP:
         return out
@@ -203,10 +203,12 @@ async def on_pvp_kill(
     n = killer.pk_marks
     added = 0
     if n >= pc.BOUNTY_FROM:
-        # Ничего не списываем: это обещание, его заберёт охотник.
+        # Залог (2026-10-15, решение владельца): золото списывается сразу,
+        # иначе его успевали потратить или передать и награда была пустой.
         wallet = await wallet_service.get_wallet(db, killer.id)
-        added = int(wallet.farm_currency * min(pc.BOUNTY_SHARE_PER_MARK * n, pc.BOUNTY_SHARE_MAX))
+        added = int(max(wallet.farm_currency, 0) * min(pc.BOUNTY_SHARE_PER_MARK * n, pc.BOUNTY_SHARE_MAX))
         if added > 0:
+            await wallet_service.charge(db, killer.id, "farm", added)
             killer.pk_bounty = (killer.pk_bounty or 0) + added
             out.bounty_added = added
     line = f"🩸 Метка клейма за убийство слабого (меток: {n}). {BOARD_HINT}"
