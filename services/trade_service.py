@@ -416,6 +416,10 @@ async def send(db: AsyncSession, character: Character, to_x, to_y) -> MountTrave
     cart = await _require_cart_here(db, character)
     if (to_x, to_y) == (character.pos_x, character.pos_y):
         raise TradeError("Повозка уже здесь.")
+    from services import pk_service
+
+    if grid.city_region_at(to_x, to_y) is not None and pk_service.city_banned(character):
+        raise TradeError(pk_service.CITY_BAN_TEXT)
     if await mount_service.active_travel(db, character.id) is not None:
         raise TradeError("Ты уже в пути.")
     return await mount_service.start_travel(

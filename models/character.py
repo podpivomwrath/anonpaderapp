@@ -93,6 +93,16 @@ class Character(Base):
     ban_reason: Mapped[str | None] = mapped_column(String(256), nullable=True)
     banned_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
+    # Пепельное клеймо (2026-10-15, services/pk_service.py): метки за убийство
+    # тех, кто слабее на 5+ уровней. Одна метка сходит за 5 часов; pk_marks_at -
+    # начало текущего пятичасового отрезка. pk_bounty - замороженная награда за
+    # голову (золото самого убийцы). revenge_* - право мести жертвы.
+    pk_marks: Mapped[int] = mapped_column(default=0, server_default="0")
+    pk_marks_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    pk_bounty: Mapped[int] = mapped_column(default=0, server_default="0")
+    revenge_target_id: Mapped[int | None] = mapped_column(nullable=True)
+    revenge_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
     # Патч 37: текущий ВЛОЖЕННЫЙ экран (скупщик/лавка/инвентарь и т.п.) — клавиатура
     # принадлежит экрану, а не сообщению. NULL = корневой экран (город/карта/бой),
     # его клавиатуру строит bot/handlers/world.py::_current_keyboard как раньше.

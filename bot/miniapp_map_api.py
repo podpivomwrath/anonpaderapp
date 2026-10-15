@@ -293,6 +293,10 @@ async def handle_post_send_mount(request: web.Request) -> web.Response:
             return web.json_response({"error": "out_of_bounds"}, status=400)
         if (x, y) == (character.pos_x, character.pos_y):
             return web.json_response({"error": "already_there"}, status=400)
+        from services import pk_service
+
+        if grid.city_region_at(x, y) is not None and pk_service.city_banned(character):
+            return web.json_response({"error": "city_banned", "message": pk_service.CITY_BAN_TEXT}, status=400)
         owned = await mount_service.owned_mounts(db, character.id)
         if not any(m.mount_id == mount_id for m in owned):
             return web.json_response({"error": "mount_not_owned"}, status=400)

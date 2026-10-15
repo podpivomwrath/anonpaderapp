@@ -43,6 +43,7 @@ from game.economy import fishing_config as fc
 from services import guild_service
 from services import daily_service, fishing_service, item_service, screen_service
 from services import onboarding_service as onboarding_svc
+from services import pk_service
 from services import trophy_service
 from services import wallet_service
 from services.db import get_session_factory
@@ -142,6 +143,8 @@ async def appraiser_back(message: Message) -> None:
 
 
 async def _render_trophies(db, character, mult: float, prefix: str = "") -> tuple[str, str]:
+    # Пепельное клеймо 5+: за реликвии вдвое меньше.
+    mult *= pk_service.relic_mult(character)
     stock = await trophy_service.get_stock(db, character.id)
     if not stock:
         text = appraiser_empty()
@@ -183,10 +186,11 @@ async def sell_trophies(message: Message) -> None:
         if character is None or character.creation_state is not None:
             return
         mult = _price_multiplier(character, grid.city_region_at(character.pos_x, character.pos_y))
+        relic_mult = mult * pk_service.relic_mult(character)
         if trophy_id == SELL_ALL_ID:
-            gold = await trophy_service.sell_all(db, character, mult)
+            gold = await trophy_service.sell_all(db, character, relic_mult)
         else:
-            gold = await trophy_service.sell_one(db, character, trophy_id, mult)
+            gold = await trophy_service.sell_one(db, character, trophy_id, relic_mult)
         daily_progress = await daily_service.record_sell_gold(db, character, gold)
         total = (await wallet_service.get_wallet(db, character.id)).farm_currency
         await db.commit()

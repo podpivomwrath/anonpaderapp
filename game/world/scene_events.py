@@ -209,8 +209,25 @@ def eligible(event: SceneEvent, ring: int, region: str, level: int) -> bool:
     )
 
 
-def pick_event(rng: random.Random, tier: str, ring: int, region: str, level: int) -> SceneEvent | None:
-    pool = [e for e in content().events if e.tier == tier and eligible(e, ring, region, level)]
+def offers_trail(event: SceneEvent) -> bool:
+    """Может ли событие выдать след (по любому выбору)."""
+    for scene in event.scenes.values():
+        results = [scene.success, scene.failure]
+        for choice in scene.choices:
+            results += [choice.result, choice.success, choice.failure, *choice.outcomes]
+        if any(r is not None and r.trail for r in results):
+            return True
+    return False
+
+
+def pick_event(rng: random.Random, tier: str, ring: int, region: str, level: int,
+               no_trails: bool = False) -> SceneEvent | None:
+    """no_trails - у игрока уже живой след: события со следом не выпадают
+    (2026-10-15: новый след молча затирал старый)."""
+    pool = [
+        e for e in content().events
+        if e.tier == tier and eligible(e, ring, region, level) and not (no_trails and offers_trail(e))
+    ]
     if not pool:
         return None
     return rng.choices(pool, weights=[e.weight for e in pool])[0]

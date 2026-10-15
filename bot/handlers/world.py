@@ -110,6 +110,7 @@ from services import (
     world_boss_service,
 )
 from services import onboarding_service as onboarding_svc
+from services import pk_service
 from services.db import get_session_factory
 
 # Поездка верхом идёт по клеткам сама (bot/handlers/mounts.py::scan): пеший
@@ -917,9 +918,11 @@ async def handle_explore_done(peer_id: int) -> None:
         elif outcome_kind == "event":
             tier = scene_events.roll_tier(_rng)
             if tier != "light":
+                live_trail = await scene_event_service.get_trail(db, character.id)
                 scene_event = scene_events.pick_event(
                     _rng, tier, grid.ring_tier(character.pos_x, character.pos_y),
                     region_for(character.pos_x, character.pos_y), character.level,
+                    no_trails=live_trail is not None and scene_event_service.trail_alive(live_trail),
                 )
         if scene_event is not None:
             outcome_kind = "scene"
@@ -1358,6 +1361,10 @@ async def move(message: Message) -> None:
             )
             return
         dx, dy = direction
+        if grid.city_region_at(character.pos_x + dx, character.pos_y + dy) is not None \
+                and pk_service.city_banned(character):
+            await message.answer(pk_service.CITY_BAN_TEXT)
+            return
         if not grid.in_bounds(character.pos_x + dx, character.pos_y + dy):
             # Патч 31, п.7: за краем мира — лорный отказ вместо
             # движения, позиция и клавиатура не меняются.

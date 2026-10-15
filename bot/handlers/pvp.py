@@ -77,7 +77,7 @@ from game.economy import fishing as game_fishing
 from game.economy import premium_config as pc
 from game.world import grid
 from models import Character, CharacterStats
-from services import pts_service, trial_service
+from services import pk_service, pts_service, trial_service
 from services import (
     admin_service,
     daily_service,
@@ -269,7 +269,12 @@ async def _build_combatant_for(db, character: Character) -> CombatantState:
         select(CharacterStats).where(CharacterStats.character_id == character.id)
     )
     gear_bonus = await item_service.compute_gear_bonus(db, character.id)
-    buff_modifiers = await preset_service.resolve_active_modifiers(db, character)
+    buff_modifiers = dict(await preset_service.resolve_active_modifiers(db, character))
+    if character.revenge_target_id is not None:
+        bonus = pk_service.revenge_bonus(character, character.revenge_target_id)
+        if bonus:
+            buff_modifiers["revenge_vs"] = character.revenge_target_id
+            buff_modifiers["revenge_bonus"] = bonus
     stats = Stats(
         strength=stats_row.strength + gear_bonus.get("str", 0),
         agility=stats_row.agility + gear_bonus.get("agi", 0),
@@ -377,8 +382,9 @@ def _class_line(c: Character, tags: dict[int, str] | None = None) -> str:
     title = daily_service.title_name(c)
     tag = (tags or {}).get(c.guild_id)
     prefix = f"{premium_service.badge(c)}[{tag}] " if tag else premium_service.badge(c)
+    prefix = f"{pk_service.badge(c)}{prefix}"
     name = f"{prefix}{c.name} «{title}»" if title else f"{prefix}{c.name}"
-    return f"{name} · {c.level} ур. · {pvp_service.class_title(c)}"
+    return f"{name} · {c.level} ур. · {pvp_service.class_title(c)}{pk_service.wanted_suffix(c)}"
 
 
 def _battle_scene_line(battle: Battle) -> str:
@@ -1424,13 +1430,16 @@ async def _finish_duel(battle: Battle, winner_cid: int, loser_cid: int) -> None:
             return
         pvp_service.record_win(winner)
         pvp_service.record_loss(loser)
+        loser_branded = pk_service.marks(loser) > 0
+        pk = await pk_service.on_pvp_kill(db, winner, loser)
         await pts_service.season_rollover(db)
         await db.refresh(winner, ["pts", "pts_season"])
         await db.refresh(loser, ["pts", "pts_season"])
         pts_delta, pts_reason = pts_service.apply_duel(winner, loser)
         winner_pts_line = pts_service.delta_line(pts_delta, winner, pts_reason)
         loser_pts_line = pts_service.delta_line(-pts_delta, loser) if pts_delta else ""
-        no_reward = pvp_service.no_reward_for_kill(winner.level, loser.level)
+        # С клеймёного трофеи забирает любой, даже сильно младший.
+        no_reward = pvp_service.no_reward_for_kill(winner.level, loser.level) and not loser_branded
         moved = {} if no_reward else await trophy_service.transfer_all(db, loser.id, winner.id)
         # Патч 58: рыба из садка ПРОПАДАЕТ, а не переходит победителю.
         # Иначе охотиться на рыбаков было бы выгоднее, чем рыбачить —
@@ -1470,6 +1479,8 @@ async def _finish_duel(battle: Battle, winner_cid: int, loser_cid: int) -> None:
         win_text += f"\n\n{daily_notice}"
     for buff_id in trial_buffs:
         win_text += f"\n\n📖 Испытание пройдено. Открыт бафф: {trial_service.buff_name(buff_id)}."
+    if pk.killer_lines:
+        win_text += "\n\n" + "\n".join(pk.killer_lines)
     await _bot_api.messages.send(
         peer_id=winner_p.peer_id, message=win_text, random_id=0,
         keyboard=kb.movement_keyboard(*winner_pos, winner_p.peer_id, has_mount=winner_has_mount),
@@ -1477,6 +1488,8 @@ async def _finish_duel(battle: Battle, winner_cid: int, loser_cid: int) -> None:
     for c in daily_progress.completed:
         await stats_window.notify_levelup(winner_p.peer_id, c.levels_gained, c.new_level)
     lose_text = f"☠ Тебя побеждает {winner_p.name}. Ты уходишь во тьму."
+    if pk.victim_lines:
+        lose_text += "\n\n" + "\n".join(pk.victim_lines)
     if loser_pts_line:
         lose_text += f"\n\n{loser_pts_line}"
     if robbed:
@@ -1641,17 +1654,32 @@ async def on_mass_battle_finished(session_id: int, result: TickResult) -> None:
             pts_deltas = pts_service.apply_mass(characters, dead_ids, battle.damage_by_pair, battle.side_of)
         pts_lines = {cid: pts_service.delta_line(d, characters[cid]) for cid, d in pts_deltas.items()}
         transfer_lines: dict[int, list[str]] = {}
+        pk_lines: dict[int, list[str]] = {}
         for victim_cid in dead_ids:
             victim = characters.get(victim_cid)
             if victim is None:
                 continue
+            victim_branded = pk_service.marks(victim) > 0
+            # Пепельное клеймо: каждый, кто бил жертву, отвечает за её смерть;
+            # награда за голову - тому, кто нанёс больше всех.
+            hitters = sorted(
+                (a for a in survivor_ids if battle.damage_by_pair.get((a, victim_cid), 0) > 0 and a in characters),
+                key=lambda a: -battle.damage_by_pair.get((a, victim_cid), 0),
+            )
+            if not result.draw:
+                for attacker_cid in hitters:
+                    pk = await pk_service.on_pvp_kill(db, characters[attacker_cid], victim)
+                    pk_lines.setdefault(attacker_cid, []).extend(pk.killer_lines)
+                    pk_lines.setdefault(victim_cid, []).extend(pk.victim_lines)
             shares: dict[int, float] = {}
             for attacker_cid in survivor_ids:
                 dmg = battle.damage_by_pair.get((attacker_cid, victim_cid), 0)
                 if dmg <= 0:
                     continue
                 attacker = characters.get(attacker_cid)
-                if attacker is None or pvp_service.no_reward_for_kill(attacker.level, victim.level):
+                if attacker is None or (
+                    pvp_service.no_reward_for_kill(attacker.level, victim.level) and not victim_branded
+                ):
                     continue
                 shares[attacker_cid] = dmg
             moved = await trophy_service.split_among(db, victim_cid, shares) if shares else {}
@@ -1724,6 +1752,8 @@ async def on_mass_battle_finished(session_id: int, result: TickResult) -> None:
                 text += f"\n\n{daily_notice}"
             if trial_lines.get(cid):
                 text += "\n\n" + "\n".join(trial_lines[cid])
+            if pk_lines.get(cid):
+                text += "\n\n" + "\n".join(pk_lines[cid])
             pos = positions.get(cid, (0, 0))
             await _bot_api.messages.send(
                 peer_id=participant.peer_id, message=text, random_id=0,
@@ -1738,7 +1768,8 @@ async def on_mass_battle_finished(session_id: int, result: TickResult) -> None:
             await _bot_api.messages.send(
                 peer_id=participant.peer_id,
                 message="☠ Тебя одолели в бою. Ты уходишь во тьму."
-                + (f"\n\n{pts_lines[cid]}" if pts_lines.get(cid) else ""),
+                + (f"\n\n{pts_lines[cid]}" if pts_lines.get(cid) else "")
+                + ("\n\n" + "\n".join(pk_lines[cid]) if pk_lines.get(cid) else ""),
                 random_id=0, keyboard=kb.waiting_keyboard(),
             )
 

@@ -257,6 +257,11 @@ async def coord_input(message: Message) -> None:
         if (to_x, to_y) == (character.pos_x, character.pos_y):
             await message.answer("Ты уже здесь. Назови другую клетку.")
             return
+        from services import pk_service
+
+        if grid.city_region_at(to_x, to_y) is not None and pk_service.city_banned(character):
+            await message.answer(pk_service.CITY_BAN_TEXT)
+            return
         # Безопасный путь - как выбран на карте мини-аппа (настройка персонажа).
         safe = bool((character.ui_flags or {}).get("safe_route"))
         seconds = await start_travel_and_notify(db, character, peer_id, mount_id, to_x, to_y, now, safe=safe)

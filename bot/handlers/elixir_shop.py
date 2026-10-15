@@ -16,6 +16,7 @@ from bot.keyboards.world import BTN_ELIXIR_SHOP
 from game.world import grid
 from services import elixir_service, screen_service
 from services import onboarding_service as onboarding_svc
+from services import pk_service
 from services import wallet_service
 from services.db import get_session_factory
 from services.wallet_service import NotEnoughCurrency
@@ -37,14 +38,14 @@ async def _owned_counts(db, character_id: int) -> dict[str, int]:
     return {d.id: count for d, count in stock}
 
 
-def _catalog_text(counts: dict[str, int]) -> str:
+def _catalog_text(counts: dict[str, int], mult: float = 1.0) -> str:
     # Без пустого элемента: строки и так склеиваются через пустую строку, а
     # лишний "" давал три пустых строки после приветствия старухи.
     lines = [shop_intro()]
     for elixir in elixir_service.shop_elixirs():
         owned = counts.get(elixir.id, 0)
         owned_suffix = f" (у тебя: {owned})" if owned else ""
-        price = elixir_service.price(elixir.id)
+        price = round(elixir_service.price(elixir.id) * mult)
         lines.append(f"{elixir.emoji} {elixir.name} - {price} зол.{owned_suffix}\n{elixir.description}")
     return "\n\n".join(lines)
 
@@ -67,7 +68,7 @@ async def open_shop(message: Message) -> None:
         counts = await _owned_counts(db, character.id)
 
     await editable_message.send_or_edit(
-        _bot_api, _NS, peer_id, _catalog_text(counts),
+        _bot_api, _NS, peer_id, _catalog_text(counts, pk_service.shop_mult(character)),
         shop_keyboard(elixir_service.shop_elixirs()),
         attachment=shop_attachment(),
     )
@@ -114,10 +115,10 @@ async def elixir_shop_select(message: Message) -> None:
         if character is None or character.creation_state is not None:
             return
         farm_currency = (await wallet_service.get_wallet(db, character.id)).farm_currency
-        price = elixir_service.price(elixir_id)
+        price = round(elixir_service.price(elixir_id) * pk_service.shop_mult(character))
         if price > farm_currency:
             counts = await _owned_counts(db, character.id)
-            text = f"{shop_not_enough_gold()}\n\n{_catalog_text(counts)}"
+            text = f"{shop_not_enough_gold()}\n\n{_catalog_text(counts, pk_service.shop_mult(character))}"
             await editable_message.send_or_edit(
                 _bot_api, _NS, peer_id, text, shop_keyboard(elixir_service.shop_elixirs()),
                 attachment=shop_attachment(),
@@ -142,7 +143,7 @@ async def elixir_shop_item_back(message: Message) -> None:
         counts = await _owned_counts(db, character.id)
 
     await editable_message.send_or_edit(
-        _bot_api, _NS, peer_id, _catalog_text(counts),
+        _bot_api, _NS, peer_id, _catalog_text(counts, pk_service.shop_mult(character)),
         shop_keyboard(elixir_service.shop_elixirs()),
         attachment=shop_attachment(),
     )
@@ -166,7 +167,7 @@ async def buy_elixir_qty(message: Message) -> None:
             spent = await elixir_service.buy_bulk(db, character, elixir_id, qty)
         except NotEnoughCurrency:
             counts = await _owned_counts(db, character.id)
-            text = f"{shop_not_enough_gold()}\n\n{_catalog_text(counts)}"
+            text = f"{shop_not_enough_gold()}\n\n{_catalog_text(counts, pk_service.shop_mult(character))}"
             await editable_message.send_or_edit(
                 _bot_api, _NS, peer_id, text, shop_keyboard(elixir_service.shop_elixirs()),
                 attachment=shop_attachment(),
@@ -178,7 +179,7 @@ async def buy_elixir_qty(message: Message) -> None:
 
     new_count = counts.get(elixir_id, 0)
     confirm = shop_bought_bulk(elixir.name, qty, spent, total, new_count)
-    text = f"{confirm}\n\n{_catalog_text(counts)}"
+    text = f"{confirm}\n\n{_catalog_text(counts, pk_service.shop_mult(character))}"
     await editable_message.send_or_edit(
         _bot_api, _NS, peer_id, text, shop_keyboard(elixir_service.shop_elixirs()),
         attachment=shop_attachment(),
@@ -191,4 +192,4 @@ async def rebuild(db, character) -> tuple[str, str] | None:
     if character.screen != "elixir_shop":
         return None
     counts = await _owned_counts(db, character.id)
-    return _catalog_text(counts), shop_keyboard(elixir_service.shop_elixirs())
+    return _catalog_text(counts, pk_service.shop_mult(character)), shop_keyboard(elixir_service.shop_elixirs())

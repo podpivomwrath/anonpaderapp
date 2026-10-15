@@ -42,7 +42,10 @@ class PairResult:
 
 def pair_points(winner: Character, victim: Character) -> PairResult:
     """Очки за победу winner над victim по рейтингам ДО боя."""
-    if victim.level <= winner.level - pc.LEVEL_GAP:
+    from services import pk_service
+
+    # Клеймёный (2026-10-15) - честная добыча при любой разнице уровней.
+    if victim.level <= winner.level - pc.LEVEL_GAP and not pk_service.marks(victim):
         return PairResult(0.0, NO_LEVEL)
     w, v = _pts(winner), _pts(victim)
     if w - v >= pc.CUTOFF:

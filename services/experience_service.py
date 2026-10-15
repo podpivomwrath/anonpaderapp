@@ -145,12 +145,12 @@ def activity_xp_line(levelup: LevelUp) -> str:
     return f"✨ +{levelup.xp_awarded} опыта" + (" (💠 +50%)" if levelup.premium_applied else "")
 
 
-def apply_death_penalty(character: Character) -> int:
+def apply_death_penalty(character: Character, mult: float = 1.0) -> int:
     """Штраф смерти: теряется доля опыта ТЕКУЩЕГО уровня (без понижения уровня,
     не ниже 0). Возвращает величину потери для лорного сообщения.
     На потолке уровня терять нечего - ноль, в базу ничего не пишется."""
     if character.level >= bc.MAX_LEVEL:
         return 0
-    penalty = int(character.experience * bc.DEATH_XP_PENALTY)
+    penalty = int(character.experience * bc.DEATH_XP_PENALTY * mult)
     character.experience = max(0, character.experience - penalty)
     return penalty

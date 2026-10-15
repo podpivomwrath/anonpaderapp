@@ -15,8 +15,11 @@ from services import experience_service
 def apply_death(character: Character, now: datetime | None = None) -> int:
     """Применяет последствия смерти: штраф опыта + таймер респавна.
     Возвращает величину потерянного опыта (для лорного сообщения)."""
+    from services import pk_service
+
     now = now or datetime.now(timezone.utc)
-    penalty = experience_service.apply_death_penalty(character)
+    # Пепельное клеймо 3+: смерть отнимает больше опыта.
+    penalty = experience_service.apply_death_penalty(character, pk_service.death_xp_mult(character))
     character.respawn_at = now + timedelta(minutes=_respawn_minutes(character))
     return penalty
 
@@ -24,7 +27,12 @@ def apply_death(character: Character, now: datetime | None = None) -> int:
 def apply_pvp_death(character: Character, now: datetime | None = None) -> None:
     """Поражение в открытом PvP (патч 22): таймер респавна как при обычной
     смерти, но БЕЗ штрафа опыта — цена поражения уже уплачена трофеями."""
+    from services import pk_service
+
     now = now or datetime.now(timezone.utc)
+    # Пепельное клеймо 3+: и в PvP смерть стоит опыта (обычно - нет).
+    if pk_service.costly_death(character):
+        experience_service.apply_death_penalty(character, pk_service.death_xp_mult(character))
     character.respawn_at = now + timedelta(minutes=_respawn_minutes(character))
 
 

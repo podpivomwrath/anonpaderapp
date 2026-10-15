@@ -87,6 +87,19 @@ async def _pts_season_job() -> None:
         await db.commit()
 
 
+async def _pk_settle_job() -> None:
+    """Пепельное клеймо: записать сошедшие метки и вернуть награду за голову
+    тем, у кого меток не осталось (services/pk_service.py)."""
+    from services import pk_service
+    from services.db import get_session_factory
+
+    async with get_session_factory()() as db:
+        refunds = await pk_service.settle_all(db)
+        await db.commit()
+    if refunds:
+        logger.info("Клеймо: вернули награду {}", refunds)
+
+
 async def run() -> None:
     settings = get_settings()
     logger.remove()
@@ -327,6 +340,9 @@ async def run() -> None:
     respawn_scheduler.add_job(
         _pts_season_job, "cron", hour=0, minute=7, timezone="Europe/Moscow",
         id="pts_season", max_instances=1, coalesce=True,
+    )
+    respawn_scheduler.add_job(
+        _pk_settle_job, "interval", minutes=10, id="pk_settle", max_instances=1, coalesce=True,
     )
 
     # Биржа: точка графика - курс на закрытие дня (снимки закрытых дней).

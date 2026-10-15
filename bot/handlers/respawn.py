@@ -20,6 +20,7 @@ from bot.pvp_texts import PVP_RESPAWN_LORE
 from bot.vk_media import photo_attachment
 from game.world import flavor
 from game.world import world_config as wc
+from game.world import grid
 from models import Character, User
 from services import death_service, guild_territory_service, screen_service, vitals_service
 from services.db import get_session_factory
@@ -81,6 +82,20 @@ async def register_death(peer_id: int, respawn_at: datetime, xp_lost: int = 0) -
 CHAPEL_RESPAWN_TEXT = "⛪ Ты приходишь в себя у часовни своей гильдии. Колокол ещё гудит."
 
 
+def _outside_gate(region: str) -> tuple[int, int]:
+    """Ближайшая к Монолиту клетка у стен родного города - не город."""
+    cx, cy = wc.CITY_COORDS[region]
+    best = None
+    for dx in (-1, 0, 1):
+        for dy in (-1, 0, 1):
+            x, y = cx + dx, cy + dy
+            if (dx or dy) and grid.in_bounds(x, y) and grid.city_region_at(x, y) is None:
+                key = grid.monolith_distance(x, y)
+                if best is None or key < best[0]:
+                    best = (key, (x, y))
+    return best[1] if best else (cx, cy)
+
+
 async def _field_keyboard(peer_id: int) -> str | None:
     """Клавиатура клетки, где игрок очнулся: часовня стоит в поле, и
     площадь города тут неуместна."""
@@ -118,6 +133,14 @@ async def scan() -> None:
                 character.pos_x, character.pos_y = wc.CITY_COORDS[character.region]
                 # Гильдии: кто выбрал часовню, встаёт у неё, а не в городе.
                 chapel = None
+                from services import pk_service
+
+                if pk_service.city_banned(character):
+                    # Клеймо 20+: стража не пускает - встаёт у ворот.
+                    character.pos_x, character.pos_y = _outside_gate(character.region)
+                    await screen_service.set_screen(db, character, None)
+                    to_revive.append((vk_id, None))
+                    continue
                 if character.respawn_at_chapel and character.guild_id is not None:
                     chapel = await guild_territory_service.chapel_cell(db, character.guild_id)
                     if chapel is not None:
