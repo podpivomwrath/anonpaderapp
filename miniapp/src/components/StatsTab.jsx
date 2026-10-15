@@ -41,7 +41,9 @@ const DERIVED_DEFS = [
     key: 'support_power',
     clientKey: 'supportPower',
     label: '✨ Сила поддержки',
-    format: (v) => (v + EPS).toFixed(2),
+    // Доля от макс. HP (0.005 за очко Воли), а не плоское число: в виде 0.37
+    // было непонятно, что это и к чему применяется.
+    format: (v) => `${(v * 100 + EPS).toFixed(1)}% HP`,
   },
   {
     key: 'poison_power',
@@ -229,6 +231,16 @@ export default function StatsTab({ character, onCharacterUpdate }) {
             </div>
           );
         })()}
+        <Caption level="1" style={{ padding: '0 16px 12px', opacity: 0.7 }}>
+          ✨ Сила поддержки - 0,5% от макс. HP за каждое очко Воли. Сейчас работает только у Тёмного мистика:
+          Оберег ставит щит на 85% этой доли, Круг тьмы лечит каждого союзника на 150% (без группы - себя).
+          {character.subclass === 'dark_mystic' && (
+            <>
+              {' '}У тебя без бонусов талантов: щит ~{Math.round(previewDerived.maxHp * previewDerived.supportPower * 0.85)} HP,
+              круг ~{Math.round(previewDerived.maxHp * previewDerived.supportPower * 1.5)} HP.
+            </>
+          )}
+        </Caption>
       </Group>
 
       {errorMsg && (
