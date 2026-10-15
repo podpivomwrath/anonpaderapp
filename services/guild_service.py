@@ -343,11 +343,19 @@ async def _upsert_invite(
     await db.flush()
 
 
+#: Отметка «гильдия отказала» в guild_invites (без своей таблицы).
+REFUSED = "refused"
+
+
 async def apply(db: AsyncSession, character: Character, guild_id: int) -> Guild:
     _check_free(character)
     guild = await db.get(Guild, guild_id)
     if guild is None:
         raise GuildError("Такой гильдии нет.")
+    refused = await _live_invite(db, guild.id, character.id, REFUSED)
+    if refused is not None:
+        left = max(1, -(-int((aware(refused.expires_at) - now_utc()).total_seconds()) // 60))
+        raise GuildError(f"Гильдия отказала тебе. Снова подать заявку в неё можно через {left} мин.")
     await _upsert_invite(db, guild.id, character.id, "apply", character.id)
     return guild
 
@@ -371,7 +379,7 @@ async def invites_for(db: AsyncSession, character_id: int) -> list[tuple[GuildIn
     rows = (
         await db.execute(
             select(GuildInvite, Guild).join(Guild, Guild.id == GuildInvite.guild_id)
-            .where(GuildInvite.character_id == character_id)
+            .where(GuildInvite.character_id == character_id, GuildInvite.kind != REFUSED)
         )
     ).all()
     now = now_utc()
@@ -401,6 +409,7 @@ async def accept_invite(db: AsyncSession, character: Character, guild_id: int) -
 async def decline_invite(db: AsyncSession, character: Character, guild_id: int) -> None:
     await db.execute(delete(GuildInvite).where(
         GuildInvite.guild_id == guild_id, GuildInvite.character_id == character.id,
+        GuildInvite.kind != REFUSED,
     ))
 
 
@@ -422,8 +431,15 @@ async def decline_application(db: AsyncSession, actor: Character, character_id: 
         raise GuildError("Заявки разбирают офицеры и выше.")
     await db.execute(delete(GuildInvite).where(
         GuildInvite.guild_id == guild.id, GuildInvite.character_id == character_id,
-        GuildInvite.kind == "apply",
+        GuildInvite.kind.in_(("apply", REFUSED)),
     ))
+    # Отказ помним REAPPLY_AFTER_DECLINE_MINUTES: всё это время в эту
+    # гильдию новая заявка не подаётся (2026-10-15, решение владельца).
+    db.add(GuildInvite(
+        guild_id=guild.id, character_id=character_id, kind=REFUSED, from_character_id=actor.id,
+        expires_at=now_utc() + timedelta(minutes=gc.REAPPLY_AFTER_DECLINE_MINUTES),
+    ))
+    await db.flush()
 
 
 async def _remove_member(db: AsyncSession, member: GuildMember, character: Character) -> None:

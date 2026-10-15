@@ -659,3 +659,23 @@ async def test_gold_tax_goes_to_treasury(db_session, make_character) -> None:
     loner = await make_character(level=30)
     await wallet_service.deposit(db_session, loner.id, "farm", 1000)
     assert (await wallet_service.get_wallet(db_session, loner.id)).farm_currency == 1000
+
+
+async def test_declined_applicant_waits_15_minutes(db_session, make_character) -> None:
+    """2026-10-15: после отказа в ту же гильдию заявку можно подать только
+    через 15 минут; отказ не виден ни в заявках, ни в приглашениях игрока."""
+    from datetime import timedelta
+
+    guild, leader = await _found(db_session, make_character)
+    applicant = await make_character(level=22)
+    await guild_service.apply(db_session, applicant, guild.id)
+    await guild_service.decline_application(db_session, leader, applicant.id)
+    assert await guild_service.applications_of(db_session, guild.id) == []
+    assert await guild_service.invites_for(db_session, applicant.id) == []
+    with pytest.raises(GuildError, match="15 мин"):
+        await guild_service.apply(db_session, applicant, guild.id)
+    row = await guild_service._live_invite(db_session, guild.id, applicant.id, guild_service.REFUSED)
+    row.expires_at = row.expires_at - timedelta(minutes=16)
+    await db_session.flush()
+    await guild_service.apply(db_session, applicant, guild.id)
+    assert [c.id for _i, c in await guild_service.applications_of(db_session, guild.id)] == [applicant.id]
