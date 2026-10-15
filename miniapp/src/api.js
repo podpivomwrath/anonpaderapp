@@ -363,6 +363,16 @@ export const tradeAction = (action, params = {}) =>
 
 export const getShop = () => request('/shop');
 
+// Самоцветы за рубли через ЮKassa (2026-10-15).
+export const getPayments = () => request('/payments');
+
+export const createPayment = (packId) =>
+  request('/payments', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ pack_id: packId, from: IN_VK ? 'vk' : 'web' }),
+  });
+
 export const buyShop = (item, days) =>
   request('/shop', {
     method: 'POST',

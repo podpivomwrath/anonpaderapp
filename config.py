@@ -72,6 +72,12 @@ class Settings(BaseSettings):
     # Веб-версия на своём домене (2026-10-15): ID приложения VK ID для входа
     # на сайте (id.vk.com). Пусто - вход на сайте выключен.
     vk_id_client_id: str = Field(default="", description="ID приложения VK ID для входа на сайте")
+    # ЮKassa (2026-10-15): shopId и секретный ключ магазина. Пусто - покупка
+    # самоцветов за рубли выключена. Вписывает владелец сам.
+    yookassa_shop_id: str = Field(default="", description="shopId магазина ЮKassa")
+    yookassa_secret_key: str = Field(default="", description="Секретный ключ магазина ЮKassa")
+    # Куда вернуть игрока после оплаты: сайт или мини-апп внутри VK.
+    site_url: str = Field(default="https://monolithgame.ru", description="Адрес сайта игры")
 
     # --- Админка (патч 27) ---
     # Единственный администратор — сверяется с verified vk_id на каждом запросе.

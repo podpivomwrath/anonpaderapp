@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Button, Div, Group, Header, Placeholder, Spinner } from '@vkontakte/vkui';
-import { buyShop, getShop } from '../api.js';
+import { IN_VK, buyShop, createPayment, getPayments, getShop } from '../api.js';
 
 /**
  * Магазин (2026-10-13): товары за самоцветы квадратными карточками. Нажатие
@@ -112,6 +112,71 @@ function BuySheet({ item, gems, onClose, onBought }) {
   );
 }
 
+// Самоцветы за рубли (ЮKassa, 2026-10-15): пакет -> страница оплаты ЮKassa.
+// Самоцветы приходят, когда ЮKassa подтвердит оплату, - бот пишет об этом.
+function GemPacks() {
+  const [data, setData] = useState(null);
+  const [busy, setBusy] = useState(null);
+  const [error, setError] = useState(null);
+  const returned = !IN_VK && new URLSearchParams(window.location.search).has('paid');
+
+  useEffect(() => {
+    getPayments().then(setData).catch(() => setData(null));
+  }, []);
+
+  if (!data) return null;
+
+  const buy = async (packId) => {
+    setBusy(packId);
+    setError(null);
+    try {
+      const { url } = await createPayment(packId);
+      if (IN_VK) window.open(url, '_blank');
+      else window.location.href = url;
+    } catch (e) {
+      setError(e.message || 'Не удалось начать оплату.');
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  return (
+    <Group header={<Header>💎 Самоцветы</Header>}>
+      <Div>
+        <p className="craft-hint">1 самоцвет = 1 ₽. Оплата через ЮKassa, самоцветы приходят сразу после оплаты.</p>
+        {returned && <p className="shop-notice">Оплата обрабатывается - как только ЮKassa её подтвердит, бот напишет в сообщения.</p>}
+        {!data.enabled && <p className="craft-hint">Покупка за рубли скоро откроется.</p>}
+        {error && <p style={{ color: 'var(--vkui--color_text_negative)' }}>{error}</p>}
+      </Div>
+      <div className="shop-grid">
+        {data.packs.map((p) => (
+          <button
+            type="button" key={p.id} className="shop-card"
+            disabled={!data.enabled || busy !== null}
+            onClick={() => buy(p.id)}
+          >
+            <span className="shop-card__emoji" aria-hidden="true">💎</span>
+            <b className="shop-card__title">{p.name}</b>
+            <span className="shop-card__price">{money(p.gems)} 💎 · {money(p.rub)} ₽</span>
+            {busy === p.id && <Spinner size="s" />}
+          </button>
+        ))}
+      </div>
+      {data.history.length > 0 && (
+        <Div>
+          <p className="craft-hint"><b>Твои покупки</b></p>
+          {data.history.map((h, i) => (
+            <p key={i} className="craft-hint">
+              {new Date(h.at).toLocaleString('ru-RU', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
+              {' · '}{money(h.gems)} 💎 за {money(h.rub)} ₽ · {h.credited ? 'зачислено' : (h.status === 'canceled' ? 'отменено' : 'ждёт подтверждения')}
+            </p>
+          ))}
+        </Div>
+      )}
+    </Group>
+  );
+}
+
 export default function ShopTab({ onWallet, onBought }) {
   const [data, setData] = useState(null);
   const [status, setStatus] = useState('loading');
@@ -152,6 +217,7 @@ export default function ShopTab({ onWallet, onBought }) {
           ))}
         </div>
       </Group>
+      <GemPacks />
       {item && (
         <BuySheet
           item={item}

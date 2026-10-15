@@ -37,6 +37,7 @@ from models.guild import (
 from models.item import Inventory, Item, ItemUpgradeHistory
 from models.lootbox import CharacterLootbox
 from models.mining import CharacterCraftTool, CharacterOre, MineVein, MiningEvent
+from models.payment import GemPayment
 from models.mount import CharacterMount, MountTravel
 from models.promo import PromoActivation, PromoCode
 from models.pvp import PvpBattle
@@ -132,4 +133,5 @@ __all__ = [
     "Wallet",
     "CharacterEventEffect",
     "EventTrail",
+    "GemPayment",
 ]
