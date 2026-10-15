@@ -187,7 +187,12 @@ async def run() -> None:
         "полученные награды сохранены.",
         "рейд",
     )
-    redis = aioredis.from_url(settings.redis_url, decode_responses=True)
+    # Пул, который ЖДЁТ свободное соединение, а не падает (2026-10-16): после
+    # рестарта VK присылает разом все события за время простоя, и обычный пул
+    # на 100 соединений сыпал MaxConnectionsError - бот минуту не отвечал.
+    redis = aioredis.Redis(connection_pool=aioredis.BlockingConnectionPool.from_url(
+        settings.redis_url, decode_responses=True, max_connections=400, timeout=30,
+    ))
 
     tick_engine = TickEngine(
         RedisActionStore(redis),
