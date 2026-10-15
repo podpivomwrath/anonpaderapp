@@ -224,12 +224,10 @@ function Trade({ data, busy, act }) {
             <p className="craft-hint">Торговля открывается с {data.min_level} уровня.</p>
           ) : (
             <>
-              <p className="craft-hint">
-                Фирма стоит {money(data.firm_price)} золота. Название - {data.name_min}-{data.name_max} символов,
-                уникальное, сменить его пока нельзя.
-              </p>
-              <NameForm busy={busy || data.gold < data.firm_price} min={data.name_min} max={data.name_max}
-                label={`Открыть за ${money(data.firm_price)}`} onSubmit={(name) => act('buy_firm', { name })} />
+              <p className="craft-hint">Фирма стоит {money(data.firm_price)} золота. Название дашь сразу после покупки.</p>
+              <Button size="l" stretched disabled={busy || data.gold < data.firm_price} onClick={() => act('buy_firm')}>
+                Открыть фирму за {money(data.firm_price)}
+              </Button>
             </>
           )}
         </Div>
@@ -239,12 +237,17 @@ function Trade({ data, busy, act }) {
 
   if (!firm.name) {
     return (
-      <Group header={<Header>🏛 Твоя повозка стала фирмой</Header>}>
+      <Group header={<Header>{firm.migrated ? '🏛 Твоя повозка стала фирмой' : '🏛 Название фирмы'}</Header>}>
         <Div>
+          {firm.migrated && (
+            <p className="guild-line">
+              Торговля теперь идёт удалённо: повозки ездят сами, а ты отправляешь их из этой вкладки. Улучшения и
+              уровень торговли сохранились, груз возмещён золотом.
+            </p>
+          )}
           <p className="guild-line">
-            Торговля теперь идёт удалённо: повозки ездят сами, а ты отправляешь их из этой вкладки. Улучшения и
-            уровень торговли сохранились, груз возмещён золотом. Осталось дать фирме название - уникальное, сменить
-            его пока нельзя.
+            Дай фирме название: {data.name_min}-{data.name_max} символов, уникальное, сменить его пока нельзя. Без
+            названия повозки не отправить.
           </p>
           <NameForm busy={busy} min={data.name_min} max={data.name_max} label="Назвать"
             onSubmit={(name) => act('name_firm', { name })} />

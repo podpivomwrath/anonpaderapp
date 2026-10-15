@@ -82,19 +82,21 @@ def _home(character: Character) -> str:
     return character.region
 
 
-async def buy_firm(db: AsyncSession, character: Character, name) -> TradeFirm:
+async def buy_firm(db: AsyncSession, character: Character, name=None) -> TradeFirm:
+    """Покупка фирмы. Название (решение владельца 2026-10-15) - сразу после
+    покупки отдельным шагом (name_firm); здесь - только если передано."""
     if character.level < tc.TRADE_MIN_LEVEL:
         raise TradeError(f"Торговать можно с {tc.TRADE_MIN_LEVEL} уровня.")
     home = _home(character)
     if await get_firm(db, character.id) is not None:
         raise TradeError("Фирма у тебя уже есть.")
-    name = await _check_name(db, name)
+    name = await _check_name(db, name) if name is not None else None
     try:
         await wallet_service.charge(db, character.id, "farm", tc.FIRM_PRICE)
     except wallet_service.NotEnoughCurrency:
         raise TradeError(f"Фирма стоит {tc.FIRM_PRICE} золота.") from None
     firm = TradeFirm(
-        character_id=character.id, name=name, name_key=name.lower(), trade_level=1, trade_xp=0,
+        character_id=character.id, name=name, name_key=name.lower() if name else None, trade_level=1, trade_xp=0,
         profit_total=0, notify_arrival=True, notify_orders=False,
     )
     db.add(firm)
@@ -104,7 +106,8 @@ async def buy_firm(db: AsyncSession, character: Character, name) -> TradeFirm:
 
 
 async def name_firm(db: AsyncSession, character: Character, name) -> TradeFirm:
-    """Название для фирмы, перенесённой со старой повозки. Менять пока нельзя."""
+    """Название фирмы - сразу после покупки или переноса со старой повозки.
+    Менять пока нельзя."""
     firm = await get_firm(db, character.id, lock=True)
     if firm is None:
         raise TradeError("Фирмы нет.")

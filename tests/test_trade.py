@@ -279,3 +279,14 @@ async def test_cart_position_along_path(db_session, make_character) -> None:
     mid = NOW + (sent.cart.arrives_at - NOW) / 2
     x, y = trade_service.position(sent.cart, mid)
     assert (x, y) not in (wc.CITY_COORDS["ridge"], wc.CITY_COORDS["docks"])
+
+
+async def test_buy_without_name_then_name(db_session, make_character) -> None:
+    """2026-10-15: фирму покупают без названия, название - следующим шагом."""
+    c = await trader(make_character)
+    firm = await trade_service.buy_firm(db_session, c)
+    assert firm.name is None and firm.name_key is None
+    with pytest.raises(trade_service.TradeError, match="название"):
+        await trade_service.dispatch(db_session, c, 1, "docks", "short", {}, NoLuck(), NOW)
+    await trade_service.name_firm(db_session, c, "Новая Лавка")
+    assert firm.name == "Новая Лавка" and firm.name_key == "новая лавка"

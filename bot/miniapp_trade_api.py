@@ -158,7 +158,9 @@ async def _state(db, character) -> dict:
     carts = await trade_service.carts(db, character.id)
     nxt = trade_service.next_slot_need(len(carts))
     state["firm"] = {
-        "name": firm.name, "trade_level": firm.trade_level, "trade_xp": firm.trade_xp,
+        "name": firm.name, "trade_level": firm.trade_level,
+        # Перенесена со старой повозки (ещё без названия, но с историей).
+        "migrated": firm.name is None and (firm.trade_level > 1 or firm.profit_total > 0 or firm.trade_xp > 0), "trade_xp": firm.trade_xp,
         "xp_next": tc.xp_to_next(firm.trade_level),
         "sell_bonus_pct": round(tc.sell_bonus(firm.trade_level) * 100),
         "profit_total": firm.profit_total,
@@ -211,8 +213,8 @@ async def handle_post(request: web.Request) -> web.Response:
         await db.commit()  # вход игрока - своей транзакцией, как на бирже
         try:
             if action == "buy_firm":
-                firm = await trade_service.buy_firm(db, character, body.get("name"))
-                done = f"🏛 Торговая фирма «{firm.name}» открыта. Первая повозка ждёт в родном городе."
+                await trade_service.buy_firm(db, character)
+                done = "🏛 Торговая фирма открыта, первая повозка ждёт в родном городе. Осталось дать фирме название."
             elif action == "name_firm":
                 firm = await trade_service.name_firm(db, character, body.get("name"))
                 done = f"🏛 Фирма теперь называется «{firm.name}»."
