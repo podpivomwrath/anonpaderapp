@@ -820,6 +820,56 @@ async def on_group_battle_finished(session_id: int, result: TickResult) -> None:
             await respawn_handlers.register_death(p.peer_id, respawn_at, defeat.xp_lost)
 
 
+async def interrupt_for_pvp(victim_peer_id: int) -> None:
+    """На участника группового боя с мобами напал игрок (2026-10-15, решение
+    владельца): бой с мобами обрывается для всей группы без итога - ни
+    наград, ни потерь. Здоровье каждого сохраняется как было на этот ход.
+    Остальным участникам - весть и их обычные кнопки на клетке."""
+    battle_id = _peer_battle.get(victim_peer_id)
+    if battle_id is None:
+        return
+    battle = _battles.get(battle_id)
+    state = _engine.sessions.get(battle_id) if _engine is not None else None
+    hp_now = {}
+    if state is not None:
+        hp_now = {cid: c.current_hp for cid, c in state.combatants.items() if cid in (battle.participants if battle else {})}
+    if _engine is not None:
+        _engine.abort_session(battle_id)
+    _drop_stale(battle_id)
+    if battle is None:
+        return
+    victim_name = next((p.name for p in battle.participants.values() if p.peer_id == victim_peer_id), "?")
+    has_mount_by_cid: dict[int, bool] = {}
+    positions: dict[int, tuple[int, int]] = {}
+    async with get_session_factory()() as db:
+        for cid in battle.participants:
+            character = await db.get(Character, cid)
+            if character is None:
+                continue
+            await scene_event_service.finish_fight_effects(db, cid)
+            positions[cid] = (character.pos_x, character.pos_y)
+            has_mount_by_cid[cid] = await mount_service.has_any_mount(db, cid)
+            hp = hp_now.get(cid)
+            stats = await db.scalar(select(CharacterStats).where(CharacterStats.character_id == cid))
+            if hp is not None and hp > 0 and stats is not None:
+                vit_bonus = (await item_service.compute_gear_bonus(db, cid)).get("vit", 0)
+                vitals_service.set_hp(character, stats, hp, vit_bonus)
+        await db.commit()
+    for cid, p in battle.participants.items():
+        if p.peer_id == victim_peer_id:
+            continue
+        pos = positions.get(cid, (0, 0))
+        keyboard = movement_keyboard(*pos, p.peer_id, has_mount=has_mount_by_cid.get(cid, False))
+        try:
+            await _bot_api.messages.send(
+                peer_id=p.peer_id, random_id=0,
+                message=f"⚔️ На {victim_name} напали! Бой с мобами прерван - без наград и без потерь.",
+            )
+            await _send_location_summary(cid, p.peer_id, keyboard)
+        except Exception:
+            logger.warning("Прерывание группового боя: не доставлено {}", p.peer_id)
+
+
 async def _tell_others(battle, cid: int, text: str) -> None:
     """Свиток действует на всю сторону (или на всех врагов) - видеть это
     должны все в бою, а не только прочитавший."""

@@ -403,13 +403,31 @@ def _battle_scene_line(battle: Battle) -> str:
 # VK тут не при чём даже на людной клетке. Длина сообщения теоретически растёт
 # с числом игроков на клетке, но лимит VK на текст (4096 симв.) недостижим на
 # практике при разумной плотности игроков.
-def _scene_text(solo: list[Character], battles: list[tuple[int, Battle]], tags: dict[int, str] | None = None) -> str:
+async def _busy_marks(db, characters: list[Character]) -> dict[int, str]:
+    """Кто на клетке сейчас дерётся не в PvP (2026-10-15): бой с мобами
+    нападение обрывает, разлом и рейд - нет."""
+    from bot.handlers import group_combat, raid_combat
+
+    marks = {}
+    for c in characters:
+        peer = await onboarding_svc.vk_id_for_character(db, c.id)
+        if peer is None:
+            continue
+        if raid_combat.has_active_battle(peer):
+            marks[c.id] = " · 🌀 в разломе, напасть нельзя"
+        elif combat_handlers.has_active_encounter(peer) or group_combat.has_active_group_battle(peer):
+            marks[c.id] = " · ⚔️ в бою с мобами"
+    return marks
+
+
+def _scene_text(solo: list[Character], battles: list[tuple[int, Battle]], tags: dict[int, str] | None = None,
+                busy: dict[int, str] | None = None) -> str:
     if not solo and not battles:
         return ALONE_ON_CELL
     lines = ["👁 Ты оглядываешься.", "", "Здесь есть кто-то ещё:"]
     idx = 1
     for c in solo:
-        lines.append(f"{idx}. {_class_line(c, tags)}")
+        lines.append(f"{idx}. {_class_line(c, tags)}{(busy or {}).get(c.id, '')}")
         idx += 1
     for _, battle in battles:
         lines.append(f"{idx}. {_battle_scene_line(battle)}")
@@ -548,8 +566,9 @@ async def look_around(message: Message) -> None:
             return
         solo, battles = await _scene_at(db, character)
         tags = await _guild_tags(db, solo)
+        busy = await _busy_marks(db, solo)
         _remember_look(peer_id, character, solo, battles)
-    await message.answer(_scene_text(solo, battles, tags))
+    await message.answer(_scene_text(solo, battles, tags, busy))
 
 
 def _peaceful_scene_text(solo: list[Character], tags: dict[int, str] | None = None) -> str:
@@ -671,11 +690,11 @@ async def attack_command(message: Message, target: str) -> None:
 
 
 async def _start_forced_duel(db, attacker, attacker_peer_id, victim, victim_peer_id) -> None:
-    from bot.handlers import group_combat, raid_combat
+    from bot.handlers import raid_combat
     with transition([attacker_peer_id, victim_peer_id]):
-        if (raid_combat.has_active_battle(victim_peer_id)
-                or group_combat.has_active_group_battle(victim_peer_id)
-                or has_active_battle(victim_peer_id)):
+        # Бой с мобами при исследовании (соло и группой) нападение обрывает;
+        # рейд и разлом - нет (2026-10-15, решение владельца).
+        if raid_combat.has_active_battle(victim_peer_id) or has_active_battle(victim_peer_id):
             raise ActivityBusy("Цель уже участвует в другом бою.")
         await db.flush()
         await db.refresh(victim)
@@ -687,10 +706,17 @@ async def _start_forced_duel(db, attacker, attacker_peer_id, victim, victim_peer
 async def _start_forced_duel_impl(
     db, attacker: Character, attacker_peer_id: int, victim: Character, victim_peer_id: int
 ) -> None:
+    from bot.handlers import group_combat
+
     if combat_handlers.has_active_encounter(victim_peer_id):
         await combat_handlers.interrupt_for_pvp(victim_peer_id)
         await _bot_api.messages.send(
             peer_id=victim_peer_id, message="⚔️ На тебя напали! Бой с тварью прерван.", random_id=0,
+        )
+    if group_combat.has_active_group_battle(victim_peer_id):
+        await group_combat.interrupt_for_pvp(victim_peer_id)
+        await _bot_api.messages.send(
+            peer_id=victim_peer_id, message="⚔️ На тебя напали! Бой группы с мобами прерван.", random_id=0,
         )
 
     attacker_combatant = await _build_combatant_for(db, attacker)

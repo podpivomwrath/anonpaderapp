@@ -155,3 +155,44 @@ async def test_world_actions_blocked_in_party_battle(monkeypatch, db_session, ma
     assert len(replies) == 3
     assert player.travel_arrives_at is None
     assert 777 not in world._resting and 777 not in world._exploring
+
+
+async def test_pvp_attack_interrupts_group_pve_without_result(monkeypatch, db_session, make_character):
+    """2026-10-15: нападение на участника группового боя с мобами обрывает
+    бой для всей группы без итога; HP сохраняется, остальным - весть."""
+    from bot.handlers import group_combat as gc
+
+    a = await make_character(region="ridge")
+    b = await make_character(region="ridge")
+    for c in (a, b):
+        c.pos_x, c.pos_y = 5, 20
+    battle_id = -9999
+    battle = gc.GroupBattle(group_id=4242, participants={
+        a.id: gc.Participant(a.id, 501, a.name, a.base_class, None),
+        b.id: gc.Participant(b.id, 502, b.name, b.base_class, None),
+    }, mob_ids={1})
+    gc._battles[battle_id] = battle
+    gc._peer_battle.update({501: battle_id, 502: battle_id})
+    gc._active_group_ids.add(4242)
+    aborted = []
+
+    class Engine:
+        sessions = {battle_id: SimpleNamespace(combatants={a.id: SimpleNamespace(current_hp=50), b.id: SimpleNamespace(current_hp=40)})}
+        def abort_session(self, sid): aborted.append(sid)
+
+    class Context:
+        async def __aenter__(self): return db_session
+        async def __aexit__(self, *args): pass
+
+    sent = []
+    async def send(**kw): sent.append(kw)
+    async def summary(*args): pass
+    monkeypatch.setattr(gc, "_engine", Engine())
+    monkeypatch.setattr(gc, "_bot_api", SimpleNamespace(messages=SimpleNamespace(send=send)))
+    monkeypatch.setattr(gc, "get_session_factory", lambda: Context)
+    monkeypatch.setattr(gc, "_send_location_summary", summary)
+    await gc.interrupt_for_pvp(501)
+    assert aborted == [battle_id]
+    assert not gc.has_active_group_battle(501) and not gc.has_active_group_battle(502)
+    assert not gc.is_group_fighting(4242)
+    assert [m["peer_id"] for m in sent] == [502] and "напали" in sent[0]["message"]
