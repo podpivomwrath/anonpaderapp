@@ -89,7 +89,7 @@ def _consume_heal_item(ctx: SkillContext, item_id: str | None) -> None:
     )
 
 
-def _dies_this_tick(mob: CombatantState, incoming: list) -> bool:
+def _dies_this_tick(mob: CombatantState, incoming: list, session: CombatSessionState | None = None) -> bool:
     """Умрёт ли моб от ударов этого хода - тогда он не бьёт в ответ.
 
     Раньше сравнивалась сырая сумма урона с HP. С лимитом урона за удар и
@@ -98,6 +98,11 @@ def _dies_this_tick(mob: CombatantState, incoming: list) -> bool:
     равно пропускал ход, будто умер. Здесь урон считается так же, как его
     потом применит движок: с лимитом за удар, за вычетом щита, и моб с
     «последним вздохом» не умирает вовсе.
+
+    2026-10-16: и с поправкой за разницу уровней (моб выше игрока получает
+    меньше) - она применяется к ударам позже этой проверки. Без неё удар
+    «на бумаге» добивал моба, моб выживал - и всё равно пропускал ход, а его
+    замах на следующем ходу считался сбитым контролем (репорт #79).
     """
     if mob.has_effect(EffectKind.LAST_BREATH) or mob.hp_floor > 0:
         return False
@@ -105,6 +110,10 @@ def _dies_this_tick(mob: CombatantState, incoming: list) -> bool:
     total = 0
     for hit in incoming:
         amount = hit.amount
+        source = session.combatants.get(hit.source_id) if session is not None else None
+        if source is not None and source.kind == "character" and amount > 0:
+            _, taken_mult = formulas.level_diff_modifiers(mob.level, source.level)
+            amount = max(round(amount * taken_mult), 1)
         if cap > 0 and amount > 0:
             amount = min(amount, max(round(mob.max_hp * cap), 1))
         total += amount
@@ -345,7 +354,7 @@ def resolve_tick(
             # вывода «теряет ход», без исключения для лингера/свежей заморозки.
             result.lines.append(f"{mob.name} теряет ход ❄️")
             continue
-        if session.mode == CombatMode.PVE and _dies_this_tick(mob, incoming_by_target.get(mob.id, [])):
+        if session.mode == CombatMode.PVE and _dies_this_tick(mob, incoming_by_target.get(mob.id, []), session):
             continue  # уже мёртв по итогам этого хода — не бьёт (патч 25, п.3)
         if mob.scripted_hit is not None:
             # Патч 53: рейд-босс с собственным сценарием хода (ротация
