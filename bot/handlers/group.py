@@ -313,10 +313,17 @@ async def notify_arrival(db, character) -> None:
     snapshot = await gs.get_group_snapshot(db, character.id)
     if snapshot is None:
         return
-    here = [
-        m for m in snapshot.members
-        if m.id != character.id and (m.pos_x, m.pos_y) == (character.pos_x, character.pos_y)
-    ]
+    from services import mount_service
+
+    here = []
+    for m in snapshot.members:
+        if m.id == character.id or (m.pos_x, m.pos_y) != (character.pos_x, character.pos_y):
+            continue
+        # Кто сам едет верхом, лишь проезжает эту клетку - ему весть ни к чему.
+        travel = await mount_service.active_travel(db, m.id)
+        if travel is not None and travel.status == "traveling":
+            continue
+        here.append(m)
     peers = await _member_peers(db, here)
     _send_later(peers, f"👥 {character.name} теперь на твоей клетке ({character.pos_x}; {character.pos_y}).")
 

@@ -603,9 +603,12 @@ async def scan() -> None:
 
                 # Башня гильдии замечает и тех, кто проезжает мимо.
                 await guild_handlers.on_arrival(db, character)
-                from bot.handlers import group as group_handlers
+                # Группе - только когда всадник остановился (2026-10-15): на
+                # каждой клетке пути весть «теперь на твоей клетке» была спамом.
+                if step.arrived or step.ambushed:
+                    from bot.handlers import group as group_handlers
 
-                await group_handlers.notify_arrival(db, character)
+                    await group_handlers.notify_arrival(db, character)
 
             if step.ambushed:
                 stats = await _stats(db, character.id)

@@ -28,7 +28,7 @@ from bot import (
     raid_key_texts,
     raid_texts,
 )
-from bot.activity import activity_action
+from bot.activity import activity_action, blocked_reason
 from bot.battle_keyboard import active_battle_keyboard, in_any_battle
 from bot.handlers import appraiser as appraiser_handlers
 from bot.handlers import combat as combat_handlers
@@ -592,6 +592,11 @@ async def gate_exit_direction(message: Message) -> None:
         region = grid.city_region_at(character.pos_x, character.pos_y)
         if region is None:
             return  # уже вышел раньше — устаревшая клавиатура
+        # Занят (бой, отдых, поездка) - за ворота не выходим (2026-10-15).
+        reason = await blocked_reason(db, character, message.peer_id)
+        if reason:
+            await message.answer(reason)
+            return
         nx, ny = character.pos_x + dx, character.pos_y + dy
         if not grid.in_bounds(nx, ny):
             return  # защитная проверка на случай устаревшей клавиатуры
