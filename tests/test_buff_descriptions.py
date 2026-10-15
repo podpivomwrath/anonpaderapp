@@ -1,5 +1,7 @@
 """Сухие описания микробаффов для вкладки «Испытания» (патчи 48-49)."""
 
+import re
+
 from game.combat import balance_config as bc
 from game.content_loader import load_content
 from game.economy import buff_descriptions
@@ -35,7 +37,7 @@ def test_description_reflects_live_config_value() -> None:
 
     # Патч 49, ч.1: итоговое значение, не прибавка — "20% вместо 12%", не "+8pp".
     text2 = buff_descriptions.describe(buffs["blood_knight_thirst"])
-    assert f"{round(bc.BLOOD_KNIGHT_THIRST_LOW_HP_LIFESTEAL_BONUS * 100)} процентных пунктов" in text2
+    assert f"{round(bc.BLOOD_KNIGHT_THIRST_LOW_HP_LIFESTEAL_BONUS * 100)}%" in text2
 
 
 def test_no_forbidden_abbreviations_anywhere() -> None:
@@ -45,7 +47,7 @@ def test_no_forbidden_abbreviations_anywhere() -> None:
     for buff_id, buff in buffs.items():
         text = buff_descriptions.describe(buff)
         assert " pp" not in text and "pp." not in text and not text.endswith("pp"), buff_id
-        assert "пп" not in text, buff_id
+        assert not re.search(r"\bпп\b", text), buff_id
         assert "%%" not in text, buff_id
 
 
@@ -63,7 +65,7 @@ def test_final_value_shown_not_delta_for_percentage_stat_bonuses() -> None:
 def test_category_label_maps_known_categories() -> None:
     assert buff_descriptions.category_label("damage") == "Урон"
     assert buff_descriptions.category_label("defense") == "Оборона"
-    assert buff_descriptions.category_label("control_utility") == "Контроль/утилита"
+    assert buff_descriptions.category_label("control_utility") == "Контроль и польза"
     assert buff_descriptions.category_label("group_support") == "Групповая поддержка"
 
 

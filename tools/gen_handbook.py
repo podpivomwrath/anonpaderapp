@@ -35,25 +35,25 @@ LORE = json.loads(
 )["subclass_select"]["path_descriptions"]
 
 CLASS_TITLES = {"warrior": "Воин", "rogue": "Разбойник", "mage": "Маг"}
-STAT_TITLES = {"STR": "Сила", "AGI": "Ловкость", "INT": "Разум", "VIT": "Живучесть", "WIL": "Воля"}
-PRIMARY_TITLES = {"str": "Сила", "agi": "Ловкость", "int": "Разум"}
+STAT_TITLES = {"STR": "Сила", "AGI": "Ловкость", "INT": "Интеллект", "VIT": "Выносливость", "WIL": "Воля"}
+PRIMARY_TITLES = {"str": "Сила", "agi": "Ловкость", "int": "Интеллект"}
 ROLE_TITLES = {
     "dd": "урон", "tank": "танк", "healer": "лекарь", "support": "поддержка",
 }
 CATEGORY_TITLES = {
     "damage": "Урон",
     "defense": "Оборона",
-    "control_utility": "Контроль и утилита",
+    "control_utility": "Контроль и польза",
     "group_support": "Групповая поддержка",
     "healing": "Лечение",
 }
 EFFECT_TITLES = {
-    "stun": "оглушение",
-    "target_vuln": "уязвимость на цели",
-    "self_dodge_buff": "уклонение себе",
-    "self_damage_buff": "усиление своего урона",
-    "double_hit": "двойной удар",
-    "guaranteed_crit": "гарантированный крит",
+    "stun": "оглушает цель: она пропускает ход",
+    "target_vuln": "урон по цели от всех больше на",
+    "self_dodge_buff": "шанс уклониться +",
+    "self_damage_buff": "весь твой урон больше на",
+    "double_hit": "бьёт два раза подряд",
+    "guaranteed_crit": "всегда критический удар",
 }
 
 
@@ -66,96 +66,100 @@ def _s(skill_id: str):
 
 
 def skill_mechanics() -> dict[str, str]:
-    """Что навык ДЕЛАЕТ, словами и с живыми числами.
+    """Что навык ДЕЛАЕТ - простыми словами и с живыми числами (2026-10-15:
+    без жаргона, понятно самому неопытному игроку).
 
     Флейвор-текст настроение передаёт, но механику не объясняет, а у половины
     навыков подклассов эффект самописный и по полю effect не читается вовсе.
     """
     return {
         "guardian_shield_bash":
-            f"Провокация на {turns(bc.PROVOKE_PVP_DURATION_TICKS)}: в PvE мобы переключаются на "
-            f"Стража, в PvP чужие цели получают на {pct(bc.PROVOKE_PVP_DAMAGE_REDUCTION)} меньше урона.",
+            f"Провокация на {turns(bc.PROVOKE_PVP_DURATION_TICKS)}. В бою с мобами все мобы бьют только тебя. "
+            f"В бою с игроками противник, который бьёт не тебя, наносит на "
+            f"{pct(bc.PROVOKE_PVP_DAMAGE_REDUCTION)} меньше урона.",
         "guardian_block":
-            f"Каждый удар по тебе слабее на {pct(_s('guardian_block').effect_value)}, и за каждый "
-            f"такой удар лечишься на {pct(bc.GUARDIAN_BLOCK_HEAL_PCT)} максимума здоровья. "
-            f"Действует в ход применения и ещё {turns(_s('guardian_block').effect_duration)}.",
+            f"Глухая оборона: каждый удар по тебе на {pct(_s('guardian_block').effect_value)} слабее, "
+            f"а за каждый такой удар ты восстанавливаешь {pct(bc.GUARDIAN_BLOCK_HEAL_PCT)} своего "
+            f"максимального здоровья. Действует в ход применения и ещё {turns(_s('guardian_block').effect_duration)}.",
         "guardian_stonegrip":
-            "Оглушает цель. Как и любой контроль, оставляет после себя след «по холоду» - "
-            "союзный Элементалист успевает добить Схождением с гарантированным критом.",
+            "Оглушает цель: она пропускает ход. Если союзный Элементалист сразу следующим ходом "
+            "ударит её Схождением стихий, удар будет критическим.",
         "guardian_unbreakable":
-            f"Один удар не может снять больше {pct(_s('guardian_unbreakable').effect_value)} "
-            f"максимума здоровья. Держится {turns(_s('guardian_unbreakable').effect_duration)}.",
+            f"{turns(_s('guardian_unbreakable').effect_duration).capitalize()} ни один удар не может снять "
+            f"с тебя больше {pct(_s('guardian_unbreakable').effect_value)} максимального здоровья за раз.",
         "blood_knight_lifesteal_strike":
-            f"Лечит на {pct(_s('blood_knight_lifesteal_strike').effect_value)} нанесённого урона.",
+            f"Ты восстанавливаешь здоровье: {pct(_s('blood_knight_lifesteal_strike').effect_value)} "
+            "от нанесённого урона.",
         "blood_knight_harvest":
-            f"Если своё здоровье ниже половины - лечит на "
-            f"{pct(_s('blood_knight_harvest').effect_value)} нанесённого урона.",
+            f"Если у тебя меньше половины здоровья, восстанавливаешь "
+            f"{pct(_s('blood_knight_harvest').effect_value)} от нанесённого урона.",
         "blood_knight_blood_seal":
-            f"Метит цель на {turns(_s('blood_knight_blood_seal').effect_duration)}: весь лайфстил "
-            f"по ней сильнее в {bc.BLOOD_KNIGHT_BLOOD_SEAL_MULT} раза.",
+            f"Помечает цель на {turns(_s('blood_knight_blood_seal').effect_duration)}: лечение от урона "
+            f"по ней в {num(bc.BLOOD_KNIGHT_BLOOD_SEAL_MULT)} раза больше.",
         "blood_knight_crimson_feast":
-            f"Стоит {pct(bc.BLOOD_KNIGHT_CRIMSON_FEAST_HP_COST)} текущего здоровья, лечит на "
-            f"{pct(_s('blood_knight_crimson_feast').effect_value)} нанесённого урона.",
+            f"Забирает у тебя {pct(bc.BLOOD_KNIGHT_CRIMSON_FEAST_HP_COST)} текущего здоровья, а потом "
+            f"лечит на {pct(_s('blood_knight_crimson_feast').effect_value)} от нанесённого урона.",
         "shadow_blade_marked_strike":
-            f"Добавляет стак Метки добычи, максимум {bc.SHADOW_BLADE_MARK_MAX_STACKS}.",
+            f"Вешает на цель заряд Метки добычи (всего не больше {bc.SHADOW_BLADE_MARK_MAX_STACKS}). "
+            "Заряды тратит Жатва меток.",
         "shadow_blade_mark_harvest":
-            f"Тратит все стаки Метки: каждый добавляет "
-            f"{pct(_s('shadow_blade_mark_harvest').effect_value)} урона.",
+            f"Снимает с цели все заряды Метки добычи: каждый заряд делает этот удар сильнее на "
+            f"{pct(_s('shadow_blade_mark_harvest').effect_value)}.",
         "shadow_blade_shadow_dance":
-            f"Добавляет {pct(_s('shadow_blade_shadow_dance').effect_value)} уклонения на "
+            f"Шанс уклониться от удара +{pct(_s('shadow_blade_shadow_dance').effect_value)} на "
             f"{turns(_s('shadow_blade_shadow_dance').effect_duration)}.",
         "shadow_blade_execute":
-            f"Всегда бьёт критом. По цели ниже {pct(bc.SHADOW_BLADE_EXECUTE_HP_THRESHOLD)} "
-            f"здоровья урон умножается на {bc.SHADOW_BLADE_EXECUTE_LOW_HP_MULT:g}.",
+            f"Всегда критический удар. Если у цели меньше {pct(bc.SHADOW_BLADE_EXECUTE_HP_THRESHOLD)} "
+            f"здоровья, урон ещё и умножается на {num(bc.SHADOW_BLADE_EXECUTE_LOW_HP_MULT)}.",
         "poisoner_venom":
-            f"Накладывает стак яда, максимум {bc.POISONER_MAX_STACKS}. Яд держится "
-            f"{turns(bc.POISONER_POISON_DURATION_TICKS)} и тикает уроном каждый ход. "
-            "Урон яда считается НЕ от урона атаки, а от Воли и Ловкости, причём "
-            f"Воля весит больше: одно очко Воли даёт "
-            f"{bc.POISONER_POISON_WIL_COEF / bc.POISONER_MAX_STACKS:.2f} урона за стак, "
-            f"очко Ловкости - {bc.POISONER_POISON_AGI_COEF / bc.POISONER_MAX_STACKS:.2f}. "
-            "Яд не критует и не может промахнуться, но его держит щит.",
+            f"Отравляет цель: каждый ход {turns(bc.POISONER_POISON_DURATION_TICKS)} яд наносит урон. "
+            f"Можно отравить до {bc.POISONER_MAX_STACKS} раз подряд - тогда яд бьёт за все разы сразу. "
+            "Сила яда зависит не от урона удара, а от твоих Воли и Ловкости (Воля важнее): "
+            f"каждое очко Воли даёт {bc.POISONER_POISON_WIL_COEF / bc.POISONER_MAX_STACKS:.2f} урона за ход "
+            f"за каждое отравление, очко Ловкости - {bc.POISONER_POISON_AGI_COEF / bc.POISONER_MAX_STACKS:.2f}. "
+            "Яд всегда попадает и не бывает критическим, но щит цели его задерживает.",
         "poisoner_decay":
-            f"Уязвимость {pct(_s('poisoner_decay').effect_value)} на "
-            f"{turns(_s('poisoner_decay').effect_duration)}: цель получает больше урона от ВСЕХ.",
+            f"Цель становится уязвимой на {turns(_s('poisoner_decay').effect_duration)}: "
+            f"урон по ней от всех больше на {pct(_s('poisoner_decay').effect_value)}.",
         "poisoner_disrupt":
-            f"С шансом {pct(_s('poisoner_disrupt').effect_value)} сбивает действие цели в этот же "
-            f"ход и накладывает Ослабление {pct(bc.POISONER_DISRUPT_WEAKEN)} на 3 хода.",
+            f"С шансом {pct(_s('poisoner_disrupt').effect_value)} цель не делает своё действие в этот ход. "
+            f"Кроме того, она {turns(3)} бьёт на {pct(bc.POISONER_DISRUPT_WEAKEN)} слабее.",
         "poisoner_toxic_burst":
-            f"Взрывает весь яд на цели: урон - {pct(_s('poisoner_toxic_burst').effect_value)} "
-            "от всего, что в яде осталось (тик со всеми стаками, умноженный на число "
-            "ходов, которые яду ещё тикать). Стаки сгорают. Тик считается с прибавками "
-            "«Разъедающего токсина» и «Некроза».",
+            f"Взрывает весь яд на цели разом: урон - {pct(_s('poisoner_toxic_burst').effect_value)} "
+            "от того, что яд ещё нанёс бы до конца, если бы его не трогать. После взрыва яда на цели нет.",
         "elementalist_fire":
-            f"Поджигает цель на {turns(_s('elementalist_fire').effect_duration)}: каждый ход "
-            f"Горение снимает {pct(_s('elementalist_fire').effect_value)} от урона ЭТОГО удара. "
-            "Горение нужно Схождению стихий.",
+            f"Поджигает цель на {turns(_s('elementalist_fire').effect_duration)}: каждый ход Горение "
+            f"наносит {pct(_s('elementalist_fire').effect_value)} от урона этого удара. Горящую цель "
+            "сильнее бьёт Схождение стихий.",
         "elementalist_ice":
-            f"Оглушает цель. Ещё {turns(bc.CC_CHILL_WINDOW_TURNS)} после этого цель считается "
-            "«по холоду»: Схождение стихий бьёт по ней гарантированным критом.",
+            "Замораживает цель: она пропускает ход. Если сразу следующим ходом ударить её Схождением "
+            "стихий, удар будет критическим.",
         "elementalist_lightning":
-            f"Бьёт ещё двух противников на {pct(_s('elementalist_lightning').effect_value)} "
-            "от основного урона.",
+            f"Молния перескакивает ещё на двух врагов: каждый получает "
+            f"{pct(_s('elementalist_lightning').effect_value)} от урона по основной цели.",
         "elementalist_convergence":
-            f"Если на цели горит Горение (своё или союзника) - урон больше на "
-            f"{pct(_s('elementalist_convergence').effect_value)}, один раз: несколько огней "
-            f"не суммируются. По цели под контролем "
-            f"или вышедшей из-под него в последний ход - ГАРАНТИРОВАННЫЙ КРИТ. Считается "
-            "любой контроль, в том числе наложенный союзником.",
+            f"Если цель горит (твоё Горение или союзника), урон больше на "
+            f"{pct(_s('elementalist_convergence').effect_value)}. Если цель оглушена или заморожена - "
+            "или была в прошлый ход, - удар всегда критический. Неважно, кто её оглушил: ты или союзник.",
         "dark_mystic_blood_pact":
-            f"{pct(_s('dark_mystic_blood_pact').effect_value)} нанесённого урона уходит лечением "
-            "самому раненому союзнику, а без союзников - себе, но слабее.",
+            f"{pct(_s('dark_mystic_blood_pact').effect_value)} нанесённого урона превращается в лечение "
+            "союзника с самым низким здоровьем. Без союзников лечит тебя, но слабее.",
         "dark_mystic_ward":
-            f"Щит на {turns(_s('dark_mystic_ward').effect_duration)}, величина зависит от Воли. "
-            "Непробитый остаток превращается в лечение.",
+            f"Ставит на тебя щит на {turns(_s('dark_mystic_ward').effect_duration)}: он принимает урон "
+            "вместо здоровья. Чем больше Воля, тем крепче щит. Что осталось от щита в конце - "
+            "превращается в лечение.",
         "dark_mystic_drain":
-            f"Лечит на {pct(_s('dark_mystic_drain').effect_value)} нанесённого урона. По цели под "
-            f"контролем или вышедшей из-под него в последний ход урон выше в "
-            f"{bc.DARK_MYSTIC_DRAIN_CONTROLLED_MULT:g} раза.",
+            f"Восстанавливает тебе {pct(_s('dark_mystic_drain').effect_value)} от нанесённого урона. "
+            f"Если цель оглушена или заморожена (или была в прошлый ход), урон в "
+            f"{num(bc.DARK_MYSTIC_DRAIN_CONTROLLED_MULT)} раза больше.",
         "dark_mystic_circle":
-            f"Стоит {pct(bc.DARK_MYSTIC_CIRCLE_HP_COST)} текущего здоровья, лечит всех союзников. "
-            "Без союзников лечит себя, но слабее.",
+            f"Забирает у тебя {pct(bc.DARK_MYSTIC_CIRCLE_HP_COST)} текущего здоровья и лечит всех союзников. "
+            "Без союзников лечит тебя, но слабее.",
     }
+
+
+def num(value: float) -> str:
+    return f"{value:g}".replace(".", ",")
 
 
 def turns(n: int) -> str:
