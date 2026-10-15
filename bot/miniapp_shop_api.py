@@ -17,14 +17,22 @@ def _error(message: str, status: int = 400) -> web.Response:
     return web.json_response({"error": message}, status=status)
 
 
+async def _catalog(db, character) -> dict:
+    from services import trade_service
+
+    wallet = await wallet_service.get_wallet(db, character.id)
+    firm = await trade_service.get_firm(db, character.id)
+    return shop_service.catalog(character, wallet.donate_currency, firm.name if firm is not None else None)
+
+
 async def handle_get(request: web.Request) -> web.Response:
     async with request.app[SESSION_FACTORY_KEY]() as db:
         character = await onboarding_svc.get_character(db, request[VK_USER_ID_KEY])
         if character is None:
             return _error("character_not_found", 404)
-        wallet = await wallet_service.get_wallet(db, character.id)
+        state = await _catalog(db, character)
         await db.commit()
-        return web.json_response(shop_service.catalog(character, wallet.donate_currency))
+        return web.json_response(state)
 
 
 async def handle_post(request: web.Request) -> web.Response:
@@ -32,7 +40,8 @@ async def handle_post(request: web.Request) -> web.Response:
         body = await request.json()
     except Exception:
         return _error("bad_request")
-    if not isinstance(body, dict) or body.get("item") != shop_service.PREMIUM_ID:
+    item = body.get("item") if isinstance(body, dict) else None
+    if item not in (shop_service.PREMIUM_ID, shop_service.RENAME_ID, shop_service.FIRM_RENAME_ID):
         return _error("bad_request")
     async with request.app[SESSION_FACTORY_KEY]() as db:
         character = await onboarding_svc.get_character(db, request[VK_USER_ID_KEY])
@@ -40,15 +49,31 @@ async def handle_post(request: web.Request) -> web.Response:
             return _error("character_not_found", 404)
         # Вход игрока пишет свои строки - фиксируем отдельно, как на бирже.
         await db.commit()
+        from sqlalchemy.exc import IntegrityError
+
         try:
-            until = await shop_service.buy_premium(db, character, body.get("days"))
+            if item == shop_service.PREMIUM_ID:
+                until = await shop_service.buy_premium(db, character, body.get("days"))
+                done = {"item": item, "days": body.get("days"), "until": until.isoformat()}
+            elif item == shop_service.RENAME_ID:
+                old = await shop_service.rename_character(db, character, body.get("name"))
+                done = {"item": item, "old": old, "name": character.name}
+            else:
+                old = await shop_service.rename_firm(db, character, body.get("name"))
+                done = {"item": item, "old": old}
+            await db.commit()
         except shop_service.ShopError as exc:
             await db.rollback()
             return _error(str(exc), 409)
+        except IntegrityError:
+            # Имя заняли в ту же секунду - уникальность держит база.
+            await db.rollback()
+            return _error("Это имя только что заняли - выбери другое.", 409)
+        state = await _catalog(db, character)
         await db.commit()
-        wallet = await wallet_service.get_wallet(db, character.id)
-        state = shop_service.catalog(character, wallet.donate_currency)
-    state["done"] = {"item": shop_service.PREMIUM_ID, "days": body.get("days"), "until": until.isoformat()}
+    if item == shop_service.FIRM_RENAME_ID:
+        done["name"] = next(i for i in state["items"] if i["id"] == item)["current"]
+    state["done"] = done
     return web.json_response(state)
 
 

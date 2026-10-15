@@ -328,6 +328,11 @@ async def handle_get_catalog(request: web.Request) -> web.Response:
     return web.json_response({"groups": admin_grant_service.catalog()})
 
 
+#: Действия, которые игрок делает сам (покупки в магазине), - в журнале
+#: подписываются им, а не админом.
+SELF_ACTIONS = {"shop_rename", "shop_firm_rename"}
+
+
 async def handle_get_journal(request: web.Request) -> web.Response:
     if not _is_admin(request):
         return _forbidden()
@@ -352,10 +357,12 @@ async def handle_get_journal(request: web.Request) -> web.Response:
                         # делает сам игрок - подписываем его, а не «модератора».
                         "who": (
                             f"💰 {(a.new_value or {}).get('donor')}" if a.action_type == "donation"
+                            else f"🛒 {targets.get(a.target_character_id, 'игрок')}" if a.action_type in SELF_ACTIONS
                             else actors.get(a.admin_vk_id, f"vk {a.admin_vk_id}")
                         ),
                         "who_character_id": (
-                            None if a.action_type == "donation" else actor_ids.get(a.admin_vk_id)
+                            None if a.action_type == "donation" or a.action_type in SELF_ACTIONS
+                            else actor_ids.get(a.admin_vk_id)
                         ),
                         "target_name": targets.get(a.target_character_id),
                         "text": admin_journal_text.describe(a, targets.get(a.target_character_id)),

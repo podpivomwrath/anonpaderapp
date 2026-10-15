@@ -404,6 +404,14 @@ export const buyShop = (item, days) =>
     body: JSON.stringify({ item, days }),
   });
 
+// Смена ника / названия фирмы за самоцветы (2026-10-16).
+export const buyShopRename = (item, name) =>
+  request('/shop', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ item, name }),
+  });
+
 // --- Донаты (2026-10-16): учёт для выдачи после вайпа, только владелец ---
 export function getAdminDonations() {
   return request('/admin/donations');

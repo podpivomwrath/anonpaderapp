@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Button, Div, Group, Header, Placeholder, Spinner } from '@vkontakte/vkui';
-import { IN_VK, buyShop, createPayment, getPayments, getShop } from '../api.js';
+import { IN_VK, buyShop, buyShopRename, createPayment, getPayments, getShop } from '../api.js';
 
 /**
  * Магазин (2026-10-13): товары за самоцветы квадратными карточками. Нажатие
@@ -112,6 +112,76 @@ function BuySheet({ item, gems, onClose, onBought }) {
   );
 }
 
+// Смена ника / названия фирмы (2026-10-16): ввести новое имя, подтвердить -
+// самоцветы списываются в тот же момент, что и меняется имя. Не подошло
+// (занято, неверные символы) - ничего не списано, ошибка в окне.
+function RenameSheet({ item, gems, onClose, onBought }) {
+  const [name, setName] = useState('');
+  const [confirming, setConfirming] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState(null);
+  const clean = name.trim().replace(/\s+/g, ' ');
+  const enough = gems >= item.price;
+  const valid = clean.length >= item.min_len && clean.length <= item.max_len && clean !== item.current;
+
+  const buy = async () => {
+    setBusy(true);
+    setError(null);
+    try {
+      onBought(await buyShopRename(item.id, clean));
+    } catch (err) {
+      setError(err.message || 'Не удалось.');
+      setConfirming(false);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <>
+      <div className="nav-scrim" onClick={onClose} aria-hidden="true" />
+      <div className="crown-sheet shop-sheet" role="dialog" aria-label={item.title}>
+        <div className="shop-sheet__head">
+          <span className="shop-sheet__emoji" aria-hidden="true">{item.emoji}</span>
+          <div>
+            <b className="shop-sheet__title">{item.title}</b>
+            {item.current && <p className="shop-sheet__active">Сейчас: {item.current}</p>}
+          </div>
+        </div>
+        {item.available === false ? (
+          <p className="shop-sheet__error">{item.unavailable}</p>
+        ) : (
+          <>
+            <input
+              className="guild-input shop-sheet__input" placeholder="Новое имя" maxLength={item.max_len}
+              value={name} disabled={busy}
+              onChange={(e) => { setName(e.target.value); setConfirming(false); setError(null); }}
+            />
+            <p className="craft-hint">{item.rules} Самоцветы списываются только при успешной смене.</p>
+          </>
+        )}
+        {error && <p className="shop-sheet__error">{error}</p>}
+        {!enough && <p className="shop-sheet__error">Не хватает самоцветов: у тебя 💎 {money(gems)}.</p>}
+        <div className="shop-sheet__actions">
+          {confirming ? (
+            <>
+              <Button size="l" stretched disabled={busy} onClick={buy}>
+                {busy ? 'Меняем…' : `Да, «${clean}» за 💎 ${money(item.price)}`}
+              </Button>
+              <Button size="l" mode="secondary" stretched disabled={busy} onClick={() => setConfirming(false)}>Отмена</Button>
+            </>
+          ) : (
+            <Button size="l" stretched disabled={!enough || !valid || item.available === false}
+              onClick={() => setConfirming(true)}>
+              Сменить за 💎 {money(item.price)}
+            </Button>
+          )}
+        </div>
+      </div>
+    </>
+  );
+}
+
 // Самоцветы за рубли (ЮKassa, 2026-10-15): пакет -> страница оплаты ЮKassa.
 // Самоцветы приходят, когда ЮKassa подтвердит оплату, - бот пишет об этом.
 function GemPacks() {
@@ -211,14 +281,30 @@ export default function ShopTab({ onWallet, onBought }) {
             <button type="button" key={i.id} className="shop-card" onClick={() => setOpen(i.id)}>
               <span className="shop-card__emoji" aria-hidden="true">{i.emoji}</span>
               <b className="shop-card__title">{i.title}</b>
-              <span className="shop-card__price">от 💎 {money(i.prices[i.min])}</span>
+              <span className="shop-card__price">
+                {i.kind === 'rename' ? `💎 ${money(i.price)}` : `от 💎 ${money(i.prices[i.min])}`}
+              </span>
               {i.active_until && <span className="shop-card__badge">активна</span>}
             </button>
           ))}
         </div>
       </Group>
       <GemPacks />
-      {item && (
+      {item && item.kind === 'rename' && (
+        <RenameSheet
+          item={item}
+          gems={data.gems}
+          onClose={() => setOpen(null)}
+          onBought={(res) => {
+            setData(res);
+            setOpen(null);
+            onWallet?.({ donate_currency: res.gems });
+            setNotice(`${item.emoji} Готово: «${res.done.old}» → «${res.done.name}».`);
+            onBought?.();
+          }}
+        />
+      )}
+      {item && item.kind !== 'rename' && (
         <BuySheet
           item={item}
           gems={data.gems}

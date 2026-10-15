@@ -2377,3 +2377,9 @@ body::before {
   opacity: 0.75;
   line-height: 1.4;
 }
+
+.shop-sheet__input {
+  width: 100%;
+  box-sizing: border-box;
+  margin-top: 8px;
+}

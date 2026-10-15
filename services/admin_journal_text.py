@@ -112,6 +112,11 @@ def describe(action: AdminAction, target: str | None) -> str:
         return f"создал промокод «{new.get('code')}»: {_rewards(new.get('rewards'))}{limit_text}"
     if kind == "delete_promo_code":
         return f"удалил промокод «{old.get('code') or note}»"
+    # Покупки в магазине за самоцветы (2026-10-16).
+    if kind == "shop_rename":
+        return f"сменил ник: {old.get('name')} → {new.get('name')}"
+    if kind == "shop_firm_rename":
+        return f"сменил название фирмы: «{old.get('name')}» → «{new.get('name')}»"
     # Учёт донатов (2026-10-16).
     if kind == "donation":
         gems = f" ({money(new.get('gems'))} 💎)" if new.get("gems") else ""
