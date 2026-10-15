@@ -63,6 +63,11 @@ export function itemSubtitle(item) {
   return parts.join(' · ');
 }
 
+// Граммы садка - в килограммы, как в чате: «3,2».
+function kg(grams) {
+  return (grams / 1000).toLocaleString('ru-RU', { maximumFractionDigits: 1 });
+}
+
 // Буфер обмена в ВК надёжен только через мост: navigator.clipboard в
 // веб-вью клиента часто запрещён.
 async function copyText(text) {
@@ -98,6 +103,19 @@ function detailRows(entry) {
       (data.grades || []).map((g) => [`${g.name} ларец`, `${g.chance}%`]),
     );
   }
+  if (kind === 'fish') {
+    return [
+      ['Градация', data.grade_title],
+      ['Вес', data.weight],
+      ['Иргал даст', `${data.price} зол.`],
+    ];
+  }
+  if (kind === 'ore') {
+    return [
+      ['Градация', data.grade_title],
+      ['В сумке', `×${data.count}`],
+    ];
+  }
   if (kind === 'trophy') {
     return [
       ['Редкость', data.rarity_title || '-'],
@@ -114,9 +132,12 @@ function detailRows(entry) {
 
 function ItemSheet({ entry, onClose, onUnequip, unequipping }) {
   const { kind, data } = entry;
-  const note = kind === 'trophy'
-    ? 'Цена - у скупщика в своём городе, в чужом он платит меньше. Реликвии не передаются.'
-    : null;
+  const NOTES = {
+    trophy: 'Цена - у скупщика в своём городе, в чужом он платит меньше. Реликвии не передаются.',
+    fish: 'Цена - у Иргала в своём городе. Рыбак у воды в глубоких кольцах платит больше.',
+    ore: 'Руда идёт на ковку в мастерской. Не продаётся и не теряется при смерти.',
+  };
+  const note = NOTES[kind] || null;
   return (
     <>
       <div className="nav-scrim" onClick={onClose} aria-hidden="true" />
@@ -125,7 +146,7 @@ function ItemSheet({ entry, onClose, onUnequip, unequipping }) {
           <ItemIcon icon={data.icon} rarity={data.rarity} alt={data.name} size={96} />
           <div className="item-sheet__title">
             <b>{data.name}</b>
-            {data.count > 1 && <small>×{data.count}</small>}
+            {kind !== 'fish' && data.count > 1 && <small>×{data.count}</small>}
           </div>
         </div>
         {data.description && <p className="item-sheet__desc">{data.description}</p>}
@@ -218,6 +239,9 @@ export default function InventoryTab({ onCharacterUpdate }) {
   const [detail, setDetail] = useState(null);      // {kind, data}
   const [qtyEntry, setQtyEntry] = useState(null);  // расходник, для которого выбираем количество
   const [chests, setChests] = useState([]);
+  const [fish, setFish] = useState([]);
+  const [fishBag, setFishBag] = useState(null);
+  const [ore, setOre] = useState([]);
   const [opening, setOpening] = useState(false);
   const [roulette, setRoulette] = useState(null);  // ответ сервера на открытие ларца
 
@@ -226,6 +250,9 @@ export default function InventoryTab({ onCharacterUpdate }) {
     setTrophies(res.trophies || []);
     setConsumables(res.consumables || []);
     setChests(res.chests || []);
+    setFish(res.fish || []);
+    setFishBag(res.fish_bag || null);
+    setOre(res.ore || []);
   }
 
   async function handleOpenChest(kind) {
@@ -319,7 +346,8 @@ export default function InventoryTab({ onCharacterUpdate }) {
     return <Placeholder icon={<div style={{ fontSize: 48 }}>🎒</div>}>Не удалось загрузить инвентарь.</Placeholder>;
   }
 
-  if (items.length === 0 && trophies.length === 0 && consumables.length === 0 && chests.length === 0) {
+  if (items.length === 0 && trophies.length === 0 && consumables.length === 0 && chests.length === 0
+    && fish.length === 0 && ore.length === 0) {
     return <Placeholder icon={<div style={{ fontSize: 48 }}>🎒</div>}>Твоя сумка пока пуста.</Placeholder>;
   }
 
@@ -341,9 +369,14 @@ export default function InventoryTab({ onCharacterUpdate }) {
       { key: 'chests', kind: 'chest', title: 'Редкости', rows: chests },
       { key: 'trophies', kind: 'trophy', title: 'Реликвии', rows: trophies },
       { key: 'consumables', kind: 'consumable', title: 'Расходники', rows: consumables },
+      {
+        key: 'fish', kind: 'fish', rows: fish,
+        title: fishBag ? `Садок · ${kg(fishBag.grams)} / ${kg(fishBag.capacity)} кг` : 'Садок',
+      },
+      { key: 'ore', kind: 'ore', title: 'Руда', rows: ore },
     ])
     .filter((group) => group.rows.length > 0);
-  const bagCount = spare.length + trophies.length + consumables.length + chests.length;
+  const bagCount = spare.length + trophies.length + consumables.length + chests.length + fish.length + ore.length;
 
   const craftButton = (item) => item.craftable && (
     <Button
@@ -441,6 +474,8 @@ export default function InventoryTab({ onCharacterUpdate }) {
     let subtitle = `${entry.category_title} · ×${entry.count}`;
     if (kind === 'trophy') subtitle = [entry.rarity_title, `×${entry.count}`].filter(Boolean).join(' · ');
     if (kind === 'chest') subtitle = `×${entry.count}`;
+    if (kind === 'fish') subtitle = `${entry.grade_title} · ${entry.weight} · ${entry.price} зол.`;
+    if (kind === 'ore') subtitle = `${entry.grade_title} · ×${entry.count}`;
     let after = null;
     if (kind === 'consumable') after = <div className="inventory-actions">{quantityButton(entry)}</div>;
     if (kind === 'chest') {

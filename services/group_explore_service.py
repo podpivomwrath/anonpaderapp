@@ -41,7 +41,11 @@ def start_or_join(
     группы или с клетки из очереди выпадают, а нажавший - всегда в ней, даже
     если раньше отменил участие или пришёл позже."""
     existing = _queues.get(group_id)
-    if existing is not None and existing.cell == cell:
+    # Очередь, где никто не готов, - старая: в ней остался урезанный состав
+    # после отмен (отдых тоже отменяет). Её собираем заново на всех, кто
+    # на клетке. Иначе нажавший первым после отдыха шёл один, а напарник
+    # ждал его в новой очереди (репорт 2026-10-14).
+    if existing is not None and existing.cell == cell and existing.ready:
         existing.cohort = (existing.cohort & set(cohort_ids)) | {character_id}
         existing.ready = (existing.ready & existing.cohort) | {character_id}
         return existing

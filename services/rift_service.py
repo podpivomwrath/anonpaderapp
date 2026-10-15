@@ -155,11 +155,17 @@ def _pick_ring(rng: random.Random, players_by_ring: dict[int, int]) -> int:
 
 def _pick_cell(ring: int, taken: set[tuple[int, int]], rng: random.Random) -> tuple[int, int]:
     """Свободная клетка кольца, где разрешено PvP: разлом - повод для
-    стычки, и мирная клетка у ворот его бы обесценила."""
+    стычки, и мирная клетка у ворот его бы обесценила.
+
+    2026-10-15: уровень клетки - в пределах уровней разлома. С тех пор как
+    мобы зависят от клетки, во внешнем кольце есть клетки 1-9 уровня, и
+    разлом 10-15 вставал среди мобов 1-2 уровня."""
     lo, hi = wc.ring_bounds(ring)
+    band_lo, band_hi = rc.BANDS[ring]
     cells = [
         c for c in grid.all_cells()
         if lo <= grid.monolith_distance(*c) <= hi
+        and band_lo <= wc.cell_base_level(grid.monolith_distance(*c)) <= band_hi
         and world_boss_world._cell_is_free(*c)
         and not grid.pvp_forbidden(*c)
         and c not in taken

@@ -696,7 +696,56 @@ async def _full_inventory(session, character_id: int) -> dict:
     payload["trophies"] = _trophies_payload(await trophy_service.get_stock(session, character_id))
     payload["consumables"] = _consumables_payload(await elixir_service.get_stock(session, character_id))
     payload["chests"] = _chests_payload(await lootbox_service.closed_chests(session, character_id))
+    # Садок и руда - тоже в сумке (2026-10-15, просьба владельца).
+    from services import fishing_service, mining_service
+
+    payload["fish"] = _fish_payload(await fishing_service.get_bag(session, character_id))
+    if character is not None:
+        payload["fish_bag"] = {
+            "grams": await fishing_service.bag_total_grams(session, character_id),
+            "capacity": game_fishing.bag_capacity_grams(character.fishing_level),
+        }
+    payload["ore"] = _ore_payload(await mining_service.get_ore(session, character_id))
     return payload
+
+
+#: Свечение рамки по градации - те же цвета, что у редкости вещей.
+_FISH_GLOW = {"big": "uncommon", "trophy": "epic", "legendary": "legendary"}
+_ORE_GLOW = {"rare": "rare", "epic": "epic", "legendary": "legendary"}
+
+
+def _fish_payload(bag) -> list[dict]:
+    """Садок: стак «вид + градация» суммарным весом и цена у Иргала
+    в своём городе (как на экране садка в чате)."""
+    return [
+        {
+            "id": f"{fish.id}:{grade}",
+            "name": fish.name,
+            "icon": f"fish:{fish.id}",
+            "rarity": _FISH_GLOW.get(grade),
+            "grade_title": game_fishing.grade_name(grade),
+            "weight": game_fishing.format_kg(grams),
+            "price": game_fishing.price_of(fish.id, grams, grade),
+            "count": 1,
+            "description": fish.description,
+        }
+        for fish, grade, grams in bag
+    ]
+
+
+def _ore_payload(stock) -> list[dict]:
+    return [
+        {
+            "id": f"{ore.id}:{grade}",
+            "name": ore.name,
+            "icon": f"ore:{ore.id}",
+            "rarity": _ORE_GLOW.get(grade),
+            "grade_title": game_mining.grade_name(grade),
+            "count": count,
+            "description": ore.description,
+        }
+        for ore, grade, count in stock
+    ]
 
 
 #: Ролл ларцов - системный генератор: исход не должен угадываться по seed.

@@ -58,7 +58,9 @@ async def others_at(db: AsyncSession, character: Character) -> list[Character]:
                 Character.id.not_in(
                     select(CharacterVoyage.character_id).where(CharacterVoyage.status == "away")
                 ),
-            )
+            # Постоянный порядок: без него номера в «Осмотреться» менялись
+            # местами от раза к разу (2026-10-15).
+            ).order_by(Character.id)
         )
     ).scalars().all()
     return [c for c in rows if not death_service.is_dead(c)]

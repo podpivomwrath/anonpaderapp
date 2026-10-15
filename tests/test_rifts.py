@@ -248,3 +248,19 @@ async def test_blood_rift_only_while_a_sixty_is_inside(db_session, make_characte
     plain = rift_combat.build_stage("ash_crypt", 2, 1000, 60, 4)
     blood = rift_combat.build_stage("ash_crypt", 2, 1000, 60, 4, blood=True)
     assert blood.power == (plain.power[0] * rc.BLOOD_HP, plain.power[1] * rc.BLOOD_DMG)
+
+
+def test_rift_cell_level_fits_rift_band() -> None:
+    """2026-10-15: разлом 10-15 вставал на клетки с мобами 1-2 уровня."""
+    import random as _random
+
+    from game.economy import rift_config as _rc
+    from game.world import grid as _grid
+    from game.world import world_config as _wc
+    from services import rift_service as _rs
+
+    rng = _random.Random(3)
+    for ring, (lo, hi) in _rc.BANDS.items():
+        for _ in range(40):
+            x, y = _rs._pick_cell(ring, set(), rng)
+            assert lo <= _wc.cell_base_level(_grid.monolith_distance(x, y)) <= hi

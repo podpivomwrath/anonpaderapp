@@ -107,3 +107,18 @@ def test_co_located_members_filters_by_position() -> None:
     members = [M(1, 5, 5), M(2, 5, 5), M(3, 6, 5)]
     result = ges.co_located_members(members, 5, 5)
     assert {m.id for m in result} == {1, 2}
+
+
+def test_queue_without_ready_members_is_rebuilt_for_whole_cell() -> None:
+    """Репорт 2026-10-14: B нажал «Исследовать», потом сел отдыхать (отмена
+    убрала его из очереди). A нажал - и ушёл один, а B после отдыха ждал A.
+    Теперь пустая по готовности очередь собирается заново на всех."""
+    gid = 990001
+    ges.clear(gid)
+    ges.start_or_join(gid, (1, 1), {1, 2}, 2)
+    ges.cancel(gid, 2)
+    queue = ges.start_or_join(gid, (1, 1), {1, 2}, 1)
+    assert queue.cohort == {1, 2} and not ges.is_ready_to_start(queue)
+    queue = ges.start_or_join(gid, (1, 1), {1, 2}, 2)
+    assert ges.is_ready_to_start(queue)
+    ges.clear(gid)

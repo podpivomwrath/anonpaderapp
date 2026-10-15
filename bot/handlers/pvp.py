@@ -151,6 +151,11 @@ _battles: dict[int, Battle] = {}
 _peer_battle: dict[int, int] = {}
 # peer_id -> battle_id, ждём выбора стороны (текстом "1"/"2") для этого боя
 _pending_join_prompt: dict[int, int] = {}
+#: Последнее «Осмотреться»: peer -> (клетка, id игроков, id боёв) в том
+#: порядке, в каком их пронумеровали. Пока игрок стоит на той же клетке,
+#: «/напасть N» бьёт того, кто был под номером N, без нового осмотра
+#: (2026-10-15, решение владельца).
+_last_look: dict[int, tuple[tuple[int, int], list[int], list[int]]] = {}
 # Патч 31, п.6: battle_id -> character_id'ы, уже объявившие действие в ТЕКУЩЕМ
 # (ещё не резолвленном) окне группового PvP — клавиатура убирается у них до
 # следующего тика. Отдельно от game.combat.tick_engine.ActionStore (тот же
@@ -412,10 +417,49 @@ def _scene_text(solo: list[Character], battles: list[tuple[int, Battle]], tags: 
     return "\n".join(lines)
 
 
-async def _resolve_target(db, character: Character, target: str):
+TARGET_GONE_TEXT = "Этой цели здесь уже нет."
+
+
+def _remember_look(peer_id: int, character: Character, solo: list[Character],
+                   battles: list[tuple[int, Battle]]) -> None:
+    _last_look[peer_id] = (
+        (character.pos_x, character.pos_y), [c.id for c in solo], [bid for bid, _ in battles],
+    )
+
+
+def _looked_entry(peer_id: int | None, character: Character, n: int) -> tuple[str, int] | None:
+    """Кто был под номером n в последнем «Осмотреться» с этой клетки:
+    ("solo", id персонажа) или ("battle", id боя). None - осмотра с этой
+    клетки не было или номера в нём нет."""
+    look = _last_look.get(peer_id) if peer_id is not None else None
+    if look is None:
+        return None
+    pos, solo_ids, battle_ids = look
+    if pos != (character.pos_x, character.pos_y):
+        _last_look.pop(peer_id, None)
+        return None
+    if 1 <= n <= len(solo_ids):
+        return "solo", solo_ids[n - 1]
+    if 0 <= n - len(solo_ids) - 1 < len(battle_ids):
+        return "battle", battle_ids[n - len(solo_ids) - 1]
+    return None
+
+
+async def _resolve_target(db, character: Character, target: str, peer_id: int | None = None):
     """Возвращает (Character, None) — цель-игрок, (None, (battle_id, Battle))
     — идущий бой, (None, None) — цель не найдена."""
     solo, battles = await _scene_at(db, character)
+    looked = _looked_entry(peer_id, character, int(target)) if target.isdigit() else None
+    if looked is not None:
+        kind, ref = looked
+        if kind == "battle":
+            return None, next(((bid, b) for bid, b in battles if bid == ref), None)
+        victim = next((c for c in solo if c.id == ref), None)
+        if victim is not None:
+            return victim, None
+        # Тот, кого видел, уже сам дерётся с кем-то на этой клетке - номер
+        # ведёт в его бой.
+        return None, next(((bid, b) for bid, b in battles if ref in b.participants), None)
     if target.isdigit():
         n = int(target)
         if 1 <= n <= len(solo):
@@ -504,6 +548,7 @@ async def look_around(message: Message) -> None:
             return
         solo, battles = await _scene_at(db, character)
         tags = await _guild_tags(db, solo)
+        _remember_look(peer_id, character, solo, battles)
     await message.answer(_scene_text(solo, battles, tags))
 
 
@@ -588,10 +633,12 @@ async def attack_command(message: Message, target: str) -> None:
         if target.strip().lower() == character.name.lower():
             await message.answer("На себя не нападают.")
             return
-        victim, battle_entry = await _resolve_target(db, character, target)
+        victim, battle_entry = await _resolve_target(db, character, target, peer_id)
         if victim is None and battle_entry is None:
             if await _afk_target_named(db, character, target):
                 await message.answer(AFK_TARGET_TEXT)
+            elif target.isdigit() and _looked_entry(peer_id, character, int(target)) is not None:
+                await message.answer(TARGET_GONE_TEXT)
             else:
                 await message.answer("Здесь нет такой цели.")
             return

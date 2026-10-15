@@ -344,29 +344,43 @@ def scaled_result(result: "SceneResult", mult: float) -> "SceneResult":
     })
 
 
-def pick_trail_cell(rng: random.Random, x: int, y: int) -> tuple[int, int] | None:
-    """Клетка следа: 2-5 клеток пути, в том же кольце или ДАЛЬШЕ от центра
-    (легче), не город и не Монолит.
+#: Насколько клетка следа может отличаться по уровню мобов от той, где
+#: игрок стоит (2026-10-15, решение владельца): примерно равная, чуть легче
+#: или чуть сложнее.
+TRAIL_LEVEL_EASIER = 3
+TRAIL_LEVEL_HARDER = 2
 
-    Раньше след вёл в то же кольцо или ближе к центру, и событие уводило
-    игрока туда, где мобы ему не по силам. Решение владельца 2026-10-12:
-    события могут отправлять на более лёгкие кольца, на более сложные - нет.
-    Из центра (кольцо 5) след поэтому всегда уходит наружу."""
-    ring = grid.ring_tier(x, y)
+
+def _cell_level(x: int, y: int) -> int:
+    return wc.cell_base_level(grid.monolith_distance(x, y))
+
+
+def pick_trail_cell(rng: random.Random, x: int, y: int) -> tuple[int, int] | None:
+    """Клетка следа: 2-5 клеток пути, не город и не Монолит, с мобами
+    примерно того же уровня, что и здесь: не легче чем на
+    TRAIL_LEVEL_EASIER и не сложнее чем на TRAIL_LEVEL_HARDER.
+
+    Раньше след ограничивался кольцом (то же или внешнее), но с уровнями по
+    клеткам внутри одного кольца разница доходит до 14 уровней, и след
+    уводил то к мелочи, то к мобам не по силам. Если подходящих клеток нет,
+    берём самые близкие по уровню."""
+    here = _cell_level(x, y)
     options = [
         (cx, cy)
         for cx in range(x - TRAIL_MAX_CELLS, x + TRAIL_MAX_CELLS + 1)
         for cy in range(y - TRAIL_MAX_CELLS, y + TRAIL_MAX_CELLS + 1)
         if TRAIL_MIN_CELLS <= grid.cells_between(x, y, cx, cy) <= TRAIL_MAX_CELLS
         and grid.in_bounds(cx, cy)
-        and grid.ring_tier(cx, cy) <= ring
-        # Из центра - всегда наружу: при следе в 2 клетки он мог остаться
-        # у самого Монолита.
-        and (ring < 5 or grid.ring_tier(cx, cy) < 5)
         and grid.city_region_at(cx, cy) is None
         and (cx, cy) != (0, 0)
     ]
-    return rng.choice(options) if options else None
+    if not options:
+        return None
+    fitting = [c for c in options if -TRAIL_LEVEL_EASIER <= _cell_level(*c) - here <= TRAIL_LEVEL_HARDER]
+    if not fitting:
+        best = min(abs(_cell_level(*c) - here) for c in options)
+        fitting = [c for c in options if abs(_cell_level(*c) - here) == best]
+    return rng.choice(fitting)
 
 
 def ring_rolls(x: int, y: int) -> int:

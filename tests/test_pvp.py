@@ -810,3 +810,23 @@ async def test_name_of_a_fighter_leads_into_his_battle(db_session, character_at)
 
     assert victim is None
     assert entry is not None and entry[1] is battle
+
+
+async def test_attack_number_follows_last_look_until_moved(db_session, character_at) -> None:
+    """2026-10-15: «/напасть N» бьёт того, кто был под номером N в последнем
+    «Осмотреться», пока нападающий не сдвинулся с клетки."""
+    me = await character_at(4, 4, region="ridge")
+    first = await character_at(4, 4, region="ridge")
+    second = await character_at(4, 4, region="ridge")
+    peer = 900001
+    pvp_handlers._remember_look(peer, me, [second, first], [])
+    victim, _ = await pvp_handlers._resolve_target(db_session, me, "1", peer)
+    assert victim.id == second.id
+    second.pos_x = 5
+    await db_session.flush()
+    victim, battle = await pvp_handlers._resolve_target(db_session, me, "1", peer)
+    assert victim is None and battle is None
+    me.pos_x = 3
+    victim, _ = await pvp_handlers._resolve_target(db_session, me, "1", peer)
+    assert victim is None
+    pvp_handlers._last_look.pop(peer, None)
