@@ -153,17 +153,20 @@ def mass_killer_lines(killer: Character, outcomes: list[KillOutcome]) -> list[st
     branded = sum(o.branded for o in outcomes)
     if branded:
         n = killer.pk_marks or 0
-        lines.append(
-            f"🩸 Клеймо x{branded} за убийство тех, кто слабее на {pc.LEVEL_GAP}+ уровней. "
-            f"Сейчас меток: {n}, каждая исчезает через {pc.DECAY_HOURS} ч. Пока метки на тебе: {consequences(n)}"
-        )
+        lines.append(f"🩸 Клеймо x{branded} (меток: {n}). {BOARD_HINT}")
     added = sum(o.bounty_added for o in outcomes)
     if added:
-        lines.append(
-            f"💰 Награда за твою голову выросла на {added} золота (всего {killer.pk_bounty}). "
-            f"Ничего не списано: её заберёт из твоего кошелька тот, кто тебя убьёт."
-        )
+        lines.append(_bounty_line(added, killer.pk_bounty))
     return lines
+
+
+#: Лог клейма - одной строкой (2026-10-15, просьба владельца): правила и
+#: последствия расписаны во вкладке «Доска», в чате их не повторяем.
+BOARD_HINT = "Подробности - во вкладке «Доска»."
+
+
+def _bounty_line(added: int, total: int) -> str:
+    return f"💰 Награда за твою голову выросла на {added} золота (всего {total})."
 
 
 async def on_pvp_kill(
@@ -206,17 +209,9 @@ async def on_pvp_kill(
         if added > 0:
             killer.pk_bounty = (killer.pk_bounty or 0) + added
             out.bounty_added = added
-    line = (
-        f"🩸 Ты убил того, кто слабее тебя на {pc.LEVEL_GAP}+ уровней, и получил метку клейма. "
-        f"Сейчас меток: {n}. Каждая исчезает сама через {pc.DECAY_HOURS} ч. "
-        f"Пока метки на тебе: {consequences(n)}"
-    )
+    line = f"🩸 Метка клейма за убийство слабого (меток: {n}). {BOARD_HINT}"
     if added:
-        line += (
-            f"\n💰 Награда за твою голову выросла на {added} золота (всего {killer.pk_bounty}). "
-            f"Сейчас ничего не списано: золото из твоего кошелька заберёт тот, кто тебя убьёт. "
-            f"Метки исчезнут раньше - награда сгорит."
-        )
+        line += "\n" + _bounty_line(added, killer.pk_bounty)
     out.killer_lines.append(line)
 
     victim.revenge_target_id = killer.id
