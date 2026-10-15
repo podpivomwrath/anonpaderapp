@@ -820,14 +820,17 @@ async def on_group_battle_finished(session_id: int, result: TickResult) -> None:
             await respawn_handlers.register_death(p.peer_id, respawn_at, defeat.xp_lost)
 
 
-async def interrupt_for_pvp(victim_peer_id: int) -> None:
+async def interrupt_for_pvp(victim_peer_id: int, notify: bool = True) -> list[tuple[int, int]]:
     """На участника группового боя с мобами напал игрок (2026-10-15, решение
     владельца): бой с мобами обрывается для всей группы без итога - ни
     наград, ни потерь. Здоровье каждого сохраняется как было на этот ход.
-    Остальным участникам - весть и их обычные кнопки на клетке."""
+    Остальным участникам - весть и их обычные кнопки на клетке (notify).
+
+    Возвращает (id персонажа, peer) живых участников - их группа целиком
+    уходит в PvP-бой с нападающим (2026-10-15)."""
     battle_id = _peer_battle.get(victim_peer_id)
     if battle_id is None:
-        return
+        return []
     battle = _battles.get(battle_id)
     state = _engine.sessions.get(battle_id) if _engine is not None else None
     hp_now = {}
@@ -837,7 +840,8 @@ async def interrupt_for_pvp(victim_peer_id: int) -> None:
         _engine.abort_session(battle_id)
     _drop_stale(battle_id)
     if battle is None:
-        return
+        return []
+    alive = [(cid, p.peer_id) for cid, p in battle.participants.items() if hp_now.get(cid, 1) > 0]
     victim_name = next((p.name for p in battle.participants.values() if p.peer_id == victim_peer_id), "?")
     has_mount_by_cid: dict[int, bool] = {}
     positions: dict[int, tuple[int, int]] = {}
@@ -856,7 +860,7 @@ async def interrupt_for_pvp(victim_peer_id: int) -> None:
                 vitals_service.set_hp(character, stats, hp, vit_bonus)
         await db.commit()
     for cid, p in battle.participants.items():
-        if p.peer_id == victim_peer_id:
+        if p.peer_id == victim_peer_id or not notify:
             continue
         pos = positions.get(cid, (0, 0))
         keyboard = movement_keyboard(*pos, p.peer_id, has_mount=has_mount_by_cid.get(cid, False))
@@ -868,6 +872,7 @@ async def interrupt_for_pvp(victim_peer_id: int) -> None:
             await _send_location_summary(cid, p.peer_id, keyboard)
         except Exception:
             logger.warning("Прерывание группового боя: не доставлено {}", p.peer_id)
+    return alive
 
 
 async def _tell_others(battle, cid: int, text: str) -> None:

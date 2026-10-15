@@ -830,3 +830,27 @@ async def test_attack_number_follows_last_look_until_moved(db_session, character
     victim, _ = await pvp_handlers._resolve_target(db_session, me, "1", peer)
     assert victim is None
     pvp_handlers._last_look.pop(peer, None)
+
+
+async def test_attack_on_group_in_mob_fight_starts_mass_battle(db_session, character_at, monkeypatch) -> None:
+    """2026-10-15: нападение на участника группы посреди её боя с мобами -
+    сразу массовый бой: нападающий против всей группы на клетке."""
+    from types import SimpleNamespace
+
+    attacker = await character_at(6, 6, region="ridge")
+    victim = await character_at(6, 6, region="ridge")
+    mate = await character_at(6, 6, region="ridge")
+    sent = []
+
+    async def send(**kw):
+        sent.append(kw)
+
+    monkeypatch.setattr(pvp_handlers, "_bot_api", SimpleNamespace(messages=SimpleNamespace(send=send)))
+    await pvp_handlers._start_group_ambush(db_session, attacker, 101, victim, [(victim, 102), (mate, 103)])
+    battle_id = pvp_handlers._peer_battle[101]
+    battle = pvp_handlers._battles[battle_id]
+    assert battle.battle_type == "mass"
+    assert battle.side_of == {attacker.id: 0, victim.id: 1, mate.id: 1}
+    assert pvp_handlers._peer_battle[103] == battle_id
+    assert {m["peer_id"] for m in sent} == {101, 102, 103}
+    pvp_handlers._mass_engine.abort_session(battle_id)

@@ -714,7 +714,23 @@ async def _start_forced_duel_impl(
             peer_id=victim_peer_id, message="⚔️ На тебя напали! Бой с тварью прерван.", random_id=0,
         )
     if group_combat.has_active_group_battle(victim_peer_id):
-        await group_combat.interrupt_for_pvp(victim_peer_id)
+        # Группа, что дралась с мобами вместе с жертвой, целиком встаёт на её
+        # сторону: бой сразу массовый (2026-10-15, решение владельца).
+        roster = await group_combat.interrupt_for_pvp(victim_peer_id, notify=False)
+        defenders = []
+        for cid, peer in roster:
+            if peer == attacker_peer_id:
+                continue
+            member = await db.get(Character, cid)
+            if member is None:
+                continue
+            await db.refresh(member)
+            if death_service.is_dead(member) or (member.pos_x, member.pos_y) != (attacker.pos_x, attacker.pos_y):
+                continue
+            defenders.append((member, peer))
+        if len(defenders) > 1:
+            await _start_group_ambush(db, attacker, attacker_peer_id, victim, defenders)
+            return
         await _bot_api.messages.send(
             peer_id=victim_peer_id, message="⚔️ На тебя напали! Бой группы с мобами прерван.", random_id=0,
         )
@@ -765,6 +781,46 @@ async def _start_forced_duel_impl(
             keyboard = pvp_waiting_keyboard()
         await _bot_api.messages.send(
             peer_id=participant.peer_id, message=f"{intro}\n\n{text}", random_id=0, keyboard=keyboard,
+        )
+
+
+async def _start_group_ambush(db, attacker: Character, attacker_peer_id: int, victim: Character,
+                              defenders: list[tuple[Character, int]]) -> None:
+    """Нападение на группу посреди её боя с мобами: сразу массовый бой -
+    нападающий против всей группы на клетке."""
+    battle_id = _new_battle_id()
+    battle = Battle(battle_type="mass", location=(attacker.pos_x, attacker.pos_y))
+    state = CombatSessionState(session_id=battle_id, mode=CombatMode.PVP_GROUP)
+    for side, roster in ((0, [(attacker, attacker_peer_id)]), (1, defenders)):
+        for character, peer in roster:
+            combatant = await _build_combatant_for(db, character)
+            combatant.side = side
+            state.add(combatant)
+            battle.participants[character.id] = _participant(character, peer)
+            battle.side_of[character.id] = side
+            _peer_battle[peer] = battle_id
+    _battles[battle_id] = battle
+    battle.last_combatants = dict(state.combatants)
+    _mass_engine.start_session(state)
+    for cid in battle.participants:
+        _init_target(battle_id, battle, cid)
+    names = ", ".join(c.name for c, _ in defenders)
+    intro = (
+        f"⚔️ {attacker.name} нападает на {victim.name} посреди боя с мобами! "
+        f"Бой с мобами прерван без итога, вся группа ({names}) вступает в схватку. "
+        f"Все действуют одновременно, ход - {round(bc.PVP_GROUP_TURN_SECONDS)} секунд."
+    )
+    for p in battle.participants.values():
+        board = intro + "\n\n" + _render_mass(state, [])
+        target_line = _target_line(battle_id, battle, p.character_id)
+        if target_line:
+            board += f"\n{target_line}"
+        combatant = state.combatants[p.character_id]
+        await _bot_api.messages.send(
+            peer_id=p.peer_id, message=board, random_id=0,
+            keyboard=pvp_combat_keyboard(
+                p.base_class, combatant.cooldowns, subclass_id=combatant.subclass_id, show_target=True,
+            ),
         )
 
 
