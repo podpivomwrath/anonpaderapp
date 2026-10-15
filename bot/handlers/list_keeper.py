@@ -40,7 +40,6 @@ from bot.onboarding_texts import CLASS_BUTTONS
 from bot.world_texts import FOREIGN_NPC_REJECTION, mentor_name
 from bot import text_match
 from game.classes.base import REGISTRY
-from game.combat import balance_config as bc
 from game.combat import display
 from game.content_loader import load_npc_texts
 from game.world import grid
@@ -77,6 +76,8 @@ def path_attachment(subclass_id: str) -> str | None:
 
 STATE_OFFER = "subclass_offer"
 STATE_PATH_SELECT = "subclass_path_select"
+#: Повторный выбор пути после смены класса/подкласса (временно бесплатно).
+FREE_REPICK_LINE = "Ты уже платил за путь. После смены класса новый выбирается без платы."
 STATE_PATH_CONFIRM = "subclass_path_confirm"
 # Переделка персонажа (альфа-тест). В characters.subclass_select_state НЕ
 # сохраняется: сцена короткая, и после рестарта бота безопаснее начать её
@@ -185,6 +186,17 @@ async def open_keeper(message: Message) -> None:
         elif not subclass_service.can_offer(character):
             await message.answer(KEEPER["too_low_level"])
             return
+        elif subclass_service.free_repick(character):
+            # После смены класса/подкласса - сразу к выбору пути, без платы.
+            await _set_select_state(db, character, STATE_PATH_SELECT)
+            await db.commit()
+            titles = [s.title for s in subclass_service.paths_for(character.base_class)]
+            await _dispenser.set(peer_id, SubclassSelectState.PATH_SELECT)
+            await message.answer(
+                f"{FREE_REPICK_LINE}\n\n{KEEPER['path_intro']}", keyboard=paths_keyboard(titles),
+                attachment=KEEPER_ATTACHMENT,
+            )
+            return
         else:
             await _set_select_state(db, character, STATE_OFFER)
             await db.commit()
@@ -207,7 +219,7 @@ async def offer_pay(message: Message) -> None:
         if character is None or character.creation_state is not None or character.subclass is not None:
             return
         try:
-            await subclass_service.pay_unlock(db, character)
+            paid = await subclass_service.pay_unlock(db, character)
         except NotEnoughCurrency:
             await message.answer(KEEPER["not_enough_gold"], keyboard=offer_keyboard())
             return
@@ -218,7 +230,7 @@ async def offer_pay(message: Message) -> None:
 
     titles = [s.title for s in subclass_service.paths_for(base_class)]
     await _dispenser.set(peer_id, SubclassSelectState.PATH_SELECT)
-    payment_line = display.gold_delta_line(-bc.SUBCLASS_UNLOCK_COST, total)
+    payment_line = display.gold_delta_line(-paid, total) if paid else FREE_REPICK_LINE
     await message.answer(f"{payment_line}\n\n{KEEPER['path_intro']}", keyboard=paths_keyboard(titles))
 
 

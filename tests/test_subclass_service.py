@@ -55,3 +55,25 @@ def test_apply_subclass_sets_field() -> None:
     fake = Fake()
     subclass_service.apply_subclass(fake, "guardian")
     assert fake.subclass == "guardian"
+
+
+async def test_repick_after_class_change_is_free(db_session, make_character) -> None:
+    """2026-10-16 (временно): после смены класса новый путь - без платы,
+    первый выбор - платный."""
+    from models import BaseClass
+    from services import respec_service, wallet_service
+
+    character = await make_character(level=30, farm=100, subclass="dark_mystic", base_class="mage")
+    await respec_service.full_class_reset(db_session, character, BaseClass("warrior"))
+    assert character.subclass is None and character.subclass_free_repick
+    assert subclass_service.free_repick(character)
+    assert await subclass_service.pay_unlock(db_session, character) == 0
+    assert (await wallet_service.get_wallet(db_session, character.id)).farm_currency == 100
+    subclass_service.apply_subclass(character, subclass_service.paths_for(character.base_class)[0].id)
+    assert not character.subclass_free_repick
+
+
+async def test_first_pick_still_paid(db_session, make_character) -> None:
+    character = await make_character(level=30, farm=bc.SUBCLASS_UNLOCK_COST)
+    assert not subclass_service.free_repick(character)
+    assert await subclass_service.pay_unlock(db_session, character) == bc.SUBCLASS_UNLOCK_COST

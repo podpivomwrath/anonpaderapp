@@ -19,11 +19,21 @@ def paths_for(base_class: str) -> list[SubclassDef]:
     return [s for s in REGISTRY.values() if s.base_class == base_class]
 
 
-async def pay_unlock(db, character: Character) -> None:
-    """Списывает SUBCLASS_UNLOCK_COST золота; кидает NotEnoughCurrency, если не хватает."""
+def free_repick(character: Character) -> bool:
+    """Путь выбирается заново после смены класса/подкласса - без платы (временно)."""
+    return bc.FREE_SUBCLASS_REPICK and bool(getattr(character, "subclass_free_repick", False))
+
+
+async def pay_unlock(db, character: Character) -> int:
+    """Списывает SUBCLASS_UNLOCK_COST золота; кидает NotEnoughCurrency, если не хватает.
+    После смены класса/подкласса - бесплатно. Возвращает списанное."""
+    if free_repick(character):
+        return 0
     await charge(db, character.id, "farm", bc.SUBCLASS_UNLOCK_COST)
+    return bc.SUBCLASS_UNLOCK_COST
 
 
 def apply_subclass(character: Character, subclass_id: str) -> None:
     """Записывает подкласс — вызывать ПОСЛЕ pay_unlock и подтверждения игрока."""
     character.subclass = subclass_id
+    character.subclass_free_repick = False

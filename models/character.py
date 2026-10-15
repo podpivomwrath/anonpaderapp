@@ -43,6 +43,9 @@ class Character(Base):
     creation_state: Mapped[str | None] = mapped_column(String(32), nullable=True)
     # Шаг FSM сцены «Раскол пути» у Хранителя (патч 12); NULL = не в процессе
     subclass_select_state: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    # Подкласс сброшен сменой класса/подкласса - новый путь выбирается без
+    # платы (2026-10-16, временно: balance_config.FREE_SUBCLASS_REPICK).
+    subclass_free_repick: Mapped[bool] = mapped_column(default=False, server_default="false")
     # Куплено слотов пресетов баффов (патч 14, ч.3): 1 — бесплатный стартовый,
     # до 5 — остальные покупаются за золото (game.combat.balance_config.PRESET_SLOT_COSTS)
     preset_slots: Mapped[int] = mapped_column(default=1)

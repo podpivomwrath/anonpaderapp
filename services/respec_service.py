@@ -57,6 +57,8 @@ async def full_class_reset(
         await charge(db, character.id, "donate", bc.CLASS_RESET_COST_DONATE)
 
     character.base_class = new_base_class
+    if character.subclass is not None:
+        character.subclass_free_repick = True
     character.subclass = None
     await _reset_stats_rows(db, character, new_base_class)
     await _drop_presets(db, character)
@@ -73,6 +75,8 @@ async def reset_subclass(db: AsyncSession, character: Character) -> Character:
     if not bc.ALPHA_FREE_RESPEC:
         await charge(db, character.id, "donate", bc.SUBCLASS_RESET_COST_DONATE)
 
+    if character.subclass is not None:
+        character.subclass_free_repick = True
     character.subclass = None
     await _drop_presets(db, character)
     return character
