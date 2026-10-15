@@ -75,7 +75,10 @@ async def handle_get(request: web.Request) -> web.Response:
         await pts_service.season_rollover(db)
         await db.commit()
         rating = await leaderboard_service.board(db, leaderboard_service.BOARD_PVP, limit=20)
-        my_rank = await pvp_service.rank_of(db, character)
+        await db.refresh(character, ["pts", "pts_season"])  # после сжатия сезона
+        # Кто не дрался, в таблице не стоит - и места у него нет.
+        fought = (character.pvp_wins or 0) + (character.pvp_losses or 0) > 0
+        my_rank = await pvp_service.rank_of(db, character) if fought else None
         revenge = None
         if pk_service.revenge_bonus(character, character.revenge_target_id or -1, now):
             target = await db.get(Character, character.revenge_target_id)

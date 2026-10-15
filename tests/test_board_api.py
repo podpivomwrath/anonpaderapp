@@ -21,3 +21,17 @@ async def test_wanted_lists_branded_with_bounty(db_session, make_character):
 def test_season():
     season = board._season(NOW)
     assert season["name"] == "Октябрь 2026" and season["days_left"] == 16
+
+
+async def test_rank_of_matches_board_on_full_tie(db_session, make_character):
+    from services import leaderboard_service, pvp_service
+
+    a = await make_character(level=20)
+    b = await make_character(level=20)
+    for c in (a, b):
+        c.pts, c.pvp_wins, c.pvp_losses = 1000, 1, 0
+    await db_session.flush()
+    rows = await leaderboard_service.board(db_session, leaderboard_service.BOARD_PVP, limit=10)
+    order = [r.character_id for r in rows]
+    for c in (a, b):
+        assert await pvp_service.rank_of(db_session, c) == order.index(c.id) + 1

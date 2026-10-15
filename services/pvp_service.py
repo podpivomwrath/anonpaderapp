@@ -139,8 +139,15 @@ async def rank_of(db: AsyncSession, character: Character) -> int:
         select(func.count()).select_from(Character).where(
             Character.creation_state.is_(None),
             (Character.pvp_wins + Character.pvp_losses) > 0,
+            # Та же сортировка, что у таблицы: PTS, победы, затем id - при
+            # полном равенстве место было «лучшее из равных» и не совпадало
+            # с таблицей (2026-10-15).
             (Character.pts > character.pts)
-            | ((Character.pts == character.pts) & (Character.pvp_wins > character.pvp_wins)),
+            | ((Character.pts == character.pts) & (Character.pvp_wins > character.pvp_wins))
+            | (
+                (Character.pts == character.pts) & (Character.pvp_wins == character.pvp_wins)
+                & (Character.id < character.id)
+            ),
         )
     )
     return (better or 0) + 1
