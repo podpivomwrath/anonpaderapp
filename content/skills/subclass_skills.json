@@ -26,25 +26,25 @@
 
   "blood_knight_lifesteal_strike": {
     "id": "blood_knight_lifesteal_strike", "name": "Кровопуск", "subclass_id": "blood_knight",
-    "multiplier": 1.15, "cd": 2, "effect": "custom",
+    "multiplier": 1.45, "cd": 2, "effect": "custom",
     "effect_value": 0.2,
     "flavor": "Клинок уходит глубоко и возвращается тёплым."
   },
   "blood_knight_harvest": {
     "id": "blood_knight_harvest", "name": "Жатва", "subclass_id": "blood_knight",
-    "multiplier": 1.35, "cd": 3, "effect": "custom",
+    "multiplier": 1.65, "cd": 3, "effect": "custom",
     "effect_value": 0.3,
     "flavor": "Чем меньше в тебе крови, тем жаднее клинок."
   },
   "blood_knight_blood_seal": {
     "id": "blood_knight_blood_seal", "name": "Кровавая печать", "subclass_id": "blood_knight",
-    "multiplier": 0.85, "cd": 4, "effect": "custom",
+    "multiplier": 1.05, "cd": 4, "effect": "custom",
     "effect_duration": 3,
     "flavor": "Знак вспыхивает на его коже. Теперь он - твой источник."
   },
   "blood_knight_crimson_feast": {
     "id": "blood_knight_crimson_feast", "name": "Багровый пир", "subclass_id": "blood_knight",
-    "multiplier": 2.0, "cd": 5, "effect": "custom",
+    "multiplier": 2.3, "cd": 5, "effect": "custom",
     "effect_value": 0.45,
     "flavor": "Ты платишь своей кровью вперёд - и забираешь с процентами."
   },
@@ -115,8 +115,8 @@
   },
   "elementalist_convergence": {
     "id": "elementalist_convergence", "name": "Схождение стихий", "subclass_id": "elementalist",
-    "multiplier": 2.1, "cd": 5, "effect": "custom",
-    "effect_value": 0.6,
+    "multiplier": 1.7, "cd": 5, "effect": "custom",
+    "effect_value": 0.3,
     "flavor": "Три силы сходятся в одной точке. Точка перестаёт существовать."
   },
 

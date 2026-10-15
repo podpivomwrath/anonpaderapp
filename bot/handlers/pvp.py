@@ -1706,6 +1706,7 @@ async def on_mass_battle_finished(session_id: int, result: TickResult) -> None:
         pts_lines = {cid: pts_service.delta_line(d, characters[cid]) for cid, d in pts_deltas.items()}
         transfer_lines: dict[int, list[str]] = {}
         pk_lines: dict[int, list[str]] = {}
+        pk_outcomes: dict[int, list] = {}
         for victim_cid in dead_ids:
             victim = characters.get(victim_cid)
             if victim is None:
@@ -1720,7 +1721,7 @@ async def on_mass_battle_finished(session_id: int, result: TickResult) -> None:
             if not result.draw:
                 for attacker_cid in hitters:
                     pk = await pk_service.on_pvp_kill(db, characters[attacker_cid], victim)
-                    pk_lines.setdefault(attacker_cid, []).extend(pk.killer_lines)
+                    pk_outcomes.setdefault(attacker_cid, []).append(pk)
                     pk_lines.setdefault(victim_cid, []).extend(pk.victim_lines)
             shares: dict[int, float] = {}
             for attacker_cid in survivor_ids:
@@ -1746,6 +1747,11 @@ async def on_mass_battle_finished(session_id: int, result: TickResult) -> None:
             death_service.apply_pvp_death(victim)
             await admin_service.log_death(db, victim, "pvp")
             respawn_handlers.register_pvp_death(battle.participants[victim_cid].peer_id)
+        # Клеймо за массовый бой - одной сводкой на убийцу.
+        for attacker_cid, outcomes in pk_outcomes.items():
+            pk_lines.setdefault(attacker_cid, []).extend(
+                pk_service.mass_killer_lines(characters[attacker_cid], outcomes)
+            )
 
         # Испытания «победи выше уровнем»: павший враг выше тебя, по которому
         # ты попал (2026-10-13).

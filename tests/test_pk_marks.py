@@ -72,3 +72,15 @@ async def test_thresholds(make_character):
     assert pk_service.costly_death(c) and not pk_service.city_banned(c)
     c.pk_marks = 20
     assert pk_service.city_banned(c)
+
+
+async def test_mass_kill_summary_is_one_block(db_session, make_character):
+    """2026-10-15: массовый бой - «Клеймо x2» и общая сумма, без абзаца на каждого."""
+    killer = await make_character(level=30, farm=1000)
+    a = await make_character(level=10)
+    b = await make_character(level=10)
+    outs = [await pk_service.on_pvp_kill(db_session, killer, v, NOW) for v in (a, b)]
+    lines = pk_service.mass_killer_lines(killer, outs)
+    assert len(lines) == 2
+    assert "x2" in lines[0] and "меток: 2" in lines[0]
+    assert "на 100 золота" in lines[1]

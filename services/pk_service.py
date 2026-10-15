@@ -138,6 +138,32 @@ class KillOutcome:
     victim_lines: list[str] = field(default_factory=list)
     bounty_claimed: int = 0
     branded: bool = False
+    bounty_added: int = 0
+    victim_name: str = ""
+
+
+def mass_killer_lines(killer: Character, outcomes: list[KillOutcome]) -> list[str]:
+    """Итог клейма за массовый бой одной сводкой (2026-10-15, просьба
+    владельца): «x2 метки» и общая сумма, а не абзац на каждого убитого."""
+    lines = []
+    claimed = [o for o in outcomes if o.bounty_claimed]
+    if claimed:
+        names = ", ".join(o.victim_name for o in claimed)
+        lines.append(f"💰 Награда за голову ({names}): +{sum(o.bounty_claimed for o in claimed)} золота.")
+    branded = sum(o.branded for o in outcomes)
+    if branded:
+        n = killer.pk_marks or 0
+        lines.append(
+            f"🩸 Клеймо x{branded} за убийство тех, кто слабее на {pc.LEVEL_GAP}+ уровней. "
+            f"Сейчас меток: {n}, каждая исчезает через {pc.DECAY_HOURS} ч. Пока метки на тебе: {consequences(n)}"
+        )
+    added = sum(o.bounty_added for o in outcomes)
+    if added:
+        lines.append(
+            f"💰 Награда за твою голову выросла на {added} золота (всего {killer.pk_bounty}). "
+            f"Ничего не списано: её заберёт из твоего кошелька тот, кто тебя убьёт."
+        )
+    return lines
 
 
 async def on_pvp_kill(
@@ -147,7 +173,7 @@ async def on_pvp_kill(
     за убийство слабого на LEVEL_GAP+ - метка, заморозка награды, право
     мести жертве. Осады и разломы сюда не заходят."""
     now = now or _now()
-    out = KillOutcome()
+    out = KillOutcome(victim_name=victim.name)
     await settle(db, killer, now)
     await settle(db, victim, now)
 
@@ -179,6 +205,7 @@ async def on_pvp_kill(
         added = int(wallet.farm_currency * min(pc.BOUNTY_SHARE_PER_MARK * n, pc.BOUNTY_SHARE_MAX))
         if added > 0:
             killer.pk_bounty = (killer.pk_bounty or 0) + added
+            out.bounty_added = added
     line = (
         f"🩸 Ты убил того, кто слабее тебя на {pc.LEVEL_GAP}+ уровней, и получил метку клейма. "
         f"Сейчас меток: {n}. Каждая исчезает сама через {pc.DECAY_HOURS} ч. "
