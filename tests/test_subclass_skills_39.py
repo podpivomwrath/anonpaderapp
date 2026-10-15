@@ -4,6 +4,7 @@
 Тёмный мистик (Оберег/Иссушение/Круг тьмы)."""
 
 
+from game.combat import balance_config as bc
 from game.combat.resolver import resolve_tick
 from game.combat.session import ActionType, CombatMode, CombatSessionState, DeclaredAction, EffectKind
 from tests.conftest import NoCritRng, combatant
@@ -287,15 +288,19 @@ def test_drain_bonus_damage_on_controlled_target() -> None:
     assert frozen_damage > plain_damage
 
 
-def test_circle_of_dark_heals_allies_and_costs_hp() -> None:
+def test_circle_of_dark_heals_whole_group_with_mystic() -> None:
+    """2026-10-16: Круг тьмы в группе лечит и самого мистика (раньше - только
+    союзников, и в группе мистик себя почти не лечил)."""
     rng = NoCritRng()
     mystic = combatant(1, side=0, subclass_id="dark_mystic", will=100)
     ally = combatant(2, side=0)
     ally.current_hp = round(ally.max_hp * 0.5)
+    mystic.current_hp = round(mystic.max_hp * 0.5)
     state = make_session(mystic, ally)
 
     hp_before = mystic.current_hp
     ally_hp_before = ally.current_hp
+    cost = round(hp_before * bc.DARK_MYSTIC_CIRCLE_HP_COST)
     resolve_tick(state, {1: skill("dark_mystic_circle")}, rng)
-    assert mystic.current_hp < hp_before  # себестоимость HP
     assert ally.current_hp > ally_hp_before  # союзник исцелён
+    assert mystic.current_hp > hp_before - cost  # плата заплачена, но и себя подлечил

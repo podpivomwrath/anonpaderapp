@@ -212,8 +212,8 @@ def drain(ctx: SkillContext) -> None:
 
 @offensive_skill("dark_mystic_circle")
 def circle_of_dark(ctx: SkillContext) -> None:
-    """Круг тьмы: тратит 20% текущего HP, лечит всех союзников с силой, зависящей от Воли
-    поддержки. Вне группы лечит себя вдвое сильнее."""
+    """Круг тьмы: тратит 20% текущего HP, лечит всю группу вместе с мистиком
+    силой поддержки (Воля). Вне группы лечит только себя."""
     skill = SUBCLASS_SKILL_DEFS["dark_mystic_circle"]
     actor = ctx.actor
     actor.cooldowns[skill.id] = skill.cd
@@ -231,9 +231,10 @@ def circle_of_dark(ctx: SkillContext) -> None:
     )
     allies = ctx.session.alive_allies_of(actor)
     if allies:
-        # Круг - плата своим HP ради союзников: себя он не лечит намеренно,
-        # иначе плата съедалась бы собственным лечением.
-        for ally in allies:
+        # Круг лечит всю группу ВМЕСТЕ с мистиком (2026-10-16, решение
+        # владельца): раньше себя он не лечил, и в группе мистик почти не
+        # восстанавливался сам - игроки жаловались.
+        for ally in [*allies, actor]:
             ctx.heals.append(PendingHeal(source_id=actor.id, target_id=ally.id, amount=round(power), label="исцеляет кругом тьмы"))
     else:
         ctx.heals.append(PendingHeal(source_id=actor.id, target_id=actor.id, amount=round(power * bc.DARK_MYSTIC_CIRCLE_SOLO_MULT), label="исцеляет кругом тьмы"))
