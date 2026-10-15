@@ -166,6 +166,16 @@ def _is_admin(request: web.Request, vk_user_id: int) -> bool:
     return staff.has_panel_access(settings, vk_user_id)
 
 
+async def handle_post_terms(request: web.Request) -> web.Response:
+    """Игрок нажал «Принимаю» в мини-аппе или на сайте (2026-10-15)."""
+    from services import terms_service
+
+    async with request.app[SESSION_FACTORY_KEY]() as session:
+        await terms_service.accept(session, request[VK_USER_ID_KEY])
+        await session.commit()
+    return web.json_response({"ok": True})
+
+
 async def handle_get_character(request: web.Request) -> web.Response:
     vk_user_id = request[VK_USER_ID_KEY]
     session_factory = request.app[SESSION_FACTORY_KEY]
@@ -1035,6 +1045,7 @@ def register_routes(app: web.Application) -> None:
     app.router.add_post("/api/miniapp/ui", handle_post_ui)
     app.router.add_get("/api/miniapp/trials", handle_get_trials)
     app.router.add_get("/api/miniapp/inventory", handle_get_inventory)
+    app.router.add_post("/api/miniapp/terms", handle_post_terms)
     app.router.add_post("/api/miniapp/equip", handle_post_equip)
     app.router.add_post("/api/miniapp/unequip", handle_post_unequip)
     app.router.add_post("/api/miniapp/chest/open", handle_post_chest_open)

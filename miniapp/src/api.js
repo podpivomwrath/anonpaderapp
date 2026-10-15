@@ -84,9 +84,16 @@ async function request(path, options) {
     if (data.error === 'account_banned') {
       window.dispatchEvent(new CustomEvent('account-banned', { detail: data }));
     }
+    if (data.error === 'terms_required') {
+      window.dispatchEvent(new CustomEvent('terms-required', { detail: data }));
+    }
     throw error;
   }
   return data;
+}
+
+export function acceptTerms() {
+  return request('/terms', { method: 'POST' });
 }
 
 export function getCharacter() {

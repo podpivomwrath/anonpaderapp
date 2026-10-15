@@ -54,6 +54,10 @@ def create_bot(settings: Settings) -> Bot:
     for labeler in LABELERS:
         bot.labeler.load(labeler)
     moderation_handlers.setup_middleware(bot)  # патч 27: бан-гейт РАНЬШЕ всех остальных middleware
+    # 2026-10-15: пользовательское соглашение - сразу после бан-гейта
+    from bot.handlers import terms as terms_handlers
+
+    terms_handlers.setup(bot)
     # 2026-10-13: страховка от «немых» кнопок - после бан-гейта (забаненному не отвечаем)
     silent_guard.install(bot.api)
     silent_guard.setup_middleware(bot)

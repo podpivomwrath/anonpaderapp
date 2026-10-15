@@ -26,6 +26,7 @@ from config import Settings
 VK_USER_ID_KEY: web.RequestKey[int] = web.RequestKey("vk_user_id")
 
 MINIAPP_PREFIX = "/api/miniapp/"
+TERMS_PATH = "/api/miniapp/terms"
 
 #: Сколько живут launch-параметры. Подпись VK бессрочна сама по себе, поэтому
 #: утёкшая ссылка (скриншот, история браузера, лог прокси) без этой проверки
@@ -116,6 +117,15 @@ async def miniapp_auth_middleware(
             return web.json_response({
                 "error": "account_banned", "reason": character.ban_reason,
                 "until": character.banned_until.isoformat() if character.banned_until else None,
+            }, status=403)
+        # Пользовательское соглашение (2026-10-15): без согласия - только
+        # окно с кнопкой «Принимаю» (POST /api/miniapp/terms).
+        from services import terms_service
+
+        if request.path != TERMS_PATH and not terms_service.accepted(await terms_service.user_of(db, vk_user_id)):
+            return web.json_response({
+                "error": "terms_required", "text": terms_service.TEXT,
+                "docs": [{"title": t, "url": u} for _i, t, u in terms_service.DOCS],
             }, status=403)
     return await handler(request)
 

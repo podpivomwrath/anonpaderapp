@@ -15,7 +15,7 @@ import TitlePicker from './TitlePicker.jsx';
 import {
   Panel, PanelHeader, PanelHeaderButton, Placeholder, Spinner, Div, Button,
 } from '@vkontakte/vkui';
-import { getCharacter, saveUi } from '../api.js';
+import { acceptTerms, getCharacter, saveUi } from '../api.js';
 import NavIcon from './NavIcon.jsx';
 import AdminTab from './AdminTab.jsx';
 import CharacterTab from './CharacterTab.jsx';
@@ -95,6 +95,10 @@ export default function Hub() {
   // Персонажа нет (или создание брошено): страница новичка, а не ошибка.
   const [newbie, setNewbie] = useState({ inCreation: false, checking: false });
   const [ban, setBan] = useState(null);
+  // Пользовательское соглашение (2026-10-15): без согласия - только окно
+  // с документами и кнопкой «Принимаю», остальное недоступно.
+  const [terms, setTerms] = useState(null);
+  const [termsBusy, setTermsBusy] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [reloadKey, setReloadKey] = useState(0);
   // Мини-апп: что уже видел (вступление, тур, подсказки) и звук - с сервера.
@@ -150,7 +154,12 @@ export default function Hub() {
   useEffect(() => {
     const onBan = (event) => setBan(event.detail);
     window.addEventListener('account-banned', onBan);
-    return () => window.removeEventListener('account-banned', onBan);
+    const onTerms = (event) => setTerms(event.detail);
+    window.addEventListener('terms-required', onTerms);
+    return () => {
+      window.removeEventListener('account-banned', onBan);
+      window.removeEventListener('terms-required', onTerms);
+    };
   }, []);
 
   // Новый уровень - волна света по шапке. Только при росте уровня за время
@@ -368,6 +377,29 @@ export default function Hub() {
       setActiveTab('character');
     }
   }, [activeTab, character?.is_admin]);
+
+  if (terms) {
+    const accept = async () => {
+      setTermsBusy(true);
+      try {
+        await acceptTerms();
+        setTerms(null);
+        load();
+      } finally {
+        setTermsBusy(false);
+      }
+    };
+    return <Panel disableBackground>{header('Монолит')}<Placeholder
+      action={<Button size="l" loading={termsBusy} onClick={accept}>✅ Принимаю</Button>}
+    >
+      <b>📜 Прежде чем продолжить</b>
+      <p>Нажимая «Принимаю», ты подтверждаешь, что тебе исполнилось 18 лет, и принимаешь условия игры:</p>
+      {(terms.docs || []).map((d) => (
+        <p key={d.url}><a href={d.url} target="_blank" rel="noopener noreferrer">{d.title}</a></p>
+      ))}
+      <p>Без согласия играть нельзя.</p>
+    </Placeholder></Panel>;
+  }
 
   if (ban) {
     return <Panel disableBackground>{header('Монолит')}<Placeholder

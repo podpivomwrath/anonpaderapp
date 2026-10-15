@@ -20,6 +20,18 @@ def _plain_xp_gain(monkeypatch):
     monkeypatch.setattr(bc, "XP_GAIN_MULT", 1.0)
 
 
+@pytest.fixture(autouse=True)
+def _terms_accepted(request, monkeypatch):
+    """Пользовательское соглашение (2026-10-15) в тестах считается принятым -
+    иначе мини-апп отвечал бы terms_required на всё. Сам гейт проверяют тесты
+    с маркером real_terms (tests/test_terms.py)."""
+    if request.node.get_closest_marker("real_terms"):
+        return
+    from services import terms_service
+
+    monkeypatch.setattr(terms_service, "accepted", lambda user: True)
+
+
 @pytest.fixture
 async def db_session():
     engine = create_async_engine("sqlite+aiosqlite://")
