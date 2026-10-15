@@ -3,7 +3,7 @@
 
   "guardian_shield_bash": {
     "id": "guardian_shield_bash", "name": "Удар щитом", "subclass_id": "guardian",
-    "multiplier": 1.5, "cd": 2, "effect": "custom",
+    "multiplier": 1.75, "cd": 2, "effect": "custom",
     "flavor": "Кромка щита входит в лицо. Теперь он смотрит только на тебя."
   },
   "guardian_block": {
@@ -14,7 +14,7 @@
   },
   "guardian_stonegrip": {
     "id": "guardian_stonegrip", "name": "Каменная хватка", "subclass_id": "guardian",
-    "multiplier": 1.35, "cd": 4, "effect": "stun",
+    "multiplier": 1.5, "cd": 4, "effect": "stun",
     "flavor": "Ты перехватываешь его и держишь. Просто держишь."
   },
   "guardian_unbreakable": {
