@@ -47,7 +47,7 @@ async def _yk_post(settings: Settings, body: dict, idempotence_key: str) -> dict
         async with http.post(API, json=body, headers={"Idempotence-Key": idempotence_key}) as resp:
             data = await resp.json(content_type=None)
             if resp.status >= 300:
-                raise PaymentError(f"ЮKassa {resp.status}: {data}")
+                raise PaymentError(f"YooKassa {resp.status}: {data}")
             return data
 
 
@@ -57,7 +57,7 @@ async def _yk_get(settings: Settings, payment_id: str) -> dict:
         async with http.get(f"{API}/{payment_id}") as resp:
             data = await resp.json(content_type=None)
             if resp.status >= 300:
-                raise PaymentError(f"ЮKassa {resp.status}: {data}")
+                raise PaymentError(f"YooKassa {resp.status}: {data}")
             return data
 
 
@@ -88,7 +88,7 @@ async def create_payment(
     await db.flush()
     url = (data.get("confirmation") or {}).get("confirmation_url")
     if not url:
-        raise PaymentError("ЮKassa не дала ссылку на оплату.")
+        raise PaymentError("Платёжный сервис не дал ссылку на оплату.")
     return url
 
 
@@ -106,7 +106,7 @@ async def apply_status(db: AsyncSession, payment: dict) -> Credited | None:
         select(GemPayment).where(GemPayment.yk_payment_id == payment.get("id")).with_for_update()
     )
     if row is None:
-        logger.warning("ЮKassa: неизвестный платёж {}", payment.get("id"))
+        logger.warning("YooKassa: неизвестный платёж {}", payment.get("id"))
         return None
     status = payment.get("status")
     if status == "canceled" and row.status == "pending":
@@ -117,7 +117,7 @@ async def apply_status(db: AsyncSession, payment: dict) -> Credited | None:
         return None
     amount = payment.get("amount") or {}
     if amount.get("currency") != "RUB" or round(float(amount.get("value", 0))) != row.amount_rub:
-        logger.error("ЮKassa: сумма платежа {} не совпала: {}", row.id, amount)
+        logger.error("YooKassa: сумма платежа {} не совпала: {}", row.id, amount)
         return None
     row.status = "succeeded"
     if row.credited or row.character_id is None:
@@ -127,7 +127,7 @@ async def apply_status(db: AsyncSession, payment: dict) -> Credited | None:
     row.credited = True
     row.paid_at = datetime.now(timezone.utc)
     await db.flush()
-    logger.info("ЮKassa: платёж {} - начислено {} самоцветов персонажу {}", row.id, row.gems, row.character_id)
+    logger.info("YooKassa: платёж {} - начислено {} самоцветов персонажу {}", row.id, row.gems, row.character_id)
     pack = gem_packs.BY_ID.get(row.pack_id)
     return Credited(vk_id=row.vk_id, gems=row.gems, pack_name=pack.name if pack else row.pack_id)
 

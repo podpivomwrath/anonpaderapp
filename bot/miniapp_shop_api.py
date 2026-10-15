@@ -109,7 +109,7 @@ async def handle_post_payment(request: web.Request) -> web.Response:
             await db.rollback()
             from loguru import logger
 
-            logger.exception("ЮKassa: не удалось создать платёж")
+            logger.exception("YooKassa: не удалось создать платёж")
             return _error("Платёжный сервис не ответил. Попробуй ещё раз.", 502)
         await db.commit()
     return web.json_response({"url": url})
@@ -133,7 +133,7 @@ async def handle_yookassa_notify(request: web.Request) -> web.Response:
             await db.rollback()
             from loguru import logger
 
-            logger.exception("ЮKassa: ошибка обработки уведомления")
+            logger.exception("YooKassa: ошибка обработки уведомления")
             return web.Response(status=500, text="retry")
     if credited is not None:
         from bot.handlers import world as world_handlers
