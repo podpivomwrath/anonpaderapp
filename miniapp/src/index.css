@@ -2359,3 +2359,21 @@ body::before {
 .trade-dest__good .trade-dest__note {
   white-space: normal;
 }
+
+/* Характеристики: строка предпросмотра раскрывает описание по нажатию. */
+.stat-row--toggle {
+  cursor: pointer;
+}
+
+.stat-row__chevron {
+  opacity: 0.45;
+  font-size: 0.85em;
+}
+
+.stat-row__hint.vkuiCaption,
+.stat-row__hint {
+  display: block;
+  padding: 0 16px 10px;
+  opacity: 0.75;
+  line-height: 1.4;
+}
