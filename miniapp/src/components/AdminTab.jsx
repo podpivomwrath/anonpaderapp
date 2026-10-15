@@ -7,7 +7,7 @@ import {
   getAdminOverview, searchAdminPlayers, getAdminPlayer, postAdminAction, getAdminJournal,
   getAdminPromoCodes, createAdminPromoCode, deleteAdminPromoCode, getAdminPromoCodeActivations,
   resetAdminActivities, getAdminMiningStats, refillAdminMining, getAdminCatalog,
-  getAdminBugReports, setAdminBugReportStatus,
+  getAdminBugReports, setAdminBugReportStatus, getAdminDonations, postAdminDonations,
 } from '../api.js';
 
 // Патч 27, ч.2: вкладка «Админ» - видна только если character.is_admin
@@ -50,6 +50,7 @@ const SECTIONS = [
   { id: 'mining', label: '⛏ Руда' },
   { id: 'promo', label: '🎟 Промокоды' },
   { id: 'bugs', label: '🐞 Баги' },
+  { id: 'donations', label: '💰 Донаты' },
 ];
 
 function StatRow({ label, value }) {
@@ -1167,6 +1168,129 @@ function PromoSection() {
   );
 }
 
+// --- Донаты (2026-10-16): кто и сколько задонатил - для выдачи после вайпа.
+// Оплаты ЮKassa пишутся сами, остальное вносится здесь. Только владелец.
+
+const rub = (v) => `${Number(v ?? 0).toLocaleString('ru-RU')} ₽`;
+
+function DonationsSection() {
+  const [data, setData] = useState(null);
+  const [status, setStatus] = useState('loading');
+  const [form, setForm] = useState({ donor: '', amount: '', vk_id: '', note: '' });
+  const [busy, setBusy] = useState(false);
+  const [notice, setNotice] = useState(null);
+  const [confirmId, setConfirmId] = useState(null);
+
+  useEffect(() => {
+    getAdminDonations()
+      .then((d) => { setData(d); setStatus('ready'); })
+      .catch((e) => setStatus(e?.message === 'forbidden' ? 'forbidden' : 'error'));
+  }, []);
+
+  const send = async (params, ok) => {
+    setBusy(true);
+    setNotice(null);
+    try {
+      setData(await postAdminDonations(params));
+      setNotice({ ok: true, text: ok });
+      return true;
+    } catch (e) {
+      setNotice({ ok: false, text: e?.message || 'Не удалось.' });
+      return false;
+    } finally {
+      setBusy(false);
+      setConfirmId(null);
+    }
+  };
+
+  const add = async () => {
+    const amount = parseInt(form.amount, 10);
+    const vk = form.vk_id.trim() ? parseInt(form.vk_id.replace(/\D/g, ''), 10) : null;
+    const done = await send(
+      { action: 'add', donor: form.donor.trim(), amount, vk_id: vk, note: form.note },
+      `Записано: ${form.donor.trim()} - ${rub(amount)}.`,
+    );
+    if (done) setForm({ donor: '', amount: '', vk_id: '', note: '' });
+  };
+
+  if (status === 'loading') return <Div style={{ display: 'flex', justifyContent: 'center', paddingTop: 24 }}><Spinner size="l" /></Div>;
+  if (status === 'forbidden') return <Placeholder>Учёт донатов видит только владелец.</Placeholder>;
+  if (status === 'error' || !data) return <Placeholder>Не удалось загрузить донаты.</Placeholder>;
+
+  return (
+    <>
+      {notice && (
+        <Div className={`craft-notice ${notice.ok ? 'craft-notice--ok' : 'craft-notice--bad'}`} onClick={() => setNotice(null)}>
+          {notice.text}
+        </Div>
+      )}
+      <Group header={<Header>💰 По донатерам · всего {rub(data.total_rub)}</Header>}>
+        {data.donors.length === 0 && <Div style={{ opacity: 0.7 }}>Донатов пока нет.</Div>}
+        {data.donors.map((d) => (
+          <div className="stat-row" key={`${d.vk_id}-${d.donor}`}>
+            <span className="stat-row__label">
+              {d.vk_id ? <a href={`https://vk.com/id${d.vk_id}`} target="_blank" rel="noreferrer">{d.donor}</a> : d.donor}
+              {d.character_name ? ` · ${d.character_name}` : ''}
+              {d.count > 1 ? ` · ${d.count} раз` : ''}
+            </span>
+            <span className="stat-row__value"><b>{rub(d.total_rub)}</b></span>
+          </div>
+        ))}
+        <Caption level="1" style={{ padding: '0 16px 12px', opacity: 0.7 }}>
+          Учёт хранится отдельно от персонажей и переживает вайп. Оплаты через ЮКассу записываются сами.
+        </Caption>
+      </Group>
+
+      <Group header={<Header>Внести донат вручную</Header>}>
+        <FormItem top="Кто (имя VK)">
+          <Input value={form.donor} onChange={(e) => setForm({ ...form, donor: e.target.value })} />
+        </FormItem>
+        <FormItem top="Сумма, ₽">
+          <Input type="number" value={form.amount} onChange={(e) => setForm({ ...form, amount: e.target.value })} />
+        </FormItem>
+        <FormItem top="VK id или ссылка (необязательно)">
+          <Input value={form.vk_id} onChange={(e) => setForm({ ...form, vk_id: e.target.value })} />
+        </FormItem>
+        <FormItem top="Заметка (необязательно)">
+          <Input value={form.note} onChange={(e) => setForm({ ...form, note: e.target.value })} />
+        </FormItem>
+        <Div>
+          <Button size="m" disabled={busy || !form.donor.trim() || !(parseInt(form.amount, 10) > 0)} onClick={add}>
+            Записать
+          </Button>
+        </Div>
+      </Group>
+
+      <Group header={<Header>Все записи</Header>}>
+        {data.entries.map((r) => (
+          <div className="stat-row" key={r.id}>
+            <span className="stat-row__label">
+              {r.donor}{r.character_name ? ` · ${r.character_name}` : ''}
+              <Caption level="1" style={{ opacity: 0.7 }}>
+                {r.created_at ? new Date(r.created_at).toLocaleString('ru-RU') : ''}
+                {' · '}{r.source === 'yookassa' ? `ЮКасса${r.gems ? `, ${r.gems} 💎` : ''}` : 'вручную'}
+                {r.note ? ` · ${r.note}` : ''}
+              </Caption>
+            </span>
+            <span className="stat-row__value">
+              <b>{rub(r.amount_rub)}</b>
+              {r.source === 'manual' && (confirmId === r.id ? (
+                <>
+                  {' '}<Button size="s" mode="secondary" disabled={busy}
+                    onClick={() => send({ action: 'delete', id: r.id }, 'Запись удалена.')}>Удалить</Button>
+                  {' '}<Button size="s" mode="tertiary" onClick={() => setConfirmId(null)}>Нет</Button>
+                </>
+              ) : (
+                <>{' '}<Button size="s" mode="tertiary" onClick={() => setConfirmId(r.id)}>✕</Button></>
+              ))}
+            </span>
+          </div>
+        ))}
+      </Group>
+    </>
+  );
+}
+
 export default function AdminTab() {
   const [section, setSection] = useState('overview');
   const [requested, setRequested] = useState(null);
@@ -1189,6 +1313,7 @@ export default function AdminTab() {
       {section === 'mining' && <MiningSection />}
       {section === 'promo' && <PromoSection />}
       {section === 'bugs' && <BugsSection />}
+      {section === 'donations' && <DonationsSection />}
     </OpenPlayerContext.Provider>
   );
 }

@@ -112,5 +112,13 @@ def describe(action: AdminAction, target: str | None) -> str:
         return f"создал промокод «{new.get('code')}»: {_rewards(new.get('rewards'))}{limit_text}"
     if kind == "delete_promo_code":
         return f"удалил промокод «{old.get('code') or note}»"
+    # Учёт донатов (2026-10-16).
+    if kind == "donation":
+        gems = f" ({money(new.get('gems'))} 💎)" if new.get("gems") else ""
+        return f"задонатил {money(new.get('rub'))} ₽{gems} через ЮКассу"
+    if kind == "donation_manual":
+        return f"внёс донат вручную: {new.get('donor')} - {money(new.get('rub'))} ₽" + (f" ({note})" if note else "")
+    if kind == "donation_deleted":
+        return f"удалил запись доната: {old.get('donor')} - {money(old.get('rub'))} ₽"
     tail = f": {note}" if note else ""
     return f"действие «{kind}» - {who}{tail}"

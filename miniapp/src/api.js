@@ -403,3 +403,16 @@ export const buyShop = (item, days) =>
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ item, days }),
   });
+
+// --- Донаты (2026-10-16): учёт для выдачи после вайпа, только владелец ---
+export function getAdminDonations() {
+  return request('/admin/donations');
+}
+
+export function postAdminDonations(params) {
+  return request('/admin/donations', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(params),
+  });
+}

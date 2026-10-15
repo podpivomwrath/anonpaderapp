@@ -348,9 +348,15 @@ async def handle_get_journal(request: web.Request) -> web.Response:
                         "target_character_id": a.target_character_id,
                         "old_value": a.old_value, "new_value": a.new_value, "note": a.note,
                         "created_at": a.created_at.isoformat(),
-                        # Обычным языком (2026-10-13): кто и что сделал.
-                        "who": actors.get(a.admin_vk_id, f"vk {a.admin_vk_id}"),
-                        "who_character_id": actor_ids.get(a.admin_vk_id),
+                        # Обычным языком (2026-10-13): кто и что сделал. Донат
+                        # делает сам игрок - подписываем его, а не «модератора».
+                        "who": (
+                            f"💰 {(a.new_value or {}).get('donor')}" if a.action_type == "donation"
+                            else actors.get(a.admin_vk_id, f"vk {a.admin_vk_id}")
+                        ),
+                        "who_character_id": (
+                            None if a.action_type == "donation" else actor_ids.get(a.admin_vk_id)
+                        ),
                         "target_name": targets.get(a.target_character_id),
                         "text": admin_journal_text.describe(a, targets.get(a.target_character_id)),
                     }
@@ -642,6 +648,74 @@ def register_routes(app: web.Application) -> None:
     app.router.add_get("/api/miniapp/admin/mining_stats", handle_get_mining_stats)
     app.router.add_post("/api/miniapp/admin/mining_refill", handle_post_mining_refill)
     app.router.add_get("/api/miniapp/admin/promo_codes", handle_get_promo_codes)
+    app.router.add_get("/api/miniapp/admin/donations", handle_get_donations)
+    app.router.add_post("/api/miniapp/admin/donations", handle_post_donations)
     app.router.add_post("/api/miniapp/admin/promo_codes", handle_post_promo_codes)
     app.router.add_delete("/api/miniapp/admin/promo_codes/{id}", handle_delete_promo_code)
     app.router.add_get("/api/miniapp/admin/promo_codes/{id}/activations", handle_get_promo_code_activations)
+
+
+# --- Донаты (2026-10-16): учёт для выдачи после вайпа. Только владелец. ---
+
+
+def _is_owner(request: web.Request) -> bool:
+    settings: Settings = request.app[SETTINGS_KEY]
+    return request.get(VK_USER_ID_KEY) == settings.admin_vk_id
+
+
+def _donations_json(rows, totals) -> dict:
+    return {
+        "total_rub": sum(r.amount_rub for r in rows),
+        "donors": [
+            {"donor": t.donor, "vk_id": t.vk_id, "character_name": t.character_name,
+             "total_rub": t.total_rub, "count": t.count}
+            for t in totals
+        ],
+        "entries": [
+            {"id": r.id, "donor": r.donor, "vk_id": r.vk_id, "character_name": r.character_name,
+             "amount_rub": r.amount_rub, "gems": r.gems, "source": r.source, "note": r.note,
+             "created_at": r.created_at.isoformat() if r.created_at else None}
+            for r in rows
+        ],
+    }
+
+
+async def handle_get_donations(request: web.Request) -> web.Response:
+    if not _is_owner(request):
+        return _forbidden()
+    from services import donation_service
+
+    async with request.app[SESSION_FACTORY_KEY]() as db:
+        rows, totals = await donation_service.ledger(db)
+        return web.json_response(_donations_json(rows, totals))
+
+
+async def handle_post_donations(request: web.Request) -> web.Response:
+    """{"action": "add", "donor", "amount", "vk_id"?, "note"?} | {"action": "delete", "id"}."""
+    if not _is_owner(request):
+        return _forbidden()
+    from services import donation_service
+
+    try:
+        body = await request.json()
+    except Exception:
+        return web.json_response({"error": "bad_request"}, status=400)
+    if not isinstance(body, dict):
+        return web.json_response({"error": "bad_request"}, status=400)
+    admin_vk_id = request[VK_USER_ID_KEY]
+    async with request.app[SESSION_FACTORY_KEY]() as db:
+        try:
+            if body.get("action") == "add":
+                await donation_service.add_manual(
+                    db, admin_vk_id, body.get("donor"), body.get("amount"), body.get("vk_id"), body.get("note"),
+                )
+            elif body.get("action") == "delete":
+                await donation_service.delete_manual(db, admin_vk_id, body.get("id"))
+            else:
+                return web.json_response({"error": "bad_request"}, status=400)
+            await db.commit()
+        except donation_service.DonationError as exc:
+            await db.rollback()
+            return web.json_response({"error": str(exc)}, status=409)
+        rows, totals = await donation_service.ledger(db)
+        return web.json_response(_donations_json(rows, totals))

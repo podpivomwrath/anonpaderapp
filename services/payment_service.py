@@ -127,6 +127,12 @@ async def apply_status(db: AsyncSession, payment: dict) -> Credited | None:
     row.credited = True
     row.paid_at = datetime.now(timezone.utc)
     await db.flush()
+    # Учёт донатов (2026-10-16): кто и сколько - для выдачи после вайпа.
+    from services import donation_service
+
+    await donation_service.record_payment(
+        db, row.vk_id, row.character_id, row.amount_rub, row.gems, str(row.yk_payment_id),
+    )
     logger.info("YooKassa: платёж {} - начислено {} самоцветов персонажу {}", row.id, row.gems, row.character_id)
     pack = gem_packs.BY_ID.get(row.pack_id)
     return Credited(vk_id=row.vk_id, gems=row.gems, pack_name=pack.name if pack else row.pack_id)
