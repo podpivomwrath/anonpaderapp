@@ -1381,6 +1381,10 @@ async def move(message: Message) -> None:
             await raid_service.leave_lobby_if_present(db, character.id)
         travel_seconds = movement_service.start_travel(character, dx, dy, now)
         await db.commit()
+        # Ушёл с клетки - событие с выбором на ней закрыто: иначе его кнопки
+        # всплывали бы потом в любой команде (2026-10-15).
+        await _drop_pending_event(message.peer_id)
+        scene_event_handlers.cancel(message.peer_id)
         # в пути — кнопки убираем, вернём по прибытии (чистка визуального шума)
         await message.answer(flavor.travel_line(_rng), keyboard=kb.waiting_keyboard())
         _travel_scheduler.schedule(message.peer_id, travel_seconds)
@@ -1659,6 +1663,15 @@ async def _current_keyboard(db, character, peer_id: int, now: datetime) -> str:
         return kb.waiting_keyboard()
     if await _check_still_dead(db, character, now):
         return kb.waiting_keyboard()
+    # Событие с выбором ждёт ответа - его кнопки важнее экрана и карты.
+    scene_kb = await scene_event_handlers.current_keyboard(db, character, peer_id)
+    if scene_kb is not None:
+        return scene_kb
+    event_id = await _pending_event_id(peer_id)
+    event = event_pool.event_by_id(event_id) if event_id else None
+    if event is not None:
+        song_extra = await song_service.can_read(db, character.id)
+        return kb.event_choice_keyboard(event, song_extra=song_extra)
     screen_kb = await _screen_keyboard(db, character)
     if screen_kb is not None:
         return screen_kb

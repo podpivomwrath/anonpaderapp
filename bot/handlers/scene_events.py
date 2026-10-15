@@ -151,7 +151,9 @@ def _finish_keyboard(kb: Keyboard) -> str:
     return kb.get_json()
 
 
-async def _render(db, character, stats, p: Pending, peer_id: int) -> tuple[str, str]:
+async def _render(db, character, stats, p: Pending, peer_id: int, rebuild: bool = False) -> tuple[str, str]:
+    """rebuild - только вернуть кнопки текущей сцены (команда посреди
+    события): без новых таймеров, загадки и сроков."""
     event = se.event_by_id(p.event_id)
     scene = event.scenes[p.scene_id]
     kb = Keyboard(one_time=False)
@@ -180,17 +182,19 @@ async def _render(db, character, stats, p: Pending, peer_id: int) -> tuple[str, 
         _button(kb, scene.stop_label, {**base, "a": "stop"}, KeyboardButtonColor.POSITIVE)
 
     elif scene.type == "timer":
-        p.deadline = time.monotonic() + scene.seconds
         _button(kb, scene.button, {**base, "a": "timer"}, KeyboardButtonColor.NEGATIVE)
-        text += f"\n\n⏱ {scene.seconds} сек."
-        p.task = asyncio.create_task(_expire(peer_id, p.token, p.scene_id, scene.seconds + 0.5, "timeout"))
+        if not rebuild:
+            p.deadline = time.monotonic() + scene.seconds
+            text += f"\n\n⏱ {scene.seconds} сек."
+            p.task = asyncio.create_task(_expire(peer_id, p.token, p.scene_id, scene.seconds + 0.5, "timeout"))
 
     elif scene.type == "riddle":
-        p.riddle = _rng.choice(scene.riddles)
-        p.deadline = time.monotonic() + RIDDLE_SECONDS
-        text += f"\n\n«{p.riddle.q}»\n\nОтвет напиши сообщением."
         _button(kb, scene.giveup_label, {**base, "a": "giveup"})
-        p.task = asyncio.create_task(_expire(peer_id, p.token, p.scene_id, RIDDLE_SECONDS, "giveup"))
+        if not rebuild:
+            p.riddle = _rng.choice(scene.riddles)
+            p.deadline = time.monotonic() + RIDDLE_SECONDS
+            text += f"\n\n«{p.riddle.q}»\n\nОтвет напиши сообщением."
+            p.task = asyncio.create_task(_expire(peer_id, p.token, p.scene_id, RIDDLE_SECONDS, "giveup"))
 
     elif scene.type == "dice":
         # Одна партия в три шага, на каждом - «Отменить»: валюта -> сумма
@@ -202,14 +206,34 @@ async def _render(db, character, stats, p: Pending, peer_id: int) -> tuple[str, 
             wallet = await wallet_service.get_wallet(db, character.id)
             have = wallet.donate_currency if p.currency == "gems" else wallet.farm_currency
             text = f"Сколько ставишь? Напиши сумму сообщением.\n\n{_money(p.currency, have)} у тебя."
-            p.deadline = time.monotonic() + RIDDLE_SECONDS
-            p.task = asyncio.create_task(_expire(peer_id, p.token, p.scene_id, RIDDLE_SECONDS, "cancel"))
+            if not rebuild:
+                p.deadline = time.monotonic() + RIDDLE_SECONDS
+                p.task = asyncio.create_task(_expire(peer_id, p.token, p.scene_id, RIDDLE_SECONDS, "cancel"))
         else:
             text = f"Ставка: {_money(p.currency, p.stake)}."
             _button(kb, "🎲 Бросить кости", {**base, "a": "roll"}, KeyboardButtonColor.POSITIVE)
         _button(kb, "Отменить", {**base, "a": "cancel"})
 
     return text, _finish_keyboard(kb)
+
+
+async def current_keyboard(db, character, peer_id: int) -> str | None:
+    """Кнопки висящего события - для любой команды посреди него (/разломы,
+    /daily, /клавиатура): раньше они подменялись кнопками движения, и
+    событие было не закончить (2026-10-15)."""
+    p = _pending.get(peer_id)
+    if p is None or p.busy:
+        return None
+    event = se.event_by_id(p.event_id)
+    if event is None or p.scene_id not in event.scenes:
+        return None
+    from sqlalchemy import select
+
+    from models import CharacterStats
+
+    stats = await db.scalar(select(CharacterStats).where(CharacterStats.character_id == character.id))
+    _text, keyboard = await _render(db, character, stats, p, peer_id, rebuild=True)
+    return keyboard
 
 
 CURRENCY_BUTTONS = {"gold": "💰 Золото", "gems": "💎 Самоцветы"}
