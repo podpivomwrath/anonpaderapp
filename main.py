@@ -393,6 +393,23 @@ async def run() -> None:
         trade_handlers.tick_job, "interval", seconds=trade_handlers.TICK_SECONDS,
         id="trade_tick", max_instances=1, coalesce=True,
     )
+    from game.economy import trade_config as tc
+
+    respawn_scheduler.add_job(
+        trade_handlers.order_job, "interval", minutes=tc.ORDER_CHECK_MINUTES,
+        id="trade_orders", max_instances=1, coalesce=True,
+    )
+    # Итоги недели фракций: понедельник по Москве; при старте - догнать
+    # пропущенный (повторный вызов ничего не делает).
+    respawn_scheduler.add_job(
+        trade_handlers.week_job, "cron", day_of_week="mon", hour=0, minute=3, timezone="Europe/Moscow",
+        id="faction_week", max_instances=1, coalesce=True, next_run_time=datetime.now(timezone.utc),
+    )
+    # Доля налога с переводов первым поставщикам - раз в сутки.
+    respawn_scheduler.add_job(
+        trade_handlers.payout_job, "cron", hour=0, minute=10, timezone="Europe/Moscow",
+        id="faction_payout", max_instances=1, coalesce=True,
+    )
 
     # Маунты (патч 25, п.7): нападения/прибытия/live-отсчёт — свой job,
     # интервал из game/economy/mount_config.py (игровая тонкая настройка, не

@@ -55,6 +55,8 @@ class TradeCart(Base):
     departed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     arrives_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True, index=True)
     ambushes: Mapped[int] = mapped_column(Integer, default=0)
+    #: Событие в пути (trade_config.TRIP_EVENTS), разыграно при отправке.
+    event: Mapped[str | None] = mapped_column(String(16), nullable=True)
     horses: Mapped[int] = mapped_column(Integer, default=1)
     body: Mapped[int] = mapped_column(Integer, default=1)
     plating: Mapped[int] = mapped_column(Integer, default=1)
@@ -81,6 +83,8 @@ class TradeTrip(Base):
     profit: Mapped[int] = mapped_column(Integer, default=0)
     ambushes: Mapped[int] = mapped_column(Integer, default=0)
     lost: Mapped[dict] = mapped_column(JSON, default=dict)
+    event: Mapped[str | None] = mapped_column(String(16), nullable=True)
+    order_crates: Mapped[int] = mapped_column(Integer, default=0)
     arrived_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
 
 
@@ -120,3 +124,46 @@ class TradeContribution(Base):
     city: Mapped[str] = mapped_column(String(16), index=True)
     points: Mapped[int] = mapped_column(Integer, default=0)
     raw: Mapped[int] = mapped_column(Integer, default=0)
+
+
+class TradeOrder(Base):
+    """Срочный заказ города: нужно total ящиков товара good_id, осталось
+    left. Общий для всех - кто довёз первым, тот и получил."""
+
+    __tablename__ = "trade_orders"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    city: Mapped[str] = mapped_column(String(16))
+    good_id: Mapped[str] = mapped_column(String(32))
+    total: Mapped[int] = mapped_column(Integer)
+    left: Mapped[int] = mapped_column(Integer)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
+
+
+class FactionWeek(Base):
+    """Итог недели фракции (неделя с понедельника по Москве): тройка лучших
+    поставщиков. first_id - «первый поставщик» на следующую неделю (доля
+    налога с переводов)."""
+
+    __tablename__ = "faction_weeks"
+
+    city: Mapped[str] = mapped_column(String(16), primary_key=True)
+    week_start: Mapped[date] = mapped_column(Date, primary_key=True)
+    first_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    second_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    third_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class FactionPayout(Base):
+    """Доля налога с переводов, накопленная первому поставщику фракции:
+    выдаётся раз в сутки одним сообщением."""
+
+    __tablename__ = "faction_payouts"
+
+    character_id: Mapped[int] = mapped_column(
+        ForeignKey("characters.id", ondelete="CASCADE"), primary_key=True
+    )
+    gold: Mapped[int] = mapped_column(BigInteger, default=0)
+    gems: Mapped[int] = mapped_column(BigInteger, default=0)

@@ -193,12 +193,19 @@ async def execute(
         raise TransferFailed("Количество должно быть больше нуля.")
 
     if offer.kind in ("gold", "gems"):
+        from game.economy import faction_config as fc
+        from services import faction_service
+
+        if amount < fc.TRANSFER_MIN:
+            raise TransferFailed(f"Валюту передают от {fc.TRANSFER_MIN}.")
         currency = "farm" if offer.kind == "gold" else "donate"
         try:
             await wallet_service.charge(db, sender_id, currency, amount)
         except wallet_service.NotEnoughCurrency:
             raise TransferFailed("Столько у тебя нет.") from None
-        await wallet_service.deposit(db, recipient_id, currency, amount)
+        # Налог фракции получателя (2026-10-15) вместо налога гильдии.
+        tax, _city = await faction_service.tax_transfer(db, recipient_id, currency, amount)
+        await wallet_service.deposit(db, recipient_id, currency, amount - tax, taxable=False)
     elif offer.kind == "elixir":
         key = {"elixir_id": offer.ref}
         if not await _take_stack(db, CharacterConsumable, {"character_id": sender_id, **key}, amount):

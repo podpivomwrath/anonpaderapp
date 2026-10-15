@@ -57,7 +57,7 @@ function NameForm({ busy, min, max, label, onSubmit }) {
 
 // --- Отправка повозки ---------------------------------------------------------
 
-function DispatchSheet({ cart, gold, routeTitles, busy, onSend, onClose }) {
+function DispatchSheet({ cart, gold, routeTitles, orders, busy, onSend, onClose }) {
   const [dest, setDest] = useState(cart.destinations[0]?.city);
   const [route, setRoute] = useState('safe');
   const [counts, setCounts] = useState({});
@@ -65,7 +65,14 @@ function DispatchSheet({ cart, gold, routeTitles, busy, onSend, onClose }) {
   const total = Object.values(counts).reduce((a, b) => a + b, 0);
   const free = cart.capacity - total;
   const cost = cart.goods.reduce((sum, g) => sum + (counts[g.id] || 0) * g.price, 0);
-  const revenue = cart.goods.reduce((sum, g) => sum + (counts[g.id] || 0) * (target?.prices[g.id] || 0), 0);
+  const orderFor = (city, goodId) => orders.find((o) => o.city === city && o.good.id === goodId);
+  // Ящики по заказу - по цене заказа, остальные - по цене города.
+  const revenue = cart.goods.reduce((sum, g) => {
+    const n = counts[g.id] || 0;
+    const o = orderFor(dest, g.id);
+    const byOrder = o ? Math.min(n, o.left) : 0;
+    return sum + (o ? byOrder * o.price : 0) + (n - byOrder) * (target?.prices[g.id] || 0);
+  }, 0);
   const set = (id, n) => setCounts({ ...counts, [id]: Math.max(0, n) });
   const info = target?.routes[route];
   const goods = Object.fromEntries(Object.entries(counts).filter(([, n]) => n > 0));
@@ -83,7 +90,10 @@ function DispatchSheet({ cart, gold, routeTitles, busy, onSend, onClose }) {
               className={`faction-choice__item${d.city === dest ? ' faction-choice__item--active' : ''}`}
               onClick={() => setDest(d.city)}>
               {d.title}
-              <span className="craft-hint">{d.kind === 'deficit' ? 'сосед, нехватка' : 'напротив, дальний рынок'}</span>
+              <span className="craft-hint">
+                {d.kind === 'deficit' ? 'сосед, нехватка' : 'напротив, дальний рынок'}
+                {cart.goods.some((g) => orderFor(d.city, g.id)) ? ' · 📜 заказ' : ''}
+              </span>
             </button>
           ))}
         </div>
@@ -109,6 +119,8 @@ function DispatchSheet({ cart, gold, routeTitles, busy, onSend, onClose }) {
                 <GoodName g={g} />
                 <span className="trade-dest__note">
                   {' '}{g.locked ? `с ${g.min_level} ур. торговли` : `${money(g.price)} → ${money(target?.prices[g.id])}`}
+                  {!g.locked && orderFor(dest, g.id)
+                    ? ` · 📜 заказ: ещё ${orderFor(dest, g.id).left} ящ. по ${money(orderFor(dest, g.id).price)}` : ''}
                 </span>
               </span>
               {!g.locked && (
@@ -205,6 +217,38 @@ function CartCard({ cart, gold, busy, act, onDispatch }) {
   );
 }
 
+function Orders({ data, busy, act }) {
+  const { firm } = data;
+  return (
+    <Group header={<Header>📜 Срочные заказы</Header>}>
+      <Div>
+        {data.orders.length === 0 ? (
+          <p className="craft-hint">Сейчас заказов нет. Новые появляются раз в несколько часов.</p>
+        ) : data.orders.map((o) => (
+          <div key={o.id} className="trade-dest__row">
+            <span className="trade-dest__good">
+              {o.title}: <GoodName g={o.good} />
+              <span className="trade-dest__note"> · ещё {o.left} из {o.total} ящ. · {duration(o.minutes_left * 60)}</span>
+            </span>
+            <b className="trade-dest__price">{money(o.price)}</b>
+          </div>
+        ))}
+        <p className="craft-hint">
+          Город платит на {data.order_bonus_pct}% дороже и вдвое больше процветания. Заказ общий: кто довёз первым,
+          тот и получил. Если заказ закрыли, пока повозка в пути, груз уйдёт по обычной цене.
+        </p>
+        {firm?.name && (
+          <label className="guild-check">
+            <input type="checkbox" checked={firm.notify_orders} disabled={busy}
+              onChange={(e) => act('notify', { orders: e.target.checked })} />
+            Сообщать в чат о новых заказах
+          </label>
+        )}
+      </Div>
+    </Group>
+  );
+}
+
 function Trade({ data, busy, act }) {
   const [dispatching, setDispatching] = useState(null);
   const { firm } = data;
@@ -277,6 +321,8 @@ function Trade({ data, busy, act }) {
         </Div>
       </Group>
 
+      <Orders data={data} busy={busy} act={act} />
+
       {data.carts.map((cart) => (
         <CartCard key={cart.slot} cart={cart} gold={data.gold} busy={busy} act={act} onDispatch={setDispatching} />
       ))}
@@ -308,7 +354,9 @@ function Trade({ data, busy, act }) {
                     {' · '}{t.crates ? `${t.crates} ящ.` : 'порожняком'}
                     {t.ambushes ? ` · ⚔ ${t.ambushes}` : ''}
                     {t.lost ? ` · 💥 ${t.lost}` : ''}
+                    {t.order_crates ? ` · 📜 по заказу ${t.order_crates}` : ''}
                     {' · '}{ago(t.minutes_ago)}
+                    {t.event ? <><br />🛤 {t.event}</> : null}
                   </span>
                 </span>
                 <b className={`trade-dest__price ${t.profit >= 0 ? 'faction-plus' : 'faction-minus'}`}>
@@ -322,7 +370,7 @@ function Trade({ data, busy, act }) {
 
       {dispatching && (
         <DispatchSheet
-          cart={dispatching} gold={data.gold} routeTitles={data.routes} busy={busy}
+          cart={dispatching} gold={data.gold} routeTitles={data.routes} orders={data.orders} busy={busy}
           onSend={async (params) => { if (await act('dispatch', params)) setDispatching(null); }}
           onClose={() => setDispatching(null)}
         />
@@ -354,6 +402,12 @@ function Factions({ data }) {
                 {f.next ? `До ступени «${f.next.name}» - ${money(f.next.min_points - f.points)} очков.` : 'Высшая ступень.'}
                 {' '}Сегодня торговцы принесли +{money(f.today)}, падение за сутки ~{money(f.decay_day)}.
               </p>
+              {f.first_supplier && <p className="guild-line">🏆 Первый поставщик недели: <b>{f.first_supplier}</b></p>}
+              {f.week_top.length > 0 && (
+                <p className="craft-hint">
+                  Лидеры этой недели: {f.week_top.map((w, i) => `${i + 1}. ${w.name} (${money(w.points)})`).join(', ')}
+                </p>
+              )}
               <p className="guild-line">
                 {f.tier.elixir_pct || f.tier.relic_pct
                   ? `Зелья в лавке ${pct(f.tier.elixir_pct)}, реликвии у скупщика ${pct(f.tier.relic_pct)}.`
@@ -371,6 +425,9 @@ function Factions({ data }) {
               торговца есть дневной потолок, он растёт с уровнем торговли. Без торговли процветание медленно падает:
               за пару недель город теряет половину.</p>
             <p>Скидки и надбавки действуют для всех, кто покупает и продаёт в этом городе.</p>
+            <p>Каждый понедельник подводятся итоги недели. Первый поставщик фракции получает по 2 Пепельных ларца,
+              Ларца руды и Ларца расходников, второй - по одному, третий - Пепельный ларец. Первый поставщик всю
+              следующую неделю получает долю налога с переводов игрокам своей фракции.</p>
             {data.tiers.map((t) => (
               <p key={t.id}>{t.emoji} {t.name} - от {money(t.min_points)}: зелья {pct(t.elixir_pct)}, реликвии {pct(t.relic_pct)}</p>
             ))}

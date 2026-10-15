@@ -18,7 +18,7 @@ from bot.onboarding_texts import REGION_TITLES
 from game.economy import faction_config as fc
 from game.economy import mining
 from game.economy import trade_config as tc
-from models import CharacterOre, TradeContribution
+from models import Character, CharacterOre, TradeContribution
 from services import faction_service, trade_service, wallet_service
 from services import onboarding_service as onboarding_svc
 
@@ -63,11 +63,16 @@ async def _factions(db, now: datetime) -> list[dict]:
         select(TradeContribution.city, func.coalesce(func.sum(TradeContribution.points), 0))
         .where(TradeContribution.day == today).group_by(TradeContribution.city)
     )).all())
+    week = faction_service.week_start(today)
     out = []
     for city in fc.CITIES:
         p = points[city]
         nxt = fc.next_tier(p)
+        first_id = await faction_service.first_supplier(db, city, now)
+        first = await db.get(Character, first_id) if first_id else None
         out.append({
+            "first_supplier": first.name if first is not None else None,
+            "week_top": [{"name": n, "points": raw} for _, n, raw in await faction_service.week_top(db, city, week)],
             "city": city, "title": REGION_TITLES[city], "points": round(p), "max": fc.MAX_POINTS,
             "tier": _tier(fc.tier_for(p)),
             "next": {"name": nxt.name, "emoji": nxt.emoji, "min_points": nxt.min_points} if nxt else None,
@@ -75,6 +80,15 @@ async def _factions(db, now: datetime) -> list[dict]:
             "decay_day": round(p * fc.DECAY_PER_DAY),
         })
     return out
+
+
+def _order(order, level: int, now: datetime) -> dict:
+    return {
+        "id": order.id, "city": order.city, "title": REGION_TITLES[order.city],
+        "good": _good(tc.GOODS_BY_ID[order.good_id]), "total": order.total, "left": order.left,
+        "price": trade_service.order_price(order, level),
+        "minutes_left": max(int((_aware(order.expires_at) - now).total_seconds() // 60), 0),
+    }
 
 
 def _cart(cart, level: int, ore_have: dict, prices: dict, now: datetime) -> dict:
@@ -152,7 +166,11 @@ async def _state(db, character) -> dict:
         "factions": await _factions(db, now),
         "tiers": [_tier(t) for t in fc.TIERS],
         "routes": {r: tc.ROUTE_TITLES[r] for r in tc.ROUTES},
+        "orders": [],
+        "order_bonus_pct": round((tc.ORDER_PRICE_MULT - 1) * 100),
     }
+    level = firm.trade_level if firm is not None else 1
+    state["orders"] = [_order(o, level, now) for o in await trade_service.active_orders(db, now)]
     if firm is None:
         return state
     carts = await trade_service.carts(db, character.id)
@@ -177,6 +195,8 @@ async def _state(db, character) -> dict:
             "id": t.id, "slot": t.slot, "from_title": REGION_TITLES[t.from_city], "to_title": REGION_TITLES[t.to_city],
             "route": t.route, "crates": t.crates, "revenue": t.revenue, "profit": t.profit,
             "ambushes": t.ambushes, "lost": trade_service.lost_text(t.lost or {}),
+            "event": tc.TRIP_EVENTS_BY_ID[t.event].text if t.event in tc.TRIP_EVENTS_BY_ID else None,
+            "order_crates": t.order_crates,
             "minutes_ago": max(int((now - _aware(t.arrived_at)).total_seconds() // 60), 0),
         }
         for t in await trade_service.recent_trips(db, character.id)

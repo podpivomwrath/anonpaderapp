@@ -290,3 +290,96 @@ async def test_buy_without_name_then_name(db_session, make_character) -> None:
         await trade_service.dispatch(db_session, c, 1, "docks", "short", {}, NoLuck(), NOW)
     await trade_service.name_firm(db_session, c, "Новая Лавка")
     assert firm.name == "Новая Лавка" and firm.name_key == "новая лавка"
+
+
+# --- Этап 2: заказы, события в пути, неделя фракции ---
+
+
+class Seq(random.Random):
+    """random() по очереди из списка, дальше - 0.999."""
+
+    def __init__(self, values):
+        super().__init__(1)
+        self.values = list(values)
+
+    def random(self) -> float:
+        return self.values.pop(0) if self.values else 0.999
+
+
+async def test_order_pays_more_and_closes(db_session, make_character) -> None:
+    from models import TradeOrder
+
+    c, _ = await firm_of(db_session, make_character)
+    order = TradeOrder(city="docks", good_id="ridge_slate", total=5, left=5, created_at=NOW,
+                       expires_at=NOW + timedelta(hours=3))
+    db_session.add(order)
+    await db_session.flush()
+    sent = await trade_service.dispatch(db_session, c, 1, "docks", "short", {"ridge_slate": 8}, NoLuck(), NOW)
+    at = sent.cart.arrives_at.replace(tzinfo=timezone.utc)
+    [a] = await trade_service.tick(db_session, NoLuck(), at)
+    assert a.order_crates == 5 and order.left == 0
+    good = tc.GOODS_BY_ID["ridge_slate"]
+    normal = round(trade_service.city_sell_price("docks", good, 0) * (1 + tc.sell_bonus(1)))
+    assert a.revenue > 8 * normal  # заказ платит больше города
+    assert a.prosperity == 8 + 5   # заказные ящики - вдвое
+    assert "срочному заказу" in a.text()
+    assert await trade_service.active_orders(db_session, at) == []
+
+
+async def test_order_tick_respects_gap_and_limit(db_session) -> None:
+    hit = AlwaysHit()
+    first = await trade_service.order_tick(db_session, hit, NOW)
+    assert first is not None and first.city != tc.GOODS_BY_ID[first.good_id].city
+    assert tc.ORDER_CRATES[0] <= first.total <= tc.ORDER_CRATES[1]
+    assert await trade_service.order_tick(db_session, hit, NOW + timedelta(hours=1)) is None  # пауза
+    second = await trade_service.order_tick(db_session, hit, NOW + timedelta(hours=2, minutes=1))
+    assert second is not None
+    # Оба открыты - предел 2, даже после паузы.
+    second.created_at = NOW
+    assert await trade_service.order_tick(db_session, hit, NOW + timedelta(hours=2, minutes=30)) is None
+    # Через 3 часа первый истёк - место освободилось.
+    assert await trade_service.order_tick(db_session, hit, NOW + timedelta(hours=3, minutes=1)) is not None
+
+
+def test_trip_event_roll() -> None:
+    assert trade_service.roll_event("short", 5, NoLuck()) is None
+    event = trade_service.roll_event("short", 5, AlwaysHit())
+    assert event is not None
+    # Пустая повозка - без событий с ящиками.
+    for _ in range(50):
+        e = trade_service.roll_event("short", 0, Seq([0.0]))
+        assert e is None or e.crates == 0
+
+
+async def test_trip_event_applied_on_arrival(db_session, make_character) -> None:
+    c, _ = await firm_of(db_session, make_character)
+    sent = await trade_service.dispatch(db_session, c, 1, "docks", "short", {"ridge_slate": 4}, NoLuck(), NOW)
+    sent.cart.event = "found"
+    [a] = await trade_service.tick(db_session, NoLuck(), sent.cart.arrives_at.replace(tzinfo=timezone.utc))
+    assert a.crates == 5 and a.event == "found" and "брошенный ящик" in a.text()
+    sent = await trade_service.dispatch(db_session, c, 1, "ridge", "short", {"docks_salt": 4}, NoLuck(), NOW)
+    sent.cart.event = "toll"
+    [a] = await trade_service.tick(db_session, NoLuck(), sent.cart.arrives_at.replace(tzinfo=timezone.utc))
+    assert a.toll == 120 and a.crates == 4
+
+
+async def test_week_close_rewards_top_three(db_session, make_character) -> None:
+    from models import CharacterLootbox, TradeContribution
+    from sqlalchemy import select
+
+    monday = datetime(2026, 10, 19, 0, 5, tzinfo=faction_service.MSK)
+    last_week = datetime(2026, 10, 14, 12, 0, tzinfo=timezone.utc)
+    players = [await make_character(level=20, region="docks") for _ in range(4)]
+    for c, raw in zip(players, (50, 300, 120, 10)):
+        db_session.add(TradeContribution(character_id=c.id, day=last_week.date(), city="docks", points=raw, raw=raw))
+    await db_session.flush()
+    awards = await faction_service.close_week(db_session, monday)
+    places = {a.character_id: a.place for a in awards}
+    assert places == {players[1].id: 1, players[2].id: 2, players[0].id: 3}
+    chests = (await db_session.scalars(
+        select(CharacterLootbox).where(CharacterLootbox.character_id == players[1].id)
+    )).all()
+    assert sorted(ch.kind for ch in chests) == ["ashen", "ashen", "ore", "ore", "supply", "supply"]
+    assert await faction_service.first_supplier(db_session, "docks", monday) == players[1].id
+    assert await faction_service.first_supplier(db_session, "ridge", monday) is None
+    assert await faction_service.close_week(db_session, monday) == []  # повторно - ничего

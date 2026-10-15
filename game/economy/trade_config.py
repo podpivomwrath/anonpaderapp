@@ -160,3 +160,50 @@ CART_TRIP_AMBUSH = 0.30
 CART_RING_MULT = {1: 0.25, 2: 1.0, 3: 1.6, 4: 2.4, 5: 3.5}
 AMBUSH_REF_CELLS = 30
 LOSS_ON_BREAK = 0.25          # обшивка выбита - рассыпается эта доля груза
+
+# --- Срочные заказы (этап 2, решения владельца 2026-10-15) ---
+# Общие для всех: город просит N ящиков одного товара по повышенной цене;
+# каждый довезённый ящик оплачивается по цене заказа, пока заказ не закрыт.
+ORDER_MAX_ACTIVE = 2
+ORDER_CHECK_MINUTES = 10
+ORDER_MIN_GAP_HOURS = 2          # новый - не раньше, чем через 2 ч после прошлого
+ORDER_SPAWN_CHANCE = 1 / 6       # за проверку после паузы: в среднем ещё ~1 ч
+ORDER_CRATES = (40, 80)
+ORDER_HOURS = 3
+ORDER_PRICE_MULT = 1.50          # к цене города без насыщения
+ORDER_PROSPERITY_MULT = 2
+#: Чем дороже товар, тем реже заказ на него: обычный - чаще всех.
+ORDER_TIER_WEIGHTS = {1: 4, 2: 3, 3: 2, 4: 1}
+
+
+@dataclass(frozen=True)
+class TripEvent:
+    id: str
+    text: str
+    good: bool          # хорошее (на безопасном пути плохие вдвое реже)
+    time_mult: float = 1.0
+    revenue_mult: float = 1.0
+    crates: int = 0     # +1 брошенный ящик / -1 вор
+    toll: int = 0       # мостовой сбор, золота
+
+
+#: Событие в пути - одной строкой в журнале и сообщении о прибытии.
+TRIP_EVENT_CHANCE = 0.25
+TRIP_EVENTS: list[TripEvent] = [
+    TripEvent("found", "На обочине подобрали брошенный ящик.", True, crates=1),
+    TripEvent("shortcut", "Возница знал короткую тропу - доехали быстрее.", True, time_mult=0.9),
+    TripEvent("fair", "В городе ярмарка - товар разобрали дороже.", True, revenue_mult=1.05),
+    TripEvent("washout", "Дорогу размыло - пришлось ждать.", False, time_mult=1.1),
+    TripEvent("lame", "Охромела лошадь - плелись шагом.", False, time_mult=1.15),
+    TripEvent("thief", "Ночью с повозки стащили ящик.", False, crates=-1),
+    TripEvent("toll", "На мосту взяли сбор за проезд.", False, toll=120),
+]
+TRIP_EVENTS_BY_ID = {e.id: e for e in TRIP_EVENTS}
+
+# --- Неделя фракции (этап 2) ---
+#: Награда тройке лучших поставщиков каждой фракции: {место: {вид ларца: штук}}.
+WEEK_REWARDS = {
+    1: {"ashen": 2, "ore": 2, "supply": 2},
+    2: {"ashen": 1, "ore": 1, "supply": 1},
+    3: {"ashen": 1},
+}

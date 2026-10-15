@@ -19,6 +19,9 @@ from vkbottle.bot import BotLabeler, Message
 from bot import editable_message
 from bot.activity import activity_action, blocked_reason
 from bot.keyboards.items import no_keyboard
+from bot.onboarding_texts import REGION_TITLES
+from game.economy import faction_config as fc
+from models import Character
 from services import onboarding_service, transfer_service
 from services.db import get_session_factory
 
@@ -33,7 +36,8 @@ NAMESPACE = "transfer"
 USAGE_TEXT = (
     "Чтобы передать, перешли сообщение получателя с подписью:\n"
     "передать <что> <сколько>\n"
-    "Например: передать золото 500, передать Малое исцеление 3, передать Скальпель Хирурга."
+    "Например: передать золото 500, передать Малое исцеление 3, передать Скальпель Хирурга.\n"
+    "Золото и самоцветы - от 100; 5% от перевода уходит в казну фракции получателя."
 )
 
 
@@ -105,6 +109,8 @@ def _resolve_qty(offer: transfer_service.Offer, qty: int | None) -> tuple[int | 
         qty = 1
     if qty <= 0:
         return None, "Количество должно быть больше нуля."
+    if offer.kind in ("gold", "gems") and qty < fc.TRANSFER_MIN:
+        return None, f"Валюту передают от {fc.TRANSFER_MIN}."
     if qty > offer.available:
         return None, f"У тебя только {offer.available}."
     return qty, None
@@ -221,16 +227,25 @@ async def transfer_confirm(message: Message) -> None:
             await db.rollback()
             await editable_message.send_or_edit(_bot_api, NAMESPACE, peer_id, str(exc), no_keyboard())
             return
+        recipient = await db.get(Character, pending.recipient_id)
+        city = recipient.region if recipient is not None else None
         await db.commit()
         sender_name = sender.name
 
     what = f"{offer.label}{_qty_text(offer, moved)}"
+    tax_line = ""
+    if offer.kind in ("gold", "gems"):
+        # Налог фракции получателя (2026-10-15): сколько ушло в казну.
+        tax = fc.transfer_tax(moved)
+        if tax:
+            treasury = f"казну {REGION_TITLES[city]}" if city in REGION_TITLES else "казну"
+            tax_line = f" Получено {moved - tax}, {tax} ушло в {treasury}."
     await editable_message.send_or_edit(
-        _bot_api, NAMESPACE, peer_id, f"📦 Передано игроку {pending.recipient_name}: {what}.", no_keyboard(),
+        _bot_api, NAMESPACE, peer_id, f"📦 Передано игроку {pending.recipient_name}: {what}.{tax_line}", no_keyboard(),
     )
     try:
         await _bot_api.messages.send(
-            peer_id=pending.recipient_peer, random_id=0, message=f"📦 {sender_name} передаёт тебе: {what}.",
+            peer_id=pending.recipient_peer, random_id=0, message=f"📦 {sender_name} передаёт тебе: {what}.{tax_line}",
         )
     except Exception:  # noqa: BLE001 - получатель мог запретить сообщения; передача уже состоялась
         logger.warning("Передача: не удалось уведомить получателя {}", pending.recipient_peer)

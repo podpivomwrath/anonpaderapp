@@ -62,3 +62,22 @@ def next_tier(points: float) -> Tier | None:
         if points < tier.min_points:
             return tier
     return None
+
+
+# --- Налог на переводы (этап 3, решения владельца 2026-10-15) ---
+#: С каждого перевода золота и самоцветов между игроками удерживается
+#: TRANSFER_TAX_PCT% (вниз); получатель получает остаток. Налог уходит в
+#: «казну» фракции получателя - из игры; LEADER_SHARE_PCT% от него (вниз)
+#: копится первому поставщику этой фракции и выдаётся раз в сутки.
+#: Налог гильдии с переводов не берётся.
+TRANSFER_MIN = 100
+TRANSFER_TAX_PCT = 5
+LEADER_SHARE_PCT = 25
+
+
+def transfer_tax(amount: int) -> int:
+    return amount * TRANSFER_TAX_PCT // 100
+
+
+def leader_share(tax: int) -> int:
+    return tax * LEADER_SHARE_PCT // 100

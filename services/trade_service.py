@@ -23,7 +23,7 @@ from game.economy import faction_config as fc
 from game.economy import trade_config as tc
 from game.world import grid
 from game.world import world_config as wc
-from models import Character, CharacterOre, TradeCart, TradeFirm, TradeMarket, TradeTrip
+from models import Character, CharacterOre, TradeCart, TradeFirm, TradeMarket, TradeOrder, TradeTrip
 from services import faction_service, lootbox_service, wallet_service
 
 
@@ -443,13 +443,95 @@ async def dispatch(
             raise TradeError(f"Не хватает золота: закупка стоит {total}.") from None
 
     cells = path(cart.city, to_city, route)
-    seconds = trip_seconds(cart, len(cells), route)
+    event = roll_event(route, total_crates, rng)
+    seconds = trip_seconds(cart, len(cells), route) * (event.time_mult if event else 1.0)
     cart.cargo, cart.paid = cargo, paid
     cart.status, cart.to_city, cart.route = "traveling", to_city, route
     cart.departed_at, cart.arrives_at = now, now + timedelta(seconds=seconds)
     cart.ambushes = roll_ambushes(cart, cells, rng)
+    cart.event = event.id if event else None
     await db.flush()
     return Dispatch(cart, total, total_crates, seconds)
+
+
+def roll_event(route: str, crates_count: int, rng: random.Random) -> tc.TripEvent | None:
+    """Событие в пути (или ничего). На безопасном пути плохие - вдвое реже;
+    события с ящиками - только если есть груз."""
+    if rng.random() >= tc.TRIP_EVENT_CHANCE:
+        return None
+    pool, weights = [], []
+    for event in tc.TRIP_EVENTS:
+        if event.crates and not crates_count:
+            continue
+        pool.append(event)
+        weights.append(1.0 if event.good or route != "safe" else 0.5)
+    return rng.choices(pool, weights)[0]
+
+
+# --- Срочные заказы ---
+
+
+def order_price(order: TradeOrder, level: int) -> int:
+    """Цена ящика по заказу: цена города без насыщения x наценка заказа,
+    с бонусом уровня торговли."""
+    good = tc.GOODS_BY_ID[order.good_id]
+    return round(city_sell_price(order.city, good, 0.0) * tc.ORDER_PRICE_MULT * (1 + tc.sell_bonus(level)))
+
+
+async def active_orders(db: AsyncSession, now: datetime | None = None) -> list[TradeOrder]:
+    now = _aware(now or _now())
+    return list((await db.scalars(
+        select(TradeOrder).where(TradeOrder.expires_at > now, TradeOrder.left > 0).order_by(TradeOrder.id)
+    )).all())
+
+
+async def order_tick(db: AsyncSession, rng: random.Random | None = None, now: datetime | None = None) -> TradeOrder | None:
+    """Раз в ORDER_CHECK_MINUTES: если заказов меньше предела и с прошлого
+    прошло ORDER_MIN_GAP_HOURS - с шансом появляется новый."""
+    rng = rng or random.Random()
+    now = _aware(now or _now())
+    if len(await active_orders(db, now)) >= tc.ORDER_MAX_ACTIVE:
+        return None
+    last = await db.scalar(select(func.max(TradeOrder.created_at)))
+    if last is not None and now - _aware(last) < timedelta(hours=tc.ORDER_MIN_GAP_HOURS):
+        return None
+    if rng.random() >= tc.ORDER_SPAWN_CHANCE:
+        return None
+    return await spawn_order(db, rng, now)
+
+
+async def spawn_order(db: AsyncSession, rng: random.Random, now: datetime | None = None) -> TradeOrder:
+    now = _aware(now or _now())
+    busy = {(o.city, o.good_id) for o in await active_orders(db, now)}
+    goods = [g for g in tc.GOODS]
+    good = rng.choices(goods, [tc.ORDER_TIER_WEIGHTS[g.tier] for g in goods])[0]
+    cities = [c for c in fc.CITIES if c != good.city and (c, good.id) not in busy] or [
+        c for c in fc.CITIES if c != good.city
+    ]
+    count = rng.randint(*tc.ORDER_CRATES)
+    order = TradeOrder(
+        city=rng.choice(cities), good_id=good.id, total=count, left=count,
+        created_at=now, expires_at=now + timedelta(hours=tc.ORDER_HOURS),
+    )
+    db.add(order)
+    await db.flush()
+    return order
+
+
+def order_text(order: TradeOrder) -> str:
+    good = tc.GOODS_BY_ID[order.good_id]
+    return (
+        f"📜 Срочный заказ: {city_title(order.city)} нужно {order.total} ящ. «{good.name}» "
+        f"({tc.TIER_NAMES[good.tier]}), цена +{round((tc.ORDER_PRICE_MULT - 1) * 100)}%, "
+        f"на {tc.ORDER_HOURS} ч. Кто довёз первым - тот и получил. Вкладка «Фракция»."
+    )
+
+
+async def order_subscribers(db: AsyncSession) -> list[int]:
+    """Персонажи, включившие вести о заказах."""
+    return list((await db.scalars(
+        select(TradeFirm.character_id).where(TradeFirm.notify_orders.is_(True), TradeFirm.name.is_not(None))
+    )).all())
 
 
 # --- Прибытие ---
@@ -498,11 +580,18 @@ class Arrival:
     level_up: int | None = None
     prosperity: int = 0
     char_levelup: object = None
+    event: str | None = None
+    order_crates: int = 0
+    toll: int = 0
 
     def text(self) -> str:
         lines = [f"🐂 Повозка №{self.slot} фирмы «{self.firm_name}» прибыла в {city_title(self.to_city)}."]
         if self.crates:
             lines.append(f"💰 Продано {self.crates} ящ. за {self.revenue} золота, прибыль {self.profit:+d}.")
+        if self.order_crates:
+            lines.append(f"📜 По срочному заказу ушло {self.order_crates} ящ.")
+        if self.event:
+            lines.append(f"🛤 {tc.TRIP_EVENTS_BY_ID[self.event].text}")
         if self.ambushes:
             lines.append(f"⚔ В пути напали {self.ambushes} раз(а), обшивка {self.durability}/{self.max_durability}.")
         if self.lost:
@@ -536,13 +625,41 @@ async def arrive(
         for good_id, n in _lose(cart, tc.LOSS_ON_BREAK, rng).items():
             out.lost[good_id] = out.lost.get(good_id, 0) + n
     out.durability, out.max_durability = cart.durability, max_durability(cart)
+    event = tc.TRIP_EVENTS_BY_ID.get(cart.event or "")
+    out.event = event.id if event else None
+    if event is not None and event.crates and cart.cargo:
+        cargo, paid = dict(cart.cargo), dict(cart.paid or {})
+        good_id = rng.choice(sorted(cargo))
+        if event.crates > 0:
+            cargo[good_id] += event.crates  # брошенный ящик - бесплатный
+        else:
+            per = paid.get(good_id, 0) / cargo[good_id]
+            cargo[good_id] -= 1
+            paid[good_id] = round(paid.get(good_id, 0) - per)
+            if cargo[good_id] <= 0:
+                cargo.pop(good_id)
+                paid.pop(good_id, None)
+        cart.cargo, cart.paid = cargo, paid
 
     revenue = cost = raw = 0
     level = firm.trade_level
     for good_id, count in (cart.cargo or {}).items():
         good = tc.GOODS_BY_ID[good_id]
+        # Сначала - срочный заказ на этот товар здесь, если он ещё открыт.
+        order = await db.scalar(
+            select(TradeOrder).where(
+                TradeOrder.city == cart.to_city, TradeOrder.good_id == good_id,
+                TradeOrder.left > 0, TradeOrder.expires_at > now,
+            ).order_by(TradeOrder.id).limit(1).with_for_update().execution_options(populate_existing=True)
+        )
+        by_order = min(order.left, count) if order is not None else 0
+        if by_order:
+            order.left -= by_order
+            revenue += order_price(order, level) * by_order
+            out.order_crates += by_order
+            raw += fc.POINTS_PER_CRATE[good.tier] * by_order * (tc.ORDER_PROSPERITY_MULT - 1)
         row = await market_row(db, cart.to_city, good_id, lock=True, now=now)
-        for _ in range(count):
+        for _ in range(count - by_order):
             revenue += round(city_sell_price(cart.to_city, good, row.pressure) * (1 + tc.sell_bonus(level)))
             row.pressure += tc.SATURATION_PER_CRATE
         cost += (cart.paid or {}).get(good_id, 0)
@@ -552,6 +669,10 @@ async def arrive(
         for _ in range(count):
             if rng.random() < tc.CHEST_CHANCE_PER_CRATE[good.tier]:
                 out.chests += 1
+    if event is not None and revenue:
+        revenue = round(revenue * event.revenue_mult)
+        out.toll = min(event.toll, revenue)
+        revenue -= out.toll
     out.revenue, out.profit = revenue, revenue - cost
     if revenue:
         await wallet_service.deposit(db, character.id, "farm", revenue)
@@ -571,12 +692,13 @@ async def arrive(
     db.add(TradeTrip(
         character_id=cart.character_id, slot=cart.slot, from_city=cart.city, to_city=cart.to_city,
         route=cart.route or "short", crates=out.crates, revenue=revenue, profit=out.profit,
-        ambushes=out.ambushes, lost=out.lost, arrived_at=now,
+        ambushes=out.ambushes, lost=out.lost, event=out.event, order_crates=out.order_crates, arrived_at=now,
     ))
     cart.city = cart.to_city
     cart.status, cart.to_city, cart.route = "idle", None, None
     cart.departed_at = cart.arrives_at = None
     cart.ambushes = 0
+    cart.event = None
     cart.cargo, cart.paid = {}, {}
     await db.flush()
     return out

@@ -38,7 +38,8 @@ async def test_gold_moves_and_is_logged(db_session, make_character) -> None:
     offer = (await ts.find(db_session, a.id, "золото")).offers[0]
     assert await ts.execute(db_session, a.id, b.id, offer, 300) == 300
     assert (await wallet_service.get_wallet(db_session, a.id)).farm_currency == 700
-    assert (await wallet_service.get_wallet(db_session, b.id)).farm_currency == 310
+    # 5% (вниз) - налог фракции получателя (2026-10-15).
+    assert (await wallet_service.get_wallet(db_session, b.id)).farm_currency == 10 + 285
     log = await db_session.scalar(select(TransferLog))
     assert (log.kind, log.amount, log.from_character_id, log.to_character_id) == ("gold", 300, a.id, b.id)
 
@@ -52,11 +53,11 @@ async def test_cannot_give_more_gold_than_owned(db_session, make_character) -> N
 
 
 async def test_gems_move(db_session, make_character) -> None:
-    a = await make_character(donate=50)
+    a = await make_character(donate=500)
     b = await make_character()
     offer = (await ts.find(db_session, a.id, "самоцветы")).offers[0]
-    await ts.execute(db_session, a.id, b.id, offer, 20)
-    assert (await wallet_service.get_wallet(db_session, b.id)).donate_currency == 20
+    await ts.execute(db_session, a.id, b.id, offer, 200)
+    assert (await wallet_service.get_wallet(db_session, b.id)).donate_currency == 190
 
 
 async def test_elixirs_move_into_new_and_existing_stacks(db_session, make_character) -> None:
@@ -209,3 +210,59 @@ async def test_inventory_payload_lists_relics_and_consumables(db_session, make_c
     assert relic["icon"] == "trophy:blood_shard" and relic["description"]
     potion = payload["consumables"][0]
     assert potion["transfer_prefix"] == "передать Малое исцеление" and potion["count"] == 4
+
+
+# --- Налог фракции на переводы валюты (2026-10-15) ---
+
+
+async def test_currency_minimum(db_session, make_character) -> None:
+    a = await make_character(farm=1000, donate=1000)
+    b = await make_character(region="docks")
+    for word in ("золото", "самоцветы"):
+        offer = (await ts.find(db_session, a.id, word)).offers[0]
+        with pytest.raises(ts.TransferFailed, match="от 100"):
+            await ts.execute(db_session, a.id, b.id, offer, 99)
+
+
+async def test_tax_rounds_down_and_feeds_first_supplier(db_session, make_character) -> None:
+    from datetime import date
+
+    from models import FactionPayout, FactionWeek
+    from services import faction_service
+
+    a = await make_character(farm=10_000, donate=1000, region="ridge")
+    b = await make_character(region="docks")
+    leader = await make_character(region="docks")
+    today = faction_service.msk_day(faction_service._now())
+    prev = faction_service.week_start(today) - __import__("datetime").timedelta(days=7)
+    db_session.add(FactionWeek(city="docks", week_start=prev, first_id=leader.id))
+    await db_session.flush()
+    gold = (await ts.find(db_session, a.id, "золото")).offers[0]
+    await ts.execute(db_session, a.id, b.id, gold, 139)
+    assert (await wallet_service.get_wallet(db_session, b.id)).farm_currency == 133  # налог 6
+    gems = (await ts.find(db_session, a.id, "самоцветы")).offers[0]
+    await ts.execute(db_session, a.id, b.id, gems, 400)
+    assert (await wallet_service.get_wallet(db_session, b.id)).donate_currency == 380  # налог 20
+    row = await db_session.get(FactionPayout, leader.id)
+    assert (row.gold, row.gems) == (1, 5)  # 25% от 6 и от 20, вниз
+    payouts = await faction_service.pay_leaders(db_session)
+    assert [(p.character_id, p.gold, p.gems) for p in payouts] == [(leader.id, 1, 5)]
+    w = await wallet_service.get_wallet(db_session, leader.id)
+    assert (w.farm_currency, w.donate_currency) == (1, 5)
+    assert await faction_service.pay_leaders(db_session) == []
+    assert isinstance(prev, date)
+
+
+async def test_no_guild_tax_on_transfer(db_session, make_character) -> None:
+    from models import Guild
+
+    a = await make_character(farm=1000)
+    b = await make_character()
+    guild = Guild(name="Налоговики", tag="НАЛ", gold_tax=20)
+    db_session.add(guild)
+    await db_session.flush()
+    b.guild_id = guild.id
+    await db_session.flush()
+    offer = (await ts.find(db_session, a.id, "золото")).offers[0]
+    await ts.execute(db_session, a.id, b.id, offer, 200)
+    assert (await wallet_service.get_wallet(db_session, b.id)).farm_currency == 190
