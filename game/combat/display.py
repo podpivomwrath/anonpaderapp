@@ -120,7 +120,9 @@ def xp_delta_line(xp: int, mult: float = 1.0, premium: bool = False) -> str:
         return ""
     parts = [f"+{xp} опыта"]
     if mult > 1.0:
-        parts.append(f"×{mult:.1f} за опасность")
+        parts.append(f"×{mult:.1f} за опасность".replace(".", ","))
+    elif mult < 1.0:
+        parts.append(f"×{round(mult, 2):g} - слабая цель".replace(".", ","))
     line = " · ".join(parts)
     if premium:
         line += " (💠 +50%)"

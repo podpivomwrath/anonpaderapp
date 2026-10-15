@@ -66,7 +66,11 @@ def test_xp_delta_line_with_premium_shows_marker() -> None:
 
 def test_xp_delta_line_with_mult_and_premium_combined() -> None:
     line = display.xp_delta_line(180, mult=1.2, premium=True)
-    assert line == "(+180 опыта · ×1.2 за опасность (💠 +50%))"
+    assert line == "(+180 опыта · ×1,2 за опасность (💠 +50%))"
+
+
+def test_xp_delta_line_weak_target() -> None:
+    assert display.xp_delta_line(58, mult=0.55) == "(+58 опыта · ×0,55 - слабая цель)"
 
 
 # --- flavor.quest_reward_line ---

@@ -43,9 +43,12 @@ async def test_reward_mob_kill_splits_xp_proportionally_to_level(db_session, cha
     high = await character_at(5, 5, level=30)
     rewards = await gcs.reward_mob_kill(db_session, [low, high], mob_level=20, rng=random.Random(1))
     by_id = {r.character_id: r for r in rewards}
-    # Высокоуровневый должен получить БОЛЬШЕ опыта, чем низкоуровневый —
-    # доля пропорциональна уровню (30 против 10).
-    assert by_id[high.id].xp_gained > by_id[low.id].xp_gained
+    # Доля пропорциональна уровню (30 против 10), но для 30-го моб 20-го -
+    # слабая цель (x0.2), а для 10-го - опасная (x2), 2026-10-15.
+    base = experience_service.xp_per_mob(20)
+    for who, share in ((low, 10 / 40), (high, 30 / 40)):
+        mult = experience_service.mob_xp_level_diff_multiplier(20, who.level)
+        assert abs(by_id[who.id].xp_gained - base * share * mult) <= 1
 
 
 async def test_reward_mob_kill_applies_level_diff_bonus_on_top_of_share(db_session, character_at) -> None:

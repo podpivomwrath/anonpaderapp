@@ -19,6 +19,7 @@ from bot.keyboards import fishing as kb
 from bot.keyboards.world import movement_keyboard
 from game.economy import fishing
 from game.economy import fishing_config as fc
+from game.world import grid
 from game.world.scheduler import PeerScheduler
 from services import experience_service, guild_quest_service
 from services import (
@@ -219,7 +220,10 @@ async def strike(message: Message) -> None:
 
         result = await fishing_service.strike(db, character, lake, _rng)
         guild_lines = await guild_quest_service.record(db, character, "fish", 1) if result.landed else []
-        char_xp = await experience_service.grant_activity_xp(db, character, "fish") if result.landed else None
+        # Опыт - по уровню клетки озера (2026-10-15), как у мобов этой клетки.
+        char_xp = await experience_service.grant_activity_xp(
+            db, character, "fish", place_level=grid.mob_level_at(character.pos_x, character.pos_y, character.level),
+        ) if result.landed else None
         grams = await fishing_service.bag_total_grams(db, character.id)
         capacity = fishing.bag_capacity_grams(character.fishing_level)
         await db.commit()

@@ -18,6 +18,7 @@ from bot import pending_activity
 from bot.activity import activity_action, blocked_reason
 from bot.keyboards import mining as kb
 from bot.keyboards.world import movement_keyboard
+from game.world import grid
 from game.world.scheduler import PeerScheduler
 from services import experience_service, guild_quest_service, mining_service, mount_service, screen_service
 from services import onboarding_service as onboarding_svc
@@ -112,7 +113,10 @@ async def on_dig_done(peer_id: int) -> None:
         guild_lines = (
             await guild_quest_service.record(db, character, "ore", 1) if result is not None else []
         )
-        char_xp = await experience_service.grant_activity_xp(db, character, "ore") if result is not None else None
+        # Опыт - по уровню клетки рудника (2026-10-15), как у мобов этой клетки.
+        char_xp = await experience_service.grant_activity_xp(
+            db, character, "ore", place_level=grid.mob_level_at(character.pos_x, character.pos_y, character.level),
+        ) if result is not None else None
         mine = mining_service.mine_at(character)
         left = await mining_service.ore_in_mine(db, mine.id) if mine else 0
         on_mine_screen = character.screen == "mine"

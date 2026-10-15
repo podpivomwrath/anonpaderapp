@@ -31,9 +31,14 @@ def mob_xp_level_diff_multiplier(mob_level: int, player_level: int) -> float:
     Симметричен по форме level_diff_modifiers (game.combat.formulas), но
     отдельные константы: калибровка урона и опыта не обязана совпадать."""
     diff = mob_level - player_level
-    if diff <= 0:
+    if diff > 0:
+        return min(1 + bc.XP_LEVEL_DIFF_BONUS * diff, bc.XP_LEVEL_DIFF_CAP)
+    below = -diff - bc.XP_LOW_FREE_GAP
+    if below <= 0:
         return 1.0
-    return min(1 + bc.XP_LEVEL_DIFF_BONUS * diff, bc.XP_LEVEL_DIFF_CAP)
+    # Слабая цель (2026-10-15): уровень моба теперь от клетки, и без штрафа
+    # выгодно было бы фармить тех, кто умирает с удара.
+    return max(1 - bc.XP_LOW_PENALTY * below, bc.XP_LOW_FLOOR)
 
 
 def xp_for_kill(mob_level: int, player_level: int) -> tuple[int, float]:
@@ -126,13 +131,24 @@ def add_experience(
     )
 
 
-async def grant_activity_xp(db, character: Character, kind: str, count: int = 1) -> LevelUp:
+async def grant_activity_xp(
+    db, character: Character, kind: str, count: int = 1, place_level: int | None = None,
+) -> LevelUp:
     """Опыт персонажа за мирное занятие (рыба, руда, ящик) - в долях моба
-    своего уровня (bc.ACTIVITY_XP_MOBS), по общим правилам начисления."""
+    (bc.ACTIVITY_XP_MOBS), по общим правилам начисления.
+
+    place_level (2026-10-15) - уровень мобов клетки, где ловят/копают: опыт
+    как за моба этого уровня, с тем же бонусом и штрафом за разницу, что у
+    боя. Иначе 40-й уровень у озера I кольца получал бы опыт как за 40-го
+    моба. Без place_level - моб своего уровня (продажа ящиков в городе)."""
     from sqlalchemy import select
 
     stats = await db.scalar(select(CharacterStats).where(CharacterStats.character_id == character.id))
-    amount = round(xp_per_mob(character.level) * bc.ACTIVITY_XP_MOBS[kind] * count)
+    per_mob = (
+        xp_for_kill(place_level, character.level)[0] if place_level is not None
+        else xp_per_mob(character.level)
+    )
+    amount = round(per_mob * bc.ACTIVITY_XP_MOBS[kind] * count)
     if stats is None or amount <= 0:
         return LevelUp(levels_gained=0, new_level=character.level)
     return add_experience(character, stats, amount)

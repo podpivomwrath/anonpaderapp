@@ -49,19 +49,27 @@ def test_xp_per_mob_formula() -> None:
 # --- Патч 26: опыт за разницу уровней ---
 
 
-def test_mob_xp_level_diff_multiplier_no_bonus_at_or_below_player_level() -> None:
+def test_mob_xp_level_diff_multiplier_no_change_near_player_level() -> None:
     assert svc.mob_xp_level_diff_multiplier(7, 7) == 1.0
-    assert svc.mob_xp_level_diff_multiplier(3, 7) == 1.0
+    assert svc.mob_xp_level_diff_multiplier(5, 7) == 1.0  # -2 - без штрафа
+
+
+def test_mob_xp_level_diff_multiplier_penalty_for_weak_targets() -> None:
+    """2026-10-15: ниже на 3+ - -15% за каждый уровень после второго, не меньше x0.2."""
+    assert svc.mob_xp_level_diff_multiplier(17, 20) == pytest.approx(0.85)
+    assert svc.mob_xp_level_diff_multiplier(15, 20) == pytest.approx(0.55)
+    assert svc.mob_xp_level_diff_multiplier(1, 60) == bc.XP_LOW_FLOOR
 
 
 def test_mob_xp_level_diff_multiplier_scales_and_caps() -> None:
-    assert svc.mob_xp_level_diff_multiplier(16, 7) == pytest.approx(1 + 0.08 * 9)
+    assert svc.mob_xp_level_diff_multiplier(16, 7) == pytest.approx(1 + 0.10 * 9)
+    assert svc.mob_xp_level_diff_multiplier(30, 20) == pytest.approx(2.0)
     assert svc.mob_xp_level_diff_multiplier(100, 1) == bc.XP_LEVEL_DIFF_CAP
 
 
 def test_xp_for_kill_applies_multiplier() -> None:
     xp, mult = svc.xp_for_kill(16, 7)
-    assert mult == pytest.approx(1 + 0.08 * 9)
+    assert mult == pytest.approx(1 + 0.10 * 9)
     assert xp == int(svc.xp_per_mob(16) * mult)
 
 
