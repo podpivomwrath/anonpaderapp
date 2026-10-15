@@ -119,6 +119,12 @@ def dig_result_text(result) -> str:
     return chr(10).join(lines)
 
 
+def vein_left_line(left: int) -> str:
+    if left <= 0:
+        return "🪨 Жила пуста. Руда появится снова, когда игроки будут исследовать мир."
+    return f"🪨 В жиле осталось руды: {left}."
+
+
 def ore_screen(ore: list) -> str:
     """Инвентарь руды. Цен нет: руду нельзя продать ни одному НПС, она ждёт
     прокачки снаряжения и торговли между игроками."""

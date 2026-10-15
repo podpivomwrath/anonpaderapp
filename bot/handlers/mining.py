@@ -107,6 +107,8 @@ async def on_dig_done(peer_id: int) -> None:
             # бота, любая будущая ветка выхода) — добыча остаётся висеть и
             # завершится, когда он вернётся в жилу.
             return
+        # Мелкая жила из события - не рудник карты, остатка у неё нет.
+        event_vein = character.mining_mine_id is None
         result = await mining_service.finish_dig(
             db, character, _rng, dig_seconds=_dig_seconds.pop(peer_id, None)
         )
@@ -128,6 +130,9 @@ async def on_dig_done(peer_id: int) -> None:
     xp_line = experience_service.activity_xp_line(char_xp) if char_xp else ""
     if xp_line:
         text += f"\n{xp_line}"
+    if mine is not None and not event_vein:
+        # Сколько руды осталось в жиле (2026-10-15, предложение игрока).
+        text += f"\n{mt.vein_left_line(left)}"
     if guild_lines:
         text += "\n\n" + "\n".join(guild_lines)
     keyboard = kb.mine_keyboard(left > 0) if on_mine_screen else None
