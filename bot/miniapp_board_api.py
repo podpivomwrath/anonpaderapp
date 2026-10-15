@@ -112,7 +112,8 @@ async def handle_get(request: web.Request) -> web.Response:
             "wanted": await _wanted(db, now),
             "rating": [
                 {"rank": e.rank, "name": e.name, "value": e.value, "premium": e.premium,
-                 "base_class": e.base_class, "subclass": e.subclass}
+                 "base_class": e.base_class, "subclass": e.subclass,
+                 "title": e.title, "title_tier": e.title_tier}
                 for e in rating
             ],
         }
