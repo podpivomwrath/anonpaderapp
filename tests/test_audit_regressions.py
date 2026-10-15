@@ -196,3 +196,40 @@ async def test_pvp_attack_interrupts_group_pve_without_result(monkeypatch, db_se
     assert not gc.has_active_group_battle(501) and not gc.has_active_group_battle(502)
     assert not gc.is_group_fighting(4242)
     assert [m["peer_id"] for m in sent] == [502] and "напали" in sent[0]["message"]
+
+
+async def test_group_victory_raises_fallen_member(monkeypatch, db_session, make_character):
+    """2026-10-15: группа победила - павший в бою не умирает, встаёт с 10% HP."""
+    from bot.handlers import group_combat as gc
+    from services import death_service
+
+    a = await make_character(region="ridge")
+    b = await make_character(region="ridge")
+    for c in (a, b):
+        c.pos_x, c.pos_y = 5, 20
+    battle_id = -9998
+    battle = gc.GroupBattle(group_id=4343, participants={
+        a.id: gc.Participant(a.id, 601, a.name, a.base_class, None),
+        b.id: gc.Participant(b.id, 602, b.name, b.base_class, None),
+    }, mob_ids={99999})
+    battle.last_combatants = {
+        a.id: SimpleNamespace(alive=True, current_hp=80, max_hp=100, kind="character", level=a.level),
+        b.id: SimpleNamespace(alive=False, current_hp=0, max_hp=100, kind="character", level=b.level),
+        99999: SimpleNamespace(alive=False, current_hp=0, max_hp=50, kind="mob", level=1),
+    }
+    gc._battles[battle_id] = battle
+
+    class Context:
+        async def __aenter__(self): return db_session
+        async def __aexit__(self, *args): pass
+
+    sent = []
+    async def send(**kw): sent.append(kw)
+    async def summary(*args): pass
+    monkeypatch.setattr(gc, "_bot_api", SimpleNamespace(messages=SimpleNamespace(send=send)))
+    monkeypatch.setattr(gc, "get_session_factory", lambda: Context)
+    monkeypatch.setattr(gc, "_send_location_summary", summary)
+    monkeypatch.setattr(gc.ash_service, "roll_appears", lambda rng: False)
+    await gc.on_group_battle_finished(battle_id, SimpleNamespace())
+    assert not death_service.is_dead(b)
+    assert any(m["peer_id"] == 602 and "подняла тебя" in m["message"] for m in sent)

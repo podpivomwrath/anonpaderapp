@@ -102,6 +102,9 @@ class GroupBattle:
     story_quest_id: str | None = None
 
 
+#: Сколько здоровья у павшего, если группа всё же победила.
+RAISED_HP_PCT = 0.10
+
 _battles: dict[int, GroupBattle] = {}
 _peer_battle: dict[int, int] = {}
 _declared_this_tick: dict[int, set[int]] = {}
@@ -753,6 +756,15 @@ async def on_group_battle_finished(session_id: int, result: TickResult) -> None:
     combatants = battle.last_combatants
     survivor_ids = [cid for cid in battle.participants if cid in combatants and combatants[cid].alive]
     dead_ids = [cid for cid in battle.participants if cid in combatants and not combatants[cid].alive]
+    # Группа победила - павших в бою поднимают свои (2026-10-15, решение
+    # владельца): без смерти и потери опыта, с малым запасом здоровья.
+    # Погибают только если пала вся группа.
+    raised_ids: list[int] = []
+    if survivor_ids and dead_ids:
+        for cid in dead_ids:
+            me = combatants[cid]
+            me.current_hp = max(1, round(me.max_hp * RAISED_HP_PCT))
+        raised_ids, survivor_ids, dead_ids = dead_ids, survivor_ids + dead_ids, []
 
     # Ежедневки на бои (2026-10-13: в группе не засчитывались вовсе). Отчёта
     # о ходах по каждому участнику у группы нет - засчитываем победу с
@@ -798,6 +810,12 @@ async def on_group_battle_finished(session_id: int, result: TickResult) -> None:
             pos = positions.get(cid, (0, 0))
             keyboard = movement_keyboard(*pos, p.peer_id, has_mount=has_mount_by_cid.get(cid, False))
             await _bot_api.messages.send(peer_id=p.peer_id, message="🏆 Группа побеждает!", random_id=0)
+            if cid in raised_ids:
+                await _bot_api.messages.send(
+                    peer_id=p.peer_id, random_id=0,
+                    message=f"🩸 Ты пал в бою, но группа победила и подняла тебя: "
+                            f"{round(RAISED_HP_PCT * 100)}% здоровья, опыт не потерян.",
+                )
             daily = battle_dailies.get(cid)
             if daily is not None:
                 notice = dailies_texts.progress_notice(daily)

@@ -8,7 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from game.combat import display
 from models import Character, CharacterStats, User
-from services import group_service, item_service, vitals_service
+from services import death_service, group_service, item_service, vitals_service
 from services.db import get_session_factory
 
 
@@ -27,6 +27,10 @@ async def group_summary_block(db: AsyncSession, character_id: int) -> str | None
         max_hp = vitals_service.max_hp(member, stats, vit_bonus)
         current_hp = vitals_service.current_hp(member, stats, vit_bonus)
         crown = "👑 " if member.id == snapshot.leader_character_id else ""
+        if death_service.is_dead(member):
+            # Павший ждёт возрождения - полоска HP тут врала бы (2026-10-15).
+            lines.append(f"{crown}{member.name} · {member.level} ур. · ☠ ждёт возрождения")
+            continue
         lines.append(
             f"{crown}{member.name} · {member.level} ур. · "
             f"{display.health_bar(current_hp, max_hp)} · ({member.pos_x}; {member.pos_y})"
