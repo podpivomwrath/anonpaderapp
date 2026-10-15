@@ -1,9 +1,9 @@
-"""Вкладка «Доска»: розыск, бои, сезон (bot/miniapp_board_api.py)."""
+"""Вкладка «Доска»: розыск и сезон (bot/miniapp_board_api.py)."""
 
 from datetime import datetime, timezone
 
 from bot import miniapp_board_api as board
-from services import pk_service, pvp_service
+from services import pk_service
 
 NOW = datetime(2026, 10, 15, 12, 0, tzinfo=timezone.utc)
 
@@ -18,11 +18,6 @@ async def test_wanted_lists_branded_with_bounty(db_session, make_character):
     assert rows[0]["next_decay_min"] == 300
 
 
-async def test_moments_and_season(db_session, make_character):
-    a = await make_character(level=20)
-    b = await make_character(level=20)
-    await pvp_service.log_battle(db_session, "duel", [a.id, b.id], [a.id])
-    moments = await board._moments(db_session)
-    assert moments[0]["winners"] == [a.name] and moments[0]["losers"] == [b.name]
+def test_season():
     season = board._season(NOW)
     assert season["name"] == "Октябрь 2026" and season["days_left"] == 16

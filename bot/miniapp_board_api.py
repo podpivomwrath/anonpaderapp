@@ -1,7 +1,8 @@
 """Вкладка «Доска» мини-аппа: /api/miniapp/board (2026-10-15).
 
 Всё PvP в одном месте: розыск (клеймёные убийцы слабых и награда за их
-голову), рейтинг PTS, сезон с рангами и последние бои. Позже сюда же -
+голову), рейтинг PTS и сезон с рангами. Последние бои
+не отдаём: кто с кем дрался - личное дело игроков (решение владельца). Позже сюда же -
 награда за голову, назначенная игроками.
 """
 
@@ -15,7 +16,7 @@ from bot.app_keys import SESSION_FACTORY_KEY
 from bot.miniapp_auth import VK_USER_ID_KEY
 from game.economy import pk_config as pkc
 from game.economy import pts_config as ptc
-from models import Character, PvpBattle
+from models import Character
 from services import leaderboard_service, pk_service, pts_service, pvp_service
 from services import onboarding_service as onboarding_svc
 
@@ -64,26 +65,6 @@ async def _wanted(db, now: datetime) -> list[dict]:
     return out
 
 
-async def _moments(db, limit: int = 15) -> list[dict]:
-    battles = (await db.scalars(
-        select(PvpBattle).where(PvpBattle.finished_at.isnot(None))
-        .order_by(PvpBattle.finished_at.desc()).limit(limit)
-    )).all()
-    ids = {cid for b in battles for cid in (b.participant_ids or [])}
-    names = {}
-    if ids:
-        names = dict((await db.execute(select(Character.id, Character.name).where(Character.id.in_(ids)))).all())
-    out = []
-    for b in battles:
-        winners = [names.get(cid, "?") for cid in (b.winner_ids or [])]
-        losers = [names.get(cid, "?") for cid in (b.participant_ids or []) if cid not in (b.winner_ids or [])]
-        out.append({
-            "type": b.battle_type, "at": b.finished_at.isoformat() if b.finished_at else None,
-            "winners": winners, "losers": losers, "draw": not b.winner_ids,
-        })
-    return out
-
-
 async def handle_get(request: web.Request) -> web.Response:
     now = datetime.now(timezone.utc)
     async with request.app[SESSION_FACTORY_KEY]() as db:
@@ -126,7 +107,6 @@ async def handle_get(request: web.Request) -> web.Response:
                  "base_class": e.base_class, "subclass": e.subclass}
                 for e in rating
             ],
-            "moments": await _moments(db),
         }
     return web.json_response(data)
 

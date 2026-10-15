@@ -2103,9 +2103,14 @@ body::before {
   margin-left: 0;
 }
 
-.top-name,
 .top-title {
   white-space: nowrap;
+}
+
+/* Длинный ник переносится, а не наезжает на очки справа (2026-10-15). */
+.top-name {
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 .top-title {

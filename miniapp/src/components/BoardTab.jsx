@@ -5,14 +5,14 @@ import ClassIcon from './ClassIcon.jsx';
 
 /**
  * «Доска» (2026-10-15): всё PvP в одном месте - розыск (Пепельное клеймо и
- * награда за голову), рейтинг PTS, последние бои и сезон с рангами.
+ * награда за голову), рейтинг PTS и сезон с рангами. Последние бои не
+ * показываем: кто с кем дрался - личное дело игроков (решение владельца).
  * Числа и правила приходят с сервера: клиент их не пересказывает.
  */
 
 const SECTIONS = [
   { id: 'wanted', title: '🩸 Розыск' },
   { id: 'rating', title: '🏅 Рейтинг' },
-  { id: 'moments', title: '⚔️ Бои' },
   { id: 'season', title: '📅 Сезон' },
 ];
 
@@ -24,15 +24,6 @@ function minutes(m) {
   if (m == null) return '';
   const h = Math.floor(m / 60);
   return h ? `${h} ч ${m % 60} мин` : `${m} мин`;
-}
-
-function ago(iso) {
-  if (!iso) return '';
-  const diff = Math.max(0, (Date.now() - new Date(iso).getTime()) / 60000);
-  if (diff < 1) return 'только что';
-  if (diff < 60) return `${Math.round(diff)} мин назад`;
-  if (diff < 24 * 60) return `${Math.round(diff / 60)} ч назад`;
-  return `${Math.round(diff / 1440)} дн назад`;
 }
 
 function Wanted({ data }) {
@@ -109,28 +100,6 @@ function Rating({ data }) {
   );
 }
 
-function Moments({ data }) {
-  const { moments } = data;
-  return (
-    <Group header={<Header>Последние бои</Header>}>
-      {moments.length === 0 && (
-        <Placeholder icon={<div style={{ fontSize: 48 }}>🕯️</div>}>Боёв пока не было.</Placeholder>
-      )}
-      {moments.map((m, i) => (
-        <div className="stat-row" key={i}>
-          <span className="stat-row__label">
-            {m.type === 'mass' ? '⚔️' : '🤺'}{' '}
-            {m.draw
-              ? `Ничья: ${[...m.winners, ...m.losers].join(', ')}`
-              : `${m.winners.join(', ')} одолел${m.winners.length > 1 ? 'и' : ''} ${m.losers.join(', ')}`}
-          </span>
-          <span className="stat-row__value craft-hint">{ago(m.at)}</span>
-        </div>
-      ))}
-    </Group>
-  );
-}
-
 function Season({ data }) {
   const { season, me } = data;
   return (
@@ -191,7 +160,6 @@ export default function BoardTab() {
       )}
       {status === 'ready' && section === 'wanted' && <Wanted data={data} />}
       {status === 'ready' && section === 'rating' && <Rating data={data} />}
-      {status === 'ready' && section === 'moments' && <Moments data={data} />}
       {status === 'ready' && section === 'season' && <Season data={data} />}
     </>
   );
