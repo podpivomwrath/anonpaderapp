@@ -8,6 +8,7 @@
 первом же действии после выхода на сводку локации.
 """
 
+import asyncio
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -57,11 +58,35 @@ async def _docs_for(peer_id: int) -> str | None:
     return joined or None
 
 
+#: Кому файлы уже отправлены или отправляются - чтобы на каждое нажатие
+#: не слать их заново и не грузить параллельно дважды.
+_docs_started: set[int] = set()
+
+
+async def _send_docs(peer_id: int) -> None:
+    try:
+        attachment = await _docs_for(peer_id)
+        if attachment:
+            await _api.messages.send(
+                peer_id=peer_id, random_id=0, message="📎 Документы:", attachment=attachment,
+            )
+        else:
+            _docs_started.discard(peer_id)
+    except Exception:  # noqa: BLE001 - фоновая отправка, окно уже у игрока
+        _docs_started.discard(peer_id)
+        logger.exception("Соглашение: не отправились документы {}", peer_id)
+
+
 async def send_gate(peer_id: int) -> None:
+    """Окно - сразу; файлы - фоном следующим сообщением. Загрузка одного PDF
+    в VK занимает ~16 с, и раньше окно ждало все три прямо в обработке
+    нажатия - очередь игрока стояла по 48 секунд (2026-10-15)."""
     await _api.messages.send(
-        peer_id=peer_id, random_id=0, message=terms_service.TEXT,
-        attachment=await _docs_for(peer_id), keyboard=accept_keyboard(),
+        peer_id=peer_id, random_id=0, message=terms_service.TEXT, keyboard=accept_keyboard(),
     )
+    if peer_id not in _docs_started:
+        _docs_started.add(peer_id)
+        asyncio.get_running_loop().create_task(_send_docs(peer_id))
 
 
 async def _busy(db, peer_id: int) -> bool:
