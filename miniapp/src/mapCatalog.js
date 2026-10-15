@@ -50,6 +50,35 @@ export function zoneLevelRange(catalog, dist) {
   return catalog.zone_table[0][2];
 }
 
+/**
+ * Уровни мобов клетки (2026-10-15) - ровно как в игре
+ * (game/world/world_config.py::cell_level_range): у внешнего края кольца -
+ * нижний уровень кольца, у внутреннего - верхний, на клетке ± разброс.
+ */
+export function cellLevelRange(catalog, dist) {
+  let row = catalog.zone_table[0];
+  for (const r of catalog.zone_table) {
+    if (dist >= r[0] && dist <= r[1]) { row = r; break; }
+  }
+  const [dLo, dHi, [lLo, lHi]] = row;
+  let base = lHi;
+  if (dHi !== dLo && lHi !== lLo) {
+    const frac = (dHi - Math.min(Math.max(dist, dLo), dHi)) / (dHi - dLo);
+    base = Math.floor(lLo + (lHi - lLo) * frac + 0.5);
+  }
+  const spread = catalog.mob_level_spread ?? 1;
+  return [Math.max(lLo, base - spread), Math.min(lHi, base + spread)];
+}
+
+/** Клетка мирной зоны у города (без самого города): игроки не нападают. */
+export function nearCity(catalog, x, y) {
+  const r = catalog.city_safe_radius ?? 1;
+  return Object.values(catalog.city_coords).some(([cx, cy]) => {
+    const d = Math.max(Math.abs(x - cx), Math.abs(y - cy));
+    return d > 0 && d <= r;
+  });
+}
+
 /** catalog.city_coords: {region: [x, y]} - возвращает region или null. */
 export function cityRegionAt(catalog, x, y) {
   for (const [region, [cx, cy]] of Object.entries(catalog.city_coords)) {
@@ -90,7 +119,9 @@ export function cellInfo(catalog, x, y, playerPos, questTarget, worldBoss) {
     isPlayer: Boolean(playerPos && playerPos.x === x && playerPos.y === y),
     isQuestTarget,
     questLabel: isQuestTarget ? questTarget.label : null,
-    levelRange: zoneLevelRange(catalog, dist),
+    levelRange: cellLevelRange(catalog, dist),
+    ringRange: zoneLevelRange(catalog, dist),
+    peaceful: nearCity(catalog, x, y),
     typeName: isMonolith ? 'Багряный Монолит' : locationTypeAt(catalog, x, y).name,
   };
 }

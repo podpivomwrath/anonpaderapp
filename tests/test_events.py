@@ -163,7 +163,7 @@ async def test_outcome_xp_grants_fraction_of_mob_xp(db_session, character_at) ->
     before = character.experience
     outcome = EventOutcome(weight=100, text="Тепло растекается по венам.", xp=True)
     await event_service.apply_outcome(db_session, character, stats, outcome, FixedRng(0.0))
-    expected = experience_service.event_xp(5, 5, wc.EVENT_XP_SAFE)
+    expected = experience_service.event_xp(wc.cell_base_level(28), 5, wc.EVENT_XP_SAFE)
     assert character.experience == before + expected
 
 
@@ -181,7 +181,7 @@ async def test_outcome_xp_scales_by_zone_not_player_level(db_session, character_
     await event_service.apply_outcome(db_session, near_center, near_stats, outcome, FixedRng(0.0))
 
     assert far_ring.experience < near_center.experience
-    assert far_ring.experience == experience_service.event_xp(15, 30, wc.EVENT_XP_SAFE)
+    assert far_ring.experience == experience_service.event_xp(wc.cell_base_level(28), 30, wc.EVENT_XP_SAFE)
     assert near_center.experience == experience_service.event_xp(60, 30, wc.EVENT_XP_SAFE)
 
 
@@ -261,7 +261,7 @@ async def test_outcome_xp_big_grants_more_than_normal(db_session, character_at) 
     before = character.experience
     outcome = EventOutcome(weight=100, text="Тепло растекается по венам.", xp_big=True)
     await event_service.apply_outcome(db_session, character, stats, outcome, FixedRng(0.0))
-    expected = experience_service.event_xp(5, 5, wc.EVENT_XP_RISKY)
+    expected = experience_service.event_xp(wc.cell_base_level(28), 5, wc.EVENT_XP_RISKY)
     assert character.experience == before + expected
     assert wc.EVENT_XP_RISKY > wc.EVENT_XP_SAFE  # действительно крупнее обычного
 

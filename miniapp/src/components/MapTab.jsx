@@ -961,7 +961,8 @@ export default function MapTab() {
           <p className="map-card__coords">({info.x}; {info.y})</p>
           <p className="map-card__line">{info.isMonolith ? '🩸 Багряный Монолит' : info.regionTitle}</p>
           {!info.isMonolith && !info.isCity && <p className="map-card__line">{info.typeName}</p>}
-          <p className="map-card__line">Уровень мобов: {info.levelRange[0]}-{info.levelRange[1]}</p>
+          <p className="map-card__line">Уровень мобов: {info.levelRange[0]}-{info.levelRange[1]} (кольцо {info.ringRange[0]}-{info.ringRange[1]})</p>
+          {info.peaceful && <p className="map-card__line">🕊 Мирная зона у города: игроки здесь не нападают</p>}
           <p className="map-card__line">До Монолита: {info.dist} {cellsWord(info.dist)}</p>
           {info.lake && (
             <p className="map-card__line">

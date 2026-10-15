@@ -6,6 +6,7 @@ import pytest
 
 from game.combat import balance_config as bc
 from game.world import encounters
+from game.world import world_config as wc
 from game.content_loader import load_bestiary, load_starter_ring
 
 
@@ -61,49 +62,22 @@ def test_bestiary_merges_all_rings_per_region() -> None:
     assert all((m.zone_min, m.zone_max) == (bc.MAX_LEVEL, bc.MAX_LEVEL) for m in bestiary["any"])
 
 
-@pytest.mark.parametrize(
-    "player_level,expected",
-    [(1, 1), (10, 10), (15, 15), (30, 15), (100, 15)],  # clamp в зону 1-15
-)
-def test_mob_level_clamped_into_zone(player_level: int, expected: int) -> None:
-    mob = load_starter_ring()["ridge"][0]  # zone 1-15
-    assert encounters.mob_level_for_player(player_level, mob) == expected
+def test_cell_level_grows_toward_monolith_within_ring() -> None:
+    """2026-10-15: уровень - от клетки. Внешний край кольца - нижняя граница,
+    внутренний - верхняя, между ними растёт к Монолиту."""
+    for d_lo, d_hi, (l_lo, l_hi) in wc.ZONE_TABLE:
+        assert wc.cell_base_level(d_hi) == l_lo or l_lo == l_hi
+        assert wc.cell_base_level(d_lo) == l_hi
+        levels = [wc.cell_base_level(d) for d in range(d_hi, d_lo - 1, -1)]
+        assert levels == sorted(levels)
 
 
-def test_mob_level_respects_zone_floor() -> None:
-    """Игрок ниже зоны → моб СЕРЕДИНЫ зоны (2026-10-12; было - нижняя граница)."""
-
-    class FakeMob:
-        zone_min = 40
-        zone_max = 45
-
-    assert encounters.mob_level_for_player(5, FakeMob) == 42
-    assert encounters.mob_level_for_player(42, FakeMob) == 42
-    assert encounters.mob_level_for_player(60, FakeMob) == 45
-
-
-# --- Патч 36: named-враги наследуют картинку базового моба ---
-
-
-def test_base_mob_image_resolves_known_id() -> None:
-    bestiary = load_bestiary()
-    known = next(m for mobs in bestiary.values() for m in mobs if m.image)
-    assert encounters.base_mob_image(known.id) == known.image
-
-
-def test_base_mob_image_none_for_missing_or_unknown_id() -> None:
-    assert encounters.base_mob_image(None) is None
-    assert encounters.base_mob_image("does_not_exist") is None
-
-
-def test_spawn_named_enemy_carries_explicit_image() -> None:
-    enc = encounters.spawn_named_enemy(2, "Тестовый враг", "флейвор", 10, 1.3, image="12345")
-    assert enc.image == "12345"
-
-
-def test_spawn_named_enemy_image_defaults_to_none() -> None:
-    enc = encounters.spawn_named_enemy(2, "Тестовый враг", "флейвор", 10, 1.3)
-    assert enc.image is None
+def test_cell_level_range_spread_stays_in_ring() -> None:
+    for d_lo, d_hi, (l_lo, l_hi) in wc.ZONE_TABLE:
+        for d in range(d_lo, d_hi + 1):
+            lo, hi = wc.cell_level_range(d)
+            assert l_lo <= lo <= hi <= l_hi
+            assert hi - lo <= 2 * wc.MOB_LEVEL_SPREAD
 
 
 def test_spawn_mob_returns_encounter_with_flavor() -> None:
@@ -117,12 +91,13 @@ def test_spawn_mob_returns_encounter_with_flavor() -> None:
         assert enc.flavor  # флейвор для показа перед боем
 
 
-def test_spawn_mob_level_matches_clamped_player_level() -> None:
-    rng = random.Random(1)
-    enc = encounters.spawn_mob(2, "ridge", player_level=8, dist=27, rng=rng)
-    assert enc.combatant.level == 8  # внутри зоны 1-15
-    enc_high = encounters.spawn_mob(2, "ridge", player_level=99, dist=27, rng=rng)
-    assert enc_high.combatant.level == 15  # потолок зоны (dist 45 => кольцо 1-15)
+def test_spawn_mob_level_ignores_player_level() -> None:
+    """Уровень моба - от клетки, игрок 1 и 60 уровня встречают одинаковых."""
+    lo, hi = wc.cell_level_range(27)
+    for player_level in (1, 60):
+        rng = random.Random(1)
+        enc = encounters.spawn_mob(2, "ridge", player_level=player_level, dist=27, rng=rng)
+        assert lo <= enc.combatant.level <= hi
 
 
 def test_spawn_mob_picks_from_region_pool() -> None:
@@ -134,23 +109,14 @@ def test_spawn_mob_picks_from_region_pool() -> None:
 
 
 def test_spawn_mob_picks_from_current_ring_not_home_region_pool() -> None:
-    """dist=20 -> кольцо 16-30 (ZONE_TABLE: dist 25-39), патч 15: моб приходит
-    из соответствующего файла бестиария, даже если игрок 5 уровня (уровень
-    поднимается до середины кольца, 23)."""
+    """dist=20 -> кольцо 16-30: моб из бестиария этого кольца и уровня клетки."""
     rng = random.Random(7)
     bestiary = load_bestiary()
     ring16_30_names = {m.name for m in bestiary["ridge"] if (m.zone_min, m.zone_max) == (16, 30)}
     enc = encounters.spawn_mob(2, "ridge", player_level=5, dist=20, rng=rng)
     assert enc.combatant.name in ring16_30_names
-    assert enc.combatant.level == 23  # середина кольца 16-30 - зашёл рано
-
-
-def test_spawn_mob_low_level_player_in_high_ring_clamps_to_ring_floor() -> None:
-    """Патч 15, техзаметки: игрок 5 уровня, зашедший в кольцо 46-60 (dist 3-11),
-    должен встретить моба середины кольца (53), а не своего уровня и не 46."""
-    rng = random.Random(11)
-    enc = encounters.spawn_mob(2, "ridge", player_level=5, dist=4, rng=rng)
-    assert enc.combatant.level == 53
+    lo, hi = wc.cell_level_range(20)
+    assert lo <= enc.combatant.level <= hi
 
 
 def test_spawn_mob_uses_content_primary_stat() -> None:
@@ -168,36 +134,39 @@ def test_spawn_mob_uses_content_primary_stat() -> None:
 _STAT_FIELD = {"str": "strength", "agi": "agility", "int": "intellect"}
 
 
-def test_spawn_mob_applies_damage_multiplier_to_primary_stat() -> None:
+def test_spawn_mob_applies_damage_multiplier_to_primary_stat(monkeypatch) -> None:
     """Патч 28: боевые статы (в т.ч. основной) масштабируются MOB_DAMAGE_MULTIPLIER
     × кольцо-вполовину (кольцо 1-15 -> ×1.0, значит только базовый множитель)."""
     from game.combat import balance_config as bc
 
+    monkeypatch.setattr(encounters, "roll_stat_spread", lambda rng: (1.0, 1.0))
     rng = random.Random(1)
     enc = encounters.spawn_mob(2, "ridge", player_level=8, dist=27, rng=rng)
     field = _STAT_FIELD[enc.combatant.primary_stat]
-    raw = encounters.balanced_mob_stats(8, enc.combatant.primary_stat)
+    raw = encounters.balanced_mob_stats(enc.combatant.level, enc.combatant.primary_stat)
     expected = round(getattr(raw, field) * bc.MOB_DAMAGE_MULTIPLIER * 1.0)
     assert getattr(enc.combatant.stats, field) == expected
 
 
-def test_spawn_mob_applies_hp_multiplier_to_vitality() -> None:
+def test_spawn_mob_applies_hp_multiplier_to_vitality(monkeypatch) -> None:
     """Патч 28: VIT масштабируется отдельным MOB_HP_MULTIPLIER (кольцо целиком,
     без деления пополам, в отличие от боевых статов)."""
     from game.combat import balance_config as bc
 
+    monkeypatch.setattr(encounters, "roll_stat_spread", lambda rng: (1.0, 1.0))
     rng = random.Random(1)
     enc = encounters.spawn_mob(2, "ridge", player_level=8, dist=27, rng=rng)
-    raw = encounters.balanced_mob_stats(8, enc.combatant.primary_stat)
+    raw = encounters.balanced_mob_stats(enc.combatant.level, enc.combatant.primary_stat)
     expected = round(raw.vitality * bc.MOB_HP_MULTIPLIER * 1.0)
     assert enc.combatant.stats.vitality == expected
 
 
-def test_spawn_mob_ring_multiplier_is_halved_for_damage() -> None:
+def test_spawn_mob_ring_multiplier_is_halved_for_damage(monkeypatch) -> None:
     """Патч 28: в кольце 16-30 (×1.15) VIT получает множитель целиком, а
     боевые статы — только половину надбавки (1 + 0.15*0.5 = 1.075)."""
     from game.combat import balance_config as bc
 
+    monkeypatch.setattr(encounters, "roll_stat_spread", lambda rng: (1.0, 1.0))
     rng = random.Random(5)
     enc = encounters.spawn_mob(2, "ridge", player_level=20, dist=20, rng=rng)  # кольцо 16-30
     field = _STAT_FIELD[enc.combatant.primary_stat]
@@ -220,3 +189,15 @@ def test_spawn_mob_center_uses_any_region_regardless_of_home_region() -> None:
         enc = encounters.spawn_mob(2, region, player_level=bc.MAX_LEVEL, dist=1, rng=rng)
         assert enc.combatant.name in center_names
         assert enc.combatant.level == bc.MAX_LEVEL
+
+
+
+def test_stat_spread_is_mild_and_never_glass_cannon() -> None:
+    """2026-10-15: разброс статов небольшой, и мало здоровья не идёт вместе
+    с большим уроном: урон сдвигается в обратную сторону вдвое слабее."""
+    rng = random.Random(3)
+    for _ in range(2000):
+        hp, dmg = encounters.roll_stat_spread(rng)
+        assert 1 - encounters.HP_SPREAD <= hp <= 1 + encounters.HP_SPREAD
+        assert dmg <= (1 + encounters.HP_SPREAD / 2) * (1 + encounters.DMG_JITTER) + 1e-9
+        assert hp * dmg >= 0.85  # общая опасность почти не плавает

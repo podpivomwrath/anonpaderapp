@@ -1,7 +1,8 @@
 """Спавн PvE-встреч по кольцам карты (патч 15: все 5 колец, не только стартовое).
 
-Уровень моба клампится под игрока в диапазон зоны (world-patch-1):
-  mob_level = clamp(player_level, zone_min, zone_max)
+Уровень моба - от клетки (2026-10-15): ближе к Монолиту - выше, в пределах
+кольца, ±1 на каждого моба (world_config.cell_level_range). Статы - с
+небольшим разбросом (roll_stat_spread).
 Мобы и флейвор — из content/mobs/*.json (все порождения раскола).
 
 Кольцо выбирается по ТЕКУЩЕМУ положению игрока (dist до Монолита), не по его
@@ -77,10 +78,23 @@ def _scale_stats_split(stats: Stats, hp_mult: float, dmg_mult: float) -> Stats:
     )
 
 
-def mob_level_for_player(player_level: int, mob: StarterRingMob) -> int:
-    """Моб равен игроку внутри зоны и не выше её потолка; зашёл в кольцо выше
-    своего уровня - середина кольца (wc.ring_mob_level)."""
-    return wc.ring_mob_level(player_level, mob.zone_min, mob.zone_max)
+def mob_level_at_dist(dist: int, rng: random.Random) -> int:
+    """Уровень нового моба: уровень клетки ± разброс, в пределах кольца
+    (2026-10-15 - от клетки, а не от игрока)."""
+    lo, hi = wc.cell_level_range(dist)
+    return rng.randint(lo, hi)
+
+
+#: Разброс статов моба (2026-10-15): здоровье ±HP_SPREAD, урон в обратную
+#: сторону вдвое слабее и ещё ±DMG_JITTER. Крепкий моб бьёт чуть слабее,
+#: хрупкий - чуть сильнее, но «мало здоровья и огромный урон» не бывает.
+HP_SPREAD = 0.12
+DMG_JITTER = 0.04
+
+
+def roll_stat_spread(rng: random.Random) -> tuple[float, float]:
+    r = rng.uniform(-HP_SPREAD, HP_SPREAD)
+    return 1.0 + r, (1.0 - r / 2) * rng.uniform(1.0 - DMG_JITTER, 1.0 + DMG_JITTER)
 
 
 @dataclass
@@ -132,7 +146,7 @@ def spawn_mob(
     pool_region = "any" if center_lo <= dist <= center_hi else region
     candidates = [m for m in _region_mobs(pool_region) if (m.zone_min, m.zone_max) == zone]
     mob = rng.choice(candidates)
-    level = mob_level_for_player(player_level, mob)
+    level = mob_level_at_dist(dist, rng)
     # Патч 28: раздельные множители — HP (длина боя) получает кольцо целиком,
     # урон (опасность) — вполовину слабее (см. balance_config.py).
     hp_mult = bc.MOB_HP_MULTIPLIER * formulas.mob_ring_multiplier(*zone)
@@ -140,6 +154,9 @@ def spawn_mob(
     if elite:
         hp_mult *= ELITE_HP_MULT
         dmg_mult *= ELITE_DMG_MULT
+    hp_roll, dmg_roll = roll_stat_spread(rng)
+    hp_mult *= hp_roll
+    dmg_mult *= dmg_roll
     stats = _scale_stats_split(balanced_mob_stats(level, mob.primary_stat), hp_mult, dmg_mult)
     combatant = build_combatant(
         id=participant_id,

@@ -98,6 +98,6 @@ async def test_collect_xp_scales_by_zone_not_player_level(db_session, character_
     near_result = await ash_service.collect(db_session, near_center, near_stats, NoCritRng())
 
     assert far_result.xp < near_result.xp
-    zone_level = grid.mob_level_at(0, 30, 30)
-    assert zone_level == 15  # clamp(30, 1, 15)
+    zone_level = grid.mob_level_at(0, 28, 30)
+    assert zone_level == grid.mob_level_at(0, 28, 1)  # уровень клетки, игрок не влияет
     assert far_result.xp == experience_service.event_xp(zone_level, 30, ac.EVENT_XP_ASH)

@@ -53,7 +53,8 @@ def test_location_summary_structure() -> None:
         FakeChar(level=3, experience=100), FakeStats(), random.Random(1), farm_currency=340
     )
     assert "📍 (49; 49)" in text          # координаты
-    assert " · зона 1-15 ур." in text     # тип локации + зона
+    lo, hi = world_summary.wc.cell_level_range(world_summary.grid.monolith_distance(49, 49))
+    assert f" · мобы {lo}-{hi} ур." in text     # тип локации + уровни мобов клетки
     assert "❤️ Здоровье:" in text         # HP-бар (патч 10)
     assert "⚔️ Уровень: 3" in text        # уровень
     assert "✨ Опыт:" in text             # шкала опыта

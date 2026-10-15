@@ -62,6 +62,10 @@ _STATIC_CATALOG = {
     "bounds_max": wc.BOUNDS_MAX,
     "city_coords": {region: [x, y] for region, (x, y) in wc.CITY_COORDS.items()},
     "zone_table": [[lo, hi, [lvl_lo, lvl_hi]] for lo, hi, (lvl_lo, lvl_hi) in wc.ZONE_TABLE],
+    # Уровень мобов клетки (2026-10-15): тот же расчёт, что в игре -
+    # mapCatalog.js::cellLevelRange повторяет world_config.cell_level_range.
+    "mob_level_spread": wc.MOB_LEVEL_SPREAD,
+    "city_safe_radius": wc.CITY_SAFE_RADIUS,
     "location_types": _location_type_catalog(),
     # Патч 58: озёра — статика (фиксированные координаты), поэтому едут
     # тем же разовым каталогом, что города и зоны, а не запросом на

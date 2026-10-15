@@ -106,8 +106,9 @@ def mob_level_at(x: int, y: int, player_level: int) -> int:
     этого клампа — далёкий забег на дальнее кольцо или возврат прокачанным
     персонажем в старую локацию давал противника/награду не по месту, а по
     текущему уровню персонажа. Эта функция — общая точка привязки к клетке."""
-    zone_min, zone_max = zone_level_range(monolith_distance(x, y))
-    return wc.ring_mob_level(player_level, zone_min, zone_max)
+    # 2026-10-15: уровень - клетки, игрок больше не влияет (player_level
+    # оставлен в сигнатуре для вызывающих).
+    return wc.cell_base_level(monolith_distance(x, y))
 
 
 def city_region_at(x: int, y: int) -> str | None:
@@ -119,11 +120,11 @@ def city_region_at(x: int, y: int) -> str | None:
 
 
 def at_city_gates(x: int, y: int) -> bool:
-    """Клетка вплотную к городу (одна из 8 соседних). Под защитой от PvP,
-    как сам город: иначе выходящего из ворот ждали прямо на первой клетке,
-    а входящего - пока он делает последний шаг к городу. Мобы тут есть."""
+    """Клетка у города - в пределах CITY_SAFE_RADIUS во все стороны (с
+    2026-10-15 - 2 клетки). Под защитой от PvP, как сам город: иначе
+    выходящего из ворот ждали прямо за стеной. Мобы тут есть."""
     return any(
-        max(abs(x - cx), abs(y - cy)) == 1 for cx, cy in wc.CITY_COORDS.values()
+        0 < max(abs(x - cx), abs(y - cy)) <= wc.CITY_SAFE_RADIUS for cx, cy in wc.CITY_COORDS.values()
     )
 
 

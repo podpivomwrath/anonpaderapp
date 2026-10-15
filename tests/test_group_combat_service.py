@@ -22,13 +22,14 @@ def test_spawn_mobs_count_matches_members() -> None:
     assert len(mobs) == 3
 
 
-def test_spawn_mobs_level_by_max_party_level() -> None:
+def test_spawn_mobs_level_by_cell_not_party() -> None:
+    """2026-10-15: уровень мобов группы - от клетки, состав группы не влияет."""
+    from game.world import world_config as wc
+
     members = [_char(1, 5), _char(2, 40)]
-    mobs = gcs.spawn_mobs(members, "ridge", dist=45, rng=random.Random(1), start_id=100)
-    # Уровень моба клампится в диапазон зоны — на dist=45 (последнее кольцо)
-    # верхняя граница заведомо ниже 40, поэтому мобы должны быть заметно
-    # выше, чем если бы уровень брался по минимальному участнику (5).
-    assert all(m.combatant.level > 5 for m in mobs)
+    mobs = gcs.spawn_mobs(members, "ridge", dist=20, rng=random.Random(1), start_id=100)
+    lo, hi = wc.cell_level_range(20)
+    assert all(lo <= m.combatant.level <= hi for m in mobs)
 
 
 def test_spawn_mobs_ids_are_sequential_from_start() -> None:

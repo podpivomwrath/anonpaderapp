@@ -72,16 +72,18 @@ def test_clamp_respects_bounds() -> None:
 # --- mob_level_at (патч 36): уровень квестового моба/события — по клетке ---
 
 
-def test_mob_level_at_clamps_into_zone() -> None:
-    assert grid.mob_level_at(0, 28, player_level=60) == 15  # дальнее кольцо, потолок 15
-    assert grid.mob_level_at(0, 28, player_level=1) == 1  # внутри зоны — как есть
-    assert grid.mob_level_at(1, 0, player_level=1) == 60  # у Монолита — пол зоны 60
+def test_mob_level_at_is_cell_level_not_player_level() -> None:
+    """2026-10-15: уровень - от клетки, игрок не влияет."""
+    assert grid.mob_level_at(0, 30, player_level=60) == 1  # у города - 1
+    assert grid.mob_level_at(0, 30, player_level=1) == 1
+    assert grid.mob_level_at(1, 0, player_level=1) == 60  # у Монолита - 60
 
 
-def test_mob_level_at_matches_zone_level_range() -> None:
-    for dist in (0, 5, 12, 20, 28):
+def test_mob_level_at_stays_in_zone_and_grows_inward() -> None:
+    prev = 0
+    for dist in range(30, -1, -1):
         zone_min, zone_max = grid.zone_level_range(dist)
-        # ниже кольца - середина кольца (2026-10-12); в I кольце 1 ур. и так внутри
-        expected = zone_min if zone_min <= 1 else (zone_min + zone_max) // 2
-        assert grid.mob_level_at(dist, 0, player_level=1) == expected
-        assert grid.mob_level_at(dist, 0, player_level=999) == zone_max
+        level = grid.mob_level_at(dist, 0, player_level=1)
+        assert zone_min <= level <= zone_max
+        assert level >= prev
+        prev = level

@@ -80,6 +80,39 @@ def ring_mob_level(player_level: int, zone_min: int, zone_max: int) -> int:
     return min(player_level, zone_max)
 
 
+#: Уровень моба - от клетки, а не от игрока (2026-10-15, решение владельца;
+#: раньше моб подстраивался под игрока). Внутри кольца уровень растёт к
+#: Монолиту: у внешнего края - нижняя граница кольца, у внутреннего -
+#: верхняя. Каждый моб при появлении - уровень клетки ± MOB_LEVEL_SPREAD.
+MOB_LEVEL_SPREAD = 1
+
+
+def _ring_of_dist(dist: int) -> tuple[int, int, tuple[int, int]]:
+    for row in ZONE_TABLE:
+        if row[0] <= dist <= row[1]:
+            return row
+    return ZONE_TABLE[0]  # за краем мира - внешнее кольцо
+
+
+def cell_base_level(dist: int) -> int:
+    """Уровень мобов клетки на расстоянии dist от Монолита."""
+    d_lo, d_hi, (l_lo, l_hi) = _ring_of_dist(dist)
+    if d_hi == d_lo or l_hi == l_lo:
+        return l_hi
+    frac = (d_hi - min(max(dist, d_lo), d_hi)) / (d_hi - d_lo)
+    # Половинки - вверх, как Math.round на карте мини-аппа (mapCatalog.js):
+    # round() в Python округляет к чётному, и карта разошлась бы с игрой.
+    return int(l_lo + (l_hi - l_lo) * frac + 0.5)
+
+
+def cell_level_range(dist: int) -> tuple[int, int]:
+    """Какого уровня бывают мобы на клетке: уровень клетки ± разброс,
+    в пределах кольца."""
+    _d_lo, _d_hi, (l_lo, l_hi) = _ring_of_dist(dist)
+    base = cell_base_level(dist)
+    return max(l_lo, base - MOB_LEVEL_SPREAD), min(l_hi, base + MOB_LEVEL_SPREAD)
+
+
 def ring_tier_for_dist(dist: int) -> int:
     """За краем мира (dist > WORLD_RADIUS) - внешнее кольцо, а не центр:
     клетка, куда игрок попасть не должен, не может давать эндгейм."""
@@ -87,6 +120,10 @@ def ring_tier_for_dist(dist: int) -> int:
         if lo <= dist <= hi:
             return tier
     return 1
+
+#: Мирная зона вокруг города: на столько клеток во все стороны игроки не
+#: нападают друг на друга (2026-10-15: было 1).
+CITY_SAFE_RADIUS = 2
 
 # --- Стартовое кольцо (первый квест) ---
 STARTING_RING_MOB_LEVELS = (1, 3)

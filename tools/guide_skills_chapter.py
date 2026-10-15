@@ -24,6 +24,7 @@ from game.combat import balance_config as bc  # noqa: E402
 from game.combat.base_skills import skills_for_class  # noqa: E402
 from game.combat.subclass_skills import SUBCLASS_SKILL_DEFS  # noqa: E402
 from game.economy import buff_descriptions as bd  # noqa: E402
+from game.world import encounters  # noqa: E402
 from game.world import world_config as wc  # noqa: E402
 from tools import gen_handbook as gh  # noqa: E402
 
@@ -68,9 +69,6 @@ def formulas_part() -> str:
         passives.append(f"<li><b>{gh.CLASS_TITLES[cls]}</b>: здоровья на {pct(mult - 1)} больше.</li>")
     for cls, bonus in bc.BASE_CLASS_CRIT_BONUS.items():
         passives.append(f"<li><b>{gh.CLASS_TITLES[cls]}</b>: шанс критического удара +{pct(bonus)}.</li>")
-    ring_mid = ", ".join(
-        f"{lo}-{hi} → {(lo + hi) // 2}" for lo, hi in (lv for _a, _b, lv in wc.ZONE_TABLE[1:4])
-    )
     return f"""    <h3>Словарь</h3>
     <dl class="events">
       <dt>Моб</dt><dd>Любой противник, которым управляет игра (твари, боссы). «Бой с мобами» - всё, кроме боёв с игроками.</dd>
@@ -114,7 +112,8 @@ def formulas_part() -> str:
     </ol>
     <h3>Разница уровней с мобом</h3>
     <p>Если моб выше тебя уровнем, за каждый уровень разницы он бьёт на {pct(bc.LVL_DIFF_DMG_BONUS)} сильнее (максимум в {num(bc.LVL_DIFF_DMG_CAP)} раза), а твой урон по нему на {pct(bc.LVL_DIFF_DEF_BONUS)} меньше (но не меньше {pct(bc.LVL_DIFF_DEF_FLOOR)} от обычного). Пример: моб выше на 4 уровня - он бьёт на {pct(bc.LVL_DIFF_DMG_BONUS * 4)} сильнее, ты по нему - на {pct(bc.LVL_DIFF_DEF_BONUS * 4)} слабее. Если моб ниже тебя, ничего не меняется.</p>
-    <p>Какого уровня моб: если ты в кольце своего уровня - твоего уровня (но не выше верхней границы кольца). Если зашёл в кольцо выше своего уровня - моб середины этого кольца: {ring_mid}. Враги из поручений считаются так же, но они сильнее обычных мобов того же уровня.</p>
+    <p>Какого уровня моб: зависит только от клетки, твой уровень роли не играет. У внешнего края кольца мобы самого низкого уровня кольца, ближе к Монолиту - всё выше, у внутреннего края - самого высокого. Каждый моб может быть на {wc.MOB_LEVEL_SPREAD} уровень выше или ниже уровня клетки. Уровень мобов клетки видно в сводке клетки и на карте. Враги из поручений - уровня своей клетки, но сильнее обычных мобов.</p>
+    <p>Статы каждого моба немного отличаются: здоровье до ±{round(encounters.HP_SPREAD * 100)}%, и чем больше здоровья, тем чуть слабее удар (и наоборот). Двух одинаковых мобов не бывает, но и слабого здоровьем моба с огромным уроном тоже.</p>
     <h3>Оглушение и заморозка</h3>
     <p>Цель пропускает ход. Перед этим проверяется её Воля: с некоторым шансом она устоит. В бою с игроками каждое следующее оглушение подряд проходит в {num(bc.CC_RESIST_MULT_PER_HIT)} раза труднее, а после {bc.CC_MAX_HITS_BEFORE_IMMUNE} подряд следующее не пройдёт вовсе - так нельзя держать игрока в оглушении весь бой. В бою с мобами такого ограничения нет.</p>
     <h3>Бонусы класса до подкласса</h3>
