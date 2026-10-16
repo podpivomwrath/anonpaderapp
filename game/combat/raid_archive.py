@@ -238,7 +238,7 @@ class ArchiveStage:
             if page == "power":
                 player.apply_effect(EffectKind.DAMAGE_BUFF, ac.PAGE_DAMAGE_UP, 1, -4)
             elif page == "weak":
-                player.apply_effect(EffectKind.WEAKEN, ac.PAGE_DAMAGE_DOWN, 1, -4)
+                player.apply_effect(EffectKind.WEAKEN, ac.PAGE_DAMAGE_DOWN, 1, -4, decays=False)
             elif page == "shield":
                 player.apply_effect(EffectKind.SHIELD_POOL, round(player.max_hp * ac.PAGE_SHIELD), 1, -4)
             else:

@@ -166,6 +166,8 @@ class RenderedHit:
     absorbed: int = 0
     #: стаков Метки добычи после уворота (см. PendingHit.marked)
     marked: int = 0
+    #: сколько срезал блок (Глухая оборона и пр.) - пишется в строке удара
+    blocked: int = 0
 
 
 @dataclass
@@ -407,7 +409,7 @@ def resolve_tick(
     # по фактическим участникам каждого хита — корректно и для группового PvE.
     if session.mode == CombatMode.PVE:
         for hit in ctx.hits:
-            if hit.amount <= 0:
+            if hit.amount <= 0 or hit.reflect_of is not None:
                 continue
             source = session.combatants.get(hit.source_id)
             target = session.combatants.get(hit.target_id)
@@ -419,6 +421,10 @@ def resolve_tick(
             elif target.kind == "mob" and source.kind == "character":
                 _, taken_mult = formulas.level_diff_modifiers(target.level, source.level)
                 hit.amount = max(round(hit.amount * taken_mult), 1)
+    # Отражение моба - доля урона, который удар нанёс на самом деле (см. PendingHit.reflect_of).
+    for hit in ctx.hits:
+        if hit.reflect_of is not None:
+            hit.amount = max(round(hit.reflect_of.amount * hit.reflect_pct), 1)
 
     # Патч 45, ч.1: снимок ПОСЛЕ прямых самомутаций хода (себестоимость HP у
     # Багрового пира/Круга тьмы — actor.current_hp меняется РАНЬШЕ, внутри
@@ -570,7 +576,7 @@ def resolve_tick(
                 is_tick=hit.is_tick,
                 hp_before=h_before, hp_after=h_after, max_hp=target.max_hp,
                 absorbed=hit.blocked + max(hit.amount - applied, 0),
-                marked=hit.marked,
+                marked=hit.marked, blocked=hit.blocked,
             )
         )
     for heal in ctx.heals:

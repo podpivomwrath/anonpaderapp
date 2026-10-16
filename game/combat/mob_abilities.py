@@ -199,7 +199,7 @@ class MobBrain:
                 self._strike(mob, other, rng, turn, trait.value, label="бьёт по всем")
         if self.has("first_turn_weaken") and self.turns == 1:
             trait = self.one("first_turn_weaken")
-            target.apply_effect(EffectKind.WEAKEN, trait.value, trait.duration, mob.id)
+            target.apply_effect(EffectKind.WEAKEN, trait.value, trait.duration, mob.id, decays=False)
             turn.lines.append(f"{mob.name}: {title.lower()} - ты медлишь")
         return turn
 
@@ -271,10 +271,10 @@ class MobBrain:
             target.apply_effect(kind, per_tick, trait.duration, mob.id)
             turn.lines.append(f"{mob.name}: {self.ability.title.lower()} - {per_tick} урона за ход")
         elif kind == EffectKind.WEAKEN:
-            target.apply_effect(kind, trait.value, trait.duration, mob.id)
+            target.apply_effect(kind, trait.value, trait.duration, mob.id, decays=False)
             turn.lines.append(f"{mob.name} ослабляет тебя на {trait.value:.0%}")
         else:
-            target.apply_effect(kind, trait.value, trait.duration, mob.id)
+            target.apply_effect(kind, trait.value, trait.duration, mob.id, decays=False)
             turn.lines.append(f"{mob.name}: ты получаешь на {trait.value:.0%} больше урона")
 
     def _self_upkeep(
@@ -307,7 +307,7 @@ class MobBrain:
             trait = self.one("stacking_weaken")
             current = target.effect_from(EffectKind.WEAKEN, mob.id)
             value = min((current.value if current else 0.0) + trait.step, trait.cap)
-            target.apply_effect(EffectKind.WEAKEN, value, 2, mob.id)
+            target.apply_effect(EffectKind.WEAKEN, value, 2, mob.id, decays=False)
 
     def _answer_incoming(
         self, mob: CombatantState, session: CombatSessionState, rng: random.Random,
@@ -333,6 +333,7 @@ class MobBrain:
                     source_id=mob.id, target_id=attacker.id,
                     amount=max(round(hit.amount * self.one("reflect").value), 1),
                     label="возвращает урон",
+                    reflect_of=hit, reflect_pct=self.one("reflect").value,
                 ))
             if self.has("brine_spray"):
                 trait = self.one("brine_spray")

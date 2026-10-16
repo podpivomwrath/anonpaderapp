@@ -35,9 +35,12 @@ def _hit_line(hit: RenderedHit, source_name: str, target_name: str, mode: str) -
         mark = f" 🎯 Метка добычи ×{hit.marked}" if hit.marked else ""
         return f"{source_name} → {word} по {target_name} - промах, {target_name} уклоняется{mark}"
     crit = " (крит!)" if hit.crit else ""
+    # Блок срезает удары каждый ход стойки, но в логе это было видно только
+    # в ход «Глухой обороны» - игроки решили, что блок срабатывает раз (2026-10-17).
+    block = f" (🛡 блок срезал {hit.blocked})" if getattr(hit, "blocked", 0) > 0 else ""
     before = display.hp_text(hit.hp_before, hit.max_hp, mode)
     after = display.hp_text(hit.hp_after, hit.max_hp, mode)
-    return f"{source_name} → {word} по {target_name} - {hit.amount} урона{crit} ({target_name}: {before} → {after})"
+    return f"{source_name} → {word} по {target_name} - {hit.amount} урона{crit}{block} ({target_name}: {before} → {after})"
 
 
 def _dot_line(hit: RenderedHit, target_name: str) -> str:

@@ -40,6 +40,7 @@ def render_hit(
     max_hp: float,
     mode: str = display.MODE_PVP,
     shielded: int = 0,
+    blocked: int = 0,
 ) -> str:
     """`[Имя] использует [Навык] на [Цель] — X урона. (Цель: A% → B%)`.
     shielded - сколько из удара съел щит: тогда X - полный удар и суффикс
@@ -54,6 +55,8 @@ def render_hit(
     pct_after = display.hp_text(hp_after, max_hp, mode)
     crit_suffix = " (крит!)" if crit else ""
     shield_suffix = f" (щит поглотил {shielded})" if shielded > 0 else ""
+    if blocked > 0:  # блок стойки (Глухая оборона) - виден в каждом ударе, не только в ход навыка
+        shield_suffix += f" (🛡 блок срезал {blocked})"
     amount += max(shielded, 0)
     delta = f"({target_name}: {pct_before} → {pct_after})"
     if is_dot:

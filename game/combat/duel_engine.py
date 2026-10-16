@@ -361,7 +361,7 @@ class DuelEngine:
             result.lines.append(combat_flavor.render_hit(
                 actor.name, target.name, label=hit.label, amount=amount, crit=hit.crit,
                 missed=False, is_dot=hit.is_dot, hp_before=before, hp_after=target.current_hp,
-                max_hp=target.max_hp, shielded=hit.amount - amount,
+                max_hp=target.max_hp, shielded=hit.amount - amount, blocked=hit.blocked,
             ))
             _apply_last_breath_guard(target, result)
             # Страж, «Отражение»: доля срезанного блоком урона возвращается

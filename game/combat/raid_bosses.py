@@ -219,7 +219,7 @@ class SurgeonAI:
             )
             target.apply_effect(
                 EffectKind.WEAKEN, rc.SURGEON_REPLACE_PARTS_WEAKEN,
-                rc.SURGEON_REPLACE_PARTS_WEAKEN_DURATION, boss.id,
+                rc.SURGEON_REPLACE_PARTS_WEAKEN_DURATION, boss.id, decays=False,
             )
             return [hit]
         # stitch_pull — лайфстил применяется ПРЯМОЙ самомутацией current_hp,

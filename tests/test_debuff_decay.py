@@ -79,3 +79,16 @@ def test_resolver_decays_from_next_turn():
     assert enemy.effect_total(EffectKind.VULNERABILITY) == pytest.approx(SEAL)
     resolve_tick(state, {1: skip, 2: skip}, NoCritRng())
     assert enemy.effect_total(EffectKind.VULNERABILITY) == pytest.approx(SEAL * KEEP)
+
+
+def test_mob_debuff_on_player_does_not_decay():
+    """Репорт #87: Инквизитор Осколка вешает +25% уязвимости каждым ударом -
+    с затуханием она таяла до +0%. Способности мобов и боссов не затухают."""
+    player = combatant(1, side=0)
+    for _ in range(6):
+        player.apply_effect(EffectKind.VULNERABILITY, 0.25, 2, source_id=99, decays=False)
+        end_turn(player)
+    assert player.effect_total(EffectKind.VULNERABILITY) == pytest.approx(0.25)
+    # ...и не мешают затуханию дебаффов от игроков рядом.
+    player.apply_effect(EffectKind.VULNERABILITY, SEAL, 3, source_id=2)
+    assert player.effect_total(EffectKind.VULNERABILITY) == pytest.approx(0.25 + SEAL)

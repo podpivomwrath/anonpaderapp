@@ -125,6 +125,20 @@ def test_reflect_works_while_the_mob_survives() -> None:
     assert any("возвращает урон" in line for line in result.lines)
 
 
+def test_reflect_is_share_of_damage_actually_dealt_to_higher_mob() -> None:
+    """Багровый обет (2026-10-17): моб на 15 уровней выше режет урон игрока,
+    а отражение считалось от сырого удара и ещё усиливалось уровнем моба -
+    «20%» выходили в 140%. Теперь ровно доля нанесённого."""
+    session, player, mob = _duel(_ability(MobTraitDef(kind="reflect", value=0.2)), mob_vit=400)
+    player.level, mob.level = 45, 60
+
+    result = resolve_tick(session, _attack(), _Rng())
+
+    dealt = next(h for h in result.hits if h.source_id == 1 and h.target_id == 2)
+    reflected = next(h for h in result.hits if h.label == "возвращает урон")
+    assert reflected.amount == max(round(dealt.amount * 0.2), 1)
+
+
 def test_capped_mob_survives_and_still_attacks() -> None:
     """Раньше «умрёт ли моб» считалось по сырой сумме урона: моб с лимитом
     урона за удар выживал, но ход пропускал, будто умер."""

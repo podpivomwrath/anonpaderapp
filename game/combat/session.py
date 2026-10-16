@@ -117,6 +117,10 @@ class Effect:
     source_id: int
     stacks: int = 1
     tag: str | None = None
+    #: Не затухает (2026-10-17): дебафф способности моба или босса - он
+    #: работает ровно как написано в описании. Затухание - против дебаффов
+    #: игроков, которые складывались в +70% (см. CombatantState.decay_debuffs).
+    fixed: bool = False
 
 
 @dataclass
@@ -270,12 +274,14 @@ class CombatantState:
         return any(e.kind == EffectKind.DOT and getattr(e, "tag", None) == BURN_TAG for e in self.effects)
 
     def apply_effect(
-        self, kind: EffectKind, value: float, duration: int, source_id: int, tag: str | None = None
+        self, kind: EffectKind, value: float, duration: int, source_id: int, tag: str | None = None,
+        decays: bool = True,
     ) -> None:
         """Наложить временный эффект. Non-stacking: повторное применение того же
         вида от того же источника ОБНОВЛЯЕТ значение и длительность, не суммирует.
-        tag - метка вида эффекта (см. BURN_TAG)."""
-        if kind in bc.DECAYING_DEBUFFS and value > 0:
+        tag - метка вида эффекта (см. BURN_TAG). decays=False - дебафф моба или
+        босса: без затухания (Effect.fixed)."""
+        if kind in bc.DECAYING_DEBUFFS and value > 0 and decays:
             # getattr: соло-бой из pickle-снимка до появления поля.
             value *= getattr(self, "debuff_fatigue", {}).get(kind.value, 1.0)
         for effect in self.effects:
@@ -288,9 +294,11 @@ class CombatantState:
                 effect.remaining_ticks = max(effect.remaining_ticks, duration)
                 if tag is not None:
                     effect.tag = tag
+                effect.fixed = not decays
                 return
         self.effects.append(
-            Effect(kind=kind, value=value, remaining_ticks=duration, source_id=source_id, tag=tag)
+            Effect(kind=kind, value=value, remaining_ticks=duration, source_id=source_id, tag=tag,
+                   fixed=not decays)
         )
 
     def decay_debuffs(self, preexisting: set[int] | None = None) -> None:
@@ -305,7 +313,10 @@ class CombatantState:
             fatigue = self.debuff_fatigue = {}
         keep = 1.0 - bc.DEBUFF_DECAY_PER_TURN
         for kind in bc.DECAYING_DEBUFFS:
-            held = [e for e in self.effects if e.kind == kind and e.value > 0]
+            held = [
+                e for e in self.effects
+                if e.kind == kind and e.value > 0 and not getattr(e, "fixed", False)
+            ]
             if not held:
                 fatigue.pop(kind, None)
                 continue

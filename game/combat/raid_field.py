@@ -189,7 +189,7 @@ class SummonerAI:
                 hits.append(compute_hit(boss, target, rng, label="Проклятие тлена",
                                         multiplier=fc.SUMMONER_CURSE_MULT, is_ability=True))
                 target.apply_effect(EffectKind.WEAKEN, fc.SUMMONER_CURSE_WEAKEN,
-                                    fc.SUMMONER_CURSE_WEAKEN_TURNS, boss.id)
+                                    fc.SUMMONER_CURSE_WEAKEN_TURNS, boss.id, decays=False)
             return hits
         target = _target_of(boss, session, rng)
         if target is None:

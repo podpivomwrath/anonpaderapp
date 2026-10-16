@@ -355,12 +355,12 @@ def _stage_attachment(battle: RaidBattle) -> str | None:
     return _texts(battle).stage_attachment(battle.stage)
 
 
-def _rift_xp_mobs(battle: RaidBattle) -> float | None:
-    """Опыт этапа разлома в «обычных мобах» каждому живому (2026-10-13,
-    решение владельца): этап с волной - x2 за каждого моба, босс - x10.
-    Не разлом - None: опыт по-старому, долей."""
+def _xp_mobs(battle: RaidBattle) -> float:
+    """Опыт этапа в «обычных мобах» каждому живому, без дележа. Разлом
+    (2026-10-13): этап с волной - x2 за каждого моба, босс - x10. Рейд
+    (2026-10-17): rc.RAID_STAGE_XP_MOBS по этапу."""
     if not battle.is_rift:
-        return None
+        return rc.RAID_STAGE_XP_MOBS[battle.stage]
     stage = battle.field_stage
     if stage is None or battle.stage == battle.final_stage or getattr(stage, "is_boss", False):
         return rfc.BOSS_XP_MOBS
@@ -1063,7 +1063,7 @@ async def _stage_rewards(battle: RaidBattle, alive_char_ids: list[int]) -> dict[
                 characters.append(character)
         mob_level = battle.rift_level if battle.is_rift else raid_bosses.BOSS_LEVEL
         rewards = await raid_combat_service.reward_mob_kill(
-            db, characters, mob_level, battle.rng, _loot_mult(battle), _rift_xp_mobs(battle),
+            db, characters, mob_level, battle.rng, _loot_mult(battle), _xp_mobs(battle),
         )
         for r in rewards:
             p = battle.participants.get(r.character_id)
