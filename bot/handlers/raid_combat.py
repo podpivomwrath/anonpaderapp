@@ -1363,6 +1363,10 @@ async def _send_location_summary(character_id: int, peer_id: int) -> None:
         logger.exception("Рейд: не удалось отправить сводку локации {}", peer_id)
 
 
+#: Павшие в пройденном разломе поднимаются с этой долей здоровья (2026-10-16).
+RIFT_RAISED_HP_PCT = 0.01
+
+
 async def _cleanup_and_return(session_id: int, battle: RaidBattle, text: str, *, defeated: bool) -> None:
     """И победа, и поражение возвращают всех к Монолиту (0;0) — позиция
     персонажей не менялась на всём протяжении рейда, поэтому достаточно
@@ -1378,6 +1382,7 @@ async def _cleanup_and_return(session_id: int, battle: RaidBattle, text: str, *,
         _chosen_target.pop(p.character_id, None)
         _character_in_raid.discard(p.character_id)
 
+    raised: set[int] = set()
     async with get_session_factory()() as db:
         has_mount_by_cid = {}
         defeats: dict[int, object] = {}
@@ -1388,6 +1393,26 @@ async def _cleanup_and_return(session_id: int, battle: RaidBattle, text: str, *,
             character.pos_x, character.pos_y = battle.home
             combatant = combatants.get(cid)
             survived = combatant is not None and combatant.alive and not defeated
+            if (
+                not survived and battle.is_rift and not defeated and combatant is not None
+                and any(c.alive and c.kind == "character" for c in combatants.values())
+            ):
+                # Разлом пройден - павших поднимают свои (2026-10-16, как в
+                # групповом PvE): на месте, с RIFT_RAISED_HP_PCT здоровья, без
+                # смерти и потери опыта.
+                from sqlalchemy import select
+
+                from models import CharacterStats
+                from services import vitals_service
+
+                stats = await db.scalar(select(CharacterStats).where(CharacterStats.character_id == cid))
+                if stats is not None:
+                    vit_bonus = (await item_service.compute_gear_bonus(db, cid)).get("vit", 0)
+                    vitals_service.set_hp(
+                        character, stats, max(1, round(combatant.max_hp * RIFT_RAISED_HP_PCT)), vit_bonus,
+                    )
+                raised.add(cid)
+                survived = True
             if survived:
                 has_mount_by_cid[cid] = await mount_service.has_any_mount(db, cid)
             else:
@@ -1412,8 +1437,13 @@ async def _cleanup_and_return(session_id: int, battle: RaidBattle, text: str, *,
 
     for cid, p in battle.participants.items():
         if cid in has_mount_by_cid:
+            raised_line = (
+                f"\n\n🩸 Ты пал в разломе, но группа его прошла и подняла тебя: "
+                f"{round(RIFT_RAISED_HP_PCT * 100)}% здоровья, опыт не потерян."
+                if cid in raised else ""
+            )
             await _bot_api.messages.send(
-                peer_id=p.peer_id, message=text, random_id=0,
+                peer_id=p.peer_id, message=text + raised_line, random_id=0,
                 keyboard=movement_keyboard(*battle.home, p.peer_id, has_mount=has_mount_by_cid.get(cid, False)),
             )
             # Сводка клетки (0; 0), как после любого боя: без неё игрок
