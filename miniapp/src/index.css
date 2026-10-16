@@ -2305,6 +2305,8 @@ body::before {
   align-items: center;
   justify-content: space-between;
   gap: 8px;
+  flex-wrap: wrap;
+  box-sizing: border-box;
   width: 100%;
   padding: 0 16px 0 0;
   background: none;
@@ -2314,7 +2316,12 @@ body::before {
   text-align: left;
   cursor: pointer;
 }
+.city-head > :first-child {
+  flex: 1 1 auto;
+  min-width: 0;
+}
 .city-head__hint {
+  margin-left: auto;
   font-size: 12px;
   color: rgba(255, 255, 255, 0.5);
   white-space: nowrap;
