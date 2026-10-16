@@ -180,6 +180,13 @@ class CombatantState:
     # Все расходники за бой (зелья + эликсиры), лимит CONSUMABLES_PER_BATTLE.
     consumables_used: int = 0
 
+    #: Затухание дебаффов (2026-10-16), {вид: доля}: с какой силой ляжет новый
+    #: дебафф этого вида (bc.DECAYING_DEBUFFS - уязвимость, ослабление). Пока
+    #: дебафф держится на цели, каждый ход и он, и эта доля падают на
+    #: bc.DEBUFF_DECAY_PER_TURN; доля сбрасывается, когда дебаффа не осталось.
+    #: Цепочкой печатей от нескольких игроков +70% больше не удержать.
+    debuff_fatigue: dict[str, float] = field(default_factory=dict)
+
     # --- Патч 46, ч.1: Элементалист, «Перегрузка»/«Стихийный поток» ---
     # Перегрузка: ходов накоплено с последнего срабатывания / готов ли пропуск КД
     # следующего навыка. Считается только если у актёра есть overload_active
@@ -268,6 +275,9 @@ class CombatantState:
         """Наложить временный эффект. Non-stacking: повторное применение того же
         вида от того же источника ОБНОВЛЯЕТ значение и длительность, не суммирует.
         tag - метка вида эффекта (см. BURN_TAG)."""
+        if kind in bc.DECAYING_DEBUFFS and value > 0:
+            # getattr: соло-бой из pickle-снимка до появления поля.
+            value *= getattr(self, "debuff_fatigue", {}).get(kind.value, 1.0)
         for effect in self.effects:
             # Щиты с разными метками не сливаются: мистик со своим Оберегом
             # выпил «Второе сердце» - это два щита, а не один перезаписанный.
@@ -282,6 +292,29 @@ class CombatantState:
         self.effects.append(
             Effect(kind=kind, value=value, remaining_ticks=duration, source_id=source_id, tag=tag)
         )
+
+    def decay_debuffs(self, preexisting: set[int] | None = None) -> None:
+        """Конец хода, после снятия истёкших эффектов: дебафф из
+        bc.DECAYING_DEBUFFS держится - он и следующий такой же слабеют на
+        bc.DEBUFF_DECAY_PER_TURN; не держится - следующий ляжет в полную
+        силу. preexisting - id эффектов, что были на начало хода (резолвер):
+        наложенный в этот ход начинает слабеть со следующего, как и его
+        длительность. Отрицательные значения (защитная черта моба) не трогаются."""
+        fatigue = getattr(self, "debuff_fatigue", None)
+        if fatigue is None:
+            fatigue = self.debuff_fatigue = {}
+        keep = 1.0 - bc.DEBUFF_DECAY_PER_TURN
+        for kind in bc.DECAYING_DEBUFFS:
+            held = [e for e in self.effects if e.kind == kind and e.value > 0]
+            if not held:
+                fatigue.pop(kind, None)
+                continue
+            old = [e for e in held if preexisting is None or id(e) in preexisting]
+            if not old:
+                continue
+            for effect in old:
+                effect.value *= keep
+            fatigue[kind] = fatigue.get(kind, 1.0) * keep
 
     def is_on_cooldown(self, skill_id: str) -> bool:
         return self.cooldowns.get(skill_id, 0) > 0

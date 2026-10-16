@@ -249,6 +249,7 @@ class DuelEngine:
             e for e in actor.effects if e.kind == EffectKind.DOT and e.remaining_ticks <= 0
         ]
         actor.effects = [e for e in actor.effects if e.remaining_ticks > 0]
+        actor.decay_debuffs()  # уязвимость и ослабление слабеют каждый ход (2026-10-16)
         actor.tick_cooldowns()
         tick_overload(actor)
         control.tick_control(actor, pvp=True)  # дуэль — всегда PvP

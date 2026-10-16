@@ -665,6 +665,7 @@ def resolve_tick(
             e for e in combatant.effects if e.kind == EffectKind.DOT and e.remaining_ticks <= 0
         ]
         combatant.effects = [e for e in combatant.effects if e.remaining_ticks > 0]
+        combatant.decay_debuffs(preexisting_effects)  # уязвимость и ослабление слабеют каждый ход (2026-10-16)
         combatant.tick_cooldowns()
         tick_overload(combatant)
         control.tick_control(combatant, pvp)
