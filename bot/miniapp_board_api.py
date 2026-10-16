@@ -153,6 +153,7 @@ async def _contracts_state(db, character, now: datetime) -> dict:
             "kills_left": c.kills_left, "kills_total": c.kills_total, "price": c.price,
             "minutes_left": max(int((expires - now).total_seconds() // 60), 0),
             "hunters": counts.get(c.id, 0), "taken": taken,
+            "guildmate": character.guild_id is not None and target.guild_id == character.guild_id,
             "mine": c.orderer_id == character.id, "on_me": target.id == character.id,
             # Где цель - только тем, кто взял заказ.
             "where": contract_service.location_text(target) if taken else None,

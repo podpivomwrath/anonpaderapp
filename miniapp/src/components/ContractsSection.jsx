@@ -129,6 +129,7 @@ export default function ContractsSection() {
               {c.on_me ? <span className="craft-hint">на тебя</span>
                 : c.mine ? <span className="craft-hint">твой заказ</span>
                   : c.taken ? <span className="craft-hint">взят</span>
+                    : c.guildmate ? <span className="craft-hint">согильдиец</span>
                     : <Button size="s" disabled={busy} onClick={() => act('take', { id: c.id })}>Взять</Button>}
             </span>
           </div>

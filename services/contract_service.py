@@ -81,6 +81,11 @@ async def take(db: AsyncSession, hunter: Character, contract_id, now: datetime |
         raise ContractError("Это заказ на тебя.")
     if contract.orderer_id == hunter.id:
         raise ContractError("Свой заказ взять нельзя.")
+    # Согильдийцев не заказывают у своих (2026-10-16, решение владельца).
+    if hunter.guild_id is not None:
+        target = await db.get(Character, contract.target_id)
+        if target is not None and target.guild_id == hunter.guild_id:
+            raise ContractError("Это твой согильдиец - заказ на него взять нельзя.")
     if await db.get(ContractTaker, (contract.id, hunter.id)) is not None:
         raise ContractError("Ты уже взял этот заказ.")
     db.add(ContractTaker(contract_id=contract.id, character_id=hunter.id, taken_at=now))

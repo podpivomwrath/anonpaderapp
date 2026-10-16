@@ -121,3 +121,20 @@ async def test_afk_target_visible_only_to_hunter(db_session, make_character):
     stranger_view, _ = await pvp._scene_at(db_session, stranger)
     assert target.id in {x.id for x in hunter_view}
     assert target.id not in {x.id for x in stranger_view}
+
+
+async def test_guildmate_cannot_take_contract(db_session, make_character):
+    from models import Guild
+
+    guild = Guild(name="Своих не бьём", tag="СНБ")
+    db_session.add(guild)
+    await db_session.flush()
+    orderer = await make_character(level=20, donate=1000)
+    target = await make_character(level=20)
+    mate = await make_character(level=20)
+    target.guild_id = mate.guild_id = guild.id
+    await db_session.flush()
+    c = await cs.create(db_session, orderer, target.name, 1, 100)
+    with pytest.raises(cs.ContractError, match="согильдиец"):
+        await cs.take(db_session, mate, c.id)
+    await cs.take(db_session, await make_character(level=20), c.id)  # чужой - может
