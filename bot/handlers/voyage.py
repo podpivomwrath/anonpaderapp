@@ -35,6 +35,17 @@ _away: set[int] = set()
 AWAY = FuncRule(lambda m: m.peer_id in _away)
 
 
+def _is_bug_report(message) -> bool:
+    """Баг-репорт (/баг, /bug) проходит и в пути (2026-10-16): сообщить о
+    проблеме можно всегда - его ловит обработчик модерации дальше по цепочке."""
+    text = (message.text or "").strip().lower()
+    return text.startswith(("/баг", "/bug"))
+
+
+#: Пока в пути - перехватываем всё, кроме баг-репорта.
+AWAY_BLOCK = FuncRule(lambda m: m.peer_id in _away and not _is_bug_report(m))
+
+
 def setup(bot_api) -> None:
     global _bot_api
     _bot_api = bot_api
@@ -200,7 +211,7 @@ async def come_back(message: Message) -> None:
     await _send_home(peer_id, text or "Ты дома.")
 
 
-@labeler.message(AWAY)
+@labeler.message(AWAY_BLOCK)
 async def while_away(message: Message) -> None:
     """Пока в пути, ничего другого: напоминание и клавиатура пути."""
     await message.answer("Ты в долгом пути. Вернуться можно кнопкой «⚓ Вернуться».", keyboard=kb.voyage_keyboard())
