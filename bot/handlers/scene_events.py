@@ -21,6 +21,7 @@ from vkbottle.bot import BotLabeler, Message
 from vkbottle.dispatch.rules import ABCRule
 
 from bot import dailies_texts, group_texts, pending_activity
+from bot.dispatch_rules import is_slash_command
 from bot.handlers import stats_window
 from bot.keyboards.world import waiting_keyboard
 from bot.vk_media import photo_attachment
@@ -529,7 +530,8 @@ class RiddleAnswer(ABCRule[Message]):
 
     async def check(self, event: Message) -> bool:
         p = _pending.get(event.peer_id)
-        return bool(p and p.riddle is not None and event.text and not event.payload)
+        return bool(p and p.riddle is not None and event.text and not event.payload
+                    and not is_slash_command(event))
 
 
 @labeler.message(RiddleAnswer())
@@ -567,7 +569,8 @@ class StakeAnswer(ABCRule[Message]):
     """Свободный текст - это сумма ставки, только пока кости её ждут."""
 
     async def check(self, event: Message) -> bool:
-        return bool(_awaits_stake(_pending.get(event.peer_id)) and event.text and not event.payload)
+        return bool(_awaits_stake(_pending.get(event.peer_id)) and event.text and not event.payload
+                    and not is_slash_command(event))
 
 
 @labeler.message(StakeAnswer())

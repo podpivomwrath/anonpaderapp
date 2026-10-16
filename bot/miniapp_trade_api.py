@@ -9,7 +9,7 @@ import random
 from datetime import datetime, timezone
 
 from aiohttp import web
-from sqlalchemy import func, select
+from sqlalchemy import case, func, select
 from sqlalchemy.exc import IntegrityError
 
 from bot.app_keys import SESSION_FACTORY_KEY
@@ -18,7 +18,7 @@ from bot.onboarding_texts import REGION_TITLES
 from game.economy import faction_config as fc
 from game.economy import mining
 from game.economy import trade_config as tc
-from models import Character, CharacterOre, TradeContribution
+from models import Character, CharacterOre, TradeContribution, TradeFirm
 from services import faction_service, trade_service, wallet_service
 from services import onboarding_service as onboarding_svc
 
@@ -277,6 +277,67 @@ async def handle_post(request: web.Request) -> web.Response:
     return web.json_response(state)
 
 
+#: Сколько торговцев показывать в сводке города.
+CITY_TOP = 10
+
+
+async def city_summary(db, city: str, now: datetime | None = None) -> dict:
+    """Сводка города (2026-10-16, клик по городу во вкладке «Фракция»): что он
+    производит и почём, что скупает и почём, лучшие торговцы города за всё
+    время (очки процветания без дневного потолка) и за эту неделю."""
+    now = now or datetime.now(timezone.utc)
+    prices = await trade_service.pressures(db, now)
+    makes = [
+        {**_good(g), "price": trade_service.city_buy_price(city, g, prices.get((city, g.id), 0.0))}
+        for g in tc.GOODS if g.city == city
+    ]
+    buys = [
+        {
+            **_good(g), "price": trade_service.city_sell_price(city, g, prices.get((city, g.id), 0.0)),
+            "deficit": city in tc.DEFICIT[g.city],
+        }
+        for g in tc.GOODS if g.city != city
+    ]
+    buys.sort(key=lambda g: (-g["price"], g["tier"]))
+    week = faction_service.week_start(faction_service.msk_day(now))
+    total = func.sum(TradeContribution.raw)
+    week_points = func.sum(case((TradeContribution.day >= week, TradeContribution.raw), else_=0))
+    rows = (await db.execute(
+        select(Character.name, TradeFirm.name, TradeFirm.trade_level, total, week_points)
+        .join(Character, Character.id == TradeContribution.character_id)
+        .outerjoin(TradeFirm, TradeFirm.character_id == TradeContribution.character_id)
+        .where(TradeContribution.city == city)
+        .group_by(TradeContribution.character_id, Character.name, TradeFirm.name, TradeFirm.trade_level)
+        .having(total > 0)
+        .order_by(total.desc(), TradeContribution.character_id)
+        .limit(CITY_TOP)
+    )).all()
+    traders = await db.scalar(
+        select(func.count(TradeFirm.character_id)).join(Character, Character.id == TradeFirm.character_id)
+        .where(Character.region == city)
+    )
+    return {
+        "city": city, "title": REGION_TITLES[city], "makes": makes, "buys": buys, "firms": int(traders or 0),
+        "top": [
+            {"name": name, "firm": firm, "trade_level": lvl, "points": int(pts), "week": int(wk or 0)}
+            for name, firm, lvl, pts, wk in rows
+        ],
+    }
+
+
+async def handle_city(request: web.Request) -> web.Response:
+    city = request.query.get("city", "")
+    if city not in fc.CITIES:
+        return _error("bad_request")
+    async with request.app[SESSION_FACTORY_KEY]() as db:
+        if await onboarding_svc.get_character(db, request[VK_USER_ID_KEY]) is None:
+            return _error("character_not_found", 404)
+        summary = await city_summary(db, city)
+        await db.commit()
+    return web.json_response(summary)
+
+
 def register_routes(app: web.Application) -> None:
+    app.router.add_get("/api/miniapp/trade/city", handle_city)
     app.router.add_get("/api/miniapp/trade", handle_get)
     app.router.add_post("/api/miniapp/trade", handle_post)

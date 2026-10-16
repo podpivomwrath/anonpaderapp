@@ -22,6 +22,7 @@ from bot.keyboards import world as kb
 from bot import text_match
 from game.economy import voyage_config as vc
 from models import User
+from bot.dispatch_rules import is_info_command
 from services import onboarding_service as onboarding_svc
 from services import voyage_service
 from services.db import get_session_factory
@@ -42,8 +43,9 @@ def _is_bug_report(message) -> bool:
     return text.startswith(("/баг", "/bug"))
 
 
-#: Пока в пути - перехватываем всё, кроме баг-репорта.
-AWAY_BLOCK = FuncRule(lambda m: m.peer_id in _away and not _is_bug_report(m))
+#: Пока в пути - перехватываем всё, кроме баг-репорта и справочных команд
+#: (/разломы, /топ, /заказ... - bot/dispatch_rules.py::INFO_COMMANDS).
+AWAY_BLOCK = FuncRule(lambda m: m.peer_id in _away and not _is_bug_report(m) and not is_info_command(m))
 
 
 def setup(bot_api) -> None:

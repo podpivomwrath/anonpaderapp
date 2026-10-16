@@ -18,3 +18,23 @@ TEXT_ONLY — состояния ожидания текстового ввод�
 from vkbottle.dispatch.rules.base import FuncRule
 
 TEXT_ONLY = FuncRule(lambda m: m.payload is None)
+
+#: Справочные команды (2026-10-16): работают в любом состоянии - посреди
+#: события, загадки, ставки, ожидания у разлома, в долгом пути - и ничего в
+#: нём не меняют: не считаются ответом и не трогают клавиатуру.
+INFO_COMMANDS = frozenset({
+    "/разломы", "/разлом", "/rifts", "/заказ", "/заказы", "/contract", "/ежедневки", "/daily",
+    "/топ", "/top", "/квест", "/quest", "/ключ", "/profile", "/баг", "/bug",
+})
+
+
+def is_slash_command(message) -> bool:
+    """Набранная команда со слэшем: ответом на загадку или ставкой не бывает."""
+    return message.payload is None and (message.text or "").lstrip().startswith("/")
+
+
+def is_info_command(message) -> bool:
+    if message.payload is not None:
+        return False
+    words = (message.text or "").strip().lower().split()
+    return bool(words) and words[0] in INFO_COMMANDS

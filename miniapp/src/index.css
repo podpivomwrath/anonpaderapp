@@ -2299,6 +2299,37 @@ body::before {
   }
 }
 
+/* «Фракция»: город раскрывается по клику (2026-10-16). */
+.city-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
+  padding: 0 16px 0 0;
+  background: none;
+  border: 0;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.city-head__hint {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.5);
+  white-space: nowrap;
+}
+.city-summary {
+  margin-bottom: 12px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+.city-summary__wait {
+  display: flex;
+  justify-content: center;
+  padding: 12px 0;
+}
+
 /* «Доска»: свёрнутые правила клейма (2026-10-15). */
 .board-rules {
   padding: 4px 16px 12px;

@@ -376,6 +376,9 @@ export const exchangeTrade = (direction, lots) =>
 
 export const getTrade = () => request('/trade');
 
+// Сводка города во вкладке «Фракция»: товары и лучшие торговцы (2026-10-16).
+export const getTradeCity = (city) => request(`/trade/city?city=${encodeURIComponent(city)}`);
+
 export const tradeAction = (action, params = {}) =>
   request('/trade', {
     method: 'POST',

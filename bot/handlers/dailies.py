@@ -6,6 +6,8 @@
 from vkbottle.bot import BotLabeler, Message
 
 from bot import dailies_texts
+from bot.battle_keyboard import active_battle_keyboard
+from bot.dispatch_rules import is_info_command
 from bot.keyboards.world import BTN_DAILIES
 from services import daily_service
 from services import onboarding_service as onboarding_svc
@@ -28,7 +30,11 @@ async def show_dailies(message: Message) -> None:
         overview = await daily_service.get_dailies_overview(db, character)
         # Клавиатура текущего состояния (бой, город, поле): без неё ответ на
         # /daily оставлял игрока без кнопок (2026-10-14).
-        keyboard = await world_handlers._current_keyboard(
-            db, character, message.peer_id, datetime.now(timezone.utc),
-        )
+        # Набранная /daily - справка: клавиатуру не трогает (2026-10-16), в бою - боевая.
+        if is_info_command(message):
+            keyboard = active_battle_keyboard(message.peer_id)
+        else:
+            keyboard = await world_handlers._current_keyboard(
+                db, character, message.peer_id, datetime.now(timezone.utc),
+            )
     await message.answer(dailies_texts.dailies_overview_text(overview), keyboard=keyboard)

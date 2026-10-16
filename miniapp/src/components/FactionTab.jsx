@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Button, Div, Group, Header, Placeholder, Spinner, Tabs, TabsItem } from '@vkontakte/vkui';
-import { getTrade, tradeAction } from '../api.js';
+import { getTrade, getTradeCity, tradeAction } from '../api.js';
 import { itemIcon } from '../itemIcons.js';
 import ItemIcon from './ItemIcon.jsx';
 
@@ -385,7 +385,59 @@ function pct(v) {
   return v > 0 ? `+${v}%` : `${v}%`;
 }
 
+// Сводка города по клику на его заголовок (2026-10-16): товары и торговцы.
+function CitySummary({ city }) {
+  const [info, setInfo] = useState(null);
+  const [failed, setFailed] = useState(false);
+  useEffect(() => {
+    getTradeCity(city).then(setInfo).catch(() => setFailed(true));
+  }, [city]);
+  if (failed) return <p className="craft-hint">Не удалось загрузить сводку.</p>;
+  if (!info) return <div className="city-summary__wait"><Spinner size="s" /></div>;
+  return (
+    <div className="city-summary">
+      <div className="trade-dest__section">Производит · цена ящика здесь</div>
+      {info.makes.map((g) => (
+        <div key={g.id} className="trade-dest__row">
+          <span className="trade-dest__good"><GoodName g={g} /> <span className="trade-dest__note">{g.tier_name}</span></span>
+          <b className="trade-dest__price">{money(g.price)}</b>
+        </div>
+      ))}
+      <div className="trade-dest__section">Скупает · платит за ящик</div>
+      {info.buys.map((g) => (
+        <div key={g.id} className="trade-dest__row">
+          <span className="trade-dest__good">
+            <GoodName g={g} />
+            <span className="trade-dest__note">
+              {' '}из {g.city_title}{g.deficit ? <span className="trade-dest__deficit"> · дефицит</span> : ''}
+            </span>
+          </span>
+          <b className="trade-dest__price">{money(g.price)}</b>
+        </div>
+      ))}
+      <p className="craft-hint">Цены без надбавки за твой уровень торговли; падают, когда туда много везут.</p>
+      <div className="trade-dest__section">Лучшие торговцы города · фирм: {info.firms}</div>
+      {info.top.length === 0 ? (
+        <p className="craft-hint">Пока никто из этого города не торговал.</p>
+      ) : info.top.map((t, i) => (
+        <div key={t.name} className="trade-dest__row">
+          <span className="trade-dest__good">
+            {i + 1}. <b>{t.name}</b>
+            <span className="trade-dest__note">
+              {t.firm ? ` · «${t.firm}»` : ''}{t.trade_level ? ` · ${t.trade_level} ур.` : ''}
+              {t.week ? ` · за неделю ${money(t.week)}` : ''}
+            </span>
+          </span>
+          <b className="trade-dest__price">{money(t.points)}</b>
+        </div>
+      ))}
+      {info.top.length > 0 && <p className="craft-hint">Очки - всё, что торговец принёс городу за всё время.</p>}
+    </div>
+  );
+}
+
 function Factions({ data }) {
+  const [open, setOpen] = useState(null);
   return (
     <>
       {data.factions.map((f) => {
@@ -394,8 +446,14 @@ function Factions({ data }) {
         const fill = Math.min(100, Math.round((100 * (f.points - lo)) / Math.max(hi - lo, 1)));
         const home = f.city === data.home;
         return (
-          <Group key={f.city} header={<Header>{f.title}{home ? ' · твой город' : ''}</Header>}>
+          <Group key={f.city} header={(
+            <button type="button" className="city-head" onClick={() => setOpen(open === f.city ? null : f.city)}>
+              <Header>{f.title}{home ? ' · твой город' : ''}</Header>
+              <span className="city-head__hint">{open === f.city ? 'свернуть ▲' : 'товары и торговцы ▼'}</span>
+            </button>
+          )}>
             <Div>
+              {open === f.city && <CitySummary city={f.city} />}
               <p className="guild-line"><b>{f.tier.emoji} {f.tier.name}</b> · {money(f.points)} очков</p>
               <div className="guild-bar"><div className="guild-bar__fill" style={{ width: `${fill}%` }} /></div>
               <p className="craft-hint">

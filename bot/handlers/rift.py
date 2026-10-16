@@ -17,7 +17,8 @@ from vkbottle.dispatch.rules.base import FuncRule
 
 from bot import rift_texts as texts
 from bot.activity import activity_action, blocked_reason
-from bot.battle_keyboard import in_any_battle
+from bot.battle_keyboard import active_battle_keyboard, in_any_battle
+from bot.dispatch_rules import is_info_command
 
 from bot.keyboards.world import BTN_LOOK_AROUND, add_miniapp_button
 from bot import text_match
@@ -43,10 +44,7 @@ def setup(bot_api) -> None:
 @labeler.message(text=["/разломы", "/разлом", "/rifts", "разломы"])
 async def rifts_command(message: Message) -> None:
     """Активные разломы: где, какие уровни, босс и что с ним сейчас (2026-10-14)."""
-    from datetime import datetime, timezone
-
     from bot.handlers import raid_combat
-    from bot.handlers import world as world_handlers  # избегаем цикла импортов
     from game.economy import rift_config as rc
 
     async with get_session_factory()() as db:
@@ -54,9 +52,10 @@ async def rifts_command(message: Message) -> None:
         if character is None or character.creation_state is not None:
             return
         rifts = await rift_service.active_rifts(db)
-        keyboard = await world_handlers._current_keyboard(
-            db, character, message.peer_id, datetime.now(timezone.utc),
-        )
+    # Справка не трогает клавиатуру (2026-10-16): раньше ответ слал «текущую»,
+    # и посреди события, ожидания группы или пути она подменяла нужные кнопки.
+    # В бою - боевая, как у /квест.
+    keyboard = active_battle_keyboard(message.peer_id)
     if not rifts:
         await message.answer("🌀 Сейчас на карте нет ни одного разлома.", keyboard=keyboard)
         return
@@ -91,6 +90,8 @@ def _passes_through(message: Message) -> bool:
     from bot.handlers import pvp
 
     if in_any_battle(message.peer_id) or message.peer_id in pvp._pending_join_prompt:
+        return True
+    if is_info_command(message):  # справочные команды ничего не меняют
         return True
     text = (message.text or "").strip().lower()
     if text.startswith(("/напасть", "/attack")) or text_match.same(message.text, BTN_LOOK_AROUND):

@@ -24,6 +24,7 @@ from vkbottle import Keyboard, KeyboardButtonColor, Text
 from vkbottle.bot import BotLabeler, Message
 from vkbottle.dispatch.rules import ABCRule
 
+from bot.dispatch_rules import is_slash_command
 from bot import raid_archive_texts as at
 from bot.keyboards import raid as raid_kb
 from game import archive_riddles, raid_puzzles
@@ -251,7 +252,8 @@ class ArchiveAnswer(ABCRule[Message]):
     async def check(self, event: Message) -> bool:
         battle_id = _peer_run.get(event.peer_id)
         run = _runs.get(battle_id) if battle_id is not None else None
-        return bool(run and run.stage == 2 and not run.done and event.text and not event.payload)
+        return bool(run and run.stage == 2 and not run.done and event.text and not event.payload
+                    and not is_slash_command(event))
 
 
 @labeler.message(ArchiveAnswer())

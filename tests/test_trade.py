@@ -383,3 +383,18 @@ async def test_week_close_rewards_top_three(db_session, make_character) -> None:
     assert await faction_service.first_supplier(db_session, "docks", monday) == players[1].id
     assert await faction_service.first_supplier(db_session, "ridge", monday) is None
     assert await faction_service.close_week(db_session, monday) == []  # повторно - ничего
+
+
+async def test_city_summary_goods_and_top(db_session, make_character) -> None:
+    """Сводка города во вкладке «Фракция»: свои товары, скупка, торговцы города."""
+    from bot.miniapp_trade_api import city_summary
+
+    c, firm = await firm_of(db_session, make_character, region="woods")
+    await faction_service.contribute(db_session, c, firm.trade_level, 40, NOW)
+    s = await city_summary(db_session, "woods", NOW)
+    assert {g["id"] for g in s["makes"]} == {g.id for g in tc.GOODS if g.city == "woods"}
+    assert all(g["price"] > 0 for g in s["makes"] + s["buys"])
+    assert all(g["city"] != "woods" for g in s["buys"])
+    assert s["firms"] == 1
+    assert s["top"] == [{"name": c.name, "firm": firm.name, "trade_level": 1, "points": 40, "week": 40}]
+    assert (await city_summary(db_session, "ridge", NOW))["top"] == []
