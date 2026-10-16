@@ -396,5 +396,5 @@ async def test_city_summary_goods_and_top(db_session, make_character) -> None:
     assert all(g["price"] > 0 for g in s["makes"] + s["buys"])
     assert all(g["city"] != "woods" for g in s["buys"])
     assert s["firms"] == 1
-    assert s["top"] == [{"name": c.name, "firm": firm.name, "trade_level": 1, "points": 40, "week": 40}]
+    assert s["top"] == [{"name": c.name, "firm": firm.name, "trade_level": 1, "points": 40, "week": 40, "credited": 40}]
     assert (await city_summary(db_session, "ridge", NOW))["top"] == []

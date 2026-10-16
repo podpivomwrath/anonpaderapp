@@ -302,8 +302,10 @@ async def city_summary(db, city: str, now: datetime | None = None) -> dict:
     week = faction_service.week_start(faction_service.msk_day(now))
     total = func.sum(TradeContribution.raw)
     week_points = func.sum(case((TradeContribution.day >= week, TradeContribution.raw), else_=0))
+    # Засчитано городу - с дневным потолком; рейтинг - по сданному без него.
+    credited = func.sum(TradeContribution.points)
     rows = (await db.execute(
-        select(Character.name, TradeFirm.name, TradeFirm.trade_level, total, week_points)
+        select(Character.name, TradeFirm.name, TradeFirm.trade_level, total, week_points, credited)
         .join(Character, Character.id == TradeContribution.character_id)
         .outerjoin(TradeFirm, TradeFirm.character_id == TradeContribution.character_id)
         .where(TradeContribution.city == city)
@@ -319,8 +321,11 @@ async def city_summary(db, city: str, now: datetime | None = None) -> dict:
     return {
         "city": city, "title": REGION_TITLES[city], "makes": makes, "buys": buys, "firms": int(traders or 0),
         "top": [
-            {"name": name, "firm": firm, "trade_level": lvl, "points": int(pts), "week": int(wk or 0)}
-            for name, firm, lvl, pts, wk in rows
+            {
+                "name": name, "firm": firm, "trade_level": lvl, "points": int(pts), "week": int(wk or 0),
+                "credited": int(cr or 0),
+            }
+            for name, firm, lvl, pts, wk, cr in rows
         ],
     }
 
