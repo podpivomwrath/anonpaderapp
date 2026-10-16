@@ -29,6 +29,10 @@ SURGEON_STAT_MULT = 3.0
 def _boss_combatant(
     id: int, name: str, hp: int, stat_mult: float, primary_stat: str = "str",
 ) -> CombatantState:
+    # Усиление рейдов (2026-10-17): все противники всех рейдов - и боссы, и
+    # промежуточные мобы - через эту функцию, поэтому множители здесь.
+    stat_mult *= rc.RAID_DMG_MULT
+    hp = round(hp * rc.RAID_HP_MULT)
     base = balanced_mob_stats(BOSS_LEVEL, primary_stat)
     scaled = Stats(
         strength=round(base.strength * stat_mult),
