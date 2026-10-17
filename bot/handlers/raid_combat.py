@@ -1456,7 +1456,7 @@ async def _cleanup_and_return(session_id: int, battle: RaidBattle, text: str, *,
             await _bot_api.messages.send(
                 peer_id=p.peer_id, message=text, random_id=0, keyboard=kb.raid_waiting_keyboard(),
             )
-            await respawn_handlers.register_death(p.peer_id, respawn_at, defeat.xp_lost)
+            await respawn_handlers.register_death(p.peer_id, respawn_at, defeat.xp_lost, defeat.relics_lost)
         else:
             # Персонажа не нашли в БД. Раньше такой участник не получал НИ
             # ОДНОГО сообщения и оставался с боевой клавиатурой мёртвого боя.

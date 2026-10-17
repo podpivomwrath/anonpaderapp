@@ -160,13 +160,16 @@ async def resolve_victory(
 class DefeatOutcome:
     respawn_minutes: float
     xp_lost: int
+    relics_lost: dict[str, int] = field(default_factory=dict)
 
 
 async def resolve_defeat(db: AsyncSession, character: Character) -> DefeatOutcome:
-    """Смерть в PvE: штраф опыта текущего уровня, таймер респавна. Возрождение в
-    родном городе — АВТОМАТИЧЕСКИ по таймеру (bot.handlers.respawn)."""
+    """Смерть в PvE: штраф опыта текущего уровня, все реликвии сгорают
+    (2026-10-17), таймер респавна. Возрождение в родном городе — АВТОМАТИЧЕСКИ
+    по таймеру (bot.handlers.respawn)."""
     minutes = death_service._respawn_minutes(character)
     xp_lost = death_service.apply_death(character)
+    relics_lost = await trophy_service.lose_all(db, character.id)
     character.travel_target_x = None
     character.travel_target_y = None
     character.travel_arrives_at = None
@@ -174,4 +177,4 @@ async def resolve_defeat(db: AsyncSession, character: Character) -> DefeatOutcom
         await trial_service.record_defeat(db, character)
     await daily_service.record_defeat(db, character)
     await admin_service.log_death(db, character, "pve")
-    return DefeatOutcome(minutes, xp_lost)
+    return DefeatOutcome(minutes, xp_lost, relics_lost)

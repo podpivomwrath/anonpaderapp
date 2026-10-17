@@ -63,13 +63,20 @@ def _death_text(respawn_at: datetime, now: datetime, xp_lost: int = 0) -> str:
     return text
 
 
-async def register_death(peer_id: int, respawn_at: datetime, xp_lost: int = 0) -> None:
-    """Смерть игрока: убрать кнопки, показать атмосферный текст (+ штраф опыта)."""
+async def register_death(
+    peer_id: int, respawn_at: datetime, xp_lost: int = 0, relics_lost: dict[str, int] | None = None,
+) -> None:
+    """Смерть игрока: убрать кнопки, показать атмосферный текст (+ штраф опыта
+    и сгоревшие реликвии - отдельной строкой, её не трогает отсчёт)."""
     now = datetime.now(timezone.utc)
     resp = await _bot_api.messages.send(
         peer_id=peer_id, message=_death_text(respawn_at, now, xp_lost), random_id=0,
         attachment=photo_attachment(DEATH_PHOTO_ID), keyboard=kb.waiting_keyboard(),
     )
+    if relics_lost:
+        from services import trophy_service
+
+        await _bot_api.messages.send(peer_id=peer_id, message=trophy_service.lost_line(relics_lost), random_id=0)
     # messages.send с peer_id возвращает message_id - по нему и правим. Раньше
     # его передавали как conversation_message_id (номер в диалоге, совсем другое
     # число): правка всегда падала, и отсчёт не обновлялся никогда.
@@ -166,11 +173,13 @@ async def scan() -> None:
             text = PVP_RESPAWN_LORE.format(city=REGION_TITLES[region])
         else:
             text = flavor.respawn_line(REGION_TITLES[region])
+        # Клавиатура площади по персонажу: пустая city_square_keyboard()
+        # теряла кнопку маунта и значок наставника.
         await _bot_api.messages.send(
             peer_id=peer_id,
             message=text,
             random_id=0,
-            keyboard=kb.city_square_keyboard(),
+            keyboard=await _field_keyboard(peer_id) or kb.city_square_keyboard(),
         )
 
     # Смерть в PvP (дуэль, массовый бой, осада) приходила только строкой

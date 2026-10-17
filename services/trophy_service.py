@@ -195,6 +195,28 @@ async def transfer_all(db: AsyncSession, loser_id: int, winner_id: int) -> dict[
     return moved
 
 
+async def lose_all(db: AsyncSession, character_id: int) -> dict[str, int]:
+    """Смерть в PvE (2026-10-17, решение владельца): все реликвии сгорают.
+    Возвращает потерянный набор {trophy_id: count} для сообщения."""
+    lost: dict[str, int] = {}
+    for row in await _lock_rows(db, character_id):
+        lost[row.trophy_id] = row.count
+        row.count = 0
+    if lost:
+        await db.flush()
+    return {d.id: lost[d.id] for d in trophy_defs_ordered() if d.id in lost}
+
+
+def lost_line(lost: dict[str, int]) -> str:
+    if not lost:
+        return ""
+    parts = []
+    for trophy_id, n in lost.items():
+        d = trophy_def(trophy_id)
+        parts.append(f"{d.emoji} {d.name} ×{n}" if d else f"{trophy_id} ×{n}")
+    return "🔥 Реликвии при тебе рассыпались в пепел: " + ", ".join(parts) + "."
+
+
 async def split_among(
     db: AsyncSession, victim_id: int, shares: dict[int, float]
 ) -> dict[int, dict[str, int]]:
