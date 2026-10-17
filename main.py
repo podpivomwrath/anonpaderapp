@@ -69,16 +69,52 @@ def create_bot(settings: Settings) -> Bot:
     return bot
 
 
-async def run_polling(bot: Bot) -> None:
-    """LongPoll-цикл: те же хендлеры и роутер, что и у Callback API."""
-    logger.info("Режим LongPoll: опрашиваем VK, публичный URL не нужен")
+#: Фоновые задачи обработки LongPoll-событий: ссылки держим, иначе сборщик
+#: мусора может снять незавершённую задачу.
+_poll_tasks: set[asyncio.Task] = set()
+
+
+async def _route_update(bot: Bot, update: dict) -> None:
+    try:
+        await bot.router.route(update, bot.api)
+    except Exception:
+        logger.exception("Ошибка обработки события {}", update.get("type"))
+
+
+async def _poll_forever(bot: Bot, redis) -> None:
+    """LongPoll: забираем события у VK сами. Каждое - своей задачей, как в
+    вебхуке (раньше по одному подряд: медленный обработчик держал всех).
+    Повторы отсекаются тем же ключом в Redis, что и у Callback - пока
+    включены оба способа, событие не обработается дважды (2026-10-17).
+    Обрыв связи с VK - пауза и новый сервер опроса, а не падение бота."""
+    from bot.webhook import is_duplicate_event
+
     bot.polling.api = bot.api
-    async for event in bot.polling.listen():
-        for update in event.get("updates", []):
-            try:
-                await bot.router.route(update, bot.api)
-            except Exception:
-                logger.exception("Ошибка обработки события {}", update.get("type"))
+    while True:
+        try:
+            async for event in bot.polling.listen():
+                for update in event.get("updates", []):
+                    if await is_duplicate_event(redis, update.get("event_id")):
+                        continue
+                    task = asyncio.create_task(_route_update(bot, update))
+                    _poll_tasks.add(task)
+                    task.add_done_callback(_poll_tasks.discard)
+        except asyncio.CancelledError:
+            raise
+        except Exception:
+            logger.exception("LongPoll: обрыв, переподключаюсь через 3 с")
+            await asyncio.sleep(3)
+
+
+async def run_polling(bot: Bot, redis, stop: asyncio.Event) -> None:
+    """LongPoll-цикл до сигнала остановки: при деплое (SIGTERM) бот должен
+    успеть сохранить соло-бои - раньше в этом режиме сигнал не ловился."""
+    logger.info("Режим LongPoll: опрашиваем VK, публичный URL не нужен")
+    poller = asyncio.create_task(_poll_forever(bot, redis))
+    try:
+        await stop.wait()
+    finally:
+        poller.cancel()
 
 
 async def _pts_season_job() -> None:
@@ -460,7 +496,7 @@ async def run() -> None:
 
     try:
         if settings.bot_mode == "polling":
-            await run_polling(bot)  # LongPoll-цикл вместо ожидания вебхуков
+            await run_polling(bot, redis, stop)  # LongPoll вместо ожидания вебхуков
         else:
             await stop.wait()  # события приходят в вебхук; ждём сигнала остановки
     finally:

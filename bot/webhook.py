@@ -39,13 +39,15 @@ EVENT_DEDUP_TTL_SECONDS = 3600
 
 
 async def _is_duplicate_event(request: web.Request, event_id: str | None) -> bool:
+    return await is_duplicate_event(request.app.get(REDIS_KEY), event_id)
+
+
+async def is_duplicate_event(redis, event_id: str | None) -> bool:
     """True — это событие уже обрабатывалось (или обрабатывается прямо сейчас),
     повторно обрабатывать не нужно. Redis опционален (тесты/локальный dev без
-    него) — тогда дедупликации просто нет, как и раньше."""
-    if not event_id:
-        return False
-    redis = request.app.get(REDIS_KEY)
-    if redis is None:
+    него) — тогда дедупликации просто нет, как и раньше. Общая для Callback и
+    LongPoll (2026-10-17): пока работают оба, одно событие не пройдёт дважды."""
+    if not event_id or redis is None:
         return False
     # SET NX EX атомарен — в отличие от отдельных EXISTS+SETEX, не даёт двум
     # почти одновременным ретраям одного event_id проскочить оба разом.
