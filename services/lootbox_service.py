@@ -103,7 +103,8 @@ async def _apply_part(db: AsyncSession, character: Character, part: LootboxRewar
         await wallet_service.deposit(db, character.id, "farm", amount)
         from services import guild_service
 
-        return guild_service.gold_label(character, amount)
+        # Сразу сумма на руки, без «(после налога N)» (2026-10-17, решение владельца).
+        return f"{guild_service.after_tax(character, amount)} золота"
     if part.type == "gems":
         amount = rng.randint(part.min, part.max)
         await wallet_service.deposit(db, character.id, "donate", amount)
