@@ -212,7 +212,10 @@ async def grant_ore(db, character, count: int, rng: random.Random, applied: Appl
     tier = grid.ring_tier(character.pos_x, character.pos_y)
     got: dict[str, int] = {}
     for _ in range(count):
-        ore_id = mining.roll_ore_id(rng, tier)
+        # Как мелкая жила при добыче (2026-10-17): тир ниже кольца и не выше
+        # того, до чего дорос горняк. Раньше бралось только кольцо, и в 4-м
+        # кольце горняк 5-го уровня получал из «Завала» Багряный сросток.
+        ore_id = mining.roll_ore_id(rng, tier, event_vein=True, mining_level=character.mining_level or 1)
         got[ore_id] = got.get(ore_id, 0) + 1
     for ore_id, n in got.items():
         await mining_service.add_ore(db, character.id, ore_id, "common", n)

@@ -288,3 +288,18 @@ def test_trail_is_short_and_pays_for_distance() -> None:
     assert _se.trail_reward_mult(None) == 1.0
     scaled = _se.scaled_result(_se.SceneResult(reward=2.5, bonus=3.0, gold=1.0), 1.6)
     assert (scaled.reward, scaled.bonus, scaled.gold) == pytest.approx((4.0, 4.8, 1.6))
+
+
+async def test_event_ore_follows_mining_level(db_session, character_at) -> None:
+    """2026-10-17: «Завал» в 4-м кольце дал горняку 5-го уровня Багряный
+    сросток. Руда событий - как мелкая жила: не выше того, до чего дорос."""
+    from game.economy import mining
+    from services import mining_service
+
+    novice = await character_at(4, 0, level=50)
+    novice.mining_level = 5
+    applied = ses.Applied(new_level=novice.level)
+    await ses.grant_ore(db_session, novice, 200, random.Random(3), applied)
+    got = {d.id for d, _grade, count in await mining_service.get_ore(db_session, novice.id) if count > 0}
+    assert got <= {"brown_iron", "salt_quartz", "living_stone"}, got  # бедный пул с протечкой кварца
+    assert mining.pool_tier_for(4, True, 50) == 3
