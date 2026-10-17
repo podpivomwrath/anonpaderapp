@@ -174,8 +174,7 @@ function Forge({ data, busy, run }) {
         {confirming ? (
           <div className="forge-confirm">
             <p className="guild-line">
-              {item.spec ? 'Перековать' : 'Сковать'} «{item.name}» в «{chosen.name}» за {cost} × {oreRow.name}
-              ({oreRow.grade_name})?{item.spec ? ' Эффективность сбросится, статы разыграются заново.' : ''}
+              {item.spec ? 'Перековать' : 'Сковать'} «{item.name}» в «{chosen.name}» за {cost} × {oreRow.name}?{item.spec ? ' Эффективность сбросится, статы разыграются заново.' : ''}
             </p>
             <div className="guild-row">
               <Button size="m" disabled={busy}
