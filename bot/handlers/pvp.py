@@ -18,6 +18,7 @@
 """
 
 import random
+import time
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 
@@ -149,6 +150,34 @@ class Battle:
 
 _battles: dict[int, Battle] = {}
 _peer_battle: dict[int, int] = {}
+#: Щит после ничьей (2026-10-17): character_id -> до какого time.time() на него
+#: нельзя напасть. В памяти: две минуты рестарт переживать не обязаны.
+_draw_shield: dict[int, float] = {}
+
+
+def draw_shield_left(character_id: int) -> int:
+    """Сколько секунд ещё действует щит после ничьей (0 - нет щита)."""
+    until = _draw_shield.get(character_id)
+    if until is None:
+        return 0
+    left = until - time.time()
+    if left <= 0:
+        _draw_shield.pop(character_id, None)
+        return 0
+    return int(left) + 1
+
+
+def _grant_draw_shield(battle: "Battle", survivors) -> list[int]:
+    """Ничья: щит выжившим с той стороны, на которую напали (сторона 1)."""
+    if battle.siege_id is not None:
+        return []
+    shielded = [cid for cid in survivors if battle.side_of.get(cid) == 1]
+    for cid in shielded:
+        _draw_shield[cid] = time.time() + bc.PVP_DRAW_SHIELD_SECONDS
+    return shielded
+
+
+DRAW_SHIELD_LINE = f"🛡 Ничья: на тебя нельзя нападать {bc.PVP_DRAW_SHIELD_SECONDS // 60} мин."
 # peer_id -> battle_id, ждём выбора стороны (текстом "1"/"2") для этого боя
 _pending_join_prompt: dict[int, int] = {}
 #: Последнее «Осмотреться»: peer -> (клетка, id игроков, id боёв) в том
@@ -414,6 +443,9 @@ async def _busy_marks(db, characters: list[Character]) -> dict[int, str]:
 
     marks = {}
     for c in characters:
+        if left := draw_shield_left(c.id):
+            marks[c.id] = f" · 🛡 после ничьей, напасть нельзя ещё {left} сек."
+            continue
         peer = await onboarding_svc.vk_id_for_character(db, c.id)
         if peer is None:
             continue
@@ -679,6 +711,10 @@ async def attack_command(message: Message, target: str) -> None:
                 await message.answer("Здесь нет такой цели.")
             return
 
+        if victim is not None and (left := draw_shield_left(victim.id)):
+            await message.answer(f"🛡 {victim.name} под защитой после ничьей - ещё {left} сек.")
+            return
+
         if safe_craft:
             # Мирная клетка (озеро, рудник): нападать можно только на цель
             # взятого заказа (2026-10-16), в чужие бои здесь не вступают.
@@ -692,6 +728,8 @@ async def attack_command(message: Message, target: str) -> None:
             await message.answer(GROUPMATE_NO_PVP_TEXT)
             return
 
+        # Напал сам - свой щит после ничьей теряешь: прячась за ним, не нападают.
+        _draw_shield.pop(character.id, None)
         if battle_entry is not None:
             battle_id, battle = battle_entry
             # Согруппник уже в бою - сразу на его сторону, без вопроса
@@ -1575,14 +1613,16 @@ async def on_duel_finished(session_id: int, result: DuelResult) -> None:
             bc.PVP_DRAW_TURN_LIMIT_TEXT if is_turn_limit
             else "🤝 Ничья: взаимное истощение. Трофеи остаются при каждом."
         )
+        shielded = _grant_draw_shield(battle, list(battle.participants)) if is_turn_limit else []
         for cid, p in battle.participants.items():
+            text = f"{draw_text}\n\n{DRAW_SHIELD_LINE}" if cid in shielded else draw_text
             if is_turn_limit:
                 pos = positions.get(cid, (0, 0))
                 keyboard = kb.movement_keyboard(*pos, p.peer_id, has_mount=has_mount_by_cid.get(cid, False))
             else:
                 keyboard = kb.waiting_keyboard()  # смерть зарегистрирована — respawn-скан подхватит
             await _bot_api.messages.send(
-                peer_id=p.peer_id, message=draw_text, random_id=0, keyboard=keyboard,
+                peer_id=p.peer_id, message=text, random_id=0, keyboard=keyboard,
             )
         return
 
@@ -1928,6 +1968,7 @@ async def on_mass_battle_finished(session_id: int, result: TickResult) -> None:
         bc.PVP_DRAW_TURN_LIMIT_TEXT if result.draw_reason == "turn_limit"
         else "🤝 Ничья: взаимное истощение. Трофеи остаются при каждом."
     )
+    shielded = _grant_draw_shield(battle, survivor_ids) if result.draw else []
     for cid, participant in battle.participants.items():
         if result.draw:
             if cid in survivor_ids:
@@ -1938,7 +1979,8 @@ async def on_mass_battle_finished(session_id: int, result: TickResult) -> None:
             else:
                 keyboard = kb.waiting_keyboard()
             await _bot_api.messages.send(
-                peer_id=participant.peer_id, message=draw_text, random_id=0, keyboard=keyboard,
+                peer_id=participant.peer_id, random_id=0, keyboard=keyboard,
+                message=f"{draw_text}\n\n{DRAW_SHIELD_LINE}" if cid in shielded else draw_text,
             )
         elif cid in survivor_ids:
             text = "🏆 Бой окончен - твоя сторона побеждает!"
