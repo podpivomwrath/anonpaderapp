@@ -2370,6 +2370,9 @@ body::before {
   padding: 8px 12px 6px;
   font-weight: 600;
 }
+.forge-sheet__hint {
+  margin: 0 12px 6px;
+}
 
 /* «Фракция»: город раскрывается по клику (2026-10-16). */
 .city-head {

@@ -113,10 +113,13 @@ function Forge({ data, busy, run }) {
   const oreRow = ore ? data.ore.find((o) => o.id === ore.id && o.grade === ore.grade) : null;
   const specs = item ? (data.specs_by_source?.[item.source_id] ?? data.specs) : data.specs;
   const chosen = specs.find((s) => s.id === spec) || null;
-  // 2026-10-17, решение владельца: в ковку - только ещё не кованые вещи и
-  // только обычная руда (все тиры); редкие градации здесь не предлагаются.
+  // 2026-10-17, решение владельца: в ковку - только ещё не кованые вещи.
+  // Руда - все градации: тир задаёт стартовую эффективность, градация -
+  // точность статов (подсказки в выборе руды и под шансами).
   const forgeable = data.items.filter((i) => !i.spec);
-  const groups = byOreType(data.ore.filter((o) => o.craft_efficiency !== null && o.grade === 'common'));
+  const groups = byOreType(data.ore.filter((o) => o.craft_efficiency !== null));
+  // Главный стат выбранного варианта и его шанс по градации - для подсказки в выборе руды.
+  const topChance = (grade) => (chosen ? chosen.chances[grade]?.[0] : null);
   const reset = () => setConfirming(false);
 
   return (
@@ -137,8 +140,8 @@ function Forge({ data, busy, run }) {
             </ForgeSlot>
           </div>
           <p className="craft-hint">
-            Выбери некованый предмет с рейд-босса и обычную руду. Чем выше тир руды, тем выше стартовая
-            эффективность.
+            Выбери некованый предмет с рейд-босса и руду. Тир руды задаёт стартовую эффективность (80-100%),
+            градация - точность: чем она выше, тем больше очков уходит в главные статы варианта.
           </p>
         </Div>
       </Group>
@@ -160,7 +163,9 @@ function Forge({ data, busy, run }) {
               {chosen.flavor && <p className="craft-hint">{chosen.flavor}</p>}
               <ChanceBars chances={chosen.chances[ore?.grade || 'common']} />
               <p className="craft-hint">
-                {oreRow ? `Стартовая эффективность: ${oreRow.craft_efficiency}%. ` : ''}
+                {oreRow
+                  ? `Шансы для руды «${oreRow.grade_name}», стартовая эффективность ${oreRow.craft_efficiency}%. `
+                  : 'Шансы для обычной руды: редкая, эпическая и легендарная сдвигают их к главным статам. '}
                 Процент - шанс каждой порции очков уйти в этот стат.
               </p>
             </>
@@ -174,7 +179,7 @@ function Forge({ data, busy, run }) {
         {confirming ? (
           <div className="forge-confirm">
             <p className="guild-line">
-              {item.spec ? 'Перековать' : 'Сковать'} «{item.name}» в «{chosen.name}» за {cost} × {oreRow.name}?{item.spec ? ' Эффективность сбросится, статы разыграются заново.' : ''}
+              {item.spec ? 'Перековать' : 'Сковать'} «{item.name}» в «{chosen.name}» за {cost} × {oreRow.name} ({oreRow.grade_name})?{item.spec ? ' Эффективность сбросится, статы разыграются заново.' : ''}
             </p>
             <div className="guild-row">
               <Button size="m" disabled={busy}
@@ -219,6 +224,11 @@ function Forge({ data, busy, run }) {
 
       {picker === 'ore' && (
         <PickSheet title={`Руда (нужно ${cost} шт.)`} onClose={() => setPicker(null)}>
+          <p className="craft-hint forge-sheet__hint">
+            Тир руды - стартовая эффективность. Градация - точность статов: обычная оставляет шансы как есть,
+            редкая, эпическая и легендарная всё сильнее сдвигают очки в главные статы.
+            {chosen ? '' : ' Выбери вариант ковки - и здесь будет видно, как градация меняет главный стат.'}
+          </p>
           {groups.length === 0 && <p className="craft-hint">Подходящей руды нет: в ковку идёт руда первых трёх тиров.</p>}
           {groups.map((group) => group.grades.map((row) => {
             const enough = row.count >= cost;
@@ -230,7 +240,9 @@ function Forge({ data, busy, run }) {
                 <span className="crown-sheet__text">
                   <b>{row.name} · {row.grade_name}</b>
                   <small>
-                    старт {row.craft_efficiency}% · у тебя {row.count}{enough ? '' : ` - не хватает`}
+                    старт {row.craft_efficiency}%
+                    {topChance(row.grade) ? ` · ${STAT_TITLES[topChance(row.grade).stat] || topChance(row.grade).stat} ${topChance(row.grade).pct}%` : ''}
+                    {' · '}у тебя {row.count}{enough ? '' : ' - не хватает'}
                   </small>
                 </span>
               </button>
