@@ -55,18 +55,189 @@ function byOreType(rows) {
     .sort((a, b) => a.tier - b.tier);
 }
 
-function LeanBars({ lean }) {
+// --- Ковка (2026-10-17): слоты «предмет + руда», ниже - что получится ---
+// Пустые слоты нажимаются и открывают выбор снизу. Шансы статов считает
+// сервер (miniapp_craft_api._chances) по градации выбранной руды: сменил
+// руду - полоски сразу показывают, куда уйдут очки.
+
+function PickSheet({ title, onClose, children }) {
+  return (
+    <>
+      <div className="nav-scrim" onClick={onClose} aria-hidden="true" />
+      <div className="crown-sheet" role="dialog" aria-label={title}>
+        <div className="forge-sheet__title">{title}</div>
+        {children}
+      </div>
+    </>
+  );
+}
+
+function ForgeSlot({ label, filled, onClick, children }) {
+  return (
+    <button type="button" className={`forge-slot${filled ? ' forge-slot--filled' : ''}`} onClick={onClick}>
+      {filled ? children : (
+        <>
+          <span className="forge-slot__plus">+</span>
+          <span className="forge-slot__label">{label}</span>
+        </>
+      )}
+    </button>
+  );
+}
+
+function ChanceBars({ chances }) {
   return (
     <div className="craft-lean">
-      {lean.map(({ stat, share }) => (
+      {chances.map(({ stat, pct }) => (
         <div className="craft-lean__row" key={stat}>
           <span className="craft-lean__name">{STAT_TITLES[stat] || stat}</span>
           <span className="craft-lean__track">
-            <span className="craft-lean__fill" style={{ width: `${Math.round(share * 100)}%` }} />
+            <span className="craft-lean__fill forge-fill" style={{ width: `${pct}%` }} />
           </span>
+          <span className="forge-pct">{pct}%</span>
         </div>
       ))}
     </div>
+  );
+}
+
+function Forge({ data, busy, run }) {
+  const [itemId, setItemId] = useState(null);
+  const [ore, setOre] = useState(null); // {id, grade}
+  const [spec, setSpec] = useState(null);
+  const [picker, setPicker] = useState(null); // 'item' | 'ore'
+  const [confirming, setConfirming] = useState(false);
+
+  const item = data.items.find((i) => i.id === itemId) || null;
+  const cost = item ? item.next_craft_cost : data.ore[0]?.craft_cost;
+  const oreRow = ore ? data.ore.find((o) => o.id === ore.id && o.grade === ore.grade) : null;
+  const specs = item ? (data.specs_by_source?.[item.source_id] ?? data.specs) : data.specs;
+  const chosen = specs.find((s) => s.id === spec) || null;
+  const groups = byOreType(data.ore.filter((o) => o.craft_efficiency !== null));
+  const reset = () => setConfirming(false);
+
+  return (
+    <>
+      <Group header={<Header>Ковка</Header>}>
+        <Div>
+          <div className="forge-slots">
+            <ForgeSlot label="Предмет" filled={!!item} onClick={() => { setPicker('item'); reset(); }}>
+              <ItemIcon icon={item?.icon} rarity={item?.rarity} alt={item?.name} />
+              <span className="forge-slot__name">{item?.name}</span>
+              {item?.spec && <span className="forge-slot__sub">{item.spec_title} · {item.efficiency}%</span>}
+            </ForgeSlot>
+            <span className="forge-plus">+</span>
+            <ForgeSlot label="Руда" filled={!!oreRow} onClick={() => { setPicker('ore'); reset(); }}>
+              <ItemIcon icon={oreRow ? `ore:${oreRow.id}` : null} rarity={oreRow?.grade} alt={oreRow?.name} />
+              <span className="forge-slot__name">{oreRow?.name}</span>
+              {oreRow && <span className="forge-slot__sub">{oreRow.grade_name} · ×{cost}</span>}
+            </ForgeSlot>
+          </div>
+          <p className="craft-hint">
+            Выбери предмет с рейд-босса и руду. Тир руды задаёт стартовую эффективность, градация - насколько
+            точно очки уйдут в профильные статы.
+          </p>
+        </Div>
+      </Group>
+
+      <Group header={<Header>Что получится</Header>}>
+        <Div>
+          <div className="faction-choice">
+            {specs.map((s) => (
+              <button key={s.id} type="button"
+                className={`faction-choice__item${s.id === spec ? ' faction-choice__item--active' : ''}`}
+                onClick={() => { setSpec(s.id); reset(); }}>
+                <b>{s.title}</b>
+              </button>
+            ))}
+          </div>
+          {chosen ? (
+            <>
+              <p className="guild-line"><b>{chosen.name}</b></p>
+              {chosen.flavor && <p className="craft-hint">{chosen.flavor}</p>}
+              <ChanceBars chances={chosen.chances[ore?.grade || 'common']} />
+              <p className="craft-hint">
+                {oreRow
+                  ? `Шансы для руды «${oreRow.grade_name}». Стартовая эффективность: ${oreRow.craft_efficiency}%.`
+                  : 'Шансы для обычной руды - выбери руду, и они пересчитаются.'}
+                {' '}Процент - шанс каждой порции очков уйти в этот стат.
+              </p>
+            </>
+          ) : (
+            <p className="craft-hint">Выбери, во что ковать: танк, урон или поддержка.</p>
+          )}
+        </Div>
+      </Group>
+
+      <Div>
+        {confirming ? (
+          <div className="forge-confirm">
+            <p className="guild-line">
+              {item.spec ? 'Перековать' : 'Сковать'} «{item.name}» в «{chosen.name}» за {cost} × {oreRow.name}
+              ({oreRow.grade_name})?{item.spec ? ' Эффективность сбросится, статы разыграются заново.' : ''}
+            </p>
+            <div className="guild-row">
+              <Button size="m" disabled={busy}
+                onClick={() => {
+                  setConfirming(false);
+                  run(() => craftItem(item.id, spec, ore.id, ore.grade));
+                }}>
+                Да, создать
+              </Button>
+              <Button size="m" mode="secondary" disabled={busy} onClick={reset}>Отмена</Button>
+            </div>
+          </div>
+        ) : (
+          <Button size="l" stretched mode="primary"
+            disabled={busy || !item || !oreRow || !chosen || oreRow.count < cost}
+            onClick={() => setConfirming(true)}>
+            {!item ? 'Выбери предмет' : !oreRow ? 'Выбери руду' : !chosen ? 'Выбери результат'
+              : oreRow.count < cost ? 'Не хватает руды' : 'Создать'}
+          </Button>
+        )}
+      </Div>
+
+      {picker === 'item' && (
+        <PickSheet title="Предмет для ковки" onClose={() => setPicker(null)}>
+          {data.items.map((row) => (
+            <button key={row.id} type="button"
+              className={`crown-sheet__item${row.id === itemId ? ' crown-sheet__item--active' : ''}`}
+              onClick={() => { setItemId(row.id); setSpec(null); setPicker(null); }}>
+              <ItemIcon icon={row.icon} rarity={row.rarity} alt={row.name} />
+              <span className="crown-sheet__text">
+                <b>{row.name}</b>
+                <small>
+                  {row.spec ? `${row.spec_title} · ${row.efficiency}% · ` : 'не кован · '}
+                  {statLine(row.stats)} · ковка {row.next_craft_cost} руды
+                </small>
+              </span>
+            </button>
+          ))}
+        </PickSheet>
+      )}
+
+      {picker === 'ore' && (
+        <PickSheet title={`Руда (нужно ${cost} шт.)`} onClose={() => setPicker(null)}>
+          {groups.length === 0 && <p className="craft-hint">Подходящей руды нет: в ковку идёт руда первых трёх тиров.</p>}
+          {groups.map((group) => group.grades.map((row) => {
+            const enough = row.count >= cost;
+            return (
+              <button key={`${row.id}:${row.grade}`} type="button" disabled={!enough}
+                className={`crown-sheet__item${ore?.id === row.id && ore?.grade === row.grade ? ' crown-sheet__item--active' : ''}`}
+                onClick={() => { setOre({ id: row.id, grade: row.grade }); setPicker(null); }}>
+                <ItemIcon icon={`ore:${row.id}`} rarity={row.grade} alt={row.name} />
+                <span className="crown-sheet__text">
+                  <b>{row.name} · {row.grade_name}</b>
+                  <small>
+                    старт {row.craft_efficiency}% · у тебя {row.count}{enough ? '' : ` - не хватает`}
+                  </small>
+                </span>
+              </button>
+            );
+          }))}
+        </PickSheet>
+      )}
+    </>
   );
 }
 
@@ -75,9 +246,6 @@ export default function CraftTab() {
   const [status, setStatus] = useState('loading');
   const [subtab, setSubtab] = useState('craft');
   const [itemId, setItemId] = useState(null);
-  const [spec, setSpec] = useState(null);
-  const [ore, setOre] = useState(null);       // {id, grade}
-  const [openOre, setOpenOre] = useState(null); // какой вид раскрыт
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState(null);
 
@@ -116,9 +284,6 @@ export default function CraftTab() {
   // под роль во вкладке «Крафт», и только потом она попадает сюда.
   const items = subtab === 'upgrade' ? data.items.filter((i) => i.spec) : data.items;
   const item = items.find((i) => i.id === itemId) || items[0];
-  // В ковку идёт только руда, которая реально поднимет процент: остальная
-  // упёрлась бы в тот же потолок и сгорела впустую.
-  const craftGroups = byOreType(data.ore.filter((o) => o.craft_efficiency !== null));
   const toolGroups = byOreType(data.ore.filter((o) => o.tool_ceiling !== null));
 
   const run = (action) => {
@@ -127,13 +292,12 @@ export default function CraftTab() {
     action()
       .then((res) => {
         setNotice({ ok: true, text: describe(res) });
-        return load();
+        // Без экрана загрузки: иначе ковка размонтируется и забудет выбор.
+        return getCraft().then(setData);
       })
       .catch((error) => setNotice({ ok: false, text: error.message }))
       .finally(() => setBusy(false));
   };
-
-  const toggleOre = (id) => setOpenOre((current) => (current === id ? null : id));
 
   return (
     <>
@@ -151,7 +315,7 @@ export default function CraftTab() {
         </Placeholder>
       )}
 
-      {item && (
+      {item && subtab === 'upgrade' && (
       <Group header={<Header>Предмет</Header>}>
         {items.map((row) => (
           <SimpleCell
@@ -174,89 +338,7 @@ export default function CraftTab() {
       )}
 
       {subtab === 'craft' ? (
-        <>
-          <Group header={<Header>Во что ковать</Header>}>
-            {(data.specs_by_source?.[item.source_id] ?? data.specs).map((option) => (
-              <div key={option.id}>
-                <SimpleCell
-                  onClick={() => setSpec(option.id)}
-                  after={option.id === spec ? '✓' : null}
-                  subtitle={option.title}
-                >
-                  {option.name}
-                </SimpleCell>
-                {/* Полоски только у выбранного: три набора сразу читались как
-                    стена, а сравнивать их одновременно всё равно не нужно. */}
-                {option.id === spec && (
-                  <Div className="craft-expand">
-                    <LeanBars lean={option.lean} />
-                  </Div>
-                )}
-              </div>
-            ))}
-          </Group>
-
-          <Group header={<Header>Руда ({item.next_craft_cost} шт.)</Header>}>
-            {craftGroups.length === 0 && <Div>Подходящей руды нет.</Div>}
-            {craftGroups.map((group) => (
-              <div key={group.id}>
-                <SimpleCell
-                  before={
-                    <ItemIcon
-                      icon={`ore:${group.id}`}
-                      // Лучшая градация из имеющихся: строка вида целиком, и
-                      // свечение должно показывать, что в ней есть ценного.
-                      rarity={group.grades[group.grades.length - 1]?.grade}
-                      alt={group.name}
-                    />
-                  }
-                  onClick={() => toggleOre(group.id)}
-                  after={openOre === group.id ? '▴' : '▾'}
-                  subtitle={`Всего ${group.total} · старт ${group.craft_efficiency}%`}
-                >
-                  {group.name}
-                </SimpleCell>
-                {openOre === group.id && (
-                  <div className="craft-expand">
-                    {group.grades.map((row) => (
-                      <SimpleCell
-                        key={row.grade}
-                        disabled={row.count < item.next_craft_cost}
-                        onClick={() => setOre({ id: row.id, grade: row.grade })}
-                        after={
-                          ore?.id === row.id && ore?.grade === row.grade
-                            ? '✓'
-                            : `${row.count} шт.`
-                        }
-                      >
-                        {row.grade_name}
-                      </SimpleCell>
-                    ))}
-                  </div>
-                )}
-              </div>
-            ))}
-          </Group>
-
-          <Div>
-            <Button
-              size="l" stretched mode="primary"
-              disabled={busy || !spec || !ore}
-              onClick={() => run(() => craftItem(item.id, spec, ore.id, ore.grade))}
-            >
-              {item.spec ? `Перековать (${item.next_craft_cost} руды)` : `Сковать (${item.next_craft_cost} руды)`}
-            </Button>
-            {ore && (
-              <p className="craft-hint">{`Пойдёт: ${oreLabel(data.ore, ore)}`}</p>
-            )}
-            {item.spec && (
-              <p className="craft-hint">
-                Перековка сбрасывает эффективность и роллит статы заново.
-                Каждая следующая дороже предыдущей.
-              </p>
-            )}
-          </Div>
-        </>
+        <Forge data={data} busy={busy} run={run} />
       ) : (
         <>
           {item && (
@@ -345,11 +427,6 @@ export default function CraftTab() {
       )}
     </>
   );
-}
-
-function oreLabel(rows, picked) {
-  const row = rows.find((r) => r.id === picked.id && r.grade === picked.grade);
-  return row ? `${row.emoji} ${row.name}, ${row.grade_name}` : '';
 }
 
 function describe(res) {

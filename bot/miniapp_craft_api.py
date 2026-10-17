@@ -28,13 +28,27 @@ def _error(message: str, status: int = 400) -> web.Response:
     return web.json_response({"error": message}, status=status)
 
 
-def _spec_payload(source_id: str) -> list[dict]:
-    """Три варианта ковки с их предрасположенностью.
+def _chances(weights: dict[str, float], primary_stat: str) -> dict[str, list[dict]]:
+    """Шанс каждой порции очков уйти в стат - по градации руды (2026-10-17:
+    новая мастерская показывает, как руда меняет шансы). Считает сервер той
+    же resolve_weights, что и сам розыгрыш, - клиент формулу не повторяет."""
+    out = {}
+    for grade in cc.GRADE_FOCUS:
+        resolved = crafting.resolve_weights(weights, primary_stat, crafting.focus_for_grade(grade))
+        total = sum(resolved.values()) or 1.0
+        out[grade] = [
+            {"stat": stat, "pct": round(100 * weight / total)}
+            for stat, weight in sorted(resolved.items(), key=lambda kv: -kv[1])
+        ]
+    return out
 
-    Числа не отдаём сознательно: игрок видит, КУДА целится специализация, но
-    не что именно выпадет. Веса нормируем в доли от максимального — клиенту
-    нужно рисовать полоски, а не воспроизводить формулу (однажды мини-апп уже
-    пересказывал серверное правило своими словами и врал, см. патч 57).
+
+def _spec_payload(source_id: str, primary_stat: str = "str") -> list[dict]:
+    """Три варианта ковки с их предрасположенностью и шансами статов.
+
+    Веса нормируем в доли от максимального — клиенту нужно рисовать полоски,
+    а не воспроизводить формулу (однажды мини-апп уже пересказывал серверное
+    правило своими словами и врал, см. патч 57).
     """
     recipe = crafting.recipe_for(source_id)
     result = []
@@ -42,6 +56,7 @@ def _spec_payload(source_id: str) -> list[dict]:
         weights = crafting.spec_weights(source_id, spec)
         top = max(weights.values())
         result.append({
+            "chances": _chances(weights, primary_stat),
             "id": spec,
             "title": cc.SPEC_TITLES[spec],
             "name": recipe.outputs[spec].name if recipe else spec,
@@ -121,12 +136,17 @@ async def handle_get_craft(request: web.Request) -> web.Response:
             {"ceiling": ceiling, "count": count}
             for ceiling, count in sorted((await craft_service.tools_of(db, character.id)).items())
         ]
-        specs = _spec_payload(items[0]["source_id"]) if items else _spec_payload("surgeon_scalpel")
+        from game.combat import balance_config as bc
+
+        primary = bc.PRIMARY_STAT_BY_CLASS.get(character.base_class, "str")
+        specs = (
+            _spec_payload(items[0]["source_id"], primary) if items else _spec_payload("surgeon_scalpel", primary)
+        )
         # У каждого источника свои названия результатов и свои веса (доспех
         # раскладывается только в живучесть и основной стат) - мастерская
         # показывает варианты того предмета, что выбран, а не первого в списке.
         specs_by_source = {
-            source_id: _spec_payload(source_id)
+            source_id: _spec_payload(source_id, primary)
             for source_id in {row["source_id"] for row in items if row["source_id"]}
         }
 
