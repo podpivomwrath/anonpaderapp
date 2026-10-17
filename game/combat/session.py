@@ -102,7 +102,13 @@ BURN_TAG = "burn"
 SECOND_HEART_TAG = "second_heart"
 WARD_TAG = "ward"
 SCROLL_WARD_TAG = "scroll_ward"
-SHIELD_NAMES = {SECOND_HEART_TAG: "Второе сердце", WARD_TAG: "Оберег", SCROLL_WARD_TAG: "Свиток оберега"}
+#: Щит «Отголоска» мистика - отдельный от Оберега (2026-10-17): в одном
+#: эффекте новый Оберег затирал накопленный отголосок.
+ECHO_TAG = "echo"
+SHIELD_NAMES = {
+    SECOND_HEART_TAG: "Второе сердце", WARD_TAG: "Оберег", SCROLL_WARD_TAG: "Свиток оберега",
+    ECHO_TAG: "Отголосок",
+}
 
 
 def shield_name(effect) -> str:

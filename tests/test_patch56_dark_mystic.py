@@ -268,6 +268,21 @@ def test_echo_in_pair_shields_the_mystic_and_adds_to_ward() -> None:
     assert ally.effect_total(EffectKind.SHIELD_POOL) >= 243
 
 
+def test_new_ward_does_not_erase_echo_shield() -> None:
+    """2026-10-17, игрок: «Оберег перекрывает щит». Отголосок лежал в том же
+    эффекте, что Оберег, и новый Оберег затирал накопленный отголосок."""
+    from game.combat.session import ECHO_TAG
+
+    healer = mystic()
+    healer.current_hp = healer.max_hp // 3
+    healer.apply_effect(EffectKind.SHIELD_POOL, 300, 2, healer.id, tag=ECHO_TAG)
+    enemy = combatant(2, side=1, agility=0, vitality=500)
+    resolve_tick(make_session(healer, enemy), {1: skill("dark_mystic_ward")}, NoCritRng())
+    tags = {getattr(e, "tag", None): e.value for e in healer.effects_of(EffectKind.SHIELD_POOL)}
+    assert tags.get(ECHO_TAG, 0) > 0, "щит отголоска пропал после Оберега"
+    assert "ward" in tags
+
+
 def test_echo_is_noop_without_allies() -> None:
     rng = NoCritRng()
     healer = mystic(heal_overflow_shield=bc.DARK_MYSTIC_ECHO_PCT)

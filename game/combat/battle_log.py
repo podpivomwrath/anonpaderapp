@@ -94,7 +94,7 @@ def class_line(combatants, owner_id: int) -> str | None:
     Отравитель - со стаков яда). Только то, что повесил сам owner_id.
     combatants - словарь бойцов (CombatSessionState или дуэль). None - нечего
     показывать: подкласса нет или ничего не висит."""
-    from game.combat.session import BURN_TAG, SECOND_HEART_TAG
+    from game.combat.session import BURN_TAG, ECHO_TAG, SECOND_HEART_TAG
 
     combatants = dict(combatants)
     owner = combatants.get(owner_id)
@@ -150,11 +150,16 @@ def class_line(combatants, owner_id: int) -> str | None:
             parts.append("📣 Провокация: " + ", ".join(taunted))
     elif sub == "dark_mystic":
         for c in allies:
-            ward = [e for e in mine(c, EffectKind.SHIELD_POOL) if getattr(e, "tag", None) != SECOND_HEART_TAG]
-            left = round(sum(e.value for e in ward))
-            if ward and left > 0:
-                who = "ты" if c.id == owner_id else c.name
-                parts.append(f"🛡 Оберег: {who} - {left} ({_turns(max(e.remaining_ticks for e in ward))})")
+            who = "ты" if c.id == owner_id else c.name
+            shields = [e for e in mine(c, EffectKind.SHIELD_POOL) if getattr(e, "tag", None) != SECOND_HEART_TAG]
+            # Оберег и Отголосок - разные щиты (2026-10-17), показываем порознь.
+            for title, group in (
+                ("Оберег", [e for e in shields if getattr(e, "tag", None) != ECHO_TAG]),
+                ("Отголосок", [e for e in shields if getattr(e, "tag", None) == ECHO_TAG]),
+            ):
+                left = round(sum(e.value for e in group))
+                if group and left > 0:
+                    parts.append(f"🛡 {title}: {who} - {left} ({_turns(max(e.remaining_ticks for e in group))})")
     return "\n".join(parts) if parts else None
 
 

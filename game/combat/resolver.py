@@ -21,7 +21,7 @@ import game.combat.subclass_skills as subclass_skills  # регистрация 
 from game.combat import balance_config as bc
 from game.combat import combat_flavor, control, display, formulas, shared_rules
 from game.combat.session import (
-    WARD_TAG,
+    ECHO_TAG,
     ActionType,
     CombatantState,
     CombatMode,
@@ -540,11 +540,12 @@ def resolve_tick(
             amount = round(overflow * echo)
             if amount <= 0:
                 continue
-            # Щит прибавляется к Оберегу того же мистика, а не заменяет его:
-            # раньше отголосок в 47 ед. затирал Оберег в 243.
+            # Свой щит, отдельно от Оберега (ECHO_TAG): раньше отголосок затирал
+            # Оберег, а потом новый Оберег - накопленный отголосок. Новый
+            # отголосок прибавляется к уже висящему.
             current = next(
                 (e for e in ally.effects_of(EffectKind.SHIELD_POOL)
-                 if e.source_id == source.id and getattr(e, "tag", None) == WARD_TAG),
+                 if e.source_id == source.id and getattr(e, "tag", None) == ECHO_TAG),
                 None,
             )
             if current is not None:
@@ -552,7 +553,7 @@ def resolve_tick(
                 current.remaining_ticks = max(current.remaining_ticks, bc.DARK_MYSTIC_ECHO_DURATION)
             else:
                 ally.apply_effect(
-                    EffectKind.SHIELD_POOL, amount, bc.DARK_MYSTIC_ECHO_DURATION, source.id, tag=WARD_TAG,
+                    EffectKind.SHIELD_POOL, amount, bc.DARK_MYSTIC_ECHO_DURATION, source.id, tag=ECHO_TAG,
                 )
             ctx.lines.append(
                 f"{source.name}: отголосок - {overflow} лишнего лечения ({target.name}) "
