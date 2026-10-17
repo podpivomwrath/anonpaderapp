@@ -215,6 +215,17 @@ async def _render(db, character, stats, p: Pending, peer_id: int, rebuild: bool 
             _button(kb, "🎲 Бросить кости", {**base, "a": "roll"}, KeyboardButtonColor.POSITIVE)
         _button(kb, "Отменить", {**base, "a": "cancel"})
 
+    elif scene.type == "dealer":
+        # Пепельный меняла: одна сделка - всё разом или одна градация.
+        from services import relic_dealer_service
+
+        offer = await relic_dealer_service.offer(db, character)
+        if not offer:
+            text += f"\n\n{scene.empty_text}"
+        for choice, label, gold in offer:
+            _button(kb, f"{label} - {gold} 💰", {**base, "a": "sell", "v": choice}, KeyboardButtonColor.POSITIVE)
+        _button(kb, "Уйти", {**base, "a": "leave"})
+
     return text, _finish_keyboard(kb)
 
 
@@ -345,6 +356,10 @@ async def _dispatch(peer_id: int, p: Pending, payload: dict) -> None:
 
         if scene.type == "dice":
             await _dice(peer_id, db, character, stats, p, scene, action, payload)
+            return
+
+        if scene.type == "dealer":
+            await _dealer(peer_id, db, character, stats, p, scene, action, payload)
             return
 
 
@@ -479,6 +494,43 @@ async def _dice(peer_id, db, character, stats, p: Pending, scene: Scene, action:
            else f"{scene.lose_text} −{_money(p.currency, p.stake)}")
     )
     await _resolve(peer_id, db, character, stats, p, SceneResult(), [line])
+
+
+async def _dealer(peer_id, db, character, stats, p: Pending, scene: Scene, action: str, payload: dict) -> None:
+    """Пепельный меняла: сделка или (с шансом relic_dealer.ATTACK_CHANCE) бой."""
+    from game.world import relic_dealer
+    from services import relic_dealer_service
+
+    if action == "leave":
+        await _resolve(peer_id, db, character, stats, p, SceneResult(text=scene.leave_text), [])
+        return
+    if action != "sell":
+        return
+    choice = payload.get("v")
+    if choice not in {c for c, _label, _gold in await relic_dealer_service.offer(db, character)}:
+        return  # сумка изменилась, пока думал: кнопка устарела
+    if _rng.random() < relic_dealer.ATTACK_CHANCE:
+        lot = await relic_dealer_service.lot(db, character, choice)
+        applied = scene_event_service.Applied(new_level=character.level)
+        await scene_event_service.finish_event(db, character, applied)
+        gear_bonus = await item_service.compute_gear_bonus(db, character.id)
+        modifiers = await scene_event_service.solo_modifiers(
+            db, character, await preset_service.resolve_active_modifiers(db, character),
+        )
+        await db.commit()
+        _pending.pop(peer_id, None)
+        await pending_activity.forget_scene(peer_id)
+        await _send(peer_id, scene.attack_text, waiting_keyboard())
+        from bot.handlers import combat as combat_handlers
+
+        await combat_handlers.start_dealer_encounter(peer_id, character, stats, gear_bonus, modifiers, lot)
+        return
+    gold, progress = await relic_dealer_service.sell(db, character, choice)
+    line = f"💰 Меняла отсчитывает {guild_service.gold_label(character, gold)}."
+    notice = dailies_texts.progress_notice(progress) if progress is not None else None
+    await _resolve(peer_id, db, character, stats, p, SceneResult(text=f"{scene.sold_text}\n\n{line}"), [])
+    if notice:
+        await _send(peer_id, notice)
 
 
 def parse_stake(text: str) -> int | None:

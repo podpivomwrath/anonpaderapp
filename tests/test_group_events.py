@@ -22,6 +22,7 @@ def test_every_mechanic_has_an_event_and_all_resolve() -> None:
     events = ge.content().events
     assert {e.mechanic for e in events} == {
         "split", "vote", "roles", "rescue", "volunteer", "circle", "pot", "branches", "nest", "siege",
+        "dealer",
     }
     for event in events:
         state = ge.initial_state(event, list(MEMBERS))

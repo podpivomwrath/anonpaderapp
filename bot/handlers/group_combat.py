@@ -101,6 +101,10 @@ class GroupBattle:
     #: обычный моб.
     story_mob_id: int | None = None
     story_quest_id: str | None = None
+    #: Пепельный меняла (game/world/relic_dealer.py): {id продавца: партия}
+    #: и id менялы. Группа пала - меняла уносит сорванное.
+    relic_lots: dict[int, dict[str, int]] = field(default_factory=dict)
+    dealer_id: int | None = None
 
 
 #: Сколько здоровья у павшего, если группа всё же победила.
@@ -175,7 +179,8 @@ async def build_member_inputs(db, members: list[Character]) -> list[MemberCombat
 
 
 async def start_ready_group(db, group_id, members, region, dist, rng, *,
-                            mob_encounters: list | None = None, story_quest_id: str | None = None) -> None:
+                            mob_encounters: list | None = None, story_quest_id: str | None = None,
+                            relic_lots: dict | None = None) -> None:
     from bot.activity import transition, blocked_reason, ActivityBusy
     peers = [await onboarding_svc.vk_id_for_character(db, c.id) for c in members]
     if any(p is None for p in peers):
@@ -191,12 +196,14 @@ async def start_ready_group(db, group_id, members, region, dist, rng, *,
         await db.commit()
         await db.close()
         await start_group_encounter(group_id, inputs, region, dist, rng,
-                                    mob_encounters=mob_encounters, story_quest_id=story_quest_id)
+                                    mob_encounters=mob_encounters, story_quest_id=story_quest_id,
+                                    relic_lots=relic_lots)
 
 
 async def start_group_encounter(
     group_id: int, members_input: list[MemberCombatInput], region: str, dist: int, rng: random.Random,
     *, mob_encounters: list | None = None, story_quest_id: str | None = None,
+    relic_lots: dict | None = None,
 ) -> None:
     """mob_encounters - готовые противники (сюжетный бой группы): первый -
     сюжетный враг квеста story_quest_id. Без них - обычная пачка клетки."""
@@ -243,6 +250,10 @@ async def start_group_encounter(
     if story_quest_id is not None and mob_encounters:
         battle.story_mob_id = mob_encounters[0].combatant.id
         battle.story_quest_id = story_quest_id
+    if relic_lots is not None and mob_encounters:
+        # Первый - Пепельный меняла, за ним его тени.
+        battle.dealer_id = mob_encounters[0].combatant.id
+        battle.relic_lots = dict(relic_lots)
     _battles[battle_id] = battle
     _active_group_ids.add(group_id)
     for p in participants.values():
@@ -807,6 +818,7 @@ async def on_group_battle_finished(session_id: int, result: TickResult) -> None:
                     vitals_service.set_hp(character, stats, combatants[cid].current_hp, vit_bonus)
             else:
                 defeats[cid] = (await encounter_service.resolve_defeat(db, character), character.respawn_at)
+        dealer_lines = await _dealer_outcome(db, battle, combatants, bool(survivor_ids))
         await db.commit()
 
     for cid, p in battle.participants.items():
@@ -814,6 +826,8 @@ async def on_group_battle_finished(session_id: int, result: TickResult) -> None:
             pos = positions.get(cid, (0, 0))
             keyboard = movement_keyboard(*pos, p.peer_id, has_mount=has_mount_by_cid.get(cid, False))
             await _bot_api.messages.send(peer_id=p.peer_id, message="🏆 Группа побеждает!", random_id=0)
+            if dealer_lines.get(cid):
+                await _bot_api.messages.send(peer_id=p.peer_id, message="\n".join(dealer_lines[cid]), random_id=0)
             for buff_id in trial_buffs.get(cid, []):
                 await _bot_api.messages.send(
                     peer_id=p.peer_id, random_id=0,
@@ -845,6 +859,41 @@ async def on_group_battle_finished(session_id: int, result: TickResult) -> None:
         elif cid in dead_ids and cid in defeats:
             defeat, respawn_at = defeats[cid]
             await respawn_handlers.register_death(p.peer_id, respawn_at, defeat.xp_lost)
+            if dealer_lines.get(cid):
+                await _bot_api.messages.send(peer_id=p.peer_id, message="\n".join(dealer_lines[cid]), random_id=0)
+
+
+async def _dealer_outcome(db, battle: GroupBattle, combatants: dict, won: bool) -> dict[int, list[str]]:
+    """Бой с Пепельным менялой: победа - награда всем (групповая надбавка),
+    реликвии при продавцах; группа пала - меняла уносит сорванное."""
+    if battle.dealer_id is None:
+        return {}
+    from game.world import group_events as ge
+    from game.world import relic_dealer
+    from services import relic_dealer_service
+
+    lines: dict[int, list[str]] = {}
+    if won:
+        for cid in battle.participants:
+            character = await db.get(Character, cid)
+            stats = await db.scalar(select(CharacterStats).where(CharacterStats.character_id == cid))
+            if character is None or stats is None:
+                continue
+            applied = await scene_event_service.apply_result(
+                db, character, stats, ge.scale(relic_dealer.win_result()), _rng,
+            )
+            dealer = combatants.get(battle.dealer_id)
+            loot = await relic_dealer_service.grant_win_loot(db, character, getattr(dealer, "level", 1), _rng)
+            lines[cid] = ["💰 Меняла рассыпается в труху. Реликвии при вас - продать их можно в городе.",
+                          *applied.lines, *loot]
+        return lines
+    dealer = combatants.get(battle.dealer_id)
+    for cid, lot in battle.relic_lots.items():
+        stolen = relic_dealer.stolen_from(lot, relic_dealer.steals_of(dealer, cid))
+        line = relic_dealer_service.stolen_line(await relic_dealer_service.take_stolen(db, cid, stolen))
+        if line:
+            lines[cid] = [line]
+    return lines
 
 
 async def interrupt_for_pvp(victim_peer_id: int, notify: bool = True) -> list[tuple[int, int]]:

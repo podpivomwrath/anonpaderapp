@@ -35,7 +35,7 @@ def test_content_graph_is_consistent() -> None:
         assert event.tier in ("medium", "deep", "finale"), event.id
         assert event.start in event.scenes, event.id
         for scene_id, scene in event.scenes.items():
-            assert scene.type in ("choice", "push", "timer", "riddle", "dice"), (event.id, scene_id)
+            assert scene.type in ("choice", "push", "timer", "riddle", "dice", "dealer"), (event.id, scene_id)
             for choice in scene.choices:
                 assert len(choice.label) <= 26, choice.label  # + подпись шанса/цены <= 40
                 if choice.check:

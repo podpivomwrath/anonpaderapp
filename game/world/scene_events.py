@@ -132,6 +132,10 @@ class Scene(BaseModel):
     win_text: str = ""
     lose_text: str = ""
     leave_text: str = ""
+    # dealer: Пепельный меняла (game/world/relic_dealer.py) - одна сделка
+    sold_text: str = ""
+    attack_text: str = ""
+    empty_text: str = ""
 
 
 class SceneEvent(BaseModel):

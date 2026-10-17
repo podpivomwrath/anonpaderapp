@@ -100,6 +100,9 @@ _mount_ambush: dict[int, int] = {}
 _world_boss: dict[int, int] = {}
 # peer_id -> награда события за победу, в мобах (патч 110: вожак в финале следа)
 _event_bonus: dict[int, float] = {}
+# peer_id -> (выставленная партия реликвий, меняла) - бой с Пепельным менялой
+# (2026-10-17): пал - меняла уносит сорванную долю партии.
+_relic_deal: dict[int, tuple[dict[str, int], object]] = {}
 # колбэк смерти игрока (world.on_player_defeat): убрать кнопки, текст, запустить респавн
 on_defeat_hook = None
 
@@ -369,6 +372,20 @@ async def start_event_encounter(
     )
 
 
+async def start_dealer_encounter(
+    peer_id: int, character, char_stats, gear_bonus, buff_modifiers, lot: dict[str, int],
+) -> None:
+    """Пепельный меняла напал вместо сделки (game/world/relic_dealer.py)."""
+    from game.world import relic_dealer
+
+    dist = grid.monolith_distance(character.pos_x, character.pos_y)
+    encounter = relic_dealer.build_dealer(MOB_ID, dist, _rng, {PLAYER_ID})
+    _relic_deal[peer_id] = (dict(lot), encounter.combatant)
+    await start_encounter(
+        peer_id, character, char_stats, gear_bonus, buff_modifiers, forced_encounter=encounter
+    )
+
+
 async def start_mount_ambush_encounter(
     peer_id: int, character, char_stats, gear_bonus, buff_modifiers,
     travel_id: int, encounter: encounters.Encounter,
@@ -457,7 +474,9 @@ async def on_battle_finished(session_id: int, result: TickResult) -> None:
     story_state = _story_encounter.pop(peer_id, None)  # (quest_id, остаток цепочки), патч 18
     travel_id = _mount_ambush.pop(peer_id, None)  # бой-нападение в пути на маунте, патч 25 п.7
     event_bonus = _event_bonus.pop(peer_id, None)  # патч 110: награда события за вожака
+    relic_deal = _relic_deal.pop(peer_id, None)  # бой с Пепельным менялой
     event_lines: list[str] = []
+    stolen_line = ""
     battle_report = tracker.finalize(result.winner_side == 0) if tracker is not None else None
     sf = get_session_factory()
     async with sf() as db:
@@ -512,6 +531,18 @@ async def on_battle_finished(session_id: int, result: TickResult) -> None:
                 event_lines += bonus.lines
                 # Опыт бонуса тоже поднимает уровень - иначе левелап молчал.
                 bonus_levels = bonus.levels_gained
+            if relic_deal is not None:
+                from game.world import relic_dealer
+
+                event_lines.append("💰 Меняла рассыпается в труху. Реликвии при тебе - продать их можно в городе.")
+                from services import relic_dealer_service
+
+                won = await scene_event_service.apply_result(db, character, stats, relic_dealer.win_result(), _rng)
+                event_lines += won.lines
+                bonus_levels += won.levels_gained
+                event_lines += await relic_dealer_service.grant_win_loot(
+                    db, character, getattr(relic_deal[1], "level", mob_level), _rng,
+                )
             event_lines += await scene_event_service.finish_fight_effects(db, character.id)
             await db.commit()
             new_level = character.level
@@ -524,6 +555,15 @@ async def on_battle_finished(session_id: int, result: TickResult) -> None:
         else:  # моб выиграл или ничья — смерть игрока (авто-респавн по таймеру)
             defeat = await encounter_service.resolve_defeat(db, character)
             await scene_event_service.finish_fight_effects(db, character.id)
+            if relic_deal is not None:
+                from game.world import relic_dealer
+                from services import relic_dealer_service
+
+                lot, dealer = relic_deal
+                stolen = relic_dealer.stolen_from(lot, relic_dealer.steals_of(dealer, PLAYER_ID))
+                stolen_line = relic_dealer_service.stolen_line(
+                    await relic_dealer_service.take_stolen(db, character.id, stolen)
+                )
             await db.commit()
             respawn_at = character.respawn_at
             xp_lost = defeat.xp_lost
@@ -642,6 +682,8 @@ async def on_battle_finished(session_id: int, result: TickResult) -> None:
     elif on_defeat_hook is not None:
         # смерть: убрать кнопки, атмосферный текст (+ штраф опыта); респавн — автоматически
         await on_defeat_hook(peer_id, respawn_at, xp_lost)
+        if stolen_line:
+            await _bot_api.messages.send(peer_id=peer_id, message=stolen_line, random_id=0)
         if travel_id is not None:
             # патч 25, п.7: смерть в бою нападения отменяет поездку
             from models import MountTravel
@@ -827,6 +869,7 @@ async def _release_encounter(peer_id: int) -> str | None:
     _battle_trackers.pop(peer_id, None)
     _story_encounter.pop(peer_id, None)
     _event_bonus.pop(peer_id, None)
+    _relic_deal.pop(peer_id, None)
     _encounter_mob_level.pop(peer_id, None)
     _encounter_mob_name.pop(peer_id, None)
     travel_id = _mount_ambush.pop(peer_id, None)

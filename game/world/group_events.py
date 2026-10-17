@@ -56,6 +56,8 @@ RESCUE_PULL, RESCUE_LEAVE = "pull", "leave"
 VOLUNTEER, SILENT = "volunteer", "silent"
 NEST_CLIMB, NEST_LEAVE = "climb", "leave"
 NO_STAKE = "0"
+#: Пепельный меняла (game/world/relic_dealer.py): «не продавать».
+DEALER_KEEP = "keep"
 #: Котёл костей (2026-10-13): ставка вписывается сообщением в золоте, без
 #: кнопок. Столько секунд на ставку, потом котёл бросает.
 POT_STAKE_SECONDS = 15
@@ -198,6 +200,11 @@ class GroupEvent(BaseModel):
     final: SceneResult | None = None
     retreat_text: str = ""
 
+    # dealer: каждый сам решает, продавать ли реликвии (одна сделка)
+    keep_label: str = "Не продавать"
+    sold_text: str = ""
+    attack_text: str = ""
+
 
 class GroupContent(BaseModel):
     events: list[GroupEvent]
@@ -278,6 +285,13 @@ def choices_of(event: GroupEvent, member_id: int, victim_id: int | None,
     if mech == "siege":
         stage = event.stages[state.get("stage", 0)]
         return [(o.id, o.label) for o in stage.options]
+    if mech == "dealer":
+        # Предложение у каждого своё - по его сумке (bot/handlers/group_events.py
+        # кладёт его в state при старте). Нечего продать - нечего и выбирать.
+        offers = state.get("offers", {}).get(str(member_id), [])
+        if not offers:
+            return []
+        return [(value, label) for value, label in offers] + [(DEALER_KEEP, event.keep_label)]
     return []
 
 
@@ -287,6 +301,7 @@ def default_choice(event: GroupEvent) -> str | None:
     просто не участвует."""
     return {
         "split": SPLIT_SHARE, "volunteer": SILENT, "pot": NO_STAKE, "nest": NEST_LEAVE,
+        "dealer": DEALER_KEEP,
     }.get(event.mechanic)
 
 
@@ -334,7 +349,7 @@ def resolve(
         "split": _resolve_split, "vote": _resolve_vote, "roles": _resolve_roles,
         "rescue": _resolve_rescue, "volunteer": _resolve_volunteer, "circle": _resolve_circle,
         "pot": _resolve_pot, "branches": _resolve_branches, "nest": _resolve_nest,
-        "siege": _resolve_siege,
+        "siege": _resolve_siege, "dealer": _resolve_dealer,
     }[event.mechanic]
     return resolver(event, members, choices, rng, leader_id, victim_id, dict(state or {}))
 
@@ -651,6 +666,13 @@ def _resolve_siege(event, members, choices, rng, leader_id, victim_id, state) ->
     out.active = list(members)
     out.state = {"stage": stage_no, "bank": bank}
     return out
+
+
+def _resolve_dealer(event, members, choices, rng, leader_id, victim_id, state) -> Outcome:
+    """Сделку и нападение ведёт bot/handlers/group_events.py::_finish_dealer
+    (нужны сумки и база). Здесь - только итог для тех, кто что выбрал."""
+    sellers = [cid for cid, value in choices.items() if value and value != DEALER_KEEP]
+    return Outcome(summary=[f"Продают меняле: {_names(members, sellers)}."])
 
 
 def _option_index(stage: SiegeStage, value: str | None) -> str | None:

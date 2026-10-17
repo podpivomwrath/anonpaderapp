@@ -47,6 +47,8 @@ KINDS = frozenset({
     "regen", "lifesteal", "on_hit", "execute", "rage_below", "banner", "first_turn_weaken",
     "first_hit_crit", "windup", "extra_hit", "repeat_every", "choir", "dive", "self_burn",
     "shield_below", "stacking_weaken", "growing", "ignore_dodge",
+    # Пепельный меняла (game/world/relic_dealer.py): удар срывает реликвии
+    "relic_hunger",
     # ответ на удары по мобу (только если моб пережил ход)
     "brine_spray", "reflect", "counter_on_dodge",
 })
@@ -113,6 +115,9 @@ class MobBrain:
         self.diving = False
         self.shield_used = False
         self.enraged = False
+        #: Пепельный меняла: кто выставил реликвии и сколько раз с кого сорвано.
+        self.relic_sellers: set[int] = set()
+        self.relic_steals: dict[int, int] = {}
 
     def has(self, kind: str) -> bool:
         return kind in self.traits
@@ -251,6 +256,8 @@ class MobBrain:
                 self._afflict(mob, target, trait, hit, turn)
         if windup is not None and windup.effect:
             self._afflict(mob, target, windup, hit, turn)
+        if self.has("relic_hunger"):
+            self._steal_relics(mob, target, turn)
         if self.has("lifesteal"):
             amount = max(round(hit.amount * self.one("lifesteal").value), 1)
             turn.heals.append(PendingHeal(
@@ -258,6 +265,24 @@ class MobBrain:
                 label="пьёт кровь",
             ))
         return hit
+
+    def _steal_relics(self, mob: CombatantState, target: CombatantState, turn: MobTurn) -> None:
+        """«Голод на реликвии»: прошедший удар по продавцу срывает долю его
+        партии (до потолка), и меняла бьёт сильнее за каждую кражу."""
+        trait = self.one("relic_hunger")
+        sellers = getattr(self, "relic_sellers", set())
+        steals = getattr(self, "relic_steals", None)
+        if steals is None:
+            steals = self.relic_steals = {}
+        if target.id not in sellers or trait.value <= 0:
+            return
+        limit = round(trait.cap / trait.value) if trait.cap > 0 else 0
+        if steals.get(target.id, 0) >= limit:
+            return
+        steals[target.id] = steals.get(target.id, 0) + 1
+        mob.apply_effect(EffectKind.DAMAGE_BUFF, trait.step * sum(steals.values()), FOREVER, mob.id)
+        pct = round(min(steals[target.id] * trait.value, trait.cap) * 100)
+        turn.lines.append(f"💰 {mob.name} срывает с {target.name} реликвии: уже {pct}% партии")
 
     def _afflict(
         self, mob: CombatantState, target: CombatantState, trait: MobTraitDef,

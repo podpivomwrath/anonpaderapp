@@ -133,18 +133,33 @@ async def maybe_start(db, group_id: int, leader_id: int | None, cohort: list[Cha
             members[c.id] = Member(c.id, peer_id, c.name)
     if len(members) < event.min_members:
         return False
+    offers = None
+    if event.mechanic == "dealer":
+        # Пепельный меняла: у каждого своё предложение - по его сумке. Если
+        # продавать некому, меняла не приходит - будет обычный бой.
+        from services import relic_dealer_service
+
+        offers = {}
+        for c in cohort:
+            rows = await relic_dealer_service.offer(db, c)
+            offers[str(c.id)] = [[choice, f"{label} - {gold} 💰"] for choice, label, gold in rows]
+        if not any(offers.values()):
+            return False
     await db.commit()
-    await start(group_id, event, members, leader_id, region, dist, (cohort[0].pos_x, cohort[0].pos_y))
+    await start(group_id, event, members, leader_id, region, dist, (cohort[0].pos_x, cohort[0].pos_y),
+                offers=offers)
     return True
 
 
 async def start(group_id: int, event: ge.GroupEvent, members: dict[int, Member], leader_id: int | None,
-                region: str, dist: int, cell: tuple[int, int]) -> None:
+                region: str, dist: int, cell: tuple[int, int], offers: dict | None = None) -> None:
     scene = GroupScene(
         token=next(_tokens), group_id=group_id, event_id=event.id, members=members,
         leader_id=leader_id, region=region, dist=dist, cell=cell,
         state=ge.initial_state(event, list(members)),
     )
+    if offers is not None:
+        scene.state["offers"] = offers
     if event.mechanic == "rescue":
         scene.victim_id = _rng.choice(sorted(members))
     _scenes[group_id] = scene
@@ -316,6 +331,8 @@ async def _resolve(scene: GroupScene) -> None:
     try:
         if scene.event.mechanic == "pot":
             await _finish_pot(scene)
+        elif scene.event.mechanic == "dealer":
+            await _finish_dealer(scene)
         else:
             continues = await _finish(scene)
     except Exception:
@@ -416,6 +433,93 @@ async def _finish(scene: GroupScene) -> bool:
     for m in scene.members.values():
         await scene_event_handlers._epilogue(m.peer_id, [], None)
     return False
+
+
+async def _finish_dealer(scene: GroupScene) -> None:
+    """Пепельный меняла в группе: каждый продаёт своё (или нет). С шансом
+    relic_dealer.ATTACK_CHANCE сделок нет - меняла с тенями нападает на всех,
+    кто стоит на клетке."""
+    from bot import dailies_texts
+    from game.world import relic_dealer
+    from services import relic_dealer_service
+
+    event = scene.event
+    sellers = {
+        cid: value for cid, value in scene.choices.items()
+        if value and value != ge.DEALER_KEEP and cid in scene.members
+    }
+    names = {cid: m.name for cid, m in scene.members.items()}
+    if not sellers:
+        for m in scene.members.values():
+            await _send(m.peer_id, f"{event.title}\n\nНикто не стал продавать. "
+                        "Меняла пожимает плечами и растворяется в пепле.", waiting_keyboard())
+            await scene_event_handlers._epilogue(m.peer_id, [], None)
+        return
+
+    attack = _rng.random() < relic_dealer.ATTACK_CHANCE
+    personal: dict[int, list[str]] = {cid: [] for cid in scene.members}
+    notices: dict[int, str] = {}
+    lots: dict[int, dict[str, int]] = {}
+    fighters: list[int] = []
+    async with get_session_factory()() as db:
+        for cid in scene.members:
+            character = await db.get(Character, cid)
+            if character is None or death_service.is_dead(character):
+                continue
+            if cid in sellers:
+                valid = {c for c, _label, _gold in await relic_dealer_service.offer(db, character)}
+                choice = sellers[cid]
+                if choice not in valid:
+                    personal[cid].append("Сумка уже не та - сделка не состоялась.")
+                elif attack:
+                    lots[cid] = await relic_dealer_service.lot(db, character, choice)
+                else:
+                    gold, progress = await relic_dealer_service.sell(db, character, choice)
+                    personal[cid].append(f"💰 Меняла отсчитывает тебе {guild_service.gold_label(character, gold)}.")
+                    if progress is not None and (notice := dailies_texts.progress_notice(progress)):
+                        notices[cid] = notice
+            await scene_event_service.finish_event(
+                db, character, scene_event_service.Applied(new_level=character.level),
+            )
+            if (character.pos_x, character.pos_y) == scene.cell:
+                fighters.append(cid)
+        await db.commit()
+
+    sold_by = ", ".join(names[cid] for cid in sellers) or "никто"
+    summary = event.attack_text if attack else f"{event.sold_text}\n\nПродали: {sold_by}."
+    for cid, m in scene.members.items():
+        text = "\n\n".join(part for part in (event.title, summary, "\n".join(personal[cid])) if part)
+        await _send(m.peer_id, text, waiting_keyboard())
+        if cid in notices:
+            await _send(m.peer_id, notices[cid])
+
+    if attack and fighters and await _start_dealer_fight(scene, fighters, lots):
+        return
+    for m in scene.members.values():
+        await scene_event_handlers._epilogue(m.peer_id, [], None)
+
+
+async def _start_dealer_fight(scene: GroupScene, fighter_ids: list[int], lots: dict[int, dict[str, int]]) -> bool:
+    from bot.handlers import group_combat as group_combat_handlers
+    from game.world import relic_dealer
+
+    encounters = [relic_dealer.build_dealer(
+        20_000_000, scene.dist, _rng, set(lots), members=len(fighter_ids),
+    )]
+    encounters += relic_dealer.build_shades(20_000_001, scene.dist, _rng, len(fighter_ids) - 1)
+    try:
+        async with get_session_factory()() as db:
+            fighters = [c for c in [await db.get(Character, cid) for cid in fighter_ids] if c is not None]
+            await group_combat_handlers.start_ready_group(
+                db, scene.group_id, fighters, scene.region, scene.dist, _rng,
+                mob_encounters=encounters, relic_lots=lots,
+            )
+    except ActivityBusy:
+        return False
+    for cid, m in scene.members.items():
+        if cid not in fighter_ids:
+            await scene_event_handlers._epilogue(m.peer_id, [], None)
+    return True
 
 
 async def _start_ambush(scene: GroupScene, fighter_ids: list[int]) -> bool:

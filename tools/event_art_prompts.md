@@ -557,3 +557,18 @@ grey, rust brown and dried blood, drifting ash in the air, moody overcast
 light, no text, no watermark, no logo, no modern objects, horizontal 3:2
 composition
 ```
+
+## 💰 Пепельный меняла — `relic_dealer` (соло) и `g_relic_dealer` (группа)
+
+Пока стоит картинка скупщика Иргала (457239078) - заменить, когда будет своя.
+
+```
+a hooded figure sitting cross-legged by a dusty roadside on a grey cloth
+spread with strange glowing relics, under the hood there is no face, only a
+mass of fused relics, crystals and bone shards shaped like a head, long thin
+hands counting coins, a lone traveller standing before him seen from behind,
+dark fantasy scene illustration, painterly semi-realistic, muted desaturated
+palette of ash grey, rust brown and dried blood, drifting ash in the air,
+moody overcast light, no text, no watermark, no logo, no modern objects,
+horizontal 3:2 composition
+```
