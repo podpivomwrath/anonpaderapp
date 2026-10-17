@@ -253,15 +253,31 @@ def compute_hit(
     # эффект уворота поднимает потолок до себя: морок даёт свои 80%, но
     # сумма с ловкостью и Дымовой завесой выше них не уходит.
     strongest_effect = max((e.value for e in target.effects_of(EffectKind.DODGE)), default=0.0)
+    effect_dodge = target.effect_total(EffectKind.DODGE)
+    # 2026-10-17, решение владельца: от навыков ИГРОК уклоняется с тем же
+    # понижающим коэффициентом и за счёт эффектов/бафов (Дымовая завеса,
+    # Танец в тени, Пепельный морок, Тень, Ускользание, Второй шанс), а не
+    # только за счёт ловкости. Раньше они шли против навыков в полную силу:
+    # Клинок теней под танцем уклонялся от навыков в ~70% случаев. Механики
+    # уворота мобов («уходит в камень» и т.п.) не трогаем.
+    scale_vs_ability = is_ability and target.kind == "character"
+    if scale_vs_ability:
+        effect_dodge *= bc.ABILITY_DODGE_RATIO
+        extra_dodge *= bc.ABILITY_DODGE_RATIO
+        strongest_effect *= bc.ABILITY_DODGE_RATIO
     total_dodge = min(
-        stat_dodge + target.effect_total(EffectKind.DODGE) + extra_dodge,
+        stat_dodge + effect_dodge + extra_dodge,
         max(bc.DODGE_HARD_CAP, min(strongest_effect, bc.DODGE_EFFECT_CAP)),
     )
     # Патч 103, «Знает, где ты»: против такого бойца уворот цели не работает
     # вовсе - ни стат, ни эффекты, ни «Второй шанс» Клинка теней.
     if ignore_dodge:
         total_dodge = 0.0
-    dodges = (not ignore_dodge and target.second_chance_active) or (
+    # «Второй шанс» против навыка - с тем же коэффициентом, а не наверняка.
+    second_chance = target.second_chance_active and (
+        not scale_vs_ability or rng.random() < bc.ABILITY_DODGE_RATIO
+    )
+    dodges = (not ignore_dodge and second_chance) or (
         total_dodge > 0 and rng.random() < total_dodge
     )
     if dodges:
