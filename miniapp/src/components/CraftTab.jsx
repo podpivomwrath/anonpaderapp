@@ -113,7 +113,10 @@ function Forge({ data, busy, run }) {
   const oreRow = ore ? data.ore.find((o) => o.id === ore.id && o.grade === ore.grade) : null;
   const specs = item ? (data.specs_by_source?.[item.source_id] ?? data.specs) : data.specs;
   const chosen = specs.find((s) => s.id === spec) || null;
-  const groups = byOreType(data.ore.filter((o) => o.craft_efficiency !== null));
+  // 2026-10-17, решение владельца: в ковку - только ещё не кованые вещи и
+  // только обычная руда (все тиры); редкие градации здесь не предлагаются.
+  const forgeable = data.items.filter((i) => !i.spec);
+  const groups = byOreType(data.ore.filter((o) => o.craft_efficiency !== null && o.grade === 'common'));
   const reset = () => setConfirming(false);
 
   return (
@@ -134,8 +137,8 @@ function Forge({ data, busy, run }) {
             </ForgeSlot>
           </div>
           <p className="craft-hint">
-            Выбери предмет с рейд-босса и руду. Тир руды задаёт стартовую эффективность, градация - насколько
-            точно очки уйдут в профильные статы.
+            Выбери некованый предмет с рейд-босса и обычную руду. Чем выше тир руды, тем выше стартовая
+            эффективность.
           </p>
         </Div>
       </Group>
@@ -157,10 +160,8 @@ function Forge({ data, busy, run }) {
               {chosen.flavor && <p className="craft-hint">{chosen.flavor}</p>}
               <ChanceBars chances={chosen.chances[ore?.grade || 'common']} />
               <p className="craft-hint">
-                {oreRow
-                  ? `Шансы для руды «${oreRow.grade_name}». Стартовая эффективность: ${oreRow.craft_efficiency}%.`
-                  : 'Шансы для обычной руды - выбери руду, и они пересчитаются.'}
-                {' '}Процент - шанс каждой порции очков уйти в этот стат.
+                {oreRow ? `Стартовая эффективность: ${oreRow.craft_efficiency}%. ` : ''}
+                Процент - шанс каждой порции очков уйти в этот стат.
               </p>
             </>
           ) : (
@@ -199,7 +200,8 @@ function Forge({ data, busy, run }) {
 
       {picker === 'item' && (
         <PickSheet title="Предмет для ковки" onClose={() => setPicker(null)}>
-          {data.items.map((row) => (
+          {forgeable.length === 0 && <p className="craft-hint">Некованых вещей нет - нужен новый предмет с рейд-босса.</p>}
+          {forgeable.map((row) => (
             <button key={row.id} type="button"
               className={`crown-sheet__item${row.id === itemId ? ' crown-sheet__item--active' : ''}`}
               onClick={() => { setItemId(row.id); setSpec(null); setPicker(null); }}>
