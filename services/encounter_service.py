@@ -93,6 +93,19 @@ async def resolve_victory(
     # множителю лута, и один моб засчитался бы как несколько.
     character.mobs_killed += 1
     trophies = await trophy_service.grant_from_kill(db, character, rng)
+    if not trophies:
+        # Диагностика (2026-10-17): у thefatherdjun 5 пустых побед из 122 у
+        # Монолита при ожидаемых ~0.3%. Пишем клетку и число бросков.
+        from loguru import logger
+
+        from game.economy import loot
+        from game.world import grid
+
+        dist = grid.monolith_distance(character.pos_x, character.pos_y)
+        logger.warning(
+            "Победа без трофеев: {} ({}; {}) dist={} бросков={}",
+            character.name, character.pos_x, character.pos_y, dist, loot.rolls_for_dist(dist),
+        )
     # Патч 110: эффект события «больше трофеев» - лишний бросок с шансом.
     # resolve_victory зовётся только из одиночного боя, как и сами эффекты.
     from services import scene_event_service
