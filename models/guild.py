@@ -18,6 +18,7 @@ from sqlalchemy import (
     Index,
     String,
     UniqueConstraint,
+    false,
     func,
 )
 from sqlalchemy.orm import Mapped, mapped_column
@@ -165,10 +166,20 @@ class GuildCell(Base):
 
 class GuildBuilding(Base):
     __tablename__ = "guild_buildings"
-    __table_args__ = (UniqueConstraint("cell_id", "building", name="uq_guild_building"),)
+    __table_args__ = (
+        UniqueConstraint("cell_id", "building", name="uq_guild_building"),
+        UniqueConstraint("guild_id", "building", name="uq_guild_court_building"),
+    )
 
     id: Mapped[int] = mapped_column(primary_key=True)
-    cell_id: Mapped[int] = mapped_column(ForeignKey("guild_cells.id", ondelete="CASCADE"), index=True)
+    #: База на карте. NULL - постройка Двора гильдии (тогда задан guild_id).
+    cell_id: Mapped[int | None] = mapped_column(
+        ForeignKey("guild_cells.id", ondelete="CASCADE"), index=True, nullable=True
+    )
+    #: Двор гильдии (2026-10-17): постройка без клетки, её не отнять осадой.
+    guild_id: Mapped[int | None] = mapped_column(
+        ForeignKey("guilds.id", ondelete="CASCADE"), index=True, nullable=True
+    )
     building: Mapped[str] = mapped_column(String(16))
     #: Готовый уровень. 0 - строится первый.
     level: Mapped[int] = mapped_column(default=0)
@@ -265,6 +276,8 @@ class GuildBoss(Base):
     spawned_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     ended_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    #: Призван из Двора (2026-10-17): бьют откуда угодно, награда - gc.BOSS_COURT_REWARD.
+    court: Mapped[bool] = mapped_column(Boolean, default=False, server_default=false())
 
 
 class GuildBossContribution(Base):

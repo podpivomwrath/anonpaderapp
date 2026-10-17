@@ -162,13 +162,20 @@ async def require_member(db: AsyncSession, character: Character) -> tuple[Guild,
 
 
 async def building_levels(db: AsyncSession, guild_id: int) -> dict[str, int]:
-    """Лучший готовый уровень каждой постройки по всем базам гильдии
-    (склад - сумма по базам)."""
-    rows = (
+    """Лучший готовый уровень каждой постройки по всем базам гильдии и её
+    Двору (склад - сумма)."""
+    rows = list(
+        (
+            await db.execute(
+                select(GuildBuilding.building, GuildBuilding.level)
+                .join(GuildCell, GuildCell.id == GuildBuilding.cell_id)
+                .where(GuildCell.guild_id == guild_id, GuildCell.status == "held")
+            )
+        ).all()
+    )
+    rows += (
         await db.execute(
-            select(GuildBuilding.building, GuildBuilding.level)
-            .join(GuildCell, GuildCell.id == GuildBuilding.cell_id)
-            .where(GuildCell.guild_id == guild_id, GuildCell.status == "held")
+            select(GuildBuilding.building, GuildBuilding.level).where(GuildBuilding.guild_id == guild_id)
         )
     ).all()
     result: dict[str, int] = {}
@@ -295,6 +302,10 @@ async def _join(db: AsyncSession, guild: Guild, character: Character) -> None:
     await db.execute(delete(GuildInvite).where(GuildInvite.character_id == character.id))
     await log(db, guild.id, "join", f"{character.name} вступает в гильдию.", character.id)
     await db.flush()
+    # Недельные цели растут вместе с гильдией (2026-10-17).
+    from services import guild_quest_service
+
+    await guild_quest_service.grow_weekly_targets(db, guild.id)
 
 
 async def _find_character(db: AsyncSession, name: str) -> Character | None:

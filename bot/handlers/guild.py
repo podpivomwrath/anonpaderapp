@@ -205,7 +205,7 @@ async def guild_command(message: Message) -> None:
         role = "наступаем" if siege.attacker_guild_id == guild.id else "обороняемся"
         lines.append(f"⚔️ Осада ({siege.x}; {siege.y}), {role}: {when} МСК.")
     if boss is not None:
-        lines.append(f"🗿 Страж цитадели призван: {boss.hp}/{boss.max_hp}. Команда «Страж».")
+        lines.append(f"🗿 {guild_boss_service.boss_title(boss)} призван: {boss.hp}/{boss.max_hp}. Команда «Страж».")
     lines.append("Управление - в мини-аппе, раздел «Гильдия».")
     await message.answer("\n".join(lines))
 
@@ -227,11 +227,13 @@ async def boss_status(message: Message) -> None:
             return
         boss = await guild_boss_service.active_boss(db, character.guild_id)
         if boss is None:
-            await message.answer("🗿 Страж цитадели не призван.")
+            await message.answer("🗿 Страж не призван.")
             return
         cooldown = await guild_boss_service.cooldown_minutes(db, boss, character.id)
-    here = (character.pos_x, character.pos_y) == (boss.x, boss.y)
-    text = f"🗿 Страж цитадели ({boss.x}; {boss.y}): {boss.hp}/{boss.max_hp} здоровья."
+    # Страж Двора (2026-10-17) - бьют откуда угодно, цитадели - на её клетке.
+    here = boss.court or (character.pos_x, character.pos_y) == (boss.x, boss.y)
+    where = "" if boss.court else f" ({boss.x}; {boss.y})"
+    text = f"🗿 {guild_boss_service.boss_title(boss)}{where}: {boss.hp}/{boss.max_hp} здоровья."
     if cooldown:
         text += f"\nСледующий заход через {cooldown} мин."
     if here and not cooldown:
@@ -345,7 +347,7 @@ async def _boss_finished(result) -> None:
         combat_handlers.end_world_boss_fight(peer)
     status = "повержен" if boss.status == "killed" else "уходит, недобитый"
     text = (
-        f"🗿 Страж цитадели {status}! Гильдии: +{result.fame} славы, {result.treasury_gold} золота "
+        f"🗿 {guild_boss_service.boss_title(boss)} {status}! Гильдии: +{result.fame} славы, {result.treasury_gold} золота "
         f"в казну, {result.ore} руды на склад."
     )
     async with get_session_factory()() as db:
@@ -365,10 +367,14 @@ async def _boss_finished(result) -> None:
         await world_boss_handlers._close_attempt(peer, boss_gone=True, got_result=True)
 
 
-async def announce_boss(guild_id: int, x: int, y: int) -> None:
+async def announce_boss(guild_id: int, x: int, y: int, court: bool = False) -> None:
+    where = (
+        f"во Дворе - бить можно откуда угодно, награда {round(gc.BOSS_COURT_REWARD * 100)}% от стража цитадели"
+        if court else f"на ({x}; {y})"
+    )
     await notify_guild(
         guild_id,
-        f"🗿 Страж цитадели призван на ({x}; {y})! Бить его можно раз в час, "
+        f"🗿 Страж {'Двора' if court else 'цитадели'} призван {where}! Бить его можно раз в час, "
         f"{gc.BOSS_LIFETIME_HOURS} ч. Команда «Страж».",
     )
 

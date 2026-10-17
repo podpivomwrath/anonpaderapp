@@ -71,6 +71,11 @@ def claim_reason(x: int, y: int) -> str | None:
     return None
 
 
+def is_peaceful(x: int, y: int) -> bool:
+    """Мирное кольцо (2026-10-17): одна клетка на гильдию, осаждать нельзя."""
+    return grid.ring_tier(x, y) == gc.PEACEFUL_RING_TIER
+
+
 def _count_slots(cells: list[GuildCell]) -> tuple[int, int]:
     """(обычных, рудников) - включая идущие закладки."""
     mines = sum(1 for c in cells if c.mine_id)
@@ -103,6 +108,11 @@ async def plant_banner(db: AsyncSession, actor: Character, x: int, y: int) -> Gu
             raise GuildError(f"Рудник можно занять с {gc.MINE_SLOT_LEVEL} уровня гильдии, и только один.")
     elif held_cells >= gc.cell_slots(guild.level):
         raise GuildError("Свободных слотов под клетки нет - нужен уровень гильдии выше.")
+    if is_peaceful(x, y) and sum(1 for c in cells if is_peaceful(c.x, c.y)) >= gc.PEACEFUL_RING_MAX_CELLS:
+        raise GuildError(
+            f"Во {gc.PEACEFUL_RING_TIER}-м кольце гильдия держит только {gc.PEACEFUL_RING_MAX_CELLS} клетку - "
+            "зато её нельзя осадить."
+        )
     effects = effects_of(guild)
     tier = grid.ring_tier(x, y)
     ore_id, ore_count = gc.CLAIM_ORE[tier]
@@ -277,6 +287,45 @@ async def start_build(db: AsyncSession, actor: Character, cell_id: int, building
     return current
 
 
+# --- Двор гильдии (2026-10-17) ------------------------------------------------------
+
+
+async def court_buildings_of(db: AsyncSession, guild_id: int) -> list[GuildBuilding]:
+    return list(
+        (await db.scalars(select(GuildBuilding).where(GuildBuilding.guild_id == guild_id))).all()
+    )
+
+
+async def start_court_build(db: AsyncSession, actor: Character, building: str) -> GuildBuilding:
+    """Стройка во Дворе: только постройки на всю гильдию, до gc.COURT_MAX_LEVEL,
+    по одной за раз. Цены и время - как на базе."""
+    guild, _member = await guild_service.require_treasurer(db, actor)
+    if building not in gc.court_buildings():
+        raise GuildError("Во Дворе это не строят - только на базе на карте.")
+    existing = await court_buildings_of(db, guild.id)
+    if any(b.upgrading_to is not None for b in existing):
+        raise GuildError("Во Дворе уже идёт стройка.")
+    current = next((b for b in existing if b.building == building), None)
+    next_level = (current.level if current else 0) + 1
+    if next_level > gc.COURT_MAX_LEVEL:
+        raise GuildError(f"Во Дворе - до {gc.COURT_MAX_LEVEL} уровня. Выше - на базе на карте.")
+    q = quote(guild, building, next_level)
+    await guild_service.spend_guild_ore(db, guild.id, q.ore_id, q.ore_count)
+    await guild_service.treasury_spend(db, guild.id, gold=q.gold)
+    if current is None:
+        current = GuildBuilding(cell_id=None, guild_id=guild.id, building=building, level=0)
+        db.add(current)
+    current.upgrading_to = next_level
+    current.done_at = now_utc() + timedelta(hours=q.hours)
+    await guild_service.log(
+        db, guild.id, "build",
+        f"{actor.name} начинает стройку во Дворе: {gc.BUILDING_TITLES[building]} {next_level} ур.",
+        actor.id,
+    )
+    await db.flush()
+    return current
+
+
 async def start_base_upgrade(db: AsyncSession, actor: Character, cell_id: int) -> GuildCell:
     guild, _member = await guild_service.require_treasurer(db, actor)
     cell = await _held_cell(db, guild, cell_id)
@@ -330,6 +379,21 @@ async def complete_due(db: AsyncSession, now: datetime | None = None) -> list[tu
         await guild_service.log(db, cell.guild_id, "build", text)
         done.append((cell.guild_id, text))
         touched.add(cell.guild_id)
+    court = (
+        await db.scalars(
+            select(GuildBuilding).where(GuildBuilding.guild_id.isnot(None), GuildBuilding.upgrading_to.isnot(None))
+        )
+    ).all()
+    for building in court:
+        if aware(building.done_at) is None or aware(building.done_at) > now:
+            continue
+        building.level = building.upgrading_to
+        building.upgrading_to = None
+        building.done_at = None
+        text = f"{gc.BUILDING_TITLES[building.building]} {building.level} ур. во Дворе достроена."
+        await guild_service.log(db, building.guild_id, "build", text)
+        done.append((building.guild_id, text))
+        touched.add(building.guild_id)
     cells = (await db.scalars(select(GuildCell).where(GuildCell.upgrade_to.isnot(None)))).all()
     for cell in cells:
         if aware(cell.upgrade_done_at) is None or aware(cell.upgrade_done_at) > now:

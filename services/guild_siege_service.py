@@ -69,9 +69,15 @@ async def recent_of(db: AsyncSession, guild_id: int, limit: int = 10) -> list[Gu
     )
 
 
-def siege_cost(guild: Guild, base_tier: str) -> int:
+def siege_cost(guild: Guild, base_tier: str, held: int = 0) -> int:
+    """held - сколько клеток держит атакующий: каждая +50% к цене (2026-10-17)."""
     effects = guild_territory_service.effects_of(guild)
-    return round(gc.SIEGE_COST[base_tier] * (1 - effects.get("siege_cost_pct", 0) / 100))
+    base = gc.SIEGE_COST[base_tier] * (1 + gc.SIEGE_COST_PER_HELD * held)
+    return round(base * (1 - effects.get("siege_cost_pct", 0) / 100))
+
+
+async def held_cells(db: AsyncSession, guild_id: int) -> int:
+    return sum(1 for c in await guild_territory_service.cells_of(db, guild_id) if c.status == "held")
 
 
 async def declare(db: AsyncSession, actor: Character, cell_id: int) -> GuildSiege:
@@ -81,6 +87,8 @@ async def declare(db: AsyncSession, actor: Character, cell_id: int) -> GuildSieg
         raise GuildError("Осаждать можно только чужую базу.")
     if cell.guild_id == guild.id:
         raise GuildError("Это твоя земля.")
+    if guild_territory_service.is_peaceful(cell.x, cell.y):
+        raise GuildError(f"Земля {gc.PEACEFUL_RING_TIER}-го кольца мирная - её не осаждают.")
     now = now_utc()
     if aware(cell.shield_until) is not None and aware(cell.shield_until) > now:
         raise GuildError("Клетка под щитом - осаду пока не объявить.")
@@ -95,7 +103,8 @@ async def declare(db: AsyncSession, actor: Character, cell_id: int) -> GuildSieg
     if not cell.mine_id and cells >= gc.cell_slots(guild.level):
         raise GuildError("Взятую клетку некуда будет поставить: нет свободного слота.")
     defender = await db.get(Guild, cell.guild_id)
-    await guild_service.treasury_spend(db, guild.id, gold=siege_cost(guild, cell.base_tier))
+    held = sum(1 for c in own if c.status == "held")
+    await guild_service.treasury_spend(db, guild.id, gold=siege_cost(guild, cell.base_tier, held))
     siege = GuildSiege(
         attacker_guild_id=guild.id, defender_guild_id=defender.id, cell_id=cell.id,
         x=cell.x, y=cell.y, declared_at=now, starts_at=next_window(defender.siege_hour, now),
@@ -269,6 +278,11 @@ async def finish(db: AsyncSession, siege_id: int, attackers_won: bool, attackers
     cell.shaft_checked_at = now
     effects = guild_territory_service.effects_of(attacker)
     cell.shield_until = now + timedelta(hours=gc.CAPTURE_SHIELD_HOURS + effects.get("shield_hours", 0))
+    # Потерявшему базу - передышка: остальные его клетки под щитом (2026-10-17).
+    rest_until = now + timedelta(hours=gc.LOSS_SHIELD_HOURS)
+    for other in await guild_territory_service.cells_of(db, defender.id) if defender is not None else []:
+        if other.id != cell.id and (aware(other.shield_until) is None or aware(other.shield_until) < rest_until):
+            other.shield_until = rest_until
     for building in (await db.scalars(select(GuildBuilding).where(GuildBuilding.cell_id == cell.id))).all():
         building.upgrading_to = None
         building.done_at = None

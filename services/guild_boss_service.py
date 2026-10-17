@@ -40,6 +40,16 @@ async def active_boss(db: AsyncSession, guild_id: int, now: datetime | None = No
     return boss
 
 
+def boss_title(boss: GuildBoss, case: str = "nom") -> str:
+    """«Страж цитадели» / «Страж Двора»; case="acc" - винительный."""
+    head = "Стража" if case == "acc" else "Страж"
+    return f"{head} {'Двора' if getattr(boss, 'court', False) else 'цитадели'}"
+
+
+def reward_mult(boss: GuildBoss) -> float:
+    return gc.BOSS_COURT_REWARD if getattr(boss, "court", False) else 1.0
+
+
 def is_alive(boss: GuildBoss, now: datetime | None = None) -> bool:
     return boss.status == "active" and aware(boss.expires_at) > (now or now_utc()) and boss.hp > 0
 
@@ -62,9 +72,8 @@ def cooldown_days_left(guild: Guild, now: datetime | None = None) -> float:
 async def summon(db: AsyncSession, actor: Character) -> GuildBoss:
     guild, _member = await guild_service.require_treasurer(db, actor)
     cells = await guild_territory_service.cells_of(db, guild.id)
+    # Без цитадели - из Двора (2026-10-17): бьют откуда угодно, награда меньше.
     citadel = next((c for c in cells if c.status == "held" and c.base_tier == gc.BASE_CITADEL), None)
-    if citadel is None:
-        raise GuildError("Стража призывают только в цитадели.")
     if await active_boss(db, guild.id) is not None:
         raise GuildError("Страж уже призван.")
     wait = cooldown_days_left(guild)
@@ -76,12 +85,13 @@ async def summon(db: AsyncSession, actor: Character) -> GuildBoss:
     now = now_utc()
     hp = max(gc.BOSS_MIN_HP, gc.BOSS_HP_PER_MEMBER * await guild_service.member_count(db, guild.id))
     boss = GuildBoss(
-        guild_id=guild.id, x=citadel.x, y=citadel.y, max_hp=hp, hp=hp, status="active",
+        guild_id=guild.id, x=citadel.x if citadel else 0, y=citadel.y if citadel else 0,
+        max_hp=hp, hp=hp, status="active", court=citadel is None,
         spawned_at=now, expires_at=now + timedelta(hours=gc.BOSS_LIFETIME_HOURS),
     )
     db.add(boss)
     guild.last_boss_at = now
-    await guild_service.log(db, guild.id, "boss", f"{actor.name} призывает Стража цитадели.", actor.id)
+    await guild_service.log(db, guild.id, "boss", f"{actor.name} призывает {boss_title(boss, 'acc')}.", actor.id)
     await db.flush()
     return boss
 
@@ -118,7 +128,7 @@ async def start_attempt(db: AsyncSession, character: Character, boss_pk: int) ->
         return AttemptCheck(False, "Стража больше нет.")
     if character.guild_id != boss.guild_id:
         return AttemptCheck(False, "Это страж чужой гильдии.")
-    if (character.pos_x, character.pos_y) != (boss.x, boss.y):
+    if not boss.court and (character.pos_x, character.pos_y) != (boss.x, boss.y):
         return AttemptCheck(False, "Страж стоит в цитадели - иди туда.")
     minutes = await cooldown_minutes(db, boss, character.id)
     if minutes:
@@ -187,6 +197,7 @@ class BossResult:
 async def distribute(db: AsyncSession, boss: GuildBoss) -> BossResult:
     """Ровно один раз на стража - тем, кто перевёл его из active."""
     share = 1.0 if boss.status == "killed" else max(0.0, min(1.0, 1 - boss.hp / boss.max_hp))
+    share *= reward_mult(boss)  # из Двора - gc.BOSS_COURT_REWARD награды
     rows = (
         await db.scalars(select(GuildBossContribution).where(GuildBossContribution.boss_id == boss.id))
     ).all()
@@ -214,7 +225,7 @@ async def distribute(db: AsyncSession, boss: GuildBoss) -> BossResult:
     status = "повержен" if boss.status == "killed" else "уходит недобитым"
     await guild_service.log(
         db, boss.guild_id, "boss",
-        f"Страж цитадели {status}: +{result.fame} славы, {treasury} золота в казну, {ore} руды на склад.",
+        f"{boss_title(boss)} {status}: +{result.fame} славы, {treasury} золота в казну, {ore} руды на склад.",
     )
     await db.flush()
     return result

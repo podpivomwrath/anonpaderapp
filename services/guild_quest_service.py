@@ -84,11 +84,11 @@ async def ensure_weekly(db: AsyncSession, guild_id: int) -> list[GuildWeekly]:
     )
     if rows:
         return rows
-    size = max(await guild_service.member_count(db, guild_id), gc.WEEKLY_MIN_MEMBERS_FOR_TARGET)
+    members = await guild_service.member_count(db, guild_id)
     for metric in weekly_metrics(guild_id, week):
         db.add(GuildWeekly(
             guild_id=guild_id, week_start=week, metric=metric,
-            target=gc.QUEST_METRICS[metric][3] * size, contributors={},
+            target=gc.weekly_target(gc.QUEST_METRICS[metric][3], members), contributors={},
         ))
     await db.flush()
     return list(
@@ -98,6 +98,25 @@ async def ensure_weekly(db: AsyncSession, guild_id: int) -> list[GuildWeekly]:
             )
         ).all()
     )
+
+
+async def grow_weekly_targets(db: AsyncSession, guild_id: int) -> None:
+    """Вступил новый участник - невыполненные недельные цели этой недели
+    дорастают до размера гильдии. Вниз не пересчитываются: ушедший не
+    облегчает неделю (2026-10-17)."""
+    members = await guild_service.member_count(db, guild_id)
+    rows = (
+        await db.scalars(
+            select(GuildWeekly).where(
+                GuildWeekly.guild_id == guild_id, GuildWeekly.week_start == guild_service.week_start_msk(),
+                GuildWeekly.completed.is_(False),
+            )
+        )
+    ).all()
+    for row in rows:
+        if row.metric in gc.QUEST_METRICS:
+            row.target = max(row.target, gc.weekly_target(gc.QUEST_METRICS[row.metric][3], members))
+    await db.flush()
 
 
 async def record(db: AsyncSession, character: Character, metric: str, amount: int = 1) -> list[str]:

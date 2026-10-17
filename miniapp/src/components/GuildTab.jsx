@@ -211,20 +211,25 @@ function Overview({ state, run, busy }) {
         )}
       </Group>
 
-      <Group header={<Header>🗿 Страж цитадели</Header>}>
+      <Group header={<Header>🗿 Страж</Header>}>
         <Div>
           {boss.active ? (
             <>
-              <p className="guild-line">Призван на ({boss.x}; {boss.y}): {money(boss.hp)} / {money(boss.max_hp)}, уйдёт через {timeLeft(boss.expires_at)}.</p>
+              <p className="guild-line">
+                {boss.court ? 'Призван во Дворе' : `Призван на (${boss.x}; ${boss.y})`}: {money(boss.hp)} / {money(boss.max_hp)}, уйдёт через {timeLeft(boss.expires_at)}.
+              </p>
               <Bar value={boss.hp} max={boss.max_hp} />
-              <p className="craft-hint">Бить - в чате: встань на клетку и напиши «Страж».</p>
+              <p className="craft-hint">
+                {boss.court ? 'Бить - в чате откуда угодно: напиши «Страж».' : 'Бить - в чате: встань на клетку и напиши «Страж».'}
+              </p>
             </>
-          ) : !boss.has_citadel ? (
-            <p style={{ opacity: 0.8 }}>Стража призывают в цитадели.</p>
           ) : (
             <>
               <p className="craft-hint">
                 Призыв: {money(boss.summon_gold)} золота и {boss.summon_ore} ×{boss.summon_ore_count} со склада. Раз в неделю.
+                {boss.has_citadel
+                  ? ' Встанет в цитадели - бить там, награда полная.'
+                  : ` Без цитадели - из Двора: бить откуда угодно, награда ${boss.court_reward_pct}%.`}
               </p>
               {boss.cooldown_hours > 0 && <p className="guild-line">Наберётся сил через {boss.cooldown_hours} ч.</p>}
               {perms.treasury && (
@@ -577,6 +582,9 @@ function Here({ state, run, busy }) {
             <p className="guild-line">
               {here.banner.mine ? `⛏ Рудник «${here.banner.mine}» - свободен.` : 'Клетка свободна.'}
             </p>
+            {here.banner.peaceful && (
+              <p className="craft-hint">🕊 Мирное кольцо: здесь гильдия держит только одну клетку, зато её нельзя осадить.</p>
+            )}
             <p className="craft-hint">
               Знамя: {money(here.banner.cost)} золота из казны и {here.banner.ore} ×{here.banner.ore_count} со склада.
               Потом участники гильдии исследуют клетку {here.banner.explorations} раз за {here.banner.hours} ч.
@@ -589,7 +597,10 @@ function Here({ state, run, busy }) {
         {here.owner && (
           <p className="guild-line">🏰 Земля [{here.owner.tag}] {here.owner.name}{here.owner.own ? ' - твоя гильдия' : ''}</p>
         )}
-        {here.siege && (
+        {here.siege && here.siege.peaceful && (
+          <p className="craft-hint">🕊 Мирное кольцо - эту землю не осаждают.</p>
+        )}
+        {here.siege && !here.siege.peaceful && (
           <>
             <p className="craft-hint">
               {here.siege.base_title}. Осада: {money(here.siege.cost)} золота из казны, начало - в окно защитников,
@@ -641,7 +652,7 @@ function Cell({ cell, state, run, busy }) {
     <div className="guild-cell">
       <SimpleCell onClick={() => setOpen(!open)} after={open ? '▴' : '▾'}
         subtitle={[
-          `${cell.base_title} · кольцо ${cell.ring}`,
+          `${cell.base_title} · кольцо ${cell.ring}${cell.peaceful ? ' 🕊 мирная' : ''}`,
           `построек ${cell.used_slots}/${cell.slots}`,
           cell.shield_until && new Date(cell.shield_until) > new Date() ? `🛡 ${timeLeft(cell.shield_until)}` : null,
           cell.here ? 'ты здесь' : null,
@@ -694,10 +705,47 @@ function Cell({ cell, state, run, busy }) {
   );
 }
 
+// Двор гильдии (2026-10-17): не на карте, не осаждается. Постройки на всю
+// гильдию - до court.max; на базах карты те же - выше, действует лучший уровень.
+function Court({ state, run, busy }) {
+  const { court, me } = state;
+  const building = court.buildings.some((b) => b.upgrading_to);
+  return (
+    <Group header={<Header>🏛 Двор гильдии</Header>}>
+      <Div className="guild-form">
+        <p className="craft-hint">
+          Двор есть у каждой гильдии: он не на карте, его не осадить. Кузня, Часовня и Склад здесь растут до {court.max} уровня
+          и действуют на всю гильдию. На базе на карте они строятся до 10 - берётся лучший уровень, склады складываются.
+        </p>
+        {court.buildings.map((b) => (
+          <div key={b.building} className="guild-building">
+            <p className="guild-line">
+              {b.emoji} <b>{b.title}</b> {b.built ? `${b.level}/${b.max}` : '- не построена'}
+              {b.upgrading_to ? ` · строится ${b.upgrading_to} ур., ещё ${timeLeft(b.done_at)}` : ''}
+            </p>
+            {b.next && me.perms.treasury && !b.upgrading_to && (
+              <div className="guild-row">
+                <span className="craft-hint">
+                  {money(b.next.gold)} 💰 · {b.next.ore} ×{b.next.ore_count} · {b.next.hours} ч
+                </span>
+                <Button size="s" disabled={busy || building}
+                  onClick={() => run('court_build', { building: b.building }, 'Стройка во Дворе началась.')}>
+                  {b.built ? 'Улучшить' : 'Построить'}
+                </Button>
+              </div>
+            )}
+          </div>
+        ))}
+      </Div>
+    </Group>
+  );
+}
+
 function Lands({ state, run, busy }) {
   const { slots, cells } = state;
   return (
     <>
+      <Court state={state} run={run} busy={busy} />
       <Here state={state} run={run} busy={busy} />
       <Group header={<Header>Владения</Header>}>
         <Div>
@@ -708,6 +756,8 @@ function Lands({ state, run, busy }) {
           <p className="craft-hint">
             Знамя ставят на свободной клетке второго-четвёртого колец: внешнее кольцо - земля новичков,
             у Монолита и на озёрах - ничьё. Каждое исследование на своей клетке приносит казне десятину.
+            Во втором кольце - одна клетка на гильдию, зато её не осаждают. Осада дороже, чем больше земли у
+            осаждающих. Потерял базу - остальные клетки 3 суток под щитом.
           </p>
         </Div>
         {cells.length === 0 && <Div style={{ opacity: 0.8 }}>Земли пока нет.</Div>}

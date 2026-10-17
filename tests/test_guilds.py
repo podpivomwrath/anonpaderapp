@@ -552,8 +552,6 @@ async def test_season_close(db_session, make_character) -> None:
 
 async def test_guild_boss(db_session, make_character) -> None:
     guild, leader = await _found(db_session, make_character)
-    with pytest.raises(GuildError, match="цитадели"):
-        await guild_boss_service.summon(db_session, leader)
     citadel = await _held_base(db_session, guild, 5, 12, tier=gc.BASE_CITADEL)
     await _ore(db_session, guild.id, gc.BOSS_SUMMON_ORE[0], gc.BOSS_SUMMON_ORE[1])
     await guild_service.treasury_add(db_session, guild.id, gold=gc.BOSS_SUMMON_GOLD)

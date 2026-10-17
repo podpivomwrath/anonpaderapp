@@ -146,6 +146,7 @@ async def _cell_payload(db, guild: Guild, cell: GuildCell, character: Character,
     return {
         "id": cell.id, "x": cell.x, "y": cell.y, "status": cell.status,
         "ring": grid.ring_tier(cell.x, cell.y),
+        "peaceful": guild_territory_service.is_peaceful(cell.x, cell.y),
         "mine": mine.name if mine else None,
         "base_tier": cell.base_tier, "base_title": gc.BASE_TITLES[cell.base_tier],
         "slots": gc.BASE_SLOTS[cell.base_tier], "used_slots": len(buildings),
@@ -158,6 +159,26 @@ async def _cell_payload(db, guild: Guild, cell: GuildCell, character: Character,
         "gates": cell.id in gate_ids,
         "here": (character.pos_x, character.pos_y) == (cell.x, cell.y),
     }
+
+
+async def _court_payload(db, guild: Guild) -> dict:
+    """Двор гильдии (2026-10-17): постройки на всю гильдию без земли."""
+    by_type = {b.building: b for b in await guild_territory_service.court_buildings_of(db, guild.id)}
+    rows = []
+    for building in gc.court_buildings():
+        current = by_type.get(building)
+        level = current.level if current else 0
+        next_level = level + 1
+        rows.append({
+            "building": building, "title": gc.BUILDING_TITLES[building],
+            "emoji": gc.BUILDING_EMOJI[building], "level": level, "max": gc.COURT_MAX_LEVEL,
+            "built": current is not None,
+            "upgrading_to": current.upgrading_to if current else None,
+            "done_at": _iso(current.done_at) if current else None,
+            "next": _quote(guild_territory_service.quote(guild, building, next_level))
+            if next_level <= gc.COURT_MAX_LEVEL else None,
+        })
+    return {"buildings": rows, "max": gc.COURT_MAX_LEVEL}
 
 
 async def _here_payload(db, guild: Guild, character: Character) -> dict:
@@ -175,6 +196,7 @@ async def _here_payload(db, guild: Guild, character: Character) -> dict:
         ore = gc.CLAIM_ORE.get(tier)
         result["banner"] = {
             "reason": reason,
+            "peaceful": guild_territory_service.is_peaceful(x, y),
             "mine": mine.name if mine else None,
             "cost": gc.banner_cost(mine is not None, len(cells)),
             "ore": _ore_name(ore[0]) if ore else None,
@@ -186,9 +208,13 @@ async def _here_payload(db, guild: Guild, character: Character) -> dict:
     owner = await db.get(Guild, cell.guild_id)
     result["owner"] = {"tag": owner.tag, "name": owner.name, "own": owner.id == guild.id}
     if owner.id != guild.id and cell.status == "held":
+        peaceful = guild_territory_service.is_peaceful(cell.x, cell.y)
         result["siege"] = {
             "cell_id": cell.id, "base_title": gc.BASE_TITLES[cell.base_tier],
-            "cost": guild_siege_service.siege_cost(guild, cell.base_tier),
+            "peaceful": peaceful,
+            "cost": guild_siege_service.siege_cost(
+                guild, cell.base_tier, await guild_siege_service.held_cells(db, guild.id),
+            ),
             "shield_until": _iso(cell.shield_until),
             "starts_at": _iso(guild_siege_service.next_window(owner.siege_hour)),
         }
@@ -291,6 +317,7 @@ async def _state(db, character: Character) -> dict:
             "mine_level": gc.MINE_SLOT_LEVEL,
         },
         "cells": [await _cell_payload(db, guild, c, character, gate_ids) for c in cells],
+        "court": await _court_payload(db, guild),
         "here": await _here_payload(db, guild, character),
         "gates": gates,
         "sieges": sieges,
@@ -308,6 +335,8 @@ async def _state(db, character: Character) -> dict:
             "summon_gold": gc.BOSS_SUMMON_GOLD,
             "summon_ore": _ore_name(gc.BOSS_SUMMON_ORE[0]), "summon_ore_count": gc.BOSS_SUMMON_ORE[1],
             "has_citadel": any(c.base_tier == gc.BASE_CITADEL and c.status == "held" for c in cells),
+            "court": bool(boss and boss.court),
+            "court_reward_pct": round(gc.BOSS_COURT_REWARD * 100),
         },
         "log": [
             {"text": row.text, "at": _iso(row.created_at)} for row in await guild_service.recent_log(db, guild.id)
@@ -419,6 +448,8 @@ async def _act(db, character: Character, vk_user_id: int, body: dict) -> list:
         await guild_territory_service.abandon(db, character, _int(body, "cell_id"))
     elif action == "build":
         await guild_territory_service.start_build(db, character, _int(body, "cell_id"), _str(body, "building"))
+    elif action == "court_build":
+        await guild_territory_service.start_court_build(db, character, _str(body, "building"))
     elif action == "upgrade_base":
         await guild_territory_service.start_base_upgrade(db, character, _int(body, "cell_id"))
     elif action == "gates":
@@ -451,7 +482,7 @@ async def _act(db, character: Character, vk_user_id: int, body: dict) -> list:
         await guild_tree_service.reset(db, character)
     elif action == "summon_boss":
         boss = await guild_boss_service.summon(db, character)
-        notes.append(("boss", boss.guild_id, boss.x, boss.y))
+        notes.append(("boss", boss.guild_id, boss.x, boss.y, boss.court))
     else:
         raise GuildError("Неизвестное действие.")
     return notes
@@ -472,7 +503,7 @@ async def _deliver(db, notes: list, vk_user_id: int) -> None:
             elif kind == "guild_officers":
                 await guild_handlers.notify_guild(note[1], note[2], min_rank=gc.RANK_OFFICER)
             elif kind == "boss":
-                await guild_handlers.announce_boss(note[1], note[2], note[3])
+                await guild_handlers.announce_boss(note[1], note[2], note[3], note[4])
             elif kind == "self_move":
                 guild_handlers.notify_peers(
                     [vk_user_id], f"🌀 Врата переносят тебя на ({note[1]}; {note[2]})."
