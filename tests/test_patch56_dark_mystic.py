@@ -250,6 +250,24 @@ def test_echo_turns_overheal_into_ally_shield() -> None:
     assert neighbour.effect_total(EffectKind.SHIELD_POOL) > 0
 
 
+def test_echo_in_pair_shields_the_mystic_and_adds_to_ward() -> None:
+    """2026-10-17, репорт: мистик и союзник на полном HP. Перелечивание
+    союзника некуда было отдать (сам мистик не был кандидатом), а щит
+    отголоска затирал Оберег вместо того, чтобы прибавиться к нему."""
+    from game.combat.session import WARD_TAG
+
+    healer = mystic(heal_overflow_shield=bc.DARK_MYSTIC_ECHO_PCT)
+    healer.current_hp = healer.max_hp // 2
+    ally = combatant(3, side=0)
+    ally.apply_effect(EffectKind.SHIELD_POOL, 243, 2, healer.id, tag=WARD_TAG)
+    enemy = combatant(2, side=1, agility=0, vitality=500)
+    result = resolve_tick(make_session(healer, ally, enemy), {1: skill("dark_mystic_circle")}, NoCritRng())
+    assert healer.effect_total(EffectKind.SHIELD_POOL) > 0, "перелечивание союзника на полном HP пропало"
+    assert any("отголосок" in line and "щитом +" in line for line in result.lines)
+    # Оберег союзника не затёрт.
+    assert ally.effect_total(EffectKind.SHIELD_POOL) >= 243
+
+
 def test_echo_is_noop_without_allies() -> None:
     rng = NoCritRng()
     healer = mystic(heal_overflow_shield=bc.DARK_MYSTIC_ECHO_PCT)

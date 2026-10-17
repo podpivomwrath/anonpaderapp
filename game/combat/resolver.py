@@ -530,15 +530,34 @@ def resolve_tick(
             )
             if overflow <= 0:
                 continue
-            candidates = [c for c in session.alive_allies_of(source) if c.id != target_id]
+            # Сам мистик - тоже кандидат (2026-10-17): вдвоём перелечивание
+            # союзника на полном HP некуда было отдать, и оно пропадало.
+            group = [*session.alive_allies_of(source), *([source] if source.alive else [])]
+            candidates = [c for c in group if c.id != target_id]
             if not candidates:
                 continue
             ally = min(candidates, key=lambda c: c.current_hp / c.max_hp)
-            ally.apply_effect(
-                EffectKind.SHIELD_POOL, round(overflow * echo),
-                bc.DARK_MYSTIC_ECHO_DURATION, source.id, tag=WARD_TAG,
+            amount = round(overflow * echo)
+            if amount <= 0:
+                continue
+            # Щит прибавляется к Оберегу того же мистика, а не заменяет его:
+            # раньше отголосок в 47 ед. затирал Оберег в 243.
+            current = next(
+                (e for e in ally.effects_of(EffectKind.SHIELD_POOL)
+                 if e.source_id == source.id and getattr(e, "tag", None) == WARD_TAG),
+                None,
             )
-            ctx.lines.append(f"{source.name}: отголосок лечения укрывает {ally.name}")
+            if current is not None:
+                current.value += amount
+                current.remaining_ticks = max(current.remaining_ticks, bc.DARK_MYSTIC_ECHO_DURATION)
+            else:
+                ally.apply_effect(
+                    EffectKind.SHIELD_POOL, amount, bc.DARK_MYSTIC_ECHO_DURATION, source.id, tag=WARD_TAG,
+                )
+            ctx.lines.append(
+                f"{source.name}: отголосок - {overflow} лишнего лечения ({target.name}) "
+                f"становится щитом +{amount} на {ally.name}"
+            )
 
     for cid in set(damage_taken) | set(heal_taken):
         combatant = session.combatants[cid]

@@ -519,7 +519,7 @@ async def handle_get_dailies(request: web.Request) -> web.Response:
         story = await _story_payload(session, character)
         overview = await daily_service.get_dailies_overview(session, character)
         login_state = await daily_service.get_login_state(session, character)
-        lootbox_history = await lootbox_service.recent_history(session, character.id, limit=10)
+        lootbox_history = await lootbox_service.recent_history(session, character.id, limit=5)
         lootbox_counts = await lootbox_service.grade_counts(session, character.id)
         song_fragments = await song_service.fragments_display(session, character.id)
         song_complete = await song_service.is_complete(session, character.id)

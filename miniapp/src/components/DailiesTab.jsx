@@ -114,7 +114,10 @@ function LootboxSection({ dailies }) {
         );
       })}
       {dailies.lootbox_history.length === 0 && <Div style={{ opacity: 0.8 }}>Ларцов пока не было.</Div>}
-      {dailies.lootbox_history.map((h, idx) => (
+      {dailies.lootbox_history.length > 0 && (
+        <div className="trade-dest__section" style={{ padding: '0 16px' }}>История выпадения · последние 5</div>
+      )}
+      {dailies.lootbox_history.slice(0, 5).map((h, idx) => (
         <Div key={idx} style={{ opacity: 0.85 }}>
           <p style={{ marginBottom: 0 }}>
             {h.emoji} {h.name}: {h.reward_summary}
