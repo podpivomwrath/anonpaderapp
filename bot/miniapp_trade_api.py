@@ -123,6 +123,10 @@ def _cart(cart, level: int, ore_have: dict, prices: dict, now: datetime) -> dict
     info["goods"] = [
         {
             **_good(g), "price": trade_service.city_buy_price(cart.city, g, prices.get((cart.city, g.id), 0.0)),
+            # Для прогноза ящик за ящиком (2026-10-17): база и насыщение - клиент
+            # считает так же, как trade_service.dispatch/arrive.
+            "base": tc.TIER_BASE_PRICE[g.tier] * tc.BUY_MULT,
+            "pressure": round(prices.get((cart.city, g.id), 0.0), 4),
             "locked": level < tc.TIER_MIN_TRADE_LEVEL[g.tier], "min_level": tc.TIER_MIN_TRADE_LEVEL[g.tier],
         }
         for g in tc.GOODS if g.city == cart.city
@@ -148,6 +152,14 @@ def _cart(cart, level: int, ore_have: dict, prices: dict, now: datetime) -> dict
                 )
                 for g in tc.GOODS if g.city == cart.city
             },
+            "sell_base": {
+                g.id: tc.TIER_BASE_PRICE[g.tier] * trade_service.sell_mult(city, g)
+                for g in tc.GOODS if g.city == cart.city
+            },
+            "pressure": {
+                g.id: round(prices.get((city, g.id), 0.0), 4) for g in tc.GOODS if g.city == cart.city
+            },
+            "sell_bonus": tc.sell_bonus(level),
         })
     info["destinations"] = destinations
     return info
@@ -168,6 +180,7 @@ async def _state(db, character) -> dict:
         "routes": {r: tc.ROUTE_TITLES[r] for r in tc.ROUTES},
         "orders": [],
         "order_bonus_pct": round((tc.ORDER_PRICE_MULT - 1) * 100),
+        "saturation": tc.SATURATION_PER_CRATE, "max_pressure": tc.MAX_PRESSURE,
     }
     level = firm.trade_level if firm is not None else 1
     state["orders"] = [_order(o, level, now) for o in await trade_service.active_orders(db, now)]

@@ -57,21 +57,44 @@ function NameForm({ busy, min, max, label, onSubmit }) {
 
 // --- Отправка повозки ---------------------------------------------------------
 
-function DispatchSheet({ cart, gold, routeTitles, orders, busy, onSend, onClose }) {
+// Цена ползёт с каждым ящиком (2026-10-17): каждый купленный поднимает цену
+// у производителя на sat, каждый проданный - опускает у покупателя. Раньше
+// прогноз умножал первую цену на число ящиков, и «прибыль» на большой повозке
+// оказывалась убытком. Считаем ровно как сервер (trade_service.dispatch/arrive).
+function buyLadder(base, pressure, n, market) {
+  let sum = 0;
+  for (let i = 0; i < n; i += 1) sum += Math.round(base * (1 + Math.min(pressure + i * market.sat, market.max)));
+  return sum;
+}
+
+function sellLadder(base, pressure, bonus, n, market) {
+  let sum = 0;
+  for (let i = 0; i < n; i += 1) {
+    sum += Math.round(Math.round(base * (1 - Math.min(pressure + i * market.sat, market.max))) * (1 + bonus));
+  }
+  return sum;
+}
+
+function DispatchSheet({ cart, gold, routeTitles, orders, market, busy, onSend, onClose }) {
   const [dest, setDest] = useState(cart.destinations[0]?.city);
   const [route, setRoute] = useState('safe');
   const [counts, setCounts] = useState({});
   const target = cart.destinations.find((d) => d.city === dest);
   const total = Object.values(counts).reduce((a, b) => a + b, 0);
   const free = cart.capacity - total;
-  const cost = cart.goods.reduce((sum, g) => sum + (counts[g.id] || 0) * g.price, 0);
+  const cost = cart.goods.reduce(
+    (sum, g) => sum + buyLadder(g.base, g.pressure, counts[g.id] || 0, market), 0,
+  );
   const orderFor = (city, goodId) => orders.find((o) => o.city === city && o.good.id === goodId);
-  // Ящики по заказу - по цене заказа, остальные - по цене города.
+  // Ящики по заказу - по цене заказа, остальные - по цене города, ящик за ящиком.
   const revenue = cart.goods.reduce((sum, g) => {
     const n = counts[g.id] || 0;
     const o = orderFor(dest, g.id);
     const byOrder = o ? Math.min(n, o.left) : 0;
-    return sum + (o ? byOrder * o.price : 0) + (n - byOrder) * (target?.prices[g.id] || 0);
+    const rest = target
+      ? sellLadder(target.sell_base[g.id], target.pressure[g.id], target.sell_bonus, n - byOrder, market)
+      : 0;
+    return sum + (o ? byOrder * o.price : 0) + rest;
   }, 0);
   const set = (id, n) => setCounts({ ...counts, [id]: Math.max(0, n) });
   const info = target?.routes[route];
@@ -91,7 +114,7 @@ function DispatchSheet({ cart, gold, routeTitles, orders, busy, onSend, onClose 
               onClick={() => setDest(d.city)}>
               {d.title}
               <span className="craft-hint">
-                {d.kind === 'deficit' ? 'сосед, нехватка' : 'напротив, дальний рынок'}
+                {d.kind === 'deficit' ? 'ближний рынок, ×1.45 к базе' : 'дальний рынок, ×1.95 к базе'}
                 {cart.goods.some((g) => orderFor(d.city, g.id)) ? ' · 📜 заказ' : ''}
               </span>
             </button>
@@ -136,8 +159,9 @@ function DispatchSheet({ cart, gold, routeTitles, orders, busy, onSend, onClose 
         })}
         <p className="craft-hint">
           Закупка ~{money(cost)} · выручка там сейчас ~{money(revenue)}
-          {cost ? ` · прибыль ~${money(revenue - cost)}` : ''}. Цена ползёт с каждым ящиком, а продажа - по цене
-          на момент прибытия. Пустую повозку можно перегнать порожняком.
+          {cost ? ` · прибыль ~${money(revenue - cost)}` : ''}. Уже с учётом того, что каждый ящик дороже при
+          покупке и дешевле при продаже. Цена продажи - на момент прибытия: если туда тем временем навезут других
+          ящиков, она будет ниже. Пустую повозку можно перегнать порожняком.
         </p>
         {info && <p className="craft-hint">В пути {duration(info.seconds)}, шанс нападения ~{Math.round(info.ambush * 100)}%.</p>}
 
@@ -371,6 +395,7 @@ function Trade({ data, busy, act }) {
       {dispatching && (
         <DispatchSheet
           cart={dispatching} gold={data.gold} routeTitles={data.routes} orders={data.orders} busy={busy}
+          market={{ sat: data.saturation, max: data.max_pressure }}
           onSend={async (params) => { if (await act('dispatch', params)) setDispatching(null); }}
           onClose={() => setDispatching(null)}
         />
@@ -409,13 +434,17 @@ function CitySummary({ city }) {
           <span className="trade-dest__good">
             <GoodName g={g} />
             <span className="trade-dest__note">
-              {' '}из {g.city_title}{g.deficit ? <span className="trade-dest__deficit"> · дефицит</span> : ''}
+              {' '}из {g.city_title}{g.deficit ? ' · ближний рынок' : ' · дальний рынок'}
             </span>
           </span>
           <b className="trade-dest__price">{money(g.price)}</b>
         </div>
       ))}
-      <p className="craft-hint">Цены без надбавки за твой уровень торговли; падают, когда туда много везут.</p>
+      <p className="craft-hint">
+        Цены без надбавки за твой уровень торговли. Ближний рынок платит ×1.45 к базовой цене товара, дальний
+        ×1.95. Каждый проданный ящик опускает цену на 1,2%, каждый купленный у производителя поднимает (до ±45%);
+        со временем цена возвращается.
+      </p>
       <div className="trade-dest__section">Лучшие торговцы города · фирм: {info.firms}</div>
       {info.top.length === 0 ? (
         <p className="craft-hint">Пока никто из этого города не торговал.</p>
