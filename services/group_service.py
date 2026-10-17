@@ -113,10 +113,11 @@ async def send_invite(db: AsyncSession, inviter: Character, target: Character) -
 
     target_membership = await get_membership(db, target.id)
     if target_membership is not None:
-        raise GroupError(f"{target.name} уже состоит в группе.")
+        # Без ника (2026-10-17): приглашение пересылкой не должно выдавать, кто это.
+        raise GroupError("Этот игрок уже состоит в группе.")
 
     if await _active_invite_to(db, target.id) is not None:
-        raise GroupError(f"{target.name} уже рассматривает другое приглашение.")
+        raise GroupError("Этот игрок уже рассматривает другое приглашение.")
 
     gap = level_gap(current_levels + [target.level])
     if gap > gc.GROUP_MAX_LEVEL_GAP:

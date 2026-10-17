@@ -536,6 +536,8 @@ def _resolve_chosen_target(battle_id: int, battle: RaidBattle, cid: int) -> int 
 
 
 def _target_line(battle_id: int, battle: RaidBattle, cid: int) -> str:
+    # Цель пала - сразу следующая, и её видно (2026-10-17).
+    _resolve_chosen_target(battle_id, battle, cid)
     combatants = _live_state(battle_id, battle)
     target_id = _chosen_target.get(cid)
     target = combatants.get(target_id) if target_id is not None else None

@@ -202,11 +202,13 @@ function Overview({ state, run, busy }) {
             <Button size="m" disabled={busy} onClick={() => run('pray', { stat }, 'Молитва услышана: +10% на час.')}>
               Вознести молитву ({money(me.prayer.cost)} золота)
             </Button>
-            <label className="guild-check">
-              <input type="checkbox" checked={me.respawn_at_chapel} disabled={busy}
-                onChange={(e) => run('respawn_pref', { on: e.target.checked })} />
-              Возрождаться у часовни, а не в городе
-            </label>
+            {me.chapel_on_map && (
+              <label className="guild-check">
+                <input type="checkbox" checked={me.respawn_at_chapel} disabled={busy}
+                  onChange={(e) => run('respawn_pref', { on: e.target.checked })} />
+                Возрождаться у часовни, а не в городе
+              </label>
+            )}
           </Div>
         )}
       </Group>

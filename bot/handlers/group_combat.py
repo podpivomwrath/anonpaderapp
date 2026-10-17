@@ -305,8 +305,24 @@ def _enemies_of(battle_id: int, battle: GroupBattle, cid: int) -> list[int]:
 
 
 def _default_enemy_target(battle_id: int, battle: GroupBattle, cid: int) -> int | None:
+    """Новая цель взамен павшей - одна на всю группу (2026-10-17: раньше
+    случайная, и после первого убийства каждый бил своего). Сначала та, что
+    уже выбрана у союзников (ассист), иначе самая раненая."""
     enemies = _enemies_of(battle_id, battle, cid)
-    return _rng.choice(enemies) if enemies else None
+    if not enemies:
+        return None
+    combatants = _live_state(battle_id, battle)
+    focus = {e: 0 for e in enemies}
+    for other in battle.participants:
+        target = _chosen_target.get(other)
+        if other != cid and target in focus:
+            focus[target] += 1
+
+    def share(e: int) -> float:
+        c = combatants.get(e)
+        return c.current_hp / c.max_hp if c is not None and c.max_hp else 1.0
+
+    return min(enemies, key=lambda e: (-focus[e], share(e), e))
 
 
 def _resolve_chosen_target(battle_id: int, battle: GroupBattle, cid: int) -> int | None:
@@ -322,6 +338,9 @@ def _resolve_chosen_target(battle_id: int, battle: GroupBattle, cid: int) -> int
 
 
 def _target_line(battle_id: int, battle: GroupBattle, cid: int) -> str:
+    # Цель пала - сразу следующая, и её видно (2026-10-17: строка пропадала
+    # до следующего нажатия, и игрок не знал, кого бьёт).
+    _resolve_chosen_target(battle_id, battle, cid)
     combatants = _live_state(battle_id, battle)
     target_id = _chosen_target.get(cid)
     target = combatants.get(target_id) if target_id is not None else None
@@ -720,7 +739,12 @@ async def on_group_tick_resolved(session_id: int, tick: int, result: TickResult)
                         namesake = await story_service.namesake_hint(db, character, mob_name)
                         if namesake:
                             lines.append(namesake)
-                    notices[r.character_id] = "\n".join(lines)
+                    # Несколько мобов за ход - блок на каждого (2026-10-17:
+                    # второй затирал первый, и награда за него будто пропадала).
+                    block = "\n".join(lines)
+                    notices[r.character_id] = (
+                        f"{notices[r.character_id]}\n\n{block}" if notices.get(r.character_id) else block
+                    )
                     if r.levels_gained > 0:
                         await stats_window.notify_levelup(p.peer_id, r.levels_gained, r.new_level)
                     await group_texts.notify_group_kick(_bot_api, r.group_kick)

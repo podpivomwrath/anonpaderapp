@@ -768,6 +768,15 @@ async def explore(message: Message) -> None:
                             )
                         except Exception:
                             pass
+                    # Поиск длится, как в соло (2026-10-17): раньше бой или
+                    # событие группы начинались мгновенно. Пока ищут - все
+                    # «исследуют»: уйти с клетки или начать другое нельзя.
+                    searching = [p for p, _text in look_around]
+                    _exploring.update(searching)
+                    try:
+                        await asyncio.sleep(_rng.uniform(wc.EXPLORE_SECONDS_MIN, wc.EXPLORE_SECONDS_MAX))
+                    finally:
+                        _exploring.difference_update(searching)
                     region = region_for(character.pos_x, character.pos_y)
                     dist = grid.monolith_distance(character.pos_x, character.pos_y)
                     if await group_event_handlers.maybe_start(

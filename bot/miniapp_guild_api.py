@@ -276,6 +276,9 @@ async def _state(db, character: Character) -> dict:
             "id": character.id, "rank": member.rank, "rank_title": gc.RANK_TITLES[member.rank],
             "perms": _perms(member), "gold": wallet.farm_currency, "gems": wallet.donate_currency,
             "respawn_at_chapel": character.respawn_at_chapel,
+            # Возродиться можно только у часовни на базе на карте - у Двора
+            # клетки нет (2026-10-17): без такой базы галочку не показываем.
+            "chapel_on_map": await guild_territory_service.chapel_cell(db, guild.id) is not None,
             "prayer": {
                 "active": guild_territory_service.prayer_active(character),
                 "stat": character.prayer_stat, "until": _iso(character.prayer_until),
@@ -289,7 +292,9 @@ async def _state(db, character: Character) -> dict:
         },
         "members": [
             {
-                "id": c.id, "name": c.name, "level": c.level, "class": naming.base_class_title(c.base_class),
+                "id": c.id, "name": c.name, "level": c.level,
+                # Подкласс, если выбран (2026-10-17): «Воин» у всех троих мало что говорил.
+                "class": naming.subclass_title(c.subclass) or naming.base_class_title(c.base_class),
                 "rank": m.rank, "rank_title": gc.RANK_TITLES[m.rank],
                 "week": m.contribution_week if m.week_start == week else 0, "total": m.contribution_total,
             }
