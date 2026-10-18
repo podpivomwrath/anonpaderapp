@@ -1419,7 +1419,9 @@ async def _cleanup_and_return(session_id: int, battle: RaidBattle, text: str, *,
             if survived:
                 has_mount_by_cid[cid] = await mount_service.has_any_mount(db, cid)
                 # Щит от снайпинга на выходе (2026-10-18): успеть уйти.
-                pvp_shield.grant(cid, pvp_shield.RIFT if battle.is_rift else pvp_shield.RAID)
+                pvp_shield.grant(
+                    cid, pvp_shield.RIFT if battle.is_rift else pvp_shield.RAID, cell=tuple(battle.home),
+                )
             else:
                 defeats[cid] = (await encounter_service.resolve_defeat(db, character), character.respawn_at)
         from services import raid_service
@@ -1469,7 +1471,7 @@ async def _cleanup_and_return(session_id: int, battle: RaidBattle, text: str, *,
             )
 
 
-SAFE_EXIT_LINE = f"\n\n🛡 {bc.PVP_SAFE_SECONDS // 60} мин. на тебя нельзя нападать - успей уйти. Нападёшь сам - защита пропадёт."
+SAFE_EXIT_LINE = f"\n\n🛡 {bc.PVP_SAFE_SECONDS // 60} мин. на тебя нельзя нападать, пока не ушёл с этой клетки. Нападёшь сам - защита пропадёт."
 
 
 async def _tell_others(battle, cid: int, text: str) -> None:

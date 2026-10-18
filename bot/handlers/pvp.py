@@ -160,11 +160,11 @@ def _grant_draw_shield(battle: "Battle", survivors) -> list[int]:
         return []
     shielded = [cid for cid in survivors if battle.side_of.get(cid) == 1]
     for cid in shielded:
-        pvp_shield.grant(cid, pvp_shield.DRAW, bc.PVP_DRAW_SHIELD_SECONDS)
+        pvp_shield.grant(cid, pvp_shield.DRAW, bc.PVP_DRAW_SHIELD_SECONDS, cell=battle.location)
     return shielded
 
 
-DRAW_SHIELD_LINE = f"🛡 Ничья: на тебя нельзя нападать {bc.PVP_DRAW_SHIELD_SECONDS // 60} мин."
+DRAW_SHIELD_LINE = f"🛡 Ничья: на тебя нельзя нападать {bc.PVP_DRAW_SHIELD_SECONDS // 60} мин., пока не ушёл с этой клетки."
 # peer_id -> battle_id, ждём выбора стороны (текстом "1"/"2") для этого боя
 _pending_join_prompt: dict[int, int] = {}
 #: Последнее «Осмотреться»: peer -> (клетка, id игроков, id боёв) в том

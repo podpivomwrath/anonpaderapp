@@ -38,6 +38,22 @@ def test_monolith_cell_gives_shield_other_cells_do_not():
         pvp_shield._shields.clear()
 
 
+def test_shield_ends_when_leaving_its_cell():
+    try:
+        pvp_shield.grant(21, pvp_shield.RAID, cell=(0, 0))
+        pvp_shield.grant(22, pvp_shield.DRAW, cell=(5, 5))
+        pvp_shield.on_moved(SimpleNamespace(id=21, pos_x=0, pos_y=1))
+        pvp_shield.on_moved(SimpleNamespace(id=22, pos_x=5, pos_y=5))
+        assert pvp_shield.left(21) == (0, "")
+        assert pvp_shield.left(22)[0] > 0
+        # Ушёл с Монолита - щит Монолита пропал, вернулся - новый.
+        pvp_shield.on_moved(SimpleNamespace(id=23, pos_x=0, pos_y=0))
+        pvp_shield.on_moved(SimpleNamespace(id=23, pos_x=1, pos_y=0))
+        assert pvp_shield.left(23) == (0, "")
+    finally:
+        pvp_shield._shields.clear()
+
+
 def test_shield_is_never_shortened_and_drops_on_attack():
     try:
         pvp_shield.grant(3, pvp_shield.RAID, 300)

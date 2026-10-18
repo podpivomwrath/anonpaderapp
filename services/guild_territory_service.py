@@ -489,6 +489,9 @@ async def travel_gates(db: AsyncSession, character: Character, target_cell_id: i
         raise GuildError(f"Врата ещё не остыли: {max(1, left)} мин.")
     character.pos_x, character.pos_y = target.x, target.y
     character.gates_used_at = now_utc()
+    from services import pvp_shield
+
+    pvp_shield.on_moved(character)
     await db.flush()
     return target
 
