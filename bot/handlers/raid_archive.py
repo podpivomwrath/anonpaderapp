@@ -306,10 +306,18 @@ async def _phrase_attempt(run: ArchiveRun, text: str) -> None:
             run.busy = False
         return
     run.deadline -= ac.WRONG_PHRASE_PENALTY_SECONDS
+    # Подсказка (2026-10-18): какие места не те, чтобы не гадать вслепую.
+    wrong = archive_riddles.wrong_places(text, run.phrase)
+    if wrong is None:
+        hint = f" Мест в строке {run.phrase.size} - слов должно быть столько же."
+    elif len(wrong) == 1:
+        hint = f" Не то слово №{wrong[0]}."
+    else:
+        hint = f" Не те слова №{', №'.join(map(str, wrong))}."
     for peer in run.peers.values():
         await _send(
             peer,
-            f"🔥 Лидер прочёл строку неверно, и дверь сжигает {ac.WRONG_PHRASE_PENALTY_SECONDS} сек. {_left(run)}",
+            f"🔥 Лидер прочёл строку неверно, и дверь сжигает {ac.WRONG_PHRASE_PENALTY_SECONDS} сек.{hint} {_left(run)}",
         )
 
 

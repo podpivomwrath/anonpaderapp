@@ -84,6 +84,16 @@ def phrase_is(text: str, phrase: Phrase) -> bool:
     return given == expected
 
 
+def wrong_places(text: str, phrase: Phrase) -> list[int] | None:
+    """Какие места строки неверны (номера с 1) - подсказка после ошибки
+    (2026-10-18). None - слов не столько, сколько мест: места не сопоставить."""
+    given = [w for w in normalize_answer(text).split() if w not in _connectors(phrase)]
+    if len(given) != phrase.size:
+        return None
+    expected = [normalize_answer(w) for w in phrase.words]
+    return [i for i, (g, e) in enumerate(zip(given, expected, strict=True), start=1) if g != e]
+
+
 def looks_like_line(text: str, phrase: Phrase) -> bool:
     """Лидер ввёл строку двери целиком: слов без связок столько же, сколько
     мест в строке. Такой текст - попытка строки, даже если в нём есть ответ

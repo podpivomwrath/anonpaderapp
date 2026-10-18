@@ -142,6 +142,14 @@ def test_full_line_from_leader_is_a_line_not_a_riddle_answer() -> None:
     assert archive_riddles.looks_like_line("тень и свеча", two)
 
 
+def test_wrong_places_hint() -> None:
+    phrase = archive_riddles.Phrase(template="{1}, {2} и {3}", words=["ночь", "ветер", "дорога"], assignments=[])
+    assert archive_riddles.wrong_places("тень, ветер и дорога", phrase) == [1]
+    assert archive_riddles.wrong_places("тень, ветер и путь", phrase) == [1, 3]
+    assert archive_riddles.wrong_places("ночь, ветер и дорога", phrase) == []
+    assert archive_riddles.wrong_places("ночь и дорога", phrase) is None
+
+
 def test_runes_code_holds_for_all_attempts_and_zero_is_marked() -> None:
     """2026-10-18, жалоба: «код меняется раньше 6 попыток». Не меняется:
     значки - счёт, а не места. Значки - по местам, у каждой руны своя скобка."""
