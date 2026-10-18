@@ -263,7 +263,9 @@ class Runes(Puzzle):
     title = "🔐 Руны замка"
     rules = (
         f"Замок загадал {ac.RUNE_CODE_LEN} разные руны. Набирай по одной. После каждой попытки: "
-        f"✅ - руна на месте, 🔸 - руна есть, но не там. Попыток {ac.RUNE_ATTEMPTS}, потом код меняется."
+        f"✅ - руна на месте, 🔸 - руна есть, но не там, ✖ - ни одной не угадал. Значки - только счёт, "
+        f"не по порядку: ✅🔸🔸 значит одна руна на месте, но не сказано какая. "
+        f"Попыток {ac.RUNE_ATTEMPTS}, потом код меняется."
     )
 
     def __init__(self, rng: random.Random) -> None:
@@ -308,7 +310,8 @@ class Runes(Puzzle):
         if len(self.typed) < ac.RUNE_CODE_LEN:
             return ""
         exact, present = self.score(self.code, self.typed)
-        self.history.append(f"{' '.join(self.typed)}  {'✅' * exact}{'🔸' * present}" or "пусто")
+        marks = "✅" * exact + "🔸" * present or "✖"
+        self.history.append(f"{' '.join(self.typed)}  {marks}")
         self.typed = []
         self.attempts -= 1
         if exact == ac.RUNE_CODE_LEN:

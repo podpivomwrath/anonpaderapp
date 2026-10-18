@@ -128,6 +128,22 @@ def test_runes_score_and_code_reset() -> None:
     assert puzzle.solved
 
 
+def test_runes_code_holds_for_all_attempts_and_zero_is_marked() -> None:
+    """2026-10-18, жалоба: «код меняется раньше 6 попыток». Не меняется:
+    значки - счёт, а не места. Промах без единой руны - ✖, а не пустота."""
+    puzzle = raid_puzzles.Runes(random.Random(3))
+    code = list(puzzle.code)
+    wrong = [r for r in raid_puzzles._RUNES if r not in code]
+    for r in wrong:
+        puzzle.press(r)
+    assert puzzle.history[-1].endswith("✖")
+    for _ in range(ac.RUNE_ATTEMPTS - 2):
+        for r in reversed(wrong):
+            puzzle.press(r)
+        assert puzzle.code == code
+    assert puzzle.attempts == 1 and puzzle.code == code
+
+
 # --- Фраза из загадок ----------------------------------------------------------------
 
 
