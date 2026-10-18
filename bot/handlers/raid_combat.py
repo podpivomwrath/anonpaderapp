@@ -113,6 +113,10 @@ class RaidBattle:
     surgeon_id: int | None = None
     surgeon_phase3_hp_at_start: int | None = None
     surgeon_phase3_failed: bool = False
+    # Награды этапов ждут конца захода (2026-10-18, решение владельца): раньше
+    # брали ключ, проходили лёгкий этап, получали опыт и нарочно погибали.
+    # Выдаются только при победе; вайп - ничего. Элемент - StageReward.
+    pending_rewards: list = field(default_factory=list)
     contribution: dict[int, RaidContribution] = field(default_factory=dict)
     # --- Рейд «Безмогильное поле» (game/combat/raid_field.py) ---
     raid_id: str = rc.RAID_PUPPET_THEATRE_ID
@@ -1054,9 +1058,52 @@ async def on_raid_tick_resolved(session_id: int, tick: int, result: TickResult) 
         asyncio.get_running_loop().create_task(_auto_skip(session_id, frozen_ids))
 
 
+@dataclass
+class StageReward:
+    """Награда взятого этапа, снятая в момент победы на этапе: кто был жив
+    и сколько этап стоил. Выдаётся в конце захода (_grant_pending_rewards)."""
+    stage: int
+    alive_ids: list[int]
+    xp_mobs: float
+    loot_mult: int
+
+
+PENDING_REWARD_LINE = "🎁 Награда за этап засчитана - её выдадут, если пройдёте до конца."
+
+
 async def _stage_rewards(battle: RaidBattle, alive_char_ids: list[int]) -> dict[int, str]:
+    """Этап взят: награда запоминается живым и ждёт конца захода."""
+    battle.pending_rewards.append(
+        StageReward(battle.stage, list(alive_char_ids), _xp_mobs(battle), _loot_mult(battle))
+    )
+    return {cid: PENDING_REWARD_LINE for cid in alive_char_ids}
+
+
+async def _grant_pending_rewards(battle: RaidBattle) -> None:
+    """Победа: все отложенные награды этапов - одним сообщением каждому."""
+    by_cid: dict[int, list[str]] = {}
+    for reward in battle.pending_rewards:
+        notices = await _grant_stage_reward(battle, reward)
+        for cid, text in notices.items():
+            if text:
+                by_cid.setdefault(cid, []).append(text)
+    battle.pending_rewards = []
+    for cid, parts in by_cid.items():
+        p = battle.participants.get(cid)
+        if p is None:
+            continue
+        try:
+            await _bot_api.messages.send(
+                peer_id=p.peer_id, random_id=0, message="🎁 Награда за пройденные этапы:\n" + "\n".join(parts),
+            )
+        except Exception:
+            logger.exception("Рейд: не удалось отправить награду {}", p.peer_id)
+
+
+async def _grant_stage_reward(battle: RaidBattle, reward: StageReward) -> dict[int, str]:
     """Награда за взятый этап живым участникам: опыт, трофеи, дроп, ключ;
     на третьем этапе - испытание «выше уровнем». {id: строки уведомления}."""
+    alive_char_ids = reward.alive_ids
     notices: dict[int, str] = {}
     async with get_session_factory()() as db:
         characters = []
@@ -1066,7 +1113,7 @@ async def _stage_rewards(battle: RaidBattle, alive_char_ids: list[int]) -> dict[
                 characters.append(character)
         mob_level = battle.rift_level if battle.is_rift else raid_bosses.BOSS_LEVEL
         rewards = await raid_combat_service.reward_mob_kill(
-            db, characters, mob_level, battle.rng, _loot_mult(battle), _xp_mobs(battle),
+            db, characters, mob_level, battle.rng, reward.loot_mult, reward.xp_mobs,
         )
         for r in rewards:
             p = battle.participants.get(r.character_id)
@@ -1083,7 +1130,7 @@ async def _stage_rewards(battle: RaidBattle, alive_char_ids: list[int]) -> dict[
             if battle.is_rift:
                 gold_owner = next((c for c in characters if c.id == r.character_id), None)
                 if gold_owner is not None:
-                    lines.append(await _rift_gold(db, battle, gold_owner))
+                    lines.append(await _rift_gold(db, battle, gold_owner, reward.stage))
             if r.raid_key_dropped:
                 lines.append(raid_key_texts.raid_key_drop_line())
             if r.group_kick is not None and r.group_kick.kicked_character_id == r.character_id:
@@ -1101,7 +1148,7 @@ async def _stage_rewards(battle: RaidBattle, alive_char_ids: list[int]) -> dict[
                 await stats_window.notify_levelup(p.peer_id, r.levels_gained, r.new_level)
         for character in characters:
             await quest_service.record_kill(db, character)
-        if battle.stage == 3 and not battle.is_rift:
+        if reward.stage == 3 and not battle.is_rift:
             # Хирург и Генерал - «выше уровнем» для испытаний (см.
             # SURGEON_TRIAL_LEVEL). Засчитывается всем, кто в рейде:
             # победа общая, как и рейд.
@@ -1260,14 +1307,14 @@ async def _grant_stage_clear_bonus(battle: RaidBattle) -> None:
             pass
 
 
-async def _rift_gold(db, battle: RaidBattle, character: Character) -> str:
+async def _rift_gold(db, battle: RaidBattle, character: Character, stage: int) -> str:
     """Золото разлома за этап - в «мобах» кольца, как у событий."""
     from services import guild_service, scene_event_service, wallet_service
 
-    if battle.stage == battle.final_stage:
+    if stage == battle.final_stage:
         mobs = rfc.STAGE_GOLD_MOBS[-1]
     else:
-        mobs = rfc.STAGE_GOLD_MOBS[battle.stage - 1]
+        mobs = rfc.STAGE_GOLD_MOBS[stage - 1]
     amount = scene_event_service.gold_amount(character, mobs)
     await wallet_service.deposit(db, character.id, "farm", amount)
     return f"💰 +{guild_service.gold_label(character, amount)}"
@@ -1328,6 +1375,7 @@ async def _grant_blood_chests(battle: RaidBattle) -> None:
 
 
 async def _finish_victory(session_id: int, battle: RaidBattle) -> None:
+    await _grant_pending_rewards(battle)
     if battle.is_rift:
         await _grant_rift_legendaries(battle)
         if getattr(battle, "rift_blood", False):
