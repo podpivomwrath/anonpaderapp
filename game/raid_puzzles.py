@@ -255,6 +255,8 @@ class Candles(Puzzle):
 # --- Руны замка -------------------------------------------------------------------
 
 _RUNES = ("ᚠ", "ᚢ", "ᚦ", "ᚨ", "ᚱ", "ᚲ")
+#: Пустая скобка (2026-10-18): широкие пробелы, чтобы по ширине была как со значком.
+_EMPTY = "  "
 ERASE = "erase"
 
 
@@ -262,10 +264,9 @@ class Runes(Puzzle):
     kind = RUNES
     title = "🔐 Руны замка"
     rules = (
-        f"Замок загадал {ac.RUNE_CODE_LEN} разные руны. Набирай по одной. После каждой попытки: "
-        f"✅ - руна на месте, 🔸 - руна есть, но не там, ✖ - ни одной не угадал. Значки - только счёт, "
-        f"не по порядку: ✅🔸🔸 значит одна руна на месте, но не сказано какая. "
-        f"Попыток {ac.RUNE_ATTEMPTS}, потом код меняется."
+        f"Замок загадал {ac.RUNE_CODE_LEN} разные руны. Набирай по одной. После каждой попытки "
+        f"у каждой руны своя скобка: [✅] - руна на месте, [🔸] - руна есть, но не здесь, "
+        f"[{_EMPTY}] - такой руны нет. Попыток {ac.RUNE_ATTEMPTS}, потом код меняется."
     )
 
     def __init__(self, rng: random.Random) -> None:
@@ -298,6 +299,15 @@ class Runes(Puzzle):
         present = sum(1 for g in guess if g in code) - exact
         return exact, present
 
+    @staticmethod
+    def marks(code: list[str], guess: list[str]) -> str:
+        """Значок у каждой руны, по местам (2026-10-18, решение владельца):
+        раньше был только счёт ✅🔸🔸, и игроки читали его как места."""
+        return " ".join(
+            f"[{'✅' if g == c else '🔸' if g in code else _EMPTY}]"
+            for g, c in zip(guess, code, strict=True)
+        )
+
     def press(self, value: str) -> str:
         if self.solved:
             return ""
@@ -310,8 +320,7 @@ class Runes(Puzzle):
         if len(self.typed) < ac.RUNE_CODE_LEN:
             return ""
         exact, present = self.score(self.code, self.typed)
-        marks = "✅" * exact + "🔸" * present or "✖"
-        self.history.append(f"{' '.join(self.typed)}  {marks}")
+        self.history.append(f"{' '.join(self.typed)}  {self.marks(self.code, self.typed)}")
         self.typed = []
         self.attempts -= 1
         if exact == ac.RUNE_CODE_LEN:
