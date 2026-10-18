@@ -2002,18 +2002,25 @@ async def on_mass_battle_finished(session_id: int, result: TickResult) -> None:
     )
     shielded = _grant_draw_shield(battle, survivor_ids) if result.draw else []
     for cid, participant in battle.participants.items():
-        if result.draw:
-            if cid in survivor_ids:
-                pos = positions.get(cid, (0, 0))
-                keyboard = kb.movement_keyboard(
-                    *pos, participant.peer_id, has_mount=has_mount_by_cid.get(cid, False)
-                )
-            else:
-                keyboard = kb.waiting_keyboard()
+        if result.draw and cid in dead_ids:
+            # Павший до конца боя умер по-настоящему (2026-10-18, баг-репорт:
+            # ему же приходило «Ничья. Списки остались нетронутыми»).
             await _bot_api.messages.send(
-                peer_id=participant.peer_id, random_id=0, keyboard=keyboard,
-                message=f"{draw_text}\n\n{DRAW_SHIELD_LINE}" if cid in shielded else draw_text,
+                peer_id=participant.peer_id, random_id=0, keyboard=kb.waiting_keyboard(),
+                message="☠ Тебя одолели в бою. Остальные разошлись вничью, но для тебя бой кончился раньше."
+                + ("\n\n" + "\n".join(pk_lines[cid]) if pk_lines.get(cid) else ""),
             )
+        elif result.draw:
+            pos = positions.get(cid, (0, 0))
+            keyboard = kb.movement_keyboard(*pos, participant.peer_id, has_mount=has_mount_by_cid.get(cid, False))
+            text = draw_text if not dead_ids else (
+                "🤝 Ничья: выжившие расходятся, но павшие в этом бою ушли во тьму."
+            )
+            if transfer_lines.get(cid):
+                text += "\n\n" + "\n".join(transfer_lines[cid])
+            if cid in shielded:
+                text += f"\n\n{DRAW_SHIELD_LINE}"
+            await _bot_api.messages.send(peer_id=participant.peer_id, random_id=0, keyboard=keyboard, message=text)
         elif cid in survivor_ids:
             text = "🏆 Бой окончен - твоя сторона побеждает!"
             lines = transfer_lines.get(cid, [])

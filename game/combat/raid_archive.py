@@ -60,9 +60,16 @@ def _skill_name(skill_id: str) -> str:
 class ArchivistAI:
     def __init__(self) -> None:
         self.turn = 0
+        #: Ластик поднят - стираем в начале своего действия, ДО удара
+        #: (2026-10-18, баг-репорт: он бил в щит, а стирал уже после).
+        self.erase_now = False
+        self.erased: int | None = None
 
     def __call__(self, boss: CombatantState, session: CombatSessionState, rng: random.Random) -> list[PendingHit]:
         self.turn += 1
+        if self.erase_now:
+            self.erase_now = False
+            self.erased = _erase_effects(session)
         if self.turn % ac.STORM_EVERY == 0:
             return [
                 compute_hit(boss, t, rng, label="Буря страниц", multiplier=ac.STORM_MULT, is_ability=True)
@@ -126,15 +133,18 @@ class ArchiveStage:
         if self.eraser_up:
             self.eraser_up = False
             self._erase(session, out)
+        elif self.ai.erased is not None:
+            self._erase_line(self.ai.erased, out)
+            self.ai.erased = None
 
         if self.ticks % ac.QUOTE_EVERY == 0:
             self.quote_open = True
             out.lines.append("⚠️ Архивариус раскрывает книгу на чистой странице.")
             self._hint("quote", "Сильнейший удар по нему в этот ход он запишет - и вернёт.", out)
         elif self.ticks % ac.ERASER_EVERY == ac.ERASER_OFFSET:
-            self.eraser_up = True
+            self.ai.erase_now = True
             out.lines.append("⚠️ Архивариус берёт ластик.")
-            self._hint("eraser", "После этого хода он сотрёт с вас щиты и усиления.", out)
+            self._hint("eraser", "В следующий ход он первым делом, до удара, сотрёт с вас щиты и усиления.", out)
 
         if boss.current_hp <= boss.max_hp * ac.LAST_CHAPTER_HP:
             self._last_chapter(session, boss, rng, out)
@@ -218,11 +228,10 @@ class ArchiveStage:
     # --- Ластик ---
 
     def _erase(self, session, out: StageTick) -> None:
-        erased = 0
-        for player in _players(session):
-            before = len(player.effects)
-            player.effects = [e for e in player.effects if e.kind not in _ERASABLE]
-            erased += before - len(player.effects)
+        self._erase_line(_erase_effects(session), out)
+
+    @staticmethod
+    def _erase_line(erased: int, out: StageTick) -> None:
         out.lines.append(
             f"🧽 Ластик проходит по вам: стёрто усилений - {erased}." if erased
             else "🧽 Ластик проходит впустую - стирать было нечего."
@@ -247,6 +256,15 @@ class ArchiveStage:
             drawn.append(f"{player.name} - {_PAGE_WORD[page]}")
         if drawn:
             out.lines.append("📜 " + ", ".join(drawn))
+
+
+def _erase_effects(session) -> int:
+    erased = 0
+    for player in _players(session):
+        before = len(player.effects)
+        player.effects = [e for e in player.effects if e.kind not in _ERASABLE]
+        erased += before - len(player.effects)
+    return erased
 
 
 def _skills_of(player: CombatantState) -> list[str]:

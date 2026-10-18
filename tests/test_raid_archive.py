@@ -301,6 +301,21 @@ def test_eraser_strips_buffs_and_shields() -> None:
     assert EffectKind.WEAKEN in kinds  # ослабления он не трогает
 
 
+def test_eraser_wipes_shield_before_the_boss_hits() -> None:
+    """2026-10-18, баг-репорт: Архивариус бил в щит и только потом стирал его."""
+    state, stage, boss = _fight(players=1)
+    player = state.combatants[1]
+    player.apply_effect(EffectKind.SHIELD_POOL, 10**6, 3, 1)
+    hp = player.current_hp
+    stage.ai.erase_now = True
+    stage.ai.turn = 0  # не «Буря страниц» - обычный удар
+    result = _tick(state, {})
+    out = stage.after_tick(state, result, random.Random(1))
+    assert player.current_hp < hp, "щит принял удар, хотя ластик должен был стереть его раньше"
+    assert not player.effects_of(EffectKind.SHIELD_POOL)
+    assert any("Ластик проходит" in line for line in out.lines)
+
+
 def test_quote_and_eraser_are_announced_a_turn_ahead() -> None:
     state, stage, boss = _fight()
     seen = []
