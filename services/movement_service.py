@@ -9,7 +9,7 @@ from datetime import datetime, timedelta, timezone
 from game.world import grid
 from game.world import world_config as wc
 from models import Character
-from services import crown_service, vitals_service
+from services import crown_service, pvp_shield, vitals_service
 
 
 def start_travel(
@@ -66,4 +66,5 @@ def resolve_arrival(character: Character, now: datetime | None = None) -> bool:
     character.travel_target_y = None
     character.travel_arrives_at = None
     vitals_service.heal_in_city(character)
+    pvp_shield.on_moved(character)
     return True

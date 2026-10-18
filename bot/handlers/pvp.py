@@ -18,7 +18,6 @@
 """
 
 import random
-import time
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 
@@ -78,7 +77,7 @@ from game.economy import fishing as game_fishing
 from game.economy import premium_config as pc
 from game.world import grid
 from models import Character, CharacterStats
-from services import pk_service, pts_service, trial_service
+from services import pk_service, pts_service, pvp_shield, trial_service
 from services import (
     admin_service,
     daily_service,
@@ -150,21 +149,9 @@ class Battle:
 
 _battles: dict[int, Battle] = {}
 _peer_battle: dict[int, int] = {}
-#: Щит после ничьей (2026-10-17): character_id -> до какого time.time() на него
-#: нельзя напасть. В памяти: две минуты рестарт переживать не обязаны.
-_draw_shield: dict[int, float] = {}
-
-
 def draw_shield_left(character_id: int) -> int:
-    """Сколько секунд ещё действует щит после ничьей (0 - нет щита)."""
-    until = _draw_shield.get(character_id)
-    if until is None:
-        return 0
-    left = until - time.time()
-    if left <= 0:
-        _draw_shield.pop(character_id, None)
-        return 0
-    return int(left) + 1
+    """Сколько секунд ещё действует щит от нападения (0 - нет щита)."""
+    return pvp_shield.left(character_id)[0]
 
 
 def _grant_draw_shield(battle: "Battle", survivors) -> list[int]:
@@ -173,7 +160,7 @@ def _grant_draw_shield(battle: "Battle", survivors) -> list[int]:
         return []
     shielded = [cid for cid in survivors if battle.side_of.get(cid) == 1]
     for cid in shielded:
-        _draw_shield[cid] = time.time() + bc.PVP_DRAW_SHIELD_SECONDS
+        pvp_shield.grant(cid, pvp_shield.DRAW, bc.PVP_DRAW_SHIELD_SECONDS)
     return shielded
 
 
@@ -443,8 +430,9 @@ async def _busy_marks(db, characters: list[Character]) -> dict[int, str]:
 
     marks = {}
     for c in characters:
-        if left := draw_shield_left(c.id):
-            marks[c.id] = f" · 🛡 после ничьей, напасть нельзя ещё {left} сек."
+        left, why = pvp_shield.left(c.id)
+        if left:
+            marks[c.id] = f" · 🛡 {why}, напасть нельзя ещё {left} сек."
             continue
         peer = await onboarding_svc.vk_id_for_character(db, c.id)
         if peer is None:
@@ -711,9 +699,11 @@ async def attack_command(message: Message, target: str) -> None:
                 await message.answer("Здесь нет такой цели.")
             return
 
-        if victim is not None and (left := draw_shield_left(victim.id)):
-            await message.answer(f"🛡 {victim.name} под защитой после ничьей - ещё {left} сек.")
-            return
+        if victim is not None:
+            left, why = pvp_shield.left(victim.id)
+            if left:
+                await message.answer(f"🛡 {victim.name} под защитой {why} - ещё {left} сек.")
+                return
 
         if safe_craft:
             # Мирная клетка (озеро, рудник): нападать можно только на цель
@@ -728,8 +718,8 @@ async def attack_command(message: Message, target: str) -> None:
             await message.answer(GROUPMATE_NO_PVP_TEXT)
             return
 
-        # Напал сам - свой щит после ничьей теряешь: прячась за ним, не нападают.
-        _draw_shield.pop(character.id, None)
+        # Напал сам - свой щит теряешь: прячась за ним, не нападают.
+        pvp_shield.drop(character.id)
         if battle_entry is not None:
             battle_id, battle = battle_entry
             # Согруппник уже в бою - сразу на его сторону, без вопроса

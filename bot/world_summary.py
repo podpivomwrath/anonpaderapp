@@ -88,6 +88,12 @@ def location_summary(
         raid_texts.MONOLITH_HINT_LINE + "\n"
         if (x, y) == raid_config.MONOLITH_COORDS else ""
     )
+    # Щит от снайпинга (2026-10-18): игрок видит, сколько его не тронут.
+    from services import pvp_shield
+
+    shield_left, shield_why = pvp_shield.left(getattr(character, "id", None))
+    if shield_left:
+        monolith_block += f"🛡 Защита {shield_why}: на тебя не нападут ещё {shield_left} сек.\n"
     # Патч 58: озеро — как Монолит: кнопка приходит только при ВХОДЕ на
     # клетку, поэтому у воды обязана быть вторая дверь командой словом.
     # Патч 59: рудник — то же, что озеро. Запас руды показывается ДО спуска:

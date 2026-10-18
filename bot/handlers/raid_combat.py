@@ -53,6 +53,7 @@ from services import (
     encounter_service,
     item_service,
     mount_service,
+    pvp_shield,
     quest_service,
     raid_combat_service,
     trial_service,
@@ -1417,6 +1418,8 @@ async def _cleanup_and_return(session_id: int, battle: RaidBattle, text: str, *,
                 survived = True
             if survived:
                 has_mount_by_cid[cid] = await mount_service.has_any_mount(db, cid)
+                # Щит от снайпинга на выходе (2026-10-18): успеть уйти.
+                pvp_shield.grant(cid, pvp_shield.RIFT if battle.is_rift else pvp_shield.RAID)
             else:
                 defeats[cid] = (await encounter_service.resolve_defeat(db, character), character.respawn_at)
         from services import raid_service
@@ -1445,7 +1448,7 @@ async def _cleanup_and_return(session_id: int, battle: RaidBattle, text: str, *,
                 if cid in raised else ""
             )
             await _bot_api.messages.send(
-                peer_id=p.peer_id, message=text + raised_line, random_id=0,
+                peer_id=p.peer_id, message=text + raised_line + SAFE_EXIT_LINE, random_id=0,
                 keyboard=movement_keyboard(*battle.home, p.peer_id, has_mount=has_mount_by_cid.get(cid, False)),
             )
             # Сводка клетки (0; 0), как после любого боя: без неё игрок
@@ -1464,6 +1467,9 @@ async def _cleanup_and_return(session_id: int, battle: RaidBattle, text: str, *,
                 peer_id=p.peer_id, message=text, random_id=0,
                 keyboard=movement_keyboard(*battle.home, p.peer_id, has_mount=False),
             )
+
+
+SAFE_EXIT_LINE = f"\n\n🛡 {bc.PVP_SAFE_SECONDS // 60} мин. на тебя нельзя нападать - успей уйти. Нападёшь сам - защита пропадёт."
 
 
 async def _tell_others(battle, cid: int, text: str) -> None:
