@@ -583,6 +583,7 @@ class Arrival:
     event: str | None = None
     order_crates: int = 0
     toll: int = 0
+    no_trade_xp: bool = False
 
     def text(self) -> str:
         lines = [f"🐂 Повозка №{self.slot} фирмы «{self.firm_name}» прибыла в {city_title(self.to_city)}."]
@@ -598,6 +599,8 @@ class Arrival:
             lines.append(f"💥 Обшивка выбита, рассыпалось: {lost_text(self.lost)}.")
         if self.chests:
             lines.append(f"🎁 В ящиках нашёлся Пепельный ларец ×{self.chests}!")
+        if self.crates and self.no_trade_xp:
+            lines.append("📉 Рейс без прибыли - опыта торговли нет.")
         if self.level_up:
             lines.append(f"📈 Уровень торговли: {self.level_up}!")
         if self.char_levelup is not None and getattr(self.char_levelup, "xp_awarded", 0):
@@ -641,7 +644,7 @@ async def arrive(
                 paid.pop(good_id, None)
         cart.cargo, cart.paid = cargo, paid
 
-    revenue = cost = raw = 0
+    revenue = cost = raw = trade_xp = 0
     level = firm.trade_level
     for good_id, count in (cart.cargo or {}).items():
         good = tc.GOODS_BY_ID[good_id]
@@ -664,7 +667,7 @@ async def arrive(
             row.pressure += tc.SATURATION_PER_CRATE
         cost += (cart.paid or {}).get(good_id, 0)
         out.crates += count
-        firm.trade_xp += tc.XP_PER_CRATE[good.tier] * count
+        trade_xp += tc.XP_PER_CRATE[good.tier] * count
         raw += fc.POINTS_PER_CRATE[good.tier] * count
         for _ in range(count):
             if rng.random() < tc.CHEST_CHANCE_PER_CRATE[good.tier]:
@@ -677,6 +680,12 @@ async def arrive(
     if revenue:
         await wallet_service.deposit(db, character.id, "farm", revenue)
     firm.profit_total += max(out.profit, 0)
+    # Опыт торговли - только за выгодный рейс (2026-10-18, решение владельца):
+    # гонять ящики в убыток ради уровня торговли нельзя.
+    if out.profit > 0:
+        firm.trade_xp += trade_xp
+    else:
+        out.no_trade_xp = True
     while firm.trade_xp >= tc.xp_to_next(firm.trade_level):
         firm.trade_xp -= tc.xp_to_next(firm.trade_level)
         firm.trade_level += 1

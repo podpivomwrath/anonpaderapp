@@ -123,6 +123,18 @@ async def test_dispatch_and_arrival(db_session, make_character) -> None:
     assert trips[0].crates == 8 and trips[0].to_city == "docks"
 
 
+async def test_loss_trip_gives_no_trade_xp(db_session, make_character) -> None:
+    """2026-10-18: рейс в убыток не даёт опыта торговли."""
+    c, firm = await firm_of(db_session, make_character)
+    sent = await trade_service.dispatch(
+        db_session, c, 1, "docks", "short", {"ridge_slate": 8}, NoLuck(), NOW,
+    )
+    sent.cart.paid = {"ridge_slate": 10**6}  # заплачено больше, чем выручит
+    a = (await trade_service.tick(db_session, NoLuck(), sent.cart.arrives_at + timedelta(seconds=1)))[0]
+    assert a.profit < 0 and firm.trade_xp == 0
+    assert "опыта торговли нет" in a.text()
+
+
 async def test_dispatch_rules(db_session, make_character) -> None:
     c, _ = await firm_of(db_session, make_character)
     with pytest.raises(trade_service.TradeError, match="не производят"):
