@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Button, Div, Group, Header, Placeholder, Spinner } from '@vkontakte/vkui';
 import { IN_VK, buyShop, buyShopRename, createPayment, getPayments, getShop } from '../api.js';
 
@@ -188,6 +188,14 @@ function GemPacks() {
   const [data, setData] = useState(null);
   const [busy, setBusy] = useState(null);
   const [error, setError] = useState(null);
+  // Ссылка на оплату кнопкой (2026-10-18): в мобильном VK (iOS и Android)
+  // window.open после ожидания ответа сервера молча блокируется - нажатие
+  // по настоящей ссылке телефон не блокирует.
+  const [payLink, setPayLink] = useState(null);
+  const payRef = useRef(null);
+  useEffect(() => {
+    if (payLink) payRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }, [payLink]);
   const returned = !IN_VK && new URLSearchParams(window.location.search).has('paid');
 
   useEffect(() => {
@@ -199,10 +207,13 @@ function GemPacks() {
   const buy = async (packId) => {
     setBusy(packId);
     setError(null);
+    setPayLink(null);
     try {
       const { url } = await createPayment(packId);
-      if (IN_VK) window.open(url, '_blank');
-      else window.location.href = url;
+      if (IN_VK) {
+        setPayLink({ url, pack: data.packs.find((p) => p.id === packId) });
+        try { window.open(url, '_blank'); } catch { /* откроют кнопкой */ }
+      } else window.location.href = url;
     } catch (e) {
       setError(e.message || 'Не удалось начать оплату.');
     } finally {
@@ -217,6 +228,14 @@ function GemPacks() {
         {returned && <p className="shop-notice">Оплата обрабатывается - как только ЮKassa её подтвердит, бот напишет в сообщения.</p>}
         {!data.enabled && <p className="craft-hint">Покупка за рубли скоро откроется.</p>}
         {error && <p style={{ color: 'var(--vkui--color_text_negative)' }}>{error}</p>}
+        {payLink && (
+          <p className="shop-notice" ref={payRef}>
+            Если страница оплаты не открылась сама:{' '}
+            <a href={payLink.url} target="_blank" rel="noopener noreferrer" onClick={() => setPayLink(null)}>
+              <b>перейти к оплате{payLink.pack ? ` · ${money(payLink.pack.rub)} ₽` : ''}</b>
+            </a>
+          </p>
+        )}
       </Div>
       <div className="shop-grid">
         {data.packs.map((p) => (
