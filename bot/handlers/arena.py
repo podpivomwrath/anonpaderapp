@@ -255,6 +255,10 @@ async def code_input(message: Message) -> None:
 async def _start(db, first, first_peer: int, second, second_peer: int) -> None:
     from bot.handlers import pvp
 
+    # Вошли в бой - ни кодов, ни очередей за обоими не остаётся: код
+    # одноразовый, и вводить его после начала боя бессмысленно.
+    _leave_all(first_peer)
+    _leave_all(second_peer)
     await pvp.start_arena_duel(db, first, first_peer, second, second_peer)
 
 

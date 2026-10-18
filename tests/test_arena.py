@@ -66,6 +66,24 @@ def test_arena_finish_skips_death_and_sends_both_back(monkeypatch):
     assert all("Ничего не потеряно" in t for t in texts.values())
 
 
+def test_code_is_removed_when_fight_starts(monkeypatch):
+    started = []
+
+    async def fake_start(db, a, ap, b, bp):
+        started.append((ap, bp))
+
+    monkeypatch.setattr(pvp, "start_arena_duel", fake_start)
+    arena._codes["4321"] = (8, 808)
+    arena._random_queue.append((9, 909))
+    try:
+        asyncio.run(arena._start(None, object(), 808, object(), 909))
+        assert started == [(808, 909)]
+        assert "4321" not in arena._codes and not arena.is_waiting(808) and not arena.is_waiting(909)
+    finally:
+        arena._codes.clear()
+        arena._random_queue.clear()
+
+
 def test_waiting_state_and_cancel():
     arena._random_queue.append((5, 505))
     arena._codes["1234"] = (6, 606)
