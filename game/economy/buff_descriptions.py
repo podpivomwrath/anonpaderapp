@@ -610,8 +610,10 @@ def _describe_dark_mystic_circle_of_darkness(b: BuffDef) -> str:
 
 def _describe_dark_mystic_echo(b: BuffDef) -> str:
     return (
-        "Лечение, которое не влезло (цель уже полностью здорова), не пропадает: оно становится щитом "
-        f"для союзника с самым низким здоровьем на {_turns(bc.DARK_MYSTIC_ECHO_DURATION)}. {_ALLIES_ONLY}"
+        f"{round(bc.DARK_MYSTIC_ECHO_PCT * 100)}% лечения, которое не влезло (цель уже полностью здорова), "
+        f"становится щитом для союзника с самым низким здоровьем на {_turns(bc.DARK_MYSTIC_ECHO_DURATION)}, "
+        f"не больше {round(bc.DARK_MYSTIC_ECHO_CAP_PCT * 100)}% его здоровья. Несбитый остаток сгорает, "
+        f"в лечение не превращается. {_ALLIES_ONLY}"
     )
 
 

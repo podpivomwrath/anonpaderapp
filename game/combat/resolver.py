@@ -538,8 +538,7 @@ def resolve_tick(
                 continue
             ally = min(candidates, key=lambda c: c.current_hp / c.max_hp)
             amount = round(overflow * echo)
-            if amount <= 0:
-                continue
+            cap = round(ally.max_hp * bc.DARK_MYSTIC_ECHO_CAP_PCT)
             # Свой щит, отдельно от Оберега (ECHO_TAG): раньше отголосок затирал
             # Оберег, а потом новый Оберег - накопленный отголосок. Новый
             # отголосок прибавляется к уже висящему.
@@ -548,6 +547,10 @@ def resolve_tick(
                  if e.source_id == source.id and getattr(e, "tag", None) == ECHO_TAG),
                 None,
             )
+            # Не выше потолка (2026-10-18): прибавляем только до cap.
+            amount = min(amount, cap - round(current.value if current is not None else 0))
+            if amount <= 0:
+                continue
             if current is not None:
                 current.value += amount
                 current.remaining_ticks = max(current.remaining_ticks, bc.DARK_MYSTIC_ECHO_DURATION)
@@ -654,6 +657,11 @@ def resolve_tick(
         # Щит (Второе сердце, Оберег; патч 16) не пробит за отведённые ходы - остаток лечит
         for effect in combatant.effects_of(EffectKind.SHIELD_POOL):
             if effect.remaining_ticks <= 0 and effect.value > 0 and combatant.alive:
+                if getattr(effect, "tag", None) == ECHO_TAG:
+                    # Щит из перелечивания не лечит снова (2026-10-18): иначе
+                    # лечение -> щит -> лечение ходили по кругу.
+                    effect.value = 0
+                    continue
                 heal = round(effect.value)
                 before_hp = combatant.current_hp
                 combatant.current_hp = min(combatant.current_hp + heal, combatant.max_hp)

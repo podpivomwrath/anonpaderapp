@@ -268,6 +268,30 @@ def test_echo_in_pair_shields_the_mystic_and_adds_to_ward() -> None:
     assert ally.effect_total(EffectKind.SHIELD_POOL) >= 243
 
 
+def test_echo_shield_is_capped_and_burns_out_without_heal() -> None:
+    """2026-10-18: щит отголоска не выше 25% макс. HP союзника и по
+    истечении сгорает, а не лечит (цикл лечение -> щит -> лечение)."""
+    from game.combat.session import ECHO_TAG
+
+    healer = mystic(heal_overflow_shield=bc.DARK_MYSTIC_ECHO_PCT)
+    healer.current_hp = healer.max_hp // 2
+    ally = combatant(3, side=0)
+    enemy = combatant(2, side=1, agility=0, vitality=500)
+    healer.apply_effect(EffectKind.SHIELD_POOL, healer.max_hp, 2, healer.id, tag=ECHO_TAG)
+    session = make_session(healer, ally, enemy)
+    resolve_tick(session, {1: skill("dark_mystic_circle")}, NoCritRng())
+    echo = [e for e in healer.effects_of(EffectKind.SHIELD_POOL) if getattr(e, "tag", None) == ECHO_TAG]
+    assert echo and echo[0].value <= healer.max_hp, "отголосок прибавился сверх уже висящего"
+
+    wounded = mystic()
+    wounded.current_hp = wounded.max_hp // 2
+    wounded.apply_effect(EffectKind.SHIELD_POOL, 300, 1, wounded.id, tag=ECHO_TAG)
+    hp = wounded.current_hp
+    resolve_tick(make_session(wounded, combatant(2, side=1, agility=0, vitality=500)), {}, NoCritRng())
+    assert wounded.current_hp <= hp, "остаток отголоска превратился в лечение"
+    assert bc.DARK_MYSTIC_ECHO_CAP_PCT == 0.25 and bc.DARK_MYSTIC_ECHO_PCT == 0.5
+
+
 def test_new_ward_does_not_erase_echo_shield() -> None:
     """2026-10-17, игрок: «Оберег перекрывает щит». Отголосок лежал в том же
     эффекте, что Оберег, и новый Оберег затирал накопленный отголосок."""

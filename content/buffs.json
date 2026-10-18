@@ -81,5 +81,5 @@
   {"id": "dark_mystic_steadfast_ward", "name": "Стойкий оберег", "subclass": "dark_mystic", "category": "defense", "description": "", "stat_modifiers": {"ward_absorb_bonus": 0.2}, "duration_ticks": 1, "implemented": true},
   {"id": "dark_mystic_shared_pact", "name": "Разделённый пакт", "subclass": "dark_mystic", "category": "group_support", "description": "", "stat_modifiers": {"shared_pact_pct": 0.3}, "duration_ticks": 1, "implemented": true},
   {"id": "dark_mystic_circle_of_darkness", "name": "Круг тьмы", "subclass": "dark_mystic", "category": "group_support", "description": "", "stat_modifiers": {"circle_interval": 5.0, "circle_pct": 0.4}, "duration_ticks": 1, "implemented": true},
-  {"id": "dark_mystic_echo", "name": "Отголосок", "subclass": "dark_mystic", "category": "group_support", "description": "", "stat_modifiers": {"heal_overflow_shield": 1.0}, "duration_ticks": 1, "implemented": true}
+  {"id": "dark_mystic_echo", "name": "Отголосок", "subclass": "dark_mystic", "category": "group_support", "description": "", "stat_modifiers": {"heal_overflow_shield": 0.5}, "duration_ticks": 1, "implemented": true}
 ]
