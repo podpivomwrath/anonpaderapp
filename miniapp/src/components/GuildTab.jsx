@@ -21,6 +21,7 @@ const SECTIONS = [
   { id: 'lands', label: 'Земли' },
   { id: 'tree', label: 'Древо' },
   { id: 'war', label: 'Осады' },
+  { id: 'directory', label: 'Гильдии' },
 ];
 
 const money = (v) => Number(v ?? 0).toLocaleString('ru-RU');
@@ -38,6 +39,15 @@ function timeLeft(iso) {
 
 function when(iso) {
   return iso ? new Date(iso).toLocaleString('ru-RU', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : '';
+}
+
+// Ник согильдейца ведёт на его страницу VK; клик не раскрывает строку.
+function PlayerLink({ id, name }) {
+  if (!id) return name;
+  return (
+    <a href={`https://vk.com/id${id}`} target="_blank" rel="noopener noreferrer"
+      onClick={(e) => e.stopPropagation()}>{name}</a>
+  );
 }
 
 function Bar({ value, max }) {
@@ -78,15 +88,52 @@ const DIRECTORY_SORTS = [
   { id: 'pve', label: 'PvE', key: (g) => g.pve },
   { id: 'pvp', label: 'PvP', key: (g) => g.pvp },
   { id: 'level', label: 'Уровень', key: (g) => g.level },
+  { id: 'new', label: 'Новые', key: (g) => (g.created ? new Date(g.created).getTime() : 0) },
 ];
+
+// Список гильдий: без гильдии - с кнопкой «Проситься», в гильдии - только
+// посмотреть топы и новые (2026-10-18), своя отмечена.
+function Directory({ directory, ownId, run, busy }) {
+  const [sort, setSort] = useState('members');
+  const key = DIRECTORY_SORTS.find((s) => s.id === sort).key;
+  const sorted = [...directory].sort((a, b) => key(b) - key(a) || b.fame_total - a.fame_total);
+  return (
+    <Group header={<Header>🏆 Топ гильдий</Header>}>
+      <Tabs className="guild-tabs">
+        {DIRECTORY_SORTS.map((s) => (
+          <TabsItem key={s.id} selected={sort === s.id} onClick={() => setSort(s.id)}>{s.label}</TabsItem>
+        ))}
+      </Tabs>
+      {directory.length === 0 && <Div style={{ opacity: 0.8 }}>Гильдий пока нет - стань первым.</Div>}
+      {sorted.map((g, i) => (
+        <SimpleCell
+          key={g.id}
+          multiline
+          subtitle={
+            `${g.level} ур. · 👥 ${g.members}/${g.cap} · ⚔️ PvE ${money(g.pve)} · 🩸 PvP ${money(g.pvp)}`
+            + (sort === 'new' && g.created ? ` · основана ${new Date(g.created).toLocaleDateString('ru-RU')}` : '')
+          }
+          after={ownId == null ? (
+            <Button size="s" mode="secondary" disabled={busy || g.members >= g.cap}
+              onClick={() => run('apply', { guild_id: g.id }, 'Заявка отправлена.')}>
+              Проситься
+            </Button>
+          ) : (g.id === ownId ? 'ваша' : null)}
+        >
+          {i + 1}. {g.crown ? '👑 ' : ''}[{g.tag}] {g.name}
+        </SimpleCell>
+      ))}
+      <Div className="craft-hint">
+        PvE - сколько мобов убили все участники вместе, PvP - сколько побед у всех вместе.
+      </Div>
+    </Group>
+  );
+}
 
 function NoGuild({ state, run, busy }) {
   const [name, setName] = useState('');
   const [tag, setTag] = useState('');
-  const [sort, setSort] = useState('members');
   const canFound = state.level >= state.found_min_level && state.gems >= state.found_cost;
-  const key = DIRECTORY_SORTS.find((s) => s.id === sort).key;
-  const sorted = [...state.directory].sort((a, b) => key(b) - key(a) || b.fame_total - a.fame_total);
   return (
     <>
       {state.rejoin_wait_hours > 0 && (
@@ -110,34 +157,7 @@ function NoGuild({ state, run, busy }) {
           ))}
         </Group>
       )}
-      <Group header={<Header>🏆 Топ гильдий</Header>}>
-        <Tabs className="guild-tabs">
-          {DIRECTORY_SORTS.map((s) => (
-            <TabsItem key={s.id} selected={sort === s.id} onClick={() => setSort(s.id)}>{s.label}</TabsItem>
-          ))}
-        </Tabs>
-        {state.directory.length === 0 && <Div style={{ opacity: 0.8 }}>Гильдий пока нет - стань первым.</Div>}
-        {sorted.map((g, i) => (
-          <SimpleCell
-            key={g.id}
-            multiline
-            subtitle={
-              `${g.level} ур. · 👥 ${g.members}/${g.cap} · ⚔️ PvE ${money(g.pve)} · 🩸 PvP ${money(g.pvp)}`
-            }
-            after={(
-              <Button size="s" mode="secondary" disabled={busy || g.members >= g.cap}
-                onClick={() => run('apply', { guild_id: g.id }, 'Заявка отправлена.')}>
-                Проситься
-              </Button>
-            )}
-          >
-            {i + 1}. {g.crown ? '👑 ' : ''}[{g.tag}] {g.name}
-          </SimpleCell>
-        ))}
-        <Div className="craft-hint">
-          PvE - сколько мобов убили все участники вместе, PvP - сколько побед у всех вместе.
-        </Div>
-      </Group>
+      <Directory directory={state.directory} run={run} busy={busy} />
       <Group header={<Header>Основать гильдию</Header>}>
         <Div className="guild-form">
           <p className="craft-hint">
@@ -288,7 +308,7 @@ function Members({ state, run, busy }) {
                 <Button size="s" disabled={busy} onClick={() => run('accept_application', { character_id: a.id }, 'Принят.')}>Принять</Button>
                 <Button size="s" mode="tertiary" disabled={busy} onClick={() => run('decline_application', { character_id: a.id })}>✕</Button>
               </span>
-            )}>{a.name}</SimpleCell>
+            )}><PlayerLink id={a.vk_id} name={a.name} /></SimpleCell>
           ))}
         </Group>
       )}
@@ -300,7 +320,7 @@ function Members({ state, run, busy }) {
               subtitle={`${m.rank_title} · ${m.level} ур. ${m.class || ''} · неделя ${money(m.week)}`}
               after={m.id === me.id ? 'ты' : (open === m.id ? '▴' : '▾')}
             >
-              {m.name}
+              <PlayerLink id={m.vk_id} name={m.name} />
             </SimpleCell>
             {open === m.id && m.id !== me.id && (
               <Div className="guild-member-actions">
@@ -888,6 +908,7 @@ export default function GuildTab() {
       {section === 'lands' && <Lands state={state} run={run} busy={busy} />}
       {section === 'tree' && <GuildTree onChanged={setState} />}
       {section === 'war' && <War state={state} run={run} busy={busy} />}
+      {section === 'directory' && <Directory directory={state.directory || []} ownId={state.guild.id} />}
     </>
   );
 }

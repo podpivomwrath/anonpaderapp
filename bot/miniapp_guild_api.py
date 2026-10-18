@@ -18,7 +18,7 @@ from bot.miniapp_auth import VK_USER_ID_KEY
 from game.economy import guild_config as gc
 from game.economy import mining
 from game.world import grid
-from models import Character, Guild, GuildCell
+from models import Character, Guild, GuildCell, User
 from services import (
     guild_boss_service,
     guild_quest_service,
@@ -103,13 +103,20 @@ async def _no_guild_state(db, character: Character) -> dict:
             for i, g in invites
         ],
         "join_min_level": gc.JOIN_MIN_LEVEL,
-        "directory": [
-            {"id": e.guild.id, "name": e.guild.name, "tag": e.guild.tag, "level": e.guild.level,
-             "members": e.members, "cap": gc.member_cap(e.guild.level), "pve": e.pve, "pvp": e.pvp,
-             "fame_total": e.guild.fame_total, "crown": guild_season_service.has_crown(e.guild)}
-            for e in directory
-        ],
+        "directory": _directory_payload(directory),
     }
+
+
+def _directory_payload(directory) -> list[dict]:
+    """Список гильдий - и для тех, кто без гильдии, и для своих (2026-10-18):
+    топы и новые гильдии смотрят все."""
+    return [
+        {"id": e.guild.id, "name": e.guild.name, "tag": e.guild.tag, "level": e.guild.level,
+         "members": e.members, "cap": gc.member_cap(e.guild.level), "pve": e.pve, "pvp": e.pvp,
+         "fame_total": e.guild.fame_total, "crown": guild_season_service.has_crown(e.guild),
+         "created": _iso(e.guild.created_at)}
+        for e in directory
+    ]
 
 
 async def _cell_payload(db, guild: Guild, cell: GuildCell, character: Character, gate_ids: set[int]) -> dict:
@@ -229,6 +236,10 @@ async def _state(db, character: Character) -> dict:
     member = await guild_service.membership(db, character.id)
     wallet = await wallet_service.get_wallet(db, character.id)
     rows = await guild_service.members(db, guild.id)
+    applications = await guild_service.applications_of(db, guild.id) if _perms(member)["applications"] else []
+    # Своим анонимность ни к чему (2026-10-18): ник в составе и в заявках ведёт
+    # на страницу VK.
+    vk_ids = await _vk_ids(db, [c for _m, c in rows] + [c for _i, c in applications])
     week = guild_service.week_start_msk()
     cells = await guild_territory_service.cells_of(db, guild.id)
     gate_ids = {c.id for c in await guild_territory_service.gate_targets(db, guild.id)}
@@ -292,7 +303,7 @@ async def _state(db, character: Character) -> dict:
         },
         "members": [
             {
-                "id": c.id, "name": c.name, "level": c.level,
+                "id": c.id, "name": c.name, "level": c.level, "vk_id": vk_ids.get(c.user_id),
                 # Подкласс, если выбран (2026-10-17): «Воин» у всех троих мало что говорил.
                 "class": naming.subclass_title(c.subclass) or naming.base_class_title(c.base_class),
                 "rank": m.rank, "rank_title": gc.RANK_TITLES[m.rank],
@@ -301,10 +312,11 @@ async def _state(db, character: Character) -> dict:
             for m, c in sorted(rows, key=lambda mc: (-gc.RANK_ORDER[mc[0].rank], mc[1].name))
         ],
         "applications": [
-            {"id": c.id, "name": c.name, "level": c.level}
-            for _i, c in await guild_service.applications_of(db, guild.id)
-        ] if _perms(member)["applications"] else [],
+            {"id": c.id, "name": c.name, "level": c.level, "vk_id": vk_ids.get(c.user_id)}
+            for _i, c in applications
+        ],
         "quests": await guild_quest_service.overview(db, character),
+        "directory": _directory_payload(await guild_service.directory(db)),
         "tops": await guild_quest_service.contribution_tops(db, guild.id),
         "warehouse": {
             "capacity": {"ore": cap.ore, "items": cap.items},
@@ -380,6 +392,16 @@ def _str(body: dict, key: str) -> str:
     return value.strip()
 
 
+async def _vk_ids(db, characters: list[Character]) -> dict[int, int]:
+    """user_id -> vk_id для ссылок на страницы игроков."""
+    from sqlalchemy import select
+
+    user_ids = {c.user_id for c in characters}
+    if not user_ids:
+        return {}
+    return dict((await db.execute(select(User.id, User.vk_id).where(User.id.in_(user_ids)))).all())
+
+
 async def _act(db, character: Character, vk_user_id: int, body: dict) -> list:
     """Выполняет действие. Возвращает отложенные уведомления [(peers|guild_id, text)]."""
     from bot.activity import blocked_reason
@@ -390,7 +412,7 @@ async def _act(db, character: Character, vk_user_id: int, body: dict) -> list:
         await guild_service.create(db, character, _str(body, "name"), _str(body, "tag"))
     elif action == "apply":
         guild = await guild_service.apply(db, character, _int(body, "guild_id"))
-        notes.append(("guild_officers", guild.id, f"📨 {character.name} ({character.level} ур.) просится в гильдию."))
+        notes.append(("guild_officers", guild.id, f"📨 [id{vk_user_id}|{character.name}] ({character.level} ур.) просится в гильдию."))
     elif action == "invite":
         target = await guild_service.invite(db, character, _str(body, "name"))
         guild = await guild_service.guild_of(db, character)
