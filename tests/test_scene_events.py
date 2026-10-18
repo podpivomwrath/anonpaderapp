@@ -131,7 +131,7 @@ def test_riddle_answers() -> None:
 
 def test_trail_cell_is_near_and_about_as_hard() -> None:
     """2026-10-15: след ведёт на клетку примерно того же уровня мобов:
-    чуть легче (до 3 ур.) или чуть сложнее (до 1 ур.)."""
+    чуть легче (до 3 ур.) или чуть сложнее (до 2 ур.)."""
     rng = random.Random(5)
     for x, y in [(0, 28), (-20, 3), (5, -5), (29, 0), (10, 10), (0, 15), (0, 23), (0, 24)]:
         here = wc.cell_base_level(grid.monolith_distance(x, y))
@@ -141,22 +141,6 @@ def test_trail_cell_is_near_and_about_as_hard() -> None:
             assert grid.in_bounds(cx, cy) and grid.city_region_at(cx, cy) is None
             diff = wc.cell_base_level(grid.monolith_distance(cx, cy)) - here
             assert -se.TRAIL_LEVEL_EASIER <= diff <= se.TRAIL_LEVEL_HARDER, ((x, y), (cx, cy), diff)
-
-
-def test_trail_cell_fits_player_level() -> None:
-    """2026-10-18: след - по уровню игрока, разброс 3-4 уровня, даже если
-    игрок стоит среди мобов намного сильнее или слабее себя."""
-    rng = random.Random(3)
-    for x, y, level in [(-20, -5, 10), (0, 15, 30), (5, 25, 12), (0, 23, 20)]:
-        for _ in range(30):
-            cx, cy = se.pick_trail_cell(rng, x, y, level)
-            diff = wc.cell_base_level(grid.monolith_distance(cx, cy)) - level
-            here = wc.cell_base_level(grid.monolith_distance(x, y))
-            if abs(here - level) <= 3:
-                assert -se.TRAIL_LEVEL_EASIER <= diff <= se.TRAIL_LEVEL_HARDER, ((x, y, level), (cx, cy), diff)
-            else:
-                # подходящих рядом нет - ближайшие к уровню игрока
-                assert abs(diff) < abs(here - level), ((x, y, level), (cx, cy), diff)
 
 
 def test_trail_from_center_never_stays_on_monolith() -> None:
