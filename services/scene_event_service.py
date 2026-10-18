@@ -421,7 +421,7 @@ async def finish_fight_effects(db: AsyncSession, character_id: int) -> list[str]
 async def create_trail(db: AsyncSession, character: Character, kind: str, rng: random.Random,
                        stage: int = 1) -> str | None:
     trail_def = scene_events.content().trails[kind]
-    cell = scene_events.pick_trail_cell(rng, character.pos_x, character.pos_y)
+    cell = scene_events.pick_trail_cell(rng, character.pos_x, character.pos_y, character.level)
     if cell is None:
         return None
     cells = grid.cells_between(character.pos_x, character.pos_y, *cell)

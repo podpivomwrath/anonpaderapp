@@ -348,27 +348,30 @@ def scaled_result(result: "SceneResult", mult: float) -> "SceneResult":
     })
 
 
-#: Насколько клетка следа может отличаться по уровню мобов от той, где
-#: игрок стоит (2026-10-15, решение владельца): примерно равная, чуть легче
-#: или чуть сложнее.
+#: Насколько клетка следа может отличаться по уровню мобов от уровня
+#: игрока: разброс 3-4 уровня (2026-10-18, решение владельца) - до 3 легче
+#: или на 1 сложнее. Раньше отсчёт шёл от клетки, где сработало событие, и
+#: игрок 10 ур., забежавший к мобам 20 ур., получал след туда же.
 TRAIL_LEVEL_EASIER = 3
-TRAIL_LEVEL_HARDER = 2
+TRAIL_LEVEL_HARDER = 1
 
 
 def _cell_level(x: int, y: int) -> int:
     return wc.cell_base_level(grid.monolith_distance(x, y))
 
 
-def pick_trail_cell(rng: random.Random, x: int, y: int) -> tuple[int, int] | None:
+def pick_trail_cell(
+    rng: random.Random, x: int, y: int, level: int | None = None,
+) -> tuple[int, int] | None:
     """Клетка следа: 2-5 клеток пути, не город и не Монолит, с мобами
-    примерно того же уровня, что и здесь: не легче чем на
-    TRAIL_LEVEL_EASIER и не сложнее чем на TRAIL_LEVEL_HARDER.
+    примерно уровня игрока (level; без него - уровня этой клетки): не легче
+    чем на TRAIL_LEVEL_EASIER и не сложнее чем на TRAIL_LEVEL_HARDER.
 
     Раньше след ограничивался кольцом (то же или внешнее), но с уровнями по
     клеткам внутри одного кольца разница доходит до 14 уровней, и след
     уводил то к мелочи, то к мобам не по силам. Если подходящих клеток нет,
     берём самые близкие по уровню."""
-    here = _cell_level(x, y)
+    here = level if level is not None else _cell_level(x, y)
     options = [
         (cx, cy)
         for cx in range(x - TRAIL_MAX_CELLS, x + TRAIL_MAX_CELLS + 1)
