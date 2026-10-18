@@ -463,6 +463,10 @@ async def _render_city_screen(db, character, screen: str | None) -> tuple[str, s
     is_foreign = region != character.region
     if screen == "tavern" and not is_foreign:
         return tavern_text(region), kb.tavern_keyboard(character)
+    if screen == "arena" and not is_foreign:
+        from bot.handlers import arena as arena_handlers  # избегаем цикла импортов
+
+        return arena_handlers.ARENA_TEXT, arena_handlers.arena_kb.arena_keyboard()
     if screen == "market_quarter":
         return market_quarter_text(region, is_foreign), kb.market_quarter_keyboard(is_foreign)
     has_mount = await mount_service.has_any_mount(db, character.id)
@@ -1635,7 +1639,7 @@ async def _screen_keyboard(db, character) -> str | None:
     _render_city_screen."""
     if character.screen is None:
         return None
-    if character.screen in ("tavern", "market_quarter"):
+    if character.screen in ("tavern", "market_quarter", "arena"):
         result = await _render_city_screen(db, character, character.screen)
         return result[1] if result is not None else None
     if character.screen == "raid_list":

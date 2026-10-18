@@ -145,7 +145,15 @@ class Battle:
     siege_id: int | None = None
     side_titles: tuple[str, str] | None = None
     side_guilds: tuple[int, int] | None = None
+    # Арена (2026-10-18): тренировочный бой - без смерти, потерь и рейтинга,
+    # с клетки не виден, вступить нельзя, итог - bot/handlers/arena.py.
+    arena: bool = False
 
+
+#: Бой арены ни на какой клетке не стоит: «Осмотреться» и вступление его не видят.
+ARENA_LOCATION = (10**6, 10**6)
+#: Итог боя арены (ставит bot/handlers/arena.py): (battle, result) -> None.
+on_arena_finished = None
 
 _battles: dict[int, Battle] = {}
 _peer_battle: dict[int, int] = {}
@@ -355,7 +363,7 @@ def _format_transfer_line(moved: dict[str, int]) -> str | None:
 
 
 def _battles_at(x: int, y: int) -> list[tuple[int, Battle]]:
-    return [(bid, b) for bid, b in _battles.items() if b.location == (x, y)]
+    return [(bid, b) for bid, b in _battles.items() if b.location == (x, y) and not b.arena]
 
 
 async def _scene_at(db, character: Character) -> tuple[list[Character], list[tuple[int, Battle]]]:
@@ -802,6 +810,28 @@ async def _start_forced_duel_impl(
             peer_id=victim_peer_id, message="⚔️ На тебя напали! Бой группы с мобами прерван.", random_id=0,
         )
 
+    from bot.handlers import group as group_handlers  # избегаем цикла импортов
+
+    await group_handlers.notify_attacked(db, victim, attacker)
+    await _launch_duel(
+        db, attacker, attacker_peer_id, victim, victim_peer_id,
+        location=(attacker.pos_x, attacker.pos_y),
+        intro=f"⚔️ {attacker.name} нападает на {victim.name}!",
+    )
+
+
+async def start_arena_duel(db, first: Character, first_peer: int, second: Character, second_peer: int) -> None:
+    """Арена (2026-10-18): дуэль без потерь, оба с полным здоровьем."""
+    await _launch_duel(
+        db, first, first_peer, second, second_peer, location=ARENA_LOCATION, arena=True,
+        intro=f"🏟 Арена: {first.name} против {second.name}! Бой тренировочный - ничего не теряется.",
+    )
+
+
+async def _launch_duel(
+    db, attacker: Character, attacker_peer_id: int, victim: Character, victim_peer_id: int,
+    location: tuple[int, int], intro: str, arena: bool = False,
+) -> None:
     attacker_combatant = await _build_combatant_for(db, attacker)
     victim_combatant = await _build_combatant_for(db, victim)
     # Патч 30, баг 3: _build_combatant_for всегда ставит side=0 — без явного
@@ -817,23 +847,21 @@ async def _start_forced_duel_impl(
     session_id = _new_battle_id()
     battle = Battle(
         battle_type="duel",
-        location=(attacker.pos_x, attacker.pos_y),
+        location=location,
         participants={
             attacker.id: _participant(attacker, attacker_peer_id),
             victim.id: _participant(victim, victim_peer_id),
         },
         side_of={attacker.id: 0, victim.id: 1},
+        arena=arena,
     )
     _battles[session_id] = battle
     _peer_battle[attacker_peer_id] = session_id
     _peer_battle[victim_peer_id] = session_id
 
-    from bot.handlers import group as group_handlers  # избегаем цикла импортов
-
-    await group_handlers.notify_attacked(db, victim, attacker)
     first_id = _duel_engine.start_duel(session_id, attacker_combatant, victim_combatant)
     duel = _duel_engine.duels[session_id]
-    intro = f"⚔️ {attacker.name} нападает на {victim.name}! Первым ходит {duel.combatants[first_id].name}."
+    intro = f"{intro} Первым ходит {duel.combatants[first_id].name}."
     board = _render_duel(duel, [], finished=False)
 
     # Патч 31, п.6: боевая клавиатура — только тому, кто ходит первым;
@@ -1427,6 +1455,10 @@ async def pvp_open_items(message: Message) -> None:
     if combatant is None or participant is None:
         return
     battle_kb = pvp_combat_keyboard(participant.base_class, combatant.cooldowns, subclass_id=combatant.subclass_id, show_target=battle.battle_type == "mass")
+    if battle.arena:
+        # Арена - бой без потерь: тратить эликсиры здесь нельзя.
+        await message.answer("🏟 На арене эликсиры не используются - бой тренировочный.", keyboard=battle_kb)
+        return
     if combatant.has_effect(EffectKind.FREEZE):
         await message.answer("Скован - не до зелий сейчас. ❄️", keyboard=battle_kb)
         return
@@ -1482,6 +1514,10 @@ async def pvp_use_item(message: Message) -> None:
     if combatant is None or participant is None:
         return
     battle_kb = pvp_combat_keyboard(participant.base_class, combatant.cooldowns, subclass_id=combatant.subclass_id, show_target=battle.battle_type == "mass")
+    if battle.arena:
+        # Арена - бой без потерь: тратить эликсиры здесь нельзя.
+        await message.answer("🏟 На арене эликсиры не используются - бой тренировочный.", keyboard=battle_kb)
+        return
     if combatant.has_effect(EffectKind.FREEZE):
         await message.answer("Скован - не до зелий сейчас. ❄️", keyboard=battle_kb)
         return
@@ -1573,6 +1609,12 @@ async def on_duel_finished(session_id: int, result: DuelResult) -> None:
         return
     for p in battle.participants.values():
         _peer_battle.pop(p.peer_id, None)
+
+    if battle.arena:
+        # Арена: ни смерти, ни трофеев, ни рейтинга - игроки возвращаются на арену.
+        if on_arena_finished is not None:
+            await on_arena_finished(battle, result)
+        return
 
     if result.draw or result.winner_id is None:
         # Патч 40, баг 1: ничья по лимиту ходов оставляла ОБОИХ живых дуэлянтов

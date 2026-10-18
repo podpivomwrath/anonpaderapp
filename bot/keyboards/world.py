@@ -35,6 +35,7 @@ BTN_DAILIES = "📜 Задания"
 # Патч 39: кварталы города — см. city_square_keyboard/tavern_keyboard/
 # market_quarter_keyboard ниже.
 BTN_TAVERN = "🍺 Таверна"
+BTN_ARENA = "🏟 Арена"  # 2026-10-18: тренировочные бои игроков, вход из Таверны
 BTN_MARKET_QUARTER = "🏪 Торговый"  # патч 41: было "Торговый квартал" — резалось
 # Долгий путь (AFK) - у каждого города свой, кнопка только в родном городе.
 VOYAGE_BUTTONS = {"docks": "⛵ В море", "ridge": "🧗 К вершинам", "scorched": "🛞 В пустошь", "woods": "🌲 В лес"}
@@ -131,6 +132,7 @@ def tavern_keyboard(character=None) -> str:
         items.append((BTN_KEEPER, KeyboardButtonColor.SECONDARY, None))
     if character is not None and character.subclass is not None:
         items.append((BTN_PRESETS, KeyboardButtonColor.SECONDARY, None))
+    items.append((BTN_ARENA, KeyboardButtonColor.PRIMARY, None))
     add_paired(kb, items)
     add_miniapp_button(kb)
     kb.row()

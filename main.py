@@ -15,6 +15,7 @@ from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
 from bot.handlers import LABELERS, list_keeper, onboarding
 from bot.handlers import appraiser as appraiser_handlers
+from bot.handlers import arena as arena_handlers
 from bot.handlers import combat as combat_handlers
 from bot.handlers import elixir_shop as elixir_shop_handlers
 from bot.handlers import group as group_handlers
@@ -269,6 +270,7 @@ async def run() -> None:
     )
     pvp_tick_engine.start()
     pvp_handlers.setup(duel_engine, pvp_tick_engine, bot.api)
+    arena_handlers.setup(bot.api)  # 2026-10-18: арена в таверне
 
     # Патч 51, ч.4: групповой PvE — ОТДЕЛЬНЫЙ экземпляр TickEngine от соло
     # tick_engine (тот держит один колбэк-пару, session_id=peer_id; здесь
