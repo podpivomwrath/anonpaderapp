@@ -84,6 +84,20 @@ def phrase_is(text: str, phrase: Phrase) -> bool:
     return given == expected
 
 
+def looks_like_line(text: str, phrase: Phrase) -> bool:
+    """Лидер ввёл строку двери целиком: слов без связок столько же, сколько
+    мест в строке. Такой текст - попытка строки, даже если в нём есть ответ
+    на свою загадку («книга - это замок и ветер», где «ветер» засчитался бы
+    огнём, 2026-10-18)."""
+    skip = _connectors(phrase) | _FILLER
+    given = [w for w in normalize_answer(text).split() if w not in skip]
+    return len(given) == phrase.size
+
+
+#: Слова-обёртки ответа («это тень», «наверное, эхо») - не места строки.
+_FILLER = {"это", "наверное", "наверно", "думаю", "ответ", "может", "-"}
+
+
 def _connectors(phrase: Phrase) -> set[str]:
     text = phrase.template
     for i in range(1, phrase.size + 1):

@@ -208,6 +208,19 @@ async def test_equip_item_swaps_old_out(db_session, character_at) -> None:
     assert inventory[second.id] is True
 
 
+async def test_raid_unique_only_from_level_60(db_session, character_at) -> None:
+    """2026-10-18: уникальные вещи рейдов - только с 60 уровня."""
+    character = await character_at(0, 30, base_class="warrior")
+    character.level = 59
+    scalpel = await item_service.grant_unique_item(db_session, character, "surgeon_scalpel", random.Random(1))
+    with pytest.raises(item_service.LevelTooLow) as exc:
+        await item_service.equip_item(db_session, character.id, scalpel.id)
+    assert exc.value.need == 60
+    character.level = 60
+    await item_service.equip_item(db_session, character.id, scalpel.id)
+    assert (await item_service.get_equipped(db_session, character.id))["weapon"].id == scalpel.id
+
+
 async def test_equip_item_above_level_is_refused(db_session, character_at) -> None:
     """Вещь выше уровня персонажа не надевается - ни новая, ни на смену."""
     character = await character_at(0, 30, base_class="warrior")

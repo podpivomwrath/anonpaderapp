@@ -273,7 +273,7 @@ async def on_answer(message: Message) -> None:
         # строка не сошлась, а в ней есть ответ на его собственную загадку
         # («это тень»): тогда засчитываем загадку и не жжём время.
         own = [pos for pos in mine if archive_riddles.answer_is(text, run.phrase.assignments[pos - 1])]
-        if not own or archive_riddles.phrase_is(text, run.phrase):
+        if not own or archive_riddles.looks_like_line(text, run.phrase):
             await _phrase_attempt(run, text)
             return
 

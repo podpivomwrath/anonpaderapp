@@ -253,9 +253,16 @@ class LevelTooLow(Exception):
         super().__init__(f"Не по силам: эту вещь можно надеть с {need} уровня.")
 
 
+#: Уникальные вещи рейдов (и скованное из них) - только с 60 уровня
+#: (2026-10-18, решение владельца).
+UNIQUE_REQUIRED_LEVEL = bc.MAX_LEVEL
+
+
 def required_level(item: Item) -> int | None:
     """С какого уровня персонажа вещь можно надеть: её уровень (ilvl).
-    У уникальных и служебных вещей уровня нет - ограничения тоже."""
+    Уникальные вещи рейдов - с 60 уровня. У служебных ограничения нет."""
+    if item.rarity == UNIQUE_RARITY_ID and not item.admin_only:
+        return UNIQUE_REQUIRED_LEVEL
     return item.ilvl
 
 

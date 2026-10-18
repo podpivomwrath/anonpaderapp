@@ -128,6 +128,20 @@ def test_runes_score_and_code_reset() -> None:
     assert puzzle.solved
 
 
+def test_full_line_from_leader_is_a_line_not_a_riddle_answer() -> None:
+    """2026-10-18, жалоба: лидер ввёл «книга - это замок и ветер», а бот
+    засчитал «ветер» как ответ на загадку про огонь вместо попытки строки."""
+    phrase = archive_riddles.Phrase(
+        template="{1} - это {2} и {3}", words=["книга", "ключ", "огонь"], assignments=[],
+    )
+    assert archive_riddles.looks_like_line("книга - это замок и ветер", phrase)
+    assert archive_riddles.looks_like_line("книга ключ огонь", phrase)
+    assert not archive_riddles.looks_like_line("это ветер", phrase)
+    two = archive_riddles.Phrase(template="{1} и {2}", words=["тень", "свеча"], assignments=[])
+    assert not archive_riddles.looks_like_line("это тень", two)
+    assert archive_riddles.looks_like_line("тень и свеча", two)
+
+
 def test_runes_code_holds_for_all_attempts_and_zero_is_marked() -> None:
     """2026-10-18, жалоба: «код меняется раньше 6 попыток». Не меняется:
     значки - счёт, а не места. Значки - по местам, у каждой руны своя скобка."""
