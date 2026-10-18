@@ -190,9 +190,12 @@ def outgoing_multiplier(actor: CombatantState, target: CombatantState) -> float:
     # Клинок дерётся один. Флаг ставит резолвер - здесь нет доступа к сессии.
     if actor.buff_modifiers.get("solo_damage_bonus", 0.0) > 0 and not actor.has_allies:
         mult *= 1.0 + actor.buff_modifiers["solo_damage_bonus"]
-    for effect in actor.effects_of(EffectKind.PROVOKE_PVP):
-        if target.id != effect.source_id:
-            mult *= 1.0 - effect.value
+    # Провокация (2026-10-18): удар по любому спровоцировавшему Стражу - полный,
+    # по остальным - снижение самой сильной провокации, без перемножения.
+    # Раньше два Стража прикрывали друг друга, а третьего - на -51..70%.
+    provokes = actor.effects_of(EffectKind.PROVOKE_PVP)
+    if provokes and all(target.id != effect.source_id for effect in provokes):
+        mult *= 1.0 - max(effect.value for effect in provokes)
     return max(mult, 0.0)
 
 

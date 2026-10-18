@@ -296,6 +296,10 @@ class CombatantState:
             if kind == EffectKind.SHIELD_POOL and getattr(effect, "tag", None) != tag:
                 continue
             if effect.kind == kind and effect.source_id == source_id:
+                # Горение (2026-10-18): слабое перекинувшееся пламя не гасит
+                # полноценный поджог того же элементалиста - остаётся сильное.
+                if tag == BURN_TAG and getattr(effect, "tag", None) == BURN_TAG:
+                    value = max(value, effect.value)
                 effect.value = value
                 effect.remaining_ticks = max(effect.remaining_ticks, duration)
                 if tag is not None:
