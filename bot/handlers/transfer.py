@@ -50,12 +50,17 @@ def setup(bot_api) -> None:
 class Pending:
     token: str
     recipient_id: int
-    recipient_name: str
+    #: Ник получателя - только своим по гильдии. Остальным он не показывается:
+    #: отправитель знает, чей это VK, и ник раскрыл бы, кто за персонажем
+    #: (2026-10-19, жалоба «снова видно ник»). None - анонимно.
+    recipient_name: str | None
     recipient_peer: int
     offers: list[transfer_service.Offer]
     qty: int | None
     chosen: transfer_service.Offer | None = None
     created: float = field(default_factory=time.monotonic)
+    #: Показывать ли получателю ник отправителя (то же правило: только гильдия).
+    reveal_sender: bool = False
 
 
 _pending: dict[int, Pending] = {}
@@ -91,6 +96,10 @@ def _choice_keyboard(token: str, count: int) -> str:
     return kb.get_json()
 
 
+def _whom(pending: "Pending") -> str:
+    return f"игроку {pending.recipient_name}" if pending.recipient_name else "игроку из пересланного сообщения"
+
+
 def _recipient_vk_id(message: Message) -> int | None:
     if message.reply_message is not None:
         return message.reply_message.from_id
@@ -124,7 +133,7 @@ async def _ask_confirm(peer_id: int, pending: Pending) -> None:
         await editable_message.send_or_edit(_bot_api, NAMESPACE, peer_id, refusal, no_keyboard())
         return
     pending.qty = qty
-    text = f"📦 Передать {offer.label}{_qty_text(offer, qty)} игроку {pending.recipient_name}?\nЭто не отменить."
+    text = f"📦 Передать {offer.label}{_qty_text(offer, qty)} {_whom(pending)}?\nЭто не отменить."
     await editable_message.send_or_edit(_bot_api, NAMESPACE, peer_id, text, _confirm_keyboard(pending.token))
 
 
@@ -157,13 +166,16 @@ async def transfer_command(message: Message, match: tuple) -> None:
             return
         name, qty = transfer_service.parse(request)
         lookup = await transfer_service.find(db, sender.id, name, qty)
+        # Анонимность: ник открыт только внутри одной гильдии.
+        same_guild = sender.guild_id is not None and sender.guild_id == recipient.guild_id
         await db.commit()
 
     if not lookup.offers:
         await message.answer(lookup.refusal or f"У тебя нет «{name}».")
         return
     pending = Pending(
-        token=uuid.uuid4().hex[:10], recipient_id=recipient.id, recipient_name=recipient.name,
+        token=uuid.uuid4().hex[:10], recipient_id=recipient.id,
+        recipient_name=recipient.name if same_guild else None, reveal_sender=same_guild,
         recipient_peer=recipient_vk, offers=lookup.offers[:MAX_CHOICES], qty=qty,
     )
     _pending[peer_id] = pending
@@ -241,11 +253,13 @@ async def transfer_confirm(message: Message) -> None:
             treasury = f"казну {REGION_TITLES[city]}" if city in REGION_TITLES else "казну"
             tax_line = f" Получено {moved - tax}, {tax} ушло в {treasury}."
     await editable_message.send_or_edit(
-        _bot_api, NAMESPACE, peer_id, f"📦 Передано игроку {pending.recipient_name}: {what}.{tax_line}", no_keyboard(),
+        _bot_api, NAMESPACE, peer_id, f"📦 Передано {_whom(pending)}: {what}.{tax_line}", no_keyboard(),
     )
     try:
         await _bot_api.messages.send(
-            peer_id=pending.recipient_peer, random_id=0, message=f"📦 {sender_name} передаёт тебе: {what}.{tax_line}",
+            peer_id=pending.recipient_peer, random_id=0,
+            message=(f"📦 {sender_name} передаёт тебе: {what}.{tax_line}" if pending.reveal_sender
+                     else f"📦 Тебе передали: {what}.{tax_line}"),
         )
     except Exception:  # noqa: BLE001 - получатель мог запретить сообщения; передача уже состоялась
         logger.warning("Передача: не удалось уведомить получателя {}", pending.recipient_peer)

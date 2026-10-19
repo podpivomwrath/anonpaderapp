@@ -100,14 +100,15 @@ async def invite_by_forward(message: Message) -> None:
             await message.answer(str(exc))
             return
         await db.commit()
-        inviter_name = inviter.name
 
     # Ник не показываем, пока игрок не согласится (2026-10-17): пересылка не
     # должна выдавать, какой персонаж у этого человека.
     await message.answer("👥 Приглашение отправлено. У игрока есть 1 минута на ответ - ник увидишь, когда он согласится.")
     await _bot_api.messages.send(
         peer_id=from_vk_id,
-        message=f"👥 {inviter_name} приглашает тебя в группу.",
+        # И приглашённому ник пригласившего - только после согласия
+        # (2026-10-19): пересылку делает знакомый по VK, ник выдал бы его.
+        message="👥 Тебя зовут в группу. Кто зовёт - увидишь, если согласишься.",
         random_id=0,
         keyboard=group_invite_keyboard(invite.id),
     )
