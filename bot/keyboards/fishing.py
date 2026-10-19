@@ -9,7 +9,9 @@ from vkbottle import Keyboard, KeyboardButtonColor, Text
 
 from bot.keyboards.world import add_miniapp_button
 
-from bot.fishing_texts import BTN_BAG, BTN_CAST, BTN_FISH, BTN_LEAVE_LAKE, BTN_STRIKE
+from bot.fishing_texts import BTN_BAG, BTN_CANCEL_CAST, BTN_CAST, BTN_FISH, BTN_LEAVE_LAKE, BTN_STRIKE
+
+CANCEL_CAST_PAYLOAD = {"type": "fish_cancel_cast"}
 
 
 def lake_keyboard() -> str:
@@ -31,7 +33,7 @@ def casting_keyboard() -> str:
     которую можно нажать заранее и ждать. Сообщение о поклёвке присылает
     планировщик (bot/handlers/fishing.py::_on_bite)."""
     kb = Keyboard(one_time=True)
-    kb.add(Text(BTN_LEAVE_LAKE), color=KeyboardButtonColor.SECONDARY)
+    kb.add(Text(BTN_CANCEL_CAST, payload=CANCEL_CAST_PAYLOAD), color=KeyboardButtonColor.SECONDARY)
     add_miniapp_button(kb)
     return kb.get_json()
 
@@ -42,7 +44,7 @@ def bite_keyboard() -> str:
     kb = Keyboard(one_time=True)
     kb.add(Text(BTN_STRIKE), color=KeyboardButtonColor.PRIMARY)
     kb.row()
-    kb.add(Text(BTN_LEAVE_LAKE), color=KeyboardButtonColor.SECONDARY)
+    kb.add(Text(BTN_CANCEL_CAST, payload=CANCEL_CAST_PAYLOAD), color=KeyboardButtonColor.SECONDARY)
     add_miniapp_button(kb)
     return kb.get_json()
 

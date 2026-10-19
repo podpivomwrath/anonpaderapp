@@ -305,6 +305,22 @@ async def bag(message: Message) -> None:
     )
 
 
+@labeler.message(payload_contains=kb.CANCEL_CAST_PAYLOAD)
+@activity_action
+async def cancel_cast(message: Message) -> None:
+    """Снасть из воды, игрок остаётся у озера (2026-10-19, вместо «Отойти»
+    на экране заброса)."""
+    async with get_session_factory()() as db:
+        character = await onboarding_svc.get_character(db, message.from_id)
+        if character is None or character.screen != "lake":
+            return
+        if _bite_scheduler is not None:
+            _bite_scheduler.cancel(message.peer_id)
+        fishing_service.clear_cast(character)
+        await db.commit()
+    await message.answer(ft.CANCEL_CAST_TEXT, keyboard=kb.lake_keyboard())
+
+
 @labeler.message(text=[ft.BTN_LEAVE_LAKE])
 @activity_action
 async def leave_lake(message: Message) -> None:

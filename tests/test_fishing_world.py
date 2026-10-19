@@ -193,10 +193,14 @@ def test_strike_button_appears_only_with_the_bite() -> None:
 def test_lake_screens_always_have_a_way_out() -> None:
     """Экран озера — вложенный и заменяет клавиатуру целиком, поэтому без
     выхода игрок застрял бы у воды."""
-    for raw in (fkb.lake_keyboard(), fkb.casting_keyboard(),
-                fkb.bite_keyboard(), fkb.bag_keyboard()):
+    for raw in (fkb.lake_keyboard(), fkb.bag_keyboard()):
         labels = [b["action"]["label"] for row in _rows(raw) for b in row]
         assert ft.BTN_LEAVE_LAKE in labels
+    # Пока снасть в воде - «Отменить» (2026-10-19): возвращает к экрану озера,
+    # где есть «Отойти от воды».
+    for raw in (fkb.casting_keyboard(), fkb.bite_keyboard()):
+        labels = [b["action"]["label"] for row in _rows(raw) for b in row]
+        assert ft.BTN_CANCEL_CAST in labels and ft.BTN_LEAVE_LAKE not in labels
 
 
 def test_approach_lake_button_is_inline() -> None:
