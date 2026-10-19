@@ -112,6 +112,8 @@ class Character(Base):
     ash_tincture_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     secret_pocket: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
     faction_changed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    #: Смена фракции, купленная в бою: город, куда переехать, когда бой кончится.
+    pending_faction: Mapped[str | None] = mapped_column(String(16), nullable=True)
 
     # Патч 37: текущий ВЛОЖЕННЫЙ экран (скупщик/лавка/инвентарь и т.п.) — клавиатура
     # принадлежит экрану, а не сообщению. NULL = корневой экран (город/карта/бой),

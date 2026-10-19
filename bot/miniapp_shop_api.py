@@ -55,10 +55,9 @@ async def handle_post(request: web.Request) -> web.Response:
         await db.commit()
         from sqlalchemy.exc import IntegrityError
 
-        if item == shop_service.FACTION_ID:
-            blocker = await faction_blocker(peer_id, character)
-            if blocker is not None:
-                return _error(blocker, 409)
+        # Смена фракции в бою (и в разломе, событии) не отказывает: оплачена
+        # сейчас, переезд - после боя (move_pending_job).
+        busy = item == shop_service.FACTION_ID and await faction_blocker(peer_id, character) is not None
         moved = None
 
         try:
@@ -75,9 +74,11 @@ async def handle_post(request: web.Request) -> web.Response:
                 done = {"item": item}
             elif item == shop_service.FACTION_ID:
                 region = body.get("region")
-                voyage_text = await shop_service.change_faction(db, character, region)
-                done = {"item": item, "region": region, "title": REGION_TITLES[region]}
-                moved = (region, voyage_text)
+                voyage_text = await shop_service.change_faction(db, character, region, defer=busy)
+                pending = character.pending_faction is not None
+                done = {"item": item, "region": region, "title": REGION_TITLES[region], "pending": pending}
+                if not pending:
+                    moved = (region, voyage_text)
             elif item == shop_service.RENAME_ID:
                 old = await shop_service.rename_character(db, character, body.get("name"))
                 done = {"item": item, "old": old, "name": character.name}
@@ -115,6 +116,40 @@ async def faction_blocker(peer_id: int, character) -> str | None:
     if scene_events.has_pending(peer_id):
         return "Сначала закончи событие."
     return None
+
+
+async def move_pending_job() -> None:
+    """Раз в несколько секунд: переезды, оплаченные в бою, - тем, у кого бой
+    кончился и кто жив."""
+    from sqlalchemy import select
+
+    from models import Character, User
+    from services import death_service
+    from services.db import get_session_factory
+
+    async with get_session_factory()() as db:
+        rows = (await db.execute(
+            select(Character.id, User.vk_id).join(User, User.id == Character.user_id)
+            .where(Character.pending_faction.isnot(None))
+        )).all()
+        await db.rollback()
+    for character_id, peer_id in rows:
+        try:
+            async with get_session_factory()() as db:
+                character = await db.get(Character, character_id, with_for_update=True)
+                if (character is None or character.pending_faction is None
+                        or death_service.is_dead(character)
+                        or await faction_blocker(peer_id, character) is not None):
+                    await db.rollback()
+                    continue
+                region = character.pending_faction
+                voyage_text = await shop_service.move_pending(db, character)
+                await db.commit()
+            await after_faction_move(peer_id, region, voyage_text)
+        except Exception:
+            from loguru import logger
+
+            logger.exception("Смена фракции после боя не прошла: персонаж {}", character_id)
 
 
 async def after_faction_move(peer_id: int, region: str, voyage_text: str | None) -> None:

@@ -296,33 +296,70 @@ def faction_item(character: Character) -> dict:
             "Сюжет нового города открывается на том же акте",
             "Новые обозы фирмы выходят из нового города, товар в пути и на складе остаётся",
         ],
-        "note": f"Менять фракцию можно раз в {ggc.FACTION_COOLDOWN_DAYS} дней. Во время боя, рейда и разлома нельзя.",
-        "available": ready is None,
+        "note": f"Менять фракцию можно раз в {ggc.FACTION_COOLDOWN_DAYS} дней. Купишь в бою - переезд случится, "
+                "когда бой закончится.",
+        "available": ready is None and character.pending_faction is None,
         "available_at": ready.isoformat() if ready is not None else None,
+        "pending": REGION_TITLES.get(character.pending_faction) if character.pending_faction else None,
     }
 
 
-async def change_faction(db: AsyncSession, character: Character, region, now: datetime | None = None) -> str | None:
+async def change_faction(
+    db: AsyncSession, character: Character, region, now: datetime | None = None, defer: bool = False,
+) -> str | None:
     """Переезд в другой город. Возвращает итог прерванного похода (или None).
     Бои, рейды, разломы и висящие события проверяет вызывающий: они живут
-    в памяти бота, а не в базе."""
+    в памяти бота, а не в базе. Занят или мёртв (defer) - самоцветы
+    списываются сейчас, а переезд ждёт в pending_faction, пока бой не
+    кончится (решение владельца 2026-10-19): его делает move_pending."""
     from game.economy import faction_config as fc
-    from game.world import world_config as wc
-    from services import (
-        admin_service, death_service, fishing_service, mining_service, mount_service,
-        movement_service, pk_service, screen_service, story_service, voyage_service,
-    )
+    from services import death_service
 
     now = now or datetime.now(timezone.utc)
     if region not in fc.CITIES:
         raise ShopError("Выбери город.")
+    if character.pending_faction is not None:
+        raise ShopError("Переезд уже оплачен - он случится после боя.")
     if region == character.region:
         raise ShopError("Ты и так живёшь в этом городе.")
     if faction_available_at(character) is not None:
         raise ShopError(f"Фракцию меняют не чаще раза в {ggc.FACTION_COOLDOWN_DAYS} дней.")
-    if death_service.is_dead(character, now):
-        raise ShopError("Сначала дождись возрождения.")
     await _charge(db, character, ggc.FACTION_PRICE)
+    character.faction_changed_at = now
+    if defer or death_service.is_dead(character, now):
+        character.pending_faction = region
+        await db.flush()
+        await _log_faction(db, character, region, pending=True)
+        return None
+    return await _move(db, character, region, now)
+
+
+async def move_pending(db: AsyncSession, character: Character, now: datetime | None = None) -> str | None:
+    """Оплаченный в бою переезд - когда бой кончился и персонаж жив."""
+    region = character.pending_faction
+    character.pending_faction = None
+    if region is None or region == character.region:
+        await db.flush()
+        return None
+    return await _move(db, character, region, now or datetime.now(timezone.utc))
+
+
+async def _log_faction(db: AsyncSession, character: Character, region: str, pending: bool = False) -> None:
+    from services import admin_service
+
+    await admin_service.log_action(
+        db, 0, "shop_faction", character.id, old_value={"region": character.region},
+        new_value={"region": region, "pending": pending},
+    )
+
+
+async def _move(db: AsyncSession, character: Character, region: str, now: datetime) -> str | None:
+    from game.world import world_config as wc
+    from services import (
+        admin_service, fishing_service, mining_service, mount_service,
+        movement_service, pk_service, screen_service, story_service, voyage_service,
+    )
+
     old = character.region
 
     voyage_text = None
@@ -348,9 +385,8 @@ async def change_faction(db: AsyncSession, character: Character, region, now: da
 
         character.pos_x, character.pos_y = _outside_gate(region)
     await screen_service.set_screen(db, character, None)
-    character.faction_changed_at = now
     await db.flush()
     await admin_service.log_action(
-        db, 0, "shop_faction", character.id, old_value={"region": old}, new_value={"region": region},
+        db, 0, "shop_faction_move", character.id, old_value={"region": old}, new_value={"region": region},
     )
     return voyage_text

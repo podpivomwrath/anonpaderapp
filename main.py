@@ -338,6 +338,11 @@ async def run() -> None:
     respawn_scheduler.start()
     respawn_scheduler.add_job(raid_handlers.reconcile_lobbies, "interval", seconds=3,
                              id="raid_lobbies", max_instances=1, coalesce=True)
+    # Смена фракции, купленная в бою, - переезд, когда бой кончился.
+    from bot import miniapp_shop_api
+
+    respawn_scheduler.add_job(miniapp_shop_api.move_pending_job, "interval", seconds=5,
+                             id="faction_pending", max_instances=1, coalesce=True)
 
     # Венцы топ-1 (патч 91): раз в сутки. Не вживую - движок боя берёт
     # характеристики на старте сессии, и смена венца посреди боя

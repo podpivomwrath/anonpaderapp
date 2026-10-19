@@ -325,7 +325,8 @@ async def distribute(db: AsyncSession, boss: WorldBoss, rng: random.Random) -> l
     expire_due), под той же блокировкой строки."""
     damage = await damage_by_character(db, boss.id)
     xp_pool = experience_service.xp_per_mob(boss.level) * wbc.XP_POOL_MOBS
-    shares = world_boss.split_pool(boss.ring, damage, pool_share(boss), xp_pool, rng)
+    loot_mult = wbc.KILL_LOOT_MULT if boss.status == KILLED else 1.0
+    shares = world_boss.split_pool(boss.ring, damage, pool_share(boss), xp_pool, rng, loot_mult)
     granted: list[Granted] = []
     for character_id in sorted(shares, key=lambda cid: -damage[cid]):
         share = shares[character_id]

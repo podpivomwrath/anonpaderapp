@@ -222,7 +222,9 @@ function FactionSheet({ item, gems, onClose, onBought }) {
           {item.perks.map((perk) => <li key={perk}>{perk}</li>)}
         </ul>
         <p className="craft-hint">{item.note}</p>
-        {item.available === false ? (
+        {item.pending ? (
+          <p className="shop-sheet__active">Переезд в {item.pending} оплачен - он случится, когда закончится бой.</p>
+        ) : item.available === false ? (
           <p className="shop-sheet__error">Сменить снова можно {untilText(item.available_at)}.</p>
         ) : (
           <div className="shop-sheet__choices">
@@ -500,7 +502,9 @@ export default function ShopTab({ onWallet, onBought }) {
             setData(res);
             setOpen(null);
             onWallet?.({ donate_currency: res.gems });
-            setNotice(`${item.emoji} Переезд готов, твой город теперь - ${res.done.title}. Бот прислал площадь в сообщения.`);
+            setNotice(res.done.pending
+              ? `${item.emoji} Переезд в ${res.done.title} оплачен. Ты в бою - переедешь, когда он закончится.`
+              : `${item.emoji} Переезд готов, твой город теперь - ${res.done.title}. Бот прислал площадь в сообщения.`);
             onBought?.();
           }}
         />

@@ -200,13 +200,6 @@ async def test_faction_cooldown_and_bad_input(db_session, make_character, seed_q
     assert shop_service.faction_item(c)["available"] is False
 
 
-async def test_faction_change_refused_while_dead(db_session, make_character, seed_quests) -> None:
-    c = await make_character(level=40, donate=1000, region="ridge")
-    c.respawn_at = NOW + timedelta(minutes=5)
-    with pytest.raises(shop_service.ShopError):
-        await shop_service.change_faction(db_session, c, "docks", NOW)
-
-
 async def test_catalog_lists_new_goods(make_character) -> None:
     c = await make_character(region="ridge")
     ids = [i["id"] for i in shop_service.catalog(c, 0)["items"]]
@@ -220,3 +213,27 @@ def test_story_lines_share_act_layout() -> None:
     городах - если линию одного города перестроят, тест подскажет."""
     acts = {r: [a.act for a in story_service.get_line(r).acts] for r in ("ridge", "docks", "woods", "scorched")}
     assert len({tuple(v) for v in acts.values()}) == 1
+
+
+async def test_bought_in_battle_moves_after(db_session, make_character, seed_quests) -> None:
+    """Куплено в бою (2026-10-19): самоцветы списаны сразу, город прежний,
+    переезд - move_pending, когда бой кончился."""
+    c = await make_character(level=40, donate=1000, region="ridge")
+    c.pos_x, c.pos_y = 5, 5
+    await shop_service.change_faction(db_session, c, "docks", NOW, defer=True)
+    assert (c.region, c.pending_faction, (c.pos_x, c.pos_y)) == ("ridge", "docks", (5, 5))
+    assert (await wallet_service.get_wallet(db_session, c.id)).donate_currency == 1000 - ggc.FACTION_PRICE
+    item = shop_service.faction_item(c)
+    assert item["available"] is False and item["pending"]
+    with pytest.raises(shop_service.ShopError):
+        await shop_service.change_faction(db_session, c, "woods", NOW)
+
+    await shop_service.move_pending(db_session, c, NOW)
+    assert (c.region, c.pending_faction, (c.pos_x, c.pos_y)) == ("docks", None, wc.CITY_COORDS["docks"])
+
+
+async def test_bought_while_dead_waits_for_respawn(db_session, make_character, seed_quests) -> None:
+    c = await make_character(level=40, donate=1000, region="ridge")
+    c.respawn_at = NOW + timedelta(minutes=5)
+    await shop_service.change_faction(db_session, c, "docks", NOW)
+    assert (c.region, c.pending_faction) == ("ridge", "docks")

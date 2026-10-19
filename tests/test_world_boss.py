@@ -278,9 +278,11 @@ async def test_kill_hands_the_pool_to_the_fighters(db_session, make_character) -
     items = (await db_session.execute(select(Inventory))).scalars().all()
     trophies = (await db_session.execute(select(CharacterTrophy))).scalars().all()
     elixirs = (await db_session.execute(select(CharacterConsumable))).scalars().all()
-    assert len(items) == wbc.ITEMS_BY_RING[1]
-    assert sum(t.count for t in trophies) == sum(wbc.TROPHIES_BY_RING[1].values())
-    assert sum(e.count for e in elixirs) == wbc.HEALS_BY_RING[1][1] + wbc.COMBAT_ELIXIRS_BY_RING[1]
+    # Убит - весь пул и бонус за добивание.
+    m = wbc.KILL_LOOT_MULT
+    assert len(items) == round(wbc.ITEMS_BY_RING[1] * m)
+    assert sum(t.count for t in trophies) == sum(round(n * m) for n in wbc.TROPHIES_BY_RING[1].values())
+    assert sum(e.count for e in elixirs) == round(wbc.HEALS_BY_RING[1][1] * m) + round(wbc.COMBAT_ELIXIRS_BY_RING[1] * m)
 
 
 async def test_escaped_boss_leaves_and_pays_a_part(db_session, make_character) -> None:
@@ -363,3 +365,14 @@ async def test_boss_ring_follows_active_players_now(db_session, make_character) 
     await db_session.flush()
     assert await svc._players_by_ring(db_session, NOW) == {2: 2, 3: 1, 4: 1}
     assert await svc._players_by_ring(db_session, NOW + timedelta(hours=2)) == {2: 2, 3: 1, 4: 2}
+
+
+def test_kill_bonus_adds_loot_rolls_but_not_xp() -> None:
+    """Добивание (2026-10-19): бросков добычи в KILL_LOOT_MULT раз больше,
+    опыт тот же - иначе недобитый босс с малым числом участников выглядел
+    выгоднее убитого."""
+    plain = world_boss.split_pool(4, {1: 1}, 1.0, 10_000, random.Random(3))[1]
+    bonus = world_boss.split_pool(4, {1: 1}, 1.0, 10_000, random.Random(3), wbc.KILL_LOOT_MULT)[1]
+    assert bonus.xp == plain.xp
+    assert len(bonus.items) == round(wbc.ITEMS_BY_RING[4] * wbc.KILL_LOOT_MULT)
+    assert bonus.trophies["heart_spike"] == round(wbc.TROPHIES_BY_RING[4]["heart_spike"] * wbc.KILL_LOOT_MULT)

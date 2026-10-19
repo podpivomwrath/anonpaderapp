@@ -122,7 +122,8 @@ def end_text(boss, got, total_damage: int) -> str:
     boss_def = world_boss.boss_def(boss.boss_id)
     name, fem = boss_def.name, boss_def.feminine
     if boss.status == "killed":
-        head = f"☠ {name} {'пала' if fem else 'пал'}!"
+        bonus = round((wbc.KILL_LOOT_MULT - 1) * 100)
+        head = f"☠ {name} {'пала' if fem else 'пал'}! За добивание добычи разыграно на {bonus}% больше."
     else:
         removed = _pct(boss.max_hp - boss.hp, boss.max_hp)
         head = (

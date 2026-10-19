@@ -137,11 +137,13 @@ def _roll_rarity(rng: random.Random) -> str:
 
 def split_pool(
     ring: int, damage_by: dict[int, int], share: float, xp_pool: int, rng: random.Random,
+    loot_mult: float = 1.0,
 ) -> dict[int, PoolShare]:
     """Делит пул кольца между участниками.
 
     share - какая часть пула разыгрывается: 1.0 за убийство, доля снятого
-    здоровья - если босс ушёл живым. Опыт делится пропорционально урону;
+    здоровья - если босс ушёл живым. loot_mult - бонус за добивание: больше
+    бросков добычи, опыт тот же. Опыт делится пропорционально урону;
     каждая вещь, трофей и склянка разыгрываются отдельно, шанс участника -
     его доля урона. Кто бил больше, чаще забирает, но и у слабого есть шанс.
     """
@@ -156,6 +158,7 @@ def split_pool(
     xp_total = round(xp_pool * share)
     for cid in ids:
         result[cid].xp = xp_total * damage_by[cid] // total
+    share *= loot_mult
 
     def winner() -> PoolShare:
         return result[rng.choices(ids, weights=weights)[0]]
