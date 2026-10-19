@@ -266,3 +266,12 @@ async def test_no_guild_tax_on_transfer(db_session, make_character) -> None:
     offer = (await ts.find(db_session, a.id, "золото")).offers[0]
     await ts.execute(db_session, a.id, b.id, offer, 200)
     assert (await wallet_service.get_wallet(db_session, b.id)).farm_currency == 190
+
+
+def test_recipient_nick_hidden_in_group_chats_even_for_guildmates() -> None:
+    from bot.handlers.transfer import recipient_name_visible
+
+    assert recipient_name_visible(5, 5, peer_id=100, from_id=100)          # личка, одна гильдия
+    assert not recipient_name_visible(5, 5, peer_id=2_000_000_001, from_id=100)  # беседа
+    assert not recipient_name_visible(5, 6, peer_id=100, from_id=100)      # разные гильдии
+    assert not recipient_name_visible(None, None, peer_id=100, from_id=100)

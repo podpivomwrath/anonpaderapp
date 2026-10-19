@@ -96,6 +96,13 @@ def _choice_keyboard(token: str, count: int) -> str:
     return kb.get_json()
 
 
+def recipient_name_visible(sender_guild: int | None, recipient_guild: int | None, peer_id: int, from_id: int) -> bool:
+    """Ник получателя открыт только внутри одной гильдии и только в личке с
+    ботом. В беседе ответ бота видят все её участники, и ник согильдийца
+    связался бы с его страницей VK (2026-10-19, жалоба на анонимность)."""
+    return sender_guild is not None and sender_guild == recipient_guild and peer_id == from_id
+
+
 def _whom(pending: "Pending") -> str:
     return f"игроку {pending.recipient_name}" if pending.recipient_name else "игроку из пересланного сообщения"
 
@@ -166,8 +173,8 @@ async def transfer_command(message: Message, match: tuple) -> None:
             return
         name, qty = transfer_service.parse(request)
         lookup = await transfer_service.find(db, sender.id, name, qty)
-        # Анонимность: ник открыт только внутри одной гильдии.
         same_guild = sender.guild_id is not None and sender.guild_id == recipient.guild_id
+        show_name = recipient_name_visible(sender.guild_id, recipient.guild_id, message.peer_id, message.from_id)
         await db.commit()
 
     if not lookup.offers:
@@ -175,7 +182,7 @@ async def transfer_command(message: Message, match: tuple) -> None:
         return
     pending = Pending(
         token=uuid.uuid4().hex[:10], recipient_id=recipient.id,
-        recipient_name=recipient.name if same_guild else None, reveal_sender=same_guild,
+        recipient_name=recipient.name if show_name else None, reveal_sender=same_guild,
         recipient_peer=recipient_vk, offers=lookup.offers[:MAX_CHOICES], qty=qty,
     )
     _pending[peer_id] = pending
