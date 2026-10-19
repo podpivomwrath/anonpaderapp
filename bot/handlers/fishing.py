@@ -321,6 +321,12 @@ async def cancel_cast(message: Message) -> None:
     await message.answer(ft.CANCEL_CAST_TEXT, keyboard=kb.lake_keyboard())
 
 
+def cancel_bite(peer_id: int) -> None:
+    """Снять таймер поклёвки: игрок ушёл от воды другим путём (маунт с карты)."""
+    if _bite_scheduler is not None:
+        _bite_scheduler.cancel(peer_id)
+
+
 @labeler.message(text=[ft.BTN_LEAVE_LAKE])
 @activity_action
 async def leave_lake(message: Message) -> None:

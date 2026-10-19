@@ -1662,6 +1662,10 @@ async def _screen_keyboard(db, character) -> str | None:
         mine = mining_service.mine_at(character)
         left = await mining_service.ore_in_mine(db, mine.id) if mine is not None else 0
         return mining_kb.mine_keyboard(left > 0)
+    # Экран озера там, где озера нет (уехал на маунте с карты, не отойдя от
+    # воды; 2026-10-19, игрок «отошёл от озера, которого не было») - не он.
+    if character.screen == "lake" and fishing_service.lake_at(character) is None:
+        return None
     if character.screen == "lake":
         if fishing_service.is_casting(character):
             return fishing_kb.casting_keyboard()

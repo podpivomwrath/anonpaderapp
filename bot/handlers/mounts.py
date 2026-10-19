@@ -323,6 +323,17 @@ async def start_travel_and_notify(
     Коммит делает вызывающий: у карты и чата разные транзакционные границы.
     """
     from_x, from_y = character.pos_x, character.pos_y
+    # Уезжает - вложенный экран клетки (озеро, рудник) и снасть в воде
+    # остаются тут. С карты маунт отправляют, не отойдя от воды, и экран
+    # озера ехал вместе с игроком (2026-10-19).
+    if character.screen is not None:
+        await screen_service.set_screen(db, character, None)
+    if character.fishing_cast_at is not None:
+        from bot.handlers import fishing as fishing_handlers
+        from services import fishing_service
+
+        fishing_handlers.cancel_bite(peer_id)
+        fishing_service.clear_cast(character)
     path = mount_service.route(from_x, from_y, to_x, to_y, safe)
     travel = await mount_service.start_travel(db, character, mount_id, to_x, to_y, _rng, now, safe=safe)
     seconds = mount_service.total_travel_seconds(mount_id, len(path))

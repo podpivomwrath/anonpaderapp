@@ -273,3 +273,16 @@ def test_lake_button_is_sent_only_from_cell_entry_points() -> None:
             # Патч 104: кнопки клетки шлёт одна функция, её зовут входы.
             assert current == "send_cell_buttons", f"кнопка озера в обход входа: {current}"
     assert callers == entry_functions, f"кнопка шлётся не только на входе: {callers}"
+
+
+async def test_lake_screen_off_the_lake_gives_no_lake_keyboard(db_session, make_character) -> None:
+    """Уехал на маунте с карты, не отойдя от воды: экран «озеро» остался, а
+    озера на клетке нет - клавиатура озера не возвращается (2026-10-19)."""
+    from bot.handlers import world as world_handlers
+
+    c = await make_character(level=30)
+    c.screen = "lake"
+    c.pos_x, c.pos_y = PLAIN_XY
+    assert await world_handlers._screen_keyboard(db_session, c) is None
+    c.pos_x, c.pos_y = LAKE_XY
+    assert await world_handlers._screen_keyboard(db_session, c) == fkb.lake_keyboard()
