@@ -122,6 +122,62 @@ function BuySheet({ item, gems, onClose, onBought }) {
   );
 }
 
+// Набор за фиксированную цену (2026-10-19: набор зелий) - список содержимого
+// и покупка в два нажатия.
+function BundleSheet({ item, gems, onClose, onBought }) {
+  const [confirming, setConfirming] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState(null);
+  const enough = gems >= item.price;
+
+  const buy = async () => {
+    setBusy(true);
+    setError(null);
+    try {
+      onBought(await buyShop(item.id));
+    } catch (err) {
+      setError(err.details?.error || 'Не удалось купить.');
+      setConfirming(false);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <>
+      <div className="nav-scrim" onClick={onClose} aria-hidden="true" />
+      <div className="crown-sheet shop-sheet" role="dialog" aria-label={item.title}>
+        <div className="shop-sheet__head">
+          <ShopIcon id={item.id} emoji={item.emoji} />
+          <div>
+            <b className="shop-sheet__title">{item.title}</b>
+          </div>
+        </div>
+        <ul className="shop-sheet__perks">
+          {item.perks.map((perk) => <li key={perk}>{perk}</li>)}
+        </ul>
+        <p className="craft-hint">{item.note}</p>
+        {error && <p className="shop-sheet__error">{error}</p>}
+        {!enough && <p className="shop-sheet__error">Не хватает самоцветов: у тебя 💎 {money(gems)}.</p>}
+        <div className="shop-sheet__actions">
+          {confirming ? (
+            <>
+              <Button size="l" stretched disabled={busy} onClick={buy}>
+                {busy ? 'Покупаем…' : `Да, купить за 💎 ${money(item.price)}`}
+              </Button>
+              <Button size="l" mode="secondary" stretched disabled={busy} onClick={() => setConfirming(false)}>Отмена</Button>
+            </>
+          ) : (
+            <Button size="l" stretched disabled={!enough} onClick={() => setConfirming(true)}>
+              Купить за 💎 {money(item.price)}
+            </Button>
+          )}
+        </div>
+      </div>
+    </>
+  );
+}
+
 // Смена ника / названия фирмы (2026-10-16): ввести новое имя, подтвердить -
 // самоцветы списываются в тот же момент, что и меняется имя. Не подошло
 // (занято, неверные символы) - ничего не списано, ошибка в окне.
@@ -311,7 +367,7 @@ export default function ShopTab({ onWallet, onBought }) {
               <ShopIcon id={i.id} emoji={i.emoji} />
               <b className="shop-card__title">{i.title}</b>
               <span className="shop-card__price">
-                {i.kind === 'rename' ? `💎 ${money(i.price)}` : `от 💎 ${money(i.prices[i.min])}`}
+                {i.kind === 'days' ? `от 💎 ${money(i.prices[i.min])}` : `💎 ${money(i.price)}`}
               </span>
               {i.active_until && <span className="shop-card__badge">активна</span>}
             </button>
@@ -333,7 +389,21 @@ export default function ShopTab({ onWallet, onBought }) {
           }}
         />
       )}
-      {item && item.kind !== 'rename' && (
+      {item && item.kind === 'bundle' && (
+        <BundleSheet
+          item={item}
+          gems={data.gems}
+          onClose={() => setOpen(null)}
+          onBought={(res) => {
+            setData(res);
+            setOpen(null);
+            onWallet?.({ donate_currency: res.gems });
+            setNotice(`${item.emoji} ${item.title} в сумке: ${res.done.contents.join(', ')}.`);
+            onBought?.();
+          }}
+        />
+      )}
+      {item && item.kind === 'days' && (
         <BuySheet
           item={item}
           gems={data.gems}

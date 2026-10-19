@@ -188,3 +188,20 @@ grey, rust brown and dried blood, weathered and worn surfaces, soft rim light
 from the upper left, deep neutral background, no text, no watermark, no border,
 square 1:1 composition, crisp readable silhouette at small size
 ```
+
+## 🧪 Набор зелий - `elixir_pack.webp`
+
+Походный набор алхимика: десяток крупных зелий лечения и по паре боевых, уложенные
+в открытый ящик. Должен читаться как «много разных склянок сразу».
+
+```
+an open wooden apothecary crate with straw padding, packed with ten large red
+healing potion flasks in a row and smaller vials of different colours beside
+them - ember orange, black, blood red, pale blue, misty grey and violet - a
+leather strap and a wax-sealed label on the lid, dark fantasy game item icon,
+single object centered, slight 3/4 angle, painterly semi-realistic, muted
+desaturated palette of ash grey, rust brown and dried blood, weathered and worn
+surfaces, soft rim light from the upper left, deep neutral background, no text,
+no watermark, no border, square 1:1 composition, crisp readable silhouette at
+small size
+```

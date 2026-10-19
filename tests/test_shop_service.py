@@ -46,3 +46,19 @@ async def test_not_enough_gems_and_bad_days(db_session, make_character) -> None:
             await shop_service.buy_premium(db_session, character, bad)
     assert (await wallet_service.get_wallet(db_session, character.id)).donate_currency == 40
     assert character.premium_until is None
+
+
+async def test_elixir_pack_gives_ten_large_heals_and_two_of_each_combat(db_session, make_character) -> None:
+    """2026-10-19: набор зелий за 100 самоцветов."""
+    from services import elixir_service
+
+    character = await make_character()
+    await wallet_service.deposit(db_session, character.id, "donate", 150)
+    await shop_service.buy_elixir_pack(db_session, character)
+    assert (await wallet_service.get_wallet(db_session, character.id)).donate_currency == 50
+    stock = {d.id: n for d, n in await elixir_service.get_stock(db_session, character.id)}
+    assert stock.pop("heal_large") == 10
+    combat = [d.id for d in elixir_service.elixir_defs_ordered() if d.category == "combat"]
+    assert stock == {cid: 2 for cid in combat} and len(combat) >= 5
+    with pytest.raises(shop_service.ShopError):
+        await shop_service.buy_elixir_pack(db_session, character)

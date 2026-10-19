@@ -41,7 +41,8 @@ async def handle_post(request: web.Request) -> web.Response:
     except Exception:
         return _error("bad_request")
     item = body.get("item") if isinstance(body, dict) else None
-    if item not in (shop_service.PREMIUM_ID, shop_service.RENAME_ID, shop_service.FIRM_RENAME_ID):
+    if item not in (shop_service.PREMIUM_ID, shop_service.RENAME_ID, shop_service.FIRM_RENAME_ID,
+                    shop_service.ELIXIR_PACK_ID):
         return _error("bad_request")
     async with request.app[SESSION_FACTORY_KEY]() as db:
         character = await onboarding_svc.get_character(db, request[VK_USER_ID_KEY])
@@ -55,6 +56,8 @@ async def handle_post(request: web.Request) -> web.Response:
             if item == shop_service.PREMIUM_ID:
                 until = await shop_service.buy_premium(db, character, body.get("days"))
                 done = {"item": item, "days": body.get("days"), "until": until.isoformat()}
+            elif item == shop_service.ELIXIR_PACK_ID:
+                done = {"item": item, "contents": await shop_service.buy_elixir_pack(db, character)}
             elif item == shop_service.RENAME_ID:
                 old = await shop_service.rename_character(db, character, body.get("name"))
                 done = {"item": item, "old": old, "name": character.name}

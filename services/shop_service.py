@@ -53,8 +53,48 @@ def catalog(character: Character, gems: int, firm_name: str | None = None) -> di
             "perks": _premium_perks(),
             "note": "Без силовых преимуществ: статы, урон и HP не меняются. Срок складывается с оставшимся.",
             "active_until": until.isoformat() if active and until is not None else None,
-        }, *rename_items(character, firm_name)],
+        }, elixir_pack_item(), *rename_items(character, firm_name)],
     }
+
+
+# --- Набор зелий (2026-10-19, решение владельца) ---
+
+ELIXIR_PACK_ID = "elixir_pack"
+ELIXIR_PACK_PRICE = 100
+ELIXIR_PACK_HEAL = ("heal_large", 10)
+ELIXIR_PACK_COMBAT_EACH = 2
+
+
+def _elixir_pack_contents() -> list[tuple[object, int]]:
+    from services import elixir_service
+
+    heal_id, heal_n = ELIXIR_PACK_HEAL
+    rows = [(elixir_service.elixir_def(heal_id), heal_n)]
+    rows += [(d, ELIXIR_PACK_COMBAT_EACH) for d in elixir_service.elixir_defs_ordered() if d.category == "combat"]
+    return [(d, n) for d, n in rows if d is not None]
+
+
+def elixir_pack_item() -> dict:
+    return {
+        "id": ELIXIR_PACK_ID, "title": "Набор зелий", "emoji": "🧪", "kind": "bundle",
+        "price": ELIXIR_PACK_PRICE,
+        "perks": [f"{d.emoji} {d.name} ×{n}" for d, n in _elixir_pack_contents()],
+        "note": "Зелья сразу попадают в сумку.",
+    }
+
+
+async def buy_elixir_pack(db: AsyncSession, character: Character) -> list[str]:
+    """Списать самоцветы и выдать набор. Возвращает строки содержимого."""
+    from services import elixir_service
+
+    try:
+        await wallet_service.charge(db, character.id, "donate", ELIXIR_PACK_PRICE)
+    except wallet_service.NotEnoughCurrency:
+        raise ShopError(f"Не хватает самоцветов: нужно 💎{ELIXIR_PACK_PRICE}.") from None
+    contents = _elixir_pack_contents()
+    for d, n in contents:
+        await elixir_service.grant(db, character.id, d.id, n)
+    return [f"{d.emoji} {d.name} ×{n}" for d, n in contents]
 
 
 async def buy_premium(db: AsyncSession, character: Character, days: int) -> datetime:
