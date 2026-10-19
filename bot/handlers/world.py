@@ -257,9 +257,16 @@ async def _maybe_send_monolith_button(peer_id: int, character) -> None:
     Не показывается, если персонаж уже в рейде/лобби (устаревшая ситуация —
     не должна произойти при обычном потоке, но не дублировать кнопку)."""
     if (character.pos_x, character.pos_y) != raid_cfg.MONOLITH_COORDS:
+        craft_button_state.leave(peer_id, craft_button_state.MONOLITH)
         return
     if raid_combat_handlers.has_active_raid(character.id):
         return
+    # Раз на вход (2026-10-18): во время фарма у Монолита предложение
+    # приходило после каждого боя и события. Войти можно и словом «Монолит».
+    x, y = character.pos_x, character.pos_y
+    if not craft_button_state.should_send(peer_id, craft_button_state.MONOLITH, x, y):
+        return
+    craft_button_state.mark_sent(peer_id, craft_button_state.MONOLITH, x, y)
     await _bot_api.messages.send(
         peer_id=peer_id, message=raid_texts.MONOLITH_CALL_TEXT, random_id=0,
         keyboard=raid_kb.touch_monolith_keyboard(),

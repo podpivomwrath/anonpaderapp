@@ -299,3 +299,24 @@ async def test_last_breath_saves_from_lethal_hit_in_duel() -> None:
         assert any("Последний вздох" in line for line in result.lines)
     finally:
         engine.shutdown()
+
+
+async def test_chill_window_survives_the_frozen_turn() -> None:
+    """2026-10-18, баг-репорт: «Схождение стихий» после удачных «Ледяных
+    оков» не критовало в дуэли - окно «по холоду» гасло в пропущенный ход."""
+    engine = make_engine()
+    engine.start()
+    try:
+        a = combatant(1, side=0)
+        b = combatant(2, side=1)
+        engine.start_duel(11, a, b)
+        await engine.act(11, 1, skip())
+        b.apply_effect(EffectKind.FREEZE, 1.0, 1, a.id)
+        b.apply_effect(EffectKind.CHILLED, 1.0, 1, a.id)
+        await engine.act(11, 2, skip())  # ход потерян из-за заморозки
+        assert b.has_effect(EffectKind.CHILLED), "окно сгорело до хода заморозившего"
+        await engine.act(11, 1, skip())
+        await engine.act(11, 2, skip())  # свой обычный ход - окно закрывается
+        assert not b.has_effect(EffectKind.CHILLED)
+    finally:
+        engine.shutdown()

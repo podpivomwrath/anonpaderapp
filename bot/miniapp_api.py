@@ -907,6 +907,13 @@ async def _ordered_presets(session: AsyncSession, character_id: int) -> list[Cha
     ).all()
 
 
+def _in_battle(vk_user_id: int) -> bool:
+    """Пресет в бою не меняется (2026-10-18): ни в соло, ни в группе, PvP и рейде."""
+    from bot.battle_keyboard import in_any_battle
+
+    return in_any_battle(vk_user_id)
+
+
 async def handle_get_presets(request: web.Request) -> web.Response:
     """Патч 14, ч.3: секция «Пресеты» — слоты, состав, каталог баффов подкласса
     (открытые + неоткрытые с подсказкой категории). Заглушка до выбора подкласса."""
@@ -962,6 +969,8 @@ async def handle_get_presets(request: web.Request) -> web.Response:
 async def handle_post_presets(request: web.Request) -> web.Response:
     """Создание/изменение состава пресета — платно (services.preset_service)."""
     vk_user_id = request[VK_USER_ID_KEY]
+    if _in_battle(vk_user_id):
+        return web.json_response({"error": "Не сейчас: идёт бой. Пресет меняется вне боя."}, status=400)
     try:
         body = await request.json()
     except Exception:
@@ -998,6 +1007,8 @@ async def handle_post_presets(request: web.Request) -> web.Response:
 
 async def handle_post_preset_switch(request: web.Request) -> web.Response:
     vk_user_id = request[VK_USER_ID_KEY]
+    if _in_battle(vk_user_id):
+        return web.json_response({"error": "Не сейчас: идёт бой. Пресет меняется вне боя."}, status=400)
     try:
         body = await request.json()
     except Exception:

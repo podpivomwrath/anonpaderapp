@@ -232,6 +232,11 @@ class DuelEngine:
 
         # Эффекты, кулдауны и контроль актёра тикают в конце его собственного хода
         for effect in actor.effects:
+            if effect.kind == EffectKind.CHILLED and actor.skipped_by_control_this_turn:
+                # Окно «по холоду» (2026-10-18, баг-репорт): в дуэли оно гасло
+                # в ход, который цель пропустила из-за контроля, и к ходу
+                # заморозившего его уже не было - «Схождение» не критовало.
+                continue
             effect.remaining_ticks -= 1
         # Элементалист, «Тепловой шок» (патч 49, ч.2) — см. комментарий в resolver.py.
         for effect in actor.effects_of(EffectKind.DOT):

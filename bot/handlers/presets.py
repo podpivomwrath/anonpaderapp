@@ -8,7 +8,6 @@ from sqlalchemy import select
 from vkbottle.bot import BotLabeler, Message
 
 from bot import editable_message
-from bot.handlers import combat as combat_handlers
 from bot.keyboards.presets import BTN_PRESETS, no_keyboard, presets_list_keyboard
 from game.content_loader import load_content
 from models import CharacterBuffPreset
@@ -16,6 +15,8 @@ from services import onboarding_service as onboarding_svc
 from services import preset_service
 from services.preset_service import PresetValidationError
 from services.db import get_session_factory
+
+from bot.battle_keyboard import in_any_battle
 
 labeler = BotLabeler()
 labeler.vbml_ignore_case = True  # команды без учёта регистра: «Пригласить» = «пригласить»
@@ -87,7 +88,7 @@ async def switch_preset_button(message: Message) -> None:
     preset_id = payload.get("id")
     if not isinstance(preset_id, int):
         return
-    if combat_handlers.has_active_encounter(peer_id):
+    if in_any_battle(peer_id):  # любой бой, не только соло (2026-10-18)
         await message.answer(IN_COMBAT_TEXT)
         return
 
@@ -110,7 +111,7 @@ async def switch_preset_button(message: Message) -> None:
 @labeler.message(text=["/пресет <n:int>", "/preset <n:int>"])
 async def switch_preset_command(message: Message, n: int) -> None:
     peer_id = message.peer_id
-    if combat_handlers.has_active_encounter(peer_id):
+    if in_any_battle(peer_id):  # любой бой, не только соло (2026-10-18)
         await message.answer(IN_COMBAT_TEXT)
         return
 
