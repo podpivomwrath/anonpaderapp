@@ -693,6 +693,9 @@ class MountDef(BaseModel):
     name: str
     rarity: str
     flavor: str = ""
+    #: Свои числа поверх редкости (Турбоишак: быстрый, но шумный).
+    seconds_per_cell: float | None = None
+    ambush_chance: float | None = None
 
 
 def load_mounts(content_dir: Path = CONTENT_DIR) -> dict[str, MountDef]:

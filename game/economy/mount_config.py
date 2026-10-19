@@ -31,7 +31,7 @@ RARITY_AMBUSH_CHANCE = {
 RARITY_EMOJI = {
     "common": "⚪",
     "rare": "🔵",
-    "epic": "🟠",
+    "epic": "🟣",  # 2026-10-19: как у вещей (🔵 → 🟣 → 🟠)
     "legendary": "🔴",
     "admin": "🛠",
 }

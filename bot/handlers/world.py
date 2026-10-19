@@ -356,6 +356,9 @@ async def send_cell_buttons(peer_id: int, character) -> None:
     await maybe_send_mine_button(peer_id, character)
     await world_boss_handlers.maybe_send_here_button(peer_id, character)
     from bot.handlers import rift as rift_handlers  # цикл импортов
+    from bot.handlers import turbo_ishak as turbo_handlers
+
+    await turbo_handlers.maybe_send_here_button(peer_id, character)
 
     await rift_handlers.maybe_send_here_button(peer_id, character)
 

@@ -443,6 +443,13 @@ body {
   animation: map-boss-glow 2.2s ease-in-out infinite;
 }
 
+/* Турбоишак дня: медный, пульсирует - он на месте ненадолго. */
+.map-pin--turbo {
+  border: 2px solid #c98a3a;
+  background: rgba(46, 26, 8, 0.88);
+  animation: map-pulse 1.4s ease-in-out infinite;
+}
+
 /* Патч 110: след события - пульсирует, как цель, к которой торопишься. */
 .map-pin--trail {
   border: 2px solid #e8a33d;

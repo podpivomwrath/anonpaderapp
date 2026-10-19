@@ -38,7 +38,7 @@ from models.item import Inventory, Item, ItemUpgradeHistory
 from models.lootbox import CharacterLootbox
 from models.mining import CharacterCraftTool, CharacterOre, MineVein, MiningEvent
 from models.payment import GemPayment
-from models.mount import CharacterMount, MountTravel
+from models.mount import CharacterMount, MountTravel, TurboIshakDay
 from models.promo import PromoActivation, PromoCode
 from models.pvp import PvpBattle
 from models.quest import CharacterQuest, Quest

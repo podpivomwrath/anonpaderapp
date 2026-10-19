@@ -22,6 +22,32 @@ class CharacterMount(Base):
     )
     mount_id: Mapped[str] = mapped_column(String(32))
     obtained_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    #: Имя от игрока (Турбоишак, 2026-10-19): «Турбоишак Алексей». None - ещё
+    #: не назван (бот ждёт имя), "" - игрок отказался давать имя.
+    nickname: Mapped[str | None] = mapped_column(String(24), nullable=True)
+
+
+class TurboIshakDay(Base):
+    """Турбоишак дня (2026-10-19): одна строка на московский день.
+
+    planned - время появления выбрано, ишака ещё нет; active - бегает по
+    карте (x, y - где он сейчас); caught - пойман (caught_by); gone - не
+    поймали за отведённое время. Числа - game/economy/turbo_config.py."""
+
+    __tablename__ = "turbo_ishak_days"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    day: Mapped[str] = mapped_column(String(10), unique=True)
+    status: Mapped[str] = mapped_column(String(10), default="planned")
+    spawn_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    next_move_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    x: Mapped[int | None] = mapped_column(nullable=True)
+    y: Mapped[int | None] = mapped_column(nullable=True)
+    caught_by: Mapped[int | None] = mapped_column(
+        ForeignKey("characters.id", ondelete="SET NULL"), nullable=True
+    )
+    caught_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
 
 class MountTravel(Base):

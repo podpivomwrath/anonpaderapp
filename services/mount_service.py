@@ -36,14 +36,23 @@ def mount_def(mount_id: str) -> MountDef | None:
 
 def seconds_per_cell(mount_id: str) -> float:
     d = mount_def(mount_id)
+    if d is not None and d.seconds_per_cell is not None:
+        return d.seconds_per_cell
     rarity = d.rarity if d is not None else "common"
     return mc.RARITY_SECONDS_PER_CELL.get(rarity, mc.RARITY_SECONDS_PER_CELL["common"])
 
 
 def ambush_chance(mount_id: str) -> float:
     d = mount_def(mount_id)
+    if d is not None and d.ambush_chance is not None:
+        return d.ambush_chance
     rarity = d.rarity if d is not None else "common"
     return mc.RARITY_AMBUSH_CHANCE.get(rarity, mc.RARITY_AMBUSH_CHANCE["common"])
+
+
+def display_name(d: MountDef, nickname: str | None) -> str:
+    """«Турбоишак Алексей» - если игрок дал маунту имя."""
+    return f"{d.name} {nickname}" if nickname else d.name
 
 
 async def grant(db: AsyncSession, character: Character, mount_id: str) -> bool:
@@ -83,7 +92,7 @@ async def owned_mounts(db: AsyncSession, character_id: int) -> list[OwnedMount]:
             continue
         result.append(
             OwnedMount(
-                mount_id=d.id, name=d.name, rarity=d.rarity,
+                mount_id=d.id, name=display_name(d, row.nickname), rarity=d.rarity,
                 emoji=mc.RARITY_EMOJI.get(d.rarity, ""),
                 seconds_per_cell=seconds_per_cell(d.id), ambush_chance=ambush_chance(d.id),
             )

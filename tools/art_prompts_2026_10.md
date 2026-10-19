@@ -293,3 +293,66 @@ rust brown and dried blood with a sickly pale-blue glow from the relics,
 drifting ash in the air, moody overcast light, no text, no watermark, no logo,
 no modern objects, horizontal 3:2 composition
 ```
+
+---
+
+# 🫏 Турбоишак (бот, 3:2) - три сцены
+
+Ишак везде один и тот же, чтобы его узнавали: серый пепельный ишак, на спине
+клёпаный медный паровой котёл с трубой, из трубы валит дым, на ногах железные
+шарнирные накладки, на голове лётные очки-гогглы, сдвинутые на лоб. Сделан на
+скорую руку из хлама, а не красиво: заплатки, проволока, ржавые болты.
+
+Загрузить в альбом (`tools/vk_upload.py`) и прислать номера: первая - когда
+игрок входит на клетку с ишаком, вторая - когда поймал, третья - для анонса ивента.
+
+## Ишак на клетке - кнопка «Подойти»
+
+Стоит на месте, жуёт сухую траву, котёл пыхтит. Видно, что сейчас сорвётся.
+
+```
+a scruffy grey donkey with a crude riveted copper steam boiler strapped to its
+back, a short smoking chimney pipe, iron hinged braces bolted onto its legs,
+old aviator goggles pushed up on its forehead, patched with wire and rusty
+bolts, standing on an ashen wasteland road chewing dry grass, steam hissing
+from a valve, one ear turned toward the viewer, a traveller seen from behind
+slowly approaching with an outstretched hand, dark fantasy scene illustration
+with a touch of humour, painterly semi-realistic, muted desaturated palette of
+ash grey, rust brown and dried blood with warm copper highlights, drifting ash
+and steam in the air, moody overcast light, no text, no watermark, no logo, no
+modern objects, horizontal 3:2 composition
+```
+
+## Пойман - игрок держит его за узду
+
+Ишак недоволен, но стоит. Котёл ещё дымит.
+
+```
+a traveller seen from behind holding the bridle of a scruffy grey donkey with
+a crude riveted copper steam boiler on its back, the donkey grumpy with ears
+flattened but standing still, thick smoke still rising from its chimney pipe,
+iron leg braces and aviator goggles on its forehead, a rope halter freshly
+tied, an ashen wasteland at dusk behind them, dark fantasy scene illustration
+with a touch of humour, painterly semi-realistic, muted desaturated palette of
+ash grey, rust brown and dried blood with warm copper highlights, drifting ash
+and steam in the air, warm low evening light, no text, no watermark, no logo,
+no modern objects, horizontal 3:2 composition
+```
+
+## Анонс ивента
+
+Ишак на полном ходу несётся по пустоши, за ним хвост дыма и искр, а сбоку из
+тумана уже выбегают твари на шум. Динамичный кадр, самый яркий из трёх.
+
+```
+a scruffy grey donkey with a crude riveted copper steam boiler on its back
+galloping at full speed across an ashen wasteland, a long trail of black smoke
+and sparks streaming from its chimney pipe, iron leg braces kicking up ash,
+aviator goggles over its eyes, monstrous silhouettes emerging from the fog on
+both sides drawn by the roar, a ruined stone road and dead trees blurred with
+speed, wide dynamic composition, dark fantasy scene illustration with a touch
+of humour, painterly semi-realistic, muted desaturated palette of ash grey,
+rust brown and dried blood with bright copper and ember highlights, drifting
+ash and steam, dramatic overcast light, no text, no watermark, no logo, no
+modern objects, horizontal 3:2 composition
+```

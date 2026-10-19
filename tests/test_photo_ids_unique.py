@@ -45,12 +45,8 @@ KNOWN_COLLISION: set[str] = set()
 INTENTIONAL_SHARED = {
     # Патч 110: оба пустых тайника ложного следа - одна и та же сцена.
     "457239194": {"scenes.json: trail_false_1", "scenes.json: trail_false_2"},
-    # 2026-10-17: Пепельный меняла ВРЕМЕННО с картинкой скупщика Иргала -
-    # своя ещё не нарисована (промт в tools/event_art_prompts.md). Убрать,
-    # когда меняле дадут свой номер.
-    "457239078": {
-        "scenes.json: relic_dealer", "group_scenes.json: g_relic_dealer", "appraiser.json: Тощий Иргал",
-    },
+    # Пепельный меняла (2026-10-19): одна сцена сделки на соло и групповое событие.
+    "457239255": {"scenes.json: relic_dealer", "group_scenes.json: g_relic_dealer"},
 }
 
 

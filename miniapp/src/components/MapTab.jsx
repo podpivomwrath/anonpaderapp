@@ -586,6 +586,8 @@ export default function MapTab() {
     ]),
     ...(questTarget ? [[questTarget.x, questTarget.y, 'map-pin--quest', '📜', questTarget.label, 1]] : []),
     ...(worldBoss ? [[worldBoss.x, worldBoss.y, 'map-pin--boss', '💀', worldBoss.name, 1.3]] : []),
+    // Турбоишак дня (2026-10-19): бегает по всей карте, поймать - зайти на клетку.
+    ...(mapState.turbo ? [[mapState.turbo.x, mapState.turbo.y, 'map-pin--turbo', '🫏', 'Турбоишак - поймай, пока не убежал', 1.25]] : []),
     ...(mapState.trail
       ? [[mapState.trail.x, mapState.trail.y, 'map-pin--trail', mapState.trail.emoji, mapState.trail.title, 1.1]]
       : []),
@@ -802,6 +804,9 @@ export default function MapTab() {
           {info.isMonolith && <p className="map-card__line">Рейды: прикоснись к Монолиту, нужен Ключ Монолита.</p>}
           {info.isCity && <p className="map-card__line">Город · без PvP · торговля, лавки, долгий путь из родного.</p>}
           {info.boss && <p className="map-card__line">💀 {info.boss.name} · ур. {info.boss.level} · {info.boss.hp_percent}%</p>}
+          {mapState.turbo && mapState.turbo.x === info.x && mapState.turbo.y === info.y && (
+            <p className="map-card__line">🫏 Турбоишак здесь. Зайди на клетку и нажми «Подойти» - он долго не стоит.</p>
+          )}
           {(() => {
             const g = guildCells.find((c) => c.x === info.x && c.y === info.y);
             if (!g) return null;

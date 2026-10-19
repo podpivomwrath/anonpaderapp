@@ -153,6 +153,12 @@ async def handle_get_state(request: web.Request) -> web.Response:
                 "hp_percent": round(100 * boss.hp / boss.max_hp) if boss.max_hp else 0,
             }
 
+        # Турбоишак дня (2026-10-19): где бегает сейчас.
+        from services import turbo_ishak_service
+
+        turbo = await turbo_ishak_service.active(db)
+        turbo_mark = {"x": turbo.x, "y": turbo.y} if turbo is not None else None
+
         # Гильдии: владения и закладки - цветом гильдии на карте.
         from services import guild_territory_service
 
@@ -212,6 +218,7 @@ async def handle_get_state(request: web.Request) -> web.Response:
                 "safe_route": bool((character.ui_flags or {}).get("safe_route")),
                 "quest_target": quest_target,
                 "world_boss": world_boss_mark,
+                "turbo": turbo_mark,
                 "trail": trail_mark,
                 "mounts": [
                     {

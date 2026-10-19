@@ -39,6 +39,7 @@ from bot.handlers.world_boss import labeler as world_boss_labeler
 from bot.handlers.voyage import labeler as voyage_labeler
 from bot.handlers.rift import labeler as rift_labeler
 from bot.handlers.terms import labeler as terms_labeler
+from bot.handlers.turbo_ishak import labeler as turbo_ishak_labeler
 
 LABELERS = [
     # Патч 110: события со сценами - сразу после онбординга. Ответ на загадку
@@ -48,7 +49,7 @@ LABELERS = [
     # раньше всех - кроме онбординга (он ловит только FSM создания).
     # Разломы: ожидание у входа перехватывает всё, кроме боя и /напасть.
     # Соглашение (2026-10-15): кнопка «Принимаю» - раньше всех.
-    terms_labeler, onboarding_labeler, voyage_labeler, rift_labeler, raid_archive_labeler, raid_procession_labeler, scene_events_labeler, group_events_labeler, world_labeler, combat_labeler, group_combat_labeler, pvp_labeler, arena_labeler, appraiser_labeler,
+    terms_labeler, onboarding_labeler, voyage_labeler, rift_labeler, raid_archive_labeler, raid_procession_labeler, scene_events_labeler, group_events_labeler, turbo_ishak_labeler, world_labeler, combat_labeler, group_combat_labeler, pvp_labeler, arena_labeler, appraiser_labeler,
     inventory_labeler, list_keeper_labeler, presets_labeler, elixir_shop_labeler,
     dailies_labeler, mounts_labeler, stats_window_labeler, moderation_labeler, basic_labeler,
     # Патч 53: рейд — до fallback/promo, как и остальные боевые/меню лейблеры.

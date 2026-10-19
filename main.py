@@ -338,6 +338,13 @@ async def run() -> None:
     respawn_scheduler.start()
     respawn_scheduler.add_job(raid_handlers.reconcile_lobbies, "interval", seconds=3,
                              id="raid_lobbies", max_instances=1, coalesce=True)
+    # Турбоишак дня (2026-10-19): появление, бег по карте, ожидание имени.
+    from bot.handlers import turbo_ishak as turbo_handlers
+
+    turbo_handlers.setup(bot.api)
+    await turbo_handlers.load_naming()
+    respawn_scheduler.add_job(turbo_handlers.tick_job, "interval", seconds=20,
+                             id="turbo_ishak", max_instances=1, coalesce=True)
     # Смена фракции, купленная в бою, - переезд, когда бой кончился.
     from bot import miniapp_shop_api
 
