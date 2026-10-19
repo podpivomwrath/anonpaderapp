@@ -79,6 +79,30 @@ def _alive(peer_id: int) -> Pending | None:
     return pending
 
 
+async def _keyboard_for(peer_id: int) -> str:
+    """Итог передачи - с текущей клавиатурой игрока (2026-10-19). Рудник и
+    озеро дают одноразовую клавиатуру: VK прячет её после первого же
+    сообщения, и после «передать ...» игрок оставался совсем без кнопок.
+    В беседе обычную клавиатуру не шлём - только снимаем инлайн-кнопки окна."""
+    if peer_id >= 2_000_000_000:
+        return no_keyboard()
+    from datetime import datetime, timezone
+
+    from bot.handlers import world as world_handlers
+
+    try:
+        async with get_session_factory()() as db:
+            character = await onboarding_service.get_character(db, peer_id)
+            keyboard = None
+            if character is not None and character.creation_state is None:
+                keyboard = await world_handlers._current_keyboard(db, character, peer_id, datetime.now(timezone.utc))
+            await db.commit()
+    except Exception:
+        logger.exception("Передача: не удалось собрать клавиатуру {}", peer_id)
+        return no_keyboard()
+    return keyboard or no_keyboard()
+
+
 def _qty_text(offer: transfer_service.Offer, qty: int) -> str:
     return f" ×{qty}" if offer.stackable else ""
 
@@ -155,7 +179,7 @@ async def _ask_confirm(peer_id: int, pending: Pending) -> None:
         refusal = NO_COURIER_TEXT
     if refusal:
         _pending.pop(peer_id, None)
-        await editable_message.send_or_edit(_bot_api, NAMESPACE, peer_id, refusal, no_keyboard())
+        await editable_message.send_or_edit(_bot_api, NAMESPACE, peer_id, refusal, await _keyboard_for(peer_id))
         return
     pending.qty = qty
     if _by_courier(pending, offer):
@@ -243,7 +267,7 @@ async def transfer_cancel(message: Message) -> None:
     pending = _alive(message.peer_id)
     if pending is not None and (message.get_payload_json() or {}).get("t") == pending.token:
         _pending.pop(message.peer_id, None)
-    await editable_message.send_or_edit(_bot_api, NAMESPACE, message.peer_id, "Передача отменена.", no_keyboard())
+    await editable_message.send_or_edit(_bot_api, NAMESPACE, message.peer_id, "Передача отменена.", await _keyboard_for(message.peer_id))
 
 
 @labeler.message(payload_contains={"type": "transfer_confirm"})
@@ -269,7 +293,7 @@ async def transfer_confirm(message: Message) -> None:
         recipient = await db.get(Character, pending.recipient_id)
         if recipient is None:
             await db.rollback()
-            await editable_message.send_or_edit(_bot_api, NAMESPACE, peer_id, "Получателя больше нет в игре.", no_keyboard())
+            await editable_message.send_or_edit(_bot_api, NAMESPACE, peer_id, "Получателя больше нет в игре.", await _keyboard_for(peer_id))
             return
         # Позиции - на момент подтверждения: пока думал, кто-то мог уйти.
         if transfer_service.needs_courier(offer, sender, recipient):
@@ -279,7 +303,7 @@ async def transfer_confirm(message: Message) -> None:
             moved = await transfer_service.execute(db, sender.id, pending.recipient_id, offer, qty)
         except transfer_service.TransferFailed as exc:
             await db.rollback()
-            await editable_message.send_or_edit(_bot_api, NAMESPACE, peer_id, str(exc), no_keyboard())
+            await editable_message.send_or_edit(_bot_api, NAMESPACE, peer_id, str(exc), await _keyboard_for(peer_id))
             return
         city = recipient.region if recipient is not None else None
         await db.commit()
@@ -294,7 +318,7 @@ async def transfer_confirm(message: Message) -> None:
             treasury = f"казну {REGION_TITLES[city]}" if city in REGION_TITLES else "казну"
             tax_line = f" Получено {moved - tax}, {tax} ушло в {treasury}."
     await editable_message.send_or_edit(
-        _bot_api, NAMESPACE, peer_id, f"📦 Передано {_whom(pending)}: {what}.{tax_line}", no_keyboard(),
+        _bot_api, NAMESPACE, peer_id, f"📦 Передано {_whom(pending)}: {what}.{tax_line}", await _keyboard_for(peer_id),
     )
     try:
         await _bot_api.messages.send(
@@ -313,17 +337,17 @@ async def _send_by_courier(db, peer_id: int, sender, recipient, pending: Pending
 
     if not sender.has_courier:
         await db.rollback()
-        await editable_message.send_or_edit(_bot_api, NAMESPACE, peer_id, NO_COURIER_TEXT, no_keyboard())
+        await editable_message.send_or_edit(_bot_api, NAMESPACE, peer_id, NO_COURIER_TEXT, await _keyboard_for(peer_id))
         return
     try:
         await courier_service.send(db, sender, recipient, offer, qty, pending.reveal_sender)
     except (courier_service.CourierError, transfer_service.TransferFailed) as exc:
         await db.rollback()
-        await editable_message.send_or_edit(_bot_api, NAMESPACE, peer_id, str(exc), no_keyboard())
+        await editable_message.send_or_edit(_bot_api, NAMESPACE, peer_id, str(exc), await _keyboard_for(peer_id))
         return
     await db.commit()
     await editable_message.send_or_edit(
         _bot_api, NAMESPACE, peer_id,
         f"{cc.EMOJI} Курьер выбежал из твоего города за посылкой: {offer.label}{_qty_text(offer, qty)}.",
-        no_keyboard(),
+        await _keyboard_for(peer_id),
     )
