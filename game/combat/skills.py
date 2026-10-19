@@ -265,9 +265,9 @@ def compute_hit(
     # уворота мобов («уходит в камень» и т.п.) не трогаем.
     scale_vs_ability = is_ability and target.kind == "character"
     if scale_vs_ability:
-        effect_dodge *= bc.ABILITY_DODGE_RATIO
-        extra_dodge *= bc.ABILITY_DODGE_RATIO
-        strongest_effect *= bc.ABILITY_DODGE_RATIO
+        effect_dodge *= bc.EFFECT_ABILITY_DODGE_RATIO
+        extra_dodge *= bc.EFFECT_ABILITY_DODGE_RATIO
+        strongest_effect *= bc.EFFECT_ABILITY_DODGE_RATIO
     total_dodge = min(
         stat_dodge + effect_dodge + extra_dodge,
         max(bc.DODGE_HARD_CAP, min(strongest_effect, bc.DODGE_EFFECT_CAP)),
@@ -278,7 +278,7 @@ def compute_hit(
         total_dodge = 0.0
     # «Второй шанс» против навыка - с тем же коэффициентом, а не наверняка.
     second_chance = target.second_chance_active and (
-        not scale_vs_ability or rng.random() < bc.ABILITY_DODGE_RATIO
+        not scale_vs_ability or rng.random() < bc.EFFECT_ABILITY_DODGE_RATIO
     )
     dodges = (not ignore_dodge and second_chance) or (
         total_dodge > 0 and rng.random() < total_dodge

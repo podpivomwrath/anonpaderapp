@@ -30,7 +30,7 @@ SHADOW_BLADE = register(
 
 @offensive_skill("shadow_blade_marked_strike")
 def marked_strike(ctx: SkillContext) -> None:
-    """Скользящий рез: 135% урона, +1 стак Метки добычи (макс. 5)."""
+    """Скользящий рез: 145% урона, +1 стак Метки добычи (макс. 5)."""
     skill = SUBCLASS_SKILL_DEFS["shadow_blade_marked_strike"]
     actor = ctx.actor
     actor.cooldowns[skill.id] = skill.cd
@@ -82,7 +82,7 @@ def mark_harvest(ctx: SkillContext) -> None:
 
 @offensive_skill("shadow_blade_execute")
 def execute(ctx: SkillContext) -> None:
-    """Казнь: 185% урона, гарантированный крит. Если цель ниже 30% HP — урон удваивается."""
+    """Казнь: 195% урона, гарантированный крит. Если цель ниже 30% HP — урон удваивается."""
     skill = SUBCLASS_SKILL_DEFS["shadow_blade_execute"]
     actor = ctx.actor
     actor.cooldowns[skill.id] = skill.cd

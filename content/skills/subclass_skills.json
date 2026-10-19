@@ -51,12 +51,12 @@
 
   "shadow_blade_marked_strike": {
     "id": "shadow_blade_marked_strike", "name": "Скользящий рез", "subclass_id": "shadow_blade",
-    "multiplier": 1.35, "cd": 2, "effect": "custom",
+    "multiplier": 1.45, "cd": 2, "effect": "custom",
     "flavor": "Порез неглубокий. Он ещё не знает, что это отметка."
   },
   "shadow_blade_mark_harvest": {
     "id": "shadow_blade_mark_harvest", "name": "Жатва меток", "subclass_id": "shadow_blade",
-    "multiplier": 1.2, "cd": 3, "effect": "custom",
+    "multiplier": 1.3, "cd": 3, "effect": "custom",
     "effect_value": 0.35,
     "flavor": "Все порезы вспоминают о себе разом."
   },
@@ -68,7 +68,7 @@
   },
   "shadow_blade_execute": {
     "id": "shadow_blade_execute", "name": "Казнь", "subclass_id": "shadow_blade",
-    "multiplier": 1.85, "cd": 5, "effect": "custom",
+    "multiplier": 1.95, "cd": 5, "effect": "custom",
     "flavor": "Ты не бьёшь. Ты завершаешь."
   },
 

@@ -19,7 +19,7 @@ def _rate(target, is_ability: bool, n: int = 4000) -> float:
 def test_smoke_screen_counts_quarter_against_abilities():
     rogue = combatant(2, 1, agility=0)
     rogue.apply_effect(EffectKind.DODGE, 0.4, 2, rogue.id)
-    assert abs(_rate(rogue, is_ability=True) - 0.4 * bc.ABILITY_DODGE_RATIO) < 0.03
+    assert abs(_rate(rogue, is_ability=True) - 0.4 * bc.EFFECT_ABILITY_DODGE_RATIO) < 0.03
     assert abs(_rate(rogue, is_ability=False) - 0.4) < 0.03
 
 
