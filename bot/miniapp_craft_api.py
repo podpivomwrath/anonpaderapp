@@ -85,6 +85,12 @@ def _item_payload(character: Character, item: Item) -> dict:
             crafting.next_efficiency(item.craft_efficiency)
             if item.craft_efficiency is not None else None
         ),
+        # Статы после следующей ступени - превью улучшения (2026-10-19).
+        "next_stats": (
+            crafting.stats_at_efficiency(item.craft_base_stats, crafting.next_efficiency(item.craft_efficiency))
+            if item.craft_efficiency is not None and item.craft_base_stats is not None
+            and crafting.next_efficiency(item.craft_efficiency) is not None else None
+        ),
         "recrafts": item.craft_recrafts,
         "bound": item.bound,
         "source_id": item.craft_source_id,

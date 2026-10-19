@@ -254,11 +254,180 @@ function Forge({ data, busy, run }) {
   );
 }
 
+// --- Улучшение (2026-10-19): как ковка - слоты «предмет + инструмент»,
+// ниже что получится, подтверждение и подсказки на каждом шаге. ---
+
+function Upgrade({ data, busy, run }) {
+  const [itemId, setItemId] = useState(null);
+  const [ceiling, setCeiling] = useState(null);
+  const [picker, setPicker] = useState(null); // 'item' | 'tool'
+  const [confirming, setConfirming] = useState(false);
+
+  const forged = data.items.filter((i) => i.spec);
+  const item = forged.find((i) => i.id === itemId) || null;
+  const tool = data.tools.find((t) => t.ceiling === ceiling) || null;
+  const need = item?.next_efficiency ?? null;
+  const fits = (t) => need !== null && t.ceiling >= need;
+  const toolGroups = byOreType(data.ore.filter((o) => o.tool_ceiling !== null));
+  const reset = () => setConfirming(false);
+
+  let blocker = null;
+  if (!item) blocker = 'Выбери предмет';
+  else if (need === null) blocker = 'Уже потолок';
+  else if (!tool) blocker = 'Выбери инструмент';
+  else if (!fits(tool)) blocker = `Нужен инструмент до ${need}%`;
+
+  return (
+    <>
+      <Group header={<Header>Улучшение</Header>}>
+        <Div>
+          <div className="forge-slots">
+            <ForgeSlot label="Предмет" filled={!!item} onClick={() => { setPicker('item'); reset(); }}>
+              <ItemIcon icon={item?.icon} rarity={item?.rarity} alt={item?.name} />
+              <span className="forge-slot__name">{item?.name}</span>
+              {item && <span className="forge-slot__sub">{item.spec_title} · {item.efficiency}%</span>}
+            </ForgeSlot>
+            <span className="forge-plus">+</span>
+            <ForgeSlot label="Инструмент" filled={!!tool} onClick={() => { setPicker('tool'); reset(); }}>
+              <ItemIcon icon={tool ? `tool:${tool.ceiling}` : null} alt="Инструмент" />
+              <span className="forge-slot__name">{tool ? `До ${tool.ceiling}%` : ''}</span>
+              {tool && <span className="forge-slot__sub">у тебя ×{tool.count}</span>}
+            </ForgeSlot>
+          </div>
+          <p className="craft-hint">
+            Улучшение поднимает эффективность выкованной вещи на одну ступень (+10%, до 120%) - все её статы
+            растут вместе с процентом. Каждая ступень тратит один инструмент, неудач не бывает.
+          </p>
+        </Div>
+      </Group>
+
+      <Group header={<Header>Что получится</Header>}>
+        <Div>
+          {!item && <p className="craft-hint">Выбери выкованную вещь - здесь будет видно, как вырастут статы.</p>}
+          {item && need === null && <p className="craft-hint">«{item.name}» уже на {item.efficiency}% - это потолок.</p>}
+          {item && need !== null && (
+            <>
+              <p className="guild-line"><b>{item.efficiency}% → {need}%</b></p>
+              <p className="craft-hint">Сейчас: {statLine(item.stats)}</p>
+              <p className="craft-hint">Станет: {statLine(item.next_stats)}</p>
+              <p className="craft-hint">
+                {tool
+                  ? (fits(tool)
+                    ? `Подойдёт: инструмент качает до ${tool.ceiling}%.${tool.ceiling > need ? ' Он сильнее, чем нужно - можно сберечь его для ступени выше.' : ''}`
+                    : `Этот инструмент качает только до ${tool.ceiling}% - для ступени ${need}% нужен потолок не ниже ${need}%.`)
+                  : `Для ступени ${need}% нужен инструмент с потолком от ${need}%.`}
+              </p>
+            </>
+          )}
+        </Div>
+      </Group>
+
+      <Div>
+        {confirming ? (
+          <div className="forge-confirm">
+            <p className="guild-line">
+              Улучшить «{item.name}» до {need}%, потратив инструмент «до {tool.ceiling}%»?
+            </p>
+            <div className="guild-row">
+              <Button size="m" disabled={busy}
+                onClick={() => { setConfirming(false); run(() => upgradeCraft(item.id, tool.ceiling)); }}>
+                Да, улучшить
+              </Button>
+              <Button size="m" mode="secondary" disabled={busy} onClick={reset}>Отмена</Button>
+            </div>
+          </div>
+        ) : (
+          <Button size="l" stretched mode="primary" disabled={busy || !!blocker} onClick={() => setConfirming(true)}>
+            {blocker || 'Улучшить'}
+          </Button>
+        )}
+      </Div>
+
+      <Group header={<Header>Выковать инструмент</Header>}>
+        <Div>
+          <p className="craft-hint">
+            Инструмент куётся из руды. Тир руды задаёт потолок, до которого он качает (тир 1 - до 90%,
+            2 - до 100%, 3 - до 110%, 4-5 - до 120%); градация руды не важна - уйдёт самая простая.
+            {need !== null ? ` Для «${item.name}» сейчас нужен потолок от ${need}%.` : ''}
+          </p>
+        </Div>
+        {toolGroups.length === 0 && <Div className="craft-hint">Подходящей руды нет: нужна руда 1-5 тиров с рудников.</Div>}
+        {toolGroups.map((group) => {
+          // Градация на инструмент не влияет: берём самую дешёвую, которой хватает.
+          const pick = group.grades.find((row) => row.count >= row.tool_cost);
+          const useful = need === null || group.tool_ceiling >= need;
+          return (
+            <SimpleCell
+              key={group.id}
+              multiline
+              before={<ItemIcon icon={`ore:${group.id}`} rarity={group.grades[group.grades.length - 1]?.grade} alt={group.name} />}
+              after={
+                <Button size="s" disabled={busy || !pick} onClick={() => run(() => craftTool(pick.id, pick.grade))}>
+                  {`${group.tool_cost} шт.`}
+                </Button>
+              }
+              subtitle={
+                `До ${group.tool_ceiling}% · у тебя ${group.total}`
+                + (pick ? ` · пойдёт ${pick.grade_name}` : ' - не хватает')
+                + (useful ? '' : ' · для этой вещи слабоват')
+              }
+            >
+              {group.name}
+            </SimpleCell>
+          );
+        })}
+      </Group>
+
+      {picker === 'item' && (
+        <PickSheet title="Предмет для улучшения" onClose={() => setPicker(null)}>
+          <p className="craft-hint forge-sheet__hint">Улучшать можно только выкованные вещи - сначала выкуй вещь с рейд-босса во вкладке «Крафт».</p>
+          {forged.length === 0 && <p className="craft-hint">Выкованных вещей нет.</p>}
+          {forged.map((row) => (
+            <button key={row.id} type="button"
+              className={`crown-sheet__item${row.id === itemId ? ' crown-sheet__item--active' : ''}`}
+              onClick={() => { setItemId(row.id); setPicker(null); }}>
+              <ItemIcon icon={row.icon} rarity={row.rarity} alt={row.name} />
+              <span className="crown-sheet__text">
+                <b>{row.name}</b>
+                <small>
+                  {row.spec_title} · {row.efficiency}%
+                  {row.next_efficiency ? ` → ${row.next_efficiency}%` : ' · потолок'} · {statLine(row.stats)}
+                </small>
+              </span>
+            </button>
+          ))}
+        </PickSheet>
+      )}
+
+      {picker === 'tool' && (
+        <PickSheet title="Инструмент" onClose={() => setPicker(null)}>
+          <p className="craft-hint forge-sheet__hint">
+            {need !== null
+              ? `Нужен потолок от ${need}%. Инструмент слабее не подойдёт, сильнее - подойдёт, но жалко.`
+              : 'Сначала выбери предмет - будет видно, какой инструмент подходит.'}
+          </p>
+          {data.tools.length === 0 && <p className="craft-hint">Инструментов нет - выкуй ниже из руды.</p>}
+          {data.tools.map((t) => (
+            <button key={t.ceiling} type="button" disabled={need !== null && !fits(t)}
+              className={`crown-sheet__item${t.ceiling === ceiling ? ' crown-sheet__item--active' : ''}`}
+              onClick={() => { setCeiling(t.ceiling); setPicker(null); }}>
+              <ItemIcon icon={`tool:${t.ceiling}`} alt="Инструмент" />
+              <span className="crown-sheet__text">
+                <b>Инструмент до {t.ceiling}%</b>
+                <small>у тебя ×{t.count}{need !== null && !fits(t) ? ` - слабее нужного (${need}%)` : ''}</small>
+              </span>
+            </button>
+          ))}
+        </PickSheet>
+      )}
+    </>
+  );
+}
+
 export default function CraftTab() {
   const [data, setData] = useState(null);
   const [status, setStatus] = useState('loading');
   const [subtab, setSubtab] = useState('craft');
-  const [itemId, setItemId] = useState(null);
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState(null);
 
@@ -268,7 +437,6 @@ export default function CraftTab() {
       .then((payload) => {
         setData(payload);
         setStatus('ready');
-        setItemId((current) => current ?? payload.items[0]?.id ?? null);
       })
       .catch(() => setStatus('error'));
   }, []);
@@ -293,11 +461,6 @@ export default function CraftTab() {
     );
   }
 
-  // Улучшать можно только выкованное: вещь прямо с босса сначала куют
-  // под роль во вкладке «Крафт», и только потом она попадает сюда.
-  const items = subtab === 'upgrade' ? data.items.filter((i) => i.spec) : data.items;
-  const item = items.find((i) => i.id === itemId) || items[0];
-  const toolGroups = byOreType(data.ore.filter((o) => o.tool_ceiling !== null));
 
   const run = (action) => {
     setBusy(true);
@@ -322,28 +485,6 @@ export default function CraftTab() {
         ))}
       </Tabs>
 
-      {!item && (
-        <Placeholder icon={<div style={{ fontSize: 44 }}>🔨</div>}>
-          Улучшать пока нечего. Сначала выкуй вещь во вкладке «Крафт» - инструменты можно готовить уже сейчас.
-        </Placeholder>
-      )}
-
-      {item && subtab === 'upgrade' && (
-      <Group header={<Header>Предмет</Header>}>
-        {items.map((row) => (
-          <SimpleCell
-            key={row.id}
-            before={<ItemIcon icon={row.icon} rarity={row.rarity} alt={row.name} />}
-            onClick={() => setItemId(row.id)}
-            subtitle={`${statLine(row.stats)}${row.efficiency ? ` · ${row.efficiency}%` : ''}`}
-            after={row.id === item.id ? '✓' : null}
-          >
-            {row.name}
-          </SimpleCell>
-        ))}
-      </Group>
-      )}
-
       {notice && (
         <Div className={notice.ok ? 'craft-notice craft-notice--ok' : 'craft-notice craft-notice--bad'}>
           {notice.text}
@@ -353,90 +494,7 @@ export default function CraftTab() {
       {subtab === 'craft' ? (
         <Forge data={data} busy={busy} run={run} />
       ) : (
-        <>
-          {item && (
-          <Group header={<Header>Эффективность</Header>}>
-            {item.efficiency === null ? (
-              <Div>Сначала выкуй предмет - улучшать пока нечего.</Div>
-            ) : (
-              <SimpleCell
-                multiline
-                subtitle={
-                  item.next_efficiency
-                    ? `Следующая ступень: ${item.next_efficiency}%`
-                    : 'Это потолок.'
-                }
-              >
-                {`${item.name} - ${item.efficiency}%`}
-              </SimpleCell>
-            )}
-          </Group>
-          )}
-
-          <Group header={<Header>Инструменты</Header>}>
-            {data.tools.length === 0 && <Div>Инструментов нет - выкуй ниже.</Div>}
-            {data.tools.map((tool) => (
-              <SimpleCell
-                key={tool.ceiling}
-                before={<ItemIcon icon={`tool:${tool.ceiling}`} alt="Инструмент" />}
-                after={
-                  <Button
-                    size="s"
-                    disabled={
-                      busy || !item || item.efficiency === null || !item.next_efficiency
-                      || tool.ceiling < item.next_efficiency
-                    }
-                    onClick={() => run(() => upgradeCraft(item.id, tool.ceiling))}
-                  >
-                    Применить
-                  </Button>
-                }
-                subtitle={`Качает до ${tool.ceiling}%`}
-              >
-                {`Инструмент ×${tool.count}`}
-              </SimpleCell>
-            ))}
-          </Group>
-
-          <Group header={<Header>Выковать инструмент</Header>}>
-            {toolGroups.length === 0 && <Div>Подходящей руды нет.</Div>}
-            {toolGroups.map((group) => {
-              // На инструмент градация не влияет вовсе - только тир. Поэтому
-              // выбирать её игроку незачем: берём самую дешёвую, которой
-              // хватает, и честно пишем какую.
-              const pick = group.grades.find((row) => row.count >= row.tool_cost);
-              return (
-                <SimpleCell
-                  key={group.id}
-                  multiline
-                  before={
-                    <ItemIcon
-                      icon={`ore:${group.id}`}
-                      rarity={group.grades[group.grades.length - 1]?.grade}
-                      alt={group.name}
-                    />
-                  }
-                  after={
-                    <Button
-                      size="s"
-                      disabled={busy || !pick}
-                      onClick={() => run(() => craftTool(pick.id, pick.grade))}
-                    >
-                      {`${group.tool_cost} шт.`}
-                    </Button>
-                  }
-                  subtitle={
-                    pick
-                      ? `До ${group.tool_ceiling}% · всего ${group.total} · пойдёт ${pick.grade_name}`
-                      : `До ${group.tool_ceiling}% · всего ${group.total} - не хватает`
-                  }
-                >
-                  {group.name}
-                </SimpleCell>
-              );
-            })}
-          </Group>
-        </>
+        <Upgrade data={data} busy={busy} run={run} />
       )}
     </>
   );
