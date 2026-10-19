@@ -329,6 +329,7 @@
 }
 .shop-card:active { transform: scale(0.97); box-shadow: 0 0 18px rgba(220, 70, 50, 0.4) inset; }
 .shop-card__emoji { font-size: 40px; line-height: 1; filter: drop-shadow(0 0 8px rgba(120, 180, 255, 0.45)); }
+.shop-card__img { width: 64px; height: 64px; object-fit: contain; border-radius: 10px; }
 .shop-card__title { font-size: 14px; }
 .shop-card__price { font-size: 13px; opacity: 0.8; font-variant-numeric: tabular-nums; }
 .shop-card__badge {

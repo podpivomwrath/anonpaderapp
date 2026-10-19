@@ -11,6 +11,16 @@ import { IN_VK, buyShop, buyShopRename, createPayment, getPayments, getShop } fr
 
 const money = (v) => Number(v ?? 0).toLocaleString('ru-RU');
 
+// Картинки карточек (2026-10-18): src/assets/shop/<id товара или пакета>.webp.
+// Нет файла - остаётся эмодзи, так что картинки можно добавлять по одной.
+const SHOP_IMAGES = import.meta.glob('../assets/shop/*.webp', { eager: true, import: 'default' });
+
+function ShopIcon({ id, emoji }) {
+  const src = SHOP_IMAGES[`../assets/shop/${id}.webp`];
+  if (src) return <img className="shop-card__img" src={src} alt="" aria-hidden="true" />;
+  return <span className="shop-card__emoji" aria-hidden="true">{emoji}</span>;
+}
+
 function daysWord(n) {
   const m10 = n % 10;
   const m100 = n % 100;
@@ -244,7 +254,7 @@ function GemPacks() {
             disabled={!data.enabled || busy !== null}
             onClick={() => buy(p.id)}
           >
-            <span className="shop-card__emoji" aria-hidden="true">💎</span>
+            <ShopIcon id={p.id} emoji="💎" />
             <b className="shop-card__title">{p.name}</b>
             <span className="shop-card__price">{money(p.gems)} 💎 · {money(p.rub)} ₽</span>
             {busy === p.id && <Spinner size="s" />}
@@ -298,7 +308,7 @@ export default function ShopTab({ onWallet, onBought }) {
         <div className="shop-grid">
           {data.items.map((i) => (
             <button type="button" key={i.id} className="shop-card" onClick={() => setOpen(i.id)}>
-              <span className="shop-card__emoji" aria-hidden="true">{i.emoji}</span>
+              <ShopIcon id={i.id} emoji={i.emoji} />
               <b className="shop-card__title">{i.title}</b>
               <span className="shop-card__price">
                 {i.kind === 'rename' ? `💎 ${money(i.price)}` : `от 💎 ${money(i.prices[i.min])}`}
