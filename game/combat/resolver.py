@@ -218,6 +218,143 @@ class TickResult:
     prelude_line_count: int = 0
 
 
+def _apply_phase(
+    session: CombatSessionState, hits: list, heals: list, ctx, rng,
+    applied_by_hit: dict[int, int], shielded_by_hit: dict[int, int], result: "TickResult",
+) -> list:
+    """Применить одну фазу хода: удары и лечение суммируются в net-дельту
+    по каждому участнику (внутри фазы всё одновременно). Возвращает удары
+    отражения, родившиеся в этой фазе. heals дополняется лечением от блока."""
+    damage_taken: dict[int, int] = {}
+    heal_taken: dict[int, int] = {}
+    reflect_hits: list[PendingHit] = []
+    for hit in hits:
+        target = session.combatants[hit.target_id]
+        amount = hit.amount
+        shared_rules.passive_mark(session.combatants.get(hit.source_id), target, hit, rng, ctx.lines)
+        # Рейд «Безмогильное поле»: купол и стойки генерала (session.py).
+        if target.incoming_hit_hook is not None and amount > 0:
+            amount = max(target.incoming_hit_hook(hit, session.combatants.get(hit.source_id), amount), 0)
+        # Несокрушимый (патч 39): входящий урон за удар не может превышать
+        # value*maxHP, применяется ДО щитов (щит гасит то, что осталось).
+        damage_cap = target.effect_total(EffectKind.DAMAGE_CAP)
+        if damage_cap > 0 and amount > 0:
+            amount = min(amount, max(round(target.max_hp * damage_cap), 1))
+        # Глухая оборона (патч 39): лечит цель за каждый удар, срезанный блоком
+        # (block_reduction/BLOCK_STANCE уже применены в compute_hit — здесь
+        # только считаем факт "удар пришёлся по блокирующей стойке").
+        block_stance = target.effect_total(EffectKind.BLOCK_STANCE)
+        if block_stance > 0 and amount > 0:
+            block_heal_pct = target.effect_total(EffectKind.BLOCK_HEAL)
+            if block_heal_pct > 0:
+                heals.append(
+                    PendingHeal(
+                        source_id=target.id, target_id=target.id,
+                        amount=round(target.max_hp * block_heal_pct), label="исцеляется от блока",
+                    )
+                )
+        # Щиты (однотиковый + «Второе сердце») и «Токсикология» - общие с
+        # дуэлью, см. game/combat/shared_rules.py.
+        pierce = (
+            shared_rules.poison_shield_pierce(session.combatants.get(hit.source_id))
+            if hit.is_dot else 0.0
+        )
+        # Сколько съел щит, пишется в строке удара (render_hit, shielded) -
+        # отдельные строки щитов больше не нужны.
+        before_shields = amount
+        amount = shared_rules.absorb_by_shields(target, amount, [], pierce=pierce)
+        shielded_by_hit[id(hit)] = before_shields - amount
+        # Страж, «Отражение» (патч 56) - общее с дуэлью правило.
+        reflected = shared_rules.block_reflect_amount(target, hit.blocked)
+        if reflected and hit.source_id != target.id:
+            attacker = session.combatants.get(hit.source_id)
+            if attacker is not None and attacker.alive:
+                reflect_hits.append(
+                    PendingHit(
+                        source_id=target.id, target_id=attacker.id,
+                        amount=reflected, label="отражает щитом",
+                    )
+                )
+        # Кровь за кровь (патч 16): доля полученного урона возвращается атакующему
+        reflect_pct = target.effect_total(EffectKind.BLOOD_REFLECT)
+        if reflect_pct > 0 and amount > 0 and hit.source_id != target.id:
+            attacker = session.combatants.get(hit.source_id)
+            if attacker is not None and attacker.alive:
+                reflect_hits.append(
+                    PendingHit(
+                        source_id=target.id, target_id=attacker.id,
+                        amount=max(round(amount * reflect_pct), 1), label=target.reflect_label,
+                    )
+                )
+        applied_by_hit[id(hit)] = amount
+        damage_taken[hit.target_id] = damage_taken.get(hit.target_id, 0) + amount
+    for hit in reflect_hits:
+        applied_by_hit[id(hit)] = hit.amount
+        damage_taken[hit.target_id] = damage_taken.get(hit.target_id, 0) + hit.amount
+    for heal in heals:
+        heal_taken[heal.target_id] = heal_taken.get(heal.target_id, 0) + heal.amount
+
+    # Патч 56, «Отголосок» Тёмного мистика: лечение сверх максимума HP не
+    # пропадает, а становится щитом следующему по низкому HP союзнику.
+    for source_id in {h.source_id for h in heals}:
+        source = session.combatants[source_id]
+        echo = source.buff_modifiers.get("heal_overflow_shield", 0.0)
+        if echo <= 0:
+            continue
+        for target_id in {h.target_id for h in heals if h.source_id == source_id}:
+            target = session.combatants[target_id]
+            overflow = (
+                target.current_hp
+                + heal_taken.get(target_id, 0)
+                - damage_taken.get(target_id, 0)
+                - target.max_hp
+            )
+            if overflow <= 0:
+                continue
+            # Сам мистик - тоже кандидат (2026-10-17): вдвоём перелечивание
+            # союзника на полном HP некуда было отдать, и оно пропадало.
+            group = [*session.alive_allies_of(source), *([source] if source.alive else [])]
+            candidates = [c for c in group if c.id != target_id]
+            if not candidates:
+                continue
+            ally = min(candidates, key=lambda c: c.current_hp / c.max_hp)
+            amount = round(overflow * echo)
+            cap = round(ally.max_hp * bc.DARK_MYSTIC_ECHO_CAP_PCT)
+            # Свой щит, отдельно от Оберега (ECHO_TAG): раньше отголосок затирал
+            # Оберег, а потом новый Оберег - накопленный отголосок. Новый
+            # отголосок прибавляется к уже висящему.
+            current = next(
+                (e for e in ally.effects_of(EffectKind.SHIELD_POOL)
+                 if e.source_id == source.id and getattr(e, "tag", None) == ECHO_TAG),
+                None,
+            )
+            # Не выше потолка (2026-10-18): прибавляем только до cap.
+            amount = min(amount, cap - round(current.value if current is not None else 0))
+            if amount <= 0:
+                continue
+            if current is not None:
+                current.value += amount
+                current.remaining_ticks = max(current.remaining_ticks, bc.DARK_MYSTIC_ECHO_DURATION)
+            else:
+                ally.apply_effect(
+                    EffectKind.SHIELD_POOL, amount, bc.DARK_MYSTIC_ECHO_DURATION, source.id, tag=ECHO_TAG,
+                )
+            ctx.lines.append(
+                f"{source.name}: отголосок - {overflow} лишнего лечения ({target.name}) "
+                f"становится щитом +{amount} на {ally.name}"
+            )
+
+    for cid in set(damage_taken) | set(heal_taken):
+        combatant = session.combatants[cid]
+        delta = heal_taken.get(cid, 0) - damage_taken.get(cid, 0)
+        combatant.current_hp = min(combatant.current_hp + delta, combatant.max_hp)
+        if combatant.hp_floor > 0 and combatant.current_hp < combatant.hp_floor:
+            combatant.current_hp = combatant.hp_floor
+        _apply_last_breath_guard(combatant, result)
+
+    return reflect_hits
+
+
 def _display_mode(session: CombatSessionState) -> str:
     return display.MODE_PVE_NUM if session.mode == CombatMode.PVE else display.MODE_PVP
 
@@ -442,142 +579,44 @@ def resolve_tick(
     # лечение было положительным и капалось верно, просто лог показывал не то).
     hp_before_apply = {c.id: c.current_hp for c in session.combatants.values()}
 
-    # --- Одновременное применение: net-дельта по каждому участнику ---
-    damage_taken: dict[int, int] = {}
-    heal_taken: dict[int, int] = {}
-    reflect_hits: list[PendingHit] = []
-    # Патч 32, баг 2/3: фактически поглощённый урон КАЖДОГО хита (после щита/
-    # пула) — по id(hit), для прогрессивного hp_before/hp_after в логе ниже.
-    # Раньше лог всех хитов по одной цели в этот ход показывал ОДИН и тот же
-    # (общий hp_before хода → итоговый current_hp) переход — второй удар
-    # «Двойного укола» выглядел так, будто не наносил урона, хотя фактически
-    # урон суммировался в damage_taken корректно.
+    # --- Применение по фазам (2026-10-19, предложение игрока) ---
+    # Против мобов ход идёт по порядку: сначала удары игроков, потом удары
+    # мобов и яды, а лечение доходит в конце хода вместе с ними (одной суммой,
+    # поэтому по-прежнему спасает от смертельного удара). Раньше всё было
+    # одной суммой, и лог врал о порядке: «Мистик лечит Стража 0 -> 25» стояло
+    # выше удара волка, который его и уронил. Вариант «лечение до мобов»
+    # проверяли: хил по почти полному союзнику сгорал, Архивариус 20% -> 11%,
+    # обоз втроём 51% -> 35%; этот вариант баланс не меняет (сим совпал).
+    # В PvP обе стороны - игроки, там ход остаётся одновременным.
     applied_by_hit: dict[int, int] = {}
     shielded_by_hit: dict[int, int] = {}
-    for hit in ctx.hits:
-        target = session.combatants[hit.target_id]
-        amount = hit.amount
-        shared_rules.passive_mark(session.combatants.get(hit.source_id), target, hit, rng, ctx.lines)
-        # Рейд «Безмогильное поле»: купол и стойки генерала (session.py).
-        if target.incoming_hit_hook is not None and amount > 0:
-            amount = max(target.incoming_hit_hook(hit, session.combatants.get(hit.source_id), amount), 0)
-        # Несокрушимый (патч 39): входящий урон за удар не может превышать
-        # value*maxHP, применяется ДО щитов (щит гасит то, что осталось).
-        damage_cap = target.effect_total(EffectKind.DAMAGE_CAP)
-        if damage_cap > 0 and amount > 0:
-            amount = min(amount, max(round(target.max_hp * damage_cap), 1))
-        # Глухая оборона (патч 39): лечит цель за каждый удар, срезанный блоком
-        # (block_reduction/BLOCK_STANCE уже применены в compute_hit — здесь
-        # только считаем факт "удар пришёлся по блокирующей стойке").
-        block_stance = target.effect_total(EffectKind.BLOCK_STANCE)
-        if block_stance > 0 and amount > 0:
-            block_heal_pct = target.effect_total(EffectKind.BLOCK_HEAL)
-            if block_heal_pct > 0:
-                ctx.heals.append(
-                    PendingHeal(
-                        source_id=target.id, target_id=target.id,
-                        amount=round(target.max_hp * block_heal_pct), label="исцеляется от блока",
-                    )
-                )
-        # Щиты (однотиковый + «Второе сердце») и «Токсикология» - общие с
-        # дуэлью, см. game/combat/shared_rules.py.
-        pierce = (
-            shared_rules.poison_shield_pierce(session.combatants.get(hit.source_id))
-            if hit.is_dot else 0.0
-        )
-        # Сколько съел щит, пишется в строке удара (render_hit, shielded) -
-        # отдельные строки щитов больше не нужны.
-        before_shields = amount
-        amount = shared_rules.absorb_by_shields(target, amount, [], pierce=pierce)
-        shielded_by_hit[id(hit)] = before_shields - amount
-        # Страж, «Отражение» (патч 56) - общее с дуэлью правило.
-        reflected = shared_rules.block_reflect_amount(target, hit.blocked)
-        if reflected and hit.source_id != target.id:
-            attacker = session.combatants.get(hit.source_id)
-            if attacker is not None and attacker.alive:
-                reflect_hits.append(
-                    PendingHit(
-                        source_id=target.id, target_id=attacker.id,
-                        amount=reflected, label="отражает щитом",
-                    )
-                )
-        # Кровь за кровь (патч 16): доля полученного урона возвращается атакующему
-        reflect_pct = target.effect_total(EffectKind.BLOOD_REFLECT)
-        if reflect_pct > 0 and amount > 0 and hit.source_id != target.id:
-            attacker = session.combatants.get(hit.source_id)
-            if attacker is not None and attacker.alive:
-                reflect_hits.append(
-                    PendingHit(
-                        source_id=target.id, target_id=attacker.id,
-                        amount=max(round(amount * reflect_pct), 1), label=target.reflect_label,
-                    )
-                )
-        applied_by_hit[id(hit)] = amount
-        damage_taken[hit.target_id] = damage_taken.get(hit.target_id, 0) + amount
-    ctx.hits.extend(reflect_hits)
-    for hit in reflect_hits:
-        applied_by_hit[id(hit)] = hit.amount
-        damage_taken[hit.target_id] = damage_taken.get(hit.target_id, 0) + hit.amount
-    for heal in ctx.heals:
-        heal_taken[heal.target_id] = heal_taken.get(heal.target_id, 0) + heal.amount
+    if session.mode == CombatMode.PVE:
+        def players_turn(hit) -> bool:
+            src = session.combatants.get(hit.source_id)
+            return src is not None and src.kind == "character" and not hit.is_tick
 
-    # Патч 56, «Отголосок» Тёмного мистика: лечение сверх максимума HP не
-    # пропадает, а становится щитом следующему по низкому HP союзнику.
-    for source_id in {h.source_id for h in ctx.heals}:
-        source = session.combatants[source_id]
-        echo = source.buff_modifiers.get("heal_overflow_shield", 0.0)
-        if echo <= 0:
-            continue
-        for target_id in {h.target_id for h in ctx.heals if h.source_id == source_id}:
-            target = session.combatants[target_id]
-            overflow = (
-                target.current_hp
-                + heal_taken.get(target_id, 0)
-                - damage_taken.get(target_id, 0)
-                - target.max_hp
-            )
-            if overflow <= 0:
-                continue
-            # Сам мистик - тоже кандидат (2026-10-17): вдвоём перелечивание
-            # союзника на полном HP некуда было отдать, и оно пропадало.
-            group = [*session.alive_allies_of(source), *([source] if source.alive else [])]
-            candidates = [c for c in group if c.id != target_id]
-            if not candidates:
-                continue
-            ally = min(candidates, key=lambda c: c.current_hp / c.max_hp)
-            amount = round(overflow * echo)
-            cap = round(ally.max_hp * bc.DARK_MYSTIC_ECHO_CAP_PCT)
-            # Свой щит, отдельно от Оберега (ECHO_TAG): раньше отголосок затирал
-            # Оберег, а потом новый Оберег - накопленный отголосок. Новый
-            # отголосок прибавляется к уже висящему.
-            current = next(
-                (e for e in ally.effects_of(EffectKind.SHIELD_POOL)
-                 if e.source_id == source.id and getattr(e, "tag", None) == ECHO_TAG),
-                None,
-            )
-            # Не выше потолка (2026-10-18): прибавляем только до cap.
-            amount = min(amount, cap - round(current.value if current is not None else 0))
-            if amount <= 0:
-                continue
-            if current is not None:
-                current.value += amount
-                current.remaining_ticks = max(current.remaining_ticks, bc.DARK_MYSTIC_ECHO_DURATION)
-            else:
-                ally.apply_effect(
-                    EffectKind.SHIELD_POOL, amount, bc.DARK_MYSTIC_ECHO_DURATION, source.id, tag=ECHO_TAG,
-                )
-            ctx.lines.append(
-                f"{source.name}: отголосок - {overflow} лишнего лечения ({target.name}) "
-                f"становится щитом +{amount} на {ally.name}"
-            )
+        phases = [
+            ([h for h in ctx.hits if players_turn(h)], []),
+            ([h for h in ctx.hits if not players_turn(h)], list(ctx.heals)),
+        ]
+    else:
+        phases = [(list(ctx.hits), list(ctx.heals))]
 
-    for cid in set(damage_taken) | set(heal_taken):
-        combatant = session.combatants[cid]
-        delta = heal_taken.get(cid, 0) - damage_taken.get(cid, 0)
-        combatant.current_hp = min(combatant.current_hp + delta, combatant.max_hp)
-        if combatant.hp_floor > 0 and combatant.current_hp < combatant.hp_floor:
-            combatant.current_hp = combatant.hp_floor
-        _apply_last_breath_guard(combatant, result)
+    log_phases: list[tuple[list, list]] = []
+    for index, (hits, heals) in enumerate(phases):
+        if index > 0:
+            # Павший в фазе игроков больше не бьёт и не получает урона: мёртвый
+            # моб не отвечает, яд по трупу не тикает, лечить мёртвого нечем.
+            hits = [
+                h for h in hits
+                if session.combatants[h.target_id].alive
+                and (h.is_tick or session.combatants[h.source_id].alive)
+            ]
+            heals = [h for h in heals if session.combatants[h.target_id].alive]
+        reflects = _apply_phase(session, hits, heals, ctx, rng, applied_by_hit, shielded_by_hit, result)
+        log_phases.append((hits + reflects, heals))
+    ctx.hits = [h for hits, _ in log_phases for h in hits]
+    ctx.heals = [h for _, heals in log_phases for h in heals]
 
     # --- Строки лога: единый краткий формат везде — PvE, PvP, рейды (патч 43,
     # ч.1) — образность убрана из пошагового лога, режим влияет только на
@@ -585,57 +624,65 @@ def resolve_tick(
     result.lines.extend(ctx.lines)
     result.prelude_line_count = len(result.lines)  # патч 51, ч.5: граница для game/combat/battle_log.py
     running_hp = dict(hp_before_apply)
-    for hit in ctx.hits:
-        source = session.combatants[hit.source_id]
-        target = session.combatants[hit.target_id]
-        h_before = running_hp[target.id]
-        applied = applied_by_hit.get(id(hit), hit.amount)
-        h_after = h_before - applied
-        running_hp[target.id] = h_after
-        result.lines.append(
-            combat_flavor.render_hit(
-                source.name, target.name,
-                label=hit.label, amount=applied, crit=hit.crit, missed=hit.missed, is_dot=hit.is_dot,
-                hp_before=h_before, hp_after=h_after, max_hp=target.max_hp, mode=mode,
-                shielded=shielded_by_hit.get(id(hit), 0),
+    # Порядок лога = порядок фаз: удары игроков, удары мобов, лечение.
+    # battle_log берёт удары из hit_renders, а лечение из heal_renders
+    # отдельно, поэтому в result.lines удары идут подряд, лечение - после.
+    hit_lines: list[str] = []
+    heal_lines: list[str] = []
+    for hits, heals in log_phases:
+        for hit in hits:
+            source = session.combatants[hit.source_id]
+            target = session.combatants[hit.target_id]
+            h_before = running_hp[target.id]
+            applied = applied_by_hit.get(id(hit), hit.amount)
+            h_after = h_before - applied
+            running_hp[target.id] = h_after
+            hit_lines.append(
+                combat_flavor.render_hit(
+                    source.name, target.name,
+                    label=hit.label, amount=applied, crit=hit.crit, missed=hit.missed, is_dot=hit.is_dot,
+                    hp_before=h_before, hp_after=h_after, max_hp=target.max_hp, mode=mode,
+                    shielded=shielded_by_hit.get(id(hit), 0),
+                )
             )
-        )
-        result.hit_renders.append(
-            RenderedHit(
-                source_id=source.id, target_id=target.id, source_side=source.side, target_side=target.side,
-                label=hit.label, amount=applied, crit=hit.crit, missed=hit.missed, is_dot=hit.is_dot,
-                is_tick=hit.is_tick,
-                hp_before=h_before, hp_after=h_after, max_hp=target.max_hp,
-                absorbed=hit.blocked + max(hit.amount - applied, 0),
-                marked=hit.marked, blocked=hit.blocked,
+            result.hit_renders.append(
+                RenderedHit(
+                    source_id=source.id, target_id=target.id, source_side=source.side, target_side=target.side,
+                    label=hit.label, amount=applied, crit=hit.crit, missed=hit.missed, is_dot=hit.is_dot,
+                    is_tick=hit.is_tick,
+                    hp_before=h_before, hp_after=h_after, max_hp=target.max_hp,
+                    absorbed=hit.blocked + max(hit.amount - applied, 0),
+                    marked=hit.marked, blocked=hit.blocked,
+                )
             )
-        )
-    for heal in ctx.heals:
-        source = session.combatants[heal.source_id]
-        target = session.combatants[heal.target_id]
-        h_before = running_hp[target.id]
-        h_after = min(h_before + heal.amount, target.max_hp)
-        # В лог идёт ФАКТИЧЕСКИ восполненное, а не запрошенное. Лечение поверх
-        # полного HP не восполняет ничего, и строка «восполнено 1 HP
-        # (100.0% -> 100.0%)» сама себе противоречила. Ноль не печатаем вовсе:
-        # строка, в которой не изменилось ни число, ни проценты, - это шум,
-        # а в рейде на пятерых такого шума приходило по пять строк за ход.
-        applied = h_after - h_before
-        if applied <= 0:
-            continue
-        running_hp[target.id] = h_after
-        result.lines.append(
-            display.action_line(
-                source.name, heal.label, target.name,
-                h_before, h_after, target.max_hp, mode,
+        for heal in heals:
+            source = session.combatants[heal.source_id]
+            target = session.combatants[heal.target_id]
+            h_before = running_hp[target.id]
+            h_after = min(h_before + heal.amount, target.max_hp)
+            # В лог идёт ФАКТИЧЕСКИ восполненное, а не запрошенное. Лечение поверх
+            # полного HP не восполняет ничего, и строка «восполнено 1 HP
+            # (100.0% -> 100.0%)» сама себе противоречила. Ноль не печатаем вовсе:
+            # строка, в которой не изменилось ни число, ни проценты, - это шум,
+            # а в рейде на пятерых такого шума приходило по пять строк за ход.
+            applied = h_after - h_before
+            if applied <= 0:
+                continue
+            running_hp[target.id] = h_after
+            heal_lines.append(
+                display.action_line(
+                    source.name, heal.label, target.name,
+                    h_before, h_after, target.max_hp, mode,
+                )
             )
-        )
-        result.heal_renders.append(
-            RenderedHeal(
-                source_id=source.id, target_id=target.id, source_side=source.side, target_side=target.side,
-                label=heal.label, amount=applied, hp_before=h_before, hp_after=h_after, max_hp=target.max_hp,
+            result.heal_renders.append(
+                RenderedHeal(
+                    source_id=source.id, target_id=target.id, source_side=source.side, target_side=target.side,
+                    label=heal.label, amount=applied, hp_before=h_before, hp_after=h_after, max_hp=target.max_hp,
+                )
             )
-        )
+    result.lines.extend(hit_lines)
+    result.lines.extend(heal_lines)
 
     # --- Тик длительностей, КД, контроля; очистка однотиковых состояний ---
     pvp = session.mode != CombatMode.PVE  # DR-стрик считаем только в PvP

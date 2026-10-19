@@ -187,6 +187,10 @@ def render_tick(
     mode = _mode(session)
     own: list[str] = []
     enemy: list[str] = []
+    # Против мобов (2026-10-19): яды, лечение и смерти - отдельным итогом хода,
+    # после действий обеих сторон. Раньше «☠ погибает» стояло в разделе
+    # игроков выше удара, который убил.
+    summary: list[str] | None = [] if session.mode == CombatMode.PVE else None
 
     def bucket(side: int) -> list[str]:
         return own if side == viewer_side else enemy
@@ -201,10 +205,17 @@ def render_tick(
         target_name = session.combatants[hit.target_id].name
         bucket(hit.source_side).append(_hit_line(hit, source_name, target_name, mode))
 
+    # Лечение против мобов доходит в конце хода, после их ударов (resolver),
+    # поэтому и в логе оно в итоге: цифры читаются сверху вниз.
+    heal_lines = []
     for heal in result.heal_renders:
         source_name = session.combatants[heal.source_id].name
         target_name = session.combatants[heal.target_id].name
-        bucket(heal.source_side).append(_heal_line(heal, source_name, target_name, mode))
+        line = _heal_line(heal, source_name, target_name, mode)
+        if summary is not None:
+            heal_lines.append(line)
+        else:
+            bucket(heal.source_side).append(line)
 
     hit_heal_span = len(result.hit_renders) + len(result.heal_renders)
     other_lines = (
@@ -212,12 +223,19 @@ def render_tick(
         + result.lines[result.prelude_line_count + hit_heal_span :]
     )
     for line in other_lines:
+        if summary is not None and line.startswith("☠"):
+            summary.append(line)
+            continue
         side = _guess_side(session, line)
         bucket(side if side is not None else 1 - viewer_side).append(line)
 
     for hit in dot_hits:
         target_name = session.combatants[hit.target_id].name
-        bucket(hit.target_side).append(_dot_line(hit, target_name))
+        (summary if summary is not None else bucket(hit.target_side)).append(_dot_line(hit, target_name))
+    if summary is not None:
+        # Порядок как в движке: яды, лечение, потом смерти.
+        deaths = [line for line in summary if line.startswith("☠")]
+        summary[:] = [line for line in summary if not line.startswith("☠")] + heal_lines + deaths
 
     # Сценарные реплики босса идут первыми в его разделе: они объясняют, что
     # он сделал в этот ход, и без них удары выглядят беспричинными.
@@ -238,6 +256,7 @@ def render_tick(
         enemy_title,
         *(enemy or ["Без изменений."]),
         "",
+        *(["📋 ИТОГ ХОДА", *summary, ""] if summary else []),
         _SEP,
     ]
     enemy_bars = [
