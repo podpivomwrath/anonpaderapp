@@ -82,6 +82,19 @@ def waiting_keyboard() -> str:
     return kb.get_json()
 
 
+BTN_WALK_CANCEL = "✖️ Отменить переход"
+WALK_CANCEL_PAYLOAD = {"type": "walk_cancel"}
+
+
+def walking_keyboard() -> str:
+    """Пеший переход на соседнюю клетку (2026-10-19): одна кнопка - передумать
+    и остаться там, откуда вышел."""
+    kb = Keyboard(one_time=False)
+    kb.add(Text(BTN_WALK_CANCEL, payload=WALK_CANCEL_PAYLOAD), color=KeyboardButtonColor.SECONDARY)
+    add_miniapp_button(kb)
+    return kb.get_json()
+
+
 def city_square_keyboard(
     character=None, mentor_badge: bool = False, has_mount: bool = False, is_foreign: bool = False,
 ) -> str:

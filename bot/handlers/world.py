@@ -535,7 +535,7 @@ async def show_location(message: Message, db, character) -> None:
 
     if movement_service.is_traveling(character, now):
         left = movement_service.remaining_seconds(character, now)
-        await message.answer(f"🚶 В пути... осталось ~{left:.0f} сек.")
+        await message.answer(f"🚶 В пути... осталось ~{left:.0f} сек.", keyboard=kb.walking_keyboard())
         return
 
     if in_any_battle(message.peer_id):
@@ -669,7 +669,7 @@ async def explore(message: Message) -> None:
             return
         if movement_service.is_traveling(character, now):
             left = movement_service.remaining_seconds(character, now)
-            await message.answer(f"🚶 В пути... осталось ~{left:.0f} сек.")
+            await message.answer(f"🚶 В пути... осталось ~{left:.0f} сек.", keyboard=kb.walking_keyboard())
             return
         if await mount_service.active_travel(db, character.id) is not None:
             await message.answer(MOUNT_BUSY_TEXT)
@@ -1367,7 +1367,7 @@ async def move(message: Message) -> None:
             return
         if movement_service.is_traveling(character, now):
             left = movement_service.remaining_seconds(character, now)
-            await message.answer(f"🚶 В пути... осталось ~{left:.0f} сек.")
+            await message.answer(f"🚶 В пути... осталось ~{left:.0f} сек.", keyboard=kb.walking_keyboard())
             return
         if await mount_service.active_travel(db, character.id) is not None:
             await message.answer(MOUNT_BUSY_TEXT)
@@ -1407,9 +1407,30 @@ async def move(message: Message) -> None:
         # всплывали бы потом в любой команде (2026-10-15).
         await _drop_pending_event(message.peer_id)
         scene_event_handlers.cancel(message.peer_id)
-        # в пути — кнопки убираем, вернём по прибытии (чистка визуального шума)
-        await message.answer(flavor.travel_line(_rng), keyboard=kb.waiting_keyboard())
+        # в пути - одна кнопка «Отменить переход» (2026-10-19), остальные вернём по прибытии
+        await message.answer(flavor.travel_line(_rng), keyboard=kb.walking_keyboard())
         _travel_scheduler.schedule(message.peer_id, travel_seconds)
+
+
+WALK_CANCEL_TEXT = "Ты передумываешь и возвращаешься."
+
+
+@labeler.message(payload_contains=kb.WALK_CANCEL_PAYLOAD)
+async def cancel_walk(message: Message) -> None:
+    """Отмена пешего перехода (2026-10-19): мгновенно, игрок остаётся на
+    клетке, откуда вышел (позиция до прибытия и не менялась)."""
+    async with get_session_factory()() as db:
+        character = await onboarding_svc.get_character(db, message.from_id)
+        if character is None or character.creation_state is not None:
+            return
+        if movement_service.is_traveling(character):
+            movement_service.cancel_travel(character)
+            if _travel_scheduler is not None:
+                _travel_scheduler.cancel(message.peer_id)
+            await db.commit()
+            await message.answer(WALK_CANCEL_TEXT)
+        # Успел дойти - кнопка устарела: просто показать, где он сейчас.
+        await show_location(message, db, character)
 
 
 async def handle_arrival(peer_id: int) -> None:
