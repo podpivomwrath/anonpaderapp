@@ -273,6 +273,14 @@ UNIQUE_LOOK = {
         "a reforged head piece made from a featureless paper mask",
         "same smooth eyeless paper face at its core, different reworking around it, shown on its own",
     ),
+    "pilgrim_greaves": (
+        "unique pilgrim leg greaves of worn leather and dull iron plates",
+        "knee pieces rubbed to a shine, flour dust in the seams, leg armor only from hip to ankle, "
+        "no feet, no boots, shown on its own with no wearer",
+        "reforged leg greaves made from pilgrim greaves",
+        "same shiny rubbed knee pieces at the core, different reworking around them, "
+        "no feet, no boots, shown on its own with no wearer",
+    ),
 }
 
 
