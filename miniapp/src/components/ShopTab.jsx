@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { Button, Div, Group, Header, Placeholder, Spinner } from '@vkontakte/vkui';
-import { IN_VK, buyShop, buyShopRename, createPayment, getPayments, getShop } from '../api.js';
+import { IN_VK, buyShop, buyShopFaction, buyShopRename, createPayment, getPayments, getShop } from '../api.js';
 
 /**
  * Магазин (2026-10-13): товары за самоцветы квадратными карточками. Нажатие
@@ -151,14 +151,20 @@ function BundleSheet({ item, gems, onClose, onBought }) {
           <ShopIcon id={item.id} emoji={item.emoji} />
           <div>
             <b className="shop-sheet__title">{item.title}</b>
+            {item.active_until && (
+              <p className="shop-sheet__active">Действует до {untilText(item.active_until)} - новая покупка прибавит время</p>
+            )}
           </div>
         </div>
         <ul className="shop-sheet__perks">
           {item.perks.map((perk) => <li key={perk}>{perk}</li>)}
         </ul>
         <p className="craft-hint">{item.note}</p>
+        {item.available === false && <p className="shop-sheet__error">{item.unavailable}</p>}
         {error && <p className="shop-sheet__error">{error}</p>}
-        {!enough && <p className="shop-sheet__error">Не хватает самоцветов: у тебя 💎 {money(gems)}.</p>}
+        {!enough && item.available !== false && (
+          <p className="shop-sheet__error">Не хватает самоцветов: у тебя 💎 {money(gems)}.</p>
+        )}
         <div className="shop-sheet__actions">
           {confirming ? (
             <>
@@ -168,8 +174,83 @@ function BundleSheet({ item, gems, onClose, onBought }) {
               <Button size="l" mode="secondary" stretched disabled={busy} onClick={() => setConfirming(false)}>Отмена</Button>
             </>
           ) : (
-            <Button size="l" stretched disabled={!enough} onClick={() => setConfirming(true)}>
+            <Button size="l" stretched disabled={!enough || item.available === false} onClick={() => setConfirming(true)}>
               Купить за 💎 {money(item.price)}
+            </Button>
+          )}
+        </div>
+      </div>
+    </>
+  );
+}
+
+// Смена фракции (2026-10-19): выбрать город и подтвердить. Бот сразу
+// переносит на площадь нового города и пишет об этом в сообщения.
+function FactionSheet({ item, gems, onClose, onBought }) {
+  const [region, setRegion] = useState(null);
+  const [confirming, setConfirming] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState(null);
+  const enough = gems >= item.price;
+  const chosen = item.options.find((o) => o.id === region);
+
+  const buy = async () => {
+    setBusy(true);
+    setError(null);
+    try {
+      onBought(await buyShopFaction(region));
+    } catch (err) {
+      setError(err.details?.error || err.message || 'Не удалось.');
+      setConfirming(false);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <>
+      <div className="nav-scrim" onClick={onClose} aria-hidden="true" />
+      <div className="crown-sheet shop-sheet" role="dialog" aria-label={item.title}>
+        <div className="shop-sheet__head">
+          <ShopIcon id={item.id} emoji={item.emoji} />
+          <div>
+            <b className="shop-sheet__title">{item.title}</b>
+            {item.current && <p className="shop-sheet__active">Сейчас: {item.current}</p>}
+          </div>
+        </div>
+        <ul className="shop-sheet__perks">
+          {item.perks.map((perk) => <li key={perk}>{perk}</li>)}
+        </ul>
+        <p className="craft-hint">{item.note}</p>
+        {item.available === false ? (
+          <p className="shop-sheet__error">Сменить снова можно {untilText(item.available_at)}.</p>
+        ) : (
+          <div className="shop-sheet__choices">
+            {item.options.map((o) => (
+              <Button
+                key={o.id} size="m" stretched disabled={busy}
+                mode={region === o.id ? 'primary' : 'secondary'}
+                onClick={() => { setRegion(o.id); setConfirming(false); setError(null); }}
+              >
+                {o.title}
+              </Button>
+            ))}
+          </div>
+        )}
+        {error && <p className="shop-sheet__error">{error}</p>}
+        {!enough && <p className="shop-sheet__error">Не хватает самоцветов: у тебя 💎 {money(gems)}.</p>}
+        <div className="shop-sheet__actions">
+          {confirming ? (
+            <>
+              <Button size="l" stretched disabled={busy} onClick={buy}>
+                {busy ? 'Переезжаем…' : `Да, в ${chosen?.title} за 💎 ${money(item.price)}`}
+              </Button>
+              <Button size="l" mode="secondary" stretched disabled={busy} onClick={() => setConfirming(false)}>Отмена</Button>
+            </>
+          ) : (
+            <Button size="l" stretched disabled={!enough || !chosen || item.available === false}
+              onClick={() => setConfirming(true)}>
+              Переехать за 💎 {money(item.price)}
             </Button>
           )}
         </div>
@@ -332,6 +413,12 @@ function GemPacks() {
   );
 }
 
+function bundleNotice(item, done) {
+  if (done.contents) return `${item.emoji} ${item.title} в сумке: ${done.contents.join(', ')}.`;
+  if (done.until) return `${item.emoji} ${item.title} действует до ${untilText(done.until)}.`;
+  return `${item.emoji} ${item.title} - готово.`;
+}
+
 export default function ShopTab({ onWallet, onBought }) {
   const [data, setData] = useState(null);
   const [status, setStatus] = useState('loading');
@@ -369,7 +456,8 @@ export default function ShopTab({ onWallet, onBought }) {
               <span className="shop-card__price">
                 {i.kind === 'days' ? `от 💎 ${money(i.prices[i.min])}` : `💎 ${money(i.price)}`}
               </span>
-              {i.active_until && <span className="shop-card__badge">активна</span>}
+              {i.active_until && <span className="shop-card__badge">{i.kind === 'days' ? 'активна' : 'действует'}</span>}
+              {i.id === 'secret_pocket' && i.available === false && <span className="shop-card__badge">есть</span>}
             </button>
           ))}
         </div>
@@ -398,7 +486,21 @@ export default function ShopTab({ onWallet, onBought }) {
             setData(res);
             setOpen(null);
             onWallet?.({ donate_currency: res.gems });
-            setNotice(`${item.emoji} ${item.title} в сумке: ${res.done.contents.join(', ')}.`);
+            setNotice(bundleNotice(item, res.done));
+            onBought?.();
+          }}
+        />
+      )}
+      {item && item.kind === 'faction' && (
+        <FactionSheet
+          item={item}
+          gems={data.gems}
+          onClose={() => setOpen(null)}
+          onBought={(res) => {
+            setData(res);
+            setOpen(null);
+            onWallet?.({ donate_currency: res.gems });
+            setNotice(`${item.emoji} Переезд готов, твой город теперь - ${res.done.title}. Бот прислал площадь в сообщения.`);
             onBought?.();
           }}
         />

@@ -10,6 +10,7 @@ from aiohttp import web
 from bot.app_keys import SESSION_FACTORY_KEY
 from bot.miniapp_auth import VK_USER_ID_KEY
 from services import onboarding_service as onboarding_svc
+from bot.onboarding_texts import REGION_TITLES
 from services import shop_service, wallet_service
 
 
@@ -42,8 +43,10 @@ async def handle_post(request: web.Request) -> web.Response:
         return _error("bad_request")
     item = body.get("item") if isinstance(body, dict) else None
     if item not in (shop_service.PREMIUM_ID, shop_service.RENAME_ID, shop_service.FIRM_RENAME_ID,
-                    shop_service.ELIXIR_PACK_ID):
+                    shop_service.ELIXIR_PACK_ID, shop_service.TINCTURE_ID, shop_service.POCKET_ID,
+                    shop_service.FACTION_ID):
         return _error("bad_request")
+    peer_id = request[VK_USER_ID_KEY]
     async with request.app[SESSION_FACTORY_KEY]() as db:
         character = await onboarding_svc.get_character(db, request[VK_USER_ID_KEY])
         if character is None:
@@ -52,12 +55,29 @@ async def handle_post(request: web.Request) -> web.Response:
         await db.commit()
         from sqlalchemy.exc import IntegrityError
 
+        if item == shop_service.FACTION_ID:
+            blocker = await faction_blocker(peer_id, character)
+            if blocker is not None:
+                return _error(blocker, 409)
+        moved = None
+
         try:
             if item == shop_service.PREMIUM_ID:
                 until = await shop_service.buy_premium(db, character, body.get("days"))
                 done = {"item": item, "days": body.get("days"), "until": until.isoformat()}
             elif item == shop_service.ELIXIR_PACK_ID:
                 done = {"item": item, "contents": await shop_service.buy_elixir_pack(db, character)}
+            elif item == shop_service.TINCTURE_ID:
+                until = await shop_service.buy_tincture(db, character)
+                done = {"item": item, "until": until.isoformat()}
+            elif item == shop_service.POCKET_ID:
+                await shop_service.buy_pocket(db, character)
+                done = {"item": item}
+            elif item == shop_service.FACTION_ID:
+                region = body.get("region")
+                voyage_text = await shop_service.change_faction(db, character, region)
+                done = {"item": item, "region": region, "title": REGION_TITLES[region]}
+                moved = (region, voyage_text)
             elif item == shop_service.RENAME_ID:
                 old = await shop_service.rename_character(db, character, body.get("name"))
                 done = {"item": item, "old": old, "name": character.name}
@@ -76,8 +96,52 @@ async def handle_post(request: web.Request) -> web.Response:
         await db.commit()
     if item == shop_service.FIRM_RENAME_ID:
         done["name"] = next(i for i in state["items"] if i["id"] == item)["current"]
+    if moved is not None:
+        await after_faction_move(peer_id, *moved)
     state["done"] = done
     return web.json_response(state)
+
+
+async def faction_blocker(peer_id: int, character) -> str | None:
+    """Переезд нельзя посреди того, что живёт в памяти бота: боя, рейда,
+    разлома, события. Остальное change_faction заканчивает сам."""
+    from bot.battle_keyboard import in_any_battle
+    from bot.handlers import raid_combat, rift, scene_events
+
+    if in_any_battle(peer_id) or raid_combat.has_active_raid(character.id):
+        return "Сначала закончи бой."
+    if rift.is_waiting(peer_id):
+        return "Ты ждёшь разлом - сначала выйди из очереди."
+    if scene_events.has_pending(peer_id):
+        return "Сначала закончи событие."
+    return None
+
+
+async def after_faction_move(peer_id: int, region: str, voyage_text: str | None) -> None:
+    """Снять то, что живёт в памяти бота, и показать площадь нового города."""
+    from bot.handlers import mounts, voyage, world
+    from bot import pending_activity
+
+    world._exploring.discard(peer_id)
+    world._resting.discard(peer_id)
+    await pending_activity.forget("explore", peer_id)
+    await pending_activity.forget("rest", peer_id)
+    voyage._away.discard(peer_id)
+    header = FACTION_MOVE_TEXT.format(city=REGION_TITLES[region])
+    if voyage_text:
+        header = f"{voyage_text}\n\n{header}"
+    try:
+        await mounts.send_cell_screen(peer_id, header)
+    except Exception:
+        from loguru import logger
+
+        logger.exception("Смена фракции: не удалось показать город {}", peer_id)
+
+
+FACTION_MOVE_TEXT = (
+    "🏳 Писарь у ворот вписывает тебя в книгу жителей, даже не подняв головы. "
+    "Новый дом - {city}."
+)
 
 
 # --- Самоцветы за рубли (ЮKassa, 2026-10-15) ---------------------------------

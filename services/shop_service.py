@@ -6,11 +6,12 @@
 клиента не верим.
 """
 
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from game.economy import dailies_config as dc
+from game.economy import gem_goods_config as ggc
 from game.economy import premium_config as pc
 from game.economy import raid_key_config as rkc
 from game.world import world_config as wc
@@ -53,7 +54,8 @@ def catalog(character: Character, gems: int, firm_name: str | None = None) -> di
             "perks": _premium_perks(),
             "note": "Без силовых преимуществ: статы, урон и HP не меняются. Срок складывается с оставшимся.",
             "active_until": until.isoformat() if active and until is not None else None,
-        }, elixir_pack_item(), *rename_items(character, firm_name)],
+        }, elixir_pack_item(), tincture_item(character), pocket_item(character), faction_item(character),
+            *rename_items(character, firm_name)],
     }
 
 
@@ -202,3 +204,153 @@ async def rename_firm(db: AsyncSession, character: Character, new_name) -> str:
         db, 0, "shop_firm_rename", character.id, old_value={"name": old}, new_value={"name": name},
     )
     return old
+
+
+# --- Настойка пепла, секретный карман, смена фракции (2026-10-19) ---
+# Числа - game/economy/gem_goods_config.py.
+
+TINCTURE_ID = ggc.TINCTURE_ID
+POCKET_ID = ggc.POCKET_ID
+FACTION_ID = ggc.FACTION_ID
+
+
+def tincture_item(character: Character) -> dict:
+    from services import death_service
+
+    active = death_service.tincture_active(character)
+    return {
+        "id": TINCTURE_ID, "title": "Настойка пепла", "emoji": "🫗", "kind": "bundle",
+        "price": ggc.TINCTURE_PRICE,
+        "perks": [
+            f"{ggc.TINCTURE_HOURS} часа после покупки смерть не отнимает опыт",
+            "Действует и в PvP, если на тебе клеймо",
+            f"Ещё одна покупка добавляет {ggc.TINCTURE_HOURS} часа к оставшемуся времени",
+        ],
+        "note": "Пьётся сразу при покупке. Таймер идёт и когда ты не в игре.",
+        "active_until": character.ash_tincture_until.isoformat() if active else None,
+    }
+
+
+async def buy_tincture(db: AsyncSession, character: Character, now: datetime | None = None) -> datetime:
+    """Выпить настойку: срок от сейчас или сверху оставшегося."""
+    from services import death_service
+
+    now = now or datetime.now(timezone.utc)
+    await _charge(db, character, ggc.TINCTURE_PRICE)
+    start = character.ash_tincture_until if death_service.tincture_active(character, now) else now
+    if start.tzinfo is None:
+        start = start.replace(tzinfo=timezone.utc)
+    character.ash_tincture_until = start + timedelta(hours=ggc.TINCTURE_HOURS)
+    await db.flush()
+    return character.ash_tincture_until
+
+
+def pocket_item(character: Character) -> dict:
+    return {
+        "id": POCKET_ID, "title": "Секретный карман", "emoji": "🎒", "kind": "bundle",
+        "price": ggc.POCKET_PRICE,
+        "perks": [
+            "При смерти половина реликвий остаётся у тебя",
+            "Работает и в PvP: победитель забирает только вторую половину",
+            "Покупается один раз и навсегда",
+        ],
+        "note": "Из нечётного стака в кармане остаётся на одну больше, так что одиночная реликвия не сгорает.",
+        "available": not character.secret_pocket,
+        "unavailable": "Карман уже пришит.",
+    }
+
+
+async def buy_pocket(db: AsyncSession, character: Character) -> None:
+    if character.secret_pocket:
+        raise ShopError("Карман уже пришит.")
+    await _charge(db, character, ggc.POCKET_PRICE)
+    character.secret_pocket = True
+    await db.flush()
+
+
+def faction_available_at(character: Character) -> datetime | None:
+    """Когда можно сменить фракцию снова (None - уже можно)."""
+    last = character.faction_changed_at
+    if last is None:
+        return None
+    if last.tzinfo is None:
+        last = last.replace(tzinfo=timezone.utc)
+    ready = last + timedelta(days=ggc.FACTION_COOLDOWN_DAYS)
+    return ready if ready > datetime.now(timezone.utc) else None
+
+
+def faction_item(character: Character) -> dict:
+    from bot.onboarding_texts import REGION_TITLES
+    from game.economy import faction_config as fc
+
+    ready = faction_available_at(character)
+    return {
+        "id": FACTION_ID, "title": "Смена фракции", "emoji": "🏳", "kind": "faction",
+        "price": ggc.FACTION_PRICE,
+        "current": REGION_TITLES.get(character.region or "", ""),
+        "options": [{"id": c, "title": REGION_TITLES[c]} for c in fc.CITIES if c != character.region],
+        "perks": [
+            "Сразу переносит на площадь нового города",
+            "Долгий путь прерывается: награда за прошедшие часы остаётся, снаряжение переезжает с тобой",
+            "Поездка, исследование и рыбалка отменяются",
+            "Сюжет нового города открывается на том же акте",
+            "Новые обозы фирмы выходят из нового города, товар в пути и на складе остаётся",
+        ],
+        "note": f"Менять фракцию можно раз в {ggc.FACTION_COOLDOWN_DAYS} дней. Во время боя, рейда и разлома нельзя.",
+        "available": ready is None,
+        "available_at": ready.isoformat() if ready is not None else None,
+    }
+
+
+async def change_faction(db: AsyncSession, character: Character, region, now: datetime | None = None) -> str | None:
+    """Переезд в другой город. Возвращает итог прерванного похода (или None).
+    Бои, рейды, разломы и висящие события проверяет вызывающий: они живут
+    в памяти бота, а не в базе."""
+    from game.economy import faction_config as fc
+    from game.world import world_config as wc
+    from services import (
+        admin_service, death_service, fishing_service, mining_service, mount_service,
+        movement_service, pk_service, screen_service, story_service, voyage_service,
+    )
+
+    now = now or datetime.now(timezone.utc)
+    if region not in fc.CITIES:
+        raise ShopError("Выбери город.")
+    if region == character.region:
+        raise ShopError("Ты и так живёшь в этом городе.")
+    if faction_available_at(character) is not None:
+        raise ShopError(f"Фракцию меняют не чаще раза в {ggc.FACTION_COOLDOWN_DAYS} дней.")
+    if death_service.is_dead(character, now):
+        raise ShopError("Сначала дождись возрождения.")
+    await _charge(db, character, ggc.FACTION_PRICE)
+    old = character.region
+
+    voyage_text = None
+    voyage = await voyage_service.get(db, character.id, lock=True)
+    if voyage is not None:
+        if voyage.status == "away":
+            voyage_text = voyage_service._finish(voyage, early=True)
+        voyage.region = region
+
+    await story_service.carry_over(db, character, old, region)
+    character.region = region
+
+    if movement_service.is_traveling(character, now):
+        movement_service.cancel_travel(character)
+    travel = await mount_service.active_travel(db, character.id)
+    if travel is not None:
+        await mount_service.cancel_travel(db, travel)
+    fishing_service.clear_cast(character)
+    await mining_service.cancel_dig(db, character)
+    character.pos_x, character.pos_y = wc.CITY_COORDS[region]
+    if pk_service.city_banned(character):
+        from bot.handlers.respawn import _outside_gate
+
+        character.pos_x, character.pos_y = _outside_gate(region)
+    await screen_service.set_screen(db, character, None)
+    character.faction_changed_at = now
+    await db.flush()
+    await admin_service.log_action(
+        db, 0, "shop_faction", character.id, old_value={"region": old}, new_value={"region": region},
+    )
+    return voyage_text

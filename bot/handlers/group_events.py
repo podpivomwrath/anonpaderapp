@@ -487,9 +487,12 @@ async def _finish_dealer(scene: GroupScene) -> None:
 
     sold_by = ", ".join(names[cid] for cid in sellers) or "никто"
     summary = event.attack_text if attack else f"{event.sold_text}\n\nПродали: {sold_by}."
+    from game.world import relic_dealer
+
+    picture = photo_attachment(relic_dealer.FIGHT_IMAGE) if attack else None
     for cid, m in scene.members.items():
         text = "\n\n".join(part for part in (event.title, summary, "\n".join(personal[cid])) if part)
-        await _send(m.peer_id, text, waiting_keyboard())
+        await _send(m.peer_id, text, waiting_keyboard(), picture)
         if cid in notices:
             await _send(m.peer_id, notices[cid])
 

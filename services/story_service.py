@@ -185,6 +185,51 @@ class StoryTurnResult:
     act_image: str | None = None  # id фото акта, если этот ход открывает акт
 
 
+async def carry_over(db: AsyncSession, character: Character, old_region: str, new_region: str) -> None:
+    """Смена фракции (2026-10-19, решение владельца): сюжет нового города
+    открывается на том же акте, что был в старом, - с первого задания акта.
+    Линия пройдена целиком - и новая считается пройденной. Если в новом
+    городе уже был прогресс дальше (вернулся туда, где жил), он остаётся.
+
+    Первое задание первого акта ведёт quest_service (стартовый квест
+    наставника): если старое уже сдано, стартовый квест нового города
+    закрывается без награды, и указатель встаёт за него."""
+    old = await _get_progress(db, character.id, old_region)
+    if old is None or old.quest_step is None:
+        return
+    old_line, line = get_line(old_region), get_line(new_region)
+    old_found = _find(old_line, old.quest_step)
+    if not old.completed and (old_found is None or old_found[1].kind == "first_quest"):
+        return  # стартовый квест ещё не сдан - новый город начнётся с начала
+    flat = _flatten(line)
+    if old.completed:
+        target_index = len(flat)
+    else:
+        target_index = next((i for i, (act_no, _q) in enumerate(flat) if act_no == old.act), 0)
+        if flat[target_index][1].kind == "first_quest":
+            target_index += 1
+    row = await _get_progress(db, character.id, new_region)
+    if row is not None:
+        if row.completed:
+            return
+        here = _find(line, row.quest_step) if row.quest_step else None
+        if here is not None and flat.index(here) >= target_index:
+            return
+    else:
+        row = CharacterStoryProgress(character_id=character.id, region=new_region)
+        db.add(row)
+    if target_index >= len(flat):
+        row.act, row.quest_step = flat[-1][0], flat[-1][1].id
+        row.completed = True
+    else:
+        row.act, row.quest_step = flat[target_index][0], flat[target_index][1].id
+        row.completed = False
+    row.status = "active"
+    row.quest_seen = False
+    await quest_service.close_starter(db, new_region, character.id)
+    await db.flush()
+
+
 async def get_progress(db: AsyncSession, character: Character) -> CharacterStoryProgress | None:
     """Публичный доступ к строке прогресса (для диагностики/тестов) — None,
     если сюжет региона ещё ни разу не выдавался."""

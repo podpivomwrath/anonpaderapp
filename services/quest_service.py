@@ -98,6 +98,20 @@ async def get_or_assign(db: AsyncSession, character: Character) -> QuestProgress
     )
 
 
+async def close_starter(db: AsyncSession, region: str, character_id: int) -> None:
+    """Смена фракции: стартовый квест нового города закрыт без награды -
+    в старом его уже сдали (story_service.carry_over)."""
+    quest = await _get_quest_def(db, region)
+    if quest is None:
+        return
+    cq = await _get_character_quest(db, character_id, quest.id)
+    if cq is None:
+        cq = CharacterQuest(character_id=character_id, quest_id=quest.id, progress=quest.target_count)
+        db.add(cq)
+    cq.status = QuestStatus.COMPLETED
+    await db.flush()
+
+
 async def record_kill(db: AsyncSession, character: Character) -> QuestProgress | None:
     """+1 к прогрессу активного квеста региона персонажа (если есть)."""
     quest = await _get_quest_def(db, character.region)

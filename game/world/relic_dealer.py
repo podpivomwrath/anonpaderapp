@@ -58,6 +58,11 @@ def win_result():
 
     return SceneResult(xp=float(WIN_MOBS))
 
+#: Картинки (альбом VK): меняла за сделкой - в начале события (image в
+#: content/events/scenes.json и group_scenes.json), меняла без капюшона -
+#: при нападении. Промты - tools/art_prompts_2026_10.md.
+FIGHT_IMAGE = "457239078"
+
 DEALER_NAME = "Пепельный меняла"
 DEALER_FLAVOR = (
     "Под капюшоном нет лица - только реликвии, сросшиеся в подобие тела. "

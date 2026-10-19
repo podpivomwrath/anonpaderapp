@@ -19,7 +19,9 @@ def apply_death(character: Character, now: datetime | None = None) -> int:
 
     now = now or datetime.now(timezone.utc)
     # Пепельное клеймо 3+: смерть отнимает больше опыта.
-    penalty = experience_service.apply_death_penalty(character, pk_service.death_xp_mult(character))
+    penalty = 0
+    if not tincture_active(character, now):
+        penalty = experience_service.apply_death_penalty(character, pk_service.death_xp_mult(character))
     character.respawn_at = now + timedelta(minutes=_respawn_minutes(character))
     return penalty
 
@@ -31,9 +33,20 @@ def apply_pvp_death(character: Character, now: datetime | None = None) -> None:
 
     now = now or datetime.now(timezone.utc)
     # Пепельное клеймо 3+: и в PvP смерть стоит опыта (обычно - нет).
-    if pk_service.costly_death(character):
+    if pk_service.costly_death(character) and not tincture_active(character, now):
         experience_service.apply_death_penalty(character, pk_service.death_xp_mult(character))
     character.respawn_at = now + timedelta(minutes=_respawn_minutes(character))
+
+
+def tincture_active(character: Character, now: datetime | None = None) -> bool:
+    """Настойка пепла (товар за самоцветы): пока действует, смерть не
+    отнимает опыт."""
+    until = character.ash_tincture_until
+    if until is None:
+        return False
+    if until.tzinfo is None:
+        until = until.replace(tzinfo=timezone.utc)
+    return (now or datetime.now(timezone.utc)) < until
 
 
 def _respawn_minutes(character: Character) -> float:

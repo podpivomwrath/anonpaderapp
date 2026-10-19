@@ -179,14 +179,31 @@ async def sell_one(
     return total
 
 
+async def has_pocket(db: AsyncSession, character_id: int) -> bool:
+    """Секретный карман (товар за самоцветы): половина реликвий переживает смерть."""
+    return bool(await db.scalar(select(Character.secret_pocket).where(Character.id == character_id)))
+
+
+def _pocketed(count: int, pocket: bool) -> int:
+    """Сколько из стака уходит при смерти (остальное остаётся в кармане)."""
+    from game.economy import gem_goods_config as ggc
+
+    return count - ggc.pocket_keeps(count) if pocket else count
+
+
 async def transfer_all(db: AsyncSession, loser_id: int, winner_id: int) -> dict[str, int]:
     """Переносит ВЕСЬ стек трофеев проигравшего победителю (дуэль, патч 22).
+    С секретным карманом - только непрятанную часть.
     Возвращает перенесённый набор {trophy_id: count} для сообщения."""
     taken: dict[str, int] = {}
+    pocket = await has_pocket(db, loser_id)
     for row in await _lock_rows(db, loser_id):
-        taken[row.trophy_id] = row.count
-        row.count = 0
-        await _add(db, winner_id, row.trophy_id, taken[row.trophy_id])
+        n = _pocketed(row.count, pocket)
+        if n <= 0:
+            continue
+        taken[row.trophy_id] = n
+        row.count -= n
+        await _add(db, winner_id, row.trophy_id, n)
     # Порядок каталога, как было до блокировок: из него собирается сообщение
     # о добыче, и строки не должны прыгать от боя к бою.
     moved = {d.id: taken[d.id] for d in trophy_defs_ordered() if d.id in taken}
@@ -196,12 +213,17 @@ async def transfer_all(db: AsyncSession, loser_id: int, winner_id: int) -> dict[
 
 
 async def lose_all(db: AsyncSession, character_id: int) -> dict[str, int]:
-    """Смерть в PvE (2026-10-17, решение владельца): все реликвии сгорают.
+    """Смерть в PvE (2026-10-17, решение владельца): все реликвии сгорают,
+    кроме спрятанных в секретный карман.
     Возвращает потерянный набор {trophy_id: count} для сообщения."""
     lost: dict[str, int] = {}
+    pocket = await has_pocket(db, character_id)
     for row in await _lock_rows(db, character_id):
-        lost[row.trophy_id] = row.count
-        row.count = 0
+        n = _pocketed(row.count, pocket)
+        if n <= 0:
+            continue
+        lost[row.trophy_id] = n
+        row.count -= n
     if lost:
         await db.flush()
     return {d.id: lost[d.id] for d in trophy_defs_ordered() if d.id in lost}
@@ -238,7 +260,11 @@ async def split_among(
         return {}
     top_id = max(shares, key=lambda cid: shares[cid])
     result: dict[int, dict[str, int]] = {}
-    for trophy_def, count in stock:
+    pocket = await has_pocket(db, victim_id)
+    for trophy_def, held in stock:
+        count = _pocketed(held, pocket)
+        if count <= 0:
+            continue
         allocated: dict[int, int] = {}
         remaining = count
         for cid, share in shares.items():
@@ -247,7 +273,7 @@ async def split_among(
             remaining -= portion
         allocated[top_id] += remaining  # остаток округления — топ-дамагеру
         row = await _get_row(db, victim_id, trophy_def.id)
-        row.count = 0
+        row.count = held - count
         for cid, amount in allocated.items():
             if amount <= 0:
                 continue

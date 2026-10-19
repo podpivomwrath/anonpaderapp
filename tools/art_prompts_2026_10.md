@@ -4,9 +4,8 @@
 **1:1, квадрат** (как иконки предметов). Лиц нет: люди со спины, в капюшоне или в тени.
 Промты на английском, стилевой хвост уже дописан - копировать целиком.
 
-Уже готовый промт, который ещё не нарисован: **Пепельный меняла** -
-`tools/event_art_prompts.md`, раздел «💰 Пепельный меняла» (сейчас временно
-стоит картинка скупщика Иргала).
+Пепельный меняла - две сцены, в конце файла (сейчас временно стоит картинка
+скупщика Иргала).
 
 ---
 
@@ -204,4 +203,93 @@ desaturated palette of ash grey, rust brown and dried blood, weathered and worn
 surfaces, soft rim light from the upper left, deep neutral background, no text,
 no watermark, no border, square 1:1 composition, crisp readable silhouette at
 small size
+```
+
+## 🫗 Настойка пепла - `ash_tincture.webp`
+
+Тёмная настойка, которую пьют перед вылазкой: смерть не отнимает опыт.
+Читаться должна как «одна склянка», не как набор.
+
+```
+a small squat glass bottle of dark grey tincture with fine ash swirling inside,
+stoppered with a cork sealed in black wax, a twine tag tied around the neck, a
+little pile of grey ash and a burnt match beside it, dark fantasy game item
+icon, single object centered, slight 3/4 angle, painterly semi-realistic, muted
+desaturated palette of ash grey, rust brown and dried blood, weathered and worn
+surfaces, soft rim light from the upper left, deep neutral background, no text,
+no watermark, no border, square 1:1 composition, crisp readable silhouette at
+small size
+```
+
+## 🎒 Секретный карман - `secret_pocket.webp`
+
+Потайной карман, вшитый в подкладку плаща: половина реликвий переживает смерть.
+
+```
+the inside of a worn leather travelling cloak folded open, a hidden pocket
+stitched into the lining with coarse thread, a few small glowing relic shards
+peeking out of it, a bone needle still hanging on the thread, dark fantasy game
+item icon, single object centered, slight 3/4 angle, painterly semi-realistic,
+muted desaturated palette of ash grey, rust brown and dried blood, weathered and
+worn surfaces, soft rim light from the upper left, deep neutral background, no
+text, no watermark, no border, square 1:1 composition, crisp readable silhouette
+at small size
+```
+
+## 🏳 Смена фракции - `faction_change.webp`
+
+Переезд в другой город: свёрнутое старое знамя и ключ от нового дома.
+
+```
+a folded old city banner tied with rope lying on a travel bundle, a heavy iron
+house key and a wax-sealed letter of residence resting on top, the banner
+fabric faded and frayed at the edges, dark fantasy game item icon, single
+object centered, slight 3/4 angle, painterly semi-realistic, muted desaturated
+palette of ash grey, rust brown and dried blood, weathered and worn surfaces,
+soft rim light from the upper left, deep neutral background, no text, no
+watermark, no border, square 1:1 composition, crisp readable silhouette at
+small size
+```
+
+---
+
+# Пепельный меняла (бот, 3:2) - две сцены
+
+Сейчас на обеих стоит картинка скупщика Иргала (457239078). Загрузить обе в альбом
+(`tools/vk_upload.py`) и прислать номера: первую впишу в событие (соло и группа),
+вторую - в сообщение о нападении.
+
+## 💰 Меняла за сделкой - начало события
+
+Лица не видно, он спокоен и торгует. Подвоха пока не видно, только намёк: из-под
+рукава торчит что-то похожее на реликвию, вросшую в кожу.
+
+```
+a hooded roadside trader sitting cross-legged on a dusty ash-grey road beside a
+dead tree, a clean grey cloth spread before him with a few glowing relics and a
+small set of brass scales, his face completely hidden in the shadow of a deep
+grey hood, long thin pale hands counting coins, one wrist showing a small
+crystal shard grown into the skin, a lone traveller with a backpack standing
+before him seen from behind, dark fantasy scene illustration, painterly
+semi-realistic, muted desaturated palette of ash grey, rust brown and dried
+blood, drifting ash in the air, moody overcast light, no text, no watermark, no
+logo, no modern objects, horizontal 3:2 composition
+```
+
+## ⚠️ Меняла нападает - начало боя
+
+Капюшон упал: под ним вместо лица ком сросшихся реликвий. Он тянется к игроку, за
+ним из-за камней выходят «скупленные тени» (в группе они дерутся, в соло просто фон).
+
+```
+a tall gaunt figure rising from a roadside, its grey hood fallen back to reveal
+no face, the head and torso a fused mass of glowing relics, crystal shards and
+bone fragments, long thin arms with clawed fingers reaching toward the viewer,
+scattered coins and a torn grey cloth on the ground, faint translucent shadowy
+human silhouettes emerging from behind rocks in the background, a traveller
+seen from behind raising a weapon in the foreground, dark fantasy scene
+illustration, painterly semi-realistic, muted desaturated palette of ash grey,
+rust brown and dried blood with a sickly pale-blue glow from the relics,
+drifting ash in the air, moody overcast light, no text, no watermark, no logo,
+no modern objects, horizontal 3:2 composition
 ```

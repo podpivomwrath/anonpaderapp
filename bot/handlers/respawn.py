@@ -67,6 +67,34 @@ def _death_text(respawn_at: datetime, now: datetime, xp_lost: int = 0) -> str:
     return text
 
 
+TINCTURE_SAVED_LINE = "🫗 Настойка пепла ещё действует: опыт не потерян."
+POCKET_SAVED_LINE = "🎒 Секретный карман цел: что было в нём, осталось при тебе."
+
+
+async def _gem_goods_lines(peer_id: int, now: datetime, pvp: bool) -> list[str]:
+    """Что сберегли товары за самоцветы. Опыт в PvP теряет только клеймёный -
+    остальным строку про настойку не показываем, она ничего не спасла."""
+    from game.combat import balance_config as bc
+    from services import pk_service, trophy_service
+
+    # Только чтение, без get_character: тот пишет строку персонажа (смена
+    # дня), а смерть приходит, пока бой ещё держит её своей сессией.
+    async with get_session_factory()() as db:
+        character = await db.scalar(
+            select(Character).join(User, User.id == Character.user_id).where(User.vk_id == peer_id)
+        )
+        if character is None:
+            return []
+        lines = []
+        would_lose_xp = character.level < bc.MAX_LEVEL and (not pvp or pk_service.costly_death(character))
+        if would_lose_xp and death_service.tincture_active(character, now):
+            lines.append(TINCTURE_SAVED_LINE)
+        if character.secret_pocket and await trophy_service.get_stock(db, character.id):
+            lines.append(POCKET_SAVED_LINE)
+        await db.rollback()
+    return lines
+
+
 async def register_death(
     peer_id: int, respawn_at: datetime, xp_lost: int = 0, relics_lost: dict[str, int] | None = None,
 ) -> None:
@@ -77,10 +105,15 @@ async def register_death(
         peer_id=peer_id, message=_death_text(respawn_at, now, xp_lost), random_id=0,
         attachment=photo_attachment(DEATH_PHOTO_ID), keyboard=kb.waiting_keyboard(),
     )
-    if relics_lost:
-        from services import trophy_service
+    from services import trophy_service
 
-        await _bot_api.messages.send(peer_id=peer_id, message=trophy_service.lost_line(relics_lost), random_id=0)
+    lines = [trophy_service.lost_line(relics_lost)] if relics_lost else []
+    try:
+        lines += await _gem_goods_lines(peer_id, now, pvp=peer_id in _pvp_death_pending)
+    except Exception:
+        logger.warning("Строки настойки/кармана для {} не собрались", peer_id)
+    if lines:
+        await _bot_api.messages.send(peer_id=peer_id, message="\n".join(lines), random_id=0)
     # messages.send с peer_id возвращает message_id - по нему и правим. Раньше
     # его передавали как conversation_message_id (номер в диалоге, совсем другое
     # число): правка всегда падала, и отсчёт не обновлялся никогда.

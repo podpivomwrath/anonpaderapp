@@ -407,6 +407,14 @@ export const buyShop = (item, days) =>
     body: JSON.stringify({ item, days }),
   });
 
+// Смена фракции за самоцветы (2026-10-19): region - id нового города.
+export const buyShopFaction = (region) =>
+  request('/shop', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ item: 'faction_change', region }),
+  });
+
 // Смена ника / названия фирмы за самоцветы (2026-10-16).
 export const buyShopRename = (item, name) =>
   request('/shop', {

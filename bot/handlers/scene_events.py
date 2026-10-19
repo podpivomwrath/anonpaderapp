@@ -521,7 +521,7 @@ async def _dealer(peer_id, db, character, stats, p: Pending, scene: Scene, actio
         await db.commit()
         _pending.pop(peer_id, None)
         await pending_activity.forget_scene(peer_id)
-        await _send(peer_id, scene.attack_text, waiting_keyboard())
+        await _send(peer_id, scene.attack_text, waiting_keyboard(), photo_attachment(relic_dealer.FIGHT_IMAGE))
         from bot.handlers import combat as combat_handlers
 
         await combat_handlers.start_dealer_encounter(peer_id, character, stats, gear_bonus, modifiers, lot)

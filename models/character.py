@@ -106,6 +106,13 @@ class Character(Base):
     revenge_target_id: Mapped[int | None] = mapped_column(nullable=True)
     revenge_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
+    # Товары за самоцветы (2026-10-19, services/shop_service.py): настойка пепла
+    # - до этого момента смерть не отнимает опыт; секретный карман - навсегда,
+    # половина реликвий переживает смерть; когда последний раз меняли фракцию.
+    ash_tincture_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    secret_pocket: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
+    faction_changed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
     # Патч 37: текущий ВЛОЖЕННЫЙ экран (скупщик/лавка/инвентарь и т.п.) — клавиатура
     # принадлежит экрану, а не сообщению. NULL = корневой экран (город/карта/бой),
     # его клавиатуру строит bot/handlers/world.py::_current_keyboard как раньше.

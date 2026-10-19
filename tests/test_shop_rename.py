@@ -46,7 +46,8 @@ def test_catalog_lists_rename_items(make_character):
 
     from datetime import datetime, timezone
 
-    c = SimpleNamespace(name="Ник", premium_until=datetime(2000, 1, 1, tzinfo=timezone.utc))
+    c = SimpleNamespace(name="Ник", premium_until=datetime(2000, 1, 1, tzinfo=timezone.utc), region="ridge",
+                        ash_tincture_until=None, secret_pocket=False, faction_changed_at=None)
     items = {i["id"]: i for i in shop_service.catalog(c, 0)["items"]}
     assert items["rename"]["price"] == 300 and items["firm_rename"]["price"] == 500
     assert items["firm_rename"]["available"] is False
