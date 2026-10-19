@@ -84,7 +84,7 @@ def _lifesteal_heal(ctx: SkillContext, hit, ratio: float) -> None:
 
 @offensive_skill("blood_knight_lifesteal_strike")
 def lifesteal_strike(ctx: SkillContext) -> None:
-    """Кровопуск: 115% урона, лечит на 20% нанесённого (капается — самый
+    """Кровопуск: 138% урона, лечит на 20% нанесённого (капается — самый
     частый навык кита, cd2)."""
     skill = SUBCLASS_SKILL_DEFS["blood_knight_lifesteal_strike"]
     actor = ctx.actor
@@ -129,7 +129,7 @@ def blood_seal(ctx: SkillContext) -> None:
 
 @offensive_skill("blood_knight_crimson_feast")
 def crimson_feast(ctx: SkillContext) -> None:
-    """Багровый пир: тратит 15% текущего HP, 200% урона, лечит на 45% нанесённого.
+    """Багровый пир: тратит 15% текущего HP, 219% урона, лечит на 45% нанесённого.
 
     Патч 47, ч.2: «Кровавый пакт» снижает себестоимость HP, «Пиршество»
     добавляет к ratio лечения — только у этого навыка (не у всех четырёх)."""
