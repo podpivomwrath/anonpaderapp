@@ -125,6 +125,17 @@ async def _news(catcher_peer: int, player: str) -> None:
         await asyncio.sleep(0.05)  # лимит сообщений сообщества
 
 
+async def _spawn_news() -> None:
+    """Ишак выбежал - всем, кто заходил за SPAWN_NEWS_ACTIVE_HOURS, без координат."""
+    async with get_session_factory()() as db:
+        recipients = await svc.news_recipients(db, hours=tc.SPAWN_NEWS_ACTIVE_HOURS)
+        await db.rollback()
+    logger.info("Турбоишак: оповещаю о выходе {}", len(recipients))
+    for peer_id in recipients:
+        await _send(peer_id, texts.SPAWN_NEWS, attachment=_photo(tc.HERE_IMAGE))
+        await asyncio.sleep(0.05)  # лимит сообщений сообщества
+
+
 @labeler.message(payload_contains={"type": "turbo_skip_name"})
 async def skip_name(message: Message) -> None:
     peer_id = message.peer_id
@@ -179,6 +190,9 @@ async def tick_job() -> None:
         day = event.day
         if event.kind == "spawn":
             logger.info("Турбоишак {}: выбежал на ({};{})", day.day, day.x, day.y)
+            task = asyncio.create_task(_spawn_news())
+            _tasks.add(task)
+            task.add_done_callback(_tasks.discard)
         if event.kind not in ("spawn", "move"):
             continue
         await _notify_cell(day.x, day.y)

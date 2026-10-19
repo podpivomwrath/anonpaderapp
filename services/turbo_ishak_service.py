@@ -209,10 +209,10 @@ async def peers_on_cell(db: AsyncSession, x: int, y: int, now: datetime | None =
     return [(vk, c) for vk, c in rows.all() if vk is not None]
 
 
-async def news_recipients(db: AsyncSession, now: datetime | None = None) -> list[int]:
+async def news_recipients(db: AsyncSession, now: datetime | None = None, hours: int = tc.NEWS_ACTIVE_HOURS) -> list[int]:
     from models import User
 
-    since = (now or _now()) - timedelta(hours=tc.NEWS_ACTIVE_HOURS)
+    since = (now or _now()) - timedelta(hours=hours)
     rows = await db.execute(
         select(User.vk_id).join(Character, Character.user_id == User.id)
         .where(Character.creation_state.is_(None), Character.last_active_at >= since)
