@@ -100,8 +100,8 @@ class CoordCancelMiddleware(BaseMiddleware[Message]):
         # Строкой: str != StateRepresentation у vkbottle даёт True всегда.
         if state is None or str(state.state) != str(MountCoordState.COORD_INPUT):
             return
-        if "mount_route_toggle" in str(self.event.payload or "") or "mount_go" in str(self.event.payload or ""):
-            return  # переключатель пути - часть того же выбора
+        if any(t in str(self.event.payload or "") for t in ("mount_route_toggle", "mount_go", "mount_pick")):
+            return  # переключатель пути и выбор маунта - часть того же выбора
         if self.event.payload or not _COORD_LIKE_RE.match(self.event.text or ""):
             await _dispenser.delete(self.event.peer_id)
 
@@ -164,25 +164,51 @@ async def open_mounts(message: Message) -> None:
         if not owned:
             await message.answer("У тебя пока нет маунтов.")
             return
-        # Пока в игре ровно один маунт (Пепельный скакун) — выбора между
-        # несколькими не требуется; структура owned_mounts готова на будущее.
-        # Патч 35, аудит: когда маунтов станет больше одного, список выбора
-        # ЗДЕСЬ подпадает под общее правило (см. bot/keyboards/appraiser.py) —
-        # кнопка на маунт допустима, только если их конечное небольшое число
-        # (маунты — фиксированный контент-каталог, не накопительный инвентарь).
-        mount = owned[0]
-        pos_x, pos_y = character.pos_x, character.pos_y
+        # Маунтов больше одного (2026-10-19) - кнопки остальных под сообщением;
+        # выбранный запоминается (ui_flags.mount). Маунты - небольшой
+        # фиксированный каталог, кнопка на каждый допустима (патч 35, аудит).
+        mount = _chosen(owned, (character.ui_flags or {}).get("mount"))
         safe = bool((character.ui_flags or {}).get("safe_route"))
         targets = await _quick_targets(db, character)
 
     await _dispenser.set(peer_id, MountCoordState.COORD_INPUT, mount_id=mount.mount_id)
-    await message.answer(
+    await message.answer(_ready_text(mount, character, safe), keyboard=_route_keyboard(safe, targets, owned, mount))
+
+
+def _chosen(owned: list, mount_id: str | None):
+    return next((m for m in owned if m.mount_id == mount_id), owned[0])
+
+
+def _ready_text(mount, character, safe: bool) -> str:
+    return (
         f"{mount.emoji} {mount.name} готов в путь.\n"
-        f"Ты в ({pos_x}; {pos_y}). Куда направиться? Пришли координаты в формате X:Y "
+        f"Ты в ({character.pos_x}; {character.pos_y}). Куда направиться? Пришли координаты в формате X:Y "
         f"(не дальше {wc.WORLD_RADIUS} клеток от Монолита, например 12:-20).\n\n"
-        f"{_route_line(safe)}",
-        keyboard=_route_keyboard(safe, targets),
+        f"{_route_line(safe)}"
     )
+
+
+@labeler.message(payload_contains={"type": "mount_pick"}, state=MountCoordState.COORD_INPUT)
+async def pick_mount(message: Message) -> None:
+    """Кнопка другого маунта: то же ожидание координат, но на нём."""
+    peer_id = message.peer_id
+    mount_id = (message.get_payload_json() or {}).get("id")
+    async with get_session_factory()() as db:
+        character = await onboarding_svc.get_character(db, message.from_id)
+        if character is None or character.creation_state is not None:
+            return
+        owned = await mount_service.owned_mounts(db, character.id)
+        mount = next((m for m in owned if m.mount_id == mount_id), None)
+        if mount is None:
+            return
+        flags = dict(character.ui_flags or {})
+        flags["mount"] = mount.mount_id
+        character.ui_flags = flags  # новый dict: JSON-поле не следит за изменением на месте
+        safe = bool(flags.get("safe_route"))
+        await db.commit()
+        targets = await _quick_targets(db, character)
+    await _dispenser.set(peer_id, MountCoordState.COORD_INPUT, mount_id=mount.mount_id)
+    await message.answer(_ready_text(mount, character, safe), keyboard=_route_keyboard(safe, targets, owned, mount))
 
 
 async def _quick_targets(db, character) -> list[tuple[str, int, int]]:
@@ -208,7 +234,13 @@ def _route_line(safe: bool) -> str:
     )
 
 
-def _route_keyboard(safe: bool, targets: list[tuple[str, int, int]] | None = None) -> str:
+#: Inline-клавиатура VK: не больше 6 рядов. Цели и переключатель пути
+#: занимают до трёх, на маунты остаётся три ряда по два.
+MOUNT_ROWS_MAX = 3
+
+
+def _route_keyboard(safe: bool, targets: list[tuple[str, int, int]] | None = None,
+                    owned: list | None = None, current=None) -> str:
     from vkbottle import Keyboard, KeyboardButtonColor, Text
 
     keyboard = Keyboard(inline=True)
@@ -217,6 +249,16 @@ def _route_keyboard(safe: bool, targets: list[tuple[str, int, int]] | None = Non
             Text(f"{label} ({x}; {y})", payload={"type": "mount_go", "x": x, "y": y}),
             color=KeyboardButtonColor.PRIMARY,
         )
+        keyboard.row()
+    others = [m for m in owned or [] if current is None or m.mount_id != current.mount_id]
+    for i, m in enumerate(others[: MOUNT_ROWS_MAX * 2]):
+        if i and i % 2 == 0:
+            keyboard.row()
+        keyboard.add(
+            Text(f"{m.emoji} {m.name}"[:40], payload={"type": "mount_pick", "id": m.mount_id}),
+            color=KeyboardButtonColor.SECONDARY,
+        )
+    if others:
         keyboard.row()
     keyboard.add(
         Text("➡️ Сделать прямым" if safe else "🛡 Сделать безопасным", payload={"type": "mount_route_toggle"}),
@@ -240,7 +282,11 @@ async def route_toggle(message: Message) -> None:
         safe = flags["safe_route"]
         await db.commit()
         targets = await _quick_targets(db, character)
-    await message.answer(f"{_route_line(safe)} Пришли координаты.", keyboard=_route_keyboard(safe, targets))
+        owned = await mount_service.owned_mounts(db, character.id)
+    current_id = message.state_peer.payload.get("mount_id") if message.state_peer else None
+    current = next((m for m in owned if m.mount_id == current_id), None)
+    await message.answer(f"{_route_line(safe)} Пришли координаты.",
+                         keyboard=_route_keyboard(safe, targets, owned if current else None, current))
 
 
 @labeler.message(payload_contains={"type": "mount_go"}, state=MountCoordState.COORD_INPUT)
