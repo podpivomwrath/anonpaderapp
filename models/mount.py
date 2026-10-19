@@ -42,8 +42,14 @@ class TurboIshakDay(Base):
     spawn_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     next_move_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    #: Где стоит, а на бегу - куда бежит (2026-10-19: бежит по клеткам, как
+    #: маунт, со скоростью Турбоишака). from_* и run_started_at - начало забега,
+    #: run_started_at = None - стоит на (x; y).
     x: Mapped[int | None] = mapped_column(nullable=True)
     y: Mapped[int | None] = mapped_column(nullable=True)
+    from_x: Mapped[int | None] = mapped_column(nullable=True)
+    from_y: Mapped[int | None] = mapped_column(nullable=True)
+    run_started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     caught_by: Mapped[int | None] = mapped_column(
         ForeignKey("characters.id", ondelete="SET NULL"), nullable=True
     )

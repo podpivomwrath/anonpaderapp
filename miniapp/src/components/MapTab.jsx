@@ -176,7 +176,8 @@ export default function MapTab() {
 
   // Пока едешь верхом, значок ползёт между клетками плавно: раз в 200 мс
   // перерисовка, позиция считается от последнего опроса (ridePos).
-  const riding = Boolean(mapState?.mount_travel && !mapState.mount_travel.paused);
+  const riding = Boolean(mapState?.mount_travel && !mapState.mount_travel.paused)
+    || Boolean(mapState?.turbo?.running);
   const [, setFrame] = useState(0);
   useEffect(() => {
     if (!riding) return undefined;
@@ -259,6 +260,9 @@ export default function MapTab() {
 
   const catalog = mapState?.catalog;
   const ride = mapState ? ridePos(mapState.mount_travel, mapState.fetchedAt) : null;
+  // Турбоишак на бегу - значок едет по клеткам, как маунт, но без линии пути.
+  const turboRun = mapState?.turbo?.running ? ridePos(mapState.turbo, mapState.fetchedAt) : null;
+  const turboPos = mapState?.turbo ? (turboRun ? turboRun.pos : mapState.turbo) : null;
   // Клетка, где персонаж стоит (по ней считаются расстояния и подсказки), и
   // где рисуется значок: верхом он едет между клетками плавно.
   const playerPos = mapState ? { x: mapState.pos_x, y: mapState.pos_y } : null;
@@ -587,7 +591,8 @@ export default function MapTab() {
     ...(questTarget ? [[questTarget.x, questTarget.y, 'map-pin--quest', '📜', questTarget.label, 1]] : []),
     ...(worldBoss ? [[worldBoss.x, worldBoss.y, 'map-pin--boss', '💀', worldBoss.name, 1.3]] : []),
     // Турбоишак дня (2026-10-19): бегает по всей карте, поймать - зайти на клетку.
-    ...(mapState.turbo ? [[mapState.turbo.x, mapState.turbo.y, 'map-pin--turbo', '🫏', 'Турбоишак - поймай, пока не убежал', 1.25]] : []),
+    ...(turboPos ? [[turboPos.x, turboPos.y, 'map-pin--turbo', '🫏',
+      mapState.turbo.running ? 'Турбоишак на бегу' : 'Турбоишак стоит - поймай, пока не убежал', 1.25]] : []),
     ...(mapState.trail
       ? [[mapState.trail.x, mapState.trail.y, 'map-pin--trail', mapState.trail.emoji, mapState.trail.title, 1.1]]
       : []),
@@ -804,7 +809,7 @@ export default function MapTab() {
           {info.isMonolith && <p className="map-card__line">Рейды: прикоснись к Монолиту, нужен Ключ Монолита.</p>}
           {info.isCity && <p className="map-card__line">Город · без PvP · торговля, лавки, долгий путь из родного.</p>}
           {info.boss && <p className="map-card__line">💀 {info.boss.name} · ур. {info.boss.level} · {info.boss.hp_percent}%</p>}
-          {mapState.turbo && mapState.turbo.x === info.x && mapState.turbo.y === info.y && (
+          {mapState.turbo && !mapState.turbo.running && mapState.turbo.x === info.x && mapState.turbo.y === info.y && (
             <p className="map-card__line">🫏 Турбоишак здесь. Зайди на клетку и нажми «Подойти» - он долго не стоит.</p>
           )}
           {(() => {

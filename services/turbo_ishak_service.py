@@ -13,6 +13,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from game.combat import balance_config as bc
 from game.economy import turbo_config as tc
+from game.world import grid
 from game.world import turbo_ishak as ti
 from models import Character, CharacterMount, CharacterStats, TurboIshakDay
 from services import death_service, mount_service
@@ -46,9 +47,60 @@ async def owns_turbo(db: AsyncSession, character_id: int) -> bool:
 
 @dataclass
 class TickEvent:
-    #: spawn | move | gone
+    #: spawn | run | arrive | gone
     kind: str
     day: TurboIshakDay
+
+
+# --- Бег по клеткам ---
+# Забег: от (from_x; from_y) к (x; y) по grid.line_path со скоростью маунта.
+# Где он сейчас, считается от времени - как у маунта, без записи каждой клетки.
+
+
+def step_seconds() -> float:
+    return mount_service.seconds_per_cell(tc.MOUNT_ID)
+
+
+def run_path(day: TurboIshakDay) -> list[tuple[int, int]]:
+    """Клетки забега без стартовой."""
+    return grid.line_path(day.from_x, day.from_y, day.x, day.y)
+
+
+def _arrival(day: TurboIshakDay) -> datetime:
+    return _aware(day.run_started_at) + timedelta(seconds=len(run_path(day)) * step_seconds())
+
+
+def is_running(day: TurboIshakDay, now: datetime | None = None) -> bool:
+    return day.run_started_at is not None and (now or _now()) < _arrival(day)
+
+
+def run_view(day: TurboIshakDay, now: datetime | None = None) -> tuple[list[tuple[int, int]], int, float] | None:
+    """(путь со стартовой клеткой, индекс текущей клетки в нём, секунд до
+    следующей) - для карты; None - стоит."""
+    now = now or _now()
+    if not is_running(day, now):
+        return None
+    path = [(day.from_x, day.from_y), *run_path(day)]
+    step = step_seconds()
+    elapsed = max((now - _aware(day.run_started_at)).total_seconds(), 0.0)
+    index = min(int(elapsed // step), len(path) - 1)
+    return path, index, step - elapsed % step
+
+
+def current_cell(day: TurboIshakDay, now: datetime | None = None) -> tuple[int, int]:
+    view = run_view(day, now)
+    if view is None:
+        return day.x, day.y
+    path, index, _left = view
+    return path[index]
+
+
+def _start_run(day: TurboIshakDay, rng: random.Random, now: datetime) -> None:
+    """Сорваться с места и бежать на случайную клетку карты."""
+    day.from_x, day.from_y = current_cell(day, now)
+    day.x, day.y = ti.pick_cell(rng, avoid=(day.from_x, day.from_y))
+    day.run_started_at = now
+    day.next_move_at = _arrival(day) + timedelta(seconds=ti.next_move_delay(rng))
 
 
 async def tick(db: AsyncSession, rng: random.Random, now: datetime | None = None) -> list[TickEvent]:
@@ -75,6 +127,7 @@ async def tick(db: AsyncSession, rng: random.Random, now: datetime | None = None
                 day.status = GONE  # не успел выйти до полуночи (бот лежал) - день пропал
                 continue
             day.x, day.y = ti.pick_cell(rng)
+            day.run_started_at = None
             day.status = ACTIVE
             day.expires_at = now + timedelta(minutes=tc.LIFETIME_MINUTES)
             day.next_move_at = now + timedelta(seconds=ti.next_move_delay(rng))
@@ -82,11 +135,16 @@ async def tick(db: AsyncSession, rng: random.Random, now: datetime | None = None
         elif _aware(day.expires_at) <= now:
             day.status = GONE
             events.append(TickEvent("gone", day))
+        elif day.run_started_at is not None:
+            if now >= _arrival(day):
+                day.run_started_at = None  # добежал и встал на (x; y)
+                events.append(TickEvent("arrive", day))
         elif _aware(day.next_move_at) <= now:
-            day.next_move_at = now + timedelta(seconds=ti.next_move_delay(rng))
-            if rng.random() >= tc.STAY_CHANCE:
-                day.x, day.y = ti.pick_cell(rng, avoid=(day.x, day.y))
-                events.append(TickEvent("move", day))
+            if rng.random() < tc.STAY_CHANCE:
+                day.next_move_at = now + timedelta(seconds=ti.next_move_delay(rng))
+            else:
+                _start_run(day, rng, now)
+                events.append(TickEvent("run", day))
     await db.flush()
     return events
 
@@ -95,6 +153,8 @@ def can_approach_reason(character: Character, day: TurboIshakDay | None, owns: b
     """Почему нельзя подойти (None - можно)."""
     if day is None or day.status != ACTIVE:
         return "gone"
+    if is_running(day, now):
+        return "running" if (character.pos_x, character.pos_y) == current_cell(day, now) else "not_here"
     if (character.pos_x, character.pos_y) != (day.x, day.y):
         return "not_here"
     if owns:
@@ -116,7 +176,7 @@ async def catch_chance(db: AsyncSession, character: Character) -> tuple[str, flo
 
 @dataclass
 class Attempt:
-    #: caught | ran | gone | not_here | owned | dead
+    #: caught | ran | gone | not_here | running | owned | dead
     outcome: str
     chance: float = 0.0
     stat: str = ""
@@ -141,8 +201,7 @@ async def attempt(db: AsyncSession, character: Character, rng: random.Random, no
         day.caught_at = now
         await db.flush()
         return Attempt("caught", chance, stat)
-    day.x, day.y = ti.pick_cell(rng, avoid=(day.x, day.y))
-    day.next_move_at = now + timedelta(seconds=ti.next_move_delay(rng))
+    _start_run(day, rng, now)
     await db.flush()
     return Attempt("ran", chance, stat)
 

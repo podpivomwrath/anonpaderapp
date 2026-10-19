@@ -193,7 +193,7 @@ async def tick_job() -> None:
             task = asyncio.create_task(_spawn_news())
             _tasks.add(task)
             task.add_done_callback(_tasks.discard)
-        if event.kind not in ("spawn", "move"):
+        if event.kind not in ("spawn", "arrive"):
             continue
         await _notify_cell(day.x, day.y)
 

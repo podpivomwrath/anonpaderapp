@@ -157,7 +157,19 @@ async def handle_get_state(request: web.Request) -> web.Response:
         from services import turbo_ishak_service
 
         turbo = await turbo_ishak_service.active(db)
-        turbo_mark = {"x": turbo.x, "y": turbo.y} if turbo is not None else None
+        turbo_mark = None
+        if turbo is not None:
+            x, y = turbo_ishak_service.current_cell(turbo)
+            turbo_mark = {"x": x, "y": y, "running": False}
+            run = turbo_ishak_service.run_view(turbo)
+            if run is not None:
+                # Как у маунта: карта ведёт значок по пути сама. Пути на карте
+                # не рисуем - куда он бежит, игрок не видит.
+                path, index, left = run
+                turbo_mark.update({
+                    "running": True, "path": [list(c) for c in path], "cell_index": index,
+                    "step_seconds": turbo_ishak_service.step_seconds(), "next_cell_in": left,
+                })
 
         # Гильдии: владения и закладки - цветом гильдии на карте.
         from services import guild_territory_service

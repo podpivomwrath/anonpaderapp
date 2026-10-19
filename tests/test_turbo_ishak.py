@@ -91,7 +91,7 @@ async def test_day_lifecycle_spawn_move_gone(db_session) -> None:
         t += timedelta(seconds=tc.MOVE_SECONDS[1] + 1)
         if t >= svc._aware(day.expires_at):
             break
-        moved += sum(e.kind == "move" for e in await svc.tick(db_session, rng, t))
+        moved += sum(e.kind == "run" for e in await svc.tick(db_session, rng, t))
     assert moved > 0
     events = await svc.tick(db_session, rng, svc._aware(day.expires_at) + timedelta(seconds=1))
     assert [e.kind for e in events] == ["gone"] and day.status == svc.GONE
@@ -123,12 +123,19 @@ async def test_fail_makes_it_run_and_owner_cannot_try(db_session, make_character
     result = await svc.attempt(db_session, c, Always(0.99), NOON)
     assert result.outcome == "ran" and (day.x, day.y) != before and day.status == svc.ACTIVE
     # Ушёл с клетки - подойти нельзя.
-    assert (await svc.attempt(db_session, c, Always(0.0), NOON)).outcome == "not_here"
+    # Сорвался и бежит: на бегу не схватить, даже если он ещё на твоей клетке.
+    assert svc.is_running(day, NOON) and svc.current_cell(day, NOON) == before
+    assert (await svc.attempt(db_session, c, Always(0.0), NOON)).outcome == "running"
+    # Пробежал дальше - тебя на его клетке уже нет.
+    later = NOON + timedelta(seconds=svc.step_seconds() * 1.5)
+    assert svc.current_cell(day, later) != before
+    assert (await svc.attempt(db_session, c, Always(0.0), later)).outcome == "not_here"
 
     owner = await make_character(level=30)
     await mount_service.grant(db_session, owner, tc.MOUNT_ID)
     owner.pos_x, owner.pos_y = day.x, day.y
-    assert (await svc.attempt(db_session, owner, Always(0.0), NOON)).outcome == "owned"
+    stopped = svc._arrival(day) + timedelta(seconds=1)
+    assert (await svc.attempt(db_session, owner, Always(0.0), stopped)).outcome == "owned"
 
 
 async def test_skip_name_keeps_plain_title(db_session, make_character) -> None:
@@ -137,3 +144,22 @@ async def test_skip_name_keeps_plain_title(db_session, make_character) -> None:
     await svc.skip_name(db_session, c)
     assert [m.name for m in await mount_service.owned_mounts(db_session, c.id)] == ["Турбоишак"]
     assert await svc.awaiting_name(db_session) == []
+
+
+async def test_run_goes_cell_by_cell_and_stops(db_session) -> None:
+    """Бег по клеткам со скоростью маунта (2026-10-19): каждый шаг - в
+    соседнюю клетку, добежал - стоит на цели и шлёт кнопки (arrive)."""
+    rng = random.Random(9)
+    day = await _run_until_active(db_session, rng)
+    svc._start_run(day, rng, NOON)
+    path, index, left = svc.run_view(day, NOON)
+    assert index == 0 and path[0] == (day.from_x, day.from_y) and path[-1] == (day.x, day.y)
+    assert 0 < left <= svc.step_seconds() == 3.5
+    cells = [svc.current_cell(day, NOON + timedelta(seconds=i * svc.step_seconds())) for i in range(len(path))]
+    assert cells == path
+    for a, b in zip(cells, cells[1:]):
+        assert max(abs(a[0] - b[0]), abs(a[1] - b[1])) == 1
+    arrival = NOON + timedelta(seconds=(len(path) - 1) * svc.step_seconds() + 1)
+    events = await svc.tick(db_session, rng, arrival)
+    assert [e.kind for e in events] == ["arrive"]
+    assert not svc.is_running(day, arrival) and svc.current_cell(day, arrival) == (day.x, day.y)
