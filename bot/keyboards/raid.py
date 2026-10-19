@@ -52,7 +52,10 @@ def raid_lobby_keyboard(ready: bool = True, raid_id: str = "puppet_theatre") -> 
     return kb.get_json()
 
 
-def raid_combat_keyboard(base_class: str, cooldowns: dict[str, int], subclass_id: str | None = None) -> str:
+def raid_combat_keyboard(
+    base_class: str, cooldowns: dict[str, int], subclass_id: str | None = None,
+    extra: list[tuple[str, dict]] | None = None,
+) -> str:
     """Патч 54: подписи берутся из общего реестра combat_modes.RAID — до этого
     были ДОСЛОВНЫМИ копиями группового PvE, и групповой обработчик (он раньше
     в LABELERS) перехватывал все три кнопки: рейд был непроходим, работали
@@ -62,6 +65,10 @@ def raid_combat_keyboard(base_class: str, cooldowns: dict[str, int], subclass_id
     None) — выйти из рейда нельзя, единственный выход — смерть всей группы
     (патч 53)."""
     kb = Keyboard(one_time=False)
+    # Кнопки этапа (груз обоза, каравай) - отдельным рядом во всю ширину сверху.
+    for label, payload in extra or ():
+        kb.add(Text(label, payload=payload), color=KeyboardButtonColor.POSITIVE)
+        kb.row()
     items: list[tuple[str, KeyboardButtonColor, dict | None]] = [
         # Патч 54: у атаки теперь есть и payload — диспетчеризация по нему не
         # зависит от подписи вовсе (второй рубеж, см. combat_modes).

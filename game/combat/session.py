@@ -423,6 +423,8 @@ class CombatSessionState:
     combatants: dict[int, CombatantState] = field(default_factory=dict)
     tick_number: int = 0
     is_raid: bool = False  # влияет на точность % в логе (п.11)
+    #: своё окно хода вместо общего (финал Мельника: жернова ускоряются)
+    turn_seconds: float | None = None
 
     def add(self, combatant: CombatantState) -> None:
         self.combatants[combatant.id] = combatant

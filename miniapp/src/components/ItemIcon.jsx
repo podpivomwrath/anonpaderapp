@@ -20,6 +20,7 @@ import { itemIcon } from '../itemIcons.js';
 const UNIQUE_STAND_IN = {
   general_cuirass: 'base:armor:Панцирь',
   archivist_mask: 'base:helmet:Маска',
+  pilgrim_greaves: 'base:legs:Поножи',
 };
 
 function fallbackFor(icon) {

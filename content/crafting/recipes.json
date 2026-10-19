@@ -23,9 +23,18 @@
   "general_cuirass": {
     "source_name": "Панцирь Тавра",
     "weights": {
-      "tank": {"vit": 0.7, "primary": 0.3},
-      "dps": {"primary": 0.65, "vit": 0.35},
-      "support": {"vit": 0.5, "primary": 0.5}
+      "tank": {
+        "vit": 0.7,
+        "primary": 0.3
+      },
+      "dps": {
+        "primary": 0.65,
+        "vit": 0.35
+      },
+      "support": {
+        "vit": 0.5,
+        "primary": 0.5
+      }
     },
     "outputs": {
       "tank": {
@@ -48,9 +57,18 @@
   "archivist_mask": {
     "source_name": "Маска Архивариуса",
     "weights": {
-      "tank": {"vit": 0.7, "primary": 0.3},
-      "dps": {"primary": 0.65, "vit": 0.35},
-      "support": {"vit": 0.5, "primary": 0.5}
+      "tank": {
+        "vit": 0.7,
+        "primary": 0.3
+      },
+      "dps": {
+        "primary": 0.65,
+        "vit": 0.35
+      },
+      "support": {
+        "vit": 0.5,
+        "primary": 0.5
+      }
     },
     "outputs": {
       "tank": {
@@ -67,6 +85,40 @@
         "name": "Венец Каталога",
         "gender": "m",
         "flavor": "От маски остался только обод, исписанный мелко, как поля старой книги. Читать его можно бесконечно."
+      }
+    }
+  },
+  "pilgrim_greaves": {
+    "source_name": "Поножи Паломника",
+    "weights": {
+      "tank": {
+        "vit": 0.7,
+        "primary": 0.3
+      },
+      "dps": {
+        "primary": 0.65,
+        "vit": 0.35
+      },
+      "support": {
+        "vit": 0.5,
+        "primary": 0.5
+      }
+    },
+    "outputs": {
+      "tank": {
+        "name": "Поножи Носильщика",
+        "gender": "pl",
+        "flavor": "Наколенники подбиты войлоком и обшиты мешковиной в два слоя. В таких держат груз, пока держат ноги."
+      },
+      "dps": {
+        "name": "Поножи Помола",
+        "gender": "pl",
+        "flavor": "Пластины стёсаны до остроты, по краю осталась белая пыль. Кто шагнул не в такт, того они перемелют."
+      },
+      "support": {
+        "name": "Обмотки Шествия",
+        "gender": "pl",
+        "flavor": "От поножей остались ремни и полосы холста, исписанные шагами: левой, правой, замри."
       }
     }
   }

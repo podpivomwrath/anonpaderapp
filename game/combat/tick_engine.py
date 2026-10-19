@@ -175,7 +175,7 @@ class TickEngine:
         if state.mode == CombatMode.PVP_GROUP:
             window = self.pvp_window_seconds
         elif state.mode == CombatMode.PVE and state.is_raid:
-            window = self.group_pve_window_seconds
+            window = state.turn_seconds or self.group_pve_window_seconds
         if window is not None:
             resolve_at = datetime.now(timezone.utc) + timedelta(seconds=window)
             self.scheduler.add_job(

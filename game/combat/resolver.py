@@ -337,7 +337,9 @@ def resolve_tick(
             result.lines.append(f"{combatant.name} теряет ход ❄️")
             continue
         if action.type == ActionType.SKIP:
-            result.lines.append(f"{combatant.name} медлит и пропускает ход")
+            # note - сценарное действие вместо хода (рейд: «несёт груз»)
+            note = action.payload.get("note")
+            result.lines.append(f"{combatant.name} {note}" if note else f"{combatant.name} медлит и пропускает ход")
             continue
         if action.type == ActionType.DEFEND:
             result.lines.append(combat_flavor.defend_line(combatant.name))

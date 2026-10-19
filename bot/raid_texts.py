@@ -20,10 +20,12 @@
 
 from bot import raid_archive_texts as at
 from bot import raid_field_texts as ft
+from bot import raid_mill_texts as mt
 from bot.vk_media import photo_attachment
 from game.economy import raid_archive_config as ac
 from game.economy import raid_config as rc
 from game.economy import raid_field_config as fc
+from game.economy import raid_mill_config as mc
 
 MONOLITH_CALL_TEXT = (
     "Вблизи от Монолита теплеет лицо. Камень сухой и тёплый, как лоб больного, "
@@ -49,6 +51,7 @@ RAID_TITLES = {
     rc.RAID_PUPPET_THEATRE_ID: BTN_PUPPET_THEATRE,
     fc.RAID_FIELD_ID: ft.BTN_FIELD,
     ac.RAID_ARCHIVE_ID: at.BTN_ARCHIVE,
+    mc.RAID_MILL_ID: mt.BTN_MILL,
 }
 RAID_IDS = tuple(RAID_TITLES)
 
@@ -164,6 +167,8 @@ def group_touch_notice(leader_name: str, raid_id: str = rc.RAID_PUPPET_THEATRE_I
         return ft.group_touch_notice(leader_name)
     if raid_id == ac.RAID_ARCHIVE_ID:
         return at.group_touch_notice(leader_name)
+    if raid_id == mc.RAID_MILL_ID:
+        return mt.group_touch_notice(leader_name)
     return (
         f"{leader_name} открыл вход в Кукольный театр. Придите к Монолиту (0; 0) "
         f"и прикоснитесь."
