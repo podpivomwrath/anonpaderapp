@@ -100,7 +100,7 @@ class CoordCancelMiddleware(BaseMiddleware[Message]):
         # Строкой: str != StateRepresentation у vkbottle даёт True всегда.
         if state is None or str(state.state) != str(MountCoordState.COORD_INPUT):
             return
-        if any(t in str(self.event.payload or "") for t in ("mount_route_toggle", "mount_go", "mount_pick")):
+        if any(t in str(self.event.payload or "") for t in ("mount_route_toggle", "mount_go", "mount_pick", "mount_choose")):
             return  # переключатель пути и выбор маунта - часть того же выбора
         if self.event.payload or not _COORD_LIKE_RE.match(self.event.text or ""):
             await _dispenser.delete(self.event.peer_id)
@@ -188,6 +188,20 @@ def _ready_text(mount, character, safe: bool) -> str:
     )
 
 
+@labeler.message(payload_contains={"type": "mount_choose"}, state=MountCoordState.COORD_INPUT)
+async def choose_mount(message: Message) -> None:
+    """Кнопка «Выбор маунта» - список маунтов, ожидание координат остаётся."""
+    async with get_session_factory()() as db:
+        character = await onboarding_svc.get_character(db, message.from_id)
+        if character is None or character.creation_state is not None:
+            return
+        owned = await mount_service.owned_mounts(db, character.id)
+        await db.commit()
+    current_id = message.state_peer.payload.get("mount_id") if message.state_peer else None
+    current = next((m for m in owned if m.mount_id == current_id), None)
+    await message.answer("На ком поедешь?", keyboard=_mounts_keyboard(owned, current))
+
+
 @labeler.message(payload_contains={"type": "mount_pick"}, state=MountCoordState.COORD_INPUT)
 async def pick_mount(message: Message) -> None:
     """Кнопка другого маунта: то же ожидание координат, но на нём."""
@@ -234,9 +248,25 @@ def _route_line(safe: bool) -> str:
     )
 
 
-#: Inline-клавиатура VK: не больше 6 рядов. Цели и переключатель пути
-#: занимают до трёх, на маунты остаётся три ряда по два.
-MOUNT_ROWS_MAX = 3
+BTN_CHOOSE_MOUNT = "🐎 Выбор маунта"
+#: Inline-клавиатура VK: не больше 6 рядов и 10 кнопок.
+MOUNT_LIST_MAX = 6
+
+
+def _mounts_keyboard(owned: list, current) -> str:
+    """Список маунтов (2026-10-19): нажал - снова «готов в путь», уже на нём."""
+    from vkbottle import Keyboard, KeyboardButtonColor, Text
+
+    keyboard = Keyboard(inline=True)
+    for i, m in enumerate(owned[:MOUNT_LIST_MAX]):
+        if i:
+            keyboard.row()
+        mark = "✅ " if current is not None and m.mount_id == current.mount_id else ""
+        keyboard.add(
+            Text(f"{mark}{m.emoji} {m.name}"[:40], payload={"type": "mount_pick", "id": m.mount_id}),
+            color=KeyboardButtonColor.PRIMARY if mark else KeyboardButtonColor.SECONDARY,
+        )
+    return keyboard.get_json()
 
 
 def _route_keyboard(safe: bool, targets: list[tuple[str, int, int]] | None = None,
@@ -250,20 +280,14 @@ def _route_keyboard(safe: bool, targets: list[tuple[str, int, int]] | None = Non
             color=KeyboardButtonColor.PRIMARY,
         )
         keyboard.row()
-    others = [m for m in owned or [] if current is None or m.mount_id != current.mount_id]
-    for i, m in enumerate(others[: MOUNT_ROWS_MAX * 2]):
-        if i and i % 2 == 0:
-            keyboard.row()
-        keyboard.add(
-            Text(f"{m.emoji} {m.name}"[:40], payload={"type": "mount_pick", "id": m.mount_id}),
-            color=KeyboardButtonColor.SECONDARY,
-        )
-    if others:
-        keyboard.row()
+
     keyboard.add(
         Text("➡️ Сделать прямым" if safe else "🛡 Сделать безопасным", payload={"type": "mount_route_toggle"}),
         color=KeyboardButtonColor.SECONDARY,
     )
+    if owned and len(owned) > 1:
+        keyboard.row()
+        keyboard.add(Text(BTN_CHOOSE_MOUNT, payload={"type": "mount_choose"}), color=KeyboardButtonColor.SECONDARY)
     return keyboard.get_json()
 
 
