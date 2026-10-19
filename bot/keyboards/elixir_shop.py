@@ -42,11 +42,13 @@ def shop_keyboard(elixirs: list[ElixirDef]) -> str:
     return kb.get_json()
 
 
-def elixir_quantity_keyboard(elixir: ElixirDef, farm_currency: int) -> str:
+def elixir_quantity_keyboard(elixir: ElixirDef, farm_currency: int, unit_price: int | None = None) -> str:
     """Экран количества для ОДНОГО зелья: кнопка на каждое доступное по
-    золоту количество из SHOP_BULK_QUANTITIES, [← Назад] к каталогу."""
+    золоту количество из SHOP_BULK_QUANTITIES, [← Назад] к каталогу.
+    unit_price - цена с множителем города и клейма, как в buy_bulk."""
     kb = Keyboard(one_time=False)
-    unit_price = ec.ELIXIR_PRICES.get(elixir.id, 0)
+    if unit_price is None:
+        unit_price = ec.ELIXIR_PRICES.get(elixir.id, 0)
     items: list[tuple[str, KeyboardButtonColor, dict | None]] = []
     for qty in ec.SHOP_BULK_QUANTITIES:
         total = unit_price * qty

@@ -134,7 +134,7 @@ async def elixir_shop_select(message: Message) -> None:
 
     text = f"{elixir.emoji} {elixir.name} - {price} зол. за штуку.\nСколько взять?"
     await editable_message.send_or_edit(
-        _bot_api, _NS, peer_id, text, elixir_quantity_keyboard(elixir, farm_currency),
+        _bot_api, _NS, peer_id, text, elixir_quantity_keyboard(elixir, farm_currency, price),
         attachment=shop_attachment(),
     )
 

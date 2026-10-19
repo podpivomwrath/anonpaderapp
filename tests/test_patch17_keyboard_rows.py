@@ -85,6 +85,16 @@ def test_quantity_keyboard_shows_all_amounts_when_rich() -> None:
         assert any(label.startswith(f"×{qty} ") for label in labels)
 
 
+def test_quantity_keyboard_uses_city_price() -> None:
+    """Кнопки считают ту же цену, что списывает buy_bulk (город, клеймо):
+    144 за штуку - ×5 стоит 720, а не базовые 750 (баг 2026-10-19)."""
+    elixir = load_elixirs()["heal_small"]
+    kb_json = elixir_quantity_keyboard(elixir, farm_currency=10_000, unit_price=144)
+    labels = {btn["action"]["label"] for row in _rows(kb_json) for btn in row}
+    assert "×5 - 720 зол." in labels
+    assert "×25 - 3600 зол." in labels
+
+
 def test_quantity_keyboard_back_button_present_even_when_poor() -> None:
     elixir = load_elixirs()["heal_small"]
     kb_json = elixir_quantity_keyboard(elixir, farm_currency=0)
