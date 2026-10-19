@@ -29,6 +29,10 @@ _bot_api = None
 _live_countdown = True
 # peer_id -> message_id сообщения о смерти (для edit-отсчёта)
 _death_message: dict[int, int] = {}
+# peer_id -> потерянный при смерти опыт: отсчёт пересобирает сообщение
+# каждый скан, и без этого строка штрафа пропадала после первой правки
+# (2026-10-19, жалоба игрока: «не написало про потерянный опыт»).
+_death_xp: dict[int, int] = {}
 # peer_id -> ждёт PvP-лорную фразу возрождения вместо обычной (патч 22) —
 # PvP-поражение не показывает счётчик смерти в реальном времени, само
 # сообщение о поражении шлёт bot/handlers/pvp.py, а не register_death.
@@ -82,6 +86,7 @@ async def register_death(
     # число): правка всегда падала, и отсчёт не обновлялся никогда.
     try:
         _death_message[peer_id] = int(resp)
+        _death_xp[peer_id] = xp_lost
     except (TypeError, ValueError):
         pass
 
@@ -161,6 +166,7 @@ async def scan() -> None:
 
     for peer_id, region in to_revive:
         _death_message.pop(peer_id, None)
+        _death_xp.pop(peer_id, None)
         if region is None:
             _pvp_death_pending.discard(peer_id)
             await _bot_api.messages.send(
@@ -203,7 +209,7 @@ async def scan() -> None:
                 await _bot_api.messages.edit(
                     peer_id=peer_id,
                     message_id=msg_id,
-                    message=_death_text(respawn_at, now),
+                    message=_death_text(respawn_at, now, _death_xp.get(peer_id, 0)),
                 )
             except Exception:
                 logger.debug("Не удалось обновить отсчёт респавна для {}", peer_id)
