@@ -290,7 +290,7 @@ def _live_state(battle_id: int, battle: GroupBattle) -> dict:
 
 
 def _character_id_for_peer(battle: GroupBattle, peer_id: int) -> int | None:
-    for cid, p in battle.participants.items():
+    for cid, p in list(battle.participants.items()):
         if p.peer_id == peer_id:
             return cid
     return None
@@ -313,7 +313,7 @@ def _default_enemy_target(battle_id: int, battle: GroupBattle, cid: int) -> int 
         return None
     combatants = _live_state(battle_id, battle)
     focus = {e: 0 for e in enemies}
-    for other in battle.participants:
+    for other in list(battle.participants):
         target = _chosen_target.get(other)
         if other != cid and target in focus:
             focus[target] += 1
@@ -363,7 +363,7 @@ async def _broadcast_board(
     state = _engine.sessions.get(battle_id)
     text = _render_board(state, result) if state is not None else ""
     notices = notices or {}
-    for cid, p in battle.participants.items():
+    for cid, p in list(battle.participants.items()):
         combatant = _live_state(battle_id, battle).get(cid)
         keyboard = (
             group_combat_keyboard(p.base_class, combatant.cooldowns, subclass_id=p.subclass_id)
@@ -427,7 +427,7 @@ def _drop_stale(battle_id: int) -> None:
             _peer_battle.pop(peer, None)
     if battle is not None:
         _active_group_ids.discard(battle.group_id)
-        for p in battle.participants.values():
+        for p in list(battle.participants.values()):
             _chosen_target.pop(p.character_id, None)
 
 
@@ -767,7 +767,7 @@ async def _story_kill(db, battle: GroupBattle) -> dict[int, str]:
     from services import story_service
 
     lines: dict[int, str] = {}
-    for cid in battle.participants:
+    for cid in list(battle.participants):
         character = await db.get(Character, cid)
         if character is None:
             continue
@@ -785,7 +785,7 @@ async def on_group_battle_finished(session_id: int, result: TickResult) -> None:
     if battle is None:
         return
     _active_group_ids.discard(battle.group_id)
-    for p in battle.participants.values():
+    for p in list(battle.participants.values()):
         _peer_battle.pop(p.peer_id, None)
         _chosen_target.pop(p.character_id, None)
 
@@ -815,7 +815,7 @@ async def on_group_battle_finished(session_id: int, result: TickResult) -> None:
         has_mount_by_cid = {}
         positions = {}
         defeats: dict[int, object] = {}
-        for cid in battle.participants:
+        for cid in list(battle.participants):
             character = await db.get(Character, cid)
             if character is None:
                 continue
@@ -845,7 +845,7 @@ async def on_group_battle_finished(session_id: int, result: TickResult) -> None:
         dealer_lines = await _dealer_outcome(db, battle, combatants, bool(survivor_ids))
         await db.commit()
 
-    for cid, p in battle.participants.items():
+    for cid, p in list(battle.participants.items()):
         if cid in survivor_ids:
             pos = positions.get(cid, (0, 0))
             keyboard = movement_keyboard(*pos, p.peer_id, has_mount=has_mount_by_cid.get(cid, False))
@@ -898,7 +898,7 @@ async def _dealer_outcome(db, battle: GroupBattle, combatants: dict, won: bool) 
 
     lines: dict[int, list[str]] = {}
     if won:
-        for cid in battle.participants:
+        for cid in list(battle.participants):
             character = await db.get(Character, cid)
             stats = await db.scalar(select(CharacterStats).where(CharacterStats.character_id == cid))
             if character is None or stats is None:
@@ -946,7 +946,7 @@ async def interrupt_for_pvp(victim_peer_id: int, notify: bool = True) -> list[tu
     has_mount_by_cid: dict[int, bool] = {}
     positions: dict[int, tuple[int, int]] = {}
     async with get_session_factory()() as db:
-        for cid in battle.participants:
+        for cid in list(battle.participants):
             character = await db.get(Character, cid)
             if character is None:
                 continue
@@ -959,7 +959,7 @@ async def interrupt_for_pvp(victim_peer_id: int, notify: bool = True) -> list[tu
                 vit_bonus = (await item_service.compute_gear_bonus(db, cid)).get("vit", 0)
                 vitals_service.set_hp(character, stats, hp, vit_bonus)
         await db.commit()
-    for cid, p in battle.participants.items():
+    for cid, p in list(battle.participants.items()):
         if p.peer_id == victim_peer_id or not notify:
             continue
         pos = positions.get(cid, (0, 0))
@@ -978,7 +978,7 @@ async def interrupt_for_pvp(victim_peer_id: int, notify: bool = True) -> list[tu
 async def _tell_others(battle, cid: int, text: str) -> None:
     """Свиток действует на всю сторону (или на всех врагов) - видеть это
     должны все в бою, а не только прочитавший."""
-    for other_id, other in battle.participants.items():
+    for other_id, other in list(battle.participants.items()):
         if other_id == cid:
             continue
         try:

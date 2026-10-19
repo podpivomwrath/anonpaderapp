@@ -8,11 +8,12 @@
 первом же действии после выхода на сводку локации.
 """
 
-import asyncio
 from datetime import datetime, timezone
 from pathlib import Path
 
 from loguru import logger
+
+from bot import background
 from vkbottle import BaseMiddleware, DocMessagesUploader, Keyboard, KeyboardButtonColor, Text
 from vkbottle.bot import BotLabeler, Message
 
@@ -86,7 +87,7 @@ async def send_gate(peer_id: int) -> None:
     )
     if peer_id not in _docs_started:
         _docs_started.add(peer_id)
-        asyncio.get_running_loop().create_task(_send_docs(peer_id))
+        background.spawn(_send_docs(peer_id))
 
 
 async def _busy(db, peer_id: int) -> bool:

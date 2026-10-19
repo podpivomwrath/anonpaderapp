@@ -15,6 +15,7 @@ from loguru import logger
 from sqlalchemy import select
 from vkbottle.bot import BotLabeler, Message
 
+from bot import background
 from bot import editable_message
 from bot.keyboards.stats_window import levelup_keyboard, no_keyboard, stats_alloc_keyboard
 from bot.keyboards.world import BTN_STATS
@@ -77,7 +78,7 @@ async def notify_levelup(peer_id: int, levels_gained: int, new_level: int) -> No
     Теперь вызывающий не ждёт окна вовсе, а окно открывается после его
     коммита и персонажа только читает."""
     if levels_gained > 0:
-        asyncio.get_running_loop().create_task(_levelup_later(peer_id, sas.levelup_header(new_level)))
+        background.spawn(_levelup_later(peer_id, sas.levelup_header(new_level)))
 
 
 async def _levelup_later(peer_id: int, header: str) -> None:

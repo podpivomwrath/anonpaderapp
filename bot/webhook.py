@@ -11,11 +11,11 @@ VK ждёт тело "ok" за миллисекунды; если ответ о�
 логируются в фоне, наружу это никогда не всплывает — VK уже получил "ok".
 """
 
-import asyncio
 
 from aiohttp import web
 from loguru import logger
 
+from bot import background
 from bot.app_keys import REDIS_KEY, ROUTE_EVENT_KEY, SESSION_FACTORY_KEY, SETTINGS_KEY, RouteEvent
 from bot.miniapp_admin_api import register_routes as register_miniapp_admin_routes
 from bot.miniapp_api import register_routes as register_miniapp_routes
@@ -92,7 +92,7 @@ async def handle_callback(request: web.Request) -> web.Response:
         except Exception:
             logger.exception("Ошибка обработки события {}", event_type)
 
-    asyncio.create_task(_process())
+    background.spawn(_process())
     return web.Response(text="ok")
 
 

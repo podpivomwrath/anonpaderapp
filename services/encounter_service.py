@@ -102,7 +102,10 @@ async def resolve_victory(
         from game.world import grid
 
         dist = grid.monolith_distance(character.pos_x, character.pos_y)
-        logger.warning(
+        # 2026-10-19, аудит: за 48 ч доли пустых побед сошлись с шансами
+        # (1 бросок ~31%, у Монолита ~0.3%) - это не сбой. Только отладка,
+        # чтобы не засорять журнал ошибок.
+        logger.debug(
             "Победа без трофеев: {} ({}; {}) dist={} бросков={}",
             character.name, character.pos_x, character.pos_y, dist, loot.rolls_for_dist(dist),
         )

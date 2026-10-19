@@ -14,6 +14,7 @@ from dataclasses import dataclass, field
 from loguru import logger
 from vkbottle.bot import BotLabeler, Message
 
+from bot import background
 from bot.keyboards.combat_items import page_of
 from bot import dailies_texts, editable_message, group_texts, raid_key_texts, raid_texts as rt
 from bot import raid_archive_texts as at
@@ -271,7 +272,7 @@ def _start_stage_session(battle_id: int, battle: RaidBattle) -> CombatSessionSta
 
     default_target = _default_target_id(battle)
     if default_target is not None:
-        for p in battle.participants.values():
+        for p in list(battle.participants.values()):
             _chosen_target[p.character_id] = default_target
     return state
 
@@ -467,7 +468,7 @@ async def begin_combat_stage(battle_id: int) -> None:
     battle.stage = 3
     state = _start_stage_session(battle_id, battle)
     _engine.start_session(state)
-    for p in battle.participants.values():
+    for p in list(battle.participants.values()):
         await _bot_api.messages.send(
             peer_id=p.peer_id, message=_appear_text(battle),
             attachment=_stage_attachment(battle), random_id=0,
@@ -499,7 +500,7 @@ def abort_run(run_id: int) -> None:
             raid_archive.abort(battle_id)
         _battles.pop(battle_id, None)
         _declared_this_tick.pop(battle_id, None)
-        for p in battle.participants.values():
+        for p in list(battle.participants.values()):
             _peer_battle.pop(p.peer_id, None)
             _chosen_target.pop(p.character_id, None)
             _character_in_raid.discard(p.character_id)
@@ -513,7 +514,7 @@ def _live_state(battle_id: int, battle: RaidBattle) -> dict:
 
 
 def _character_id_for_peer(battle: RaidBattle, peer_id: int) -> int | None:
-    for cid, p in battle.participants.items():
+    for cid, p in list(battle.participants.items()):
         if p.peer_id == peer_id:
             return cid
     return None
@@ -574,7 +575,7 @@ async def _broadcast_board(
     text = _render_board(state, result, boss_lines) if state is not None else ""
     notices = notices or {}
     skipping = _declared_this_tick.get(battle_id, set())
-    for cid, p in battle.participants.items():
+    for cid, p in list(battle.participants.items()):
         combatant = _live_state(battle_id, battle).get(cid)
         # Скованный (руки на поле) ход не выбирает - за него уже объявлен
         # пропуск, кнопки боя ему ни к чему.
@@ -1055,7 +1056,7 @@ async def on_raid_tick_resolved(session_id: int, tick: int, result: TickResult) 
     if frozen_ids:
         # Последней строкой: следующий ход движок откроет только после
         # возврата из этого колбэка, а пропуск надо объявить уже в нём.
-        asyncio.get_running_loop().create_task(_auto_skip(session_id, frozen_ids))
+        background.spawn(_auto_skip(session_id, frozen_ids))
 
 
 @dataclass
@@ -1153,7 +1154,7 @@ async def _grant_stage_reward(battle: RaidBattle, reward: StageReward) -> dict[i
             # SURGEON_TRIAL_LEVEL). Засчитывается всем, кто в рейде:
             # победа общая, как и рейд.
             trial_level = _trial_level(battle)
-            for cid, p in battle.participants.items():
+            for cid, p in list(battle.participants.items()):
                 character = await db.get(Character, cid)
                 if character is None or character.subclass is None:
                     continue
@@ -1236,7 +1237,7 @@ async def _advance_or_finish(session_id: int, battle: RaidBattle) -> None:
         transition_text = texts.transition_text(stage_cleared)
     else:
         transition_text = texts.STAGE1_TO_STAGE2_TEXT if stage_cleared == 1 else texts.STAGE2_TO_STAGE3_TEXT
-    for p in battle.participants.values():
+    for p in list(battle.participants.values()):
         await _bot_api.messages.send(
             peer_id=p.peer_id, message=transition_text, random_id=0, keyboard=kb.raid_waiting_keyboard(),
         )
@@ -1252,7 +1253,7 @@ async def _advance_or_finish(session_id: int, battle: RaidBattle) -> None:
     battle.stage += 1
     state = _start_stage_session(session_id, battle)
     _engine.start_session(state)
-    for p in battle.participants.values():
+    for p in list(battle.participants.values()):
         await _bot_api.messages.send(
             peer_id=p.peer_id, message=_appear_text(battle),
             attachment=_stage_attachment(battle), random_id=0,
@@ -1266,7 +1267,7 @@ async def _grant_stage_clear_bonus(battle: RaidBattle) -> None:
     одному случайному участнику (независимый розыгрыш)."""
     async with get_session_factory()() as db:
         candidates = []
-        for cid in battle.participants:
+        for cid in list(battle.participants):
             character = await db.get(Character, cid)
             if character is not None:
                 candidates.append(character)
@@ -1340,7 +1341,7 @@ async def _grant_rift_legendaries(battle: RaidBattle) -> None:
             drops.append((winner, item))
         await db.commit()
     names = ", ".join(f"{w.name} - {item.name}" for w, item in drops)
-    for cid, p in battle.participants.items():
+    for cid, p in list(battle.participants.items()):
         lines = [item_service.format_drop_announcement(item) for w, item in drops if w.id == cid]
         lines.append(f"🟠 Легендарная добыча разлома: {names}.")
         try:
@@ -1356,7 +1357,7 @@ async def _grant_blood_chests(battle: RaidBattle) -> None:
     from services import lootbox_service
 
     async with get_session_factory()() as db:
-        for cid in battle.participants:
+        for cid in list(battle.participants):
             character = await db.get(Character, cid)
             if character is None:
                 continue
@@ -1367,7 +1368,7 @@ async def _grant_blood_chests(battle: RaidBattle) -> None:
         "🩸 Кровавый разлом отдаёт своё: ⛏ Ларец руды и 🧪 Ларец расходников - "
         "в сумке, открыть в мини-аппе."
     )
-    for p in battle.participants.values():
+    for p in list(battle.participants.values()):
         try:
             await _bot_api.messages.send(peer_id=p.peer_id, message=text, random_id=0)
         except Exception:
@@ -1428,7 +1429,7 @@ async def _cleanup_and_return(session_id: int, battle: RaidBattle, text: str, *,
     state = _engine.sessions.get(session_id)
     if state is not None:
         combatants = dict(state.combatants)
-    for p in battle.participants.values():
+    for p in list(battle.participants.values()):
         _peer_battle.pop(p.peer_id, None)
         _chosen_target.pop(p.character_id, None)
         _character_in_raid.discard(p.character_id)
@@ -1437,7 +1438,7 @@ async def _cleanup_and_return(session_id: int, battle: RaidBattle, text: str, *,
     async with get_session_factory()() as db:
         has_mount_by_cid = {}
         defeats: dict[int, object] = {}
-        for cid in battle.participants:
+        for cid in list(battle.participants):
             character = await db.get(Character, cid)
             if character is None:
                 continue
@@ -1490,7 +1491,7 @@ async def _cleanup_and_return(session_id: int, battle: RaidBattle, text: str, *,
     ])
     text = f"{text}\n\n{table}"
 
-    for cid, p in battle.participants.items():
+    for cid, p in list(battle.participants.items()):
         if cid in has_mount_by_cid:
             raised_line = (
                 f"\n\n🩸 Ты пал в разломе, но группа его прошла и подняла тебя: "
@@ -1525,7 +1526,7 @@ SAFE_EXIT_LINE = f"\n\n🛡 {bc.PVP_SAFE_SECONDS // 60} мин. на тебя н
 async def _tell_others(battle, cid: int, text: str) -> None:
     """Свиток действует на всю сторону (или на всех врагов) - видеть это
     должны все в бою, а не только прочитавший."""
-    for other_id, other in battle.participants.items():
+    for other_id, other in list(battle.participants.items()):
         if other_id == cid:
             continue
         try:

@@ -334,7 +334,7 @@ async def _build_combatant_for(db, character: Character) -> CombatantState:
 
 
 def _character_id_for_peer(battle: Battle, peer_id: int) -> int | None:
-    for cid, p in battle.participants.items():
+    for cid, p in list(battle.participants.items()):
         if p.peer_id == peer_id:
             return cid
     return None
@@ -563,7 +563,7 @@ async def _groupmate_side(db, character, battle: Battle) -> int | None:
 def _battle_roster_text(battle_id: int, battle: Battle) -> str:
     combatants = _live_state(battle_id, battle)
     by_side: dict[int, list[str]] = {0: [], 1: []}
-    for cid, p in battle.participants.items():
+    for cid, p in list(battle.participants.items()):
         c = combatants.get(cid)
         if c is None:
             continue
@@ -870,7 +870,7 @@ async def _launch_duel(
 
     # Патч 31, п.6: боевая клавиатура — только тому, кто ходит первым;
     # второй игрок ждёт с убранными кнопками, чтобы не жать их вне очереди.
-    for cid, participant in battle.participants.items():
+    for cid, participant in list(battle.participants.items()):
         combatant = duel.combatants[cid]
         if cid == first_id:
             text = f"{board}\n\n▶️ Твой ход!"
@@ -901,7 +901,7 @@ async def _start_group_ambush(db, attacker: Character, attacker_peer_id: int, vi
     _battles[battle_id] = battle
     battle.last_combatants = dict(state.combatants)
     _mass_engine.start_session(state)
-    for cid in battle.participants:
+    for cid in list(battle.participants):
         _init_target(battle_id, battle, cid)
     names = ", ".join(c.name for c, _ in defenders)
     intro = (
@@ -909,7 +909,7 @@ async def _start_group_ambush(db, attacker: Character, attacker_peer_id: int, vi
         f"Бой с мобами прерван без итога, вся группа ({names}) вступает в схватку. "
         f"Все действуют одновременно, ход - {round(bc.PVP_GROUP_TURN_SECONDS)} секунд."
     )
-    for p in battle.participants.values():
+    for p in list(battle.participants.values()):
         board = intro + "\n\n" + _render_mass(state, [])
         target_line = _target_line(battle_id, battle, p.character_id)
         if target_line:
@@ -1080,10 +1080,10 @@ async def _convert_duel_to_mass(session_id: int, battle: Battle) -> None:
 
     # Патч 38: с этого момента возможен выбор цели — каждому участнику
     # назначается автоцель (первый противник из списка).
-    for cid in battle.participants:
+    for cid in list(battle.participants):
         _init_target(session_id, battle, cid)
 
-    for p in battle.participants.values():
+    for p in list(battle.participants.values()):
         target_line = _target_line(session_id, battle, p.character_id)
         board = "⚔️ В бой вступает третий! Теперь это массовая схватка - все стороны действуют " \
             "одновременно, ход - 30 секунд.\n\n" + _render_mass(state, [])
@@ -1135,9 +1135,9 @@ async def start_siege_battle(
     _battles[battle_id] = battle
     battle.last_combatants = dict(state.combatants)
     _mass_engine.start_session(state)
-    for cid in battle.participants:
+    for cid in list(battle.participants):
         _init_target(battle_id, battle, cid)
-    for p in battle.participants.values():
+    for p in list(battle.participants.values()):
         board = intro + "\n\n" + _render_mass(state, [])
         target_line = _target_line(battle_id, battle, p.character_id)
         if target_line:
@@ -1160,7 +1160,7 @@ def battle_at(location: tuple[int, int]) -> int | None:
 
 
 def release_participants(battle: Battle) -> None:
-    for p in battle.participants.values():
+    for p in list(battle.participants.values()):
         _peer_battle.pop(p.peer_id, None)
         _chosen_target.pop(p.character_id, None)
 
@@ -1580,7 +1580,7 @@ async def on_duel_turn_resolved(session_id: int, turn: int, result: DuelResult) 
     # указывает на актёра только что резолвленного хода в этой точке).
     next_actor_id = duel.order[duel.turn_number % 2] if duel is not None else None
 
-    for p in battle.participants.values():
+    for p in list(battle.participants.values()):
         combatant = duel.combatants.get(p.character_id) if duel is not None else None
         text = (
             _render_duel(duel, result.lines, finished=result.finished, next_actor_id=next_actor_id)
@@ -1611,7 +1611,7 @@ async def on_duel_finished(session_id: int, result: DuelResult) -> None:
     battle = _battles.pop(session_id, None)
     if battle is None:
         return
-    for p in battle.participants.values():
+    for p in list(battle.participants.values()):
         _peer_battle.pop(p.peer_id, None)
 
     if battle.arena:
@@ -1632,7 +1632,7 @@ async def on_duel_finished(session_id: int, result: DuelResult) -> None:
         has_mount_by_cid: dict[int, bool] = {}
         async with get_session_factory()() as db:
             await pvp_service.log_battle(db, "duel", list(battle.participants), [])
-            for cid in battle.participants:
+            for cid in list(battle.participants):
                 character = await db.get(Character, cid)
                 if character is None:
                     continue
@@ -1650,7 +1650,7 @@ async def on_duel_finished(session_id: int, result: DuelResult) -> None:
             else "🤝 Ничья: взаимное истощение. Трофеи остаются при каждом."
         )
         shielded = _grant_draw_shield(battle, list(battle.participants)) if is_turn_limit else []
-        for cid, p in battle.participants.items():
+        for cid, p in list(battle.participants.items()):
             text = f"{draw_text}\n\n{DRAW_SHIELD_LINE}" if cid in shielded else draw_text
             if is_turn_limit:
                 pos = positions.get(cid, (0, 0))
@@ -1847,7 +1847,7 @@ async def on_mass_tick_resolved(session_id: int, tick: int, result: TickResult) 
             else:
                 _chosen_target.pop(cid, None)  # бой вот-вот завершится (сторона добита)
 
-    for cid, participant in battle.participants.items():
+    for cid, participant in list(battle.participants.items()):
         combatant = battle.last_combatants.get(cid)
         keyboard = (
             pvp_combat_keyboard(participant.base_class, combatant.cooldowns, subclass_id=combatant.subclass_id, show_target=True)
@@ -1874,7 +1874,7 @@ async def on_mass_battle_finished(session_id: int, result: TickResult) -> None:
     _declared_this_tick.pop(session_id, None)
     if battle is None:
         return
-    for p in battle.participants.values():
+    for p in list(battle.participants.values()):
         _peer_battle.pop(p.peer_id, None)
         _chosen_target.pop(p.character_id, None)
 
@@ -1890,7 +1890,7 @@ async def on_mass_battle_finished(session_id: int, result: TickResult) -> None:
 
     async with get_session_factory()() as db:
         characters: dict[int, Character] = {}
-        for cid in battle.participants:
+        for cid in list(battle.participants):
             character = await db.get(Character, cid)
             if character is not None:
                 characters[cid] = character
@@ -2005,7 +2005,7 @@ async def on_mass_battle_finished(session_id: int, result: TickResult) -> None:
         else "🤝 Ничья: взаимное истощение. Трофеи остаются при каждом."
     )
     shielded = _grant_draw_shield(battle, survivor_ids) if result.draw else []
-    for cid, participant in battle.participants.items():
+    for cid, participant in list(battle.participants.items()):
         if result.draw and cid in dead_ids:
             # Павший до конца боя умер по-настоящему (2026-10-18, баг-репорт:
             # ему же приходило «Ничья. Списки остались нетронутыми»).
@@ -2064,7 +2064,7 @@ async def on_mass_battle_finished(session_id: int, result: TickResult) -> None:
 async def _tell_others(battle, cid: int, text: str) -> None:
     """Свиток действует на всю сторону (или на всех врагов) - видеть это
     должны все в бою, а не только прочитавший."""
-    for other_id, other in battle.participants.items():
+    for other_id, other in list(battle.participants.items()):
         if other_id == cid:
             continue
         try:

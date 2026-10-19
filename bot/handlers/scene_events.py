@@ -20,6 +20,7 @@ from vkbottle import Keyboard, KeyboardButtonColor, Text
 from vkbottle.bot import BotLabeler, Message
 from vkbottle.dispatch.rules import ABCRule
 
+from bot import background
 from bot import dailies_texts, group_texts, pending_activity
 from bot.dispatch_rules import is_slash_command
 from bot.handlers import stats_window
@@ -82,7 +83,7 @@ def cancel(peer_id: int) -> None:
 def _forget_later(peer_id: int) -> None:
     """Стереть сохранённую сцену из синхронного кода (cancel)."""
     try:
-        asyncio.get_running_loop().create_task(pending_activity.forget_scene(peer_id))
+        background.spawn(pending_activity.forget_scene(peer_id))
     except RuntimeError:
         pass  # вне цикла событий (тесты) - сохранения и не было
 

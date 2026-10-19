@@ -11,10 +11,10 @@
 код промо, и без явного порядка функция приглашения могла бы быть перехвачена
 угадавшим совпадение промокодом."""
 
-import asyncio
 
 from vkbottle.bot import BotLabeler, Message
 
+from bot import background
 from bot.keyboards.group import group_invite_keyboard, leave_confirm_keyboard
 from bot import group_texts
 from game.world import grid
@@ -303,7 +303,7 @@ def _send_later(peers: list[int], text: str) -> None:
             except Exception:
                 pass
 
-    asyncio.get_running_loop().create_task(run())
+    background.spawn(run())
 
 
 async def notify_arrival(db, character) -> None:

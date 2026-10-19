@@ -17,6 +17,8 @@ import asyncio
 import time
 
 from loguru import logger
+
+from bot import background
 from vkbottle import BaseMiddleware
 from vkbottle.bot import Message
 
@@ -42,7 +44,17 @@ def install(api) -> None:
             for p in str(data.get("peer_ids") or "").split(","):
                 if p.strip().lstrip("-").isdigit():
                     _last_out[int(p)] = now
-        return await original(method, data, version)
+        try:
+            return await original(method, data, version)
+        except Exception as exc:  # noqa: BLE001 - смотрим только на код ошибки VK
+            # Код 10 - «Internal server error, try later» у самого VK. В логах
+            # он ронял разбор хода боя: игрок не получал сообщение о ходе
+            # (2026-10-19). Один повтор через секунду почти всегда проходит.
+            if getattr(exc, "code", None) != 10:
+                raise
+            logger.warning("VK {}: внутренняя ошибка VK (10), повтор", method)
+            await asyncio.sleep(1.0)
+            return await original(method, data, version)
 
     api.request = request
 
@@ -91,7 +103,7 @@ class SilentGuardMiddleware(BaseMiddleware[Message]):
         if event.from_id <= 0 or event.peer_id != event.from_id:
             return
         started = float(getattr(event, "date", 0) or 0) or time.time()
-        asyncio.get_running_loop().create_task(_check_later(event.peer_id, event.from_id, started))
+        background.spawn(_check_later(event.peer_id, event.from_id, started))
 
 
 def setup_middleware(bot) -> None:
