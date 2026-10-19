@@ -2525,3 +2525,13 @@ body::before {
   align-items: flex-end;
   gap: 4px;
 }
+
+/* Вкладки везде (2026-10-19): не помещаются - лента прокручивается вбок, а не
+   режет подписи. Короткий ряд по-прежнему растягивается на всю ширину. */
+.vkuiTabs__in {
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.vkuiTabs__in::-webkit-scrollbar { display: none; }
+.vkuiTabsItem__host { flex-shrink: 0; }
+.vkuiTabsItem__label { white-space: nowrap; }

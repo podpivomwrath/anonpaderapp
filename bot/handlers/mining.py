@@ -122,6 +122,11 @@ async def on_dig_done(peer_id: int) -> None:
         mine = mining_service.mine_at(character)
         left = await mining_service.ore_in_mine(db, mine.id) if mine else 0
         on_mine_screen = character.screen == "mine"
+        if event_vein and result is not None:
+            # Жила из события одноразовая (2026-10-19): после добычи сразу
+            # наверх, на сводку клетки, без лишнего шага «Наверх».
+            await screen_service.set_screen(db, character, None)
+            on_mine_screen = False
         await db.commit()
 
     if result is None:
@@ -139,10 +144,26 @@ async def on_dig_done(peer_id: int) -> None:
     await _bot_api.messages.send(
         peer_id=peer_id, message=text, random_id=0, keyboard=keyboard,
     )
+    if event_vein:
+        await _send_location_summary(peer_id)
     if char_xp is not None and char_xp.levels_gained:
         from bot.handlers import stats_window  # избегаем цикла импортов
 
         await stats_window.notify_levelup(peer_id, char_xp.levels_gained, char_xp.new_level)
+
+
+async def _send_location_summary(peer_id: int) -> None:
+    """Сводка клетки с кнопками движения - после жилы из события."""
+    from bot.handlers import world as world_handlers  # избегаем цикла импортов
+
+    async with get_session_factory()() as db:
+        character = await onboarding_svc.get_character(db, peer_id)
+        if character is None:
+            return
+        text, attachment, keyboard = await world_handlers.location_summary_parts(db, character, peer_id)
+    await _bot_api.messages.send(
+        peer_id=peer_id, message=text, random_id=0, attachment=attachment, keyboard=keyboard,
+    )
 
 
 async def _enter_mine(message: Message) -> None:

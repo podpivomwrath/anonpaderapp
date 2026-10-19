@@ -376,6 +376,22 @@ async def quest_summary_line(db: AsyncSession, character: Character) -> str | No
     return "\n".join(lines) if lines else None
 
 
+async def quest_destination(db: AsyncSession, character: Character) -> tuple[str, int, int] | None:
+    """Куда вести маунта по квесту (2026-10-19): клетка цели квеста или,
+    если цель достигнута, родной город к наставнику. (подпись, x, y)."""
+    from game.world import world_config as wc
+
+    quest = await current_quest_def(db, character)
+    if quest is None or quest.kind == "first_quest":
+        return None
+    if quest.kind == "travel_combat":
+        row = await get_progress(db, character)
+        if row.status != "ready":
+            return "К квесту", quest.target_x, quest.target_y
+    x, y = wc.CITY_COORDS[character.region]
+    return "К наставнику", x, y
+
+
 async def _story_summary_line(db: AsyncSession, character: Character) -> str | None:
     """Строка активного сюжетного квеста для сводки локации (патч 21, п.4):
     '📜 [Название] → (x;y) · направление' / '📜 [Название] → вернуться в город'.

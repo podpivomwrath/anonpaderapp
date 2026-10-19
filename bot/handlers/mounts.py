@@ -100,7 +100,7 @@ class CoordCancelMiddleware(BaseMiddleware[Message]):
         # Строкой: str != StateRepresentation у vkbottle даёт True всегда.
         if state is None or str(state.state) != str(MountCoordState.COORD_INPUT):
             return
-        if "mount_route_toggle" in str(self.event.payload or ""):
+        if "mount_route_toggle" in str(self.event.payload or "") or "mount_go" in str(self.event.payload or ""):
             return  # переключатель пути - часть того же выбора
         if self.event.payload or not _COORD_LIKE_RE.match(self.event.text or ""):
             await _dispenser.delete(self.event.peer_id)
@@ -173,6 +173,7 @@ async def open_mounts(message: Message) -> None:
         mount = owned[0]
         pos_x, pos_y = character.pos_x, character.pos_y
         safe = bool((character.ui_flags or {}).get("safe_route"))
+        targets = await _quick_targets(db, character)
 
     await _dispenser.set(peer_id, MountCoordState.COORD_INPUT, mount_id=mount.mount_id)
     await message.answer(
@@ -180,8 +181,24 @@ async def open_mounts(message: Message) -> None:
         f"Ты в ({pos_x}; {pos_y}). Куда направиться? Пришли координаты в формате X:Y "
         f"(не дальше {wc.WORLD_RADIUS} клеток от Монолита, например 12:-20).\n\n"
         f"{_route_line(safe)}",
-        keyboard=_route_keyboard(safe),
+        keyboard=_route_keyboard(safe, targets),
     )
+
+
+async def _quick_targets(db, character) -> list[tuple[str, int, int]]:
+    """Быстрые цели для маунта (2026-10-19): квест и живой след события -
+    кнопкой, без набора координат. Своя клетка не предлагается."""
+    from services import scene_event_service, story_service
+
+    targets = []
+    quest = await story_service.quest_destination(db, character)
+    if quest is not None:
+        targets.append(("📜 " + quest[0], quest[1], quest[2]))
+    trail = await scene_event_service.get_trail(db, character.id)
+    if trail is not None and scene_event_service.trail_alive(trail):
+        targets.append(("🐾 К следу", trail.x, trail.y))
+    here = (character.pos_x, character.pos_y)
+    return [t for t in targets if (t[1], t[2]) != here]
 
 
 def _route_line(safe: bool) -> str:
@@ -191,10 +208,16 @@ def _route_line(safe: bool) -> str:
     )
 
 
-def _route_keyboard(safe: bool) -> str:
+def _route_keyboard(safe: bool, targets: list[tuple[str, int, int]] | None = None) -> str:
     from vkbottle import Keyboard, KeyboardButtonColor, Text
 
     keyboard = Keyboard(inline=True)
+    for label, x, y in targets or []:
+        keyboard.add(
+            Text(f"{label} ({x}; {y})", payload={"type": "mount_go", "x": x, "y": y}),
+            color=KeyboardButtonColor.PRIMARY,
+        )
+        keyboard.row()
     keyboard.add(
         Text("➡️ Сделать прямым" if safe else "🛡 Сделать безопасным", payload={"type": "mount_route_toggle"}),
         color=KeyboardButtonColor.SECONDARY,
@@ -216,7 +239,19 @@ async def route_toggle(message: Message) -> None:
         character.ui_flags = flags  # новый dict: JSON-поле не следит за изменением на месте
         safe = flags["safe_route"]
         await db.commit()
-    await message.answer(f"{_route_line(safe)} Пришли координаты.", keyboard=_route_keyboard(safe))
+        targets = await _quick_targets(db, character)
+    await message.answer(f"{_route_line(safe)} Пришли координаты.", keyboard=_route_keyboard(safe, targets))
+
+
+@labeler.message(payload_contains={"type": "mount_go"}, state=MountCoordState.COORD_INPUT)
+@activity_action
+async def quick_target(message: Message) -> None:
+    """Кнопка быстрой цели (квест, след) - то же, что прислать её координаты."""
+    payload = message.get_payload_json() or {}
+    x, y = payload.get("x"), payload.get("y")
+    if not isinstance(x, int) or not isinstance(y, int):
+        return
+    await _travel_to(message, x, y)
 
 
 @labeler.message(TEXT_ONLY, _looks_like_coords, state=MountCoordState.COORD_INPUT)
@@ -231,8 +266,15 @@ async def coord_input(message: Message) -> None:
     if coords is None:
         await message.answer("Не понял координаты. Формат: X:Y или X Y (например 12:-20).")
         return
-    to_x, to_y = coords
+    await _travel_to(message, *coords)
 
+
+async def _travel_to(message: Message, to_x: int, to_y: int) -> None:
+    peer_id = message.peer_id
+    mount_id = (message.state_peer.payload.get("mount_id") if message.state_peer else None)
+    if mount_id is None:
+        await _dispenser.delete(peer_id)
+        return
     async with get_session_factory()() as db:
         character = await onboarding_svc.get_character(db, message.from_id)
         if character is None or character.creation_state is not None:
