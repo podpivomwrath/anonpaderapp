@@ -186,8 +186,8 @@ async def test_full_class_reset_charges_when_alpha_is_over(
 
 
 async def test_reset_subclass_keeps_class_and_stats(db_session, make_character) -> None:
-    """Сброс подкласса обязан снести пресеты: они собраны из баффов прежнего
-    пула, а resolve_buff_modifiers ищет id в ОБЩЕМ каталоге и применил бы их."""
+    """2026-10-19: пресеты при смене подкласса не удаляются, но у другого
+    подкласса их не видно и в бою они не действуют; вернулся - всё на месте."""
     from services.respec_service import reset_subclass
 
     character = await make_character(level=10, farm=10_000, subclass="guardian")
@@ -206,7 +206,14 @@ async def test_reset_subclass_keeps_class_and_stats(db_session, make_character) 
     left = (await db_session.scalars(
         select(CharacterBuffPreset).where(CharacterBuffPreset.character_id == character.id)
     )).all()
-    assert left == []
+    assert len(left) == 1                                 # пресет сохранён
+    from services import preset_service
+
+    character.subclass = "elementalist"                   # чужой подкласс
+    assert await preset_service.presets_of(db_session, character) == []
+    assert await preset_service.resolve_active_modifiers(db_session, character) == {}
+    character.subclass = "guardian"                       # вернулся
+    assert [p.name for p in await preset_service.presets_of(db_session, character)] == ["боевой"]
 
 
 async def test_reset_stats_returns_points_and_keeps_subclass(

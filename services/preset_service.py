@@ -60,6 +60,37 @@ def validate_preset(
             raise PresetValidationError(f"Бафф {buff_id} ещё не открыт - пройди испытание")
 
 
+def preset_subclass(preset: CharacterBuffPreset) -> str | None:
+    """Чей пресет: подкласс его баффов. Пул баффов у каждого подкласса свой,
+    так что пресет принадлежит ровно одному (2026-10-19: пресеты больше не
+    удаляются при смене подкласса - их просто не видно у другого)."""
+    from game.content_loader import load_content
+
+    buffs = load_content().buffs
+    for buff_id in preset.buff_ids or []:
+        buff = buffs.get(buff_id)
+        if buff is not None:
+            return buff.subclass
+    return None
+
+
+def belongs(preset: CharacterBuffPreset, subclass: str | None) -> bool:
+    owner = preset_subclass(preset)
+    return subclass is not None and (owner is None or owner == subclass)
+
+
+async def presets_of(db: AsyncSession, character: Character) -> list[CharacterBuffPreset]:
+    """Пресеты текущего подкласса, по порядку создания."""
+    rows = (
+        await db.scalars(
+            select(CharacterBuffPreset)
+            .where(CharacterBuffPreset.character_id == character.id)
+            .order_by(CharacterBuffPreset.id)
+        )
+    ).all()
+    return [p for p in rows if belongs(p, character.subclass)]
+
+
 def effective_preset_slots(character: Character) -> int:
     """Патч 50: купленные слоты (character.preset_slots) + бонусный слот
     Метки Хранителя, пока она активна. Не мутирует preset_slots — бонус
@@ -101,15 +132,8 @@ async def save_preset(
     validate_preset(buff_ids, character.subclass, catalog, unlocked)
 
     if preset_id is None:
-        existing_count = len(
-            (
-                await db.scalars(
-                    select(CharacterBuffPreset).where(
-                        CharacterBuffPreset.character_id == character.id
-                    )
-                )
-            ).all()
-        )
+        # Слоты - на подкласс: пресеты прежних подклассов места не занимают.
+        existing_count = len(await presets_of(db, character))
         if existing_count >= effective_preset_slots(character):
             raise PresetValidationError(
                 "Нет свободных слотов пресетов - купи ещё один в разделе «Персонаж»"
@@ -122,7 +146,7 @@ async def save_preset(
 
     if preset_id is not None:
         preset = await db.get(CharacterBuffPreset, preset_id)
-        if preset is None or preset.character_id != character.id:
+        if preset is None or preset.character_id != character.id or not belongs(preset, character.subclass):
             raise PresetValidationError("Пресет не найден")
         preset.name = name
         preset.buff_ids = buff_ids
@@ -136,12 +160,19 @@ async def save_preset(
 
 
 async def get_active_preset(db: AsyncSession, character_id: int) -> CharacterBuffPreset | None:
-    return await db.scalar(
-        select(CharacterBuffPreset).where(
-            CharacterBuffPreset.character_id == character_id,
-            CharacterBuffPreset.is_active.is_(True),
+    """Активный пресет ТЕКУЩЕГО подкласса: у каждого подкласса свой активный."""
+    character = await db.get(Character, character_id)
+    if character is None:
+        return None
+    rows = (
+        await db.scalars(
+            select(CharacterBuffPreset).where(
+                CharacterBuffPreset.character_id == character_id,
+                CharacterBuffPreset.is_active.is_(True),
+            )
         )
-    )
+    ).all()
+    return next((p for p in rows if belongs(p, character.subclass)), None)
 
 
 def preset_rule_hint(catalog_labels: dict[str, str] | None = None) -> str:
@@ -218,13 +249,7 @@ async def switch_active_preset(
     удаляются, но переключиться на них нельзя, пока премиум не продлён.
     Уже АКТИВНЫЙ пресет продолжает действовать в бою независимо от этого —
     правило касается только смены активного, не отбирает уже включённый."""
-    presets = (
-        await db.scalars(
-            select(CharacterBuffPreset)
-            .where(CharacterBuffPreset.character_id == character.id)
-            .order_by(CharacterBuffPreset.id)
-        )
-    ).all()
+    presets = await presets_of(db, character)
     target = next((p for p in presets if p.id == preset_id), None)
     if target is None:
         raise PresetValidationError("Пресет не найден")

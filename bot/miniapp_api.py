@@ -21,7 +21,7 @@ from bot.onboarding_texts import REGION_TITLES
 from config import Settings
 from game.content_loader import load_content
 from game.economy import buff_descriptions
-from models import BaseClass, Character, CharacterBuffPreset, User
+from models import BaseClass, Character, User
 from services import (
     daily_service,
     elixir_service,
@@ -897,14 +897,6 @@ async def handle_post_unequip(request: web.Request) -> web.Response:
         return web.json_response(await _full_inventory(session, character.id))
 
 
-async def _ordered_presets(session: AsyncSession, character_id: int) -> list[CharacterBuffPreset]:
-    return (
-        await session.scalars(
-            select(CharacterBuffPreset)
-            .where(CharacterBuffPreset.character_id == character_id)
-            .order_by(CharacterBuffPreset.id)
-        )
-    ).all()
 
 
 def _in_battle(vk_user_id: int) -> bool:
@@ -929,7 +921,7 @@ async def handle_get_presets(request: web.Request) -> web.Response:
                  "presets": [], "buffs": [], "rule_hint": ""}
             )
 
-        presets = await _ordered_presets(session, character.id)
+        presets = await preset_service.presets_of(session, character)
         catalog = load_content().buffs
         unlocked = await trial_service.unlocked_buff_ids(session, character.id)
         subclass_buffs = [b for b in catalog.values() if b.subclass == character.subclass]

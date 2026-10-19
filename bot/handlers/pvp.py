@@ -25,6 +25,7 @@ from sqlalchemy import select
 from vkbottle.bot import BotLabeler, Message
 
 from bot.keyboards.combat_items import page_of
+from bot.vk_media import photo_attachment
 from bot import dailies_texts, editable_message
 from bot.activity import ActivityBusy, activity_action, blocked_reason, transition
 from bot.battle_keyboard import active_battle_keyboard, answer_battle_gone, in_any_battle
@@ -149,6 +150,9 @@ class Battle:
     # с клетки не виден, вступить нельзя, итог - bot/handlers/arena.py.
     arena: bool = False
 
+
+#: Картинка начала осады (2026-10-19).
+SIEGE_PHOTO_ID = "457239249"
 
 #: Бой арены ни на какой клетке не стоит: «Осмотреться» и вступление его не видят.
 ARENA_LOCATION = (10**6, 10**6)
@@ -1140,7 +1144,7 @@ async def start_siege_battle(
             board += f"\n{target_line}"
         combatant = state.combatants[p.character_id]
         await _bot_api.messages.send(
-            peer_id=p.peer_id, message=board, random_id=0,
+            peer_id=p.peer_id, message=board, random_id=0, attachment=photo_attachment(SIEGE_PHOTO_ID),
             keyboard=pvp_combat_keyboard(
                 p.base_class, combatant.cooldowns, subclass_id=combatant.subclass_id, show_target=True,
             ),

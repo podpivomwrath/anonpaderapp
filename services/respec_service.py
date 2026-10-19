@@ -9,16 +9,17 @@
 bc.ALPHA_FREE_RESPEC. Когда альфа кончится, флаг выключается - и списание
 включается обратно само, трогать вызывающий код не придётся.
 
-ВАЖНО про пресеты. Пул баффов у каждого подкласса свой, но resolve_buff_modifiers
-ищет id в ОБЩЕМ каталоге: пресет, собранный до смены подкласса, продолжил бы
-работать в бою чужими баффами. Поэтому любая смена подкласса сносит пресеты.
+ВАЖНО про пресеты. Пул баффов у каждого подкласса свой. С 2026-10-19 пресеты
+при смене класса и подкласса НЕ удаляются (решение владельца): каждый пресет
+принадлежит подклассу своих баффов, и видно и действует только у него
+(preset_service.belongs). Вернулся на прежний подкласс - пресеты на месте.
 """
 
-from sqlalchemy import delete, select
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from game.combat import balance_config as bc
-from models import BaseClass, Character, CharacterBuffPreset, CharacterStats
+from models import BaseClass, Character, CharacterStats
 from services.wallet_service import charge
 
 
@@ -39,18 +40,12 @@ async def _reset_stats_rows(db: AsyncSession, character: Character, base_class: 
     stats.unspent_points = bc.STAT_POINTS_PER_LEVEL * (character.level - 1)
 
 
-async def _drop_presets(db: AsyncSession, character: Character) -> None:
-    await db.execute(
-        delete(CharacterBuffPreset).where(CharacterBuffPreset.character_id == character.id)
-    )
-
-
 async def full_class_reset(
     db: AsyncSession, character: Character, new_base_class: BaseClass
 ) -> Character:
     """Смена базового класса с нуля:
     - списывает CLASS_RESET_COST_DONATE донат-валюты (кроме альфы);
-    - сбрасывает подкласс и пресеты баффов (пул баффов другой);
+    - сбрасывает подкласс (пресеты остаются - см. докстринг модуля);
     - статы возвращаются к стартовым, очки прокачки — в unspent_points.
     """
     if not bc.ALPHA_FREE_RESPEC:
@@ -61,14 +56,13 @@ async def full_class_reset(
         character.subclass_free_repick = True
     character.subclass = None
     await _reset_stats_rows(db, character, new_base_class)
-    await _drop_presets(db, character)
     return character
 
 
 async def reset_subclass(db: AsyncSession, character: Character) -> Character:
     """Сброс ТОЛЬКО подкласса: базовый класс и характеристики остаются.
 
-    Пресеты сносятся обязательно — они собраны из баффов прежнего пула.
+    Пресеты остаются - у прежнего подкласса, см. докстринг модуля.
     Прогресс испытаний не трогаем: он привязан к id баффов, и если игрок
     вернётся к прежнему подклассу, открытое останется открытым.
     """
@@ -78,7 +72,6 @@ async def reset_subclass(db: AsyncSession, character: Character) -> Character:
     if character.subclass is not None:
         character.subclass_free_repick = True
     character.subclass = None
-    await _drop_presets(db, character)
     return character
 
 

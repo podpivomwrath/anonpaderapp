@@ -456,9 +456,11 @@ export default function InventoryTab({ onCharacterUpdate }) {
         multiline
         before={open.before}
         subtitle={itemSubtitle(item)}
+        // «В мастерскую» - строкой под описанием (2026-10-19): справа рядом с
+        // «Надеть» она сжимала название и статы до столбика в одну букву.
+        extraSubtitle={item.craftable ? <div className="inventory-craft">{craftButton(item)}</div> : undefined}
         after={inBag ? (
           <div className="inventory-actions">
-            {craftButton(item)}
             {transferButton(item)}
             <Button
               mode="secondary" size="s"
@@ -471,7 +473,6 @@ export default function InventoryTab({ onCharacterUpdate }) {
           </div>
         ) : (
           <div className="inventory-actions">
-            {craftButton(item)}
             <Button
               mode="tertiary" size="s"
               loading={equippingId === item.id}

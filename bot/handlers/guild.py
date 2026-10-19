@@ -14,6 +14,7 @@ from vkbottle.bot import BotLabeler, Message
 
 from bot.activity import activity_action, blocked_reason
 from bot.keyboards.world import empty_keyboard
+from bot.vk_media import photo_attachment
 from game.economy import guild_config as gc
 from game.world import encounters
 from models import Character, GuildBoss
@@ -219,6 +220,10 @@ def boss_keyboard() -> str:
     return kb.get_json()
 
 
+#: Картинка Стража гильдии (2026-10-19).
+GUARDIAN_PHOTO_ID = "457239250"
+
+
 @labeler.message(text=["Страж", "страж"])
 async def boss_status(message: Message) -> None:
     async with get_session_factory()() as db:
@@ -236,10 +241,11 @@ async def boss_status(message: Message) -> None:
     text = f"🗿 {guild_boss_service.boss_title(boss)}{where}: {boss.hp}/{boss.max_hp} здоровья."
     if cooldown:
         text += f"\nСледующий заход через {cooldown} мин."
+    photo = photo_attachment(GUARDIAN_PHOTO_ID)
     if here and not cooldown:
-        await message.answer(text, keyboard=boss_keyboard())
+        await message.answer(text, attachment=photo, keyboard=boss_keyboard())
     else:
-        await message.answer(text)
+        await message.answer(text, attachment=photo)
 
 
 @labeler.message(payload_contains={"type": "guild_boss_attack"})

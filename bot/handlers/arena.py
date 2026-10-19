@@ -21,6 +21,7 @@ from vkbottle.dispatch.rules import ABCRule
 from bot.dispatch_rules import is_slash_command
 from bot.keyboards import arena as arena_kb
 from bot.keyboards.world import BTN_ARENA
+from bot.vk_media import photo_attachment
 from bot.world_texts import FOREIGN_NPC_REJECTION
 from game.world import grid
 from models import Character
@@ -32,6 +33,7 @@ labeler = BotLabeler()
 labeler.vbml_ignore_case = True
 
 SCREEN = "arena"
+ARENA_PHOTO_ID = "457239248"
 CODE_DIGITS = 4
 
 _rng = random.Random()
@@ -118,7 +120,7 @@ async def open_arena(message: Message) -> None:
             return
         await screen_service.set_screen(db, character, SCREEN)
         await db.commit()
-    await message.answer(ARENA_TEXT, keyboard=keyboard_for(message.peer_id))
+    await message.answer(ARENA_TEXT, attachment=photo_attachment(ARENA_PHOTO_ID), keyboard=keyboard_for(message.peer_id))
 
 
 @labeler.message(text=[arena_kb.BTN_ARENA_BACK])

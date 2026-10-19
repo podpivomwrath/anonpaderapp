@@ -4,7 +4,6 @@
 Переключение — всегда бесплатно и мгновенно (см. services/preset_service.py);
 недоступно во время боя и до выбора подкласса."""
 
-from sqlalchemy import select
 from vkbottle.bot import BotLabeler, Message
 
 from bot import editable_message
@@ -33,14 +32,6 @@ def setup(bot_api) -> None:
     _bot_api = bot_api
 
 
-async def _ordered_presets(db, character_id: int) -> list[CharacterBuffPreset]:
-    return (
-        await db.scalars(
-            select(CharacterBuffPreset)
-            .where(CharacterBuffPreset.character_id == character_id)
-            .order_by(CharacterBuffPreset.id)
-        )
-    ).all()
 
 
 def _list_text(presets: list[CharacterBuffPreset]) -> str:
@@ -71,7 +62,7 @@ async def open_presets(message: Message) -> None:
         if character.subclass is None:
             await message.answer(NO_SUBCLASS_TEXT)
             return
-        presets = await _ordered_presets(db, character.id)
+        presets = await preset_service.presets_of(db, character)
 
     if not presets:
         await editable_message.send_or_edit(_bot_api, _NS, peer_id, _list_text(presets), no_keyboard())
@@ -101,7 +92,7 @@ async def switch_preset_button(message: Message) -> None:
         except PresetValidationError:
             return
         await db.commit()
-        presets = await _ordered_presets(db, character.id)
+        presets = await preset_service.presets_of(db, character)
 
     await editable_message.send_or_edit(
         _bot_api, _NS, peer_id, _list_text(presets), presets_list_keyboard(presets)
@@ -123,7 +114,7 @@ async def switch_preset_command(message: Message, n: int) -> None:
             await message.answer(NO_SUBCLASS_TEXT)
             return
 
-        presets = await _ordered_presets(db, character.id)
+        presets = await preset_service.presets_of(db, character)
         if n < 1 or n > len(presets):
             await message.answer(f"Пресет {n} пуст. Собери его в разделе «Персонаж».")
             return
