@@ -3,6 +3,8 @@
 
 import json
 
+from bot.keyboards import combat_modes
+
 from bot.keyboards.pvp import (
     BTN_PVP_ATTACK,
     BTN_PVP_ITEM,
@@ -31,7 +33,7 @@ def test_combat_keyboard_uses_subclass_skills_when_present() -> None:
     sub_labels = _labels(pvp_combat_keyboard("warrior", {}, subclass_id="guardian"))
     assert "Удар щитом" in sub_labels
     assert "Глухая оборона" in sub_labels
-    assert not (sub_labels & base_labels - {BTN_PVP_ATTACK, BTN_PVP_ITEM})
+    assert not (sub_labels & base_labels - {BTN_PVP_ATTACK, BTN_PVP_ITEM, combat_modes.DEFEND_LABEL})
 
 
 def test_combat_keyboard_item_text_differs_from_pve() -> None:

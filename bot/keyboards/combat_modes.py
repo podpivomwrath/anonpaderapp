@@ -34,6 +34,9 @@ tests/test_combat_mode_registry.py (в том числе автоматичес�
 
 from dataclasses import dataclass
 
+# Одна подпись на все режимы: правила text= на неё нет, только payload.
+DEFEND_LABEL = "🛡️ Защититься"
+
 
 @dataclass(frozen=True)
 class CombatModeUi:
@@ -52,6 +55,9 @@ class CombatModeUi:
     target: str | None
     escape: str | None
     skill_payload: str
+    # «Защититься» (2026-10-19): подпись общая на все режимы, а разводит их
+    # уникальный payload - обработчики ловят только его (см. докстринг модуля).
+    defend_payload: str
 
     @property
     def allows_target_selection(self) -> bool:
@@ -79,6 +85,7 @@ SOLO_PVE = CombatModeUi(
     target=None,
     escape="🏃 Побег",
     skill_payload="skill",
+    defend_payload="defend",
 )
 
 # Открытое PvP (bot/handlers/pvp.py): дуэль + массовый бой. Побега нет.
@@ -92,6 +99,7 @@ PVP = CombatModeUi(
     target="🎯 Смена цели",
     escape=None,
     skill_payload="pvp_skill",
+    defend_payload="pvp_defend",
 )
 
 # Групповой PvE (bot/handlers/group_combat.py, патч 51).
@@ -102,6 +110,7 @@ GROUP_PVE = CombatModeUi(
     target="🎯 Цель",
     escape=None,
     skill_payload="group_pve_skill",
+    defend_payload="group_pve_defend",
 )
 
 # Рейд (bot/handlers/raid_combat.py, патч 53). Патч 54: все три подписи были
@@ -114,6 +123,7 @@ RAID = CombatModeUi(
     target="🎯 Выбор цели",
     escape=None,
     skill_payload="raid_skill",
+    defend_payload="raid_defend",
 )
 
 ALL_MODES: tuple[CombatModeUi, ...] = (SOLO_PVE, PVP, GROUP_PVE, RAID)

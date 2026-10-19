@@ -344,6 +344,7 @@ def combat_keyboard(base_class: str, cooldowns: dict[str, int], subclass_id: str
         label = skill.name if cd <= 0 else f"{skill.name} (КД {cd})"
         color = KeyboardButtonColor.PRIMARY if cd <= 0 else KeyboardButtonColor.SECONDARY
         items.append((label, color, {"type": "skill", "id": skill.id}))
+    items.append((combat_modes.DEFEND_LABEL, KeyboardButtonColor.SECONDARY, {"type": combat_modes.SOLO_PVE.defend_payload}))
     items.append((BTN_ITEM, KeyboardButtonColor.SECONDARY, None))
     items.append((BTN_FLEE, KeyboardButtonColor.NEGATIVE, None))
     add_paired(kb, items)

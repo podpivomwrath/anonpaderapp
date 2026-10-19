@@ -227,6 +227,11 @@ class DuelEngine:
             result.lines.append(f"{actor.name} теряет ход ❄️")
         elif action.type == ActionType.SKIP:
             result.lines.append(f"{actor.name} пропускает ход")
+        elif action.type == ActionType.DEFEND:
+            # reset_transient выше уже прошёл: защита держится до начала
+            # следующего хода актёра, то есть весь ответный ход соперника.
+            actor.defend_reduction = bc.DEFEND_DAMAGE_REDUCTION
+            result.lines.append(combat_flavor.defend_line(actor.name))
         else:
             self._apply_action(state, actor, action, result)
 

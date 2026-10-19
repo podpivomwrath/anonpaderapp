@@ -24,6 +24,7 @@ from datetime import datetime, timezone
 from sqlalchemy import select
 from vkbottle.bot import BotLabeler, Message
 
+from bot.keyboards import combat_modes
 from bot.keyboards.combat_items import page_of
 from bot.vk_media import photo_attachment
 from bot import dailies_texts, editable_message
@@ -1173,6 +1174,11 @@ async def pvp_attack(message: Message) -> None:
     await _pvp_action(message, DeclaredAction(type=ActionType.ATTACK))
 
 
+@labeler.message(payload_contains={"type": combat_modes.PVP.defend_payload})
+async def pvp_defend(message: Message) -> None:
+    await _pvp_action(message, DeclaredAction(type=ActionType.DEFEND))
+
+
 @labeler.message(payload_contains={"type": "pvp_skill"})
 async def pvp_skill(message: Message) -> None:
     payload = message.get_payload_json() or {}
@@ -1217,7 +1223,9 @@ async def _pvp_action(message: Message, action: DeclaredAction) -> None:
     if cid is None:
         return
 
-    is_defensive = action.type == ActionType.SKILL and action.skill_id in DEFENSIVE_SKILLS
+    is_defensive = action.type == ActionType.DEFEND or (
+        action.type == ActionType.SKILL and action.skill_id in DEFENSIVE_SKILLS
+    )
     if not is_defensive:
         # Патч 38: в массовом бою действие бьёт по ВЫБРАННОЙ игроком цели
         # (см. pvp_pick_target/_chosen_target), не по случайной; в дуэли

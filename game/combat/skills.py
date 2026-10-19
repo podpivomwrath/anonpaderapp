@@ -345,6 +345,9 @@ def compute_hit(
         base *= 1.0 - target.buff_modifiers.get("low_hp_damage_reduction", 0.0)
     # Глухая оборона (патч 39) — многоходовый блок, не суммируется с однотиковым
     # block_reduction (напр. Живительный блок пресета), берём максимум.
+    # «Защититься» (2026-10-19) - отдельным множителем: складывается с любыми
+    # снижениями и не считается блоком (не кормит «Отражение»/«Возмездие»).
+    base *= 1.0 - target.defend_reduction
     before_block = base
     base *= 1.0 - max(target.block_reduction, target.effect_total(EffectKind.BLOCK_STANCE))
     # Патч 56 (Страж): срезанное блоком нужно «Отражению» (вернуть долю

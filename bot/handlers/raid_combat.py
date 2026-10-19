@@ -15,6 +15,7 @@ from loguru import logger
 from vkbottle.bot import BotLabeler, Message
 
 from bot import background
+from bot.keyboards import combat_modes
 from bot.keyboards.combat_items import page_of
 from bot import dailies_texts, editable_message, group_texts, raid_key_texts, raid_texts as rt
 from bot import raid_archive_texts as at
@@ -614,6 +615,11 @@ async def raid_attack(message: Message) -> None:
     await _raid_action(message, DeclaredAction(type=ActionType.ATTACK))
 
 
+@labeler.message(payload_contains={"type": combat_modes.RAID.defend_payload})
+async def raid_defend(message: Message) -> None:
+    await _raid_action(message, DeclaredAction(type=ActionType.DEFEND))
+
+
 @labeler.message(payload_contains={"type": "raid_skill"})
 async def raid_skill(message: Message) -> None:
     payload = message.get_payload_json() or {}
@@ -654,7 +660,9 @@ async def _raid_action(message: Message, action: DeclaredAction) -> None:
     if cid is None:
         return
 
-    is_defensive = action.type == ActionType.SKILL and action.skill_id in DEFENSIVE_SKILLS
+    is_defensive = action.type == ActionType.DEFEND or (
+        action.type == ActionType.SKILL and action.skill_id in DEFENSIVE_SKILLS
+    )
     if not is_defensive:
         target = _resolve_chosen_target(battle_id, battle, cid)
         if target is None:

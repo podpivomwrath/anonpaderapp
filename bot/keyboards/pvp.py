@@ -70,6 +70,7 @@ def pvp_combat_keyboard(
         label = skill.name if cd <= 0 else f"{skill.name} (КД {cd})"
         color = KeyboardButtonColor.PRIMARY if cd <= 0 else KeyboardButtonColor.SECONDARY
         items.append((label, color, {"type": "pvp_skill", "id": skill.id}))
+    items.append((combat_modes.DEFEND_LABEL, KeyboardButtonColor.SECONDARY, {"type": combat_modes.PVP.defend_payload}))
     if show_target:
         items.append((BTN_PVP_TARGET, KeyboardButtonColor.SECONDARY, None))
     items.append((BTN_PVP_ITEM, KeyboardButtonColor.SECONDARY, None))

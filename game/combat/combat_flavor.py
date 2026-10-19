@@ -12,6 +12,7 @@
 базовая атака — «атакует», крит — суффикс `(крит!)`, промах — «уклоняется».
 """
 
+from game.combat import balance_config as bc
 from game.combat import display
 
 # Метки-ГЛАГОЛЫ (уже согласованное действие: «Волк кусает», «Страж
@@ -111,3 +112,9 @@ def unimplemented_skill_line(actor_name: str, skill_id: str | None) -> str:
     definition = BASE_SKILL_DEFS.get(skill_id) or SUBCLASS_SKILL_DEFS.get(skill_id)
     name = definition.name if definition is not None else "приём"
     return f"{actor_name} пытается применить «{name}», но ничего не выходит."
+
+
+def defend_line(name: str) -> str:
+    """«Защититься» (2026-10-19): ход пропущен добровольно."""
+    pct = round(bc.DEFEND_DAMAGE_REDUCTION * 100)
+    return f"🛡️ {name} защищается: входящий урон -{pct}% до следующего хода"

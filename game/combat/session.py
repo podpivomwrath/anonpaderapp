@@ -27,6 +27,9 @@ class ActionType(StrEnum):
     SKILL = "skill"
     ITEM = "item"  # патч 16: лечебное зелье — тратит ход, как атака/навык
     SKIP = "skip"
+    # 2026-10-19: «Защититься» - добровольный пропуск хода за -10% входящего
+    # урона до следующего своего хода (bc.DEFEND_DAMAGE_REDUCTION).
+    DEFEND = "defend"
 
 
 class EffectKind(StrEnum):
@@ -154,6 +157,7 @@ class CombatantState:
     # в дуэли — в начале собственного хода)
     shield: int = 0                 # пул поглощения
     block_reduction: float = 0.0    # доля срезаемого входящего урона
+    defend_reduction: float = 0.0   # «Защититься»: множитель поверх всех снижений, не блок
     mitigation_penalty: float = 0.0  # штраф к митигации (групповой щит стража)
     taunted_by: int | None = None   # PvE-форс цели для моба
     taunt_left: int = 0             # сколько ещё тиков держится taunted_by
@@ -350,6 +354,7 @@ class CombatantState:
         self.blocked_this_tick = 0
         self.shield = 0
         self.block_reduction = 0.0
+        self.defend_reduction = 0.0
         self.mitigation_penalty = 0.0
         # Провокация держится taunt_left тиков (2026-10-14: раньше слетала
         # после первого же тика, хотя навык обещает 2 хода).

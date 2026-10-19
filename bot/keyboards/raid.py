@@ -72,6 +72,7 @@ def raid_combat_keyboard(base_class: str, cooldowns: dict[str, int], subclass_id
         label = skill.name if cd <= 0 else f"{skill.name} (КД {cd})"
         color = KeyboardButtonColor.PRIMARY if cd <= 0 else KeyboardButtonColor.SECONDARY
         items.append((label, color, {"type": _RAID.skill_payload, "id": skill.id}))
+    items.append((combat_modes.DEFEND_LABEL, KeyboardButtonColor.SECONDARY, {"type": combat_modes.RAID.defend_payload}))
     items.append((_RAID.target, KeyboardButtonColor.SECONDARY, {"type": "raid_open_target"}))
     items.append((_RAID.item, KeyboardButtonColor.SECONDARY, {"type": "raid_open_items"}))
     add_paired(kb, items)

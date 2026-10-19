@@ -13,6 +13,7 @@ from vkbottle.bot import BotLabeler, Message
 
 from bot import ash_handful_state, dailies_texts, editable_message, group_texts, raid_key_texts
 from bot.handlers import stats_window
+from bot.keyboards import combat_modes
 from bot.keyboards.combat_items import combat_items_keyboard, page_of
 from bot.keyboards.items import no_keyboard
 from bot.keyboards.world import (
@@ -715,6 +716,18 @@ async def attack(message: Message) -> None:
         await _engine.declare_action(
             message.peer_id, PLAYER_ID, DeclaredAction(type=ActionType.ATTACK, target_id=MOB_ID)
         )
+    except (KeyError, ValueError):
+        pass
+
+
+@labeler.message(payload_contains={"type": combat_modes.SOLO_PVE.defend_payload})
+async def defend(message: Message) -> None:
+    _flee_confirm.pop(message.peer_id, None)
+    if not has_active_encounter(message.peer_id):
+        await _no_encounter(message)
+        return
+    try:
+        await _engine.declare_action(message.peer_id, PLAYER_ID, DeclaredAction(type=ActionType.DEFEND))
     except (KeyError, ValueError):
         pass
 

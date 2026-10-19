@@ -277,6 +277,8 @@ def resolve_tick(
     for cid, action in normalized.items():
         if cid in frozen_at_start:
             continue
+        if action.type == ActionType.DEFEND:
+            session.combatants[cid].defend_reduction = bc.DEFEND_DAMAGE_REDUCTION
         if action.type == ActionType.SKILL and action.skill_id in DEFENSIVE_SKILLS:
             ctx.actor = session.combatants[cid]
             ctx.action = action
@@ -336,6 +338,9 @@ def resolve_tick(
             continue
         if action.type == ActionType.SKIP:
             result.lines.append(f"{combatant.name} медлит и пропускает ход")
+            continue
+        if action.type == ActionType.DEFEND:
+            result.lines.append(combat_flavor.defend_line(combatant.name))
             continue
         _run_offensive(ctx, cid, action, session, result)
 

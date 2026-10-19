@@ -37,6 +37,7 @@ def group_combat_keyboard(
         label = skill.name if cd <= 0 else f"{skill.name} (КД {cd})"
         color = KeyboardButtonColor.PRIMARY if cd <= 0 else KeyboardButtonColor.SECONDARY
         items.append((label, color, {"type": "group_pve_skill", "id": skill.id}))
+    items.append((combat_modes.DEFEND_LABEL, KeyboardButtonColor.SECONDARY, {"type": combat_modes.GROUP_PVE.defend_payload}))
     items.append((BTN_GROUP_TARGET, KeyboardButtonColor.SECONDARY, None))
     items.append((BTN_GROUP_ITEM, KeyboardButtonColor.SECONDARY, None))
     add_paired(kb, items)

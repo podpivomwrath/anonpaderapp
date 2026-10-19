@@ -18,6 +18,7 @@ from loguru import logger
 from sqlalchemy import select
 from vkbottle.bot import BotLabeler, Message
 
+from bot.keyboards import combat_modes
 from bot.keyboards.combat_items import page_of
 from bot import ash_handful_state, dailies_texts, editable_message, group_texts, raid_key_texts
 from bot.handlers import respawn as respawn_handlers
@@ -391,6 +392,11 @@ async def group_attack(message: Message) -> None:
     await _group_action(message, DeclaredAction(type=ActionType.ATTACK))
 
 
+@labeler.message(payload_contains={"type": combat_modes.GROUP_PVE.defend_payload})
+async def group_defend(message: Message) -> None:
+    await _group_action(message, DeclaredAction(type=ActionType.DEFEND))
+
+
 @labeler.message(payload_contains={"type": "group_pve_skill"})
 async def group_skill(message: Message) -> None:
     payload = message.get_payload_json() or {}
@@ -449,7 +455,9 @@ async def _group_action(message: Message, action: DeclaredAction) -> None:
     if cid is None:
         return
 
-    is_defensive = action.type == ActionType.SKILL and action.skill_id in DEFENSIVE_SKILLS
+    is_defensive = action.type == ActionType.DEFEND or (
+        action.type == ActionType.SKILL and action.skill_id in DEFENSIVE_SKILLS
+    )
     if not is_defensive:
         target = _resolve_chosen_target(battle_id, battle, cid)
         if target is None:

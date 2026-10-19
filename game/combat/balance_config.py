@@ -447,3 +447,7 @@ ELEMENTALIST_ICE_FIELD_CHILL_PCT = 0.10         # Ледяное поле: -со
 # силы; полная сила возвращается, когда дебафф с цели спал совсем.
 DEBUFF_DECAY_PER_TURN = 0.30
 DECAYING_DEBUFFS = ("vulnerability", "weaken")   # EffectKind.VULNERABILITY, EffectKind.WEAKEN
+
+# «Защититься» (2026-10-19): добровольный пропуск хода, входящий урон -10%
+# до следующего своего хода (тик в групповых боях, ответ соперника в дуэли).
+DEFEND_DAMAGE_REDUCTION = 0.10
