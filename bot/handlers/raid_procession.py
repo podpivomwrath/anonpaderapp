@@ -215,7 +215,7 @@ async def _watch(battle_id: int, token: int) -> None:
             if not warned and left <= 60:
                 warned = True
                 for peer in run.peers.values():
-                    await _send(peer, "⏳ Осталась минута. Скрип совсем близко.")
+                    await _send(peer, "⏳ Осталась минута. Жёрнов уже в сотне шагов.")
             await asyncio.sleep(min(left, 5))
     except asyncio.CancelledError:
         return

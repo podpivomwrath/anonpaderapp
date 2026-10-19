@@ -176,7 +176,7 @@ class CargoStage:
     def _drop(self, session: CombatSessionState, out: StageTick) -> None:
         self.sacks -= 1
         if self.sacks <= 0:
-            out.lines.append("🌾 Последний мешок рвётся о камни. Обоз пуст, и жернова догоняют вас.")
+            out.lines.append("🌾 Последний мешок рвётся о камни. Обоз пуст, жёрнов догоняет вас.")
             for player in _players(session):
                 _hurt(player, player.current_hp, out)
             return
@@ -322,7 +322,7 @@ class MillerStage:
             return
         action = result.actions.get(cid)
         if action is None or action.type in (ActionType.SKIP, ActionType.DEFEND):
-            out.lines.append(f"{player.name} замирает, и жернова проходят мимо.")
+            out.lines.append(f"{player.name} замирает - жёрнов проходит мимо.")
             return
         out.lines.append(f"⚙️ {player.name} шевельнулся - жернова дробят ему ноги.")
         _hurt(player, round(player.max_hp * mc.FREEZE_CRUSH_PCT), out)
