@@ -356,3 +356,23 @@ rust brown and dried blood with bright copper and ember highlights, drifting
 ash and steam, dramatic overcast light, no text, no watermark, no logo, no
 modern objects, horizontal 3:2 composition
 ```
+
+---
+
+## 🏃 Курьер - `courier.webp` (карточка магазина, 1:1)
+
+Обычный парень-посыльный лет пятнадцати, без пепла и магии: бежит с сумкой
+через плечо. Лицо не показываем - он бежит в три четверти спиной или лицо
+в тени козырька. Читаться должен как «доставка».
+
+```
+a lanky teenage messenger boy running, seen in three-quarter view from behind,
+a worn leather satchel over his shoulder bouncing with a wrapped parcel tied
+with twine, patched linen shirt with rolled sleeves, a flat cap pulled low,
+scuffed boots kicking up dust, an ordinary village lad with no magic and no
+armour, dark fantasy game item icon, single figure centered, painterly
+semi-realistic, muted desaturated palette of ash grey, rust brown and dried
+blood, weathered and worn surfaces, soft rim light from the upper left, deep
+neutral background, no text, no watermark, no border, square 1:1 composition,
+crisp readable silhouette at small size
+```

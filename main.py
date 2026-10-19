@@ -345,6 +345,12 @@ async def run() -> None:
     await turbo_handlers.load_naming()
     respawn_scheduler.add_job(turbo_handlers.tick_job, "interval", seconds=20,
                              id="turbo_ishak", max_instances=1, coalesce=True)
+    # Курьер (2026-10-19): шаги по клеткам и сообщения о посылках.
+    from bot.handlers import courier as courier_handlers
+
+    courier_handlers.setup(bot.api)
+    respawn_scheduler.add_job(courier_handlers.tick_job, "interval", seconds=2,
+                             id="courier", max_instances=1, coalesce=True)
     # Смена фракции, купленная в бою, - переезд, когда бой кончился.
     from bot import miniapp_shop_api
 

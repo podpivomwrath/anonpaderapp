@@ -590,6 +590,9 @@ export default function MapTab() {
     ]),
     ...(questTarget ? [[questTarget.x, questTarget.y, 'map-pin--quest', '📜', questTarget.label, 1]] : []),
     ...(worldBoss ? [[worldBoss.x, worldBoss.y, 'map-pin--boss', '💀', worldBoss.name, 1.3]] : []),
+    // Курьер с посылкой (2026-10-19): свой и тот, что бежит к тебе.
+    ...(mapState.couriers || []).map((c) => [c.x, c.y, 'map-pin--courier', '🏃',
+      c.own ? `Твой курьер: ${c.label}` : `К тебе бежит курьер: ${c.label}`, 1.05]),
     // Турбоишак дня (2026-10-19): бегает по всей карте, поймать - зайти на клетку.
     ...(turboPos ? [[turboPos.x, turboPos.y, 'map-pin--turbo', '🫏',
       mapState.turbo.running ? 'Турбоишак на бегу' : 'Турбоишак стоит - поймай, пока не убежал', 1.25]] : []),

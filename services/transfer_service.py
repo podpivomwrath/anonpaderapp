@@ -15,7 +15,7 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass
 
-from sqlalchemy import select, update
+from sqlalchemy import delete, select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -181,20 +181,30 @@ async def _take_stack(db: AsyncSession, model, key: dict, amount: int) -> bool:
     return bool(result.rowcount)
 
 
-async def execute(
-    db: AsyncSession, sender_id: int, recipient_id: int, offer: Offer, amount: int,
-) -> int:
-    """Передаёт и пишет журнал. Возвращает переданное количество.
-    TransferFailed - у отправителя этого уже нет (ушло в параллельном запросе)."""
-    if sender_id == recipient_id:
-        raise TransferFailed("Самому себе не передать.")
+#: Из рук в руки (2026-10-19, решение владельца): вещи, зелья и руду - только
+#: тому, кто на одной клетке с тобой (город - тоже клетка). Дальше - курьер
+#: (services/courier_service.py). Золото и самоцветы - на любое расстояние.
+NEEDS_NEAR = ("elixir", "ore", "item")
+
+
+def same_cell(sender, recipient) -> bool:
+    return (sender.pos_x, sender.pos_y) == (recipient.pos_x, recipient.pos_y)
+
+
+def needs_courier(offer: Offer, sender, recipient) -> bool:
+    return offer.kind in NEEDS_NEAR and not same_cell(sender, recipient)
+
+
+async def take(db: AsyncSession, sender_id: int, offer: Offer, amount: int) -> int:
+    """Списать у отправителя (для курьера - сразу при подтверждении, чтобы
+    вещь в пути нельзя было продать или передать второй раз). Вещь
+    отвязывается от отправителя, но остаётся в базе - её несёт курьер.
+    Возвращает количество. TransferFailed - этого уже нет."""
     amount = 1 if not offer.stackable else amount
     if amount <= 0:
         raise TransferFailed("Количество должно быть больше нуля.")
-
     if offer.kind in ("gold", "gems"):
         from game.economy import faction_config as fc
-        from services import faction_service
 
         if amount < fc.TRANSFER_MIN:
             raise TransferFailed(f"Валюту передают от {fc.TRANSFER_MIN}.")
@@ -203,41 +213,70 @@ async def execute(
             await wallet_service.charge(db, sender_id, currency, amount)
         except wallet_service.NotEnoughCurrency:
             raise TransferFailed("Столько у тебя нет.") from None
-        # Налог фракции получателя (2026-10-15) вместо налога гильдии.
-        tax, _city = await faction_service.tax_transfer(db, recipient_id, currency, amount)
-        await wallet_service.deposit(db, recipient_id, currency, amount - tax, taxable=False)
     elif offer.kind == "elixir":
-        key = {"elixir_id": offer.ref}
-        if not await _take_stack(db, CharacterConsumable, {"character_id": sender_id, **key}, amount):
+        if not await _take_stack(db, CharacterConsumable, {"character_id": sender_id, "elixir_id": offer.ref}, amount):
             raise TransferFailed("Столько у тебя нет.")
-        await _credit_stack(db, CharacterConsumable, {"character_id": recipient_id, **key}, amount)
     elif offer.kind == "ore":
         ore_id, grade = offer.ref.split(":", 1)
-        key = {"ore_id": ore_id, "grade": grade}
-        if not await _take_stack(db, CharacterOre, {"character_id": sender_id, **key}, amount):
+        key = {"character_id": sender_id, "ore_id": ore_id, "grade": grade}
+        if not await _take_stack(db, CharacterOre, key, amount):
             raise TransferFailed("Столько у тебя нет.")
-        await _credit_stack(db, CharacterOre, {"character_id": recipient_id, **key}, amount)
     elif offer.kind == "item":
         item = await db.get(Item, int(offer.ref), with_for_update=True)
         if item is None or item.admin_only or item.bound or item.craft_spec is not None:
             raise TransferFailed("Эту вещь не передать.")
         moved = await db.execute(
-            update(Inventory).where(
+            delete(Inventory).where(
                 Inventory.item_id == item.id,
                 Inventory.character_id == sender_id,
                 Inventory.equipped.is_(False),
-            ).values(character_id=recipient_id)
-            .execution_options(synchronize_session="fetch")
+            ).execution_options(synchronize_session="fetch")
         )
         if not moved.rowcount:
             raise TransferFailed("Этой вещи у тебя уже нет - или она надета.")
     else:
         raise TransferFailed("Это не передаётся.")
+    return amount
 
+
+async def give(db: AsyncSession, recipient_id: int, kind: str, ref: str | None, amount: int) -> int:
+    """Выдать получателю то, что списано take. Возвращает, сколько дошло
+    (у валюты - за вычетом налога фракции получателя)."""
+    if kind in ("gold", "gems"):
+        from services import faction_service
+
+        currency = "farm" if kind == "gold" else "donate"
+        # Налог фракции получателя (2026-10-15) вместо налога гильдии.
+        tax, _city = await faction_service.tax_transfer(db, recipient_id, currency, amount)
+        await wallet_service.deposit(db, recipient_id, currency, amount - tax, taxable=False)
+        return amount - tax
+    if kind == "elixir":
+        await _credit_stack(db, CharacterConsumable, {"character_id": recipient_id, "elixir_id": ref}, amount)
+    elif kind == "ore":
+        ore_id, grade = ref.split(":", 1)
+        await _credit_stack(db, CharacterOre, {"character_id": recipient_id, "ore_id": ore_id, "grade": grade}, amount)
+    elif kind == "item":
+        db.add(Inventory(character_id=recipient_id, item_id=int(ref), equipped=False))
+    return amount
+
+
+def log(db: AsyncSession, sender_id: int, recipient_id: int, kind: str, ref: str | None, label: str, amount: int) -> None:
     db.add(TransferLog(
-        from_character_id=sender_id, to_character_id=recipient_id, kind=offer.kind,
-        ref=offer.ref, label=offer.label[:160], amount=amount,
+        from_character_id=sender_id, to_character_id=recipient_id, kind=kind,
+        ref=ref, label=label[:160], amount=amount,
     ))
+
+
+async def execute(
+    db: AsyncSession, sender_id: int, recipient_id: int, offer: Offer, amount: int,
+) -> int:
+    """Передаёт из рук в руки и пишет журнал. Возвращает переданное количество.
+    TransferFailed - у отправителя этого уже нет (ушло в параллельном запросе)."""
+    if sender_id == recipient_id:
+        raise TransferFailed("Самому себе не передать.")
+    amount = await take(db, sender_id, offer, amount)
+    await give(db, recipient_id, offer.kind, offer.ref, amount)
+    log(db, sender_id, recipient_id, offer.kind, offer.ref, offer.label, amount)
     await db.flush()
     return amount
 

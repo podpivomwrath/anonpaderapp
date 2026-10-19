@@ -171,6 +171,18 @@ async def handle_get_state(request: web.Request) -> web.Response:
                     "step_seconds": turbo_ishak_service.step_seconds(), "next_cell_in": left,
                 })
 
+        # Курьер (2026-10-19): свой - с посылкой туда и обратно, чужой - когда
+        # уже бежит к тебе. Где он сейчас; путь не рисуем.
+        from services import courier_service
+
+        courier_marks = []
+        mine = await courier_service.active_of(db, character.id)
+        if mine is not None:
+            courier_marks.append({"x": mine.x, "y": mine.y, "own": True, "label": mine.label})
+        for d in await courier_service.incoming(db, character.id):
+            if mine is None or d.id != mine.id:
+                courier_marks.append({"x": d.x, "y": d.y, "own": False, "label": d.label})
+
         # Гильдии: владения и закладки - цветом гильдии на карте.
         from services import guild_territory_service
 
@@ -231,6 +243,7 @@ async def handle_get_state(request: web.Request) -> web.Response:
                 "quest_target": quest_target,
                 "world_boss": world_boss_mark,
                 "turbo": turbo_mark,
+                "couriers": courier_marks,
                 "trail": trail_mark,
                 "mounts": [
                     {

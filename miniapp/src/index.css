@@ -443,6 +443,12 @@ body {
   animation: map-boss-glow 2.2s ease-in-out infinite;
 }
 
+/* Курьер с посылкой. */
+.map-pin--courier {
+  border: 2px solid #8fb3d9;
+  background: rgba(14, 26, 40, 0.88);
+}
+
 /* Турбоишак дня: медный, пульсирует - он на месте ненадолго. */
 .map-pin--turbo {
   border: 2px solid #c98a3a;

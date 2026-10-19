@@ -44,7 +44,7 @@ async def handle_post(request: web.Request) -> web.Response:
     item = body.get("item") if isinstance(body, dict) else None
     if item not in (shop_service.PREMIUM_ID, shop_service.RENAME_ID, shop_service.FIRM_RENAME_ID,
                     shop_service.ELIXIR_PACK_ID, shop_service.TINCTURE_ID, shop_service.POCKET_ID,
-                    shop_service.FACTION_ID):
+                    shop_service.FACTION_ID, shop_service.COURIER_ID):
         return _error("bad_request")
     peer_id = request[VK_USER_ID_KEY]
     async with request.app[SESSION_FACTORY_KEY]() as db:
@@ -71,6 +71,9 @@ async def handle_post(request: web.Request) -> web.Response:
                 done = {"item": item, "until": until.isoformat()}
             elif item == shop_service.POCKET_ID:
                 await shop_service.buy_pocket(db, character)
+                done = {"item": item}
+            elif item == shop_service.COURIER_ID:
+                await shop_service.buy_courier(db, character)
                 done = {"item": item}
             elif item == shop_service.FACTION_ID:
                 region = body.get("region")

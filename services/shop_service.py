@@ -55,6 +55,7 @@ def catalog(character: Character, gems: int, firm_name: str | None = None) -> di
             "note": "Без силовых преимуществ: статы, урон и HP не меняются. Срок складывается с оставшимся.",
             "active_until": until.isoformat() if active and until is not None else None,
         }, elixir_pack_item(), tincture_item(character), pocket_item(character), faction_item(character),
+            courier_item(character),
             *rename_items(character, firm_name)],
     }
 
@@ -390,3 +391,36 @@ async def _move(db: AsyncSession, character: Character, region: str, now: dateti
         db, 0, "shop_faction_move", character.id, old_value={"region": old}, new_value={"region": region},
     )
     return voyage_text
+
+
+# --- Курьер (2026-10-19): питомец-доставщик, services/courier_service.py ---
+
+COURIER_ID = "courier"
+
+
+def courier_item(character: Character) -> dict:
+    from game.economy import courier_config as cc
+
+    return {
+        "id": COURIER_ID, "title": "Курьер", "emoji": cc.EMOJI, "kind": "bundle", "price": cc.PRICE,
+        "perks": [
+            "Носит вещи, зелья и руду тому, кто далеко от тебя",
+            "Выходит из твоего города, забирает посылку у тебя и бежит к получателю",
+            "Получатель сменил клетку - курьер поворачивает за ним прямо в дороге",
+            "Получатель в бою или рейде - курьер ждёт рядом и отдаёт посылку после боя",
+            "Покупается один раз и навсегда",
+        ],
+        "note": "Рядом с тобой и золото с самоцветами передаются и без курьера, как раньше. "
+                "Одна посылка за раз: следующую он возьмёт, когда отдаст эту.",
+        "available": not character.has_courier,
+        "unavailable": "Курьер у тебя уже есть.",
+    }
+
+
+async def buy_courier(db: AsyncSession, character: Character) -> None:
+    from services import courier_service
+
+    try:
+        await courier_service.buy(db, character)
+    except courier_service.CourierError as exc:
+        raise ShopError(str(exc)) from None

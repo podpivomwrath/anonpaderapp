@@ -52,7 +52,7 @@ from models.trade import (
     FactionPayout, FactionState, FactionWeek, TradeCart, TradeContribution, TradeFirm, TradeMarket, TradeOrder, TradeTrip,
 )
 from models.subclass_trial import CharacterTrialProgress, CharacterUnlockedBuff
-from models.transfer import TransferLog
+from models.transfer import CourierDelivery, TransferLog
 from models.trophy import CharacterTrophy
 from models.user import User
 from models.rift import Rift, RiftMeter
