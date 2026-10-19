@@ -34,6 +34,10 @@ def test_passive_mark_only_for_shadow_blade_and_real_hits():
     shared_rules.passive_mark(blade, target, _hit(is_dot=True), hit_roll, lines)
     shared_rules.passive_mark(blade, target, _hit(), _Rng(0.99), lines)
     assert target.effect_from(EffectKind.MARK, blade.id) is None
+    # Метку открывает только Рез: без неё пассивка не вешает ничего.
+    shared_rules.passive_mark(blade, target, _hit(), hit_roll, lines)
+    assert target.effect_from(EffectKind.MARK, blade.id) is None
+    shared_rules.add_mark(blade, target)
     shared_rules.passive_mark(blade, target, _hit(), hit_roll, lines)
     shared_rules.passive_mark(blade, target, _hit(), hit_roll, lines)
-    assert target.effect_from(EffectKind.MARK, blade.id).stacks == 2
+    assert target.effect_from(EffectKind.MARK, blade.id).stacks == 3

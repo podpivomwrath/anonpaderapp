@@ -220,24 +220,30 @@ def inspiration_on_deaths(
 # --- Клинок теней: Метка добычи ---
 
 
-def add_mark(actor: CombatantState, target: CombatantState) -> None:
-    """+1 стак Метки добычи от актёра на цели (до максимума), длительность
+def add_mark(actor: CombatantState, target: CombatantState, stacks: int = 1) -> None:
+    """+stacks Метки добычи от актёра на цели (до максимума), длительность
     обновляется до полной."""
     mark = target.effect_from(EffectKind.MARK, actor.id)
     if mark is not None:
-        mark.stacks = min(mark.stacks + 1, bc.SHADOW_BLADE_MARK_MAX_STACKS)
+        mark.stacks = min(mark.stacks + stacks, bc.SHADOW_BLADE_MARK_MAX_STACKS)
         mark.remaining_ticks = max(mark.remaining_ticks, bc.SHADOW_BLADE_MARK_DURATION)
     else:
         target.effects.append(
             Effect(kind=EffectKind.MARK, value=1.0, remaining_ticks=bc.SHADOW_BLADE_MARK_DURATION,
-                   source_id=actor.id, stacks=1)
+                   source_id=actor.id, stacks=min(stacks, bc.SHADOW_BLADE_MARK_MAX_STACKS))
         )
 
 
 def passive_mark(actor: CombatantState | None, target: CombatantState, hit, rng, lines: list[str]) -> None:
     """Пассивка Клинка теней (2026-10-19): любой попавший удар (атака или
-    навык, не ДоТ) с шансом вешает Метку добычи. Работает в обоих движках."""
+    навык, не ДоТ) с шансом добавляет стак к Метке добычи. Работает в обоих
+    движках.
+
+    Только к уже висящей метке: открывает её Скользящий рез. Иначе метки
+    летели отовсюду и Рез стал не нужен (жалоба игрока 2026-10-19)."""
     if actor is None or getattr(actor, "subclass_id", None) != "shadow_blade":
+        return
+    if target.effect_from(EffectKind.MARK, actor.id) is None:
         return
     if hit.missed or hit.is_dot or hit.amount <= 0 or actor.id == target.id or not target.alive:
         return

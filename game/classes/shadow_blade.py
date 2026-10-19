@@ -8,7 +8,8 @@ self_dodge_buff, регистрируется в subclass_skills.py) — сам�
 
 from game.classes.base import Role, SubclassDef, register
 from game.combat import balance_config as bc
-from game.combat.session import Effect, EffectKind
+from game.combat import shared_rules
+from game.combat.session import EffectKind
 from game.combat.skills import SkillContext, compute_hit, offensive_skill
 from game.combat.subclass_skills import SUBCLASS_SKILL_DEFS
 
@@ -30,7 +31,8 @@ SHADOW_BLADE = register(
 
 @offensive_skill("shadow_blade_marked_strike")
 def marked_strike(ctx: SkillContext) -> None:
-    """Скользящий рез: 145% урона, +1 стак Метки добычи (макс. 5)."""
+    """Скользящий рез: 145% урона, +2 стака Метки добычи (макс. 5). Единственный
+    способ открыть метку без баффов пресета: пассивка только добавляет к ней."""
     skill = SUBCLASS_SKILL_DEFS["shadow_blade_marked_strike"]
     actor = ctx.actor
     actor.cooldowns[skill.id] = skill.cd
@@ -39,17 +41,8 @@ def marked_strike(ctx: SkillContext) -> None:
         return
     ctx.hits.append(compute_hit(actor, target, ctx.rng, skill.name, skill.multiplier, is_ability=True))
 
-    existing = target.effect_from(EffectKind.MARK, actor.id)
-    if existing is not None:
-        existing.stacks = min(existing.stacks + 1, bc.SHADOW_BLADE_MARK_MAX_STACKS)
-        # Патч 52, баг 1: длительность ОБНОВЛЯЕТСЯ до полной, не суммируется —
-        # max(), не прямое присваивание (см. game/classes/poisoner.py).
-        existing.remaining_ticks = max(existing.remaining_ticks, bc.SHADOW_BLADE_MARK_DURATION)
-    else:
-        target.effects.append(
-            Effect(kind=EffectKind.MARK, value=1.0, remaining_ticks=bc.SHADOW_BLADE_MARK_DURATION,
-                   source_id=actor.id, stacks=1)
-        )
+    # Длительность обновляется до полной, не суммируется (патч 52, баг 1).
+    shared_rules.add_mark(actor, target, bc.SHADOW_BLADE_MARKED_STRIKE_STACKS)
     ctx.lines.append(f"{target.name} помечен добычей ({actor.name}) 🎯")
 
 

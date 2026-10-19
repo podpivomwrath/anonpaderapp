@@ -94,11 +94,11 @@ def test_marked_strike_stacks_and_harvest_consumes() -> None:
 
     resolve_tick(state, {1: skill("shadow_blade_marked_strike", 2)}, rng)
     mark = enemy.effect_from(EffectKind.MARK, 1)
-    assert mark is not None and mark.stacks == 1
+    assert mark is not None and mark.stacks == bc.SHADOW_BLADE_MARKED_STRIKE_STACKS
 
     resolve_tick(state, {1: attack(2)}, rng)  # обычная атака — стак НЕ растёт и НЕ тратится
     mark = enemy.effect_from(EffectKind.MARK, 1)
-    assert mark is not None and mark.stacks == 1
+    assert mark is not None and mark.stacks == bc.SHADOW_BLADE_MARKED_STRIKE_STACKS
 
     hp_before = enemy.current_hp
     resolve_tick(state, {1: skill("shadow_blade_mark_harvest", 2)}, rng)
