@@ -788,9 +788,7 @@ async def use_item(message: Message) -> None:
         return
 
     limit_reached = player.combat_elixirs_used >= ec.ELIXIR_PER_BATTLE_LIMIT
-    visible = [(d, count) for d, count in stock if d.category == "heal" or not limit_reached]
-    if consumable_limit.left(player) <= 0:
-        visible = []
+    visible = consumable_limit.visible_stock(player, stock, limit_reached)
     text = consumable_limit.items_header(player)
     if limit_reached and any(d.category != "heal" for d, _ in stock):
         text += "\n\nБольше твоё тело не выдержит за один бой - боевые эликсиры недоступны."
@@ -825,6 +823,9 @@ async def use_combat_item(message: Message) -> None:
     if consumable_limit.left(player) <= 0:
         await message.answer(consumable_limit.EXHAUSTED_TEXT, keyboard=_combat_kb(state, peer_id))
         return
+    if elixir.category == "heal" and consumable_limit.heal_taken(player):
+        await message.answer(consumable_limit.HEAL_TAKEN_TEXT, keyboard=_combat_kb(state, peer_id))
+        return
     if elixir.category != "heal" and player.combat_elixirs_used >= ec.ELIXIR_PER_BATTLE_LIMIT:
         await message.answer("Больше твоё тело не выдержит за один бой.", keyboard=_combat_kb(state, peer_id))
         return
@@ -852,6 +853,7 @@ async def use_combat_item(message: Message) -> None:
     if elixir.category == "heal":
         # Лечебное зелье - тоже без траты хода (2026-10-14).
         line = elixir_effects.drink_heal(player, elixir_id)
+        consumable_limit.mark_heal(player)
     else:
         line = elixir_effects.apply_combat_elixir(player, elixir_id, state.combatants)
         player.combat_elixirs_used += 1

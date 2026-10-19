@@ -193,6 +193,9 @@ class CombatantState:
     combat_elixirs_used: int = 0
     # Все расходники за бой (зелья + эликсиры), лимит CONSUMABLES_PER_BATTLE.
     consumables_used: int = 0
+    # Лечебное зелье - одно за ход (2026-10-19): ход не тратит, но второе до
+    # следующего хода не выпить. Сбрасывается в reset_transient.
+    heal_drunk_this_turn: bool = False
 
     #: Затухание дебаффов (2026-10-16), {вид: доля}: с какой силой ляжет новый
     #: дебафф этого вида (bc.DECAYING_DEBUFFS - уязвимость, ослабление). Пока
@@ -356,6 +359,7 @@ class CombatantState:
         self.block_reduction = 0.0
         self.defend_reduction = 0.0
         self.mitigation_penalty = 0.0
+        self.heal_drunk_this_turn = False
         # Провокация держится taunt_left тиков (2026-10-14: раньше слетала
         # после первого же тика, хотя навык обещает 2 хода).
         self.taunt_left = max(0, self.taunt_left - 1)

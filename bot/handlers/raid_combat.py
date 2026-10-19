@@ -928,9 +928,7 @@ async def raid_open_items(message: Message) -> None:
         return
 
     limit_reached = combatant.combat_elixirs_used >= ec.ELIXIR_PER_BATTLE_LIMIT
-    visible = [(d, count) for d, count in stock if d.category == "heal" or not limit_reached]
-    if consumable_limit.left(combatant) <= 0:
-        visible = []
+    visible = consumable_limit.visible_stock(combatant, stock, limit_reached)
     text = consumable_limit.items_header(combatant)
     if limit_reached and any(d.category != "heal" for d, _ in stock):
         text += "\n\nБольше твоё тело не выдержит за один бой - боевые эликсиры недоступны."
@@ -974,6 +972,9 @@ async def raid_use_item(message: Message) -> None:
     if consumable_limit.left(combatant) <= 0:
         await message.answer(consumable_limit.EXHAUSTED_TEXT, keyboard=battle_kb)
         return
+    if elixir.category == "heal" and consumable_limit.heal_taken(combatant):
+        await message.answer(consumable_limit.HEAL_TAKEN_TEXT, keyboard=battle_kb)
+        return
     if elixir.category != "heal" and combatant.combat_elixirs_used >= ec.ELIXIR_PER_BATTLE_LIMIT:
         await message.answer("Больше твоё тело не выдержит за один бой.", keyboard=battle_kb)
         return
@@ -996,6 +997,7 @@ async def raid_use_item(message: Message) -> None:
     # Лечебное зелье - тоже без траты хода (2026-10-14).
     if elixir.category == "heal":
         line = elixir_effects.drink_heal(combatant, elixir_id)
+        consumable_limit.mark_heal(combatant)
     else:
         line = elixir_effects.apply_combat_elixir(combatant, elixir_id, _live_state(battle_id, battle))
         combatant.combat_elixirs_used += 1
