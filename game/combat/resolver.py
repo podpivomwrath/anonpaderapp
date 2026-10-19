@@ -450,6 +450,7 @@ def resolve_tick(
     for hit in ctx.hits:
         target = session.combatants[hit.target_id]
         amount = hit.amount
+        shared_rules.passive_mark(session.combatants.get(hit.source_id), target, hit, rng, ctx.lines)
         # Рейд «Безмогильное поле»: купол и стойки генерала (session.py).
         if target.incoming_hit_hook is not None and amount > 0:
             amount = max(target.incoming_hit_hook(hit, session.combatants.get(hit.source_id), amount), 0)

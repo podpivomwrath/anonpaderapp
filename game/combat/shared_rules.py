@@ -215,3 +215,33 @@ def inspiration_on_deaths(
                         EffectKind.DAMAGE_BUFF, dmg_bonus, bc.SHADOW_BLADE_INSPIRATION_TURNS, owner.id
                     )
             lines.append(f"{owner.name} воодушевляет союзников добычей")
+
+
+# --- Клинок теней: Метка добычи ---
+
+
+def add_mark(actor: CombatantState, target: CombatantState) -> None:
+    """+1 стак Метки добычи от актёра на цели (до максимума), длительность
+    обновляется до полной."""
+    mark = target.effect_from(EffectKind.MARK, actor.id)
+    if mark is not None:
+        mark.stacks = min(mark.stacks + 1, bc.SHADOW_BLADE_MARK_MAX_STACKS)
+        mark.remaining_ticks = max(mark.remaining_ticks, bc.SHADOW_BLADE_MARK_DURATION)
+    else:
+        target.effects.append(
+            Effect(kind=EffectKind.MARK, value=1.0, remaining_ticks=bc.SHADOW_BLADE_MARK_DURATION,
+                   source_id=actor.id, stacks=1)
+        )
+
+
+def passive_mark(actor: CombatantState | None, target: CombatantState, hit, rng, lines: list[str]) -> None:
+    """Пассивка Клинка теней (2026-10-19): любой попавший удар (атака или
+    навык, не ДоТ) с шансом вешает Метку добычи. Работает в обоих движках."""
+    if actor is None or getattr(actor, "subclass_id", None) != "shadow_blade":
+        return
+    if hit.missed or hit.is_dot or hit.amount <= 0 or actor.id == target.id or not target.alive:
+        return
+    if rng.random() >= bc.SHADOW_BLADE_PASSIVE_MARK_CHANCE:
+        return
+    add_mark(actor, target)
+    lines.append(f"{target.name} помечен добычей ({actor.name}) 🎯")

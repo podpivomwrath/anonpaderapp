@@ -62,7 +62,7 @@
   },
   "shadow_blade_shadow_dance": {
     "id": "shadow_blade_shadow_dance", "name": "Танец в тени", "subclass_id": "shadow_blade",
-    "multiplier": 0, "cd": 4, "effect": "self_dodge_buff",
+    "multiplier": 1.0, "cd": 4, "effect": "self_dodge_buff",
     "effect_value": 0.4, "effect_duration": 2,
     "flavor": "Ты перестаёшь быть там, где был. Ненадолго, но этого хватает."
   },

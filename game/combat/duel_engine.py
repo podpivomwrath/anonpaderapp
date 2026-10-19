@@ -353,6 +353,7 @@ class DuelEngine:
                 ))
                 continue
             before = target.current_hp
+            shared_rules.passive_mark(actor, target, hit, self.rng, result.lines)
             # Щиты (однотиковый + «Второе сердце») считаются общим правилом:
             # раньше этот блок жил своей жизнью, и патчу 52 пришлось отдельно
             # добавлять сюда SHIELD_POOL, которого движок не знал.
