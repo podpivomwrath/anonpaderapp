@@ -273,7 +273,7 @@ async def _resolve_junk(db, character) -> tuple[str, str]:
     if roll < fc.JUNK_RAID_KEY_CHANCE + fc.JUNK_ITEM_CHANCE:
         item = await item_service.grant_random_item(db, character, character.level, _rng)
         if item is not None:
-            return (f"⚔️ Крючок вытаскивает со дна находку: {item.name}. Кто-то оставил это там.",
+            return (f"⚔️ Крючок вытаскивает со дна находку: {item.name}. Утопленнику она больше не нужна.",
                     kb.lake_keyboard())
     if roll < fc.JUNK_RAID_KEY_CHANCE + fc.JUNK_ITEM_CHANCE + fc.JUNK_CHEST_CHANCE:
         drop = await trophy_service.grant_from_event(db, character, _rng)
