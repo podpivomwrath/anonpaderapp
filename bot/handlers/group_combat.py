@@ -729,6 +729,11 @@ async def on_group_tick_resolved(session_id: int, tick: int, result: TickResult)
                     drop_line = trophy_service.format_drop_line(r.trophies)
                     if drop_line:
                         lines.append(drop_line)
+                    from bot.handlers import guild as guild_handlers  # избегаем цикла импортов
+
+                    tithe_line = guild_handlers.take_tithe_line(p.peer_id)
+                    if tithe_line:
+                        lines.append(tithe_line)
                     if r.item_dropped is not None:
                         lines.append(item_service.format_drop_announcement(r.item_dropped))
                     if r.elixir_line:

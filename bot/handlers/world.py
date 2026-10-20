@@ -765,7 +765,9 @@ async def explore(message: Message) -> None:
                             # Страховка: группа ушла - отдых не доигрывается.
                             _resting.discard(member_peer_id)
                             await pending_activity.forget("rest", member_peer_id)
-                        await guild_territory_service.on_exploration(db, member_character)
+                        tithe = await guild_territory_service.on_exploration(db, member_character)
+                        if member_peer_id is not None:
+                            guild_handlers.remember_tithe(member_peer_id, member_character, tithe)
                         # Ежедневки «исследуй» - и в группе, каждому (2026-10-13).
                         member_daily = await daily_service.record_exploration(db, member_character)
                         text = "🔍 Группа осматривается вокруг..."
@@ -1187,6 +1189,9 @@ async def event_choice(message: Message) -> None:
     result_text = result.text
     if fish_sale_line:
         result_text += chr(10) * 2 + fish_sale_line
+    tithe_line = guild_handlers.take_tithe_line(peer_id)
+    if tithe_line:
+        result_text += f"\n{tithe_line}"
     if result.group_kick is not None and result.group_kick.kicked_character_id == character.id:
         result_text += f"\n\n{group_texts.level_gap_kick_self_line()}"
     await message.answer(result_text, keyboard=kb.waiting_keyboard())

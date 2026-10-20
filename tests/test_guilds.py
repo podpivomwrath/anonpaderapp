@@ -728,3 +728,16 @@ async def test_city_gates_free_with_first_gate(db_session, make_character) -> No
     leader.pos_x, leader.pos_y = 7, 7
     with pytest.raises(GuildError):
         await guild_territory_service.travel_gates(db_session, leader, base.id)
+
+
+def test_tithe_line_only_for_own_guild_and_once() -> None:
+    from types import SimpleNamespace as N
+
+    from bot.handlers import guild as guild_handlers
+
+    me = N(guild_id=7)
+    guild_handlers.remember_tithe(1, me, N(tithe_gold=40, tithe_guild_id=7))
+    assert guild_handlers.take_tithe_line(1) == "🏰 +40 золота в казну гильдии"
+    assert guild_handlers.take_tithe_line(1) is None
+    guild_handlers.remember_tithe(1, me, N(tithe_gold=40, tithe_guild_id=8))  # чужая земля
+    assert guild_handlers.take_tithe_line(1) is None

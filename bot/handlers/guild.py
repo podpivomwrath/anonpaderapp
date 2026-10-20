@@ -86,8 +86,27 @@ async def notify_guild(guild_id: int, text: str, min_rank: str | None = None) ->
 # --- Поле: исследование и прибытие -------------------------------------------------
 
 
+#: Десятина с исследования на земле своей гильдии - ждёт итога боя или события
+#: (2026-10-20, владелец: подписывать в награде, сколько капнуло в казну).
+_tithe: dict[int, int] = {}
+
+
+def remember_tithe(peer_id: int, character: Character, outcome) -> None:
+    """Каждое исследование перезаписывает: строка - только за последнее."""
+    if outcome is not None and outcome.tithe_gold and outcome.tithe_guild_id == character.guild_id:
+        _tithe[peer_id] = outcome.tithe_gold
+    else:
+        _tithe.pop(peer_id, None)
+
+
+def take_tithe_line(peer_id: int) -> str | None:
+    gold = _tithe.pop(peer_id, None)
+    return f"🏰 +{gold} золота в казну гильдии" if gold else None
+
+
 async def after_exploration(peer_id: int, character: Character, outcome) -> None:
     """Закладка знамени: вехи прогресса и завершение."""
+    remember_tithe(peer_id, character, outcome)
     if outcome is None:
         return
     if outcome.claimed is not None:

@@ -598,6 +598,11 @@ async def on_battle_finished(session_id: int, result: TickResult) -> None:
         drop_line = trophy_service.format_drop_line(outcome.trophies_gained)
         if drop_line is not None:
             text += f"\n{drop_line}"
+        from bot.handlers import guild as guild_handlers  # избегаем цикла импортов
+
+        tithe_line = guild_handlers.take_tithe_line(peer_id)
+        if tithe_line:
+            text += f"\n{tithe_line}"
         if outcome.elixir_line:
             text += f"\n{outcome.elixir_line}"
         if outcome.raid_key_dropped:
