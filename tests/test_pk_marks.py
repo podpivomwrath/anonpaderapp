@@ -81,3 +81,13 @@ async def test_mass_kill_summary_is_one_block(db_session, make_character):
     lines = pk_service.mass_killer_lines(killer, outs)
     assert len(lines) == 1
     assert "x2" in lines[0] and "меток: 2" in lines[0]
+
+
+async def test_weak_attacker_who_lost_brands_nobody(db_session, make_character):
+    """Слабый напал сам и погиб - это самооборона: ни метки, ни права мести
+    (2026-10-20)."""
+    defender = await make_character(level=40)
+    attacker = await make_character(level=20)
+    out = await pk_service.on_pvp_kill(db_session, defender, attacker, NOW, victim_attacked=True)
+    assert not out.branded and defender.pk_marks == 0
+    assert attacker.revenge_target_id is None

@@ -1688,7 +1688,8 @@ async def _finish_duel(battle: Battle, winner_cid: int, loser_cid: int) -> None:
             return
         pvp_service.record_win(winner)
         pvp_service.record_loss(loser)
-        pk = await pk_service.on_pvp_kill(db, winner, loser)
+        # Напал сам и проиграл - самооборона победителя, клейма нет (2026-10-20).
+        pk = await pk_service.on_pvp_kill(db, winner, loser, victim_attacked=battle.side_of.get(loser_cid) == 0)
         # Заказ на игрока (2026-10-16): после клейма - оно смотрит, взят ли заказ.
         from services import contract_service
 
@@ -1942,7 +1943,9 @@ async def on_mass_battle_finished(session_id: int, result: TickResult) -> None:
             )
             if not result.draw:
                 for attacker_cid in hitters:
-                    pk = await pk_service.on_pvp_kill(db, characters[attacker_cid], victim)
+                    pk = await pk_service.on_pvp_kill(
+                        db, characters[attacker_cid], victim, victim_attacked=battle.side_of.get(victim_cid) == 0,
+                    )
                     pk_outcomes.setdefault(attacker_cid, []).append(pk)
                     pk_lines.setdefault(victim_cid, []).extend(pk.victim_lines)
                 # Заказ на игрока: доля - каждому взявшему заказ, кто бил цель.

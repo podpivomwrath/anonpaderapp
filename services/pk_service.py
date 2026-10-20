@@ -158,17 +158,19 @@ BOARD_HINT = "Подробности - во вкладке «Доска»."
 
 async def on_pvp_kill(
     db: AsyncSession, killer: Character, victim: Character, now: datetime | None = None,
+    victim_attacked: bool = False,
 ) -> KillOutcome:
     """Убийство в открытом PvP: за убийство слабого на LEVEL_GAP+ - метка и
     право мести жертве. Охота на клеймёного меток не даёт. Осады и разломы
-    сюда не заходят."""
+    сюда не заходят. victim_attacked - погибший сам напал (или был на стороне
+    напавших): это самооборона, метки и права мести нет (2026-10-20)."""
     now = now or _now()
     out = KillOutcome(victim_name=victim.name)
     await settle(db, killer, now)
     await settle(db, victim, now)
 
     victim_branded = marks(victim, now) > 0
-    if victim_branded or killer.level - victim.level < pc.LEVEL_GAP:
+    if victim_attacked or victim_branded or killer.level - victim.level < pc.LEVEL_GAP:
         return out
     # Заказ на игрока (2026-10-16): охота по взятому заказу клейма не даёт.
     from services import contract_service
