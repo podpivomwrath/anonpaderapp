@@ -127,6 +127,23 @@ class MobBrain:
 
     # --- ход ----------------------------------------------------------------
 
+    def passive(
+        self,
+        mob: CombatantState,
+        target: CombatantState | None,
+        session: CombatSessionState,
+        rng: random.Random,
+        incoming: list[PendingHit],
+    ) -> MobTurn:
+        """Ход оглушённого моба (2026-10-20, репорты: в стане не регенится и
+        не отражает урон). Действовать он не может - ни удара, ни ответного
+        удара при уклонении, - но свойства тела работают: регенерация,
+        отражение, рассол, щит и самоподжог при малом здоровье."""
+        turn = MobTurn()
+        self._answer_incoming(mob, session, rng, incoming, turn, stunned=True)
+        self._self_upkeep(mob, target, session, turn, stunned=True)
+        return turn
+
     def act(
         self,
         mob: CombatantState,
@@ -304,7 +321,7 @@ class MobBrain:
 
     def _self_upkeep(
         self, mob: CombatantState, target: CombatantState | None,
-        session: CombatSessionState, turn: MobTurn,
+        session: CombatSessionState, turn: MobTurn, stunned: bool = False,
     ) -> None:
         if self.has("regen"):
             amount = max(round(mob.max_hp * self.one("regen").value), 1)
@@ -328,7 +345,7 @@ class MobBrain:
                     amount=max(round(mob.max_hp * trait.value), 1),
                     label="горит сам", is_dot=True, is_tick=True,
                 ))
-        if self.has("stacking_weaken") and target is not None and target.alive:
+        if self.has("stacking_weaken") and not stunned and target is not None and target.alive:
             trait = self.one("stacking_weaken")
             current = target.effect_from(EffectKind.WEAKEN, mob.id)
             value = min((current.value if current else 0.0) + trait.step, trait.cap)
@@ -336,10 +353,11 @@ class MobBrain:
 
     def _answer_incoming(
         self, mob: CombatantState, session: CombatSessionState, rng: random.Random,
-        incoming: list[PendingHit], turn: MobTurn,
+        incoming: list[PendingHit], turn: MobTurn, stunned: bool = False,
     ) -> None:
         """Ответ на удары по мобу в этом ходу. Моб его пережил - иначе
-        резолвер сюда бы не пустил (см. шапку модуля)."""
+        резолвер сюда бы не пустил (см. шапку модуля). stunned - оглушён:
+        ответного удара нет, отражение и рассол работают."""
         for hit in incoming:
             attacker = session.combatants.get(hit.source_id)
             if attacker is None or not attacker.alive or attacker.side == mob.side:
@@ -347,7 +365,7 @@ class MobBrain:
             if hit.is_dot:
                 continue  # яд - не удар, на него не отвечают
             if hit.missed:
-                if self.has("counter_on_dodge"):
+                if self.has("counter_on_dodge") and not stunned:
                     self._strike(mob, attacker, rng, turn, self.one("counter_on_dodge").mult,
                                  label="бьёт в ответ")
                 continue

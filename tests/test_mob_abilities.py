@@ -271,3 +271,37 @@ def test_story_enemy_without_a_base_mob_fights_plainly() -> None:
     encounter = encounters.spawn_named_enemy(2, "Безымянный", "проба", 20, 1.0)
     assert encounter.combatant.mob_brain is None
     assert encounter.ability_line is None
+
+
+# --- Оглушённый моб (2026-10-20, репорты) ---------------------------------------------
+
+
+def test_stunned_mob_still_regenerates() -> None:
+    session, player, mob = _duel(_ability(MobTraitDef(kind="regen", value=0.10)), mob_vit=200)
+    mob.current_hp = mob.max_hp // 2
+    mob.apply_effect(EffectKind.FREEZE, 1.0, 1, player.id)
+    before = mob.current_hp
+
+    result = resolve_tick(session, _skip(), _Rng())
+
+    assert any("теряет ход" in line for line in result.lines)
+    assert mob.current_hp > before
+
+
+def test_stunned_mob_still_reflects_but_does_not_bite() -> None:
+    session, player, mob = _duel(_ability(MobTraitDef(kind="reflect", value=0.5)), mob_vit=200)
+    mob.apply_effect(EffectKind.FREEZE, 1.0, 1, player.id)
+
+    result = resolve_tick(session, _attack(), _Rng())
+
+    assert any(h.label == "возвращает урон" and h.target_id == player.id for h in result.hits)
+    assert not any(h.source_id == mob.id and h.label == "кусает" for h in result.hits)
+
+
+def test_stunned_mob_does_not_counter_a_dodge() -> None:
+    session, player, mob = _duel(_ability(MobTraitDef(kind="counter_on_dodge", mult=1.0)), mob_vit=200)
+    mob.apply_effect(EffectKind.FREEZE, 1.0, 1, player.id)
+    turn = mob.mob_brain.passive(mob, None, session, _Rng(), [
+        mob_abilities.PendingHit(source_id=player.id, target_id=mob.id, amount=0, label="бьёт", missed=True),
+    ])
+    assert not turn.hits

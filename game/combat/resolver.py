@@ -499,6 +499,18 @@ def resolve_tick(
             # Патч 52, баг 1: см. комментарий у фазы 4a — единственное место
             # вывода «теряет ход», без исключения для лингера/свежей заморозки.
             result.lines.append(f"{mob.name} теряет ход ❄️")
+            # Свойства тела (регенерация, отражение...) работают и в оглушении
+            # (2026-10-20). Как и ход - только если моб этот ход переживёт.
+            if mob.mob_brain is not None and mob.scripted_hit is None and not (
+                session.mode == CombatMode.PVE
+                and _dies_this_tick(mob, incoming_by_target.get(mob.id, []), session)
+            ):
+                turn = mob.mob_brain.passive(
+                    mob, None, session, rng, incoming_by_target.get(mob.id, []),
+                )
+                ctx.hits.extend(turn.hits)
+                ctx.heals.extend(turn.heals)
+                ctx.lines.extend(turn.lines)
             continue
         if session.mode == CombatMode.PVE and _dies_this_tick(mob, incoming_by_target.get(mob.id, []), session):
             continue  # уже мёртв по итогам этого хода — не бьёт (патч 25, п.3)
