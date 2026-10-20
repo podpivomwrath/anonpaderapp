@@ -56,6 +56,9 @@ const ICONS = {
   'craft:general_cuirass:dps': new URL('./assets/items/craft_general_cuirass_dps.webp', import.meta.url).href,
   'craft:general_cuirass:support': new URL('./assets/items/craft_general_cuirass_support.webp', import.meta.url).href,
   'craft:general_cuirass:tank': new URL('./assets/items/craft_general_cuirass_tank.webp', import.meta.url).href,
+  'craft:nameless_stride:dps': new URL('./assets/items/craft_nameless_stride_dps.webp', import.meta.url).href,
+  'craft:nameless_stride:support': new URL('./assets/items/craft_nameless_stride_support.webp', import.meta.url).href,
+  'craft:nameless_stride:tank': new URL('./assets/items/craft_nameless_stride_tank.webp', import.meta.url).href,
   'craft:pilgrim_greaves:dps': new URL('./assets/items/craft_pilgrim_greaves_dps.webp', import.meta.url).href,
   'craft:pilgrim_greaves:support': new URL('./assets/items/craft_pilgrim_greaves_support.webp', import.meta.url).href,
   'craft:pilgrim_greaves:tank': new URL('./assets/items/craft_pilgrim_greaves_tank.webp', import.meta.url).href,
@@ -147,6 +150,7 @@ const ICONS = {
   'trophy:taint_clot': new URL('./assets/items/trophy_taint_clot.webp', import.meta.url).href,
   'unique:archivist_mask': new URL('./assets/items/unique_archivist_mask.webp', import.meta.url).href,
   'unique:general_cuirass': new URL('./assets/items/unique_general_cuirass.webp', import.meta.url).href,
+  'unique:nameless_stride': new URL('./assets/items/unique_nameless_stride.webp', import.meta.url).href,
   'unique:pilgrim_greaves': new URL('./assets/items/unique_pilgrim_greaves.webp', import.meta.url).href,
   'unique:surgeon_scalpel': new URL('./assets/items/unique_surgeon_scalpel.webp', import.meta.url).href,
 };

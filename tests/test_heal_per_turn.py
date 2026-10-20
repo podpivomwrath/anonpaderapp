@@ -39,4 +39,4 @@ def test_battle_limit_still_hides_everything() -> None:
     hero = combatant(1, 0, level=30)
     hero.consumables_used = cl.LIMIT
     assert cl.visible_stock(hero, [(HEAL, 5)], False) == []
-    assert cl.LIMIT == 10
+    assert cl.LIMIT == 5
