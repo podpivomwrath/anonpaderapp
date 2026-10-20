@@ -410,3 +410,11 @@ async def test_city_summary_goods_and_top(db_session, make_character) -> None:
     assert s["firms"] == 1
     assert s["top"] == [{"name": c.name, "firm": firm.name, "trade_level": 1, "points": 40, "week": 40, "credited": 40}]
     assert (await city_summary(db_session, "ridge", NOW))["top"] == []
+
+
+def test_arrival_shows_net_after_guild_tax() -> None:
+    a = trade_service.Arrival(character_id=1, slot=2, firm_name="Ф", to_city="docks", crates=12,
+                              revenue=2723, net=2043, profit=1019)
+    text = a.text()
+    assert "за 2723 золота, на руки после налога гильдии 2043" in text
+    assert "Прибыль рейса +1019 (выручка минус закупка)" in text

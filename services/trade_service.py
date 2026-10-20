@@ -570,6 +570,8 @@ class Arrival:
     notify: bool = True
     crates: int = 0
     revenue: int = 0
+    #: на руки после налога гильдии (2026-10-20: игрок не понимал, откуда лишнее)
+    net: int = 0
     profit: int = 0
     ambushes: int = 0
     broke: bool = False
@@ -588,7 +590,12 @@ class Arrival:
     def text(self) -> str:
         lines = [f"🐂 Повозка №{self.slot} фирмы «{self.firm_name}» прибыла в {city_title(self.to_city)}."]
         if self.crates:
-            lines.append(f"💰 Продано {self.crates} ящ. за {self.revenue} золота, прибыль {self.profit:+d}.")
+            sold = f"💰 Продано {self.crates} ящ. за {self.revenue} золота"
+            if self.net and self.net != self.revenue:
+                sold += f", на руки после налога гильдии {self.net}"
+            # Закупку списали при отправке, поэтому в кошелёк приходит вся
+            # выручка, а прибыль рейса - выручка минус закупка.
+            lines.append(f"{sold}. Прибыль рейса {self.profit:+d} (выручка минус закупка).")
         if self.order_crates:
             lines.append(f"📜 По срочному заказу ушло {self.order_crates} ящ.")
         if self.event:
@@ -678,6 +685,9 @@ async def arrive(
         revenue -= out.toll
     out.revenue, out.profit = revenue, revenue - cost
     if revenue:
+        from services import guild_service  # избегаем цикла импортов
+
+        out.net = guild_service.after_tax(character, revenue)
         await wallet_service.deposit(db, character.id, "farm", revenue)
     firm.profit_total += max(out.profit, 0)
     # Опыт торговли - только за выгодный рейс (2026-10-18, решение владельца):
