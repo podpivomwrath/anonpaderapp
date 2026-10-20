@@ -57,10 +57,18 @@ def carry_order(subclasses: list[str | None]) -> list[str | None]:
     return order
 
 
-def _hurt(player: CombatantState, amount: int, out: StageTick) -> None:
-    """Сценарный урон мимо резолвера; гибель - в out.deaths."""
+def _hurt(player: CombatantState, amount: int, out: StageTick, through_shields: bool = False) -> None:
+    """Сценарный урон мимо резолвера; гибель - в out.deaths. Щиты его держат,
+    как обычный удар (2026-10-20, жалоба: жернова шли сквозь щиты);
+    through_shields - только гибель всей группы, её щитом не закрыть."""
     if amount <= 0 or not player.alive:
         return
+    if not through_shields:
+        from game.combat.shared_rules import absorb_by_shields
+
+        amount = absorb_by_shields(player, amount, out.lines)
+        if amount <= 0:
+            return
     player.current_hp = max(0, player.current_hp - amount)
     if player.current_hp <= 0:
         out.deaths.append(player.id)
@@ -184,7 +192,7 @@ class CargoStage:
         if self.sacks <= 0:
             out.lines.append("🌾 Последний мешок рвётся о камни. Обоз пуст, жёрнов догоняет вас.")
             for player in _players(session):
-                _hurt(player, player.current_hp, out)
+                _hurt(player, player.current_hp, out, through_shields=True)
             return
         pct = round(mc.HEAVY_WEAKEN * 100)
         out.lines.append(
@@ -291,10 +299,15 @@ class MillerStage:
             out.lines.append("🍞 Каравай крошится в муку - никто не взял.")
 
         if self.ticks % mc.GRIND_EVERY == 0:
-            self._grind(session, out)
+            self._grind(session, result, out)
         elif self.ticks % mc.GRIND_EVERY == mc.GRIND_EVERY - 1:
             out.lines.append("⚠️ Жернова поворачиваются к тому, кто бьёт яростнее всех.")
-            self._hint("grind", f"Помол бьёт того, кто за {mc.GRIND_EVERY} хода нанёс Мельнику больше всех урона.", out)
+            self._hint(
+                "grind",
+                f"Помол бьёт того, кто за {mc.GRIND_EVERY} хода нанёс Мельнику больше всех урона. "
+                "«🛡️ Защититься» в ход помола - урон вдвое меньше, и следующий помол не станет сильнее.",
+                out,
+            )
 
         if self.ticks % mc.FREEZE_EVERY == 0:
             self._mark_hold(session, rng, out)
@@ -346,7 +359,7 @@ class MillerStage:
             if h.target_id == self.boss_id and not h.missed and h.amount > 0 and h.source_side == 0:
                 self.window_damage[h.source_id] = self.window_damage.get(h.source_id, 0) + h.amount
 
-    def _grind(self, session, out: StageTick) -> None:
+    def _grind(self, session, result: TickResult, out: StageTick) -> None:
         window, self.window_damage = self.window_damage, {}
         alive = {p.id: p for p in _players(session)}
         candidates = [(dmg, cid) for cid, dmg in window.items() if cid in alive and dmg > 0]
@@ -355,10 +368,19 @@ class MillerStage:
             return
         _, cid = max(candidates)
         victim = alive[cid]
-        times = self.ground.get(cid, 0)
-        self.ground[cid] = times + 1
+        # Стаки (2026-10-20, жалоба: «стакают урон, не обойти»): не больше
+        # GRIND_MAX_STACKS; помол ушёл в другого - у прежних стаки сброшены.
+        self.ground = {cid: self.ground.get(cid, 0)}
+        times = self.ground[cid]
         amount = round(victim.max_hp * mc.GRIND_BASE_PCT * (1 + mc.GRIND_GROWTH * times))
-        out.lines.append(f"⚙️ Помол: {victim.name} - {amount} урона" + (f" (уже {times + 1}-й раз)" if times else ""))
+        action = result.actions.get(cid)
+        if action is not None and action.type == ActionType.DEFEND:
+            # Встретил помол щитом: вдвое слабее, и стак не растёт.
+            amount = round(amount * mc.GRIND_DEFEND_MULT)
+            out.lines.append(f"⚙️ Помол: {victim.name} закрывается - {amount} урона")
+        else:
+            self.ground[cid] = min(times + 1, mc.GRIND_MAX_STACKS)
+            out.lines.append(f"⚙️ Помол: {victim.name} - {amount} урона" + (f" (уже {times + 1}-й раз)" if times else ""))
         _hurt(victim, amount, out)
 
     # --- Цепь ---

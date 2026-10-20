@@ -193,17 +193,49 @@ def test_hold_spares_the_still_and_crushes_the_restless() -> None:
     assert b.id in out.frozen
 
 
-def test_grind_hits_the_top_damage_dealer_harder_each_time() -> None:
+def _grind_once(stage, state, who, action=None) -> int:
+    """Один помол по who; вернёт снятое здоровье."""
+    who.current_hp = who.max_hp
+    stage.window_damage = {who.id: 500}
+    actions = {who.id: DeclaredAction(type=action)} if action else {}
+    stage._grind(state, TickResult(actions=actions), StageTick())
+    return who.max_hp - who.current_hp
+
+
+def test_grind_stacks_are_capped() -> None:
+    """2026-10-20: стаков не больше GRIND_MAX_STACKS - дальше не растёт."""
     stage, state, (a, b) = _miller()
     a.max_hp = a.current_hp = 10_000
-    stage.window_damage = {a.id: 500, b.id: 100}
-    out = StageTick()
-    stage._grind(state, out)
-    first = 10_000 - a.current_hp
-    a.current_hp = a.max_hp
+    hits = [_grind_once(stage, state, a) for _ in range(5)]
+    assert hits[1] > hits[0] and hits[2] > hits[1]
+    assert hits[2] == hits[3] == hits[4]
+    assert hits[4] == round(10_000 * mc.GRIND_BASE_PCT * (1 + mc.GRIND_GROWTH * mc.GRIND_MAX_STACKS))
+
+
+def test_grind_on_someone_else_resets_stacks() -> None:
+    stage, state, (a, b) = _miller()
+    a.max_hp = a.current_hp = b.max_hp = b.current_hp = 10_000
+    first = _grind_once(stage, state, a)
+    _grind_once(stage, state, a)
+    _grind_once(stage, state, b)
+    assert _grind_once(stage, state, a) == first
+
+
+def test_defend_halves_the_grind_and_stops_the_stack() -> None:
+    stage, state, (a, b) = _miller()
+    a.max_hp = a.current_hp = 10_000
+    plain = _grind_once(stage, state, a, ActionType.DEFEND)
+    assert plain == round(10_000 * mc.GRIND_BASE_PCT * mc.GRIND_DEFEND_MULT)
+    assert _grind_once(stage, state, a, ActionType.DEFEND) == plain  # стак не вырос
+
+
+def test_millstones_respect_shields() -> None:
+    stage, state, (a, b) = _miller()
+    a.max_hp = a.current_hp = 10_000
+    a.apply_effect(EffectKind.SHIELD_POOL, 1_000, 3, a.id)
     stage.window_damage = {a.id: 500}
-    stage._grind(state, out)
-    assert 10_000 - a.current_hp > first
+    stage._grind(state, TickResult(), StageTick())
+    assert a.current_hp == 10_000 - (round(10_000 * mc.GRIND_BASE_PCT) - 1_000)
 
 
 def _hit_on(target_id: int, amount: int):
