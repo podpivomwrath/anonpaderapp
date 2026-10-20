@@ -713,7 +713,52 @@ def describe(buff: BuffDef) -> str:
     if not buff.implemented:
         return ""
     generator = _GENERATORS.get(buff.id)
+    if generator is None and (buff.subclass or "").endswith("_path"):
+        return _describe_path(buff)
     return generator(buff) if generator is not None else ""
+
+
+def _describe_path(buff: BuffDef) -> str:
+    """Баффы пути без подкласса (2026-10-20): описание по ключам модификаторов,
+    числа навыков - из content/skills/base_skills.json."""
+    from game.combat.base_skills import BASE_SKILL_DEFS
+
+    mods = buff.stat_modifiers
+    parts: list[str] = []
+    for key, value in mods.items():
+        kind, _, skill_id = key.partition(":")
+        skill = BASE_SKILL_DEFS.get(skill_id)
+        if skill is not None:
+            name = f"«{skill.name}»"
+            if kind == "skill_bonus":
+                parts.append(f"{name} бьёт сильнее: {_pct(skill.multiplier + value)} урона атаки вместо {_pct(skill.multiplier)}.")
+            elif kind == "skill_cd":
+                parts.append(f"Навык {name} перезаряжается {_turns(skill.cd - round(value))} вместо {skill.cd}.")
+            elif kind == "skill_duration":
+                parts.append(f"{name} держится {_turns(skill.effect_duration + round(value))} вместо {skill.effect_duration}.")
+            elif kind == "skill_value":
+                what = {"self_damage_buff": "к урону", "self_dodge_buff": "к уклонению",
+                        "target_vuln": "уязвимости цели"}.get(skill.effect or "", "")
+                parts.append(f"{name} даёт {_pct(skill.effect_value + value)} {what} вместо {_pct(skill.effect_value)}.")
+            continue
+        text = {
+            "incoming_damage_reduction": f"Весь входящий урон меньше на {_pct(value)}.",
+            "damage_bonus": f"Весь твой урон больше на {_pct(value)}.",
+            "crit_chance_bonus": f"Шанс крита выше на {_points(value)}.",
+            "dodge_bonus": f"Шанс уклониться выше на {_points(value)}.",
+            "crit_damage_taken_reduction": f"Вражеские криты бьют по тебе на {_pct(value)} слабее.",
+            "solo_damage_bonus": f"Урон больше на {_pct(value)}, когда дерёшься без союзников.",
+            "execute_damage_bonus": f"Урон больше на {_pct(value)} по цели, у которой меньше {_pct(bc.PATH_EXECUTE_HP)} здоровья.",
+            "third_stab_chance": f"«Двойной укол»: шанс {_pct(value)} ударить третий раз.",
+            "no_cooldown_chance": f"Шанс {_pct(value)}, что навык не уйдёт на перезарядку.",
+            "low_hp_damage_reduction": (
+                f"Пока здоровья меньше {_pct(mods.get('low_hp_damage_reduction_threshold', 0.3))}, "
+                f"входящий урон меньше на {_pct(value)}."
+            ),
+        }.get(key)
+        if text:
+            parts.append(text)
+    return " ".join(parts)
 
 
 def category_label(category: str) -> str:

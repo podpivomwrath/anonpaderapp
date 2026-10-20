@@ -190,6 +190,10 @@ def outgoing_multiplier(actor: CombatantState, target: CombatantState) -> float:
     # Клинок дерётся один. Флаг ставит резолвер - здесь нет доступа к сессии.
     if actor.buff_modifiers.get("solo_damage_bonus", 0.0) > 0 and not actor.has_allies:
         mult *= 1.0 + actor.buff_modifiers["solo_damage_bonus"]
+    # Путь разбойника, «Добивание» (2026-10-20): по цели ниже порога здоровья.
+    execute = actor.buff_modifiers.get("execute_damage_bonus", 0.0)
+    if execute > 0 and target.max_hp > 0 and target.current_hp < target.max_hp * bc.PATH_EXECUTE_HP:
+        mult *= 1.0 + execute
     # Провокация (2026-10-18): удар по любому спровоцировавшему Стражу - полный,
     # по остальным - снижение самой сильной провокации, без перемножения.
     # Раньше два Стража прикрывали друг друга, а третьего - на -51..70%.

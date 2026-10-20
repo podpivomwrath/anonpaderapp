@@ -14,6 +14,8 @@ from vkbottle.bot import BotLabeler, Message
 from bot.keyboards.list_keeper import (
     BTN_CHOOSE_PATH,
     BTN_CONFIRM_PATH,
+    BTN_DECLINE,
+    BTN_DECLINE_CONFIRM,
     BTN_KEEPER_LEAVE,
     BTN_LEAVE,
     BTN_OTHER_PATH,
@@ -26,6 +28,7 @@ from bot.keyboards.list_keeper import (
     BTN_REMAKE_SUBCLASS,
     BTN_THINK_MORE,
     base_class_keyboard,
+    decline_confirm_keyboard,
     offer_keyboard,
     path_confirm_keyboard,
     path_view_keyboard,
@@ -79,6 +82,9 @@ STATE_PATH_SELECT = "subclass_path_select"
 #: Повторный выбор пути после смены класса/подкласса (временно бесплатно).
 FREE_REPICK_LINE = "Ты уже платил за путь. После смены класса новый выбирается без платы."
 STATE_PATH_CONFIRM = "subclass_path_confirm"
+# Отказ от подкласса (2026-10-20): подтверждение живёт в памяти, после
+# рестарта игрок вернётся на прежний шаг (предложение или выбор пути).
+STATE_DECLINE_CONFIRM = "subclass_decline_confirm"
 # Переделка персонажа (альфа-тест). В characters.subclass_select_state НЕ
 # сохраняется: сцена короткая, и после рестарта бота безопаснее начать её
 # заново, чем восстановить игрока посреди необратимого действия.
@@ -98,6 +104,7 @@ class SubclassSelectState(BaseStateGroup):
     REMAKE_CLASS = STATE_REMAKE_CLASS
     REMAKE_CONFIRM = STATE_REMAKE_CONFIRM
     PATH_CONFIRM = STATE_PATH_CONFIRM
+    DECLINE_CONFIRM = STATE_DECLINE_CONFIRM
 
 
 RESTORE_STATES = {
@@ -183,6 +190,9 @@ async def open_keeper(message: Message) -> None:
             return
         if character.subclass is not None:
             has_subclass = True
+        elif subclass_service.declined(character):
+            await message.answer(KEEPER["declined_visit"], attachment=KEEPER_ATTACHMENT)
+            return
         elif not subclass_service.can_offer(character):
             await message.answer(KEEPER["too_low_level"])
             return
@@ -193,7 +203,7 @@ async def open_keeper(message: Message) -> None:
             titles = [s.title for s in subclass_service.paths_for(character.base_class)]
             await _dispenser.set(peer_id, SubclassSelectState.PATH_SELECT)
             await message.answer(
-                f"{FREE_REPICK_LINE}\n\n{KEEPER['path_intro']}", keyboard=paths_keyboard(titles),
+                f"{FREE_REPICK_LINE}\n\n{KEEPER['path_intro']}", keyboard=paths_keyboard(titles, decline=True),
                 attachment=KEEPER_ATTACHMENT,
             )
             return
@@ -248,6 +258,64 @@ async def offer_leave(message: Message) -> None:
         "Хорошо. Возвращайся, когда будешь готов.",
         keyboard=tavern_keyboard(character),
     )
+
+
+@labeler.message(state=SubclassSelectState.OFFER, text=[BTN_DECLINE])
+@labeler.message(state=SubclassSelectState.PATH_SELECT, text=[BTN_DECLINE])
+async def decline_ask(message: Message) -> None:
+    async with get_session_factory()() as db:
+        character = await onboarding_svc.get_character(db, message.from_id)
+        if character is None or character.subclass is not None or subclass_service.declined(character):
+            return
+        # После оплаты отказ сжёг бы 20 000: в выборе пути кнопка есть только
+        # у бесплатного повтора после смены класса.
+        if character.subclass_select_state == STATE_PATH_SELECT and not subclass_service.free_repick(character):
+            return
+    await _dispenser.set(message.peer_id, SubclassSelectState.DECLINE_CONFIRM)
+    await message.answer(KEEPER["decline_question"], keyboard=decline_confirm_keyboard())
+
+
+@labeler.message(state=SubclassSelectState.DECLINE_CONFIRM, text=[BTN_DECLINE_CONFIRM])
+async def decline_confirm(message: Message) -> None:
+    async with get_session_factory()() as db:
+        character = await onboarding_svc.get_character(db, message.from_id)
+        if character is None or character.subclass is not None or subclass_service.declined(character):
+            await _dispenser.delete(message.peer_id)
+            return
+        subclass_service.decline(character)
+        await _set_select_state(db, character, None)
+        stats = await db.scalar(
+            select(CharacterStats).where(CharacterStats.character_id == character.id)
+        )
+        # Для сюжета отказ - тот же выбор пути: пауза на 30 уровне снимается.
+        story_reward_text = await story_service.advance_past_subclass_gate(db, character, stats)
+        await screen_service.set_screen(db, character, "tavern")
+        await db.commit()
+    await _dispenser.delete(message.peer_id)
+    text = KEEPER["declined"]
+    if story_reward_text:
+        text += f"\n\n{story_reward_text}"
+    await message.answer(text, keyboard=tavern_keyboard(character))
+    if story_reward_text:
+        await message.answer(f"📜 {mentor_name(character.region)} ждёт тебя в городе.")
+
+
+@labeler.message(state=SubclassSelectState.DECLINE_CONFIRM)
+async def decline_back(message: Message) -> None:
+    """«Подумаю ещё» и всё прочее - назад, на тот шаг, откуда пришли."""
+    async with get_session_factory()() as db:
+        character = await onboarding_svc.get_character(db, message.from_id)
+        if character is None:
+            return
+        on_paths = character.subclass_select_state == STATE_PATH_SELECT
+        titles = [s.title for s in subclass_service.paths_for(character.base_class)]
+        free = subclass_service.free_repick(character)
+    if on_paths:
+        await _dispenser.set(message.peer_id, SubclassSelectState.PATH_SELECT)
+        await message.answer(KEEPER["path_intro"], keyboard=paths_keyboard(titles, decline=free))
+        return
+    await _dispenser.set(message.peer_id, SubclassSelectState.OFFER)
+    await message.answer(KEEPER["offer"].format(nickname=character.name), keyboard=offer_keyboard())
 
 
 @labeler.message(state=SubclassSelectState.OFFER)

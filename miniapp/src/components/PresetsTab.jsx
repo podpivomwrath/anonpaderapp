@@ -37,7 +37,7 @@ export default function PresetsTab({ character }) {
 
   useEffect(load, []);
 
-  if (!character.subclass) {
+  if (!character.subclass && !character.buff_pool) {
     return (
       <Placeholder icon={<div style={{ fontSize: 48 }}>⚔️</div>}>
         Твоя Метка ещё не обрела форму. Возвращайся, когда кровь потребует имени.

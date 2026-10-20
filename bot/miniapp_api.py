@@ -16,7 +16,7 @@ from bot.app_keys import SESSION_FACTORY_KEY, SETTINGS_KEY
 from bot import dailies_texts
 from bot.miniapp_auth import VK_USER_ID_KEY
 from game.economy import crafting
-from services import naming
+from services import naming, subclass_service
 from bot.onboarding_texts import REGION_TITLES
 from config import Settings
 from game.content_loader import load_content
@@ -88,6 +88,9 @@ def _character_payload(
         # Название резолвит СЕРВЕР (патч 73): раньше клиент показывал
         # сырой id и в шапке висело «dark_mystic».
         "subclass_title": naming.subclass_title(character.subclass),
+        # Пул пресетов: подкласс или базовый класс после отказа (2026-10-20).
+        "buff_pool": subclass_service.buff_pool(character),
+        "subclass_declined": subclass_service.declined(character),
         # Венец топ-1 (патч 91). Держать можно сразу несколько досок, но
         # рамка в шапке одна: берём первую в порядке BOARDS, иначе она
         # менялась бы от показа к показу вслед за порядком выдачи из базы.
@@ -913,7 +916,8 @@ async def handle_get_presets(request: web.Request) -> web.Response:
         character = await _load_character(session, vk_user_id)
         if character is None:
             return web.json_response({"error": "character_not_found"}, status=404)
-        if character.subclass is None:
+        pool = subclass_service.buff_pool(character)
+        if pool is None:
             return web.json_response(
                 {"subclass": None, "preset_slots": character.preset_slots, "next_slot_cost": None,
                  "presets": [], "buffs": [], "rule_hint": ""}
@@ -922,7 +926,7 @@ async def handle_get_presets(request: web.Request) -> web.Response:
         presets = await preset_service.presets_of(session, character)
         catalog = load_content().buffs
         unlocked = await trial_service.unlocked_buff_ids(session, character.id)
-        subclass_buffs = [b for b in catalog.values() if b.subclass == character.subclass]
+        subclass_buffs = [b for b in catalog.values() if b.subclass == pool]
         try:
             next_cost = preset_service.next_slot_cost(character.preset_slots)
         except PresetValidationError:
@@ -930,7 +934,7 @@ async def handle_get_presets(request: web.Request) -> web.Response:
 
         return web.json_response(
             {
-                "subclass": character.subclass,
+                "subclass": pool,
                 "preset_slots": character.preset_slots,
                 "next_slot_cost": next_cost,
                 "presets": [
@@ -948,7 +952,7 @@ async def handle_get_presets(request: web.Request) -> web.Response:
                         "category_label": buff_descriptions.category_label(b.category),
                         # без описания игрок собирает пресет вслепую, по одним названиям
                         "description": buff_descriptions.describe(b),
-                        "unlocked": b.id in unlocked,
+                        "unlocked": b.id in unlocked or subclass_service.is_path_pool(pool),
                     }
                     for b in subclass_buffs
                 ],
@@ -981,7 +985,7 @@ async def handle_post_presets(request: web.Request) -> web.Response:
         character = await _load_character(session, vk_user_id)
         if character is None:
             return web.json_response({"error": "character_not_found"}, status=404)
-        if character.subclass is None:
+        if subclass_service.buff_pool(character) is None:
             return web.json_response({"error": "no_subclass"}, status=400)
 
         catalog = load_content().buffs

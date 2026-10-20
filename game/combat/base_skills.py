@@ -11,7 +11,7 @@
 from game.combat import balance_config as bc
 from game.combat import combat_flavor, control
 from game.combat.session import CombatMode, EffectKind
-from game.combat.skills import SkillContext, compute_hit, offensive_skill
+from game.combat.skills import SkillContext, compute_hit, offensive_skill, set_cooldown
 from game.content_loader import BaseSkillDef, load_base_skills
 
 # {skill_id: BaseSkillDef} и {base_class: [defs]} — для клавиатур/валидации
@@ -21,27 +21,42 @@ BASE_SKILL_DEFS: dict[str, BaseSkillDef] = {
 }
 
 
+def path_mod(actor, kind: str, skill_id: str) -> float:
+    """Микробафф пути базового класса (отказ от подкласса, 2026-10-20) на
+    конкретный навык: ключ "<kind>:<id навыка>" в stat_modifiers пресета.
+    kind: skill_bonus (+к множителю урона), skill_cd (-ходов перезарядки),
+    skill_duration (+ходов эффекта), skill_value (+к силе эффекта)."""
+    return actor.buff_modifiers.get(f"{kind}:{skill_id}", 0.0)
+
+
 def _make_handler(skill: BaseSkillDef):
     def handler(ctx: SkillContext) -> None:
         actor = ctx.actor
-        actor.cooldowns[skill.id] = skill.cd  # тикнется в резолвере/дуэли
+        cd = max(1, skill.cd - round(path_mod(actor, "skill_cd", skill.id)))
+        set_cooldown(actor, skill.id, cd, ctx.rng)  # тикнется в резолвере/дуэли
         target = ctx.resolve_target()
+        multiplier = skill.multiplier + path_mod(actor, "skill_bonus", skill.id)
+        duration = skill.effect_duration + round(path_mod(actor, "skill_duration", skill.id))
+        value = skill.effect_value + path_mod(actor, "skill_value", skill.id)
 
         # --- Урон ---
         if skill.effect == "double_hit":
-            # два отдельных удара, крит считается для каждого независимо
+            # два отдельных удара, крит считается для каждого независимо;
+            # «Третий укол» пути разбойника - шанс на третий
             if target is not None:
-                ctx.hits.append(
-                    compute_hit(actor, target, ctx.rng, skill.name, skill.multiplier, is_ability=True)
-                )
-                ctx.hits.append(
-                    compute_hit(actor, target, ctx.rng, skill.name, skill.multiplier, is_ability=True)
-                )
-        elif skill.multiplier > 0 and target is not None:
+                strikes = 2
+                third = actor.buff_modifiers.get("third_stab_chance", 0.0)
+                if third > 0 and ctx.rng.random() < third:
+                    strikes = 3
+                for _ in range(strikes):
+                    ctx.hits.append(
+                        compute_hit(actor, target, ctx.rng, skill.name, multiplier, is_ability=True)
+                    )
+        elif multiplier > 0 and target is not None:
             force_crit = skill.effect == "guaranteed_crit"
             ctx.hits.append(
                 compute_hit(
-                    actor, target, ctx.rng, skill.name, skill.multiplier, force_crit, is_ability=True,
+                    actor, target, ctx.rng, skill.name, multiplier, force_crit, is_ability=True,
                 )
             )
 
@@ -72,24 +87,14 @@ def _make_handler(skill: BaseSkillDef):
                             combat_flavor.control_immune_line(target.name, bc.CC_IMMUNITY_DURATION)
                         )
         elif skill.effect == "self_damage_buff":
-            actor.apply_effect(
-                EffectKind.DAMAGE_BUFF, skill.effect_value, skill.effect_duration, actor.id
-            )
-            ctx.lines.append(combat_flavor.self_buff_line(
-                actor.name, skill.name, "урон", skill.effect_value, skill.effect_duration,
-            ))
+            actor.apply_effect(EffectKind.DAMAGE_BUFF, value, duration, actor.id)
+            ctx.lines.append(combat_flavor.self_buff_line(actor.name, skill.name, "урон", value, duration))
         elif skill.effect == "self_dodge_buff":
-            actor.apply_effect(
-                EffectKind.DODGE, skill.effect_value, skill.effect_duration, actor.id
-            )
-            ctx.lines.append(combat_flavor.self_buff_line(
-                actor.name, skill.name, "уклонение", skill.effect_value, skill.effect_duration,
-            ))
+            actor.apply_effect(EffectKind.DODGE, value, duration, actor.id)
+            ctx.lines.append(combat_flavor.self_buff_line(actor.name, skill.name, "уклонение", value, duration))
         elif skill.effect == "target_vuln":
             if target is not None:
-                target.apply_effect(
-                    EffectKind.VULNERABILITY, skill.effect_value, skill.effect_duration, actor.id
-                )
+                target.apply_effect(EffectKind.VULNERABILITY, value, duration, actor.id)
 
     return handler
 

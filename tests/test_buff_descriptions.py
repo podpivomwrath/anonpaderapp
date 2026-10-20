@@ -73,6 +73,6 @@ def test_all_buff_categories_are_mapped() -> None:
     """Ни один bufф.category не должен молча остаться немаппленным —
     иначе фронт покажет сырое английское значение вместо русской метки."""
     buffs = load_content().buffs
-    assert len(buffs) == 78
+    assert len(buffs) == 105  # 78 подклассовых + 27 пути базовых классов (2026-10-20)
     for buff_id, buff in buffs.items():
         assert buff.category in buff_descriptions.CATEGORY_LABELS, buff_id

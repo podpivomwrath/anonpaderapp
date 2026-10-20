@@ -374,6 +374,7 @@ function GemPacks() {
     <Group header={<Header>💎 Самоцветы</Header>}>
       <Div>
         <p className="craft-hint">1 самоцвет = 1 ₽. Оплата через ЮKassa, самоцветы приходят сразу после оплаты.</p>
+        <p className="shop-notice">На релизе игры все самоцветы, купленные за рубли, будут начислены на твой аккаунт.</p>
         {returned && <p className="shop-notice">Оплата обрабатывается - как только ЮKassa её подтвердит, бот напишет в сообщения.</p>}
         {!data.enabled && <p className="craft-hint">Покупка за рубли скоро откроется.</p>}
         {error && <p style={{ color: 'var(--vkui--color_text_negative)' }}>{error}</p>}

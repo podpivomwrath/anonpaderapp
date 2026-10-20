@@ -28,6 +28,9 @@ PRIMARY_STAT_BY_CLASS = {"warrior": "str", "rogue": "agi", "mage": "int"}
 # не трогаем. Проверка - tools/sim_base_classes.py.
 BASE_CLASS_HP_MULT = {"warrior": 1.10}        # +10% к итоговому здоровью
 BASE_CLASS_CRIT_BONUS = {"rogue": 0.10}       # +10 п.п. к шансу крита
+# Путь без подкласса (2026-10-20): пассивки выше остаются и после 30 уровня,
+# пресеты - из баффов "<класс>_path" в content/buffs.json.
+PATH_EXECUTE_HP = 0.30                         # «Добивание»: цель ниже 30% здоровья
 
 # --- Опыт и уровни (progression-patch-4) ---
 # character.experience = опыт, накопленный В ТЕКУЩЕМ уровне (сбрасывается при левелапе).

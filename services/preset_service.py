@@ -13,7 +13,7 @@ from game.combat import balance_config as bc
 from game.content_loader import BuffDef
 from game.economy import premium_config as pc
 from models import Character, CharacterBuffPreset
-from services import premium_service, trial_service
+from services import premium_service, subclass_service, trial_service
 from services.wallet_service import charge
 
 
@@ -54,6 +54,7 @@ def validate_preset(
             )
         if (
             buff.subclass is not None
+            and not subclass_service.is_path_pool(buff.subclass)
             and unlocked_buff_ids is not None
             and buff_id not in unlocked_buff_ids
         ):
@@ -88,7 +89,7 @@ async def presets_of(db: AsyncSession, character: Character) -> list[CharacterBu
             .order_by(CharacterBuffPreset.id)
         )
     ).all()
-    return [p for p in rows if belongs(p, character.subclass)]
+    return [p for p in rows if belongs(p, subclass_service.buff_pool(character))]
 
 
 def effective_preset_slots(character: Character) -> int:
@@ -129,7 +130,7 @@ async def save_preset(
     бесплатно (2026-10-16).
     Новый пресет нельзя создать сверх купленных слотов (патч 14, ч.3)."""
     unlocked = await trial_service.unlocked_buff_ids(db, character.id)
-    validate_preset(buff_ids, character.subclass, catalog, unlocked)
+    validate_preset(buff_ids, subclass_service.buff_pool(character), catalog, unlocked)
 
     if preset_id is None:
         # Слоты - на подкласс: пресеты прежних подклассов места не занимают.
@@ -146,7 +147,7 @@ async def save_preset(
 
     if preset_id is not None:
         preset = await db.get(CharacterBuffPreset, preset_id)
-        if preset is None or preset.character_id != character.id or not belongs(preset, character.subclass):
+        if preset is None or preset.character_id != character.id or not belongs(preset, subclass_service.buff_pool(character)):
             raise PresetValidationError("Пресет не найден")
         preset.name = name
         preset.buff_ids = buff_ids
@@ -172,7 +173,7 @@ async def get_active_preset(db: AsyncSession, character_id: int) -> CharacterBuf
             )
         )
     ).all()
-    return next((p for p in rows if belongs(p, character.subclass)), None)
+    return next((p for p in rows if belongs(p, subclass_service.buff_pool(character))), None)
 
 
 def preset_rule_hint(catalog_labels: dict[str, str] | None = None) -> str:
@@ -229,7 +230,7 @@ def resolve_buff_modifiers(buff_ids: list[str], catalog: dict[str, BuffDef]) -> 
 async def resolve_active_modifiers(db: AsyncSession, character: Character) -> dict[str, float]:
     """Шорткат: активный пресет персонажа → смерженные stat_modifiers
     (патч 14, ч.3). Пусто, если подкласс не выбран или пресет не активирован."""
-    if character.subclass is None:
+    if subclass_service.buff_pool(character) is None:
         return {}
     active = await get_active_preset(db, character.id)
     if active is None:

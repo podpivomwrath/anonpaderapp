@@ -24,7 +24,7 @@ from game.economy import story_config as sc
 from game.world import grid
 from game.world import world_config as wc
 from models import Character, CharacterStats, CharacterStoryProgress
-from services import experience_service, group_service, quest_service, wallet_service
+from services import experience_service, group_service, quest_service, subclass_service, wallet_service
 
 _lines: dict[str, StoryLineDef] = {}
 
@@ -280,7 +280,7 @@ async def visit_mentor(
         return None
 
     if quest.kind == "subclass_gate":
-        if character.subclass is None:
+        if not subclass_service.path_chosen(character):
             row.quest_seen = True
             await db.flush()
             return StoryTurnResult(text=format_text(quest.assign_text, character))
@@ -475,7 +475,7 @@ async def quest_reminder_text(db: AsyncSession, character: Character, mentor_nam
         return _format_assign(quest, character)
 
     if quest.kind == "subclass_gate":
-        if character.subclass is None:
+        if not subclass_service.path_chosen(character):
             return format_text(quest.assign_text, character)
         return f"У тебя нет активного задания. {mentor_name} ждёт тебя в городе."
 

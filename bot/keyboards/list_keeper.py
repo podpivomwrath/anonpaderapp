@@ -10,6 +10,9 @@ BTN_CHOOSE_PATH = "Выбрать этот путь"
 BTN_OTHER_PATH = "Другой путь"
 BTN_CONFIRM_PATH = "Да, это мой путь"
 BTN_THINK_MORE = "Подумаю ещё"
+# Отказ от подкласса (2026-10-20): остаться базовым классом навсегда.
+BTN_DECLINE = "Отказаться от пути"
+BTN_DECLINE_CONFIRM = "Да, без пути"
 
 # Переделка персонажа (альфа-тест): Хранитель переписывает запись в Списке.
 BTN_REMAKE = "Переделать себя"
@@ -25,15 +28,22 @@ def offer_keyboard() -> str:
     kb = Keyboard(one_time=True)
     kb.add(Text(BTN_PAY), color=KeyboardButtonColor.POSITIVE)
     kb.row()
+    kb.add(Text(BTN_DECLINE), color=KeyboardButtonColor.NEGATIVE)
+    kb.row()
     kb.add(Text(BTN_LEAVE), color=KeyboardButtonColor.SECONDARY)
     add_miniapp_button(kb)
     return kb.get_json()
 
 
-def paths_keyboard(titles: list[str]) -> str:
+def paths_keyboard(titles: list[str], decline: bool = False) -> str:
+    """decline - кнопка отказа от пути: только пока за путь не заплачено
+    (бесплатный повтор после смены класса). После оплаты отказ сжёг бы золото."""
     kb = Keyboard(one_time=True)
     for title in titles:
         kb.add(Text(title), color=KeyboardButtonColor.PRIMARY)
+    if decline:
+        kb.row()
+        kb.add(Text(BTN_DECLINE), color=KeyboardButtonColor.NEGATIVE)
     add_miniapp_button(kb)
     return kb.get_json()
 
@@ -97,5 +107,14 @@ def trials_keyboard() -> str:
     kb.add(Text(BTN_REMAKE), color=KeyboardButtonColor.SECONDARY)
     kb.row()
     kb.add(Text(BTN_KEEPER_LEAVE), color=KeyboardButtonColor.SECONDARY)
+    add_miniapp_button(kb)
+    return kb.get_json()
+
+
+def decline_confirm_keyboard() -> str:
+    kb = Keyboard(one_time=True)
+    kb.add(Text(BTN_DECLINE_CONFIRM), color=KeyboardButtonColor.NEGATIVE)
+    kb.row()
+    kb.add(Text(BTN_THINK_MORE), color=KeyboardButtonColor.SECONDARY)
     add_miniapp_button(kb)
     return kb.get_json()

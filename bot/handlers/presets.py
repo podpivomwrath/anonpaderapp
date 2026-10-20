@@ -11,7 +11,7 @@ from bot.keyboards.presets import BTN_PRESETS, no_keyboard, presets_list_keyboar
 from game.content_loader import load_content
 from models import CharacterBuffPreset
 from services import onboarding_service as onboarding_svc
-from services import preset_service
+from services import preset_service, subclass_service
 from services.preset_service import PresetValidationError
 from services.db import get_session_factory
 
@@ -59,7 +59,7 @@ async def open_presets(message: Message) -> None:
         character = await onboarding_svc.get_character(db, message.from_id)
         if character is None or character.creation_state is not None:
             return
-        if character.subclass is None:
+        if subclass_service.buff_pool(character) is None:
             await message.answer(NO_SUBCLASS_TEXT)
             return
         presets = await preset_service.presets_of(db, character)
@@ -110,7 +110,7 @@ async def switch_preset_command(message: Message, n: int) -> None:
         character = await onboarding_svc.get_character(db, message.from_id)
         if character is None or character.creation_state is not None:
             return
-        if character.subclass is None:
+        if subclass_service.buff_pool(character) is None:
             await message.answer(NO_SUBCLASS_TEXT)
             return
 
