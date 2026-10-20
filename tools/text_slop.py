@@ -55,6 +55,9 @@ PUNCH = re.compile(r"(?:^|[.!?]\s+)((?:[А-ЯЁ][^\s.!?]*)(?:\s+[^\s.!?]+){0,2})
 
 
 def _literals(path: Path) -> list[tuple[int, str]]:
+    if path.suffix in (".txt", ".md"):
+        # Патчноуты и рассылки (tools/broadcast.py): весь файл - один текст.
+        return [(1, path.read_text(encoding="utf-8"))]
     if path.suffix == ".json":
         out: list[tuple[int, str]] = []
 
@@ -96,10 +99,37 @@ def _literals(path: Path) -> list[tuple[int, str]]:
 
 def game_files(paths: list[str] | None = None) -> list[Path]:
     if paths:
+        # Абсолютный путь (файл вне репозитория) Path склеит как есть.
         return [ROOT / p for p in paths]
     files = sorted((ROOT / "bot").rglob("*.py")) + sorted((ROOT / "game").rglob("*.py"))
     files += sorted((ROOT / "content").rglob("*.json"))
+    files += sorted((ROOT / "patchnotes").glob("*.txt"))
     return [f for f in files if "__pycache__" not in f.parts]
+
+
+def _shown(path: Path) -> str:
+    try:
+        return path.relative_to(ROOT).as_posix()
+    except ValueError:
+        return path.as_posix()
+
+
+def check_text(text: str, hard_only: bool = False, where: str = "текст", lineno: int = 1):
+    """[(rule, где, строка, фрагмент)] для одного текста - то же, что scan."""
+    hits = []
+    if not CYR.search(text):
+        return hits
+    for rule in RULES:
+        if hard_only and not rule.hard:
+            continue
+        for m in rule.pattern.finditer(text):
+            start = max(0, m.start() - 30)
+            frag = text[start:m.end() + 30].replace("\n", " ")
+            hits.append((rule, where, lineno, frag))
+    if not hard_only and len(text) > 120:
+        for m in PUNCH.finditer(text):
+            hits.append((_PUNCH_RULE, where, lineno, m.group(1)))
+    return hits
 
 
 def scan(paths: list[str] | None = None, hard_only: bool = False):
@@ -107,18 +137,7 @@ def scan(paths: list[str] | None = None, hard_only: bool = False):
     hits = []
     for path in game_files(paths):
         for lineno, text in _literals(path):
-            if not CYR.search(text):
-                continue
-            for rule in RULES:
-                if hard_only and not rule.hard:
-                    continue
-                for m in rule.pattern.finditer(text):
-                    start = max(0, m.start() - 30)
-                    frag = text[start:m.end() + 30].replace("\n", " ")
-                    hits.append((rule, path.relative_to(ROOT).as_posix(), lineno, frag))
-            if not hard_only and len(text) > 120:
-                for m in PUNCH.finditer(text):
-                    hits.append((_PUNCH_RULE, path.relative_to(ROOT).as_posix(), lineno, m.group(1)))
+            hits += check_text(text, hard_only, _shown(path), lineno)
     return hits
 
 
