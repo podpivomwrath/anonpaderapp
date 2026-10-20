@@ -892,7 +892,7 @@ async def on_group_battle_finished(session_id: int, result: TickResult) -> None:
                 )
         elif cid in dead_ids and cid in defeats:
             defeat, respawn_at = defeats[cid]
-            await respawn_handlers.register_death(p.peer_id, respawn_at, defeat.xp_lost, defeat.relics_lost)
+            await respawn_handlers.register_death(p.peer_id, respawn_at, defeat.xp_lost, defeat.relics_lost, defeat.fish_lost)
             if dealer_lines.get(cid):
                 await _bot_api.messages.send(peer_id=p.peer_id, message="\n".join(dealer_lines[cid]), random_id=0)
 

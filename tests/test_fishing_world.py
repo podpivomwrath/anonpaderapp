@@ -286,3 +286,33 @@ async def test_lake_screen_off_the_lake_gives_no_lake_keyboard(db_session, make_
     assert await world_handlers._screen_keyboard(db_session, c) is None
     c.pos_x, c.pos_y = LAKE_XY
     assert await world_handlers._screen_keyboard(db_session, c) == fkb.lake_keyboard()
+
+
+def test_buyer_markup_capped_by_fish_home_ring() -> None:
+    """2026-10-20: рыба с 1 кольца у рыбака в центре берёт наценку 2 кольца,
+    а не ×3-4; со своего и соседнего кольца - как раньше."""
+    lo5, hi5 = fc.BUYER_EVENT_MARKUP[5]
+    lo2, hi2 = fc.BUYER_EVENT_MARKUP[2]
+    top = hi5
+    assert game_fishing_buyer(top, 5, 1) == hi2
+    assert game_fishing_buyer(lo5, 5, 1) == lo2
+    assert game_fishing_buyer(top, 5, 4) == top  # с соседнего кольца - без среза
+    assert game_fishing_buyer(top, 5, 5) == top
+    mid = (lo5 + hi5) / 2
+    assert abs(game_fishing_buyer(mid, 5, 1) - (lo2 + hi2) / 2) < 1e-9
+
+
+def game_fishing_buyer(m, cell_tier, fish_tier):
+    return fishing.buyer_fish_multiplier(m, cell_tier, fish_tier)
+
+
+async def test_pve_death_drops_the_bag(db_session, make_character) -> None:
+    from models import CharacterFish
+    from services import encounter_service, fishing_service
+
+    c = await make_character(level=30, experience=500, region="ridge")
+    db_session.add(CharacterFish(character_id=c.id, fish_id="ashen_roach", grade="common", total_grams=4500))
+    await db_session.flush()
+    outcome = await encounter_service.resolve_defeat(db_session, c)
+    assert outcome.fish_lost == 4500
+    assert await fishing_service.bag_total_grams(db_session, c.id) == 0

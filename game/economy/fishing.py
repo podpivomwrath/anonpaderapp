@@ -222,6 +222,19 @@ def line_break_chance(lake_tier: int, fishing_level: int, fraction: float) -> fl
 # --- Цена --------------------------------------------------------------------
 
 
+def buyer_fish_multiplier(cell_multiplier: float, cell_tier: int, fish_tier: int) -> float:
+    """Наценка рыбака на одну рыбу. Бросок наценки один на сделку (он и
+    показан игроку как cell_multiplier), но рыба с мелкого кольца берёт его
+    в диапазоне своего тира + BUYER_TIER_REACH, а не кольца клетки."""
+    cap = fish_tier + fc.BUYER_TIER_REACH
+    if cell_tier <= cap or cap not in fc.BUYER_EVENT_MARKUP:
+        return cell_multiplier
+    lo, hi = fc.BUYER_EVENT_MARKUP[cell_tier]
+    roll = min(max((cell_multiplier - lo) / (hi - lo), 0.0), 1.0) if hi > lo else 0.0
+    cap_lo, cap_hi = fc.BUYER_EVENT_MARKUP[cap]
+    return cap_lo + roll * (cap_hi - cap_lo)
+
+
 def price_of(fish_id: str, grams: int, grade_id: str) -> int:
     """Каталожная цена (то, от чего считаются и скидка Иргала, и наценка
     ивента). Линейна по весу — именно поэтому стак «вид + градация» можно

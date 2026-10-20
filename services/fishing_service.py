@@ -307,18 +307,27 @@ async def get_bag(db: AsyncSession, character_id: int) -> list[tuple[FishDef, st
     return result
 
 
-async def bag_value(db: AsyncSession, character_id: int, multiplier: float = 1.0) -> int:
+def _stack_multiplier(definition, multiplier: float, buyer_tier: int | None) -> float:
+    """buyer_tier - кольцо клетки рыбака: наценка с поправкой на тир рыбы."""
+    if buyer_tier is None:
+        return multiplier
+    return fishing.buyer_fish_multiplier(multiplier, buyer_tier, definition.tier)
+
+
+async def bag_value(
+    db: AsyncSession, character_id: int, multiplier: float = 1.0, buyer_tier: int | None = None,
+) -> int:
     """Сколько дадут за весь садок при этом множителе. Цена считается ОТ
     СТАКА: она линейна по весу, поэтому это ровно сумма цен всех рыб, но без
     поштучного округления, которое у мелочи упиралось в минимум 1 золотой."""
     return sum(
-        round(fishing.price_of(definition.id, grams, grade_id) * multiplier)
+        round(fishing.price_of(definition.id, grams, grade_id) * _stack_multiplier(definition, multiplier, buyer_tier))
         for definition, grade_id, grams in await get_bag(db, character_id)
     )
 
 
 async def sell_bag(
-    db: AsyncSession, character: Character, multiplier: float = 1.0
+    db: AsyncSession, character: Character, multiplier: float = 1.0, buyer_tier: int | None = None,
 ) -> tuple[int, int]:
     """Продаёт садок целиком. Возвращает (золото, суммарный вес в граммах).
     Рекорды не трогаются — проданная рыба остаётся в рекордах навсегда.
@@ -342,9 +351,9 @@ async def sell_bag(
     bag = await get_bag(db, character.id)
     if not bag:
         return 0, 0
-    multiplier *= crown_service.fish_sale_multiplier(character)
+    crown = crown_service.fish_sale_multiplier(character)
     gold = sum(
-        round(fishing.price_of(definition.id, grams, grade_id) * multiplier)
+        round(fishing.price_of(definition.id, grams, grade_id) * _stack_multiplier(definition, multiplier, buyer_tier) * crown)
         for definition, grade_id, grams in bag
     )
     grams_total = sum(grams for _d, _g, grams in bag)
@@ -357,8 +366,8 @@ async def sell_bag(
 
 
 async def drop_bag(db: AsyncSession, character_id: int) -> int:
-    """Весь садок пропадает (поражение в открытом PvP). Возвращает потерянный
-    вес для сообщения.
+    """Весь садок пропадает (поражение в открытом PvP, а с 2026-10-20 - и
+    смерть от моба). Возвращает потерянный вес для сообщения.
 
     Рыба именно ПРОПАДАЕТ, а не переходит победителю — в отличие от трофеев
     (trophy_service.transfer_all). Решение продуктовое: победитель не должен

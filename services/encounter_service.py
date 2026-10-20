@@ -164,6 +164,8 @@ class DefeatOutcome:
     respawn_minutes: float
     xp_lost: int
     relics_lost: dict[str, int] = field(default_factory=dict)
+    #: Садок пропал целиком (2026-10-20), граммы - для сообщения.
+    fish_lost: int = 0
 
 
 async def resolve_defeat(db: AsyncSession, character: Character) -> DefeatOutcome:
@@ -173,6 +175,9 @@ async def resolve_defeat(db: AsyncSession, character: Character) -> DefeatOutcom
     minutes = death_service._respawn_minutes(character)
     xp_lost = death_service.apply_death(character)
     relics_lost = await trophy_service.lose_all(db, character.id)
+    from services import fishing_service
+
+    fish_lost = await fishing_service.drop_bag(db, character.id)
     character.travel_target_x = None
     character.travel_target_y = None
     character.travel_arrives_at = None
@@ -180,4 +185,4 @@ async def resolve_defeat(db: AsyncSession, character: Character) -> DefeatOutcom
         await trial_service.record_defeat(db, character)
     await daily_service.record_defeat(db, character)
     await admin_service.log_death(db, character, "pve")
-    return DefeatOutcome(minutes, xp_lost, relics_lost)
+    return DefeatOutcome(minutes, xp_lost, relics_lost, fish_lost)

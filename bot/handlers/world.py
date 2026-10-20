@@ -1008,7 +1008,10 @@ async def handle_explore_done(peer_id: int) -> None:
                     multiplier = _roll_fish_offer_multiplier(character)
                     fish_offer = _FishOffer(
                         multiplier=multiplier,
-                        gold=await fishing_service.bag_value(db, character.id, multiplier),
+                        gold=await fishing_service.bag_value(
+                            db, character.id, multiplier,
+                            game_fishing.ring_tier(character.pos_x, character.pos_y),
+                        ),
                         weight_label=game_fishing.format_kg(bag_grams),
                     )
             if event.id == "ash_altar":
@@ -1140,7 +1143,9 @@ async def event_choice(message: Message) -> None:
                     "Рыбак уже ушёл - и с ним его цена."
                 )
                 return
-            gold, grams = await fishing_service.sell_bag(db, character, fish_multiplier)
+            gold, grams = await fishing_service.sell_bag(
+                db, character, fish_multiplier, game_fishing.ring_tier(character.pos_x, character.pos_y),
+            )
             fish_sold = gold > 0
             if gold:
                 fish_sale_line = (

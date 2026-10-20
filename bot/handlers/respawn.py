@@ -97,6 +97,7 @@ async def _gem_goods_lines(peer_id: int, now: datetime, pvp: bool) -> list[str]:
 
 async def register_death(
     peer_id: int, respawn_at: datetime, xp_lost: int = 0, relics_lost: dict[str, int] | None = None,
+    fish_lost: int = 0,
 ) -> None:
     """Смерть игрока: убрать кнопки, показать атмосферный текст (+ штраф опыта
     и сгоревшие реликвии - отдельной строкой, её не трогает отсчёт)."""
@@ -108,6 +109,10 @@ async def register_death(
     from services import trophy_service
 
     lines = [trophy_service.lost_line(relics_lost)] if relics_lost else []
+    if fish_lost:
+        from game.economy import fishing as game_fishing
+
+        lines.append(f"🧺 Садок пропал: {game_fishing.format_kg(fish_lost)} рыбы.")
     try:
         lines += await _gem_goods_lines(peer_id, now, pvp=peer_id in _pvp_death_pending)
     except Exception:

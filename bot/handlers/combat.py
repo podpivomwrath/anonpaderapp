@@ -569,6 +569,7 @@ async def on_battle_finished(session_id: int, result: TickResult) -> None:
             respawn_at = character.respawn_at
             xp_lost = defeat.xp_lost
             relics_lost = defeat.relics_lost
+            fish_lost = defeat.fish_lost
 
     if result.winner_side == 0 and story_state is not None and story_state[1] > 1:
         # эскорт (патч 18, квест «Свидетель»): ещё не последний бой цепочки —
@@ -683,7 +684,7 @@ async def on_battle_finished(session_id: int, result: TickResult) -> None:
             )
     elif on_defeat_hook is not None:
         # смерть: убрать кнопки, атмосферный текст (+ штраф опыта); респавн — автоматически
-        await on_defeat_hook(peer_id, respawn_at, xp_lost, relics_lost)
+        await on_defeat_hook(peer_id, respawn_at, xp_lost, relics_lost, fish_lost)
         if stolen_line:
             await _bot_api.messages.send(peer_id=peer_id, message=stolen_line, random_id=0)
         if travel_id is not None:
