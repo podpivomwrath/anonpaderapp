@@ -235,9 +235,9 @@ async def boss_status(message: Message) -> None:
             await message.answer("🗿 Страж не призван.")
             return
         cooldown = await guild_boss_service.cooldown_minutes(db, boss, character.id)
-    # Страж Двора (2026-10-17) - бьют откуда угодно, цитадели - на её клетке.
-    here = boss.court or (character.pos_x, character.pos_y) == (boss.x, boss.y)
-    where = "" if boss.court else f" ({boss.x}; {boss.y})"
+    # Страж Двора - из любого города (2026-10-20), цитадели - на её клетке.
+    here = guild_boss_service.can_reach(boss, character)
+    where = " (бить - из любого города)" if boss.court else f" ({boss.x}; {boss.y}, или из любого города)"
     text = f"🗿 {guild_boss_service.boss_title(boss)}{where}: {boss.hp}/{boss.max_hp} здоровья."
     if cooldown:
         text += f"\nСледующий заход через {cooldown} мин."
@@ -375,7 +375,7 @@ async def _boss_finished(result) -> None:
 
 async def announce_boss(guild_id: int, x: int, y: int, court: bool = False) -> None:
     where = (
-        f"во Дворе - бить можно откуда угодно, награда {round(gc.BOSS_COURT_REWARD * 100)}% от стража цитадели"
+        f"во Дворе - бить можно из любого города, награда {round(gc.BOSS_COURT_REWARD * 100)}% от стража цитадели"
         if court else f"на ({x}; {y})"
     )
     await notify_guild(

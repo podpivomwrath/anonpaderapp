@@ -354,6 +354,12 @@ async def _state(db, character: Character) -> dict:
             "has_citadel": any(c.base_tier == gc.BASE_CITADEL and c.status == "held" for c in cells),
             "court": bool(boss and boss.court),
             "court_reward_pct": round(gc.BOSS_COURT_REWARD * 100),
+            "difficulty": guild_boss_service.difficulty_of(boss)[0] if boss else None,
+            "difficulties": [
+                {"level": lvl, "name": name, "hp": await guild_boss_service.boss_hp(db, guild, lvl),
+                 "reward_pct": round(reward * 100)}
+                for lvl, (name, _hp, reward) in gc.BOSS_DIFFICULTIES.items()
+            ],
         },
         "log": [
             {"text": row.text, "at": _iso(row.created_at)} for row in await guild_service.recent_log(db, guild.id)
@@ -508,7 +514,7 @@ async def _act(db, character: Character, vk_user_id: int, body: dict) -> list:
     elif action == "tree_reset":
         await guild_tree_service.reset(db, character)
     elif action == "summon_boss":
-        boss = await guild_boss_service.summon(db, character)
+        boss = await guild_boss_service.summon(db, character, body.get("difficulty") or 1)
         notes.append(("boss", boss.guild_id, boss.x, boss.y, boss.court))
     else:
         raise GuildError("Неизвестное действие.")

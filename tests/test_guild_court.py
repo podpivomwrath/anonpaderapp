@@ -115,7 +115,7 @@ async def test_court_boss_without_citadel_pays_less(db_session, make_character) 
     await guild_service.treasury_add(db_session, guild.id, gold=gc.BOSS_SUMMON_GOLD)
     boss = await guild_boss_service.summon(db_session, leader)
     assert boss.court
-    leader.pos_x, leader.pos_y = 7, 7  # где угодно
+    leader.pos_x, leader.pos_y = _city()  # из любого города (2026-10-20)
     assert (await guild_boss_service.start_attempt(db_session, leader, boss.id)).ok
     await guild_boss_service.apply_damage(db_session, boss.id, leader.id, 10**9)
     result = await guild_boss_service.distribute(db_session, boss)
@@ -134,3 +134,51 @@ async def test_weekly_targets_scale_and_grow_on_join(db_session, make_character)
     for r in rows:
         assert r.target == gc.weekly_target(gc.QUEST_METRICS[r.metric][3], 13) > first[r.metric]
     assert gc.weekly_target(60, 18) > 60 * 2 * 18
+
+
+async def test_boss_difficulty_scales_hp_and_reward(db_session, make_character) -> None:
+    guild, leader = await _found(db_session, make_character)
+    await _ore(db_session, guild.id, gc.BOSS_SUMMON_ORE[0], gc.BOSS_SUMMON_ORE[1])
+    await guild_service.treasury_add(db_session, guild.id, gold=gc.BOSS_SUMMON_GOLD)
+    with pytest.raises(guild_service.GuildError):
+        await guild_boss_service.summon(db_session, leader, 9)
+    boss = await guild_boss_service.summon(db_session, leader, 3)
+    _name, hp_mult, reward = gc.BOSS_DIFFICULTIES[3]
+    assert boss.max_hp == round(gc.BOSS_MIN_HP * hp_mult)
+    assert "(" in guild_boss_service.boss_title(boss)
+    leader.pos_x, leader.pos_y = _city()
+    assert (await guild_boss_service.start_attempt(db_session, leader, boss.id)).ok
+    await guild_boss_service.apply_damage(db_session, boss.id, leader.id, 10**9)
+    result = await guild_boss_service.distribute(db_session, boss)
+    assert result.treasury_gold == round(gc.BOSS_TREASURY_GOLD * gc.BOSS_COURT_REWARD * reward)
+
+
+async def test_court_boss_only_from_a_city(db_session, make_character) -> None:
+    from game.world import grid
+
+    guild, leader = await _found(db_session, make_character)
+    await _ore(db_session, guild.id, gc.BOSS_SUMMON_ORE[0], gc.BOSS_SUMMON_ORE[1])
+    await guild_service.treasury_add(db_session, guild.id, gold=gc.BOSS_SUMMON_GOLD)
+    boss = await guild_boss_service.summon(db_session, leader)
+    leader.pos_x, leader.pos_y = 7, 7
+    assert grid.city_region_at(7, 7) is None
+    assert not (await guild_boss_service.start_attempt(db_session, leader, boss.id)).ok
+    leader.pos_x, leader.pos_y = _city()
+    assert (await guild_boss_service.start_attempt(db_session, leader, boss.id)).ok
+
+
+def _city() -> tuple[int, int]:
+    from game.world import grid
+
+    return next((x, y) for x in range(-30, 31) for y in range(-30, 31) if grid.city_region_at(x, y))
+
+
+def test_citadel_boss_reachable_from_its_cell_or_any_city() -> None:
+    from types import SimpleNamespace as N
+
+    boss = N(court=False, x=7, y=7)
+    assert guild_boss_service.can_reach(boss, N(pos_x=7, pos_y=7))
+    assert guild_boss_service.can_reach(boss, N(pos_x=_city()[0], pos_y=_city()[1]))
+    assert not guild_boss_service.can_reach(boss, N(pos_x=8, pos_y=7))
+    court = N(court=True, x=0, y=0)
+    assert not guild_boss_service.can_reach(court, N(pos_x=7, pos_y=7))

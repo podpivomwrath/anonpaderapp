@@ -40,14 +40,30 @@ async def active_boss(db: AsyncSession, guild_id: int, now: datetime | None = No
     return boss
 
 
+def difficulty_of(boss: GuildBoss) -> tuple[str, float, float]:
+    """(название, x здоровья, x награды) сложности стража."""
+    return gc.BOSS_DIFFICULTIES.get(getattr(boss, "difficulty", None) or 1, gc.BOSS_DIFFICULTIES[1])
+
+
 def boss_title(boss: GuildBoss, case: str = "nom") -> str:
-    """«Страж цитадели» / «Страж Двора»; case="acc" - винительный."""
+    """«Страж цитадели» / «Страж Двора»; case="acc" - винительный. Сложность
+    выше первой - в скобках: «Страж Двора (Гневный)»."""
     head = "Стража" if case == "acc" else "Страж"
-    return f"{head} {'Двора' if getattr(boss, 'court', False) else 'цитадели'}"
+    title = f"{head} {'Двора' if getattr(boss, 'court', False) else 'цитадели'}"
+    if (getattr(boss, "difficulty", None) or 1) > 1:
+        title += f" ({difficulty_of(boss)[0]})"  # подпись сложности - без склонения
+    return title
 
 
 def reward_mult(boss: GuildBoss) -> float:
-    return gc.BOSS_COURT_REWARD if getattr(boss, "court", False) else 1.0
+    court = gc.BOSS_COURT_REWARD if getattr(boss, "court", False) else 1.0
+    return court * difficulty_of(boss)[2]
+
+
+async def boss_hp(db: AsyncSession, guild: Guild, difficulty: int) -> int:
+    """Здоровье стража этой сложности для гильдии такого размера."""
+    base = max(gc.BOSS_MIN_HP, gc.BOSS_HP_PER_MEMBER * await guild_service.member_count(db, guild.id))
+    return round(base * gc.BOSS_DIFFICULTIES[difficulty][1])
 
 
 def is_alive(boss: GuildBoss, now: datetime | None = None) -> bool:
@@ -69,10 +85,20 @@ def cooldown_days_left(guild: Guild, now: datetime | None = None) -> float:
     return max(0.0, left.total_seconds() / 86400)
 
 
-async def summon(db: AsyncSession, actor: Character) -> GuildBoss:
+def can_reach(boss: GuildBoss, character: Character) -> bool:
+    """Любого стража бьют из любого города; стража цитадели - ещё и с её
+    клетки (2026-10-20, владелец: раньше Стража Двора били из любой точки карты)."""
+    if grid.city_region_at(character.pos_x, character.pos_y) is not None:
+        return True
+    return not boss.court and (character.pos_x, character.pos_y) == (boss.x, boss.y)
+
+
+async def summon(db: AsyncSession, actor: Character, difficulty: int = 1) -> GuildBoss:
+    if difficulty not in gc.BOSS_DIFFICULTIES:
+        raise GuildError("Нет такой сложности.")
     guild, _member = await guild_service.require_treasurer(db, actor)
     cells = await guild_territory_service.cells_of(db, guild.id)
-    # Без цитадели - из Двора (2026-10-17): бьют откуда угодно, награда меньше.
+    # Без цитадели - из Двора (2026-10-17): бьют из любого города (2026-10-20), награда меньше.
     citadel = next((c for c in cells if c.status == "held" and c.base_tier == gc.BASE_CITADEL), None)
     if await active_boss(db, guild.id) is not None:
         raise GuildError("Страж уже призван.")
@@ -83,10 +109,10 @@ async def summon(db: AsyncSession, actor: Character) -> GuildBoss:
     await guild_service.spend_guild_ore(db, guild.id, ore_id, ore_count)
     await guild_service.treasury_spend(db, guild.id, gold=gc.BOSS_SUMMON_GOLD)
     now = now_utc()
-    hp = max(gc.BOSS_MIN_HP, gc.BOSS_HP_PER_MEMBER * await guild_service.member_count(db, guild.id))
+    hp = await boss_hp(db, guild, difficulty)
     boss = GuildBoss(
         guild_id=guild.id, x=citadel.x if citadel else 0, y=citadel.y if citadel else 0,
-        max_hp=hp, hp=hp, status="active", court=citadel is None,
+        max_hp=hp, hp=hp, status="active", court=citadel is None, difficulty=difficulty,
         spawned_at=now, expires_at=now + timedelta(hours=gc.BOSS_LIFETIME_HOURS),
     )
     db.add(boss)
@@ -128,8 +154,10 @@ async def start_attempt(db: AsyncSession, character: Character, boss_pk: int) ->
         return AttemptCheck(False, "Стража больше нет.")
     if character.guild_id != boss.guild_id:
         return AttemptCheck(False, "Это страж чужой гильдии.")
-    if not boss.court and (character.pos_x, character.pos_y) != (boss.x, boss.y):
-        return AttemptCheck(False, "Страж стоит в цитадели - иди туда.")
+    if not can_reach(boss, character):
+        if boss.court:
+            return AttemptCheck(False, "Страж Двора отвечает только в городе - зайди в любой город.")
+        return AttemptCheck(False, "Страж стоит в цитадели - иди туда или в любой город.")
     minutes = await cooldown_minutes(db, boss, character.id)
     if minutes:
         return AttemptCheck(False, f"Следующий заход через {minutes} мин.", minutes)
@@ -197,7 +225,7 @@ class BossResult:
 async def distribute(db: AsyncSession, boss: GuildBoss) -> BossResult:
     """Ровно один раз на стража - тем, кто перевёл его из active."""
     share = 1.0 if boss.status == "killed" else max(0.0, min(1.0, 1 - boss.hp / boss.max_hp))
-    share *= reward_mult(boss)  # из Двора - gc.BOSS_COURT_REWARD награды
+    share *= reward_mult(boss)  # из Двора - gc.BOSS_COURT_REWARD награды; x сложности
     rows = (
         await db.scalars(select(GuildBossContribution).where(GuildBossContribution.boss_id == boss.id))
     ).all()

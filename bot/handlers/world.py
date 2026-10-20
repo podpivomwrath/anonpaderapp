@@ -502,7 +502,16 @@ async def _announce_daily(peer_id: int, progress) -> None:
 async def location_summary_parts(db, character, peer_id: int) -> tuple[str, str | None, str]:
     """Сводка клетки карты целиком: текст, картинка, клавиатура перемещения.
     Для тех, кто возвращает игрока на карту вне обычного показа локации
-    (заход к мировому боссу, патч 104)."""
+    (заход к мировому боссу, патч 104).
+
+    В городе - экран города, а не клетки (2026-10-20, баг-репорт: после
+    Стража из Двора игрок оказывался «в локации города», а не в городе)."""
+    region = grid.city_region_at(character.pos_x, character.pos_y)
+    if region is not None:
+        city = await _render_city_screen(db, character, getattr(character, "screen", None))
+        if city is not None:
+            text, keyboard = city
+            return text, hub_attachment(region), keyboard
     stats = await _get_stats(db, character.id)
     wallet = await wallet_service.get_wallet(db, character.id)
     gear_bonus = await item_service.compute_gear_bonus(db, character.id)

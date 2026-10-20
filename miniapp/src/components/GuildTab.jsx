@@ -180,7 +180,9 @@ function NoGuild({ state, run, busy }) {
 function Overview({ state, run, busy }) {
   const { guild, me, boss } = state;
   const [stat, setStat] = useState('str');
+  const [bossLevel, setBossLevel] = useState(1);
   const perms = me.perms;
+  const bossPick = (boss.difficulties || []).find((d) => d.level === bossLevel);
   return (
     <>
       <Group>
@@ -238,11 +240,12 @@ function Overview({ state, run, busy }) {
           {boss.active ? (
             <>
               <p className="guild-line">
+                {boss.difficulty ? `${boss.difficulty}. ` : ''}
                 {boss.court ? 'Призван во Дворе' : `Призван на (${boss.x}; ${boss.y})`}: {money(boss.hp)} / {money(boss.max_hp)}, уйдёт через {timeLeft(boss.expires_at)}.
               </p>
               <Bar value={boss.hp} max={boss.max_hp} />
               <p className="craft-hint">
-                {boss.court ? 'Бить - в чате откуда угодно: напиши «Страж».' : 'Бить - в чате: встань на клетку и напиши «Страж».'}
+                {boss.court ? 'Бить - в чате, из любого города: напиши «Страж».' : 'Бить - в чате, на клетке цитадели или из любого города: напиши «Страж».'}
               </p>
             </>
           ) : (
@@ -250,12 +253,32 @@ function Overview({ state, run, busy }) {
               <p className="craft-hint">
                 Призыв: {money(boss.summon_gold)} золота и {boss.summon_ore} ×{boss.summon_ore_count} со склада. Раз в неделю.
                 {boss.has_citadel
-                  ? ' Встанет в цитадели - бить там, награда полная.'
-                  : ` Без цитадели - из Двора: бить откуда угодно, награда ${boss.court_reward_pct}%.`}
+                  ? ' Встанет в цитадели - бить там или из любого города, награда полная.'
+                  : ` Без цитадели - из Двора: бить из любого города, награда ${boss.court_reward_pct}%.`}
               </p>
               {boss.cooldown_hours > 0 && <p className="guild-line">Наберётся сил через {boss.cooldown_hours} ч.</p>}
+              {perms.treasury && (boss.difficulties || []).length > 0 && (
+                <>
+                  <p className="craft-hint">Сложность: чем сильнее страж, тем больше здоровья и награды. Недобитый платит по доле снятого здоровья.</p>
+                  <div className="guild-boss-levels">
+                    {boss.difficulties.map((d) => (
+                      <button type="button" key={d.level}
+                        className={`guild-boss-level${d.level === bossLevel ? ' guild-boss-level--on' : ''}`}
+                        onClick={() => setBossLevel(d.level)}>
+                        {d.name}
+                      </button>
+                    ))}
+                  </div>
+                  {bossPick && (
+                    <p className="guild-line">
+                      Здоровье {money(bossPick.hp)} · награда ×{(bossPick.reward_pct / 100).toLocaleString('ru-RU')}
+                    </p>
+                  )}
+                </>
+              )}
               {perms.treasury && (
-                <Button size="m" disabled={busy || boss.cooldown_hours > 0} onClick={() => run('summon_boss', {}, 'Страж призван!')}>
+                <Button size="m" disabled={busy || boss.cooldown_hours > 0}
+                  onClick={() => run('summon_boss', { difficulty: bossLevel }, 'Страж призван!')}>
                   Призвать
                 </Button>
               )}

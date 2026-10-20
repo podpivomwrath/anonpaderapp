@@ -389,3 +389,16 @@
 .shop-sheet__error { color: #ff8a80; margin: 6px 0; font-size: 14px; }
 .shop-sheet__actions { display: flex; flex-direction: column; gap: 8px; margin-top: 8px; }
 .shop-sheet__choices { display: grid; grid-template-columns: 1fr; gap: 8px; margin: 8px 0; }
+
+/* Сложность стража (2026-10-20). */
+.guild-boss-levels { display: flex; gap: 6px; margin: 6px 0; flex-wrap: wrap; }
+.guild-boss-level {
+  flex: 1 1 40%;
+  padding: 7px 6px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  background: rgba(255, 255, 255, 0.04);
+  color: inherit;
+  font-size: 13px;
+}
+.guild-boss-level--on { border-color: #d9483b; background: rgba(217, 72, 59, 0.2); }

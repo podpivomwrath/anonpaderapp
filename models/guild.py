@@ -278,6 +278,8 @@ class GuildBoss(Base):
     ended_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     #: Призван из Двора (2026-10-17): бьют откуда угодно, награда - gc.BOSS_COURT_REWARD.
     court: Mapped[bool] = mapped_column(Boolean, default=False, server_default=false())
+    #: Сложность (2026-10-20): ключ gc.BOSS_DIFFICULTIES - множители здоровья и награды.
+    difficulty: Mapped[int] = mapped_column(default=1, server_default="1")
 
 
 class GuildBossContribution(Base):
