@@ -378,9 +378,14 @@ async def handle_get_route(request: web.Request) -> web.Response:
             return web.json_response({"error": "bad_request"}, status=400)
         fx, fy = character.pos_x, character.pos_y
         path = mount_service.route(fx, fy, x, y, safe)
+        direct = mount_service.route(fx, fy, x, y, False) if safe else path
         owned = await mount_service.owned_mounts(db, character.id)
     return web.json_response({
         "cells": len(path),
+        # Безопасный обход той же длины, что прямой (2026-10-20): время то же,
+        # и окно говорит об этом прямо - иначе переключатель казался сломанным.
+        "direct_cells": len(direct),
+        "detour": path != direct,
         "path": [[fx, fy]] + [list(c) for c in path],
         "mounts": {
             m.mount_id: {

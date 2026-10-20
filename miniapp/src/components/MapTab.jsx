@@ -515,12 +515,27 @@ export default function MapTab() {
   useEffect(() => {
     if (!routeKey || !selected) return undefined;
     let alive = true;
-    getMapRoute(selected.x, selected.y, safeRoute)
-      .then((data) => { if (alive) setRoutePreview({ key: routeKey, ...data }); })
-      .catch(() => { if (alive) setRoutePreview(null); });
-    return () => { alive = false; };
+    let timer = null;
+    // Не пришло - ещё раз через пару секунд (2026-10-20): иначе окно так и
+    // показывало бы время прямого пути при включённом безопасном.
+    const load = (attempt) => {
+      getMapRoute(selected.x, selected.y, safeRoute)
+        .then((data) => { if (alive) setRoutePreview({ key: routeKey, ...data }); })
+        .catch(() => {
+          if (alive && attempt < 3) timer = setTimeout(() => load(attempt + 1), 1500 * attempt);
+        });
+    };
+    load(1);
+    return () => { alive = false; if (timer) clearTimeout(timer); };
   }, [routeKey]); // eslint-disable-line react-hooks/exhaustive-deps
   const preview = routePreview && routePreview.key === routeKey ? routePreview : null;
+  // Безопасный путь пока считается - время и риск не показываем, чтобы не
+  // выдать время прямого пути за безопасное.
+  const routePending = Boolean(routeKey) && !preview;
+  const detourNote = safeRoute && preview
+    ? (preview.cells > preview.direct_cells ? `обход +${preview.cells - preview.direct_cells} кл.`
+      : preview.detour ? 'обход без потери времени' : 'опасных колец по пути нет')
+    : null;
 
   const confirmSend = async () => {
     if (!selected || !sendFlow?.mount) return;
@@ -851,7 +866,7 @@ export default function MapTab() {
             >
               {safeRoute ? '✓ 🛡 Безопасный путь' : '🛡 Безопасный путь'}
               <span className="map-safe-toggle__hint">
-                {safeRoute ? 'в обход колец опаснее цели - дольше' : 'напрямую, через любые кольца'}
+                {safeRoute ? `в обход колец опаснее цели${detourNote ? ` - ${detourNote}` : ''}` : 'напрямую, через любые кольца'}
               </span>
             </button>
           )}
@@ -864,7 +879,8 @@ export default function MapTab() {
                   <button key={m.mount_id} className="map-card__mount-option" onClick={() => setSendFlow({ step: 'confirm', mount: m })}>
                     <span>{m.emoji} {m.name}</span>
                     <span className="map-card__mount-meta">
-                      {formatSeconds(est ? est.seconds : m.seconds_per_cell * cells)} · риск {Math.round((est ? est.ambush : m.ambush_chance) * 100)}%
+                      {routePending ? 'считаю путь…'
+                        : `${formatSeconds(est ? est.seconds : m.seconds_per_cell * cells)} · риск ${Math.round((est ? est.ambush : m.ambush_chance) * 100)}%`}
                     </span>
                   </button>
                 );
@@ -878,11 +894,16 @@ export default function MapTab() {
             const est = preview?.mounts?.[sendFlow.mount.mount_id];
             return (
               <div className="map-card__confirm">
-                <p className="map-card__line">
-                  Путь: {cells} {cellsWord(cells)} · {sendFlow.mount.name} ·{' '}
-                  {formatSeconds(est ? est.seconds : sendFlow.mount.seconds_per_cell * cells)} ·{' '}
-                  риск нападения {Math.round((est ? est.ambush : sendFlow.mount.ambush_chance) * 100)}%
-                </p>
+                {routePending ? (
+                  <p className="map-card__line">Считаю путь…</p>
+                ) : (
+                  <p className="map-card__line">
+                    Путь: {cells} {cellsWord(cells)} · {sendFlow.mount.name} ·{' '}
+                    {formatSeconds(est ? est.seconds : sendFlow.mount.seconds_per_cell * cells)} ·{' '}
+                    риск нападения {Math.round((est ? est.ambush : sendFlow.mount.ambush_chance) * 100)}%
+                    {detourNote ? ` · 🛡 ${detourNote}` : ''}
+                  </p>
+                )}
                 <div className="map-card__confirm-actions">
                   <Button size="m" stretched onClick={confirmSend}>Подтвердить</Button>
                   <Button size="m" stretched mode="tertiary" onClick={() => setSendFlow({ step: 'pick', mount: null })}>Назад</Button>
