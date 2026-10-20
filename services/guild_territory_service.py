@@ -471,29 +471,70 @@ def gates_cooldown_minutes(level: int) -> int:
     return max(1, gc.GATES_COOLDOWN_MINUTES - gc.GATES_COOLDOWN_CUT_PER_LEVEL * (level - 1))
 
 
-async def travel_gates(db: AsyncSession, character: Character, target_cell_id: int) -> GuildCell:
-    guild, _member = await guild_service.require_member(db, character)
-    here = await cell_at(db, character.pos_x, character.pos_y)
-    gates = await gate_targets(db, guild.id)
-    gate_ids = {c.id for c in gates}
-    if here is None or here.id not in gate_ids:
-        raise GuildError("Врата открываются только на своей базе с вратами.")
-    target = next((c for c in gates if c.id == target_cell_id), None)
-    if target is None or target.id == here.id:
-        raise GuildError("Туда врата не ведут.")
-    gate = await building_at(db, here.id, gc.B_GATES)
-    cooldown = gates_cooldown_minutes(gate.level if gate else 1)
+def in_city(character: Character) -> bool:
+    return grid.city_region_at(character.pos_x, character.pos_y) is not None
+
+
+def home_city(character: Character) -> tuple[int, int] | None:
+    from game.world import world_config as wc
+
+    return wc.CITY_COORDS.get(character.region)
+
+
+async def _gates_cooldown(db: AsyncSession, here: GuildCell | None, gates: list[GuildCell]) -> int:
+    """Остывание: у врат базы - их уровень; у городских - лучшие врата гильдии."""
+    if here is not None:
+        gate = await building_at(db, here.id, gc.B_GATES)
+        return gates_cooldown_minutes(gate.level if gate else 1)
+    levels = [b.level for c in gates if (b := await building_at(db, c.id, gc.B_GATES)) is not None]
+    return gates_cooldown_minutes(max(levels, default=1))
+
+
+def _check_cooldown(character: Character, cooldown: int) -> None:
     used = aware(character.gates_used_at)
     if used is not None and now_utc() - used < timedelta(minutes=cooldown):
         left = cooldown - int((now_utc() - used).total_seconds() // 60)
         raise GuildError(f"Врата ещё не остыли: {max(1, left)} мин.")
-    character.pos_x, character.pos_y = target.x, target.y
+
+
+async def travel_gates(db: AsyncSession, character: Character, target_cell_id) -> tuple[int, int]:
+    """Перенос вратами. target_cell_id - клетка гильдии с вратами или "city" -
+    родной город. Городские врата (2026-10-20, владелец) - бесплатные, есть у
+    каждой гильдии с хотя бы одними вратами на базе: из любого города - на
+    любую базу с вратами, с базы с вратами - в родной город. Возвращает (x, y)."""
+    guild, _member = await guild_service.require_member(db, character)
+    gates = await gate_targets(db, guild.id)
+    if not gates:
+        raise GuildError("У гильдии нет врат - поставьте их на базе.")
+    here = await cell_at(db, character.pos_x, character.pos_y)
+    on_gate = here is not None and here.id in {c.id for c in gates}
+    from_city = in_city(character)
+    if not on_gate and not from_city:
+        raise GuildError("Врата открываются на своей базе с вратами или в городе.")
+    if target_cell_id == "city":
+        if not on_gate:
+            raise GuildError("В город ведут врата базы.")
+        from services import pk_service
+
+        if pk_service.city_banned(character):
+            raise GuildError(pk_service.CITY_BAN_TEXT)
+        target_xy = home_city(character)
+        if target_xy is None:
+            raise GuildError("Туда врата не ведут.")
+    else:
+        target = next((c for c in gates if c.id == target_cell_id), None)
+        if target is None or (here is not None and target.id == here.id):
+            raise GuildError("Туда врата не ведут.")
+        target_xy = (target.x, target.y)
+    _check_cooldown(character, await _gates_cooldown(db, here if on_gate else None, gates))
+    character.pos_x, character.pos_y = target_xy
     character.gates_used_at = now_utc()
+    character.screen = None
     from services import pvp_shield
 
     pvp_shield.on_moved(character)
     await db.flush()
-    return target
+    return target_xy
 
 
 # --- Часовня и молитва ----------------------------------------------------------

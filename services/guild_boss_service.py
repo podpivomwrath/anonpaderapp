@@ -23,8 +23,8 @@ from game.combat.session import CombatantState
 from game.economy import guild_config as gc
 from game.world import encounters, grid
 from game.world import world_boss as world_boss_rules
-from models import Character, Guild, GuildBoss, GuildBossContribution
-from services import guild_service, guild_territory_service, wallet_service
+from models import Character, CharacterStats, Guild, GuildBoss, GuildBossContribution
+from services import experience_service, guild_service, guild_territory_service, wallet_service
 from services.guild_service import GuildError, aware, now_utc
 
 BOSS_NAME = "Страж цитадели"
@@ -105,9 +105,9 @@ async def summon(db: AsyncSession, actor: Character, difficulty: int = 1) -> Gui
     wait = cooldown_days_left(guild)
     if wait > 0:
         raise GuildError(f"Страж ещё не набрался сил: {max(1, round(wait * 24))} ч.")
-    ore_id, ore_count = gc.BOSS_SUMMON_ORE
+    gold, ore_id, ore_count = gc.BOSS_SUMMON[difficulty]
     await guild_service.spend_guild_ore(db, guild.id, ore_id, ore_count)
-    await guild_service.treasury_spend(db, guild.id, gold=gc.BOSS_SUMMON_GOLD)
+    await guild_service.treasury_spend(db, guild.id, gold=gold)
     now = now_utc()
     hp = await boss_hp(db, guild, difficulty)
     boss = GuildBoss(
@@ -210,6 +210,8 @@ class BossGrant:
     damage: int
     gold: int
     net_gold: int = 0
+    xp: int = 0
+    levelup: object | None = None
 
 
 @dataclass
@@ -224,8 +226,9 @@ class BossResult:
 
 async def distribute(db: AsyncSession, boss: GuildBoss) -> BossResult:
     """Ровно один раз на стража - тем, кто перевёл его из active."""
-    share = 1.0 if boss.status == "killed" else max(0.0, min(1.0, 1 - boss.hp / boss.max_hp))
-    share *= reward_mult(boss)  # из Двора - gc.BOSS_COURT_REWARD награды; x сложности
+    killed_share = 1.0 if boss.status == "killed" else max(0.0, min(1.0, 1 - boss.hp / boss.max_hp))
+    court = gc.BOSS_COURT_REWARD if getattr(boss, "court", False) else 1.0
+    share = killed_share * reward_mult(boss)  # из Двора - gc.BOSS_COURT_REWARD награды; x сложности
     rows = (
         await db.scalars(select(GuildBossContribution).where(GuildBossContribution.boss_id == boss.id))
     ).all()
@@ -235,11 +238,13 @@ async def distribute(db: AsyncSession, boss: GuildBoss) -> BossResult:
     treasury = round(gc.BOSS_TREASURY_GOLD * share)
     if treasury:
         await guild_service.treasury_add(db, boss.guild_id, gold=treasury)
-    ore_id, ore_count = gc.BOSS_ORE_REWARD
-    ore = round(ore_count * share)
+    ore_id, ore_count = gc.BOSS_ORE_REWARDS[getattr(boss, "difficulty", None) or 1]
+    ore = round(ore_count * killed_share * court)
     if ore:
         await guild_service.add_guild_ore(db, boss.guild_id, ore_id, "rare", ore)
     pool = round(gc.BOSS_PERSONAL_GOLD * len(damage) * share)
+    # Опыт (2026-10-20): как за BOSS_XP_MOBS мобов уровня стража, x сложности.
+    xp_each = experience_service.xp_per_mob(BOSS_LEVEL) * gc.BOSS_XP_MOBS * share
     result = BossResult(boss, share, fame.gained if fame else 0, treasury, ore)
     for character_id, dealt in sorted(damage.items(), key=lambda t: -t[1]):
         gold = round(pool * dealt / total)
@@ -247,8 +252,9 @@ async def distribute(db: AsyncSession, boss: GuildBoss) -> BossResult:
             await wallet_service.deposit(db, character_id, "farm", gold)
         await guild_service.add_contribution(db, character_id, max(1, round(50 * dealt / total)))
         member = await db.get(Character, character_id)
+        xp, levelup = await _grant_xp(db, member, xp_each * (0.5 + 0.5 * len(damage) * dealt / total))
         result.granted.append(BossGrant(
-            character_id, dealt, gold, guild_service.after_tax(member, gold) if member else gold,
+            character_id, dealt, gold, guild_service.after_tax(member, gold) if member else gold, xp, levelup,
         ))
     status = "повержен" if boss.status == "killed" else "уходит недобитым"
     await guild_service.log(
@@ -257,6 +263,17 @@ async def distribute(db: AsyncSession, boss: GuildBoss) -> BossResult:
     )
     await db.flush()
     return result
+
+
+async def _grant_xp(db: AsyncSession, member: Character | None, amount: float):
+    """(начислено, LevelUp или None). На 60 уровне опыт не растёт - 0."""
+    if member is None or amount <= 0:
+        return 0, None
+    stats = await db.scalar(select(CharacterStats).where(CharacterStats.character_id == member.id))
+    if stats is None:
+        return 0, None
+    levelup = experience_service.add_experience(member, stats, round(amount))
+    return levelup.xp_awarded, levelup if levelup.levels_gained else None
 
 
 async def expire_due(db: AsyncSession, now: datetime | None = None) -> list[BossResult]:

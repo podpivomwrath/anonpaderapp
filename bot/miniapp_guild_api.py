@@ -14,6 +14,7 @@ from aiohttp import web
 from loguru import logger
 
 from bot.app_keys import SESSION_FACTORY_KEY
+from bot.onboarding_texts import REGION_TITLES
 from bot.miniapp_auth import VK_USER_ID_KEY
 from game.economy import guild_config as gc
 from game.economy import mining
@@ -262,12 +263,18 @@ async def _state(db, character: Character) -> dict:
     stored = await guild_service.stored_items(db, guild.id)
     here_cell = await guild_territory_service.cell_at(db, character.pos_x, character.pos_y) \
         if character.pos_x is not None else None
+    # Врата (2026-10-20): с базы с вратами - на другие базы и в родной город,
+    # из любого города - городскими вратами на любую базу с вратами.
     gates = []
-    if here_cell is not None and here_cell.id in gate_ids:
+    on_gate = here_cell is not None and here_cell.id in gate_ids
+    if on_gate or (gate_ids and guild_territory_service.in_city(character)):
         gates = [
-            {"cell_id": c.id, "x": c.x, "y": c.y}
-            for c in await guild_territory_service.gate_targets(db, guild.id) if c.id != here_cell.id
+            {"cell_id": c.id, "x": c.x, "y": c.y, "title": f"({c.x}; {c.y})"}
+            for c in await guild_territory_service.gate_targets(db, guild.id)
+            if here_cell is None or c.id != here_cell.id
         ]
+    if on_gate and guild_territory_service.home_city(character) is not None:
+        gates.append({"cell_id": "city", "title": f"🏙 {REGION_TITLES.get(character.region, 'Город')}"})
     effects = await guild_service.guild_effects(db, guild)
     return {
         "in_guild": True,
@@ -349,15 +356,17 @@ async def _state(db, character: Character) -> dict:
             "x": boss.x if boss else None, "y": boss.y if boss else None,
             "expires_at": _iso(boss.expires_at) if boss else None,
             "cooldown_hours": round(guild_boss_service.cooldown_days_left(guild) * 24, 1),
-            "summon_gold": gc.BOSS_SUMMON_GOLD,
-            "summon_ore": _ore_name(gc.BOSS_SUMMON_ORE[0]), "summon_ore_count": gc.BOSS_SUMMON_ORE[1],
             "has_citadel": any(c.base_tier == gc.BASE_CITADEL and c.status == "held" for c in cells),
             "court": bool(boss and boss.court),
             "court_reward_pct": round(gc.BOSS_COURT_REWARD * 100),
             "difficulty": guild_boss_service.difficulty_of(boss)[0] if boss else None,
             "difficulties": [
                 {"level": lvl, "name": name, "hp": await guild_boss_service.boss_hp(db, guild, lvl),
-                 "reward_pct": round(reward * 100)}
+                 "reward_pct": round(reward * 100),
+                 "summon_gold": gc.BOSS_SUMMON[lvl][0],
+                 "summon_ore": _ore_name(gc.BOSS_SUMMON[lvl][1]), "summon_ore_count": gc.BOSS_SUMMON[lvl][2],
+                 "reward_gold": round(gc.BOSS_TREASURY_GOLD * reward),
+                 "reward_ore": _ore_name(gc.BOSS_ORE_REWARDS[lvl][0]), "reward_ore_count": gc.BOSS_ORE_REWARDS[lvl][1]}
                 for lvl, (name, _hp, reward) in gc.BOSS_DIFFICULTIES.items()
             ],
         },
@@ -489,8 +498,9 @@ async def _act(db, character: Character, vk_user_id: int, body: dict) -> list:
         reason = await blocked_reason(db, character, vk_user_id)
         if reason:
             raise GuildError(reason)
-        target = await guild_territory_service.travel_gates(db, character, _int(body, "cell_id"))
-        notes.append(("self_move", target.x, target.y))
+        cell_id = "city" if body.get("cell_id") == "city" else _int(body, "cell_id")
+        x, y = await guild_territory_service.travel_gates(db, character, cell_id)
+        notes.append(("self_move", x, y))
     elif action == "pray":
         await guild_territory_service.pray(db, character, _str(body, "stat"))
     elif action == "respawn_pref":
@@ -538,8 +548,14 @@ async def _deliver(db, notes: list, vk_user_id: int) -> None:
             elif kind == "boss":
                 await guild_handlers.announce_boss(note[1], note[2], note[3], note[4])
             elif kind == "self_move":
-                guild_handlers.notify_peers(
-                    [vk_user_id], f"🌀 Врата переносят тебя на ({note[1]}; {note[2]})."
+                # Сводка места с клавиатурой: после врат в город - экран города.
+                from bot.handlers import world as world_handlers  # избегаем цикла импортов
+
+                character = await onboarding_svc.get_character(db, vk_user_id)
+                text, attachment, keyboard = await world_handlers.location_summary_parts(db, character, vk_user_id)
+                await guild_handlers.send(
+                    vk_user_id, f"🌀 Врата переносят тебя на ({note[1]}; {note[2]}).\n\n{text}",
+                    attachment=attachment, keyboard=keyboard,
                 )
         except Exception:
             logger.exception("Гильдии: не доставлено уведомление {}", note)

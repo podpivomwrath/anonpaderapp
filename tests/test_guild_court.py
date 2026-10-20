@@ -111,8 +111,7 @@ async def test_losing_a_base_shields_the_rest(db_session, make_character) -> Non
 
 async def test_court_boss_without_citadel_pays_less(db_session, make_character) -> None:
     guild, leader = await _found(db_session, make_character)
-    await _ore(db_session, guild.id, gc.BOSS_SUMMON_ORE[0], gc.BOSS_SUMMON_ORE[1])
-    await guild_service.treasury_add(db_session, guild.id, gold=gc.BOSS_SUMMON_GOLD)
+    await _boss_cost(db_session, guild.id)
     boss = await guild_boss_service.summon(db_session, leader)
     assert boss.court
     leader.pos_x, leader.pos_y = _city()  # из любого города (2026-10-20)
@@ -138,8 +137,7 @@ async def test_weekly_targets_scale_and_grow_on_join(db_session, make_character)
 
 async def test_boss_difficulty_scales_hp_and_reward(db_session, make_character) -> None:
     guild, leader = await _found(db_session, make_character)
-    await _ore(db_session, guild.id, gc.BOSS_SUMMON_ORE[0], gc.BOSS_SUMMON_ORE[1])
-    await guild_service.treasury_add(db_session, guild.id, gold=gc.BOSS_SUMMON_GOLD)
+    await _boss_cost(db_session, guild.id)
     with pytest.raises(guild_service.GuildError):
         await guild_boss_service.summon(db_session, leader, 9)
     boss = await guild_boss_service.summon(db_session, leader, 3)
@@ -157,8 +155,7 @@ async def test_court_boss_only_from_a_city(db_session, make_character) -> None:
     from game.world import grid
 
     guild, leader = await _found(db_session, make_character)
-    await _ore(db_session, guild.id, gc.BOSS_SUMMON_ORE[0], gc.BOSS_SUMMON_ORE[1])
-    await guild_service.treasury_add(db_session, guild.id, gold=gc.BOSS_SUMMON_GOLD)
+    await _boss_cost(db_session, guild.id)
     boss = await guild_boss_service.summon(db_session, leader)
     leader.pos_x, leader.pos_y = 7, 7
     assert grid.city_region_at(7, 7) is None
@@ -182,3 +179,10 @@ def test_citadel_boss_reachable_from_its_cell_or_any_city() -> None:
     assert not guild_boss_service.can_reach(boss, N(pos_x=8, pos_y=7))
     court = N(court=True, x=0, y=0)
     assert not guild_boss_service.can_reach(court, N(pos_x=7, pos_y=7))
+
+
+async def _boss_cost(db_session, guild_id: int) -> None:
+    """Руда и золото на призыв стража любой сложности."""
+    for _gold, ore_id, count in gc.BOSS_SUMMON.values():
+        await _ore(db_session, guild_id, ore_id, count)
+    await guild_service.treasury_add(db_session, guild_id, gold=sum(g for g, _o, _c in gc.BOSS_SUMMON.values()))

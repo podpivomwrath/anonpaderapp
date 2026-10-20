@@ -251,7 +251,7 @@ function Overview({ state, run, busy }) {
           ) : (
             <>
               <p className="craft-hint">
-                Призыв: {money(boss.summon_gold)} золота и {boss.summon_ore} ×{boss.summon_ore_count} со склада. Раз в неделю.
+                Призыв раз в неделю, цена и награда - по сложности. Бойцам - золото и опыт по урону.
                 {boss.has_citadel
                   ? ' Встанет в цитадели - бить там или из любого города, награда полная.'
                   : ` Без цитадели - из Двора: бить из любого города, награда ${boss.court_reward_pct}%.`}
@@ -270,9 +270,16 @@ function Overview({ state, run, busy }) {
                     ))}
                   </div>
                   {bossPick && (
-                    <p className="guild-line">
-                      Здоровье {money(bossPick.hp)} · награда ×{(bossPick.reward_pct / 100).toLocaleString('ru-RU')}
-                    </p>
+                    <>
+                      <p className="guild-line">
+                        Призыв: {money(bossPick.summon_gold)} золота и {bossPick.summon_ore} ×{bossPick.summon_ore_count} со склада.
+                      </p>
+                      <p className="guild-line">
+                        Здоровье {money(bossPick.hp)}. За убитого: {money(bossPick.reward_gold)} золота в казну
+                        и {bossPick.reward_ore} ×{bossPick.reward_ore_count} на склад
+                        {boss.has_citadel ? '' : ` (из Двора - ${boss.court_reward_pct}%)`}.
+                      </p>
+                    </>
                   )}
                 </>
               )}
@@ -669,7 +676,7 @@ function Here({ state, run, busy }) {
           {state.gates.map((g) => (
             <Button key={g.cell_id} size="s" mode="secondary" disabled={busy}
               onClick={() => run('gates', { cell_id: g.cell_id }, 'Ты прошёл через врата.')}>
-              ({g.x}; {g.y})
+              {g.title || `(${g.x}; ${g.y})`}
             </Button>
           ))}
         </Div>

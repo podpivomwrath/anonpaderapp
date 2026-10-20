@@ -250,7 +250,7 @@ def _apply_phase(
                 heals.append(
                     PendingHeal(
                         source_id=target.id, target_id=target.id,
-                        amount=round(target.max_hp * block_heal_pct), label="исцеляется от блока",
+                        amount=round(target.max_hp * block_heal_pct), label="Глухая оборона гасит удар",
                     )
                 )
         # Щиты (однотиковый + «Второе сердце») и «Токсикология» - общие с

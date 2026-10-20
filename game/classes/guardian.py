@@ -107,7 +107,7 @@ def block(ctx: SkillContext) -> None:
         ctx.heals.append(
             PendingHeal(
                 source_id=actor.id, target_id=actor.id,
-                amount=round(actor.max_hp * heal_pct), label="исцеляется от блока",
+                amount=round(actor.max_hp * heal_pct), label="Живительный блок",
             )
         )
 

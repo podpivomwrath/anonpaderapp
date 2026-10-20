@@ -553,8 +553,7 @@ async def test_season_close(db_session, make_character) -> None:
 async def test_guild_boss(db_session, make_character) -> None:
     guild, leader = await _found(db_session, make_character)
     citadel = await _held_base(db_session, guild, 5, 12, tier=gc.BASE_CITADEL)
-    await _ore(db_session, guild.id, gc.BOSS_SUMMON_ORE[0], gc.BOSS_SUMMON_ORE[1])
-    await guild_service.treasury_add(db_session, guild.id, gold=gc.BOSS_SUMMON_GOLD)
+    await _boss_cost(db_session, guild.id)
     boss = await guild_boss_service.summon(db_session, leader)
     assert boss.hp == gc.BOSS_MIN_HP
     leader.pos_x, leader.pos_y = citadel.x, citadel.y
@@ -564,10 +563,14 @@ async def test_guild_boss(db_session, make_character) -> None:
     assert not again.ok
     damage = await guild_boss_service.apply_damage(db_session, boss.id, leader.id, 10**9)
     assert damage.killed_now
+    await db_session.refresh(guild)
+    before = guild.treasury_gold
     result = await guild_boss_service.distribute(db_session, boss)
     assert result.share == 1.0 and result.granted[0].gold == gc.BOSS_PERSONAL_GOLD
     await db_session.refresh(guild)
-    assert guild.treasury_gold == gc.BOSS_TREASURY_GOLD
+    assert guild.treasury_gold - before == gc.BOSS_TREASURY_GOLD
+    assert result.ore == gc.BOSS_ORE_REWARDS[1][1]
+    assert leader.level >= 60 or result.granted[0].xp > 0
 
 
 async def test_members_listing(db_session, make_character) -> None:
@@ -694,3 +697,34 @@ def test_tree_arms_are_separate_and_bridge_is_inside_second_arm() -> None:
         bridge = nodes[f"{branch}:bridge"]
         assert bridge.links == {f"{branch}:1:9", f"{branch}:1:10"}
         assert f"{branch}:1:10" not in nodes[f"{branch}:1:9"].links
+
+
+async def _boss_cost(db_session, guild_id: int) -> None:
+    """Руда и золото на призыв стража любой сложности."""
+    for _gold, ore_id, count in gc.BOSS_SUMMON.values():
+        await _ore(db_session, guild_id, ore_id, count)
+    await guild_service.treasury_add(db_session, guild_id, gold=sum(g for g, _o, _c in gc.BOSS_SUMMON.values()))
+
+
+async def test_city_gates_free_with_first_gate(db_session, make_character) -> None:
+    from game.world import world_config as wc
+
+    guild, leader = await _found(db_session, make_character)
+    leader.region = "ridge"
+    city = wc.CITY_COORDS[leader.region]
+    leader.pos_x, leader.pos_y = city
+    with pytest.raises(GuildError, match="нет врат"):
+        await guild_territory_service.travel_gates(db_session, leader, 1)
+    base = await _held_base(db_session, guild, 5, 12)
+    db_session.add(GuildBuilding(cell_id=base.id, building=gc.B_GATES, level=1))
+    await db_session.flush()
+    # Из города - на базу с вратами.
+    assert await guild_territory_service.travel_gates(db_session, leader, base.id) == (5, 12)
+    leader.gates_used_at = None
+    # С базы - в родной город.
+    assert await guild_territory_service.travel_gates(db_session, leader, "city") == city
+    leader.gates_used_at = None
+    # С клетки без врат и не из города - нельзя.
+    leader.pos_x, leader.pos_y = 7, 7
+    with pytest.raises(GuildError):
+        await guild_territory_service.travel_gates(db_session, leader, base.id)
