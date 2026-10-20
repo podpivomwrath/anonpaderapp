@@ -79,7 +79,7 @@ from game.economy import fishing as game_fishing
 from game.economy import premium_config as pc
 from game.world import grid
 from models import Character, CharacterStats
-from services import pk_service, pts_service, pvp_shield, trial_service
+from services import pk_service, pts_service, pvp_shield, subclass_service, trial_service
 from services import (
     admin_service,
     daily_service,
@@ -1717,7 +1717,7 @@ async def _finish_duel(battle: Battle, winner_cid: int, loser_cid: int) -> None:
         await pvp_service.log_battle(db, "duel", [winner_cid, loser_cid], [winner_cid])
         daily_progress = await daily_service.record_pvp_win(db, winner)
         # Испытания «победи выше уровнем» засчитывают и PvP (2026-10-13).
-        trial_buffs = await trial_service.record_level_kill(db, winner, loser.level) if winner.subclass else []
+        trial_buffs = await trial_service.record_level_kill(db, winner, loser.level) if subclass_service.buff_pool(winner) else []
         winner_pos = (winner.pos_x, winner.pos_y)
         winner_has_mount = await mount_service.has_any_mount(db, winner.id)
         await db.commit()
@@ -1991,7 +1991,7 @@ async def on_mass_battle_finished(session_id: int, result: TickResult) -> None:
         trial_lines: dict[int, list[str]] = {}
         for cid in winner_ids:
             me = characters.get(cid)
-            if me is None or me.subclass is None:
+            if me is None or subclass_service.buff_pool(me) is None:
                 continue
             top = max(
                 (characters[v].level for v in dead_ids

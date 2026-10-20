@@ -31,6 +31,14 @@ def _load() -> None:
         _defs_by_subclass.setdefault(t.subclass, []).append(t)
 
 
+def _pool(character) -> str | None:
+    """Подкласс или путь базового класса (отказ от подкласса, 2026-10-20):
+    у пути свои испытания, subclass в class_trials.json - "<класс>_path"."""
+    from services import subclass_service
+
+    return subclass_service.buff_pool(character)
+
+
 def trial_defs_for(subclass: str) -> list[ClassTrialDef]:
     _load()
     return _defs_by_subclass.get(subclass, [])
@@ -108,9 +116,10 @@ async def _reset(db: AsyncSession, character_id: int, trial: ClassTrialDef) -> N
 
 
 async def _active_trials(db: AsyncSession, character: Character) -> list[ClassTrialDef]:
-    if character.subclass is None:
+    pool = _pool(character)
+    if pool is None:
         return []
-    defs = trial_defs_for(character.subclass)
+    defs = trial_defs_for(pool)
     rows = await _progress_rows(db, character.id, [d.id for d in defs])
     return [d for d in defs if not (rows.get(d.id) is not None and rows[d.id].completed)]
 
@@ -332,12 +341,13 @@ class TrialState:
 
 async def get_trial_states(db: AsyncSession, character: Character) -> list[TrialState]:
     """Для чата Хранителя и мини-аппа (вкладка «Испытания»)."""
-    if character.subclass is None:
+    pool = _pool(character)
+    if pool is None:
         return []
     from game.content_loader import load_content
 
     catalog = load_content().buffs
-    defs = trial_defs_for(character.subclass)
+    defs = trial_defs_for(pool)
     rows = await _progress_rows(db, character.id, [d.id for d in defs])
     result = []
     for d in defs:

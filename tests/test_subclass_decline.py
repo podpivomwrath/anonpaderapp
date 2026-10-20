@@ -9,8 +9,8 @@ from game.combat import balance_config as bc
 from game.combat.base_skills import BASE_SKILL_DEFS
 from game.combat.resolver import resolve_tick
 from game.content_loader import load_content
-from models import BaseClass
-from services import power_service, preset_service, subclass_service
+from models import BaseClass, CharacterUnlockedBuff
+from services import power_service, preset_service, subclass_service, trial_service
 from services.preset_service import PresetValidationError
 from services.respec_service import full_class_reset
 from tests.conftest import NoCritRng, combatant
@@ -27,7 +27,7 @@ def test_every_base_class_has_a_full_pool() -> None:
         assert all(b.implemented for b in pool)
 
 
-async def test_decline_opens_base_pool_without_trials(db_session, make_character) -> None:
+async def test_decline_opens_base_pool_behind_trials(db_session, make_character) -> None:
     character = await make_character(level=30, farm=10_000)
     assert subclass_service.buff_pool(character) is None
     subclass_service.decline(character)
@@ -35,6 +35,14 @@ async def test_decline_opens_base_pool_without_trials(db_session, make_character
     assert subclass_service.path_chosen(character)
     assert subclass_service.buff_pool(character) == "warrior_path"
 
+    # Баффы пути открываются испытаниями, как у подклассов (2026-10-20).
+    states = await trial_service.get_trial_states(db_session, character)
+    assert {s_.trial.buff_id for s_ in states} == {b.id for b in CATALOG.values() if b.subclass == "warrior_path"}
+    with pytest.raises(PresetValidationError):
+        await preset_service.save_preset(db_session, character, "Путь", WARRIOR_SET, CATALOG)
+    for buff_id in WARRIOR_SET:
+        db_session.add(CharacterUnlockedBuff(character_id=character.id, buff_id=buff_id))
+    await db_session.flush()
     preset = await preset_service.save_preset(db_session, character, "Путь", WARRIOR_SET, CATALOG)
     await preset_service.switch_active_preset(db_session, character, preset.id)
     mods = await preset_service.resolve_active_modifiers(db_session, character)
@@ -44,11 +52,14 @@ async def test_decline_opens_base_pool_without_trials(db_session, make_character
 
 
 def test_foreign_path_buffs_rejected() -> None:
+    opened = set(WARRIOR_SET)
     with pytest.raises(PresetValidationError):
-        preset_service.validate_preset(WARRIOR_SET, "rogue_path", CATALOG, set())
+        preset_service.validate_preset(WARRIOR_SET, "rogue_path", CATALOG, opened)
     with pytest.raises(PresetValidationError):
-        preset_service.validate_preset(WARRIOR_SET, "guardian", CATALOG, set())
-    preset_service.validate_preset(WARRIOR_SET, "warrior_path", CATALOG, set())
+        preset_service.validate_preset(WARRIOR_SET, "guardian", CATALOG, opened)
+    with pytest.raises(PresetValidationError):
+        preset_service.validate_preset(WARRIOR_SET, "warrior_path", CATALOG, set())
+    preset_service.validate_preset(WARRIOR_SET, "warrior_path", CATALOG, opened)
 
 
 async def test_only_full_class_change_clears_decline(db_session, make_character) -> None:

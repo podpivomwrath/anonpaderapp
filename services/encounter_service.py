@@ -19,6 +19,7 @@ from services import (
     item_service,
     quest_service,
     raid_key_service,
+    subclass_service,
     trial_service,
     trophy_service,
 )
@@ -124,7 +125,7 @@ async def resolve_victory(
     elixir_line = await elixir_service.grant_heal_from_kill(db, character, rng)
 
     unlocked: list[str] = []
-    if character.subclass is not None:
+    if subclass_service.buff_pool(character) is not None:
         unlocked += await trial_service.record_trophies(db, character, trophies)
         if battle_report is not None:
             unlocked += await trial_service.record_battle(db, character, battle_report)
@@ -181,7 +182,7 @@ async def resolve_defeat(db: AsyncSession, character: Character) -> DefeatOutcom
     character.travel_target_x = None
     character.travel_target_y = None
     character.travel_arrives_at = None
-    if character.subclass is not None:
+    if subclass_service.buff_pool(character) is not None:
         await trial_service.record_defeat(db, character)
     await daily_service.record_defeat(db, character)
     await admin_service.log_death(db, character, "pve")

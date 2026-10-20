@@ -54,7 +54,6 @@ def validate_preset(
             )
         if (
             buff.subclass is not None
-            and not subclass_service.is_path_pool(buff.subclass)
             and unlocked_buff_ids is not None
             and buff_id not in unlocked_buff_ids
         ):

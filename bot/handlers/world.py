@@ -110,6 +110,7 @@ from services import (
     world_boss_service,
 )
 from services import onboarding_service as onboarding_svc
+from services import subclass_service
 from services import pk_service
 from services.db import get_session_factory
 
@@ -527,7 +528,7 @@ async def show_location(message: Message, db, character) -> None:
         return
 
     if movement_service.resolve_arrival(character, now):
-        if character.subclass is not None:
+        if subclass_service.buff_pool(character) is not None:
             await trial_service.record_cell_moved(db, character)
         daily_progress = await daily_service.record_cell_moved(db, character)
         await db.commit()
@@ -1317,7 +1318,7 @@ async def handle_rest_done(peer_id: int) -> None:
         max_hp = vitals_service.max_hp(character, stats, vit_bonus)
         hp_before = vitals_service.current_hp(character, stats, vit_bonus)
         vitals_service.restore_full(character)
-        if character.subclass is not None:
+        if subclass_service.buff_pool(character) is not None:
             await trial_service.record_rest(db, character)
         await daily_service.record_rest(db, character)
         has_mount = await mount_service.has_any_mount(db, character.id)
@@ -1363,7 +1364,7 @@ async def move(message: Message) -> None:
             await message.answer("🛏️ Ты отдыхаешь. Дай себе минуту.")
             return
         if movement_service.resolve_arrival(character, now):
-            if character.subclass is not None:
+            if subclass_service.buff_pool(character) is not None:
                 await trial_service.record_cell_moved(db, character)
             daily_progress = await daily_service.record_cell_moved(db, character)
             await db.commit()
@@ -1450,7 +1451,7 @@ async def handle_arrival(peer_id: int) -> None:
             return
         if not movement_service.resolve_arrival(character):
             return  # игрок уже сам разрешил прибытие более ранним действием
-        if character.subclass is not None:
+        if subclass_service.buff_pool(character) is not None:
             await trial_service.record_cell_moved(db, character)
         daily_progress = await daily_service.record_cell_moved(db, character)
         await guild_handlers.on_arrival(db, character)

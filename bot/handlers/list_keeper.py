@@ -191,8 +191,7 @@ async def open_keeper(message: Message) -> None:
         if character.subclass is not None:
             has_subclass = True
         elif subclass_service.declined(character):
-            await message.answer(KEEPER["declined_visit"], attachment=KEEPER_ATTACHMENT)
-            return
+            has_subclass = True  # испытания пути - как у подкласса
         elif not subclass_service.can_offer(character):
             await message.answer(KEEPER["too_low_level"])
             return

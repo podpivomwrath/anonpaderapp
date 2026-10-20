@@ -49,6 +49,7 @@ from services import (
     wallet_service,
 )
 from services import onboarding_service as onboarding_svc
+from services import subclass_service
 from services.db import get_session_factory
 
 labeler = BotLabeler()
@@ -739,7 +740,7 @@ async def scan() -> None:
             if step.arrived:
                 from services import trial_service
 
-                if character.subclass is not None:
+                if subclass_service.buff_pool(character) is not None:
                     await trial_service.record_cell_moved(db, character)
                 stats = await _stats(db, character.id)
                 wallet = await wallet_service.get_wallet(db, character.id)

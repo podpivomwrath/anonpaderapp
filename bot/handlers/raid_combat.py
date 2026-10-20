@@ -63,6 +63,7 @@ from services import (
     pvp_shield,
     quest_service,
     raid_combat_service,
+    subclass_service,
     trial_service,
     trophy_service,
 )
@@ -1367,7 +1368,7 @@ async def _grant_stage_reward(battle: RaidBattle, reward: StageReward) -> dict[i
             trial_level = _trial_level(battle)
             for cid, p in list(battle.participants.items()):
                 character = await db.get(Character, cid)
-                if character is None or character.subclass is None:
+                if character is None or subclass_service.buff_pool(character) is None:
                     continue
                 for buff_id in await trial_service.record_level_kill(db, character, trial_level):
                     opened = f"📖 Испытание пройдено. Открыт бафф: {trial_service.buff_name(buff_id)}."

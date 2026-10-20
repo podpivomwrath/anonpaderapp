@@ -264,13 +264,13 @@ async def handle_get_trials(request: web.Request) -> web.Response:
         character = await _load_character(session, vk_user_id)
         if character is None:
             return web.json_response({"error": "character_not_found"}, status=404)
-        if character.subclass is None:
+        if subclass_service.buff_pool(character) is None:
             return web.json_response({"subclass": None, "trials": []})
         states = await trial_service.get_trial_states(session, character)
         catalog = load_content().buffs
         return web.json_response(
             {
-                "subclass": character.subclass,
+                "subclass": subclass_service.buff_pool(character),
                 "trials": [
                     {
                         "id": s.trial.id,
@@ -952,7 +952,7 @@ async def handle_get_presets(request: web.Request) -> web.Response:
                         "category_label": buff_descriptions.category_label(b.category),
                         # без описания игрок собирает пресет вслепую, по одним названиям
                         "description": buff_descriptions.describe(b),
-                        "unlocked": b.id in unlocked or subclass_service.is_path_pool(pool),
+                        "unlocked": b.id in unlocked,
                     }
                     for b in subclass_buffs
                 ],

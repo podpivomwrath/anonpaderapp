@@ -69,6 +69,7 @@ from services import (
     vitals_service,
 )
 from services import onboarding_service as onboarding_svc
+from services import subclass_service
 from services import story_service
 from services.db import get_session_factory
 
@@ -841,7 +842,7 @@ async def on_group_battle_finished(session_id: int, result: TickResult) -> None:
                     only_skills=False, only_basic_attack=False,
                 )
                 battle_dailies[cid] = await daily_service.record_battle(db, character, report)
-                if character.subclass is not None:
+                if subclass_service.buff_pool(character) is not None:
                     trial_buffs[cid] = await trial_service.record_group_win(db, character)
                 # HP после боя остаётся как есть, как в соло (2026-10-13):
                 # раньше группа шла в следующий бой с полным HP без отдыха.
