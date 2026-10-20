@@ -96,47 +96,75 @@
 
 .guild-danger { display: flex; justify-content: center; padding-bottom: 24px; }
 
-.guild-tree {
-  position: relative;
-  height: 420px;
-  margin: 0 12px;
-  overscroll-behavior: contain;
-  border-radius: 12px;
-  background: radial-gradient(circle at center, rgba(60, 20, 20, 0.6), rgba(10, 8, 8, 0.9));
-  touch-action: none;
+/* Древо - созвездия (2026-10-20): одна рука ветви на экране, без жестов. */
+.guild-tree { margin: 0 12px; user-select: none; }
+.guild-tree__tabs, .guild-tree__arms { display: flex; gap: 6px; margin-bottom: 6px; }
+.guild-tree__tab, .guild-tree__arm {
+  flex: 1;
+  min-width: 0;
+  padding: 7px 6px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  background: rgba(255, 255, 255, 0.04);
+  color: inherit;
+  font-size: 13px;
+  white-space: nowrap;
   overflow: hidden;
-  user-select: none;
+  text-overflow: ellipsis;
 }
-.guild-tree__svg { width: 100%; height: 100%; display: block; }
-.guild-tree__edge { stroke: rgba(255, 255, 255, 0.14); stroke-width: 3; }
-.guild-tree__edge--on { stroke-width: 5; opacity: 0.9; }
+.guild-tree__tab span { opacity: 0.6; font-size: 12px; }
+.guild-tree__arm { font-size: 12px; padding: 5px 4px; }
+.guild-tree__tab--on, .guild-tree__arm--on {
+  border-color: var(--branch);
+  background: color-mix(in srgb, var(--branch) 22%, transparent);
+}
+/* Экран руки: картинка 2:3 целиком, по высоте окна - без прокрутки. */
+.guild-tree__stage {
+  position: relative;
+  width: min(100%, calc((100dvh - 230px) * 2 / 3));
+  aspect-ratio: 2 / 3;
+  margin: 0 auto;
+  border-radius: 12px;
+  overflow: hidden;
+  background: #0b0a0c;
+}
+.guild-tree__art {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  opacity: 0.8;
+  pointer-events: none;
+}
+.guild-tree__svg { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+.guild-tree__star { cursor: pointer; -webkit-tap-highlight-color: transparent; }
+.guild-tree__node--away { stroke-dasharray: 6 5; }
+.guild-tree__away-label {
+  font-size: 34px;
+  fill: rgba(255, 255, 255, 0.75);
+  pointer-events: none;
+}
+.guild-tree__edge { stroke: rgba(255, 255, 255, 0.28); stroke-width: 4; }
+.guild-tree__edge--on { stroke-width: 7; opacity: 0.95; }
+/* Звёзды: закрытая - бледная, доступная - светится цветом ветви, взятая - горит. */
 .guild-tree__node {
-  fill: rgba(20, 16, 16, 0.95);
-  stroke: var(--branch);
-  stroke-width: 2.5;
-  opacity: 0.45;
+  fill: rgba(12, 10, 12, 0.9);
+  stroke: rgba(255, 255, 255, 0.6);
+  stroke-width: 4;
   cursor: pointer;
 }
-.guild-tree__node--available { opacity: 1; stroke-dasharray: 4 3; }
-.guild-tree__node--taken { opacity: 1; fill: var(--branch); }
-.guild-tree__node--selected { stroke: #fff; stroke-width: 4; opacity: 1; }
-.guild-tree__zoom {
-  position: absolute;
-  right: 8px;
-  top: 8px;
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
+.guild-tree__node--available {
+  stroke: var(--branch);
+  stroke-width: 6;
+  filter: drop-shadow(0 0 6px var(--branch));
 }
-.guild-tree__zoom button {
-  width: 34px;
-  height: 34px;
-  border-radius: 8px;
-  border: 1px solid rgba(255, 255, 255, 0.25);
-  background: rgba(0, 0, 0, 0.6);
-  color: #fff;
-  font-size: 18px;
+.guild-tree__node--taken {
+  fill: var(--branch);
+  stroke: #fff4e6;
+  filter: drop-shadow(0 0 10px var(--branch));
 }
+.guild-tree__node--selected { stroke: #fff; stroke-width: 8; }
 .guild-tree__legend { display: flex; gap: 14px; flex-wrap: wrap; font-size: 13px; }
 .guild-tree__legend i {
   display: inline-block;
@@ -164,7 +192,7 @@
 .guild-tree__card {
   position: absolute;
   left: 10px;
-  right: 54px;
+  right: 10px;
   bottom: 10px;
   max-height: 62%;
   overflow-y: auto;
@@ -195,15 +223,12 @@
   color: #ff8a73;
 }
 
-.guild-tree__card--top { top: 52px; bottom: auto; }
+.guild-tree__card--top { top: 10px; bottom: auto; }
 
 /* Сводка древа - полоса сверху поверх древа. */
 .guild-tree__bar {
-  position: absolute;
-  left: 10px;
-  right: 54px;
-  top: 8px;
   display: flex;
+  margin-bottom: 6px;
   align-items: center;
   justify-content: space-between;
   gap: 8px;
@@ -224,7 +249,7 @@
 .guild-tree__toast {
   position: absolute;
   left: 10px;
-  right: 54px;
+  right: 10px;
   bottom: 10px;
   padding: 10px 12px;
   border-radius: 10px;

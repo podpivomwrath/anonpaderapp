@@ -1,26 +1,25 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Button, Div, Placeholder, Spinner } from '@vkontakte/vkui';
 import { getGuildTree, guildAction } from '../api.js';
+import { ARM_IMAGES, ARM_POINTS, ROOT_POINT, STAGE_H, STAGE_W, armOf } from './guildTreeLayout.js';
 
-// Древо гильдии: три ветви, почти двести узлов. Рисуется SVG целиком, а
-// смотрится как карта - перетаскиванием и масштабом. Координаты и связи
-// приходят с сервера (game/guild/tree.py): клиент ничего не пересчитывает.
+// Древо гильдии - созвездия (2026-10-20, решение владельца). Раньше всё
+// древо было одной картой с перетаскиванием и щипком, и в VK жесты
+// путались: тап считался сдвигом, щипок перехватывало приложение. Теперь
+// на экране одна рука ветви - картинка-силуэт и 21 звезда по её контуру,
+// всё видно целиком: ни прокрутки, ни масштаба, только нажатия.
 //
-// Ветви растут снизу вверх. Экран древа занимает всю высоту окна, а сама
-// страница на нём не листается: иначе жест по древу то тянул его, то
-// прокручивал страницу. Сводка, итоги и карточка узла - плашками поверх.
+// Координаты и связи узлов - с сервера (game/guild/tree.py), положение
+// звёзд на картинке - guildTreeLayout.js. Связи в соседнюю руку и
+// перемычка ветви - звёзды у края экрана: нажатие ведёт в ту руку.
 
 const BRANCH_COLOR = { war: '#d9483b', craft: '#e8a33d', kin: '#5fa8d9' };
-const RADIUS = { root: 22, small: 9, notable: 15, keystone: 22 };
-//: Ширина древа в его единицах при масштабе 1 - видно всё целиком.
-const BASE_WIDTH = 2500;
-//: Начальный вид: центр чуть выше корней, древо целиком.
-const HOME = { x: 0, y: -380, scale: 1 };
-const MIN_SCALE = 0.6;
-const MAX_SCALE = 10;
-const clampScale = (s) => Math.min(MAX_SCALE, Math.max(MIN_SCALE, s));
+const RADIUS = { root: 30, small: 15, notable: 23, keystone: 34 };
+//: Невидимая зона нажатия вокруг звезды - палец больше звезды.
+const HIT = 40;
 const money = (v) => Number(v ?? 0).toLocaleString('ru-RU');
 const KIND_TITLES = { root: 'начало ветви', small: 'малый узел', notable: 'средний узел', keystone: 'ключевой узел' };
+const ARM_TITLES_FALLBACK = ['Рука 1', 'Рука 2', 'Рука 3'];
 
 export default function GuildTree({ onChanged }) {
   const [tree, setTree] = useState(null);
@@ -28,14 +27,9 @@ export default function GuildTree({ onChanged }) {
   const [selected, setSelected] = useState(null);
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState(null);
-  const [view, setView] = useState(HOME);
-  const [size, setSize] = useState({ w: 1, h: 0 });
   const [info, setInfo] = useState(false);
-  const drag = useRef(null);
-  // Пальцы на экране: один - тянем древо, два - масштаб щипком.
-  const pointers = useRef(new Map());
-  const pinch = useRef(null);
-  const box = useRef(null);
+  const [branch, setBranch] = useState('war');
+  const [arm, setArm] = useState(0);
 
   const load = useCallback(() => {
     getGuildTree()
@@ -43,45 +37,6 @@ export default function GuildTree({ onChanged }) {
       .catch(() => setStatus('error'));
   }, []);
   useEffect(() => { load(); }, [load]);
-
-  // Страница на экране древа не листается: древо само заполняет окно.
-  useEffect(() => {
-    const body = document.body.style.overflow;
-    const html = document.documentElement.style.overflow;
-    document.body.style.overflow = 'hidden';
-    document.documentElement.style.overflow = 'hidden';
-    window.scrollTo(0, 0);
-    return () => {
-      document.body.style.overflow = body;
-      document.documentElement.style.overflow = html;
-    };
-  }, []);
-
-  // Высота - до низа окна от верха древа.
-  useEffect(() => {
-    const measure = () => {
-      const el = box.current;
-      if (!el) return;
-      const rect = el.getBoundingClientRect();
-      setSize({ w: rect.width, h: Math.max(320, Math.round(window.innerHeight - rect.top - 8)) });
-    };
-    measure();
-    window.addEventListener('resize', measure);
-    return () => window.removeEventListener('resize', measure);
-  }, [status]);
-
-  // Колесо - нативным обработчиком: в React он пассивный, preventDefault в
-  // нём не работает, и вместо приближения листалась вся страница.
-  useEffect(() => {
-    const el = box.current;
-    if (!el) return undefined;
-    const onWheel = (e) => {
-      e.preventDefault();
-      setView((v) => ({ ...v, scale: clampScale(v.scale * (e.deltaY < 0 ? 1.15 : 1 / 1.15)) }));
-    };
-    el.addEventListener('wheel', onWheel, { passive: false });
-    return () => el.removeEventListener('wheel', onWheel);
-  }, [status]);
 
   const act = async (action, params, okText) => {
     setBusy(true);
@@ -106,68 +61,39 @@ export default function GuildTree({ onChanged }) {
 
   const byId = Object.fromEntries(tree.nodes.map((n) => [n.id, n]));
   const node = selected ? byId[selected] : null;
-  const edges = [];
-  const seen = new Set();
-  tree.nodes.forEach((n) => n.links.forEach((l) => {
-    const key = n.id < l ? `${n.id}|${l}` : `${l}|${n.id}`;
-    if (seen.has(key)) return;
-    seen.add(key);
-    edges.push([n, byId[l]]);
-  }));
+  const color = BRANCH_COLOR[branch];
+  const rootId = `${branch}:root`;
+  const armIds = ARM_POINTS[branch][arm].map((_, i) => `${branch}:${arm}:${i}`);
+  const point = Object.fromEntries(armIds.map((id, i) => [id, ARM_POINTS[branch][arm][i]]));
+  point[rootId] = ROOT_POINT;
+  const armTitle = (b, a) => byId[`${b}:${a}:20`]?.name || ARM_TITLES_FALLBACK[a];
 
-  const distance = () => {
-    const [a, b] = [...pointers.current.values()];
-    return Math.hypot(a.x - b.x, a.y - b.y) || 1;
-  };
-  const onPointerDown = (e) => {
-    pointers.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
-    e.currentTarget.setPointerCapture?.(e.pointerId);
-    if (pointers.current.size === 2) {
-      pinch.current = { dist: distance(), scale: view.scale };
-      if (drag.current) drag.current.moved = true;
-      return;
-    }
-    drag.current = { x: e.clientX, y: e.clientY, vx: view.x, vy: view.y, moved: false };
-  };
-  const onPointerMove = (e) => {
-    if (!pointers.current.has(e.pointerId)) return;
-    pointers.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
-    if (pointers.current.size >= 2 && pinch.current) {
-      const ratio = distance() / pinch.current.dist;
-      setView((v) => ({ ...v, scale: clampScale(pinch.current.scale * ratio) }));
-      return;
-    }
-    const d = drag.current;
-    if (!d) return;
-    const dx = e.clientX - d.x;
-    const dy = e.clientY - d.y;
-    if (Math.abs(dx) + Math.abs(dy) > 4) d.moved = true;
-    // Пиксели экрана -> единицы древа: видимая ширина / ширина окна.
-    const width = e.currentTarget.getBoundingClientRect().width || 1;
-    setView((v) => {
-      const k = BASE_WIDTH / v.scale / width;
-      return { ...v, x: d.vx - dx * k, y: d.vy - dy * k };
+  // Звёзды за краем экрана: узлы других рук и перемычка, связанные с узлами
+  // этой руки. Встают у левого или правого края на высоте своего соседа.
+  const outside = [];
+  armIds.forEach((id) => {
+    (byId[id]?.links || []).forEach((linked) => {
+      if (linked === rootId || point[linked] || outside.some((o) => o.id === linked)) return;
+      const other = armOf(linked);
+      const left = other !== null ? other < arm : arm === 1;
+      outside.push({ id: linked, from: id, arm: other, x: left ? 70 : 930, y: point[id][1] });
     });
-  };
-  const onPointerUp = (e) => {
-    pointers.current.delete(e.pointerId);
-    if (pointers.current.size < 2) pinch.current = null;
-    if (pointers.current.size === 1) {
-      // Один палец остался - продолжаем тянуть от него, без скачка.
-      const [rest] = [...pointers.current.values()];
-      drag.current = { x: rest.x, y: rest.y, vx: view.x, vy: view.y, moved: true };
-      return;
+  });
+  outside.forEach((o) => { point[o.id] = [o.x, o.y]; });
+
+  const edges = [[rootId, armIds[0]]];
+  for (let i = 1; i < armIds.length; i += 1) edges.push([armIds[i - 1], armIds[i]]);
+  outside.forEach((o) => edges.push([o.from, o.id]));
+
+  const pick = (id) => {
+    const target = outside.find((o) => o.id === id);
+    if (target && target.arm !== null) {
+      // Узел соседней руки - переходим туда, он и откроется.
+      setArm(target.arm);
     }
-    // Нажатие без сдвига - выбор узла под пальцем. По точке, а не по onClick:
-    // захват указателя уводит click на контейнер, и узел его не получает.
-    if (drag.current && !drag.current.moved) {
-      const hit = document.elementFromPoint(e.clientX, e.clientY);
-      const id = hit?.getAttribute?.('data-node');
-      if (id) setSelected(id);
-    }
-    drag.current = null;
+    setInfo(false);
+    setSelected(id);
   };
-  const zoom = (k) => setView((v) => ({ ...v, scale: clampScale(v.scale * k) }));
 
   /** Почему узел сейчас не взять - или null, если можно. */
   const lack = (n) => {
@@ -178,111 +104,126 @@ export default function GuildTree({ onChanged }) {
     return null;
   };
 
-  // Видимая область в единицах древа: ширина от масштаба, высота - по
-  // пропорциям экрана, чтобы древо не сплющивалось.
-  const vbW = BASE_WIDTH / view.scale;
-  const vbH = vbW * (size.h / Math.max(size.w, 1));
-  const viewBox = `${view.x - vbW / 2} ${view.y - vbH / 2} ${vbW} ${vbH}`;
-  const stop = { onPointerDown: (e) => e.stopPropagation(), onPointerUp: (e) => e.stopPropagation() };
+  const taken = (b) => tree.nodes.filter((n) => n.branch === b && n.taken && n.kind !== 'root').length;
 
   return (
-    <div
-      ref={box}
-      className="guild-tree"
-      style={{ height: size.h || undefined }}
-      onPointerDown={onPointerDown} onPointerMove={onPointerMove} onPointerUp={onPointerUp}
-      onPointerCancel={onPointerUp}
-    >
-      <svg viewBox={viewBox} className="guild-tree__svg" preserveAspectRatio="xMidYMid meet">
-        {edges.map(([a, b]) => (
-          <line key={`${a.id}|${b.id}`} x1={a.x} y1={a.y} x2={b.x} y2={b.y}
-            className={a.taken && b.taken ? 'guild-tree__edge guild-tree__edge--on' : 'guild-tree__edge'}
-            style={a.taken && b.taken ? { stroke: BRANCH_COLOR[a.branch] } : undefined} />
+    <div className="guild-tree">
+      <div className="guild-tree__tabs">
+        {Object.entries(tree.branches).map(([id, title]) => (
+          <button type="button" key={id}
+            className={`guild-tree__tab${id === branch ? ' guild-tree__tab--on' : ''}`}
+            style={{ '--branch': BRANCH_COLOR[id] }}
+            onClick={() => { setBranch(id); setArm(0); setSelected(null); }}>
+            {title} <span>{taken(id)}</span>
+          </button>
         ))}
-        {tree.nodes.map((n) => (
-          <circle key={n.id} cx={n.x} cy={n.y} r={RADIUS[n.kind]}
-            className={[
-              'guild-tree__node',
-              n.taken ? 'guild-tree__node--taken' : '',
-              n.available ? 'guild-tree__node--available' : '',
-              selected === n.id ? 'guild-tree__node--selected' : '',
-            ].join(' ')}
-            style={{ '--branch': BRANCH_COLOR[n.branch] }}
-            data-node={n.id}
-          />
+      </div>
+      <div className="guild-tree__arms">
+        {[0, 1, 2].map((a) => (
+          <button type="button" key={a}
+            className={`guild-tree__arm${a === arm ? ' guild-tree__arm--on' : ''}`}
+            style={{ '--branch': color }}
+            onClick={() => { setArm(a); setSelected(null); }}>
+            {armTitle(branch, a)}
+          </button>
         ))}
-        {tree.nodes.filter((n) => n.kind === 'root').map((n) => (
-          <text key={`t:${n.id}`} x={n.x} y={n.y + 48} className="guild-tree__root-label"
-            style={{ fill: BRANCH_COLOR[n.branch] }}>{n.name}</text>
-        ))}
-      </svg>
+      </div>
 
-      {/* Сводка - плашкой поверх древа: страница не листается, всё здесь. */}
-      <div className="guild-tree__bar" {...stop}>
+      <div className="guild-tree__bar">
         <span>Очков: <b>{tree.points_available}</b> · узлов {tree.taken}/{tree.total_nodes}</span>
         <button type="button" onClick={() => { setInfo(!info); setSelected(null); }}>
           {info ? '✕' : 'Итоги'}
         </button>
       </div>
 
-      {info && (
-        <div className="guild-tree__card guild-tree__card--top" {...stop}>
-          <p className="guild-tree__card-title">Древо гильдии</p>
-          <div className="guild-tree__legend">
-            {Object.entries(tree.branches).map(([id, title]) => (
-              <span key={id}><i style={{ background: BRANCH_COLOR[id] }} /> {title}</span>
-            ))}
+      <div className="guild-tree__stage">
+        <img className="guild-tree__art" src={ARM_IMAGES[branch][arm]} alt="" draggable="false" />
+        <svg viewBox={`0 0 ${STAGE_W} ${STAGE_H}`} className="guild-tree__svg">
+          {edges.map(([a, b]) => {
+            const lit = (id) => byId[id]?.kind === 'root' || byId[id]?.taken;
+            const on = lit(a) && lit(b);
+            const [x1, y1] = point[a];
+            const [x2, y2] = point[b];
+            return (
+              <line key={`${a}|${b}`} x1={x1} y1={y1} x2={x2} y2={y2}
+                className={on ? 'guild-tree__edge guild-tree__edge--on' : 'guild-tree__edge'}
+                style={on ? { stroke: color } : undefined} />
+            );
+          })}
+          {Object.entries(point).map(([id, [x, y]]) => {
+            const n = byId[id];
+            if (!n) return null;
+            const away = outside.some((o) => o.id === id);
+            return (
+              <g key={id} className="guild-tree__star" onClick={() => pick(id)}>
+                <circle cx={x} cy={y} r={HIT} fill="transparent" />
+                <circle cx={x} cy={y} r={RADIUS[n.kind]}
+                  className={[
+                    'guild-tree__node',
+                    n.taken || n.kind === 'root' ? 'guild-tree__node--taken' : '',
+                    n.available ? 'guild-tree__node--available' : '',
+                    away ? 'guild-tree__node--away' : '',
+                    selected === id ? 'guild-tree__node--selected' : '',
+                  ].join(' ')}
+                  style={{ '--branch': color }} />
+                {away && (
+                  <text x={x < STAGE_W / 2 ? x - HIT : x + HIT} y={y + RADIUS[n.kind] + 36}
+                    textAnchor={x < STAGE_W / 2 ? 'start' : 'end'} className="guild-tree__away-label">
+                    {armOf(id) === null ? 'перемычка' : `${x < STAGE_W / 2 ? '← ' : ''}рука ${armOf(id) + 1}${x < STAGE_W / 2 ? '' : ' →'}`}
+                  </text>
+                )}
+              </g>
+            );
+          })}
+        </svg>
+
+        {info && (
+          <div className="guild-tree__card guild-tree__card--top">
+            <p className="guild-tree__card-title">Древо гильдии</p>
+            <p className="craft-hint">
+              Три ветви по три руки. Узел берут рядом с уже взятым: малый - 1 очко, средний - 2, ключевой - 3,
+              плюс золото из казны{tree.can_edit ? ` (в казне ${money(tree.treasury_gold)})` : ''}. Звёзды у края
+              ведут в соседнюю руку. Очки дают уровни гильдии. Брать могут глава и казначеи.
+            </p>
+            {tree.effects.length === 0
+              ? <p className="guild-line">Узлов пока нет.</p>
+              : tree.effects.map((e) => <p key={e} className="guild-line">• {e}</p>)}
           </div>
-          <p className="craft-hint">
-            Ветви растут снизу вверх. Узел берут рядом с уже взятым: малый - 1 очко, средний - 2, ключевой - 3,
-            плюс золото из казны{tree.can_edit ? ` (в казне ${money(tree.treasury_gold)})` : ''}. Очки дают уровни
-            гильдии. Брать могут глава и казначеи.
-          </p>
-          {tree.effects.length === 0
-            ? <p className="guild-line">Узлов пока нет.</p>
-            : tree.effects.map((e) => <p key={e} className="guild-line">• {e}</p>)}
-        </div>
-      )}
+        )}
 
-      {node && !info && (
-        // Карточка узла - как карточка клетки на карте.
-        <div className="guild-tree__card guild-tree__card--top" {...stop}>
-          <button type="button" className="guild-tree__card-close" onClick={() => setSelected(null)}
-            aria-label="Закрыть">✕</button>
-          <p className="guild-tree__card-title" style={{ color: BRANCH_COLOR[node.branch] }}>{node.name}</p>
-          <p className="craft-hint">{tree.branches[node.branch]} · {KIND_TITLES[node.kind]}</p>
-          <p className="guild-line guild-tree__desc">{node.description}</p>
-          {node.kind === 'root' || node.taken ? (
-            node.kind !== 'root' && <p className="guild-line">✅ Взят</p>
-          ) : (
-            <>
-              <p className="craft-hint">
-                Цена: {node.points} очк. (есть {tree.points_available}) и {money(node.gold)} 💰
-              </p>
-              {lack(node) ? (
-                <p className="guild-tree__card-lack">{lack(node)}</p>
-              ) : (
-                <Button size="m" stretched disabled={busy}
-                  onClick={() => act('tree_allocate', { node_id: node.id }, `Узел «${node.name}» взят.`)}>
-                  Взять узел
-                </Button>
-              )}
-            </>
-          )}
-        </div>
-      )}
+        {node && !info && (
+          <div className="guild-tree__card">
+            <button type="button" className="guild-tree__card-close" onClick={() => setSelected(null)}
+              aria-label="Закрыть">✕</button>
+            <p className="guild-tree__card-title" style={{ color: BRANCH_COLOR[node.branch] }}>{node.name}</p>
+            <p className="craft-hint">{tree.branches[node.branch]} · {KIND_TITLES[node.kind]}</p>
+            <p className="guild-line guild-tree__desc">{node.description}</p>
+            {node.kind === 'root' || node.taken ? (
+              node.kind !== 'root' && <p className="guild-line">✅ Взят</p>
+            ) : (
+              <>
+                <p className="craft-hint">
+                  Цена: {node.points} очк. (есть {tree.points_available}) и {money(node.gold)} 💰
+                </p>
+                {lack(node) ? (
+                  <p className="guild-tree__card-lack">{lack(node)}</p>
+                ) : (
+                  <Button size="m" stretched disabled={busy}
+                    onClick={() => act('tree_allocate', { node_id: node.id }, `Узел «${node.name}» взят.`)}>
+                    Взять узел
+                  </Button>
+                )}
+              </>
+            )}
+          </div>
+        )}
 
-      {notice && (
-        <div className={`guild-tree__toast ${notice.ok ? 'craft-notice--ok' : 'craft-notice--bad'}`}
-          {...stop} onClick={() => setNotice(null)}>
-          {notice.text}
-        </div>
-      )}
-
-      <div className="guild-tree__zoom" {...stop}>
-        <button type="button" onClick={() => zoom(1.3)}>+</button>
-        <button type="button" onClick={() => zoom(1 / 1.3)}>−</button>
-        <button type="button" onClick={() => setView(HOME)}>◎</button>
+        {notice && (
+          <div className={`guild-tree__toast ${notice.ok ? 'craft-notice--ok' : 'craft-notice--bad'}`}
+            onClick={() => setNotice(null)}>
+            {notice.text}
+          </div>
+        )}
       </div>
     </div>
   );
