@@ -291,18 +291,19 @@ def build() -> dict[str, TreeNode]:
                 nodes[node_id] = node
                 _link(nodes, previous, node_id)
                 previous = node_id
-        # Перемычки между соседними руками у средних узлов: обход вокруг.
-        for arm in range(2):
-            for pos in (6, 13):
-                _link(nodes, f"{branch}:{arm}:{pos}", f"{branch}:{arm + 1}:{pos - 1}")
-        # Десятый средний узел - между руками 0 и 1 на середине пути.
+        # Десятый средний узел («перемычка», id остался прежним) - внутри
+        # второй руки, между её 9-м и 10-м узлом (2026-10-20, владелец:
+        # каждая рука качается отдельно, переходов между руками нет). Раньше
+        # он соединял руки 0 и 1, а у средних узлов были связи между руками.
         bridge_id = f"{branch}:bridge"
         name, effects = next(notable_iter)
-        a, c = nodes[f"{branch}:0:9"], nodes[f"{branch}:1:9"]
+        a, c = nodes[f"{branch}:1:9"], nodes[f"{branch}:1:10"]
         nodes[bridge_id] = TreeNode(
             bridge_id, branch, KIND_NOTABLE, name, dict(effects),
             round((a.x + c.x) / 2, 1), round((a.y + c.y) / 2, 1),
         )
+        a.links.discard(c.id)
+        c.links.discard(a.id)
         _link(nodes, bridge_id, a.id)
         _link(nodes, bridge_id, c.id)
     for node in nodes.values():

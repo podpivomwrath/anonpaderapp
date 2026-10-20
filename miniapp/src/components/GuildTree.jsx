@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Button, Div, Placeholder, Spinner } from '@vkontakte/vkui';
 import { getGuildTree, guildAction } from '../api.js';
-import { ARM_IMAGES, ARM_POINTS, ROOT_POINT, STAGE_H, STAGE_W, armOf } from './guildTreeLayout.js';
+import { ARM_IMAGES, ARM_POINTS, ROOT_POINT, STAGE_H, STAGE_W, armNodeIds } from './guildTreeLayout.js';
 
 // Древо гильдии - созвездия (2026-10-20, решение владельца). Раньше всё
 // древо было одной картой с перетаскиванием и щипком, и в VK жесты
@@ -78,28 +78,13 @@ export default function GuildTree({ onChanged }) {
   const node = selected ? byId[selected] : null;
   const color = BRANCH_COLOR[branch];
   const rootId = `${branch}:root`;
-  const armIds = ARM_POINTS[branch][arm].map((_, i) => `${branch}:${arm}:${i}`);
+  const armIds = armNodeIds(branch, arm);
   const point = Object.fromEntries(armIds.map((id, i) => [id, ARM_POINTS[branch][arm][i]]));
   point[rootId] = ROOT_POINT;
   const armTitle = (b, a) => byId[`${b}:${a}:20`]?.name || ARM_TITLES_FALLBACK[a];
 
-  // Перемычка ветви (узел между руками 1 и 2) - обычная звезда сбоку от
-  // своего соседа на обеих руках: без неё узел не взять. Связи в соседние
-  // руки не рисуем (2026-10-20, владелец: кнопки перехода мешали) - каждая
-  // рука и так растёт от корня.
-  const outside = [];
-  armIds.forEach((id) => {
-    (byId[id]?.links || []).forEach((linked) => {
-      if (armOf(linked) !== null || linked === rootId || outside.some((o) => o.id === linked)) return;
-      const [x, y] = point[id];
-      outside.push({ id: linked, from: id, x: arm === 0 ? Math.min(x + 170, 930) : Math.max(x - 170, 70), y: y - 40 });
-    });
-  });
-  outside.forEach((o) => { point[o.id] = [o.x, o.y]; });
-
   const edges = [[rootId, armIds[0]]];
   for (let i = 1; i < armIds.length; i += 1) edges.push([armIds[i - 1], armIds[i]]);
-  outside.forEach((o) => edges.push([o.from, o.id]));
 
   const pick = (id) => {
     setInfo(false);
@@ -187,7 +172,7 @@ export default function GuildTree({ onChanged }) {
             <p className="craft-hint">
               Три ветви по три руки. Узел берут рядом с уже взятым: малый - 1 очко, средний - 2, ключевой - 3,
               плюс золото из казны{tree.can_edit ? ` (в казне ${money(tree.treasury_gold)})` : ''}. Каждая рука растёт
-              от начала ветви, перемычка - звезда между первыми двумя руками. Очки дают уровни гильдии. Брать могут глава и казначеи.
+              от начала ветви и качается отдельно. Очки дают уровни гильдии. Брать могут глава и казначеи.
             </p>
             {tree.effects.length === 0
               ? <p className="guild-line">Узлов пока нет.</p>

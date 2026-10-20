@@ -677,3 +677,20 @@ async def test_declined_applicant_waits_15_minutes(db_session, make_character) -
     await db_session.flush()
     await guild_service.apply(db_session, applicant, guild.id)
     assert [c.id for _i, c in await guild_service.applications_of(db_session, guild.id)] == [applicant.id]
+
+
+def test_tree_arms_are_separate_and_bridge_is_inside_second_arm() -> None:
+    from game.guild import tree
+
+    nodes = tree.build()
+    for node in nodes.values():
+        parts = node.id.split(":")
+        if len(parts) != 3:
+            continue
+        for link in node.links:
+            other = link.split(":")
+            assert len(other) != 3 or other[1] == parts[1], (node.id, link)
+    for branch in tree.BRANCHES:
+        bridge = nodes[f"{branch}:bridge"]
+        assert bridge.links == {f"{branch}:1:9", f"{branch}:1:10"}
+        assert f"{branch}:1:10" not in nodes[f"{branch}:1:9"].links
