@@ -51,6 +51,14 @@ async def test_sale_pays_bonus_over_appraiser_and_gives_no_xp(db_session, make_c
     assert await trophy_service.get_stock(db_session, seller.id) == []
 
 
+async def test_blood_brand_does_not_cut_dealer_price(db_session, make_character):
+    from datetime import datetime, timezone
+
+    seller = await make_character(level=20, region="ridge")
+    seller.pk_marks, seller.pk_marks_at = 10, datetime.now(timezone.utc)
+    assert await relic_dealer_service.price_mult(db_session, seller) == pytest.approx(1 + rd.PRICE_BONUS)
+
+
 async def test_defeat_loses_only_stolen_part(db_session, make_character):
     seller = await make_character(level=20)
     await trophy_service.grant_specific(db_session, seller.id, "taint_clot", 20)

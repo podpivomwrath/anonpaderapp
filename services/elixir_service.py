@@ -73,7 +73,7 @@ async def buy_bulk(db: AsyncSession, character: Character, elixir_id: str, qty: 
     стеку. Возвращает потраченное золото."""
     from services import faction_service
 
-    # Пепельное клеймо 5+ и процветание города (2026-10-15).
+    # Кровавое клеймо 5+ и процветание города (2026-10-15).
     cost = round(price(elixir_id) * await faction_service.shop_mult(db, character)) * qty
     await wallet_service.charge(db, character.id, "farm", cost)
     row = await _get_row(db, character.id, elixir_id)

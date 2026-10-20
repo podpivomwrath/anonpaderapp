@@ -1,4 +1,4 @@
-"""Пепельное клеймо (services/pk_service.py, 2026-10-15)."""
+"""Кровавое клеймо (services/pk_service.py, 2026-10-15)."""
 
 from datetime import datetime, timedelta, timezone
 

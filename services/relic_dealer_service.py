@@ -1,8 +1,9 @@
 """Пепельный меняла: сделка и её последствия (правила - game/world/relic_dealer.py).
 
-Цена - как у скупщика в городе со всеми множителями игрока (клеймо,
-процветание РОДНОГО города - меняла стоит в поле, венец, гильдия, налог) и
-+25% сверху. Сделка одна: всё разом или одна градация, как у Иргала.
+Цена - как у скупщика в городе со множителями игрока (процветание РОДНОГО
+города - меняла стоит в поле, венец, гильдия, налог) и +25% сверху. Кровавое
+клеймо у менялы цену не режет (2026-10-20, владелец): штраф клейма - городской,
+меняле до стражи дела нет. Сделка одна: всё разом или одна градация, как у Иргала.
 """
 
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -16,12 +17,10 @@ ALL = "all"
 
 async def price_mult(db: AsyncSession, character: Character) -> float:
     """Множитель к цене скупщика, кроме венца и гильдии (их добавляет сама
-    продажа в trophy_service)."""
-    from services import pk_service
-
+    продажа в trophy_service). Без клейма - см. шапку модуля."""
     tier = await faction_service.tier_of(db, character.region)
     city = tier.relic_mult if tier else 1.0
-    return (1 + rd.PRICE_BONUS) * pk_service.relic_mult(character) * city
+    return (1 + rd.PRICE_BONUS) * city
 
 
 async def offer(db: AsyncSession, character: Character) -> list[tuple[str, str, int]]:

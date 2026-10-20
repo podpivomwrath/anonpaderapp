@@ -18,7 +18,7 @@ def apply_death(character: Character, now: datetime | None = None) -> int:
     from services import pk_service
 
     now = now or datetime.now(timezone.utc)
-    # Пепельное клеймо 3+: смерть отнимает больше опыта.
+    # Кровавое клеймо 3+: смерть отнимает больше опыта.
     penalty = 0
     if not tincture_active(character, now):
         penalty = experience_service.apply_death_penalty(character, pk_service.death_xp_mult(character))
@@ -32,7 +32,7 @@ def apply_pvp_death(character: Character, now: datetime | None = None) -> None:
     from services import pk_service
 
     now = now or datetime.now(timezone.utc)
-    # Пепельное клеймо 3+: и в PvP смерть стоит опыта (обычно - нет).
+    # Кровавое клеймо 3+: и в PvP смерть стоит опыта (обычно - нет).
     if pk_service.costly_death(character) and not tincture_active(character, now):
         experience_service.apply_death_penalty(character, pk_service.death_xp_mult(character))
     character.respawn_at = now + timedelta(minutes=_respawn_minutes(character))

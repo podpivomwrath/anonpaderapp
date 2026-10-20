@@ -103,7 +103,7 @@ async def _city_tier_here(db: AsyncSession, character: Character) -> fc.Tier | N
 
 
 async def shop_mult(db: AsyncSession, character: Character) -> float:
-    """Множитель цены зелий в лавке: Пепельное клеймо x ступень города."""
+    """Множитель цены зелий в лавке: Кровавое клеймо x ступень города."""
     from services import pk_service
 
     tier = await _city_tier_here(db, character)
@@ -111,7 +111,7 @@ async def shop_mult(db: AsyncSession, character: Character) -> float:
 
 
 async def relic_mult(db: AsyncSession, character: Character) -> float:
-    """Множитель выручки за реликвии: Пепельное клеймо x ступень города."""
+    """Множитель выручки за реликвии: Кровавое клеймо x ступень города."""
     from services import pk_service
 
     tier = await _city_tier_here(db, character)

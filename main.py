@@ -139,7 +139,7 @@ async def _vk_names_job(api) -> None:
 
 
 async def _pk_settle_job() -> None:
-    """Пепельное клеймо: записать сошедшие метки и снять награду за голову
+    """Кровавое клеймо: записать сошедшие метки и снять награду за голову
     с тех, у кого меток не осталось (services/pk_service.py)."""
     from services import pk_service
     from services.db import get_session_factory

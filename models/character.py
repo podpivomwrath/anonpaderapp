@@ -96,7 +96,7 @@ class Character(Base):
     ban_reason: Mapped[str | None] = mapped_column(String(256), nullable=True)
     banned_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
-    # Пепельное клеймо (2026-10-15, services/pk_service.py): метки за убийство
+    # Кровавое клеймо (2026-10-15, services/pk_service.py): метки за убийство
     # тех, кто слабее на 5+ уровней. Одна метка сходит за 5 часов; pk_marks_at -
     # начало текущего пятичасового отрезка. pk_bounty - замороженная награда за
     # голову (золото самого убийцы). revenge_* - право мести жертвы.

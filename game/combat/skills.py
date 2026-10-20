@@ -175,7 +175,7 @@ def outgoing_multiplier(actor: CombatantState, target: CombatantState) -> float:
     mult = 1.0 - min(actor.effect_total(EffectKind.WEAKEN), 0.9)
     mult *= 1.0 + actor.effect_total(EffectKind.DAMAGE_BUFF)  # Боевой клич +20%
     mult *= 1.0 + actor.buff_modifiers.get("damage_bonus", 0.0)
-    # Право мести (Пепельное клеймо): только по тому, кто убил тебя.
+    # Право мести (Кровавое клеймо): только по тому, кто убил тебя.
     if actor.buff_modifiers.get("revenge_vs") == target.id:
         mult *= 1.0 + actor.buff_modifiers.get("revenge_bonus", 0.0)
     mult *= 1.0 + actor.effect_total(EffectKind.ASHEN_FEVER)
