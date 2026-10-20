@@ -41,7 +41,7 @@ class TrailRun:
     deadline: float = 0.0
     done: bool = False
     task: asyncio.Task | None = None
-    last_step: dict[int, float] = field(default_factory=dict)
+    walking: dict[int, asyncio.Task] = field(default_factory=dict)
     lock: asyncio.Lock = field(default_factory=asyncio.Lock)
 
 
@@ -75,6 +75,7 @@ def abort(battle_id: int) -> None:
     if run is None:
         return
     run.done = True
+    _stop_walks(run)
     if run.task is not None:
         run.task.cancel()
     for peer in run.peers.values():
@@ -151,6 +152,10 @@ def _place_key(run: TrailRun, i: int) -> str:
     return run.lab.maze.places[i]
 
 
+def _place_name(run: TrailRun, i: int) -> str:
+    return tt.KIND_NAMES.get(_place_key(run, i)) or run.lab.maze.names[i]
+
+
 def _status(run: TrailRun) -> str:
     found = len(run.lab.found)
     return f"👣 Следов: {found}/{tc.FOOTPRINTS} · {_left(run)}"
@@ -160,10 +165,12 @@ def _cell_text(run: TrailRun, cid: int, header: list[str] | None = None) -> str:
     lab = run.lab
     here = lab.pos[cid]
     key = _place_key(run, here)
-    line = tt.KIND_LINES.get(key) or tt.PLACE_LINES.get(key, "")
+    lines = tt.PLACE_LINES.get(key, ("",))
+    line = tt.KIND_LINES.get(key) or lines[here % len(lines)]
+    name = _place_name(run, here)
     exits = " ".join(lab_rules.DIR_ARROWS[d] for d in lab.exits(here)) or "-"
     parts = list(header or [])
-    parts.append(f"📍 {lab.maze.names[here]}\n{line}".rstrip())
+    parts.append(f"📍 {name}\n{line}".rstrip())
     parts.append(f"Выходы: {exits}\n{_status(run)}")
     return "\n\n".join(parts)
 
@@ -237,15 +244,45 @@ async def on_step(message: Message) -> None:
         if target == lab.pos[cid]:
             await _show_cell(run, cid)
             return
-        if now - run.last_step.get(cid, -1e9) < tc.STEP_SECONDS:
-            await _send(message.peer_id, tt.REFUSE_TOO_FAST, map_keyboard(run, cid))
+        if cid in run.walking:
+            await _send(message.peer_id, tt.REFUSE_WALKING)
             return
-        result = lab.move(cid, target, now)
+        reason = lab.check(cid, target, now)
+        if reason:
+            await _send(message.peer_id, _REFUSALS.get(reason, tt.REFUSE_WALL), map_keyboard(run, cid))
+            return
+        if tc.STEP_SECONDS <= 0:
+            await _after_move(run, cid, lab.move(cid, target, now), now)
+            return
+        # Переход идёт tc.STEP_SECONDS (2026-10-20, владелец): иначе карту
+        # пробегают кликами за минуту. Стена и решётка отказывают сразу.
+        await _send(message.peer_id, tt.WALKING.format(side=lab_rules.compass(lab.pos[cid], target)))
+        run.walking[cid] = asyncio.get_running_loop().create_task(_walk(run, cid, target))
+
+
+async def _walk(run: TrailRun, cid: int, target: int) -> None:
+    try:
+        await asyncio.sleep(tc.STEP_SECONDS)
+    except asyncio.CancelledError:
+        return
+    async with run.lock:
+        run.walking.pop(cid, None)
+        if run.done:
+            return
+        now = time.monotonic()
+        result = run.lab.move(cid, target, now)
         if not result.ok:
-            await _send(message.peer_id, _REFUSALS.get(result.reason, tt.REFUSE_WALL), map_keyboard(run, cid))
+            # Пока шёл, поймал Безымянный (уже сказали) или закрылась решётка.
+            if result.reason == "grate":
+                await _send(run.peers[cid], tt.REFUSE_GRATE, map_keyboard(run, cid))
             return
-        run.last_step[cid] = now
         await _after_move(run, cid, result, now)
+
+
+def _stop_walks(run: TrailRun) -> None:
+    for task in run.walking.values():
+        task.cancel()
+    run.walking.clear()
 
 
 async def _after_move(run: TrailRun, cid: int, result: lab_rules.MoveResult, now: float) -> None:
@@ -253,7 +290,7 @@ async def _after_move(run: TrailRun, cid: int, result: lab_rules.MoveResult, now
     header: list[str] = []
     photo = None
     found = len(lab.found)
-    place = lab.maze.names[lab.pos[cid]]
+    place = _place_name(run, lab.pos[cid])
     if "footprint" in result.events:
         header.append(tt.EVENT_FOOTPRINT.format(found=found, total=tc.FOOTPRINTS))
         photo = "footprint"
@@ -292,6 +329,9 @@ async def _after_move(run: TrailRun, cid: int, result: lab_rules.MoveResult, now
 
 async def _caught(run: TrailRun, cids: list[int]) -> None:
     for cid in cids:
+        walk = run.walking.pop(cid, None)
+        if walk is not None:
+            walk.cancel()
         await _tell(run, cid, tt.EVENT_CAUGHT.format(seconds=round(tc.CAUGHT_SECONDS)), "caught")
         for other in run.peers:
             if other != cid:
@@ -307,7 +347,7 @@ async def where_all(message: Message) -> None:
     now = time.monotonic()
     lines = ["📜 Где все:"]
     for other, n in sorted(run.numbers.items(), key=lambda kv: kv[1]):
-        where = run.lab.maze.names[run.lab.pos[other]]
+        where = _place_name(run, run.lab.pos[other])
         mark = " (без имени)" if run.lab.is_frozen(other, now) else ""
         me = " - ты" if other == cid else ""
         lines.append(f"{n}. {run.names[other]}{me}: {where}{mark}")
@@ -321,6 +361,7 @@ async def _finish(run: TrailRun) -> None:
     from bot.handlers import raid_combat
 
     run.done = True
+    _stop_walks(run)
     if run.task is not None:
         run.task.cancel()
         run.task = None

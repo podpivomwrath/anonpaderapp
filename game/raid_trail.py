@@ -26,10 +26,10 @@ FOOTPRINT, PLATE, PIT, REST, ECHO = "footprint", "plate", "pit", "rest", "echo"
 #: Места лабиринта: название клетки -> группа картинки. Названия нужны, чтобы
 #: группа договаривалась словами («я у колодца»), а не координатами.
 PLACE_NAMES = {
-    "well": ("Сухой колодец", "Колодец с цепью", "Двор с колодцем", "Глухой двор", "Каменный желоб", "Яма для воды"),
-    "bells": ("Зал колоколов", "Звонница", "Зал без звона", "Колокольный проход", "Медный зал", "Зал цепей"),
+    "well": ("Сухой колодец", "Колодец с цепью", "Двор с колодцем", "Глухой двор", "Каменный желоб", "Водосборник"),
+    "bells": ("Зал колоколов", "Колокольня", "Зал без звона", "Колокольный проход", "Медный зал", "Зал цепей"),
     "arch": ("Обвалившаяся арка", "Узкий лаз", "Треснувший свод", "Завал", "Арка без имени", "Кривой коридор"),
-    "lists": ("Комната списков", "Стена имён", "Зал вычеркнутых", "Свечной угол", "Переписная", "Ниша с огарками"),
+    "lists": ("Комната списков", "Стена имён", "Зал вычеркнутых", "Зал записей", "Переписная", "Пыльная канцелярия"),
 }
 
 
@@ -283,17 +283,25 @@ class Labyrinth:
 
     # --- ход игрока ---
 
-    def move(self, cid: int, target: int, now: float) -> MoveResult:
+    def check(self, cid: int, target: int, now: float) -> str | None:
+        """Почему шаг невозможен (None - можно). Шаг идёт tc.STEP_SECONDS:
+        проверка - при нажатии, сам move - когда игрок дошёл."""
         if self.is_frozen(cid, now):
-            return MoveResult(False, "frozen")
+            return "frozen"
         here = self.pos[cid]
         if target not in neighbors(here).values():
-            return MoveResult(False, "not_adjacent")
+            return "not_adjacent"
         e = _edge(here, target)
         if e not in self.maze.passages:
-            return MoveResult(False, "wall")
+            return "wall"
         if e == self.maze.grate and not self.grate_open:
-            return MoveResult(False, "grate")
+            return "grate"
+        return None
+
+    def move(self, cid: int, target: int, now: float) -> MoveResult:
+        reason = self.check(cid, target, now)
+        if reason:
+            return MoveResult(False, reason)
         self.pos[cid] = target
         self.explored.add(target)
         out = MoveResult(True)

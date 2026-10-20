@@ -304,3 +304,33 @@ async def test_handler_walks_the_labyrinth_and_starts_the_fight(monkeypatch) -> 
             await handler.on_step(_Msg(70, {"type": "trl", "t": run.token, "c": cell}))
     assert started == [3]
     assert -500 not in handler._runs
+
+
+async def test_step_takes_time_and_blocks_new_presses(monkeypatch) -> None:
+    import asyncio
+
+    from bot.handlers import raid_combat
+    from bot.handlers import raid_trail as handler
+
+    api = _FakeApi()
+    monkeypatch.setattr(raid_combat, "_bot_api", api)
+    monkeypatch.setattr(handler.tc, "STEP_SECONDS", 0.05)
+    monkeypatch.setattr(handler, "_rng", random.Random(4))
+    battle = SimpleNamespace(participants={7: SimpleNamespace(peer_id=70, name="Соло")})
+    await handler.start(-501, battle)
+    run = handler._runs[-501]
+    run.task.cancel()
+    lab = run.lab
+    _calm(lab)
+    here = lab.pos[7]
+    target = lab_rules.neighbors(here)[lab.exits(here)[0]]
+
+    await handler.on_step(_Msg(70, {"type": "trl", "t": run.token, "c": target}))
+    assert lab.pos[7] == here and api.sent[-1][1].startswith("🚶")
+    await handler.on_step(_Msg(70, {"type": "trl", "t": run.token, "c": target}))
+    assert api.sent[-1][1] == handler.tt.REFUSE_WALKING
+
+    await run.walking[7]
+    assert lab.pos[7] != here and not run.walking
+    handler.abort(-501)
+    await asyncio.sleep(0)
