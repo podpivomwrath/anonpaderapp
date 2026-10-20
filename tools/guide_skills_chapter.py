@@ -133,7 +133,8 @@ def formulas_part() -> str:
 
 def base_classes_part() -> str:
     out = ['    <h3>Базовые классы</h3>',
-           f'    <p>Эти навыки у тебя с 1 по {bc.SUBCLASS_UNLOCK_MIN_LEVEL - 1} уровень. После выбора подкласса их заменяют навыки подкласса.</p>']
+           f'    <p>Эти навыки у тебя с 1 по {bc.SUBCLASS_UNLOCK_MIN_LEVEL - 1} уровень. После выбора подкласса их заменяют навыки подкласса. '
+           'Кто отказался от подкласса, остаётся с ними навсегда и собирает пресеты из микробаффов своего класса.</p>']
     for cls, title in gh.CLASS_TITLES.items():
         start = bc.STARTING_STATS[cls]
         stats = ", ".join(f"{gh.STAT_TITLES[k]} {v}" for k, v in start.items())
@@ -141,7 +142,23 @@ def base_classes_part() -> str:
         out.append(f'    <p class="levels">Стартовые характеристики: {stats}</p>')
         rows = [[E(s.name), gh.damage_line(s.multiplier), gh.turns(s.cd), base_effect(s)] for s in skills_for_class(cls)]
         out.append(table(["Навык", "Урон", "Перезарядка", "Эффект"], rows))
+        out.append(_buffs_block(f"{cls}_path", "Микробаффы без подкласса"))
     return "\n".join(out)
+
+
+def _buffs_block(pool: str, label: str = "Микробаффы") -> str:
+    buffs = [b for b in gh.CONTENT.buffs.values() if b.subclass == pool]
+    by_cat: dict[str, list] = {}
+    for b in buffs:
+        by_cat.setdefault(b.category, []).append(b)
+    items = []
+    for cat, group in sorted(by_cat.items()):
+        items.append(f"      <p><b>{gh.CATEGORY_TITLES.get(cat, cat)}</b></p>\n      <ul>")
+        for b in group:
+            items.append(f"        <li><b>{E(b.name)}</b> - {E(bd.describe(b) or 'в разработке')}</li>")
+        items.append("      </ul>")
+    return (f'    <details class="buffs"><summary>{label} ({len(buffs)})</summary>\n'
+            + "\n".join(items) + "\n    </details>")
 
 
 def subclasses_part(mechanics: dict[str, str]) -> str:
@@ -159,18 +176,7 @@ def subclasses_part(mechanics: dict[str, str]) -> str:
             rows.append([f"<b>{E(s.name)}</b>", gh.damage_line(s.multiplier), gh.turns(s.cd),
                          E(mechanics.get(skill_id, "") or "-")])
         out.append(table(["Навык", "Урон", "Перезарядка", "Что делает"], rows))
-        buffs = [b for b in gh.CONTENT.buffs.values() if b.subclass == sub_id]
-        by_cat: dict[str, list] = {}
-        for b in buffs:
-            by_cat.setdefault(b.category, []).append(b)
-        items = []
-        for cat, group in sorted(by_cat.items()):
-            items.append(f"      <p><b>{gh.CATEGORY_TITLES.get(cat, cat)}</b></p>\n      <ul>")
-            for b in group:
-                items.append(f"        <li><b>{E(b.name)}</b> - {E(bd.describe(b) or 'в разработке')}</li>")
-            items.append("      </ul>")
-        out.append(f'    <details class="buffs"><summary>Микробаффы ({len(buffs)})</summary>\n'
-                   + "\n".join(items) + "\n    </details>")
+        out.append(_buffs_block(sub_id))
     return "\n".join(out)
 
 
