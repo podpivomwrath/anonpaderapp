@@ -128,6 +128,10 @@ OVERRIDE_FILES = {
     "craft:pilgrim_greaves:tank": "лут_поножи_носильщика.png",
     "craft:pilgrim_greaves:dps": "лут_поножи_помола.png",
     "craft:pilgrim_greaves:support": "лут_обмотки_шествия.png",
+    "unique:nameless_stride": "лут_поступь_безымянного.png",
+    "craft:nameless_stride:tank": "лут_каменная_поступь.png",
+    "craft:nameless_stride:dps": "лут_босая_поступь.png",
+    "craft:nameless_stride:support": "лут_тихая_поступь.png",
 }
 
 #: Картинки, которых нет в контенте игры: значки базовых классов и рамки

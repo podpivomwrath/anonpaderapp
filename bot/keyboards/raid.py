@@ -55,6 +55,7 @@ def raid_lobby_keyboard(ready: bool = True, raid_id: str = "puppet_theatre") -> 
 def raid_combat_keyboard(
     base_class: str, cooldowns: dict[str, int], subclass_id: str | None = None,
     extra: list[tuple[str, dict]] | None = None,
+    grid: list[list[tuple[str, dict, str]]] | None = None,
 ) -> str:
     """Патч 54: подписи берутся из общего реестра combat_modes.RAID — до этого
     были ДОСЛОВНЫМИ копиями группового PvE, и групповой обработчик (он раньше
@@ -65,6 +66,13 @@ def raid_combat_keyboard(
     None) — выйти из рейда нельзя, единственный выход — смерть всей группы
     (патч 53)."""
     kb = Keyboard(one_time=False)
+    # Арена Безымянного (2026-10-20): поле клеток сверху, цвет - состояние.
+    colors = {"positive": KeyboardButtonColor.POSITIVE, "negative": KeyboardButtonColor.NEGATIVE,
+              "primary": KeyboardButtonColor.PRIMARY, "secondary": KeyboardButtonColor.SECONDARY}
+    for row in grid or ():
+        for label, payload, color in row:
+            kb.add(Text(label, payload=payload), color=colors[color])
+        kb.row()
     # Кнопки этапа (груз обоза, каравай) - отдельным рядом во всю ширину сверху.
     for label, payload in extra or ():
         kb.add(Text(label, payload=payload), color=KeyboardButtonColor.POSITIVE)

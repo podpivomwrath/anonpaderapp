@@ -21,6 +21,7 @@ from bot import dailies_texts, editable_message, group_texts, raid_key_texts, ra
 from bot import raid_archive_texts as at
 from bot import raid_field_texts as ft
 from bot import raid_mill_texts as mt
+from bot import raid_trail_texts as tt
 from bot.handlers import respawn as respawn_handlers
 from bot.handlers import stats_window
 from bot.handlers.group_combat import MemberCombatInput
@@ -30,6 +31,7 @@ from bot.keyboards.items import no_keyboard
 from bot.keyboards.world import movement_keyboard
 from game.combat import balance_config as bc
 from game.combat import battle_log, display, elixir_effects, raid_archive, raid_bosses, raid_field, raid_mill
+from game.combat import raid_trail as trail_combat
 from game.combat import rift as rift_combat
 from game.combat.resolver import TickResult
 from game.combat.session import (
@@ -49,6 +51,7 @@ from game.economy import raid_config as rc
 from game.economy import raid_archive_config as ac
 from game.economy import raid_field_config as fc
 from game.economy import raid_mill_config as mc
+from game.economy import raid_trail_config as tc
 from game.economy import rift_config as rfc
 from models import Character
 from services import (
@@ -168,6 +171,10 @@ class RaidBattle:
         return self.raid_id == mc.RAID_MILL_ID
 
     @property
+    def is_trail(self) -> bool:
+        return self.raid_id == tc.RAID_TRAIL_ID
+
+    @property
     def is_theatre(self) -> bool:
         return self.raid_id == rc.RAID_PUPPET_THEATRE_ID
 
@@ -214,6 +221,10 @@ def rebuild_keyboard(peer_id: int) -> str | None:
         from bot.handlers import raid_procession  # цикл импортов
 
         return raid_procession.keyboard_for(peer_id)
+    if battle.is_trail and battle.stage < 3:
+        from bot.handlers import raid_trail  # цикл импортов
+
+        return raid_trail.keyboard_for(peer_id)
     state = _engine.sessions.get(battle_id) if _engine else None
     cid = _character_id_for_peer(battle, peer_id)
     c = state.combatants.get(cid) if state else None
@@ -232,7 +243,32 @@ def _combat_keyboard(battle: RaidBattle, p: Participant, combatant) -> str:
         extra.append((mt.BTN_CARRY, {"type": "raid_carry"}))
     elif isinstance(stage, raid_mill.MillerStage) and stage.bread_open:
         extra.append((mt.BTN_BREAD, {"type": "raid_bread"}))
-    return kb.raid_combat_keyboard(p.base_class, combatant.cooldowns, subclass_id=p.subclass_id, extra=extra)
+    grid = _arena_grid(battle, stage, p.character_id) if isinstance(stage, trail_combat.NamelessStage) else None
+    return kb.raid_combat_keyboard(p.base_class, combatant.cooldowns, subclass_id=p.subclass_id, extra=extra,
+                                   grid=grid)
+
+
+def _arena_grid(battle: RaidBattle, stage, cid: int) -> list[list[tuple[str, dict, str]]]:
+    """Арена Безымянного 3×3 сверху боевой клавиатуры: цвет - что на клетке."""
+    numbers = {c: n for n, c in enumerate(sorted(battle.participants), start=1)}
+    danger = stage.danger(cid)
+    rows = []
+    for r in range(tc.ARENA):
+        row = []
+        for c in range(tc.ARENA):
+            cell = r * tc.ARENA + c
+            others = [numbers[o] for o, pos in stage.pos.items() if pos == cell and o != cid]
+            if stage.pos.get(cid) == cell:
+                label, color = "📍", "positive"
+            elif cell in danger:
+                label, color = (str(min(others)) if others else "👣"), "negative"
+            elif others:
+                label, color = str(min(others)), "secondary"
+            else:
+                label, color = "·", "primary"
+            row.append((label, {"type": "raid_step", "c": cell}, color))
+        rows.append(row)
+    return rows
 
 
 # --- Построение боевых участников (свежие каждый этап — как и групповой PvE) ---
@@ -267,7 +303,7 @@ def _start_stage_session(battle_id: int, battle: RaidBattle) -> CombatSessionSta
     state = CombatSessionState(session_id=battle_id, mode=CombatMode.PVE, is_raid=True)
     _build_player_combatants(state, battle.member_inputs)
 
-    if battle.is_field or battle.is_archive or battle.is_rift or battle.is_mill:
+    if battle.is_field or battle.is_archive or battle.is_rift or battle.is_mill or battle.is_trail:
         _build_field_stage(battle, state)
     elif battle.stage == 1:
         mobs = raid_bosses.build_stage1_mobs(start_id=20_000_000)
@@ -316,6 +352,8 @@ def _build_field_stage(battle: RaidBattle, state: CombatSessionState) -> None:
         stage = raid_mill.CargoStage(start_id=20_700_000, participants=len(battle.participants), order=order)
     elif battle.is_mill:
         stage = raid_mill.MillerStage(start_id=20_800_000)
+    elif battle.is_trail:
+        stage = trail_combat.NamelessStage(start_id=20_900_000)
     elif battle.stage == 1:
         stage = raid_field.FogStage(start_id=20_300_000)
     elif battle.stage == 2:
@@ -363,6 +401,7 @@ _FIELD_LOOT_MULT = {1: fc.STAGE1_LOOT_MULT, 2: fc.STAGE2_LOOT_MULT, 3: fc.STAGE3
 
 _ARCHIVE_LOOT_MULT = {1: ac.STAGE1_LOOT_MULT, 2: ac.STAGE2_LOOT_MULT, 3: ac.STAGE3_LOOT_MULT}
 _MILL_LOOT_MULT = {1: mc.STAGE1_LOOT_MULT, 2: mc.STAGE2_LOOT_MULT, 3: mc.STAGE3_LOOT_MULT}
+_TRAIL_LOOT_MULT = {1: tc.STAGE1_LOOT_MULT, 2: tc.STAGE2_LOOT_MULT, 3: tc.STAGE3_LOOT_MULT}
 
 
 def _texts(battle: RaidBattle):
@@ -377,6 +416,8 @@ def _texts(battle: RaidBattle):
         return at
     if battle.is_mill:
         return mt
+    if battle.is_trail:
+        return tt
     return rt
 
 
@@ -387,6 +428,8 @@ def _appear_text(battle: RaidBattle) -> str:
         return at.STAGE3_APPEAR_TEXT
     if battle.is_mill:
         return mt.STAGE2_APPEAR_TEXT if battle.stage == 2 else mt.STAGE3_APPEAR_TEXT
+    if battle.is_trail:
+        return tt.STAGE3_APPEAR_TEXT
     return (_FIELD_APPEAR_TEXT if battle.is_field else _STAGE_APPEAR_TEXT)[battle.stage]
 
 
@@ -416,6 +459,8 @@ def _loot_mult(battle: RaidBattle) -> int:
         return _ARCHIVE_LOOT_MULT[battle.stage]
     if battle.is_mill:
         return _MILL_LOOT_MULT[battle.stage]
+    if battle.is_trail:
+        return _TRAIL_LOOT_MULT[battle.stage]
     return (_FIELD_LOOT_MULT if battle.is_field else _STAGE_LOOT_MULT)[battle.stage]
 
 
@@ -424,6 +469,8 @@ def _trial_level(battle: RaidBattle) -> int:
         return ac.TRIAL_LEVEL
     if battle.is_mill:
         return mc.TRIAL_LEVEL
+    if battle.is_trail:
+        return tc.TRIAL_LEVEL
     return fc.TRIAL_LEVEL if battle.is_field else rc.SURGEON_TRIAL_LEVEL
 
 
@@ -432,6 +479,8 @@ def _unique_id(battle: RaidBattle) -> str:
         return ac.RAID_UNIQUE_ITEM_ID
     if battle.is_mill:
         return mc.RAID_UNIQUE_ITEM_ID
+    if battle.is_trail:
+        return tc.RAID_UNIQUE_ITEM_ID
     return fc.RAID_UNIQUE_ITEM_ID if battle.is_field else rc.RAID_UNIQUE_ITEM_ID
 
 
@@ -493,6 +542,17 @@ async def start_raid(
                 attachment=texts.prologue_attachment(), random_id=0,
             )
         await raid_procession.start(battle_id, battle)
+        return
+    if battle.is_trail:
+        # Первый этап - лабиринт, не бой: бой с Безымянным - третьим этапом.
+        from bot.handlers import raid_trail  # цикл импортов
+
+        for p in participants.values():
+            await _bot_api.messages.send(
+                peer_id=p.peer_id, message=texts.PROLOGUE_TEXT,
+                attachment=texts.prologue_attachment(), random_id=0,
+            )
+        await raid_trail.start(battle_id, battle)
         return
 
     state = _start_stage_session(battle_id, battle)
@@ -558,6 +618,10 @@ def abort_run(run_id: int) -> None:
             from bot.handlers import raid_procession  # цикл импортов
 
             raid_procession.abort(battle_id)
+        if battle.is_trail:
+            from bot.handlers import raid_trail  # цикл импортов
+
+            raid_trail.abort(battle_id)
         _battles.pop(battle_id, None)
         _declared_this_tick.pop(battle_id, None)
         for p in list(battle.participants.values()):
@@ -767,6 +831,31 @@ async def raid_carry(message: Message) -> None:
     await _raid_action(message, action)
     if action.payload.get("carry") and cid not in _declared_this_tick.get(battle_id, set()):
         stage.carried = False  # ход не принят движком - груз свободен
+
+
+@labeler.message(payload_contains={"type": "raid_step"})
+async def raid_step(message: Message) -> None:
+    """Безымянный: шаг по арене - занимает ход."""
+    battle_id = _peer_battle.get(message.peer_id)
+    battle = _battles.get(battle_id) if battle_id is not None else None
+    if battle is None:
+        await answer_battle_gone(message)
+        return
+    stage = battle.field_stage
+    cid = _character_id_for_peer(battle, message.peer_id)
+    cell = (message.get_payload_json() or {}).get("c")
+    if not isinstance(stage, trail_combat.NamelessStage) or cid is None or not isinstance(cell, int):
+        return
+    if cid in _declared_this_tick.get(battle_id, set()):
+        return
+    if not stage.can_step(cid, cell):
+        state = _engine.sessions.get(battle_id)
+        combatant = state.combatants.get(cid) if state else None
+        if combatant is not None:
+            await message.answer("Шагнуть можно только на соседнюю плиту.",
+                                 keyboard=_combat_keyboard(battle, battle.participants[cid], combatant))
+        return
+    await _raid_action(message, DeclaredAction(type=ActionType.SKIP, payload={"note": tt.STEP_NOTE, "step": cell}))
 
 
 @labeler.message(payload_contains={"type": "raid_bread"})
@@ -1300,7 +1389,8 @@ def _field_after_tick(battle: RaidBattle, state: CombatSessionState, result: Tic
     stage = battle.field_stage
     if getattr(stage, "rift", False):
         return stage.after_tick(state, result, battle.rng)
-    if isinstance(stage, (raid_archive.ArchiveStage, raid_mill.CargoStage, raid_mill.MillerStage)):
+    if isinstance(stage, (raid_archive.ArchiveStage, raid_mill.CargoStage, raid_mill.MillerStage,
+                          trail_combat.NamelessStage)):
         return stage.after_tick(state, result, battle.rng)
     if isinstance(stage, raid_field.FogStage):
         return stage.after_tick(state, result)

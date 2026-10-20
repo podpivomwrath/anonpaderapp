@@ -281,6 +281,14 @@ UNIQUE_LOOK = {
         "same shiny rubbed knee pieces at the core, different reworking around them, "
         "no feet, no boots, shown on its own with no wearer",
     ),
+    "nameless_stride": (
+        "unique worn grey leather boots, soles walked thin",
+        "a faint glowing bare footprint inside each boot, empty needle holes on the cuff where a name was unpicked, "
+        "a pair of boots only with no wearer",
+        "reforged boots made from worn grey nameless boots",
+        "same unpicked needle holes on the cuff at the core, different reworking around them, "
+        "a pair of boots only with no wearer",
+    ),
 }
 
 
