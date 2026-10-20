@@ -121,7 +121,7 @@
 /* Экран руки: картинка 2:3 целиком, по высоте окна - без прокрутки. */
 .guild-tree__stage {
   position: relative;
-  width: min(100%, calc((100dvh - 230px) * 2 / 3));
+  width: 100%;
   aspect-ratio: 2 / 3;
   margin: 0 auto;
   border-radius: 12px;
@@ -139,12 +139,6 @@
 }
 .guild-tree__svg { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
 .guild-tree__star { cursor: pointer; -webkit-tap-highlight-color: transparent; }
-.guild-tree__node--away { stroke-dasharray: 6 5; }
-.guild-tree__away-label {
-  font-size: 34px;
-  fill: rgba(255, 255, 255, 0.75);
-  pointer-events: none;
-}
 .guild-tree__edge { stroke: rgba(255, 255, 255, 0.28); stroke-width: 4; }
 .guild-tree__edge--on { stroke-width: 7; opacity: 0.95; }
 /* Звёзды: закрытая - бледная, доступная - светится цветом ветви, взятая - горит. */

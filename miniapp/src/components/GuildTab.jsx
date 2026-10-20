@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import {
-  Button, Div, Group, Header, Placeholder, SimpleCell, Spinner, Tabs, TabsItem,
+  Button, Div, Group, Header, HorizontalScroll, Placeholder, SimpleCell, Spinner, Tabs, TabsItem,
 } from '@vkontakte/vkui';
 import { getGuild, guildAction } from '../api.js';
 import GuildTree from './GuildTree.jsx';
@@ -917,10 +917,14 @@ export default function GuildTab() {
   return (
     <>
       <Group>
+        {/* Вкладок больше, чем влезает: на компьютере колесо и стрелки
+            листают их вбок, на телефоне - палец (2026-10-20). */}
         <Tabs className="guild-tabs">
-          {SECTIONS.map((s) => (
-            <TabsItem key={s.id} selected={section === s.id} onClick={() => setSection(s.id)}>{s.label}</TabsItem>
-          ))}
+          <HorizontalScroll arrowSize="m" scrollOnAnyWheel>
+            {SECTIONS.map((s) => (
+              <TabsItem key={s.id} selected={section === s.id} onClick={() => setSection(s.id)}>{s.label}</TabsItem>
+            ))}
+          </HorizontalScroll>
         </Tabs>
       </Group>
       {noticeBox}

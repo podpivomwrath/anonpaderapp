@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Button, Div, Placeholder, Spinner } from '@vkontakte/vkui';
 import { getGuildTree, guildAction } from '../api.js';
 import { ARM_IMAGES, ARM_POINTS, ROOT_POINT, STAGE_H, STAGE_W, armOf } from './guildTreeLayout.js';
@@ -10,8 +10,7 @@ import { ARM_IMAGES, ARM_POINTS, ROOT_POINT, STAGE_H, STAGE_W, armOf } from './g
 // всё видно целиком: ни прокрутки, ни масштаба, только нажатия.
 //
 // Координаты и связи узлов - с сервера (game/guild/tree.py), положение
-// звёзд на картинке - guildTreeLayout.js. Связи в соседнюю руку и
-// перемычка ветви - звёзды у края экрана: нажатие ведёт в ту руку.
+// звёзд на картинке - guildTreeLayout.js.
 
 const BRANCH_COLOR = { war: '#d9483b', craft: '#e8a33d', kin: '#5fa8d9' };
 const RADIUS = { root: 30, small: 15, notable: 23, keystone: 34 };
@@ -30,6 +29,10 @@ export default function GuildTree({ onChanged }) {
   const [info, setInfo] = useState(false);
   const [branch, setBranch] = useState('war');
   const [arm, setArm] = useState(0);
+  // Ширина экрана руки: картинка 2:3 целиком влезает до низа окна, сколько
+  // бы места ни заняли шапка и вкладки над ней (на телефоне их много).
+  const stage = useRef(null);
+  const [stageWidth, setStageWidth] = useState(null);
 
   const load = useCallback(() => {
     getGuildTree()
@@ -37,6 +40,18 @@ export default function GuildTree({ onChanged }) {
       .catch(() => setStatus('error'));
   }, []);
   useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+    const measure = () => {
+      const el = stage.current;
+      if (!el) return;
+      const top = el.getBoundingClientRect().top + window.scrollY;
+      const room = window.innerHeight - top - 12;
+      setStageWidth(Math.max(220, Math.floor(room * 2 / 3)));
+    };
+    measure();
+    window.addEventListener('resize', measure);
+    return () => window.removeEventListener('resize', measure);
+  }, [status]);
 
   const act = async (action, params, okText) => {
     setBusy(true);
@@ -68,15 +83,16 @@ export default function GuildTree({ onChanged }) {
   point[rootId] = ROOT_POINT;
   const armTitle = (b, a) => byId[`${b}:${a}:20`]?.name || ARM_TITLES_FALLBACK[a];
 
-  // Звёзды за краем экрана: узлы других рук и перемычка, связанные с узлами
-  // этой руки. Встают у левого или правого края на высоте своего соседа.
+  // Перемычка ветви (узел между руками 1 и 2) - обычная звезда сбоку от
+  // своего соседа на обеих руках: без неё узел не взять. Связи в соседние
+  // руки не рисуем (2026-10-20, владелец: кнопки перехода мешали) - каждая
+  // рука и так растёт от корня.
   const outside = [];
   armIds.forEach((id) => {
     (byId[id]?.links || []).forEach((linked) => {
-      if (linked === rootId || point[linked] || outside.some((o) => o.id === linked)) return;
-      const other = armOf(linked);
-      const left = other !== null ? other < arm : arm === 1;
-      outside.push({ id: linked, from: id, arm: other, x: left ? 70 : 930, y: point[id][1] });
+      if (armOf(linked) !== null || linked === rootId || outside.some((o) => o.id === linked)) return;
+      const [x, y] = point[id];
+      outside.push({ id: linked, from: id, x: arm === 0 ? Math.min(x + 170, 930) : Math.max(x - 170, 70), y: y - 40 });
     });
   });
   outside.forEach((o) => { point[o.id] = [o.x, o.y]; });
@@ -86,11 +102,6 @@ export default function GuildTree({ onChanged }) {
   outside.forEach((o) => edges.push([o.from, o.id]));
 
   const pick = (id) => {
-    const target = outside.find((o) => o.id === id);
-    if (target && target.arm !== null) {
-      // Узел соседней руки - переходим туда, он и откроется.
-      setArm(target.arm);
-    }
     setInfo(false);
     setSelected(id);
   };
@@ -136,7 +147,8 @@ export default function GuildTree({ onChanged }) {
         </button>
       </div>
 
-      <div className="guild-tree__stage">
+      <div className="guild-tree__stage" ref={stage}
+        style={stageWidth ? { width: `min(100%, ${stageWidth}px)` } : undefined}>
         <img className="guild-tree__art" src={ARM_IMAGES[branch][arm]} alt="" draggable="false" />
         <svg viewBox={`0 0 ${STAGE_W} ${STAGE_H}`} className="guild-tree__svg">
           {edges.map(([a, b]) => {
@@ -153,7 +165,6 @@ export default function GuildTree({ onChanged }) {
           {Object.entries(point).map(([id, [x, y]]) => {
             const n = byId[id];
             if (!n) return null;
-            const away = outside.some((o) => o.id === id);
             return (
               <g key={id} className="guild-tree__star" onClick={() => pick(id)}>
                 <circle cx={x} cy={y} r={HIT} fill="transparent" />
@@ -162,16 +173,9 @@ export default function GuildTree({ onChanged }) {
                     'guild-tree__node',
                     n.taken || n.kind === 'root' ? 'guild-tree__node--taken' : '',
                     n.available ? 'guild-tree__node--available' : '',
-                    away ? 'guild-tree__node--away' : '',
                     selected === id ? 'guild-tree__node--selected' : '',
                   ].join(' ')}
                   style={{ '--branch': color }} />
-                {away && (
-                  <text x={x < STAGE_W / 2 ? x - HIT : x + HIT} y={y + RADIUS[n.kind] + 36}
-                    textAnchor={x < STAGE_W / 2 ? 'start' : 'end'} className="guild-tree__away-label">
-                    {armOf(id) === null ? 'перемычка' : `${x < STAGE_W / 2 ? '← ' : ''}рука ${armOf(id) + 1}${x < STAGE_W / 2 ? '' : ' →'}`}
-                  </text>
-                )}
               </g>
             );
           })}
@@ -182,8 +186,8 @@ export default function GuildTree({ onChanged }) {
             <p className="guild-tree__card-title">Древо гильдии</p>
             <p className="craft-hint">
               Три ветви по три руки. Узел берут рядом с уже взятым: малый - 1 очко, средний - 2, ключевой - 3,
-              плюс золото из казны{tree.can_edit ? ` (в казне ${money(tree.treasury_gold)})` : ''}. Звёзды у края
-              ведут в соседнюю руку. Очки дают уровни гильдии. Брать могут глава и казначеи.
+              плюс золото из казны{tree.can_edit ? ` (в казне ${money(tree.treasury_gold)})` : ''}. Каждая рука растёт
+              от начала ветви, перемычка - звезда между первыми двумя руками. Очки дают уровни гильдии. Брать могут глава и казначеи.
             </p>
             {tree.effects.length === 0
               ? <p className="guild-line">Узлов пока нет.</p>
