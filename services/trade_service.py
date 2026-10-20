@@ -592,7 +592,7 @@ class Arrival:
         if self.crates:
             sold = f"💰 Продано {self.crates} ящ. за {self.revenue} золота"
             if self.net and self.net != self.revenue:
-                sold += f", на руки после налога гильдии {self.net}"
+                sold += f", на руки {self.net} (налог гильдии - только с прибыли)"
             # Закупку списали при отправке, поэтому в кошелёк приходит вся
             # выручка, а прибыль рейса - выручка минус закупка.
             lines.append(f"{sold}. Прибыль рейса {self.profit:+d} (выручка минус закупка).")
@@ -687,8 +687,16 @@ async def arrive(
     if revenue:
         from services import guild_service  # избегаем цикла импортов
 
-        out.net = guild_service.after_tax(character, revenue)
-        await wallet_service.deposit(db, character.id, "farm", revenue)
+        # Налог гильдии - только с прибыли рейса (2026-10-20, владелец): закупку
+        # игрок оплатил своим золотом, её возврат налогом не облагается,
+        # убыточный рейс не облагается вовсе.
+        taxed = max(revenue - cost, 0)
+        returned = revenue - taxed
+        out.net = returned + guild_service.after_tax(character, taxed)
+        if returned:
+            await wallet_service.deposit(db, character.id, "farm", returned, taxable=False)
+        if taxed:
+            await wallet_service.deposit(db, character.id, "farm", taxed)
     firm.profit_total += max(out.profit, 0)
     # Опыт торговли - только за выгодный рейс (2026-10-18, решение владельца):
     # гонять ящики в убыток ради уровня торговли нельзя.

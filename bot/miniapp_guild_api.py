@@ -516,7 +516,7 @@ async def _act(db, character: Character, vk_user_id: int, body: dict) -> list:
     elif action == "tax":
         await guild_service.set_tax(db, character, _int(body, "percent"))
         guild = await guild_service.guild_of(db, character)
-        notes.append(("guild", guild.id, f"🏰 Налог гильдии теперь {guild.gold_tax}%: эта доля любого золота участников идёт в казну."))
+        notes.append(("guild", guild.id, f"🏰 Налог гильдии теперь {guild.gold_tax}%: эта доля золота участников идёт в казну (с торговли - только с прибыли рейса)."))
     elif action == "siege_hour":
         await guild_siege_service.set_siege_hour(db, character, _int(body, "hour"))
     elif action == "tree_allocate":

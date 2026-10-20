@@ -416,5 +416,5 @@ def test_arrival_shows_net_after_guild_tax() -> None:
     a = trade_service.Arrival(character_id=1, slot=2, firm_name="Ф", to_city="docks", crates=12,
                               revenue=2723, net=2043, profit=1019)
     text = a.text()
-    assert "за 2723 золота, на руки после налога гильдии 2043" in text
+    assert "за 2723 золота, на руки 2043 (налог гильдии - только с прибыли)" in text
     assert "Прибыль рейса +1019 (выручка минус закупка)" in text
