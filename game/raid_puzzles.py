@@ -8,12 +8,13 @@ cells клавиатурой, payload кнопки несёт value, обрат�
 У каждого игрока группы своя головоломка - пять видов на пятерых.
 """
 
+import itertools
 import random
 
 from game.economy import raid_archive_config as ac
 
-TTT, PAIRS, SLIDE, CANDLES, RUNES = "ttt", "pairs", "slide", "candles", "runes"
-KINDS = (TTT, PAIRS, SLIDE, CANDLES, RUNES)
+TTT, PAIRS, PAGES, CANDLES, RUNES = "ttt", "pairs", "pages", "candles", "runes"
+KINDS = (TTT, PAIRS, PAGES, CANDLES, RUNES)
 
 Cell = tuple[str, str]  # (подпись кнопки, value)
 
@@ -158,10 +159,8 @@ class Pairs(Puzzle):
         return "Не пара."
 
 
-# --- Пятнашки 3×3 ------------------------------------------------------------------
-
-
 def _neighbors(i: int) -> list[int]:
+    """Соседи крестом на поле 3×3 (свечи)."""
     r, c = divmod(i, 3)
     out = []
     for dr, dc in ((1, 0), (-1, 0), (0, 1), (0, -1)):
@@ -171,46 +170,135 @@ def _neighbors(i: int) -> list[int]:
     return out
 
 
-class Slide(Puzzle):
-    kind = SLIDE
-    title = "🔢 Пятнашки"
-    rules = "Собери плитки по порядку 1-8, пустая клетка - в правом нижнем углу. Двигается плитка рядом с пустой."
+# --- Проклятые страницы (мини-сапёр, 2026-10-20 вместо пятнашек) -------------------
+# Пятнашки собирались за 20-40 ходов, и клавиатура VK на каждом ходу делала
+# игру вязкой. Здесь 6-10 нажатий, и каждое что-то открывает.
 
-    SOLVED = [1, 2, 3, 4, 5, 6, 7, 8, 0]
+PAGES_ROWS, PAGES_COLS, PAGES_CURSED = 4, 3, 2
+#: Сколько чистых страниц должно остаться закрытыми после первого нажатия.
+PAGES_MIN_LEFT = 3
+_PAGE_CLOSED = "📄"
+_PAGE_NUMBERS = ("▫️", "1", "2", "3", "4", "5", "6", "7", "8")
 
-    def __init__(self, rng: random.Random, shuffle_moves: int = 40) -> None:
+
+def _around(i: int) -> list[int]:
+    """Соседи по всем 8 направлениям на поле страниц."""
+    r, c = divmod(i, PAGES_COLS)
+    return [
+        nr * PAGES_COLS + nc
+        for nr in range(r - 1, r + 2) for nc in range(c - 1, c + 2)
+        if (nr, nc) != (r, c) and 0 <= nr < PAGES_ROWS and 0 <= nc < PAGES_COLS
+    ]
+
+
+def _counts(cursed: set[int]) -> list[int]:
+    return [sum(1 for n in _around(i) if n in cursed) for i in range(PAGES_ROWS * PAGES_COLS)]
+
+
+def _open_from(i: int, counts: list[int], cursed: set[int], opened: set[int]) -> None:
+    """Открыть страницу; у нуля - сразу и всех соседей, как в сапёре."""
+    stack = [i]
+    while stack:
+        j = stack.pop()
+        if j in opened or j in cursed:
+            continue
+        opened.add(j)
+        if counts[j] == 0:
+            stack.extend(_around(j))
+
+
+def solvable_without_guessing(first: int, cursed: set[int]) -> bool:
+    """Решается ли поле одной логикой: перебор всех раскладок проклятий,
+    согласных с открытыми числами, и открытие страниц, чистых во ВСЕХ из них."""
+    size = PAGES_ROWS * PAGES_COLS
+    counts = _counts(cursed)
+    opened: set[int] = set()
+    _open_from(first, counts, cursed, opened)
+    while len(opened) < size - len(cursed):
+        closed = [i for i in range(size) if i not in opened]
+        layouts = [
+            set(combo) for combo in itertools.combinations(closed, len(cursed))
+            if all(_counts(set(combo))[i] == counts[i] for i in opened)
+        ]
+        safe = [i for i in closed if all(i not in lay for lay in layouts)]
+        if not safe:
+            return False
+        for i in safe:
+            _open_from(i, counts, cursed, opened)
+    return True
+
+
+class Pages(Puzzle):
+    kind = PAGES
+    title = "📜 Проклятые страницы"
+    rules = (
+        f"Под {PAGES_CURSED} страницами проклятие. Открытая страница показывает число проклятых "
+        "соседей, считая наискосок. Первая страница всегда чистая. Открой все чистые. Тронешь "
+        "проклятую - страницы перемешаются, начнёшь сначала."
+    )
+
+    def __init__(self, rng: random.Random) -> None:
         super().__init__(rng)
-        self.board = list(self.SOLVED)
-        prev = None
-        # Перемешивание ходами от решённого - раскладка всегда собираемая.
-        while self.board == self.SOLVED:
-            for _ in range(shuffle_moves):
-                empty = self.board.index(0)
-                options = [n for n in _neighbors(empty) if n != prev]
-                pick = rng.choice(options)
-                self.board[empty], self.board[pick] = self.board[pick], 0
-                prev = empty
-        self.moves = 0
+        self._reset()
+
+    def _reset(self) -> None:
+        # Проклятия раскладываются после первого нажатия: первая страница всегда чистая.
+        self.cursed: set[int] = set()
+        self.counts: list[int] = []
+        self.opened: set[int] = set()
+
+    def _deal(self, first: int) -> None:
+        size = PAGES_ROWS * PAGES_COLS
+        keep_clear = {first}
+        free = [i for i in range(size) if i not in keep_clear]
+        # Все раскладки, решаемые логикой; из них - те, где после первого
+        # нажатия остаётся больше всего работы: иначе это не головоломка, а
+        # один клик, открывающий всё поле.
+        best: list[set[int]] = []
+        best_left = -1
+        for combo in itertools.combinations(free, PAGES_CURSED):
+            cursed = set(combo)
+            if not solvable_without_guessing(first, cursed):
+                continue
+            opened: set[int] = set()
+            _open_from(first, _counts(cursed), cursed, opened)
+            left = min(size - PAGES_CURSED - len(opened), PAGES_MIN_LEFT)
+            if left > best_left:
+                best, best_left = [cursed], left
+            elif left == best_left:
+                best.append(cursed)
+        cursed = self.rng.choice(best) if best else set(self.rng.sample(free, PAGES_CURSED))
+        self.cursed = cursed
+        self.counts = _counts(cursed)
 
     def cells(self) -> list[list[Cell]]:
-        return [[(str(v) if v else "▫️", str(r * 3 + c)) for c, v in enumerate(self.board[r * 3:r * 3 + 3])]
-                for r in range(3)]
+        return [
+            [
+                (_PAGE_NUMBERS[self.counts[i]] if i in self.opened else _PAGE_CLOSED, str(i))
+                for i in range(r * PAGES_COLS, (r + 1) * PAGES_COLS)
+            ]
+            for r in range(PAGES_ROWS)
+        ]
 
     def status(self) -> str:
-        return f"Ходов: {self.moves}"
+        left = PAGES_ROWS * PAGES_COLS - PAGES_CURSED - len(self.opened)
+        return f"Чистых страниц осталось: {left}"
 
     def press(self, value: str) -> str:
         if not value.isdigit() or self.solved:
             return ""
         i = int(value)
-        empty = self.board.index(0)
-        if i not in _neighbors(empty):
+        if not 0 <= i < PAGES_ROWS * PAGES_COLS or i in self.opened:
             return ""
-        self.board[empty], self.board[i] = self.board[i], 0
-        self.moves += 1
-        if self.board == self.SOLVED:
+        if not self.cursed:
+            self._deal(i)
+        if i in self.cursed:
+            self._reset()
+            return "Страница чернеет у тебя в руках. Листы взлетают и ложатся заново, все закрытые."
+        _open_from(i, self.counts, self.cursed, self.opened)
+        if len(self.opened) == PAGES_ROWS * PAGES_COLS - PAGES_CURSED:
             self.solved = True
-            return "Плитки встают на места с сухим щелчком."
+            return "Последняя чистая страница открыта. Проклятые сворачиваются в трубку."
         return ""
 
 
@@ -332,7 +420,7 @@ class Runes(Puzzle):
         return ""
 
 
-_CLASSES = {TTT: TicTacToe, PAIRS: Pairs, SLIDE: Slide, CANDLES: Candles, RUNES: Runes}
+_CLASSES = {TTT: TicTacToe, PAIRS: Pairs, PAGES: Pages, CANDLES: Candles, RUNES: Runes}
 
 
 def deal(rng: random.Random, players: int) -> list[Puzzle]:

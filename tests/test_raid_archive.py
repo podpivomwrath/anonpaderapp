@@ -2,7 +2,6 @@
 
 import itertools
 import random
-from collections import deque
 
 from game import archive_riddles, raid_puzzles
 from game.combat import raid_archive
@@ -30,38 +29,41 @@ def test_puzzle_boards_fit_a_vk_keyboard() -> None:
         assert all(1 <= len(row) <= 5 for row in rows)
 
 
-def _solve_slide(board: list[int]) -> list[int]:
-    """BFS: последовательность клеток, которые надо нажать."""
-    start, goal = tuple(board), tuple(raid_puzzles.Slide.SOLVED)
-    prev = {start: None}
-    queue = deque([start])
-    while queue:
-        state = queue.popleft()
-        if state == goal:
-            break
-        empty = state.index(0)
-        for n in raid_puzzles._neighbors(empty):
-            nxt = list(state)
-            nxt[empty], nxt[n] = nxt[n], 0
-            nxt = tuple(nxt)
-            if nxt not in prev:
-                prev[nxt] = (state, n)
-                queue.append(nxt)
-    path = []
-    state = goal
-    while prev[state] is not None:
-        state, n = prev[state]
-        path.append(n)
-    return list(reversed(path))
+def _logic_player(puzzle) -> None:
+    """Играет как человек без угадывания: открывает только страницы, чистые
+    при любой раскладке, согласной с открытыми числами."""
+    size = raid_puzzles.PAGES_ROWS * raid_puzzles.PAGES_COLS
+    puzzle.press("0")
+    while not puzzle.solved:
+        closed = [i for i in range(size) if i not in puzzle.opened]
+        layouts = [
+            set(c) for c in itertools.combinations(closed, raid_puzzles.PAGES_CURSED)
+            if all(raid_puzzles._counts(set(c))[i] == puzzle.counts[i] for i in puzzle.opened)
+        ]
+        safe = [i for i in closed if all(i not in lay for lay in layouts)]
+        assert safe, "пришлось бы угадывать"
+        puzzle.press(str(safe[0]))
 
 
-def test_slide_is_always_solvable() -> None:
-    for seed in range(15):
-        puzzle = raid_puzzles.Slide(random.Random(seed))
-        assert not puzzle.solved
-        for cell in _solve_slide(puzzle.board):
-            puzzle.press(str(cell))
+def test_cursed_pages_solve_by_logic_alone() -> None:
+    for seed in range(40):
+        puzzle = raid_puzzles.Pages(random.Random(seed))
+        _logic_player(puzzle)
         assert puzzle.solved
+        assert len(puzzle.opened) == 12 - raid_puzzles.PAGES_CURSED
+
+
+def test_first_page_is_always_clean_and_a_curse_reshuffles() -> None:
+    for seed in range(20):
+        puzzle = raid_puzzles.Pages(random.Random(seed))
+        first = seed % 12
+        assert puzzle.press(str(first)) == "" or puzzle.solved
+        assert first in puzzle.opened
+        assert 12 - raid_puzzles.PAGES_CURSED - len(puzzle.opened) >= raid_puzzles.PAGES_MIN_LEFT
+        cursed = next(iter(puzzle.cursed))
+        line = puzzle.press(str(cursed))
+        assert line and not puzzle.solved
+        assert puzzle.opened == set() and puzzle.cursed == set()  # всё заново, без смерти
 
 
 def test_candles_are_always_solvable() -> None:
