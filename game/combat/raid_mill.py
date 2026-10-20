@@ -12,8 +12,10 @@
   иначе жернова дробят ему ноги.
 - «Помол»: раз в mc.GRIND_EVERY ходов - по тому, кто за это время нанёс
   Мельнику больше всех урона; каждый следующий помол того же игрока сильнее.
-- «Цепь жерновов»: двое скованы, половина урона одного идёт второму. Цепь -
-  отдельный противник; не разбили за mc.CHAIN_TURNS ходов - стягивается.
+- «Цепь жерновов» (2026-10-20): один игрок прикован к Мельнику. Половина
+  урона по Мельнику уходит в прикованного, половина лечения и щитов на
+  прикованном - Мельнику. Цепь - отдельный противник; не разбили за
+  mc.CHAIN_TURNS ходов - стягивается и ранит прикованного.
 - «Отлучение»: один подкласс состава на ход без навыков.
 - «Каравай»: взявший лечится, но следующий удар Мельника - в него, сильнее.
 - Финал: ниже mc.FINAL_HP ход вдвое короче.
@@ -63,6 +65,10 @@ def _hurt(player: CombatantState, amount: int, out: StageTick) -> None:
     if player.current_hp <= 0:
         out.deaths.append(player.id)
         out.lines.append(f"☠ {player.name} погибает")
+
+
+def _shields(player: CombatantState) -> dict[int, float]:
+    return {id(e): e.value for e in player.effects_of(EffectKind.SHIELD_POOL)}
 
 
 def _taken(result: TickResult, cid: int) -> int:
@@ -226,8 +232,11 @@ class MillerStage:
         self.ground: dict[int, int] = {}
         # «Цепь»
         self.chain_id: int | None = None
-        self.chained: tuple[int, int] | None = None
+        self.chained_id: int | None = None
         self.chain_left = 0
+        #: Щиты прикованного на конец прошлого хода: {id(эффекта): остаток}.
+        #: По нему видно, какой щит повесили за ход, - половина уходит Мельнику.
+        self.chain_shields: dict[int, float] = {}
         # «Каравай»
         self.bread_open = False
         self.fed_id: int | None = None
@@ -356,54 +365,77 @@ class MillerStage:
 
     def _spawn_chain(self, session, rng, out: StageTick) -> None:
         players = _players(session)
-        if len(players) < 2:
+        if not players:
             return
-        a, b = rng.sample(players, 2)
+        victim = rng.choice(players)
         chain = _boss_combatant(self._new_id(), CHAIN_NAME, mc.CHAIN_HP, 1.0)
         chain.scripted_hit = _idle
         chain.control_immune_always = True
         session.add(chain)
         self.chain_id = chain.id
-        self.chained = (a.id, b.id)
+        self.chained_id = victim.id
         self.chain_left = mc.CHAIN_TURNS
+        self.chain_shields = _shields(victim)
         out.lines.append(
-            f"⛓ Цепь жерновов сковывает {a.name} и {b.name}: половина урона одного идёт второму."
+            f"⛓ Цепь жерновов приковывает {victim.name} к Мельнику: половина урона по Мельнику "
+            f"уходит в {victim.name}, половина лечения и щитов на нём - Мельнику."
         )
         self._hint(
-            "chain", f"Разбейте цепь за {mc.CHAIN_TURNS} хода (🎯 Выбор цели), иначе она стянется.", out,
+            "chain",
+            f"Пока цепь цела, каждый удар по Мельнику ранит прикованного. Бейте цепь всей группой "
+            f"(🎯 Выбор цели): за {mc.CHAIN_TURNS} хода не разобьёте - она стянется.",
+            out,
         )
 
     def _tick_chain(self, session, result: TickResult, out: StageTick) -> None:
-        if self.chain_id is None or self.chained is None:
+        if self.chain_id is None or self.chained_id is None:
             return
         chain = session.combatants.get(self.chain_id)
-        pair = [session.combatants.get(cid) for cid in self.chained]
-        if chain is None or not chain.alive:
-            out.lines.append("⛓ Цепь разбита.")
+        boss = session.combatants[self.boss_id]
+        player = session.combatants.get(self.chained_id)
+        if chain is None or not chain.alive or player is None or not player.alive:
+            if chain is not None and not chain.alive:
+                out.lines.append("⛓ Цепь разбита.")
             self._drop_chain(chain)
             return
-        first, second = pair
-        for me, other in ((first, second), (second, first)):
-            if me is None or other is None or not other.alive:
-                continue
-            shared = round(_taken(result, me.id) * mc.CHAIN_SHARE)
-            if shared > 0:
-                out.lines.append(f"⛓ Цепь: {other.name} - {shared} урона")
-                _hurt(other, shared, out)
+        # Урон по Мельнику: половина возвращается ему и бьёт прикованного.
+        shared = round(_taken(result, boss.id) * mc.CHAIN_SHARE)
+        if shared > 0:
+            boss.current_hp = min(boss.max_hp, boss.current_hp + shared)
+            out.lines.append(f"⛓ Цепь: {shared} урона с Мельника уходит в {player.name}")
+            _hurt(player, shared, out)
+        # Лечение и щиты прикованного: половина - Мельнику.
+        healed = sum(h.amount for h in result.heal_renders if h.target_id == player.id)
+        drained = min(round(healed * mc.CHAIN_SHARE), max(player.current_hp - 1, 0))
+        if player.alive and drained > 0:
+            player.current_hp -= drained
+        shield_cut = 0
+        before = self.chain_shields
+        for effect in player.effects_of(EffectKind.SHIELD_POOL):
+            gained = effect.value - before.get(id(effect), 0.0)
+            if gained > 0:
+                cut = gained * mc.CHAIN_SHARE
+                effect.value -= cut
+                shield_cut += round(cut)
+        self.chain_shields = _shields(player)
+        to_boss = drained + shield_cut
+        if to_boss > 0:
+            boss.current_hp = min(boss.max_hp, boss.current_hp + to_boss)
+            out.lines.append(f"⛓ Цепь: Мельник забирает {to_boss} лечения и щитов {player.name}")
         self.chain_left -= 1
         if self.chain_left <= 0:
             out.lines.append("⛓ Цепь стягивается.")
-            for p in pair:
-                if p is not None and p.alive:
-                    _hurt(p, round(p.max_hp * mc.CHAIN_SNAP_PCT), out)
+            if player.alive:
+                _hurt(player, round(player.max_hp * mc.CHAIN_SNAP_PCT), out)
             self._drop_chain(chain)
 
     def _drop_chain(self, chain: CombatantState | None) -> None:
         if chain is not None:
             chain.current_hp = 0
         self.chain_id = None
-        self.chained = None
+        self.chained_id = None
         self.chain_left = 0
+        self.chain_shields = {}
 
     # --- Отлучение ---
 

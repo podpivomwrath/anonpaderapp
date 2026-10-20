@@ -206,16 +206,58 @@ def test_grind_hits_the_top_damage_dealer_harder_each_time() -> None:
     assert 10_000 - a.current_hp > first
 
 
-def test_chain_shares_damage_and_snaps_if_not_broken() -> None:
+def _hit_on(target_id: int, amount: int):
+    return SimpleNamespace(target_id=target_id, amount=amount, missed=False)
+
+
+def test_chain_ties_one_player_to_the_miller_and_snaps() -> None:
+    """2026-10-20: цепь - игрок и Мельник. Не разбили - стягивается и ранит
+    только прикованного."""
     stage, state, (a, b) = _miller()
     stage._spawn_chain(state, random.Random(1), StageTick())
     chain = state.combatants[stage.chain_id]
     assert chain.side == 1 and chain.alive
-    first, second = (state.combatants[c] for c in stage.chained)
+    victim = state.combatants[stage.chained_id]
+    other = b if victim is a else a
     for _ in range(mc.CHAIN_TURNS):
         stage._tick_chain(state, TickResult(), StageTick())
     assert stage.chain_id is None and not chain.alive
-    assert first.current_hp < first.max_hp and second.current_hp < second.max_hp
+    assert victim.current_hp < victim.max_hp and other.current_hp == other.max_hp
+
+
+def test_chain_moves_half_of_the_millers_damage_to_the_player() -> None:
+    stage, state, _ = _miller()
+    stage._spawn_chain(state, random.Random(1), StageTick())
+    boss = state.combatants[stage.boss_id]
+    victim = state.combatants[stage.chained_id]
+    boss.current_hp -= 1000  # удары игроков этого хода
+    result = TickResult(hit_renders=[_hit_on(boss.id, 1000)])
+    stage._tick_chain(state, result, StageTick())
+    assert boss.current_hp == boss.max_hp - 500
+    assert victim.current_hp == victim.max_hp - 500
+
+
+def test_chain_gives_half_of_heals_and_shields_to_the_miller() -> None:
+    from game.combat.resolver import RenderedHeal
+
+    stage, state, _ = _miller()
+    stage._spawn_chain(state, random.Random(1), StageTick())
+    boss = state.combatants[stage.boss_id]
+    victim = state.combatants[stage.chained_id]
+    boss.current_hp -= 2000
+    victim.current_hp = victim.max_hp - 100  # лечение уже легло: +400
+    victim.apply_effect(EffectKind.SHIELD_POOL, 600, 3, victim.id)
+    heal = RenderedHeal(source_id=victim.id, target_id=victim.id, source_side=0, target_side=0, label="x",
+                        amount=400, hp_before=victim.max_hp - 500, hp_after=victim.max_hp - 100,
+                        max_hp=victim.max_hp)
+    stage._tick_chain(state, TickResult(heal_renders=[heal]), StageTick())
+    assert victim.current_hp == victim.max_hp - 300
+    shield = victim.effects_of(EffectKind.SHIELD_POOL)[0]
+    assert shield.value == 300
+    assert boss.current_hp == boss.max_hp - 2000 + 200 + 300
+    # Старый щит на следующем ходу второй раз не делится.
+    stage._tick_chain(state, TickResult(), StageTick())
+    assert shield.value == 300
 
 
 def test_broken_chain_does_no_harm() -> None:
