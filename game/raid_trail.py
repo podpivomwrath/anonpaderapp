@@ -131,27 +131,32 @@ def _bfs_avoiding(passages, start: int, avoid: set[int]) -> set[int]:
 def generate(rng: random.Random) -> Maze:
     start_exits = set(neighbors(START).values())
     while True:
-        passages, parent = _perfect_tree(rng)
-        candidates = []
-        for v, u in parent.items():
-            if u < 0:
-                continue
-            sub = _subtree(parent, v)
-            # Соседи входа - не за решёткой: оба хода со старта открыты всегда.
-            if tc.LOCKED_MIN <= len(sub) <= tc.LOCKED_MAX and not sub & ({START, GATE} | start_exits):
-                candidates.append((_edge(u, v), sub))
-        if candidates:
+        while True:
+            passages, parent = _perfect_tree(rng)
+            candidates = []
+            for v, u in parent.items():
+                if u < 0:
+                    continue
+                sub = _subtree(parent, v)
+                # Соседи входа - не за решёткой: оба хода со старта открыты всегда.
+                if tc.LOCKED_MIN <= len(sub) <= tc.LOCKED_MAX and not sub & ({START, GATE} | start_exits):
+                    candidates.append((_edge(u, v), sub))
+            if candidates:
+                break
+        grate, locked = rng.choice(candidates)
+        # Лишние проходы - только внутри своей части, чтобы не обойти решётку.
+        extra = [
+            _edge(a, b) for a in range(N * N) for b in neighbors(a).values()
+            if a < b and _edge(a, b) not in passages and ((a in locked) == (b in locked))
+        ]
+        rng.shuffle(extra)
+        passages |= set(extra[: tc.EXTRA_OPENINGS])
+        # Со входа - два хода (2026-10-21): с одним Безымянный запирал группу на старте.
+        passages |= {_edge(START, n) for n in start_exits}
+
+        # Каждый ход со входа сам ведёт к Воротам: Безымянный в одном не запрёт.
+        if all(GATE in _bfs_avoiding(passages, START, {n}) for n in start_exits if n != GATE):
             break
-    grate, locked = rng.choice(candidates)
-    # Лишние проходы - только внутри своей части, чтобы не обойти решётку.
-    extra = [
-        _edge(a, b) for a in range(N * N) for b in neighbors(a).values()
-        if a < b and _edge(a, b) not in passages and ((a in locked) == (b in locked))
-    ]
-    rng.shuffle(extra)
-    passages |= set(extra[: tc.EXTRA_OPENINGS])
-    # Со входа - два хода (2026-10-21): с одним Безымянный запирал группу на старте.
-    passages |= {_edge(START, n) for n in start_exits}
 
     kinds: dict[int, str] = {}
     dist = _bfs(passages, START, blocked=grate)

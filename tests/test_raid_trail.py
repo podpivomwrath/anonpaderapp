@@ -72,6 +72,9 @@ def test_start_always_has_two_open_exits() -> None:
         lab = lab_rules.Labyrinth([1], random.Random(seed))
         assert len(lab.exits(lab_rules.START)) == 2, seed
         assert not set(lab_rules.neighbors(lab_rules.START).values()) & lab.maze.locked, seed
+        for n in lab_rules.neighbors(lab_rules.START).values():
+            # Безымянный стоит в одном ходе - через другой до Ворот дойти можно.
+            assert lab_rules.GATE in lab_rules._bfs_avoiding(lab.maze.passages, lab_rules.START, {n}), seed
 
 
 def test_solo_run_can_finish_with_plate_hold() -> None:
