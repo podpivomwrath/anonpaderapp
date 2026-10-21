@@ -145,6 +145,8 @@ async def test_world_actions_blocked_in_party_battle(monkeypatch, db_session, ma
     monkeypatch.setattr(world, "get_session_factory", lambda: Context)
     from bot.handlers import rest as rest_handlers
     monkeypatch.setattr(rest_handlers, "get_session_factory", lambda: Context)
+    from bot.handlers import explore as explore_handlers
+    monkeypatch.setattr(explore_handlers, "get_session_factory", lambda: Context)
     monkeypatch.setattr(world.onboarding_svc, "get_character", get_character)
     handler = raid_combat if mode == "raid" else group_combat
     name = "has_active_battle" if mode == "raid" else "has_active_group_battle"

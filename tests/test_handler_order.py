@@ -13,7 +13,7 @@ import bot.handlers as handlers
 
 EXPECTED = [
     "terms", "onboarding", "voyage", "rift", "raid_archive", "raid_procession", "raid_trail", "scene_events",
-    "group_events", "turbo_ishak", "world", "rest", "stuck", "combat", "group_combat", "pvp", "arena", "house", "herbs",
+    "group_events", "turbo_ishak", "world", "explore", "rest", "stuck", "combat", "group_combat", "pvp", "arena", "house", "herbs",
     "appraiser", "inventory", "list_keeper", "presets", "elixir_shop", "dailies", "mounts", "stats_window",
     "moderation", "basic", "raid", "raid_combat", "fishing", "mining", "world_boss", "guild", "group", "contracts",
     "transfer", "promo", "fallback",

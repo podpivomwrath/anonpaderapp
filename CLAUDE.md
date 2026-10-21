@@ -36,6 +36,13 @@ python tools/broadcast.py - [--hours 24] [--photo N] --send`. Скрипт са�
   - тогда снять его в `world.force_unstick`). Свои копии проверки не писать:
   все входы берут `busy()` (`activity.blocked_reason`, маунт, карта мини-аппа,
   поход). Если код нужен карте - `_MAP_REASONS` и текст в `MapTab.jsx`.
+- **Где мир**: `bot/handlers/world.py` - город, карта, ходьба, клавиатуры экранов;
+  исследование и события - `explore.py`, отдых - `rest.py`, `/застрял` - `stuck.py`.
+  Общее состояние мира остаётся в world.py, модули берут его как `world.X`.
+- **Что держится в памяти** - `bot/memory_state.py`: новое хранилище впиши туда
+  с ответом «кто снимает» (сверка `tests/test_memory_state.py`).
+- **Ввод словами** (не кнопкой) - строка в `bot/button_gate.TYPED_INPUTS` и
+  пропуск в `_typed_input_expected`, иначе фильтр кнопок отрежет его.
 - **Исследование и отдых**: отметки «занят» только через `bot/explore_rest.py`
   (`start`/`stop`/`drop`) - там память и запись в Redis меняются вместе.
 - **Новый экран чата**: родитель в `services/screen_service.PARENT` и
