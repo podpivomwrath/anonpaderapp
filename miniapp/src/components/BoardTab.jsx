@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
-import { Div, Group, Header, Placeholder, Spinner, Tabs, TabsItem } from '@vkontakte/vkui';
+import { Div, Group, Header, Placeholder, Spinner, TabsItem } from '@vkontakte/vkui';
+import Tabs from './ScrollTabs.jsx';
 import { getBoard } from '../api.js';
 import ClassIcon from './ClassIcon.jsx';
 import ContractsSection from './ContractsSection.jsx';

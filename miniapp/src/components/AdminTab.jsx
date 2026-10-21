@@ -1,8 +1,8 @@
 import { createContext, useContext, useEffect, useState } from 'react';
 import {
-  Tabs, TabsItem, Group, Header, Div, Spinner, Placeholder, Button, Input, FormItem, Select, Textarea, Checkbox,
-  Caption, SimpleCell,
+  TabsItem, Group, Header, Div, Spinner, Placeholder, Button, Input, FormItem, Select, Textarea, Checkbox, Caption, SimpleCell,
 } from '@vkontakte/vkui';
+import Tabs from './ScrollTabs.jsx';
 import {
   getAdminOverview, searchAdminPlayers, getAdminPlayer, postAdminAction, getAdminJournal,
   getAdminPromoCodes, createAdminPromoCode, deleteAdminPromoCode, getAdminPromoCodeActivations,

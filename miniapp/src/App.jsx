@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import bridge from '@vkontakte/vk-bridge';
-import { AppRoot, ConfigProvider, SplitLayout, SplitCol, Tabs, TabsItem } from '@vkontakte/vkui';
+import { AppRoot, ConfigProvider, SplitLayout, SplitCol, TabsItem } from '@vkontakte/vkui';
+import Tabs from './components/ScrollTabs.jsx';
 import BackgroundScene from './components/BackgroundScene.jsx';
 import ChestRoulette from './components/ChestRoulette.jsx';
 import Hub from './components/Hub.jsx';

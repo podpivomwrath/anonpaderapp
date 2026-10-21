@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { HorizontalScroll, Tabs, TabsItem } from '@vkontakte/vkui';
+import { TabsItem } from '@vkontakte/vkui';
+import Tabs from './ScrollTabs.jsx';
 import StatsTab from './StatsTab.jsx';
 import PresetsTab from './PresetsTab.jsx';
 import TrialsTab from './TrialsTab.jsx';
@@ -26,14 +27,11 @@ export default function CharacterTab({ character, onCharacterUpdate }) {
   return (
     <>
       <Tabs>
-        {/* Четыре вкладки не влезают в ширину телефона - листаются вбок. */}
-        <HorizontalScroll arrowSize="m" scrollOnAnyWheel>
-          {SECTIONS.map((s) => (
-            <TabsItem key={s.id} selected={section === s.id} onClick={() => setSection(s.id)}>
-              {s.label}
-            </TabsItem>
-          ))}
-        </HorizontalScroll>
+        {SECTIONS.map((s) => (
+          <TabsItem key={s.id} selected={section === s.id} onClick={() => setSection(s.id)}>
+            {s.label}
+          </TabsItem>
+        ))}
       </Tabs>
       {section === 'stats' && <StatsTab character={character} onCharacterUpdate={onCharacterUpdate} />}
       {section === 'presets' && <PresetsTab character={character} />}

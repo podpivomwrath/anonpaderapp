@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
-import { Tabs, TabsItem, Group, Header, Div, Spinner, Placeholder } from '@vkontakte/vkui';
+import { TabsItem, Group, Header, Div, Spinner, Placeholder } from '@vkontakte/vkui';
+import Tabs from './ScrollTabs.jsx';
 import { getDailies } from '../api.js';
 
 // Патч 23: вкладка «Задания» - три раздела (Сюжет/Ежедневные/Вход).

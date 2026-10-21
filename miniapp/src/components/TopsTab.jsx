@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
-import { Group, Header, Div, Spinner, Placeholder, Tabs, TabsItem } from '@vkontakte/vkui';
+import { Group, Header, Div, Spinner, Placeholder, TabsItem } from '@vkontakte/vkui';
+import Tabs from './ScrollTabs.jsx';
 import { getLeaderboard } from '../api.js';
 import ClassIcon from './ClassIcon.jsx';
 

@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useState } from 'react';
 import {
-  Button, Div, Group, Header, Placeholder, Spinner, Tabs, TabsItem,
+  Button, Div, Group, Header, Placeholder, Spinner, TabsItem,
 } from '@vkontakte/vkui';
+import Tabs from './ScrollTabs.jsx';
 import { craftItem, craftTool, getCraft, upgradeCraft } from '../api.js';
 import ItemIcon from './ItemIcon.jsx';
 

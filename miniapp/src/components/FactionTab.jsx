@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Button, Div, Group, Header, Placeholder, Spinner, Tabs, TabsItem } from '@vkontakte/vkui';
+import { Button, Div, Group, Header, Placeholder, Spinner, TabsItem } from '@vkontakte/vkui';
+import Tabs from './ScrollTabs.jsx';
 import { getTrade, getTradeCity, tradeAction } from '../api.js';
 import { itemIcon } from '../itemIcons.js';
 import ItemIcon from './ItemIcon.jsx';
