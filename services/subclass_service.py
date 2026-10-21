@@ -51,7 +51,9 @@ def is_path_pool(pool: str | None) -> bool:
 def decline(character: Character) -> None:
     """Отказ от подкласса - бесплатно и навсегда (снимает только смена класса)."""
     character.subclass_declined = True
-    # Право на бесплатный выбор, если за путь уже платили, не трогаем.
+    # 2026-10-21, владелец: отказ - такой же выбор пути, как подкласс. Значит,
+    # и право на бесплатный повторный выбор после сброса - как у подкласса.
+    character.subclass_free_repick = True
 
 
 def paths_for(base_class: str) -> list[SubclassDef]:

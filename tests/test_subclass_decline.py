@@ -68,7 +68,19 @@ async def test_only_full_class_change_clears_decline(db_session, make_character)
     await full_class_reset(db_session, character, BaseClass.MAGE)
     assert not subclass_service.declined(character)
     assert subclass_service.can_offer(character)
-    assert not character.subclass_free_repick  # за путь не платили - повтор не бесплатный
+    # 2026-10-21: отказ - тоже выбор пути, повтор после смены класса бесплатный.
+    assert subclass_service.free_repick(character)
+
+
+async def test_subclass_reset_works_for_declined(db_session, make_character) -> None:
+    """Отказ сбрасывается «Сменить подкласс» так же, как подкласс."""
+    from services import respec_service
+
+    character = await make_character(level=30)
+    subclass_service.decline(character)
+    await respec_service.reset_subclass(db_session, character)
+    assert not subclass_service.declined(character) and character.subclass is None
+    assert subclass_service.can_offer(character) and subclass_service.free_repick(character)
 
 
 def test_path_skill_buffs_change_damage_and_cooldown() -> None:

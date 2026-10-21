@@ -20,6 +20,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from game.combat import balance_config as bc
 from models import BaseClass, Character, CharacterStats
+from services import subclass_service
 from services.wallet_service import charge
 
 
@@ -52,12 +53,10 @@ async def full_class_reset(
         await charge(db, character.id, "donate", bc.CLASS_RESET_COST_DONATE)
 
     character.base_class = new_base_class
-    if character.subclass is not None:
+    # Отказ от подкласса - тоже выбранный путь (2026-10-21): сбрасывается так же.
+    if subclass_service.path_chosen(character):
         character.subclass_free_repick = True
     character.subclass = None
-    # Отказ от подкласса снимается только сменой класса (2026-10-20): новый
-    # класс решает про путь заново. Бесплатно - только если за путь когда-то
-    # уже платили (флаг subclass_free_repick живёт с первого выбора).
     character.subclass_declined = False
     await _reset_stats_rows(db, character, new_base_class)
     return character
@@ -73,9 +72,11 @@ async def reset_subclass(db: AsyncSession, character: Character) -> Character:
     if not bc.ALPHA_FREE_RESPEC:
         await charge(db, character.id, "donate", bc.SUBCLASS_RESET_COST_DONATE)
 
-    if character.subclass is not None:
+    if subclass_service.path_chosen(character):
         character.subclass_free_repick = True
     character.subclass = None
+    # Отказ от подкласса сбрасывается так же, как подкласс (2026-10-21).
+    character.subclass_declined = False
     return character
 
 

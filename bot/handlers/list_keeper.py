@@ -454,7 +454,8 @@ async def _open_remake_menu(message: Message) -> None:
         character = await onboarding_svc.get_character(db, message.from_id)
         if character is None or character.creation_state is not None:
             return
-        has_subclass = character.subclass is not None
+        # Отказ от пути - тоже подкласс: его можно сменить (2026-10-21).
+        has_subclass = subclass_service.path_chosen(character)
     await _dispenser.set(message.peer_id, SubclassSelectState.REMAKE_MENU)
     await message.answer(_REMAKE_INTRO, keyboard=remake_keyboard(has_subclass),
                          attachment=KEEPER_ATTACHMENT)
@@ -535,7 +536,7 @@ async def remake_apply(message: Message) -> None:
         if character is None or character.creation_state is not None:
             return
         if action == BTN_REMAKE_SUBCLASS:
-            if character.subclass is None:
+            if not subclass_service.path_chosen(character):
                 return
             await respec_service.reset_subclass(db, character)
             reply = ("- Путь стёрт. - Хранитель закрывает страницу. - "
