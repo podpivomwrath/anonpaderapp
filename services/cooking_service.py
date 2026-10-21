@@ -209,6 +209,19 @@ async def get_food(db: AsyncSession, character_id: int) -> list[tuple[DishDef, c
     return out
 
 
+def _norm(text: str) -> str:
+    return " ".join(text.lower().replace("ё", "е").split())
+
+
+async def find_food(db: AsyncSession, character_id: int, query: str) -> list[tuple[DishDef, cc.Dish, str, int]]:
+    """Блюда из сумки по названию (команда /съесть): точное совпадение, иначе
+    начало или кусок названия. Лучшая градация рыбы - первой."""
+    q = _norm(query)
+    food = await get_food(db, character_id)
+    exact = [f for f in food if _norm(f[0].name) == q]
+    return exact or [f for f in food if q and q in _norm(f[0].name)]
+
+
 async def eat(db: AsyncSession, character: Character, dish_id: str, grade: str, now: datetime | None = None) -> cc.Dish:
     """Съесть порцию: новое блюдо заменяет действующее."""
     row = await db.scalar(select(CharacterFood).where(

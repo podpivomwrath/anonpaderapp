@@ -217,7 +217,7 @@ def cooking_text(character: Character) -> str:
 def cooked_text(result: cooking_service.Cooked) -> str:
     d = cooking.dish_def(result.dish.dish_id)
     text = (f"🔥 Готово: {d.emoji} {d.name} ×{result.portions} · рыба {fishing.grade_name(result.grade)}. "
-            f"Лежит в инвентаре, во вкладке «Еда» мини-аппа. Кулинария +{result.xp} опыта.")
+            f"Съесть - в мини-аппе (Инвентарь, «Еда») или командой /съесть. Кулинария +{result.xp} опыта.")
     if result.level_after > result.level_before:
         text += f"\n🔥 Кулинария: {result.level_after} уровень."
     if result.unlocked:
@@ -429,3 +429,51 @@ async def tick_job() -> None:
                 await _bot_api.messages.send(peer_id=peer, random_id=0, message=notice)
         except Exception:
             logger.warning("Дом: сообщение о работе не доставлено {}", peer)
+
+
+# --- /съесть: еда без мини-аппа (2026-10-21) ------------------------------------
+
+
+def _food_line(d, dish, grade, n) -> str:
+    return f"{d.emoji} {d.name} (рыба {fishing.grade_name(grade)}) ×{n}: {cooking.buff_text(dish, grade)}"
+
+
+@labeler.message(text=["/съесть", "/съесть <name>", "/eat", "/eat <name>"])
+async def eat_command(message: Message, name: str | None = None) -> None:
+    """Для тех, у кого не открывается мини-апп. Только вне боя и исследования,
+    как кнопка «Съесть»: бафф ложится на следующий бой."""
+    from bot.battle_keyboard import in_any_battle
+    from bot.handlers import world as world_handlers
+
+    async with get_session_factory()() as db:
+        character = await onboarding_svc.get_character(db, message.from_id)
+        if character is None or character.creation_state is not None:
+            return
+        food = await cooking_service.get_food(db, character.id)
+        if not name:
+            if not food:
+                await message.answer("🍲 Еды в сумке нет. Блюда готовят в печи дома.")
+                return
+            lines = ["🍲 Еда в сумке:"] + [_food_line(*f) for f in food]
+            lines.append("\nСъесть: /съесть и название, например /съесть " + food[0][0].name.lower())
+            await message.answer("\n".join(lines))
+            return
+        if in_any_battle(message.peer_id) or world_handlers.is_busy(message.peer_id):
+            await message.answer("🍲 Сейчас не до еды: сначала закончи бой или исследование.")
+            return
+        found = await cooking_service.find_food(db, character.id, name)
+        names = {f[0].name for f in found}
+        if not found:
+            await message.answer("🍲 Такого блюда в сумке нет. Посмотреть, что есть: /съесть")
+            return
+        if len(names) > 1:
+            await message.answer("🍲 Подходит несколько блюд: " + ", ".join(sorted(names)) + ". Напиши название точнее.")
+            return
+        d, dish, grade, _n = found[0]  # лучшая градация рыбы - первой
+        await cooking_service.eat(db, character, dish.dish_id, grade)
+        await db.commit()
+        minutes = cooking_service.minutes_left(character)
+    await message.answer(
+        f"{d.emoji} Съедено: {d.name} (рыба {fishing.grade_name(grade)}). "
+        f"{cooking.buff_text(dish, grade)} на {minutes} мин. Прежний бафф еды, если был, сменился этим."
+    )
