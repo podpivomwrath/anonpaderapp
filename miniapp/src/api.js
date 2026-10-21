@@ -135,6 +135,11 @@ export function saveUi(body) {
   });
 }
 
+// «Всю рыбу сразу в садок» (Ремесла): кнопки «Отпустить» после поимки не будет.
+export function setFishAutoKeep(on) {
+  return saveUi({ set: { fish_auto_keep: on } });
+}
+
 export function glance() {
   return request('/glance', { method: 'POST' });
 }

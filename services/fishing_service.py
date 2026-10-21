@@ -305,6 +305,11 @@ async def keep_catch(db: AsyncSession, character: Character) -> Decision | None:
     return Decision(fish=fish, grams=grams, kept=True)
 
 
+def auto_keep(character: Character) -> bool:
+    """Игрок включил в Ремеслах «класть всю рыбу в садок» (2026-10-21)."""
+    return bool((character.ui_flags or {}).get("fish_auto_keep"))
+
+
 def release_catch(character: Character) -> Decision | None:
     """Отпустить вытащенную рыбу. None - решать нечего."""
     if not has_catch(character):

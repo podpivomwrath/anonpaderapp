@@ -502,3 +502,15 @@ def test_break_never_gives_more_than_any_catch_at_that_lake() -> None:
             pool = fc.LAKE_POOLS[fishing.pool_tier_for(lake_tier, level)]
             cheapest_catch = min(fishing.catch_xp(fish_id, 0.0) for fish_id in pool)
             assert fishing.break_xp(lake_tier, level) <= cheapest_catch
+
+
+@pytest.mark.asyncio
+async def test_auto_keep_flag_from_crafts_tab(db_session, make_character) -> None:
+    """2026-10-21: «Автоматически класть всю рыбу в садок» - флаг в ui_flags."""
+    from bot.miniapp_api import UI_FLAGS
+
+    character = await make_character()
+    assert UI_FLAGS["fish_auto_keep"] is bool
+    assert not fishing_service.auto_keep(character)
+    character.ui_flags = {"fish_auto_keep": True}
+    assert fishing_service.auto_keep(character)

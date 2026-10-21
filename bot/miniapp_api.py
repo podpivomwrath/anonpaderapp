@@ -359,7 +359,8 @@ async def handle_post_title(request: web.Request) -> web.Response:
 #: звук. Остальное отбрасывается - это не хранилище для чего попало.
 # safe_route (2026-10-13) - безопасный путь верхом: включают на карте,
 # действует и при отправке маунта из чата.
-UI_FLAGS = {"intro": int, "tour": int, "sound": bool, "safe_route": bool}
+#: fish_auto_keep (2026-10-21) - вытащенная рыба сразу в садок, без «Отпустить».
+UI_FLAGS = {"intro": int, "tour": int, "sound": bool, "safe_route": bool, "fish_auto_keep": bool}
 UI_HINTS_MAX = 32
 
 

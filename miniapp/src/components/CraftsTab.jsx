@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react';
 import {
-  Caption, Div, Group, Header, Placeholder, SimpleCell, Spinner,
+  Caption, Div, Group, Header, Placeholder, SimpleCell, Spinner, Switch,
 } from '@vkontakte/vkui';
-import { getInventory } from '../api.js';
+import { getInventory, setFishAutoKeep } from '../api.js';
 import ItemIcon from './ItemIcon.jsx';
 import { itemIcon } from '../itemIcons.js';
 import { ItemSheet } from './InventoryTab.jsx';
@@ -35,6 +35,12 @@ export default function CraftsTab({ character }) {
   const [status, setStatus] = useState('loading');
   const [detail, setDetail] = useState(null);
   const [open, setOpen] = useState(null);
+  const [autoKeep, setAutoKeep] = useState(Boolean(character.ui?.fish_auto_keep));
+
+  function toggleAutoKeep(next) {
+    setAutoKeep(next);
+    setFishAutoKeep(next).catch(() => setAutoKeep(!next));
+  }
 
   useEffect(() => {
     getInventory()
@@ -134,6 +140,13 @@ export default function CraftsTab({ character }) {
             Потолка нет. Уровень повышает шанс на крупную рыбу, снижает обрыв лески и увеличивает садок.
             Рыбу берёт Иргал, а Рыбак у воды в глубоких кольцах платит больше.
           </Caption>
+          <SimpleCell
+            Component="label"
+            multiline
+            after={<Switch checked={autoKeep} onChange={(e) => toggleAutoKeep(e.target.checked)} />}
+          >
+            Автоматически класть всю рыбу в садок
+          </SimpleCell>
           {pouch('fish', fishBag ? `Садок · ${kg(fishBag.grams)} / ${kg(fishBag.capacity)} кг` : 'Садок',
             'fish', fish, 'Садок пуст.')}
         </Group>

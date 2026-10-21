@@ -232,6 +232,11 @@ async def strike(message: Message) -> None:
         char_xp = await experience_service.grant_activity_xp(
             db, character, "fish", place_level=grid.mob_level_at(character.pos_x, character.pos_y, character.level),
         ) if result.landed else None
+        # Включено «всю рыбу в садок» - решение принимаем за игрока. Садок
+        # полон - кнопки всё равно приходят: рыбу можно только отпустить.
+        kept = None
+        if result.landed and fishing_service.auto_keep(character):
+            kept = await fishing_service.keep_catch(db, character)
         grams = await fishing_service.bag_total_grams(db, character.id)
         capacity = fishing.bag_capacity_grams(character.fishing_level)
         await db.commit()
@@ -255,7 +260,9 @@ async def strike(message: Message) -> None:
         if xp_line:
             body += f"\n{xp_line}"
 
-    if result.landed:
+    if result.landed and kept is not None and kept.bag_full:
+        text, keyboard = f"{body}\n\n{ft.bag_full_decide_text(capacity)}", kb.catch_keyboard()
+    elif result.landed and kept is None:
         # Садок - после решения «В садок» / «Отпустить» (2026-10-21).
         text, keyboard = body, kb.catch_keyboard()
     else:
