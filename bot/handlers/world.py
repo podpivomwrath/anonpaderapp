@@ -473,7 +473,12 @@ async def _render_city_screen(db, character, screen: str | None) -> tuple[str, s
         return None
     is_foreign = region != character.region
     if screen == "tavern" and not is_foreign:
-        return tavern_text(region), kb.tavern_keyboard(character)
+        badge = await story_service.mentor_badge_active(db, character)
+        return tavern_text(region), kb.tavern_keyboard(character, badge)
+    if screen == "house" and not is_foreign and character.has_house:
+        from bot.handlers import house as house_handlers  # избегаем цикла импортов
+
+        return house_handlers.house_text(), kb.house_keyboard()
     if screen == "arena" and not is_foreign:
         from bot.handlers import arena as arena_handlers  # избегаем цикла импортов
 
@@ -1596,7 +1601,7 @@ async def visit_market(message: Message) -> None:
 # --- Патч 39: кварталы города — переходы между Площадью/Таверной/Торговым квартаром ---
 
 
-@labeler.message(text=[kb.BTN_TAVERN])
+@labeler.message(text=[kb.BTN_TAVERN, kb.BTN_TAVERN_BADGE])
 async def open_tavern(message: Message) -> None:
     async with get_session_factory()() as db:
         character = await onboarding_svc.get_character(db, message.from_id)
@@ -1689,7 +1694,7 @@ async def _screen_keyboard(db, character) -> str | None:
     _render_city_screen."""
     if character.screen is None:
         return None
-    if character.screen in ("tavern", "market_quarter", "arena"):
+    if character.screen in ("tavern", "market_quarter", "arena", "house"):
         result = await _render_city_screen(db, character, character.screen)
         return result[1] if result is not None else None
     if character.screen == "raid_list":

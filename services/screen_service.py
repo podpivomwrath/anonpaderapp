@@ -38,6 +38,7 @@ PARENT: dict[str, str | None] = {
     "inventory": "market_quarter",
     "tavern": None,
     "market_quarter": None,
+    "house": None,
 }
 
 

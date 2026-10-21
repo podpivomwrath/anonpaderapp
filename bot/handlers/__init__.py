@@ -7,6 +7,7 @@
 
 from bot.handlers.appraiser import labeler as appraiser_labeler
 from bot.handlers.arena import labeler as arena_labeler
+from bot.handlers.house import labeler as house_labeler
 from bot.handlers.basic import labeler as basic_labeler
 from bot.handlers.combat import labeler as combat_labeler
 from bot.handlers.contracts import labeler as contracts_labeler
@@ -50,7 +51,7 @@ LABELERS = [
     # раньше всех - кроме онбординга (он ловит только FSM создания).
     # Разломы: ожидание у входа перехватывает всё, кроме боя и /напасть.
     # Соглашение (2026-10-15): кнопка «Принимаю» - раньше всех.
-    terms_labeler, onboarding_labeler, voyage_labeler, rift_labeler, raid_archive_labeler, raid_procession_labeler, raid_trail_labeler, scene_events_labeler, group_events_labeler, turbo_ishak_labeler, world_labeler, combat_labeler, group_combat_labeler, pvp_labeler, arena_labeler, appraiser_labeler,
+    terms_labeler, onboarding_labeler, voyage_labeler, rift_labeler, raid_archive_labeler, raid_procession_labeler, raid_trail_labeler, scene_events_labeler, group_events_labeler, turbo_ishak_labeler, world_labeler, combat_labeler, group_combat_labeler, pvp_labeler, arena_labeler, house_labeler, appraiser_labeler,
     inventory_labeler, list_keeper_labeler, presets_labeler, elixir_shop_labeler,
     dailies_labeler, mounts_labeler, stats_window_labeler, moderation_labeler, basic_labeler,
     # Патч 53: рейд — до fallback/promo, как и остальные боевые/меню лейблеры.

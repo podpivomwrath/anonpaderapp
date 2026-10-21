@@ -24,6 +24,9 @@ from bot.keyboards.world import (
     BTN_SQUARE_BACK,
     BTN_STATS,
     BTN_TAVERN,
+    BTN_TAVERN_BADGE,
+    BTN_HOUSE,
+    BTN_MENTOR_BADGE,
     city_square_keyboard,
     market_quarter_keyboard,
     tavern_keyboard,
@@ -36,6 +39,7 @@ from game.combat import balance_config as bc
 class FakeCharacter:
     level: int = 40
     subclass: str | None = "guardian"
+    has_house: bool = False
 
 
 @pytest.fixture(autouse=True)
@@ -55,9 +59,20 @@ def _rows(kb_json: str) -> list[list[dict]]:
 # --- Главная площадь ---
 
 
-def test_square_own_city_shows_mentor_and_both_quarters() -> None:
+def test_square_own_city_shows_both_quarters_mentor_moved_to_tavern() -> None:
     labels = _labels(city_square_keyboard(FakeCharacter(), has_mount=True, is_foreign=False))
-    assert {BTN_MENTOR, BTN_GATE, BTN_TAVERN, BTN_MARKET_QUARTER, BTN_MOUNT}.issubset(labels)
+    assert {BTN_GATE, BTN_TAVERN, BTN_MARKET_QUARTER, BTN_MOUNT}.issubset(labels)
+    # 2026-10-21: Наставник - в Таверне, на площади только значок на её кнопке.
+    assert BTN_MENTOR not in labels and BTN_HOUSE not in labels
+    badge = _labels(city_square_keyboard(FakeCharacter(), mentor_badge=True))
+    assert BTN_TAVERN_BADGE in badge and BTN_TAVERN not in badge
+
+
+def test_house_button_only_with_house_and_only_at_home() -> None:
+    owner = FakeCharacter(has_house=True)
+    assert BTN_HOUSE in _labels(city_square_keyboard(owner, has_mount=True))
+    assert BTN_HOUSE not in _labels(city_square_keyboard(owner, has_mount=True, is_foreign=True))
+    assert len(_rows(city_square_keyboard(owner, has_mount=True))) <= 6
 
 
 def test_square_foreign_city_hides_mentor_and_tavern() -> None:
@@ -84,7 +99,8 @@ def test_square_rows_bounded() -> None:
 def test_tavern_shows_personal_menus_and_back_last() -> None:
     kb_json = tavern_keyboard(FakeCharacter())
     labels = _labels(kb_json)
-    assert {BTN_REST, BTN_STATS, BTN_DAILIES, BTN_KEEPER, BTN_PRESETS, BTN_SQUARE_BACK}.issubset(labels)
+    assert {BTN_MENTOR, BTN_REST, BTN_STATS, BTN_DAILIES, BTN_KEEPER, BTN_PRESETS, BTN_SQUARE_BACK}.issubset(labels)
+    assert BTN_MENTOR_BADGE in _labels(tavern_keyboard(FakeCharacter(), mentor_badge=True))
     rows = _rows(kb_json)
     assert rows[-1][-1]["action"]["label"] == BTN_SQUARE_BACK
 

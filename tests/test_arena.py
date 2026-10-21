@@ -19,7 +19,8 @@ def test_arena_button_fits_tavern_limits():
     full = SimpleNamespace(level=60, subclass="guardian")
     rows = _labels(world_kb.tavern_keyboard(full))
     buttons = [b for row in rows for b in row if b and b != world_kb.BTN_SQUARE_BACK and "Персонаж" not in b]
-    assert world_kb.BTN_ARENA in buttons and len(buttons) <= 6
+    # 2026-10-21: +Наставник с площади - 7 кнопок, 4 ряда по 2.
+    assert world_kb.BTN_ARENA in buttons and len(buttons) <= 7
     assert all(len(row) <= 2 for row in rows)
 
 

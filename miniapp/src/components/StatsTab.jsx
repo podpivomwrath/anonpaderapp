@@ -216,42 +216,7 @@ export default function StatsTab({ character, onCharacterUpdate }) {
         )}
       </Group>
 
-      {character.fishing && (
-        <Group header={<Header>🎣 Рыбалка</Header>}>
-          <div className="stat-row">
-            <span className="stat-row__label">Уровень</span>
-            <span className="stat-row__value">{character.fishing.level}</span>
-          </div>
-          <div className="stat-row">
-            <span className="stat-row__label">Опыт</span>
-            <span className="stat-row__value">
-              {character.fishing.xp} / {character.fishing.xp_to_next}
-            </span>
-          </div>
-          <Caption level="1" style={{ padding: '0 16px 12px', opacity: 0.7 }}>
-            У уровня рыбалки нет потолка. Он повышает шанс на крупную рыбу,
-            снижает обрыв лески и увеличивает садок.
-          </Caption>
-        </Group>
-      )}
-
-      {character.mining && (
-        <Group header={<Header>⛏ Горное дело</Header>}>
-          <div className="stat-row">
-            <span className="stat-row__label">Уровень</span>
-            <span className="stat-row__value">{character.mining.level}</span>
-          </div>
-          <div className="stat-row">
-            <span className="stat-row__label">Опыт</span>
-            <span className="stat-row__value">
-              {character.mining.xp} / {character.mining.xp_to_next}
-            </span>
-          </div>
-          <Caption level="1" style={{ padding: '0 16px 12px', opacity: 0.7 }}>
-            Потолка нет. Уровень ускоряет добычу и повышает шанс на редкую руду.
-          </Caption>
-        </Group>
-      )}
+      {/* Рыбалка и горное дело (2026-10-21) - во вкладке «Ремёсла». */}
 
       <Group header={<Header>Предпросмотр</Header>}>
         {DERIVED_DEFS.filter((row) => !row.onlyFor || row.onlyFor === character.subclass).map((row) => {

@@ -75,6 +75,9 @@ async def handle_post(request: web.Request) -> web.Response:
             elif item == shop_service.COURIER_ID:
                 await shop_service.buy_courier(db, character)
                 done = {"item": item}
+            elif item == shop_service.HOUSE_ID:
+                await shop_service.buy_house(db, character)
+                done = {"item": item}
             elif item == shop_service.FACTION_ID:
                 region = body.get("region")
                 voyage_text = await shop_service.change_faction(db, character, region, defer=busy)

@@ -35,6 +35,10 @@ BTN_DAILIES = "📜 Задания"
 # Патч 39: кварталы города — см. city_square_keyboard/tavern_keyboard/
 # market_quarter_keyboard ниже.
 BTN_TAVERN = "🍺 Таверна"
+BTN_TAVERN_BADGE = f"{BTN_TAVERN} ❗"  # 2026-10-21: Наставник теперь в Таверне
+BTN_HOUSE = "🏠 Дом"  # 2026-10-21: куплен за самоцветы, только в родном городе
+BTN_OVEN = "🔥 Печь"
+BTN_ALCHEMY = "⚗️ Алхимический стол"
 BTN_ARENA = "🏟 Арена"  # 2026-10-18: тренировочные бои игроков, вход из Таверны
 BTN_MARKET_QUARTER = "🏪 Торговый"  # патч 41: было "Торговый квартал" — резалось
 # Долгий путь (AFK) - у каждого города свой, кнопка только в родном городе.
@@ -112,13 +116,15 @@ def city_square_keyboard(
     Патч 41: 2 колонки вместо столбика — до 3 рядов кнопок вместо 4-5."""
     kb = Keyboard(one_time=False)
     items: list[tuple[str, KeyboardButtonColor, dict | None]] = []
-    if not is_foreign:
-        items.append((BTN_MENTOR_BADGE if mentor_badge else BTN_MENTOR, KeyboardButtonColor.PRIMARY, None))
+    # 2026-10-21: Наставник переехал в Таверну, его место на площади - Дом.
+    # Значок «есть что взять у наставника» теперь на кнопке Таверны.
+    if not is_foreign and getattr(character, "has_house", False):
+        items.append((BTN_HOUSE, KeyboardButtonColor.PRIMARY, None))
     if has_mount:
         items.append((BTN_MOUNT, KeyboardButtonColor.SECONDARY, None))
     items.append((BTN_GATE, KeyboardButtonColor.POSITIVE, None))
     if not is_foreign:
-        items.append((BTN_TAVERN, KeyboardButtonColor.SECONDARY, None))
+        items.append((BTN_TAVERN_BADGE if mentor_badge else BTN_TAVERN, KeyboardButtonColor.SECONDARY, None))
     items.append((BTN_MARKET_QUARTER, KeyboardButtonColor.SECONDARY, None))
     home = getattr(character, "region", None)
     if not is_foreign and home in VOYAGE_BUTTONS:
@@ -128,7 +134,7 @@ def city_square_keyboard(
     return kb.get_json()
 
 
-def tavern_keyboard(character=None) -> str:
+def tavern_keyboard(character=None, mentor_badge: bool = False) -> str:
     """Патч 39: Таверна — личные меню (отдых/статы/задания) + условные
     (Хранитель Списков с 30 уровня, Пресеты после выбора подкласса — кнопки
     НЕ показываются вовсе, если недоступны, не серые). Только в родном
@@ -137,6 +143,8 @@ def tavern_keyboard(character=None) -> str:
     Патч 41: 2 колонки — до 3 рядов вместо 5, [← Назад] отдельной строкой."""
     kb = Keyboard(one_time=False)
     items: list[tuple[str, KeyboardButtonColor, dict | None]] = [
+        # 2026-10-21: Наставник переехал сюда с площади.
+        (BTN_MENTOR_BADGE if mentor_badge else BTN_MENTOR, KeyboardButtonColor.PRIMARY, None),
         (BTN_REST, KeyboardButtonColor.SECONDARY, None),
         (BTN_STATS, KeyboardButtonColor.SECONDARY, None),
         (BTN_DAILIES, KeyboardButtonColor.SECONDARY, None),
@@ -147,6 +155,19 @@ def tavern_keyboard(character=None) -> str:
         items.append((BTN_PRESETS, KeyboardButtonColor.SECONDARY, None))
     items.append((BTN_ARENA, KeyboardButtonColor.PRIMARY, None))
     add_paired(kb, items)
+    add_miniapp_button(kb)
+    kb.row()
+    kb.add(Text(BTN_SQUARE_BACK), color=KeyboardButtonColor.SECONDARY)
+    return kb.get_json()
+
+
+def house_keyboard() -> str:
+    """Дом (2026-10-21): печь и стол, дальше добавятся другие вещи."""
+    kb = Keyboard(one_time=False)
+    add_paired(kb, [
+        (BTN_OVEN, KeyboardButtonColor.SECONDARY, None),
+        (BTN_ALCHEMY, KeyboardButtonColor.SECONDARY, None),
+    ])
     add_miniapp_button(kb)
     kb.row()
     kb.add(Text(BTN_SQUARE_BACK), color=KeyboardButtonColor.SECONDARY)

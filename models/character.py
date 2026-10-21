@@ -118,6 +118,9 @@ class Character(Base):
     faction_changed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     #: Курьер (2026-10-19, services/courier_service.py): куплен навсегда.
     has_courier: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
+    #: Дом (2026-10-21, game/economy/house_config.py): куплен навсегда, стоит
+    #: в родном городе и переезжает вместе с игроком.
+    has_house: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
     #: Смена фракции, купленная в бою: город, куда переехать, когда бой кончится.
     pending_faction: Mapped[str | None] = mapped_column(String(16), nullable=True)
 

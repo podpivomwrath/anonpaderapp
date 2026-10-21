@@ -55,7 +55,7 @@ def catalog(character: Character, gems: int, firm_name: str | None = None) -> di
             "note": "Без силовых преимуществ: статы, урон и HP не меняются. Срок складывается с оставшимся.",
             "active_until": until.isoformat() if active and until is not None else None,
         }, elixir_pack_item(), tincture_item(character), pocket_item(character), faction_item(character),
-            courier_item(character),
+            courier_item(character), *house_items(character),
             *rename_items(character, firm_name)],
     }
 
@@ -415,6 +415,46 @@ def courier_item(character: Character) -> dict:
         "available": not character.has_courier,
         "unavailable": "Курьер у тебя уже есть.",
     }
+
+
+# --- Дом (2026-10-21): печь и алхимический стол, game/economy/house_config.py ---
+
+HOUSE_ID = "house"
+
+
+def house_items(character: Character) -> list[dict]:
+    from game.economy import house_config as hc
+
+    if not hc.ON_SALE:
+        return []
+    return [{
+        "id": HOUSE_ID, "title": "Дом", "emoji": hc.EMOJI, "kind": "bundle", "price": hc.PRICE,
+        "perks": [
+            "Свой дом в родном городе, кнопка «Дом» на площади",
+            "Печь: готовишь блюда из рыбы и трав, они дают бафф на 30 минут",
+            "Алхимический стол: сам варишь зелья из лавки, выходит дешевле",
+            "Переезжаешь в другой город - дом переезжает с тобой",
+            "Покупается один раз и навсегда",
+        ],
+        "note": "Травы собирать можно и без дома, а варить зелья и готовить еду - только дома.",
+        "available": not character.has_house,
+        "unavailable": "Дом у тебя уже есть.",
+    }]
+
+
+async def buy_house(db: AsyncSession, character: Character) -> None:
+    from game.economy import house_config as hc
+
+    if not hc.ON_SALE:
+        raise ShopError("Дом пока не продаётся.")
+    if character.has_house:
+        raise ShopError("Дом у тебя уже есть.")
+    try:
+        await wallet_service.charge(db, character.id, "donate", hc.PRICE)
+    except wallet_service.NotEnoughCurrency:
+        raise ShopError(f"Не хватает самоцветов: нужно 💎{hc.PRICE}.") from None
+    character.has_house = True
+    await db.flush()
 
 
 async def buy_courier(db: AsyncSession, character: Character) -> None:
