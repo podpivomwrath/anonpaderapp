@@ -220,6 +220,8 @@ async def grant(
         wallet = await wallet_service.get_wallet(db, character.id)
         field = "farm_currency" if kind == "gold" else "donate_currency"
         setattr(wallet, field, getattr(wallet, field) + amount)
+        await wallet_service.log_change(db, character.id, "farm" if kind == "gold" else "donate", amount,
+                                        getattr(wallet, field), "admin.grant_any")
     elif kind == "raid_keys":
         character.raid_keys += amount
     elif kind == "gear":

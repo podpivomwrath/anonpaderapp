@@ -759,6 +759,19 @@ function PlayerCard({ card, onRefresh }) {
         ))}
       </Fold>
 
+      {card.wallet_log && (
+        <Fold title={<>Журнал золота и самоцветов ({card.wallet_log.length})</>}>
+          {card.wallet_log.length === 0 && <Div style={{ opacity: 0.7 }}>Операций пока не было.</Div>}
+          {card.wallet_log.map((w, i) => (
+            <StatRow
+              key={i}
+              label={`${new Date(w.at).toLocaleString('ru')} · ${w.reason}${w.note ? ` (${w.note})` : ''}`}
+              value={`${w.delta > 0 ? '+' : ''}${w.delta.toLocaleString('ru')} ${w.currency} → ${w.balance.toLocaleString('ru')}`}
+            />
+          ))}
+        </Fold>
+      )}
+
       <Fold title={<>Снаряжение</>}>
         {card.inventory.length === 0 && <Div style={{ opacity: 0.7 }}>Инвентарь пуст.</Div>}
         {card.inventory.map((item) => (

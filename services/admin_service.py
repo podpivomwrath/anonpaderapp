@@ -336,6 +336,7 @@ async def player_card(db: AsyncSession, character_id: int) -> dict | None:
     quest_line = await story_service.quest_summary_line(db, character) if character.region else None
     recent_actions = await action_journal(db, limit=10, target_character_id=character_id)
     crafts_block = await _crafts_card(db, character)
+    crafts_block["wallet_log"] = await wallet_journal(db, character_id)
 
     return {
         "id": character.id,
@@ -451,6 +452,60 @@ async def player_card(db: AsyncSession, character_id: int) -> dict | None:
     }
 
 
+#: Причина операции в журнале кошелька («модуль.функция») -> по-русски.
+#: Незнакомая показывается как есть - новая трата не потеряется.
+WALLET_REASONS = {
+    "admin.grant_currency": "Админка: валюта", "admin.grant_any": "Админка: выдача",
+    "alchemy_service.start": "Варка зелья", "cooking_service.start": "Готовка в печи",
+    "contract_service.create": "Заказ на голову", "contract_service.on_kill": "Награда за заказ",
+    "courier_service.buy": "Курьер (магазин)", "daily_service._apply_delta": "Ежедневное задание",
+    "daily_service._grant_reward": "Ежедневное задание", "elixir_service.buy_bulk": "Лавка зелий",
+    "exchange.buy_donate": "Биржа: купил самоцветы", "exchange.sell_donate": "Биржа: продал самоцветы",
+    "faction_service.pay_leaders": "Выплата фракции", "fishing._resolve_junk": "Хлам с рыбалки",
+    "fishing_service.sell_bag": "Продажа рыбы", "group_events._finish": "Групповое событие",
+    "group_events._finish_pot": "Групповое событие", "guild_boss_service.distribute": "Страж гильдии",
+    "guild_quest_service.record": "Задание гильдии", "guild_service.create": "Основание гильдии",
+    "guild_service.deposit": "Вклад в казну гильдии", "guild_service.disband": "Роспуск гильдии",
+    "guild_service.withdraw": "Выдача из казны гильдии", "guild_territory_service.pray": "Гильдия: молитва",
+    "guild_tree_service.reset": "Сброс древа гильдии", "item_service.sell_item": "Продажа снаряжения",
+    "lootbox_service._apply_part": "Ларец", "miniapp_guild_api._act": "Гильдия",
+    "mining_service.sell_ore": "Продажа руды", "payment_service.apply_status": "Покупка самоцветов (донат)",
+    "pk_service.settle": "Кровавое клеймо", "preset_service.buy_preset_slot": "Слот пресета",
+    "preset_service.save_preset": "Новый пресет", "promo_service._apply_reward": "Промокод",
+    "raid_combat._rift_gold": "Разлом", "respec_service.full_class_reset": "Смена класса",
+    "respec_service.reset_subclass": "Сброс подкласса", "respec_service.reset_stats": "Сброс характеристик",
+    "scene_event_service.grant_gold": "Событие", "scene_event_service.pay": "Событие: плата",
+    "scene_events._dice": "Кости в событии", "shop_service._charge": "Магазин",
+    "shop_service.buy_elixir_pack": "Набор зелий", "shop_service.buy_house": "Дом",
+    "shop_service.buy_premium": "Метка Хранителя", "story_service._grant": "Сюжет",
+    "subclass_service.pay_unlock": "Выбор подкласса", "trade_service.arrive": "Торговля: продажа груза",
+    "trade_service.buy_cart": "Торговля: повозка", "trade_service.buy_firm": "Торговля: фирма",
+    "trade_service.dispatch": "Торговля: закупка груза", "trade_service.repair": "Торговля: ремонт",
+    "trade_service.upgrade": "Торговля: улучшение", "transfer_service.give": "Передача: получил",
+    "transfer_service.take": "Передача: отдал", "trophy_service.sell_all": "Продажа реликвий",
+    "trophy_service.sell_one": "Продажа реликвий", "voyage_service._reward": "Поход: находка",
+    "voyage_service.buy": "Поход: снаряжение", "voyage_service.upgrade": "Поход: улучшение",
+}
+
+
+async def wallet_journal(db: AsyncSession, character_id: int) -> list[dict]:
+    """Последние операции с золотом и самоцветами, новые сверху."""
+    from models import WalletLog
+
+    rows = (await db.scalars(
+        select(WalletLog).where(WalletLog.character_id == character_id).order_by(WalletLog.id.desc())
+    )).all()
+    return [
+        {
+            "at": r.created_at.isoformat() if r.created_at else None,
+            "currency": "💰" if r.currency == "farm" else "💎",
+            "delta": r.delta, "balance": r.balance,
+            "reason": WALLET_REASONS.get(r.reason, r.reason), "note": r.note,
+        }
+        for r in rows
+    ]
+
+
 async def _crafts_card(db: AsyncSession, character: Character) -> dict:
     """Ремесла, дом, еда, гильдия и разовые покупки (2026-10-21) - всё, чего
     карточка не знала с последних патчей."""
@@ -548,6 +603,7 @@ async def grant_currency(
     before = getattr(wallet, field_name)
     setattr(wallet, field_name, max(0, before + amount))
     after = getattr(wallet, field_name)
+    await wallet_service.log_change(db, character.id, currency, after - before, after, "admin.grant_currency")
     await log_action(
         db, admin_vk_id, "grant_currency", character.id,
         old_value={currency: before}, new_value={currency: after}, note=f"delta={amount}",

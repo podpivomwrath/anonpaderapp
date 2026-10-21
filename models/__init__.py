@@ -7,7 +7,7 @@ from models.character import Character, CharacterBuffPreset, CharacterStats
 from models.combat import CombatParticipant, CombatSession
 from models.consumable import CharacterConsumable
 from models.dailies import CharacterDaily, CharacterTitle
-from models.economy import ExchangeDaily, ExchangeOrder, ExchangeState, Wallet
+from models.economy import ExchangeDaily, ExchangeOrder, ExchangeState, Wallet, WalletLog
 from models.enums import (
     BaseClass,
     CombatStatus,
@@ -62,6 +62,7 @@ from models.voyage import CharacterVoyage
 from models.world_boss import WorldBoss, WorldBossContribution, WorldBossMeter
 
 __all__ = [
+    "WalletLog",
     "CharacterFood",
     "CharacterHerb",
     "HerbPatch",

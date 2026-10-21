@@ -16,6 +16,24 @@ class Wallet(Base):
     donate_currency: Mapped[int] = mapped_column(BigInteger, default=0)
 
 
+class WalletLog(Base):
+    """Журнал золота и самоцветов (2026-10-21): последние операции игрока -
+    чтобы на «у меня пропало золото» отвечать точными суммами, а не догадками.
+    Пишется в wallet_service.charge/deposit; хранится WALLET_LOG_KEEP строк
+    на персонажа, старые удаляются при записи новых."""
+
+    __tablename__ = "wallet_log"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    character_id: Mapped[int] = mapped_column(ForeignKey("characters.id", ondelete="CASCADE"), index=True)
+    currency: Mapped[str] = mapped_column(String(8))     # farm | donate
+    delta: Mapped[int] = mapped_column(BigInteger)       # со знаком; начисление - после налога гильдии
+    balance: Mapped[int] = mapped_column(BigInteger)     # что стало после операции
+    reason: Mapped[str] = mapped_column(String(64))      # модуль.функция, откуда пришло
+    note: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
 class ExchangeOrder(Base):
     """Исполненная сделка на бирже (игра — дилер, не P2P ордербук)."""
 
