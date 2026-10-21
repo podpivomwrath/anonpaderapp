@@ -54,6 +54,7 @@ export default function CraftsTab({ character }) {
   const fishBag = bag.fish_bag;
   const herbs = bag.herbs || [];
   const herbal = character.herbalism;
+  const alch = character.alchemy;
 
   const row = (kind, entry) => (
     <SimpleCell
@@ -88,6 +89,14 @@ export default function CraftsTab({ character }) {
     </SimpleCell>
   );
 
+  const recipeRow = (r) => (
+    <SimpleCell key={r.id} multiline before={<span className="craft-emoji-icon" aria-hidden="true">{r.emoji}</span>}
+      subtitle={r.known ? r.needs : `Откроется на ${r.level} уровне`}
+      style={r.known ? undefined : { opacity: 0.55 }}>
+      {r.name} ×{r.out}
+    </SimpleCell>
+  );
+
   const pouch = (key, title, kind, rows, empty) => (
     <>
       <SimpleCell
@@ -99,7 +108,11 @@ export default function CraftsTab({ character }) {
       {open === key && (
         <div className="craft-expand">
           {rows.length
-            ? rows.map((r) => (kind === 'catalog' ? catalogRow(r) : row(kind, r)))
+            ? rows.map((r) => {
+              if (kind === 'catalog') return catalogRow(r);
+              if (kind === 'recipe') return recipeRow(r);
+              return row(kind, r);
+            })
             : <Div><Caption level="1">{empty}</Caption></Div>}
         </div>
       )}
@@ -151,6 +164,30 @@ export default function CraftsTab({ character }) {
           </Caption>
           {pouch('herbs', 'Сумка травника', 'herb', herbs, 'Сумка пуста.')}
           {pouch('herb_catalog', 'Травы', 'catalog', herbal.catalog, '')}
+        </Group>
+      )}
+
+      {alch && (
+        <Group header={<Header>⚗️ Алхимия</Header>}>
+          <div className="stat-row">
+            <span className="stat-row__label">Уровень</span>
+            <span className="stat-row__value">{alch.level} / {alch.max_level}</span>
+          </div>
+          {alch.xp_to_next > 0 && (
+            <div className="stat-row">
+              <span className="stat-row__label">Опыт</span>
+              <span className="stat-row__value">{alch.xp} / {alch.xp_to_next}</span>
+            </div>
+          )}
+          <Caption level="1" style={{ padding: '0 16px 12px', opacity: 0.7 }}>
+            {alch.has_house
+              ? 'Варят в чате: Дом на площади родного города, Алхимический стол. '
+              : 'Нужен дом - он продается в Магазине за самоцветы. '}
+            Зелья те же, что в лавке, а выходит дешевле: лечебные по 10 штук, боевые по 3. Варка идет 30 секунд,
+            и до конца из дома не выйти. Каждые 10 уровней склянки дешевле на 10% и +10% к шансу лишней порции
+            {alch.level >= 10 ? ` (сейчас -${alch.discount_pct}% и ${alch.bonus_pct}%)` : ''}.
+          </Caption>
+          {pouch('recipes', 'Рецепты', 'recipe', alch.recipes, '')}
         </Group>
       )}
 

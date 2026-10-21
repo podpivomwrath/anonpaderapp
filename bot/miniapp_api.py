@@ -137,6 +137,7 @@ def _character_payload(
         },
         # Травничество (2026-10-21): с потолком, в отличие от рыбалки и руды.
         "herbalism": herbalism_payload(character),
+        "alchemy": alchemy_payload(character),
         "mobs_killed": character.mobs_killed,
         # Патч 32, баг 1: экипировка нужна фронтенду ОТДЕЛЬНО от derived — живой
         # предпросмотр (miniapp/src/formulas.js) пересчитывает derived сам при
@@ -776,6 +777,31 @@ def herbalism_payload(character) -> dict:
              "known": herbalism.can_see(character.herbalism_level, h)}
             for h in herbalism.herb_defs_ordered()
         ],
+    }
+
+
+def alchemy_payload(character) -> dict:
+    """Алхимия (2026-10-21): уровень и рецепты. Варят в чате, в доме."""
+    from game.economy import alchemy
+    from game.economy import alchemy_config as ac
+    from game.economy import herbalism
+    from services import elixir_service
+
+    level = character.alchemy_level
+    recipes = []
+    for r in ac.RECIPES:
+        d = elixir_service.elixir_def(r.elixir_id)
+        herbs = [f"{herbalism.herb_def(h).name} {n}" for h, n in r.herbs.items()]
+        recipes.append({
+            "id": r.elixir_id, "name": d.name if d else r.elixir_id, "emoji": d.emoji if d else "🧪",
+            "level": r.level, "known": r.level <= level, "out": r.out,
+            "needs": ", ".join(herbs + [f"{alchemy.gold_cost(r, level)} зол."]),
+        })
+    return {
+        "level": level, "xp": character.alchemy_xp, "xp_to_next": alchemy.xp_to_next(level),
+        "max_level": ac.MAX_LEVEL, "has_house": character.has_house,
+        "discount_pct": round(ac.GOLD_DISCOUNT_PER_10 * (level // 10) * 100),
+        "bonus_pct": round(alchemy.bonus_chance(level) * 100), "recipes": recipes,
     }
 
 

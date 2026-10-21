@@ -135,6 +135,20 @@ async def add_herb(db: AsyncSession, character_id: int, herb_id: str, amount: in
     await db.flush()
 
 
+async def spend(db: AsyncSession, character_id: int, needs: dict[str, int]) -> bool:
+    """Списать пучки разом; не хватает хоть одного - не списывается ничего."""
+    rows = (await db.scalars(select(CharacterHerb).where(
+        CharacterHerb.character_id == character_id, CharacterHerb.herb_id.in_(list(needs)),
+    ).with_for_update().execution_options(populate_existing=True))).all()
+    have = {r.herb_id: r for r in rows}
+    if any(have.get(h) is None or have[h].count < n for h, n in needs.items()):
+        return False
+    for h, n in needs.items():
+        have[h].count -= n
+    await db.flush()
+    return True
+
+
 async def get_bag(db: AsyncSession, character_id: int) -> list[tuple[HerbDef, int]]:
     """(трава, пучков) в порядке каталога, только непустые."""
     rows = (await db.execute(select(CharacterHerb.herb_id, CharacterHerb.count).where(

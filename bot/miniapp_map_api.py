@@ -283,6 +283,9 @@ def _blocked_reason(character: Character, peer_id: int) -> str | None:
     # новой блокирующей активности правило надо продублировать и здесь.
     if mining_service.is_digging(character):
         return "mining"
+    # Дом (2026-10-21): варка не выпускает из дома.
+    if character.house_work is not None:
+        return "house_work"
     return None
 
 

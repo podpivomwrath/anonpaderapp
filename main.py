@@ -351,6 +351,12 @@ async def run() -> None:
     courier_handlers.setup(bot.api)
     respawn_scheduler.add_job(courier_handlers.tick_job, "interval", seconds=2,
                              id="courier", max_instances=1, coalesce=True)
+    # Дом (2026-10-21): доварить зелья, у которых вышло время.
+    from bot.handlers import house as house_handlers
+
+    house_handlers.setup(bot.api)
+    respawn_scheduler.add_job(house_handlers.tick_job, "interval", seconds=2,
+                             id="house_work", max_instances=1, coalesce=True)
     # Смена фракции, купленная в бою, - переезд, когда бой кончился.
     from bot import miniapp_shop_api
 

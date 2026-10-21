@@ -71,6 +71,9 @@ async def blocked_reason(db, character, peer_id: int) -> str | None:
         from bot import mining_texts
 
         return mining_texts.busy_text(mining_service.remaining_seconds(character))
+    # Дом (2026-10-21): варка не выпускает из дома до конца.
+    if character.house_work is not None:
+        return "Сначала закончи варку в доме."
     travel = await mount_service.active_travel(db, character.id)
     if travel is not None and travel.status == "traveling":
         return "Сначала дождись окончания поездки."
