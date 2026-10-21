@@ -467,6 +467,10 @@ async def rebuild(db, character) -> tuple[str, str] | None:
         return await _render_gear_detail(db, character, mult, page=1)
     if character.screen == "appraiser_ore":
         return await _render_ore(db, character, mult)
+    if character.screen == "appraiser_fish":
+        # Найдено сверкой tests/test_wiring.py (2026-10-21): экран рыбы
+        # после /клавиатура получал чужую клавиатуру.
+        return await _render_fish(db, character)
     return None
 
 

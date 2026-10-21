@@ -17,7 +17,6 @@ from vkbottle.bot import BotLabeler, Message
 from vkbottle.dispatch.rules.base import FuncRule
 
 from bot.activity import activity_action
-from bot.battle_keyboard import in_any_battle
 from bot.keyboards import world as kb
 from bot import text_match
 from game.economy import voyage_config as vc
@@ -166,16 +165,17 @@ async def upgrade(message: Message) -> None:
 @labeler.message(payload_contains={"type": "voyage_go"})
 @activity_action
 async def go(message: Message) -> None:
-    from bot.handlers import pvp as pvp_handlers
-    from bot.handlers import world as world_handlers
+    from bot.activity import blocked_reason
 
     peer_id = message.peer_id
-    if in_any_battle(peer_id) or pvp_handlers.has_active_battle(peer_id) or world_handlers.is_busy(peer_id):
-        await message.answer("Сначала закончи то, что начал.")
-        return
     async with get_session_factory()() as db:
         character = await onboarding_svc.get_character(db, message.from_id)
         if character is None or character.creation_state is not None:
+            return
+        # Общая проверка bot/busy.py (2026-10-21): своя копия не знала про варку в доме.
+        reason = await blocked_reason(db, character, peer_id)
+        if reason:
+            await message.answer(reason)
             return
         try:
             voyage = await voyage_service.start(db, character)

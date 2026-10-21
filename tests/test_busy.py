@@ -1,0 +1,78 @@
+"""Одна проверка «чем занят игрок» (bot/busy.py, 2026-10-21) и как каждое
+занятие заканчивается. Раньше у каждого входа была своя копия, и они
+расходились: Морфей застрял в забое, карта пускала маунта из рейда."""
+
+import re
+from datetime import datetime, timedelta, timezone
+from pathlib import Path
+
+from bot import busy as busy_mod
+from bot.handlers import mounts as mounts_handlers
+from bot.handlers import world as world_handlers
+from bot.miniapp_map_api import _MAP_REASONS
+from models import Character
+
+ROOT = Path(__file__).resolve().parent.parent
+
+
+def test_every_state_says_how_it_ends() -> None:
+    """Новое занятие без записи в ENDS_BY - это будущий игрок, который
+    застрял навсегда: сначала реши, что его снимает."""
+    assert set(busy_mod.STATES) == set(busy_mod.ENDS_BY)
+    assert set(busy_mod.ENDS_BY.values()) <= {"unstick", "timer", "battle"}
+
+
+def test_every_entry_knows_every_state() -> None:
+    # Карта мини-аппа: на каждый код - свой отказ, и у фронтенда есть его текст.
+    assert set(_MAP_REASONS) == set(busy_mod.STATES) - {"riding"}  # маунт в пути карта проверяет сама
+    map_tab = (ROOT / "miniapp/src/components/MapTab.jsx").read_text(encoding="utf-8")
+    for reason in _MAP_REASONS.values():
+        assert re.search(rf"^\s*{reason}:\s*'", map_tab, re.M), f"нет текста отказа {reason} в MapTab.jsx"
+    # Маунт в чате подставляет свои тексты - только для известных кодов.
+    assert set(mounts_handlers._MOUNT_TEXTS) <= set(busy_mod.STATES)
+
+
+def _char(**kw) -> Character:
+    return Character(user_id=1, name="x", base_class="warrior", **kw)
+
+
+async def test_states_detected_in_memory() -> None:
+    now = datetime.now(timezone.utc)
+    soon = now + timedelta(minutes=5)
+
+    async def code(c):
+        found = await busy_mod.busy(None, c, peer_id=777001, now=now, skip=("riding",))
+        return found.code if found else None
+
+    assert await code(_char()) is None
+    assert await code(_char(respawn_at=soon)) == "dead"
+    assert await code(_char(screen="mine", mining_ends_at=soon)) == "digging"
+    # Вынесло наверх - добыча больше не держит.
+    assert await code(_char(screen=None, mining_ends_at=soon)) is None
+    assert await code(_char(house_work="alchemy:heal_small", house_work_until=soon)) == "house_work"
+    assert await code(_char(pos_x=0, pos_y=0, travel_target_x=3, travel_target_y=3, travel_arrives_at=soon)) \
+        == "traveling_on_foot"
+
+
+async def test_unstick_clears_every_unstick_state(db_session, character_at, monkeypatch) -> None:
+    """Всё, что помечено «unstick», /застрял действительно снимает - разом."""
+    import bot.handlers.combat as combat_handlers
+    from game.economy import mining
+
+    class _FakeEngine:
+        sessions: dict = {}
+
+    monkeypatch.setattr(combat_handlers, "_engine", _FakeEngine())
+    mine = mining.all_mines()[0]
+    c = await character_at(mine.x, mine.y)
+    peer = 777002
+    now = datetime.now(timezone.utc)
+    c.screen = "mine"
+    c.mining_mine_id = mine.id
+    c.mining_ends_at = now + timedelta(minutes=5)
+    world_handlers._exploring.add(peer)
+    await db_session.flush()
+    assert (await busy_mod.busy(db_session, c, peer)) is not None
+
+    await world_handlers.force_unstick(db_session, c, peer)
+    assert await busy_mod.busy(db_session, c, peer) is None

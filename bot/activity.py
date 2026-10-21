@@ -47,34 +47,9 @@ def activity_action(handler):
 
 
 async def blocked_reason(db, character, peer_id: int) -> str | None:
-    from bot.battle_keyboard import in_any_battle
-    from bot.handlers import world
-    from services import death_service, mining_service, mount_service, movement_service
-    if in_any_battle(peer_id):
-        return "Сначала закончи текущий бой."
-    if death_service.is_dead(character):
-        return "Сначала дождись возрождения."
-    if movement_service.is_traveling(character):
-        return "Сначала дождись прибытия."
-    if world.is_busy(peer_id):
-        return "Сначала закончи исследование или отдых."
-    # Патч 59: добыча руды блокирует ВСЁ до конца — это её единственный
-    # ограничитель. Проверка по БД, а не по памяти процесса: добыча длится
-    # минутами и переживает рестарт бота.
-    #
-    # Блокирует только пока игрок реально в забое (screen == "mine"). После
-    # рестарта бота экран сбрасывается, и игрок оказывается свободен «в хабе»:
-    # он сам решает, вернуться в жилу и доработать остаток или уйти с клетки и
-    # потерять его. Без этой оговорки он был бы заморожен и не смог бы ни того
-    # ни другого.
-    if character.screen == "mine" and mining_service.is_digging(character):
-        from bot import mining_texts
+    """Текст отказа, если игрок чем-то занят. Само состояние - bot/busy.py,
+    одна проверка на весь бот (2026-10-21)."""
+    from bot.busy import busy
 
-        return mining_texts.busy_text(mining_service.remaining_seconds(character))
-    # Дом (2026-10-21): варка не выпускает из дома до конца.
-    if character.house_work is not None:
-        return "Сначала закончи варку в доме."
-    travel = await mount_service.active_travel(db, character.id)
-    if travel is not None and travel.status == "traveling":
-        return "Сначала дождись окончания поездки."
-    return None
+    found = await busy(db, character, peer_id)
+    return found.text if found is not None else None

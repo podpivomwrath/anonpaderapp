@@ -287,7 +287,7 @@ async def test_send_mount_rejects_second_travel(client, session_factory) -> None
     assert data["error"] == "already_on_mount"
 
 
-def test_blocked_reason_dead_character_in_memory() -> None:
+async def test_blocked_reason_dead_character_in_memory() -> None:
     """_blocked_reason принимает Character напрямую — конструируем его в
     памяти (без записи/чтения из БД), чтобы обойти SQLite tzinfo round-trip
     (см. докстринг выше) и всё же проверить гейт "мёртв" по-настоящему."""
@@ -297,14 +297,14 @@ def test_blocked_reason_dead_character_in_memory() -> None:
         user_id=1, name="x", base_class="warrior",
         respawn_at=datetime.now(timezone.utc) + timedelta(minutes=5),
     )
-    assert _blocked_reason(character, peer_id=1) == "dead"
+    assert await _blocked_reason(None, character, peer_id=1) == "dead"  # маунт в пути карта проверяет сама
 
 
-def test_blocked_reason_none_when_free() -> None:
+async def test_blocked_reason_none_when_free() -> None:
     from bot.miniapp_map_api import _blocked_reason
 
     character = Character(user_id=1, name="x", base_class="warrior")
-    assert _blocked_reason(character, peer_id=1) is None
+    assert await _blocked_reason(None, character, peer_id=1) is None
 
 
 async def test_state_marks_the_live_world_boss(client, session_factory) -> None:

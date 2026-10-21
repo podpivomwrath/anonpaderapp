@@ -15,10 +15,7 @@ from aiohttp import web
 from sqlalchemy import select
 
 from bot.app_keys import SESSION_FACTORY_KEY
-from bot.handlers import combat as combat_handlers
 from bot.handlers import mounts as mounts_handlers
-from bot.handlers import pvp as pvp_handlers
-from bot.handlers import world as world_handlers
 from bot.miniapp_auth import VK_USER_ID_KEY
 from game.content_loader import load_location_types
 from game.economy import fishing, mining
@@ -262,31 +259,21 @@ async def handle_get_state(request: web.Request) -> web.Response:
         )
 
 
-def _blocked_reason(character: Character, peer_id: int) -> str | None:
-    """То же, что bot/handlers/mounts.py::_blocked_reason, но без гейта на
-    пеший переход (карта не запрещает отправить маунт из чужого состояния,
-    которое уже блокирует само по себе — movement_service ниже проверяется
-    отдельно) и без world_handlers.is_busy на пешей ходьбе (учтено отдельным
-    полем в ответе, а не блокировкой здесь)."""
-    if death_service.is_dead(character):
-        return "dead"
-    if pvp_handlers.has_active_battle(peer_id):
-        return "in_pvp"
-    if combat_handlers.has_active_encounter(peer_id):
-        return "in_combat"
-    if world_handlers.is_busy(peer_id):
-        return "busy"
-    if movement_service.is_traveling(character):
-        return "traveling_on_foot"
-    # Патч 59: добыча блокирует всё, включая отправку маунта. Эта копия гейта
-    # уже однажды разошлась с основной (bot/activity.py) — при добавлении
-    # новой блокирующей активности правило надо продублировать и здесь.
-    if mining_service.is_digging(character):
-        return "mining"
-    # Дом (2026-10-21): варка не выпускает из дома.
-    if character.house_work is not None:
-        return "house_work"
-    return None
+#: Код bot/busy.py -> код отказа, который понимает фронтенд (MapTab.jsx).
+_MAP_REASONS = {
+    "dead": "dead", "pvp": "in_pvp", "battle": "in_combat", "busy": "busy",
+    "traveling_on_foot": "traveling_on_foot", "digging": "mining", "house_work": "house_work",
+}
+
+
+async def _blocked_reason(db, character: Character, peer_id: int) -> str | None:
+    """Чем занят игрок - общая проверка bot/busy.py (2026-10-21). Раньше
+    здесь была своя копия, и она не знала про групповой бой и рейд. Маунт
+    в пути проверяется ниже отдельно (свой код already_on_mount)."""
+    from bot.busy import busy
+
+    found = await busy(db, character, peer_id, skip=("riding",))
+    return _MAP_REASONS.get(found.code, "busy") if found is not None else None
 
 
 async def handle_post_stop_travel(request: web.Request) -> web.Response:
@@ -328,7 +315,7 @@ async def handle_post_send_mount(request: web.Request) -> web.Response:
         if character is None:
             return web.json_response({"error": "character_not_found"}, status=404)
 
-        reason = _blocked_reason(character, vk_user_id)
+        reason = await _blocked_reason(db, character, vk_user_id)
         if reason is not None:
             return web.json_response({"error": reason}, status=400)
         if await mount_service.active_travel(db, character.id) is not None:

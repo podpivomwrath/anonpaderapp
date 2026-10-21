@@ -129,24 +129,29 @@ def _format_seconds(seconds: float) -> str:
     return f"~{seconds:.0f} сек"
 
 
+#: Свои тексты маунта поверх общей проверки bot/busy.py.
+_MOUNT_TEXTS = {
+    "dead": "☠ Сначала очнись.",
+    "pvp": "Сначала разберись с открытым боем.",
+    "battle": "В бою не до маунта.",
+    "busy": "Сначала закончи то, что начал.",
+    "traveling_on_foot": "🚶 Ты уже в пути пешком.",
+    "riding": "🐎 Ты уже в пути на маунте.",
+}
+
+
 async def _blocked_reason(db, character, peer_id: int, now: datetime) -> str | None:
     """Общие гейты для открытия меню маунта и для подтверждения координат:
-    None — можно ехать, иначе — текст отказа."""
-    from services import death_service, movement_service
+    None — можно ехать, иначе — текст отказа. Состояние - bot/busy.py
+    (2026-10-21: раньше маунт в чате не знал про забой и варку)."""
+    from bot.busy import busy
 
-    if death_service.is_dead(character, now):
-        return "☠ Сначала очнись."
-    if pvp_handlers.has_active_battle(peer_id):
-        return "Сначала разберись с открытым боем."
-    if in_any_battle(peer_id):
-        return "В бою не до маунта."
-    if world_handlers.is_busy(peer_id):
-        return "Сначала закончи то, что начал."
-    if movement_service.is_traveling(character, now):
-        return "🚶 Ты уже в пути пешком."
-    if await mount_service.active_travel(db, character.id) is not None:
-        return "🐎 Ты уже в пути на маунте."
-    return None
+    found = await busy(db, character, peer_id, now)
+    if found is None:
+        return None
+    if found.code == "riding" or await mount_service.active_travel(db, character.id) is None:
+        return _MOUNT_TEXTS.get(found.code, found.text)
+    return _MOUNT_TEXTS["riding"]
 
 
 @labeler.message(text=[kb.BTN_MOUNT])
