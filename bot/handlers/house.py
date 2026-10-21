@@ -18,6 +18,7 @@ from vkbottle import Keyboard, KeyboardButtonColor, Text
 from vkbottle.bot import BotLabeler, Message
 
 from bot.keyboards import world as kb
+from bot.vk_media import photo_attachment
 from bot.keyboards.layout import add_paired
 from bot.keyboards.world import add_miniapp_button
 from bot.world_texts import FOREIGN_NPC_REJECTION
@@ -37,6 +38,9 @@ labeler.vbml_ignore_case = True  # команды без учёта регист
 
 HOUSE_TEXT = "🏠 Дом\n\nТвои стены в городе. У окна печь, в углу стол с ретортами и склянками."
 BUSY_TEXT = "🏠 Работа на огне. Дождись ее или брось - тогда все, что пошло в дело, пропадет."
+
+#: Картинки в альбоме группы (tools/crafts_art_prompts.md, 2026-10-21).
+HOUSE_PHOTO, OVEN_PHOTO, TABLE_PHOTO = "457239277", "457239278", "457239279"
 
 BTN_HOUSE_BACK = "← Дом"
 BTN_OVEN_BACK = "← Печь"
@@ -269,7 +273,7 @@ async def open_house(message: Message) -> None:
             return
         await screen_service.set_screen(db, character, "house")
         await db.commit()
-    await message.answer(HOUSE_TEXT, keyboard=kb.house_keyboard())
+    await message.answer(HOUSE_TEXT, keyboard=kb.house_keyboard(), attachment=photo_attachment(HOUSE_PHOTO))
 
 
 @labeler.message(payload_contains={"type": "house_back"})
@@ -289,7 +293,8 @@ async def open_alchemy(message: Message) -> None:
         await screen_service.set_screen(db, character, "alchemy")
         await db.commit()
         text = await alchemy_text(db, character)
-    await message.answer(text, keyboard=alchemy_keyboard(character.alchemy_level))
+    await message.answer(text, keyboard=alchemy_keyboard(character.alchemy_level),
+                         attachment=photo_attachment(TABLE_PHOTO))
 
 
 @labeler.message(payload_contains={"type": "brew"})
@@ -322,7 +327,8 @@ async def open_oven(message: Message) -> None:
         await screen_service.set_screen(db, character, "oven")
         await db.commit()
         text = await oven_text(db, character)
-    await message.answer(text, keyboard=oven_keyboard(character.cooking_level))
+    await message.answer(text, keyboard=oven_keyboard(character.cooking_level),
+                         attachment=photo_attachment(OVEN_PHOTO))
 
 
 @labeler.message(payload_contains={"type": "oven"})
