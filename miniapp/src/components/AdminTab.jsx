@@ -410,6 +410,9 @@ function ActionForm({ playerId, playerName, onDone }) {
       } else if (action === 'reset_character') {
         params.confirm = true;
         params.confirm_name = fields.confirm_name || '';
+      } else if (action === 'set_craft_level') {
+        params.craft = fields.craft || 'herbalism';
+        params.level = parseInt(fields.level, 10) || 1;
       } else if (action === 'ban') {
         params.reason = fields.reason || '';
         params.confirm = true;
@@ -441,6 +444,8 @@ function ActionForm({ playerId, playerName, onDone }) {
             { value: 'grant_admin_mount', label: '🛠 Выдать тестовый маунт (себе)' },
             { value: 'grant_admin_weapon', label: '🛠 Выдать тестовое оружие (себе)' },
             { value: 'set_level', label: 'Изменить уровень' },
+            { value: 'set_craft_level', label: 'Уровень ремесла' },
+            { value: 'clear_house_work', label: 'Снять работу в доме (варка/готовка)' },
             { value: 'teleport', label: 'Телепорт' },
             { value: 'restore_hp', label: 'Восстановить HP + снять респавн' },
             { value: 'reset_activity', label: 'Сбросить активности (аналог /застрял)' },
@@ -490,6 +495,26 @@ function ActionForm({ playerId, playerName, onDone }) {
         <FormItem top="Новый уровень">
           <Input type="number" value={fields.level || ''} onChange={set('level')} />
         </FormItem>
+      )}
+      {action === 'set_craft_level' && (
+        <>
+          <FormItem top="Ремесло">
+            <Select
+              value={fields.craft || 'herbalism'}
+              onChange={(e) => setFields((f) => ({ ...f, craft: e.target.value }))}
+              options={[
+                { value: 'herbalism', label: '🌿 Травничество (до 50)' },
+                { value: 'alchemy', label: '⚗️ Алхимия (до 50)' },
+                { value: 'cooking', label: '🔥 Кулинария (до 50)' },
+                { value: 'fishing', label: '🎣 Рыбалка' },
+                { value: 'mining', label: '⛏ Горное дело' },
+              ]}
+            />
+          </FormItem>
+          <FormItem top="Уровень">
+            <Input type="number" value={fields.level || ''} onChange={set('level')} />
+          </FormItem>
+        </>
       )}
       {action === 'teleport' && (
         <>
@@ -748,6 +773,29 @@ function PlayerCard({ card, onRefresh }) {
           <StatRow key={e.id} label={`${e.emoji} ${e.name}`} value={`×${e.count}`} />
         ))}
       </Fold>
+
+      {card.crafts && (
+        <Fold title={<>Ремесла, дом и еда</>}>
+          {card.crafts.map((c) => (
+            <StatRow key={c.title} label={c.title}
+              value={`${c.level} ур.${c.xp_to_next ? ` (${c.xp} / ${c.xp_to_next})` : ''}`} />
+          ))}
+          <StatRow label="Дом" value={card.house.has ? (card.house.work || 'есть, сейчас пусто') : 'нет'} />
+          <StatRow label="Сытость" value={card.food_buff || 'нет'} />
+          <StatRow label="Садок / руда" value={`${card.fish_kg} кг / ${card.ore_pieces} шт.`} />
+          {card.herbs.map((h) => <StatRow key={h.name} label={h.name} value={`×${h.count}`} />)}
+          {card.food.map((f) => <StatRow key={f.name + f.grade} label={`${f.name} (рыба ${f.grade})`} value={`×${f.count}`} />)}
+        </Fold>
+      )}
+
+      {card.flags && (
+        <Fold title={<>Гильдия и покупки</>}>
+          <StatRow label="Гильдия" value={card.guild ? `[${card.guild.tag}] ${card.guild.name}, ${card.guild.rank}` : 'нет'} />
+          <StatRow label="Курьер" value={card.flags.courier ? 'есть' : 'нет'} />
+          <StatRow label="Тайный карман" value={card.flags.pocket ? 'есть' : 'нет'} />
+          <StatRow label="Подкласс" value={card.flags.subclass_declined ? 'отказался, путь базового класса' : (card.subclass_title || 'не выбран')} />
+        </Fold>
+      )}
 
       <Fold title={<>Маунты</>}>
         {card.mounts.length === 0 && <Div style={{ opacity: 0.7 }}>Маунтов нет.</Div>}

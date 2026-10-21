@@ -335,6 +335,7 @@ async def player_card(db: AsyncSession, character_id: int) -> dict | None:
     dailies = await daily_service.get_dailies_overview(db, character)
     quest_line = await story_service.quest_summary_line(db, character) if character.region else None
     recent_actions = await action_journal(db, limit=10, target_character_id=character_id)
+    crafts_block = await _crafts_card(db, character)
 
     return {
         "id": character.id,
@@ -438,6 +439,7 @@ async def player_card(db: AsyncSession, character_id: int) -> dict | None:
         "is_premium": premium_service.is_premium(character),
         "created_at": user.created_at.isoformat() if user is not None else None,
         "last_active_at": character.last_active_at.isoformat() if character.last_active_at else None,
+        **crafts_block,
         "recent_admin_actions": [
             {
                 "action_type": a.action_type, "note": a.note, "created_at": a.created_at.isoformat(),
@@ -447,6 +449,91 @@ async def player_card(db: AsyncSession, character_id: int) -> dict | None:
             for a in recent_actions
         ],
     }
+
+
+async def _crafts_card(db: AsyncSession, character: Character) -> dict:
+    """Ремесла, дом, еда, гильдия и разовые покупки (2026-10-21) - всё, чего
+    карточка не знала с последних патчей."""
+    from game.economy import alchemy, cooking, fishing, herbalism, mining
+    from services import (
+        alchemy_service, cooking_service, fishing_service, guild_service, herb_service, mining_service,
+    )
+    from game.economy import guild_config as gc
+
+    def skill(title, level, xp, nxt):
+        return {"title": title, "level": level, "xp": xp, "xp_to_next": nxt or None}
+
+    work = None
+    if character.house_work:
+        found = cooking_service.cooking_now(character)
+        brewing = alchemy_service.brewing(character)
+        what = (cooking.dish_def(found[0].dish_id).name if found
+                else (elixir_service.elixir_def(brewing.elixir_id).name if brewing else character.house_work))
+        work = f"{'готовит' if found else 'варит'} «{what}», осталось {alchemy_service.seconds_left(character)} сек."
+    food = cooking_service.active(character)
+    member = await guild_service.membership(db, character.id)
+    guild = await guild_service.guild_of(db, character) if member is not None else None
+    return {
+        "crafts": [
+            skill("🎣 Рыбалка", character.fishing_level, character.fishing_xp, fishing.xp_to_next(character.fishing_level)),
+            skill("⛏ Горное дело", character.mining_level, character.mining_xp, mining.xp_to_next(character.mining_level)),
+            skill("🌿 Травничество", character.herbalism_level, character.herbalism_xp,
+                  herbalism.xp_to_next(character.herbalism_level)),
+            skill("⚗️ Алхимия", character.alchemy_level, character.alchemy_xp, alchemy.xp_to_next(character.alchemy_level)),
+            skill("🔥 Кулинария", character.cooking_level, character.cooking_xp, cooking.xp_to_next(character.cooking_level)),
+        ],
+        "house": {"has": character.has_house, "work": work},
+        "food_buff": (
+            f"{cooking.dish_def(food[0].dish_id).name}: {cooking.buff_text(*food)}, "
+            f"ещё {cooking_service.minutes_left(character)} мин." if food else None
+        ),
+        "herbs": [{"name": f"{h.emoji} {h.name}", "count": n} for h, n in await herb_service.get_bag(db, character.id)],
+        "food": [
+            {"name": f"{d.emoji} {d.name}", "grade": fishing.grade_name(g), "count": n}
+            for d, _dish, g, n in await cooking_service.get_food(db, character.id)
+        ],
+        "fish_kg": round(await fishing_service.bag_total_grams(db, character.id) / 1000, 1),
+        "ore_pieces": await mining_service.total_ore(db, character.id),
+        "flags": {
+            "courier": character.has_courier, "pocket": character.secret_pocket,
+            "subclass_declined": character.subclass_declined,
+        },
+        "guild": {
+            "tag": guild.tag, "name": guild.name, "rank": gc.RANK_TITLES.get(member.rank, member.rank),
+        } if guild is not None else None,
+    }
+
+
+CRAFT_FIELDS = {
+    "fishing": ("fishing_level", "fishing_xp", "Рыбалка", None),
+    "mining": ("mining_level", "mining_xp", "Горное дело", None),
+    "herbalism": ("herbalism_level", "herbalism_xp", "Травничество", 50),
+    "alchemy": ("alchemy_level", "alchemy_xp", "Алхимия", 50),
+    "cooking": ("cooking_level", "cooking_xp", "Кулинария", 50),
+}
+
+
+async def set_craft_level(db: AsyncSession, admin_vk_id: int, character: Character, craft: str, level: int) -> None:
+    """Уровень ремесла (2026-10-21). Опыт внутри уровня обнуляется."""
+    if craft not in CRAFT_FIELDS:
+        raise ValueError(craft)
+    level_field, xp_field, title, cap = CRAFT_FIELDS[craft]
+    top = cap or 500
+    if not 1 <= level <= top:
+        raise ValueError(level)
+    old = getattr(character, level_field)
+    setattr(character, level_field, level)
+    setattr(character, xp_field, 0)
+    await log_action(db, admin_vk_id, "set_craft_level", character.id,
+                     old_value={"level": old}, new_value={"level": level}, note=title)
+
+
+async def clear_house_work(db: AsyncSession, admin_vk_id: int, character: Character) -> None:
+    """Снять зависшую варку или готовку (без возврата ингредиентов)."""
+    old = character.house_work
+    character.house_work = None
+    character.house_work_until = None
+    await log_action(db, admin_vk_id, "clear_house_work", character.id, old_value={"work": old})
 
 
 # --- Действия над игроком (2.3), каждое логируется ---
@@ -592,6 +679,9 @@ async def reset_activity_db(db: AsyncSession, character: Character) -> None:
     активным."""
     if movement_service.is_traveling(character):
         movement_service.cancel_travel(character)
+    # Дом (2026-10-21): зависшая варка или готовка не держит в доме.
+    character.house_work = None
+    character.house_work_until = None
     active_mount_travel = await mount_service.active_travel(db, character.id)
     if active_mount_travel is not None:
         await mount_service.cancel_travel(db, active_mount_travel)

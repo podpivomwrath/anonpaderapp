@@ -19,6 +19,11 @@ from game.economy.exchange import Exchange
 from models import (
     BugReport,
     Character,
+    CharacterFood,
+    CharacterHerb,
+    CourierDelivery,
+    GuildBoss,
+    HerbPatch,
     CharacterFish,
     CharacterLootbox,
     CharacterVoyage,
@@ -86,6 +91,34 @@ async def systems_stats(db: AsyncSession) -> list[dict]:
         _row("Кусков руды добыто за сутки", digs_day),
     ]
 
+    # --- Ремесла и дом (2026-10-21) ---
+    from game.economy import herbal_config as hc
+
+    fresh = now - timedelta(hours=hc.LIFETIME_HOURS)
+    herbs_map = await _count(db, HerbPatch, HerbPatch.spawned_at >= fresh)
+    herbs_day = await _count(db, HerbPatch, HerbPatch.spawned_at >= day_ago)
+    herbs_bags = await db.scalar(select(func.coalesce(func.sum(CharacterHerb.count), 0)))
+    houses = await _count(db, Character, finished, Character.has_house.is_(True))
+    brewing = await _count(db, Character, Character.house_work.like("alchemy:%"))
+    cooking_now = await _count(db, Character, Character.house_work.like("cook:%"))
+    fed = await _count(db, Character, Character.food_until > now)
+    food_bags = await db.scalar(select(func.coalesce(func.sum(CharacterFood.count), 0)))
+    tops = {
+        title: await db.scalar(select(func.max(col)))
+        for title, col in (("трав", Character.herbalism_level), ("алх", Character.alchemy_level),
+                           ("кул", Character.cooking_level))
+    }
+    herbalists = await _count(db, Character, finished, Character.herbalism_level > 1)
+    crafts_block = [
+        _row("Домов куплено", houses),
+        _row(f"Трав на карте / выросло за сутки (лимит {hc.MAP_CAP})", f"{herbs_map} / {herbs_day}"),
+        _row("Пучков в сумках / травников 2+ ур.", f"{int(herbs_bags or 0)} / {herbalists}"),
+        _row("Варят сейчас / готовят сейчас", f"{brewing} / {cooking_now}"),
+        _row("Сыты (бафф еды идёт) / порций в сумках", f"{fed} / {int(food_bags or 0)}"),
+        _row("Лучший уровень: травничество / алхимия / кулинария",
+             f"{tops['трав'] or 1} / {tops['алх'] or 1} / {tops['кул'] or 1}"),
+    ]
+
     # --- Рейды, разломы, мировой босс ---
     raids_now = await _count(db, RaidRun, RaidRun.status == "active")
     raids_day = await _count(db, RaidRun, RaidRun.created_at >= day_ago)
@@ -93,10 +126,16 @@ async def systems_stats(db: AsyncSession) -> list[dict]:
     rifts_busy = await _count(db, Rift, Rift.status == "active", Rift.state != "free")
     boss_alive = await _count(db, WorldBoss, WorldBoss.status == "active")
     bosses_day = await _count(db, WorldBoss, WorldBoss.ended_at >= day_ago)
+    guild_bosses = (await db.execute(
+        select(GuildBoss.difficulty, func.count()).where(GuildBoss.status == "active").group_by(GuildBoss.difficulty)
+    )).all()
+    bosses_week = await _count(db, GuildBoss, GuildBoss.ended_at >= now - timedelta(days=7))
     pve_block = [
         _row("Рейдов идёт сейчас / начато за сутки", f"{raids_now} / {raids_day}"),
         _row("Разломов открыто / из них заняты", f"{rifts_open} / {rifts_busy}"),
         _row("Мировой босс на карте / побеждён или ушёл за сутки", f"{'да' if boss_alive else 'нет'} / {bosses_day}"),
+        _row("Стражей гильдий сейчас (по сложности 1-4) / закончено за неделю",
+             f"{', '.join(f'{d}: {n}' for d, n in sorted(guild_bosses)) or 'нет'} / {bosses_week}"),
     ]
 
     # --- Торговля, походы, маунты ---
@@ -110,6 +149,7 @@ async def systems_stats(db: AsyncSession) -> list[dict]:
         _row("Повозок в пути сейчас", carts_out),
         _row("В долгом походе сейчас", voyages),
         _row("В пути на маунте сейчас", riding),
+        _row("Курьеров с посылкой сейчас", await _count(db, CourierDelivery, CourierDelivery.status == "active")),
     ]
 
     # --- Биржа и донат ---
@@ -140,6 +180,7 @@ async def systems_stats(db: AsyncSession) -> list[dict]:
     return [
         {"title": "🏰 Гильдии", "rows": guild_block},
         {"title": "🎣 Рыбалка и добыча", "rows": trades_block},
+        {"title": "🌿 Ремесла и дом", "rows": crafts_block},
         {"title": "🌀 Рейды, разломы, босс", "rows": pve_block},
         {"title": "🐂 Торговля и дороги", "rows": road_block},
         {"title": "💎 Биржа и донат", "rows": money_block},

@@ -88,6 +88,10 @@ def describe(action: AdminAction, target: str | None) -> str:
         return f"выдал {note} - {who}"
     if kind == "grant_buff":
         return f"открыл бафф - {who}" + (f": {note}" if note else "")
+    if kind == "set_craft_level":
+        return f"поставил {note or 'ремеслу'} уровень {new.get('level')} (был {old.get('level')}) - {who}"
+    if kind == "clear_house_work":
+        return f"снял работу в доме ({old.get('work') or 'пусто'}) - {who}"
     if kind == "teleport":
         return f"перенёс {who} с ({old.get('x')}; {old.get('y')}) на ({new.get('x')}; {new.get('y')})"
     if kind == "restore_hp":

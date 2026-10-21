@@ -230,6 +230,13 @@ async def handle_post_action(request: web.Request) -> web.Response:
                 if not isinstance(level, int):
                     return web.json_response({"error": "bad_request"}, status=400)
                 await admin_service.set_level(db, admin_vk_id, character, level)
+            elif action == "set_craft_level":
+                craft, level = body.get("craft"), body.get("level")
+                if not isinstance(craft, str) or not isinstance(level, int):
+                    return web.json_response({"error": "bad_request"}, status=400)
+                await admin_service.set_craft_level(db, admin_vk_id, character, craft, level)
+            elif action == "clear_house_work":
+                await admin_service.clear_house_work(db, admin_vk_id, character)
             elif action == "teleport":
                 x, y = body.get("x"), body.get("y")
                 if not isinstance(x, int) or not isinstance(y, int):

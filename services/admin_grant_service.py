@@ -118,6 +118,22 @@ def catalog() -> list[dict]:
         )
         for m in mount_service._defs().values()
     ]
+    from game.economy import cooking, herbalism
+    from game.economy import cooking_config as cookc
+
+    herbs = [_entry(f"herb:{h.id}", f"{h.emoji} {h.name}") for h in herbalism.herb_defs_ordered()]
+    dishes = [
+        _entry(f"dish:{d.dish_id}", f"{cooking.dish_def(d.dish_id).emoji} {cooking.dish_def(d.dish_id).name}", variants=[
+            {"key": f"dish:{d.dish_id}:{grade}", "label": f"рыба {name}{_grade_suffix(fc.GRADE_EMOJI.get(grade))}"}
+            for _t, grade, name, _m in fc.GRADES
+        ])
+        for d in cookc.DISHES
+    ]
+    purchases = [
+        _entry("flag:has_house", "🏠 Дом", "one"),
+        _entry("flag:has_courier", "🏃 Курьер", "one"),
+        _entry("flag:secret_pocket", "🧥 Тайный карман", "one"),
+    ]
     service = [
         _entry(f"admin_weapon:{w.id}", f"🛠 {w.name} (только себе)", "pieces")
         for w in load_admin_weapons()
@@ -145,6 +161,9 @@ def catalog() -> list[dict]:
         {"id": "ore", "title": "⛏ Руда", "entries": ores},
         {"id": "tools", "title": "🔧 Инструменты", "entries": tools},
         {"id": "fish", "title": "🐟 Рыба", "entries": fish},
+        {"id": "herbs", "title": "🌿 Травы", "entries": herbs},
+        {"id": "food", "title": "🍲 Еда", "entries": dishes},
+        {"id": "purchases", "title": "🏠 Разовые покупки", "entries": purchases},
         {"id": "mounts", "title": "🐎 Маунты", "entries": mounts},
         {"id": "service", "title": "🛠 Служебное", "entries": service},
     ]
@@ -270,6 +289,18 @@ async def grant(
             row = CharacterFish(character_id=character.id, fish_id=fish_id, grade=grade, total_grams=0)
             db.add(row)
         row.total_grams += _fish_grams(fish_id, grade) * amount
+    elif kind == "herb":
+        from services import herb_service
+
+        await herb_service.add_herb(db, character.id, rest[0], amount)
+    elif kind == "dish":
+        from services import cooking_service
+
+        await cooking_service.add_food(db, character.id, rest[0], rest[1], amount)
+    elif kind == "flag":
+        if getattr(character, rest[0]):
+            raise GrantError("Это у игрока уже есть.")
+        setattr(character, rest[0], True)
     elif kind == "mount":
         if rest[0] == mount_cfg.ADMIN_MOUNT_ID:
             await _require_self(db, admin_vk_id, character)
