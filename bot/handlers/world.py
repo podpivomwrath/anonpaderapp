@@ -1368,6 +1368,7 @@ async def _move(message: Message, direction: tuple[int, int] | None) -> None:
         if (character.pos_x, character.pos_y) == raid_cfg.MONOLITH_COORDS:
             await raid_service.leave_lobby_if_present(db, character.id)
         travel_seconds = movement_service.start_travel(character, dx, dy, now)
+        guild_handlers.forget_tithe(message.peer_id)
         await db.commit()
         # Ушёл с клетки - событие с выбором на ней закрыто: иначе его кнопки
         # всплывали бы потом в любой команде (2026-10-15).

@@ -412,6 +412,9 @@ async def start_travel_and_notify(
         fishing_service.clear_cast(character)
     path = mount_service.route(from_x, from_y, to_x, to_y, safe)
     travel = await mount_service.start_travel(db, character, mount_id, to_x, to_y, _rng, now, safe=safe)
+    from bot.handlers import guild as guild_handlers
+
+    guild_handlers.forget_tithe(peer_id)
     seconds = mount_service.total_travel_seconds(mount_id, len(path))
     await db.commit()
     await notify_travel_started(

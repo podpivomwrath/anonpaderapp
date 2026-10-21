@@ -601,7 +601,8 @@ async def on_battle_finished(session_id: int, result: TickResult) -> None:
             text += f"\n{drop_line}"
         from bot.handlers import guild as guild_handlers  # избегаем цикла импортов
 
-        tithe_line = guild_handlers.take_tithe_line(peer_id)
+        # Взнос - итог исследования, а не нападения в пути (2026-10-21).
+        tithe_line = guild_handlers.take_tithe_line(peer_id) if travel_id is None else None
         if tithe_line:
             text += f"\n{tithe_line}"
         if outcome.elixir_line:

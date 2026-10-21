@@ -764,3 +764,19 @@ async def test_ore_journal_names_the_grade_and_receiver_hears(db_session, make_c
     assert notes == []  # себе - без вести
     _note_receiver(notes, leader, SimpleNamespace(id=leader.id + 1), "со склада гильдии: кварц")
     assert notes == [("char", leader.id + 1, f"🏰 {leader.name} выдает тебе со склада гильдии: кварц.")]
+
+
+def test_tithe_line_does_not_follow_the_player_onto_the_road() -> None:
+    """2026-10-21: строку взноса за исследование показывал первый бой в пути
+    на маунте - казалось, что взнос дают за мобов в дороге."""
+    from types import SimpleNamespace
+
+    from bot.handlers import guild as guild_handlers
+
+    character = SimpleNamespace(guild_id=7)
+    outcome = SimpleNamespace(tithe_gold=40, tithe_guild_id=7)
+    guild_handlers.remember_tithe(555, character, outcome)
+    guild_handlers.forget_tithe(555)  # выехал с клетки
+    assert guild_handlers.take_tithe_line(555) is None
+    guild_handlers.remember_tithe(555, character, outcome)
+    assert guild_handlers.take_tithe_line(555) == "🏰 +40 золота в казну гильдии"

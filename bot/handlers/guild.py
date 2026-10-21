@@ -99,6 +99,12 @@ def remember_tithe(peer_id: int, character: Character, outcome) -> None:
         _tithe.pop(peer_id, None)
 
 
+def forget_tithe(peer_id: int) -> None:
+    """Ушёл с клетки - строка взноса больше ни к чему не относится. Иначе её
+    показывал первый бой в пути на маунте, будто взнос дал он (2026-10-21)."""
+    _tithe.pop(peer_id, None)
+
+
 def take_tithe_line(peer_id: int) -> str | None:
     gold = _tithe.pop(peer_id, None)
     return f"🏰 +{gold} золота в казну гильдии" if gold else None
