@@ -476,3 +476,19 @@ def test_gate_never_raises_the_tier_above_the_lake() -> None:
     for level in (1, 80, 10_000):
         for tier in fc.LAKE_POOLS:
             assert fishing.pool_tier_for(tier, level) <= tier
+
+
+@pytest.mark.asyncio
+async def test_leaving_the_lake_loses_undecided_catch(db_session, make_character) -> None:
+    """2026-10-21, владелец: ушел от воды, не решив, - рыба пропала."""
+    from datetime import datetime, timezone
+
+    from services import screen_service
+
+    character = await make_character()
+    character.screen = "lake"
+    await _landed(db_session, character, 500, datetime.now(timezone.utc))
+    assert fishing_service.has_catch(character)
+    await screen_service.set_screen(db_session, character, None)
+    assert not fishing_service.has_catch(character)
+    assert await fishing_service.bag_total_grams(db_session, character.id) == 0

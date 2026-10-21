@@ -139,6 +139,9 @@ async def _enter_lake(message: Message) -> None:
             await message.answer(reason)
             return
 
+        if character.screen != "lake":
+            # Был не у воды - вытащенная рыба уже ушла (2026-10-21).
+            fishing_service.drop_catch(character)
         await screen_service.set_screen(db, character, "lake")
         grams = await fishing_service.bag_total_grams(db, character.id)
         capacity = fishing.bag_capacity_grams(character.fishing_level)
@@ -279,11 +282,16 @@ async def release(message: Message) -> None:
 
 
 async def _decide(message: Message, keep: bool) -> None:
-    """Вытащенная рыба: в садок или в воду. Работает и не у воды - решение
-    могло остаться висеть после ухода с озера."""
+    """Вытащенная рыба: в садок или в воду. Только у воды: ушёл - рыба ушла
+    (2026-10-21, владелец)."""
     async with get_session_factory()() as db:
         character = await onboarding_svc.get_character(db, message.from_id)
         if character is None:
+            return
+        if character.screen != "lake":
+            fishing_service.drop_catch(character)
+            await db.commit()
+            await message.answer(ft.CATCH_GONE_TEXT)
             return
         if keep:
             decision = await fishing_service.keep_catch(db, character)

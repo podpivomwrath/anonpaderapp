@@ -136,6 +136,7 @@ def catch_text(result, character=None) -> str:
 
 DECIDE_FIRST_TEXT = "Сначала реши, что делать с уловом: в садок или обратно в воду."
 NOTHING_TO_DECIDE_TEXT = "Решать уже нечего."
+CATCH_GONE_TEXT = "Ты отошел от воды, и рыба уплыла."
 
 
 def kept_line(decision) -> str:

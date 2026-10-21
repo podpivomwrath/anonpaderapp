@@ -54,5 +54,10 @@ def parent_of(screen: str | None) -> str | None:
 
 
 async def set_screen(db: AsyncSession, character: Character, screen: str | None) -> None:
+    if character.screen == "lake" and screen != "lake" and character.fishing_cast_at is None:
+        # Ушёл от воды - вытащенная, но не убранная в садок рыба уходит
+        # (2026-10-21, владелец). Снасть в воде здесь не трогаем.
+        character.fishing_pending_fish = None
+        character.fishing_pending_grams = None
     character.screen = screen
     await db.flush()

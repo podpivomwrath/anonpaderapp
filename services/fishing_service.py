@@ -94,6 +94,12 @@ def has_catch(character: Character) -> bool:
     return character.fishing_cast_at is None and character.fishing_pending_fish is not None
 
 
+def drop_catch(character: Character) -> None:
+    """Вытащенная рыба пропадает: игрок ушёл от воды, не решив (2026-10-21)."""
+    if has_catch(character):
+        clear_cast(character)
+
+
 def clear_cast(character: Character) -> None:
     character.fishing_cast_at = None
     character.fishing_bite_at = None
