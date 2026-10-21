@@ -26,6 +26,8 @@ echo "Бэкап сохранён: $OUT_FILE"
 
 # Ротация: удалить бэкапы старше $KEEP_DAYS дней
 find "$BACKUP_DIR" -name 'postgres_*.sql.gz' -mtime "+${KEEP_DAYS}" -delete
+# Копии перед выкаткой (scripts/deploy-release.sh) - та же ротация (2026-10-21:
+# их скопилось 470+).
+find "$BACKUP_DIR" -name 'pre_release_*.sql.gz' -mtime "+${KEEP_DAYS}" -delete
 
-echo "Готово. Бэкапов в $BACKUP_DIR:"
-ls -lh "$BACKUP_DIR"
+echo "Готово. Бэкапов в $BACKUP_DIR: $(ls "$BACKUP_DIR" | wc -l)"
