@@ -44,9 +44,10 @@ def test_ring_tier_is_favoured_but_not_exclusive() -> None:
 
 
 def test_xp_curve_and_cap() -> None:
-    assert herbalism.xp_to_next(1) == 14 and herbalism.xp_to_next(hc.MAX_LEVEL) == 0
+    assert herbalism.xp_to_next(1) == 41 and herbalism.xp_to_next(hc.MAX_LEVEL) == 0
+    # 2026-10-21, «ещё медленнее»: до 50-го ~19 000 опыта (было 5 390).
     total = sum(herbalism.xp_to_next(level) for level in range(1, hc.MAX_LEVEL))
-    assert 4000 < total < 7000
+    assert 17000 < total < 21000
     assert herbalism.double_chance(9) == 0 and herbalism.double_chance(50) == 0.5
 
 
@@ -89,7 +90,7 @@ async def test_pick_gives_bag_and_xp_and_removes_patch(db_session, character_at)
     assert (await herb_service.pick(db_session, c, patch.id, random.Random(1), NOW)).status == "gone"
     assert "пучок в сумке" in herb_handlers.picked_text(res)
     # Шкала опыта ремесла под логом (2026-10-21).
-    assert "🌿 Травничество 1 ур.: ▰▰▰▰▰▰▰▱▱▱ 10 / 14" in herb_handlers.picked_text(res, c)
+    assert "🌿 Травничество 1 ур.: ▰▰▱▱▱▱▱▱▱▱ 10 / 41" in herb_handlers.picked_text(res, c)
 
 
 async def test_pick_refuses_elsewhere_unseen_and_withered(db_session, character_at) -> None:

@@ -8,7 +8,7 @@ def xp_to_next(level: int) -> int:
     """0 - потолок."""
     if level >= ac.MAX_LEVEL:
         return 0
-    return ac.XP_BASE + ac.XP_PER_LEVEL * level
+    return round(ac.XP_BASE + ac.XP_PER_LEVEL * level ** ac.XP_EXP)
 
 
 def grant_xp(character, xp: int) -> None:

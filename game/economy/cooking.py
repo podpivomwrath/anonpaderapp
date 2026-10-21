@@ -16,7 +16,7 @@ def dish_def(dish_id: str) -> DishDef | None:
 def xp_to_next(level: int) -> int:
     if level >= cc.MAX_LEVEL:
         return 0
-    return cc.XP_BASE + cc.XP_PER_LEVEL * level
+    return round(cc.XP_BASE + cc.XP_PER_LEVEL * level ** cc.XP_EXP)
 
 
 def grant_xp(character, xp: int) -> None:

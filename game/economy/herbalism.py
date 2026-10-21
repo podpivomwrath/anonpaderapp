@@ -56,7 +56,7 @@ def xp_to_next(level: int) -> int:
     """0 - потолок, дальше расти некуда."""
     if level >= hc.MAX_LEVEL:
         return 0
-    return hc.XP_BASE + hc.XP_PER_LEVEL * level
+    return round(hc.XP_BASE + hc.XP_PER_LEVEL * level ** hc.XP_EXP)
 
 
 def double_chance(level: int) -> float:
