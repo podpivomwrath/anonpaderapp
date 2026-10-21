@@ -187,3 +187,29 @@ def test_city_and_house_keyboards_fit_phone_without_scroll(monkeypatch) -> None:
     }
     for name, raw in screens.items():
         assert len(_rows(raw)) <= 5, f"{name}: {len(_rows(raw))} рядов"
+
+
+async def test_rest_in_city_is_refused(monkeypatch, db_session, make_character) -> None:
+    """2026-10-21: в городе отдыха нет - старая кнопка получает отказ и
+    свежую клавиатуру, отдых не начинается."""
+    from types import SimpleNamespace
+
+    from bot import explore_rest
+    from bot.handlers import rest as rest_handlers
+    from game.world import world_config as wc
+
+    player = await make_character(region="ridge")
+    player.pos_x, player.pos_y = wc.CITY_COORDS["ridge"]
+
+    class Context:
+        async def __aenter__(self): return db_session
+        async def __aexit__(self, *args): pass
+
+    async def get_character(*args): return player
+    monkeypatch.setattr(rest_handlers, "get_session_factory", lambda: Context)
+    monkeypatch.setattr(rest_handlers.onboarding_svc, "get_character", get_character)
+    replies = []
+    async def answer(text, **kwargs): replies.append((text, kwargs))
+    await rest_handlers.rest(SimpleNamespace(peer_id=9911, from_id=9911, text="🛏️ Отдых", answer=answer))
+    assert replies[0][0] == rest_handlers.CITY_REST_TEXT and replies[0][1]["keyboard"]
+    assert not explore_rest.resting(9911)
