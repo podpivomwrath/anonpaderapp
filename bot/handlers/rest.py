@@ -39,8 +39,6 @@ from services.db import get_session_factory
 labeler = BotLabeler()
 labeler.vbml_ignore_case = True
 
-CITY_REST_TEXT = "В городе отдыхать незачем: здоровье здесь восстанавливается само."
-
 
 @labeler.message(text=[kb.BTN_REST])
 @activity_action
@@ -56,12 +54,6 @@ async def rest(message: Message) -> None:
             return
         if in_any_battle(peer_id):
             await message.answer("В бою не отдохнёшь.")
-            return
-        if grid.city_region_at(character.pos_x, character.pos_y) is not None:
-            # 2026-10-21: в городе отдыха нет - здоровье там восстанавливается
-            # само. Кнопку убрали из Таверны; это ответ старой клавиатуре.
-            screen = await world._render_city_screen(db, character, character.screen)
-            await message.answer(CITY_REST_TEXT, keyboard=screen[1] if screen else None)
             return
         if world._in_mine_digging(character):
             await message.answer(
@@ -123,7 +115,8 @@ async def handle_rest_done(peer_id: int) -> None:
         await db.commit()
         region = grid.city_region_at(character.pos_x, character.pos_y)
         if region is not None:
-            # Отдых, начатый в городе до 2026-10-21 и доигранный после рестарта.
+            # Патч 39: отдых начинается из Таверны — после него возвращаемся
+            # туда же (character.screen), а не сбрасываем на площадь.
             _, keyboard = await world._render_city_screen(db, character, character.screen)
         else:
             keyboard = kb.movement_keyboard(character.pos_x, character.pos_y, peer_id, has_mount=has_mount)
