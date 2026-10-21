@@ -4,6 +4,7 @@ import asyncio
 
 import pytest
 
+import game.classes  # noqa: F401 - регистрация подклассов (Страж в тесте блока)
 from game.combat import elixir_effects
 from game.combat.duel_engine import DuelEngine, DuelResult
 from game.combat.session import ActionType, DeclaredAction, EffectKind
@@ -169,9 +170,11 @@ async def test_turn_limit_forces_draw() -> None:
         first = engine.start_duel(10, a, b)
         assert first == 1  # NoCritRng.shuffle сохраняет порядок -> order = (1, 2)
 
-        await engine.act(10, 1, skip())  # ход 1
-        await engine.act(10, 2, skip())  # ход 2
-        result = await engine.act(10, 1, skip())  # ход 3 — лимит достигнут
+        # 2026-10-21: max_turns - ходов каждого: 3 на двоих = 6 ходов дуэли.
+        for actor in (1, 2, 1, 2, 1):
+            result = await engine.act(10, actor, skip())
+            assert not result.finished
+        result = await engine.act(10, 2, skip())  # ход 6 — каждый сходил по 3
 
         assert result.finished and result.draw and result.draw_reason == "turn_limit"
         assert result.winner_id is None
@@ -193,13 +196,13 @@ async def test_turn_limit_warning_appears_from_threshold() -> None:
         engine.start_duel(10, a, b)
 
         result = None
-        for _ in range(14):  # ходы 1..14 — до предупреждения (20-14=6 > 5)
+        for _ in range(29):  # ходы 1..29 — до предупреждения (каждому 20-14=6 > 5)
             actor = engine.duels[10].current_actor_id
             result = await engine.act(10, actor, skip())
             assert not any("Ходов до исхода" in line for line in result.lines)
 
         actor = engine.duels[10].current_actor_id
-        result = await engine.act(10, actor, skip())  # ход 15: 20-15=5 <= 5
+        result = await engine.act(10, actor, skip())  # ход 30: каждый сходил 15, осталось 5
         assert any("Ходов до исхода: 5" in line for line in result.lines)
     finally:
         engine.shutdown()

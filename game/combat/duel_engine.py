@@ -284,12 +284,14 @@ class DuelEngine:
             result.finished = True
             result.winner_id = alive[0].id
             result.lines.append(f"🏆 Победитель дуэли: {alive[0].name}")
-        elif self.max_turns is not None and turn >= self.max_turns:
+        elif self.max_turns is not None and turn >= 2 * self.max_turns:
             # Патч 30: лимит ходов — принудительная ничья, никто не проиграл.
+            # 2026-10-21: лимит - ходов КАЖДОГО, как в массовом бою. Ход дуэли -
+            # это ход одного участника, и при 20 общих каждый бил всего 10 раз.
             result.finished, result.draw, result.draw_reason = True, True, "turn_limit"
             result.lines.append(bc.PVP_DRAW_TURN_LIMIT_TEXT)
         elif self.max_turns is not None:
-            remaining = self.max_turns - turn
+            remaining = self.max_turns - turn // 2
             if remaining <= bc.PVP_MAX_TURNS_WARNING_AT:
                 result.lines.append(f"⏳ Ходов до исхода: {remaining}")
 
