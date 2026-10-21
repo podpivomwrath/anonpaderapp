@@ -26,24 +26,28 @@ def test_catalog_no_yo_and_dishes_known() -> None:
         assert d is not None and "ё" not in (d.name + d.description).lower()
     assert cooking.buff_text(cc.DISHES_BY_ID["wormwood_soup"], "legendary") == "+20% здоровья"
     assert cooking.food_minutes(9) == 30 and cooking.food_minutes(50) == 60
+    # Градации - рыбьи (мелочь ... легендарная), а не рудные.
+    from game.economy import fishing_config as fc
+
+    assert set(cc.GRADE_MULT) == set(cc.GRADE_ORDER) == {g[1] for g in fc.GRADES}
 
 
 async def test_cook_from_fish_portions_by_weight(db_session, make_character) -> None:
     c = await make_character(farm=500)
-    await _fish(db_session, c.id, "pale_perch", "rare", 1800)
+    await _fish(db_session, c.id, "pale_perch", "big", 1800)
     await _fish(db_session, c.id, "blind_gudgeon", "common", 300)  # меньше порции - не предлагается
     await herb_service.add_herb(db_session, c.id, "bitter_wormwood", 1)
     dish = cc.DISHES_BY_ID["wormwood_soup"]
     options = await cooking_service.fish_options(db_session, c.id, dish)
     assert [(o.fish.id, o.portions) for o in options] == [("pale_perch", 3)]
-    await cooking_service.start(db_session, c, "wormwood_soup", "pale_perch", "rare", NOW)
-    assert cooking_service.cooking_now(c) == (dish, "rare", 3)
+    await cooking_service.start(db_session, c, "wormwood_soup", "pale_perch", "big", NOW)
+    assert cooking_service.cooking_now(c) == (dish, "big", 3)
     assert (await wallet_service.get_wallet(db_session, c.id)).farm_currency == 480
     assert [x.id for x in await cooking_service.due(db_session, NOW + timedelta(seconds=31))] == [c.id]
     res = await cooking_service.finish(db_session, c)
     assert res.portions == 3 and res.xp == 22
     food = await cooking_service.get_food(db_session, c.id)
-    assert [(d.id, g, n) for d, _, g, n in food] == [("wormwood_soup", "rare", 3)]
+    assert [(d.id, g, n) for d, _, g, n in food] == [("wormwood_soup", "big", 3)]
     assert "×3" in house_handlers.cooked_text(res)
 
 
@@ -62,9 +66,9 @@ async def test_cook_refusals_keep_everything(db_session, make_character) -> None
 
 async def test_eat_gives_buff_replaces_old_and_reaches_combat(db_session, make_character) -> None:
     c = await make_character()
-    await cooking_service.add_food(db_session, c.id, "wormwood_soup", "epic", 1)
+    await cooking_service.add_food(db_session, c.id, "wormwood_soup", "trophy", 1)
     await cooking_service.add_food(db_session, c.id, "orache_stew", "common", 1)
-    await cooking_service.eat(db_session, c, "wormwood_soup", "epic")
+    await cooking_service.eat(db_session, c, "wormwood_soup", "trophy")
     assert cooking_service.buff(c) == {"max_hp_bonus": 0.15}
     from models import CharacterStats
     from sqlalchemy import select

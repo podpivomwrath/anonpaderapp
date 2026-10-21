@@ -92,7 +92,7 @@ async def fish_options(db: AsyncSession, character_id: int, dish: cc.Dish) -> li
     rows = (await db.scalars(select(CharacterFish).where(
         CharacterFish.character_id == character_id, CharacterFish.total_grams > 0,
     ))).all()
-    order = {g: i for i, g in enumerate(("legendary", "epic", "rare", "common"))}
+    order = {g: i for i, g in enumerate(cc.GRADE_ORDER)}
     out = []
     for r in rows:
         fish = fishing.fish_def(r.fish_id)
@@ -201,7 +201,7 @@ async def get_food(db: AsyncSession, character_id: int) -> list[tuple[DishDef, c
     by_key = {(r.dish_id, r.grade): r.count for r in rows}
     out = []
     for dish in cc.DISHES:
-        for grade in ("legendary", "epic", "rare", "common"):
+        for grade in cc.GRADE_ORDER:
             n = by_key.get((dish.dish_id, grade))
             d = cooking.dish_def(dish.dish_id)
             if n and d is not None:

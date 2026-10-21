@@ -51,8 +51,10 @@ BUFF_TITLES = {
     "relic_bonus": "к шансу лишней реликвии с моба",
 }
 
-#: Сила блюда от градации рыбы.
-GRADE_MULT = {"common": 1.0, "rare": 1.25, "epic": 1.5, "legendary": 2.0}
+#: Сила блюда от градации рыбы (градации - fishing_config.GRADES).
+GRADE_MULT = {"small": 0.75, "common": 1.0, "big": 1.25, "trophy": 1.5, "legendary": 2.0}
+#: Лучшие градации - первыми в списках.
+GRADE_ORDER = ("legendary", "trophy", "big", "common", "small")
 
 #: Граммов рыбы на порцию по тиру; за одну готовку - не больше MAX_PORTIONS.
 PORTION_GRAMS = {1: 500, 2: 1200, 3: 3000, 4: 6000, 5: 2000}
