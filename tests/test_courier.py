@@ -145,3 +145,25 @@ async def test_courier_is_bought_once(db_session, make_character) -> None:
         await cs.buy(db_session, c)
     rows = (await db_session.scalars(select(CourierDelivery))).all()
     assert rows == []
+
+
+async def test_batch_parcel_carries_several_kinds(db_session, make_character) -> None:
+    """2026-10-21: пачка через запятую - одной посылкой курьера."""
+    from services import herb_service
+
+    s, r = await _pair(make_character)
+    elixir = await _elixir_offer(db_session, s.id)
+    await herb_service.add_herb(db_session, s.id, "bitter_wormwood", 4)
+    herb = (await ts.find(db_session, s.id, "горькая полынь")).offers[0]
+
+    d = await cs.send_batch(db_session, s, r, [(elixir, 2), (herb, 3)], reveal_sender=False, now=T0)
+    assert d.kind == cs.BATCH and d.amount == 2 and "×3" in d.label
+    assert [(h.id, n) for h, n in await herb_service.get_bag(db_session, s.id)] == [("bitter_wormwood", 1)]
+    with pytest.raises(cs.CourierError):  # одна посылка за раз - и у пачки
+        await cs.send_batch(db_session, s, r, [(herb, 1)], reveal_sender=False, now=T0)
+
+    assert await _run(db_session, T0 + STEP * 200) == ["picked", "delivered"]
+    assert [(h.id, n) for h, n in await herb_service.get_bag(db_session, r.id)] == [("bitter_wormwood", 3)]
+    got = await db_session.scalar(select(CharacterConsumable.count).where(
+        CharacterConsumable.character_id == r.id, CharacterConsumable.elixir_id == "heal_small"))
+    assert got == 2

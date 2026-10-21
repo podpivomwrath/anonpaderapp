@@ -10,6 +10,7 @@
 bot/handlers/courier.py. Числа - game/economy/courier_config.py.
 """
 
+import json
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 
@@ -97,6 +98,51 @@ async def send(
     return delivery
 
 
+BATCH = "batch"
+
+
+async def send_batch(
+    db: AsyncSession, sender: Character, recipient: Character,
+    batch: list[tuple["transfer_service.Offer", int]], reveal_sender: bool, now: datetime | None = None,
+) -> CourierDelivery:
+    """Пачка в одной посылке (2026-10-21): списать всё сразу и выпустить
+    курьера. Не хватило чего-то одного - не списано ничего (откат у вызывающего)."""
+    if not sender.has_courier:
+        raise CourierError("Курьера у тебя нет.")
+    if await active_of(db, sender.id) is not None:
+        raise CourierError("Курьер ещё бегает с прошлой посылкой. Дождись, пока он её отдаст.")
+    parts, labels = [], []
+    for offer, amount in batch:
+        if offer.kind in transfer_service.NEEDS_NEAR:
+            amount = await transfer_service.take(db, sender.id, offer, amount)
+            parts.append([offer.kind, offer.ref, amount])
+            labels.append(offer.label + (f" ×{amount}" if offer.stackable else ""))
+    if not parts:
+        raise CourierError("Это передаётся и без курьера.")
+    x, y = start_cell(sender)
+    delivery = CourierDelivery(
+        sender_id=sender.id, recipient_id=recipient.id, kind=BATCH, ref=json.dumps(parts, ensure_ascii=False),
+        label=", ".join(labels)[:160], amount=len(parts), reveal_sender=reveal_sender,
+        phase=PICKUP, status=ACTIVE, x=x, y=y, last_step_at=now or _now(), waiting=False,
+    )
+    db.add(delivery)
+    await db.flush()
+    return delivery
+
+
+def _parts(d: CourierDelivery) -> list[tuple[str, str | None, int]]:
+    if d.kind == BATCH:
+        return [tuple(p) for p in json.loads(d.ref or "[]")]
+    return [(d.kind, d.ref, d.amount)]
+
+
+async def _hand_over(db: AsyncSession, d: CourierDelivery, to_id: int, log: bool) -> None:
+    for kind, ref, amount in _parts(d):
+        await transfer_service.give(db, to_id, kind, ref, amount)
+        if log:
+            transfer_service.log(db, d.sender_id, to_id, kind, ref, d.label, amount)
+
+
 def next_cell(x: int, y: int, tx: int, ty: int) -> tuple[int, int]:
     """Шаг в соседнюю клетку к цели (по прямой, как маунт)."""
     path = grid.line_path(x, y, tx, ty)
@@ -148,8 +194,7 @@ async def advance(db: AsyncSession, busy_ids: set[int], now: datetime | None = N
                 d.waiting = True
                 events.append(Event("waiting", d))
             continue
-        await transfer_service.give(db, target.id, d.kind, d.ref, d.amount)
-        transfer_service.log(db, d.sender_id, target.id, d.kind, d.ref, d.label, d.amount)
+        await _hand_over(db, d, target.id, log=True)
         d.status, d.finished_at, d.waiting = DELIVERED, now, False
         events.append(Event("delivered", d))
     await db.flush()
@@ -159,6 +204,6 @@ async def advance(db: AsyncSession, busy_ids: set[int], now: datetime | None = N
 async def _lost_target(db: AsyncSession, d: CourierDelivery, now: datetime) -> list[Event]:
     """Персонажа удалили, пока курьер бежал: посылку - обратно отправителю."""
     if d.sender_id is not None and await db.get(Character, d.sender_id) is not None:
-        await transfer_service.give(db, d.sender_id, d.kind, d.ref, d.amount)
+        await _hand_over(db, d, d.sender_id, log=False)
     d.status, d.finished_at = RETURNED, now
     return [Event("returned", d)]

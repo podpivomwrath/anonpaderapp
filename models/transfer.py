@@ -2,7 +2,7 @@
 
 from datetime import datetime
 
-from sqlalchemy import BigInteger, DateTime, ForeignKey, String, func
+from sqlalchemy import BigInteger, DateTime, ForeignKey, String, Text, func
 from sqlalchemy.orm import Mapped, mapped_column
 
 from models.base import Base
@@ -57,7 +57,8 @@ class CourierDelivery(Base):
         ForeignKey("characters.id", ondelete="SET NULL"), nullable=True, index=True
     )
     kind: Mapped[str] = mapped_column(String(16))
-    ref: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    #: kind="batch" (2026-10-21) - список [[kind, ref, amount], ...] в JSON.
+    ref: Mapped[str | None] = mapped_column(Text, nullable=True)
     label: Mapped[str] = mapped_column(String(160))
     amount: Mapped[int] = mapped_column(BigInteger)
     #: Видно ли получателю ник отправителя (то же правило, что у передачи).

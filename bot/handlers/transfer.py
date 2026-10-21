@@ -228,8 +228,9 @@ async def transfer_command(message: Message, match: tuple) -> None:
         if len(parts) > 1:
             batch, refusal = await _resolve_batch(db, sender.id, parts)
             near = transfer_service.same_cell(sender, recipient)
-            if refusal is None and not near and any(o.kind in transfer_service.NEEDS_NEAR for o, _ in batch):
-                refusal = BATCH_FAR_TEXT
+            far_goods = not near and any(o.kind in transfer_service.NEEDS_NEAR for o, _ in batch)
+            if refusal is None and far_goods and not sender.has_courier:
+                refusal = NO_COURIER_TEXT
             same_guild = sender.guild_id is not None and sender.guild_id == recipient.guild_id
             show_name = recipient_name_visible(sender.guild_id, recipient.guild_id, message.peer_id, message.from_id)
             await db.commit()
@@ -243,7 +244,9 @@ async def transfer_command(message: Message, match: tuple) -> None:
             )
             _pending[peer_id] = pending
             editable_message.clear(NAMESPACE, peer_id)
-            text = f"📦 Передать {_whom(pending)}:\n" + "\n".join(_batch_lines(batch)) + "\nЭто не отменить."
+            head = (f"{cc.EMOJI} Курьер отнесёт {_whom(pending)}:" if far_goods
+                    else f"📦 Передать {_whom(pending)}:")
+            text = head + "\n" + "\n".join(_batch_lines(batch)) + "\nЭто не отменить."
             await editable_message.send_or_edit(_bot_api, NAMESPACE, peer_id, text, _confirm_keyboard(pending.token))
             return
         name, qty = transfer_service.parse(request)
@@ -274,12 +277,6 @@ async def transfer_command(message: Message, match: tuple) -> None:
     await editable_message.send_or_edit(
         _bot_api, NAMESPACE, peer_id, "\n".join(lines), _choice_keyboard(pending.token, len(pending.offers)),
     )
-
-
-BATCH_FAR_TEXT = (
-    "Списком вещи передают только тому, кто на твоей клетке. Курьер носит по одной "
-    "посылке - на расстояние передай по одной."
-)
 
 
 def _batch_lines(batch) -> list[str]:
@@ -415,18 +412,25 @@ async def _confirm_batch(message: Message, pending: Pending) -> None:
             await db.rollback()
             await editable_message.send_or_edit(_bot_api, NAMESPACE, peer_id, "Получателя больше нет в игре.", await _keyboard_for(peer_id))
             return
-        if any(transfer_service.needs_courier(o, sender, recipient) for o, _ in pending.batch):
-            await db.rollback()
-            await editable_message.send_or_edit(_bot_api, NAMESPACE, peer_id, BATCH_FAR_TEXT, await _keyboard_for(peer_id))
-            return
+        # Вещи на расстояние - одной посылкой курьером; валюта - сразу.
+        far = [(o, q) for o, q in pending.batch if transfer_service.needs_courier(o, sender, recipient)]
         moved: list[tuple[transfer_service.Offer, int]] = []
         try:
+            if far:
+                from services import courier_service
+
+                await courier_service.send_batch(db, sender, recipient, far, pending.reveal_sender)
             for offer, qty in pending.batch:
-                moved.append((offer, await transfer_service.execute(db, sender.id, recipient.id, offer, qty)))
-        except transfer_service.TransferFailed as exc:
+                if (offer, qty) not in far:
+                    moved.append((offer, await transfer_service.execute(db, sender.id, recipient.id, offer, qty)))
+        except Exception as exc:
+            from services import courier_service
+
+            if not isinstance(exc, (transfer_service.TransferFailed, courier_service.CourierError)):
+                raise
             await db.rollback()
             await editable_message.send_or_edit(
-                _bot_api, NAMESPACE, peer_id, f"{offer.label}: {exc} Ничего не передано.", await _keyboard_for(peer_id),
+                _bot_api, NAMESPACE, peer_id, f"{exc} Ничего не передано.", await _keyboard_for(peer_id),
             )
             return
         await db.commit()
@@ -439,10 +443,17 @@ async def _confirm_batch(message: Message, pending: Pending) -> None:
         if offer.kind in ("gold", "gems") and fc.transfer_tax(amount):
             line += f" (дошло {amount - fc.transfer_tax(amount)})"
         lines.append(line)
+    if far:
+        courier = f"{cc.EMOJI} Курьер выбежал из твоего города за посылкой:\n" + "\n".join(_batch_lines(far))
+        text = courier + ("\n\n📦 Сразу передано:\n" + "\n".join(lines) if lines else "")
+        await editable_message.send_or_edit(_bot_api, NAMESPACE, peer_id, text, await _keyboard_for(peer_id))
+        if not lines:
+            return  # получатель узнает, когда курьер побежит к нему
     what = "\n".join(lines)
-    await editable_message.send_or_edit(
-        _bot_api, NAMESPACE, peer_id, f"📦 Передано {_whom(pending)}:\n{what}", await _keyboard_for(peer_id),
-    )
+    if not far:
+        await editable_message.send_or_edit(
+            _bot_api, NAMESPACE, peer_id, f"📦 Передано {_whom(pending)}:\n{what}", await _keyboard_for(peer_id),
+        )
     try:
         await _bot_api.messages.send(
             peer_id=pending.recipient_peer, random_id=0,
