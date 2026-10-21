@@ -95,3 +95,21 @@ border, square 1:1 composition, crisp readable silhouette at small size
 | `img/еда_камбала.png` | Камбала на углях | a whole flat flounder grilled over glowing coals on an iron grate, faint ember glow from heather sprigs under it |
 | `img/еда_слеза.png` | Слеза глубины в корне | a pale translucent deep sea fish fillet laid on slices of crimson root, served on a dark stone plate |
 | `img/еда_пир.png` | Пир у Монолита | a heavy wooden platter with a whole roasted large fish, crimson roots and a single stone flower in the centre, a dark red glow in the background |
+
+## Карточка магазина - `img/магазин_дом.png` (1:1)
+
+Сейчас на карточке временная вырезка из картинки комнаты. Своя иконка -
+снаружи: небольшой каменный дом в городе, свет в окне и дым из трубы,
+чтобы читалось «свой угол» даже на маленькой карточке.
+
+```
+a small narrow two-storey stone townhouse squeezed between darker buildings,
+a warm orange light in one window, thin smoke rising from a crooked chimney,
+a heavy wooden door with an iron ring, grey ash falling on the roof tiles,
+dark fantasy game item icon, single building centered, slight 3/4 angle,
+painterly semi-realistic, muted desaturated palette of ash grey, rust brown
+and dried blood with a warm ember accent, weathered and worn surfaces, soft
+rim light from the upper left, deep neutral background, no text, no
+watermark, no border, square 1:1 composition, crisp readable silhouette at
+small size
+```
