@@ -25,7 +25,7 @@ TEXT_ONLY = FuncRule(lambda m: m.payload is None)
 INFO_COMMANDS = frozenset({
     "/разломы", "/разлом", "/rifts", "/заказ", "/заказы", "/contract", "/ежедневки", "/daily",
     "/топ", "/top", "/квест", "/quest", "/ключ", "/profile", "/профиль", "/баг", "/bug",
-    "/гильдия", "/guild",
+    "/гильдия", "/guild", "/помощь", "/команды", "/help",
 })
 
 
