@@ -32,7 +32,7 @@ def test_damage() -> None:
 
 def test_caps() -> None:
     assert formulas.crit_chance(100) == pytest.approx(0.3)
-    assert formulas.crit_chance(500) == 0.60          # потолок
+    assert formulas.crit_chance(500) == 0.70          # потолок (2026-10-21: было 0.60)
     assert formulas.mitigation(100) == pytest.approx(0.2)
     assert formulas.mitigation(400) == 0.50           # потолок
     assert formulas.control_resist(50) == pytest.approx(0.5)

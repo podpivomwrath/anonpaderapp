@@ -29,7 +29,7 @@ const CRIT_PER_AGI = 0.003;
 // game/combat/balance_config.py::BASE_CLASS_HP_MULT / BASE_CLASS_CRIT_BONUS.
 const BASE_CLASS_HP_MULT = { warrior: 1.1 };
 const BASE_CLASS_CRIT_BONUS = { rogue: 0.1 };
-const CRIT_CAP = 0.6;
+const CRIT_CAP = 0.7; // как balance_config.CRIT_CAP
 
 const MITIGATION_PER_VIT = 0.002;
 const MITIGATION_CAP = 0.5;
