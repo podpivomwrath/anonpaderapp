@@ -29,6 +29,26 @@ SUBCLASS_SKILL_DEFS: dict[str, SubclassSkillDef] = {
 _GENERIC_EFFECTS = {None, "stun", "target_vuln", "self_dodge_buff"}
 
 
+#: Метка Разложения (2026-10-21, жалоба игроков): одна на цель от всех
+#: отравителей. Второй отравитель её обновляет - полная сила, свежая
+#: длительность, - а не вешает свою, ослабленную затуханием дебаффов.
+DECAY_TAG = "decay"
+
+
+def _apply_vulnerability(target, skill: SubclassSkillDef, value: float, source_id: int) -> None:
+    if skill.id != "poisoner_decay":
+        target.apply_effect(EffectKind.VULNERABILITY, value, skill.effect_duration, source_id)
+        return
+    mark = next((e for e in target.effects
+                 if e.kind == EffectKind.VULNERABILITY and getattr(e, "tag", None) == DECAY_TAG), None)
+    if mark is None:
+        target.apply_effect(EffectKind.VULNERABILITY, value, skill.effect_duration, source_id, tag=DECAY_TAG)
+        return
+    mark.value = max(mark.value, value)
+    mark.remaining_ticks = max(mark.remaining_ticks, skill.effect_duration)
+    mark.source_id = source_id
+
+
 def _make_handler(skill: SubclassSkillDef):
     def handler(ctx: SkillContext) -> None:
         actor = ctx.actor
@@ -101,9 +121,7 @@ def _make_handler(skill: SubclassSkillDef):
                     target.apply_effect(EffectKind.WEAKEN, weaken, skill.effect_duration, actor.id)
                     ctx.lines.append(f"{target.name}: двойная доза - ослабление вдобавок к уязвимости")
                 vulnerability = skill.effect_value + vuln_bonus
-                target.apply_effect(
-                    EffectKind.VULNERABILITY, vulnerability, skill.effect_duration, actor.id,
-                )
+                _apply_vulnerability(target, skill, vulnerability, actor.id)
                 # Патч балансировки: с «Токсичной кровью» Уязвимость расходится
                 # по ВСЕМ отравленным этим Отравителем целям. Это его вклад в
                 # группу: он поднимает урон всей команды, а не одной цели. Один
@@ -112,9 +130,7 @@ def _make_handler(skill: SubclassSkillDef):
                     spread = vulnerability * bc.POISONER_TOXIC_BLOOD_SPREAD_PCT
                     for other in ctx.session.alive_enemies_of(actor):
                         if other.id != target.id and other.effect_from(EffectKind.DOT, actor.id):
-                            other.apply_effect(
-                                EffectKind.VULNERABILITY, spread, skill.effect_duration, actor.id
-                            )
+                            _apply_vulnerability(other, skill, spread, actor.id)
 
     return handler
 

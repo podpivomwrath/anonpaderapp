@@ -4,7 +4,7 @@
     {
       "id": "warrior_cleave",
       "name": "Рассекающий удар",
-      "multiplier": 1.8,
+      "multiplier": 1.5,
       "cd": 2,
       "effect": null,
       "flavor": "Широкий замах, вкладывающий всю массу тела в один разрез."

@@ -59,7 +59,7 @@ def test_cleave_multiplier_180() -> None:
     resolve_tick(s2, {3: skill("warrior_cleave", 4)}, rng)
     cleaved = b2.max_hp - b2.current_hp
 
-    assert cleaved == round(plain * 1.8)
+    assert cleaved == round(plain * 1.5)  # 2026-10-21: было 1.8
 
 
 def test_double_stab_two_hits() -> None:
