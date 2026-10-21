@@ -36,15 +36,23 @@ async def handle_get(request: web.Request) -> web.Response:
         return web.json_response(state)
 
 
+#: Что можно купить. Новый товар каталога обязан попасть сюда - иначе покупка
+#: молча падает в bad_request (так было с Домом 2026-10-21); следит
+#: tests/test_shop_rename.py::test_every_catalog_item_is_buyable.
+BUYABLE = (
+    shop_service.PREMIUM_ID, shop_service.RENAME_ID, shop_service.FIRM_RENAME_ID,
+    shop_service.ELIXIR_PACK_ID, shop_service.TINCTURE_ID, shop_service.POCKET_ID,
+    shop_service.FACTION_ID, shop_service.COURIER_ID, shop_service.HOUSE_ID,
+)
+
+
 async def handle_post(request: web.Request) -> web.Response:
     try:
         body = await request.json()
     except Exception:
         return _error("bad_request")
     item = body.get("item") if isinstance(body, dict) else None
-    if item not in (shop_service.PREMIUM_ID, shop_service.RENAME_ID, shop_service.FIRM_RENAME_ID,
-                    shop_service.ELIXIR_PACK_ID, shop_service.TINCTURE_ID, shop_service.POCKET_ID,
-                    shop_service.FACTION_ID, shop_service.COURIER_ID):
+    if item not in BUYABLE:
         return _error("bad_request")
     peer_id = request[VK_USER_ID_KEY]
     async with request.app[SESSION_FACTORY_KEY]() as db:

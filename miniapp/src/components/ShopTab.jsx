@@ -419,6 +419,7 @@ function GemPacks() {
 function bundleNotice(item, done) {
   if (done.contents) return `${item.emoji} ${item.title} в сумке: ${done.contents.join(', ')}.`;
   if (done.until) return `${item.emoji} ${item.title} действует до ${untilText(done.until)}.`;
+  if (item.id === 'house') return '🏠 Дом твой: кнопка «Дом» теперь на площади родного города.';
   return `${item.emoji} ${item.title} - готово.`;
 }
 
