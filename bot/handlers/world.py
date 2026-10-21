@@ -1387,9 +1387,26 @@ async def handle_rest_done(peer_id: int) -> None:
     await _bot_api.messages.send(peer_id=peer_id, message=text, random_id=0, keyboard=keyboard)
 
 
+@labeler.message(payload_contains={"type": kb.MOVE_PAYLOAD_TYPE})
+@activity_action
+async def move_by_payload(message: Message) -> None:
+    """Стрелка карты с payload (2026-10-21): подпись со значком соседней
+    клетки по тексту не узнать, направление берём из кнопки."""
+    payload = message.get_payload_json() or {}
+    dx, dy = payload.get("dx"), payload.get("dy")
+    if not isinstance(dx, int) or not isinstance(dy, int) or abs(dx) + abs(dy) != 1:
+        return
+    await _move(message, (dx, dy))
+
+
 @labeler.message(text=kb.MOVEMENT_TEXTS)
 @activity_action
 async def move(message: Message) -> None:
+    await _move(message, None)
+
+
+async def _move(message: Message, direction: tuple[int, int] | None) -> None:
+    """direction=None - старая кнопка или набранный текст: направление по подписи."""
     async with get_session_factory()() as db:
         character = await onboarding_svc.get_character(db, message.from_id)
         if character is None or character.creation_state is not None:
@@ -1427,7 +1444,8 @@ async def move(message: Message) -> None:
         if await mount_service.active_travel(db, character.id) is not None:
             await message.answer(MOUNT_BUSY_TEXT)
             return
-        direction = kb.resolve_direction(character.pos_x, character.pos_y, message.text)
+        if direction is None:
+            direction = kb.resolve_direction(character.pos_x, character.pos_y, message.text)
         if direction is None:
             # Устаревшая клавиатура: кнопка не подходит к клетке (стрелка там,
             # где теперь подпись города, и наоборот). Раньше - молчали, и

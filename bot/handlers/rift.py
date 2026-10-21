@@ -259,6 +259,7 @@ async def tick_job() -> None:
         async with get_session_factory()() as db:
             await rift_service.expire_due(db)
             await db.commit()
+            await rift_service.refresh_cells(db)
     except Exception:
         logger.exception("Разломы: тик не прошёл")
 

@@ -211,6 +211,28 @@ _DIRECTION_DELTAS = {
 # по текущей позиции через resolve_direction().
 MOVEMENT_TEXTS = list(_DIRECTION_DELTAS) + list(REGION_TITLES.values())
 
+#: Кнопки движения несут направление в payload (2026-10-21): подпись теперь
+#: меняется от соседней клетки («⬆️ (⛏)»), и по тексту её уже не узнать.
+MOVE_PAYLOAD_TYPE = "move"
+
+
+def neighbor_mark(x: int, y: int) -> str | None:
+    """Значок того, что стоит на клетке, - в скобках у стрелки (2026-10-21,
+    просьба владельца): разлом, Монолит, рудник, озеро."""
+    from game.economy import fishing, mining
+    from game.economy import raid_config
+    from services import rift_service
+
+    if (x, y) in rift_service.cached_cells():
+        return "🌀"
+    if (x, y) == raid_config.MONOLITH_COORDS:
+        return "🗿"
+    if mining.mine_at(x, y) is not None:
+        return "⛏"
+    if fishing.is_lake(x, y):
+        return "🎣"
+    return None
+
 
 def _direction_label(x: int, y: int, dx: int, dy: int, arrow: str) -> str:
     """Подпись кнопки направления от (x;y): название города — если соседняя
@@ -225,7 +247,10 @@ def _direction_label(x: int, y: int, dx: int, dy: int, arrow: str) -> str:
     if not grid.in_bounds(nx, ny):
         return arrow
     region = grid.city_region_at(nx, ny)
-    return REGION_TITLES[region] if region is not None else arrow
+    if region is not None:
+        return REGION_TITLES[region]
+    mark = neighbor_mark(nx, ny)
+    return f"{arrow} ({mark})" if mark else arrow
 
 
 def resolve_direction(x: int, y: int, text: str) -> tuple[int, int] | None:
@@ -235,9 +260,20 @@ def resolve_direction(x: int, y: int, text: str) -> tuple[int, int] | None:
     ушёл). Направление за границей карты теперь резолвится как обычно —
     легальность самого хода проверяет вызывающий (grid.in_bounds)."""
     for arrow, (dx, dy) in _DIRECTION_DELTAS.items():
-        if text_match.same(_direction_label(x, y, dx, dy, arrow), text):
+        label = _direction_label(x, y, dx, dy, arrow)
+        # Голая стрелка (набрана рукой или старая клавиатура без значка)
+        # подходит, пока рядом не город.
+        if text_match.same(label, text) or (label.startswith(arrow) and text_match.same(arrow, text)):
             return dx, dy
     return None
+
+
+def _move_button(kb: Keyboard, x: int, y: int, arrow: str) -> None:
+    dx, dy = _DIRECTION_DELTAS[arrow]
+    kb.add(
+        Text(_direction_label(x, y, dx, dy, arrow), payload={"type": MOVE_PAYLOAD_TYPE, "dx": dx, "dy": dy}),
+        color=KeyboardButtonColor.SECONDARY,
+    )
 
 
 def movement_keyboard(
@@ -260,19 +296,14 @@ def movement_keyboard(
     Патч 31, п.7: все 4 направления теперь ВСЕГДА на месте (раньше кнопка,
     ведущая за границу карты, убиралась целиком — раскладка «прыгала», игрок
     промахивался мимо съехавших кнопок)."""
-    up = _direction_label(pos_x, pos_y, *_DIRECTION_DELTAS[BTN_UP], BTN_UP)
-    down = _direction_label(pos_x, pos_y, *_DIRECTION_DELTAS[BTN_DOWN], BTN_DOWN)
-    left = _direction_label(pos_x, pos_y, *_DIRECTION_DELTAS[BTN_LEFT], BTN_LEFT)
-    right = _direction_label(pos_x, pos_y, *_DIRECTION_DELTAS[BTN_RIGHT], BTN_RIGHT)
-
     kb = Keyboard(one_time=False)
-    kb.add(Text(up), color=KeyboardButtonColor.SECONDARY)
+    _move_button(kb, pos_x, pos_y, BTN_UP)
     kb.row()
-    kb.add(Text(left), color=KeyboardButtonColor.SECONDARY)
+    _move_button(kb, pos_x, pos_y, BTN_LEFT)
     kb.add(Text(BTN_EXPLORE), color=KeyboardButtonColor.POSITIVE)
-    kb.add(Text(right), color=KeyboardButtonColor.SECONDARY)
+    _move_button(kb, pos_x, pos_y, BTN_RIGHT)
     kb.row()
-    kb.add(Text(down), color=KeyboardButtonColor.SECONDARY)
+    _move_button(kb, pos_x, pos_y, BTN_DOWN)
     kb.row()
     kb.add(Text(BTN_REST), color=KeyboardButtonColor.SECONDARY)
     kb.add(Text(BTN_LOOK_AROUND), color=KeyboardButtonColor.SECONDARY)
@@ -329,13 +360,15 @@ def continue_travel_keyboard(travel_id: int) -> str:
 
 def gate_direction_keyboard(pos_x: int, pos_y: int) -> str:
     """Выбор направления при выходе из города (патч 17, п.2): только
-    направления, остающиеся в пределах мира (из города на краю круга — три: внутрь и вдоль края)."""
+    направления, остающиеся в пределах мира (из города на краю круга — три: внутрь и вдоль края).
+    У стрелки - координаты клетки за воротами (2026-10-21)."""
     kb = Keyboard(inline=True)
     for arrow, (dx, dy) in _DIRECTION_DELTAS.items():
         nx, ny = pos_x + dx, pos_y + dy
         if not grid.in_bounds(nx, ny):
             continue
-        kb.add(Text(arrow, payload={"type": "gate_dir", "dx": dx, "dy": dy}), color=KeyboardButtonColor.SECONDARY)
+        kb.add(Text(f"{arrow} ({nx}; {ny})", payload={"type": "gate_dir", "dx": dx, "dy": dy}),
+               color=KeyboardButtonColor.SECONDARY)
         kb.row()
     return kb.get_json()
 

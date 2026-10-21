@@ -79,6 +79,20 @@ async def active_rifts(db: AsyncSession, now: datetime | None = None) -> list[Ri
     return [r for r in rows if r.state != FREE or not is_expired(r, now)]
 
 
+#: Клетки разломов для подписей стрелок на карте (2026-10-21): клавиатура
+#: синхронная и в базу не ходит, поэтому тик разломов кладёт сюда снимок.
+_cells: frozenset[tuple[int, int]] = frozenset()
+
+
+def cached_cells() -> frozenset[tuple[int, int]]:
+    return _cells
+
+
+async def refresh_cells(db: AsyncSession, now: datetime | None = None) -> None:
+    global _cells
+    _cells = frozenset((r.x, r.y) for r in await active_rifts(db, now))
+
+
 async def rift_at(db: AsyncSession, x: int, y: int, now: datetime | None = None) -> Rift | None:
     for rift in await active_rifts(db, now):
         if (rift.x, rift.y) == (x, y):
