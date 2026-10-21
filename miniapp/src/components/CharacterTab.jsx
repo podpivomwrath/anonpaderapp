@@ -17,7 +17,7 @@ const SECTIONS = [
   { id: 'presets', label: 'Пресеты' },
   { id: 'trials', label: 'Испытания' },
   // 2026-10-21: уровни ремёсел и их сумки (рыба, руда) - из Характеристик и Инвентаря.
-  { id: 'crafts', label: 'Ремёсла' },
+  { id: 'crafts', label: 'Ремесла' },
 ];
 
 export default function CharacterTab({ character, onCharacterUpdate }) {

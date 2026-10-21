@@ -169,6 +169,9 @@ class Character(Base):
         DateTime(timezone=True), nullable=True
     )
     mining_xp: Mapped[int] = mapped_column(BigInteger, default=0)
+    # Травничество (2026-10-21): потолок herbal_config.MAX_LEVEL.
+    herbalism_level: Mapped[int] = mapped_column(default=1, server_default="1")
+    herbalism_xp: Mapped[int] = mapped_column(BigInteger, default=0, server_default="0")
     # Состояние добычи. Добыча БЛОКИРУЕТ все действия, пока идёт, и живёт в
     # БД, а не в памяти: она длится минутами (до полутора часов новичку в
     # глубоком руднике), и терять её из-за деплоя нельзя.

@@ -687,6 +687,9 @@ async def on_battle_finished(session_id: int, result: TickResult) -> None:
             await _bot_api.messages.send(
                 peer_id=peer_id, message=ASH_OFFER_TEXT, random_id=0, keyboard=ash_handful_keyboard(),
             )
+        from bot.handlers import herbs as herb_handlers  # цикл импортов
+
+        await herb_handlers.notify(peer_id, character)
     elif on_defeat_hook is not None:
         # смерть: убрать кнопки, атмосферный текст (+ штраф опыта); респавн — автоматически
         await on_defeat_hook(peer_id, respawn_at, xp_lost, relics_lost, fish_lost)

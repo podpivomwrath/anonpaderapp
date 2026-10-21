@@ -91,6 +91,7 @@ from services import (
     guild_territory_service,
     group_service,
     item_service,
+    herb_service,
     mining_service,
     mount_service,
     movement_service,
@@ -362,6 +363,9 @@ async def send_cell_buttons(peer_id: int, character) -> None:
     await turbo_handlers.maybe_send_here_button(peer_id, character)
 
     await rift_handlers.maybe_send_here_button(peer_id, character)
+    from bot.handlers import herbs as herb_handlers
+
+    await herb_handlers.notify(peer_id, character)
 
 
 async def _deliver_daily_notice(peer_id: int, character) -> None:
@@ -771,6 +775,7 @@ async def explore(message: Message) -> None:
                             _resting.discard(member_peer_id)
                             await pending_activity.forget("rest", member_peer_id)
                         tithe = await guild_territory_service.on_exploration(db, member_character)
+                        await herb_service.spawn(db, _rng, (member_character.pos_x, member_character.pos_y))
                         if member_peer_id is not None:
                             guild_handlers.remember_tithe(member_peer_id, member_character, tithe)
                         # Ежедневки «исследуй» - и в группе, каждому (2026-10-13).
@@ -970,6 +975,8 @@ async def handle_explore_done(peer_id: int) -> None:
         # случайный неполный рудник. Рудники — общий ресурс, который наполняет
         # активность всего сервера, а не персональный кран.
         await mining_service.spawn_ore(db, _rng)
+        # 2026-10-21: и траву - на случайную клетку карты, не на эту.
+        await herb_service.spawn(db, _rng, (character.pos_x, character.pos_y))
         # Патч 104: тот же принцип для мировых боссов - счётчик наполняет
         # активность всего сервера.
         new_boss = await world_boss_service.record_exploration(db, _rng)
@@ -1086,6 +1093,9 @@ async def handle_explore_done(peer_id: int) -> None:
             attachment=event_attachment(event.id),
             keyboard=mining_kb.event_vein_keyboard(event.id, vein_token),
         )
+        from bot.handlers import herbs as herb_handlers  # цикл импортов
+
+        await herb_handlers.notify(peer_id, character)
         return
 
     if empty_fisher:
@@ -1103,6 +1113,9 @@ async def handle_explore_done(peer_id: int) -> None:
             keyboard=kb.movement_keyboard(character.pos_x, character.pos_y, peer_id,
                                           has_mount=has_mount),
         )
+        from bot.handlers import herbs as herb_handlers  # цикл импортов
+
+        await herb_handlers.notify(peer_id, character)
         return
 
     _pending_events[peer_id] = event.id
@@ -1219,6 +1232,9 @@ async def event_choice(message: Message) -> None:
     if ash_handful_state.is_pending(peer_id):
         await message.answer(kb.ASH_OFFER_TEXT, keyboard=kb.ash_handful_keyboard())
     await _maybe_send_monolith_button(peer_id, character)
+    from bot.handlers import herbs as herb_handlers  # цикл импортов
+
+    await herb_handlers.notify(peer_id, character)
 
 
 SONG_READ_SCENE = (

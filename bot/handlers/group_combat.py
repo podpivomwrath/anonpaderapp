@@ -896,6 +896,7 @@ async def on_group_battle_finished(session_id: int, result: TickResult) -> None:
                 await _bot_api.messages.send(
                     peer_id=p.peer_id, message=ASH_OFFER_TEXT, random_id=0, keyboard=ash_handful_keyboard(),
                 )
+            await _notify_herb(cid, p.peer_id)
         elif cid in dead_ids and cid in defeats:
             defeat, respawn_at = defeats[cid]
             await respawn_handlers.register_death(p.peer_id, respawn_at, defeat.xp_lost, defeat.relics_lost, defeat.fish_lost)
@@ -1001,6 +1002,19 @@ async def _tell_others(battle, cid: int, text: str) -> None:
             await _bot_api.messages.send(peer_id=other.peer_id, message=text, random_id=0)
         except Exception:
             logger.warning("Свиток: не доставлено {}", other.peer_id)
+
+
+async def _notify_herb(character_id: int, peer_id: int) -> None:
+    """Трава на клетке (2026-10-21) - каждому участнику после сводки."""
+    from bot.handlers import herbs as herb_handlers  # избегаем цикла импортов
+
+    try:
+        async with get_session_factory()() as db:
+            character = await db.get(Character, character_id)
+        if character is not None:
+            await herb_handlers.notify(peer_id, character)
+    except Exception:
+        logger.exception("Групповой бой: не удалось показать траву {}", peer_id)
 
 
 async def _send_location_summary(character_id: int, peer_id: int, fallback_keyboard: str) -> None:

@@ -129,6 +129,12 @@ function detailRows(entry) {
       ['В сумке', `×${data.count}`],
     ];
   }
+  if (kind === 'herb') {
+    return [
+      ['Тир', data.tier],
+      ['В сумке', `×${data.count}`],
+    ];
+  }
   if (kind === 'trophy') {
     return [
       ['Редкость', data.rarity_title || '-'],
@@ -148,6 +154,7 @@ export function ItemSheet({ entry, onClose, onUnequip, unequipping }) {
   const NOTES = {
     trophy: 'Цена - у скупщика в своём городе, в чужом он платит меньше. Реликвии не передаются.',
     fish: 'Цена - у Иргала в своём городе. Рыбак у воды в глубоких кольцах платит больше.',
+    herb: 'Из трав варят зелья на алхимическом столе и готовят блюда в печи - для этого нужен дом.',
     ore: 'Руда идёт на ковку в мастерской и не теряется при смерти. Лишнее железо и кварц дёшево берёт Иргал.',
   };
   const note = NOTES[kind] || null;

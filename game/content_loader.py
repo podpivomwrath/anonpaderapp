@@ -390,6 +390,20 @@ def load_ore_defs(content_dir: Path = CONTENT_DIR) -> list[OreDef]:
     return [OreDef(**raw) for raw in _load_json(content_dir / "mining" / "ores.json")]
 
 
+class HerbDef(BaseModel):
+    """Трава (content/herbs/herbs.json, 2026-10-21). Числа - game/economy/herbal_config.py."""
+
+    id: str
+    emoji: str
+    name: str
+    tier: int
+    description: str = ""
+
+
+def load_herb_defs(content_dir: Path = CONTENT_DIR) -> list[HerbDef]:
+    return [HerbDef(**raw) for raw in _load_json(content_dir / "herbs" / "herbs.json")]
+
+
 class MineDef(BaseModel):
     """Рудник (content/mining/mines.json, патч 59) — клетка с фиксированными
     координатами, по той же логике, что озёра, но в других местах.

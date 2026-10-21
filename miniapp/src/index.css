@@ -2548,3 +2548,14 @@ body::before {
 .vkuiTabs__in::-webkit-scrollbar { display: none; }
 .vkuiTabsItem__host { flex-shrink: 0; }
 .vkuiTabsItem__label { white-space: nowrap; }
+
+/* Ремесла (2026-10-21): иконка-эмодзи там, где картинки ещё нет. */
+.craft-emoji-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  font-size: 24px;
+  line-height: 1;
+}

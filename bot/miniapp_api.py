@@ -135,6 +135,8 @@ def _character_payload(
             "xp": character.mining_xp,
             "xp_to_next": game_mining.xp_to_next(character.mining_level),
         },
+        # Травничество (2026-10-21): с потолком, в отличие от рыбалки и руды.
+        "herbalism": herbalism_payload(character),
         "mobs_killed": character.mobs_killed,
         # Патч 32, баг 1: экипировка нужна фронтенду ОТДЕЛЬНО от derived — живой
         # предпросмотр (miniapp/src/formulas.js) пересчитывает derived сам при
@@ -717,6 +719,9 @@ async def _full_inventory(session, character_id: int) -> dict:
             "capacity": game_fishing.bag_capacity_grams(character.fishing_level),
         }
     payload["ore"] = _ore_payload(await mining_service.get_ore(session, character_id))
+    from services import herb_service
+
+    payload["herbs"] = _herb_payload(await herb_service.get_bag(session, character_id))
     return payload
 
 
@@ -742,6 +747,36 @@ def _fish_payload(bag) -> list[dict]:
         }
         for fish, grade, grams in bag
     ]
+
+
+def _herb_payload(bag) -> list[dict]:
+    """Сумка травника (2026-10-21). Картинок пока нет - иконка эмодзи."""
+    return [
+        {
+            "id": herb.id, "name": herb.name, "emoji": herb.emoji, "icon": f"herb:{herb.id}",
+            "count": count, "description": herb.description, "tier": herb.tier,
+        }
+        for herb, count in bag
+    ]
+
+
+def herbalism_payload(character) -> dict:
+    """Травничество: уровень, опыт и каталог - какие травы видны и с какого уровня."""
+    from game.economy import herbal_config as hc
+    from game.economy import herbalism
+
+    return {
+        "level": character.herbalism_level,
+        "xp": character.herbalism_xp,
+        "xp_to_next": herbalism.xp_to_next(character.herbalism_level),
+        "max_level": hc.MAX_LEVEL,
+        "double_pct": round(herbalism.double_chance(character.herbalism_level) * 100),
+        "catalog": [
+            {"id": h.id, "name": h.name, "emoji": h.emoji, "level": herbalism.required_level(h),
+             "known": herbalism.can_see(character.herbalism_level, h)}
+            for h in herbalism.herb_defs_ordered()
+        ],
+    }
 
 
 def _ore_payload(stock) -> list[dict]:

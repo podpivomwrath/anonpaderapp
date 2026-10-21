@@ -690,3 +690,6 @@ async def _epilogue(peer_id: int, lines: list[str], applied) -> None:
     await _api().messages.send(
         peer_id=peer_id, message=text, random_id=0, attachment=attachment, keyboard=keyboard,
     )
+    from bot.handlers import herbs as herb_handlers  # цикл импортов
+
+    await herb_handlers.notify(peer_id, character)
