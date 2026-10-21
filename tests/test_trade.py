@@ -249,7 +249,8 @@ async def test_city_tier_changes_shop_and_relic_prices(db_session, make_characte
     c = await make_character(level=30, region="docks")
     c.pos_x, c.pos_y = wc.CITY_COORDS["docks"]
     assert await faction_service.shop_mult(db_session, c) == 1.0
-    await faction_service.add_points(db_session, "docks", 8_000, NOW)
+    # Цены считают распад от текущего часа - очки кладём «сейчас», не на NOW.
+    await faction_service.add_points(db_session, "docks", 8_000, faction_service._now())
     assert await faction_service.shop_mult(db_session, c) == pytest.approx(0.90)
     assert await faction_service.relic_mult(db_session, c) == pytest.approx(1.10)
     assert "Золотой век" in await faction_service.city_line(db_session, c, relics=True)

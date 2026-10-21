@@ -129,6 +129,7 @@ def _bfs_avoiding(passages, start: int, avoid: set[int]) -> set[int]:
 
 
 def generate(rng: random.Random) -> Maze:
+    start_exits = set(neighbors(START).values())
     while True:
         passages, parent = _perfect_tree(rng)
         candidates = []
@@ -136,7 +137,8 @@ def generate(rng: random.Random) -> Maze:
             if u < 0:
                 continue
             sub = _subtree(parent, v)
-            if tc.LOCKED_MIN <= len(sub) <= tc.LOCKED_MAX and START not in sub and GATE not in sub:
+            # Соседи входа - не за решёткой: оба хода со старта открыты всегда.
+            if tc.LOCKED_MIN <= len(sub) <= tc.LOCKED_MAX and not sub & ({START, GATE} | start_exits):
                 candidates.append((_edge(u, v), sub))
         if candidates:
             break
@@ -148,6 +150,8 @@ def generate(rng: random.Random) -> Maze:
     ]
     rng.shuffle(extra)
     passages |= set(extra[: tc.EXTRA_OPENINGS])
+    # Со входа - два хода (2026-10-21): с одним Безымянный запирал группу на старте.
+    passages |= {_edge(START, n) for n in start_exits}
 
     kinds: dict[int, str] = {}
     dist = _bfs(passages, START, blocked=grate)

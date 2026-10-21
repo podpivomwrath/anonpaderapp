@@ -66,6 +66,14 @@ def test_walls_and_adjacency_are_enforced() -> None:
     assert lab.move(1, lab_rules.GATE, 0.0).reason == "not_adjacent"
 
 
+def test_start_always_has_two_open_exits() -> None:
+    """Репорт 2026-10-21: с одним ходом Безымянный запер группу на входе."""
+    for seed in range(300):
+        lab = lab_rules.Labyrinth([1], random.Random(seed))
+        assert len(lab.exits(lab_rules.START)) == 2, seed
+        assert not set(lab_rules.neighbors(lab_rules.START).values()) & lab.maze.locked, seed
+
+
 def test_solo_run_can_finish_with_plate_hold() -> None:
     """Соло: плита держит решётку, пока бежишь до второй; три Следа - ворота."""
     for seed in range(30):
