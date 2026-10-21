@@ -96,7 +96,7 @@ def test_max_hp_bonus_applies_in_combatant() -> None:
 
 def test_oven_and_fish_keyboards_fit_vk() -> None:
     rows = json.loads(house_handlers.oven_keyboard(cc.MAX_LEVEL))["buttons"]
-    assert len(rows) <= 10 and all(len(r) <= 2 for r in rows)
+    assert len(rows) <= 5 and all(len(r) <= 3 for r in rows)
 
 
 async def test_craft_dailies_need_house_and_are_fixed(db_session, make_character) -> None:

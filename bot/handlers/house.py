@@ -307,7 +307,7 @@ async def house_back(message: Message) -> None:
 # --- Алхимия ------------------------------------------------------------------
 
 
-@labeler.message(text=[kb.BTN_ALCHEMY])
+@labeler.message(text=[kb.BTN_ALCHEMY, kb.BTN_ALCHEMY_OLD])
 async def open_alchemy(message: Message) -> None:
     async with get_session_factory()() as db:
         character = await _home_character(db, message)

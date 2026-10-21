@@ -93,5 +93,6 @@ async def test_bonus_portion_and_level_up(db_session, make_character) -> None:
 
 def test_alchemy_keyboard_fits_vk_with_all_recipes() -> None:
     rows = json.loads(house_handlers.alchemy_keyboard(ac.MAX_LEVEL))["buttons"]
-    assert len(rows) <= 10 and all(len(r) <= 2 for r in rows)
+    # 2026-10-21: по 3 короткие кнопки в ряд - экран без прокрутки.
+    assert len(rows) <= 5 and all(len(r) <= 3 for r in rows)
     assert rows[-1][-1]["action"]["label"] == house_handlers.BTN_HOUSE_BACK
