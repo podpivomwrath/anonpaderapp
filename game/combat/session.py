@@ -389,6 +389,10 @@ def build_combatant(
     max_hp = round(formulas.hp(level, stats.vitality, formulas.tier_multiplier(tier)))
     if kind == "character":
         max_hp = round(max_hp * formulas.class_hp_mult(base_class, subclass_id))
+        # Еда (2026-10-21): +доля здоровья приходит модификатором.
+        bonus = (buff_modifiers or {}).get("max_hp_bonus", 0.0)
+        if bonus:
+            max_hp = round(max_hp * (1 + bonus))
     return CombatantState(
         id=id,
         side=side,

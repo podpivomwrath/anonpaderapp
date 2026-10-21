@@ -55,6 +55,7 @@ export default function CraftsTab({ character }) {
   const herbs = bag.herbs || [];
   const herbal = character.herbalism;
   const alch = character.alchemy;
+  const cook = character.cooking;
 
   const row = (kind, entry) => (
     <SimpleCell
@@ -81,8 +82,13 @@ export default function CraftsTab({ character }) {
     </SimpleCell>
   );
 
+  // Картинка, если уже нарисована, иначе эмодзи. У закрытой травы - только эмодзи-замок.
+  const glyph = (e, open = true) => (open && e.icon && itemIcon(e.icon)
+    ? <ItemIcon icon={e.icon} alt={e.name} />
+    : <span className="craft-emoji-icon" aria-hidden="true">{open ? e.emoji : '🔒'}</span>);
+
   const catalogRow = (h) => (
-    <SimpleCell key={h.id} before={<span className="craft-emoji-icon" aria-hidden="true">{h.emoji}</span>}
+    <SimpleCell key={h.id} before={glyph(h, h.known)}
       subtitle={h.known ? 'Различаешь' : `Откроется на ${h.level} уровне`}
       style={h.known ? undefined : { opacity: 0.55 }}>
       {h.known ? h.name : '???'}
@@ -90,10 +96,10 @@ export default function CraftsTab({ character }) {
   );
 
   const recipeRow = (r) => (
-    <SimpleCell key={r.id} multiline before={<span className="craft-emoji-icon" aria-hidden="true">{r.emoji}</span>}
+    <SimpleCell key={r.id} multiline before={glyph(r)}
       subtitle={r.known ? r.needs : `Откроется на ${r.level} уровне`}
       style={r.known ? undefined : { opacity: 0.55 }}>
-      {r.name} ×{r.out}
+      {r.out ? `${r.name} ×${r.out}` : r.name}
     </SimpleCell>
   );
 
@@ -188,6 +194,30 @@ export default function CraftsTab({ character }) {
             {alch.level >= 10 ? ` (сейчас -${alch.discount_pct}% и ${alch.bonus_pct}%)` : ''}.
           </Caption>
           {pouch('recipes', 'Рецепты', 'recipe', alch.recipes, '')}
+        </Group>
+      )}
+
+      {cook && (
+        <Group header={<Header>🔥 Кулинария</Header>}>
+          <div className="stat-row">
+            <span className="stat-row__label">Уровень</span>
+            <span className="stat-row__value">{cook.level} / {cook.max_level}</span>
+          </div>
+          {cook.xp_to_next > 0 && (
+            <div className="stat-row">
+              <span className="stat-row__label">Опыт</span>
+              <span className="stat-row__value">{cook.xp} / {cook.xp_to_next}</span>
+            </div>
+          )}
+          <Caption level="1" style={{ padding: '0 16px 12px', opacity: 0.7 }}>
+            {cook.has_house
+              ? 'Готовят в чате: Дом на площади родного города, Печь. '
+              : 'Нужен дом - он продается в Магазине за самоцветы. '}
+            Из рыбы и трав, соль и специи докупаются сами. Тяжелее рыба - больше порций, лучше градация -
+            сильнее блюдо. Готовое лежит в Инвентаре во вкладке «Еда», есть можно вне боя. Бафф держится
+            {` ${cook.minutes} мин.`}, переживает смерть, новое блюдо заменяет старое. Каждые 10 уровней бафф длится дольше.
+          </Caption>
+          {pouch('dishes', 'Рецепты', 'recipe', cook.recipes, '')}
         </Group>
       )}
 

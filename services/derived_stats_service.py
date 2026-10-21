@@ -49,8 +49,9 @@ def compute(
     k_dmg = formulas.k_dmg_for(primary_stat)
 
     return DerivedStats(
-        max_hp=round(formulas.hp(character.level, vitality, tier_mult)
-                     * formulas.class_hp_mult(character.base_class, character.subclass)),
+        max_hp=round(round(formulas.hp(character.level, vitality, tier_mult)
+                           * formulas.class_hp_mult(character.base_class, character.subclass))
+                     * _food_hp_mult(character)),
         damage=round(formulas.damage(tier_mult, primary_value, k_dmg), 1),
         crit_chance=min(formulas.crit_chance(agility)
                         + formulas.class_crit_bonus(character.base_class, character.subclass), 1.0),
@@ -63,3 +64,10 @@ def compute(
             poison_tick_damage_per_stack(will, agility) * bc.POISONER_MAX_STACKS, 1
         ),
     )
+
+
+def _food_hp_mult(character) -> float:
+    """Еда (2026-10-21): здоровье в карточке - с баффом, как в бою."""
+    from services import cooking_service
+
+    return cooking_service.hp_mult(character) if hasattr(character, "food_dish") else 1.0

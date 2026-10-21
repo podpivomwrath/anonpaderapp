@@ -49,6 +49,7 @@ from game.combat.session import (
 )
 from game.combat.tick_engine import TickEngine
 from bot.world_summary import location_attachment, location_summary
+from services import cooking_service
 from game.combat import consumable_limit
 from game.economy import elixir_config as ec
 from game.world import encounters, grid
@@ -627,6 +628,7 @@ async def on_battle_finished(session_id: int, result: TickResult) -> None:
             old_max_hp = round(
                 formulas.hp(old_level, stats.vitality + vit_bonus, formulas.tier_multiplier(old_tier))
                 * formulas.class_hp_mult(getattr(character, "base_class", None), getattr(character, "subclass", None))
+                * cooking_service.hp_mult(character)
             )
             new_max_hp = vitals_service.max_hp(character, stats, vit_bonus)
             text += "\n\n" + world_flavor.levelup_line(new_level, _rng)

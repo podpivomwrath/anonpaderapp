@@ -404,6 +404,19 @@ def load_herb_defs(content_dir: Path = CONTENT_DIR) -> list[HerbDef]:
     return [HerbDef(**raw) for raw in _load_json(content_dir / "herbs" / "herbs.json")]
 
 
+class DishDef(BaseModel):
+    """Блюдо (content/cooking/dishes.json, 2026-10-21). Числа - game/economy/cooking_config.py."""
+
+    id: str
+    emoji: str
+    name: str
+    description: str = ""
+
+
+def load_dish_defs(content_dir: Path = CONTENT_DIR) -> list[DishDef]:
+    return [DishDef(**raw) for raw in _load_json(content_dir / "cooking" / "dishes.json")]
+
+
 class MineDef(BaseModel):
     """Рудник (content/mining/mines.json, патч 59) — клетка с фиксированными
     координатами, по той же логике, что озёра, но в других местах.

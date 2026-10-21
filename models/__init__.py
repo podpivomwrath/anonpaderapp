@@ -34,6 +34,7 @@ from models.guild import (
     GuildSiege,
     GuildWeekly,
 )
+from models.food import CharacterFood
 from models.herb import CharacterHerb, HerbPatch
 from models.item import Inventory, Item, ItemUpgradeHistory
 from models.lootbox import CharacterLootbox
@@ -61,6 +62,7 @@ from models.voyage import CharacterVoyage
 from models.world_boss import WorldBoss, WorldBossContribution, WorldBossMeter
 
 __all__ = [
+    "CharacterFood",
     "CharacterHerb",
     "HerbPatch",
     "AdminAction",

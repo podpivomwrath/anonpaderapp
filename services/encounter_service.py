@@ -83,6 +83,9 @@ async def resolve_victory(
         select(CharacterStats).where(CharacterStats.character_id == character.id)
     )
     xp, xp_mult = experience_service.xp_for_kill(mob_level, character.level)
+    from services import cooking_service
+
+    xp = round(xp * cooking_service.xp_mult(character))  # еда (2026-10-21)
     levelup = experience_service.add_experience(character, stats, xp)
     group_kick = None
     if levelup.levels_gained > 0:
@@ -115,6 +118,7 @@ async def resolve_victory(
     from services import scene_event_service
 
     bonus = await scene_event_service.trophy_bonus(db, character.id)
+    bonus += cooking_service.relic_bonus(character)  # еда (2026-10-21)
     if bonus > 0 and rng.random() < bonus:
         extra = await scene_event_service.extra_kill_trophies(db, character, rng)
         for trophy_id, count in extra.items():

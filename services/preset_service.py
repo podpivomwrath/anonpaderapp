@@ -228,15 +228,23 @@ def resolve_buff_modifiers(buff_ids: list[str], catalog: dict[str, BuffDef]) -> 
 
 async def resolve_active_modifiers(db: AsyncSession, character: Character) -> dict[str, float]:
     """Шорткат: активный пресет персонажа → смерженные stat_modifiers
-    (патч 14, ч.3). Пусто, если подкласс не выбран или пресет не активирован."""
+    (патч 14, ч.3). Пусто, если подкласс не выбран или пресет не активирован.
+    2026-10-21: сюда же - боевая часть баффа от еды (урон, защита, здоровье),
+    так она попадает во все бои, что строятся от пресета."""
+    from services import cooking_service
+
+    food = cooking_service.combat_modifiers(character)
     if subclass_service.buff_pool(character) is None:
-        return {}
+        return dict(food)
     active = await get_active_preset(db, character.id)
     if active is None:
-        return {}
+        return dict(food)
     from game.content_loader import load_content
 
-    return resolve_buff_modifiers(active.buff_ids, load_content().buffs)
+    merged = resolve_buff_modifiers(active.buff_ids, load_content().buffs)
+    for key, value in food.items():
+        merged[key] = merged.get(key, 0.0) + value
+    return merged
 
 
 async def switch_active_preset(

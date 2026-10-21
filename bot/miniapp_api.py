@@ -138,6 +138,7 @@ def _character_payload(
         # Травничество (2026-10-21): с потолком, в отличие от рыбалки и руды.
         "herbalism": herbalism_payload(character),
         "alchemy": alchemy_payload(character),
+        "cooking": cooking_payload(character),
         "mobs_killed": character.mobs_killed,
         # Патч 32, баг 1: экипировка нужна фронтенду ОТДЕЛЬНО от derived — живой
         # предпросмотр (miniapp/src/formulas.js) пересчитывает derived сам при
@@ -723,6 +724,11 @@ async def _full_inventory(session, character_id: int) -> dict:
     from services import herb_service
 
     payload["herbs"] = _herb_payload(await herb_service.get_bag(session, character_id))
+    from services import cooking_service
+
+    payload["food"] = _food_payload(await cooking_service.get_food(session, character_id))
+    if character is not None:
+        payload["food_buff"] = food_buff_payload(character)
     return payload
 
 
@@ -773,11 +779,91 @@ def herbalism_payload(character) -> dict:
         "max_level": hc.MAX_LEVEL,
         "double_pct": round(herbalism.double_chance(character.herbalism_level) * 100),
         "catalog": [
-            {"id": h.id, "name": h.name, "emoji": h.emoji, "level": herbalism.required_level(h),
+            {"id": h.id, "name": h.name, "emoji": h.emoji, "icon": f"herb:{h.id}", "level": herbalism.required_level(h),
              "known": herbalism.can_see(character.herbalism_level, h)}
             for h in herbalism.herb_defs_ordered()
         ],
     }
+
+
+def _food_payload(food) -> list[dict]:
+    """Еда (2026-10-21): стак по блюду и градации рыбы - от неё сила."""
+    from game.economy import cooking, fishing
+
+    return [
+        {
+            "id": f"{dish.dish_id}:{grade}", "dish": dish.dish_id, "grade": grade, "name": d.name,
+            "emoji": d.emoji, "icon": f"dish:{dish.dish_id}", "count": count, "description": d.description,
+            "grade_title": fishing.grade_name(grade), "effect": cooking.buff_text(dish, grade),
+        }
+        for d, dish, grade, count in food
+    ]
+
+
+def food_buff_payload(character) -> dict | None:
+    from game.economy import cooking
+    from services import cooking_service
+
+    found = cooking_service.active(character)
+    if found is None:
+        return None
+    dish, grade = found
+    d = cooking.dish_def(dish.dish_id)
+    return {"name": d.name, "emoji": d.emoji, "effect": cooking.buff_text(dish, grade),
+            "minutes_left": cooking_service.minutes_left(character)}
+
+
+def cooking_payload(character) -> dict:
+    """Кулинария (2026-10-21): уровень и рецепты. Готовят в чате, в доме."""
+    from game.economy import cooking, herbalism
+    from game.economy import cooking_config as cc
+
+    level = character.cooking_level
+    recipes = []
+    for dish in cc.DISHES:
+        d = cooking.dish_def(dish.dish_id)
+        needs = [f"рыба {dish.fish_tier}-го тира"]
+        if dish.herb:
+            needs.append(herbalism.herb_def(dish.herb).name)
+        needs.append(f"{dish.gold} зол.")
+        recipes.append({
+            "id": dish.dish_id, "name": d.name, "emoji": d.emoji, "icon": f"dish:{dish.dish_id}", "level": dish.level,
+            "known": dish.level <= level, "out": None,
+            "needs": f"{', '.join(needs)} · {cooking.buff_text(dish, 'common')}",
+        })
+    return {
+        "level": level, "xp": character.cooking_xp, "xp_to_next": cooking.xp_to_next(level),
+        "max_level": cc.MAX_LEVEL, "has_house": character.has_house,
+        "minutes": cooking.food_minutes(level), "recipes": recipes,
+    }
+
+
+async def handle_post_eat(request: web.Request) -> web.Response:
+    """Съесть порцию (2026-10-21). Только вне боя и не посреди исследования:
+    бафф ложится на следующий бой, а не меняет идущий."""
+    from bot.battle_keyboard import in_any_battle
+    from bot.handlers import world as world_handlers
+    from services import cooking_service
+
+    vk_user_id = request[VK_USER_ID_KEY]
+    async with request.app[SESSION_FACTORY_KEY]() as session:
+        character = await _load_character(session, vk_user_id)
+        if character is None:
+            return web.json_response({"error": "character_not_found"}, status=404)
+        if in_any_battle(vk_user_id) or world_handlers.is_busy(vk_user_id):
+            return web.json_response({"error": "Сейчас не до еды: сначала закончи бой или исследование."}, status=409)
+        try:
+            body = await request.json() if request.can_read_body else {}
+        except Exception:
+            body = {}
+        body = body if isinstance(body, dict) else {}
+        try:
+            await cooking_service.eat(session, character, str(body.get("dish")), str(body.get("grade")))
+        except cooking_service.CookingError as exc:
+            await session.rollback()
+            return web.json_response({"error": str(exc)}, status=409)
+        await session.commit()
+        return web.json_response(await _full_inventory(session, character.id))
 
 
 def alchemy_payload(character) -> dict:
@@ -1115,6 +1201,7 @@ def register_routes(app: web.Application) -> None:
     app.router.add_post("/api/miniapp/equip", handle_post_equip)
     app.router.add_post("/api/miniapp/unequip", handle_post_unequip)
     app.router.add_post("/api/miniapp/chest/open", handle_post_chest_open)
+    app.router.add_post("/api/miniapp/eat", handle_post_eat)
     app.router.add_get("/api/miniapp/presets", handle_get_presets)
     app.router.add_post("/api/miniapp/presets", handle_post_presets)
     app.router.add_post("/api/miniapp/presets/switch", handle_post_preset_switch)

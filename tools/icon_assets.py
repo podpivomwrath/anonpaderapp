@@ -157,6 +157,27 @@ EXTRA_FILES = {
     "elixir:scroll_healing": "свиток_лечения.png",
     "elixir:scroll_ward": "свиток_оберега.png",
     "elixir:scroll_vulnerability": "свиток_уязвимости.png",
+    # Ремесла (tools/crafts_art_prompts.md, 2026-10-21)
+    "herb:bitter_wormwood": "трава_полынь.png",
+    "herb:ash_plantain": "трава_подорожник.png",
+    "herb:salt_orache": "трава_лебеда.png",
+    "herb:rusty_thistle": "трава_чертополох.png",
+    "herb:bloodwort": "трава_кровохлебка.png",
+    "herb:grey_hemlock": "трава_болиголов.png",
+    "herb:ash_poppy": "трава_мак.png",
+    "herb:smoldering_heather": "трава_вереск.png",
+    "herb:crimson_root": "трава_корень.png",
+    "herb:stone_bloom": "трава_каменный_цвет.png",
+    "dish:wormwood_soup": "еда_уха.png",
+    "dish:baked_gudgeon": "еда_пескарь.png",
+    "dish:orache_stew": "еда_похлебка.png",
+    "dish:smoked_tench": "еда_линь.png",
+    "dish:thistle_pie": "еда_пирог.png",
+    "dish:bloodwort_eel": "еда_угорь.png",
+    "dish:sturgeon_roast": "еда_жаркое.png",
+    "dish:coal_flounder": "еда_камбала.png",
+    "dish:deep_tear_root": "еда_слеза.png",
+    "dish:monolith_feast": "еда_пир.png",
 }
 
 BG_OUT = ROOT / "miniapp" / "src" / "assets"

@@ -479,7 +479,7 @@ async def _render_city_screen(db, character, screen: str | None) -> tuple[str, s
     if screen == "tavern" and not is_foreign:
         badge = await story_service.mentor_badge_active(db, character)
         return tavern_text(region), kb.tavern_keyboard(character, badge)
-    if screen in ("house", "alchemy", "brewing") and not is_foreign and character.has_house:
+    if screen in ("house", "alchemy", "brewing", "oven", "oven_fish", "cooking") and not is_foreign and character.has_house:
         from bot.handlers import house as house_handlers  # избегаем цикла импортов
 
         inner = await house_handlers.rebuild(db, character)
@@ -1718,7 +1718,7 @@ async def _screen_keyboard(db, character) -> str | None:
     _render_city_screen."""
     if character.screen is None:
         return None
-    if character.screen in ("tavern", "market_quarter", "arena", "house", "alchemy", "brewing"):
+    if character.screen in ("tavern", "market_quarter", "arena", "house", "alchemy", "brewing", "oven", "oven_fish", "cooking"):
         result = await _render_city_screen(db, character, character.screen)
         return result[1] if result is not None else None
     if character.screen == "raid_list":

@@ -179,6 +179,13 @@ class Character(Base):
     #: Пока не кончилась - из дома не выйти (bot/activity.py::blocked_reason).
     house_work: Mapped[str | None] = mapped_column(String(64), nullable=True)
     house_work_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    # Кулинария (2026-10-21): уровень и бафф съеденного блюда (одно за раз,
+    # переживает смерть). Блюда в инвентаре - models/food.py.
+    cooking_level: Mapped[int] = mapped_column(default=1, server_default="1")
+    cooking_xp: Mapped[int] = mapped_column(BigInteger, default=0, server_default="0")
+    food_dish: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    food_grade: Mapped[str | None] = mapped_column(String(16), nullable=True)
+    food_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     # Состояние добычи. Добыча БЛОКИРУЕТ все действия, пока идёт, и живёт в
     # БД, а не в памяти: она длится минутами (до полутора часов новичку в
     # глубоком руднике), и терять её из-за деплоя нельзя.

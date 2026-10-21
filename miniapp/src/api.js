@@ -166,6 +166,10 @@ export function unequipItem(itemId) {
 
 // Открыть самый старый ларец из сумки. Исход решает сервер, рулетка его
 // только показывает: ответ несёт ленту карточек и место выигрыша.
+export function eatFood(dish, grade) {
+  return request('/eat', { method: 'POST', body: JSON.stringify({ dish, grade }) });
+}
+
 export function openChest(kind = 'ashen') {
   return request('/chest/open', { method: 'POST', body: JSON.stringify({ kind }) });
 }

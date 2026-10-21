@@ -11,7 +11,8 @@ from vkbottle import Keyboard, KeyboardButtonColor, Text
 from vkbottle.bot import BotLabeler, Message
 
 from bot.battle_keyboard import in_any_battle
-from services import death_service, herb_service, movement_service
+from bot import dailies_texts
+from services import daily_service, death_service, herb_service, movement_service
 from services import onboarding_service as onboarding_svc
 from services.db import get_session_factory
 
@@ -83,5 +84,9 @@ async def pick_herb(message: Message) -> None:
             await message.answer(REFUSALS["elsewhere"])
             return
         result = await herb_service.pick(db, character, patch_id, _rng)
+        progress = await daily_service.record_craft(db, character, "herb_pick") if result.status == "ok" else None
         await db.commit()
     await message.answer(picked_text(result) if result.status == "ok" else REFUSALS[result.status])
+    notice = dailies_texts.progress_notice(progress) if progress is not None else None
+    if notice:
+        await message.answer(notice)

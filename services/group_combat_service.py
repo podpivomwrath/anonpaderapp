@@ -83,7 +83,9 @@ async def reward_mob_kill(
     for character in alive_members:
         share = base_total * (character.level / total_levels)
         mult = experience_service.mob_xp_level_diff_multiplier(mob_level, character.level)
-        xp_amount = round(share * mult)
+        from services import cooking_service
+
+        xp_amount = round(share * mult * cooking_service.xp_mult(character))  # еда (2026-10-21)
         stats = await db.scalar(
             select(CharacterStats).where(CharacterStats.character_id == character.id)
         )

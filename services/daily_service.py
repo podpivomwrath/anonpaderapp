@@ -63,7 +63,11 @@ def quest_def(quest_id: str) -> DailyQuestDef | None:
 
 def _eligible_pool(character: Character) -> list[DailyQuestDef]:
     _load()
-    return [q for q in _defs_by_id.values() if character.level >= q.min_level]
+    # Варка и готовка (2026-10-21) - только тем, у кого есть дом.
+    return [
+        q for q in _defs_by_id.values()
+        if character.level >= q.min_level and (not q.params.get("needs_house") or getattr(character, "has_house", False))
+    ]
 
 
 def today_msk(now: datetime | None = None) -> date:
@@ -245,6 +249,8 @@ def _row_target(row: CharacterDaily, qdef: DailyQuestDef, character: Character) 
         return row.target
     if row.completed and row.progress:
         return row.progress
+    if qdef.params.get("fixed"):
+        return qdef.base_target  # ремесла: трав на карте мало, от уровня не растёт
     return dc.scaled_target(qdef.base_target, character.level)
 
 
@@ -451,6 +457,18 @@ async def record_sell_gold(db: AsyncSession, character: Character, gold: int) ->
                 completions.append(completion)
     result = await _finish(db, character, completions)
     return await _with_guild(db, character, "sell_gold", gold, result)
+
+
+async def record_craft(db: AsyncSession, character: Character, condition_type: str) -> DailyProgressResult:
+    """Ремесла (2026-10-21): herb_pick | brew | cook - по одному за действие."""
+    completions = []
+    for row in await _active_dailies(db, character):
+        qdef = quest_def(row.quest_id)
+        if qdef is not None and qdef.condition_type == condition_type:
+            completion = await _apply_delta(db, character, row, 1)
+            if completion:
+                completions.append(completion)
+    return await _finish(db, character, completions)
 
 
 async def record_pvp_win(db: AsyncSession, character: Character) -> DailyProgressResult:

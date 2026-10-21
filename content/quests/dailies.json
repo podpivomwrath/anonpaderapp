@@ -75,5 +75,8 @@
     "progress_label": "Выжить в боях, опустившись ниже 25% здоровья",
     "condition_type": "low_hp_survive",
     "base_target": 3
-  }
+  },
+  {"id": "herbalist", "title": "Травник", "progress_label": "Собрать траву", "condition_type": "herb_pick", "base_target": 2, "params": {"fixed": true}},
+  {"id": "brewer", "title": "Варщик", "progress_label": "Сварить зелья на алхимическом столе", "condition_type": "brew", "base_target": 2, "params": {"fixed": true, "needs_house": true}},
+  {"id": "home_cook", "title": "Повар", "progress_label": "Приготовить блюда в печи", "condition_type": "cook", "base_target": 2, "params": {"fixed": true, "needs_house": true}}
 ]

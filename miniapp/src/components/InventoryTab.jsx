@@ -3,7 +3,8 @@ import bridge from '@vkontakte/vk-bridge';
 import {
   Button, Div, Group, Header, Placeholder, SimpleCell, Spinner, Text,
 } from '@vkontakte/vkui';
-import { IN_VK, equipItem, getCharacter, getInventory, openChest, unequipItem } from '../api.js';
+import { IN_VK, eatFood, equipItem, getCharacter, getInventory, openChest, unequipItem } from '../api.js';
+import { itemIcon } from '../itemIcons.js';
 import ChestRoulette from './ChestRoulette.jsx';
 import ItemIcon from './ItemIcon.jsx';
 
@@ -129,6 +130,13 @@ function detailRows(entry) {
       ['В сумке', `×${data.count}`],
     ];
   }
+  if (kind === 'food') {
+    return [
+      ['Рыба', data.grade_title],
+      ['Действие', data.effect],
+      ['В сумке', `×${data.count}`],
+    ];
+  }
   if (kind === 'herb') {
     return [
       ['Тир', data.tier],
@@ -154,6 +162,7 @@ export function ItemSheet({ entry, onClose, onUnequip, unequipping }) {
   const NOTES = {
     trophy: 'Цена - у скупщика в своём городе, в чужом он платит меньше. Реликвии не передаются.',
     fish: 'Цена - у Иргала в своём городе. Рыбак у воды в глубоких кольцах платит больше.',
+    food: 'Есть можно только вне боя. Действует одно блюдо: новое заменяет старое. Бафф не пропадает после смерти.',
     herb: 'Из трав варят зелья на алхимическом столе и готовят блюда в печи - для этого нужен дом.',
     ore: 'Руда идёт на ковку в мастерской и не теряется при смерти. Лишнее железо и кварц дёшево берёт Иргал.',
   };
@@ -259,6 +268,9 @@ export default function InventoryTab({ onCharacterUpdate }) {
   const [detail, setDetail] = useState(null);      // {kind, data}
   const [qtyEntry, setQtyEntry] = useState(null);  // расходник, для которого выбираем количество
   const [chests, setChests] = useState([]);
+  const [food, setFood] = useState([]);
+  const [foodBuff, setFoodBuff] = useState(null);
+  const [eating, setEating] = useState(null);
   const [opening, setOpening] = useState(false);
   const [roulette, setRoulette] = useState(null);  // ответ сервера на открытие ларца
 
@@ -267,6 +279,22 @@ export default function InventoryTab({ onCharacterUpdate }) {
     setTrophies(res.trophies || []);
     setConsumables(res.consumables || []);
     setChests(res.chests || []);
+    setFood(res.food || []);
+    setFoodBuff(res.food_buff || null);
+  }
+
+  // Еда (2026-10-21): только вне боя - сервер откажет, если бой идёт.
+  async function handleEat(entry) {
+    if (eating) return;
+    setEating(entry.id);
+    setErrorMsg(null);
+    try {
+      apply(await eatFood(entry.dish, entry.grade));
+    } catch (err) {
+      setErrorMsg(err?.message?.includes(' ') ? err.message : 'Не удалось поесть.');
+    } finally {
+      setEating(null);
+    }
   }
 
   async function handleOpenChest(kind) {
@@ -361,7 +389,8 @@ export default function InventoryTab({ onCharacterUpdate }) {
   }
 
   // Рыба и руда (2026-10-21) - во вкладке «Персонаж → Ремёсла», здесь их нет.
-  if (items.length === 0 && trophies.length === 0 && consumables.length === 0 && chests.length === 0) {
+  if (items.length === 0 && trophies.length === 0 && consumables.length === 0 && chests.length === 0
+    && food.length === 0 && !foodBuff) {
     return <Placeholder icon={<div style={{ fontSize: 48 }}>🎒</div>}>Твоя сумка пока пуста.</Placeholder>;
   }
 
@@ -383,9 +412,10 @@ export default function InventoryTab({ onCharacterUpdate }) {
       { key: 'chests', kind: 'chest', title: 'Редкости', rows: chests },
       { key: 'trophies', kind: 'trophy', title: 'Реликвии', rows: trophies },
       { key: 'consumables', kind: 'consumable', title: 'Расходники', rows: consumables },
+      { key: 'food', kind: 'food', title: 'Еда', rows: food },
     ])
     .filter((group) => group.rows.length > 0);
-  const bagCount = spare.length + trophies.length + consumables.length + chests.length;
+  const bagCount = spare.length + trophies.length + consumables.length + chests.length + food.length;
 
   const craftButton = (item) => item.craftable && (
     <Button
@@ -429,7 +459,9 @@ export default function InventoryTab({ onCharacterUpdate }) {
     before: (
       <button type="button" className="item-open" onClick={() => setDetail({ kind, data })}
         aria-label={`Подробнее: ${data.name}`}>
-        <ItemIcon icon={data.icon} rarity={data.rarity} alt={data.name} />
+        {itemIcon(data.icon || '') || !data.emoji
+          ? <ItemIcon icon={data.icon} rarity={data.rarity} alt={data.name} />
+          : <span className="craft-emoji-icon" aria-hidden="true">{data.emoji}</span>}
       </button>
     ),
     name: (
@@ -484,8 +516,16 @@ export default function InventoryTab({ onCharacterUpdate }) {
     let subtitle = `${entry.category_title} · ×${entry.count}`;
     if (kind === 'trophy') subtitle = [entry.rarity_title, `×${entry.count}`].filter(Boolean).join(' · ');
     if (kind === 'chest') subtitle = `×${entry.count}`;
+    if (kind === 'food') subtitle = `${entry.grade_title} · ×${entry.count} · ${entry.effect}`;
     let after = null;
     if (kind === 'consumable') after = <div className="inventory-actions">{quantityButton(entry)}</div>;
+    if (kind === 'food') {
+      after = (
+        <Button mode="primary" size="s" loading={eating === entry.id} onClick={() => handleEat(entry)}>
+          Съесть
+        </Button>
+      );
+    }
     if (kind === 'chest') {
       after = (
         <Button mode="primary" size="s" loading={opening} onClick={() => handleOpenChest(entry.kind)}>
@@ -510,6 +550,14 @@ export default function InventoryTab({ onCharacterUpdate }) {
     <>
       {errorMsg && (
         <Div><Text style={{ color: '#c81e3a' }}>{errorMsg}</Text></Div>
+      )}
+
+      {foodBuff && (
+        <Group header={<Header>Сытость</Header>}>
+          <Div>
+            {foodBuff.emoji} {foodBuff.name}: {foodBuff.effect}. Еще {foodBuff.minutes_left} мин.
+          </Div>
+        </Group>
       )}
 
       <Group header={<Header>Надето</Header>}>

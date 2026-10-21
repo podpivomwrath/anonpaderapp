@@ -19,11 +19,16 @@ def heal_in_city(character: Character) -> None:
 
 
 def max_hp(character: Character, stats: CharacterStats, vit_bonus: int = 0) -> int:
+    from services import cooking_service
+
     tier = formulas.tier_for_level(character.level)
-    return round(
+    base = round(
         formulas.hp(character.level, stats.vitality + vit_bonus, formulas.tier_multiplier(tier))
         * formulas.class_hp_mult(getattr(character, "base_class", None), getattr(character, "subclass", None))
     )
+    # Еда (2026-10-21): та же доля, что в бою (session.build_combatant).
+    mult = cooking_service.hp_mult(character) if hasattr(character, "food_dish") else 1.0
+    return round(base * mult) if mult != 1.0 else base
 
 
 def current_hp(character: Character, stats: CharacterStats, vit_bonus: int = 0) -> int:
