@@ -145,7 +145,8 @@ def tavern_keyboard(character=None, mentor_badge: bool = False) -> str:
     items: list[tuple[str, KeyboardButtonColor, dict | None]] = [
         # 2026-10-21: Наставник переехал сюда с площади.
         (BTN_MENTOR_BADGE if mentor_badge else BTN_MENTOR, KeyboardButtonColor.PRIMARY, None),
-        (BTN_REST, KeyboardButtonColor.SECONDARY, None),
+        # «Отдых» убран (2026-10-21): в городе здоровье восстанавливается само,
+        # а седьмая кнопка уводила «← Площадь» за край экрана.
         (BTN_STATS, KeyboardButtonColor.SECONDARY, None),
         (BTN_DAILIES, KeyboardButtonColor.SECONDARY, None),
     ]

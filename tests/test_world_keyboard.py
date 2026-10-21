@@ -99,7 +99,8 @@ def test_square_rows_bounded() -> None:
 def test_tavern_shows_personal_menus_and_back_last() -> None:
     kb_json = tavern_keyboard(FakeCharacter())
     labels = _labels(kb_json)
-    assert {BTN_MENTOR, BTN_REST, BTN_STATS, BTN_DAILIES, BTN_KEEPER, BTN_PRESETS, BTN_SQUARE_BACK}.issubset(labels)
+    assert {BTN_MENTOR, BTN_STATS, BTN_DAILIES, BTN_KEEPER, BTN_PRESETS, BTN_SQUARE_BACK}.issubset(labels)
+    assert BTN_REST not in labels  # в городе здоровье и так полное
     assert BTN_MENTOR_BADGE in _labels(tavern_keyboard(FakeCharacter(), mentor_badge=True))
     rows = _rows(kb_json)
     assert rows[-1][-1]["action"]["label"] == BTN_SQUARE_BACK
@@ -130,7 +131,7 @@ def test_tavern_none_character_still_works() -> None:
     labels = _labels(tavern_keyboard(None))
     assert BTN_KEEPER not in labels
     assert BTN_PRESETS not in labels
-    assert BTN_REST in labels
+    assert BTN_DAILIES in labels
 
 
 # --- Торговый квартал ---
@@ -166,3 +167,23 @@ def test_square_home_city_shows_its_voyage_only() -> None:
     assert VOYAGE_BUTTONS["docks"] in _labels(city_square_keyboard(home, is_foreign=False))
     assert VOYAGE_BUTTONS["docks"] not in _labels(city_square_keyboard(home, is_foreign=True))
     assert len(_rows(city_square_keyboard(home, has_mount=True, is_foreign=False))) <= 6
+
+
+def test_city_and_house_keyboards_fit_phone_without_scroll(monkeypatch) -> None:
+    """2026-10-21 (скрин владельца): на телефоне видно ~5 рядов, остальное
+    листается - «← Площадь» уезжала за край. Ряды считаем вместе с кнопкой
+    мини-аппа: в бою она есть."""
+    from bot.handlers import house as house_handlers
+    from game.economy import alchemy_config, cooking_config
+
+    monkeypatch.setattr(world_kb, "get_settings", lambda: Settings(_env_file=None, vk_miniapp_url="https://vk.com/app1"))
+    full = FakeCharacter(level=60, subclass="guardian", has_house=True)
+    screens = {
+        "площадь": city_square_keyboard(full, has_mount=True),
+        "таверна": tavern_keyboard(full),
+        "дом": world_kb.house_keyboard(),
+        "стол": house_handlers.alchemy_keyboard(alchemy_config.MAX_LEVEL),
+        "печь": house_handlers.oven_keyboard(cooking_config.MAX_LEVEL),
+    }
+    for name, raw in screens.items():
+        assert len(_rows(raw)) <= 5, f"{name}: {len(_rows(raw))} рядов"

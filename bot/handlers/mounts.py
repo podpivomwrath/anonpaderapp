@@ -613,8 +613,12 @@ async def send_cell_screen(peer_id: int, header: str) -> None:
             is_foreign = region != character.region
             mentor_badge = not is_foreign and await story_service.mentor_badge_active(db, character)
             await db.commit()
+            from bot.world_summary import status_block
+
+            status = status_block(character, stats, wallet.farm_currency, wallet.donate_currency,
+                                  gear_bonus.get("vit", 0))
             await _bot_api.messages.send(
-                peer_id=peer_id, message=f"{header}\n\n{REGION_TITLES[region]}", random_id=0,
+                peer_id=peer_id, message=f"{header}\n\n{REGION_TITLES[region]}\n\n{status}", random_id=0,
                 attachment=hub_attachment(region),
                 keyboard=kb.city_square_keyboard(character, mentor_badge, has_mount=has_mount, is_foreign=is_foreign),
             )
@@ -806,6 +810,10 @@ async def scan() -> None:
                 foreign_city_entry_text(REGION_TITLES[region]) if is_foreign
                 else f"🐎 Ты прибываешь к воротам: {REGION_TITLES[region]}"
             )
+            from bot.world_summary import status_block
+
+            text += "\n\n" + status_block(character, stats, farm_currency, donate_currency,
+                                            (gear_bonus or {}).get("vit", 0))
             await _bot_api.messages.send(
                 peer_id=peer_id,
                 message=text,

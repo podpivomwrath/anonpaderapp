@@ -19,7 +19,6 @@ from vkbottle.bot import BotLabeler, Message
 
 from bot.keyboards import world as kb
 from bot.vk_media import photo_attachment
-from bot.keyboards.layout import add_paired
 from bot.keyboards.world import add_miniapp_button
 from bot.world_texts import FOREIGN_NPC_REJECTION
 from game.combat import display
@@ -66,32 +65,47 @@ def house_text() -> str:
 # --- Клавиатуры ---------------------------------------------------------------
 
 
-def _with_back(kb_: Keyboard, label: str, payload: dict) -> str:
-    add_miniapp_button(kb_)
-    kb_.row()
+#: Короткие подписи для кнопок стола и печи (2026-10-21): 10 рецептов по 3 в
+#: ряд - 4 ряда, и «← Дом» виден без прокрутки. Полные названия - в тексте.
+SHORT = {
+    "heal_small": "🧪 Малое", "heal_medium": "🧪 Среднее", "heal_large": "🧪 Большое",
+    "ashen_fever": "🔥 Лихорадка", "blood_for_blood": "🩸 Кровь", "ashen_haze": "🌫️ Морок",
+    "shard_blood": "⚡ Осколки", "blood_clarity": "🧿 Ясность", "second_heart": "🛡️ Сердце",
+    "last_breath": "💀 Вздох",
+    "wormwood_soup": "🍲 Уха", "baked_gudgeon": "🐟 Пескарь", "orache_stew": "🥣 Похлебка",
+    "smoked_tench": "🐠 Линь", "thistle_pie": "🥧 Пирог", "bloodwort_eel": "🍢 Угорь",
+    "sturgeon_roast": "🍖 Жаркое", "coal_flounder": "🔥 Камбала", "deep_tear_root": "🍱 Слеза",
+    "monolith_feast": "🍽 Пир",
+}
+
+
+def _rows_of_three(kb_: Keyboard, items: list[tuple[str, dict]]) -> None:
+    for i, (label, payload) in enumerate(items):
+        kb_.add(Text(label, payload=payload), color=KeyboardButtonColor.SECONDARY)
+        if i % 3 == 2:
+            kb_.row()
+    if len(items) % 3:
+        kb_.row()
+
+
+def _with_back(kb_: Keyboard, label: str, payload: dict, miniapp: bool = True) -> str:
+    if miniapp:
+        add_miniapp_button(kb_)
+        kb_.row()
     kb_.add(Text(label, payload=payload), color=KeyboardButtonColor.SECONDARY)
     return kb_.get_json()
 
 
 def alchemy_keyboard(level: int) -> str:
     kb_ = Keyboard(one_time=False)
-    items = []
-    for recipe in alchemy.known(level):
-        d = elixir_service.elixir_def(recipe.elixir_id)
-        if d is not None:
-            items.append((f"{d.emoji} {d.name}", KeyboardButtonColor.SECONDARY, {"type": "brew", "id": recipe.elixir_id}))
-    add_paired(kb_, items)
-    return _with_back(kb_, BTN_HOUSE_BACK, {"type": "house_back"})
+    _rows_of_three(kb_, [(SHORT[r.elixir_id], {"type": "brew", "id": r.elixir_id}) for r in alchemy.known(level)])
+    return _with_back(kb_, BTN_HOUSE_BACK, {"type": "house_back"}, miniapp=False)
 
 
 def oven_keyboard(level: int) -> str:
     kb_ = Keyboard(one_time=False)
-    items = []
-    for dish in cooking.known(level):
-        d = cooking.dish_def(dish.dish_id)
-        items.append((f"{d.emoji} {d.name}", KeyboardButtonColor.SECONDARY, {"type": "cook", "id": dish.dish_id}))
-    add_paired(kb_, items)
-    return _with_back(kb_, BTN_HOUSE_BACK, {"type": "house_back"})
+    _rows_of_three(kb_, [(SHORT[d.dish_id], {"type": "cook", "id": d.dish_id}) for d in cooking.known(level)])
+    return _with_back(kb_, BTN_HOUSE_BACK, {"type": "house_back"}, miniapp=False)
 
 
 def fish_keyboard(dish: cc.Dish, options: list) -> str:
@@ -106,7 +120,7 @@ def fish_keyboard(dish: cc.Dish, options: list) -> str:
             kb_.row()
     if min(len(options), FISH_CHOICES) % 2 == 1:
         kb_.row()
-    return _with_back(kb_, BTN_OVEN_BACK, {"type": "oven"})
+    return _with_back(kb_, BTN_OVEN_BACK, {"type": "oven"}, miniapp=False)
 
 
 def work_keyboard(character: Character | None = None) -> str:

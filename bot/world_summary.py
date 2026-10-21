@@ -51,6 +51,24 @@ def wallet_line(farm_currency: int, donate_currency: int) -> str:
     return f"💰 Золото: {farm_currency} · 💎 Самоцветы: {donate_currency}"
 
 
+def status_lines(character, stats, farm_currency: int, donate_currency: int = 0, vit_bonus: int = 0) -> str:
+    """Здоровье, уровень, опыт, кошелёк - общий блок сводки клетки и площади
+    города (2026-10-21: в городе статуса не было вовсе)."""
+    max_hp = vitals_service.max_hp(character, stats, vit_bonus)
+    current_hp = vitals_service.current_hp(character, stats, vit_bonus)
+    return (
+        f"❤️ Здоровье: {display.health_bar(current_hp, max_hp)}\n"
+        f"⚔️ Уровень: {character.level}\n"
+        f"{xp_bar(character.level, character.experience)}\n"
+        f"{wallet_line(farm_currency, donate_currency)}"
+    )
+
+
+def status_block(character, stats, farm_currency: int, donate_currency: int = 0, vit_bonus: int = 0) -> str:
+    """Статус между разделителями - под текстом площади города."""
+    return f"{_SEP}\n{status_lines(character, stats, farm_currency, donate_currency, vit_bonus)}\n{_SEP}"
+
+
 def location_summary(
     character, stats, rng: random.Random, farm_currency: int, vit_bonus: int = 0,
     quest_line: str | None = None, donate_currency: int = 0, group_block: str | None = None,
@@ -74,9 +92,6 @@ def location_summary(
     lo, hi = wc.cell_level_range(grid.monolith_distance(x, y))
     zone_line = f"📍 ({x}; {y}) - {loc_type.name} · мобы {lo}-{hi} ур."
     description = rng.choice(loc_type.descriptions)
-    max_hp = vitals_service.max_hp(character, stats, vit_bonus)
-    current_hp = vitals_service.current_hp(character, stats, vit_bonus)
-    hp_line = f"❤️ Здоровье: {display.health_bar(current_hp, max_hp)}"
     quest_block = f"{quest_line}\n" if quest_line else ""
     key_block = (
         f"{raid_key_texts.raid_key_inventory_line(character.raid_keys)}\n"
@@ -123,10 +138,7 @@ def location_summary(
     return (
         f"{zone_line}\n{description}\n\n"
         f"{_SEP}\n"
-        f"{hp_line}\n"
-        f"⚔️ Уровень: {character.level}\n"
-        f"{xp_bar(character.level, character.experience)}\n"
-        f"{wallet_line(farm_currency, donate_currency)}\n"
+        f"{status_lines(character, stats, farm_currency, donate_currency, vit_bonus)}\n"
         f"{key_block}"
         f"{monolith_block}"
         f"{lake_block}"

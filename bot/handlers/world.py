@@ -495,7 +495,18 @@ async def _render_city_screen(db, character, screen: str | None) -> tuple[str, s
     has_mount = await mount_service.has_any_mount(db, character.id)
     mentor_badge = not is_foreign and await story_service.mentor_badge_active(db, character)
     text = foreign_city_entry_text(REGION_TITLES[region]) if is_foreign else city_square_text(region)
+    text += "\n\n" + await city_status(db, character)
     return text, kb.city_square_keyboard(character, mentor_badge, has_mount=has_mount, is_foreign=is_foreign)
+
+
+async def city_status(db, character) -> str:
+    """Статус игрока под текстом площади (2026-10-21, просьба владельца)."""
+    from bot.world_summary import status_block
+
+    stats = await _get_stats(db, character.id)
+    wallet = await wallet_service.get_wallet(db, character.id)
+    vit = (await item_service.compute_gear_bonus(db, character.id)).get("vit", 0)
+    return status_block(character, stats, wallet.farm_currency, wallet.donate_currency, vit)
 
 
 async def _announce_daily(peer_id: int, progress) -> None:
