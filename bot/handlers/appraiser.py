@@ -28,6 +28,7 @@ from bot.keyboards.appraiser import (
     GEAR_DETAIL_PAGE_SIZE,
     SELL_ALL_ID,
     appraiser_fish_keyboard,
+    appraiser_ore_keyboard,
     appraiser_root_keyboard,
     appraiser_trophies_keyboard,
     sell_confirm_keyboard,
@@ -40,8 +41,10 @@ from game.combat import balance_config as bc
 from game.world import grid
 from game.economy import fishing as game_fishing
 from game.economy import fishing_config as fc
+from game.economy import mining
+from game.economy import mining_config as mc
 from services import guild_service
-from services import daily_service, fishing_service, item_service, screen_service
+from services import daily_service, fishing_service, item_service, mining_service, screen_service
 from services import onboarding_service as onboarding_svc
 from services import faction_service
 from services import trophy_service
@@ -462,6 +465,8 @@ async def rebuild(db, character) -> tuple[str, str] | None:
         return await _render_gear_main(db, character, mult)
     if character.screen == "appraiser_gear_detail":
         return await _render_gear_detail(db, character, mult, page=1)
+    if character.screen == "appraiser_ore":
+        return await _render_ore(db, character, mult)
     return None
 
 
@@ -539,3 +544,78 @@ async def sell_fish(message: Message) -> None:
     notice = dailies_texts.progress_notice(daily_progress)
     if notice:
         await _bot_api.messages.send(peer_id=peer_id, message=notice, random_id=0)
+
+
+# --- Руда (2026-10-21) ---------------------------------------------------------
+# Иргал берёт только мелкую руду (mc.APPRAISER_ORE_IDS) и дёшево: это сброс
+# излишков, а не заработок. Наценка чужого города - как у трофеев; процветание,
+# клеймо и перк гильдии «за реликвии» к руде не относятся.
+
+async def _render_ore(db, character, mult: float, prefix: str = "") -> tuple[str, str]:
+    stacks = await mining_service.sellable_ore(db, character.id)
+    by_ore: dict[str, tuple] = {}
+    best_count, best_gold = 0, 0.0
+    lines = []
+    for definition, grade_id, count in stacks:
+        price = mining_service.ore_sell_price(definition.id, grade_id) * mult
+        emoji = mc.GRADE_EMOJI.get(grade_id, "")
+        mark = f"{emoji} " if emoji else ""
+        lines.append(
+            f"{mark}{definition.emoji} {definition.name} ({mining.grade_name(grade_id)})"
+            f" ×{count} - {round(price * count)} зол."
+        )
+        if grade_id == "common":
+            by_ore[definition.id] = (definition.id, definition.emoji, count, round(price * count))
+        else:
+            best_count += count
+            best_gold += price * count
+    if not lines:
+        text = "- Железо и кварц возьму, остальное оставь себе. А у тебя ни того, ни другого."
+    else:
+        text = "- Железо и кварц беру, дорого не дам. Остальная руда мне не нужна.\n\n" + "\n".join(lines)
+    if prefix:
+        text = f"{prefix}\n\n{text}"
+    return text, appraiser_ore_keyboard(list(by_ore.values()), (best_count, round(best_gold)))
+
+
+@labeler.message(payload_contains={"type": "appraiser_ore"})
+async def appraiser_ore(message: Message) -> None:
+    peer_id = message.peer_id
+    async with get_session_factory()() as db:
+        character = await onboarding_svc.get_character(db, message.from_id)
+        if character is None or character.creation_state is not None:
+            return
+        mult = _price_multiplier(character, grid.city_region_at(character.pos_x, character.pos_y))
+        await screen_service.set_screen(db, character, "appraiser_ore")
+        await db.commit()
+        text, kb = await _render_ore(db, character, mult)
+    await editable_message.send_or_edit(_bot_api, _NS, peer_id, text, kb, attachment=appraiser_attachment())
+
+
+@labeler.message(payload_contains={"type": "sell_ore"})
+async def sell_ore(message: Message) -> None:
+    peer_id = message.peer_id
+    payload = message.get_payload_json() or {}
+    ore_id = payload.get("ore")
+    best = bool(payload.get("best"))
+    if not best and ore_id not in mc.APPRAISER_ORE_IDS:
+        return
+    async with get_session_factory()() as db:
+        character = await onboarding_svc.get_character(db, message.from_id)
+        if character is None or character.creation_state is not None:
+            return
+        region = grid.city_region_at(character.pos_x, character.pos_y)
+        if region is None:
+            return  # скупщик только в городе
+        mult = _price_multiplier(character, region)
+        gold, _pieces = await mining_service.sell_ore(db, character.id, ore_id, best, mult)
+        daily_progress = await daily_service.record_sell_gold(db, character, gold)
+        total = (await wallet_service.get_wallet(db, character.id)).farm_currency
+        await db.commit()
+        sold = appraiser_sold(gold, total, guild_service.after_tax(character, gold)) if gold > 0 else ""
+        text, kb = await _render_ore(db, character, mult, prefix=sold)
+    await editable_message.send_or_edit(_bot_api, _NS, peer_id, text, kb, attachment=appraiser_attachment())
+    if gold > 0:
+        notice = dailies_texts.progress_notice(daily_progress)
+        if notice:
+            await _bot_api.messages.send(peer_id=peer_id, message=notice, random_id=0)

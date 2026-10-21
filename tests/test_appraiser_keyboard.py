@@ -57,6 +57,7 @@ def test_appraiser_root_keyboard_has_all_sections_and_back_last() -> None:
     payload_types = [b["action"]["payload"]["type"] for b in buttons if "payload" in b["action"]]
     assert payload_types == [
         "appraiser_trophies", "appraiser_gear", "appraiser_fish",  # патч 58: + рыба
+        "appraiser_ore",  # 2026-10-21: + руда
         "appraiser_back",
     ]
     assert _last_button(kb_json)["action"]["payload"]["type"] == "appraiser_back"

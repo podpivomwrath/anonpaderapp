@@ -28,6 +28,7 @@ BTN_TROPHIES = "🧿 Трофеи"  # патч 41: было "Продать тр
 BTN_SELL_GEAR = "🗡 Снаряжение"  # патч 41: было "Продать снаряжение"
 BTN_GEAR_DETAIL = "📋 По предметам"
 BTN_FISH = "🐟 Рыба"  # патч 58
+BTN_ORE = "⛏ Руда"  # 2026-10-21
 BTN_BACK = "← Назад"
 
 # Патч 35: 6 предметов на страницу подробного режима — вместе со служебными
@@ -53,6 +54,7 @@ def appraiser_root_keyboard() -> str:
         # пепла, а не рыбник), зато берёт ВСЕГДА и в любом городе: это
         # гарантированный пол цены против случайного ивента с рыбаком.
         (BTN_FISH, KeyboardButtonColor.SECONDARY, {"type": "appraiser_fish"}),
+        (BTN_ORE, KeyboardButtonColor.SECONDARY, {"type": "appraiser_ore"}),
     ])
     add_miniapp_button(kb)
     kb.row()
@@ -142,6 +144,26 @@ def sell_confirm_keyboard(confirm_payload: dict) -> str:
     kb.row()
     kb.add(Text("Отмена", payload={"type": "appraiser_gear"}), color=KeyboardButtonColor.NEGATIVE)
     add_miniapp_button(kb)
+    return kb.get_json()
+
+
+def appraiser_ore_keyboard(by_ore: list[tuple[str, str, int, int]], best: tuple[int, int]) -> str:
+    """Руда (2026-10-21): кнопка на вид - только обычная градация; лучшие
+    градации - одной отдельной кнопкой, чтобы не сдать их заодно с обычной
+    (от градации зависит крафт). by_ore: (id, эмодзи, кусков, золото)."""
+    kb = Keyboard(one_time=False)
+    items = [
+        (f"Продать {emoji} ×{count} - {gold} зол.", KeyboardButtonColor.POSITIVE,
+         {"type": "sell_ore", "ore": ore_id})
+        for ore_id, emoji, count, gold in by_ore
+    ]
+    if best[0]:
+        items.append((f"Лучшие градации ×{best[0]} - {best[1]} зол.", KeyboardButtonColor.SECONDARY,
+                      {"type": "sell_ore", "best": 1}))
+    add_paired(kb, items)
+    add_miniapp_button(kb)
+    kb.row()
+    kb.add(Text(BTN_BACK, payload={"type": "appraiser_root"}), color=KeyboardButtonColor.SECONDARY)
     return kb.get_json()
 
 

@@ -367,6 +367,43 @@ async def get_ore(db: AsyncSession, character_id: int) -> list[tuple[OreDef, str
     return result
 
 
+def ore_sell_price(ore_id: str, grade_id: str) -> float:
+    return mc.ORE_SELL_PRICE.get(ore_id, 0) * mc.ORE_SELL_GRADE_MULT.get(grade_id, 1.0)
+
+
+async def sellable_ore(db: AsyncSession, character_id: int) -> list[tuple[OreDef, str, int]]:
+    """Стаки, которые берёт Иргал."""
+    return [x for x in await get_ore(db, character_id) if x[0].id in mc.APPRAISER_ORE_IDS]
+
+
+async def sell_ore(
+    db: AsyncSession, character_id: int, ore_id: str | None, best: bool, price_multiplier: float = 1.0
+) -> tuple[int, int]:
+    """Продать Иргалу: ore_id - обычную руду этого вида, best=True - все
+    лучшие градации скупаемых видов. (золото, кусков). Строки под FOR UPDATE:
+    два быстрых нажатия не продадут одно и то же дважды (как у трофеев)."""
+    from services import wallet_service
+
+    query = select(CharacterOre).where(
+        CharacterOre.character_id == character_id,
+        CharacterOre.count > 0,
+        CharacterOre.ore_id.in_(mc.APPRAISER_ORE_IDS),
+    )
+    if best:
+        query = query.where(CharacterOre.grade != "common")
+    else:
+        query = query.where(CharacterOre.ore_id == ore_id, CharacterOre.grade == "common")
+    rows = (await db.execute(query.with_for_update().execution_options(populate_existing=True))).scalars().all()
+    pieces = sum(r.count for r in rows)
+    gold = round(sum(ore_sell_price(r.ore_id, r.grade) * r.count for r in rows) * price_multiplier)
+    for row in rows:
+        row.count = 0
+    if gold > 0:
+        await wallet_service.deposit(db, character_id, "farm", gold)
+    await db.flush()
+    return gold, pieces
+
+
 async def total_ore(db: AsyncSession, character_id: int) -> int:
     return sum(count for _d, _g, count in await get_ore(db, character_id))
 
