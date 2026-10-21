@@ -741,3 +741,26 @@ def test_tithe_line_only_for_own_guild_and_once() -> None:
     assert guild_handlers.take_tithe_line(1) is None
     guild_handlers.remember_tithe(1, me, N(tithe_gold=40, tithe_guild_id=8))  # чужая земля
     assert guild_handlers.take_tithe_line(1) is None
+
+
+async def test_ore_journal_names_the_grade_and_receiver_hears(db_session, make_character) -> None:
+    """2026-10-21, жалоба: «выдали два эпика, а в журнале качество не видно».
+    Журнал склада пишет градацию; получателю выдачи - весть в чат."""
+    from types import SimpleNamespace
+
+    from bot.miniapp_guild_api import _note_receiver
+    from models import GuildLog
+
+    guild, leader = await _found(db_session, make_character)
+    db_session.add(CharacterOre(character_id=leader.id, ore_id="salt_quartz", grade="epic", count=3))
+    await db_session.flush()
+    await guild_service.deposit_ore(db_session, leader, "salt_quartz", "epic", 3)
+    await guild_service.withdraw_ore(db_session, leader, "salt_quartz", "epic", 2)
+    texts = (await db_session.scalars(select(GuildLog.text).where(GuildLog.guild_id == guild.id))).all()
+    assert any("(эпическая) ×3" in t for t in texts) and any("(эпическая) ×2" in t for t in texts)
+
+    notes: list = []
+    _note_receiver(notes, leader, leader, "x")
+    assert notes == []  # себе - без вести
+    _note_receiver(notes, leader, SimpleNamespace(id=leader.id + 1), "со склада гильдии: кварц")
+    assert notes == [("char", leader.id + 1, f"🏰 {leader.name} выдает тебе со склада гильдии: кварц.")]

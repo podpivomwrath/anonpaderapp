@@ -783,7 +783,7 @@ async def deposit_ore(
     from game.economy import mining
 
     ore = mining.ore_def(ore_id)
-    await log(db, guild.id, "ore", f"{character.name} сдаёт на склад: {ore.name if ore else ore_id} ×{count}.", character.id)
+    await log(db, guild.id, "ore", f"{character.name} сдаёт на склад: {ore.name if ore else ore_id} ({mining.grade_name(grade)}) ×{count}.", character.id)
 
 
 async def withdraw_ore(
@@ -809,7 +809,7 @@ async def withdraw_ore(
     from game.economy import mining
 
     ore = mining.ore_def(ore_id)
-    await log(db, guild.id, "ore", f"{actor.name} выдаёт со склада {ore.name if ore else ore_id} ×{count}: {receiver.name}.", actor.id)
+    await log(db, guild.id, "ore", f"{actor.name} выдаёт со склада {ore.name if ore else ore_id} ({mining.grade_name(grade)}) ×{count}: {receiver.name}.", actor.id)
     return receiver
 
 

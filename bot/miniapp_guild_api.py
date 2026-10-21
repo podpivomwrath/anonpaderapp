@@ -407,6 +407,13 @@ def _str(body: dict, key: str) -> str:
     return value.strip()
 
 
+def _note_receiver(notes: list, actor, receiver, what: str) -> None:
+    """Выдача из казны или со склада другому - получателю весть в чат
+    (2026-10-21): «Ник выдает тебе ...». Себе - без вести."""
+    if receiver is not None and receiver.id != actor.id:
+        notes.append(("char", receiver.id, f"🏰 {actor.name} выдает тебе {what}."))
+
+
 async def _vk_ids(db, characters: list[Character]) -> dict[int, int]:
     """user_id -> vk_id для ссылок на страницы игроков."""
     from sqlalchemy import select
@@ -462,20 +469,31 @@ async def _act(db, character: Character, vk_user_id: int, body: dict) -> list:
         await guild_service.deposit(db, character, _str(body, "currency"), _int(body, "amount"))
     elif action == "withdraw":
         to = body.get("to")
-        await guild_service.withdraw(
-            db, character, _str(body, "currency"), _int(body, "amount"), to if isinstance(to, int) else None,
-        )
+        currency, amount = _str(body, "currency"), _int(body, "amount")
+        receiver = await guild_service.withdraw(db, character, currency, amount, to if isinstance(to, int) else None)
+        what = f"💰 {amount} золота" if currency == "gold" else f"💎 {amount}"
+        _note_receiver(notes, character, receiver, f"из казны гильдии: {what}")
     elif action == "deposit_ore":
         await guild_service.deposit_ore(db, character, _str(body, "ore_id"), _str(body, "grade"), _int(body, "count"))
     elif action == "withdraw_ore":
         to = body.get("to")
-        await guild_service.withdraw_ore(
-            db, character, _str(body, "ore_id"), _str(body, "grade"), _int(body, "count"),
-            to if isinstance(to, int) else None,
+        ore_id, grade, count = _str(body, "ore_id"), _str(body, "grade"), _int(body, "count")
+        receiver = await guild_service.withdraw_ore(
+            db, character, ore_id, grade, count, to if isinstance(to, int) else None,
         )
+        from game.economy import mining
+
+        ore = mining.ore_def(ore_id)
+        name = f"{ore.emoji} {ore.name}" if ore else ore_id
+        _note_receiver(notes, character, receiver, f"со склада гильдии: {name} ({mining.grade_name(grade)}) ×{count}")
     elif action == "withdraw_item":
         to = body.get("to")
-        await guild_service.withdraw_item(db, character, _int(body, "item_id"), to if isinstance(to, int) else None)
+        item_id = _int(body, "item_id")
+        receiver = await guild_service.withdraw_item(db, character, item_id, to if isinstance(to, int) else None)
+        from models import Item
+
+        item = await db.get(Item, item_id)
+        _note_receiver(notes, character, receiver, f"со склада гильдии: {item.name if item else 'вещь'}")
     elif action == "banner":
         reason = await blocked_reason(db, character, vk_user_id)
         if reason:
