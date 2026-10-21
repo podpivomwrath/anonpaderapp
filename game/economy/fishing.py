@@ -264,6 +264,15 @@ def catch_xp(fish_id: str, fraction: float, landed: bool = True) -> int:
     return max(round(base), 1)
 
 
+def break_xp(lake_tier: int, fishing_level: int) -> int:
+    """Опыт за обрыв (2026-10-21, жалоба «за обрыв опыта больше, чем за
+    рыбу»): не от того, что сорвалось, а от пула озера - доля самой мелкой
+    рыбы, что тут клюёт. Так обрыв всегда дешевле любой пойманной рыбы."""
+    pool = fc.LAKE_POOLS[pool_tier_for(lake_tier, fishing_level)]
+    cheapest = min(fish_def(fish_id).tier for fish_id in pool)
+    return max(round(fc.FISHING_TIER_XP.get(cheapest, 1) * fc.FISHING_XP_ON_BREAK), 1)
+
+
 def add_fishing_xp(fishing_level: int, fishing_xp: int, gained: int) -> tuple[int, int, int]:
     """(новый уровень, остаток опыта, сколько уровней взято). Потолка нет,
     поэтому цикл ограничен только тем, что xp_to_next растёт быстрее опыта."""

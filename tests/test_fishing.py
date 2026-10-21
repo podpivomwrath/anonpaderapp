@@ -492,3 +492,13 @@ async def test_leaving_the_lake_loses_undecided_catch(db_session, make_character
     await screen_service.set_screen(db_session, character, None)
     assert not fishing_service.has_catch(character)
     assert await fishing_service.bag_total_grams(db_session, character.id) == 0
+
+
+def test_break_never_gives_more_than_any_catch_at_that_lake() -> None:
+    """2026-10-21: «за обрыв опыта больше, чем за рыбу». Обрыв - от пула озера,
+    не от сорвавшейся рыбы, и дешевле самой мелкой пойманной."""
+    for lake_tier in fc.LAKE_POOLS:
+        for level in (1, 15, 30, 60):
+            pool = fc.LAKE_POOLS[fishing.pool_tier_for(lake_tier, level)]
+            cheapest_catch = min(fishing.catch_xp(fish_id, 0.0) for fish_id in pool)
+            assert fishing.break_xp(lake_tier, level) <= cheapest_catch

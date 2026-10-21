@@ -124,7 +124,7 @@ def simulate(lake_tier: int, fishing_level: int, hours: float, rng: random.Rando
 
         if rng.random() < fishing.line_break_chance(lake_tier, fishing_level, fraction):
             res.breaks += 1
-            res.xp += fishing.catch_xp(fish_id, fraction, landed=False)
+            res.xp += fishing.break_xp(lake_tier, fishing_level)
             continue
 
         grade_id, _name, _mult = fishing.grade_for(fraction)

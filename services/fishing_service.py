@@ -178,21 +178,21 @@ async def strike(
         return StrikeResult(too_early=True)
     if strike_expired(character, now):
         # Прозевал окно — рыба ушла сама. Опыт как за обрыв, текст другой.
-        return await _apply_break(db, character, fish_id, grams, missed=True)
+        return await _apply_break(db, character, lake, fish_id, grams, missed=True)
 
     fraction = fishing.fraction_of(fish_id, grams)
     if rng.random() < fishing.line_break_chance(lake.tier, character.fishing_level, fraction):
-        return await _apply_break(db, character, fish_id, grams)
+        return await _apply_break(db, character, lake, fish_id, grams)
 
     return await _apply_catch(db, character, fish_id, grams, fraction)
 
 
 async def _apply_break(
-    db: AsyncSession, character: Character, fish_id: str, grams: int,
+    db: AsyncSession, character: Character, lake: LakeDef, fish_id: str, grams: int,
     missed: bool = False,
 ) -> StrikeResult:
     fraction = fishing.fraction_of(fish_id, grams)
-    xp = fishing.catch_xp(fish_id, fraction, landed=False)
+    xp = fishing.break_xp(lake.tier, character.fishing_level)
     level, remainder, levels = fishing.add_fishing_xp(
         character.fishing_level, character.fishing_xp, xp
     )
