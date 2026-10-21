@@ -70,7 +70,21 @@ async def test_repick_after_class_change_is_free(db_session, make_character) -> 
     assert await subclass_service.pay_unlock(db_session, character) == 0
     assert (await wallet_service.get_wallet(db_session, character.id)).farm_currency == 100
     subclass_service.apply_subclass(character, subclass_service.paths_for(character.base_class)[0].id)
-    assert not character.subclass_free_repick
+    assert character.subclass_free_repick  # 2026-10-21: «уже платил» не сгорает
+
+
+async def test_paid_once_stays_free_through_decline_and_class_change(db_session, make_character) -> None:
+    """Репорт Archon (2026-10-21): подкласс -> сброс подкласса -> отказ от пути
+    -> смена класса, и Хранитель снова просил 20 000."""
+    from models import BaseClass
+    from services import respec_service
+
+    character = await make_character(level=58, base_class="warrior", subclass="blood_knight")
+    await respec_service.reset_subclass(db_session, character)
+    subclass_service.decline(character)
+    await respec_service.full_class_reset(db_session, character, BaseClass("warrior"))
+    assert subclass_service.free_repick(character)
+    assert await subclass_service.pay_unlock(db_session, character) == 0
 
 
 async def test_first_pick_still_paid(db_session, make_character) -> None:

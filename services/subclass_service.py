@@ -51,7 +51,7 @@ def is_path_pool(pool: str | None) -> bool:
 def decline(character: Character) -> None:
     """Отказ от подкласса - бесплатно и навсегда (снимает только смена класса)."""
     character.subclass_declined = True
-    character.subclass_free_repick = False
+    # Право на бесплатный выбор, если за путь уже платили, не трогаем.
 
 
 def paths_for(base_class: str) -> list[SubclassDef]:
@@ -76,4 +76,7 @@ async def pay_unlock(db, character: Character) -> int:
 def apply_subclass(character: Character, subclass_id: str) -> None:
     """Записывает подкласс — вызывать ПОСЛЕ pay_unlock и подтверждения игрока."""
     character.subclass = subclass_id
-    character.subclass_free_repick = False
+    # 2026-10-21 (репорт Archon): флаг - «за путь уже платили», он больше не
+    # сгорает. Раньше выбор его гасил, а отказ от пути стирал: подкласс ->
+    # сброс -> отказ -> смена класса, и Хранитель снова просил 20 000.
+    character.subclass_free_repick = True

@@ -56,7 +56,8 @@ async def full_class_reset(
         character.subclass_free_repick = True
     character.subclass = None
     # Отказ от подкласса снимается только сменой класса (2026-10-20): новый
-    # класс решает про путь заново. Бесплатного повтора нет - за путь не платили.
+    # класс решает про путь заново. Бесплатно - только если за путь когда-то
+    # уже платили (флаг subclass_free_repick живёт с первого выбора).
     character.subclass_declined = False
     await _reset_stats_rows(db, character, new_base_class)
     return character
