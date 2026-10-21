@@ -199,7 +199,20 @@ def test_mining_blocks_move_explore_and_rest() -> None:
 
     for handler in (world_handlers.move, world_handlers.explore, world_handlers.rest):
         source = inspect.getsource(handler)
-        assert "mining_service.is_digging" in source, f"{handler.__name__} не знает про добычу"
+        assert "_in_mine_digging" in source, f"{handler.__name__} не знает про добычу"
+
+
+def test_digging_blocks_only_in_mine_screen() -> None:
+    """Репорт 2026-10-21 (Морфей Велес): /застрял вынес из забоя, таймер руды
+    ждал экрана забоя, а ходьба - конца добычи. Вне забоя добыча не держит."""
+    from datetime import datetime, timedelta, timezone
+    from types import SimpleNamespace
+
+    from bot.handlers import world as world_handlers
+
+    ends = datetime.now(timezone.utc) + timedelta(minutes=5)
+    assert world_handlers._in_mine_digging(SimpleNamespace(screen="mine", mining_ends_at=ends))
+    assert not world_handlers._in_mine_digging(SimpleNamespace(screen=None, mining_ends_at=ends))
 
 
 def test_craft_screens_are_restorable() -> None:
@@ -212,3 +225,30 @@ def test_craft_screens_are_restorable() -> None:
     source = inspect.getsource(world_handlers._screen_keyboard)
     assert '"mine"' in source
     assert '"lake"' in source
+
+
+async def test_stuck_command_drops_the_pick_and_returns_ore(db_session, character_at, monkeypatch) -> None:
+    """/застрял выносит из забоя и бросает кирку: добыча снята, кусок - в жиле."""
+    from datetime import datetime, timedelta, timezone
+
+    import bot.handlers.combat as combat_handlers
+    import bot.handlers.world as world_handlers
+    from game.economy import mining
+    from models import MineVein
+    from services import mining_service
+
+    class _FakeEngine:
+        sessions: dict = {}
+
+    monkeypatch.setattr(combat_handlers, "_engine", _FakeEngine())
+    mine = mining.all_mines()[0]
+    character = await character_at(mine.x, mine.y)
+    db_session.add(MineVein(mine_id=mine.id, ore_count=2))
+    character.screen = "mine"
+    character.mining_mine_id = mine.id
+    character.mining_ends_at = datetime.now(timezone.utc) + timedelta(minutes=6)
+    await db_session.flush()
+
+    assert await world_handlers.force_unstick(db_session, character, 515151) is False
+    assert not mining_service.is_digging(character) and character.screen is None
+    assert (await db_session.get(MineVein, mine.id)).ore_count == 3

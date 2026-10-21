@@ -678,7 +678,7 @@ async def explore(message: Message) -> None:
         if in_any_battle(peer_id):
             await message.answer("⚔️ Ты уже в бою.")
             return
-        if mining_service.is_digging(character):
+        if _in_mine_digging(character):
             await message.answer(
                 mining_texts.busy_text(mining_service.remaining_seconds(character))
             )
@@ -1300,7 +1300,7 @@ async def rest(message: Message) -> None:
         if in_any_battle(peer_id):
             await message.answer("В бою не отдохнёшь.")
             return
-        if mining_service.is_digging(character):
+        if _in_mine_digging(character):
             await message.answer(
                 mining_texts.busy_text(mining_service.remaining_seconds(character))
             )
@@ -1390,7 +1390,7 @@ async def move(message: Message) -> None:
         if in_any_battle(message.peer_id):
             await message.answer("Сначала разберись с боем.")
             return
-        if mining_service.is_digging(character):
+        if _in_mine_digging(character):
             await message.answer(
                 mining_texts.busy_text(mining_service.remaining_seconds(character))
             )
@@ -1880,6 +1880,15 @@ def activity_state(peer_id: int) -> str:
     return "в городе/на карте"
 
 
+def _in_mine_digging(character) -> bool:
+    """Добыча держит, только пока игрок в забое - как в bot/activity.py.
+    Вынесло наверх (рестарт, /застрял) - он волен уйти, добыча сбросится на
+    следующей клетке (abandon_if_elsewhere), кусок вернётся в жилу. Раньше
+    здесь была голая is_digging: таймер руды ждал экрана забоя, а ходьба -
+    конца добычи, и игрок застревал навсегда (2026-10-21, Морфей Велес)."""
+    return character.screen == "mine" and mining_service.is_digging(character)
+
+
 async def force_unstick(db, character, peer_id: int, *, admin_override: bool = False) -> bool:
     """Аварийный выход из зависшей активности (патч 25, п.5). Общая логика
     /застрял и админского «Сбросить активности» — по умолчанию (admin_override=
@@ -1900,6 +1909,9 @@ async def force_unstick(db, character, peer_id: int, *, admin_override: bool = F
     # даже если PvP не даёт прервать сам бой, застрявший вложенный экран
     # (скупщик/лавка/инвентарь) сбрасывается.
     await screen_service.set_screen(db, character, None)
+    # Добыча (2026-10-21): /застрял выносит из забоя - значит, и кирку бросает,
+    # начатый кусок возвращается в жилу (как «Бросить кирку»).
+    await mining_service.cancel_dig(db, character)
     # Ниже interrupt_for_pvp и маунт пишут строку персонажа СВОИМИ сессиями.
     # Пока эта держит её изменённой (экран, время активности), они ждали её
     # до таймаута базы - и /застрял сам застревал (2026-10-11, дважды).
