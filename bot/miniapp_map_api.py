@@ -171,13 +171,15 @@ async def handle_get_state(request: web.Request) -> web.Response:
                     "step_seconds": turbo_ishak_service.step_seconds(), "next_cell_in": left,
                 })
 
-        # Курьер (2026-10-19): свой - с посылкой туда и обратно, чужой - когда
-        # уже бежит к тебе. Где он сейчас; путь не рисуем.
+        # Курьер (2026-10-19): свой - пока бежит к тебе за посылкой, чужой - когда
+        # уже бежит к тебе. Где он сейчас; путь не рисуем. С посылкой к получателю
+        # свой курьер не виден (2026-10-21): он бежит прямо на получателя и ждёт
+        # на его клетке - за 1 кусок руды выходил трекер любого игрока.
         from services import courier_service
 
         courier_marks = []
         mine = await courier_service.active_of(db, character.id)
-        if mine is not None:
+        if mine is not None and mine.phase == courier_service.PICKUP:
             courier_marks.append({"x": mine.x, "y": mine.y, "own": True, "label": mine.label})
         for d in await courier_service.incoming(db, character.id):
             if mine is None or d.id != mine.id:

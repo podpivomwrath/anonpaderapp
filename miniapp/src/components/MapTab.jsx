@@ -2,6 +2,7 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 import { Div, Spinner, Placeholder, Button, IconButton } from '@vkontakte/vkui';
 import { getMapRoute, getMapState, saveUi, sendMountFromMap, stopTravel } from '../api.js';
 import mapBase from '../assets/world-map-drawn-2048.webp';
+import NavIcon from './NavIcon.jsx';
 import {
   DRAW_RINGS, MAP_CENTER, REGION_TITLES, cellInfo, cellSizeAt, cellToMap, cellsBetween, clamp, mapToCell,
   monolithDistance, ringBorders,
@@ -623,7 +624,7 @@ export default function MapTab() {
     ...(mapState.hunts || []).map((h) => [h.x, h.y, 'map-pin--hunt', '🎯', `Цель заказа: ${h.name}, ${h.level} ур.`, 1.1]),
     // Повозки торговой фирмы в пути - там, где они сейчас (стоящие ждут в городах).
     ...(mapState.carts || []).filter((c) => c.traveling)
-      .map((c) => [c.x, c.y, 'map-pin--cart', '🐂', `Твоя повозка №${c.num} в пути`, 0.9]),
+      .map((c) => [c.x, c.y, 'map-pin--cart', <NavIcon id="trade" size="72%" />, `Твоя повозка №${c.num} в пути`, 0.9]),
     ...(mapState.rifts || []).map((r) => [
       r.x, r.y,
       r.blood ? 'map-pin--rift map-pin--rift-blood' : `map-pin--rift${r.state !== 'free' ? ' map-pin--rift-busy' : ''}`,
