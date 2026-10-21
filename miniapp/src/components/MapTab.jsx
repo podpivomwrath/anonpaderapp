@@ -636,9 +636,22 @@ export default function MapTab() {
   ];
 
   /** Метка в точке (sx, sy); size - её размер в пикселях. */
+  // Ключ метки должен быть уникальным: две повозки одной фирмы, отправленные
+  // друг за другом, стоят на одной клетке, и с ключом «класс:x:y» React
+  // путал их и оставлял на карте старые метки шлейфом (репорт 2026-10-21).
+  // Совпавшему ключу - порядковый номер.
+  const seenKeys = new Map();
+  const pinKey = (className, x, y) => {
+    if (className === 'map-pin--player') return className;
+    const base = `${className}:${x}:${y}`;
+    const n = seenKeys.get(base) || 0;
+    seenKeys.set(base, n + 1);
+    return n ? `${base}#${n}` : base;
+  };
+
   const pinAt = ([x, y, className, content, title], sx, sy, px) => (
     <div
-      key={className === 'map-pin--player' ? className : `${className}:${x}:${y}`}
+      key={pinKey(className, x, y)}
       className={`map-pin ${className}`}
       style={{ left: sx - px / 2, top: sy - px / 2, width: px, height: px, fontSize: px * 0.62 }}
       title={title}
