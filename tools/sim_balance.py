@@ -358,7 +358,7 @@ _LOOP = asyncio.new_event_loop()
 
 def run_duel(a: CombatantState, b: CombatantState, rng: random.Random) -> int | None:
     """Настоящий дуэльный движок. Возвращает id победителя либо None (ничья)."""
-    engine = DuelEngine(rng=rng, max_turns=MAX_TURNS)
+    engine = DuelEngine(rng=rng, max_turns=bc.PVP_MAX_TURNS)  # как в игре: ходов каждому
     engine.start_duel(1, a, b)
     state = engine.duels[1]
     session_view = state.as_session_state()
