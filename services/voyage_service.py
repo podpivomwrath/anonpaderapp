@@ -210,6 +210,55 @@ async def _reward(
     return lines, xp, gold, levels
 
 
+#: id ремесла -> (поля уровня и опыта, «опыта чего», «что N ур.»).
+CRAFTS = {
+    "fishing": ("fishing_level", "fishing_xp", "рыбалки", "рыбалка"),
+    "mining": ("mining_level", "mining_xp", "горного дела", "горное дело"),
+    "herbalism": ("herbalism_level", "herbalism_xp", "травничества", "травничество"),
+    "alchemy": ("alchemy_level", "alchemy_xp", "алхимии", "алхимия"),
+    "cooking": ("cooking_level", "cooking_xp", "кулинарии", "кулинария"),
+}
+
+
+def _xp_to_next(craft: str, level: int) -> int:
+    from game.economy import alchemy, cooking, fishing, herbalism, mining
+
+    return {"fishing": fishing.xp_to_next, "mining": mining.xp_to_next, "herbalism": herbalism.xp_to_next,
+            "alchemy": alchemy.xp_to_next, "cooking": cooking.xp_to_next}[craft](level)
+
+
+def craft_xp(character: Character, rng: random.Random) -> str | None:
+    """Шанс опыта случайного ремесла за час похода: отдельная строка под
+    вестью часа («что было в пути» и опыт в скобках) или None."""
+    if rng.random() >= vc.CRAFT_XP_CHANCE:
+        return None
+    open_crafts = [c for c, (lvl, _xp, _t, _n) in CRAFTS.items() if _xp_to_next(c, getattr(character, lvl)) > 0]
+    if not open_crafts:
+        return None
+    craft = rng.choice(open_crafts)
+    level_field, xp_field, title, name = CRAFTS[craft]
+    before = getattr(character, level_field)
+    amount = max(1, round(_xp_to_next(craft, before) * vc.CRAFT_XP_SHARE))
+    if craft in ("fishing", "mining"):
+        from game.economy import fishing, mining
+
+        add = fishing.add_fishing_xp if craft == "fishing" else mining.add_mining_xp
+        level, rest, levels = add(before, getattr(character, xp_field), amount)
+        setattr(character, level_field, level)
+        setattr(character, xp_field, rest)
+        if levels:
+            setattr(character, f"{craft}_level_at", _now())
+    else:
+        from game.economy import alchemy, cooking
+        from services import herb_service
+
+        {"herbalism": herb_service.grant_xp, "alchemy": alchemy.grant_xp, "cooking": cooking.grant_xp}[craft](
+            character, amount)
+    after = getattr(character, level_field)
+    reward = f"+{amount} опыта {title}" + (f", {name} {after} ур." if after > before else "")
+    return f"{rng.choice(vc.CRAFT_XP_TEXTS[craft])} ({reward})"
+
+
 def _item_label(key: str, count: int) -> str:
     if key == "chest":
         name = f"🎁 {lootbox_service.CHEST_NAME}"
@@ -249,6 +298,7 @@ async def tick(db: AsyncSession, rng: random.Random | None = None, now: datetime
             tier, index, text, kind = _roll_event(voyage, rng)
             voyage.last_event = f"{tier}:{index}"
             lines, xp, gold, levels = await _reward(db, character, stats, voyage, kind)
+            craft_line = craft_xp(character, rng)
             voyage.hours_done += 1
             voyage.trip_xp += xp
             voyage.trip_gold += gold
@@ -256,6 +306,8 @@ async def tick(db: AsyncSession, rng: random.Random | None = None, now: datetime
             body = f"{trip.emoji} Час {voyage.hours_done} из {hours}. {vc.TIER_TITLES[tier]}{text}"
             if lines:
                 body += f" ({', '.join(lines)})"
+            if craft_line:
+                body += f"\n{craft_line}"
             image = vc.LEGENDARY_IMAGES.get((voyage.region, index), "") if tier == "legendary" else ""
             notices.append(Notice(character.id, body, levels=levels, new_level=character.level, image=image))
             voyage.next_event_at = _aware(voyage.next_event_at) + timedelta(minutes=vc.EVENT_INTERVAL_MINUTES)

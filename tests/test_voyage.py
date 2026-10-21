@@ -102,6 +102,7 @@ async def test_hour_shows_reward_in_brackets_and_summary_lists_everything(db_ses
     events = iter([("notable", 0, "Остов корабля.", "clot"), ("legendary", 0, "Сундук.", "chest"),
                    ("common", 0, "Соль.", "gold")])
     monkeypatch.setattr(voyage_service, "_roll_event", lambda v, rng: next(events))
+    monkeypatch.setattr(voyage_service.vc, "CRAFT_XP_CHANCE", 0.0)  # ремесла - отдельный тест
     notices = await voyage_service.tick(db_session, random.Random(1), now=NOW + timedelta(hours=3, minutes=1))
     assert "Остов корабля. (🔵 Сгусток скверны ×2)" in notices[0].text
     assert notices[1].text.endswith("(🎁 Пепельный ларец)")
@@ -122,3 +123,21 @@ async def test_max_level_gets_gold_instead_of_xp(db_session, character_at) -> No
     stats = await db_session.scalar(select(CharacterStats).where(CharacterStats.character_id == c.id))
     lines, xp, gold, _ = await voyage_service._reward(db_session, c, stats, voyage, "xp")
     assert xp == 0 and gold > 0 and lines == [f"+{gold} золота"]
+
+
+def test_craft_xp_in_voyage_hour(monkeypatch) -> None:
+    """Ремесла в походе (2026-10-21): своя строка с вестью и опытом, ремесло на потолке не выпадает."""
+    from types import SimpleNamespace
+
+    monkeypatch.setattr(voyage_service.vc, "CRAFT_XP_CHANCE", 1.0)
+    c = SimpleNamespace(fishing_level=1, fishing_xp=0, fishing_level_at=None, mining_level=1, mining_xp=0,
+                        mining_level_at=None, herbalism_level=50, herbalism_xp=0, alchemy_level=50, alchemy_xp=0,
+                        cooking_level=50, cooking_xp=0)
+    seen = set()
+    for seed in range(40):
+        line = voyage_service.craft_xp(c, random.Random(seed))
+        assert line and "опыта " in line and line.endswith(")")
+        seen.add(line.split()[0])
+    assert seen <= {"🎣", "⛏"}  # травничество, алхимия, кулинария на потолке
+    monkeypatch.setattr(voyage_service.vc, "CRAFT_XP_CHANCE", 0.0)
+    assert voyage_service.craft_xp(c, random.Random(1)) is None
