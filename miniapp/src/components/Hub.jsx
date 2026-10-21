@@ -1,4 +1,6 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import {
+  Suspense, lazy, useCallback, useEffect, useRef, useState,
+} from 'react';
 import bridge from '@vkontakte/vk-bridge';
 import ClassIcon from './ClassIcon.jsx';
 import IntroScene from './IntroScene.jsx';
@@ -17,18 +19,22 @@ import {
 } from '@vkontakte/vkui';
 import { acceptTerms, getCharacter, saveUi } from '../api.js';
 import NavIcon from './NavIcon.jsx';
-import AdminTab from './AdminTab.jsx';
 import CharacterTab from './CharacterTab.jsx';
-import CraftTab from './CraftTab.jsx';
 import DailiesTab from './DailiesTab.jsx';
-import ExchangeTab from './ExchangeTab.jsx';
-import ShopTab from './ShopTab.jsx';
-import FactionTab from './FactionTab.jsx';
-import GuildTab from './GuildTab.jsx';
 import InventoryTab from './InventoryTab.jsx';
-import MapTab from './MapTab.jsx';
-import TopsTab from './TopsTab.jsx';
-import BoardTab from './BoardTab.jsx';
+
+// Разделы, которые открывают не каждый раз, грузятся отдельно при первом
+// открытии (2026-10-21): основной файл мини-аппа был больше 500 КБ, и на
+// телефоне в слабой сети персонаж открывался долго.
+const AdminTab = lazy(() => import('./AdminTab.jsx'));
+const CraftTab = lazy(() => import('./CraftTab.jsx'));
+const ExchangeTab = lazy(() => import('./ExchangeTab.jsx'));
+const ShopTab = lazy(() => import('./ShopTab.jsx'));
+const FactionTab = lazy(() => import('./FactionTab.jsx'));
+const GuildTab = lazy(() => import('./GuildTab.jsx'));
+const MapTab = lazy(() => import('./MapTab.jsx'));
+const TopsTab = lazy(() => import('./TopsTab.jsx'));
+const BoardTab = lazy(() => import('./BoardTab.jsx'));
 
 // Патч 14, ч.1: было 5 вкладок (Характеристики/Инвентарь/Пресеты/Испытания/
 // Биржа) - Характеристики+Пресеты+Испытания объединены в «Персонаж».
@@ -588,6 +594,7 @@ export default function Hub() {
       >
         {/* Раздел появляется плавно: ключ по разделу перезапускает анимацию. */}
         <div key={activeTab} className={`tab-enter tab-enter--${direction}`}>
+        <Suspense fallback={<Div style={{ display: 'flex', justifyContent: 'center', paddingTop: 48 }}><Spinner size="l" /></Div>}>
         {activeTab === 'character' && (
           <CharacterTab character={character} onCharacterUpdate={setCharacter} />
         )}
@@ -611,6 +618,7 @@ export default function Hub() {
           />
         )}
         {activeTab === 'admin' && character.is_admin && <AdminTab />}
+        </Suspense>
         </div>
       </div>
 
