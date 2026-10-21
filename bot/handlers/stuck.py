@@ -10,7 +10,7 @@ from datetime import datetime, timezone
 
 from vkbottle.bot import BotLabeler, Message
 
-from bot import pending_activity
+from bot import explore_rest
 from bot.battle_keyboard import active_battle_keyboard
 from bot.handlers import combat as combat_handlers
 from bot.handlers import group_combat as group_combat_handlers
@@ -78,12 +78,8 @@ async def force_unstick(db, character, peer_id: int, *, admin_override: bool = F
             travel = await db.get(MountTravel, travel_id)
             if travel is not None:
                 await mount_service.cancel_travel(db, travel)
-    world._exploring.discard(peer_id)
-    world._resting.discard(peer_id)
-    # Запись в Redis снимается вместе с отметкой в памяти. Иначе сброшенный
-    # отдых воскрес бы после следующего деплоя и вылечил бы бесплатно.
-    await pending_activity.forget("explore", peer_id)
-    await pending_activity.forget("rest", peer_id)
+    # Отметка и запись в Redis снимаются вместе (bot/explore_rest.py).
+    await explore_rest.drop(peer_id)
     now = datetime.now(timezone.utc)
     if movement_service.is_traveling(character, now):
         movement_service.cancel_travel(character)

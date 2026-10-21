@@ -7,6 +7,7 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 from bot import busy as busy_mod
+from bot import explore_rest
 from bot.handlers import mounts as mounts_handlers
 from bot.handlers import world as world_handlers
 from bot.miniapp_map_api import _MAP_REASONS
@@ -70,7 +71,7 @@ async def test_unstick_clears_every_unstick_state(db_session, character_at, monk
     c.screen = "mine"
     c.mining_mine_id = mine.id
     c.mining_ends_at = now + timedelta(minutes=5)
-    world_handlers._exploring.add(peer)
+    explore_rest.restore(explore_rest.EXPLORE, peer)
     await db_session.flush()
     assert (await busy_mod.busy(db_session, c, peer)) is not None
 

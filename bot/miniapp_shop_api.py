@@ -169,12 +169,9 @@ async def move_pending_job() -> None:
 async def after_faction_move(peer_id: int, region: str, voyage_text: str | None) -> None:
     """Снять то, что живёт в памяти бота, и показать площадь нового города."""
     from bot.handlers import mounts, voyage, world
-    from bot import pending_activity
+    from bot import explore_rest
 
-    world._exploring.discard(peer_id)
-    world._resting.discard(peer_id)
-    await pending_activity.forget("explore", peer_id)
-    await pending_activity.forget("rest", peer_id)
+    await explore_rest.drop(peer_id)
     voyage._away.discard(peer_id)
     header = FACTION_MOVE_TEXT.format(city=REGION_TITLES[region])
     if voyage_text:

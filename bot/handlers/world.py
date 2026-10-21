@@ -51,7 +51,7 @@ from bot.keyboards import world as kb
 from bot.keyboards.group_explore import group_ready_keyboard
 from bot.onboarding_texts import REGION_TITLES
 from bot.world_summary import location_attachment, location_summary
-from bot import pending_activity
+from bot import explore_rest, pending_activity
 from bot.world_texts import (
     FOREIGN_NPC_REJECTION,
     act_attachment,
@@ -129,10 +129,7 @@ _rest_scheduler: PeerScheduler | None = None
 _bot_api = None
 _rng = random.Random()
 
-# Игроки, у которых сейчас идёт исследование клетки (5-10 сек до появления моба).
-_exploring: set[int] = set()
-# Игроки, которые сейчас отдыхают (8-12 сек до восстановления HP).
-_resting: set[int] = set()
+# Кто исследует или отдыхает - bot/explore_rest.py (2026-10-21).
 # peer_id -> id события с выбором, ожидающего ответа (патч 9, блок 1)
 #: Пауза между сообщениями служебной рассылки (VK лимитирует темп).
 SERVICE_NOTICE_DELAY_SECONDS = 0.06
@@ -225,11 +222,10 @@ async def resume_after_restart() -> dict[str, int]:
         resumed["travel"] += 1
 
     for kind, peer_id, left in await pending_activity.pending():
-        if kind == "explore":
-            _exploring.add(peer_id)
+        explore_rest.restore(kind, peer_id)
+        if kind == explore_rest.EXPLORE:
             _explore_scheduler.schedule(peer_id, left)
         else:
-            _resting.add(peer_id)
             _rest_scheduler.schedule(peer_id, left)
         resumed[kind] += 1
     return resumed
@@ -694,10 +690,10 @@ async def explore(message: Message) -> None:
                 mining_texts.busy_text(mining_service.remaining_seconds(character))
             )
             return
-        if peer_id in _exploring:
+        if explore_rest.exploring(peer_id):
             await message.answer("🔍 Ты уже осматриваешься...")
             return
-        if peer_id in _resting:
+        if explore_rest.resting(peer_id):
             await message.answer("🛏️ Ты отдыхаешь. Дай себе минуту.")
             return
         if movement_service.is_traveling(character, now):
@@ -784,10 +780,9 @@ async def explore(message: Message) -> None:
                         if member_character is None:
                             continue
                         member_peer_id = await onboarding_svc.vk_id_for_character(db, m.id)
-                        if member_peer_id is not None and member_peer_id in _resting:
+                        if member_peer_id is not None and explore_rest.resting(member_peer_id):
                             # Страховка: группа ушла - отдых не доигрывается.
-                            _resting.discard(member_peer_id)
-                            await pending_activity.forget("rest", member_peer_id)
+                            await explore_rest.stop(explore_rest.REST, member_peer_id)
                         tithe = await guild_territory_service.on_exploration(db, member_character)
                         await herb_service.spawn(db, _rng, (member_character.pos_x, member_character.pos_y))
                         if member_peer_id is not None:
@@ -822,11 +817,8 @@ async def explore(message: Message) -> None:
                     # событие группы начинались мгновенно. Пока ищут - все
                     # «исследуют»: уйти с клетки или начать другое нельзя.
                     searching = [p for p, _text in look_around]
-                    _exploring.update(searching)
-                    try:
+                    with explore_rest.group_search(searching):
                         await asyncio.sleep(_rng.uniform(wc.EXPLORE_SECONDS_MIN, wc.EXPLORE_SECONDS_MAX))
-                    finally:
-                        _exploring.difference_update(searching)
                     region = region_for(character.pos_x, character.pos_y)
                     dist = grid.monolith_distance(character.pos_x, character.pos_y)
                     if await group_event_handlers.maybe_start(
@@ -851,8 +843,8 @@ async def explore(message: Message) -> None:
 
     # патч 25, п.4: несобранная горстка пепла сгорает при новом исследовании
     ash_burned = ash_handful_state.clear(peer_id)
-    _exploring.add(peer_id)
     delay = _rng.uniform(wc.EXPLORE_SECONDS_MIN, wc.EXPLORE_SECONDS_MAX)
+    await explore_rest.start(explore_rest.EXPLORE, peer_id, delay)
     # Кнопки убираем до появления моба.
     text = "🔍 Ты осматриваешься вокруг..."
     if ash_burned:
@@ -861,7 +853,6 @@ async def explore(message: Message) -> None:
         text += f"\n\n{fragment.text}"
     await message.answer(text, keyboard=kb.waiting_keyboard())
     _explore_scheduler.schedule(peer_id, delay)
-    await pending_activity.remember("explore", peer_id, delay)
 
 
 QUEUE_READY_HINT = "👥 Все, кто остался на клетке, готовы - нажми «🔍 Исследовать», чтобы начать."
@@ -950,8 +941,7 @@ async def handle_explore_done(peer_id: int) -> None:
     Флейвор (Песнь/замечания) больше не бывает самостоятельным исходом — он
     остался только внутри сообщения ожидания "Ты осматриваешься..." (patch-5),
     которое уже показано раньше и не пересекается с этим исходом."""
-    _exploring.discard(peer_id)
-    await pending_activity.forget("explore", peer_id)
+    await explore_rest.stop(explore_rest.EXPLORE, peer_id)
     async with get_session_factory()() as db:
         character = await onboarding_svc.get_character(db, peer_id)
         if character is None or character.creation_state is not None:
@@ -1316,10 +1306,10 @@ async def rest(message: Message) -> None:
                 mining_texts.busy_text(mining_service.remaining_seconds(character))
             )
             return
-        if peer_id in _resting:
+        if explore_rest.resting(peer_id):
             await message.answer("🛏️ Ты уже отдыхаешь.")
             return
-        if peer_id in _exploring or movement_service.is_traveling(character, now):
+        if explore_rest.exploring(peer_id) or movement_service.is_traveling(character, now):
             await message.answer("Сначала закончи то, что начал.")
             return
         if await mount_service.active_travel(db, character.id) is not None:
@@ -1335,27 +1325,24 @@ async def rest(message: Message) -> None:
                 still_ready = group_explore_service.cancel(rest_snapshot.id, character.id)
                 hint_peers = await ready_hint_peers(db, still_ready)
 
-    _resting.add(peer_id)
     # Патч 50: Метка Хранителя — отдых вдвое быстрее.
     if premium_service.is_premium(character):
         delay = _rng.uniform(pc.REST_SECONDS_MIN, pc.REST_SECONDS_MAX)
     else:
         delay = _rng.uniform(wc.REST_SECONDS_MIN, wc.REST_SECONDS_MAX)
+    await explore_rest.start(explore_rest.REST, peer_id, delay)
     # отдых — кнопки убираем на время (чистка шума)
     await message.answer(flavor.rest_start(), keyboard=kb.waiting_keyboard())
     if hint_peers:
         await message.answer("Ты вышел из очереди группового исследования.")
         await send_ready_hint(hint_peers)
     _rest_scheduler.schedule(peer_id, delay)
-    await pending_activity.remember("rest", peer_id, delay)
 
 
 async def handle_rest_done(peer_id: int) -> None:
     """Колбэк планировщика: отдых окончен — HP восстановлено, кнопки возвращены."""
-    if peer_id not in _resting:
+    if not await explore_rest.stop(explore_rest.REST, peer_id):
         return  # отдых прерван (напр. пришёл бой — задел на будущее)
-    _resting.discard(peer_id)
-    await pending_activity.forget("rest", peer_id)
     async with get_session_factory()() as db:
         character = await onboarding_svc.get_character(db, peer_id)
         if character is None or character.creation_state is not None:
@@ -1423,10 +1410,10 @@ async def _move(message: Message, direction: tuple[int, int] | None) -> None:
                 mining_texts.busy_text(mining_service.remaining_seconds(character))
             )
             return
-        if message.peer_id in _exploring:
+        if explore_rest.exploring(message.peer_id):
             await message.answer("🔍 Ты осматриваешься - подожди.")
             return
-        if message.peer_id in _resting:
+        if explore_rest.resting(message.peer_id):
             await message.answer("🛏️ Ты отдыхаешь. Дай себе минуту.")
             return
         if movement_service.resolve_arrival(character, now):
@@ -1721,7 +1708,7 @@ async def quest_reminder(message: Message) -> None:
 def is_busy(peer_id: int) -> bool:
     """Патч 25, п.7: занят исследованием/отдыхом — используется мунтами,
     чтобы не начинать поездку поверх незавершённого действия."""
-    return peer_id in _exploring or peer_id in _resting
+    return explore_rest.busy(peer_id)
 
 
 # Патч 37: рестроители клавиатуры+текста вложенных экранов, по имени
@@ -1782,7 +1769,7 @@ async def _current_keyboard(db, character, peer_id: int, now: datetime) -> str:
     battle_kb = active_battle_keyboard(peer_id)
     if battle_kb is not None:
         return battle_kb
-    if peer_id in _exploring or peer_id in _resting or movement_service.is_traveling(character, now):
+    if explore_rest.busy(peer_id) or movement_service.is_traveling(character, now):
         return kb.waiting_keyboard()
     if await mount_service.active_travel(db, character.id) is not None:
         return kb.waiting_keyboard()
@@ -1898,9 +1885,9 @@ def activity_state(peer_id: int) -> str:
         return "в бою"
     if pvp_handlers.rebuild_keyboard(peer_id) is not None:
         return "в PvP-бою"
-    if peer_id in _exploring:
+    if explore_rest.exploring(peer_id):
         return "в исследовании"
-    if peer_id in _resting:
+    if explore_rest.resting(peer_id):
         return "отдыхает"
     return "в городе/на карте"
 

@@ -154,7 +154,9 @@ async def test_world_actions_blocked_in_party_battle(monkeypatch, db_session, ma
         await action(message)
     assert len(replies) == 3
     assert player.travel_arrives_at is None
-    assert 777 not in world._resting and 777 not in world._exploring
+    from bot import explore_rest
+
+    assert not explore_rest.busy(777)
 
 
 async def test_pvp_attack_interrupts_group_pve_without_result(monkeypatch, db_session, make_character):

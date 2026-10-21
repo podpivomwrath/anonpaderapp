@@ -36,6 +36,8 @@ python tools/broadcast.py - [--hours 24] [--photo N] --send`. Скрипт са�
   - тогда снять его в `world.force_unstick`). Свои копии проверки не писать:
   все входы берут `busy()` (`activity.blocked_reason`, маунт, карта мини-аппа,
   поход). Если код нужен карте - `_MAP_REASONS` и текст в `MapTab.jsx`.
+- **Исследование и отдых**: отметки «занят» только через `bot/explore_rest.py`
+  (`start`/`stop`/`drop`) - там память и запись в Redis меняются вместе.
 - **Новый экран чата**: родитель в `services/screen_service.PARENT` и
   восстановление в `world._screen_keyboard` или в `rebuild()` модуля.
 - **Новая кнопка с payload**: обработчик `payload_contains={"type": ...}`.

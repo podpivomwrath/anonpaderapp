@@ -540,13 +540,15 @@ async def test_force_unstick_admin_override_defeats_pvp_and_still_resets_rest(
     pvp_handlers._battles[-30] = battle
     pvp_handlers._peer_battle[peer_id] = -30
 
-    world_handlers._exploring.add(peer_id)
+    from bot import explore_rest
+
+    explore_rest.restore(explore_rest.EXPLORE, peer_id)
 
     result = await world_handlers.force_unstick(db_session, character, peer_id, admin_override=True)
 
     assert result is False  # не ветвится отдельно на PvP в админском режиме
     assert session.combatants[character.id].alive is False  # PvP-боец "погиб"
-    assert peer_id not in world_handlers._exploring  # и остальное всё равно снято
+    assert not explore_rest.exploring(peer_id)  # и остальное всё равно снято
 
 
 def test_character_id_for_peer() -> None:

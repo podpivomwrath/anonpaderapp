@@ -11,7 +11,7 @@ from pathlib import Path
 
 import pytest
 
-from bot import pending_activity
+from bot import explore_rest, pending_activity
 from bot.handlers import world
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -113,9 +113,9 @@ async def wired_world(monkeypatch, redis):
     monkeypatch.setattr(world, "_travel_scheduler", schedulers["travel"])
     monkeypatch.setattr(world, "_explore_scheduler", schedulers["explore"])
     monkeypatch.setattr(world, "_rest_scheduler", schedulers["rest"])
-    monkeypatch.setattr(world, "_exploring", set())
-    monkeypatch.setattr(world, "_resting", set())
+    explore_rest.clear()
     yield factory, schedulers
+    explore_rest.clear()
     await engine.dispose()
 
 
@@ -154,7 +154,7 @@ async def test_walk_that_should_have_ended_arrives_at_once(wired_world) -> None:
 
 
 async def test_rest_and_explore_are_put_back_where_they_were(wired_world) -> None:
-    """Колбэк отдыха выходит молча, если игрока нет в _resting, - поэтому
+    """Колбэк отдыха выходит молча, если игрок не отдыхает, - поэтому
     мало перезапланировать задачу, надо вернуть и отметку."""
     _factory, schedulers = wired_world
     await pending_activity.remember("rest", 11, 40)
@@ -163,28 +163,33 @@ async def test_rest_and_explore_are_put_back_where_they_were(wired_world) -> Non
     resumed = await world.resume_after_restart()
 
     assert resumed == {"travel": 0, "explore": 1, "rest": 1}
-    assert 11 in world._resting and 11 in schedulers["rest"].jobs
-    assert 12 in world._exploring and 12 in schedulers["explore"].jobs
+    assert explore_rest.resting(11) and 11 in schedulers["rest"].jobs
+    assert explore_rest.exploring(12) and 12 in schedulers["explore"].jobs
 
 
 # --- Прерванное не воскресает --------------------------------------------------
 
 
-def test_every_interruption_also_clears_the_redis_mark() -> None:
-    """Каждое место, где занятие снимается из памяти, обязано снять и запись
-    в Redis. Иначе прерванный отдых воскреснет после следующего деплоя и
-    вылечит бесплатно, а сброшенное через /застрял исследование - вернётся.
-    """
-    code = re.sub(r"#[^\n]*", "", (ROOT / "bot" / "handlers" / "world.py").read_text(encoding="utf-8"))
-    for kind, registry in (("explore", "_exploring"), ("rest", "_resting")):
-        dropped = len(re.findall(rf"{registry}\.discard\(", code))
-        forgotten = len(re.findall(rf'pending_activity\.forget\("{kind}"', code))
-        assert dropped == forgotten, (
-            f"{registry}: снимается в {dropped} местах, а запись в Redis - в {forgotten}"
-        )
-        started = len(re.findall(rf"{registry}\.add\(", code))
-        remembered = len(re.findall(rf'pending_activity\.remember\("{kind}"', code))
-        # +1: resume_after_restart возвращает отметку, но запись там уже есть.
-        assert remembered == started - 1, (
-            f"{registry}: начинается в {started - 1} местах, запоминается в {remembered}"
-        )
+def test_nobody_touches_explore_rest_marks_directly() -> None:
+    """Отметки «исследует/отдыхает» меняет только bot/explore_rest.py: там
+    отметка в памяти и запись в Redis снимаются вместе. Иначе прерванный
+    отдых воскреснет после деплоя и вылечит бесплатно (2026-10-21)."""
+    for path in (ROOT / "bot").rglob("*.py"):
+        if path.name == "explore_rest.py":
+            continue
+        code = path.read_text(encoding="utf-8")
+        assert "explore_rest._peers" not in code, path
+        for kind in ("explore", "rest"):
+            assert f'pending_activity.forget("{kind}"' not in code, f"{path}: снимай через explore_rest.stop"
+            assert f'pending_activity.remember("{kind}"' not in code, f"{path}: начинай через explore_rest.start"
+
+
+async def test_stop_clears_memory_and_redis(monkeypatch) -> None:
+    redis = FakeRedis()
+    monkeypatch.setattr(pending_activity, "_redis", redis)
+    explore_rest.clear()
+    await explore_rest.start(explore_rest.REST, 5, 30)
+    assert explore_rest.resting(5) and redis.data
+    assert await explore_rest.stop(explore_rest.REST, 5) is True
+    assert not explore_rest.resting(5) and not redis.data
+    assert await explore_rest.stop(explore_rest.REST, 5) is False
