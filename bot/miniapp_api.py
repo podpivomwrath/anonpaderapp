@@ -794,7 +794,7 @@ def _food_payload(food) -> list[dict]:
         {
             "id": f"{dish.dish_id}:{grade}", "dish": dish.dish_id, "grade": grade, "name": d.name,
             "emoji": d.emoji, "icon": f"dish:{dish.dish_id}", "count": count, "description": d.description,
-            "grade_title": fishing.grade_name(grade), "effect": cooking.buff_text(dish, grade),
+            "grade_title": f"рыба {fishing.grade_name(grade)}", "effect": cooking.buff_text(dish, grade),
         }
         for d, dish, grade, count in food
     ]

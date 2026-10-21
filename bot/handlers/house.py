@@ -212,7 +212,7 @@ def cooking_text(character: Character) -> str:
 
 def cooked_text(result: cooking_service.Cooked) -> str:
     d = cooking.dish_def(result.dish.dish_id)
-    text = (f"🔥 Готово: {d.emoji} {d.name} ×{result.portions} ({fishing.grade_name(result.grade)}). "
+    text = (f"🔥 Готово: {d.emoji} {d.name} ×{result.portions} · рыба {fishing.grade_name(result.grade)}. "
             f"Лежит в инвентаре, во вкладке «Еда» мини-аппа. Кулинария +{result.xp} опыта.")
     if result.level_after > result.level_before:
         text += f"\n🔥 Кулинария: {result.level_after} уровень."
