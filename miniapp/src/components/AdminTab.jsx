@@ -311,9 +311,24 @@ function OverviewSection() {
   if (status === 'loading') return <Div style={{ display: 'flex', justifyContent: 'center', paddingTop: 24 }}><Spinner size="l" /></Div>;
   if (status === 'error' || !data) return <Placeholder>Не удалось загрузить обзор.</Placeholder>;
 
-  const { players, progression, retention, economy, combat, systems = [] } = data;
+  const { players, progression, retention, economy, combat, systems = [], errors, pvp_balance: pvpBalance } = data;
   return (
     <>
+      {errors && (
+        <Group header={<Header>{errors.hour ? '⚠️' : '✅'} Ошибки бота</Header>}>
+          <StatRow label="За час / за сутки" value={`${errors.hour} / ${errors.day}`} />
+          {errors.top.map((e) => <StatRow key={e.text} label={e.text} value={`×${e.count}`} />)}
+          {errors.day === 0 && <Div style={{ opacity: 0.7 }}>С последнего перезапуска ошибок не было.</Div>}
+        </Group>
+      )}
+      {pvpBalance && (
+        <Group header={<Header>⚔️ Дуэли за 14 дней (разница уровней до 3)</Header>}>
+          {pvpBalance.length === 0 && <Div style={{ opacity: 0.7 }}>Данных пока нет - копятся с 21.10.</Div>}
+          {pvpBalance.map((r) => (
+            <StatRow key={r.sub} label={r.title} value={`${r.winrate}% (${r.wins} из ${r.fights})`} />
+          ))}
+        </Group>
+      )}
       <Group header={<Header>👥 Игроки</Header>}>
         <StatRow label="Всего персонажей" value={players.total_characters} />
         <StatRow label="Застряло на создании" value={players.stuck_onboarding} />

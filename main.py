@@ -180,6 +180,11 @@ async def run() -> None:
             # бот обязан подняться всё равно и писать хотя бы в stderr.
             logger.exception("Файловые логи недоступны ({}), пишу только в stderr", log_dir)
 
+    # Сводка ошибок для админки и вести о всплеске (2026-10-21).
+    from bot import error_watch
+
+    error_watch.install()
+
     if not settings.vk_token:
         raise RuntimeError(
             "VK_TOKEN не задан. Скопируй .env.example в .env и заполни (см. README)."
@@ -359,6 +364,10 @@ async def run() -> None:
             await resource_log.cleanup(db)
             await db.commit()
 
+    from bot import error_watch
+
+    respawn_scheduler.add_job(error_watch.alert_job, "interval", minutes=10, id="error_watch",
+                              max_instances=1, coalesce=True)
     # Журнал ресурсов хранит 7 дней (2026-10-21).
     respawn_scheduler.add_job(resource_log_cleanup, "interval", hours=1, id="resource_log_cleanup",
                               max_instances=1, coalesce=True)

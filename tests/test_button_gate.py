@@ -61,3 +61,41 @@ async def test_new_player_and_group_chats_pass(gate_db) -> None:
     assert await button_gate.allowed(_msg("привет", peer=987654321))  # персонажа нет - онбординг
     chat = SimpleNamespace(text="Исследовать", payload=None, peer_id=2000000001, from_id=5, state_peer=None)
     assert await button_gate.allowed(chat)
+
+
+def _typed_handlers() -> set[str]:
+    """Обработчики, чьё правило не требует кнопки: TEXT_ONLY, FuncRule, свои
+    правила, state=, regex без «/» и пустое правило."""
+    import re
+    from pathlib import Path
+
+    found = set()
+    for path in sorted((Path(__file__).resolve().parent.parent / "bot" / "handlers").glob("*.py")):
+        lines = path.read_text(encoding="utf-8").splitlines()
+        for i, line in enumerate(lines):
+            if not line.startswith("@labeler.message("):
+                continue
+            dec, j = line, i
+            while dec.count("(") > dec.count(")") and j + 1 < len(lines):
+                j += 1
+                dec += lines[j].strip()
+            typed = ("TEXT_ONLY" in dec or "FuncRule" in dec or re.search(r"[A-Z][a-zA-Z]+\(\)\)", dec)
+                     or "state=" in dec or ("regex=" in dec and "^\\s*/" not in dec)
+                     or dec.strip() == "@labeler.message()")
+            if not typed:
+                continue
+            k = j + 1
+            while not lines[k].startswith(("async def", "def")):
+                k += 1
+            found.add(f"{path.stem}.{re.match(r'(?:async )?def (\w+)', lines[k]).group(1)}")
+    return found
+
+
+def test_every_typed_input_handler_is_known_to_the_gate() -> None:
+    """2026-10-21: новый ввод словами без строки в TYPED_INPUTS фильтр отрежет молча."""
+    known = button_gate.TYPED_INPUTS
+    missing = sorted(
+        name for name in _typed_handlers()
+        if name not in known and f"{name.split('.')[0]}.*" not in known
+    )
+    assert not missing, f"впиши в button_gate.TYPED_INPUTS и в _typed_input_expected: {missing}"

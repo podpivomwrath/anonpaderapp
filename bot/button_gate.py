@@ -16,6 +16,28 @@ from vkbottle.bot import Message
 from models import Character, PromoCode, User
 from services.db import get_session_factory
 
+#: Обработчики, которые читают сообщение без кнопки, и как фильтр их
+#: пропускает (2026-10-21). Новый такой обработчик без строки здесь роняет
+#: tests/test_button_gate.py - иначе фильтр молча отрежет его ввод.
+TYPED_INPUTS: dict[str, str] = {
+    "arena.code_input": "CodeInput: игрок вводит код",
+    "fallback.fallback": "последний: на набранный текст молчит",
+    "group_events.on_pot_stake": "_pot_scene_of: ставка в Котле",
+    "promo.try_activate_promo": "код промо существует в базе",
+    "pvp.join_via_text": "_pending_join_prompt, пока тот бой идёт",
+    "raid_archive.on_answer": "ArchiveAnswer: этап загадок",
+    "rift.cancel": "кнопка «Отмена» (метка есть), FuncRule только сужает",
+    "scene_events.riddle_answer": "RiddleAnswer: загадка ждёт ответа",
+    "scene_events.stake_answer": "StakeAnswer: кости ждут ставку",
+    "turbo_ishak.name_reply": "_naming: имя пойманного ишака",
+    # Состояния диспенсера (state=...) - state_peer: создание персонажа,
+    # выбор подкласса у Хранителя, координаты маунта.
+    "onboarding.*": "state_peer",
+    "list_keeper.*": "state_peer",
+    "mounts.*": "state_peer",
+}
+
+
 async def _typed_input_expected(message: Message) -> bool:
     """Бот сам ждёт от игрока слова: ник при создании и координаты маунта
     (диспенсер состояний), код арены, ответ загадке Архива и сцены, ставку в
@@ -26,7 +48,9 @@ async def _typed_input_expected(message: Message) -> bool:
     peer = message.peer_id
     if message.state_peer is not None:
         return True
-    if peer in turbo_ishak._naming or peer in pvp._pending_join_prompt:
+    # Приглашение выбрать сторону - только пока тот бой идёт: неотвеченное
+    # иначе висело бы вечно и пропускало любой набранный текст (2026-10-21).
+    if peer in turbo_ishak._naming or pvp._pending_join_prompt.get(peer) in pvp._battles:
         return True
     if group_events._pot_scene_of(peer) is not None:
         return True

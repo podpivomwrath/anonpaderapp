@@ -6,6 +6,7 @@
 что вкладка скрыта на фронтенде — см. safe-rollout секцию патча."""
 
 import random
+from bot import error_watch
 from datetime import datetime, timezone
 
 from aiohttp import web
@@ -55,6 +56,9 @@ async def handle_get_overview(request: web.Request) -> web.Response:
     async with session_factory() as db:
         stats = await admin_service.overview_stats(db)
         systems = await admin_systems_service.systems_stats(db)
+        from services import pvp_service
+
+        pvp_balance = await pvp_service.subclass_winrates(db)
     return web.json_response(
         {
             "players": stats.players,
@@ -63,8 +67,22 @@ async def handle_get_overview(request: web.Request) -> web.Response:
             "economy": _humanize_economy(stats.economy),
             "combat": stats.combat,
             "systems": systems,
+            "errors": error_watch.stats(),
+            "pvp_balance": [{**row, "title": _fighter_title(row["sub"])} for row in pvp_balance],
         }
     )
+
+
+def _fighter_title(kind: str) -> str:
+    """Подкласс, «путь класса» или базовый класс - по-русски."""
+    from game.classes.base import REGISTRY
+
+    classes = {"warrior": "Воин", "rogue": "Разбойник", "mage": "Маг"}
+    if kind in REGISTRY:
+        return REGISTRY[kind].title
+    if kind.endswith("_path"):
+        return f"{classes.get(kind[:-5], kind)} без подкласса"
+    return f"{classes.get(kind, kind)} до 30 ур."
 
 
 def _titled(counts: dict, title) -> dict:

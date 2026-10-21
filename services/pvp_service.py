@@ -85,14 +85,49 @@ async def log_battle(
     """battle_type: "duel" | "mass". winner_ids пуст при ничьей (только дуэль
     — в массовом бою ничьей не бывает, resolve_tick всегда даёт победителя,
     кроме одновременной гибели последних двух сторон)."""
+    rows = (await db.scalars(select(Character).where(Character.id.in_(list(participant_ids))))).all()
     battle = PvpBattle(
         battle_type=battle_type,
         participant_ids=list(participant_ids),
         winner_ids=list(winner_ids),
+        participants=[{"id": c.id, "level": c.level, "sub": fighter_kind(c)} for c in rows],
         finished_at=datetime.now(timezone.utc),
     )
     db.add(battle)
     await db.flush()
+
+
+def fighter_kind(character: Character) -> str:
+    """Подкласс, «путь <класса>» при отказе или базовый класс до 30 уровня."""
+    if character.subclass:
+        return character.subclass
+    if getattr(character, "subclass_declined", False):
+        return f"{character.base_class}_path"
+    return character.base_class
+
+
+async def subclass_winrates(db: AsyncSession, days: int = 14, max_level_gap: int = 3) -> list[dict]:
+    """Дуэли за days дней между близкими по уровню: кто кого. Не по текущему
+    подклассу игрока, а по тому, каким он был в бою."""
+    since = datetime.now(timezone.utc) - timedelta(days=days)
+    battles = (await db.scalars(select(PvpBattle).where(
+        PvpBattle.battle_type == "duel", PvpBattle.participants.is_not(None), PvpBattle.finished_at >= since,
+    ))).all()
+    wins: dict[str, int] = {}
+    fights: dict[str, int] = {}
+    for b in battles:
+        people = b.participants or []
+        if len(people) != 2 or abs(people[0]["level"] - people[1]["level"]) > max_level_gap:
+            continue
+        for p in people:
+            fights[p["sub"]] = fights.get(p["sub"], 0) + 1
+            if p["id"] in (b.winner_ids or []):
+                wins[p["sub"]] = wins.get(p["sub"], 0) + 1
+    return sorted(
+        ({"sub": sub, "fights": n, "wins": wins.get(sub, 0), "winrate": round(100 * wins.get(sub, 0) / n)}
+         for sub, n in fights.items()),
+        key=lambda r: -r["fights"],
+    )
 
 
 @dataclass

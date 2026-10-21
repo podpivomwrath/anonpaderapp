@@ -46,6 +46,9 @@ for attempt in $(seq 1 30); do
     sleep 2
 done
 $healthy
+# Основные экраны собираются на живых данных pupsik (2026-10-21); упало -
+# ERR-ловушка выше возвращает прошлые образы.
+dc exec -T bot python tools/smoke.py
 dc exec -T bot alembic current
 dc ps
 stopped=false

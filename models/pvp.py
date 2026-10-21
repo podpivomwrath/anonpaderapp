@@ -21,5 +21,8 @@ class PvpBattle(Base):
     battle_type: Mapped[str] = mapped_column(String(16))  # "duel" | "mass"
     participant_ids: Mapped[list] = mapped_column(JSON)
     winner_ids: Mapped[list] = mapped_column(JSON)
+    #: Кто дрался (2026-10-21): [{"id", "level", "sub"}] на момент боя - для
+    #: честной статистики подклассов на равных уровнях (pvp_service.subclass_winrates).
+    participants: Mapped[list | None] = mapped_column(JSON, nullable=True)
     started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
