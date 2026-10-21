@@ -12,6 +12,20 @@ from bot.keyboards.world import add_miniapp_button
 from bot.fishing_texts import BTN_BAG, BTN_CANCEL_CAST, BTN_CAST, BTN_FISH, BTN_LEAVE_LAKE, BTN_STRIKE
 
 CANCEL_CAST_PAYLOAD = {"type": "fish_cancel_cast"}
+KEEP_PAYLOAD = {"type": "fish_keep"}
+RELEASE_PAYLOAD = {"type": "fish_release"}
+BTN_KEEP = "🧺 В садок"
+BTN_RELEASE = "🐟 Отпустить"
+
+
+def catch_keyboard() -> str:
+    """Рыба вытащена (2026-10-21): в садок или обратно в воду. Новый заброс -
+    только после решения."""
+    kb = Keyboard(one_time=True)
+    kb.add(Text(BTN_KEEP, payload=KEEP_PAYLOAD), color=KeyboardButtonColor.POSITIVE)
+    kb.add(Text(BTN_RELEASE, payload=RELEASE_PAYLOAD), color=KeyboardButtonColor.SECONDARY)
+    add_miniapp_button(kb)
+    return kb.get_json()
 
 
 def lake_keyboard() -> str:

@@ -134,6 +134,22 @@ def catch_text(result, character=None) -> str:
     return chr(10).join(lines)
 
 
+DECIDE_FIRST_TEXT = "Сначала реши, что делать с уловом: в садок или обратно в воду."
+NOTHING_TO_DECIDE_TEXT = "Решать уже нечего."
+
+
+def kept_line(decision) -> str:
+    return f"🧺 {decision.fish.emoji} {decision.fish.name} ({fishing.format_kg(decision.grams)}) в садке."
+
+
+def released_line(decision) -> str:
+    return f"🐟 {decision.fish.name} уходит обратно в воду."
+
+
+def bag_full_decide_text(capacity: int) -> str:
+    return f"🧺 Садок полон ({fishing.format_kg(capacity)}). Эту рыбу можно только отпустить."
+
+
 def junk_text(junk_id: str, character=None) -> str:
     from services import guild_service
 

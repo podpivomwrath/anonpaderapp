@@ -151,7 +151,9 @@ async def _enter_lake(message: Message) -> None:
         f"{ft.bag_line(grams, capacity)}\n"
         f"{ft.SEP}"
     )
-    await message.answer(text, keyboard=kb.lake_keyboard(), attachment=ft.lake_attachment(lake))
+    # Вытащенная рыба ждёт решения - сначала оно, потом заброс.
+    keyboard = kb.catch_keyboard() if fishing_service.has_catch(character) else kb.lake_keyboard()
+    await message.answer(text, keyboard=keyboard, attachment=ft.lake_attachment(lake))
 
 
 @labeler.message(text=[ft.LAKE_COMMAND])
@@ -183,6 +185,9 @@ async def cast(message: Message) -> None:
         # с процессом) не должен запирать снасть в воде навсегда.
         if fishing_service.is_casting(character) and not fishing_service.cast_is_stale(character):
             await message.answer(ft.ALREADY_CASTING_TEXT, keyboard=kb.casting_keyboard())
+            return
+        if fishing_service.has_catch(character):
+            await message.answer(ft.DECIDE_FIRST_TEXT, keyboard=kb.catch_keyboard())
             return
         result = fishing_service.start_cast(character, lake, _rng)
         await db.commit()
@@ -247,14 +252,58 @@ async def strike(message: Message) -> None:
         if xp_line:
             body += f"\n{xp_line}"
 
-    text = f"{body}\n\n{ft.SEP}\n{ft.bag_line(grams, capacity)}\n{ft.SEP}"
+    if result.landed:
+        # Садок - после решения «В садок» / «Отпустить» (2026-10-21).
+        text, keyboard = body, kb.catch_keyboard()
+    else:
+        text, keyboard = f"{body}\n\n{ft.SEP}\n{ft.bag_line(grams, capacity)}\n{ft.SEP}", kb.lake_keyboard()
     if guild_lines:
         text += "\n\n" + "\n".join(guild_lines)
-    await message.answer(text, keyboard=kb.lake_keyboard())
+    await message.answer(text, keyboard=keyboard)
     if char_xp is not None and char_xp.levels_gained:
         from bot.handlers import stats_window  # избегаем цикла импортов
 
         await stats_window.notify_levelup(message.peer_id, char_xp.levels_gained, char_xp.new_level)
+
+
+@labeler.message(payload_contains=kb.KEEP_PAYLOAD)
+@activity_action
+async def keep(message: Message) -> None:
+    await _decide(message, keep=True)
+
+
+@labeler.message(payload_contains=kb.RELEASE_PAYLOAD)
+@activity_action
+async def release(message: Message) -> None:
+    await _decide(message, keep=False)
+
+
+async def _decide(message: Message, keep: bool) -> None:
+    """Вытащенная рыба: в садок или в воду. Работает и не у воды - решение
+    могло остаться висеть после ухода с озера."""
+    async with get_session_factory()() as db:
+        character = await onboarding_svc.get_character(db, message.from_id)
+        if character is None:
+            return
+        if keep:
+            decision = await fishing_service.keep_catch(db, character)
+        else:
+            decision = fishing_service.release_catch(character)
+        grams = await fishing_service.bag_total_grams(db, character.id)
+        capacity = fishing.bag_capacity_grams(character.fishing_level)
+        at_lake = character.screen == "lake"
+        await db.commit()
+    if decision is None:
+        await message.answer(ft.NOTHING_TO_DECIDE_TEXT, keyboard=kb.lake_keyboard() if at_lake else None)
+        return
+    if decision.bag_full:
+        await message.answer(ft.bag_full_decide_text(capacity), keyboard=kb.catch_keyboard())
+        return
+    line = ft.kept_line(decision) if decision.kept else ft.released_line(decision)
+    await message.answer(
+        f"{line}\n\n{ft.SEP}\n{ft.bag_line(grams, capacity)}\n{ft.SEP}",
+        keyboard=kb.lake_keyboard() if at_lake else None,
+    )
 
 
 async def _resolve_junk(db, character) -> tuple[str, str]:

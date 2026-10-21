@@ -88,6 +88,12 @@ def strike_expired(character: Character, now: datetime | None = None) -> bool:
     return now > deadline
 
 
+def has_catch(character: Character) -> bool:
+    """Рыба вытащена и ждёт решения: в садок или отпустить (2026-10-21).
+    Хранится в тех же полях, что и рыба на крючке, но снасть уже не в воде."""
+    return character.fishing_cast_at is None and character.fishing_pending_fish is not None
+
+
 def clear_cast(character: Character) -> None:
     character.fishing_cast_at = None
     character.fishing_bite_at = None
@@ -203,31 +209,8 @@ async def _apply_catch(
 ) -> StrikeResult:
     grade_id, grade_label, _mult = fishing.grade_for(fraction)
 
-    capacity = fishing.bag_capacity_grams(character.fishing_level)
-    current = await bag_total_grams(db, character.id)
-    if current >= capacity:
-        # Садок уже полон: заброс не завершается — снасть остаётся заброшенной,
-        # игрок идёт продавать. Лимит проверяется ДО добавления рыбы, а не
-        # после: пока в садке есть место хоть на грамм, последняя рыба влезает
-        # целиком, даже если вес перевалит за лимит (11/10 кг). Иначе крупный
-        # улов, пойманный в последний момент, терялся бы целиком — окно
-        # подсечки закрывается раньше, чем игрок успеет продать садок.
-        return StrikeResult(bag_full=True, grams=grams, fraction=fraction)
-
-    row = await db.scalar(
-        select(CharacterFish).where(
-            CharacterFish.character_id == character.id,
-            CharacterFish.fish_id == fish_id,
-            CharacterFish.grade == grade_id,
-        )
-    )
-    if row is None:
-        row = CharacterFish(
-            character_id=character.id, fish_id=fish_id, grade=grade_id, total_grams=0
-        )
-        db.add(row)
-    row.total_grams += grams
-
+    # 2026-10-21: в садок рыба идёт не сразу - игрок решает, оставить её или
+    # отпустить (keep_catch / release_catch). Опыт и рекорд - за саму поимку.
     is_record = await _update_record(db, character.id, fish_id, grams)
 
     xp = fishing.catch_xp(fish_id, fraction)
@@ -237,7 +220,8 @@ async def _apply_catch(
     if levels:
         character.fishing_level_at = datetime.now(timezone.utc)
     character.fishing_level, character.fishing_xp = level, remainder
-    clear_cast(character)
+    character.fishing_cast_at = None
+    character.fishing_bite_at = None
     await db.flush()
 
     return StrikeResult(
@@ -275,6 +259,54 @@ async def _update_record(
 
 
 # --- Садок --------------------------------------------------------------------
+
+@dataclass
+class Decision:
+    """Чем кончилось решение по улову. kept=False и bag_full=False - отпустил."""
+
+    fish: FishDef
+    grams: int
+    kept: bool = False
+    bag_full: bool = False
+
+
+async def keep_catch(db: AsyncSession, character: Character) -> Decision | None:
+    """Положить вытащенную рыбу в садок. None - решать нечего.
+
+    Лимит проверяется ДО добавления: пока в садке есть место хоть на грамм,
+    рыба влезает целиком, даже если вес перевалит за лимит (11/10 кг)."""
+    if not has_catch(character):
+        return None
+    fish_id, grams = character.fishing_pending_fish, character.fishing_pending_grams
+    fish = fishing.fish_def(fish_id)
+    capacity = fishing.bag_capacity_grams(character.fishing_level)
+    if await bag_total_grams(db, character.id) >= capacity:
+        return Decision(fish=fish, grams=grams, bag_full=True)
+    grade_id, _label, _mult = fishing.grade_for(fishing.fraction_of(fish_id, grams))
+    row = await db.scalar(
+        select(CharacterFish).where(
+            CharacterFish.character_id == character.id,
+            CharacterFish.fish_id == fish_id,
+            CharacterFish.grade == grade_id,
+        )
+    )
+    if row is None:
+        row = CharacterFish(character_id=character.id, fish_id=fish_id, grade=grade_id, total_grams=0)
+        db.add(row)
+    row.total_grams += grams
+    clear_cast(character)
+    await db.flush()
+    return Decision(fish=fish, grams=grams, kept=True)
+
+
+def release_catch(character: Character) -> Decision | None:
+    """Отпустить вытащенную рыбу. None - решать нечего."""
+    if not has_catch(character):
+        return None
+    decision = Decision(fish=fishing.fish_def(character.fishing_pending_fish), grams=character.fishing_pending_grams)
+    clear_cast(character)
+    return decision
+
 
 async def bag_total_grams(db: AsyncSession, character_id: int) -> int:
     total = await db.scalar(

@@ -248,113 +248,69 @@ async def test_drop_bag_loses_fish_without_transferring(db_session, make_charact
     assert await fishing_service.bag_total_grams(db_session, winner.id) == 0
 
 
-@pytest.mark.asyncio
-async def test_bag_capacity_blocks_catch_instead_of_dropping_fish(
-    db_session, make_character
-) -> None:
-    """Полный садок НЕ съедает пойманное молча: заброс просто не завершается."""
-    character = await make_character()
-    character.fishing_level = 1
-    capacity = fishing.bag_capacity_grams(character.fishing_level)
-    db_session.add(CharacterFish(
-        character_id=character.id, fish_id="monolith_catfish", grade="common",
-        total_grams=capacity,
-    ))
-    await db_session.flush()
-
-    character.fishing_pending_fish = "monolith_catfish"
-    character.fishing_pending_grams = 20000
-    from datetime import datetime, timedelta, timezone
-
-    now = datetime.now(timezone.utc)
-    character.fishing_cast_at = now - timedelta(seconds=10)
-    character.fishing_bite_at = now - timedelta(seconds=1)
+async def _landed(db_session, character, grams, now):
+    """Вытащить рыбу: гоняем сиды, пока леска не выдержит."""
+    from datetime import timedelta
 
     lake = fishing.lake_at(1, 0)
-    result = await fishing_service.strike(
-        db_session, character, lake, random.Random(0), now=now
-    )
+    for seed in range(50):
+        character.fishing_pending_fish = "monolith_catfish"
+        character.fishing_pending_grams = grams
+        character.fishing_cast_at = now - timedelta(seconds=10)
+        character.fishing_bite_at = now - timedelta(seconds=1)
+        result = await fishing_service.strike(db_session, character, lake, random.Random(seed), now=now)
+        if result.landed:
+            return result
+    raise AssertionError("рыба ни разу не удержалась")
 
-    assert result.bag_full is True
-    assert result.landed is False
-    # Снасть осталась заброшенной — игрок идёт продавать и возвращается.
-    assert character.fishing_pending_fish == "monolith_catfish"
+
+@pytest.mark.asyncio
+async def test_catch_waits_for_decision_and_full_bag_only_releases(db_session, make_character) -> None:
+    """2026-10-21: вытащенная рыба не лезет в садок сама - опыт сразу, садок
+    после «В садок». Полный садок рыбу не съедает: её можно только отпустить."""
+    from datetime import datetime, timezone
+
+    character = await make_character()
+    character.fishing_level = 1
+    # С запасом: поимка может поднять уровень рыбалки, а с ним и вместимость.
+    full = fishing.bag_capacity_grams(60) * 2
+    db_session.add(CharacterFish(
+        character_id=character.id, fish_id="monolith_catfish", grade="common", total_grams=full,
+    ))
+    await db_session.flush()
+    xp_before = character.fishing_xp
+
+    result = await _landed(db_session, character, 20000, datetime.now(timezone.utc))
+    assert result.xp > 0 and (character.fishing_xp != xp_before or character.fishing_level > 1)
+    assert fishing_service.has_catch(character) and not fishing_service.is_casting(character)
+    decision = await fishing_service.keep_catch(db_session, character)
+    assert decision.bag_full and fishing_service.has_catch(character)
+    assert await fishing_service.bag_total_grams(db_session, character.id) == full
+    released = fishing_service.release_catch(character)
+    assert released.fish.id == "monolith_catfish" and not fishing_service.has_catch(character)
+    assert await fishing_service.bag_total_grams(db_session, character.id) == full
 
 
 @pytest.mark.asyncio
 async def test_last_fish_may_exceed_capacity(db_session, make_character) -> None:
     """В садке есть место хоть на грамм - рыба ложится целиком, вес может выйти
     за лимит (11/10 кг). Не теряем крупный улов из-за нескольких граммов."""
-    from datetime import datetime, timedelta, timezone
+    from datetime import datetime, timezone
 
     character = await make_character()
     character.fishing_level = 1
     capacity = fishing.bag_capacity_grams(character.fishing_level)
     db_session.add(CharacterFish(
-        character_id=character.id, fish_id="monolith_catfish", grade="common",
-        total_grams=capacity - 1,
+        character_id=character.id, fish_id="monolith_catfish", grade="common", total_grams=capacity - 1,
     ))
     await db_session.flush()
 
-    character.fishing_pending_fish = "monolith_catfish"
-    character.fishing_pending_grams = 3000
-    now = datetime.now(timezone.utc)
-    character.fishing_cast_at = now - timedelta(seconds=10)
-    character.fishing_bite_at = now - timedelta(seconds=1)
-
-    lake = fishing.lake_at(1, 0)
-    # Обрыв леской разыгрывается отдельно от лимита - гоняем, пока рыба не
-    # удержится (rng фиксирован, но защищаемся от смены кривой обрыва).
-    result = None
-    for seed in range(50):
-        character.fishing_pending_fish = "monolith_catfish"
-        character.fishing_pending_grams = 3000
-        character.fishing_cast_at = now - timedelta(seconds=10)
-        character.fishing_bite_at = now - timedelta(seconds=1)
-        result = await fishing_service.strike(
-            db_session, character, lake, random.Random(seed), now=now
-        )
-        if result.landed:
-            break
-    assert result is not None and result.landed is True
-    assert result.bag_full is False
+    await _landed(db_session, character, 3000, datetime.now(timezone.utc))
+    assert await fishing_service.bag_total_grams(db_session, character.id) == capacity - 1  # ещё не решил
+    decision = await fishing_service.keep_catch(db_session, character)
+    assert decision.kept and not decision.bag_full
     assert await fishing_service.bag_total_grams(db_session, character.id) > capacity
-
-
-@pytest.mark.asyncio
-async def test_bag_over_capacity_blocks_next_catch(db_session, make_character) -> None:
-    """Садок уже выше лимита (последняя рыба переполнила) - следующая не влезает."""
-    from datetime import datetime, timedelta, timezone
-
-    character = await make_character()
-    character.fishing_level = 1
-    capacity = fishing.bag_capacity_grams(character.fishing_level)
-    db_session.add(CharacterFish(
-        character_id=character.id, fish_id="monolith_catfish", grade="common",
-        total_grams=capacity + 1000,
-    ))
-    await db_session.flush()
-
-    now = datetime.now(timezone.utc)
-    character.fishing_pending_fish = "monolith_catfish"
-    character.fishing_pending_grams = 500
-    character.fishing_cast_at = now - timedelta(seconds=10)
-    character.fishing_bite_at = now - timedelta(seconds=1)
-
-    lake = fishing.lake_at(1, 0)
-    result = None
-    for seed in range(50):
-        character.fishing_pending_fish = "monolith_catfish"
-        character.fishing_pending_grams = 500
-        character.fishing_cast_at = now - timedelta(seconds=10)
-        character.fishing_bite_at = now - timedelta(seconds=1)
-        result = await fishing_service.strike(
-            db_session, character, lake, random.Random(seed), now=now
-        )
-        if result.bag_full:
-            break
-    assert result is not None and result.bag_full is True
-    assert await fishing_service.bag_total_grams(db_session, character.id) == capacity + 1000
+    assert await fishing_service.keep_catch(db_session, character) is None  # решать уже нечего
 
 
 # --- Сквозной цикл ------------------------------------------------------------
@@ -389,6 +345,7 @@ async def test_full_cycle_cast_strike_catch_sell(db_session, make_character) -> 
             assert result.grams > 0
             assert result.grade_id in {g[1] for g in fc.GRADES}
             assert result.xp > 0
+            assert (await fishing_service.keep_catch(db_session, character)).kept
         # После любого исхода снасть свободна.
         assert character.fishing_cast_at is None
 
