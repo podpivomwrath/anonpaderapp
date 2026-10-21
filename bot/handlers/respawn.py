@@ -22,7 +22,7 @@ from game.world import flavor
 from game.world import world_config as wc
 from game.world import grid
 from models import Character, User
-from services import death_service, guild_territory_service, screen_service, vitals_service
+from services import death_service, guild_territory_service, pvp_shield, screen_service, vitals_service
 from services.db import get_session_factory
 
 _bot_api = None
@@ -129,7 +129,10 @@ async def register_death(
         pass
 
 
-CHAPEL_RESPAWN_TEXT = "⛪ Ты приходишь в себя у часовни своей гильдии. Колокол ещё гудит."
+CHAPEL_RESPAWN_TEXT = (
+    "⛪ Ты приходишь в себя у часовни своей гильдии. Колокол ещё гудит.\n"
+    "🛡 Две минуты на тебя не нападут, пока не уйдешь с этой клетки."
+)
 
 
 def _outside_gate(region: str) -> tuple[int, int]:
@@ -195,6 +198,9 @@ async def scan() -> None:
                     chapel = await guild_territory_service.chapel_cell(db, character.guild_id)
                     if chapel is not None:
                         character.pos_x, character.pos_y = chapel.x, chapel.y
+                        # Часовня стоит в поле: без щита у неё добивали бы
+                        # только что очнувшихся (2026-10-21, владелец).
+                        pvp_shield.grant(character.id, pvp_shield.CHAPEL, cell=(chapel.x, chapel.y))
                 # Патч 39: возрождение — всегда корневой экран (площадь).
                 await screen_service.set_screen(db, character, None)
                 to_revive.append((vk_id, None if chapel is not None else character.region))
