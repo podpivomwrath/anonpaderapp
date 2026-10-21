@@ -106,7 +106,7 @@ def busy_text(seconds: float) -> str:
     return f"⛏ Ты в забое. Осталось примерно {mining.format_duration(seconds)}."
 
 
-def dig_result_text(result) -> str:
+def dig_result_text(result, character=None) -> str:
     """Короткая сводка добычи: что подняли, опыт, уровень."""
     emoji = mc.GRADE_EMOJI.get(result.grade_id, "")
     mark = f"{emoji} " if emoji else ""
@@ -116,6 +116,12 @@ def dig_result_text(result) -> str:
     ]
     if result.levels_gained:
         lines.append(f"⬆️ Уровень горного дела: {result.new_level}")
+    if character is not None:
+        from game.combat import display
+
+        lines.append(display.craft_xp_line(
+            "⛏", "Горное дело", character.mining_level, character.mining_xp, mining.xp_to_next(character.mining_level),
+        ))
     return chr(10).join(lines)
 
 

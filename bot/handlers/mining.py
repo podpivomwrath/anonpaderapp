@@ -131,7 +131,7 @@ async def on_dig_done(peer_id: int) -> None:
 
     if result is None:
         return
-    text = mt.dig_result_text(result)
+    text = mt.dig_result_text(result, character)
     xp_line = experience_service.activity_xp_line(char_xp) if char_xp else ""
     if xp_line:
         text += f"\n{xp_line}"

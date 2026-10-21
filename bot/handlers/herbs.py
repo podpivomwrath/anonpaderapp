@@ -49,7 +49,7 @@ async def notify(peer_id: int, character) -> None:
     )
 
 
-def picked_text(result) -> str:
+def picked_text(result, character=None) -> str:
     herb = result.herb
     bunches = "два пучка" if result.amount == 2 else "пучок"
     text = f"{herb.emoji} {herb.name}: {bunches} в сумке травника. Травничество +{result.xp} опыта."
@@ -57,6 +57,14 @@ def picked_text(result) -> str:
         text += f"\n🌿 Травничество: {result.level_after} уровень."
     if result.unlocked:
         text += "\nТеперь ты различаешь новые травы: " + ", ".join(h.name for h in result.unlocked) + "."
+    if character is not None:
+        from game.combat import display
+        from game.economy import herbalism
+
+        text += "\n" + display.craft_xp_line(
+            "🌿", "Травничество", character.herbalism_level, character.herbalism_xp,
+            herbalism.xp_to_next(character.herbalism_level),
+        )
     return text
 
 
@@ -86,7 +94,7 @@ async def pick_herb(message: Message) -> None:
         result = await herb_service.pick(db, character, patch_id, _rng)
         progress = await daily_service.record_craft(db, character, "herb_pick") if result.status == "ok" else None
         await db.commit()
-    await message.answer(picked_text(result) if result.status == "ok" else REFUSALS[result.status])
+    await message.answer(picked_text(result, character) if result.status == "ok" else REFUSALS[result.status])
     notice = dailies_texts.progress_notice(progress) if progress is not None else None
     if notice:
         await message.answer(notice)

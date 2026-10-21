@@ -240,8 +240,9 @@ async def strike(message: Message) -> None:
         body = prefix + ft.break_text(result.fraction) + f"\n🎣 +{result.xp} опыта рыбалки"
         if result.levels_gained:
             body += f"\n⬆️ Уровень рыбалки: {result.new_level}"
+        body += f"\n{ft.fishing_xp_line(character)}"
     else:
-        body = ft.catch_text(result)
+        body = ft.catch_text(result, character)
         xp_line = experience_service.activity_xp_line(char_xp) if char_xp else ""
         if xp_line:
             body += f"\n{xp_line}"

@@ -161,3 +161,13 @@ def action_line(
     """
     delta_line = hp_delta_line(hp_before, hp_after, max_hp, mode)
     return f"{actor_name} {verb} → {target_name}: {delta_line}{suffix}"
+
+
+def craft_xp_line(emoji: str, title: str, level: int, xp: int, need: int) -> str:
+    """Шкала опыта ремесла под логом сбора, варки, улова (2026-10-21):
+    «🌿 Травничество 3 ур.: ▰▰▰▱▱▱▱▱▱▱ 12 / 22». need=0 - потолок."""
+    if need <= 0:
+        return f"{emoji} {title} {level} ур.: МАКС"
+    ratio = max(0.0, min(xp / need, 1.0))
+    filled = round(ratio * BAR_WIDTH)
+    return f"{emoji} {title} {level} ур.: {BAR_FILLED * filled}{BAR_EMPTY * (BAR_WIDTH - filled)} {xp} / {need}"

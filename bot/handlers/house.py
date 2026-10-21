@@ -22,6 +22,7 @@ from bot.vk_media import photo_attachment
 from bot.keyboards.layout import add_paired
 from bot.keyboards.world import add_miniapp_button
 from bot.world_texts import FOREIGN_NPC_REJECTION
+from game.combat import display
 from game.economy import alchemy, cooking, fishing, herbalism
 from game.economy import cooking_config as cc
 from game.economy import fishing_config as fc
@@ -158,7 +159,7 @@ def brewing_text(character: Character) -> str:
             "Выйти из дома до конца варки нельзя. Бросишь - травы и золото пропадут.")
 
 
-def brewed_text(result: alchemy_service.Brewed) -> str:
+def brewed_text(result: alchemy_service.Brewed, character: Character | None = None) -> str:
     d = elixir_service.elixir_def(result.recipe.elixir_id)
     text = f"⚗️ Готово: {d.emoji} {d.name} ×{result.amount}, уже в инвентаре. Алхимия +{result.xp} опыта."
     if result.level_after > result.level_before:
@@ -166,6 +167,10 @@ def brewed_text(result: alchemy_service.Brewed) -> str:
     if result.unlocked:
         names = ", ".join(elixir_service.elixir_def(r.elixir_id).name for r in result.unlocked)
         text += f"\nНовые рецепты: {names}."
+    if character is not None:
+        text += "\n" + display.craft_xp_line(
+            "⚗️", "Алхимия", character.alchemy_level, character.alchemy_xp, alchemy.xp_to_next(character.alchemy_level),
+        )
     return text
 
 
@@ -214,7 +219,7 @@ def cooking_text(character: Character) -> str:
             "Выйти из дома до конца готовки нельзя. Бросишь - рыба, трава и золото пропадут.")
 
 
-def cooked_text(result: cooking_service.Cooked) -> str:
+def cooked_text(result: cooking_service.Cooked, character: Character | None = None) -> str:
     d = cooking.dish_def(result.dish.dish_id)
     text = (f"🔥 Готово: {d.emoji} {d.name} ×{result.portions} · рыба {fishing.grade_name(result.grade)}. "
             f"Съесть - в мини-аппе (Инвентарь, «Еда») или командой /съесть. Кулинария +{result.xp} опыта.")
@@ -222,6 +227,10 @@ def cooked_text(result: cooking_service.Cooked) -> str:
         text += f"\n🔥 Кулинария: {result.level_after} уровень."
     if result.unlocked:
         text += "\nНовые рецепты: " + ", ".join(cooking.dish_def(x.dish_id).name for x in result.unlocked) + "."
+    if character is not None:
+        text += "\n" + display.craft_xp_line(
+            "🔥", "Кулинария", character.cooking_level, character.cooking_xp, cooking.xp_to_next(character.cooking_level),
+        )
     return text
 
 
@@ -404,7 +413,7 @@ async def tick_job() -> None:
                 await screen_service.set_screen(db, character, "alchemy")
                 peer = await onboarding_svc.vk_id_for_character(db, character.id)
                 progress = await daily_service.record_craft(db, character, "brew")
-                done.append((peer, f"{brewed_text(result)}\n\n{await alchemy_text(db, character)}",
+                done.append((peer, f"{brewed_text(result, character)}\n\n{await alchemy_text(db, character)}",
                              alchemy_keyboard(character.alchemy_level), progress))
             for character in await cooking_service.due(db):
                 result = await cooking_service.finish(db, character)
@@ -413,7 +422,7 @@ async def tick_job() -> None:
                 await screen_service.set_screen(db, character, "oven")
                 peer = await onboarding_svc.vk_id_for_character(db, character.id)
                 progress = await daily_service.record_craft(db, character, "cook")
-                done.append((peer, f"{cooked_text(result)}\n\n{await oven_text(db, character)}",
+                done.append((peer, f"{cooked_text(result, character)}\n\n{await oven_text(db, character)}",
                              oven_keyboard(character.cooking_level), progress))
             await db.commit()
     except Exception:

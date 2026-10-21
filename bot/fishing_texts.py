@@ -104,7 +104,15 @@ def break_text(fraction: float) -> str:
     return result
 
 
-def catch_text(result) -> str:
+def fishing_xp_line(character) -> str:
+    from game.combat import display
+
+    return display.craft_xp_line(
+        "🎣", "Рыбалка", character.fishing_level, character.fishing_xp, fishing.xp_to_next(character.fishing_level),
+    )
+
+
+def catch_text(result, character=None) -> str:
     """Сообщение об удачной подсечке: строка улова, рекорд, опыт. Описание
     вида сюда НЕ попадает — его место в альманахе, а не в каждой поимке."""
     fish = result.fish
@@ -121,6 +129,8 @@ def catch_text(result) -> str:
     lines.append(f"🎣 +{result.xp} опыта рыбалки")
     if result.levels_gained:
         lines.append(f"⬆️ Уровень рыбалки: {result.new_level}")
+    if character is not None:
+        lines.append(fishing_xp_line(character))
     return chr(10).join(lines)
 
 

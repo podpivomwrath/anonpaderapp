@@ -88,6 +88,8 @@ async def test_pick_gives_bag_and_xp_and_removes_patch(db_session, character_at)
     assert [(h.id, n) for h, n in await herb_service.get_bag(db_session, c.id)] == [("bitter_wormwood", 1)]
     assert (await herb_service.pick(db_session, c, patch.id, random.Random(1), NOW)).status == "gone"
     assert "пучок в сумке" in herb_handlers.picked_text(res)
+    # Шкала опыта ремесла под логом (2026-10-21).
+    assert "🌿 Травничество 1 ур.: ▰▰▰▰▰▰▰▱▱▱ 10 / 14" in herb_handlers.picked_text(res, c)
 
 
 async def test_pick_refuses_elsewhere_unseen_and_withered(db_session, character_at) -> None:
