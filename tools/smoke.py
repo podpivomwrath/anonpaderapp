@@ -43,13 +43,14 @@ class FakeRequest(dict):
 
 async def main() -> int:
     from bot import miniapp_api, miniapp_guild_api, miniapp_map_api, miniapp_shop_api
-    from bot.app_keys import SESSION_FACTORY_KEY
+    from bot.app_keys import SESSION_FACTORY_KEY, SETTINGS_KEY
+    from config import get_settings
     from bot.handlers import world as world_handlers
     from services import admin_service, onboarding_service
     from services.db import get_session_factory
 
     factory = get_session_factory()
-    app = {SESSION_FACTORY_KEY: factory}
+    app = {SESSION_FACTORY_KEY: factory, SETTINGS_KEY: get_settings()}
     checks = {
         "персонаж": miniapp_api.handle_get_character,
         "сумка": miniapp_api.handle_get_inventory,
