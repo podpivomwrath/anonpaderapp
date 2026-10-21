@@ -143,6 +143,8 @@ async def test_world_actions_blocked_in_party_battle(monkeypatch, db_session, ma
         async def __aenter__(self): return db_session
         async def __aexit__(self, *args): pass
     monkeypatch.setattr(world, "get_session_factory", lambda: Context)
+    from bot.handlers import rest as rest_handlers
+    monkeypatch.setattr(rest_handlers, "get_session_factory", lambda: Context)
     monkeypatch.setattr(world.onboarding_svc, "get_character", get_character)
     handler = raid_combat if mode == "raid" else group_combat
     name = "has_active_battle" if mode == "raid" else "has_active_group_battle"
@@ -150,7 +152,7 @@ async def test_world_actions_blocked_in_party_battle(monkeypatch, db_session, ma
     replies = []
     async def answer(*args, **kwargs): replies.append(args)
     message = SimpleNamespace(peer_id=777, from_id=777, text="↑", answer=answer)
-    for action in (world.move, world.explore, world.rest):
+    for action in (world.move, world.explore, rest_handlers.rest):
         await action(message)
     assert len(replies) == 3
     assert player.travel_arrives_at is None

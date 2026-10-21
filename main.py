@@ -313,7 +313,9 @@ async def run() -> None:
     travel_scheduler.start()
     explore_scheduler = PeerScheduler(world_handlers.handle_explore_done, job_prefix="explore")
     explore_scheduler.start()
-    rest_scheduler = PeerScheduler(world_handlers.handle_rest_done, job_prefix="rest")
+    from bot.handlers import rest as rest_handlers
+
+    rest_scheduler = PeerScheduler(rest_handlers.handle_rest_done, job_prefix="rest")
     rest_scheduler.start()
     world_handlers.setup(travel_scheduler, explore_scheduler, rest_scheduler, bot.api)
     # Переходы, исследования и отдых, оборванные перезапуском (патч 98).

@@ -197,7 +197,9 @@ def test_mining_blocks_move_explore_and_rest() -> None:
 
     from bot.handlers import world as world_handlers
 
-    for handler in (world_handlers._move, world_handlers.explore, world_handlers.rest):
+    from bot.handlers import rest as rest_handlers
+
+    for handler in (world_handlers._move, world_handlers.explore, rest_handlers.rest):
         source = inspect.getsource(handler)
         assert "_in_mine_digging" in source, f"{handler.__name__} не знает про добычу"
 
