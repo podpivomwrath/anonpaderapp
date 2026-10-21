@@ -24,7 +24,8 @@ TEXT_ONLY = FuncRule(lambda m: m.payload is None)
 #: нём не меняют: не считаются ответом и не трогают клавиатуру.
 INFO_COMMANDS = frozenset({
     "/разломы", "/разлом", "/rifts", "/заказ", "/заказы", "/contract", "/ежедневки", "/daily",
-    "/топ", "/top", "/квест", "/quest", "/ключ", "/profile", "/баг", "/bug",
+    "/топ", "/top", "/квест", "/quest", "/ключ", "/profile", "/профиль", "/баг", "/bug",
+    "/гильдия", "/guild",
 })
 
 

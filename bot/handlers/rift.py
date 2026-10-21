@@ -41,7 +41,7 @@ def setup(bot_api) -> None:
     _bot_api = bot_api
 
 
-@labeler.message(text=["/разломы", "/разлом", "/rifts", "разломы"])
+@labeler.message(text=["/разломы", "/разлом", "/rifts"])
 async def rifts_command(message: Message) -> None:
     """Активные разломы: где, какие уровни, босс и что с ним сейчас (2026-10-14)."""
     from bot.handlers import raid_combat

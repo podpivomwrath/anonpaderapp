@@ -31,6 +31,6 @@ async def test_invite_matches_any_case_and_keeps_the_name() -> None:
     )
 
     class Msg:
-        text = "ПРИГЛАСИТЬ ПупсиК"
+        text = "/ПРИГЛАСИТЬ ПупсиК"
 
     assert await rule.check(Msg()) == {"name": "ПупсиК"}

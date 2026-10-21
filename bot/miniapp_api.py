@@ -640,8 +640,8 @@ def _consumables_payload(stock) -> list[dict]:
             "icon": f"elixir:{elixir.id}",
             "category_title": _ELIXIR_CATEGORY_TITLES.get(elixir.category, elixir.category),
             "description": elixir.description,
-            # Количество клиент допишет после ползунка: «передать <имя> <N>».
-            "transfer_prefix": f"передать {elixir.name}",
+            # Количество клиент допишет после ползунка: «/передать <имя> <N>».
+            "transfer_prefix": f"/передать {elixir.name}",
         }
         for elixir, count in stock
     ]

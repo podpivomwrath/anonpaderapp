@@ -156,7 +156,7 @@ async def test_nothing_named_like_that(db_session, make_character) -> None:
 def test_command_for_names_the_exact_item() -> None:
     from types import SimpleNamespace
 
-    assert ts.command_for(SimpleNamespace(name="Скальпель Хирурга", id=1212)) == "передать Скальпель Хирурга 1212"
+    assert ts.command_for(SimpleNamespace(name="Скальпель Хирурга", id=1212)) == "/передать Скальпель Хирурга 1212"
 
 
 async def test_equipped_service_item_says_it_is_never_transferable(db_session, make_character) -> None:
@@ -177,8 +177,8 @@ def test_miniapp_offers_the_command_for_every_transferable_item() -> None:
         base.update(kw)
         return SimpleNamespace(**base)
 
-    assert _transfer_command(item()) == "передать Пепельный клинок 7"
-    assert _transfer_command(item(rarity="unique", name="Скальпель Хирурга")) == "передать Скальпель Хирурга 7"
+    assert _transfer_command(item()) == "/передать Пепельный клинок 7"
+    assert _transfer_command(item(rarity="unique", name="Скальпель Хирурга")) == "/передать Скальпель Хирурга 7"
     assert _transfer_command(item(bound=True, craft_spec="dps")) is None
     assert _transfer_command(item(admin_only=True)) is None
 
@@ -209,7 +209,7 @@ async def test_inventory_payload_lists_relics_and_consumables(db_session, make_c
     assert relic["rarity_title"] == "Редкая" and relic["price_total"] == relic["price"] * 3
     assert relic["icon"] == "trophy:blood_shard" and relic["description"]
     potion = payload["consumables"][0]
-    assert potion["transfer_prefix"] == "передать Малое исцеление" and potion["count"] == 4
+    assert potion["transfer_prefix"] == "/передать Малое исцеление" and potion["count"] == 4
 
 
 # --- Налог фракции на переводы валюты (2026-10-15) ---

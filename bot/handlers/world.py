@@ -1756,7 +1756,7 @@ async def broadcast_service_notice(text: str) -> int:
     return sent
 
 
-@labeler.message(text=["/клавиатура", "/keyboard"])
+@labeler.message(text=["/клавиатура", "/клава", "/keyboard"])
 async def keyboard_command(message: Message) -> None:
     """Патч 25, п.5: пересобрать и прислать актуальную клавиатуру, ничего не
     прерывая — работает всегда, включая PvP."""

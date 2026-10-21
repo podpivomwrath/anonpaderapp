@@ -36,8 +36,8 @@ NAMESPACE = "transfer"
 
 USAGE_TEXT = (
     "Чтобы передать, перешли сообщение получателя с подписью:\n"
-    "передать <что> <сколько>\n"
-    "Например: передать золото 500, передать Малое исцеление 3, передать Скальпель Хирурга.\n"
+    "/передать <что> <сколько>\n"
+    "Например: /передать золото 500, /передать Малое исцеление 3, /передать Скальпель Хирурга.\n"
     "Золото и самоцветы - от 100; 5% от перевода уходит в казну фракции получателя."
 )
 
@@ -150,7 +150,7 @@ def _resolve_qty(offer: transfer_service.Offer, qty: int | None) -> tuple[int | 
         return 1, None  # экипировка - всегда одна штука, даже если написали число
     if qty is None:
         if offer.kind in ("gold", "gems"):
-            return None, "Укажи сколько: например, «передать золото 500»."
+            return None, "Укажи сколько: например, «/передать золото 500»."
         qty = 1
     if qty <= 0:
         return None, "Количество должно быть больше нуля."
@@ -191,7 +191,7 @@ async def _ask_confirm(peer_id: int, pending: Pending) -> None:
     await editable_message.send_or_edit(_bot_api, NAMESPACE, peer_id, text, _confirm_keyboard(pending.token))
 
 
-@labeler.message(regex=r"(?is)^\s*/?передать(?:\s+(.*))?$")
+@labeler.message(regex=r"(?is)^\s*/передать(?:\s+(.*))?$")
 @activity_action
 async def transfer_command(message: Message, match: tuple) -> None:
     peer_id = message.peer_id

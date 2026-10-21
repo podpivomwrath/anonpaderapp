@@ -12,7 +12,7 @@ labeler = BotLabeler()
 labeler.vbml_ignore_case = True  # команды без учёта регистра: «Пригласить» = «пригласить»
 
 
-@labeler.message(text=["/profile", "profile", "профиль", "Профиль"])
+@labeler.message(text=["/профиль", "/profile"])
 async def handle_profile(message: Message) -> None:
     async with get_session_factory()() as session:
         text = await get_profile_text(session, vk_id=message.from_id)

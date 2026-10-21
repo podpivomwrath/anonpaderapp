@@ -29,8 +29,8 @@ labeler.vbml_ignore_case = True  # команды без учёта регист
 _bot_api = None
 
 USAGE_TEXT = (
-    "Чтобы пригласить в группу: напиши «пригласить Никнейм» или перешли "
-    "сообщение игрока боту с подписью «пригласить»."
+    "Чтобы пригласить в группу: напиши «/пригласить Никнейм» или перешли "
+    "сообщение игрока боту с подписью «/пригласить»."
 )
 NOT_FOUND_TEXT = "Игрок с таким ником не найден."
 
@@ -68,12 +68,12 @@ async def _send_invite(message: Message, nickname: str) -> None:
         )
 
 
-@labeler.message(text=["пригласить <name>", "/invite <name>"])
+@labeler.message(text=["/пригласить <name>", "/invite <name>"])
 async def invite_by_name(message: Message, name: str) -> None:
     await _send_invite(message, name)
 
 
-@labeler.message(text=["пригласить"])
+@labeler.message(text=["/пригласить", "/invite"])
 async def invite_by_forward(message: Message) -> None:
     """Пересылка сообщения игрока боту с подписью «пригласить» — id
     отправителя берётся из fwd_messages/reply_message (vkbottle Message)."""

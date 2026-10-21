@@ -197,7 +197,7 @@ async def season_job() -> None:
 # --- Команда «Гильдия» --------------------------------------------------------------
 
 
-@labeler.message(text=["Гильдия", "гильдия"])
+@labeler.message(text=["/гильдия", "/guild"])
 async def guild_command(message: Message) -> None:
     async with get_session_factory()() as db:
         character = await onboarding_service.get_character(db, message.from_id)
@@ -225,7 +225,7 @@ async def guild_command(message: Message) -> None:
         role = "наступаем" if siege.attacker_guild_id == guild.id else "обороняемся"
         lines.append(f"⚔️ Осада ({siege.x}; {siege.y}), {role}: {when} МСК.")
     if boss is not None:
-        lines.append(f"🗿 {guild_boss_service.boss_title(boss)} призван: {boss.hp}/{boss.max_hp}. Команда «Страж».")
+        lines.append(f"🗿 {guild_boss_service.boss_title(boss)} призван: {boss.hp}/{boss.max_hp}. Команда «/страж».")
     lines.append("Управление - в мини-аппе, раздел «Гильдия».")
     await message.answer("\n".join(lines))
 
@@ -243,7 +243,7 @@ def boss_keyboard() -> str:
 GUARDIAN_PHOTO_ID = "457239250"
 
 
-@labeler.message(text=["Страж", "страж"])
+@labeler.message(text=["/страж"])
 async def boss_status(message: Message) -> None:
     async with get_session_factory()() as db:
         character = await onboarding_service.get_character(db, message.from_id)
@@ -406,6 +406,6 @@ async def announce_boss(guild_id: int, x: int, y: int, court: bool = False) -> N
     await notify_guild(
         guild_id,
         f"🗿 Страж {'Двора' if court else 'цитадели'} призван {where}! Бить его можно раз в час, "
-        f"{gc.BOSS_LIFETIME_HOURS} ч. Команда «Страж».",
+        f"{gc.BOSS_LIFETIME_HOURS} ч. Команда «/страж».",
     )
 

@@ -293,4 +293,4 @@ async def recent(db: AsyncSession, character_id: int, limit: int = 20) -> list[T
 
 def command_for(item: Item) -> str:
     """«передать Скальпель Хирурга 1212» - команда на ровно этот экземпляр."""
-    return f"передать {item.name} {item.id}"
+    return f"/передать {item.name} {item.id}"

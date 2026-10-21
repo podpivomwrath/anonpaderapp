@@ -55,6 +55,10 @@ def create_bot(settings: Settings) -> Bot:
     for labeler in LABELERS:
         bot.labeler.load(labeler)
     moderation_handlers.setup_middleware(bot)  # патч 27: бан-гейт РАНЬШЕ всех остальных middleware
+    # 2026-10-21: набранный текст без кнопки и без «/» бот не читает
+    from bot import button_gate
+
+    button_gate.setup_middleware(bot)
     # 2026-10-15: пользовательское соглашение - сразу после бан-гейта
     from bot.handlers import terms as terms_handlers
 
