@@ -136,6 +136,9 @@ async def pay(db: AsyncSession, character: Character, req: Requirement | None) -
         )
         if not result.rowcount:
             return False
+        from services import resource_log
+
+        resource_log.add(db, character.id, "trophy", trophy_id, -1)
     return True
 
 

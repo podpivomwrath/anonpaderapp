@@ -241,6 +241,9 @@ async def upgrade(db: AsyncSession, character: Character, slot, part_id) -> Trad
     )
     if not result.rowcount:
         raise TradeError(f"Нужно {ore_count} шт. обычной руды «{ore.name if ore else ore_id}».")
+    from services import resource_log
+
+    resource_log.add(db, character.id, "ore", f"{ore_id}:common", -ore_count)
     try:
         await wallet_service.charge(db, character.id, "farm", gold)
     except wallet_service.NotEnoughCurrency:

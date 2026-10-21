@@ -337,6 +337,7 @@ async def player_card(db: AsyncSession, character_id: int) -> dict | None:
     recent_actions = await action_journal(db, limit=10, target_character_id=character_id)
     crafts_block = await _crafts_card(db, character)
     crafts_block["wallet_log"] = await wallet_journal(db, character_id)
+    crafts_block["resource_log"] = await resource_journal(db, character_id)
 
     return {
         "id": character.id,
@@ -504,6 +505,58 @@ async def wallet_journal(db: AsyncSession, character_id: int) -> list[dict]:
         }
         for r in rows
     ]
+
+
+RESOURCE_KINDS = {"ore": "⛏", "fish": "🐟", "herb": "🌿", "food": "🍲", "elixir": "🧪", "trophy": "💀", "item": "⚔️"}
+
+
+async def _resource_label(db: AsyncSession, kind: str, ref: str) -> str:
+    from game.economy import cooking, fishing, herbalism, mining
+    from models import Item
+    from services import elixir_service, trophy_service
+
+    head, _, grade = ref.partition(":")
+    if kind == "ore":
+        d = mining.ore_def(head)
+        return f"{d.name if d else head} ({mining.grade_name(grade)})"
+    if kind == "fish":
+        d = fishing.fish_def(head)
+        return f"{d.name if d else head} ({fishing.grade_name(grade)})"
+    if kind == "food":
+        d = cooking.dish_def(head)
+        return f"{d.name if d else head} (рыба {fishing.grade_name(grade)})"
+    if kind == "herb":
+        d = herbalism.herb_def(head)
+        return d.name if d else head
+    if kind == "elixir":
+        d = elixir_service.elixir_def(head)
+        return d.name if d else head
+    if kind == "trophy":
+        d = trophy_service.trophy_def(head)
+        return d.name if d else head
+    if kind == "item" and head.isdigit():
+        item = await db.get(Item, int(head))
+        return f"{item.name} #{head}" if item else f"вещь #{head}"
+    return ref
+
+
+async def resource_journal(db: AsyncSession, character_id: int, limit: int = 40) -> list[dict]:
+    """Последние изменения руды, рыбы, трав, еды, зелий, реликвий и вещей (2026-10-21)."""
+    from models import ResourceLog
+
+    rows = (await db.scalars(
+        select(ResourceLog).where(ResourceLog.character_id == character_id)
+        .order_by(ResourceLog.id.desc()).limit(limit)
+    )).all()
+    out = []
+    for r in rows:
+        amount = f"{r.delta / 1000:+.1f} кг".replace(".", ",") if r.kind == "fish" else f"{r.delta:+d}"
+        out.append({
+            "at": r.created_at.isoformat() if r.created_at else None,
+            "what": f"{RESOURCE_KINDS.get(r.kind, '')} {await _resource_label(db, r.kind, r.ref)}",
+            "amount": amount, "reason": WALLET_REASONS.get(r.reason, r.reason),
+        })
+    return out
 
 
 async def _crafts_card(db: AsyncSession, character: Character) -> dict:

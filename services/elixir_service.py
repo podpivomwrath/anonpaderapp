@@ -131,4 +131,8 @@ async def consume(db: AsyncSession, character_id: int, elixir_id: str) -> bool:
         .values(count=CharacterConsumable.count - 1)
         .execution_options(synchronize_session="fetch")
     )
+    if result.rowcount:
+        from services import resource_log
+
+        resource_log.add(db, character_id, "elixir", elixir_id, -1)
     return bool(result.rowcount)

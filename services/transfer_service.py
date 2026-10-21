@@ -223,18 +223,29 @@ class TransferFailed(Exception):
     pass
 
 
+def _log_stack(db: AsyncSession, model, key: dict, delta: int) -> None:
+    from services import resource_log
+
+    spec = resource_log.TRACKED.get(model)
+    if spec is not None:
+        ref = ":".join(str(v) for k, v in key.items() if k != "character_id")
+        resource_log.add(db, key["character_id"], spec[0], ref, delta)
+
+
 async def _credit_stack(db: AsyncSession, model, key: dict, amount: int) -> None:
     """Прибавка получателю одним UPDATE; строки нет - вставка. Если строку
     в ту же секунду вставил параллельный запрос - снова UPDATE."""
     where = [getattr(model, k) == v for k, v in key.items()]
     result = await db.execute(update(model).where(*where).values(count=model.count + amount))
     if result.rowcount:
+        _log_stack(db, model, key, amount)
         return
     try:
         async with db.begin_nested():
             db.add(model(**key, count=amount))
     except IntegrityError:
         await db.execute(update(model).where(*where).values(count=model.count + amount))
+        _log_stack(db, model, key, amount)
 
 
 async def _take_stack(db: AsyncSession, model, key: dict, amount: int) -> bool:
@@ -243,6 +254,8 @@ async def _take_stack(db: AsyncSession, model, key: dict, amount: int) -> bool:
         update(model).where(*where, model.count >= amount).values(count=model.count - amount)
         .execution_options(synchronize_session="fetch")
     )
+    if result.rowcount:
+        _log_stack(db, model, key, -amount)
     return bool(result.rowcount)
 
 
@@ -305,6 +318,7 @@ async def take(db: AsyncSession, sender_id: int, offer: Offer, amount: int) -> i
         )
         if not taken.rowcount:
             raise TransferFailed("Этой рыбы у тебя уже нет.")
+        _log_stack(db, CharacterFish, {"character_id": sender_id, "fish_id": fish_id, "grade": grade}, -int(grams))
     elif offer.kind == "item":
         item = await db.get(Item, int(offer.ref), with_for_update=True)
         if item is None or item.admin_only or item.bound or item.craft_spec is not None:
@@ -318,6 +332,9 @@ async def take(db: AsyncSession, sender_id: int, offer: Offer, amount: int) -> i
         )
         if not moved.rowcount:
             raise TransferFailed("Этой вещи у тебя уже нет - или она надета.")
+        from services import resource_log
+
+        resource_log.add(db, sender_id, "item", offer.ref, -1)
     else:
         raise TransferFailed("Это не передаётся.")
     return amount
@@ -356,6 +373,8 @@ async def give(db: AsyncSession, recipient_id: int, kind: str, ref: str | None, 
                                  .values(total_grams=CharacterFish.total_grams + int(grams)))
         if not added.rowcount:
             db.add(CharacterFish(character_id=recipient_id, fish_id=fish_id, grade=grade, total_grams=int(grams)))
+        else:
+            _log_stack(db, CharacterFish, {"character_id": recipient_id, "fish_id": fish_id, "grade": grade}, int(grams))
     return amount
 
 

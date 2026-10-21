@@ -326,6 +326,9 @@ async def run() -> None:
     # Без этого у игрока оставалась клавиатура ожидания без кнопок, а само
     # занятие не заканчивалось никогда.
     pending_activity.setup(redis)
+    from bot import action_log
+
+    action_log.setup(redis)  # 2026-10-21: последние действия игрока - в карточке админки
     resumed = await world_handlers.resume_after_restart()
     # Рыбалка и добыча: их состояние в базе, таймеры - в памяти (2026-10-12).
     resumed["fishing"] = await fishing_handlers.resume_after_restart()
@@ -349,6 +352,16 @@ async def run() -> None:
 
     turbo_handlers.setup(bot.api)
     await turbo_handlers.load_naming()
+    async def resource_log_cleanup() -> None:
+        from services import resource_log
+
+        async with get_session_factory()() as db:
+            await resource_log.cleanup(db)
+            await db.commit()
+
+    # Журнал ресурсов хранит 7 дней (2026-10-21).
+    respawn_scheduler.add_job(resource_log_cleanup, "interval", hours=1, id="resource_log_cleanup",
+                              max_instances=1, coalesce=True)
     respawn_scheduler.add_job(turbo_handlers.tick_job, "interval", seconds=20,
                              id="turbo_ishak", max_instances=1, coalesce=True)
     # Курьер (2026-10-19): шаги по клеткам и сообщения о посылках.

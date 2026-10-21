@@ -772,6 +772,32 @@ function PlayerCard({ card, onRefresh }) {
         </Fold>
       )}
 
+      {card.resource_log && (
+        <Fold title={<>Журнал ресурсов и вещей ({card.resource_log.length})</>}>
+          {card.resource_log.length === 0 && <Div style={{ opacity: 0.7 }}>За неделю изменений не было.</Div>}
+          {card.resource_log.map((r, i) => (
+            <StatRow
+              key={i}
+              label={`${new Date(r.at).toLocaleString('ru')} · ${r.what} · ${r.reason}`}
+              value={r.amount}
+            />
+          ))}
+        </Fold>
+      )}
+
+      {card.actions && (
+        <Fold title={<>Последние действия в чате ({card.actions.length})</>}>
+          {card.actions.length === 0 && <Div style={{ opacity: 0.7 }}>За двое суток ничего не дошло до бота.</Div>}
+          {card.actions.map((a, i) => (
+            <StatRow
+              key={i}
+              label={`${new Date(a.at * 1000).toLocaleString('ru')} · ${a.kind}${a.accepted ? '' : ' (отсеяно: не кнопка)'}`}
+              value={a.text || '-'}
+            />
+          ))}
+        </Fold>
+      )}
+
       <Fold title={<>Снаряжение</>}>
         {card.inventory.length === 0 && <Div style={{ opacity: 0.7 }}>Инвентарь пуст.</Div>}
         {card.inventory.map((item) => (

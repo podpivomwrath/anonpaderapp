@@ -60,7 +60,11 @@ async def allowed(message: Message) -> bool:
 
 class ButtonGateMiddleware(BaseMiddleware[Message]):
     async def pre(self) -> None:
-        if not await allowed(self.event):
+        from bot import action_log
+
+        ok = await allowed(self.event)
+        await action_log.record(self.event, ok)
+        if not ok:
             self.stop("typed text ignored")
 
 

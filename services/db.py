@@ -9,6 +9,9 @@ from sqlalchemy.ext.asyncio import (
 
 from config import get_settings
 
+# Журнал ресурсов слушает сохранения любой сессии (2026-10-21).
+import services.resource_log  # noqa: E402,F401
+
 _engine: AsyncEngine | None = None
 _session_factory: async_sessionmaker[AsyncSession] | None = None
 

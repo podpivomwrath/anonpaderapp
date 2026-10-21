@@ -98,6 +98,10 @@ async def _spend_ore(
         )
         .values(count=CharacterOre.count - amount)
     )
+    if result.rowcount:
+        from services import resource_log
+
+        resource_log.add(db, character_id, "ore", f"{ore_id}:{grade}", -amount)
     if not result.rowcount:
         have = await ore_amount(db, character_id, ore_id, grade)
         definition = mining.ore_def(ore_id)

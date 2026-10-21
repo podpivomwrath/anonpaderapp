@@ -427,6 +427,9 @@ async def sell_item(
     )
     if not claimed.rowcount:
         return 0
+    from services import resource_log
+
+    resource_log.add(db, character.id, "item", str(item_id), -1)
     db.expunge(row)
     await db.execute(delete(Item).where(Item.id == item_id))
     db.expunge(item)

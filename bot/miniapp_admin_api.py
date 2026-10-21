@@ -148,6 +148,9 @@ async def handle_get_player(request: web.Request) -> web.Response:
     # что и bot/miniapp_map_api.py::_blocked_reason (сервисный слой намеренно
     # не импортирует bot/handlers/*, см. докстринг admin_service.py).
     vk_id = card.get("vk_id")
+    from bot import action_log
+
+    card["actions"] = await action_log.recent(vk_id)
     card["in_combat"] = vk_id is not None and combat_handlers.has_active_encounter(vk_id)
     card["in_pvp"] = vk_id is not None and pvp_handlers.has_active_battle(vk_id)
     card["busy"] = vk_id is not None and world_handlers.is_busy(vk_id)

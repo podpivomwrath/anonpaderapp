@@ -403,6 +403,10 @@ async def sell_bag(
     await db.execute(
         delete(CharacterFish).where(CharacterFish.character_id == character.id)
     )
+    from services import resource_log
+
+    for definition, grade_id, grams in bag:
+        resource_log.add(db, character.id, "fish", f"{definition.id}:{grade_id}", -grams)
     await wallet_service.deposit(db, character.id, "farm", gold)
     await db.flush()
     return gold, grams_total
@@ -419,6 +423,10 @@ async def drop_bag(db: AsyncSession, character_id: int) -> int:
     """
     grams = await bag_total_grams(db, character_id)
     if grams:
+        from services import resource_log
+
+        for definition, grade_id, stack in await get_bag(db, character_id):
+            resource_log.add(db, character_id, "fish", f"{definition.id}:{grade_id}", -stack)
         await db.execute(
             delete(CharacterFish).where(CharacterFish.character_id == character_id)
         )

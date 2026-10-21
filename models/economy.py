@@ -34,6 +34,22 @@ class WalletLog(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
+class ResourceLog(Base):
+    """Журнал ресурсов (2026-10-21): руда, рыба, травы, еда, зелья, реликвии,
+    вещи - что пришло и ушло и откуда. Пишет services/resource_log.py, хранит
+    7 дней."""
+
+    __tablename__ = "resource_log"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    character_id: Mapped[int] = mapped_column(ForeignKey("characters.id", ondelete="CASCADE"), index=True)
+    kind: Mapped[str] = mapped_column(String(8))         # ore | fish | herb | food | elixir | trophy | item
+    ref: Mapped[str] = mapped_column(String(80))         # «руда:градация», id травы, id вещи...
+    delta: Mapped[int] = mapped_column(BigInteger)       # у рыбы - граммы
+    reason: Mapped[str] = mapped_column(String(80))      # модуль.функция, откуда пришло
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), index=True)
+
+
 class ExchangeOrder(Base):
     """Исполненная сделка на бирже (игра — дилер, не P2P ордербук)."""
 
