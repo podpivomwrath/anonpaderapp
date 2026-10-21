@@ -25,7 +25,7 @@ const SLOT_ORDER = ['weapon', 'helmet', 'armor', 'legs', 'boots'];
 
 // Иконки нарисованы здесь, а не взяты из @vkontakte/icons: пакета нет в
 // зависимостях мини-аппа, он приезжает только транзитом через VKUI.
-function CopyIcon() {
+export function CopyIcon() {
   return (
     <svg width="20" height="20" viewBox="0 0 20 20" fill="none" aria-hidden="true">
       <rect x="7" y="7" width="9.5" height="9.5" rx="2" stroke="currentColor" strokeWidth="1.6" />
@@ -35,7 +35,7 @@ function CopyIcon() {
   );
 }
 
-function CheckIcon() {
+export function CheckIcon() {
   return (
     <svg width="20" height="20" viewBox="0 0 20 20" fill="none" aria-hidden="true">
       <path d="M4.5 10.5l3.5 3.5 7.5-8" stroke="currentColor" strokeWidth="1.8"
@@ -80,7 +80,7 @@ function legacyCopy(text) {
   area.remove();
 }
 
-async function copyText(text) {
+export async function copyText(text) {
   if (!IN_VK) {
     try { await navigator.clipboard.writeText(text); } catch { legacyCopy(text); }
     return;
@@ -205,7 +205,7 @@ export function ItemSheet({ entry, onClose, onUnequip, unequipping }) {
 
 // --- Сколько передать -------------------------------------------------------
 
-function QuantitySheet({ entry, onClose, onCopied }) {
+export function QuantitySheet({ entry, onClose, onCopied }) {
   const max = Math.max(1, entry.count);
   const [qty, setQty] = useState(1);
   const clamp = (value) => Math.min(max, Math.max(1, Math.round(Number(value) || 1)));
@@ -521,9 +521,12 @@ export default function InventoryTab({ onCharacterUpdate }) {
     if (kind === 'consumable') after = <div className="inventory-actions">{quantityButton(entry)}</div>;
     if (kind === 'food') {
       after = (
-        <Button mode="primary" size="s" loading={eating === entry.id} onClick={() => handleEat(entry)}>
-          Съесть
-        </Button>
+        <div className="inventory-actions">
+          {quantityButton(entry)}
+          <Button mode="primary" size="s" loading={eating === entry.id} onClick={() => handleEat(entry)}>
+            Съесть
+          </Button>
+        </div>
       );
     }
     if (kind === 'chest') {

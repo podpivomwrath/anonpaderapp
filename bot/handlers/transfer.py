@@ -34,10 +34,14 @@ PENDING_TTL_SECONDS = 180
 MAX_CHOICES = 8
 NAMESPACE = "transfer"
 
+#: Сколько позиций можно передать одной командой через запятую (2026-10-21).
+MAX_BATCH = 10
+
 USAGE_TEXT = (
     "Чтобы передать, перешли сообщение получателя с подписью:\n"
     "/передать <что> <сколько>\n"
     "Например: /передать золото 500, /передать Малое исцеление 3, /передать Скальпель Хирурга.\n"
+    "Несколько сразу - через запятую: /передать Горькая полынь 2, Малое исцеление 3.\n"
     "Золото и самоцветы - от 100; 5% от перевода уходит в казну фракции получателя."
 )
 
@@ -66,6 +70,8 @@ class Pending:
     #: руду дальше своей клетки носит только курьер.
     near: bool = True
     has_courier: bool = False
+    #: Несколько позиций через запятую (2026-10-21): [(что, сколько)].
+    batch: list[tuple[transfer_service.Offer, int]] | None = None
 
 
 _pending: dict[int, Pending] = {}
@@ -218,6 +224,28 @@ async def transfer_command(message: Message, match: tuple) -> None:
         if recipient.id == sender.id:
             await message.answer("Самому себе не передать.")
             return
+        parts = [part for part in request.split(",") if part.strip()]
+        if len(parts) > 1:
+            batch, refusal = await _resolve_batch(db, sender.id, parts)
+            near = transfer_service.same_cell(sender, recipient)
+            if refusal is None and not near and any(o.kind in transfer_service.NEEDS_NEAR for o, _ in batch):
+                refusal = BATCH_FAR_TEXT
+            same_guild = sender.guild_id is not None and sender.guild_id == recipient.guild_id
+            show_name = recipient_name_visible(sender.guild_id, recipient.guild_id, message.peer_id, message.from_id)
+            await db.commit()
+            if refusal:
+                await message.answer(refusal)
+                return
+            pending = Pending(
+                token=uuid.uuid4().hex[:10], recipient_id=recipient.id,
+                recipient_name=recipient.name if show_name else None, reveal_sender=same_guild,
+                recipient_peer=recipient_vk, offers=[o for o, _ in batch], qty=None, near=near, batch=batch,
+            )
+            _pending[peer_id] = pending
+            editable_message.clear(NAMESPACE, peer_id)
+            text = f"📦 Передать {_whom(pending)}:\n" + "\n".join(_batch_lines(batch)) + "\nЭто не отменить."
+            await editable_message.send_or_edit(_bot_api, NAMESPACE, peer_id, text, _confirm_keyboard(pending.token))
+            return
         name, qty = transfer_service.parse(request)
         lookup = await transfer_service.find(db, sender.id, name, qty)
         same_guild = sender.guild_id is not None and sender.guild_id == recipient.guild_id
@@ -248,6 +276,42 @@ async def transfer_command(message: Message, match: tuple) -> None:
     )
 
 
+BATCH_FAR_TEXT = (
+    "Списком вещи передают только тому, кто на твоей клетке. Курьер носит по одной "
+    "посылке - на расстояние передай по одной."
+)
+
+
+def _batch_lines(batch) -> list[str]:
+    return [f"· {offer.label}{_qty_text(offer, qty)}" for offer, qty in batch]
+
+
+async def _resolve_batch(db, sender_id: int, parts: list[str]):
+    """Каждая позиция должна найтись ровно одна, иначе - отказ целиком с
+    подсказкой, что уточнить. Без числа - одна штука."""
+    if len(parts) > MAX_BATCH:
+        return [], f"За раз - не больше {MAX_BATCH} позиций."
+    batch: list[tuple[transfer_service.Offer, int]] = []
+    for part in parts:
+        name, qty = transfer_service.parse(part)
+        lookup = await transfer_service.find(db, sender_id, name, qty)
+        if not lookup.offers:
+            return [], lookup.refusal or f"У тебя нет «{name}»."
+        if len(lookup.offers) > 1:
+            variants = ", ".join(o.label for o in lookup.offers[:MAX_CHOICES])
+            return [], f"«{name}» - уточни, какой именно: {variants}."
+        offer = lookup.offers[0]
+        if offer.stackable and qty is None and offer.kind not in ("gold", "gems"):
+            qty = 1
+        amount, refusal = _resolve_qty(offer, qty)
+        if refusal:
+            return [], f"«{name}»: {refusal}"
+        if any(o.token == offer.token for o, _ in batch):
+            return [], f"«{name}» указано дважды."
+        batch.append((offer, amount))
+    return batch, None
+
+
 @labeler.message(payload_contains={"type": "transfer_pick"})
 async def transfer_pick(message: Message) -> None:
     payload = message.get_payload_json() or {}
@@ -276,6 +340,10 @@ async def transfer_confirm(message: Message) -> None:
     peer_id = message.peer_id
     payload = message.get_payload_json() or {}
     pending = _alive(peer_id)
+    if pending is not None and pending.batch and payload.get("t") == pending.token:
+        _pending.pop(peer_id, None)
+        await _confirm_batch(message, pending)
+        return
     if pending is None or payload.get("t") != pending.token or pending.chosen is None:
         await message.answer("Эта передача уже неактуальна.")
         return
@@ -325,6 +393,61 @@ async def transfer_confirm(message: Message) -> None:
             peer_id=pending.recipient_peer, random_id=0,
             message=(f"📦 {sender_name} передаёт тебе: {what}.{tax_line}" if pending.reveal_sender
                      else f"📦 Тебе передали: {what}.{tax_line}"),
+        )
+    except Exception:  # noqa: BLE001 - получатель мог запретить сообщения; передача уже состоялась
+        logger.warning("Передача: не удалось уведомить получателя {}", pending.recipient_peer)
+
+
+async def _confirm_batch(message: Message, pending: Pending) -> None:
+    """Всё списком в одной транзакции: не хватило чего-то одного - не
+    передаётся ничего."""
+    peer_id = message.peer_id
+    async with get_session_factory()() as db:
+        sender = await onboarding_service.get_character(db, message.from_id)
+        if sender is None:
+            return
+        reason = await blocked_reason(db, sender, peer_id)
+        if reason:
+            await message.answer(reason)
+            return
+        recipient = await db.get(Character, pending.recipient_id)
+        if recipient is None:
+            await db.rollback()
+            await editable_message.send_or_edit(_bot_api, NAMESPACE, peer_id, "Получателя больше нет в игре.", await _keyboard_for(peer_id))
+            return
+        if any(transfer_service.needs_courier(o, sender, recipient) for o, _ in pending.batch):
+            await db.rollback()
+            await editable_message.send_or_edit(_bot_api, NAMESPACE, peer_id, BATCH_FAR_TEXT, await _keyboard_for(peer_id))
+            return
+        moved: list[tuple[transfer_service.Offer, int]] = []
+        try:
+            for offer, qty in pending.batch:
+                moved.append((offer, await transfer_service.execute(db, sender.id, recipient.id, offer, qty)))
+        except transfer_service.TransferFailed as exc:
+            await db.rollback()
+            await editable_message.send_or_edit(
+                _bot_api, NAMESPACE, peer_id, f"{offer.label}: {exc} Ничего не передано.", await _keyboard_for(peer_id),
+            )
+            return
+        await db.commit()
+        sender_name = sender.name
+
+    # Налог фракции с валюты в списке - как у одиночной передачи.
+    lines = []
+    for offer, amount in moved:
+        line = f"· {offer.label}{_qty_text(offer, amount)}"
+        if offer.kind in ("gold", "gems") and fc.transfer_tax(amount):
+            line += f" (дошло {amount - fc.transfer_tax(amount)})"
+        lines.append(line)
+    what = "\n".join(lines)
+    await editable_message.send_or_edit(
+        _bot_api, NAMESPACE, peer_id, f"📦 Передано {_whom(pending)}:\n{what}", await _keyboard_for(peer_id),
+    )
+    try:
+        await _bot_api.messages.send(
+            peer_id=pending.recipient_peer, random_id=0,
+            message=(f"📦 {sender_name} передаёт тебе:\n{what}" if pending.reveal_sender
+                     else f"📦 Тебе передали:\n{what}"),
         )
     except Exception:  # noqa: BLE001 - получатель мог запретить сообщения; передача уже состоялась
         logger.warning("Передача: не удалось уведомить получателя {}", pending.recipient_peer)

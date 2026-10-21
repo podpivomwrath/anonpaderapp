@@ -16,7 +16,7 @@ from bot.app_keys import SESSION_FACTORY_KEY, SETTINGS_KEY
 from bot import dailies_texts
 from bot.miniapp_auth import VK_USER_ID_KEY
 from game.economy import crafting
-from services import naming, subclass_service
+from services import naming, subclass_service, transfer_service
 from bot.onboarding_texts import REGION_TITLES
 from config import Settings
 from game.content_loader import load_content
@@ -752,6 +752,7 @@ def _fish_payload(bag) -> list[dict]:
             "price": game_fishing.price_of(fish.id, grams, grade),
             "count": 1,
             "description": fish.description,
+            "transfer_command": transfer_service.fish_command(fish.name, grade),
         }
         for fish, grade, grams in bag
     ]
@@ -763,6 +764,7 @@ def _herb_payload(bag) -> list[dict]:
         {
             "id": herb.id, "name": herb.name, "emoji": herb.emoji, "icon": f"herb:{herb.id}",
             "count": count, "description": herb.description, "tier": herb.tier,
+            "transfer_prefix": f"/передать {herb.name}",
         }
         for herb, count in bag
     ]
@@ -796,6 +798,7 @@ def _food_payload(food) -> list[dict]:
             "id": f"{dish.dish_id}:{grade}", "dish": dish.dish_id, "grade": grade, "name": d.name,
             "emoji": d.emoji, "icon": f"dish:{dish.dish_id}", "count": count, "description": d.description,
             "grade_title": f"рыба {fishing.grade_name(grade)}", "effect": cooking.buff_text(dish, grade),
+            "transfer_prefix": transfer_service.food_command(d.name, grade),
         }
         for d, dish, grade, count in food
     ]
@@ -902,6 +905,7 @@ def _ore_payload(stock) -> list[dict]:
             "grade_title": game_mining.grade_name(grade),
             "count": count,
             "description": ore.description,
+            "transfer_prefix": f"/передать {ore.name} {game_mining.grade_name(grade)}",
         }
         for ore, grade, count in stock
     ]

@@ -5,7 +5,9 @@ import {
 import { getInventory, setFishAutoKeep } from '../api.js';
 import ItemIcon from './ItemIcon.jsx';
 import { itemIcon } from '../itemIcons.js';
-import { ItemSheet } from './InventoryTab.jsx';
+import {
+  CheckIcon, CopyIcon, ItemSheet, QuantitySheet, copyText,
+} from './InventoryTab.jsx';
 
 // Ремесла (2026-10-21): у каждого ремесла - уровень, опыт, короткая подсказка
 // и своя сумка. Рыба и руда переехали сюда из инвентаря: всё ремесленное
@@ -35,6 +37,29 @@ export default function CraftsTab({ character }) {
   const [status, setStatus] = useState('loading');
   const [detail, setDetail] = useState(null);
   const [open, setOpen] = useState(null);
+  const [qtyEntry, setQtyEntry] = useState(null);
+  const [copiedId, setCopiedId] = useState(null);
+
+  const markCopied = (key) => {
+    setCopiedId(key);
+    setTimeout(() => setCopiedId((cur) => (cur === key ? null : cur)), 2500);
+  };
+
+  // Передача (2026-10-21): рыбу - стаком целиком, готовой командой; травы и
+  // руду - сколько выберешь ползунком, как зелья в инвентаре.
+  const copyButton = (entry) => {
+    if (!entry.transfer_command && !entry.transfer_prefix) return null;
+    const key = `craft:${entry.id}`;
+    const onClick = entry.transfer_command
+      ? async () => { await copyText(entry.transfer_command); markCopied(key); }
+      : () => setQtyEntry({ ...entry, id: key });
+    return (
+      <button type="button" className="copy-transfer" title="Скопировать команду передачи"
+        aria-label="Скопировать команду передачи" onClick={onClick}>
+        {copiedId === key ? <CheckIcon /> : <CopyIcon />}
+      </button>
+    );
+  };
   const [autoKeep, setAutoKeep] = useState(Boolean(character.ui?.fish_auto_keep));
 
   function toggleAutoKeep(next) {
@@ -67,6 +92,7 @@ export default function CraftsTab({ character }) {
     <SimpleCell
       key={entry.id}
       multiline
+      after={<div className="inventory-actions">{copyButton(entry)}</div>}
       before={(
         <button type="button" className="item-open" onClick={() => setDetail({ kind, data: entry })}
           aria-label={`Подробнее: ${entry.name}`}>
@@ -235,6 +261,9 @@ export default function CraftsTab({ character }) {
       )}
 
       {detail && <ItemSheet entry={detail} onClose={() => setDetail(null)} />}
+      {qtyEntry && (
+        <QuantitySheet entry={qtyEntry} onClose={() => setQtyEntry(null)} onCopied={(id) => markCopied(id)} />
+      )}
     </>
   );
 }

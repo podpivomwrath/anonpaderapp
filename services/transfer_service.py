@@ -1,8 +1,10 @@
 """Передача предметов и валюты между игроками.
 
 Можно: золото, самоцветы, расходники, руду, экипировку (включая уникальные
-боссовые вещи вроде Скальпеля Хирурга). Нельзя: скованную экипировку (она
-привязана при ковке), надетое, служебное, трофеи и рыбу.
+боссовые вещи вроде Скальпеля Хирурга), травы, рыбу и блюда (2026-10-21).
+Нельзя: скованную экипировку (она привязана при ковке), надетое, служебное
+и трофеи. Рыба передаётся стаком «вид + градация» целиком: у неё вес, а не
+штуки.
 
 Все списания - условным запросом в базу («списать, если хватает»), а не
 «прочитать -> вычесть -> записать»: события ВК обрабатываются параллельно,
@@ -20,7 +22,16 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from game.economy import fishing, mining
-from models import CharacterConsumable, CharacterOre, Inventory, Item, TransferLog
+from models import (
+    CharacterConsumable,
+    CharacterFish,
+    CharacterFood,
+    CharacterHerb,
+    CharacterOre,
+    Inventory,
+    Item,
+    TransferLog,
+)
 from services import (
     elixir_service,
     item_service,
@@ -39,8 +50,9 @@ _GRADE_STEMS = {"обычн": "common", "редк": "rare", "эпич": "epic", 
 class Offer:
     """Что именно передаётся: одна строка выбора."""
 
-    kind: str                # gold | gems | elixir | ore | item
-    ref: str | None          # id эликсира, «руда:градация», id предмета
+    kind: str                # gold | gems | elixir | ore | item | herb | fish | food
+    ref: str | None          # id эликсира, «руда:градация», id предмета, id травы,
+                             # «рыба:градация:граммы», «блюдо:градация»
     label: str               # как видит игрок
     available: int           # сколько есть у отправителя
     stackable: bool = True
@@ -62,6 +74,8 @@ def parse(text: str) -> tuple[str, int | None]:
     Число можно ставить и перед названием: «100 зол», «3 малое исцеление».
     Регистр не важен - всё сравнивается в нижнем."""
     text = " ".join(text.split()).strip()
+    # «горькая полынь 1 штука», «2 шт» - слово «штук» не часть названия.
+    text = re.sub(r"\s+(?:шт\.?|штук[аи]?)$", "", text, flags=re.IGNORECASE)
     first = re.match(r"^(\d+)\s+(\D.*)$", text)
     if first:
         return first.group(2).strip().lower(), int(first.group(1))
@@ -79,6 +93,55 @@ def _split_grade(name: str) -> tuple[str, str | None]:
             if last.startswith(stem):
                 return " ".join(words[:-1]), grade
     return name, None
+
+
+def _split_fish_grade(name: str) -> tuple[str, str | None]:
+    """«ржавый линь трофейная» -> ("ржавый линь", "trophy"). Градации рыбы
+    (и блюд из неё) - свои, не как у руды."""
+    from game.economy import fishing_config as fc
+
+    words = name.split()
+    if len(words) >= 2:
+        last = words[-1].strip("()")
+        for _threshold, grade_id, title, _mult in fc.GRADES:
+            if last == title or last.startswith(title[:5]):
+                return " ".join(words[:-1]), grade_id
+    return name, None
+
+
+def fish_command(fish_name: str, grade: str) -> str:
+    """Команда на стак рыбы - её копирует кнопка в Ремеслах."""
+    return f"/передать {fish_name} {fishing.grade_name(grade)}"
+
+
+def food_command(dish_name: str, grade: str) -> str:
+    """Команда на блюдо без количества - число допишет мини-апп."""
+    return f"/передать {dish_name} {fishing.grade_name(grade)}"
+
+
+async def _craft_offers(db: AsyncSession, character_id: int, name: str) -> list[Offer]:
+    """Травы, рыба и блюда (2026-10-21)."""
+    from services import cooking_service, fishing_service, herb_service
+
+    for herb, count in await herb_service.get_bag(db, character_id):
+        if herb.name.lower() == name:
+            return [Offer("herb", herb.id, f"{herb.emoji} {herb.name}", count)]
+    base, grade = _split_fish_grade(name)
+    fish = [
+        Offer("fish", f"{definition.id}:{grade_id}:{grams}",
+              f"{definition.emoji} {definition.name} ({fishing.grade_name(grade_id)}, {fishing.format_kg(grams)})",
+              1, stackable=False)
+        for definition, grade_id, grams in await fishing_service.get_bag(db, character_id)
+        if definition.name.lower() == base and (grade is None or grade_id == grade)
+    ]
+    if fish:
+        return fish
+    return [
+        Offer("food", f"{dish.dish_id}:{grade_id}",
+              f"{d.emoji} {d.name} (рыба {fishing.grade_name(grade_id)})", count)
+        for d, dish, grade_id, count in await cooking_service.get_food(db, character_id)
+        if d.name.lower() == base and (grade is None or grade_id == grade)
+    ]
 
 
 def is_transferable(item: Item, equipped: bool) -> str | None:
@@ -125,6 +188,10 @@ async def find(db: AsyncSession, character_id: int, name: str, number: int | Non
     if ore_offers:
         return Lookup(ore_offers)
 
+    craft = await _craft_offers(db, character_id, name)
+    if craft:
+        return Lookup(craft)
+
     matches = [(item, equipped) for item, equipped in await item_service.get_inventory(db, character_id)
                if item.name.lower() == name]
     if number is not None:
@@ -146,8 +213,6 @@ async def find(db: AsyncSession, character_id: int, name: str, number: int | Non
 
     if any(t.name.lower() == name for t in trophy_service.trophy_defs_ordered()):
         return Lookup([], "Трофеи не передаются - их можно только продать.")
-    if any(f.name.lower() == name for f in fishing.fish_defs_ordered()):
-        return Lookup([], "Рыба не передаётся.")
     return Lookup([])
 
 
@@ -184,7 +249,7 @@ async def _take_stack(db: AsyncSession, model, key: dict, amount: int) -> bool:
 #: Из рук в руки (2026-10-19, решение владельца): вещи, зелья и руду - только
 #: тому, кто на одной клетке с тобой (город - тоже клетка). Дальше - курьер
 #: (services/courier_service.py). Золото и самоцветы - на любое расстояние.
-NEEDS_NEAR = ("elixir", "ore", "item")
+NEEDS_NEAR = ("elixir", "ore", "item", "herb", "fish", "food")
 
 
 def same_cell(sender, recipient) -> bool:
@@ -221,6 +286,25 @@ async def take(db: AsyncSession, sender_id: int, offer: Offer, amount: int) -> i
         key = {"character_id": sender_id, "ore_id": ore_id, "grade": grade}
         if not await _take_stack(db, CharacterOre, key, amount):
             raise TransferFailed("Столько у тебя нет.")
+    elif offer.kind == "herb":
+        if not await _take_stack(db, CharacterHerb, {"character_id": sender_id, "herb_id": offer.ref}, amount):
+            raise TransferFailed("Столько у тебя нет.")
+    elif offer.kind == "food":
+        dish_id, grade = offer.ref.split(":", 1)
+        key = {"character_id": sender_id, "dish_id": dish_id, "grade": grade}
+        if not await _take_stack(db, CharacterFood, key, amount):
+            raise TransferFailed("Столько у тебя нет.")
+    elif offer.kind == "fish":
+        fish_id, grade, grams = offer.ref.split(":", 2)
+        taken = await db.execute(
+            update(CharacterFish).where(
+                CharacterFish.character_id == sender_id, CharacterFish.fish_id == fish_id,
+                CharacterFish.grade == grade, CharacterFish.total_grams >= int(grams),
+            ).values(total_grams=CharacterFish.total_grams - int(grams))
+            .execution_options(synchronize_session="fetch")
+        )
+        if not taken.rowcount:
+            raise TransferFailed("Этой рыбы у тебя уже нет.")
     elif offer.kind == "item":
         item = await db.get(Item, int(offer.ref), with_for_update=True)
         if item is None or item.admin_only or item.bound or item.craft_spec is not None:
@@ -257,6 +341,21 @@ async def give(db: AsyncSession, recipient_id: int, kind: str, ref: str | None, 
         await _credit_stack(db, CharacterOre, {"character_id": recipient_id, "ore_id": ore_id, "grade": grade}, amount)
     elif kind == "item":
         db.add(Inventory(character_id=recipient_id, item_id=int(ref), equipped=False))
+    elif kind == "herb":
+        await _credit_stack(db, CharacterHerb, {"character_id": recipient_id, "herb_id": ref}, amount)
+    elif kind == "food":
+        dish_id, grade = ref.split(":", 1)
+        await _credit_stack(db, CharacterFood, {"character_id": recipient_id, "dish_id": dish_id, "grade": grade}, amount)
+    elif kind == "fish":
+        # Садок получателя может выйти за лимит - как последняя рыба при ловле:
+        # посылку, уже списанную у отправителя, не возвращаем.
+        fish_id, grade, grams = ref.split(":", 2)
+        where = [CharacterFish.character_id == recipient_id, CharacterFish.fish_id == fish_id,
+                 CharacterFish.grade == grade]
+        added = await db.execute(update(CharacterFish).where(*where)
+                                 .values(total_grams=CharacterFish.total_grams + int(grams)))
+        if not added.rowcount:
+            db.add(CharacterFish(character_id=recipient_id, fish_id=fish_id, grade=grade, total_grams=int(grams)))
     return amount
 
 

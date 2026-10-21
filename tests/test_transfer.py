@@ -136,15 +136,45 @@ async def test_item_already_gone_is_not_given_twice(db_session, make_character) 
     assert await _owner(db_session, item.id) == b.id
 
 
-async def test_trophies_and_fish_are_refused(db_session, make_character) -> None:
-    from game.economy import fishing
-
+async def test_trophies_are_refused(db_session, make_character) -> None:
     a = await make_character()
     trophy = trophy_service.trophy_defs_ordered()[0]
     await trophy_service.grant_specific(db_session, a.id, trophy.id, 3)
     assert "Трофеи" in (await ts.find(db_session, a.id, trophy.name.lower())).refusal
+
+
+async def test_herbs_food_and_fish_change_hands(db_session, make_character) -> None:
+    """2026-10-21: травы и блюда - штуками, рыба - стаком «вид + градация» целиком."""
+    from game.economy import cooking, fishing
+    from game.economy import cooking_config as cc
+    from models import CharacterFish
+    from services import cooking_service, fishing_service, herb_service
+
+    a = await make_character()
+    b = await make_character()
+    await herb_service.add_herb(db_session, a.id, "bitter_wormwood", 5)
+    dish = cc.DISHES[0]
+    await cooking_service.add_food(db_session, a.id, dish.dish_id, "trophy", 3)
     fish = fishing.fish_defs_ordered()[0]
-    assert "Рыба" in (await ts.find(db_session, a.id, fish.name.lower())).refusal
+    db_session.add(CharacterFish(character_id=a.id, fish_id=fish.id, grade="big", total_grams=2300))
+    await db_session.flush()
+
+    herb = (await ts.find(db_session, a.id, "горькая полынь")).offers[0]
+    assert await ts.execute(db_session, a.id, b.id, herb, 2) == 2
+    assert [(h.id, n) for h, n in await herb_service.get_bag(db_session, b.id)] == [("bitter_wormwood", 2)]
+
+    name, qty = ts.parse(ts.food_command(cooking.dish_def(dish.dish_id).name, "trophy")[len("/передать "):] + " 2")
+    food = (await ts.find(db_session, a.id, name, qty)).offers
+    assert len(food) == 1 and food[0].kind == "food"
+    await ts.execute(db_session, a.id, b.id, food[0], 2)
+    assert [(g, n) for _d, _dish, g, n in await cooking_service.get_food(db_session, b.id)] == [("trophy", 2)]
+
+    name, qty = ts.parse(ts.fish_command(fish.name, "big")[len("/передать "):])
+    offers = (await ts.find(db_session, a.id, name, qty)).offers
+    assert len(offers) == 1 and not offers[0].stackable and "2,3" in offers[0].label
+    await ts.execute(db_session, a.id, b.id, offers[0], 1)
+    assert await fishing_service.bag_total_grams(db_session, a.id) == 0
+    assert await fishing_service.bag_total_grams(db_session, b.id) == 2300
 
 
 async def test_nothing_named_like_that(db_session, make_character) -> None:
@@ -275,3 +305,30 @@ def test_recipient_nick_hidden_in_group_chats_even_for_guildmates() -> None:
     assert not recipient_name_visible(5, 5, peer_id=2_000_000_001, from_id=100)  # беседа
     assert not recipient_name_visible(5, 6, peer_id=100, from_id=100)      # разные гильдии
     assert not recipient_name_visible(None, None, peer_id=100, from_id=100)
+
+
+def test_parse_drops_the_word_pieces() -> None:
+    assert ts.parse("горькая полынь 1 штука") == ("горькая полынь", 1)
+    assert ts.parse("Малое исцеление 3 шт") == ("малое исцеление", 3)
+    assert ts.parse("пепельный кварц штуки") == ("пепельный кварц", None)
+
+
+async def test_batch_through_commas(db_session, make_character) -> None:
+    """2026-10-21: «/передать горькая полынь 1 штука, Малое исцеление 2» - всё
+    одним подтверждением; без числа - одна штука; нашлось не всё - отказ целиком."""
+    from bot.handlers import transfer as th
+    from services import herb_service
+
+    a = await make_character()
+    await herb_service.add_herb(db_session, a.id, "bitter_wormwood", 5)
+    elixir = elixir_service.elixir_defs_ordered()[0]
+    await elixir_service.grant(db_session, a.id, elixir.id, 4)
+
+    batch, refusal = await th._resolve_batch(
+        db_session, a.id, ["горькая полынь 1 штука", f" {elixir.name} 2", ]
+    )
+    assert refusal is None and [(o.kind, q) for o, q in batch] == [("herb", 1), ("elixir", 2)]
+    batch, refusal = await th._resolve_batch(db_session, a.id, ["горькая полынь", "меч тысячи истин"])
+    assert batch == [] and "меч тысячи истин" in refusal
+    batch, refusal = await th._resolve_batch(db_session, a.id, ["горькая полынь 9"])
+    assert batch == [] and "5" in refusal
