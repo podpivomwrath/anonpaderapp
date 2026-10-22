@@ -21,7 +21,7 @@ BTN_RELEASE = "🐟 Отпустить"
 def catch_keyboard() -> str:
     """Рыба вытащена (2026-10-21): в садок или обратно в воду. Новый заброс -
     только после решения."""
-    kb = Keyboard(one_time=True)
+    kb = Keyboard(one_time=False)
     kb.add(Text(BTN_KEEP, payload=KEEP_PAYLOAD), color=KeyboardButtonColor.POSITIVE)
     kb.add(Text(BTN_RELEASE, payload=RELEASE_PAYLOAD), color=KeyboardButtonColor.SECONDARY)
     add_miniapp_button(kb)
@@ -30,7 +30,7 @@ def catch_keyboard() -> str:
 
 def lake_keyboard() -> str:
     """Стоим у воды, снасть не заброшена."""
-    kb = Keyboard(one_time=True)
+    kb = Keyboard(one_time=False)
     kb.add(Text(BTN_CAST), color=KeyboardButtonColor.POSITIVE)
     kb.row()
     kb.add(Text(BTN_BAG), color=KeyboardButtonColor.SECONDARY)
@@ -46,7 +46,7 @@ def casting_keyboard() -> str:
     Так подсечка и становится подсечкой — реакцией на событие, а не кнопкой,
     которую можно нажать заранее и ждать. Сообщение о поклёвке присылает
     планировщик (bot/handlers/fishing.py::_on_bite)."""
-    kb = Keyboard(one_time=True)
+    kb = Keyboard(one_time=False)
     kb.add(Text(BTN_CANCEL_CAST, payload=CANCEL_CAST_PAYLOAD), color=KeyboardButtonColor.SECONDARY)
     add_miniapp_button(kb)
     return kb.get_json()
@@ -55,7 +55,7 @@ def casting_keyboard() -> str:
 def bite_keyboard() -> str:
     """Клюёт! Приходит ОТДЕЛЬНЫМ сообщением в момент поклёвки; окно на
     подсечку — fishing_config.STRIKE_WINDOW_SECONDS."""
-    kb = Keyboard(one_time=True)
+    kb = Keyboard(one_time=False)
     kb.add(Text(BTN_STRIKE), color=KeyboardButtonColor.PRIMARY)
     kb.row()
     kb.add(Text(BTN_CANCEL_CAST, payload=CANCEL_CAST_PAYLOAD), color=KeyboardButtonColor.SECONDARY)
@@ -64,7 +64,7 @@ def bite_keyboard() -> str:
 
 
 def bag_keyboard() -> str:
-    kb = Keyboard(one_time=True)
+    kb = Keyboard(one_time=False)
     kb.add(Text(BTN_CAST), color=KeyboardButtonColor.POSITIVE)
     kb.row()
     kb.add(Text(BTN_LEAVE_LAKE), color=KeyboardButtonColor.SECONDARY)

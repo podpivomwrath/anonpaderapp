@@ -25,7 +25,7 @@ def mine_keyboard(has_ore: bool) -> str:
     has_ore=False — жила пуста, кнопку добычи не показываем вовсе: предлагать
     действие, которое гарантированно откажет, хуже, чем не предлагать.
     """
-    kb = Keyboard(one_time=True)
+    kb = Keyboard(one_time=False)
     if has_ore:
         kb.add(Text(BTN_DIG), color=KeyboardButtonColor.POSITIVE)
         kb.row()
@@ -43,14 +43,14 @@ def digging_keyboard() -> str:
     которой ни одна кнопка не работала. Сначала отменяешь копание — и только
     потом поднимаешься наверх обычной кнопкой экрана рудника.
     """
-    kb = Keyboard(one_time=True)
+    kb = Keyboard(one_time=False)
     kb.add(Text(BTN_ABANDON), color=KeyboardButtonColor.NEGATIVE)
     add_miniapp_button(kb)
     return kb.get_json()
 
 
 def ore_keyboard() -> str:
-    kb = Keyboard(one_time=True)
+    kb = Keyboard(one_time=False)
     kb.add(Text(BTN_LEAVE_MINE), color=KeyboardButtonColor.SECONDARY)
     add_miniapp_button(kb)
     return kb.get_json()
