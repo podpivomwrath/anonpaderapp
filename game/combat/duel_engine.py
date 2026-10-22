@@ -382,11 +382,13 @@ class DuelEngine:
             blocked_back = shared_rules.block_reflect_amount(target, hit.blocked)
             if blocked_back and actor.id != target.id and actor.alive:
                 actor_before = actor.current_hp
-                actor.current_hp -= blocked_back
+                # Через щиты ударившего (2026-10-22), как в тиковом движке.
+                back = shared_rules.absorb_by_shields(actor, blocked_back, [])
+                actor.current_hp -= back
                 result.lines.append(combat_flavor.render_hit(
-                    target.name, actor.name, label="отражает щитом", amount=blocked_back,
+                    target.name, actor.name, label="отражает щитом", amount=back,
                     crit=False, missed=False, is_dot=False, hp_before=actor_before,
-                    hp_after=actor.current_hp, max_hp=actor.max_hp,
+                    hp_after=actor.current_hp, max_hp=actor.max_hp, shielded=blocked_back - back,
                 ))
                 _apply_last_breath_guard(actor, result)
             # Патч 52, баг 2: Кровь за кровь (BLOOD_REFLECT) — раньше не
@@ -395,11 +397,12 @@ class DuelEngine:
             if reflect_pct > 0 and amount > 0 and actor.id != target.id and actor.alive:
                 reflect_amount = max(round(amount * reflect_pct), 1)
                 actor_before = actor.current_hp
-                actor.current_hp -= reflect_amount
+                back = shared_rules.absorb_by_shields(actor, reflect_amount, [])
+                actor.current_hp -= back
                 result.lines.append(combat_flavor.render_hit(
-                    target.name, actor.name, label="шипы", amount=reflect_amount, crit=False,
+                    target.name, actor.name, label="шипы", amount=back, crit=False,
                     missed=False, is_dot=False, hp_before=actor_before, hp_after=actor.current_hp,
-                    max_hp=actor.max_hp,
+                    max_hp=actor.max_hp, shielded=reflect_amount - back,
                 ))
                 _apply_last_breath_guard(actor, result)
         for heal in ctx.heals:

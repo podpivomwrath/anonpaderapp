@@ -327,11 +327,14 @@ async def brew(message: Message) -> None:
         character = await _home_character(db, message)
         if character is None or await _busy(message, character):
             return
+        # Уровень - до отката: после rollback персонаж просрочен, и чтение
+        # поля в асинхронной сессии падает (бот отвечал «кнопка устарела»).
+        level = character.alchemy_level
         try:
             await alchemy_service.start(db, character, elixir_id)
         except alchemy_service.AlchemyError as exc:
             await db.rollback()
-            await message.answer(str(exc), keyboard=alchemy_keyboard(character.alchemy_level))
+            await message.answer(str(exc), keyboard=alchemy_keyboard(level))
             return
         await screen_service.set_screen(db, character, "brewing")
         await db.commit()
@@ -381,11 +384,12 @@ async def cook(message: Message) -> None:
         character = await _home_character(db, message)
         if character is None or await _busy(message, character):
             return
+        level = character.cooking_level  # до отката, как в brew
         try:
             await cooking_service.start(db, character, payload.get("d"), payload.get("f"), payload.get("g"))
         except cooking_service.CookingError as exc:
             await db.rollback()
-            await message.answer(str(exc), keyboard=oven_keyboard(character.cooking_level))
+            await message.answer(str(exc), keyboard=oven_keyboard(level))
             return
         await screen_service.set_screen(db, character, "cooking")
         await db.commit()

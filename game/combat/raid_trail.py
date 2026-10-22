@@ -136,8 +136,12 @@ class NamelessStage:
         for cid in self.pos:
             self.still[cid] = 0 if cid in moved else self.still.get(cid, 0) + 1
         # Окликнуть: союзник шагнул на клетку безымянного (или тот к союзнику).
+        # Окликает только тот, кто сам помнит имя: двое безымянных, сойдясь,
+        # раньше возвращали имя друг другу (2026-10-22).
+        forgot = set(self.nameless)
         for cid in list(self.nameless):
-            if any(o != cid and self.pos.get(o) == self.pos.get(cid) and (o in moved or cid in moved)
+            if any(o != cid and o not in forgot and self.pos.get(o) == self.pos.get(cid)
+                   and (o in moved or cid in moved)
                    for o in self.pos):
                 self.nameless.discard(cid)
                 out.lines.append(tt.CALLED_LINE.format(name=players[cid].name))

@@ -149,6 +149,45 @@ def test_hunter_catches_and_releases_to_start() -> None:
     assert not lab.hunter_tick(100.0).moved
 
 
+def test_no_pits_next_to_the_start() -> None:
+    """2026-10-22: «второй выход ведёт сразу в могилу» - яма была соседом входа."""
+    start_exits = set(lab_rules.neighbors(lab_rules.START).values())
+    for seed in range(300):
+        maze = lab_rules.generate(random.Random(seed))
+        pits = {i for i, k in maze.kinds.items() if k == lab_rules.PIT}
+        assert len(pits) == tc.PITS and not pits & start_exits, seed
+
+
+def test_hunter_never_steps_into_pits_or_onto_the_gate() -> None:
+    """2026-10-22: Безымянный наступал в яму и ловил ждущих у ворот."""
+    for seed in range(40):
+        lab = lab_rules.Labyrinth([1, 2], random.Random(seed))
+        lab.grate_open = True
+        free = [i for i in range(lab_rules.N * lab_rules.N)
+                if i not in (lab_rules.START, lab_rules.GATE) and lab.kind(i) != lab_rules.PIT]
+        rng = random.Random(seed)
+        lab.pos[2] = lab_rules.GATE
+        for t in range(200):
+            if t % 5 == 0:
+                lab.pos[1] = rng.choice(free)
+                lab.frozen_until.clear()
+            lab.hunter_next = 0.0
+            res = lab.hunter_tick(float(t))
+            assert lab.hunter != lab_rules.GATE or not res.moved
+            assert lab.kind(lab.hunter) != lab_rules.PIT
+            assert 2 not in res.caught and not lab.is_frozen(2, float(t))
+
+
+def test_stepping_onto_the_gate_is_safe_even_with_the_hunter_there() -> None:
+    lab = lab_rules.Labyrinth([1], random.Random(4))
+    lab.grate_open = True
+    lab.pos[1] = next(n for n in lab_rules.neighbors(lab_rules.GATE).values()
+                      if lab.maze.connected(n, lab_rules.GATE, True))
+    assert lab.hunter == lab_rules.GATE
+    res = lab.move(1, lab_rules.GATE, 0.0)
+    assert res.ok and "caught" not in res.events and not lab.is_frozen(1, 1.0)
+
+
 # --- Клавиатуры под лимиты VK ------------------------------------------------------
 
 
@@ -228,6 +267,21 @@ def test_nameless_sees_nothing_until_called() -> None:
     stage.marks = set()
     stage.after_tick(state, _step(b.id, stage.pos[a.id]), random.Random(3))
     assert a.id not in stage.nameless
+
+
+def test_two_nameless_do_not_call_each_other() -> None:
+    """2026-10-22: двое без имени сошлись на одной клетке - имя вернулось обоим."""
+    stage, state, (a, b, c) = _arena(3)
+    stage.nameless = {a.id, b.id}
+    stage.marks = set()
+    stage.pos[b.id] = next(x for x in range(trail.CELLS) if trail.adjacent(x, stage.pos[a.id])
+                           and x != stage.pos[c.id])
+    stage.after_tick(state, _step(b.id, stage.pos[a.id]), random.Random(3))
+    assert stage.nameless >= {a.id, b.id}
+    # Третий, с именем, окликает обоих разом.
+    stage.pos[c.id] = next(x for x in range(trail.CELLS) if trail.adjacent(x, stage.pos[a.id]))
+    stage.after_tick(state, _step(c.id, stage.pos[a.id]), random.Random(3))
+    assert not stage.nameless & {a.id, b.id}
 
 
 def test_marks_always_cover_someone_and_shrink_in_final() -> None:

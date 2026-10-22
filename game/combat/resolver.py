@@ -288,9 +288,14 @@ def _apply_phase(
                 )
         applied_by_hit[id(hit)] = amount
         damage_taken[hit.target_id] = damage_taken.get(hit.target_id, 0) + amount
+    # Ответный урон - тоже через щиты ударившего (2026-10-22, баг: «возврат
+    # урона бьёт сквозь щиты»).
     for hit in reflect_hits:
-        applied_by_hit[id(hit)] = hit.amount
-        damage_taken[hit.target_id] = damage_taken.get(hit.target_id, 0) + hit.amount
+        before_shields = hit.amount
+        amount = shared_rules.absorb_by_shields(session.combatants[hit.target_id], hit.amount, [])
+        shielded_by_hit[id(hit)] = before_shields - amount
+        applied_by_hit[id(hit)] = amount
+        damage_taken[hit.target_id] = damage_taken.get(hit.target_id, 0) + amount
     for heal in heals:
         heal_taken[heal.target_id] = heal_taken.get(heal.target_id, 0) + heal.amount
 

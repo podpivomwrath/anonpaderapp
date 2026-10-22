@@ -96,3 +96,52 @@ def test_alchemy_keyboard_fits_vk_with_all_recipes() -> None:
     # 2026-10-21: по 3 короткие кнопки в ряд - экран без прокрутки.
     assert len(rows) <= 5 and all(len(r) <= 3 for r in rows)
     assert rows[-1][-1]["action"]["label"] == house_handlers.BTN_HOUSE_BACK
+
+
+class _Msg:
+    def __init__(self, payload: dict):
+        self.from_id = self.peer_id = 1
+        self._payload = payload
+        self.sent: list[str] = []
+
+    def get_payload_json(self):
+        return self._payload
+
+    async def answer(self, text, **_kw):
+        self.sent.append(text)
+
+
+async def test_refusal_answers_after_rollback(db_session, make_character, monkeypatch) -> None:
+    """Баг 2026-10-22: «Не хватает трав» откатывал сессию, потом читал уровень
+    у просроченного персонажа - падало, и игрок видел «кнопка устарела»."""
+    c = await _ready(db_session, make_character, herbs={"bitter_wormwood": 1})
+
+    class _Db:
+        def __getattr__(self, name):
+            return getattr(db_session, name)
+
+        async def rollback(self):
+            db_session.expire(c)  # как настоящий откат: поля персонажа просрочены
+
+    class _Factory:
+        def __call__(self):
+            return self
+
+        async def __aenter__(self):
+            return _Db()
+
+        async def __aexit__(self, *a):
+            return False
+
+    async def _home(_db, _m):
+        return c
+
+    monkeypatch.setattr(house_handlers, "get_session_factory", lambda: _Factory())
+    monkeypatch.setattr(house_handlers, "_home_character", _home)
+    msg = _Msg({"type": "brew", "id": "heal_small"})
+    await house_handlers.brew(msg)
+    assert "трав" in msg.sent[-1]
+    await db_session.refresh(c)
+    msg = _Msg({"type": "cook_fish", "d": "wormwood_soup", "f": "gudgeon", "g": "common"})
+    await house_handlers.cook(msg)
+    assert len(msg.sent) == 1  # отказ дошёл, а не упал

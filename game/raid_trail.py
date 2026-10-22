@@ -177,8 +177,14 @@ def generate(rng: random.Random) -> Maze:
     # Яма отбрасывает на старт - в единственном коридоре к чему-то она сделала
     # бы это «что-то» недостижимым. Ставим только туда, без чего всё остальное
     # по-прежнему достижимо.
+    # Не у входа (2026-10-22, жалоба «второй выход ведёт сразу в могилу»): на
+    # соседях входа ям нет никогда, через клетку от него - только если больше
+    # некуда.
+    def from_start(i: int) -> int:
+        return sum(rc(i))
+
     pits: set[int] = set()
-    for i in list(free):
+    for i in sorted((i for i in free if from_start(i) > 1), key=lambda i: from_start(i) <= 2):
         if len(pits) == tc.PITS:
             break
         trial = pits | {i}
@@ -330,7 +336,7 @@ class Labyrinth:
                 nearest = min(left, key=lambda i: abs(rc(i)[0] - rc(target)[0]) + abs(rc(i)[1] - rc(target)[1]))
                 out.echo = compass(target, nearest)
             out.events.append("echo")
-        if self.pos[cid] == self.hunter:
+        if self.pos[cid] == self.hunter and target != GATE:
             self._catch(cid, now)
             out.events.append("caught")
         if self.update_plates(now):
@@ -350,12 +356,22 @@ class Labyrinth:
 
     # --- Безымянный ---
 
+    def hunter_can_enter(self, i: int) -> bool:
+        """Безымянный не заходит на ворота (там ждут своих) и в ямы: раньше
+        шагал в провал и стоял в нём (2026-10-22)."""
+        return i != GATE and self.kind(i) != PIT
+
     def hunter_tick(self, now: float) -> HunterResult:
         out = HunterResult()
         if now < self.hunter_next:
             return out
         self.hunter_next = now + tc.HUNTER_STEP_SECONDS
-        prey = [cid for cid in self.players if not self.is_frozen(cid, now) and self.pos[cid] != START]
+        # Вход и ворота - убежища: у ворот группа ждёт отставших (2026-10-22,
+        # жалоба: ждали у ворот, а он ловил там по одному, пока не вышло время).
+        prey = [
+            cid for cid in self.players
+            if not self.is_frozen(cid, now) and self.pos[cid] not in (START, GATE)
+        ]
         if not prey:
             return out
         # Кратчайший путь до ближайшей добычи - BFS от Безымянного.
@@ -369,7 +385,7 @@ class Labyrinth:
                 goal = cur
                 break
             for n in neighbors(cur).values():
-                if n not in prev and self.maze.connected(cur, n, self.grate_open):
+                if n not in prev and self.hunter_can_enter(n) and self.maze.connected(cur, n, self.grate_open):
                     prev[n] = cur
                     queue.append(n)
         if goal is None:

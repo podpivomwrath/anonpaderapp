@@ -193,6 +193,21 @@ def test_blood_for_blood_reflects_damage_to_attacker() -> None:
     assert mob.current_hp < mob_hp_before
 
 
+def test_reflected_damage_goes_through_attacker_shield() -> None:
+    """Баг 2026-10-22: ответный урон бил сквозь щиты ударившего."""
+    rng = NoCritRng()
+    player = combatant(1, side=0)
+    mob = combatant(2, side=1, kind="mob", vitality=5000)
+    session = make_session(player, mob)
+    elixir_effects.apply_combat_elixir(player, "blood_for_blood")
+    mob.apply_effect(EffectKind.SHIELD_POOL, 10**6, 5, mob.id)
+    mob_hp_before = mob.current_hp
+
+    resolve_tick(session, {1: skip(2)}, rng)
+    assert mob.current_hp == mob_hp_before  # всё съел щит
+    assert mob.effects_of(EffectKind.SHIELD_POOL)[0].value < 10**6
+
+
 # --- 🧿 Ясность крови ---
 
 

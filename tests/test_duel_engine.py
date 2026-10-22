@@ -281,6 +281,25 @@ async def test_blood_for_blood_reflects_damage_in_duel() -> None:
         engine.shutdown()
 
 
+async def test_blood_for_blood_reflection_hits_shield_first_in_duel() -> None:
+    """Баг 2026-10-22: ответный урон в дуэли шёл мимо щитов атакующего."""
+    engine = make_engine()
+    engine.start()
+    try:
+        a = combatant(1, side=0)
+        b = combatant(2, side=1)
+        engine.start_duel(10, a, b)
+        elixir_effects.apply_combat_elixir(a, "blood_for_blood")
+        b.apply_effect(EffectKind.SHIELD_POOL, 10**6, 5, b.id)
+
+        await engine.act(10, 1, skip())
+        await engine.act(10, 2, attack(1))
+        assert b.current_hp == b.max_hp
+        assert b.effects_of(EffectKind.SHIELD_POOL)[0].value < 10**6
+    finally:
+        engine.shutdown()
+
+
 async def test_last_breath_saves_from_lethal_hit_in_duel() -> None:
     """Патч 52, баг 2: «Последний вздох» (LAST_BREATH) не проверялся вовсе в
     duel_engine — смертельный удар убивал, несмотря на активный эликсир."""
