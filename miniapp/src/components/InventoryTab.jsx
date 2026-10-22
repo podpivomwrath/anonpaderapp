@@ -3,15 +3,15 @@ import bridge from '@vkontakte/vk-bridge';
 import {
   Button, Div, Group, Header, Placeholder, SimpleCell, Text,
 } from '@vkontakte/vkui';
-import { IN_VK, eatFood, equipItem, getCharacter, getInventory, openChest, unequipItem } from '../api.js';
+import { IN_VK, eatFood, getInventory, openChest } from '../api.js';
 import { itemIcon } from '../itemIcons.js';
 import ChestRoulette from './ChestRoulette.jsx';
 import ItemIcon from './ItemIcon.jsx';
 import Skeleton from './Skeleton.jsx';
 
-// Патч 74: вместо одного плоского списка - «Надето» отдельно и сумка,
-// свёрнутая по слотам. Плоский список рос вместе с дропом и превращался в
-// стену одинаковых строк, где надетое терялось среди лишнего.
+// Патч 74: вместо одного плоского списка - сумка, свёрнутая по слотам.
+// Плоский список рос вместе с дропом и превращался в стену одинаковых строк.
+// Надетое и само надевание (2026-10-22) - во вкладке «Персонаж → Герой».
 //
 // Реликвии и расходники - такие же свёрнутые группы в той же сумке, а не
 // отдельные вкладки: одно место, где лежит всё, что у персонажа есть.
@@ -158,7 +158,7 @@ function detailRows(entry) {
   ];
 }
 
-export function ItemSheet({ entry, onClose, onUnequip, unequipping }) {
+export function ItemSheet({ entry, onClose }) {
   const { kind, data } = entry;
   const NOTES = {
     trophy: 'Цена - у скупщика в своём городе, в чужом он платит меньше. Реликвии не передаются.',
@@ -189,15 +189,6 @@ export function ItemSheet({ entry, onClose, onUnequip, unequipping }) {
           ))}
         </dl>
         {note && <p className="item-sheet__note">{note}</p>}
-        {kind === 'gear' && data.equipped && onUnequip && (
-          <Button
-            mode="outline" size="l" stretched loading={unequipping}
-            onClick={() => onUnequip(data.id)}
-            style={{ marginBottom: 8 }}
-          >
-            Снять
-          </Button>
-        )}
         <Button mode="secondary" size="l" stretched onClick={onClose}>Закрыть</Button>
       </div>
     </>
@@ -257,12 +248,11 @@ export function QuantitySheet({ entry, onClose, onCopied }) {
   );
 }
 
-export default function InventoryTab({ onCharacterUpdate }) {
+export default function InventoryTab() {
   const [items, setItems] = useState(null);
   const [trophies, setTrophies] = useState([]);
   const [consumables, setConsumables] = useState([]);
   const [status, setStatus] = useState('loading');
-  const [equippingId, setEquippingId] = useState(null);
   const [errorMsg, setErrorMsg] = useState(null);
   const [openSlot, setOpenSlot] = useState(null);
   const [copiedId, setCopiedId] = useState(null);
@@ -330,53 +320,6 @@ export default function InventoryTab({ onCharacterUpdate }) {
 
   useEffect(load, []);
 
-  async function handleEquip(itemId) {
-    setEquippingId(itemId);
-    setErrorMsg(null);
-    try {
-      const res = await equipItem(itemId);
-      apply(res);
-      // Надетая вещь меняет статы, а карточка персонажа лежит в Hub: без
-      // этого вкладка «Характеристики» показывала старые цифры до перезапуска
-      // мини-аппа - ровно тот же разрыв, что чинил патч 32 для предпросмотра.
-      if (onCharacterUpdate) {
-        try {
-          onCharacterUpdate(await getCharacter());
-        } catch {
-          /* предмет уже надет; обновление карточки подтянется при следующем открытии */
-        }
-      }
-    } catch (err) {
-      // Раньше тут стоял setStatus('error') - одна неудачная экипировка
-      // подменяла весь загруженный список сообщением «не удалось загрузить».
-      setErrorMsg(err?.message || 'Не удалось надеть предмет.');
-    } finally {
-      setEquippingId(null);
-    }
-  }
-
-  // Патч 111: снять надетую вещь. Как и после «Надеть» - перезапросить
-  // персонажа: статы и Мощь в шапке зависят от того, что надето сейчас.
-  async function handleUnequip(itemId) {
-    setEquippingId(itemId);
-    setErrorMsg(null);
-    try {
-      apply(await unequipItem(itemId));
-      setDetail(null);
-      if (onCharacterUpdate) {
-        try {
-          onCharacterUpdate(await getCharacter());
-        } catch {
-          /* вещь уже снята; шапка обновится при следующем открытии */
-        }
-      }
-    } catch (err) {
-      setErrorMsg(err?.message === 'cannot_unequip' ? 'Эта вещь уже не надета.' : (err?.message?.includes(' ') ? err.message : 'Не удалось снять предмет.'));
-    } finally {
-      setEquippingId(null);
-    }
-  }
-
   if (status === 'loading') {
     return (
       <Skeleton />
@@ -388,7 +331,7 @@ export default function InventoryTab({ onCharacterUpdate }) {
   }
 
   // Рыба и руда (2026-10-21) - во вкладке «Персонаж → Ремёсла», здесь их нет.
-  if (items.length === 0 && trophies.length === 0 && consumables.length === 0 && chests.length === 0
+  if (items.every((i) => i.equipped) && trophies.length === 0 && consumables.length === 0 && chests.length === 0
     && food.length === 0 && !foodBuff) {
     return <Placeholder icon={<div style={{ fontSize: 48 }}>🎒</div>}>Твоя сумка пока пуста.</Placeholder>;
   }
@@ -398,7 +341,8 @@ export default function InventoryTab({ onCharacterUpdate }) {
     setTimeout(() => setCopiedId((cur) => (cur === key ? null : cur)), 2500);
   };
 
-  const equipped = items.filter((i) => i.equipped);
+  // Надевают и снимают во вкладке «Персонаж → Герой» (2026-10-22): здесь
+  // надетое не показываем вовсе, сумка - только то, что лежит.
   const spare = items.filter((i) => !i.equipped);
   const groups = SLOT_ORDER
     .map((slot) => ({
@@ -453,7 +397,7 @@ export default function InventoryTab({ onCharacterUpdate }) {
   );
 
   // Иконка и название открывают подсказку - кнопками, чтобы нажатие не
-  // задевало «Надеть» и копирование в той же строке.
+  // задевало копирование в той же строке.
   const opener = (kind, data) => ({
     before: (
       <button type="button" className="item-open" onClick={() => setDetail({ kind, data })}
@@ -470,7 +414,7 @@ export default function InventoryTab({ onCharacterUpdate }) {
     ),
   });
 
-  const gearRow = (item, inBag) => {
+  const gearRow = (item) => {
     const open = opener('gear', item);
     return (
       <SimpleCell
@@ -478,32 +422,10 @@ export default function InventoryTab({ onCharacterUpdate }) {
         multiline
         before={open.before}
         subtitle={itemSubtitle(item)}
-        // «В мастерскую» - строкой под описанием (2026-10-19): справа рядом с
-        // «Надеть» она сжимала название и статы до столбика в одну букву.
+        // «В мастерскую» - строкой под описанием (2026-10-19): справа она
+        // сжимала название и статы до столбика в одну букву.
         extraSubtitle={item.craftable ? <div className="inventory-craft">{craftButton(item)}</div> : undefined}
-        after={inBag ? (
-          <div className="inventory-actions">
-            {transferButton(item)}
-            <Button
-              mode="secondary" size="s"
-              loading={equippingId === item.id}
-              disabled={Boolean(item.need_level)}
-              onClick={() => handleEquip(item.id)}
-            >
-              Надеть
-            </Button>
-          </div>
-        ) : (
-          <div className="inventory-actions">
-            <Button
-              mode="tertiary" size="s"
-              loading={equippingId === item.id}
-              onClick={() => handleUnequip(item.id)}
-            >
-              Снять
-            </Button>
-          </div>
-        )}
+        after={item.transfer_command ? <div className="inventory-actions">{transferButton(item)}</div> : null}
       >
         {open.name}
       </SimpleCell>
@@ -562,14 +484,8 @@ export default function InventoryTab({ onCharacterUpdate }) {
         </Group>
       )}
 
-      <Group header={<Header>Надето</Header>}>
-        {equipped.length === 0 && <Div>Ничего не надето.</Div>}
-        {SLOT_ORDER.map((slot) => equipped.find((i) => i.slot === slot)).filter(Boolean)
-          .map((item) => gearRow(item, false))}
-      </Group>
-
       <Group header={<Header>В сумке ({bagCount})</Header>}>
-        {groups.length === 0 && <Div>Сумка пуста - всё на тебе.</Div>}
+        {groups.length === 0 && <Div>Сумка пуста.</Div>}
         {groups.map((group) => (
           <div key={group.key}>
             <SimpleCell
@@ -580,7 +496,7 @@ export default function InventoryTab({ onCharacterUpdate }) {
             </SimpleCell>
             {openSlot === group.key && (
               <div className="craft-expand">
-                {group.rows.map((row) => (group.kind === 'gear' ? gearRow(row, true) : stackRow(group.kind, row)))}
+                {group.rows.map((row) => (group.kind === 'gear' ? gearRow(row) : stackRow(group.kind, row)))}
               </div>
             )}
           </div>
@@ -588,10 +504,7 @@ export default function InventoryTab({ onCharacterUpdate }) {
       </Group>
 
       {detail && (
-        <ItemSheet
-          entry={detail} onClose={() => setDetail(null)}
-          onUnequip={handleUnequip} unequipping={equippingId === detail.data?.id}
-        />
+        <ItemSheet entry={detail} onClose={() => setDetail(null)} />
       )}
       {roulette && (
         <ChestRoulette

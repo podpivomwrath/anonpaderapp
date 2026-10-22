@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Group, Header } from '@vkontakte/vkui';
 import { equipItem, getCharacter, getInventory, getTrophies, setGender, unequipItem } from '../api.js';
 import { silhouetteUrl } from '../silhouettes.js';
@@ -6,18 +6,21 @@ import { itemIcon } from '../itemIcons.js';
 import ItemIcon from './ItemIcon.jsx';
 import Sparks from './Sparks.jsx';
 
-// Вкладка «Герой» (2026-10-22): силуэт персонажа, на нём окна слотов. Нажал
-// окно - снизу список вещей из сумки для этого слота, с разницей к надетой.
-// Под силуэтом - бонус снаряжения и полка трофеев.
+// Вкладка «Герой» (2026-10-22): силуэт персонажа, по бокам окна слотов,
+// от окна к телу - тонкая линия. Нажал окно - снизу список вещей из сумки для
+// этого слота, с разницей к надетой. Под силуэтом - бонус снаряжения и полка
+// трофеев. Окна сперва лежали прямо на теле - владельцу не понравилось.
 
-// Где окна лежат на силуэте, в долях кадра. Кадр у всех 18 картинок общий:
+// Окна: слева оружие (оно у всех 18 силуэтов в руке слева), справа броня
+// сверху вниз. y - высота окна и точки на теле, ax - куда на теле ведёт
+// линия; всё в долях кадра силуэта. Кадр у всех картинок общий:
 // tools/silhouette_assets.py выравнивает их по капюшону и подошвам.
 const SLOTS = [
-  { slot: 'helmet', x: 50, y: 10.5 },
-  { slot: 'armor', x: 50, y: 30 },
-  { slot: 'weapon', x: 17, y: 46 },
-  { slot: 'legs', x: 50, y: 57 },
-  { slot: 'boots', x: 50, y: 89 },
+  { slot: 'weapon', side: 'left', y: 46, ax: 19 },
+  { slot: 'helmet', side: 'right', y: 9, ax: 56 },
+  { slot: 'armor', side: 'right', y: 31, ax: 62 },
+  { slot: 'legs', side: 'right', y: 60, ax: 57 },
+  { slot: 'boots', side: 'right', y: 89, ax: 60 },
 ];
 
 const SLOT_TITLES = {
@@ -176,6 +179,58 @@ function TrophyShelf({ trophies }) {
   );
 }
 
+// Линии от окна к телу. Считаются по размерам раскладки (offset*), а не по
+// экранным координатам: во время анимации появления силуэт чуть уменьшен,
+// и линии, посчитанные в этот момент, промахивались мимо тела.
+function useLeaders(row, img, ready) {
+  const [lines, setLines] = useState([]);
+  useLayoutEffect(() => {
+    const box = row.current;
+    const fig = img.current?.parentElement;
+    if (!box || !fig) return undefined;
+    const place = () => {
+      setLines(SLOTS.map(({ slot, side, y, ax }) => {
+        const el = box.querySelector(`[data-slot="${slot}"]`);
+        const col = el?.parentElement;
+        // Окно сдвинуто на половину своей ширины (translate) - в offsetLeft этого нет.
+        const left = col ? col.offsetLeft + el.offsetLeft - el.offsetWidth / 2 : 0;
+        return {
+          slot,
+          x1: side === 'left' ? left + (el?.offsetWidth || 0) : left,
+          x2: fig.offsetLeft + (fig.offsetWidth * ax) / 100,
+          y: fig.offsetTop + (fig.offsetHeight * y) / 100,
+        };
+      }));
+    };
+    place();
+    const observer = new ResizeObserver(place);
+    observer.observe(box);
+    return () => observer.disconnect();
+  }, [row, img, ready]);
+  return lines;
+}
+
+function GenderChoice({ character, onPick, busy }) {
+  return (
+    <Group>
+      <div className="gender-choice">
+        <p className="gender-choice__title">Выбери облик</p>
+        <div className="gender-choice__row">
+          {[['m', 'Мужской'], ['f', 'Женский']].map(([g, label]) => (
+            <button
+              type="button" key={g} className="gender-choice__card" disabled={busy}
+              onClick={() => onPick(g)} aria-label={label}
+            >
+              <img src={silhouetteUrl(character.subclass, character.base_class, g)} alt="" draggable="false" />
+              <span>{label}</span>
+            </button>
+          ))}
+        </div>
+      </div>
+    </Group>
+  );
+}
+
 export function HeroSkeleton() {
   return (
     <Group>
@@ -195,7 +250,10 @@ export default function HeroTab({ character, onCharacterUpdate }) {
   const [error, setError] = useState(null);
   // Сколько раз в слот надевали вещь - каждое надевание даёт вспышку искр.
   const [flashes, setFlashes] = useState({});
-  const [gender, setGenderState] = useState(character.gender || 'm');
+  const [gender, setGenderState] = useState(character.gender || null);
+  const [choosing, setChoosing] = useState(false);
+  const rowRef = useRef(null);
+  const imgRef = useRef(null);
 
   useEffect(() => {
     getInventory().then((res) => setItems(res.items)).catch(() => setFailed(true));
@@ -251,61 +309,70 @@ export default function HeroTab({ character, onCharacterUpdate }) {
     }
   }
 
+  // Пол выбирается один раз (2026-10-22, владелец), сменить пока нельзя.
   async function pickGender(next) {
-    if (next === gender) return;
-    setGenderState(next);
+    setChoosing(true);
     try {
-      await setGender(next);
-      onCharacterUpdate((prev) => ({ ...prev, gender: next }));
-    } catch {
-      setGenderState(gender);
+      const res = await setGender(next);
+      setGenderState(res.gender);
+      onCharacterUpdate((prev) => ({ ...prev, gender: res.gender }));
+    } catch (err) {
+      // Уже выбран (с другого устройства) - сервер вернул какой.
+      if (err?.details?.gender) setGenderState(err.details.gender);
+    } finally {
+      setChoosing(false);
     }
   }
 
+  // Ключ пересчёта: силуэт появился или сменился.
+  const lines = useLeaders(rowRef, imgRef, Boolean(items && gender) && [character.subclass, gender].join());
+
   if (failed) return <Group><p className="hero-error">Не удалось загрузить снаряжение.</p></Group>;
+  if (!gender) return <GenderChoice character={character} onPick={pickGender} busy={choosing} />;
   if (!items) return <HeroSkeleton />;
 
   const url = silhouetteUrl(character.subclass, character.base_class, gender);
   const path = character.subclass || character.base_class;
   const bonus = STAT_ORDER.filter((k) => character.gear_bonus?.[k]);
 
+  const slotButton = ({ slot, y }) => {
+    const item = equipped[slot];
+    const rar = item?.rarity;
+    return (
+      <button
+        type="button" key={slot} data-slot={slot}
+        className={`gear-slot${item ? ` gear-slot--filled gear-slot--${rar}` : ''}`}
+        style={{ top: `${y}%` }}
+        onClick={() => setOpenSlot(slot)}
+        aria-label={item ? `${SLOT_TITLES[slot]}: ${item.name}` : SLOT_TITLES[slot]}
+      >
+        {item
+          ? <ItemIcon icon={item.icon} rarity={item.rarity} alt="" size={48} />
+          : <SlotGlyph slot={slot} />}
+        {upgrades[slot] && <span className="gear-slot__up" aria-hidden="true">▲</span>}
+        <Sparks burst={flashes[slot] || 0} />
+      </button>
+    );
+  };
+
   return (
     <>
       <Group>
         <div className={`hero-stage hero-stage--${path}`}>
-          <div className="gender-switch" role="radiogroup" aria-label="Пол">
-            {[['m', '♂'], ['f', '♀']].map(([g, sign]) => (
-              <button
-                type="button" key={g} role="radio" aria-checked={gender === g}
-                className={gender === g ? 'gender-switch__btn gender-switch__btn--on' : 'gender-switch__btn'}
-                onClick={() => pickGender(g)}
-                aria-label={g === 'm' ? 'Мужской' : 'Женский'}
-              >
-                {sign}
-              </button>
-            ))}
-          </div>
-          <div className="hero-figure">
-            <img key={url} className="hero-figure__img" src={url} alt="" draggable="false" />
-            {SLOTS.map(({ slot, x, y }) => {
-              const item = equipped[slot];
-              const rar = item?.rarity;
-              return (
-                <button
-                  type="button" key={slot}
-                  className={`gear-slot${item ? ` gear-slot--filled gear-slot--${rar}` : ''}`}
-                  style={{ left: `${x}%`, top: `${y}%` }}
-                  onClick={() => setOpenSlot(slot)}
-                  aria-label={item ? `${SLOT_TITLES[slot]}: ${item.name}` : SLOT_TITLES[slot]}
-                >
-                  {item
-                    ? <ItemIcon icon={item.icon} rarity={item.rarity} alt="" size={48} />
-                    : <SlotGlyph slot={slot} />}
-                  {upgrades[slot] && <span className="gear-slot__up" aria-hidden="true">▲</span>}
-                  <Sparks burst={flashes[slot] || 0} />
-                </button>
-              );
-            })}
+          <div className="hero-row" ref={rowRef}>
+            <svg className="hero-leaders" aria-hidden="true">
+              {lines.map((l) => (
+                <g key={l.slot} className={equipped[l.slot] ? 'hero-leader hero-leader--on' : 'hero-leader'}>
+                  <line x1={l.x1} y1={l.y} x2={l.x2} y2={l.y} />
+                  <circle cx={l.x2} cy={l.y} r="2.5" />
+                </g>
+              ))}
+            </svg>
+            <div className="hero-col hero-col--left">{SLOTS.filter((x) => x.side === 'left').map(slotButton)}</div>
+            <div className="hero-figure">
+              <img key={url} ref={imgRef} className="hero-figure__img" src={url} alt="" draggable="false" />
+            </div>
+            <div className="hero-col hero-col--right">{SLOTS.filter((x) => x.side === 'right').map(slotButton)}</div>
           </div>
           {bonus.length > 0 && (
             <div className="hero-bonus">
