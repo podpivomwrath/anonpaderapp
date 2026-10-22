@@ -24,6 +24,7 @@ from datetime import datetime, timezone
 from sqlalchemy import select
 from vkbottle.bot import BotLabeler, Message
 
+from bot import info_reply
 from bot.keyboards import combat_modes
 from bot.keyboards.combat_items import page_of
 from bot.vk_media import photo_attachment
@@ -458,7 +459,7 @@ async def leaderboard_command(message: Message) -> None:
             f"Ты: {rank} место - {character.pts} PTS · {pts_service.rank_name(character.pts)}"
             f" · {character.pvp_wins} / {character.pvp_losses}"
         )
-    await message.answer("\n".join(lines))
+    await info_reply.answer(message, "\n".join(lines))
 
 
 # --- /напасть, /attack ---

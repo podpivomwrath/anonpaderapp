@@ -15,9 +15,10 @@ from vkbottle import Keyboard, KeyboardButtonColor, Text
 from vkbottle.bot import BotLabeler, Message
 from vkbottle.dispatch.rules.base import FuncRule
 
+from bot import info_reply
 from bot import rift_texts as texts
 from bot.activity import activity_action, blocked_reason
-from bot.battle_keyboard import active_battle_keyboard, in_any_battle
+from bot.battle_keyboard import in_any_battle
 from bot.dispatch_rules import is_info_command
 
 from bot.keyboards.world import BTN_LOOK_AROUND, add_miniapp_button
@@ -55,7 +56,7 @@ async def rifts_command(message: Message) -> None:
     # Справка не трогает клавиатуру (2026-10-16): раньше ответ слал «текущую»,
     # и посреди события, ожидания группы или пути она подменяла нужные кнопки.
     # В бою - боевая, как у /квест.
-    keyboard = active_battle_keyboard(message.peer_id)
+    keyboard = await info_reply.keyboard_for(message.peer_id, message.from_id)
     if not rifts:
         await message.answer("🌀 Сейчас на карте нет ни одного разлома.", keyboard=keyboard)
         return

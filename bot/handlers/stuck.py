@@ -53,6 +53,11 @@ async def force_unstick(db, character, peer_id: int, *, admin_override: bool = F
     # Добыча (2026-10-21): /застрял выносит из забоя - значит, и кирку бросает,
     # начатый кусок возвращается в жилу (как «Бросить кирку»).
     await mining_service.cancel_dig(db, character)
+    # Рыбалка (2026-10-23): снасть в воде держит на клетке - /застрял сматывает.
+    from services import fishing_service
+
+    if fishing_service.is_casting(character):  # пойманную рыбу не трогаем
+        fishing_service.clear_cast(character)
     # Ниже interrupt_for_pvp и маунт пишут строку персонажа СВОИМИ сессиями.
     # Пока эта держит её изменённой (экран, время активности), они ждали её
     # до таймаута базы - и /застрял сам застревал (2026-10-11, дважды).

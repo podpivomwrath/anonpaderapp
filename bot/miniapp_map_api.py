@@ -263,6 +263,7 @@ async def handle_get_state(request: web.Request) -> web.Response:
 _MAP_REASONS = {
     "dead": "dead", "pvp": "in_pvp", "battle": "in_combat", "busy": "busy",
     "traveling_on_foot": "traveling_on_foot", "digging": "mining", "house_work": "house_work",
+    "fishing": "fishing",
 }
 
 
@@ -318,6 +319,10 @@ async def handle_post_send_mount(request: web.Request) -> web.Response:
         reason = await _blocked_reason(db, character, vk_user_id)
         if reason is not None:
             return web.json_response({"error": reason}, status=400)
+        from bot.busy import open_event
+
+        if await open_event(vk_user_id) is not None:
+            return web.json_response({"error": "in_event"}, status=400)
         if await mount_service.active_travel(db, character.id) is not None:
             return web.json_response({"error": "already_on_mount"}, status=400)
         if not grid.in_bounds(x, y):

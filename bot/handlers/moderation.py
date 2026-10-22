@@ -13,6 +13,7 @@ from sqlalchemy import select
 from vkbottle import BaseMiddleware
 from vkbottle.bot import BotLabeler, Message
 
+from bot import info_reply
 from bot.battle_keyboard import active_battle_keyboard
 from bot.handlers import world as world_handlers
 from bot.onboarding_texts import REGION_TITLES
@@ -142,7 +143,7 @@ async def bug_report_no_text(message: Message) -> None:
         await _handle_bug_report(message, BUG_ONLY_ATTACHMENT)
         return
     # Патч 30, баг 2: справочные команды не должны стирать боевую клавиатуру.
-    await message.answer(BUG_ASK_TEXT, keyboard=active_battle_keyboard(message.peer_id))
+    await info_reply.answer(message, BUG_ASK_TEXT)
 
 
 def _attachments_summary(message: Message) -> list[dict]:

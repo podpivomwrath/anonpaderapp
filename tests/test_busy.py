@@ -77,3 +77,26 @@ async def test_unstick_clears_every_unstick_state(db_session, character_at, monk
 
     await world_handlers.force_unstick(db_session, c, peer)
     assert await busy_mod.busy(db_session, c, peer) is None
+
+
+async def test_cast_line_holds_on_the_cell() -> None:
+    """2026-10-23, баг-репорт: со снастью в воде уходили с клетки."""
+    now = datetime.now(timezone.utc)
+    cast = _char(screen="lake", fishing_cast_at=now, fishing_bite_at=now + timedelta(seconds=20))
+    found = await busy_mod.busy(None, cast, peer_id=777003, now=now, skip=("riding",))
+    assert found is not None and found.code == "fishing"
+    # Окно подсечки давно прошло (рестарт) - не держит.
+    stale = _char(screen="lake", fishing_cast_at=now - timedelta(hours=1), fishing_bite_at=now - timedelta(hours=1))
+    assert await busy_mod.busy(None, stale, peer_id=777003, now=now, skip=("riding",)) is None
+
+
+async def test_open_event_blocks_the_mount() -> None:
+    """2026-10-23, владелец: с открытым событием исследования в седло нельзя."""
+    peer = 777004
+    assert await busy_mod.open_event(peer) is None
+    world_handlers._pending_events[peer] = "wounded_traveler"
+    try:
+        found = await busy_mod.open_event(peer)
+        assert found is not None and found.code == "event"
+    finally:
+        world_handlers._pending_events.pop(peer, None)

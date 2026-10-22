@@ -3,7 +3,7 @@
 from vkbottle import Keyboard
 from vkbottle.bot import BotLabeler, Message
 
-from bot.battle_keyboard import active_battle_keyboard
+from bot import info_reply
 from bot.keyboards.world import add_miniapp_button
 from services.db import get_session_factory
 from services.user_service import get_profile_text
@@ -51,7 +51,7 @@ HELP_TEXT = """📖 Команды
 @labeler.message(text=["/помощь", "/команды", "/help"])
 async def handle_help(message: Message) -> None:
     # Справка не трогает клавиатуру: работает и посреди боя.
-    await message.answer(HELP_TEXT)
+    await info_reply.answer(message, HELP_TEXT)
 
 
 @labeler.message(text=["/профиль", "/profile"])
@@ -67,9 +67,10 @@ async def handle_profile(message: Message) -> None:
 
     # Патч 30, баг 2: справочная команда не должна стирать боевую клавиатуру,
     # если игрок сейчас в PvE/PvP-бою.
-    battle_kb = active_battle_keyboard(message.peer_id)
-    if battle_kb is not None:
-        await message.answer(text, keyboard=battle_kb)
+    # На озере и в руднике - кнопки экрана (bot/info_reply.py).
+    state_kb = await info_reply.keyboard_for(message.peer_id, message.from_id)
+    if state_kb is not None:
+        await message.answer(text, keyboard=state_kb)
         return
 
     # Клавиатуру шлём только если мини-апп настроен — иначе пустая

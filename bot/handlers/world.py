@@ -18,6 +18,7 @@ from loguru import logger
 from sqlalchemy import select
 from vkbottle.bot import BotLabeler, Message
 
+from bot import info_reply
 from bot import (
     craft_button_state,
     dailies_texts,
@@ -971,7 +972,7 @@ async def quest_reminder(message: Message) -> None:
             return
         text = await story_service.quest_reminder_text(db, character, mentor_name(character.region))
     # Патч 30, баг 2: справочная команда не должна стирать боевую клавиатуру.
-    await message.answer(text, keyboard=active_battle_keyboard(message.peer_id))
+    await info_reply.answer(message, text)
 
 
 def is_busy(peer_id: int) -> bool:
@@ -1141,9 +1142,9 @@ async def raid_key_command(message: Message) -> None:
         if character is None or character.creation_state is not None:
             return
         if character.raid_keys <= 0:
-            await message.answer("У тебя нет Ключа Монолита.")
+            await info_reply.answer(message, "У тебя нет Ключа Монолита.")
             return
-        await message.answer(raid_key_texts.RAID_KEY_USE_TEXT)
+    await info_reply.answer(message, raid_key_texts.RAID_KEY_USE_TEXT)
 
 
 def activity_state(peer_id: int) -> str:

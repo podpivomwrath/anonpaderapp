@@ -10,6 +10,7 @@ from loguru import logger
 from sqlalchemy import select
 from vkbottle.bot import BotLabeler, Message
 
+from bot import info_reply
 from models import Character, Contract, ContractTaker
 from services import contract_service
 from services import onboarding_service as onboarding_svc
@@ -56,9 +57,9 @@ async def contracts_command(message: Message) -> None:
         if await contract_service.is_target(db, character.id, now):
             lines.append("📜 На тебя есть заказ: вне городов охотники видят тебя на карте.")
     if not lines:
-        await message.answer("📜 Взятых заказов нет. Заказы - на «Доске» в мини-аппе, вкладка «Заказы».")
+        await info_reply.answer(message, "📜 Взятых заказов нет. Заказы - на «Доске» в мини-аппе, вкладка «Заказы».")
         return
-    await message.answer("📜 Твои заказы:\n\n" + "\n".join(lines))
+    await info_reply.answer(message, "📜 Твои заказы:\n\n" + "\n".join(lines))
 
 
 async def notify_target(target_id: int, kills: int) -> None:

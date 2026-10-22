@@ -20,6 +20,7 @@ STATES: dict[str, str] = {
     "battle": "Сначала закончи текущий бой.",
     "busy": "Сначала закончи исследование или отдых.",
     "digging": "",  # текст с остатком времени - mining_texts.busy_text
+    "fishing": "Снасть в воде. Сначала дождись поклёвки или отмени заброс.",
     "house_work": "Сначала закончи варку в доме.",
     "traveling_on_foot": "Сначала дождись прибытия.",
     "riding": "Сначала дождись окончания поездки.",
@@ -35,6 +36,7 @@ ENDS_BY: dict[str, str] = {
     "battle": "battle",
     "busy": "unstick",
     "digging": "unstick",
+    "fishing": "unstick",
     "house_work": "timer",
     "traveling_on_foot": "unstick",
     "riding": "unstick",
@@ -75,6 +77,13 @@ async def busy(db, character, peer_id: int, now: datetime | None = None, skip: t
         from bot import mining_texts
 
         checks.append(hit("digging", mining_texts.busy_text(mining_service.remaining_seconds(character))))
+    # Рыбалка (2026-10-23, баг-репорт: со снастью в воде уходили с клетки).
+    # Держит, пока снасть в воде и окно подсечки не прошло.
+    if character.screen == "lake":
+        from services import fishing_service
+
+        if fishing_service.is_casting(character) and not fishing_service.cast_is_stale(character, now):
+            checks.append(hit("fishing"))
     if getattr(character, "house_work", None) is not None:
         checks.append(hit("house_work"))
     if movement_service.is_traveling(character, now):
@@ -85,4 +94,18 @@ async def busy(db, character, peer_id: int, now: datetime | None = None, skip: t
     travel = await mount_service.active_travel(db, character.id)
     if travel is not None and travel.status in ("traveling", "ambushed"):
         return hit("riding")
+    return None
+
+
+#: Открытое событие исследования - только для маунта (2026-10-23, владелец:
+#: «сначала закончить событие, потом ехать»). В busy() его нет: пешком и
+#: остальные занятия событие не держит, у него свои кнопки.
+EVENT_TEXT = "Сначала закончи событие - потом в седло."
+
+
+async def open_event(peer_id: int) -> Busy | None:
+    from bot.handlers import scene_events, world
+
+    if scene_events.has_pending(peer_id) or await world._pending_event_id(peer_id) is not None:
+        return Busy("event", EVENT_TEXT)
     return None

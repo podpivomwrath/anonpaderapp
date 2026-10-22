@@ -146,7 +146,9 @@ async def _blocked_reason(db, character, peer_id: int, now: datetime) -> str | N
     (2026-10-21: раньше маунт в чате не знал про забой и варку)."""
     from bot.busy import busy
 
-    found = await busy(db, character, peer_id, now)
+    from bot.busy import open_event
+
+    found = await busy(db, character, peer_id, now) or await open_event(peer_id)
     if found is None:
         return None
     if found.code == "riding" or await mount_service.active_travel(db, character.id) is None:

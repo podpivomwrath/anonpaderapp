@@ -12,6 +12,7 @@ from loguru import logger
 from vkbottle import Keyboard, KeyboardButtonColor, Text
 from vkbottle.bot import BotLabeler, Message
 
+from bot import info_reply
 from bot.activity import activity_action, blocked_reason
 from bot.keyboards.world import empty_keyboard
 from bot.vk_media import photo_attachment
@@ -211,8 +212,8 @@ async def guild_command(message: Message) -> None:
             return
         guild = await guild_service.guild_of(db, character)
         if guild is None:
-            await message.answer(
-                "🏰 Ты не в гильдии. Вступить или основать свою можно в мини-аппе: раздел «Гильдия»."
+            await info_reply.answer(
+                message, "🏰 Ты не в гильдии. Вступить или основать свою можно в мини-аппе: раздел «Гильдия»."
             )
             return
         member = await guild_service.membership(db, character.id)
@@ -233,7 +234,7 @@ async def guild_command(message: Message) -> None:
     if boss is not None:
         lines.append(f"🗿 {guild_boss_service.boss_title(boss)} призван: {boss.hp}/{boss.max_hp}. Команда «/страж».")
     lines.append("Управление - в мини-аппе, раздел «Гильдия».")
-    await message.answer("\n".join(lines))
+    await info_reply.answer(message, "\n".join(lines))
 
 
 # --- Страж цитадели --------------------------------------------------------------------
