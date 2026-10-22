@@ -128,9 +128,14 @@ def at_city_gates(x: int, y: int) -> bool:
     )
 
 
+def is_monolith(x: int, y: int) -> bool:
+    return (x, y) == (0, 0)
+
+
 def pvp_forbidden(x: int, y: int) -> bool:
-    """Город или клетка у его ворот: игроки здесь не нападают друг на друга."""
-    return city_region_at(x, y) is not None or at_city_gates(x, y)
+    """Город, клетка у его ворот или Монолит (0;0, с 2026-10-22): игроки
+    здесь не нападают друг на друга."""
+    return city_region_at(x, y) is not None or at_city_gates(x, y) or is_monolith(x, y)
 
 
 def in_bounds(x: int, y: int) -> bool:

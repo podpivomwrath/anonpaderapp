@@ -25,3 +25,4 @@ def test_city_gates_are_pvp_free() -> None:
     assert grid.at_city_gates(28, 0) and not grid.at_city_gates(30, 0)
     assert not grid.pvp_forbidden(0, 27) and not grid.pvp_forbidden(3, 29)
     assert not grid.pvp_forbidden(10, 10)
+    assert grid.pvp_forbidden(0, 0)  # Монолит (2026-10-22)

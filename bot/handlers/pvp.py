@@ -52,8 +52,10 @@ from bot.pvp_texts import (
     CITY_NO_PVP_TEXT,
     GATES_NO_PVP_TEXT,
     LAKE_NO_PVP_TEXT,
+    MONOLITH_NO_PVP_TEXT,
     NOTHING_TO_TAKE,
     SIEGE_NO_PVP_TEXT,
+    WORLD_BOSS_NO_PVP_TEXT,
 )
 from game.combat import balance_config as bc
 from game.combat import battle_log, display, elixir_effects
@@ -96,6 +98,7 @@ from services import (
     preset_service,
     pvp_service,
     trophy_service,
+    world_boss_service,
 )
 from services import onboarding_service as onboarding_svc
 from services.db import get_session_factory
@@ -104,13 +107,20 @@ from services.db import get_session_factory
 def _is_safe_craft_cell(character) -> bool:
     """Мирная клетка ремесла: озеро или рудник первых двух колец.
 
-    Правило одно на все ремёсла сознательно — «первые два кольца мирные»
+    Правило одно на все ремёсла сознательно — с 2026-10-22 мирные все озёра и рудники
     игрок должен помнить одно, а не по отдельному на каждое занятие.
     """
     return (
         fishing_service.is_safe_lake(character.pos_x, character.pos_y)
         or mining_service.is_safe_mine(character.pos_x, character.pos_y)
     )
+
+
+async def _at_world_boss(db, character) -> bool:
+    """Клетка живого мирового босса - без PvP (2026-10-22, владелец): все
+    бьют чудовище, а не друг друга."""
+    boss = await world_boss_service.active_boss(db)
+    return boss is not None and (boss.x, boss.y) == (character.pos_x, character.pos_y)
 
 
 labeler = BotLabeler()
@@ -386,9 +396,10 @@ async def look_around(message: Message) -> None:
         # пустоту (жалоба игрока). Теперь показываем, кто рядом, без номеров -
         # нападать здесь всё равно нельзя.
         safe_craft = _is_safe_craft_cell(character)
-        if safe_craft or grid.pvp_forbidden(character.pos_x, character.pos_y):
+        at_boss = await _at_world_boss(db, character)
+        if safe_craft or at_boss or grid.pvp_forbidden(character.pos_x, character.pos_y):
             solo, _battles = await _scene_at(db, character)
-            hunted = await _hunted_here(db, character, solo) if safe_craft and not grid.pvp_forbidden(
+            hunted = await _hunted_here(db, character, solo) if safe_craft and not at_boss and not grid.pvp_forbidden(
                 character.pos_x, character.pos_y) else []
             if not hunted:
                 await message.answer(_peaceful_scene_text(solo, await _guild_tags(db, solo)))
@@ -482,6 +493,12 @@ async def attack_command(message: Message, target: str) -> None:
             return
         if grid.at_city_gates(character.pos_x, character.pos_y):
             await message.answer(GATES_NO_PVP_TEXT)
+            return
+        if grid.is_monolith(character.pos_x, character.pos_y):
+            await message.answer(MONOLITH_NO_PVP_TEXT)
+            return
+        if await _at_world_boss(db, character):
+            await message.answer(WORLD_BOSS_NO_PVP_TEXT)
             return
         if await guild_siege_service.lock_at(db, character.pos_x, character.pos_y) is not None:
             await message.answer(SIEGE_NO_PVP_TEXT)

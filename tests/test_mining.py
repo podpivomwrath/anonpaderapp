@@ -166,9 +166,10 @@ def test_better_grade_gives_more_xp() -> None:
 
 # --- Мирные рудники -----------------------------------------------------------
 
-def test_safe_mines_are_exactly_first_two_rings() -> None:
+def test_every_mine_is_safe() -> None:
+    """2026-10-22, владелец: все рудники без PvP (было - кольца I-II)."""
     for mine in mining.all_mines():
-        assert mining.is_safe_mine(mine.x, mine.y) is (mine.tier <= mc.PVP_SAFE_MAX_MINE_TIER)
+        assert mining.is_safe_mine(mine.x, mine.y), mine.id
 
 
 def test_plain_cell_is_never_a_safe_mine() -> None:

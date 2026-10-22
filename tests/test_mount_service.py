@@ -160,12 +160,13 @@ async def test_advance_moves_character_cell_by_cell(make_character) -> None:
 
 async def test_ambush_stops_on_the_cell_and_resume_continues_from_it(db_session, make_character) -> None:
     character = await make_character(level=10)
-    travel = _build_travel(character_id=character.id)
+    # По оси y: (1;0) - озеро, а озёра с 2026-10-22 мирные и засад там нет.
+    travel = _build_travel(character_id=character.id, to_x=0, to_y=10)
     db_session.add(travel)
     await db_session.flush()
     step = mount_service.advance(travel, character, AlwaysAmbush(), now=NOW + timedelta(seconds=30))
     assert step.ambushed and travel.status == "ambushed"
-    assert travel.cell_index == 1 and (character.pos_x, character.pos_y) == (1, 0)
+    assert travel.cell_index == 1 and (character.pos_x, character.pos_y) == (0, 1)
     assert mount_service.frozen_remaining_seconds(travel) == 9 * 7.0
     later = NOW + timedelta(seconds=500)  # бой шёл долго - в счёт дороги не идёт
     await mount_service.resume_travel(db_session, travel, now=later)
@@ -194,8 +195,9 @@ async def test_legacy_travel_without_steps_arrives_by_timer(make_character) -> N
 def test_ambush_chance_by_ring_and_safe_cells() -> None:
     outer = mount_service.cell_ambush_chance("ashen_steed", 25, 3)
     middle = mount_service.cell_ambush_chance("ashen_steed", 10, 0)
-    center = mount_service.cell_ambush_chance("ashen_steed", 1, 0)
+    center = mount_service.cell_ambush_chance("ashen_steed", 1, 1)
     assert 0 < outer < middle < center
+    assert mount_service.cell_ambush_chance("ashen_steed", 1, 0) == 0  # озеро - все мирные (2026-10-22)
     assert mount_service.cell_ambush_chance("ashen_steed", 0, 30) == 0  # город
     assert mount_service.cell_ambush_chance("admin_ashen_herald", 10, 0) == 0
     # через центр к противоположному городу опаснее, чем вдоль края к соседнему

@@ -170,7 +170,10 @@ def test_break_still_gives_some_xp() -> None:
 
 # --- Мирные озёра -------------------------------------------------------------
 
-def test_safe_lakes_are_exactly_first_two_rings() -> None:
+def test_every_lake_is_safe() -> None:
+    """2026-10-22, владелец: все озёра без PvP (было - кольца I-II)."""
+    for lake in fishing.all_lakes():
+        assert fishing.is_safe_lake(lake.x, lake.y), lake.id
     for lake in fishing.all_lakes():
         expected = lake.tier <= fc.PVP_SAFE_MAX_LAKE_TIER
         assert fishing.is_safe_lake(lake.x, lake.y) is expected, lake.id
