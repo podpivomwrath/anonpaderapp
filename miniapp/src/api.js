@@ -454,3 +454,16 @@ export const contractAction = (action, params = {}) =>
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ action, ...params }),
   });
+
+// Вкладка «Герой» (2026-10-22): пол силуэта и полка трофеев.
+export function setGender(gender) {
+  return request('/gender', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ gender }),
+  });
+}
+
+export function getTrophies() {
+  return request('/trophies');
+}

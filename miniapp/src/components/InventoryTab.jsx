@@ -1,12 +1,13 @@
 import { useEffect, useState } from 'react';
 import bridge from '@vkontakte/vk-bridge';
 import {
-  Button, Div, Group, Header, Placeholder, SimpleCell, Spinner, Text,
+  Button, Div, Group, Header, Placeholder, SimpleCell, Text,
 } from '@vkontakte/vkui';
 import { IN_VK, eatFood, equipItem, getCharacter, getInventory, openChest, unequipItem } from '../api.js';
 import { itemIcon } from '../itemIcons.js';
 import ChestRoulette from './ChestRoulette.jsx';
 import ItemIcon from './ItemIcon.jsx';
+import Skeleton from './Skeleton.jsx';
 
 // Патч 74: вместо одного плоского списка - «Надето» отдельно и сумка,
 // свёрнутая по слотам. Плоский список рос вместе с дропом и превращался в
@@ -378,9 +379,7 @@ export default function InventoryTab({ onCharacterUpdate }) {
 
   if (status === 'loading') {
     return (
-      <Div style={{ display: 'flex', justifyContent: 'center', paddingTop: 48 }}>
-        <Spinner size="l" />
-      </Div>
+      <Skeleton />
     );
   }
 

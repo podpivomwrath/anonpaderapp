@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
-import { Group, Header, Div, Text, Spinner, Placeholder, Button, Input, Checkbox } from '@vkontakte/vkui';
+import { Group, Header, Div, Text, Placeholder, Button, Input, Checkbox } from '@vkontakte/vkui';
 import { getPresets, savePreset, switchPreset, buyPresetSlot } from '../api.js';
+import Skeleton from './Skeleton.jsx';
 
 // Коды ошибок сервера, у которых нет человеческого текста на той стороне.
 const ERROR_TEXTS = {
@@ -47,9 +48,7 @@ export default function PresetsTab({ character }) {
 
   if (status === 'loading') {
     return (
-      <Div style={{ display: 'flex', justifyContent: 'center', paddingTop: 48 }}>
-        <Spinner size="l" />
-      </Div>
+      <Skeleton />
     );
   }
 

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import {
-  Caption, Div, Group, Header, Placeholder, SimpleCell, Spinner, Switch,
+  Caption, Div, Group, Header, Placeholder, SimpleCell, Switch,
 } from '@vkontakte/vkui';
 import { getInventory, setFishAutoKeep } from '../api.js';
 import ItemIcon from './ItemIcon.jsx';
@@ -8,6 +8,7 @@ import { itemIcon } from '../itemIcons.js';
 import {
   CheckIcon, CopyIcon, ItemSheet, QuantitySheet, copyText,
 } from './InventoryTab.jsx';
+import Skeleton from './Skeleton.jsx';
 
 // Ремесла (2026-10-21): у каждого ремесла - уровень, опыт, короткая подсказка
 // и своя сумка. Рыба и руда переехали сюда из инвентаря: всё ремесленное
@@ -74,7 +75,7 @@ export default function CraftsTab({ character }) {
   }, []);
 
   if (status === 'loading') {
-    return <Div style={{ display: 'flex', justifyContent: 'center', paddingTop: 48 }}><Spinner size="l" /></Div>;
+    return <Skeleton />;
   }
   if (status === 'error') {
     return <Placeholder icon={<div style={{ fontSize: 48 }}>🛠</div>}>Не удалось загрузить ремёсла.</Placeholder>;

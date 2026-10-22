@@ -2,7 +2,8 @@ import {
   Suspense, lazy, useCallback, useEffect, useRef, useState,
 } from 'react';
 import bridge from '@vkontakte/vk-bridge';
-import ClassIcon from './ClassIcon.jsx';
+import XpEmblem from './XpEmblem.jsx';
+import AshLayer from './AshLayer.jsx';
 import IntroScene from './IntroScene.jsx';
 import NewPlayer from './NewPlayer.jsx';
 import TabHint from './TabHint.jsx';
@@ -22,6 +23,7 @@ import NavIcon from './NavIcon.jsx';
 import CharacterTab from './CharacterTab.jsx';
 import DailiesTab from './DailiesTab.jsx';
 import InventoryTab from './InventoryTab.jsx';
+import Skeleton from './Skeleton.jsx';
 
 // Разделы, которые открывают не каждый раз, грузятся отдельно при первом
 // открытии (2026-10-21): основной файл мини-аппа был больше 500 КБ, и на
@@ -171,6 +173,7 @@ export default function Hub() {
   // Новый уровень - волна света по шапке. Только при росте уровня за время
   // открытого мини-аппа: при загрузке сравнивать не с чем.
   const [levelUp, setLevelUp] = useState(false);
+  const [levelBursts, setLevelBursts] = useState(0);
   const lastLevel = useRef(null);
   const level = character?.level;
   useEffect(() => {
@@ -179,6 +182,7 @@ export default function Hub() {
     lastLevel.current = level;
     if (before == null || level <= before) return undefined;
     setLevelUp(true);
+    setLevelBursts((n) => n + 1);
     const timer = setTimeout(() => setLevelUp(false), 1800);
     return () => clearTimeout(timer);
   }, [level]);
@@ -507,6 +511,10 @@ export default function Hub() {
           отнимала бы место у мира. */}
       {activeTab !== 'map' && (
       <div className={levelUp ? 'hub-banner hub-banner--levelup' : 'hub-banner'} data-tour="banner">
+        {/* Пепел за шапкой (2026-10-22). На слабом устройстве - нет. */}
+        {!document.body.classList.contains('lite') && (
+          <AshLayer className="hub-banner__ash" density={4} ember={0.3} />
+        )}
         {/* Эмблема пути. Стоит у имени, а не у слова «Тёмный мистик»:
             подкласс выбирают один раз и навсегда, и в шапке он часть того,
             КТО ты, а не ещё одна строка характеристик. */}
@@ -520,20 +528,10 @@ export default function Hub() {
             onClick={() => setCrownOpen(true)}
             aria-label="Рамка"
           >
-            <ClassIcon
-              subclass={character.subclass}
-              baseClass={character.base_class}
-              crown={character.crown_frame || null}
-              size={44}
-            />
+            <XpEmblem character={character} burst={levelBursts} />
           </button>
         ) : (
-          <ClassIcon
-            subclass={character.subclass}
-            baseClass={character.base_class}
-            crown={character.crown_frame || null}
-            size={44}
-          />
+          <XpEmblem character={character} burst={levelBursts} />
         )}
         <div className="hub-banner__text">
         <p className="hub-banner__name">
@@ -556,8 +554,7 @@ export default function Hub() {
         </p>
         <p className="hub-banner__meta">
           {character.base_class_title}
-          {character.subclass_title ? ` · ${character.subclass_title}` : ''} · {character.region_title} · Ур.{' '}
-          {character.level}
+          {character.subclass_title ? ` · ${character.subclass_title}` : ''} · {character.region_title}
         </p>
         {character.farm_currency !== null && (
           <p className="hub-banner__meta">
@@ -594,7 +591,7 @@ export default function Hub() {
       >
         {/* Раздел появляется плавно: ключ по разделу перезапускает анимацию. */}
         <div key={activeTab} className={`tab-enter tab-enter--${direction}`}>
-        <Suspense fallback={<Div style={{ display: 'flex', justifyContent: 'center', paddingTop: 48 }}><Spinner size="l" /></Div>}>
+        <Suspense fallback={<Skeleton />}>
         {activeTab === 'character' && (
           <CharacterTab character={character} onCharacterUpdate={setCharacter} />
         )}

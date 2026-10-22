@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react';
-import { Group, Header, Div, Spinner, Placeholder, TabsItem } from '@vkontakte/vkui';
+import { Group, Header, Div, Placeholder, TabsItem } from '@vkontakte/vkui';
 import Tabs from './ScrollTabs.jsx';
 import { getLeaderboard } from '../api.js';
 import ClassIcon from './ClassIcon.jsx';
+import Skeleton from './Skeleton.jsx';
 
 function money(value) {
   return Number(value ?? 0).toLocaleString('ru-RU');
@@ -71,9 +72,7 @@ export default function TopsTab() {
       </Tabs>
 
       {status === 'loading' && (
-        <Div style={{ display: 'flex', justifyContent: 'center', paddingTop: 48 }}>
-          <Spinner size="l" />
-        </Div>
+        <Skeleton />
       )}
 
       {status === 'error' && (

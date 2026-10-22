@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Button, Div, Group, Header, Placeholder, SimpleCell, Spinner } from '@vkontakte/vkui';
+import { Button, Div, Group, Header, Placeholder, SimpleCell } from '@vkontakte/vkui';
 import { exchangeTrade, getExchange } from '../api.js';
 import PriceChart from './PriceChart.jsx';
+import Skeleton from './Skeleton.jsx';
 
 // Биржа самоцветов. Игра - дилер: курс считает сервер по формуле
 // (game/economy/exchange.py) от того, сколько самоцветов игроки купили и
@@ -48,7 +49,7 @@ export default function ExchangeTab({ onWallet }) {
   };
 
   if (status === 'loading') {
-    return <Div style={{ display: 'flex', justifyContent: 'center', paddingTop: 48 }}><Spinner size="l" /></Div>;
+    return <Skeleton />;
   }
   if (status === 'error' || !data) {
     return <Placeholder action={<Button onClick={load}>Ещё раз</Button>}>Не удалось открыть биржу.</Placeholder>;

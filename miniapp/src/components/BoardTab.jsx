@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react';
-import { Div, Group, Header, Placeholder, Spinner, TabsItem } from '@vkontakte/vkui';
+import { Div, Group, Header, Placeholder, TabsItem } from '@vkontakte/vkui';
 import Tabs from './ScrollTabs.jsx';
 import { getBoard } from '../api.js';
 import ClassIcon from './ClassIcon.jsx';
 import ContractsSection from './ContractsSection.jsx';
+import Skeleton from './Skeleton.jsx';
 
 /**
  * «Доска» (2026-10-15): всё PvP в одном месте - розыск (Кровавое клеймо и
@@ -174,7 +175,7 @@ export default function BoardTab() {
         ))}
       </Tabs>
       {status === 'loading' && (
-        <Div style={{ display: 'flex', justifyContent: 'center', paddingTop: 48 }}><Spinner size="l" /></Div>
+        <Skeleton />
       )}
       {status === 'error' && (
         <Placeholder icon={<div style={{ fontSize: 48 }}>🕯️</div>}>Не удалось загрузить доску.</Placeholder>

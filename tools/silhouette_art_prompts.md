@@ -259,6 +259,13 @@ no fog, no text, no watermark, no logo, vertical 2:3 composition
 Та же поза, рамка, фон и тлеющая кромка, что у мужских: окна слотов общие
 для обоих. Без лица - так же.
 
+**Как получить пару к мужскому.** Мужские уже готовы: у всех глубокий
+капюшон, слоистая тёмная одежда, ремни, свечение по контуру. Если
+генератор принимает картинку-образец, подай мужской силуэт этого же класса
+и попроси «same character, female version, same pose and framing» - так
+поза и рамка совпадут лучше всего. Если нет - промты ниже повторяют
+мужские слово в слово, кроме фигуры.
+
 **Броня полная и практичная, как у мужских.** Без открытого тела, без
 «бронелифчиков» и подчёркнутых форм: это тот же боец того же подкласса,
 женский силуэт читается по пропорциям (уже плечи и талия, другая посадка),
@@ -274,7 +281,7 @@ no fog, no text, no watermark, no logo, vertical 2:3 composition
 Та же тяжесть и те же наплечники, что у мужского: рыцарь, а не украшение. Волосы, если видны, убраны под капюшон или шлем.
 
 ```
-a tall broad-shouldered female knight in heavy angular plate with large pauldrons, a tattered cloak hanging in torn strips behind her, a long straight greatsword held low in the right hand with the point toward the ground, thin trails of dark red glow running along the blade edge, practical full armor with no exposed skin, the rim light along her outline has a faint blood red tint, full body figure standing upright facing the viewer, symmetrical front view,
+a tall strong female knight in heavy angular plate with large pauldrons, cut for a woman's frame with narrower shoulders and waist, a deep hood pulled over the head, a tattered cloak hanging in torn strips behind her, a long straight greatsword held low in the right hand with the point toward the ground, thin trails of dark red glow running along the blade edge, practical full armor with no exposed skin, the rim light along her outline has a faint blood red tint, full body figure standing upright facing the viewer, symmetrical front view,
 feet slightly apart, arms held a little away from the body with both hands
 visible, the head hidden in deep shadow with no visible face or features,
 the whole figure is a near-black silhouette with only a faint ember rim light
@@ -292,7 +299,7 @@ no fog, no text, no watermark, no logo, vertical 2:3 composition
 Такая же массивная, как мужской Страж: толстая броня, большой щит, крепкая стойка. Женский силуэт читается по более узкой талии и посадке плеч, не по открытой броне.
 
 ```
-a powerfully built female guardian in thick layered plate, a large rounded tower shield strapped to the left forearm and held slightly out to the side so the chest stays visible, a short heavy mace in the right hand, wide firm stance, practical full armor with no exposed skin, the rim light along her outline is steady and pale like cooling iron, full body figure standing upright facing the viewer, symmetrical front view,
+a powerfully built female guardian in thick layered plate, cut for a woman's frame with narrower shoulders and waist, a deep hood pulled over the head, a large rounded tower shield strapped to the left forearm and held slightly out to the side so the chest stays visible, a short heavy mace in the right hand, wide firm stance, practical full armor with no exposed skin, the rim light along her outline is steady and pale like cooling iron, full body figure standing upright facing the viewer, symmetrical front view,
 feet slightly apart, arms held a little away from the body with both hands
 visible, the head hidden in deep shadow with no visible face or features,
 the whole figure is a near-black silhouette with only a faint ember rim light
@@ -310,7 +317,7 @@ no fog, no text, no watermark, no logo, vertical 2:3 composition
 Высокая, в длинной мантии с капюшоном, мантия расходится спереди - ноги видны под слоты штанов и сапог.
 
 ```
-a tall slender female mystic in a long hooded robe that parts at the front to show the legs and boots underneath, a tall gnarled staff in the right hand topped with a small pale violet flame, the left hand open and raised slightly with a faint violet glow in the palm, the rim light along her outline has a cold violet tint, full body figure standing upright facing the viewer, symmetrical front view,
+a tall slender female mystic in a long hooded robe that parts at the front to show the legs and boots underneath, cut for a woman's frame with narrower shoulders and waist, a deep hood pulled over the head, a tall gnarled staff in the right hand topped with a small pale violet flame, the left hand open and raised slightly with a faint violet glow in the palm, the rim light along her outline has a cold violet tint, full body figure standing upright facing the viewer, symmetrical front view,
 feet slightly apart, arms held a little away from the body with both hands
 visible, the head hidden in deep shadow with no visible face or features,
 the whole figure is a near-black silhouette with only a faint ember rim light
@@ -328,7 +335,7 @@ no fog, no text, no watermark, no logo, vertical 2:3 composition
 Плащ до колен, короткий жезл, три стихийные искры у левой руки - как у мужского.
 
 ```
-a lean female mage in a hooded knee-length coat with loose sleeves, a short rod in the right hand, three small floating motes around the left hand, one of flickering fire, one of pale blue ice, one of crackling white lightning, the coat edges lifted slightly as if by a hot draft, the rim light along her outline shifts from orange to icy blue, full body figure standing upright facing the viewer, symmetrical front view,
+a lean female mage in a hooded knee-length coat with loose sleeves, cut for a woman's frame with narrower shoulders and waist, a deep hood pulled over the head, a short rod in the right hand, three small floating motes around the left hand, one of flickering fire, one of pale blue ice, one of crackling white lightning, the coat edges lifted slightly as if by a hot draft, the rim light along her outline shifts from orange to icy blue, full body figure standing upright facing the viewer, symmetrical front view,
 feet slightly apart, arms held a little away from the body with both hands
 visible, the head hidden in deep shadow with no visible face or features,
 the whole figure is a near-black silhouette with only a faint ember rim light
@@ -346,7 +353,7 @@ no fog, no text, no watermark, no logo, vertical 2:3 composition
 Узкая и лёгкая, облегающая кожаная одежда закрывает тело полностью - ловкость, а не открытость.
 
 ```
-a slim agile female assassin in close fitting dark leathers that cover the whole body, a short hooded half cape over the shoulders, a long dagger held in a reverse grip in the right hand, a second dagger sheathed at the hip, wisps of black shadow curling off the shoulders and heels, the rim light along her outline is thin and sharp like a knife edge, full body figure standing upright facing the viewer, symmetrical front view,
+a slim agile female assassin in close fitting dark leathers that cover the whole body, cut for a woman's frame with narrower shoulders and waist, a deep hood pulled over the head, a short hooded half cape over the shoulders, a long dagger held in a reverse grip in the right hand, a second dagger sheathed at the hip, wisps of black shadow curling off the shoulders and heels, the rim light along her outline is thin and sharp like a knife edge, full body figure standing upright facing the viewer, symmetrical front view,
 feet slightly apart, arms held a little away from the body with both hands
 visible, the head hidden in deep shadow with no visible face or features,
 the whole figure is a near-black silhouette with only a faint ember rim light
@@ -364,7 +371,7 @@ no fog, no text, no watermark, no logo, vertical 2:3 composition
 Сутулая, в длинном рваном плаще со склянками на поясе - травница с дурной славой.
 
 ```
-a hunched female poisoner in a long ragged hooded cloak, a belt hung with small glass vials and pouches, a short curved blade in the right hand with a drop of sickly green liquid on its tip, a faint green haze rising from the vials, the rim light along her outline has a dull toxic green tint, full body figure standing upright facing the viewer, symmetrical front view,
+a hunched female poisoner in a long ragged hooded cloak, cut for a woman's frame with narrower shoulders and waist, a deep hood pulled over the head, a belt hung with small glass vials and pouches, a short curved blade in the right hand with a drop of sickly green liquid on its tip, a faint green haze rising from the vials, the rim light along her outline has a dull toxic green tint, full body figure standing upright facing the viewer, symmetrical front view,
 feet slightly apart, arms held a little away from the body with both hands
 visible, the head hidden in deep shadow with no visible face or features,
 the whole figure is a near-black silhouette with only a faint ember rim light
@@ -382,7 +389,7 @@ no fog, no text, no watermark, no logo, vertical 2:3 composition
 `img/силуэт_воин_ж.png`
 
 ```
-a sturdy plain female warrior in simple worn mail and a short cloak, a plain straight sword in the right hand pointing down, a small round buckler on the left arm held to the side, practical armor with no exposed skin, full body figure standing upright facing the viewer, symmetrical front view,
+a sturdy plain female warrior in simple worn mail and a short cloak, cut for a woman's frame with narrower shoulders and waist, a deep hood pulled over the head, a plain straight sword in the right hand pointing down, a small round buckler on the left arm held to the side, practical armor with no exposed skin, full body figure standing upright facing the viewer, symmetrical front view,
 feet slightly apart, arms held a little away from the body with both hands
 visible, the head hidden in deep shadow with no visible face or features,
 the whole figure is a near-black silhouette with only a faint ember rim light
@@ -398,7 +405,7 @@ no fog, no text, no watermark, no logo, vertical 2:3 composition
 `img/силуэт_разбойник_ж.png`
 
 ```
-a light wiry female rogue in a simple hooded jacket and soft boots, a plain short knife in the right hand, a coil of rope at the belt, full body figure standing upright facing the viewer, symmetrical front view,
+a light wiry female rogue in a simple hooded jacket and soft boots, cut for a woman's frame with narrower shoulders and waist, a deep hood pulled over the head, a plain short knife in the right hand, a coil of rope at the belt, full body figure standing upright facing the viewer, symmetrical front view,
 feet slightly apart, arms held a little away from the body with both hands
 visible, the head hidden in deep shadow with no visible face or features,
 the whole figure is a near-black silhouette with only a faint ember rim light
@@ -414,7 +421,7 @@ no fog, no text, no watermark, no logo, vertical 2:3 composition
 `img/силуэт_маг_ж.png`
 
 ```
-a young female mage in a plain hooded travelling robe that parts at the front, a simple wooden staff in the right hand, a small faint ember glowing above the open left palm, full body figure standing upright facing the viewer, symmetrical front view,
+a young female mage in a plain hooded travelling robe that parts at the front, cut for a woman's frame with narrower shoulders and waist, a deep hood pulled over the head, a simple wooden staff in the right hand, a small faint ember glowing above the open left palm, full body figure standing upright facing the viewer, symmetrical front view,
 feet slightly apart, arms held a little away from the body with both hands
 visible, the head hidden in deep shadow with no visible face or features,
 the whole figure is a near-black silhouette with only a faint ember rim light

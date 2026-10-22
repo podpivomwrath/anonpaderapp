@@ -1,12 +1,13 @@
 import { useCallback, useEffect, useState } from 'react';
 import {
-  Button, Div, Group, Header, Placeholder, SimpleCell, Spinner, TabsItem,
+  Button, Div, Group, Header, Placeholder, SimpleCell, TabsItem,
 } from '@vkontakte/vkui';
 import Tabs from './ScrollTabs.jsx';
 import { getGuild, guildAction } from '../api.js';
 import GuildTree from './GuildTree.jsx';
 import ItemIcon from './ItemIcon.jsx';
 import { itemSubtitle } from './InventoryTab.jsx';
+import Skeleton from './Skeleton.jsx';
 
 // Гильдии. Всё управление - здесь: состав, казна и склад, земли и стройка,
 // древо, осады. В чате остаётся то, что происходит в поле.
@@ -902,7 +903,7 @@ export default function GuildTab() {
   }, []);
 
   if (status === 'loading') {
-    return <Div style={{ display: 'flex', justifyContent: 'center', paddingTop: 48 }}><Spinner size="l" /></Div>;
+    return <Skeleton />;
   }
   if (status === 'error' || !state) {
     return (

@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { Group, Header, Button, Div, Text, Caption } from '@vkontakte/vkui';
 import { computeDerived } from '../formulas.js';
 import { submitStats } from '../api.js';
+import StatRadar from './StatRadar.jsx';
 
 // toFixed режет 0.075 -> "0.07" из-за бинарного представления числа -
 // небольшой эпсилон убирает эту ложную "не докрутку" в отображении.
@@ -127,6 +128,7 @@ export default function StatsTab({ character, onCharacterUpdate }) {
   const [submitting, setSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState(null);
   const [openHint, setOpenHint] = useState(null);
+  const [saved, setSaved] = useState(0);
 
   const totalPending = Object.values(pending).reduce((a, b) => a + b, 0);
   const remaining = character.unspent_points - totalPending;
@@ -149,6 +151,11 @@ export default function StatsTab({ character, onCharacterUpdate }) {
     }),
     [character.level, character.base_class, character.subclass, previewStats, character.gear_bonus],
   );
+
+  const withGear = (stats) => Object.fromEntries(
+    Object.entries(stats).map(([k, v]) => [k, v + (character.gear_bonus?.[k] || 0)]),
+  );
+  const barScale = Math.max(1, ...STAT_DEFS.map((d) => previewStats[d.key] + (character.gear_bonus?.[d.key] || 0)));
 
   function increment(key) {
     if (remaining <= 0) return;
@@ -174,6 +181,7 @@ export default function StatsTab({ character, onCharacterUpdate }) {
       onCharacterUpdate(updated);
       setPending(EMPTY_PENDING);
       setConfirming(false);
+      setSaved((n) => n + 1);
     } catch (err) {
       setErrorMsg(SAVE_ERRORS[err?.message] || 'Не удалось сохранить распределение. Попробуй ещё раз.');
     } finally {
@@ -184,8 +192,12 @@ export default function StatsTab({ character, onCharacterUpdate }) {
   return (
     <>
       <Group header={<Header>Свободных очков: {remaining}</Header>}>
+        <StatRadar current={withGear(character.stats)} preview={withGear(previewStats)} burst={saved} />
         {STAT_DEFS.map((stat) => (
-          <div className="stat-row" key={stat.key}>
+          <div className={pending[stat.key] ? 'stat-row stat-row--pending' : 'stat-row'} key={stat.key}>
+            <span className="stat-row__bar" aria-hidden="true">
+              <i style={{ width: `${(100 * (previewStats[stat.key] + (character.gear_bonus?.[stat.key] || 0))) / barScale}%` }} />
+            </span>
             <span className="stat-row__label">{stat.label}</span>
             <div className="stat-row__controls">
               <Button
@@ -208,12 +220,6 @@ export default function StatsTab({ character, onCharacterUpdate }) {
             </div>
           </div>
         ))}
-        {Object.values(character.gear_bonus || {}).some(Boolean) && (
-          <Caption level="1" style={{ padding: '0 16px 12px', opacity: 0.7 }}>
-            Зелёное <span className="stat-row__gear">+N</span> - от надетого снаряжения. Оно уже учтено в
-            предпросмотре ниже и в бою: урон и навыки растут от основного стата, здоровье - от выносливости.
-          </Caption>
-        )}
       </Group>
 
       {/* Рыбалка и горное дело (2026-10-21) - во вкладке «Ремёсла». */}
@@ -244,9 +250,6 @@ export default function StatsTab({ character, onCharacterUpdate }) {
             />
           );
         })()}
-        <Caption level="1" style={{ padding: '0 16px 12px', opacity: 0.7 }}>
-          Нажми на строку - покажу, откуда берётся число и где оно работает.
-        </Caption>
       </Group>
 
       {errorMsg && (
@@ -282,9 +285,6 @@ export default function StatsTab({ character, onCharacterUpdate }) {
           </Button>
         </Div>
       )}
-      <Caption level="1" style={{ padding: '0 16px 16px', opacity: 0.7 }}>
-        Распределение статов постоянно. Сброс появится позже как платная операция.
-      </Caption>
     </>
   );
 }

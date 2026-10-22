@@ -1,0 +1,783 @@
+/* ===== Профиль, 2026-10-22 ===================================================
+   Отклик кнопок, перетекающая подсветка вкладок, кольцо опыта в шапке,
+   вкладка «Герой» (силуэт со слотами, трофеи), радар характеристик, искры,
+   стеклянные панели, заготовки на время загрузки.
+
+   Слабое устройство (body.lite, ставит main.jsx) и «уменьшить движение» в
+   системе - без размытия, искр и пульсаций: внизу файла. */
+
+:root {
+  --spring: cubic-bezier(0.3, 1.5, 0.45, 1);
+  --rar-common: rgba(255, 255, 255, 0.18);
+  --rar-uncommon: #6c8db3;
+  --rar-rare: #8b6cb3;
+  --rar-epic: #b8823f;
+  --rar-legendary: #c8a94a;
+  --rar-unique: #c81e3a;
+  --up: #8fe39a;
+  --down: #ff8a80;
+}
+
+/* --- Кнопки: наведение, нажатие, недоступные ------------------------------------- */
+/* Наведение - только там, где есть мышь: на телефоне «наведение» залипало
+   бы после касания. Там тот же отклик даёт нажатие. */
+
+.vkuiButton__host,
+.vkuiTabsItem__host,
+.nav-drawer__item,
+.gear-slot,
+.slot-row,
+.relic,
+.gender-switch__btn,
+.copy-transfer,
+.crown-sheet__item {
+  transition:
+    transform 0.22s var(--spring),
+    filter 0.2s ease,
+    background-color 0.2s ease,
+    box-shadow 0.25s ease,
+    opacity 0.2s ease;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .vkuiButton__host:not(:disabled):not([aria-disabled='true']):hover,
+  .gear-slot:hover,
+  .slot-row:not(:disabled):hover,
+  .relic:hover,
+  .gender-switch__btn:hover,
+  .copy-transfer:hover,
+  .crown-sheet__item:not(:disabled):hover {
+    transform: scale(1.05);
+    filter: brightness(1.22) saturate(1.1);
+  }
+
+  .vkuiTabsItem__host:hover,
+  .nav-drawer__item:hover {
+    filter: brightness(1.25);
+  }
+}
+
+.vkuiButton__host:not(:disabled):active,
+.gear-slot:active,
+.slot-row:not(:disabled):active,
+.relic:active,
+.gender-switch__btn:active,
+.crown-sheet__item:not(:disabled):active {
+  transform: scale(0.94);
+  filter: brightness(1.3);
+  transition-duration: 0.08s;
+}
+
+/* «Спящие» кнопки - серые: видно сразу, что сейчас не нажать. */
+.vkuiButton__host:disabled,
+.vkuiButton__host[aria-disabled='true'],
+.slot-row:disabled,
+.crown-sheet__item:disabled {
+  filter: grayscale(0.85) brightness(0.8);
+  opacity: 0.5;
+  cursor: default;
+}
+
+/* --- Вкладки: одна подложка перетекает к выбранной -------------------------------- */
+
+.ink-tabs .vkuiHorizontalScroll__inWrapper {
+  position: relative;
+}
+
+.ink-tabs .vkuiTabsItem__underline {
+  display: none;
+}
+
+.ink-tabs .vkuiTabsItem__host {
+  position: relative;
+  z-index: 1;
+  background: none !important;
+}
+
+.ink-tabs .vkuiTabsItem__selected {
+  color: #fff;
+}
+
+.ink-tabs__ink {
+  position: absolute;
+  left: 0;
+  top: 4px;
+  bottom: 4px;
+  z-index: 0;
+  border-radius: 10px;
+  background: linear-gradient(180deg, rgba(200, 30, 58, 0.26), rgba(200, 30, 58, 0.14));
+  box-shadow: inset 0 -2px 0 #c81e3a, 0 0 14px -4px rgba(200, 30, 58, 0.7);
+  transition: transform 0.36s var(--spring), width 0.36s var(--spring);
+  pointer-events: none;
+}
+
+/* --- Кольцо опыта вокруг эмблемы ---------------------------------------------------- */
+
+.xp-emblem {
+  --xp-a: #ff5a3c;
+  --xp-b: #c81e3a;
+  --xp-glow: rgba(200, 30, 58, 0.55);
+  position: relative;
+  display: inline-grid;
+  place-items: center;
+  width: 62px;
+  height: 62px;
+  flex: 0 0 auto;
+}
+
+.xp-emblem--rare { --xp-a: #a9c6f2; --xp-b: #5d86c9; --xp-glow: rgba(127, 168, 230, 0.6); }
+.xp-emblem--epic { --xp-a: #d4b6f5; --xp-b: #8e5fd0; --xp-glow: rgba(180, 140, 230, 0.6); }
+.xp-emblem--legendary { --xp-a: #ffe08a; --xp-b: #d39a24; --xp-glow: rgba(240, 198, 78, 0.65); }
+.xp-emblem--max { --xp-a: #ffe08a; --xp-b: #d39a24; }
+
+.xp-emblem__ring {
+  position: absolute;
+  inset: 0;
+  filter: drop-shadow(0 0 5px var(--xp-glow));
+}
+
+.xp-emblem__track {
+  stroke: rgba(255, 255, 255, 0.1);
+}
+
+.xp-emblem__bar {
+  transition: stroke-dashoffset 0.9s var(--ease-out, ease-out);
+}
+
+.xp-emblem--legendary .xp-emblem__ring {
+  animation: tier-breathe 3.2s ease-in-out infinite;
+}
+
+@keyframes tier-breathe {
+  50% { filter: drop-shadow(0 0 10px var(--xp-glow)); }
+}
+
+.xp-emblem__icon {
+  line-height: 0;
+  border-radius: 50%;
+}
+
+.xp-emblem__icon .item-icon {
+  border-radius: 50%;
+}
+
+.xp-emblem__level {
+  position: absolute;
+  left: 50%;
+  bottom: -4px;
+  transform: translateX(-50%);
+  min-width: 22px;
+  padding: 0 6px;
+  border-radius: 9px;
+  background: linear-gradient(180deg, var(--xp-a), var(--xp-b));
+  color: #1a0508;
+  font: 700 12px/17px 'Cormorant SC', Forum, serif;
+  text-align: center;
+  text-shadow: none;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.6);
+  font-variant-numeric: tabular-nums;
+}
+
+/* --- Вкладка «Герой» ------------------------------------------------------------------ */
+
+.hero-stage {
+  position: relative;
+  padding: 10px 12px 14px;
+  background:
+    radial-gradient(ellipse 55% 42% at 50% 46%, var(--hero-glow, rgba(200, 60, 30, 0.22)), transparent 70%),
+    radial-gradient(ellipse 40% 8% at 50% 96%, rgba(0, 0, 0, 0.55), transparent 70%);
+}
+
+.hero-stage--dark_mystic { --hero-glow: rgba(150, 90, 220, 0.22); }
+.hero-stage--elementalist { --hero-glow: rgba(90, 140, 230, 0.2); }
+.hero-stage--poisoner { --hero-glow: rgba(120, 190, 70, 0.18); }
+.hero-stage--guardian { --hero-glow: rgba(200, 200, 210, 0.14); }
+.hero-stage--blood_knight { --hero-glow: rgba(210, 30, 40, 0.26); }
+.hero-stage--shadow_blade { --hero-glow: rgba(170, 170, 190, 0.12); }
+
+.hero-figure {
+  position: relative;
+  height: min(58vh, 470px);
+  aspect-ratio: 600 / 960;
+  max-width: 100%;
+  margin: 0 auto;
+}
+
+.hero-figure__img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  user-select: none;
+  animation: figure-in 0.45s var(--ease-out, ease-out) backwards;
+}
+
+@keyframes figure-in {
+  from { opacity: 0; transform: scale(0.97); }
+}
+
+.gender-switch {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  z-index: 3;
+  display: flex;
+  gap: 2px;
+  padding: 3px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.35);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.gender-switch__btn {
+  width: 30px;
+  height: 30px;
+  border: 0;
+  border-radius: 50%;
+  background: none;
+  color: rgba(255, 255, 255, 0.45);
+  font-size: 17px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.gender-switch__btn--on {
+  background: rgba(200, 30, 58, 0.35);
+  color: #fff;
+  box-shadow: 0 0 10px -2px rgba(200, 30, 58, 0.8);
+}
+
+/* Окно слота лежит прямо на теле. Пустое - стекло с контуром и значком,
+   надетое - иконка вещи со свечением редкости. */
+.gear-slot {
+  --rar: var(--rar-common);
+  position: absolute;
+  z-index: 2;
+  width: clamp(44px, 17.5%, 58px);
+  aspect-ratio: 1;
+  translate: -50% -50%;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 1px dashed rgba(255, 255, 255, 0.28);
+  border-radius: 12px;
+  background: rgba(14, 14, 18, 0.42);
+  backdrop-filter: blur(3px);
+  -webkit-backdrop-filter: blur(3px);
+  color: rgba(255, 255, 255, 0.55);
+  cursor: pointer;
+}
+
+.gear-slot--filled {
+  border: 1px solid var(--rar);
+  background: rgba(14, 14, 18, 0.7);
+  box-shadow: 0 0 12px -2px var(--rar), inset 0 0 0 1px rgba(0, 0, 0, 0.5);
+}
+
+.gear-slot--filled .item-icon {
+  width: 100% !important;
+  height: 100% !important;
+  border-radius: 11px;
+  box-shadow: none;
+}
+
+.gear-slot--uncommon { --rar: var(--rar-uncommon); }
+.gear-slot--rare { --rar: var(--rar-rare); }
+.gear-slot--epic { --rar: var(--rar-epic); }
+.gear-slot--legendary { --rar: var(--rar-legendary); }
+.gear-slot--unique { --rar: var(--rar-unique); }
+
+.gear-slot--epic,
+.gear-slot--legendary,
+.gear-slot--unique {
+  animation: rarity-shimmer 2.8s ease-in-out infinite;
+}
+
+@keyframes rarity-shimmer {
+  50% { box-shadow: 0 0 20px 1px var(--rar), inset 0 0 0 1px rgba(0, 0, 0, 0.5); }
+}
+
+/* Есть вещь сильнее надетой. */
+.gear-slot__up {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  width: 17px;
+  height: 17px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: #3f9a52;
+  color: #fff;
+  font-size: 9px;
+  box-shadow: 0 0 0 2px #0b0c0e, 0 0 10px rgba(110, 220, 120, 0.8);
+  animation: up-pulse 1.8s ease-in-out infinite;
+}
+
+@keyframes up-pulse {
+  50% { transform: scale(1.18); }
+}
+
+.hero-bonus {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 6px;
+  margin-top: 6px;
+}
+
+.gear-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.07);
+  font-size: 12.5px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.gear-chip--up { color: var(--up); background: rgba(110, 220, 120, 0.12); }
+.gear-chip--down { color: var(--down); background: rgba(230, 70, 60, 0.12); }
+.gear-chip--same,
+.gear-chip--lock { opacity: 0.6; }
+
+.hero-error {
+  margin: 8px 0 0;
+  text-align: center;
+  color: #e2707a;
+  font-size: 13px;
+}
+
+/* Лист выбора вещи для слота. */
+.slot-sheet {
+  padding-top: 12px;
+}
+
+.slot-sheet__head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 8px 10px;
+  font-family: Forum, 'Times New Roman', serif;
+  font-size: 19px;
+  letter-spacing: 0.03em;
+}
+
+.slot-sheet__glyph {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  background: rgba(200, 30, 58, 0.16);
+  color: #f2d9dc;
+}
+
+.slot-sheet__list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.slot-sheet__empty {
+  margin: 4px 8px 10px;
+  opacity: 0.6;
+  font-size: 14px;
+}
+
+.slot-row {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 8px;
+  border: 1px solid transparent;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.03);
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.slot-row--current {
+  margin-bottom: 8px;
+  background: rgba(200, 30, 58, 0.1);
+  border-color: rgba(200, 30, 58, 0.35);
+  cursor: default;
+}
+
+.slot-row--best {
+  border-color: rgba(143, 227, 154, 0.45);
+  box-shadow: 0 0 14px -6px rgba(110, 220, 120, 0.8);
+}
+
+.slot-row--locked {
+  filter: grayscale(0.9);
+}
+
+.slot-row__text {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+  flex: 1;
+}
+
+.slot-row__name {
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.slot-row__best {
+  color: var(--up);
+  margin-right: 5px;
+  font-size: 0.8em;
+}
+
+.slot-row__chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.slot-row__off {
+  flex: 0 0 auto;
+  width: 34px;
+  height: 34px;
+  display: grid;
+  place-items: center;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.3);
+  color: rgba(255, 255, 255, 0.8);
+  cursor: pointer;
+}
+
+.slot-row__spin {
+  width: 18px;
+  height: 18px;
+  border: 2px solid rgba(255, 255, 255, 0.2);
+  border-top-color: #fff;
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.rarity-text--uncommon { color: #9cb8dc; }
+.rarity-text--rare { color: #b79ce0; }
+.rarity-text--epic { color: #e0aa62; }
+.rarity-text--legendary { color: #f0d27a; }
+.rarity-text--unique { color: #ff6b80; }
+
+/* Трофеи: реликвии рейдов и четыре счётчика. */
+.relic-row {
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+  padding: 4px 12px 8px;
+}
+
+.relic {
+  width: 52px;
+  height: 52px;
+  padding: 0;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 50%;
+  overflow: hidden;
+  background: rgba(0, 0, 0, 0.4);
+  cursor: pointer;
+  filter: grayscale(1) brightness(0.45);
+}
+
+.relic img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.relic--won {
+  filter: none;
+  border-color: rgba(200, 30, 58, 0.7);
+  box-shadow: 0 0 14px -3px rgba(200, 30, 58, 0.9);
+}
+
+.relic--picked {
+  outline: 2px solid rgba(255, 255, 255, 0.5);
+  outline-offset: 2px;
+}
+
+.relic-caption {
+  margin: -2px 16px 8px;
+  text-align: center;
+  font-size: 13px;
+  opacity: 0.8;
+}
+
+.trophy-tiles {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 6px;
+  padding: 0 10px 12px;
+}
+
+.trophy-tile {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
+  padding: 8px 2px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.04);
+  min-width: 0;
+}
+
+.trophy-tile__icon {
+  font-size: 18px;
+}
+
+.trophy-tile__value {
+  font: 600 16px/1.2 'Cormorant SC', Forum, serif;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.trophy-tile__label {
+  font-size: 10.5px;
+  opacity: 0.6;
+  text-align: center;
+}
+
+/* --- Характеристики: радар и полоски ------------------------------------------------- */
+
+.stat-radar {
+  position: relative;
+  display: grid;
+  place-items: center;
+  padding: 2px 0 4px;
+}
+
+.stat-radar__svg {
+  width: min(240px, 70vw);
+  height: auto;
+  overflow: visible;
+}
+
+.stat-radar__grid {
+  fill: none;
+  stroke: rgba(255, 255, 255, 0.08);
+}
+
+.stat-radar__axis {
+  stroke: rgba(255, 255, 255, 0.07);
+}
+
+.stat-radar__now {
+  fill: rgba(200, 30, 58, 0.28);
+  stroke: #e2384f;
+  stroke-width: 1.6;
+  stroke-linejoin: round;
+  filter: drop-shadow(0 0 6px rgba(200, 30, 58, 0.55));
+}
+
+.stat-radar__next {
+  fill: rgba(110, 220, 120, 0.12);
+  stroke: var(--up);
+  stroke-width: 1.4;
+  stroke-dasharray: 4 3;
+  stroke-linejoin: round;
+}
+
+.stat-radar__dot {
+  fill: #ffd2c4;
+}
+
+.stat-radar__icon {
+  font-size: 15px;
+}
+
+.stat-row {
+  position: relative;
+}
+
+.stat-row__bar {
+  position: absolute;
+  left: 16px;
+  right: 16px;
+  bottom: 2px;
+  height: 2px;
+  border-radius: 2px;
+  background: rgba(255, 255, 255, 0.05);
+  overflow: hidden;
+}
+
+.stat-row__bar i {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #7a1424, #e2384f);
+  transition: width 0.4s var(--ease-out, ease-out);
+}
+
+.stat-row--pending .stat-row__bar i {
+  background: linear-gradient(90deg, #2f6e3b, var(--up));
+}
+
+.stat-row--pending .stat-row__value {
+  color: var(--up);
+}
+
+/* --- Искры ---------------------------------------------------------------------------- */
+
+.sparks {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 0;
+  height: 0;
+  pointer-events: none;
+  z-index: 5;
+}
+
+.sparks i {
+  position: absolute;
+  width: var(--s);
+  height: var(--s);
+  margin: calc(var(--s) / -2);
+  border-radius: 50%;
+  background: #ffd08a;
+  box-shadow: 0 0 6px 1px rgba(255, 120, 40, 0.9);
+  animation: spark-fly var(--d) ease-out forwards;
+}
+
+@keyframes spark-fly {
+  0% { transform: translate(0, 0) scale(1); opacity: 1; }
+  100% { transform: translate(var(--dx), var(--dy)) scale(0.2); opacity: 0; }
+}
+
+/* --- Стеклянные панели ------------------------------------------------------------------ */
+/* Панели и так полупрозрачные (index.css, --surface); размытие делает их
+   матовым стеклом поверх живого фона, а не просто притемнением. */
+
+.hub-content .vkuiGroup {
+  backdrop-filter: blur(10px) saturate(1.15);
+  -webkit-backdrop-filter: blur(10px) saturate(1.15);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05), 0 8px 24px -14px rgba(0, 0, 0, 0.8);
+}
+
+.hub-banner {
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+}
+
+/* --- Заготовки на время загрузки ------------------------------------------------------- */
+
+.skeleton {
+  position: relative;
+  overflow: hidden;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.skeleton::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  transform: translateX(-100%);
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.07), transparent);
+  animation: shimmer 1.3s ease-in-out infinite;
+}
+
+@keyframes shimmer {
+  to { transform: translateX(100%); }
+}
+
+.skeleton-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px 8px;
+}
+
+.skeleton-line {
+  height: 52px;
+}
+
+.skeleton-line--short {
+  height: 18px;
+  width: 40%;
+}
+
+/* --- Слабое устройство и «уменьшить движение» ---------------------------------------- */
+
+body.lite .hub-content .vkuiGroup,
+body.lite .hub-banner,
+body.lite .gear-slot {
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+body.lite .sparks,
+body.lite .gear-slot--epic,
+body.lite .gear-slot--legendary,
+body.lite .gear-slot--unique,
+body.lite .gear-slot__up,
+body.lite .xp-emblem__ring,
+body.lite .skeleton::after {
+  animation: none;
+}
+
+body.lite .sparks {
+  display: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sparks { display: none; }
+  .gear-slot--epic,
+  .gear-slot--legendary,
+  .gear-slot--unique,
+  .gear-slot__up,
+  .xp-emblem__ring,
+  .hero-figure__img,
+  .skeleton::after { animation: none; }
+  .ink-tabs__ink,
+  .xp-emblem__bar,
+  .stat-row__bar i { transition: none; }
+}
+
+/* Строка стата в одну линию: «Выносливость» с бонусом снаряжения
+   переносилась на вторую строку. */
+.stat-row__label {
+  white-space: nowrap;
+  min-width: 0;
+}
+
+.stat-row__controls {
+  gap: 6px;
+}
+
+.stat-row__value {
+  white-space: nowrap;
+}
+
+/* Пепел за шапкой: под текстом, нажатия не перехватывает. */
+.hub-banner__ash {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  opacity: 0.8;
+}
+
+.hub-banner > :not(.hub-banner__ash) {
+  position: relative;
+  z-index: 1;
+}

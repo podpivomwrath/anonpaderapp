@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Button, Div, Group, Header, Placeholder, Spinner } from '@vkontakte/vkui';
 import { IN_VK, buyShop, buyShopFaction, buyShopRename, createPayment, getPayments, getShop } from '../api.js';
+import Skeleton from './Skeleton.jsx';
 
 /**
  * Магазин (2026-10-13): товары за самоцветы квадратными карточками. Нажатие
@@ -437,7 +438,7 @@ export default function ShopTab({ onWallet, onBought }) {
   useEffect(load, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   if (status === 'loading') {
-    return <Div style={{ display: 'flex', justifyContent: 'center', paddingTop: 48 }}><Spinner size="l" /></Div>;
+    return <Skeleton />;
   }
   if (status === 'error' || !data) {
     return <Placeholder action={<Button onClick={load}>Ещё раз</Button>}>Магазин не открылся.</Placeholder>;

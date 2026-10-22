@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
-import { Button, Div, Group, Header, Placeholder, Spinner } from '@vkontakte/vkui';
+import { Button, Div, Group, Header, Placeholder } from '@vkontakte/vkui';
 import { contractAction, getContracts } from '../api.js';
 import ClassIcon from './ClassIcon.jsx';
+import Skeleton from './Skeleton.jsx';
 
 /**
  * «Заказы» на «Доске» (2026-10-16): анонимный заказ убийств игрока за
@@ -98,7 +99,7 @@ export default function ContractsSection() {
   };
 
   if (status === 'loading') {
-    return <Div style={{ display: 'flex', justifyContent: 'center', paddingTop: 48 }}><Spinner size="l" /></Div>;
+    return <Skeleton />;
   }
   if (status === 'error' || !data) return <Placeholder>Не удалось загрузить заказы.</Placeholder>;
 

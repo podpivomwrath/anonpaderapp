@@ -1,0 +1,331 @@
+import { useEffect, useMemo, useState } from 'react';
+import { Group, Header } from '@vkontakte/vkui';
+import { equipItem, getCharacter, getInventory, getTrophies, setGender, unequipItem } from '../api.js';
+import { silhouetteUrl } from '../silhouettes.js';
+import { itemIcon } from '../itemIcons.js';
+import ItemIcon from './ItemIcon.jsx';
+import Sparks from './Sparks.jsx';
+
+// Вкладка «Герой» (2026-10-22): силуэт персонажа, на нём окна слотов. Нажал
+// окно - снизу список вещей из сумки для этого слота, с разницей к надетой.
+// Под силуэтом - бонус снаряжения и полка трофеев.
+
+// Где окна лежат на силуэте, в долях кадра. Кадр у всех 18 картинок общий:
+// tools/silhouette_assets.py выравнивает их по капюшону и подошвам.
+const SLOTS = [
+  { slot: 'helmet', x: 50, y: 10.5 },
+  { slot: 'armor', x: 50, y: 30 },
+  { slot: 'weapon', x: 17, y: 46 },
+  { slot: 'legs', x: 50, y: 57 },
+  { slot: 'boots', x: 50, y: 89 },
+];
+
+const SLOT_TITLES = {
+  weapon: 'Оружие', helmet: 'Шлем', armor: 'Нагрудник', legs: 'Штаны', boots: 'Сапоги',
+};
+
+export const STAT_ICONS = { str: '💪', agi: '🏃', int: '🧠', vit: '❤️', wil: '✨' };
+const STAT_ORDER = ['str', 'agi', 'int', 'vit', 'wil'];
+
+// Значки слотов - для пустого окна: подпись словом там была бы лишней.
+function SlotGlyph({ slot }) {
+  const common = {
+    width: 26, height: 26, viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor',
+    strokeWidth: 1.6, strokeLinecap: 'round', strokeLinejoin: 'round', 'aria-hidden': true,
+  };
+  if (slot === 'helmet') {
+    return <svg {...common}><path d="M4 15a8 8 0 0 1 16 0v3H4z" /><path d="M12 7v8M8 18v2M16 18v2" /></svg>;
+  }
+  if (slot === 'armor') {
+    return <svg {...common}><path d="M8 3l4 2 4-2 4 4-3 3v10H7V10L4 7z" /><path d="M12 5v15" /></svg>;
+  }
+  if (slot === 'legs') {
+    return <svg {...common}><path d="M6 3h12l-1 18h-4l-1-11-1 11H7z" /></svg>;
+  }
+  if (slot === 'boots') {
+    return <svg {...common}><path d="M7 3h6v11l6 3v3H5v-3l2-1z" /></svg>;
+  }
+  return <svg {...common}><path d="M19 3l-9 9M14 3h5v5M5 15l4 4M3 21l4-4M8 12l4 4" /></svg>;
+}
+
+function statDiff(item, current) {
+  const keys = new Set([...Object.keys(item?.base_stats || {}), ...Object.keys(current?.base_stats || {})]);
+  return STAT_ORDER.filter((k) => keys.has(k))
+    .map((k) => [k, (item?.base_stats?.[k] || 0) - (current?.base_stats?.[k] || 0)])
+    .filter(([, d]) => d !== 0);
+}
+
+function DiffChips({ diff }) {
+  if (!diff.length) return <span className="gear-chip gear-chip--same">=</span>;
+  return diff.map(([k, d]) => (
+    <span key={k} className={d > 0 ? 'gear-chip gear-chip--up' : 'gear-chip gear-chip--down'}>
+      {STAT_ICONS[k]} {d > 0 ? `+${d}` : d}
+    </span>
+  ));
+}
+
+// Класс CSS по редкости: id идёт в имя класса, а не в текст на экране.
+const rarityText = (rarity) => `slot-row__name rarity-text--${rarity}`;
+
+function SlotSheet({ slot, items, onClose, onEquip, onUnequip, busyId }) {
+  const current = items.find((i) => i.slot === slot && i.equipped) || null;
+  const spare = items
+    .filter((i) => i.slot === slot && !i.equipped)
+    .sort((a, b) => Boolean(a.need_level) - Boolean(b.need_level) || b.power - a.power);
+  const best = spare.find((i) => !i.need_level && i.power > (current?.power || 0));
+  return (
+    <>
+      <div className="nav-scrim" onClick={onClose} aria-hidden="true" />
+      <div className="crown-sheet slot-sheet" role="dialog" aria-label={SLOT_TITLES[slot]}>
+        <div className="slot-sheet__head">
+          <span className="slot-sheet__glyph"><SlotGlyph slot={slot} /></span>
+          <b>{SLOT_TITLES[slot]}</b>
+        </div>
+        {current && (
+          <div className="slot-row slot-row--current">
+            <ItemIcon icon={current.icon} rarity={current.rarity} alt={current.name} size={44} />
+            <div className="slot-row__text">
+              <span className={rarityText(current.rarity)}>{current.name}</span>
+              <span className="slot-row__chips">
+                {STAT_ORDER.filter((k) => current.base_stats?.[k]).map((k) => (
+                  <span key={k} className="gear-chip">{STAT_ICONS[k]} +{current.base_stats[k]}</span>
+                ))}
+              </span>
+            </div>
+            <button
+              type="button" className="slot-row__off" disabled={busyId === current.id}
+              onClick={() => onUnequip(current.id)} aria-label="Снять"
+            >
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                strokeWidth="2" strokeLinecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" /></svg>
+            </button>
+          </div>
+        )}
+        <div className="slot-sheet__list">
+          {spare.length === 0 && <p className="slot-sheet__empty">В сумке нет вещей для этого слота.</p>}
+          {spare.map((item) => {
+            const locked = Boolean(item.need_level);
+            return (
+              <button
+                type="button" key={item.id}
+                className={`slot-row${locked ? ' slot-row--locked' : ''}${item === best ? ' slot-row--best' : ''}`}
+                disabled={locked || busyId != null}
+                onClick={() => onEquip(item.id)}
+              >
+                <ItemIcon icon={item.icon} rarity={item.rarity} alt={item.name} size={44} />
+                <span className="slot-row__text">
+                  <span className={rarityText(item.rarity)}>
+                    {item === best && <span className="slot-row__best" aria-label="лучше надетого">▲</span>}
+                    {item.name}
+                  </span>
+                  <span className="slot-row__chips">
+                    {locked
+                      ? <span className="gear-chip gear-chip--lock">🔒 {item.need_level}</span>
+                      : <DiffChips diff={statDiff(item, current)} />}
+                  </span>
+                </span>
+                {busyId === item.id && <span className="slot-row__spin" aria-hidden="true" />}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+    </>
+  );
+}
+
+function TrophyShelf({ trophies }) {
+  const [picked, setPicked] = useState(null);
+  if (!trophies) return null;
+  const tiles = [
+    ['⚔️', trophies.mobs_killed.toLocaleString('ru-RU'), 'мобов'],
+    ['🩸', trophies.pvp_wins.toLocaleString('ru-RU'), 'побед PvP'],
+    [trophies.best_fish?.emoji || '🎣', trophies.best_fish?.weight || '-', 'рекорд улова'],
+    ['👑', `${trophies.titles_open}/${trophies.titles_total}`, 'титулов'],
+  ];
+  const relic = trophies.raids.find((r) => r.raid === picked);
+  return (
+    <Group header={<Header>Трофеи</Header>}>
+      <div className="relic-row">
+        {trophies.raids.map((r) => (
+          <button
+            type="button" key={r.raid}
+            className={`relic${r.won ? ' relic--won' : ''}${picked === r.raid ? ' relic--picked' : ''}`}
+            onClick={() => setPicked(picked === r.raid ? null : r.raid)}
+            aria-label={r.name}
+          >
+            {itemIcon(r.icon) ? <img src={itemIcon(r.icon)} alt="" /> : <span>?</span>}
+          </button>
+        ))}
+      </div>
+      {relic && (
+        <p className="relic-caption">
+          {relic.name}{relic.won ? '' : ' - ещё не добыто'}
+        </p>
+      )}
+      <div className="trophy-tiles">
+        {tiles.map(([icon, value, label]) => (
+          <div className="trophy-tile" key={label}>
+            <span className="trophy-tile__icon" aria-hidden="true">{icon}</span>
+            <b className="trophy-tile__value">{value}</b>
+            <small className="trophy-tile__label">{label}</small>
+          </div>
+        ))}
+      </div>
+    </Group>
+  );
+}
+
+export function HeroSkeleton() {
+  return (
+    <Group>
+      <div className="hero-stage">
+        <div className="hero-figure skeleton" />
+      </div>
+    </Group>
+  );
+}
+
+export default function HeroTab({ character, onCharacterUpdate }) {
+  const [items, setItems] = useState(null);
+  const [trophies, setTrophies] = useState(null);
+  const [failed, setFailed] = useState(false);
+  const [openSlot, setOpenSlot] = useState(null);
+  const [busyId, setBusyId] = useState(null);
+  const [error, setError] = useState(null);
+  // Сколько раз в слот надевали вещь - каждое надевание даёт вспышку искр.
+  const [flashes, setFlashes] = useState({});
+  const [gender, setGenderState] = useState(character.gender || 'm');
+
+  useEffect(() => {
+    getInventory().then((res) => setItems(res.items)).catch(() => setFailed(true));
+    getTrophies().then(setTrophies).catch(() => {});
+  }, []);
+
+  const equipped = useMemo(
+    () => Object.fromEntries((items || []).filter((i) => i.equipped).map((i) => [i.slot, i])),
+    [items],
+  );
+  // Есть ли в сумке вещь сильнее надетой - зелёная метка на окне слота.
+  const upgrades = useMemo(() => {
+    const out = {};
+    for (const item of items || []) {
+      if (item.equipped || item.need_level) continue;
+      if (item.power > (equipped[item.slot]?.power || 0)) out[item.slot] = true;
+    }
+    return out;
+  }, [items, equipped]);
+
+  async function refreshCharacter() {
+    try { onCharacterUpdate(await getCharacter()); } catch { /* шапка подтянется позже */ }
+  }
+
+  async function handleEquip(itemId) {
+    const slot = openSlot;
+    setBusyId(itemId);
+    setError(null);
+    try {
+      const res = await equipItem(itemId);
+      setItems(res.items);
+      setOpenSlot(null);
+      setFlashes((f) => ({ ...f, [slot]: (f[slot] || 0) + 1 }));
+      refreshCharacter();
+    } catch (err) {
+      setError(err?.message?.includes(' ') ? err.message : 'Не удалось надеть.');
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  async function handleUnequip(itemId) {
+    setBusyId(itemId);
+    setError(null);
+    try {
+      const res = await unequipItem(itemId);
+      setItems(res.items);
+      refreshCharacter();
+    } catch {
+      setError('Не удалось снять.');
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  async function pickGender(next) {
+    if (next === gender) return;
+    setGenderState(next);
+    try {
+      await setGender(next);
+      onCharacterUpdate((prev) => ({ ...prev, gender: next }));
+    } catch {
+      setGenderState(gender);
+    }
+  }
+
+  if (failed) return <Group><p className="hero-error">Не удалось загрузить снаряжение.</p></Group>;
+  if (!items) return <HeroSkeleton />;
+
+  const url = silhouetteUrl(character.subclass, character.base_class, gender);
+  const path = character.subclass || character.base_class;
+  const bonus = STAT_ORDER.filter((k) => character.gear_bonus?.[k]);
+
+  return (
+    <>
+      <Group>
+        <div className={`hero-stage hero-stage--${path}`}>
+          <div className="gender-switch" role="radiogroup" aria-label="Пол">
+            {[['m', '♂'], ['f', '♀']].map(([g, sign]) => (
+              <button
+                type="button" key={g} role="radio" aria-checked={gender === g}
+                className={gender === g ? 'gender-switch__btn gender-switch__btn--on' : 'gender-switch__btn'}
+                onClick={() => pickGender(g)}
+                aria-label={g === 'm' ? 'Мужской' : 'Женский'}
+              >
+                {sign}
+              </button>
+            ))}
+          </div>
+          <div className="hero-figure">
+            <img key={url} className="hero-figure__img" src={url} alt="" draggable="false" />
+            {SLOTS.map(({ slot, x, y }) => {
+              const item = equipped[slot];
+              const rar = item?.rarity;
+              return (
+                <button
+                  type="button" key={slot}
+                  className={`gear-slot${item ? ` gear-slot--filled gear-slot--${rar}` : ''}`}
+                  style={{ left: `${x}%`, top: `${y}%` }}
+                  onClick={() => setOpenSlot(slot)}
+                  aria-label={item ? `${SLOT_TITLES[slot]}: ${item.name}` : SLOT_TITLES[slot]}
+                >
+                  {item
+                    ? <ItemIcon icon={item.icon} rarity={item.rarity} alt="" size={48} />
+                    : <SlotGlyph slot={slot} />}
+                  {upgrades[slot] && <span className="gear-slot__up" aria-hidden="true">▲</span>}
+                  <Sparks burst={flashes[slot] || 0} />
+                </button>
+              );
+            })}
+          </div>
+          {bonus.length > 0 && (
+            <div className="hero-bonus">
+              {bonus.map((k) => (
+                <span key={k} className="gear-chip">{STAT_ICONS[k]} +{character.gear_bonus[k]}</span>
+              ))}
+            </div>
+          )}
+          {error && <p className="hero-error">{error}</p>}
+        </div>
+      </Group>
+
+      <TrophyShelf trophies={trophies} />
+
+      {openSlot && (
+        <SlotSheet
+          slot={openSlot} items={items} busyId={busyId}
+          onClose={() => setOpenSlot(null)} onEquip={handleEquip} onUnequip={handleUnequip}
+        />
+      )}
+    </>
+  );
+}

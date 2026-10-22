@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
-import { TabsItem, Group, Header, Div, Spinner, Placeholder } from '@vkontakte/vkui';
+import { TabsItem, Group, Header, Div, Placeholder } from '@vkontakte/vkui';
 import Tabs from './ScrollTabs.jsx';
 import { getDailies } from '../api.js';
+import Skeleton from './Skeleton.jsx';
 
 // Патч 23: вкладка «Задания» - три раздела (Сюжет/Ежедневные/Вход).
 const SECTIONS = [
@@ -215,9 +216,7 @@ export default function DailiesTab() {
 
   if (status === 'loading') {
     return (
-      <Div style={{ display: 'flex', justifyContent: 'center', paddingTop: 48 }}>
-        <Spinner size="l" />
-      </Div>
+      <Skeleton />
     );
   }
 

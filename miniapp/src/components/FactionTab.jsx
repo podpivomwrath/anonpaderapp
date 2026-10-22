@@ -4,6 +4,7 @@ import Tabs from './ScrollTabs.jsx';
 import { getTrade, getTradeCity, tradeAction } from '../api.js';
 import { itemIcon } from '../itemIcons.js';
 import ItemIcon from './ItemIcon.jsx';
+import Skeleton from './Skeleton.jsx';
 
 // Вкладка «Фракция» (2026-10-15): торговая фирма и процветание городов.
 // Цены, пути, шансы и правила считает сервер (services/trade_service.py,
@@ -570,7 +571,7 @@ export default function FactionTab({ onWallet }) {
   };
 
   if (status === 'loading') {
-    return <Div style={{ display: 'flex', justifyContent: 'center', paddingTop: 48 }}><Spinner size="l" /></Div>;
+    return <Skeleton />;
   }
   if (status === 'error' || !data) {
     return <Placeholder action={<Button onClick={load}>Ещё раз</Button>}>Не удалось открыть вкладку.</Placeholder>;

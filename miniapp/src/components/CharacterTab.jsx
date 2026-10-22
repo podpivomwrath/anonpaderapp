@@ -5,6 +5,7 @@ import StatsTab from './StatsTab.jsx';
 import PresetsTab from './PresetsTab.jsx';
 import TrialsTab from './TrialsTab.jsx';
 import CraftsTab from './CraftsTab.jsx';
+import HeroTab from './HeroTab.jsx';
 
 // Патч 14, ч.1: Характеристики + Пресеты + Испытания объединены в одну
 // вкладку «Персонаж», переключаемые под-табами. Патч 22: + топ PvP.
@@ -14,6 +15,8 @@ import CraftsTab from './CraftsTab.jsx';
 // Патч 74: «Топы» уехали в корень - они про всех игроков, а не про твоего
 // персонажа, и место в шторке под них теперь есть.
 const SECTIONS = [
+  // 2026-10-22: силуэт со снаряжением и трофеи - лицо профиля, открывается первым.
+  { id: 'hero', label: 'Герой' },
   { id: 'stats', label: 'Характеристики' },
   { id: 'presets', label: 'Пресеты' },
   { id: 'trials', label: 'Испытания' },
@@ -22,7 +25,7 @@ const SECTIONS = [
 ];
 
 export default function CharacterTab({ character, onCharacterUpdate }) {
-  const [section, setSection] = useState('stats');
+  const [section, setSection] = useState('hero');
 
   return (
     <>
@@ -33,6 +36,7 @@ export default function CharacterTab({ character, onCharacterUpdate }) {
           </TabsItem>
         ))}
       </Tabs>
+      {section === 'hero' && <HeroTab character={character} onCharacterUpdate={onCharacterUpdate} />}
       {section === 'stats' && <StatsTab character={character} onCharacterUpdate={onCharacterUpdate} />}
       {section === 'presets' && <PresetsTab character={character} />}
       {section === 'trials' && <TrialsTab />}
