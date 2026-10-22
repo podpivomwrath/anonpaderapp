@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Group, Header } from '@vkontakte/vkui';
 import { equipItem, getCharacter, getInventory, getTrophies, setGender, unequipItem } from '../api.js';
 import { silhouetteUrl } from '../silhouettes.js';
@@ -6,21 +6,21 @@ import { itemIcon } from '../itemIcons.js';
 import ItemIcon from './ItemIcon.jsx';
 import Sparks from './Sparks.jsx';
 
-// Вкладка «Герой» (2026-10-22): силуэт персонажа, по бокам окна слотов,
-// от окна к телу - тонкая линия. Нажал окно - снизу список вещей из сумки для
+// Вкладка «Герой» (2026-10-22): силуэт персонажа, по бокам окна слотов
+// (линии от окна к телу владелец убрал - и так понятно). Нажал окно - снизу список вещей из сумки для
 // этого слота, с разницей к надетой. Под силуэтом - бонус снаряжения и полка
 // трофеев. Окна сперва лежали прямо на теле - владельцу не понравилось.
 
 // Окна: слева оружие (оно у всех 18 силуэтов в руке слева), справа броня
-// сверху вниз. y - высота окна и точки на теле, ax - куда на теле ведёт
-// линия; всё в долях кадра силуэта. Кадр у всех картинок общий:
-// tools/silhouette_assets.py выравнивает их по капюшону и подошвам.
+// сверху вниз. y - высота окна в долях кадра силуэта, на уровне своей части
+// тела. Кадр у всех картинок общий: tools/silhouette_assets.py выравнивает
+// их по капюшону и подошвам.
 const SLOTS = [
-  { slot: 'weapon', side: 'left', y: 46, ax: 19 },
-  { slot: 'helmet', side: 'right', y: 9, ax: 56 },
-  { slot: 'armor', side: 'right', y: 31, ax: 62 },
-  { slot: 'legs', side: 'right', y: 60, ax: 57 },
-  { slot: 'boots', side: 'right', y: 89, ax: 60 },
+  { slot: 'weapon', side: 'left', y: 46 },
+  { slot: 'helmet', side: 'right', y: 9 },
+  { slot: 'armor', side: 'right', y: 31 },
+  { slot: 'legs', side: 'right', y: 60 },
+  { slot: 'boots', side: 'right', y: 89 },
 ];
 
 const SLOT_TITLES = {
@@ -179,37 +179,6 @@ function TrophyShelf({ trophies }) {
   );
 }
 
-// Линии от окна к телу. Считаются по размерам раскладки (offset*), а не по
-// экранным координатам: во время анимации появления силуэт чуть уменьшен,
-// и линии, посчитанные в этот момент, промахивались мимо тела.
-function useLeaders(row, img, ready) {
-  const [lines, setLines] = useState([]);
-  useLayoutEffect(() => {
-    const box = row.current;
-    const fig = img.current?.parentElement;
-    if (!box || !fig) return undefined;
-    const place = () => {
-      setLines(SLOTS.map(({ slot, side, y, ax }) => {
-        const el = box.querySelector(`[data-slot="${slot}"]`);
-        const col = el?.parentElement;
-        // Окно сдвинуто на половину своей ширины (translate) - в offsetLeft этого нет.
-        const left = col ? col.offsetLeft + el.offsetLeft - el.offsetWidth / 2 : 0;
-        return {
-          slot,
-          x1: side === 'left' ? left + (el?.offsetWidth || 0) : left,
-          x2: fig.offsetLeft + (fig.offsetWidth * ax) / 100,
-          y: fig.offsetTop + (fig.offsetHeight * y) / 100,
-        };
-      }));
-    };
-    place();
-    const observer = new ResizeObserver(place);
-    observer.observe(box);
-    return () => observer.disconnect();
-  }, [row, img, ready]);
-  return lines;
-}
-
 function GenderChoice({ character, onPick, busy }) {
   return (
     <Group>
@@ -252,8 +221,6 @@ export default function HeroTab({ character, onCharacterUpdate }) {
   const [flashes, setFlashes] = useState({});
   const [gender, setGenderState] = useState(character.gender || null);
   const [choosing, setChoosing] = useState(false);
-  const rowRef = useRef(null);
-  const imgRef = useRef(null);
 
   useEffect(() => {
     getInventory().then((res) => setItems(res.items)).catch(() => setFailed(true));
@@ -324,8 +291,6 @@ export default function HeroTab({ character, onCharacterUpdate }) {
     }
   }
 
-  // Ключ пересчёта: силуэт появился или сменился.
-  const lines = useLeaders(rowRef, imgRef, Boolean(items && gender) && [character.subclass, gender].join());
 
   if (failed) return <Group><p className="hero-error">Не удалось загрузить снаряжение.</p></Group>;
   if (!gender) return <GenderChoice character={character} onPick={pickGender} busy={choosing} />;
@@ -359,18 +324,10 @@ export default function HeroTab({ character, onCharacterUpdate }) {
     <>
       <Group>
         <div className={`hero-stage hero-stage--${path}`}>
-          <div className="hero-row" ref={rowRef}>
-            <svg className="hero-leaders" aria-hidden="true">
-              {lines.map((l) => (
-                <g key={l.slot} className={equipped[l.slot] ? 'hero-leader hero-leader--on' : 'hero-leader'}>
-                  <line x1={l.x1} y1={l.y} x2={l.x2} y2={l.y} />
-                  <circle cx={l.x2} cy={l.y} r="2.5" />
-                </g>
-              ))}
-            </svg>
+          <div className="hero-row">
             <div className="hero-col hero-col--left">{SLOTS.filter((x) => x.side === 'left').map(slotButton)}</div>
             <div className="hero-figure">
-              <img key={url} ref={imgRef} className="hero-figure__img" src={url} alt="" draggable="false" />
+              <img key={url} className="hero-figure__img" src={url} alt="" draggable="false" />
             </div>
             <div className="hero-col hero-col--right">{SLOTS.filter((x) => x.side === 'right').map(slotButton)}</div>
           </div>

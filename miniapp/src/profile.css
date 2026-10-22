@@ -214,36 +214,6 @@
   aspect-ratio: 600 / 960;
 }
 
-.hero-leaders {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  overflow: visible;
-  pointer-events: none;
-  z-index: 1;
-}
-
-.hero-leader line {
-  stroke: rgba(255, 255, 255, 0.16);
-  stroke-width: 1;
-  stroke-dasharray: 3 3;
-}
-
-.hero-leader circle {
-  fill: rgba(255, 255, 255, 0.3);
-}
-
-.hero-leader--on line {
-  stroke: rgba(226, 56, 79, 0.55);
-  stroke-dasharray: none;
-}
-
-.hero-leader--on circle {
-  fill: #e2384f;
-  filter: drop-shadow(0 0 3px rgba(226, 56, 79, 0.9));
-}
-
 .hero-figure__img {
   width: 100%;
   height: 100%;
@@ -256,7 +226,7 @@
   from { opacity: 0; transform: scale(0.97); }
 }
 
-/* Окно слота лежит прямо на теле. Пустое - стекло с контуром и значком,
+/* Окно слота в колонке у силуэта. Пустое - стекло с контуром и значком,
    надетое - иконка вещи со свечением редкости. */
 .gear-slot {
   --rar: var(--rar-common);
