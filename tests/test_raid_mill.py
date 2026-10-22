@@ -417,6 +417,10 @@ async def test_full_run_reaches_the_miller(monkeypatch) -> None:
         await raid_combat.raid_carry(_Msg(wrong.peer_id, {"type": "raid_carry"}))
         await raid_combat.raid_carry(_Msg(right.peer_id, {"type": "raid_carry"}))
         assert cargo.progress == 1
+        # В доске хода видно, кто нёс груз (2026-10-22, просьба владельца).
+        board = next(s["message"] for s in reversed(api.sent) if "Груз" in (s.get("message") or ""))
+        assert f"{right.character.name} {raid_mill.CARRY_NOTE}" in board
+        assert f"нёс: {right.character.name}" in board
         while battle.stage == 2:
             state = engine.sessions[battle_id]
             carrier = cargo.carrier(state)

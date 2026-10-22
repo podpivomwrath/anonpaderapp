@@ -47,3 +47,12 @@ def test_switch_off():
     no_images.set_muted(1, False)
     data = {"peer_id": 1, "message": "x", "attachment": "photo-1_2"}
     assert no_images.strip("messages.send", data) is data
+
+
+def test_answer_sends_peer_ids_as_list():
+    """message.answer в vkbottle шлёт peer_ids=[id] - список, не строку."""
+    no_images.set_muted(1, True)
+    out = no_images.strip("messages.send", {"peer_ids": [1], "message": "клетка", "attachment": "photo-1_2"})
+    assert out["attachment"] == ""
+    assert no_images.peers_of({"peer_ids": [1, 2]}) == [1, 2]
+    assert no_images.peers_of({"peer_id": 3, "peer_ids": "4,5"}) == [3, 4, 5]

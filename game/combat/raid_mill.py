@@ -143,18 +143,31 @@ class CargoStage:
     def claim(self) -> None:
         self.carried = True
 
-    def status_line(self, session: CombatSessionState) -> str:
+    def status_line(self, session: CombatSessionState, carried_by: list[str] | None = None) -> str:
+        """Строка обоза. carried_by - кто нёс в этом ходу (ники): раньше здесь
+        было только «несёт: <подкласс>» - чья очередь ДАЛЬШЕ, и её читали как
+        «кто нёс» (2026-10-22, просьба владельца). Теперь отдельно: кто нёс в
+        ходу и кто несёт следующим - подкласс и ники живых с ним."""
         carrier = self.carrier(session)
-        who = subclass_title(carrier) if carrier is not None or self.order == [None] else "-"
-        return (
-            f"📦 Груз: {self.progress}/{mc.CARGO_STEPS} · 🌾 мешков: {self.sacks} · "
-            f"несёт: {who}"
-        )
+        if carrier is not None or self.order == [None]:
+            names = [p.name for p in _players(session) if p.subclass_id == carrier]
+            nxt = subclass_title(carrier) + (f" ({', '.join(names)})" if names else "")
+        else:
+            nxt = "-"
+        parts = [f"📦 Груз: {self.progress}/{mc.CARGO_STEPS}", f"🌾 мешков: {self.sacks}"]
+        if carried_by is not None:
+            parts.append(f"нёс: {', '.join(carried_by)}" if carried_by else "груз стоит")
+        parts.append(f"следующим несёт: {nxt}")
+        return " · ".join(parts)
 
     def after_tick(self, session: CombatSessionState, result: TickResult, rng: random.Random) -> StageTick:
         self.ticks += 1
         out = StageTick()
-        carried = any(a.payload.get("carry") for a in result.actions.values())
+        carried_by = [
+            session.combatants[cid].name for cid, a in result.actions.items()
+            if a.payload.get("carry") and cid in session.combatants
+        ]
+        carried = bool(carried_by)
         self.carried = False
         if carried:
             self.progress += 1
@@ -172,7 +185,7 @@ class CargoStage:
                 if self.sacks <= 0:
                     return out
         self._spawn(session)
-        out.lines.append(self.status_line(session))
+        out.lines.append(self.status_line(session, carried_by))
         return out
 
     def _drop(self, session: CombatSessionState, out: StageTick) -> None:

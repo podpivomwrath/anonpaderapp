@@ -49,12 +49,9 @@ def install(api) -> None:
         data = no_images.strip(method, data)
         if method in ("messages.send", "messages.edit"):
             now = time.time()
-            peer = data.get("peer_id")
-            if peer is not None:
-                _last_out[int(peer)] = now
-            for p in str(data.get("peer_ids") or "").split(","):
-                if p.strip().lstrip("-").isdigit():
-                    _last_out[int(p)] = now
+            # peer_id числом, peer_ids списком (message.answer) или строкой.
+            for p in no_images.peers_of(data):
+                _last_out[p] = now
         try:
             return await original(method, data, version)
         except Exception as exc:  # noqa: BLE001 - смотрим только на код ошибки VK

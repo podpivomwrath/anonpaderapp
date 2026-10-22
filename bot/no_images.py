@@ -42,6 +42,28 @@ def is_muted(vk_id: int) -> bool:
     return int(vk_id) in _muted
 
 
+def peers_of(data: dict) -> list[int]:
+    """Кому уходит сообщение. vkbottle шлёт по-разному: api.messages.send -
+    peer_id числом, message.answer - peer_ids СПИСКОМ ([id]), рассылки -
+    строкой «1,2,3». Раньше список не разбирался, и ответы через
+    message.answer (статус клетки и почти всё остальное) уходили с картинкой
+    (2026-10-22, жалоба: после отмены перехода картинка пришла)."""
+    out: list[int] = []
+    raw = [data.get("peer_id")]
+    many = data.get("peer_ids")
+    if isinstance(many, (list, tuple, set)):
+        raw += list(many)
+    elif many is not None:
+        raw += str(many).split(",")
+    for p in raw:
+        if p is None:
+            continue
+        text = str(p).strip()
+        if text.lstrip("-").isdigit():
+            out.append(int(text))
+    return out
+
+
 def strip(method: str, data: dict) -> dict:
     """Убрать фото из messages.send / messages.edit тому, кто их выключил.
     Возвращает те же данные или копию без фото."""
@@ -50,16 +72,13 @@ def strip(method: str, data: dict) -> dict:
     attachment = data.get("attachment")
     if not attachment:
         return data
-    peers = []
-    if data.get("peer_id") is not None:
-        peers.append(data["peer_id"])
-    peers += [p for p in str(data.get("peer_ids") or "").split(",") if p.strip()]
-    try:
-        if not peers or not all(int(p) in _muted for p in peers):
-            return data
-    except (TypeError, ValueError):
+    peers = peers_of(data)
+    if not peers or not all(p in _muted for p in peers):
         return data
-    parts = [a for a in str(attachment).split(",") if a.strip()]
+    if isinstance(attachment, (list, tuple)):
+        parts = [str(a) for a in attachment if str(a).strip()]
+    else:
+        parts = [a for a in str(attachment).split(",") if a.strip()]
     kept = [a for a in parts if not a.strip().startswith("photo")]
     if len(kept) == len(parts):
         return data
