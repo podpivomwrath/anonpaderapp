@@ -84,7 +84,7 @@ BLOOD_FOR_BLOOD_REFLECT_PCT = 0.30
 # 🧿 Ясность крови
 BLOOD_CLARITY_DURATION = 2
 
-# 🛡️ Второе сердце — щит % от макс. HP; TODO: калибровка (патч не дал точного числа)
+# 🛡️ Второе сердце — щит % от макс. HP; в игре как есть, отдельно не калибровалось (2026-10-22)
 SECOND_HEART_DURATION = 3
 SECOND_HEART_SHIELD_PCT_MAX_HP = 0.30
 
@@ -92,6 +92,6 @@ SECOND_HEART_SHIELD_PCT_MAX_HP = 0.30
 ASHEN_HAZE_DURATION = 2
 ASHEN_HAZE_DODGE_CHANCE = 0.80
 
-# ⚡ Осколочная кровь — фикс. бонус урона за удар = уровень * коэф.; TODO: калибровка
+# ⚡ Осколочная кровь — фикс. бонус урона за удар = уровень * коэф.; в игре как есть, отдельно не калибровалось (2026-10-22)
 SHARD_BLOOD_DURATION = 3
 SHARD_BLOOD_DAMAGE_PER_LEVEL = 1.5

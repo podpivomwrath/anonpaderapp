@@ -105,3 +105,30 @@ async def test_start_is_taken_from_message_date_not_from_pre(monkeypatch) -> Non
     await middleware.post()
     await asyncio.sleep(0)
     assert seen == [1_700_000_000.0]
+
+
+async def test_unexpected_send_error_is_logged_closed_dm_is_not(monkeypatch) -> None:
+    """2026-10-22: битая клавиатура и прочие баги VK тонули в `except: pass` у
+    вызова; закрытая личка - ожидаемо, её не пишем."""
+    import pytest
+
+    class VkError(Exception):
+        def __init__(self, code):
+            super().__init__(f"code {code}")
+            self.code = code
+
+    class FailingApi:
+        def __init__(self, code):
+            self.code = code
+
+        async def request(self, method, data, version=None):
+            raise VkError(self.code)
+
+    logged = []
+    monkeypatch.setattr(silent_guard.logger, "error", lambda *a, **k: logged.append(a))
+    for code, expect_log in ((901, False), (911, True)):
+        api = FailingApi(code)
+        silent_guard.install(api)
+        with pytest.raises(VkError):
+            await api.request("messages.send", {"peer_id": 1, "message": "x"})
+        assert bool(logged) == expect_log

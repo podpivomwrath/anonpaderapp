@@ -24,6 +24,13 @@ from vkbottle.bot import Message
 
 GRACE_SECONDS = 2.5
 STALE_TEXT = "Кнопки обновлены."
+#: Ошибки VK при отправке, которые ждём и глотаем у вызова молча: игрок закрыл
+#: личку (901/902, 7 - «нельзя писать контактам»), бот в чёрном списке (900),
+#: сообщение нельзя править (909, 15). Любой другой код - битая клавиатура (911/912),
+#: длинный текст (914), неверный параметр (100) - это баг, его пишем в журнал
+#: ошибок здесь же: у вызова он часто тонет в `except Exception: pass`
+#: (2026-10-22).
+EXPECTED_SEND_ERRORS = {7, 900, 901, 902, 909, 15}
 
 _last_out: dict[int, float] = {}
 _api = None
@@ -50,7 +57,10 @@ def install(api) -> None:
             # Код 10 - «Internal server error, try later» у самого VK. В логах
             # он ронял разбор хода боя: игрок не получал сообщение о ходе
             # (2026-10-19). Один повтор через секунду почти всегда проходит.
-            if getattr(exc, "code", None) != 10:
+            code = getattr(exc, "code", None)
+            if code != 10:
+                if method in ("messages.send", "messages.edit") and code not in EXPECTED_SEND_ERRORS:
+                    logger.error("VK {}: ошибка {} для {} - {}", method, code, data.get("peer_id"), exc)
                 raise
             logger.warning("VK {}: внутренняя ошибка VK (10), повтор", method)
             await asyncio.sleep(1.0)

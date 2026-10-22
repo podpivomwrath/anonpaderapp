@@ -28,7 +28,7 @@ BUFF_CATEGORIES = {"damage", "defense", "control_utility", "group_support"}
 
 class BuffDef(BaseModel):
     """Микробафф (п.7 дизайна): пул 12-15 на подкласс, категории обязательны
-    к разнообразию при сборке пресета. Конкретные значения — TODO: content."""
+    к разнообразию при сборке пресета. Значения - в content/."""
 
     id: str
     name: str

@@ -11,9 +11,8 @@ from dataclasses import dataclass
 from game.combat.resolver import TickResult
 from game.combat.session import ActionType
 
-# Скилы стихий элементалиста (game/classes/elementalist.py) — многие ещё TODO:
-# content и не зарегистрированы как хендлеры, прогресс по ним появится, когда
-# скилы будут реализованы; трекер уже готов их подхватить.
+# Скилы стихий элементалиста (game/classes/elementalist.py) - по ним трекер
+# отмечает, какие стихии игрок применил за бой.
 ELEMENT_SKILLS = {
     "elementalist_fire": "fire",
     "elementalist_ice": "ice",
