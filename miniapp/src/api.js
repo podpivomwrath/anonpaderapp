@@ -165,6 +165,16 @@ export function equipItem(itemId) {
   });
 }
 
+// Передача по нику (2026-10-22): command - та же, что копирует кнопка
+// «Команда передачи»; без confirm сервер только проверяет и пишет, что и кому.
+export function transferByNick(command, name, qty, confirm) {
+  return request('/transfer', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ command, name, qty: qty ?? undefined, confirm: Boolean(confirm) }),
+  });
+}
+
 // Разобрать уникальную вещь в звёздную пыль (2026-10-22).
 export function disassembleItem(itemId) {
   return request('/disassemble', {

@@ -3,7 +3,9 @@ import bridge from '@vkontakte/vk-bridge';
 import {
   Button, Group, Placeholder,
 } from '@vkontakte/vkui';
-import { IN_VK, disassembleItem, eatFood, getInventory, openChest } from '../api.js';
+import {
+  IN_VK, disassembleItem, eatFood, getInventory, openChest, transferByNick,
+} from '../api.js';
 import { itemIcon } from '../itemIcons.js';
 import ChestRoulette from './ChestRoulette.jsx';
 import ItemIcon from './ItemIcon.jsx';
@@ -225,11 +227,80 @@ export function ItemSheet({ entry, onClose, worn, compare = false, actions = nul
   );
 }
 
+// --- Передача по нику (2026-10-22) -------------------------------------------
+// Раньше передать можно было только в чате, ответом на сообщение игрока, то
+// есть через его профиль VK. Здесь - по нику: сначала сервер проверяет и
+// пишет, что и кому уйдёт (и нужен ли курьер), вторым нажатием - передача.
+
+const NICK_KEY = 'pines:last-nick';
+
+export function NickTransfer({ command, qty = null, onDone }) {
+  const [name, setName] = useState(() => {
+    try { return localStorage.getItem(NICK_KEY) || ''; } catch { return ''; }
+  });
+  const [preview, setPreview] = useState(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState(null);
+  const [done, setDone] = useState(null);
+
+  async function run(confirm) {
+    setBusy(true);
+    setError(null);
+    try {
+      const res = await transferByNick(command, name.trim(), qty, confirm);
+      if (confirm) {
+        try { localStorage.setItem(NICK_KEY, name.trim()); } catch { /* ник не запомнится */ }
+        if (onDone) onDone(res.done);
+        else setDone(res.done);
+      } else {
+        setPreview(res.preview);
+      }
+    } catch (err) {
+      setError(err?.message?.includes(' ') ? err.message : 'Не удалось передать.');
+      setPreview(null);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  if (done) return <p className="nick-transfer__done">{done}</p>;
+  return (
+    <div className="nick-transfer">
+      <div className="nick-transfer__row">
+        <input
+          className="guild-input nick-transfer__input" placeholder="Ник получателя" maxLength={24}
+          value={name} onChange={(e) => { setName(e.target.value); setPreview(null); setError(null); }}
+          autoComplete="off" spellCheck="false"
+        />
+        {!preview && (
+          <button type="button" className="pill-btn pill-btn--main" disabled={busy || !name.trim()} onClick={() => run(false)}>
+            Далее
+          </button>
+        )}
+      </div>
+      {error && <p className="nick-transfer__error">{error}</p>}
+      {preview && (
+        <div className="break-confirm">
+          <span className="break-confirm__text">
+            {preview.courier ? 'Курьер отнесёт' : 'Передать'} {preview.what} игроку {preview.to}?
+            {preview.courier ? ' Он заберёт посылку у тебя и побежит к получателю.' : ''} Это не отменить.
+          </span>
+          <button type="button" className="pill-btn pill-btn--main" disabled={busy} onClick={() => run(true)}>
+            Да, передать
+          </button>
+          <button type="button" className="pill-btn" disabled={busy} onClick={() => setPreview(null)}>Отмена</button>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // --- Сколько передать -------------------------------------------------------
 
-export function QuantitySheet({ entry, onClose, onCopied }) {
+export function QuantitySheet({ entry, onClose, onCopied, onTransferred }) {
   const max = Math.max(1, entry.count);
   const [qty, setQty] = useState(1);
+  const [byNick, setByNick] = useState(false);
   const clamp = (value) => Math.min(max, Math.max(1, Math.round(Number(value) || 1)));
 
   async function confirm() {
@@ -266,12 +337,21 @@ export function QuantitySheet({ entry, onClose, onCopied }) {
             aria-label="Количество числом"
           />
         </div>
-        <p className="item-sheet__note">
-          Скопируется: {entry.transfer_prefix} {clamp(qty)}
-        </p>
+        {byNick ? (
+          <NickTransfer command={entry.transfer_prefix} qty={clamp(qty)} onDone={onTransferred} />
+        ) : (
+          <>
+            <p className="item-sheet__note">
+              Скопируется: {entry.transfer_prefix} {clamp(qty)}
+            </p>
+            <button type="button" className="pill-btn nick-transfer__open" onClick={() => setByNick(true)}>
+              👤 Передать по нику
+            </button>
+          </>
+        )}
         <div className="qty-picker__buttons">
-          <Button mode="secondary" size="l" stretched onClick={onClose}>Отменить</Button>
-          <Button mode="primary" size="l" stretched onClick={confirm}>ОК</Button>
+          <Button mode="secondary" size="l" stretched onClick={onClose}>{byNick ? 'Закрыть' : 'Отменить'}</Button>
+          {!byNick && <Button mode="primary" size="l" stretched onClick={confirm}>Скопировать</Button>}
         </div>
       </div>
     </>
@@ -424,6 +504,8 @@ export default function InventoryTab({ onOpenTab }) {
   const [eating, setEating] = useState(null);
   const [opening, setOpening] = useState(false);
   const [breaking, setBreaking] = useState(null);  // id вещи, которую подтверждают разобрать
+  const [nickFor, setNickFor] = useState(null);    // id вещи, которую передают по нику
+  const [notice, setNotice] = useState(null);
   const [roulette, setRoulette] = useState(null);  // ответ сервера на открытие ларца
   const [seen, setSeen] = useState(null);
   const [dustBurst, setDustBurst] = useState(0);
@@ -508,6 +590,15 @@ export default function InventoryTab({ onOpenTab }) {
   }
 
   useEffect(load, []);
+
+  // После передачи по нику: шторку закрыть, сумку перечитать без заставки.
+  function transferred(text) {
+    setDetail(null);
+    setNickFor(null);
+    setErrorMsg(null);
+    setNotice(text);
+    getInventory().then(apply).catch(() => { /* перечитается при следующем заходе */ });
+  }
 
   // Надевают и снимают во вкладке «Персонаж → Герой» (2026-10-22): здесь
   // надетое не показываем вовсе, сумка - только то, что лежит.
@@ -624,7 +715,13 @@ export default function InventoryTab({ onOpenTab }) {
             onClick={async () => { await copyText(data.transfer_command); markCopied(entry.key); }}>
             {copiedId === entry.key ? <CheckIcon /> : <CopyIcon />} Команда передачи
           </button>,
+          <button key="nick" type="button" className="pill-btn" onClick={() => setNickFor(nickFor === data.id ? null : data.id)}>
+            👤 По нику
+          </button>,
         );
+        if (nickFor === data.id) {
+          out.push(<NickTransfer key="nickform" command={data.transfer_command} onDone={transferred} />);
+        }
       }
       // Уникальную - с босса или уже кованую - можно разобрать в звёздную пыль.
       if (data.disassemble) {
@@ -686,6 +783,7 @@ export default function InventoryTab({ onOpenTab }) {
       />
 
       {errorMsg && <p className="tab-error">{errorMsg}</p>}
+      {notice && <p className="tab-notice" onClick={() => setNotice(null)}>{notice}</p>}
 
       <Group>
         <div className="bag-toolbar">
@@ -732,7 +830,7 @@ export default function InventoryTab({ onOpenTab }) {
       {detail && (
         <ItemSheet
           entry={detail}
-          onClose={() => { setDetail(null); setBreaking(null); }}
+          onClose={() => { setDetail(null); setBreaking(null); setNickFor(null); }}
           compare={detail.kind === 'gear'}
           worn={detail.kind === 'gear' ? worn[detail.data.slot] : null}
           actions={sheetActions(detail)}
@@ -751,6 +849,7 @@ export default function InventoryTab({ onOpenTab }) {
           entry={qtyEntry}
           onClose={() => setQtyEntry(null)}
           onCopied={(id) => markCopied(`stack:${id}`)}
+          onTransferred={(text) => { setQtyEntry(null); transferred(text); }}
         />
       )}
     </>

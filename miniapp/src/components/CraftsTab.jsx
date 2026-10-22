@@ -65,6 +65,7 @@ export default function CraftsTab({ character }) {
   const [open, setOpen] = useState(null);
   const [qtyEntry, setQtyEntry] = useState(null);
   const [copiedId, setCopiedId] = useState(null);
+  const [notice, setNotice] = useState(null);
 
   const markCopied = (key) => {
     setCopiedId(key);
@@ -185,6 +186,7 @@ export default function CraftsTab({ character }) {
 
   return (
     <>
+      {notice && <p className="tab-notice" onClick={() => setNotice(null)}>{notice}</p>}
       {character.fishing && (
         <Group header={<Header>🎣 Рыбалка</Header>}>
           <CraftHead icon="🎣" level={character.fishing.level} xp={character.fishing.xp} xpNext={character.fishing.xp_to_next} />
@@ -273,7 +275,14 @@ export default function CraftsTab({ character }) {
 
       {detail && <ItemSheet entry={detail} onClose={() => setDetail(null)} />}
       {qtyEntry && (
-        <QuantitySheet entry={qtyEntry} onClose={() => setQtyEntry(null)} onCopied={(id) => markCopied(id)} />
+        <QuantitySheet
+          entry={qtyEntry} onClose={() => setQtyEntry(null)} onCopied={(id) => markCopied(id)}
+          onTransferred={(text) => {
+            setQtyEntry(null);
+            setNotice(text);
+            getInventory().then(setBag).catch(() => { /* перечитается при следующем заходе */ });
+          }}
+        />
       )}
     </>
   );

@@ -25,6 +25,7 @@ from bot.miniapp_exchange_api import register_routes as register_exchange_routes
 from bot.miniapp_shop_api import register_routes as register_shop_routes
 from bot.miniapp_board_api import register_routes as register_board_routes
 from bot.miniapp_hero_api import register_routes as register_hero_routes
+from bot.miniapp_transfer_api import register_routes as register_transfer_routes
 from bot.miniapp_trade_api import register_routes as register_trade_routes
 from bot.miniapp_auth import miniapp_auth_middleware, miniapp_cors_middleware
 from bot.web_auth import register_routes as register_web_auth_routes
@@ -118,6 +119,7 @@ def create_app(settings: Settings, route_event: RouteEvent, redis=None) -> web.A
     register_shop_routes(app)
     register_board_routes(app)
     register_hero_routes(app)
+    register_transfer_routes(app)
     register_trade_routes(app)
     register_miniapp_admin_routes(app)
     register_miniapp_map_routes(app)

@@ -2289,3 +2289,34 @@ body.lite .shop-showcase::after { animation: none; display: none; }
   .trade-dest__row:has(.faction-qty) { flex-wrap: wrap; }
   .trade-dest__row .faction-qty { width: 100%; justify-content: flex-end; }
 }
+
+/* --- Передача по нику ------------------------------------------------------------ */
+
+.tab-notice {
+  margin: 8px 16px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: rgba(121, 199, 127, 0.1);
+  border: 1px solid rgba(121, 199, 127, 0.35);
+  color: #c9f0cc;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.nick-transfer {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+  margin: 2px 0 8px;
+}
+
+.nick-transfer__row {
+  display: flex;
+  gap: 8px;
+}
+
+.nick-transfer__input { flex: 1; min-width: 0; }
+.nick-transfer__error { margin: 0; color: #ff8a80; font-size: 13.5px; }
+.nick-transfer__done { margin: 4px 0 10px; color: #c9f0cc; font-size: 14px; }
+.nick-transfer__open { margin-bottom: 12px; }
