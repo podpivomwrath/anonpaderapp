@@ -578,6 +578,9 @@
 .newbie__secondary {
   display: block;
   width: 100%;
+  /* «Открыть диалог» - ссылка, а не кнопка: без border-box её отступы
+     считались сверх 100% ширины, и она вылезала за карточку справа. */
+  box-sizing: border-box;
   padding: 13px 16px;
   border-radius: 12px;
   font: inherit;
