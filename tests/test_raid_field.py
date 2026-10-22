@@ -240,16 +240,30 @@ def test_chain_passes_enemy_damage_to_the_other_end() -> None:
     assert b_before - b.current_hp == hit_a + hit_b
 
 
-def test_open_grave_strikes_its_victim_through_the_normal_hit() -> None:
+def test_open_grave_takes_most_of_the_victims_health_at_once() -> None:
+    """Не разбили надгробие - могила открывается и сразу забирает
+    GRAVE_OPEN_HP_SHARE максимума здоровья: без хода на защиту (2026-10-22)."""
     state, stage = _summoner_stage()
     grave = _cast(stage, state, rf.GRAVE)
-    victim_id = grave.victim_id
-    for _ in range(fc.GRAVE_TURNS):
-        out = stage.after_tick(state, _tick(state, {}), random.Random(1))
-    assert stage.ai.grave_strike_on == victim_id
+    victim = state.combatants[grave.victim_id]
+    for _ in range(fc.GRAVE_TURNS - 1):
+        stage.after_tick(state, _tick(state, {}), random.Random(1))
+    victim.current_hp = victim.max_hp
+    out = stage.after_tick(state, _tick(state, {}), random.Random(1))
     assert any("Могила открывается" in line for line in out.lines)
-    result = _tick(state, {})
-    assert any(h.label == "Чужая могила" and h.target_id == victim_id for h in result.hit_renders)
+    lost = victim.max_hp - victim.current_hp
+    assert lost >= round(victim.max_hp * fc.GRAVE_OPEN_HP_SHARE) - 1
+
+
+def test_open_grave_kills_a_wounded_victim() -> None:
+    state, stage = _summoner_stage()
+    grave = _cast(stage, state, rf.GRAVE)
+    victim = state.combatants[grave.victim_id]
+    for _ in range(fc.GRAVE_TURNS - 1):
+        stage.after_tick(state, _tick(state, {}), random.Random(1))
+    victim.current_hp = victim.max_hp // 2
+    out = stage.after_tick(state, _tick(state, {}), random.Random(1))
+    assert victim.id in out.deaths and not victim.alive
 
 
 def test_broken_grave_never_strikes() -> None:
@@ -257,8 +271,8 @@ def test_broken_grave_never_strikes() -> None:
     grave = _cast(stage, state, rf.GRAVE)
     state.combatants[grave.combatant_id].current_hp = 0
     for _ in range(fc.GRAVE_TURNS + 1):
-        stage.after_tick(state, _tick(state, {}), random.Random(1))
-    assert stage.ai.grave_strike_on is None
+        out = stage.after_tick(state, _tick(state, {}), random.Random(1))
+        assert not any("Могила открывается" in line for line in out.lines)
 
 
 # --- Этап 3: Генерал ----------------------------------------------------------
@@ -362,21 +376,18 @@ def test_count_within_the_limit_costs_nothing() -> None:
     assert all(state.combatants[cid].current_hp == hp_before[cid] for cid in (1, 2, 3))
 
 
-def test_stances_alternate_with_plain_strikes_and_hint_only_once() -> None:
+def test_stances_alternate_with_plain_strikes_without_hints() -> None:
+    """Подсказок к стойкам нет (2026-10-22): только поза."""
     state, stage, general = _general()
     rng = random.Random(9)
-    hints = 0
     for _ in range(40):
         before = stage.ai.active
         out = stage.after_tick(state, _tick(state, {}, rng), rng, {})
-        hints += sum(1 for line in out.lines if not line.startswith("⚠️") and line in {
-            h.format(allowed=stage.count_allowed) for h in rf._HINT.values()
-        })
+        assert not any("Следующий удар придётся" in line or "Взмах заденет" in line for line in out.lines)
         if before in rf.STANCES and before != rf.CHALLENGE:
             assert stage.ai.active == rf.STRIKE
         for p in (1, 2, 3, 4, 5):
             state.combatants[p].current_hp = state.combatants[p].max_hp
-    assert hints <= len(rf.STANCES)
 
 
 def test_feint_shows_one_stance_and_does_another() -> None:

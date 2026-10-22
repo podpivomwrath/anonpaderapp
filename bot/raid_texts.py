@@ -155,6 +155,10 @@ EPILOGUE_TEXT = (
 RAID_DEFEAT_TEXT = "Занавес идёт вниз раньше времени. В зале не хлопают."
 
 
+#: Все сняли готовность - сбор распущен (2026-10-22).
+LOBBY_DISSOLVED_TEXT = "Сбор на рейд распущен: готовность сняли все. Выбрать рейд можно заново у Монолита."
+
+
 def lobby_status_line(ready: int, total: int) -> str:
     return f"Готовы: {ready}/{total}"
 

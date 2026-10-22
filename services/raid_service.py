@@ -17,6 +17,13 @@ from game.economy import raid_config as rc
 from models import Character, Group, GroupMember, RaidLobby, RaidLobbyMember, RaidRun
 
 
+#: Начать сбор (стать лидером) без ключа нельзя: ключ списывается у лидера.
+NO_KEY_TO_LEAD = (
+    "Начать сбор может только тот, у кого есть Ключ Монолита: его списывают у лидера. "
+    "У тебя ключа нет - пусть рейд первым выберет тот, у кого он есть."
+)
+
+
 class RaidError(Exception):
     pass
 
@@ -91,6 +98,11 @@ async def touch_monolith(
 
     lobby = await active_lobby_for_group(db, group_id) if group_id is not None else None
     if lobby is None:
+        # Начинает сбор - значит, лидер, а ключ списывается у лидера. Без
+        # ключа сбор раньше начинался и разваливался только на старте
+        # (2026-10-22, баг-репорт).
+        if (character.raid_keys or 0) <= 0:
+            raise RaidError(NO_KEY_TO_LEAD)
         lobby = RaidLobby(
             group_id=group_id, raid_id=raid_id, leader_character_id=character.id, status="waiting",
         )
@@ -108,7 +120,9 @@ async def touch_monolith(
 
 async def cancel_readiness(db: AsyncSession, character_id: int) -> LobbySnapshot | None:
     """«Отменить готовность» — персонаж остаётся в лобби (счётчик
-    уменьшается), но не выходит из него совсем. None — не было в лобби."""
+    уменьшается), но не выходит из него совсем. None — не было в лобби.
+    Готовность сняли все - лобби пустое по сути: вызывающий распускает его
+    (no_one_ready), иначе «Готовы: 0/N» висело бы бесконечно (2026-10-22)."""
     membership = await get_membership(db, character_id)
     if membership is None:
         return None
@@ -141,7 +155,16 @@ async def leave_lobby_if_present(db: AsyncSession, character_id: int) -> LobbySn
             await db.flush()
         return None
     if lobby is not None and lobby.leader_character_id == character_id:
-        lobby.leader_character_id = min(remaining, key=lambda m: m.id).character_id
+        # Новый лидер - по возможности тот, у кого есть ключ: списывается он
+        # у лидера (2026-10-22). Нет ни у кого - первый по очереди, старт
+        # откажет и распустит лобби.
+        chars = {c.id: c for c in (await db.scalars(
+            select(Character).where(Character.id.in_([m.character_id for m in remaining]))
+        )).all()}
+        lobby.leader_character_id = min(
+            remaining,
+            key=lambda m: ((chars.get(m.character_id).raid_keys or 0) <= 0 if chars.get(m.character_id) else True, m.id),
+        ).character_id
         await db.flush()
     return await get_snapshot(db, lobby_id)
 
@@ -179,6 +202,10 @@ async def prune_absent_members(db: AsyncSession, lobby_id: int) -> LobbySnapshot
     for character_id in absent:
         await leave_lobby_if_present(db, character_id)
     return await get_snapshot(db, lobby_id)
+
+
+def no_one_ready(snapshot: LobbySnapshot) -> bool:
+    return snapshot.status == "waiting" and not any(ready for _, ready in snapshot.members)
 
 
 def is_ready_to_start(snapshot: LobbySnapshot) -> bool:

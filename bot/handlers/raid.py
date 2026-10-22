@@ -171,10 +171,36 @@ async def cancel_ready(message: Message) -> None:
         if character is None:
             return
         snapshot = await rs.cancel_readiness(db, character.id)
+        dissolved: dict[int, int] = {}
+        mounts: dict[int, bool] = {}
+        if snapshot is not None and rs.no_one_ready(snapshot):
+            # Готовность сняли все - сбор распускается (2026-10-22, баг-репорт:
+            # очередь висела с «Готовы: 0/N»).
+            dissolved = await _peer_ids_for(db, [c.id for c, _ in snapshot.members])
+            mounts = {cid: await mount_service.has_any_mount(db, cid) for cid in dissolved}
+            await rs.dissolve_lobby(db, snapshot.id)
+            _published.pop(snapshot.id, None)
+            snapshot = None
         await db.commit()
         if snapshot is None:
             has_mount = await mount_service.has_any_mount(db, character.id)
+    for cid, peer in dissolved.items():
+        if peer == message.peer_id:
+            continue
+        try:
+            await _bot_api.messages.send(
+                peer_id=peer, random_id=0, message=rt.LOBBY_DISSOLVED_TEXT,
+                keyboard=movement_keyboard(character.pos_x, character.pos_y, peer, has_mount=mounts.get(cid, False)),
+            )
+        except Exception:  # noqa: BLE001 - закрыл личку; сбор уже распущен
+            logger.warning("Raid lobby: не удалось сообщить о роспуске {}", peer)
     if snapshot is None:
+        if dissolved:
+            await message.answer(
+                rt.LOBBY_DISSOLVED_TEXT,
+                keyboard=movement_keyboard(character.pos_x, character.pos_y, message.peer_id, has_mount=has_mount),
+            )
+            return
         await message.answer(
             "Готовность снята.",
             keyboard=movement_keyboard(character.pos_x, character.pos_y, message.peer_id, has_mount=has_mount),

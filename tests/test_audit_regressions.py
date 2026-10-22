@@ -58,6 +58,7 @@ async def test_callback_abort_does_not_reopen_tick():
 
 async def test_ready_can_be_restored(db_session, make_character):
     player = await make_character()
+    player.raid_keys = 1  # начать сбор можно только с ключом (2026-10-22)
     original = await rs.touch_monolith(db_session, player, "puppet_theatre", None)
     await rs.cancel_readiness(db_session, player.id)
     restored = await rs.touch_monolith(db_session, player, "puppet_theatre", None)
@@ -67,6 +68,7 @@ async def test_ready_can_be_restored(db_session, make_character):
 
 async def test_lobby_transfers_leader_on_group_exit(db_session, make_character):
     gid, (a, b, c) = await _make_group(db_session, make_character, 3)
+    a.raid_keys = b.raid_keys = c.raid_keys = 1
     await rs.touch_monolith(db_session, a, "puppet_theatre", gid)
     await rs.touch_monolith(db_session, b, "puppet_theatre", gid)
     await gs.leave_group(db_session, a.id)

@@ -21,6 +21,17 @@ from game.economy import raid_config as rc
 from services import group_service as gs
 from services import raid_service as rs
 
+
+@pytest.fixture
+def make_character(make_character):
+    """Начать сбор можно только с ключом (2026-10-22) - у тестовых
+    персонажей по ключу, если тест не решил иначе."""
+    async def _make(*args, **kwargs):
+        character = await make_character(*args, **kwargs)
+        character.raid_keys = 1
+        return character
+    return _make
+
 AWAY = (41, -41)  # где на проде стоял Гостус, оставаясь в лобби
 
 
@@ -256,6 +267,7 @@ async def _waiting_lobby(factory, size: int = 2, touched: int = 1):
             character = Character(
                 user_id=user.id, name=f"Игрок{n}", base_class="warrior", level=60,
                 pos_x=rc.MONOLITH_COORDS[0], pos_y=rc.MONOLITH_COORDS[1], region="ridge",
+                raid_keys=1,
             )
             db.add(character)
             people.append(character)

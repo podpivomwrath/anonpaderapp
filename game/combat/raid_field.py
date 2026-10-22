@@ -193,21 +193,14 @@ class FieldObject:
 
 class SummonerAI:
     """Ход призывателя внутри резолва: слабый удар, раз в несколько ходов
-    проклятие по всем. Удар из открытой могилы тоже идёт отсюда - через
-    обычный расчёт удара, поэтому щиты, блок и лечение на цели работают."""
+    проклятие по всем. Открытая могила бьёт не отсюда, а из _tick_grave -
+    уроном механики, сразу при открытии (2026-10-22)."""
 
     def __init__(self) -> None:
         self.turn = 0
-        self.grave_strike_on: int | None = None
 
     def __call__(self, boss: CombatantState, session: CombatSessionState, rng: random.Random) -> list[PendingHit]:
         self.turn += 1
-        if self.grave_strike_on is not None:
-            victim = session.combatants.get(self.grave_strike_on)
-            self.grave_strike_on = None
-            if victim is not None and victim.alive:
-                return [compute_hit(boss, victim, rng, label="Чужая могила",
-                                    multiplier=fc.GRAVE_STRIKE_MULT, is_ability=True)]
         if self.turn % fc.SUMMONER_CURSE_EVERY == 0:
             hits = []
             for target in session.alive_enemies_of(boss):
@@ -442,8 +435,9 @@ class SummonerStage:
             if obj.turns_left <= 0:
                 _kill(grave)
                 obj.turns_left = -1
-                self.ai.grave_strike_on = victim.id
-                out.lines.append(f"⚠️ Могила открывается: {victim.name}. Следующий ход - удар в неё.")
+                # «Чужая могила»: сразу, без хода на защиту и мимо уворота.
+                out.lines.append(f"🪦 Могила открывается под ногами: {victim.name}. Чужая могила тянет к себе.")
+                stage_hurt(victim, round(victim.max_hp * fc.GRAVE_OPEN_HP_SHARE), out)
             else:
                 out.lines.append(f"🪦 Могила ждёт: {victim.name}. Ходов: {obj.turns_left}.")
 
@@ -533,16 +527,8 @@ _POSE = {
     CHALLENGE: "⚠️ Генерал указывает алебардой: {target}.",
     COUNT: "⚠️ Генерал опускает алебарду и начинает считать вслух.",
 }
-# Подсказка - только при первом показе стойки за заход. Дальше группа
-# читает позу сама: в этом и смысл этапа.
-_HINT = {
-    GUARD: "Кто ударит его в этот ход, получит свой удар обратно.",
-    LUNGE: "Следующий удар придётся в одного, и он будет тяжёлым.",
-    REAP: "Взмах заденет всех.",
-    IRON: "Простые удары отскочат от лат. Навыки найдут щели.",
-    CHALLENGE: f"{fc.CHALLENGE_TURNS} хода это поединок: ранить его сможет только вызванный.",
-    COUNT: "Если ударят больше чем {allowed}, он ответит каждому.",
-}
+# Подсказок к стойкам нет (2026-10-22, владелец): что значит поза, группа
+# запоминает сама. Раньше первая показанная стойка за заход объясняла себя.
 # Обманная стойка: показана одна, сделана другая. Выдаёт её одна
 # странная деталь - внимательный заметит.
 _FEINTS = {
@@ -606,7 +592,6 @@ class GeneralStage:
         self.ai = GeneralAI()
         self.leftover = leftover_objects
         self.ticks = 0
-        self.shown: set[str] = set()
         self.last_stance: str | None = None
         self.banner = False
         self.banner_turns = 0
@@ -749,6 +734,3 @@ class GeneralStage:
         if tell:
             line = f"{line} {tell.format(target=target.name)}"
         out.lines.append(line)
-        if shown not in self.shown:
-            self.shown.add(shown)
-            out.lines.append(_HINT[shown].format(allowed=self.count_allowed))

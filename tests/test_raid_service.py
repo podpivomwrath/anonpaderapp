@@ -7,6 +7,17 @@ from services import group_service as gs
 from services import raid_service as rs
 
 
+@pytest.fixture
+def make_character(make_character):
+    """Начать сбор можно только с ключом (2026-10-22) - у тестовых
+    персонажей по ключу, если тест не решил иначе."""
+    async def _make(*args, **kwargs):
+        character = await make_character(*args, **kwargs)
+        character.raid_keys = 1
+        return character
+    return _make
+
+
 async def _make_group(db_session, make_character, size: int = 2):
     """Возвращает (group_id, [leader, member2, ...])."""
     leader = await make_character(level=60)
@@ -129,7 +140,7 @@ async def test_group_dissolving_pulls_everyone_out_of_the_lobby(
 
 async def test_consume_key_and_start_requires_key(db_session, make_character) -> None:
     player = await make_character(level=60)
-    assert player.raid_keys == 0
+    player.raid_keys = 0
     ok = await rs.consume_key_and_start(db_session, player)
     assert ok is False
     assert player.raid_keys == 0
@@ -151,3 +162,40 @@ async def test_dissolve_lobby_removes_everything(db_session, make_character) -> 
     assert await rs.get_membership(db_session, leader.id) is None
     assert await rs.get_membership(db_session, member2.id) is None
     assert await rs.get_snapshot(db_session, snap.id) is None
+
+
+async def test_no_key_cannot_start_gathering(db_session, make_character) -> None:
+    """Лидер - тот, кто начал сбор, и ключ списывается у него (2026-10-22)."""
+    player = await make_character(level=60)
+    player.raid_keys = 0
+    player.pos_x, player.pos_y = rc.MONOLITH_COORDS
+    with pytest.raises(rs.RaidError):
+        await rs.touch_monolith(db_session, player, "graveless_field", None)
+
+
+async def test_member_without_key_can_join_a_keyed_leaders_gathering(db_session, make_character) -> None:
+    group_id, (leader, member2) = await _make_group(db_session, make_character, size=2)
+    member2.raid_keys = 0
+    await rs.touch_monolith(db_session, leader, "graveless_field", group_id)
+    snapshot = await rs.touch_monolith(db_session, member2, "graveless_field", group_id)
+    assert snapshot.leader_character_id == leader.id and len(snapshot.members) == 2
+
+
+async def test_everyone_cancelling_means_no_one_ready(db_session, make_character) -> None:
+    group_id, (leader, member2) = await _make_group(db_session, make_character, size=2)
+    await rs.touch_monolith(db_session, leader, "graveless_field", group_id)
+    await rs.touch_monolith(db_session, member2, "graveless_field", group_id)
+    snap = await rs.cancel_readiness(db_session, leader.id)
+    assert not rs.no_one_ready(snap)
+    snap = await rs.cancel_readiness(db_session, member2.id)
+    assert rs.no_one_ready(snap)
+
+
+async def test_leadership_passes_to_a_member_with_a_key(db_session, make_character) -> None:
+    group_id, (leader, member2, member3) = await _make_group(db_session, make_character, size=3)
+    member2.raid_keys = 0
+    await rs.touch_monolith(db_session, leader, "graveless_field", group_id)
+    await rs.touch_monolith(db_session, member2, "graveless_field", group_id)
+    await rs.touch_monolith(db_session, member3, "graveless_field", group_id)
+    snap = await rs.leave_lobby_if_present(db_session, leader.id)
+    assert snap.leader_character_id == member3.id
