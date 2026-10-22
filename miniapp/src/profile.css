@@ -884,29 +884,35 @@ body.lite .sparks {
   width: 112px;
   aspect-ratio: 420 / 560;
   pointer-events: none;
-  /* Снизу фигура растворяется в карточке: кадр обрезан по поясу. */
-  -webkit-mask-image: linear-gradient(180deg, #000 70%, transparent 100%);
-  mask-image: linear-gradient(180deg, #000 70%, transparent 100%);
-  transition: filter 0.4s ease;
+  /* Фигура растворяется в карточке снизу (кадр обрезан по поясу) и справа:
+     генератор упёр плечо в край кадра, и без растворения в карточке был
+     виден ровный срез (2026-10-22). */
+  -webkit-mask-image:
+    linear-gradient(180deg, #000 68%, transparent 100%),
+    linear-gradient(90deg, #000 70%, transparent 100%);
+  -webkit-mask-composite: source-in;
+  mask-image:
+    linear-gradient(180deg, #000 68%, transparent 100%),
+    linear-gradient(90deg, #000 70%, transparent 100%);
+  mask-composite: intersect;
   animation: narrator-in 0.45s var(--ease-out, ease-out) backwards;
 }
 
-.narrator--speaking {
-  filter: drop-shadow(0 0 10px rgba(255, 140, 60, 0.35));
-}
-
+/* Основной кадр лежит снизу всегда, рот и моргание - поверх и меняются
+   мгновенно. Раньше кадры перетекали через прозрачность: в середине оба
+   полупрозрачны, фигура тускнела - «мерцает» (2026-10-22). */
 .narrator__frame {
   position: absolute;
   inset: 0;
   width: 100%;
   height: 100%;
   object-fit: contain;
-  opacity: 0;
-  transition: opacity 0.06s linear;
+  visibility: hidden;
 }
 
+.narrator__frame--base,
 .narrator__frame--on {
-  opacity: 1;
+  visibility: visible;
 }
 
 @keyframes narrator-in {

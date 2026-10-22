@@ -7,12 +7,14 @@ tools/narrator_art_prompts.md): 1 - рот закрыт, 2 - приоткрыт,
 4 - моргает. Что делает:
   1. из кадров 2-4 берёт только лицо и кладёт на кадр 1 с мягким краем:
      правка картинки генератором шевелит шум по всему кадру, и при смене
-     кадров плащ и руки мелко дрожали бы;
+     кадров плащ и руки мелко дрожали бы; тон лица подгоняет под кадр 1;
   2. вырезает чёрный фон - одна маска на позу, по кадру 1 (у всех кадров
-     позы один контур), тем же приёмом, что силуэты героя;
+     позы один контур): фигура непрозрачна, тёплый ореол вокруг -
+     полупрозрачен по своей яркости, без рваного края;
   3. отражает зеркально: на картинках он смотрит и показывает влево, а в
      мини-аппе стоит слева от текста подсказки и должен смотреть на него;
-  4. пишет webp в miniapp/src/assets/narrator/<поза>_<кадр>.webp.
+  4. пишет webp в miniapp/src/assets/narrator/<поза>_<кадр>.webp; в кадрах
+     2-4 только овал лица - мини-апп кладёт их поверх кадра 1.
 
 Оригиналы в git не идут (по 2.3 МБ).
 """
@@ -20,7 +22,7 @@ tools/narrator_art_prompts.md): 1 - рот закрыт, 2 - приоткрыт,
 import sys
 from pathlib import Path
 
-from PIL import Image, ImageChops, ImageDraw, ImageFilter, ImageOps
+from PIL import Image, ImageChops, ImageDraw, ImageFilter, ImageMath, ImageOps, ImageStat
 
 ROOT = Path(__file__).resolve().parent.parent
 SRC = ROOT / "img"
@@ -31,6 +33,9 @@ WIDTH = 420
 QUALITY = 84
 BG_LEVEL = 12
 CLOSE = 9
+#: Свечение вокруг фигуры (тёплый ореол на чёрном) - полупрозрачное по своей
+#: яркости: при такой яркости и выше оно уже непрозрачное.
+GLOW_FULL = 70
 
 
 def background_mask(img: Image.Image) -> Image.Image:
@@ -75,16 +80,50 @@ def face_mask(base: Image.Image, frames: list[Image.Image]) -> Image.Image:
     return mask.filter(ImageFilter.GaussianBlur(18))
 
 
+def match_tone(frame: Image.Image, base: Image.Image, mask: Image.Image) -> Image.Image:
+    """Тон лица кадра - как у основного: правка генератором чуть сдвигает
+    цвет, и при смене кадров лицо вспыхивало (2026-10-22, «мерцает»)."""
+    a = ImageStat.Stat(frame, mask).mean
+    b = ImageStat.Stat(base, mask).mean
+    bands = [band.point(lambda v, d=b[i] - a[i]: max(0, min(255, round(v + d))))
+             for i, band in enumerate(frame.split())]
+    return Image.merge("RGB", bands)
+
+
+def soft_alpha(img: Image.Image) -> Image.Image:
+    """Прозрачность: фигура целиком непрозрачна, а свечение вокруг -
+    полупрозрачно по своей яркости. Раньше резали по порогу, и ореол
+    обрывался рваным краем (2026-10-22, «свечение плохо вырезано»)."""
+    hard = Image.eval(background_mask(img), lambda v: 255 - v).filter(ImageFilter.GaussianBlur(1.2))
+    glow = img.convert("L").point(lambda v: min(255, round(v * 255 / GLOW_FULL)))
+    return ImageChops.lighter(hard, glow)
+
+
+def unpremultiply(img: Image.Image, alpha: Image.Image) -> Image.Image:
+    """Фон был чёрным, значит цвет полупрозрачного ореола на картинке уже
+    затемнён на его прозрачность - возвращаем настоящий цвет, иначе ореол
+    поверх карточки выйдет грязно-тёмным."""
+    bands = []
+    for band in img.split():
+        out = ImageMath.lambda_eval(
+            lambda a: a["c"] * 255 / (a["a"] + (a["a"] == 0)), c=band, a=alpha,
+        )
+        bands.append(out.convert("L"))  # из целых в 0-255: лишнее срезается
+    return Image.merge("RGB", bands)
+
+
 def process_pose(pose: int) -> None:
     frames = [Image.open(SRC / f"рассказчик_{pose}_{k}.png").convert("RGB") for k in (1, 2, 3, 4)]
     base = frames[0]
     mask = face_mask(base, frames[1:])
-    alpha = Image.eval(background_mask(base), lambda v: 255 - v).filter(ImageFilter.GaussianBlur(1.2))
+    alpha = soft_alpha(base)
     height = round(WIDTH * base.height / base.width)
     for k, frame in enumerate(frames, start=1):
-        merged = base if k == 1 else Image.composite(frame, base, mask)
-        rgba = merged.convert("RGBA")
-        rgba.putalpha(alpha)
+        merged = base if k == 1 else Image.composite(match_tone(frame, base, mask), base, mask)
+        rgba = unpremultiply(merged, alpha).convert("RGBA")
+        # Кадры 2-4 в мини-аппе лежат ПОВЕРХ кадра 1 - в них только лицо, иначе
+        # полупрозрачный ореол сложился бы дважды и пульсировал при смене кадров.
+        rgba.putalpha(alpha if k == 1 else ImageChops.multiply(alpha, mask))
         out = ImageOps.mirror(rgba).resize((WIDTH, height), Image.LANCZOS)
         target = OUT / f"{pose}_{k}.webp"
         out.save(target, "WEBP", quality=QUALITY, method=6)

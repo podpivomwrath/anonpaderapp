@@ -9,8 +9,8 @@ import { onVoice } from '../voice.js';
  * 2 - показывает рукой, 3 - усмехается.
  *
  * Пока звучит фраза этого шага, рот открывается в такт громкости записи;
- * раз в несколько секунд он моргает. Все четыре кадра лежат стопкой, виден
- * один - смена без мигания и без догрузки.
+ * раз в несколько секунд он моргает. Кадры лежат стопкой: основной снизу
+ * всегда, рот или моргание поверх - смена без мигания и без догрузки.
  */
 const FILES = import.meta.glob('../assets/narrator/*.webp', { eager: true, query: '?url', import: 'default' });
 const FRAME = Object.fromEntries(
@@ -19,17 +19,15 @@ const FRAME = Object.fromEntries(
 const REDUCED = typeof window !== 'undefined'
   && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
 
-/** Кадр рта по громкости: тишина - закрыт, тихо - приоткрыт, громко - открыт. */
-function mouthFrom(analyser, buffer) {
+/** Громкость фразы сейчас, 0..~0.3. */
+function loudness(analyser, buffer) {
   analyser.getByteTimeDomainData(buffer);
   let sum = 0;
   for (let i = 0; i < buffer.length; i += 1) {
     const v = (buffer[i] - 128) / 128;
     sum += v * v;
   }
-  const rms = Math.sqrt(sum / buffer.length);
-  if (rms < 0.03) return 1;
-  return rms < 0.09 ? 2 : 3;
+  return Math.sqrt(sum / buffer.length);
 }
 
 export default function Narrator({ voice, pose = 1 }) {
@@ -44,19 +42,32 @@ export default function Narrator({ voice, pose = 1 }) {
     let raf = 0;
     let last = 0;
     let blinkUntil = 0;
+    let level = 0;
+    let mouth = 1;
+    let fallback = 0;
     const buffer = speaking?.analyser ? new Uint8Array(speaking.analyser.fftSize) : null;
-    blinkAt.current = performance.now() + 1500 + Math.random() * 2500;
+    blinkAt.current = performance.now() + 2000 + Math.random() * 3000;
     const tick = (now) => {
       raf = requestAnimationFrame(tick);
-      if (now - last < 85) return;  // ~12 кадров в секунду: чаще губы мельтешат
+      // ~8 смен в секунду: чаще губы мельтешат.
+      if (now - last < 120) return;
       last = now;
       if (now > blinkAt.current) {
-        blinkUntil = now + 140;
-        blinkAt.current = now + 2800 + Math.random() * 3200;
+        blinkUntil = now + 150;
+        blinkAt.current = now + 4000 + Math.random() * 3000;
       }
-      let mouth = 1;
-      if (speaking) {
-        mouth = buffer ? mouthFrom(speaking.analyser, buffer) : 1 + Math.floor(Math.random() * 3);
+      if (speaking && buffer) {
+        // Громкость сглажена, а рот переходит на соседний кадр, только когда
+        // она уверенно ушла за порог: иначе он дёргался на каждом шорохе.
+        level = level * 0.55 + loudness(speaking.analyser, buffer) * 0.45;
+        const want = level < 0.025 ? 1 : level < 0.075 ? 2 : 3;
+        if (Math.abs(want - mouth) >= 1) mouth += Math.sign(want - mouth);
+      } else if (speaking) {
+        // Без анализатора: спокойное «открыл - прикрыл», не наугад.
+        fallback = (fallback + 1) % 4;
+        mouth = [2, 3, 2, 1][fallback];
+      } else {
+        mouth = 1;
       }
       // Моргает, только когда рот закрыт: открытый рот с закрытыми глазами
       // в кадрах не нарисован.
@@ -68,11 +79,12 @@ export default function Narrator({ voice, pose = 1 }) {
 
   if (!FRAME[`${pose}_1`]) return null;
   return (
-    <div className={speaking ? 'narrator narrator--speaking' : 'narrator'} aria-hidden="true">
+    <div className="narrator" aria-hidden="true">
       {[1, 2, 3, 4].map((k) => (
         <img
           key={k} src={FRAME[`${pose}_${k}`]} alt="" draggable="false"
-          className={k === frame ? 'narrator__frame narrator__frame--on' : 'narrator__frame'}
+          className={k === 1 ? 'narrator__frame narrator__frame--base'
+            : k === frame ? 'narrator__frame narrator__frame--on' : 'narrator__frame'}
         />
       ))}
     </div>
