@@ -204,7 +204,7 @@ function Settings({ character, onCharacterUpdate }) {
   );
 }
 
-function GenderChoice({ character, onPick, busy }) {
+export function GenderChoice({ character, onPick, busy }) {
   return (
     <Group>
       <div className="gender-choice">
@@ -222,6 +222,32 @@ function GenderChoice({ character, onPick, busy }) {
         </div>
       </div>
     </Group>
+  );
+}
+
+// Выбор облика поверх всего при первом входе (2026-10-22): раньше он
+// появлялся только во вкладке «Герой», и тур с подсказками в это время
+// подсвечивал окна слотов, которых ещё не было на экране.
+export function GenderGate({ character, onCharacterUpdate }) {
+  const [busy, setBusy] = useState(false);
+  async function pick(next) {
+    setBusy(true);
+    try {
+      const res = await setGender(next);
+      onCharacterUpdate((prev) => ({ ...prev, gender: res.gender }));
+    } catch (err) {
+      // Уже выбран (с другого устройства) - сервер вернул какой.
+      if (err?.details?.gender) onCharacterUpdate((prev) => ({ ...prev, gender: err.details.gender }));
+    } finally {
+      setBusy(false);
+    }
+  }
+  return (
+    <div className="gender-gate" role="dialog" aria-label="Выбери облик">
+      <div className="gender-gate__card">
+        <GenderChoice character={character} onPick={pick} busy={busy} />
+      </div>
+    </div>
   );
 }
 
@@ -246,6 +272,10 @@ export default function HeroTab({ character, onCharacterUpdate }) {
   const [flashes, setFlashes] = useState({});
   const [gender, setGenderState] = useState(character.gender || null);
   const [choosing, setChoosing] = useState(false);
+  // Облик могли выбрать на экране выбора при входе (GenderGate) - подхватить.
+  useEffect(() => {
+    if (character.gender) setGenderState(character.gender);
+  }, [character.gender]);
 
   useEffect(() => {
     getInventory().then((res) => setItems(res.items)).catch(() => setFailed(true));

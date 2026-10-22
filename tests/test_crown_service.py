@@ -334,7 +334,7 @@ async def test_all_bonuses_work_regardless_of_the_worn_frame(db_session, make_ch
     crown_service.set_frame(player, leaderboard_service.BOARD_MINING)
 
     assert crown_service.craft_ore_multiplier(player) == 1 - cc.CRAFT_ORE_CUT
-    assert crown_service.mining_multiplier(player) == 1 - cc.MINING_CUT
+    assert crown_service.mining_double_chance(player) == cc.MINING_DOUBLE_CHANCE
 
 
 async def test_menu_describes_every_held_crown(db_session, make_character) -> None:
@@ -379,3 +379,27 @@ def test_arrival_is_scheduled_by_the_actual_travel_time() -> None:
         assert "CELL_TRAVEL_SECONDS" not in argument, (
             f"планировщик берёт константу мимо movement_service: {argument}"
         )
+
+
+async def test_mining_crown_doubles_ore_not_from_the_vein(db_session, make_character) -> None:
+    """Венец «Жила» (2026-10-22): шанс второго куска; из жилы - всё равно один."""
+    import random
+
+    from services import mining_service
+
+    player = await make_character(level=10)
+    player.crowns = {"mining": "2026-09-01T00:00:00+00:00"}
+    await db_session.flush()
+    assert crown_service.mining_double_chance(player) == cc.MINING_DOUBLE_CHANCE
+
+    class Lucky(random.Random):
+        def random(self):  # каждый бросок шанса проходит
+            return 0.0
+
+    player.mining_ends_at = __import__("datetime").datetime.now(__import__("datetime").timezone.utc)
+    player.mining_mine_id = None  # мелкая жила события - без общей жилы рудника
+    player.pos_x, player.pos_y = 10, 10
+    result = await mining_service.finish_dig(db_session, player, Lucky(1))
+    assert result is not None and result.count == 2
+    stock = {(d.id, g): n for d, g, n in await mining_service.get_ore(db_session, player.id)}
+    assert stock[(result.ore.id, result.grade_id)] == 2

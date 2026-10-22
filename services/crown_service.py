@@ -149,9 +149,10 @@ def travel_multiplier(character: Character) -> float:
     return 1.0 - cc.TRAVEL_CUT if has_crown(character, board) else 1.0
 
 
-def mining_multiplier(character: Character) -> float:
+def mining_double_chance(character: Character) -> float:
+    """Венец «Жила»: шанс второго куска руды за добычу (2026-10-22)."""
     board = leaderboard_service.BOARD_MINING
-    return 1.0 - cc.MINING_CUT if has_crown(character, board) else 1.0
+    return cc.MINING_DOUBLE_CHANCE if has_crown(character, board) else 0.0
 
 
 def _set(character: Character, crowns: dict[str, str]) -> None:

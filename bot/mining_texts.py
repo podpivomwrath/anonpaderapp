@@ -111,7 +111,8 @@ def dig_result_text(result, character=None) -> str:
     emoji = mc.GRADE_EMOJI.get(result.grade_id, "")
     mark = f"{emoji} " if emoji else ""
     lines = [
-        f"{mark}{result.ore.emoji} {result.ore.name} ({result.grade_label})",
+        f"{mark}{result.ore.emoji} {result.ore.name} ({result.grade_label})"
+        + (f" ×{result.count} - венец «Жила»" if result.count > 1 else ""),
         f"⛏ +{result.xp} опыта горного дела",
     ]
     if result.levels_gained:

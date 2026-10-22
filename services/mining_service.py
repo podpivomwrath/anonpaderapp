@@ -230,6 +230,8 @@ class DigResult:
     xp: int
     levels_gained: int
     new_level: int
+    #: Сколько кусков пришло: 2 - сработал венец «Жила».
+    count: int = 1
 
 
 async def start_dig(
@@ -269,7 +271,6 @@ async def start_dig(
     seed = hashlib.sha256(f"{character.id}:{place}:{digs}".encode()).digest()
     roll_rng = random.Random(int.from_bytes(seed[:8], "big"))
     seconds = mining.roll_dig_seconds(roll_rng, tier, character.mining_level, event_vein)
-    seconds *= crown_service.mining_multiplier(character)  # венец «Жила», патч 91
     from services import guild_service
 
     seconds *= 1 - guild_service.perk(character, "mining_speed_pct") / 100
@@ -302,7 +303,11 @@ async def finish_dig(
 
     ore_id = mining.roll_ore_id(rng, tier, event_vein, character.mining_level)
     grade_id, grade_label = mining.roll_grade(rng, tier, character.mining_level, event_vein)
-    await add_ore(db, character.id, ore_id, grade_id, 1)
+    # Венец «Жила» (2026-10-22): шанс второго куска той же руды. Из жилы
+    # рудника ушёл один кусок ещё при старте - второй сверху, не из жилы.
+    chance = crown_service.mining_double_chance(character)
+    count = 2 if chance and rng.random() < chance else 1
+    await add_ore(db, character.id, ore_id, grade_id, count)
     db.add(MiningEvent(
         kind="dig", mine_id=character.mining_mine_id, character_id=character.id,
         ore_id=ore_id, grade=grade_id,
@@ -321,7 +326,7 @@ async def finish_dig(
 
     return DigResult(
         ore=mining.ore_def(ore_id), grade_id=grade_id, grade_label=grade_label,
-        xp=xp, levels_gained=levels, new_level=level,
+        xp=xp, levels_gained=levels, new_level=level, count=count,
     )
 
 

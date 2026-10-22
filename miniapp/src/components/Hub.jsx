@@ -9,6 +9,7 @@ import NewPlayer from './NewPlayer.jsx';
 import TabHint from './TabHint.jsx';
 import { TAB_HINTS } from './tabHints.js';
 import Tour from './Tour.jsx';
+import { GenderGate } from './HeroTab.jsx';
 import Spotlight from './Spotlight.jsx';
 import { guideSteps } from './guide.js';
 import { playTab, preloadTab, setSoundEnabled, unlock } from '../sound.js';
@@ -270,9 +271,12 @@ export default function Hub() {
   };
 
   const showIntro = Boolean(ui) && (ui.intro || 0) < INTRO_VERSION;
-  const showTour = Boolean(ui) && !showIntro && !ui.tour;
+  // Облик (пол) выбирают сразу после вступления, до тура и подсказок
+  // (2026-10-22): иначе подсказки «Героя» показывали на пустой экран выбора.
+  const showGender = Boolean(ui) && !showIntro && Boolean(character) && !character.gender;
+  const showTour = Boolean(ui) && !showIntro && !showGender && !ui.tour;
   const firstVisit = TAB_HINTS[activeTab] && !(ui?.hints || []).includes(activeTab);
-  const showHint = Boolean(ui) && !showIntro && !showTour && !guide && !quickHelp && firstVisit;
+  const showHint = Boolean(ui) && !showIntro && !showGender && !showTour && !guide && !quickHelp && firstVisit;
   const finishIntro = (withSound) => {
     unlock();
     setSoundEnabled(withSound);
@@ -646,6 +650,7 @@ export default function Hub() {
       </div>
 
       {showIntro && <IntroScene onDone={finishIntro} />}
+      {showGender && <GenderGate character={character} onCharacterUpdate={setCharacter} />}
       {showTour && <Tour onDone={finishTour} />}
       {showHint && (
         <TabHint

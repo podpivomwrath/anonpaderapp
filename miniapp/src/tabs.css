@@ -2327,3 +2327,26 @@ body.lite .shop-showcase::after { animation: none; display: none; }
   flex-direction: column;
   gap: 8px;
 }
+
+/* Выбор облика при первом входе - поверх всего, до тура и подсказок. */
+.gender-gate {
+  position: fixed;
+  inset: 0;
+  z-index: 300;
+  display: grid;
+  place-items: center;
+  padding: 16px;
+  background: radial-gradient(circle at 50% 40%, rgba(40, 14, 16, 0.92), rgba(6, 6, 8, 0.97));
+  animation: scrim-in 0.3s ease-out backwards;
+  overflow-y: auto;
+}
+
+.gender-gate__card {
+  width: 100%;
+  max-width: 440px;
+  border-radius: 18px;
+  border: 1px solid rgba(200, 30, 58, 0.35);
+  background: rgba(20, 18, 22, 0.96);
+  box-shadow: 0 20px 60px -20px rgba(0, 0, 0, 0.9);
+  animation: result-in 0.5s var(--spring, ease-out) backwards;
+}
