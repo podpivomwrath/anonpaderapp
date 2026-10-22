@@ -44,11 +44,40 @@ async def spawn(
     cell = herbalism.roll_cell(rng, {(x, y) for x, y in rows} | {explorer_cell})
     if cell is None:
         return None
-    herb = herbalism.roll_herb(rng, *cell)
+    herb = herbalism.roll_herb(rng, await herbalists_level(db, now))
     patch = HerbPatch(x=cell[0], y=cell[1], herb_id=herb.id, spawned_at=now)
     db.add(patch)
     await db.flush()
     return patch
+
+
+async def herbalists_level(db: AsyncSession, now: datetime | None = None) -> float:
+    """Средний уровень травников в сети (2026-10-22): от него - тир новой
+    травы. Травник - кто уже рвал траву (уровень выше 1 или есть опыт).
+    Никого в сети - средний за сутки, никого и за сутки - 1."""
+    now = now or _now()
+    for minutes in (hc.ONLINE_MINUTES, 24 * 60):
+        levels = list(await db.scalars(select(Character.herbalism_level).where(
+            Character.creation_state.is_(None),
+            Character.last_active_at >= now - timedelta(minutes=minutes),
+            (Character.herbalism_level > 1) | (Character.herbalism_xp > 0),
+        )))
+        if levels:
+            return sum(levels) / len(levels)
+    return 1.0
+
+
+async def regrow_all(db: AsyncSession, rng: random.Random, now: datetime | None = None) -> int:
+    """Перерастить всю траву на карте под нынешних травников: клетки и
+    время остаются, вид травы выбирается заново (2026-10-22, разово после
+    смены правила)."""
+    now = now or _now()
+    level = await herbalists_level(db, now)
+    patches = list(await db.scalars(select(HerbPatch).where(HerbPatch.spawned_at >= _fresh_since(now))))
+    for patch in patches:
+        patch.herb_id = herbalism.roll_herb(rng, level).id
+    await db.flush()
+    return len(patches)
 
 
 async def visible_here(db: AsyncSession, character: Character, now: datetime | None = None) -> tuple[HerbPatch, HerbDef] | None:

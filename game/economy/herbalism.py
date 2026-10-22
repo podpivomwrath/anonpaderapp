@@ -33,12 +33,28 @@ def can_see(level: int, herb: HerbDef) -> bool:
     return level >= required_level(herb)
 
 
-def roll_herb(rng: random.Random, x: int, y: int) -> HerbDef:
-    """Тир - от кольца клетки с перекосом, вид внутри тира - поровну."""
-    ring = grid.ring_tier(x, y)
-    tiers = sorted(hc.TIER_LEVEL)
-    weights = [hc.RING_TIER_WEIGHT if t == ring else 1 for t in tiers]
-    tier = rng.choices(tiers, weights=weights)[0]
+def visible_tier(level: float) -> int:
+    """Старший тир, который различает травник этого уровня."""
+    return max(t for t, need in hc.TIER_LEVEL.items() if level >= need) if level >= 1 else 1
+
+
+def tier_weights(main: int) -> dict[int, int]:
+    """Веса тиров при главном тире main (см. herbal_config, 2026-10-22)."""
+    out = {}
+    for t in sorted(hc.TIER_LEVEL):
+        if t == main:
+            out[t] = hc.TIER_WEIGHT_MAIN
+        elif t < main:
+            out[t] = hc.TIER_WEIGHT_LOWER
+        elif t == main + 1:
+            out[t] = hc.TIER_WEIGHT_NEXT
+    return out
+
+
+def roll_herb(rng: random.Random, avg_level: float) -> HerbDef:
+    """Тир - по среднему уровню травников в сети, вид внутри тира - поровну."""
+    weights = tier_weights(visible_tier(avg_level))
+    tier = rng.choices(list(weights), weights=list(weights.values()))[0]
     return rng.choice([h for h in herb_defs_ordered() if h.tier == tier])
 
 

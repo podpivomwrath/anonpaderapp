@@ -35,12 +35,36 @@ def test_catalog_two_herbs_per_tier_and_no_yo() -> None:
     assert not any("ё" in (h.name + h.description).lower() for h in herbalism.herb_defs_ordered())
 
 
-def test_ring_tier_is_favoured_but_not_exclusive() -> None:
+def test_tier_follows_the_herbalists_level() -> None:
+    """2026-10-22: тир травы - по среднему уровню травников в сети. Новички
+    видят почти только свою траву, выше следующего тира не растёт."""
     rng = random.Random(1)
-    x, y = 0, 29  # внешнее кольцо
-    tiers = Counter(herbalism.roll_herb(rng, x, y).tier for _ in range(4000))
-    ring = grid.ring_tier(x, y)
-    assert tiers[ring] > 1500 and all(tiers[t] > 200 for t in hc.TIER_LEVEL)
+    low = Counter(herbalism.roll_herb(rng, 2).tier for _ in range(4000))
+    assert set(low) == {1, 2} and low[1] > 3000
+    mid = Counter(herbalism.roll_herb(rng, 25).tier for _ in range(4000))
+    assert set(mid) == {1, 2, 3, 4} and mid[3] == max(mid.values())
+    top = Counter(herbalism.roll_herb(rng, 50).tier for _ in range(4000))
+    assert top[5] == max(top.values()) and set(top) == {1, 2, 3, 4, 5}
+
+
+async def test_herbalists_level_counts_only_active_herbalists(db_session, character_at) -> None:
+    a = await character_at(1, 1)
+    b = await character_at(2, 2)
+    c = await character_at(3, 3)
+    a.last_active_at = b.last_active_at = c.last_active_at = NOW
+    a.herbalism_level, b.herbalism_level = 1, 21
+    a.herbalism_xp = 5            # рвал траву, но ещё 1 уровень
+    c.herbalism_level, c.herbalism_xp = 1, 0  # не травник - не в счёт
+    await db_session.flush()
+    assert await herb_service.herbalists_level(db_session, NOW) == 11
+
+
+async def test_regrow_rerolls_existing_patches(db_session, character_at) -> None:
+    patch = await _plant(db_session, 5, 20)
+    patch.herb_id = next(h.id for h in herbalism.herb_defs_ordered() if h.tier == 5)
+    await db_session.flush()
+    assert await herb_service.regrow_all(db_session, random.Random(3), NOW) == 1
+    assert herbalism.herb_def(patch.herb_id).tier <= 2  # травников нет - уровень 1
 
 
 def test_xp_curve_and_cap() -> None:
