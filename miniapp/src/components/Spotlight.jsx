@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { hasVoice, playVoice, stopVoice } from '../voice.js';
 
 /**
  * Подсветка по шагам: экран затемнён, нужный элемент - в светлой рамке,
@@ -9,6 +10,9 @@ import { useEffect, useState } from 'react';
  *   'h:Надето'      - блок раздела, чей заголовок начинается с «Надето»;
  *   '.map-controls' - любой CSS-селектор;
  *   null            - карточка по центру, без подсветки.
+ *
+ * voice - ключ файла озвучки (voice.js): фраза звучит, когда карточка шага
+ * показана, и обрывается при переходе дальше или закрытии.
  *
  * Раздел грузит данные после открытия, поэтому цель ждём до WAIT_MS. Не
  * дождались - шаг показывается по центру: текст всё равно полезен.
@@ -136,6 +140,12 @@ export default function Spotlight({ steps, onDone, label, onNavigate }) {
     };
   }, [current.target, step]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Озвучка шага - когда карточка уже видна, а не пока ищется цель.
+  useEffect(() => {
+    if (!searching && current.voice) playVoice(current.voice);
+    return () => stopVoice();
+  }, [searching, step, current.voice]);
+
   const next = () => (step + 1 >= steps.length ? onDone() : setStep(step + 1));
   // Гайд раздела: «Вкладка ›» - сразу к следующей вкладке раздела.
   const subKey = (s) => String([].concat(s.sub || '')[0]);
@@ -157,7 +167,20 @@ export default function Spotlight({ steps, onDone, label, onNavigate }) {
         : <div className="tour__dim" />}
       {!searching && (
         <div key={step} className="tour__card" style={cardStyle}>
-          <p className="tour__title">{current.title}</p>
+          <p className="tour__title">
+            {current.title}
+            {hasVoice(current.voice) && (
+              <button
+                type="button" className="tour__voice" aria-label="Послушать ещё раз"
+                onClick={() => playVoice(current.voice, { force: true })}
+              >
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                  strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <path d="M4 9v6h4l5 4V5L8 9z" /><path d="M16.5 8.5a5 5 0 0 1 0 7M19 6a8.5 8.5 0 0 1 0 12" />
+                </svg>
+              </button>
+            )}
+          </p>
           <p className="tour__text">{current.text}</p>
           <div className="tour__row">
             <span className="tour__count">

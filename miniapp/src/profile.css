@@ -850,3 +850,36 @@ body.lite .sparks {
 .gender-choice__card:active {
   transform: scale(0.96);
 }
+
+/* Озвучка подсказки: «послушать ещё раз» рядом с заголовком шага. */
+.tour__title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.tour__voice {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  margin-left: auto;
+  padding: 0;
+  border: 1px solid rgba(240, 201, 168, 0.25);
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.25);
+  color: #f0c9a8;
+  cursor: pointer;
+  transition: transform 0.22s var(--spring), filter 0.2s ease;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .tour__voice:hover {
+    transform: scale(1.1);
+    filter: brightness(1.25);
+  }
+}
+
+.tour__voice:active {
+  transform: scale(0.92);
+}
