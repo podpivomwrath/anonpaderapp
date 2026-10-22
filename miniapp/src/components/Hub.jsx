@@ -141,6 +141,9 @@ export default function Hub() {
   // «?» в шапке - полный гайд: сам ходит по разделам, подсвечивает и
   // объясняет. {from, steps}; по окончании - обратно в раздел, откуда начали.
   const [guide, setGuide] = useState(null);
+  // «?» (2026-10-22): сначала короткие озвученные подсказки раздела, из них
+  // «Подробнее» ведёт в полный гайд без озвучки.
+  const [quickHelp, setQuickHelp] = useState(null);
 
   // Раздел въезжает с той стороны, где он стоит в меню: ниже по списку -
   // справа, выше - слева. Так переход читается как движение по меню.
@@ -263,7 +266,7 @@ export default function Hub() {
   const showIntro = Boolean(ui) && (ui.intro || 0) < INTRO_VERSION;
   const showTour = Boolean(ui) && !showIntro && !ui.tour;
   const firstVisit = TAB_HINTS[activeTab] && !(ui?.hints || []).includes(activeTab);
-  const showHint = Boolean(ui) && !showIntro && !showTour && !guide && firstVisit;
+  const showHint = Boolean(ui) && !showIntro && !showTour && !guide && !quickHelp && firstVisit;
   const finishIntro = (withSound) => {
     unlock();
     setSoundEnabled(withSound);
@@ -300,6 +303,7 @@ export default function Hub() {
   };
   const startGuide = () => {
     if (menuOpen) closeMenu();
+    setQuickHelp(null);
     setGuide({
       from: activeRef.current,
       started: Date.now(),
@@ -308,6 +312,20 @@ export default function Hub() {
         return steps.length ? steps : [{ target: null, title: 'Гайд', text: 'Для этого раздела гайда пока нет.' }];
       })(),
     });
+  };
+  const startHelp = () => {
+    if (menuOpen) closeMenu();
+    const tab = activeRef.current;
+    if (!TAB_HINTS[tab]) {
+      startGuide();
+      return;
+    }
+    setQuickHelp({ tab, started: Date.now() });
+  };
+  const endHelp = () => {
+    const tab = quickHelp?.tab;
+    setQuickHelp(null);
+    if (tab && !(ui?.hints || []).includes(tab)) hintSeen(tab);
   };
   const endGuide = () => {
     const from = guide?.from;
@@ -345,7 +363,7 @@ export default function Hub() {
         </PanelHeaderButton>
         {/* На узком экране правый угол шапки закрыт кнопками ВК - «?» здесь. */}
         <span className="help-btn help-btn--inline" data-tour="help">
-          <PanelHeaderButton aria-label="Гайд по мини-аппу" title="Гайд по мини-аппу" onClick={() => startGuide()}>
+          <PanelHeaderButton aria-label="Гайд по мини-аппу" title="Гайд по мини-аппу" onClick={() => startHelp()}>
             <NavIcon id="help" className="hub-icon" />
           </PanelHeaderButton>
         </span>
@@ -371,7 +389,7 @@ export default function Hub() {
       </span>
       {/* «?» в правом углу на высоте «Монолита» - где угол свободен. */}
       <span className="help-btn help-btn--corner" data-tour="help">
-        <PanelHeaderButton aria-label="Гайд по мини-аппу" title="Гайд по мини-аппу" onClick={() => startGuide()}>
+        <PanelHeaderButton aria-label="Гайд по мини-аппу" title="Гайд по мини-аппу" onClick={() => startHelp()}>
           <NavIcon id="help" className="hub-icon" />
         </PanelHeaderButton>
       </span>
@@ -621,7 +639,21 @@ export default function Hub() {
 
       {showIntro && <IntroScene onDone={finishIntro} />}
       {showTour && <Tour onDone={finishTour} />}
-      {showHint && <TabHint tab={activeTab} onClose={() => hintSeen(activeTab)} />}
+      {showHint && (
+        <TabHint
+          tab={activeTab}
+          onClose={() => hintSeen(activeTab)}
+          onMore={() => { hintSeen(activeTab); startGuide(); }}
+        />
+      )}
+      {quickHelp && (
+        <TabHint
+          key={quickHelp.started}
+          tab={quickHelp.tab}
+          onClose={endHelp}
+          onMore={() => { endHelp(); startGuide(); }}
+        />
+      )}
       {guide && (
         <Spotlight
           key={guide.started}

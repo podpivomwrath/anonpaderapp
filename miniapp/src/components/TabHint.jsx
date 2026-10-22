@@ -11,8 +11,8 @@ import { TAB_HINTS } from './tabHints.js';
  * селектор - любой элемент, null - карточка по центру.
  */
 
-export default function TabHint({ tab, before = [], onClose }) {
+export default function TabHint({ tab, before = [], onClose, onMore }) {
   const steps = [...before, ...(TAB_HINTS[tab] || [])];
   if (!steps.length) return null;
-  return <Spotlight key={tab} steps={steps} onDone={onClose} label="Подсказки раздела" />;
+  return <Spotlight key={tab} steps={steps} onDone={onClose} onMore={onMore} label="Подсказки раздела" />;
 }

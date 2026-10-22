@@ -55,7 +55,9 @@ function frameOf(el) {
   return { top, left: r.left - PAD, width: r.width + PAD * 2, height: Math.max(bottom - top, 40) };
 }
 
-export default function Spotlight({ steps, onDone, label, onNavigate }) {
+// onMore - на последнем шаге кнопка «Подробнее» (2026-10-22): короткие
+// озвученные подсказки раздела ведут дальше в полный гайд по нему.
+export default function Spotlight({ steps, onDone, label, onNavigate, onMore }) {
   const [step, setStep] = useState(0);
   const [rect, setRect] = useState(null);
   const [searching, setSearching] = useState(true);
@@ -194,12 +196,21 @@ export default function Spotlight({ steps, onDone, label, onNavigate }) {
             {nextChapter > 0 && (
               <button type="button" className="tour__skip" onClick={() => setStep(nextChapter)}>Вкладка ›</button>
             )}
-            {steps.length > 1 && (
-              <button type="button" className="tour__skip" onClick={onDone}>{current.chapter ? 'Закрыть' : 'Пропустить'}</button>
+            {onMore && step + 1 >= steps.length ? (
+              <>
+                <button type="button" className="tour__skip" onClick={onDone}>Понятно</button>
+                <button type="button" className="tour__next" onClick={onMore}>Подробнее</button>
+              </>
+            ) : (
+              <>
+                {steps.length > 1 && (
+                  <button type="button" className="tour__skip" onClick={onDone}>{current.chapter ? 'Закрыть' : 'Пропустить'}</button>
+                )}
+                <button type="button" className="tour__next" onClick={next}>
+                  {step + 1 >= steps.length ? 'Понятно' : 'Дальше'}
+                </button>
+              </>
             )}
-            <button type="button" className="tour__next" onClick={next}>
-              {step + 1 >= steps.length ? 'Понятно' : 'Дальше'}
-            </button>
           </div>
         </div>
       )}
