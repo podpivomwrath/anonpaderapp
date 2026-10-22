@@ -39,6 +39,18 @@ python tools/broadcast.py - [--hours 24] [--photo N] --send`. Скрипт са�
 - **Где мир**: `bot/handlers/world.py` - город, карта, ходьба, клавиатуры экранов;
   исследование и события - `explore.py`, отдых - `rest.py`, `/застрял` - `stuck.py`.
   Общее состояние мира остаётся в world.py, модули берут его как `world.X`.
+- **PvP, рейды, мини-апп** (нарезка 2026-10-22): обработчики PvP - `pvp.py`,
+  итоги боёв - `pvp_results.py`, осмотр клетки и цели - `pvp_scene.py`; рейды -
+  `raid_combat.py` (обработчики), разбор хода и награды - `raid_results.py`;
+  мини-апп - `miniapp_api.py`, инвентарь - `miniapp_inventory_api.py`, пресеты -
+  `miniapp_presets_api.py`. Состояние - в старом модуле (`pvp.X`,
+  `raid_combat.X`). Перенос функции меняет её адрес «модуль.функция» в журналах
+  золота и ресурсов - добавь новый ключ в `admin_service.WALLET_REASONS`, старый
+  оставь для истории.
+- **Урон механики рейда** (не удар резолвера) - только `raid_field.stage_hurt`
+  (щиты, «Последний вздох», гибель); правило для обоих движков боя -
+  `game/combat/shared_rules.py`. Сверки: `tests/test_hp_writes.py`,
+  `tests/test_duel_parity.py`.
 - **Что держится в памяти** - `bot/memory_state.py`: новое хранилище впиши туда
   с ответом «кто снимает» (сверка `tests/test_memory_state.py`).
 - **Ввод словами** (не кнопкой) - строка в `bot/button_gate.TYPED_INPUTS` и
