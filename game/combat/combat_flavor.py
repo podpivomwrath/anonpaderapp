@@ -97,6 +97,11 @@ def control_blocked_line(target_name: str, reason: str | None = None) -> str:
     return f"{target_name}: защита от повторного контроля - эффект не наложен."
 
 
+def frost_line(target_name: str) -> str:
+    """Ледяные оковы по тому, кого контроль не берёт: иней вместо заморозки."""
+    return f"{target_name} не замерзает, но покрывается инеем ❄️ Схождение стихий следующим ходом ударит критом."
+
+
 def unimplemented_skill_line(actor_name: str, skill_id: str | None) -> str:
     """Навык объявлен, но обработчика к нему нет.
 

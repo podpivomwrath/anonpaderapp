@@ -237,6 +237,37 @@ def test_convergence_ignores_poison_and_other_dots() -> None:
     assert _convergence_damage((EffectKind.DOT, 99, None)) == _convergence_damage()
 
 
+def test_ice_frosts_control_immune_boss_and_convergence_crits() -> None:
+    """2026-10-22, владелец: босса Ледяные оковы не замораживают, но
+    покрывают инеем - Схождение следующим ходом бьёт его критом, как по
+    замороженной цели. Ход босс не теряет."""
+    ele = combatant(1, side=0, subclass_id="elementalist")
+    boss = combatant(2, side=1, vitality=500)
+    boss.control_immune_always = True
+    state = make_session(ele, boss)
+
+    result = resolve_tick(state, {1: skill("elementalist_ice", 2)}, NoCritRng())
+    assert not boss.has_effect(EffectKind.FREEZE)
+    assert boss.has_effect(EffectKind.CHILLED)
+    assert any("инеем" in line for line in result.lines)
+
+    result = resolve_tick(state, {1: skill("elementalist_convergence", 2)}, NoCritRng())
+    assert any(h.crit for h in result.hit_renders if not h.is_tick and h.source_id == 1)
+
+
+def test_other_stuns_do_not_frost_a_boss() -> None:
+    """Иней - только от Ледяных оков: прочие оглушения по боссу как раньше."""
+    from game.combat.subclass_skills import SUBCLASS_SKILL_DEFS
+
+    stun = next(s for s in SUBCLASS_SKILL_DEFS.values() if s.effect == "stun" and s.id != "elementalist_ice")
+    actor = combatant(1, side=0, subclass_id=stun.subclass_id)
+    boss = combatant(2, side=1, vitality=500)
+    boss.control_immune_always = True
+    state = make_session(actor, boss)
+    resolve_tick(state, {1: skill(stun.id, 2)}, NoCritRng())
+    assert not boss.has_effect(EffectKind.CHILLED)
+
+
 def test_fire_whip_marks_its_dot_as_burning() -> None:
     ele = combatant(1, side=0, subclass_id="elementalist")
     enemy = combatant(2, side=1, vitality=500)
