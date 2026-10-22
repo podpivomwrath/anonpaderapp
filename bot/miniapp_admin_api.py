@@ -296,6 +296,12 @@ async def handle_post_action(request: web.Request) -> web.Response:
                         return web.json_response({"error": "in_battle"}, status=409)
                 await admin_service.reset_activity_db(db, character)
                 reset_info = await character_reset_service.reset_character(db, admin_vk_id, character.id)
+                if reset_peer_id is not None:
+                    # Новый персонаж начинает с картинками: настройка жила в
+                    # ui_flags удалённого (2026-10-22, bot/no_images.py).
+                    from bot import no_images
+
+                    no_images.set_muted(reset_peer_id, False)
             elif action == "ban":
                 reason = body.get("reason")
                 if not isinstance(reason, str) or not reason.strip():
