@@ -2282,3 +2282,10 @@ body.lite .shop-showcase::after { animation: none; display: none; }
 .section-head--art .section-head__label { opacity: 0.92; }
 .section-head--art .section-head__aside small { opacity: 0.85; }
 .section-head--art .section-head__icon { filter: drop-shadow(0 0 2px #000) drop-shadow(0 2px 8px rgba(0, 0, 0, 0.9)); }
+
+/* Отправка повозки: с кнопкой «0» (2026-10-22) кнопкам в строке тесно - на
+   телефоне они уходят под название товара, а не сжимают его в столбик. */
+@media (max-width: 480px) {
+  .trade-dest__row:has(.faction-qty) { flex-wrap: wrap; }
+  .trade-dest__row .faction-qty { width: 100%; justify-content: flex-end; }
+}

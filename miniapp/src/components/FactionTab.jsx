@@ -151,6 +151,8 @@ function DispatchSheet({ cart, gold, routeTitles, orders, market, busy, onSend, 
               </span>
               {!g.locked && (
                 <div className="faction-qty">
+                  {/* «0» - выгрузить товар целиком, а не по ящику (2026-10-22, просьба игрока). */}
+                  <Button size="s" mode="tertiary" disabled={n <= 0} onClick={() => set(g.id, 0)}>0</Button>
                   <Button size="s" mode="secondary" disabled={n <= 0} onClick={() => set(g.id, n - 1)}>−</Button>
                   <span className="faction-qty__value">{n}</span>
                   <Button size="s" mode="secondary" disabled={free <= 0} onClick={() => set(g.id, n + 1)}>+</Button>
