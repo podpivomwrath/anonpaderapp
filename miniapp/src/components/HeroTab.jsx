@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Group, Header, SimpleCell, Switch } from '@vkontakte/vkui';
 import {
-  equipItem, getCharacter, getInventory, getTrophies, setGender, setNoImages, unequipItem,
+  equipItem, getCharacter, getInventory, getTrophies, setGender, setNoImages, setShortLog, unequipItem,
 } from '../api.js';
 import { silhouetteUrl } from '../silhouettes.js';
 import { itemIcon } from '../itemIcons.js';
@@ -191,6 +191,14 @@ function Settings({ character, onCharacterUpdate }) {
       .then(() => onCharacterUpdate((prev) => ({ ...prev, ui: { ...(prev.ui || {}), no_images: next } })))
       .catch(() => setOff(!next));
   };
+  // Короткий боевой лог (2026-10-22, bot/short_log.py).
+  const [short, setShort] = useState(Boolean(character.ui?.short_log));
+  const toggleShort = (next) => {
+    setShort(next);
+    setShortLog(next)
+      .then(() => onCharacterUpdate((prev) => ({ ...prev, ui: { ...(prev.ui || {}), short_log: next } })))
+      .catch(() => setShort(!next));
+  };
   return (
     <Group header={<Header>Настройки</Header>}>
       <SimpleCell
@@ -200,6 +208,21 @@ function Settings({ character, onCharacterUpdate }) {
       >
         Убрать картинки в игре
       </SimpleCell>
+      <SimpleCell
+        Component="label" multiline
+        subtitle="В бою только здоровье с изменением за ход и значки эффектов. Весь лог хода - кнопкой «📜 Сводка»."
+        after={<Switch checked={short} onChange={(e) => toggleShort(e.target.checked)} />}
+      >
+        Короткий лог боя
+      </SimpleCell>
+      {short && (
+        <p className="tab-notice short-log-legend">
+          🔥 горит · ☠️ яд · ❄️ скован · 🧊 после контроля · 💢 уязвимость · 🥀 ослаблен ·
+          🎯 метки · 🩸 печать крови · ⚔️ 🌀 🗡 🌋 урон выше · 💨 уклонение · 🧱 глухая оборона ·
+          🪨 предел урона · 🪞 отражение · ✨ не берёт контроль · 💀 последний вздох ·
+          📣 провокация · 🛡️ щит
+        </p>
+      )}
     </Group>
   );
 }

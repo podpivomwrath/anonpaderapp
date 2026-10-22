@@ -368,7 +368,9 @@ async def handle_post_title(request: web.Request) -> web.Response:
 #: fish_auto_keep (2026-10-21) - вытащенная рыба сразу в садок, без «Отпустить».
 UI_FLAGS = {"intro": int, "tour": int, "sound": bool, "safe_route": bool, "fish_auto_keep": bool,
             # «Убрать картинки в игре» (2026-10-22): bot/no_images.py.
-            "no_images": bool}
+            "no_images": bool,
+            # Короткий боевой лог (2026-10-22): bot/short_log.py.
+            "short_log": bool}
 UI_HINTS_MAX = 32
 
 
@@ -406,6 +408,10 @@ async def handle_post_ui(request: web.Request) -> web.Response:
             from bot import no_images
 
             no_images.set_muted(request[VK_USER_ID_KEY], bool(flags["no_images"]))
+        if "short_log" in flags:
+            from bot import short_log
+
+            short_log.set_short(request[VK_USER_ID_KEY], bool(flags["short_log"]))
         return web.json_response({"ui": flags})
 
 

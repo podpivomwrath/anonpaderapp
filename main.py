@@ -343,6 +343,12 @@ async def run() -> None:
     muted = await no_images.load(get_session_factory())
     if muted:
         logger.info("Без картинок: {} игроков", muted)
+    from bot import short_log
+
+    # 2026-10-22: короткий боевой лог по выбору игрока
+    short_count = await short_log.load(get_session_factory())
+    if short_count:
+        logger.info("Короткий лог боя: {} игроков", short_count)
     resumed = await world_handlers.resume_after_restart()
     # Рыбалка и добыча: их состояние в базе, таймеры - в памяти (2026-10-12).
     resumed["fishing"] = await fishing_handlers.resume_after_restart()

@@ -742,6 +742,17 @@ def _render_duel(
     return "\n".join(parts)
 
 
+def _render_duel_short(duel: DuelState, finished: bool) -> str:
+    """Короткий лог дуэли (bot/short_log.py): полоски и значки эффектов, без
+    строк хода."""
+    lines = [f"⚔️ ДУЭЛЬ - ход {duel.turn_number}"]
+    for cid in duel.order:
+        lines.append(battle_log.short_bar(duel.combatants[cid], display.MODE_PVP))
+    if finished:
+        lines += [f"☠ {c.name} падает" for c in duel.combatants.values() if not c.alive]
+    return "\n".join(lines)
+
+
 # --- Присоединение к идущему бою ---
 
 

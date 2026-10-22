@@ -20,7 +20,7 @@ from vkbottle.bot import BotLabeler, Message
 
 from bot.keyboards import combat_modes
 from bot.keyboards.combat_items import page_of
-from bot import ash_handful_state, dailies_texts, editable_message, group_texts, raid_key_texts
+from bot import ash_handful_state, dailies_texts, editable_message, group_texts, raid_key_texts, short_log
 from bot.handlers import respawn as respawn_handlers
 from bot.battle_keyboard import answer_battle_gone
 from bot.handlers import stats_window
@@ -364,6 +364,7 @@ async def _broadcast_board(
 ) -> None:
     state = _engine.sessions.get(battle_id)
     text = _render_board(state, result) if state is not None else ""
+    short = battle_log.render_short(state, result or TickResult()) if state is not None else ""
     notices = notices or {}
     for cid, p in list(battle.participants.items()):
         combatant = _live_state(battle_id, battle).get(cid)
@@ -373,14 +374,16 @@ async def _broadcast_board(
             else group_waiting_keyboard()
         )
         personal = text
+        short_personal = short
         notice = notices.get(cid)
         target_line = _target_line(battle_id, battle, cid)
         if target_line and combatant is not None and combatant.alive:
             personal = f"{personal}\n{target_line}"
+            short_personal = f"{short_personal}\n{target_line}"
         own = battle_log.class_line(state.combatants, cid) if state is not None else None
         if own:
             personal = f"{personal}\n{own}"
-        await _bot_api.messages.send(peer_id=p.peer_id, message=personal, random_id=0, keyboard=keyboard)
+        await short_log.send(_bot_api, p.peer_id, short_personal or personal, personal, keyboard)
         if notice:
             # Добыча и опыт - отдельным сообщением после хода (2026-10-13):
             # лог боя, затем лут, затем сводка клетки. Раньше лут стоял над

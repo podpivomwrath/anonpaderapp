@@ -6,7 +6,7 @@
 здесь к нему обращаются как pvp.X, чтобы копия была одна и тесты подменяли там же.
 """
 
-from bot import dailies_texts
+from bot import dailies_texts, short_log
 from bot.handlers import respawn as respawn_handlers
 from bot.handlers import stats_window
 from bot.keyboards import world as kb
@@ -49,6 +49,7 @@ async def on_duel_turn_resolved(session_id: int, turn: int, result: DuelResult) 
             if duel is not None
             else "\n".join(result.lines)
         )
+        short = pvp._render_duel_short(duel, finished=result.finished) if duel is not None else text
         own = battle_log.class_line(duel.combatants, p.character_id) if duel is not None else None
         if own and not result.finished:
             text += f"\n\n{own}"
@@ -56,11 +57,13 @@ async def on_duel_turn_resolved(session_id: int, turn: int, result: DuelResult) 
             keyboard = kb.waiting_keyboard()
         elif p.character_id == next_actor_id:
             text += "\n\n▶️ Твой ход!"
+            short += "\n\n▶️ Твой ход!"
             keyboard = pvp_combat_keyboard(p.base_class, combatant.cooldowns, subclass_id=combatant.subclass_id)
         else:
             text += "\n\n⏳ Ход противника. Ожидание..."
+            short += "\n\n⏳ Ход противника. Ожидание..."
             keyboard = pvp_waiting_keyboard()
-        await pvp._bot_api.messages.send(peer_id=p.peer_id, message=text, random_id=0, keyboard=keyboard)
+        await short_log.send(pvp._bot_api, p.peer_id, short, text, keyboard)
 
     if result.finished:
         return  # on_duel_finished разрулит исход и очистку
@@ -288,6 +291,18 @@ async def on_mass_tick_resolved(session_id: int, tick: int, result: TickResult) 
             text_by_side[side] = _render_mass_tick(session, result, side, battle)
         return text_by_side[side]
 
+    short_by_side: dict[int, str] = {}
+
+    def _short_for(cid: int) -> str:
+        if session is None:
+            return "\n".join(result.lines)
+        side = battle.side_of.get(cid, 0)
+        if side not in short_by_side:
+            short_by_side[side] = battle_log.render_short(
+                session, result, viewer_side=side, title="🏰 ОСАДА" if battle.side_titles else "⚔️ БОЙ",
+            )
+        return short_by_side[side]
+
     # Патч 38: у кого цель погибла в этот тик — автопереключение на первого
     # живого противника + личное уведомление (не в общий боевой лог, у
     # каждого своя цель, значит и уведомление у каждого своё).
@@ -318,18 +333,19 @@ async def on_mass_tick_resolved(session_id: int, tick: int, result: TickResult) 
             else pvp_waiting_keyboard()
         )
         personal_text = _board_for(cid)
+        short_text = _short_for(cid)
         notice = switch_notices.get(cid)
         if notice:
             personal_text = f"{notice}\n\n{personal_text}"
+            short_text = f"{notice}\n\n{short_text}"
         target_line = pvp._target_line(session_id, battle, cid)
         if target_line:
             personal_text = f"{personal_text}\n{target_line}"
+            short_text = f"{short_text}\n{target_line}"
         own = battle_log.class_line(session.combatants, cid) if session is not None else None
         if own:
             personal_text = f"{personal_text}\n{own}"
-        await pvp._bot_api.messages.send(
-            peer_id=participant.peer_id, message=personal_text, random_id=0, keyboard=keyboard,
-        )
+        await short_log.send(pvp._bot_api, participant.peer_id, short_text, personal_text, keyboard)
 
 
 async def on_mass_battle_finished(session_id: int, result: TickResult) -> None:

@@ -145,6 +145,11 @@ export function setNoImages(on) {
   return saveUi({ set: { no_images: on } });
 }
 
+// Короткий боевой лог (2026-10-22): полоски и значки вместо полного лога.
+export function setShortLog(on) {
+  return saveUi({ set: { short_log: on } });
+}
+
 export function glance() {
   return request('/glance', { method: 'POST' });
 }

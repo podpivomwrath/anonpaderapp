@@ -163,6 +163,102 @@ def class_line(combatants, owner_id: int) -> str | None:
     return "\n".join(parts) if parts else None
 
 
+#: Короткий лог (2026-10-22, владелец): эффекты на бойце - значками у его
+#: полоски здоровья. Расшифровка - в переключателе мини-аппа (HeroTab).
+_ICONS: tuple[tuple[EffectKind, str], ...] = (
+    (EffectKind.FREEZE, "❄️"),
+    (EffectKind.CHILLED, "🧊"),
+    (EffectKind.VULNERABILITY, "💢"),
+    (EffectKind.WEAKEN, "🥀"),
+    (EffectKind.BLOOD_SEAL, "🩸"),
+    (EffectKind.DAMAGE_BUFF, "⚔️"),
+    (EffectKind.ELEMENTAL_FLOW, "🌀"),
+    (EffectKind.FLAT_DAMAGE_BONUS, "🗡"),
+    (EffectKind.ASHEN_FEVER, "🌋"),
+    (EffectKind.DODGE, "💨"),
+    (EffectKind.BLOCK_STANCE, "🧱"),
+    (EffectKind.DAMAGE_CAP, "🪨"),
+    (EffectKind.BLOOD_REFLECT, "🪞"),
+    (EffectKind.CONTROL_IMMUNE, "✨"),
+    (EffectKind.LAST_BREATH, "💀"),
+)
+
+
+def effect_icons(c) -> str:
+    """Значки эффектов бойца: горение, яд, метки (со стаками), остальное по
+    одному значку на вид. Щит - числом, как в полном логе."""
+    from game.combat.session import BURN_TAG
+
+    out: list[str] = []
+    dots = [e for e in c.effects_of(EffectKind.DOT) if e.remaining_ticks > 0]
+    if any(getattr(e, "tag", None) == BURN_TAG for e in dots):
+        out.append("🔥")
+    poison = sum(e.stacks for e in dots if getattr(e, "tag", None) != BURN_TAG)
+    if poison:
+        out.append("☠️" if poison == 1 else f"☠️×{poison}")
+    marks = sum(e.stacks for e in c.effects_of(EffectKind.MARK))
+    if marks:
+        out.append(f"🎯×{marks}")
+    for kind, icon in _ICONS:
+        if any(e.remaining_ticks > 0 and (kind != EffectKind.VULNERABILITY or e.value > 0)
+               for e in c.effects_of(kind)):
+            out.append(icon)
+    if getattr(c, "taunted_by", None) is not None:
+        out.append("📣")
+    shield = display.shield_suffix(c)
+    return (shield + (" " + "".join(out) if out else "")) if shield else (" " + "".join(out) if out else "")
+
+
+def _hp_changes(result: TickResult) -> dict[int, tuple[int, int]]:
+    """Сколько бойцу за ход сняли и сколько вылечили: (урон, лечение)."""
+    out: dict[int, list[int]] = {}
+    for h in result.hit_renders:
+        if not h.missed:
+            out.setdefault(h.target_id, [0, 0])[0] += max(h.hp_before - h.hp_after, 0)
+    for h in result.heal_renders:
+        out.setdefault(h.target_id, [0, 0])[1] += max(h.hp_after - h.hp_before, 0)
+    return {cid: (lost, healed) for cid, (lost, healed) in out.items()}
+
+
+def short_bar(c, mode: str, change: tuple[int, int] | None = None) -> str:
+    """«Волк: ▰▰▱ 120/300 (-45, +10) 🔥❄️» - строка бойца короткого лога."""
+    delta = ""
+    if change:
+        parts = [f"-{change[0]}" if change[0] else "", f"+{change[1]}" if change[1] else ""]
+        parts = [p for p in parts if p]
+        delta = f" ({', '.join(parts)})" if parts else ""
+    return f"{c.name}: {display.health_bar(c.current_hp, c.max_hp, mode)}{delta}{effect_icons(c)}"
+
+
+def render_short(
+    session: CombatSessionState,
+    result: TickResult,
+    viewer_side: int = 0,
+    enemy_lines: list[str] | None = None,
+    title: str = "⚔️ БОЙ",
+) -> str:
+    """Короткий лог хода (2026-10-22, владелец, переключатель в мини-аппе):
+    только полоски здоровья с изменением за ход и значки эффектов. Сценарные
+    реплики босса остаются: по ним в рейде решают, куда встать. Смерти - тоже.
+    Полный лог - кнопкой «📜 Сводка» (bot/short_log.py)."""
+    mode = _mode(session)
+    changes = _hp_changes(result)
+    parts = [f"{title} - ход {session.tick_number}"]
+    if enemy_lines:
+        parts += ["", *enemy_lines]
+    parts.append("")
+    enemies = [c for c in session.combatants.values() if c.side != viewer_side and c.alive]
+    own = [c for c in session.combatants.values() if c.side == viewer_side and c.alive]
+    parts += [short_bar(c, mode, changes.get(c.id)) for c in enemies]
+    if enemies:
+        parts.append(_SEP)
+    parts += [short_bar(c, mode, changes.get(c.id)) for c in own]
+    deaths = [line for line in result.lines if line.startswith("☠")]
+    if deaths:
+        parts += ["", *deaths]
+    return "\n".join(parts)
+
+
 def render_tick(
     session: CombatSessionState,
     result: TickResult,

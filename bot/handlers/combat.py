@@ -11,7 +11,7 @@ import time
 from vkbottle import BaseStateGroup  # noqa: F401  (совместимость импортов)
 from vkbottle.bot import BotLabeler, Message
 
-from bot import ash_handful_state, dailies_texts, editable_message, group_texts, raid_key_texts
+from bot import ash_handful_state, dailies_texts, editable_message, group_texts, raid_key_texts, short_log
 from bot.handlers import stats_window
 from bot.keyboards import combat_modes
 from bot.keyboards.combat_items import combat_items_keyboard, page_of
@@ -455,9 +455,8 @@ async def on_tick_resolved(session_id: int, tick: int, result: TickResult) -> No
     # лог финального удара уходит без боевых кнопок (сводку/смерть с нужной
     # клавиатурой пришлёт on_battle_finished) — иначе кнопки боя мелькают.
     keyboard = empty_keyboard() if result.finished else _combat_kb(state, session_id)
-    await _bot_api.messages.send(
-        peer_id=session_id, message=_render(state, result), random_id=0,
-        keyboard=keyboard,
+    await short_log.send(
+        _bot_api, session_id, battle_log.render_short(state, result), _render(state, result), keyboard,
     )
 
 
