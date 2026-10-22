@@ -2267,3 +2267,18 @@ body.lite .shop-showcase::after { animation: none; display: none; }
   top: 40%;
   pointer-events: none;
 }
+
+/* Текст шапки поверх баннера (2026-10-22): на светлых местах картинки он
+   сливался с фоном - тёмная обводка по контуру букв и мягкая тень под ними. */
+.section-head--art .section-head__value,
+.section-head--art .section-head__label,
+.section-head--art .section-head__aside {
+  text-shadow:
+    -1px -1px 0 rgba(0, 0, 0, 0.9), 1px -1px 0 rgba(0, 0, 0, 0.9),
+    -1px 1px 0 rgba(0, 0, 0, 0.9), 1px 1px 0 rgba(0, 0, 0, 0.9),
+    0 0 8px rgba(0, 0, 0, 0.95), 0 2px 12px rgba(0, 0, 0, 0.8);
+}
+
+.section-head--art .section-head__label { opacity: 0.92; }
+.section-head--art .section-head__aside small { opacity: 0.85; }
+.section-head--art .section-head__icon { filter: drop-shadow(0 0 2px #000) drop-shadow(0 2px 8px rgba(0, 0, 0, 0.9)); }
