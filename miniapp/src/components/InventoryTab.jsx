@@ -507,6 +507,7 @@ export default function InventoryTab({ onOpenTab }) {
   const [nickFor, setNickFor] = useState(null);    // id вещи, которую передают по нику
   const [notice, setNotice] = useState(null);
   const [roulette, setRoulette] = useState(null);  // ответ сервера на открытие ларца
+  const [rouletteRun, setRouletteRun] = useState(0); // новый ключ - рулетка крутится заново
   const [seen, setSeen] = useState(null);
   const [dustBurst, setDustBurst] = useState(0);
 
@@ -569,6 +570,26 @@ export default function InventoryTab({ onOpenTab }) {
       setErrorMsg(err?.message?.includes(' ') ? err.message : 'Не удалось разобрать.');
     } finally {
       setBreaking(null);
+    }
+  }
+
+  // «Открыть ещё один» (2026-10-22, просьба игрока): следующий ларец того же
+  // вида прямо из окна награды, без возврата к сумке. Сумку обновляем сразу -
+  // в ней уже нет открытого ларца.
+  const chestsLeft = roulette
+    ? (roulette.inventory?.chests || []).find((c) => c.kind === roulette.result.kind)?.count || 0
+    : 0;
+
+  async function openAnother() {
+    const kind = roulette.result.kind;
+    if (roulette.inventory) apply(roulette.inventory);
+    try {
+      const next = await openChest(kind);
+      setRouletteRun((n) => n + 1);
+      setRoulette(next);
+    } catch (err) {
+      setRoulette(null);
+      setErrorMsg(err?.message === 'no_chest' ? 'Ларцов в сумке больше нет.' : 'Не удалось открыть ларец.');
     }
   }
 
@@ -838,10 +859,13 @@ export default function InventoryTab({ onOpenTab }) {
       )}
       {roulette && (
         <ChestRoulette
+          key={rouletteRun}
           strip={roulette.strip}
           winIndex={roulette.win_index}
           result={roulette.result}
           onClose={closeRoulette}
+          left={chestsLeft}
+          onAgain={openAnother}
         />
       )}
       {qtyEntry && (

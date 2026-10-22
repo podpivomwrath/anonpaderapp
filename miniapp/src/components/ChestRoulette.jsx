@@ -35,13 +35,14 @@ function haptic(style) {
   bridge.send('VKWebAppTapticImpactOccurred', { style }).catch(() => {});
 }
 
-export default function ChestRoulette({ strip, winIndex, result, onClose }) {
+export default function ChestRoulette({ strip, winIndex, result, onClose, left = 0, onAgain = null }) {
   const viewportRef = useRef(null);
   const trackRef = useRef(null);
   const [offset, setOffset] = useState(0);
   const [spinning, setSpinning] = useState(false);
   // spin -> win (карточка подсвечена) -> shake -> burst
   const [phase, setPhase] = useState('spin');
+  const [again, setAgain] = useState(false);
 
   // Искры разлетаются по кругу с разбросом - считаем один раз.
   const sparks = useMemo(() => Array.from({ length: SPARKS }, (_, i) => ({
@@ -181,6 +182,12 @@ export default function ChestRoulette({ strip, winIndex, result, onClose }) {
               </div>
               <div className="roulette__take" style={{ animationDelay: `${0.45 + result.lines.length * 0.18}s` }}>
                 <Button mode="primary" size="l" stretched onClick={onClose}>Забрать</Button>
+                {/* Следующий ларец того же вида - не возвращаясь в сумку (2026-10-22). */}
+                {onAgain && left > 0 && (
+                  <Button mode="secondary" size="l" stretched disabled={again} onClick={() => { setAgain(true); onAgain(); }}>
+                    Открыть ещё один · осталось {left}
+                  </Button>
+                )}
               </div>
             </>
           ) : (
