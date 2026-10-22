@@ -6,12 +6,13 @@ const SUBTABS = '.tab-enter .vkuiTabs__host';
 
 // Тексты и озвучка (2026-10-22): говорит рассудительный пожилой мужчина.
 // Текст на экране совпадает с записью (assets/voice/<voice>.mp3), кроме
-// значков: их голос называет словами.
+// значков: их голос называет словами. pose - поза рассказчика (Narrator.jsx):
+// 2 - показывает рукой на подсвеченное, 3 - усмехается; без pose - спокойно.
 export const TAB_HINTS = {
   character: [
     { target: SUBTABS, title: 'Персонаж', voice: 'hint_character_1',
       text: 'Тут всё про тебя самого: снаряжение, очки характеристик, пресеты, испытания и ремёсла.' },
-    { target: '.hero-row', title: 'Снаряжение', voice: 'hint_character_2',
+    { target: '.hero-row', title: 'Снаряжение', voice: 'hint_character_2', pose: 2,
       text: 'Окна по бокам - твои вещи. Нажми на окно, и я покажу, что из сумки подойдёт. Зелёная стрелка значит, что в сумке есть вещь получше надетой.' },
     { target: 'h:Трофеи', title: 'Трофеи', voice: 'hint_character_3',
       text: 'Внизу твои трофеи: вещи с рейдовых боссов и счёт добычи. Серые пока не добыты.' },
@@ -19,13 +20,13 @@ export const TAB_HINTS = {
   dailies: [
     { target: SUBTABS, title: 'Задания', voice: 'hint_dailies_1',
       text: 'Сюжет, задания на день и подарок за то, что заходишь каждый день.' },
-    { target: 'h:📜 Сюжет', title: 'Сюжет', voice: 'hint_dailies_2',
+    { target: 'h:📜 Сюжет', title: 'Сюжет', voice: 'hint_dailies_2', pose: 2,
       text: 'Здесь твой квест и что от тебя нужно. Врага по сюжету узнаешь по свитку 📜 рядом с именем.' },
     { target: 'h:📖 Летопись', title: 'Летопись', voice: 'hint_dailies_3',
       text: 'В летописи собраны Пепельная Песнь и твои титулы. Нажми на строку, раскроется.' },
   ],
   inventory: [
-    { target: 'h:В сумке', title: 'Сумка', voice: 'hint_inventory_1',
+    { target: 'h:В сумке', title: 'Сумка', voice: 'hint_inventory_1', pose: 2,
       text: 'Нажми на вещь, чтобы рассмотреть её целиком. Ларцы и реликвии тоже лежат тут. Надевать иди в Персонаж, на вкладку Герой.' },
   ],
   craft: [
@@ -35,9 +36,9 @@ export const TAB_HINTS = {
       text: 'Вещь с рейдового босса можно перековать под себя: на защиту, на урон или на поддержку.' },
   ],
   map: [
-    { target: null, title: 'Карта', voice: 'hint_map_1',
+    { target: null, title: 'Карта', voice: 'hint_map_1', pose: 2,
       text: 'Нажми на клетку, и я расскажу, что там: какие уровни, есть ли озеро, рудник или разлом. Отсюда же можно отправить маунта.' },
-    { target: '.map-controls', title: 'Управление', voice: 'hint_map_2',
+    { target: '.map-controls', title: 'Управление', voice: 'hint_map_2', pose: 2,
       text: 'Кружок с точкой ◎ вернёт тебя к себе. Приближать можно двумя пальцами или колёсиком.' },
     { target: null, title: 'Значки', voice: 'hint_map_3',
       text: 'Воронка 🌀 - разлом, череп 💀 - мировой босс, удочка 🎣 - озеро, кирка ⛏ - рудник, верблюд 🐪 - караван.' },
@@ -49,7 +50,7 @@ export const TAB_HINTS = {
   tops: [
     { target: SUBTABS, title: 'Доски', voice: 'hint_tops_1',
       text: 'У каждой доски свой рейтинг. Если не все видны, листай вбок.' },
-    { target: '.top-help', title: 'Венцы', voice: 'hint_tops_2',
+    { target: '.top-help', title: 'Венцы', voice: 'hint_tops_2', pose: 2,
       text: 'Кто первый на доске, получает венец: рамку вокруг знака и прибавку к силе. Правила - под знаком вопроса.' },
   ],
   board: [
@@ -63,15 +64,15 @@ export const TAB_HINTS = {
       text: 'Повозки возят товар сами. От тебя нужно одно: отправить каждую в рейс.' },
   ],
   exchange: [
-    { target: 'h:💱', title: 'Курс', voice: 'hint_exchange_1',
+    { target: 'h:💱', title: 'Курс', voice: 'hint_exchange_1', pose: 3,
       text: 'Курс двигаете вы, игроки. Покупают - он растёт, продают - падает.' },
     { target: 'h:Сделка', title: 'Сделка', voice: 'hint_exchange_2',
       text: 'Здесь самоцветы покупают и продают за золото.' },
-    { target: 'h:📈', title: 'График', voice: 'hint_exchange_3',
+    { target: 'h:📈', title: 'График', voice: 'hint_exchange_3', pose: 2,
       text: 'Тут курс по закрытым дням. Посмотри, прежде чем продавать.' },
   ],
   shop: [
-    { target: '.shop-card', title: 'Товар', voice: 'hint_shop_1',
+    { target: '.shop-card', title: 'Товар', voice: 'hint_shop_1', pose: 2,
       text: 'Нажми на карточку. Ползунком выберешь срок, цена посчитается сама.' },
   ],
 };

@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { hasVoice, playVoice, stopVoice } from '../voice.js';
+import Narrator from './Narrator.jsx';
 
 /**
  * Подсветка по шагам: экран затемнён, нужный элемент - в светлой рамке,
@@ -12,7 +13,8 @@ import { hasVoice, playVoice, stopVoice } from '../voice.js';
  *   null            - карточка по центру, без подсветки.
  *
  * voice - ключ файла озвучки (voice.js): фраза звучит, когда карточка шага
- * показана, и обрывается при переходе дальше или закрытии.
+ * показана, и обрывается при переходе дальше или закрытии. У озвученного
+ * шага в карточке стоит рассказчик (Narrator.jsx), pose - его поза.
  *
  * Раздел грузит данные после открытия, поэтому цель ждём до WAIT_MS. Не
  * дождались - шаг показывается по центру: текст всё равно полезен.
@@ -166,7 +168,8 @@ export default function Spotlight({ steps, onDone, label, onNavigate }) {
         ? <div className="tour__spot" style={rect} />
         : <div className="tour__dim" />}
       {!searching && (
-        <div key={step} className="tour__card" style={cardStyle}>
+        <div key={step} className={hasVoice(current.voice) ? 'tour__card tour__card--narrated' : 'tour__card'} style={cardStyle}>
+          {hasVoice(current.voice) && <Narrator voice={current.voice} pose={current.pose} />}
           <p className="tour__title">
             {current.title}
             {hasVoice(current.voice) && (

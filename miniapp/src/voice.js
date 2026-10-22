@@ -24,6 +24,46 @@ const BY_KEY = Object.fromEntries(
 let current = null;
 let pending = null;
 
+// Кто сейчас говорит - для рассказчика (Narrator.jsx): он шевелит губами,
+// пока звучит фраза, в такт её громкости.
+const listeners = new Set();
+let state = { key: null, analyser: null };
+let ctx = null;
+
+function emit(next) {
+  state = next;
+  listeners.forEach((fn) => fn(state));
+}
+
+export function onVoice(fn) {
+  listeners.add(fn);
+  fn(state);
+  return () => listeners.delete(fn);
+}
+
+/** Громкость фразы для губ. Звук идёт через Web Audio только если контекст
+ *  уже работает: подключённый к спящему контексту элемент молчал бы. Нет
+ *  анализатора - рассказчик шевелит губами наугад. */
+function analyserFor(audio) {
+  try {
+    const Ctx = window.AudioContext || window.webkitAudioContext;
+    if (!Ctx) return null;
+    ctx = ctx || new Ctx();
+    if (ctx.state !== 'running') {
+      ctx.resume().catch(() => {});
+      return null;
+    }
+    const source = ctx.createMediaElementSource(audio);
+    const analyser = ctx.createAnalyser();
+    analyser.fftSize = 512;
+    source.connect(analyser);
+    analyser.connect(ctx.destination);
+    return analyser;
+  } catch {
+    return null;
+  }
+}
+
 function onFirstTouch() {
   document.removeEventListener('pointerdown', onFirstTouch, true);
   document.removeEventListener('keydown', onFirstTouch, true);
@@ -42,7 +82,13 @@ function start(key) {
   const audio = new Audio(BY_KEY[key]);
   audio.volume = 0.95;
   current = audio;
-  audio.play().catch((err) => {
+  const analyser = analyserFor(audio);
+  audio.addEventListener('ended', () => {
+    if (current === audio) emit({ key: null, analyser: null });
+  });
+  audio.play().then(() => {
+    if (current === audio) emit({ key, analyser });
+  }).catch((err) => {
     if (current === audio) current = null;
     if (err?.name === 'NotAllowedError') waitForTouch(key);
   });
@@ -57,6 +103,7 @@ export function stopVoice() {
   if (!current) return;
   current.pause();
   current = null;
+  emit({ key: null, analyser: null });
 }
 
 export function playVoice(key, { force = false } = {}) {
