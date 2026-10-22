@@ -1,27 +1,41 @@
 import { useEffect, useState } from 'react';
-import { Group, Header, Div, Text, Spinner, Placeholder } from '@vkontakte/vkui';
+import { Group, Header, Placeholder } from '@vkontakte/vkui';
 import { getTrials } from '../api.js';
+import Skeleton from './Skeleton.jsx';
+import { Bar, Empty, SectionHead } from './ui.jsx';
 
-function BuffDetail({ trial }) {
+// Испытания подкласса (2026-10-22): карточки с полоской прогресса, нажатие
+// раскрывает эффект бафа. Открытые - отдельной сеткой ниже.
+
+function TrialCard({ t, open, onToggle }) {
   return (
-    <Div className="buff-detail">
-      <Text style={{ opacity: 0.7, fontSize: 13 }}>Категория: {trial.category}</Text>
-      {trial.implemented ? (
-        trial.description && (
-          <Text style={{ fontSize: 14, marginTop: 4 }}>{trial.description}</Text>
-        )
-      ) : (
-        <Text style={{ fontSize: 14, marginTop: 4, opacity: 0.7 }}>⚙️ В разработке - эффект пока не действует в бою.</Text>
-      )}
-      <Text style={{ opacity: 0.7, fontSize: 13, marginTop: 6 }}>
-        Статус: {trial.unlocked ? 'открыт' : 'не открыт'}
-      </Text>
-      {!trial.unlocked && (
-        <Text style={{ opacity: 0.7, fontSize: 13 }}>
-          Испытание: {trial.text} ({trial.progress}/{trial.target})
-        </Text>
-      )}
-    </Div>
+    <div className={`trial-card${t.unlocked ? ' trial-card--open' : ''}`}>
+      <button type="button" className="trial-card__row" onClick={onToggle} aria-expanded={open}>
+        <span className="trial-card__seal" aria-hidden="true">{t.unlocked ? '✦' : '🔒'}</span>
+        <span className="trial-card__text">
+          <b className="trial-card__name">{t.buff_name}{!t.implemented && ' ⚙️'}</b>
+          {!t.unlocked && <small className="trial-card__task">{t.text}</small>}
+          {t.unlocked && <small className="trial-card__task">{t.category}</small>}
+          {!t.unlocked && (
+            <span className="daily-card__progress">
+              <Bar value={t.progress} max={t.target} tone="blue" thin />
+              <span className="daily-card__count">{Math.min(t.progress, t.target)}/{t.target}</span>
+            </span>
+          )}
+        </span>
+        <span className={open ? 'chronicle-row__arrow chronicle-row__arrow--open' : 'chronicle-row__arrow'}>›</span>
+      </button>
+      <div className={open ? 'fold fold--open' : 'fold'} aria-hidden={!open}>
+        <div className="fold__inner">
+          <div className="trial-card__detail">
+            {t.implemented
+              ? (t.description && <p>{t.description}</p>)
+              : <p className="trial-card__wip">⚙️ В разработке - эффект пока не действует в бою.</p>}
+            {!t.unlocked && <small>Категория: {t.category}</small>}
+          </div>
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -40,13 +54,7 @@ export default function TrialsTab() {
       .catch(() => setStatus('error'));
   }, []);
 
-  if (status === 'loading') {
-    return (
-      <Div style={{ display: 'flex', justifyContent: 'center', paddingTop: 48 }}>
-        <Spinner size="l" />
-      </Div>
-    );
-  }
+  if (status === 'loading') return <Skeleton />;
 
   if (status === 'error') {
     return <Placeholder icon={<div style={{ fontSize: 48 }}>🕯️</div>}>Не удалось загрузить испытания.</Placeholder>;
@@ -54,9 +62,9 @@ export default function TrialsTab() {
 
   if (!data.subclass) {
     return (
-      <Placeholder icon={<div style={{ fontSize: 48 }}>📖</div>}>
-        Твоя Метка ещё не обрела форму. Возвращайся, когда кровь потребует имени.
-      </Placeholder>
+      <Group>
+        <Empty icon="📖">Твоя Метка ещё не обрела форму. Возвращайся, когда кровь потребует имени.</Empty>
+      </Group>
     );
   }
 
@@ -67,40 +75,25 @@ export default function TrialsTab() {
 
   return (
     <>
+      <SectionHead
+        kind="trials" icon="✦" value={`${unlocked.length}/${data.trials.length}`} label="испытаний пройдено"
+      />
       {locked.length > 0 && (
         <Group header={<Header>Испытания ({locked.length})</Header>}>
-          {locked.map((t) => (
-            <div key={t.id}>
-              <div className="stat-row" style={{ cursor: 'pointer' }} onClick={() => toggle(t.id)}>
-                <div>
-                  <div className="stat-row__label">
-                    🔒 {t.buff_name}
-                    {!t.implemented && ' ⚙️'}
-                  </div>
-                  <Text style={{ opacity: 0.7, fontSize: 13 }}>{t.text}</Text>
-                </div>
-                <span className="stat-row__value">
-                  {t.progress}/{t.target}
-                </span>
-              </div>
-              {expandedId === t.id && <BuffDetail trial={t} />}
-            </div>
-          ))}
+          <div className="card-list">
+            {locked.map((t) => (
+              <TrialCard key={t.id} t={t} open={expandedId === t.id} onToggle={() => toggle(t.id)} />
+            ))}
+          </div>
         </Group>
       )}
       {unlocked.length > 0 && (
         <Group header={<Header>Открыто ({unlocked.length})</Header>}>
-          {unlocked.map((t) => (
-            <div key={t.id}>
-              <div className="stat-row" style={{ cursor: 'pointer' }} onClick={() => toggle(t.id)}>
-                <span className="stat-row__label">
-                  🔓 {t.buff_name}
-                  {!t.implemented && ' ⚙️'}
-                </span>
-              </div>
-              {expandedId === t.id && <BuffDetail trial={t} />}
-            </div>
-          ))}
+          <div className="card-list">
+            {unlocked.map((t) => (
+              <TrialCard key={t.id} t={t} open={expandedId === t.id} onToggle={() => toggle(t.id)} />
+            ))}
+          </div>
         </Group>
       )}
     </>

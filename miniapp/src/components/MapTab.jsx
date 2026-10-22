@@ -2,6 +2,7 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 import { Div, Spinner, Placeholder, Button, IconButton } from '@vkontakte/vkui';
 import { getMapRoute, getMapState, saveUi, sendMountFromMap, stopTravel } from '../api.js';
 import mapBase from '../assets/world-map-drawn-2048.webp';
+import { Sheet } from './ui.jsx';
 import {
   DRAW_RINGS, MAP_CENTER, REGION_TITLES, cellInfo, cellSizeAt, cellToMap, cellsBetween, clamp, mapToCell,
   monolithDistance, ringBorders,
@@ -104,7 +105,37 @@ function readSimple() {
 // Хранится на сервере (настройка персонажа) - отправка из чата тоже идёт
 // безопасным путём, если он включён. Путь в обход колец опаснее цели - дольше.
 
-export default function MapTab() {
+// focus - клетка, которую показать при открытии (цель задания из «Заданий»).
+// Легенда значков карты (2026-10-22): открывается кнопкой «?» у карты.
+const LEGEND = [
+  ['🟡', 'Ты'],
+  ['🏛', 'Город'],
+  ['⛏', 'Рудник (бледный - жила пуста)'],
+  ['🎣', 'Озеро'],
+  ['📜', 'Цель сюжетного задания'],
+  ['💀', 'Мировой босс'],
+  ['🌀', 'Разлом (🩸 - кровавый)'],
+  ['🏰', 'База гильдии (🏯 цитадель, 🚩 закладка знамени)'],
+  ['🫏', 'Турбоишак'],
+  ['🎯', 'Цель заказа на убийство'],
+  ['🐂', 'Твоя повозка в пути'],
+  ['🏃', 'Курьер'],
+  ['⚑', 'Куда едешь'],
+];
+
+function MapLegend({ onClose }) {
+  return (
+    <Sheet title="Значки карты" icon="🗺" onClose={onClose}>
+      <ul className="map-legend">
+        {LEGEND.map(([icon, text]) => (
+          <li key={text}><span className="map-legend__icon" aria-hidden="true">{icon}</span>{text}</li>
+        ))}
+      </ul>
+    </Sheet>
+  );
+}
+
+export default function MapTab({ focus = null }) {
   const containerRef = useRef(null);
   const [size, setSize] = useState({ width: 360, height: 420 });
   const [view, setView] = useState(null); // {cu, cv, scale}
@@ -123,6 +154,7 @@ export default function MapTab() {
     saveUi({ set: { safe_route: next } }).catch(() => { /* не сохранилось - выбор остаётся до перезагрузки */ });
   };
   const [banner, setBanner] = useState(null);
+  const [legendOpen, setLegendOpen] = useState(false);
   const [stopping, setStopping] = useState(false);
 
   const pointers = useRef(new Map());
@@ -244,9 +276,19 @@ export default function MapTab() {
   // Только при загрузке и смене размера окна - НЕ на каждом опросе раз в
   // 5 секунд: раньше сдвинутая карта через пару секунд прыгала в центр.
   const fittedRef = useRef(true);
+  const focusedRef = useRef(false);
   const hasState = Boolean(mapState);
   useEffect(() => {
     if (!hasState) return;
+    if (focus && !focusedRef.current) {
+      // Цель задания: приблизить к клетке и открыть её карточку.
+      focusedRef.current = true;
+      fittedRef.current = false;
+      const p = cellToMap(focus.x, focus.y);
+      setView(clampView({ cu: p.u, cv: p.v, scale: clampScale(minScale * 3) }));
+      setSelected({ x: focus.x, y: focus.y });
+      return;
+    }
     if (!view || fittedRef.current) {
       setView(clampView({ cu: MAP_CENTER.u, cv: MAP_CENTER.v, scale: minScale }));
     }
@@ -765,6 +807,7 @@ export default function MapTab() {
 
         <div className="map-controls">
           <IconButton className="map-controls__btn" onClick={recenterOnPlayer} aria-label="К себе">◎</IconButton>
+          <IconButton className="map-controls__btn" onClick={() => setLegendOpen(true)} aria-label="Значки карты">?</IconButton>
           <button
             type="button"
             className={`map-simple-toggle${simple ? ' map-simple-toggle--on' : ''}`}
@@ -802,6 +845,7 @@ export default function MapTab() {
       </div>
 
       {banner && <div className="map-toast">{banner}</div>}
+      {legendOpen && <MapLegend onClose={() => setLegendOpen(false)} />}
 
       {info && (
         <div className="map-card">

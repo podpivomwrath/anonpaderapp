@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react';
-import { Group, Header, Div, Placeholder, TabsItem } from '@vkontakte/vkui';
+import { Group, Header, Placeholder, TabsItem } from '@vkontakte/vkui';
 import Tabs from './ScrollTabs.jsx';
 import { getLeaderboard } from '../api.js';
 import ClassIcon from './ClassIcon.jsx';
 import Skeleton from './Skeleton.jsx';
+import { Empty, Podium, SectionHead } from './ui.jsx';
 
 function money(value) {
   return Number(value ?? 0).toLocaleString('ru-RU');
@@ -32,6 +33,47 @@ const EMPTY_HINTS = {
   mining: 'Пока никто не поднял уровень горного дела.',
 };
 
+/** На сколько мест сдвинулся со вчера. */
+function Moved({ n }) {
+  if (!n) return null;
+  return n > 0
+    ? <span className="top-moved top-moved--up" title="мест вверх со вчера">▲{n}</span>
+    : <span className="top-moved top-moved--down" title="мест вниз со вчера">▼{-n}</span>;
+}
+
+function TopRow({ e }) {
+  return (
+    <div className={`stat-row top-row${e.me ? ' top-row--me' : ''}`}>
+      <span className="stat-row__label">
+        <span className="top-rank">{e.rank}</span>
+        {/* Рамка венца - та, что игрок носит (2026-10-15): у каждого,
+            у кого есть венец, а не только у первого места доски. */}
+        <ClassIcon
+          subclass={e.subclass}
+          baseClass={e.base_class}
+          crown={e.crown_frame || null}
+          size={40}
+        />
+        {/* Имя, титул и Мощь переносятся внутри своей колонки: на
+            телефоне в одну строку они наезжали на достижение справа. */}
+        <span className="top-who">
+          <span className="top-name">{e.premium && '💠 '}{e.name}</span>
+          {/* Титул - цветом своего тира, как в шапке профиля. */}
+          {e.title && (
+            <span className={`top-title title-tier title-tier--${e.title_tier || 'common'}`}>«{e.title}»</span>
+          )}
+          {/* Патч 111: Мощь - только в боевых топах (сервер шлёт её там). */}
+          {e.power != null && <span className="power-chip" title="Мощь">⚔ {money(e.power)}</span>}
+        </span>
+      </span>
+      <span className="stat-row__value">
+        {e.value}
+        <Moved n={e.moved} />
+      </span>
+    </div>
+  );
+}
+
 export default function TopsTab() {
   const [board, setBoard] = useState('pvp');
   const [boards, setBoards] = useState(DEFAULT_BOARDS);
@@ -39,6 +81,8 @@ export default function TopsTab() {
   const [status, setStatus] = useState('loading'); // loading | ready | error
   const [crown, setCrown] = useState(null);
   const [helpOpen, setHelpOpen] = useState(false);
+  const [me, setMe] = useState(null);
+  const [total, setTotal] = useState(0);
 
   useEffect(() => {
     let cancelled = false;
@@ -48,6 +92,8 @@ export default function TopsTab() {
         if (cancelled) return;
         setTop(res.top || []);
         setCrown(res.crown || null);
+        setMe(res.me || null);
+        setTotal(res.total ?? (res.top || []).length);
         if (res.boards?.length) setBoards(res.boards);
         setStatus('ready');
       })
@@ -60,6 +106,8 @@ export default function TopsTab() {
   }, [board]);
 
   const current = boards.find((b) => b.id === board);
+  // Своё место: в десятке - из списка, ниже - отдельной строкой с сервера.
+  const myRank = (top.find((e) => e.me) || me)?.rank ?? null;
 
   return (
     <>
@@ -82,54 +130,47 @@ export default function TopsTab() {
       )}
 
       {status === 'ready' && top.length === 0 && (
-        <Placeholder icon={<div style={{ fontSize: 48 }}>🕯️</div>}>
-          {EMPTY_HINTS[board] || 'Пока пусто.'}
-        </Placeholder>
+        <Group><Empty icon="🕯️">{EMPTY_HINTS[board] || 'Пока пусто.'}</Empty></Group>
       )}
 
       {status === 'ready' && top.length > 0 && (
-        <Group
-          header={(
-            <Header>
-              <span className="top-header">
-                {current?.title || 'Топ'}
-                {crown && (
-                  // Подсказка: за что место в этом топе и что даёт венец первого.
-                  <button type="button" className="top-help" onClick={() => setHelpOpen(true)} aria-label="Что даёт этот топ">
-                    ?
-                  </button>
-                )}
-              </span>
-            </Header>
-          )}
-        >
-          {top.map((e) => (
-            <div className="stat-row top-row" key={e.rank}>
-              <span className="stat-row__label">
-                {/* Рамка венца - та, что игрок носит (2026-10-15): у каждого,
-                    у кого есть венец, а не только у первого места доски. */}
-                <ClassIcon
-                  subclass={e.subclass}
-                  baseClass={e.base_class}
-                  crown={e.crown_frame || null}
-                  size={40}
-                />
-                {/* Имя, титул и Мощь переносятся внутри своей колонки: на
-                    телефоне в одну строку они наезжали на достижение справа. */}
-                <span className="top-who">
-                  <span className="top-name">{e.rank}. {e.premium && '💠 '}{e.name}</span>
-                  {/* Титул - цветом своего тира, как в шапке профиля. */}
-                  {e.title && (
-                    <span className={`top-title title-tier title-tier--${e.title_tier || 'common'}`}>«{e.title}»</span>
-                  )}
-                  {/* Патч 111: Мощь - только в боевых топах (сервер шлёт её там). */}
-                  {e.power != null && <span className="power-chip" title="Мощь">⚔ {money(e.power)}</span>}
+        <>
+          <SectionHead
+            kind="tops" icon="🏆"
+            value={myRank ? `#${myRank}` : '-'}
+            label={myRank ? `твоё место из ${total}` : `тебя нет в топе · всего ${total}`}
+            aside={crown && (
+              // Подсказка: за что место в этом топе и что даёт венец первого.
+              <button type="button" className="top-help" onClick={() => setHelpOpen(true)} aria-label="Что даёт этот топ">
+                ?
+              </button>
+            )}
+          />
+          <Group header={<Header>{current?.title || 'Топ'}</Header>}>
+            <Podium
+              entries={top.slice(0, 3).map((e) => ({
+                key: e.rank, name: e.name, value: e.value, raw: e,
+                sub: e.title ? `«${e.title}»` : null,
+              }))}
+              renderBadge={(e, place) => (
+                <span className={e.raw.me ? 'podium__me' : undefined}>
+                  <ClassIcon
+                    subclass={e.raw.subclass} baseClass={e.raw.base_class}
+                    crown={e.raw.crown_frame || null} size={place === 1 ? 64 : 52}
+                  />
                 </span>
-              </span>
-              <span className="stat-row__value">{e.value}</span>
+              )}
+            />
+            <div className="top-list">
+              {top.slice(3).map((e) => <TopRow key={e.rank} e={e} />)}
             </div>
-          ))}
-        </Group>
+          </Group>
+          {me && (
+            <div className="top-mine">
+              <TopRow e={me} />
+            </div>
+          )}
+        </>
       )}
       {helpOpen && crown && (
         <>

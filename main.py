@@ -334,6 +334,9 @@ async def run() -> None:
     from bot import action_log
 
     action_log.setup(redis)  # 2026-10-21: последние действия игрока - в карточке админки
+    from bot import top_places
+
+    top_places.setup(redis)  # 2026-10-22: места в топах вчера - стрелки в мини-аппе
     resumed = await world_handlers.resume_after_restart()
     # Рыбалка и добыча: их состояние в базе, таймеры - в памяти (2026-10-12).
     resumed["fishing"] = await fishing_handlers.resume_after_restart()

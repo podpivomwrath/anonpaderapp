@@ -10,6 +10,7 @@ import './intro.css'
 import './background.css'
 import './motion.css'
 import './profile.css'
+import './tabs.css'
 import App from './App.jsx'
 
 // Масштаб страницы щипком выключен целиком: у карты и древа гильдии свой зум,

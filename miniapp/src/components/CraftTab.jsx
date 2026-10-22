@@ -1,10 +1,13 @@
 import { useCallback, useEffect, useState } from 'react';
 import {
-  Button, Div, Group, Header, Placeholder, Spinner, TabsItem,
+  Button, Div, Group, Header, Placeholder, TabsItem,
 } from '@vkontakte/vkui';
 import Tabs from './ScrollTabs.jsx';
 import { craftItem, craftTool, getCraft, upgradeCraft } from '../api.js';
 import ItemIcon from './ItemIcon.jsx';
+import Skeleton from './Skeleton.jsx';
+import Sparks from './Sparks.jsx';
+import { Empty, SectionHead, Sheet } from './ui.jsx';
 
 // Патч 72: мастерская. Два подраздела - «Крафт» (сковать/перековать) и
 // «Улучшение» (инструменты и ступени процентов).
@@ -86,6 +89,64 @@ function ForgeSlot({ label, filled, onClick, children }) {
   );
 }
 
+// Наковальня между слотами (2026-10-22): раскаляется, когда всё выбрано, и
+// принимает удар при ковке - strike растёт с каждой удачной операцией.
+function Anvil({ hot, strike }) {
+  return (
+    <span className={`forge-anvil${hot ? ' forge-anvil--hot' : ''}`}>
+      <svg key={strike} className={strike ? 'forge-anvil__svg forge-anvil__svg--strike' : 'forge-anvil__svg'} viewBox="0 0 64 48" width="56" height="42" aria-hidden="true">
+        <path d="M6 10h40c6 0 12 3 14 8H46l-4 6H22l-4-6H10C8 18 6 14 6 10z" fill="currentColor" />
+        <path d="M24 24h16l3 12H21z" fill="currentColor" opacity="0.85" />
+        <path d="M16 36h32v6H16z" fill="currentColor" />
+      </svg>
+      <Sparks burst={strike} />
+    </span>
+  );
+}
+
+// Ступени эффективности: от минимума до потолка, пройденные залиты.
+function EffLadder({ eff, now, next }) {
+  const steps = [];
+  for (let v = eff.min; v <= eff.max; v += eff.step) steps.push(v);
+  return (
+    <div className="eff-ladder">
+      {steps.map((v) => (
+        <span
+          key={v}
+          className={`eff-ladder__step${v <= now ? ' eff-ladder__step--done' : ''}${v === next ? ' eff-ladder__step--next' : ''}${v > eff.craft_max ? ' eff-ladder__step--over' : ''}`}
+        >
+          {v}
+        </span>
+      ))}
+    </div>
+  );
+}
+
+function ResultSheet({ result, onClose }) {
+  const item = result.item;
+  const rar = item?.rarity;
+  const nameClass = `forge-result__name rarity-text--${rar || 'common'}`;
+  return (
+    <Sheet title="Готово" icon="⚒" onClose={onClose} className="forge-result">
+      <div className="forge-result__stage">
+        {item && <ItemIcon icon={item.icon} rarity={item.rarity} alt={item.name} size={112} />}
+        {!item && result.ceiling && <ItemIcon icon={`tool:${result.ceiling}`} alt="Инструмент" size={112} />}
+        <Sparks burst={1} instant />
+      </div>
+      {item && <b className={nameClass}>{item.name}</b>}
+      {result.efficiency_after ? (
+        <p className="forge-result__big">{result.efficiency_before}% → {result.efficiency_after}%</p>
+      ) : item ? (
+        <p className="forge-result__big">{item.efficiency}%</p>
+      ) : (
+        <p className="forge-result__big">Инструмент до {result.ceiling}%</p>
+      )}
+      {item && <p className="forge-result__stats">{statLine(item.stats)}</p>}
+      <button type="button" className="pill-btn pill-btn--main forge-result__ok" onClick={onClose}>Забрать</button>
+    </Sheet>
+  );
+}
+
 function ChanceBars({ chances }) {
   return (
     <div className="craft-lean">
@@ -102,7 +163,7 @@ function ChanceBars({ chances }) {
   );
 }
 
-function Forge({ data, busy, run }) {
+function Forge({ data, busy, run, strike }) {
   const [itemId, setItemId] = useState(null);
   const [ore, setOre] = useState(null); // {id, grade}
   const [spec, setSpec] = useState(null);
@@ -133,7 +194,7 @@ function Forge({ data, busy, run }) {
               <span className="forge-slot__name">{item?.name}</span>
               {item?.spec && <span className="forge-slot__sub">{item.spec_title} · {item.efficiency}%</span>}
             </ForgeSlot>
-            <span className="forge-plus">+</span>
+            <Anvil hot={Boolean(item && oreRow && chosen)} strike={strike} />
             <ForgeSlot label="Руда" filled={!!oreRow} onClick={() => { setPicker('ore'); reset(); }}>
               <ItemIcon icon={oreRow ? `ore:${oreRow.id}` : null} rarity={oreRow?.grade} alt={oreRow?.name} />
               <span className="forge-slot__name">{oreRow?.name}</span>
@@ -349,7 +410,7 @@ function ToolForge({ data, busy, run, need, itemName }) {
   );
 }
 
-function Upgrade({ data, busy, run }) {
+function Upgrade({ data, busy, run, strike }) {
   const [itemId, setItemId] = useState(null);
   const [ceiling, setCeiling] = useState(null);
   const [picker, setPicker] = useState(null); // 'item' | 'tool'
@@ -378,7 +439,7 @@ function Upgrade({ data, busy, run }) {
               <span className="forge-slot__name">{item?.name}</span>
               {item && <span className="forge-slot__sub">{item.spec_title} · {item.efficiency}%</span>}
             </ForgeSlot>
-            <span className="forge-plus">+</span>
+            <Anvil hot={Boolean(item && tool && need !== null && fits(tool))} strike={strike} />
             <ForgeSlot label="Инструмент" filled={!!tool} onClick={() => { setPicker('tool'); reset(); }}>
               <ItemIcon icon={tool ? `tool:${tool.ceiling}` : null} alt="Инструмент" />
               <span className="forge-slot__name">{tool ? `До ${tool.ceiling}%` : ''}</span>
@@ -396,6 +457,7 @@ function Upgrade({ data, busy, run }) {
         <Div>
           {!item && <p className="craft-hint">Выбери выкованную вещь - здесь будет видно, как вырастут статы.</p>}
           {item && need === null && <p className="craft-hint">«{item.name}» уже на {item.efficiency}% - это потолок.</p>}
+          {item && data.efficiency && <EffLadder eff={data.efficiency} now={item.efficiency} next={need} />}
           {item && need !== null && (
             <>
               <p className="guild-line"><b>{item.efficiency}% → {need}%</b></p>
@@ -488,6 +550,8 @@ export default function CraftTab() {
   const [subtab, setSubtab] = useState('craft');
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState(null);
+  const [result, setResult] = useState(null);
+  const [strike, setStrike] = useState(0);
 
   const load = useCallback(() => {
     setStatus('loading');
@@ -501,9 +565,7 @@ export default function CraftTab() {
 
   useEffect(() => { load(); }, [load]);
 
-  if (status === 'loading') {
-    return <Div style={{ display: 'flex', justifyContent: 'center', paddingTop: 32 }}><Spinner /></Div>;
-  }
+  if (status === 'loading') return <Skeleton />;
   if (status === 'error' || !data) {
     return (
       <Placeholder action={<Button onClick={load}>Попробовать снова</Button>}>
@@ -513,19 +575,19 @@ export default function CraftTab() {
   }
   if (!data.items.length) {
     return (
-      <Placeholder icon={<div style={{ fontSize: 44 }}>🔨</div>}>
-        Ковать пока не из чего. Нужен предмет с рейд-босса.
-      </Placeholder>
+      <Group>
+        <Empty icon="🔨">Ковать пока не из чего. В мастерскую идут вещи с рейд-боссов.</Empty>
+      </Group>
     );
   }
-
 
   const run = (action) => {
     setBusy(true);
     setNotice(null);
     action()
       .then((res) => {
-        setNotice({ ok: true, text: describe(res) });
+        setStrike((s) => s + 1);
+        setResult(res);
         // Без экрана загрузки: иначе ковка размонтируется и забудет выбор.
         return getCraft().then(setData);
       })
@@ -533,8 +595,16 @@ export default function CraftTab() {
       .finally(() => setBusy(false));
   };
 
+  const forged = data.items.filter((i) => i.spec).length;
+  const tools = data.tools.reduce((sum, t) => sum + t.count, 0);
+  const stock = byOreType(data.ore);
+
   return (
     <>
+      <SectionHead
+        kind="craft" icon="⚒️" value={`${forged}/${data.items.length}`} label="вещей выковано"
+        aside={<>🧰 {tools}<br /><small>инструментов</small></>}
+      />
       <Tabs>
         {SUBTABS.map((tab) => (
           <TabsItem key={tab.id} selected={subtab === tab.id} onClick={() => setSubtab(tab.id)}>
@@ -550,19 +620,31 @@ export default function CraftTab() {
       )}
 
       {subtab === 'craft' ? (
-        <Forge data={data} busy={busy} run={run} />
+        <Forge data={data} busy={busy} run={run} strike={strike} />
       ) : (
-        <Upgrade data={data} busy={busy} run={run} />
+        <Upgrade data={data} busy={busy} run={run} strike={strike} />
       )}
+
+      {stock.length > 0 && (
+        <Group header={<Header>Запас руды</Header>}>
+          <div className="tile-grid ore-grid">
+            {stock.map((g) => (
+              <div className="tile ore-tile" key={g.id}>
+                <ItemIcon icon={`ore:${g.id}`} rarity={g.grades[g.grades.length - 1]?.grade} alt={g.name} size={40} />
+                <b className="tile__value">{g.total}</b>
+                <small className="tile__label">{g.name}</small>
+                <span className="ore-tile__grades">
+                  {g.grades.map((row) => (
+                    <i key={row.grade} className={`ore-dot ore-dot--${row.grade}`} title={`${row.grade_name}: ${row.count}`} />
+                  ))}
+                </span>
+              </div>
+            ))}
+          </div>
+        </Group>
+      )}
+
+      {result && <ResultSheet result={result} onClose={() => setResult(null)} />}
     </>
   );
-}
-
-function describe(res) {
-  if (res.ceiling) return `Инструмент готов - качает до ${res.ceiling}%.`;
-  if (res.efficiency_after) {
-    return `${res.efficiency_before}% → ${res.efficiency_after}%.`;
-  }
-  const item = res.item;
-  return `${item.name}: ${statLine(item.stats)} (${item.efficiency}%).`;
 }

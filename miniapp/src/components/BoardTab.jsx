@@ -5,6 +5,7 @@ import { getBoard } from '../api.js';
 import ClassIcon from './ClassIcon.jsx';
 import ContractsSection from './ContractsSection.jsx';
 import Skeleton from './Skeleton.jsx';
+import { Bar, Empty, Podium, SectionHead } from './ui.jsx';
 
 /**
  * «Доска» (2026-10-15): всё PvP в одном месте - розыск (Кровавое клеймо и
@@ -34,6 +35,10 @@ function Wanted({ data }) {
   const { me, rules, wanted } = data;
   return (
     <>
+      <SectionHead
+        kind="board" icon="🩸" value={wanted.length} label="клеймёных убийц сейчас"
+        aside={me.marks > 0 ? <>🩸 {me.marks}<br /><small>твоё клеймо</small></> : null}
+      />
       {(me.marks > 0 || me.revenge) && (
         <Group header={<Header>Ты</Header>}>
           <Div>
@@ -50,26 +55,27 @@ function Wanted({ data }) {
         </Group>
       )}
       <Group header={<Header>Клеймёные убийцы</Header>}>
-        {wanted.length === 0 && (
-          <Placeholder icon={<div style={{ fontSize: 48 }}>🕊️</div>}>
-            Сейчас никто не носит клеймо.
-          </Placeholder>
-        )}
-        {wanted.map((w) => (
-          <div className="stat-row top-row" key={w.id}>
-            <span className="stat-row__label">
-              <ClassIcon subclass={w.subclass} baseClass={w.base_class} crown={w.crown_frame || null} size={40} />
-              <span className="top-who">
-                <span className="top-name">🩸{w.marks} {w.name}</span>
-                <span className="craft-hint">
-                  {w.level} ур.{w.city_banned ? ' · в город не пускают' : ''}
-                  {w.next_decay_min != null ? ` · метка сойдёт через ${minutes(w.next_decay_min)}` : ''}
+        {wanted.length === 0 && <Empty icon="🕊️">Сейчас никто не носит клеймо.</Empty>}
+        {wanted.length > 0 && (
+          <div className="wanted-grid">
+            {wanted.map((w) => (
+              <div className="wanted-card" key={w.id}>
+                <span className="wanted-card__head">Разыскивается</span>
+                <ClassIcon subclass={w.subclass} baseClass={w.base_class} crown={w.crown_frame || null} size={56} />
+                <b className="wanted-card__name">{w.name}</b>
+                <span className="wanted-card__marks" aria-label={`меток: ${w.marks}`}>
+                  {'🩸'.repeat(Math.min(w.marks, 5))}{w.marks > 5 ? ` ×${w.marks}` : ''}
                 </span>
-              </span>
-            </span>
-            <span className="stat-row__value">🩸 {w.marks}</span>
+                <small className="wanted-card__meta">
+                  {w.level} ур.{w.city_banned ? ' · вне закона' : ''}
+                </small>
+                {w.next_decay_min != null && (
+                  <small className="wanted-card__meta">метка сойдёт через {minutes(w.next_decay_min)}</small>
+                )}
+              </div>
+            ))}
           </div>
-        ))}
+        )}
       </Group>
       {/* Правила свёрнуты - развёрнутые занимали полэкрана (2026-10-15). */}
       <Group>
@@ -95,56 +101,82 @@ function Wanted({ data }) {
 function Rating({ data }) {
   const { me, rating } = data;
   return (
-    <Group header={<Header>Рейтинг PvP · сезон {data.season.name}</Header>}>
+    <>
       {/* Своё место видно всегда, даже за пределами двадцатки (2026-10-15). */}
-      <Div className="craft-hint">
-        {me.place
-          ? <>Ты: <b>{me.place} место</b> из {me.rated_total} · {money(me.pts)} PTS · {me.rank}</>
-          : <>Тебя пока нет в рейтинге: ты попадёшь в него после первого PvP-боя. Сейчас у тебя {money(me.pts)} PTS · {me.rank}.</>}
-      </Div>
-      {rating.length === 0 && (
-        <Placeholder icon={<div style={{ fontSize: 48 }}>🕯️</div>}>В этом сезоне ещё никто не дрался в PvP.</Placeholder>
-      )}
-      {rating.map((e) => (
-        <div className="stat-row top-row" key={e.rank}>
-          <span className="stat-row__label">
-            {/* Рамка венца, которую носит игрок (своя у каждого). */}
-            <ClassIcon subclass={e.subclass} baseClass={e.base_class} crown={e.crown_frame || null} size={40} />
-            <span className="top-who">
-              <span className="top-name">{e.rank}. {e.premium && '💠 '}{e.name}</span>
-              {e.title && <span className={`top-title title-tier title-tier--${e.title_tier || 'common'}`}>«{e.title}»</span>}
-            </span>
-          </span>
-          <span className="stat-row__value">{e.value}</span>
+      <SectionHead
+        kind="board" icon="🏅" value={me.place ? `#${me.place}` : '-'}
+        label={me.place ? `место из ${me.rated_total} · ${me.rank}` : `ты в рейтинге после первого PvP-боя · ${me.rank}`}
+        aside={<>{money(me.pts)}<br /><small>PTS</small></>}
+      />
+      <Group header={<Header>Рейтинг PvP · сезон {data.season.name}</Header>}>
+        {rating.length === 0 && <Empty icon="🕯️">В этом сезоне ещё никто не дрался в PvP.</Empty>}
+        {rating.length > 0 && (
+          <Podium
+            entries={rating.slice(0, 3).map((e) => ({ key: e.rank, name: e.name, value: e.value.split(' · ')[0], raw: e, sub: e.value.split(' · ')[1] }))}
+            renderBadge={(e, place) => (
+              <ClassIcon subclass={e.raw.subclass} baseClass={e.raw.base_class} crown={e.raw.crown_frame || null} size={place === 1 ? 64 : 52} />
+            )}
+          />
+        )}
+        <div className="top-list">
+          {rating.slice(3).map((e) => (
+            <div className="stat-row top-row" key={e.rank}>
+              <span className="stat-row__label">
+                <span className="top-rank">{e.rank}</span>
+                {/* Рамка венца, которую носит игрок (своя у каждого). */}
+                <ClassIcon subclass={e.subclass} baseClass={e.base_class} crown={e.crown_frame || null} size={40} />
+                <span className="top-who">
+                  <span className="top-name">{e.premium && '💠 '}{e.name}</span>
+                  {e.title && <span className={`top-title title-tier title-tier--${e.title_tier || 'common'}`}>«{e.title}»</span>}
+                </span>
+              </span>
+              <span className="stat-row__value">{e.value}</span>
+            </div>
+          ))}
         </div>
-      ))}
-    </Group>
+      </Group>
+    </>
   );
 }
 
 function Season({ data }) {
   const { season, me } = data;
+  const idx = Math.max(0, season.ranks.findIndex((r) => r.name === me.rank));
+  const next = season.ranks[idx + 1];
+  const cur = season.ranks[idx];
   return (
     <>
-      <Group header={<Header>Сезон: {season.name}</Header>}>
-        <Div>
-          <p className="guild-line">До конца сезона: {season.days_left} дн.</p>
-          <p className="craft-hint">
-            Сезон длится календарный месяц. В начале нового сезона рейтинг каждого сжимается к {money(season.start)}: остаётся {season.keep_pct}% того, на сколько ты был выше или ниже.
-          </p>
-          <p className="guild-line">Твой ранг: {me.rank} · {money(me.pts)} PTS</p>
-        </Div>
-      </Group>
+      <SectionHead
+        kind="board" icon="📅" value={`${season.days_left} дн.`} label={`до конца сезона «${season.name}»`}
+        aside={<>{me.rank}<br /><small>{money(me.pts)} PTS</small></>}
+      />
       <Group header={<Header>Ранги</Header>}>
-        {season.ranks.map((r, i) => {
-          const next = season.ranks[i + 1];
-          return (
-            <div className="stat-row" key={r.name}>
-              <span className="stat-row__label">{r.name}{me.rank === r.name ? ' ← ты' : ''}</span>
-              <span className="stat-row__value">{next ? `${money(r.from)}-${money(next.from - 1)}` : `${money(r.from)}+`} PTS</span>
-            </div>
-          );
-        })}
+        {next && (
+          <div className="milestone">
+            <span className="milestone__head">
+              <span>До ранга «{next.name}»</span>
+              <span>{money(Math.max(0, next.from - me.pts))} PTS</span>
+            </span>
+            <Bar value={me.pts - cur.from} max={next.from - cur.from} tone="red" />
+          </div>
+        )}
+        <ol className="rank-ladder">
+          {[...season.ranks].reverse().map((r) => {
+            const i = season.ranks.indexOf(r);
+            const after = season.ranks[i + 1];
+            const state = i < idx ? 'done' : i === idx ? 'now' : 'todo';
+            return (
+              <li key={r.name} className={`rank-ladder__step rank-ladder__step--${state}`}>
+                <span className="rank-ladder__dot" />
+                <span className="rank-ladder__name">{r.name}</span>
+                <span className="rank-ladder__pts">{after ? `${money(r.from)}-${money(after.from - 1)}` : `${money(r.from)}+`}</span>
+              </li>
+            );
+          })}
+        </ol>
+        <p className="craft-hint season-note">
+          Сезон длится календарный месяц. В начале нового сезона рейтинг каждого сжимается к {money(season.start)}: остаётся {season.keep_pct}% того, на сколько ты был выше или ниже.
+        </p>
       </Group>
     </>
   );

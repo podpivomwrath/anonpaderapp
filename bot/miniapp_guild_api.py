@@ -313,6 +313,9 @@ async def _state(db, character: Character) -> dict:
                 "id": c.id, "name": c.name, "level": c.level, "vk_id": vk_ids.get(c.user_id),
                 # Подкласс, если выбран (2026-10-17): «Воин» у всех троих мало что говорил.
                 "class": naming.subclass_title(c.subclass) or naming.base_class_title(c.base_class),
+                # Значок класса и «был в сети» (2026-10-22): состав карточками.
+                "base_class": c.base_class, "subclass": c.subclass,
+                "seen_at": c.last_active_at.isoformat() if c.last_active_at else None,
                 "rank": m.rank, "rank_title": gc.RANK_TITLES[m.rank],
                 "week": m.contribution_week if m.week_start == week else 0, "total": m.contribution_total,
             }

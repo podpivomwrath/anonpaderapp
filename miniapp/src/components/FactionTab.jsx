@@ -5,6 +5,7 @@ import { getTrade, getTradeCity, tradeAction } from '../api.js';
 import { itemIcon } from '../itemIcons.js';
 import ItemIcon from './ItemIcon.jsx';
 import Skeleton from './Skeleton.jsx';
+import { Bar as UiBar, SectionHead } from './ui.jsx';
 
 // Вкладка «Фракция» (2026-10-15): торговая фирма и процветание городов.
 // Цены, пути, шансы и правила считает сервер (services/trade_service.py,
@@ -181,6 +182,33 @@ function DispatchSheet({ cart, gold, routeTitles, orders, market, busy, onSend, 
 
 // --- Повозка --------------------------------------------------------------------
 
+// Дорога повозки (2026-10-22): от города к городу, повозка едет по полосе.
+function Road({ cart }) {
+  const done = cart.seconds_total ? 1 - cart.seconds_left / cart.seconds_total : 0.5;
+  const pct = Math.round(Math.max(0.03, Math.min(0.97, done)) * 100);
+  return (
+    <div className={`cart-road${cart.route === 'safe' ? ' cart-road--safe' : ''}`}>
+      <span className="cart-road__city">{cart.city_title}</span>
+      <span className="cart-road__track">
+        <i className="cart-road__done" style={{ width: `${pct}%` }} />
+        <span className="cart-road__ox" style={{ left: `${pct}%` }} aria-hidden="true">🐂</span>
+      </span>
+      <span className="cart-road__city">{cart.to_title}</span>
+    </div>
+  );
+}
+
+// Кузов ящиками: заполненные - груз, пустые - свободное место.
+function Crates({ crates, capacity }) {
+  return (
+    <span className="cart-crates" aria-label={`груз ${crates} из ${capacity}`}>
+      {Array.from({ length: capacity }, (_, i) => (
+        <i key={i} className={i < crates ? 'cart-crates__box cart-crates__box--full' : 'cart-crates__box'} />
+      ))}
+    </span>
+  );
+}
+
 function CartCard({ cart, gold, busy, act, onDispatch }) {
   const [workshop, setWorkshop] = useState(false);
   const traveling = cart.status === 'traveling';
@@ -188,16 +216,26 @@ function CartCard({ cart, gold, busy, act, onDispatch }) {
     <Group header={<Header>🐂 Повозка №{cart.slot} · {traveling ? `в пути в ${cart.to_title}` : cart.city_title}</Header>}>
       <Div>
         {traveling ? (
-          <p className="guild-line">
-            Прибудет через ~{duration(cart.seconds_left)} · путь {cart.route === 'safe' ? 'безопасный' : 'короткий'}
-          </p>
+          <>
+            <Road cart={cart} />
+            <p className="guild-line">
+              Прибудет через ~{duration(cart.seconds_left)} · путь {cart.route === 'safe' ? 'безопасный' : 'короткий'}
+            </p>
+          </>
         ) : (
           <p className="guild-line">Стоит в городе и ждёт.</p>
         )}
-        <p className="guild-line">
-          📦 {traveling ? `Груз ${cart.crates}/${cart.capacity}` : `Кузов ${cart.capacity} ящ.`}
-          {' · '}🛡 Обшивка {cart.durability}/{cart.max_durability}
-        </p>
+        <div className="cart-stats">
+          <span className="cart-stats__row">
+            <span>📦 {traveling ? `Груз ${cart.crates}/${cart.capacity}` : `Кузов ${cart.capacity} ящ.`}</span>
+            <Crates crates={traveling ? cart.crates : 0} capacity={cart.capacity} />
+          </span>
+          <span className="cart-stats__row">
+            <span>🛡 Обшивка {cart.durability}/{cart.max_durability}</span>
+            <UiBar value={cart.durability} max={cart.max_durability}
+              tone={cart.durability / cart.max_durability < 0.35 ? 'red' : 'green'} thin />
+          </span>
+        </div>
         {cart.cargo.length > 0 && (
           <div className="trade-cargo">
             {cart.cargo.map((g) => <span key={g.id} className="trade-chip"><GoodName g={g} size={20} count={g.count} /></span>)}
@@ -328,17 +366,28 @@ function Trade({ data, busy, act }) {
 
   return (
     <>
-      <Group header={<Header>🏛 «{firm.name}» · торговля {firm.trade_level} ур.{firm.sell_bonus_pct ? ` · +${firm.sell_bonus_pct}% к выручке` : ''}</Header>}>
+      <SectionHead
+        kind="trade" icon="🐂" value={`«${firm.name}»`}
+        label={`торговля ${firm.trade_level} ур.${firm.sell_bonus_pct ? ` · +${firm.sell_bonus_pct}% к выручке` : ''}`}
+        aside={<>{firm.profit_total >= 0 ? '+' : ''}{money(firm.profit_total)}<br /><small>прибыль за всё время</small></>}
+      />
+      <Group header={<Header>🏛 Фирма</Header>}>
         <Div>
-          <div className="trade-xp">
-            <div className="trade-xp__bar" style={{ width: `${Math.round((100 * firm.trade_xp) / firm.xp_next)}%` }} />
+          <div className="milestone milestone--flat">
+            <span className="milestone__head">
+              <span>Опыт торговли</span>
+              <span>{firm.trade_xp} / {firm.xp_next}</span>
+            </span>
+            <UiBar value={firm.trade_xp} max={firm.xp_next} />
           </div>
-          <p className="craft-hint">
-            Опыт {firm.trade_xp} / {firm.xp_next} · прибыль за всё время {money(firm.profit_total)} · у тебя 💰 {money(data.gold)}
-          </p>
-          <p className="guild-line">
-            🏛 Процветание {data.home_title}: сегодня ты принёс {firm.today_points} из {firm.daily_cap} очков.
-          </p>
+          <div className="milestone milestone--flat">
+            <span className="milestone__head">
+              <span>🏛 Процветание {data.home_title} сегодня</span>
+              <span>{firm.today_points} / {firm.daily_cap}</span>
+            </span>
+            <UiBar value={firm.today_points} max={firm.daily_cap} tone="blue" thin />
+          </div>
+          <p className="craft-hint">У тебя 💰 {money(data.gold)}</p>
           <label className="guild-check">
             <input type="checkbox" checked={firm.notify_arrival} disabled={busy}
               onChange={(e) => act('notify', { arrival: e.target.checked })} />
@@ -483,7 +532,7 @@ function Factions({ data }) {
         const fill = Math.min(100, Math.round((100 * (f.points - lo)) / Math.max(hi - lo, 1)));
         const home = f.city === data.home;
         return (
-          <Group key={f.city} header={(
+          <Group key={f.city} className={home ? 'faction-home' : undefined} header={(
             <button type="button" className="city-head" onClick={() => setOpen(open === f.city ? null : f.city)}>
               <Header>{f.title}{home ? ' · твой город' : ''}</Header>
               <span className="city-head__hint">{open === f.city ? 'свернуть ▲' : 'товары и торговцы ▼'}</span>
@@ -491,8 +540,19 @@ function Factions({ data }) {
           )}>
             <Div>
               {open === f.city && <CitySummary city={f.city} />}
-              <p className="guild-line"><b>{f.tier.emoji} {f.tier.name}</b> · {money(f.points)} очков</p>
-              <div className="guild-bar"><div className="guild-bar__fill" style={{ width: `${fill}%` }} /></div>
+              <div className="faction-head">
+                <span className="faction-head__emblem" aria-hidden="true">{f.tier.emoji}</span>
+                <span className="faction-head__text">
+                  <b>{f.tier.name}</b>
+                  <small>{money(f.points)} очков</small>
+                </span>
+                <span className="faction-steps" aria-hidden="true">
+                  {data.tiers.map((t) => (
+                    <i key={t.id} className={f.points >= t.min_points ? 'faction-steps__dot faction-steps__dot--on' : 'faction-steps__dot'} title={t.name} />
+                  ))}
+                </span>
+              </div>
+              <UiBar value={fill} max={100} tone={home ? 'red' : 'gold'} />
               <p className="craft-hint">
                 {f.next ? `До ступени «${f.next.name}» - ${money(f.next.min_points - f.points)} очков.` : 'Высшая ступень.'}
                 {' '}Сегодня торговцы принесли +{money(f.today)}, падение за сутки ~{money(f.decay_day)}.

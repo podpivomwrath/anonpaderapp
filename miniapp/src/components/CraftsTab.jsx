@@ -9,6 +9,7 @@ import {
   CheckIcon, CopyIcon, ItemSheet, QuantitySheet, copyText,
 } from './InventoryTab.jsx';
 import Skeleton from './Skeleton.jsx';
+import { Bar } from './ui.jsx';
 
 // Ремесла (2026-10-21): у каждого ремесла - уровень, опыт, короткая подсказка
 // и своя сумка. Рыба и руда переехали сюда из инвентаря: всё ремесленное
@@ -18,19 +19,43 @@ function kg(grams) {
   return (grams / 1000).toLocaleString('ru-RU', { maximumFractionDigits: 1 });
 }
 
-function Progress({ skill }) {
+// Шапка ремесла (2026-10-22): кольцо уровня, полоска опыта и что откроется
+// следующим. Кольцо заполняется опытом до следующего уровня.
+function CraftHead({ icon, level, max, xp, xpNext, next }) {
+  const r = 26;
+  const len = 2 * Math.PI * r;
+  const share = xpNext > 0 ? Math.min(1, xp / xpNext) : 1;
   return (
-    <>
-      <div className="stat-row">
-        <span className="stat-row__label">Уровень</span>
-        <span className="stat-row__value">{skill.level}</span>
-      </div>
-      <div className="stat-row">
-        <span className="stat-row__label">Опыт</span>
-        <span className="stat-row__value">{skill.xp} / {skill.xp_to_next}</span>
-      </div>
-    </>
+    <div className="craft-head">
+      <span className="craft-ring">
+        <svg viewBox="0 0 64 64" width="64" height="64" aria-hidden="true">
+          <circle cx="32" cy="32" r={r} className="craft-ring__track" />
+          <circle cx="32" cy="32" r={r} className="craft-ring__bar"
+            strokeDasharray={len} strokeDashoffset={len * (1 - share)} />
+        </svg>
+        <span className="craft-ring__icon" aria-hidden="true">{icon}</span>
+        <b className="craft-ring__level">{level}</b>
+      </span>
+      <span className="craft-head__text">
+        <span className="craft-head__lvl">
+          Уровень {level}{max ? ` из ${max}` : ''}
+        </span>
+        {xpNext > 0 ? (
+          <span className="daily-card__progress">
+            <Bar value={xp} max={xpNext} tone="green" thin />
+            <span className="daily-card__count">{xp}/{xpNext}</span>
+          </span>
+        ) : <small className="craft-head__max">предел</small>}
+        {next && <small className="craft-head__next">Дальше: {next}</small>}
+      </span>
+    </div>
   );
+}
+
+// Первое закрытое в списке (трава, рецепт) - «на N уровне».
+function nextLocked(rows) {
+  const row = (rows || []).find((r) => !r.known);
+  return row ? `новое на ${row.level} уровне` : null;
 }
 
 export default function CraftsTab({ character }) {
@@ -162,7 +187,16 @@ export default function CraftsTab({ character }) {
     <>
       {character.fishing && (
         <Group header={<Header>🎣 Рыбалка</Header>}>
-          <Progress skill={character.fishing} />
+          <CraftHead icon="🎣" level={character.fishing.level} xp={character.fishing.xp} xpNext={character.fishing.xp_to_next} />
+          {fishBag && (
+            <div className="milestone milestone--inset">
+              <span className="milestone__head">
+                <span>Садок</span>
+                <span>{kg(fishBag.grams)} / {kg(fishBag.capacity)} кг</span>
+              </span>
+              <Bar value={fishBag.grams} max={fishBag.capacity} tone={fishBag.grams >= fishBag.capacity ? 'red' : 'blue'} thin />
+            </div>
+          )}
           <Caption level="1" style={{ padding: '0 16px 12px', opacity: 0.7 }}>
             Потолка нет. Уровень повышает шанс на крупную рыбу, снижает обрыв лески и увеличивает садок.
             Рыбу берёт Иргал, а Рыбак у воды в глубоких кольцах платит больше.
@@ -174,14 +208,14 @@ export default function CraftsTab({ character }) {
           >
             Автоматически класть всю рыбу в садок
           </SimpleCell>
-          {pouch('fish', fishBag ? `Садок · ${kg(fishBag.grams)} / ${kg(fishBag.capacity)} кг` : 'Садок',
+          {pouch('fish', 'Рыба в садке',
             'fish', fish, 'Садок пуст.')}
         </Group>
       )}
 
       {character.mining && (
         <Group header={<Header>⛏ Горное дело</Header>}>
-          <Progress skill={character.mining} />
+          <CraftHead icon="⛏" level={character.mining.level} xp={character.mining.xp} xpNext={character.mining.xp_to_next} />
           <Caption level="1" style={{ padding: '0 16px 12px', opacity: 0.7 }}>
             Потолка нет. Уровень ускоряет добычу и повышает шанс на редкую руду. Руда идёт в мастерскую,
             лишнее железо и кварц дёшево берёт Иргал.
@@ -192,16 +226,8 @@ export default function CraftsTab({ character }) {
 
       {herbal && (
         <Group header={<Header>🌿 Травничество</Header>}>
-          <div className="stat-row">
-            <span className="stat-row__label">Уровень</span>
-            <span className="stat-row__value">{herbal.level} / {herbal.max_level}</span>
-          </div>
-          {herbal.xp_to_next > 0 && (
-            <div className="stat-row">
-              <span className="stat-row__label">Опыт</span>
-              <span className="stat-row__value">{herbal.xp} / {herbal.xp_to_next}</span>
-            </div>
-          )}
+          <CraftHead icon="🌿" level={herbal.level} max={herbal.max_level} xp={herbal.xp} xpNext={herbal.xp_to_next}
+            next={nextLocked(herbal.catalog)} />
           <Caption level="1" style={{ padding: '0 16px 12px', opacity: 0.7 }}>
             Трава вырастает на случайных клетках, пока игроки исследуют мир, и ждет сутки. Зайдешь на клетку
             с травой - в чате появится кнопка «Собрать». Кто первый сорвал, того и трава. Каждые 10 уровней
@@ -215,16 +241,8 @@ export default function CraftsTab({ character }) {
 
       {alch && (
         <Group header={<Header>⚗️ Алхимия</Header>}>
-          <div className="stat-row">
-            <span className="stat-row__label">Уровень</span>
-            <span className="stat-row__value">{alch.level} / {alch.max_level}</span>
-          </div>
-          {alch.xp_to_next > 0 && (
-            <div className="stat-row">
-              <span className="stat-row__label">Опыт</span>
-              <span className="stat-row__value">{alch.xp} / {alch.xp_to_next}</span>
-            </div>
-          )}
+          <CraftHead icon="⚗️" level={alch.level} max={alch.max_level} xp={alch.xp} xpNext={alch.xp_to_next}
+            next={nextLocked(alch.recipes)} />
           <Caption level="1" style={{ padding: '0 16px 12px', opacity: 0.7 }}>
             {alch.has_house
               ? 'Варят в чате: Дом на площади родного города, Алхимический стол. '
@@ -239,16 +257,8 @@ export default function CraftsTab({ character }) {
 
       {cook && (
         <Group header={<Header>🔥 Кулинария</Header>}>
-          <div className="stat-row">
-            <span className="stat-row__label">Уровень</span>
-            <span className="stat-row__value">{cook.level} / {cook.max_level}</span>
-          </div>
-          {cook.xp_to_next > 0 && (
-            <div className="stat-row">
-              <span className="stat-row__label">Опыт</span>
-              <span className="stat-row__value">{cook.xp} / {cook.xp_to_next}</span>
-            </div>
-          )}
+          <CraftHead icon="🔥" level={cook.level} max={cook.max_level} xp={cook.xp} xpNext={cook.xp_to_next}
+            next={nextLocked(cook.recipes)} />
           <Caption level="1" style={{ padding: '0 16px 12px', opacity: 0.7 }}>
             {cook.has_house
               ? 'Готовят в чате: Дом на площади родного города, Печь. '

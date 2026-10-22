@@ -25,9 +25,10 @@ function makeSparks(seed) {
   });
 }
 
-export default function Sparks({ burst, color = 'ember' }) {
+export default function Sparks({ burst, color = 'ember', instant = false }) {
   const [sparks, setSparks] = useState(null);
-  const [seen, setSeen] = useState(burst);
+  // instant - вспышка сразу при появлении (карточка результата ковки).
+  const [seen, setSeen] = useState(instant ? null : burst);
 
   useEffect(() => {
     if (burst === seen) return undefined;

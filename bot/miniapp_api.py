@@ -13,7 +13,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from bot.app_keys import SESSION_FACTORY_KEY, SETTINGS_KEY
-from bot import dailies_texts
+from bot import dailies_texts, top_places
 from bot.miniapp_auth import VK_USER_ID_KEY
 from game.combat import balance_config as bc
 from game.economy import crafting
@@ -435,15 +435,38 @@ async def handle_get_leaderboard(request: web.Request) -> web.Response:
         character = await _load_character(session, vk_user_id)
         if character is None:
             return web.json_response({"error": "character_not_found"}, status=404)
-        entries = await leaderboard_service.board(session, board_id, limit=10)
+        # Вся доска (2026-10-22): своя строка внизу, даже если ты не в десятке,
+        # и стрелки места со вчера. Игроков немного - список целиком дешёвый.
+        full = await leaderboard_service.board(session, board_id, limit=5000)
+        entries = full[:10]
+        mine = next((e for e in full if e.character_id == character.id), None)
+        shown = entries + ([mine] if mine is not None and mine.rank > 10 else [])
+        moved = await top_places.deltas(board_id, {e.character_id: e.rank for e in full if e.character_id})
         powers = {}
         if board_id in leaderboard_service.COMBAT_BOARDS:
-            for e in entries:
+            for e in shown:
                 if e.character_id is not None:
                     powers[e.character_id] = await power_service.power_by_id(session, e.character_id)
         from game.economy import crown_config as cc
 
-        frames = await crown_service.frames_by_id(session, [e.character_id for e in entries])
+        frames = await crown_service.frames_by_id(session, [e.character_id for e in shown])
+
+        def row(e):
+            return {
+                "rank": e.rank, "name": e.name, "value": e.value,
+                "title": e.title, "title_tier": e.title_tier, "premium": e.premium,
+                # Значок класса в строке. Подкласс есть не у всех (до 30
+                # уровня его нет вовсе), поэтому клиенту отдаются оба, а
+                # он показывает подкласс, если тот выбран.
+                "base_class": e.base_class, "subclass": e.subclass,
+                # Патч 111: Мощь рядом с ником - только в боевых топах.
+                "power": powers.get(e.character_id),
+                # Рамка венца, которую носит игрок (своя у каждого).
+                "crown_frame": frames.get(e.character_id),
+                "me": e.character_id == character.id,
+                # На сколько мест поднялся со вчера (минус - опустился).
+                "moved": moved.get(e.character_id),
+            }
         return web.json_response({
             "board": board_id,
             "boards": [
@@ -461,19 +484,9 @@ async def handle_get_leaderboard(request: web.Request) -> web.Response:
                     for b in leaderboard_service.BOARDS
                 ],
             },
-            "top": [
-                {"rank": e.rank, "name": e.name, "value": e.value,
-                 "title": e.title, "title_tier": e.title_tier, "premium": e.premium,
-                 # Значок класса в строке. Подкласс есть не у всех (до 30
-                 # уровня его нет вовсе), поэтому клиенту отдаются оба, а
-                 # он показывает подкласс, если тот выбран.
-                 "base_class": e.base_class, "subclass": e.subclass,
-                 # Патч 111: Мощь рядом с ником - только в боевых топах.
-                 "power": powers.get(e.character_id),
-                 # Рамка венца, которую носит игрок (своя у каждого).
-                 "crown_frame": frames.get(e.character_id)}
-                for e in entries
-            ],
+            "top": [row(e) for e in entries],
+            "me": row(mine) if mine is not None and mine.rank > 10 else None,
+            "total": len(full),
         })
 
 
@@ -489,9 +502,19 @@ async def _story_payload(session: AsyncSession, character: Character) -> dict:
         for act in line.acts
         if row is not None and (row.completed or act.act < row.act)
     ]
+    # Путь актов для вкладки (2026-10-22): пройденные, текущий и сколько
+    # впереди - названия будущих не раскрываем.
+    current_act = None if row is None or row.completed else row.act
+    acts = [
+        {"act": act.act,
+         "title": act.title if row is not None and (row.completed or act.act <= row.act) else None,
+         "state": ("done" if row is not None and (row.completed or act.act < row.act)
+                   else "now" if act.act == current_act else "todo")}
+        for act in line.acts
+    ]
     quest = await story_service.current_quest_def(session, character)
     if quest is None:
-        return {"active_quest": None, "passed_acts": passed_acts}
+        return {"active_quest": None, "passed_acts": passed_acts, "acts": acts}
 
     if quest.kind == "first_quest":
         peek = await quest_service.peek_progress(session, character)
@@ -503,7 +526,7 @@ async def _story_payload(session: AsyncSession, character: Character) -> dict:
                 "target": None,
                 "ready": peek.status == "ready",
             }
-        return {"active_quest": active_quest, "passed_acts": passed_acts}
+        return {"active_quest": active_quest, "passed_acts": passed_acts, "acts": acts}
 
     target = None
     if quest.target_x is not None and quest.target_y is not None:
@@ -517,6 +540,7 @@ async def _story_payload(session: AsyncSession, character: Character) -> dict:
             "ready": ready,
         },
         "passed_acts": passed_acts,
+        "acts": acts,
     }
 
 
@@ -596,6 +620,10 @@ async def handle_get_dailies(request: web.Request) -> web.Response:
                     # календаря. Данные и так уходили, просто не читались.
                     "rewards_text": {
                         str(day): dailies_texts.reward_preview(reward)
+                        for day, reward in login_state.rewards.items()
+                    },
+                    "rewards_icon": {
+                        str(day): dailies_texts.reward_icon(reward)
                         for day, reward in login_state.rewards.items()
                     },
                 },

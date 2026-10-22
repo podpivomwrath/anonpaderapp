@@ -26,13 +26,13 @@ export const TAB_HINTS = {
       text: 'В летописи собраны Пепельная Песнь и твои титулы. Нажми на строку, раскроется.' },
   ],
   inventory: [
-    { target: 'h:В сумке', title: 'Сумка', voice: 'hint_inventory_1', pose: 2,
+    { target: '.bag-grid', title: 'Сумка', voice: 'hint_inventory_1', pose: 2,
       text: 'Нажми на вещь, чтобы рассмотреть её целиком. Ларцы и реликвии тоже лежат тут. Надевать иди в Персонаж, на вкладку Герой.' },
   ],
   craft: [
     { target: SUBTABS, title: 'Мастерская', voice: 'hint_craft_1',
       text: 'Здесь куют новые вещи и улучшают старые.' },
-    { target: 'h:Предмет', title: 'Перековка', voice: 'hint_craft_2',
+    { target: '.forge-slots', title: 'Перековка', voice: 'hint_craft_2',
       text: 'Вещь с рейдового босса можно перековать под себя: на защиту, на урон или на поддержку.' },
   ],
   map: [

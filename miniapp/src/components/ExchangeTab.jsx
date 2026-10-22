@@ -3,6 +3,7 @@ import { Button, Div, Group, Header, Placeholder, SimpleCell } from '@vkontakte/
 import { exchangeTrade, getExchange } from '../api.js';
 import PriceChart from './PriceChart.jsx';
 import Skeleton from './Skeleton.jsx';
+import { SectionHead } from './ui.jsx';
 
 // Биржа самоцветов. Игра - дилер: курс считает сервер по формуле
 // (game/economy/exchange.py) от того, сколько самоцветов игроки купили и
@@ -11,6 +12,15 @@ import Skeleton from './Skeleton.jsx';
 
 const money = (v) => Number(v ?? 0).toLocaleString('ru-RU');
 const MAX_PREVIEW = 10;
+
+// Изменение курса покупки за сутки: последняя точка графика не позже суток
+// назад против нынешней цены. Нет такой точки - стрелки нет.
+function dayChange(chart, now) {
+  const dayAgo = Date.now() - 86_400_000;
+  const old = [...(chart || [])].reverse().find((p) => new Date(p.t).getTime() <= dayAgo);
+  if (!old || !old.buy) return null;
+  return ((now - old.buy) / old.buy) * 100;
+}
 
 function when(iso) {
   return iso ? new Date(iso).toLocaleString('ru-RU', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : '';
@@ -58,17 +68,37 @@ export default function ExchangeTab({ onWallet }) {
   const buyCost = data.buy_series[lots - 1];
   const sellGain = data.sell_series[lots - 1];
   const gems = lots * data.lot;
+  const change = dayChange(data.chart, data.buy_lot);
 
   return (
     <>
+      <SectionHead
+        kind="exchange" icon="💱" value={money(data.buy_lot)}
+        label={(
+          <>
+            золота за {data.lot} 💎
+            {change != null && Math.abs(change) >= 0.05 && (
+              <span className={change > 0 ? 'rate-delta rate-delta--up' : 'rate-delta rate-delta--down'}>
+                {' '}{change > 0 ? '▲' : '▼'} {Math.abs(change).toFixed(1)}% за сутки
+              </span>
+            )}
+          </>
+        )}
+        aside={<>💰 {money(data.gold)}<br /><small>💎 {money(data.gems)}</small></>}
+      />
+
+      <Group header={<Header>📈 Курс лота</Header>}>
+        <Div><PriceChart points={data.chart} /></Div>
+      </Group>
+
       <Group header={<Header>💱 Курс за {data.lot} 💎</Header>}>
         <Div>
           <div className="exchange-rates">
-            <div className="exchange-rate">
+            <div className="exchange-rate exchange-rate--buy">
               <span className="craft-hint">Купить</span>
               <b>{money(data.buy_lot)}</b>
             </div>
-            <div className="exchange-rate">
+            <div className="exchange-rate exchange-rate--sell">
               <span className="craft-hint">Продать</span>
               <b>{money(data.sell_lot)}</b>
             </div>
@@ -78,7 +108,6 @@ export default function ExchangeTab({ onWallet }) {
             следующего на {data.growth_pct}%, каждый проданный - опускает: курс складывается из сделок всех
             игроков. Продажа на {data.spread_pct}% дешевле покупки, поэтому перепродать с выгодой нельзя.
           </p>
-          <p className="guild-line">У тебя: 💰 {money(data.gold)} · 💎 {money(data.gems)}</p>
         </Div>
       </Group>
 
@@ -107,14 +136,14 @@ export default function ExchangeTab({ onWallet }) {
         </Div>
       </Group>
 
-      <Group header={<Header>📈 Курс лота</Header>}>
-        <Div><PriceChart points={data.chart} /></Div>
-      </Group>
-
       {data.mine.length > 0 && (
         <Group header={<Header>Мои сделки</Header>}>
           {data.mine.map((o, i) => (
-            <SimpleCell key={i} subtitle={when(o.at)} after={`${money(o.gold)} 💰`}>
+            <SimpleCell
+              key={i} subtitle={when(o.at)}
+              before={<span className={`deal-mark deal-mark--${o.direction}`} aria-hidden="true">{o.direction === 'buy' ? '↓' : '↑'}</span>}
+              after={<span className={`deal-gold deal-gold--${o.direction}`}>{o.direction === 'buy' ? '−' : '+'}{money(o.gold)} 💰</span>}
+            >
               {o.direction === 'buy' ? 'Купил' : 'Продал'} {money(o.gems)} 💎
             </SimpleCell>
           ))}

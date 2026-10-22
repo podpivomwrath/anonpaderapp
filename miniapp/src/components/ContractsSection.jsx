@@ -3,6 +3,7 @@ import { Button, Div, Group, Header, Placeholder } from '@vkontakte/vkui';
 import { contractAction, getContracts } from '../api.js';
 import ClassIcon from './ClassIcon.jsx';
 import Skeleton from './Skeleton.jsx';
+import { Bar, Empty, SectionHead } from './ui.jsx';
 
 /**
  * «Заказы» на «Доске» (2026-10-16): анонимный заказ убийств игрока за
@@ -110,31 +111,37 @@ export default function ContractsSection() {
           {notice.text}
         </Div>
       )}
+      <SectionHead
+        kind="board" icon="🎯" value={data.contracts.length} label="открытых заказов"
+        aside={<>💎 {money(data.gems)}<br /><small>у тебя</small></>}
+      />
       <Group header={<Header>🎯 Открытые заказы</Header>}>
-        {data.contracts.length === 0 && <Div><p className="craft-hint">Сейчас заказов нет.</p></Div>}
-        {data.contracts.map((c) => (
-          <div className="stat-row top-row" key={c.id}>
-            <span className="stat-row__label">
-              <ClassIcon subclass={c.subclass} baseClass={c.base_class} crown={c.crown_frame || null} size={40} />
-              <span className="top-who">
-                <span className="top-name">{c.name}</span>
-                <span className="craft-hint">
-                  {c.level} ур. · мощь {money(c.power)} · убийств {c.kills_left}/{c.kills_total} · ещё {left(c.minutes_left)}
-                  {c.hunters ? ` · взяли: ${c.hunters}` : ''}
+        {data.contracts.length === 0 && <Empty icon="🎯">Сейчас заказов нет.</Empty>}
+        <div className="card-list">
+          {data.contracts.map((c) => (
+            <div className={`contract-card${c.on_me ? ' contract-card--me' : ''}`} key={c.id}>
+              <ClassIcon subclass={c.subclass} baseClass={c.base_class} crown={c.crown_frame || null} size={48} />
+              <div className="contract-card__body">
+                <b className="contract-card__name">{c.name}</b>
+                <small className="contract-card__meta">{c.level} ур. · мощь {money(c.power)} · ещё {left(c.minutes_left)}</small>
+                {c.where && <small className="contract-card__meta">📍 {c.where}</small>}
+                <span className="daily-card__progress">
+                  <Bar value={c.kills_total - c.kills_left} max={c.kills_total} tone="red" thin />
+                  <span className="daily-card__count">{c.kills_total - c.kills_left}/{c.kills_total}</span>
                 </span>
-                {c.where && <span className="craft-hint">📍 {c.where}</span>}
+                {c.hunters ? <small className="contract-card__meta">взяли: {c.hunters}</small> : null}
+              </div>
+              <span className="contract-card__side">
+                <b className="contract-card__price">💎{money(c.price)}</b>
+                {c.on_me ? <small>на тебя</small>
+                  : c.mine ? <small>твой заказ</small>
+                    : c.taken ? <small>взят</small>
+                      : c.guildmate ? <small>согильдиец</small>
+                        : <button type="button" className="pill-btn pill-btn--main" disabled={busy} onClick={() => act('take', { id: c.id })}>Взять</button>}
               </span>
-            </span>
-            <span className="stat-row__value contract-side">
-              <b>💎{money(c.price)}</b>
-              {c.on_me ? <span className="craft-hint">на тебя</span>
-                : c.mine ? <span className="craft-hint">твой заказ</span>
-                  : c.taken ? <span className="craft-hint">взят</span>
-                    : c.guildmate ? <span className="craft-hint">согильдиец</span>
-                    : <Button size="s" disabled={busy} onClick={() => act('take', { id: c.id })}>Взять</Button>}
-            </span>
-          </div>
-        ))}
+            </div>
+          ))}
+        </div>
         <Div>
           <p className="craft-hint">
             Цена - за одно убийство. Взявшие видят цель на карте, и вне городов она от них не спрячется ни в АФК,

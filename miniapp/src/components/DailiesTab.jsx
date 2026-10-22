@@ -1,10 +1,12 @@
 import { useEffect, useState } from 'react';
-import { TabsItem, Group, Header, Div, Placeholder } from '@vkontakte/vkui';
+import { TabsItem, Group, Header, Placeholder } from '@vkontakte/vkui';
 import Tabs from './ScrollTabs.jsx';
 import { getDailies } from '../api.js';
 import Skeleton from './Skeleton.jsx';
+import { Bar, Empty, SectionHead, hm, useCountdown } from './ui.jsx';
 
 // Патч 23: вкладка «Задания» - три раздела (Сюжет/Ежедневные/Вход).
+// 2026-10-22: путь актов, карточки заданий с полоской, календарь входа.
 const SECTIONS = [
   { id: 'story', label: 'Сюжет' },
   { id: 'dailies', label: 'Ежедневные' },
@@ -12,36 +14,41 @@ const SECTIONS = [
 ];
 
 // Патч 78: локальный сборщик строки награды убран - он печатал сырой id
-// («heal_small ×3»). Текст приходит с сервера готовым, как и всё остальное
-// форматирование (патч 73: формат принадлежит серверу).
+// («heal_small ×3»). Текст и значок награды приходят с сервера готовыми
+// (патч 73: формат принадлежит серверу).
 
-function StoryTab({ story }) {
+function ActsPath({ acts }) {
+  if (!acts?.length) return null;
+  return (
+    <ol className="acts-path">
+      {acts.map((a) => (
+        <li key={a.act} className={`acts-path__step acts-path__step--${a.state}`}>
+          <span className="acts-path__dot">{a.state === 'done' ? '✓' : a.act}</span>
+          <span className="acts-path__title">{a.title || `Акт ${a.act}`}</span>
+        </li>
+      ))}
+    </ol>
+  );
+}
+
+function StoryTab({ story, onShowOnMap }) {
+  const quest = story.active_quest;
   return (
     <Group header={<Header>📜 Сюжет</Header>}>
-      {story.active_quest ? (
-        <Div>
-          <p style={{ fontWeight: 600, marginBottom: 4 }}>{story.active_quest.title}</p>
-          <p style={{ marginBottom: 8 }}>{story.active_quest.text}</p>
-          {story.active_quest.target && (
-            <p style={{ opacity: 0.8 }}>
-              📍 Цель: ({story.active_quest.target.x}; {story.active_quest.target.y}) -{' '}
-              {story.active_quest.target.label}
-            </p>
+      <ActsPath acts={story.acts} />
+      {quest ? (
+        <div className={`quest-card${quest.ready ? ' quest-card--ready' : ''}`}>
+          <b className="quest-card__title">{quest.title}</b>
+          <p className="quest-card__text">{quest.text}</p>
+          {quest.ready && <p className="quest-card__ready">Цель достигнута - вернись к наставнику.</p>}
+          {quest.target && !quest.ready && (
+            <button type="button" className="pill-btn" onClick={() => onShowOnMap(quest.target)}>
+              📍 {quest.target.label} ({quest.target.x}; {quest.target.y})
+            </button>
           )}
-          {story.active_quest.ready && <p style={{ opacity: 0.8 }}>Цель достигнута - вернись к наставнику.</p>}
-        </Div>
+        </div>
       ) : (
-        <Div style={{ opacity: 0.8 }}>Активного сюжетного квеста нет.</Div>
-      )}
-      {story.passed_acts.length > 0 && (
-        <Div>
-          <p style={{ fontWeight: 600, marginBottom: 4 }}>Пройденные акты:</p>
-          {story.passed_acts.map((a) => (
-            <p key={a.act} style={{ opacity: 0.8 }}>
-              Акт {a.act}: {a.title}
-            </p>
-          ))}
-        </Div>
+        <Empty icon="📜">Активного сюжетного задания нет.</Empty>
       )}
     </Group>
   );
@@ -101,62 +108,78 @@ export function ChronicleSection({ song, titles }) {
 }
 
 function LootboxSection({ dailies }) {
+  const grades = dailies.lootbox_grades.filter((g) => dailies.lootbox_counts[g.id]);
   return (
     <Group header={<Header>🗃️ Пепельные ларцы</Header>}>
-      {dailies.lootbox_grades.map((g) => {
-        const count = dailies.lootbox_counts[g.id] || 0;
-        if (!count) return null;
-        return (
-          <div className="stat-row" key={g.id}>
-            <span className="stat-row__label">
-              {g.emoji} {g.name}
-            </span>
-            <span className="stat-row__value">{count} раз</span>
-          </div>
-        );
-      })}
-      {dailies.lootbox_history.length === 0 && <Div style={{ opacity: 0.8 }}>Ларцов пока не было.</Div>}
-      {dailies.lootbox_history.length > 0 && (
-        <div className="trade-dest__section" style={{ padding: '0 16px' }}>История выпадения · последние 5</div>
+      {grades.length === 0 && <Empty icon="🗃️">Ларцов пока не было. Они падают за ежедневные задания.</Empty>}
+      {grades.length > 0 && (
+        <div className="tile-grid">
+          {grades.map((g) => (
+            <div className="tile" key={g.id}>
+              <span className="tile__icon" aria-hidden="true">{g.emoji}</span>
+              <b className="tile__value">{dailies.lootbox_counts[g.id]}</b>
+              <small className="tile__label">{g.name}</small>
+            </div>
+          ))}
+        </div>
       )}
-      {dailies.lootbox_history.slice(0, 5).map((h, idx) => (
-        <Div key={idx} style={{ opacity: 0.85 }}>
-          <p style={{ marginBottom: 0 }}>
-            {h.emoji} {h.name}: {h.reward_summary}
-          </p>
-        </Div>
-      ))}
+      {dailies.lootbox_history.length > 0 && (
+        <>
+          <div className="list-caption">Последние ларцы</div>
+          <ul className="plain-list">
+            {dailies.lootbox_history.slice(0, 5).map((h, idx) => (
+              <li key={idx}><span aria-hidden="true">{h.emoji}</span> {h.name}: {h.reward_summary}</li>
+            ))}
+          </ul>
+        </>
+      )}
     </Group>
   );
 }
 
+function QuestCard({ q }) {
+  return (
+    <div className={`daily-card${q.completed ? ' daily-card--done' : ''}`}>
+      <span className="daily-card__mark" aria-hidden="true">{q.completed ? '✓' : ''}</span>
+      <div className="daily-card__body">
+        <b className="daily-card__title">{q.title}</b>
+        <small className="daily-card__how">{q.progress_label}</small>
+        <span className="daily-card__progress">
+          <Bar value={q.progress} max={q.target} tone={q.completed ? 'green' : 'gold'} />
+          <span className="daily-card__count">{Math.min(q.progress, q.target)}/{q.target}</span>
+        </span>
+      </div>
+      <span className="daily-card__reward">
+        {q.xp_reward > 0 && <span>✨ {q.xp_reward}</span>}
+        {q.gold_reward > 0 && <span>🪙 {q.gold_reward}</span>}
+      </span>
+    </div>
+  );
+}
+
 function DailyQuestsTab({ dailies }) {
-  const hours = Math.floor(dailies.seconds_until_reset / 3600);
-  const minutes = Math.floor((dailies.seconds_until_reset % 3600) / 60);
+  const left = useCountdown(dailies.seconds_until_reset);
+  const done = dailies.quests.filter((q) => q.completed).length;
   return (
     <>
-      <Group header={<Header>🗓️ Ежедневные задания</Header>}>
-        {dailies.quests.map((q) => (
-          <div className="stat-row" key={q.id}>
-            <span className="stat-row__label">
-              {q.completed ? '✅' : '▫️'} {q.title}: {q.progress_label}
+      <SectionHead
+        kind="dailies" icon="🔥" value={dailies.daily_streak}
+        label="дней подряд" aside={<>⏳ {hm(left)}<br /><small>до нового дня</small></>}
+      />
+      <Group header={<Header>🗓️ Ежедневные задания · {done}/{dailies.quests.length}</Header>}>
+        <div className="card-list">
+          {dailies.quests.map((q) => <QuestCard key={q.id} q={q} />)}
+        </div>
+        {dailies.next_milestone_day && (
+          <div className="milestone">
+            <span className="milestone__head">
+              <span>Рубеж: день {dailies.next_milestone_day}</span>
+              <span>{dailies.daily_streak}/{dailies.next_milestone_day}</span>
             </span>
-            <span className="stat-row__value">
-              {q.progress}/{q.target}
-            </span>
+            <Bar value={dailies.daily_streak} max={dailies.next_milestone_day} tone="red" thin />
+            <small className="milestone__reward">🎁 {dailies.next_milestone_reward_text}</small>
           </div>
-        ))}
-        <Div>
-          <p>🔥 Стрик ежедневок: {dailies.daily_streak} дней</p>
-          {dailies.next_milestone_day && (
-            <p style={{ opacity: 0.8 }}>
-              Следующий рубеж: день {dailies.next_milestone_day} - {dailies.next_milestone_reward_text}
-            </p>
-          )}
-          <p style={{ opacity: 0.8 }}>
-            ⏳ До сброса дня: {hours}ч {minutes}м
-          </p>
-        </Div>
+        )}
       </Group>
       <LootboxSection dailies={dailies} />
     </>
@@ -164,42 +187,45 @@ function DailyQuestsTab({ dailies }) {
 }
 
 function LoginCycleTab({ login }) {
+  const [picked, setPicked] = useState(login.cycle_day);
+  const days = Array.from({ length: login.cycle_length }, (_, i) => i + 1);
+  const state = (day) => {
+    if (day < login.cycle_day || (day === login.cycle_day && login.claimed_today)) return 'taken';
+    if (day === login.cycle_day) return 'today';
+    return 'later';
+  };
   return (
-    <Group header={<Header>📅 Награда за вход</Header>}>
-      <Div>
-        <p>Стрик входа: {login.login_streak} дней</p>
-        <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', margin: '8px 0' }}>
-          {Array.from({ length: login.cycle_length }, (_, i) => i + 1).map((day) => (
-            <div
-              key={day}
-              title={login.rewards_text?.[day] || ''}
-              style={{
-                width: 28,
-                height: 28,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                borderRadius: 6,
-                fontSize: 12,
-                background: day === login.cycle_day ? 'var(--vkui--color_accent_blue)' : 'var(--vkui--color_background_secondary)',
-                color: day === login.cycle_day ? '#fff' : 'inherit',
-              }}
+    <>
+      <SectionHead kind="login" icon="📅" value={login.login_streak} label="дней входа подряд" />
+      <Group header={<Header>Награда за вход · день {login.cycle_day}/{login.cycle_length}</Header>}>
+        <div className="login-cal">
+          {days.map((day) => (
+            <button
+              type="button" key={day}
+              className={`login-cal__day login-cal__day--${state(day)}${picked === day ? ' login-cal__day--picked' : ''}`}
+              onClick={() => setPicked(day)}
+              aria-label={`День ${day}: ${login.rewards_text?.[day] || 'без награды'}`}
             >
-              {day}
-            </div>
+              <span className="login-cal__num">{day}</span>
+              <span className="login-cal__icon" aria-hidden="true">
+                {state(day) === 'taken' ? '✓' : (login.rewards_icon?.[day] || '·')}
+              </span>
+            </button>
           ))}
         </div>
-        {login.today_reward && (
-          <p style={{ opacity: 0.8 }}>
-            Награда дня: {login.today_reward_text} ({login.claimed_today ? 'уже получена сегодня' : 'будет выдана автоматически'})
-          </p>
-        )}
-      </Div>
-    </Group>
+        <p className="login-cal__caption">
+          <b>День {picked}{picked === login.cycle_day ? ' (сегодня)' : ''}:</b>{' '}
+          {login.rewards_text?.[picked] || 'без награды'}
+          {picked === login.cycle_day && login.today_reward && (
+            <span className="login-cal__status">{login.claimed_today ? ' · получена' : ' · придёт сама'}</span>
+          )}
+        </p>
+      </Group>
+    </>
   );
 }
 
-export default function DailiesTab() {
+export default function DailiesTab({ onShowOnMap }) {
   const [section, setSection] = useState('story');
   const [data, setData] = useState(null);
   const [status, setStatus] = useState('loading'); // loading | ready | error
@@ -235,7 +261,7 @@ export default function DailiesTab() {
       </Tabs>
       {section === 'story' && (
         <>
-          <StoryTab story={data.story} />
+          <StoryTab story={data.story} onShowOnMap={onShowOnMap} />
           <ChronicleSection song={data.song} titles={data.titles} />
         </>
       )}

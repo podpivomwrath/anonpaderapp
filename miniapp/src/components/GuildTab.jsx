@@ -8,6 +8,8 @@ import GuildTree from './GuildTree.jsx';
 import ItemIcon from './ItemIcon.jsx';
 import { itemSubtitle } from './InventoryTab.jsx';
 import Skeleton from './Skeleton.jsx';
+import ClassIcon from './ClassIcon.jsx';
+import { Bar as UiBar, Empty } from './ui.jsx';
 
 // Гильдии. Всё управление - здесь: состав, казна и склад, земли и стройка,
 // древо, осады. В чате остаётся то, что происходит в поле.
@@ -52,11 +54,38 @@ function PlayerLink({ id, name }) {
   );
 }
 
-function Bar({ value, max }) {
-  const pct = max > 0 ? Math.min(100, Math.round((100 * value) / max)) : 0;
+function Bar({ value, max, tone = 'gold' }) {
+  return <UiBar value={value} max={max} tone={tone} />;
+}
+
+// Герб гильдии (2026-10-22): щит с тегом, цвет - от тега, у гильдии с
+// венцом сезона - корона над щитом. Картинок нет: щит рисует CSS.
+function crestHue(tag) {
+  let h = 0;
+  for (const ch of tag || '') h = (h * 31 + ch.charCodeAt(0)) % 360;
+  return h;
+}
+
+export function GuildCrest({ tag, crown = false, size = 44 }) {
   return (
-    <div className="guild-bar"><div className="guild-bar__fill" style={{ width: `${pct}%` }} /></div>
+    <span className={`guild-crest${crown ? ' guild-crest--crown' : ''}`}
+      style={{ '--crest-h': crestHue(tag), '--crest-size': `${size}px` }} aria-hidden="true">
+      <span className="guild-crest__tag">{tag}</span>
+    </span>
   );
+}
+
+const MEDALS = ['🥇', '🥈', '🥉'];
+
+// Был в сети: «в сети» - последние 15 минут.
+function seenText(iso) {
+  if (!iso) return null;
+  const min = Math.round((Date.now() - new Date(iso).getTime()) / 60000);
+  if (min < 15) return { online: true, text: 'в сети' };
+  if (min < 60) return { online: false, text: `был ${min} мин назад` };
+  const h = Math.floor(min / 60);
+  if (h < 24) return { online: false, text: `был ${h} ч назад` };
+  return { online: false, text: `был ${Math.floor(h / 24)} д назад` };
 }
 
 /** Кнопка с подтверждением в два нажатия - без системных диалогов. */
@@ -106,11 +135,12 @@ function Directory({ directory, ownId, run, busy }) {
           <TabsItem key={s.id} selected={sort === s.id} onClick={() => setSort(s.id)}>{s.label}</TabsItem>
         ))}
       </Tabs>
-      {directory.length === 0 && <Div style={{ opacity: 0.8 }}>Гильдий пока нет - стань первым.</Div>}
+      {directory.length === 0 && <Empty icon="🏰">Гильдий пока нет - стань первым.</Empty>}
       {sorted.map((g, i) => (
         <SimpleCell
           key={g.id}
           multiline
+          before={<GuildCrest tag={g.tag} crown={g.crown} size={40} />}
           subtitle={
             `${g.level} ур. · 👥 ${g.members}/${g.cap} · ⚔️ PvE ${money(g.pve)} · 🩸 PvP ${money(g.pvp)}`
             + (sort === 'new' && g.created ? ` · основана ${new Date(g.created).toLocaleDateString('ru-RU')}` : '')
@@ -122,7 +152,7 @@ function Directory({ directory, ownId, run, busy }) {
             </Button>
           ) : (g.id === ownId ? 'ваша' : null)}
         >
-          {i + 1}. {g.crown ? '👑 ' : ''}[{g.tag}] {g.name}
+          {MEDALS[i] || `${i + 1}.`} {g.name}
         </SimpleCell>
       ))}
       <Div className="craft-hint">
@@ -188,26 +218,34 @@ function Overview({ state, run, busy }) {
   return (
     <>
       <Group>
-        <Div>
-          <p className="guild-title">{guild.crown ? '👑 ' : ''}[{guild.tag}] {guild.name}</p>
-          <p className="craft-hint">
-            {guild.level} уровень · участников {guild.members}/{guild.cap}
-            {guild.season_wins ? ` · побед в сезонах: ${guild.season_wins}` : ''}
-          </p>
-          <p className="guild-line">Слава: {money(guild.fame)} / {money(guild.fame_next)}</p>
-          <Bar value={guild.fame} max={guild.fame_next} />
-          <p className="guild-line">Ты - {me.rank_title.toLowerCase()} · вклад за неделю {money(me.contribution_week)}, всего {money(me.contribution_total)}</p>
-          <p className="guild-line">Казна: 💰 {money(guild.treasury_gold)} · 💎 {money(guild.treasury_gems)}</p>
+        <div className="guild-hero" style={{ '--crest-h': crestHue(guild.tag) }}>
+          <GuildCrest tag={guild.tag} crown={guild.crown} size={72} />
+          <div className="guild-hero__text">
+            <b className="guild-hero__name">{guild.name}</b>
+            <small className="guild-hero__sub">
+              {guild.level} уровень · ты - {me.rank_title.toLowerCase()}
+              {guild.season_wins ? ` · побед в сезонах: ${guild.season_wins}` : ''}
+            </small>
+            <span className="guild-hero__fame">
+              <Bar value={guild.fame} max={guild.fame_next} />
+              <small>слава {money(guild.fame)} / {money(guild.fame_next)}</small>
+            </span>
+          </div>
+        </div>
+        <div className="tile-grid guild-tiles">
+          <div className="tile"><span className="tile__icon">👥</span><b className="tile__value">{guild.members}/{guild.cap}</b><small className="tile__label">участников</small></div>
+          <div className="tile"><span className="tile__icon">💰</span><b className="tile__value">{money(guild.treasury_gold)}</b><small className="tile__label">казна · 💎 {money(guild.treasury_gems)}</small></div>
+          <div className="tile"><span className="tile__icon">⭐</span><b className="tile__value">{money(me.contribution_week)}</b><small className="tile__label">твой вклад</small></div>
           {state.season.place && (
-            <p className="guild-line">Сезон {state.season.season}: {state.season.place} место</p>
+            <div className="tile"><span className="tile__icon">👑</span><b className="tile__value">{state.season.place}</b><small className="tile__label">место в сезоне</small></div>
           )}
-        </Div>
+        </div>
       </Group>
 
       <Group header={<Header>Бонусы гильдии</Header>}>
         {guild.effects.length === 0
-          ? <Div style={{ opacity: 0.8 }}>Пока нет: их дают узлы древа.</Div>
-          : <Div>{guild.effects.map((e) => <p key={e} className="guild-line">• {e}</p>)}</Div>}
+          ? <Empty icon="🌳">Пока нет: их дают узлы древа.</Empty>
+          : <div className="effect-chips">{guild.effects.map((e) => <span key={e} className="effect-chip">{e}</span>)}</div>}
       </Group>
 
       <Group header={<Header>⛪ Часовня</Header>}>
@@ -245,7 +283,7 @@ function Overview({ state, run, busy }) {
                 {boss.difficulty ? `${boss.difficulty}. ` : ''}
                 {boss.court ? 'Призван во Дворе' : `Призван на (${boss.x}; ${boss.y})`}: {money(boss.hp)} / {money(boss.max_hp)}, уйдёт через {timeLeft(boss.expires_at)}.
               </p>
-              <Bar value={boss.hp} max={boss.max_hp} />
+              <Bar value={boss.hp} max={boss.max_hp} tone="red" />
               <p className="craft-hint">
                 {boss.court ? 'Бить - в чате, из любого города: напиши «/страж».' : 'Бить - в чате, на клетке цитадели или из любого города: напиши «/страж».'}
               </p>
@@ -345,15 +383,28 @@ function Members({ state, run, busy }) {
         </Group>
       )}
       <Group header={<Header>Участники ({members.length})</Header>}>
-        {members.map((m) => (
-          <div key={m.id}>
-            <SimpleCell
-              onClick={() => setOpen(open === m.id ? null : m.id)}
-              subtitle={`${m.rank_title} · ${m.level} ур. ${m.class || ''} · неделя ${money(m.week)}`}
-              after={m.id === me.id ? 'ты' : (open === m.id ? '▴' : '▾')}
-            >
-              <PlayerLink id={m.vk_id} name={m.name} />
-            </SimpleCell>
+        {members.map((m) => {
+          const seen = m.id === me.id ? null : seenText(m.seen_at);
+          return (
+          <div key={m.id} className={`member-card${m.id === me.id ? ' member-card--me' : ''}`}>
+            <button type="button" className="member-card__row" onClick={() => setOpen(open === m.id ? null : m.id)}>
+              <span className="member-card__icon">
+                <ClassIcon subclass={m.subclass} baseClass={m.base_class} size={40} />
+                {seen?.online && <i className="member-card__online" />}
+              </span>
+              <span className="member-card__text">
+                <span className="member-card__name"><PlayerLink id={m.vk_id} name={m.name} /></span>
+                <small className="member-card__meta">
+                  <span className={`rank-chip rank-chip--${m.rank}`}>{m.rank_title}</span>
+                  {' '}{m.level} ур. {m.class || ''}
+                </small>
+                {seen && <small className={seen.online ? 'member-card__seen member-card__seen--on' : 'member-card__seen'}>{seen.text}</small>}
+              </span>
+              <span className="member-card__week">
+                <b>{money(m.week)}</b>
+                <small>{m.id === me.id ? 'ты' : 'за неделю'}</small>
+              </span>
+            </button>
             {open === m.id && m.id !== me.id && (
               <Div className="guild-member-actions">
                 <select className="guild-input" value={m.rank} disabled={busy}
@@ -370,17 +421,18 @@ function Members({ state, run, busy }) {
               </Div>
             )}
           </div>
-        ))}
+          );
+        })}
       </Group>
       <Group header={<Header>Топ вклада</Header>}>
         <Tabs>
           <TabsItem selected={topMode === 'week'} onClick={() => setTopMode('week')}>Неделя</TabsItem>
           <TabsItem selected={topMode === 'total'} onClick={() => setTopMode('total')}>Всё время</TabsItem>
         </Tabs>
-        {(tops[topMode] || []).length === 0 && <Div style={{ opacity: 0.8 }}>Вклада пока нет.</Div>}
+        {(tops[topMode] || []).length === 0 && <Empty icon="⭐">Вклада пока нет.</Empty>}
         {(tops[topMode] || []).map((row, i) => (
           <div className="stat-row" key={row.id}>
-            <span className="stat-row__label">{i + 1}. {row.name}</span>
+            <span className="stat-row__label">{MEDALS[i] || `${i + 1}.`} {row.name}</span>
             <span className="stat-row__value">{money(row.value)}</span>
           </div>
         ))}
@@ -393,11 +445,18 @@ function Members({ state, run, busy }) {
 
 function QuestRow({ q, extra }) {
   return (
-    <Div className="guild-quest">
-      <p className="guild-line"><b>{q.completed ? '✅ ' : ''}{q.title}</b> - {q.label}</p>
-      <Bar value={q.progress} max={q.target} />
-      <p className="craft-hint">{money(q.progress)} / {money(q.target)} · {q.reward}{extra ? ` · ${extra}` : ''}</p>
-    </Div>
+    <div className={`daily-card${q.completed ? ' daily-card--done' : ''}`}>
+      <span className="daily-card__mark" aria-hidden="true">{q.completed ? '✓' : ''}</span>
+      <div className="daily-card__body">
+        <b className="daily-card__title">{q.title}</b>
+        <small className="daily-card__how">{q.label}</small>
+        <span className="daily-card__progress">
+          <Bar value={q.progress} max={q.target} tone={q.completed ? 'green' : 'gold'} />
+          <span className="daily-card__count">{money(Math.min(q.progress, q.target))}/{money(q.target)}</span>
+        </span>
+        <small className="daily-card__how">🎁 {q.reward}{extra ? ` · ${extra}` : ''}</small>
+      </div>
+    </div>
   );
 }
 
@@ -406,10 +465,10 @@ function Quests({ state }) {
   return (
     <>
       <Group header={<Header>Личные - на сегодня</Header>}>
-        {quests.dailies.map((q) => <QuestRow key={q.metric} q={q} />)}
+        <div className="card-list">{quests.dailies.map((q) => <QuestRow key={q.metric} q={q} />)}</div>
       </Group>
       <Group header={<Header>Общие - на неделю</Header>}>
-        {quests.weekly.map((q) => <QuestRow key={q.metric} q={q} extra={`твой вклад ${money(q.mine)}`} />)}
+        <div className="card-list">{quests.weekly.map((q) => <QuestRow key={q.metric} q={q} extra={`твой вклад ${money(q.mine)}`} />)}</div>
       </Group>
     </>
   );
@@ -472,12 +531,20 @@ function Treasury({ state, run, busy }) {
 
   const header = (
     <Group>
+      <div className="tile-grid guild-tiles">
+        <div className="tile"><span className="tile__icon">💰</span><b className="tile__value">{money(guild.treasury_gold)}</b><small className="tile__label">золото</small></div>
+        <div className="tile"><span className="tile__icon">💎</span><b className="tile__value">{money(guild.treasury_gems)}</b><small className="tile__label">самоцветы</small></div>
+        <div className="tile"><span className="tile__icon">🪙</span><b className="tile__value">{guild.gold_tax}%</b><small className="tile__label">налог</small></div>
+      </div>
       <Div>
-        <p className="guild-line">💰 Казна: {money(guild.treasury_gold)} · 💎 {money(guild.treasury_gems)}</p>
-        <p className="craft-hint">
-          📦 Склад: руда {warehouse.ore_total}/{warehouse.capacity.ore}{warehouse.items.length ? `, вещи ${warehouse.items.length}` : ''}
-          {warehouse.ore_full ? ' · полон, шахты стоят' : ''}
-        </p>
+        <div className="milestone milestone--flat">
+          <span className="milestone__head">
+            <span>📦 Склад руды{warehouse.items.length ? ` · вещей ${warehouse.items.length}` : ''}</span>
+            <span>{warehouse.ore_total}/{warehouse.capacity.ore}</span>
+          </span>
+          <Bar value={warehouse.ore_total} max={warehouse.capacity.ore} tone={warehouse.ore_full ? 'red' : 'blue'} thin />
+          {warehouse.ore_full && <small className="milestone__reward">Склад полон, шахты стоят.</small>}
+        </div>
         <p className="craft-hint">
           🪙 Налог гильдии: {guild.gold_tax}% с любого золота участников (собрано всего {money(guild.tax_collected)}).
         </p>
@@ -814,7 +881,7 @@ function Lands({ state, run, busy }) {
             осаждающих. Потерял базу - остальные клетки 3 суток под щитом.
           </p>
         </Div>
-        {cells.length === 0 && <Div style={{ opacity: 0.8 }}>Земли пока нет.</Div>}
+        {cells.length === 0 && <Empty icon="🚩">Земли пока нет. Знамя ставят на свободной клетке.</Empty>}
         {cells.map((c) => <Cell key={c.id} cell={c} state={state} run={run} busy={busy} />)}
       </Group>
     </>
@@ -833,13 +900,21 @@ function War({ state, run, busy }) {
   return (
     <>
       <Group header={<Header>⚔️ Осады</Header>}>
-        {sieges.length === 0 && <Div style={{ opacity: 0.8 }}>Осад не было.</Div>}
-        {sieges.map((s) => (
-          <SimpleCell key={s.id} multiline
-            subtitle={s.result || `${SIEGE_STATUS[s.status]} · ${when(s.starts_at)} МСК`}>
-            {s.role === 'attack' ? '⚔️ Штурм' : '🛡 Оборона'} ({s.x}; {s.y}) · {s.enemy}
-          </SimpleCell>
-        ))}
+        {sieges.length === 0 && <Empty icon="🏰">Осад не было.</Empty>}
+        <div className="card-list">
+          {sieges.map((s) => (
+            <div key={s.id} className={`siege-card siege-card--${s.role} siege-card--${s.status}`}>
+              <span className="siege-card__icon" aria-hidden="true">{s.role === 'attack' ? '⚔️' : '🛡'}</span>
+              <span className="siege-card__text">
+                <b>{s.role === 'attack' ? 'Штурм' : 'Оборона'} ({s.x}; {s.y}) · {s.enemy}</b>
+                <small>{s.result || `${SIEGE_STATUS[s.status]} · ${when(s.starts_at)} МСК`}</small>
+              </span>
+              {(s.status === 'scheduled' || s.status === 'running') && (
+                <span className="siege-card__when">{s.status === 'running' ? 'идёт' : timeLeft(s.starts_at)}</span>
+              )}
+            </div>
+          ))}
+        </div>
         <Div className="craft-hint">
           Осаду объявляют, стоя на чужой базе (раздел «Земли»). Начало - в окно защитников, не раньше чем через 12 ч.
           В назначенный час в бой встают все свободные участники обеих гильдий на клетке; опоздавшие вступают через «Осмотреться».
@@ -857,10 +932,13 @@ function War({ state, run, busy }) {
         </Div>
       </Group>
       <Group header={<Header>👑 Сезон {season.season}</Header>}>
-        {season.top.length === 0 && <Div style={{ opacity: 0.8 }}>Очков пока ни у кого.</Div>}
+        {season.top.length === 0 && <Empty icon="👑">Очков пока ни у кого.</Empty>}
         {season.top.map((row, i) => (
           <div className="stat-row" key={row.tag}>
-            <span className="stat-row__label">{i + 1}. [{row.tag}] {row.name}</span>
+            <span className="stat-row__label season-guild">
+              <span className="top-rank">{MEDALS[i] || i + 1}</span>
+              <GuildCrest tag={row.tag} size={32} /> {row.name}
+            </span>
             <span className="stat-row__value">{money(row.points)}</span>
           </div>
         ))}

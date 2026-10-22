@@ -117,6 +117,11 @@ def _cart(cart, level: int, ore_have: dict, prices: dict, now: datetime) -> dict
         info.update({
             "to_city": cart.to_city, "to_title": REGION_TITLES[cart.to_city], "route": cart.route,
             "seconds_left": max(int((_aware(cart.arrives_at) - now).total_seconds()), 0),
+            # Вся дорога - для бегущей по пути повозки в мини-аппе (2026-10-22).
+            "seconds_total": (
+                max(int((_aware(cart.arrives_at) - _aware(cart.departed_at)).total_seconds()), 1)
+                if cart.departed_at else None
+            ),
         })
         return info
     # Что можно закупить здесь и куда везти: пути и шанс нападения.

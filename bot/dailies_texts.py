@@ -52,6 +52,22 @@ def reward_preview(reward: dict | None) -> str:
     return ", ".join(parts)
 
 
+def reward_icon(reward: dict | None) -> str:
+    """Значок награды для клетки календаря входа в мини-аппе (2026-10-22).
+    Тоже здесь, а не на клиенте: разбирать награду - дело сервера."""
+    if not reward:
+        return "·"
+    if "title" in reward:
+        return "🏷"
+    if "gems" in reward:
+        return "💎"
+    if "elixir" in reward or "elixirs_random_combat" in reward:
+        return "🧪"
+    if "gold" in reward:
+        return "🪙"
+    return "🎁"
+
+
 def dailies_overview_text(overview: DailiesOverview) -> str:
     lines = ["📜 Ежедневные задания", ""]
     for q in overview.quests:

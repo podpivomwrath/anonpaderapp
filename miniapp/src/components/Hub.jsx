@@ -144,12 +144,18 @@ export default function Hub() {
   // «?» (2026-10-22): сначала короткие озвученные подсказки раздела, из них
   // «Подробнее» ведёт в полный гайд без озвучки.
   const [quickHelp, setQuickHelp] = useState(null);
+  // Клетка, которую карта покажет при открытии (цель задания); после
+  // ухода с карты сбрасывается.
+  const [mapFocus, setMapFocus] = useState(null);
 
   // Раздел въезжает с той стороны, где он стоит в меню: ниже по списку -
   // справа, выше - слева. Так переход читается как движение по меню.
   const [direction, setDirection] = useState('fwd');
   const activeRef = useRef(activeTab);
-  useEffect(() => { activeRef.current = activeTab; }, [activeTab]);
+  useEffect(() => {
+    activeRef.current = activeTab;
+    if (activeTab !== 'map') setMapFocus(null);
+  }, [activeTab]);
   const openTab = useCallback((id) => {
     const prev = activeRef.current;
     if (prev !== id) {
@@ -613,10 +619,12 @@ export default function Hub() {
         {activeTab === 'character' && (
           <CharacterTab character={character} onCharacterUpdate={setCharacter} />
         )}
-        {activeTab === 'dailies' && <DailiesTab />}
-        {activeTab === 'inventory' && <InventoryTab />}
+        {activeTab === 'dailies' && (
+          <DailiesTab onShowOnMap={(cell) => { setMapFocus(cell); openTab('map'); }} />
+        )}
+        {activeTab === 'inventory' && <InventoryTab onOpenTab={openTab} />}
         {activeTab === 'craft' && <CraftTab />}
-        {activeTab === 'map' && <MapTab />}
+        {activeTab === 'map' && <MapTab focus={mapFocus} />}
         {activeTab === 'tops' && <TopsTab />}
         {activeTab === 'board' && <BoardTab />}
         {activeTab === 'guild' && <GuildTab />}

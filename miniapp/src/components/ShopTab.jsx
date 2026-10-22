@@ -1,7 +1,9 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Button, Div, Group, Header, Placeholder, Spinner } from '@vkontakte/vkui';
 import { IN_VK, buyShop, buyShopFaction, buyShopRename, createPayment, getPayments, getShop } from '../api.js';
 import Skeleton from './Skeleton.jsx';
+import Sparks from './Sparks.jsx';
+import { SectionHead } from './ui.jsx';
 
 /**
  * Магазин (2026-10-13): товары за самоцветы квадратными карточками. Нажатие
@@ -20,6 +22,31 @@ function ShopIcon({ id, emoji }) {
   const src = SHOP_IMAGES[`../assets/shop/${id}.webp`];
   if (src) return <img className="shop-card__img" src={src} alt="" aria-hidden="true" />;
   return <span className="shop-card__emoji" aria-hidden="true">{emoji}</span>;
+}
+
+// Сколько экономит долгий срок против короткого (цена дня), в процентах.
+function longSaving(item) {
+  if (item.kind !== 'days') return 0;
+  const lo = item.prices[item.min] / item.min;
+  const hi = item.prices[item.max] / item.max;
+  return lo > 0 ? Math.round((1 - hi / lo) * 100) : 0;
+}
+
+// Покупка прошла (2026-10-22): картинка товара с искрами на секунду с лишним.
+function Celebrate({ item, onDone }) {
+  useEffect(() => {
+    const id = setTimeout(onDone, 1700);
+    return () => clearTimeout(id);
+  }, [onDone]);
+  return (
+    <div className="shop-celebrate" onClick={onDone} aria-hidden="true">
+      <span className="shop-celebrate__icon">
+        <ShopIcon id={item.id} emoji={item.emoji} />
+        <Sparks burst={1} instant />
+      </span>
+      <b className="shop-celebrate__title">{item.title}</b>
+    </div>
+  );
 }
 
 function daysWord(n) {
@@ -429,6 +456,8 @@ export default function ShopTab({ onWallet, onBought }) {
   const [status, setStatus] = useState('loading');
   const [open, setOpen] = useState(null);
   const [notice, setNotice] = useState(null);
+  const [celebrate, setCelebrate] = useState(null);
+  const endCelebrate = useCallback(() => setCelebrate(null), []);
 
   const load = () => {
     getShop()
@@ -445,17 +474,36 @@ export default function ShopTab({ onWallet, onBought }) {
   }
 
   const item = open ? data.items.find((i) => i.id === open) : null;
+  const [featured, ...rest] = data.items;
 
   return (
     <>
-      <Group header={<Header>🛒 Магазин</Header>}>
-        <Div>
-          <p className="guild-line">У тебя: 💎 {money(data.gems)}</p>
-          {notice && <p className="shop-notice">{notice}</p>}
-        </Div>
+      <SectionHead kind="shop" icon="💎" value={money(data.gems)} label="Пепельных самоцветов" />
+      {notice && <Div><p className="shop-notice">{notice}</p></Div>}
+      {featured && (
+        <Group>
+          <button type="button" className="shop-showcase" onClick={() => setOpen(featured.id)}>
+            <span className="shop-showcase__art"><ShopIcon id={featured.id} emoji={featured.emoji} /></span>
+            <span className="shop-showcase__text">
+              <b className="shop-showcase__title">{featured.title}</b>
+              {(featured.perks || []).slice(0, 3).map((perk) => (
+                <small key={perk} className="shop-showcase__perk">• {perk}</small>
+              ))}
+              <span className="shop-showcase__price">
+                {featured.active_until
+                  ? `активна до ${untilText(featured.active_until)}`
+                  : featured.kind === 'days' ? `от 💎 ${money(featured.prices[featured.min])}` : `💎 ${money(featured.price)}`}
+              </span>
+            </span>
+            {longSaving(featured) >= 10 && <span className="shop-card__deal">до −{longSaving(featured)}%</span>}
+          </button>
+        </Group>
+      )}
+      <Group header={<Header>Товары</Header>}>
         <div className="shop-grid">
-          {data.items.map((i) => (
+          {rest.map((i) => (
             <button type="button" key={i.id} className="shop-card" onClick={() => setOpen(i.id)}>
+              {longSaving(i) >= 10 && <span className="shop-card__deal">до −{longSaving(i)}%</span>}
               <ShopIcon id={i.id} emoji={i.emoji} />
               <b className="shop-card__title">{i.title}</b>
               <span className="shop-card__price">
@@ -476,6 +524,7 @@ export default function ShopTab({ onWallet, onBought }) {
           onBought={(res) => {
             setData(res);
             setOpen(null);
+            setCelebrate(item);
             onWallet?.({ donate_currency: res.gems });
             setNotice(`${item.emoji} Готово: «${res.done.old}» → «${res.done.name}».`);
             onBought?.();
@@ -490,6 +539,7 @@ export default function ShopTab({ onWallet, onBought }) {
           onBought={(res) => {
             setData(res);
             setOpen(null);
+            setCelebrate(item);
             onWallet?.({ donate_currency: res.gems });
             setNotice(bundleNotice(item, res.done));
             onBought?.();
@@ -504,6 +554,7 @@ export default function ShopTab({ onWallet, onBought }) {
           onBought={(res) => {
             setData(res);
             setOpen(null);
+            setCelebrate(item);
             onWallet?.({ donate_currency: res.gems });
             setNotice(res.done.pending
               ? `${item.emoji} Переезд в ${res.done.title} оплачен. Ты в бою - переедешь, когда он закончится.`
@@ -512,6 +563,7 @@ export default function ShopTab({ onWallet, onBought }) {
           }}
         />
       )}
+      {celebrate && <Celebrate item={celebrate} onDone={endCelebrate} />}
       {item && item.kind === 'days' && (
         <BuySheet
           item={item}
@@ -520,6 +572,7 @@ export default function ShopTab({ onWallet, onBought }) {
           onBought={(res) => {
             setData(res);
             setOpen(null);
+            setCelebrate(item);
             onWallet?.({ donate_currency: res.gems });
             setNotice(`${item.emoji} ${item.title} - до ${untilText(res.done.until)}.`);
             onBought?.();

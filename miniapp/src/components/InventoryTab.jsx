@@ -1,20 +1,26 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import bridge from '@vkontakte/vk-bridge';
 import {
-  Button, Div, Group, Header, Placeholder, SimpleCell, Text,
+  Button, Group, Placeholder,
 } from '@vkontakte/vkui';
 import { IN_VK, eatFood, getInventory, openChest } from '../api.js';
 import { itemIcon } from '../itemIcons.js';
 import ChestRoulette from './ChestRoulette.jsx';
 import ItemIcon from './ItemIcon.jsx';
 import Skeleton from './Skeleton.jsx';
+import { Empty, SectionHead } from './ui.jsx';
 
 // Патч 74: вместо одного плоского списка - сумка, свёрнутая по слотам.
 // Плоский список рос вместе с дропом и превращался в стену одинаковых строк.
 // Надетое и само надевание (2026-10-22) - во вкладке «Персонаж → Герой».
 //
-// Реликвии и расходники - такие же свёрнутые группы в той же сумке, а не
-// отдельные вкладки: одно место, где лежит всё, что у персонажа есть.
+// Реликвии и расходники - в той же сумке, а не отдельные вкладки: одно
+// место, где лежит всё, что у персонажа есть.
+//
+// 2026-10-22: сумка - сетка ячеек с рамкой редкости и фильтры значками;
+// группы по слотам ушли, порядок внутри - слот, редкость, сила.
+
+const STAT_ICONS = { str: '💪', agi: '🏃', int: '🧠', vit: '❤️', wil: '✨' };
 
 const STAT_NAMES = {
   str: 'Сила', agi: 'Ловкость', int: 'Интеллект', vit: 'Выносливость', wil: 'Воля',
@@ -158,7 +164,28 @@ function detailRows(entry) {
   ];
 }
 
-export function ItemSheet({ entry, onClose }) {
+// Разница с надетым в том же слоте: «💪 +3 · 🧠 -2».
+function CompareLine({ item, worn }) {
+  const keys = ['str', 'agi', 'int', 'vit', 'wil'];
+  const diff = keys
+    .map((k) => [k, (item.base_stats?.[k] || 0) - (worn?.base_stats?.[k] || 0)])
+    .filter(([, d]) => d !== 0);
+  return (
+    <div className="item-compare">
+      <span className="item-compare__label">{worn ? `против «${worn.name}»` : 'слот пуст'}</span>
+      <span className="item-compare__chips">
+        {diff.length === 0 && <span className="gear-chip gear-chip--same">=</span>}
+        {diff.map(([k, d]) => (
+          <span key={k} className={d > 0 ? 'gear-chip gear-chip--up' : 'gear-chip gear-chip--down'}>
+            {STAT_ICONS[k]} {d > 0 ? `+${d}` : d}
+          </span>
+        ))}
+      </span>
+    </div>
+  );
+}
+
+export function ItemSheet({ entry, onClose, worn, compare = false, actions = null }) {
   const { kind, data } = entry;
   const NOTES = {
     trophy: 'Цена - у скупщика в своём городе, в чужом он платит меньше. Реликвии не передаются.',
@@ -188,7 +215,9 @@ export function ItemSheet({ entry, onClose }) {
             </div>
           ))}
         </dl>
+        {compare && <CompareLine item={data} worn={worn} />}
         {note && <p className="item-sheet__note">{note}</p>}
+        {actions && <div className="item-sheet__actions">{actions}</div>}
         <Button mode="secondary" size="l" stretched onClick={onClose}>Закрыть</Button>
       </div>
     </>
@@ -248,13 +277,74 @@ export function QuantitySheet({ entry, onClose, onCopied }) {
   );
 }
 
-export default function InventoryTab() {
+
+// --- Сумка сеткой (2026-10-22) ------------------------------------------------
+// Ячейки с картинкой и рамкой редкости, сверху фильтры значками. Нажатие на
+// ячейку - шторка вещи, все действия (передать, съесть, открыть) там.
+
+const FILTERS = [
+  { id: 'all', icon: '🎒', title: 'Всё' },
+  { id: 'gear', icon: '⚔️', title: 'Снаряжение' },
+  { id: 'chest', icon: '🗃️', title: 'Ларцы' },
+  { id: 'trophy', icon: '🏺', title: 'Реликвии' },
+  { id: 'consumable', icon: '🧪', title: 'Расходники' },
+  { id: 'food', icon: '🍲', title: 'Еда' },
+];
+
+// Что игрок уже видел: новые вещи помечены точкой, пока их не открыли.
+// Только в этом браузере - удобство, а не данные игры.
+const SEEN_KEY = 'pines:bag-seen';
+
+function loadSeen() {
+  try {
+    const raw = localStorage.getItem(SEEN_KEY);
+    return raw ? new Set(JSON.parse(raw)) : null;
+  } catch {
+    return null;
+  }
+}
+
+function saveSeen(set) {
+  try { localStorage.setItem(SEEN_KEY, JSON.stringify([...set].slice(-600))); } catch { /* без памяти - без точек */ }
+}
+
+// Вещь без своей картинки (админская, свежая) - значок слота, а не пустая ячейка.
+const SLOT_EMOJI = { weapon: '⚔️', helmet: '🪖', armor: '🛡️', legs: '👖', boots: '👢' };
+// Те же запасные картинки, что у ItemIcon: ларцы, свитки, уникальные и кованые.
+const hasPicture = (icon) => Boolean(icon) && (Boolean(itemIcon(icon))
+  || ['chest:', 'elixir:scroll_', 'unique:', 'craft:'].some((p) => icon.startsWith(p)));
+
+const RARITY_RANK = { unique: 5, legendary: 4, epic: 3, rare: 2, uncommon: 1, common: 0 };
+
+function BagCell({ entry, isNew, onOpen }) {
+  const { data } = entry;
+  const count = entry.kind === 'gear' ? null : data.count;
+  const rar = data.rarity || 'common';
+  return (
+    <button
+      type="button"
+      className={`bag-cell bag-cell--${rar}${data.need_level ? ' bag-cell--locked' : ''}`}
+      onClick={onOpen}
+      aria-label={data.name}
+    >
+      {hasPicture(data.icon)
+        ? <ItemIcon icon={data.icon} rarity={data.rarity} alt="" size={56} />
+        : <span className="bag-cell__emoji" aria-hidden="true">{data.emoji || SLOT_EMOJI[data.slot] || '❔'}</span>}
+      {count > 1 && <span className="bag-cell__count">{count > 999 ? '999+' : count}</span>}
+      {entry.better && <span className="bag-cell__up" aria-hidden="true">▲</span>}
+      {data.need_level && <span className="bag-cell__lock" aria-hidden="true">🔒</span>}
+      {isNew && <span className="bag-cell__new" aria-hidden="true" />}
+    </button>
+  );
+}
+
+export default function InventoryTab({ onOpenTab }) {
   const [items, setItems] = useState(null);
   const [trophies, setTrophies] = useState([]);
   const [consumables, setConsumables] = useState([]);
   const [status, setStatus] = useState('loading');
   const [errorMsg, setErrorMsg] = useState(null);
-  const [openSlot, setOpenSlot] = useState(null);
+  const [filter, setFilter] = useState('all');
   const [copiedId, setCopiedId] = useState(null);
   const [detail, setDetail] = useState(null);      // {kind, data}
   const [qtyEntry, setQtyEntry] = useState(null);  // расходник, для которого выбираем количество
@@ -264,6 +354,7 @@ export default function InventoryTab() {
   const [eating, setEating] = useState(null);
   const [opening, setOpening] = useState(false);
   const [roulette, setRoulette] = useState(null);  // ответ сервера на открытие ларца
+  const [seen, setSeen] = useState(null);
 
   function apply(res) {
     setItems(res.items);
@@ -281,6 +372,7 @@ export default function InventoryTab() {
     setErrorMsg(null);
     try {
       apply(await eatFood(entry.dish, entry.grade));
+      setDetail(null);
     } catch (err) {
       setErrorMsg(err?.message?.includes(' ') ? err.message : 'Не удалось поесть.');
     } finally {
@@ -294,6 +386,7 @@ export default function InventoryTab() {
     setErrorMsg(null);
     try {
       setRoulette(await openChest(kind));
+      setDetail(null);
     } catch (err) {
       setErrorMsg(err?.message === 'no_chest' ? 'Ларцов в сумке больше нет.' : 'Не удалось открыть ларец.');
     } finally {
@@ -320,6 +413,42 @@ export default function InventoryTab() {
 
   useEffect(load, []);
 
+  // Надевают и снимают во вкладке «Персонаж → Герой» (2026-10-22): здесь
+  // надетое не показываем вовсе, сумка - только то, что лежит.
+  const worn = useMemo(
+    () => Object.fromEntries((items || []).filter((i) => i.equipped).map((i) => [i.slot, i])),
+    [items],
+  );
+  const entries = useMemo(() => {
+    if (!items) return [];
+    const gear = items
+      .filter((i) => !i.equipped)
+      .sort((a, b) => SLOT_ORDER.indexOf(a.slot) - SLOT_ORDER.indexOf(b.slot)
+        || (RARITY_RANK[b.rarity] || 0) - (RARITY_RANK[a.rarity] || 0) || b.power - a.power)
+      .map((i) => ({
+        kind: 'gear', key: `gear:${i.id}`, data: i,
+        better: !i.need_level && i.power > (worn[i.slot]?.power || 0),
+      }));
+    const stack = (kind, rows) => rows.map((r) => ({ kind, key: `${kind}:${r.id}`, data: r }));
+    return [
+      ...stack('chest', chests), ...gear, ...stack('trophy', trophies),
+      ...stack('consumable', consumables), ...stack('food', food),
+    ];
+  }, [items, worn, chests, trophies, consumables, food]);
+
+  // Первый заход в этом браузере - всё уже «видено», точек нет.
+  useEffect(() => {
+    if (status !== 'ready') return;
+    const stored = loadSeen();
+    if (stored) {
+      setSeen(stored);
+    } else {
+      const all = new Set(entries.map((e) => e.key));
+      saveSeen(all);
+      setSeen(all);
+    }
+  }, [status]); // eslint-disable-line react-hooks/exhaustive-deps
+
   if (status === 'loading') {
     return (
       <Skeleton />
@@ -330,181 +459,134 @@ export default function InventoryTab() {
     return <Placeholder icon={<div style={{ fontSize: 48 }}>🎒</div>}>Не удалось загрузить инвентарь.</Placeholder>;
   }
 
-  // Рыба и руда (2026-10-21) - во вкладке «Персонаж → Ремёсла», здесь их нет.
-  if (items.every((i) => i.equipped) && trophies.length === 0 && consumables.length === 0 && chests.length === 0
-    && food.length === 0 && !foodBuff) {
-    return <Placeholder icon={<div style={{ fontSize: 48 }}>🎒</div>}>Твоя сумка пока пуста.</Placeholder>;
-  }
-
   const markCopied = (key) => {
     setCopiedId(key);
     setTimeout(() => setCopiedId((cur) => (cur === key ? null : cur)), 2500);
   };
 
-  // Надевают и снимают во вкладке «Персонаж → Герой» (2026-10-22): здесь
-  // надетое не показываем вовсе, сумка - только то, что лежит.
-  const spare = items.filter((i) => !i.equipped);
-  const groups = SLOT_ORDER
-    .map((slot) => ({
-      key: slot,
-      kind: 'gear',
-      title: (items.find((i) => i.slot === slot) || {}).slot_title || slot,
-      rows: spare.filter((i) => i.slot === slot),
-    }))
-    .concat([
-      { key: 'chests', kind: 'chest', title: 'Редкости', rows: chests },
-      { key: 'trophies', kind: 'trophy', title: 'Реликвии', rows: trophies },
-      { key: 'consumables', kind: 'consumable', title: 'Расходники', rows: consumables },
-      { key: 'food', kind: 'food', title: 'Еда', rows: food },
-    ])
-    .filter((group) => group.rows.length > 0);
-  const bagCount = spare.length + trophies.length + consumables.length + chests.length + food.length;
-
-  const craftButton = (item) => item.craftable && (
-    <Button
-      mode="outline" size="s"
-      onClick={() => window.dispatchEvent(new CustomEvent('open-craft'))}
-    >
-      В мастерскую
-    </Button>
-  );
-
-  // Команду передачи с номером экземпляра собирает сервер (transfer_command);
-  // здесь только копирование.
-  const transferButton = (item) => item.transfer_command && (
-    <button
-      type="button"
-      className="copy-transfer"
-      title="Скопировать команду передачи"
-      aria-label="Скопировать команду передачи"
-      onClick={async () => { await copyText(item.transfer_command); markCopied(`gear:${item.id}`); }}
-    >
-      {copiedId === `gear:${item.id}` ? <CheckIcon /> : <CopyIcon />}
-    </button>
-  );
-
-  // У штучного количество выбирается ползунком, поэтому кнопка открывает окно.
-  const quantityButton = (entry) => entry.transfer_prefix && (
-    <button
-      type="button"
-      className="copy-transfer"
-      title="Скопировать команду передачи"
-      aria-label="Скопировать команду передачи"
-      onClick={() => setQtyEntry(entry)}
-    >
-      {copiedId === `stack:${entry.id}` ? <CheckIcon /> : <CopyIcon />}
-    </button>
-  );
-
-  // Иконка и название открывают подсказку - кнопками, чтобы нажатие не
-  // задевало копирование в той же строке.
-  const opener = (kind, data) => ({
-    before: (
-      <button type="button" className="item-open" onClick={() => setDetail({ kind, data })}
-        aria-label={`Подробнее: ${data.name}`}>
-        {itemIcon(data.icon || '') || !data.emoji
-          ? <ItemIcon icon={data.icon} rarity={data.rarity} alt={data.name} />
-          : <span className="craft-emoji-icon" aria-hidden="true">{data.emoji}</span>}
-      </button>
-    ),
-    name: (
-      <button type="button" className="item-open item-open--name" onClick={() => setDetail({ kind, data })}>
-        {data.name}
-      </button>
-    ),
-  });
-
-  const gearRow = (item) => {
-    const open = opener('gear', item);
-    return (
-      <SimpleCell
-        key={item.id}
-        multiline
-        before={open.before}
-        subtitle={itemSubtitle(item)}
-        // «В мастерскую» - строкой под описанием (2026-10-19): справа она
-        // сжимала название и статы до столбика в одну букву.
-        extraSubtitle={item.craftable ? <div className="inventory-craft">{craftButton(item)}</div> : undefined}
-        after={item.transfer_command ? <div className="inventory-actions">{transferButton(item)}</div> : null}
-      >
-        {open.name}
-      </SimpleCell>
-    );
+  const openEntry = (entry) => {
+    setDetail(entry);
+    if (seen && !seen.has(entry.key)) {
+      const next = new Set(seen);
+      next.add(entry.key);
+      saveSeen(next);
+      setSeen(next);
+    }
   };
 
-  const stackRow = (kind, entry) => {
-    const open = opener(kind, entry);
-    let subtitle = `${entry.category_title} · ×${entry.count}`;
-    if (kind === 'trophy') subtitle = [entry.rarity_title, `×${entry.count}`].filter(Boolean).join(' · ');
-    if (kind === 'chest') subtitle = `×${entry.count}`;
-    if (kind === 'food') subtitle = `${entry.grade_title} · ×${entry.count} · ${entry.effect}`;
-    let after = null;
-    if (kind === 'consumable') after = <div className="inventory-actions">{quantityButton(entry)}</div>;
-    if (kind === 'food') {
-      after = (
-        <div className="inventory-actions">
-          {quantityButton(entry)}
-          <Button mode="primary" size="s" loading={eating === entry.id} onClick={() => handleEat(entry)}>
-            Съесть
-          </Button>
-        </div>
+  const counts = Object.fromEntries(FILTERS.map((f) => [
+    f.id, f.id === 'all' ? entries.length : entries.filter((e) => e.kind === f.id).length,
+  ]));
+  const shown = filter === 'all' ? entries : entries.filter((e) => e.kind === filter);
+  const newCount = seen ? entries.filter((e) => !seen.has(e.key)).length : 0;
+
+  // Действия вещи - в её шторке.
+  const sheetActions = (entry) => {
+    const { kind, data } = entry;
+    const out = [];
+    if (kind === 'gear') {
+      out.push(
+        <button key="hero" type="button" className="pill-btn" onClick={() => onOpenTab?.('character')}>
+          🧍 Надеть в «Герое»
+        </button>,
       );
+      if (data.craftable) {
+        out.push(
+          <button key="craft" type="button" className="pill-btn"
+            onClick={() => window.dispatchEvent(new CustomEvent('open-craft'))}>
+            ⚒ В мастерскую
+          </button>,
+        );
+      }
+      // Команду передачи с номером экземпляра собирает сервер (transfer_command).
+      if (data.transfer_command) {
+        out.push(
+          <button key="copy" type="button" className="pill-btn"
+            onClick={async () => { await copyText(data.transfer_command); markCopied(entry.key); }}>
+            {copiedId === entry.key ? <CheckIcon /> : <CopyIcon />} Команда передачи
+          </button>,
+        );
+      }
     }
     if (kind === 'chest') {
-      after = (
-        <Button mode="primary" size="s" loading={opening} onClick={() => handleOpenChest(entry.kind)}>
-          Открыть
-        </Button>
+      out.push(
+        <button key="open" type="button" className="pill-btn pill-btn--main" disabled={opening}
+          onClick={() => handleOpenChest(data.kind)}>
+          🗝 Открыть
+        </button>,
       );
     }
-    return (
-      <SimpleCell
-        key={entry.id}
-        multiline
-        before={open.before}
-        subtitle={subtitle}
-        after={after}
-      >
-        {open.name}
-      </SimpleCell>
-    );
+    if (kind === 'food') {
+      out.push(
+        <button key="eat" type="button" className="pill-btn pill-btn--main" disabled={eating === data.id}
+          onClick={() => handleEat(data)}>
+          🍴 Съесть
+        </button>,
+      );
+    }
+    // У штучного количество выбирается ползунком, поэтому кнопка открывает окно.
+    if ((kind === 'consumable' || kind === 'food') && data.transfer_prefix) {
+      out.push(
+        <button key="qty" type="button" className="pill-btn" onClick={() => { setQtyEntry(data); setDetail(null); }}>
+          {copiedId === `stack:${data.id}` ? <CheckIcon /> : <CopyIcon />} Передать
+        </button>,
+      );
+    }
+    return out.length ? out : null;
   };
 
   return (
     <>
-      {errorMsg && (
-        <Div><Text style={{ color: '#c81e3a' }}>{errorMsg}</Text></Div>
-      )}
+      <SectionHead
+        kind="inventory" icon="🎒" value={entries.length}
+        label={newCount > 0 ? `в сумке · новых ${newCount}` : 'в сумке'}
+        aside={foodBuff && (
+          <span className="bag-buff" title={foodBuff.effect}>
+            {foodBuff.emoji} {foodBuff.minutes_left} мин<br /><small>{foodBuff.name}</small>
+          </span>
+        )}
+      />
 
-      {foodBuff && (
-        <Group header={<Header>Сытость</Header>}>
-          <Div>
-            {foodBuff.emoji} {foodBuff.name}: {foodBuff.effect}. Еще {foodBuff.minutes_left} мин.
-          </Div>
-        </Group>
-      )}
+      {errorMsg && <p className="tab-error">{errorMsg}</p>}
 
-      <Group header={<Header>В сумке ({bagCount})</Header>}>
-        {groups.length === 0 && <Div>Сумка пуста.</Div>}
-        {groups.map((group) => (
-          <div key={group.key}>
-            <SimpleCell
-              onClick={() => setOpenSlot((cur) => (cur === group.key ? null : group.key))}
-              after={openSlot === group.key ? '▴' : `${group.rows.length} ▾`}
+      <Group>
+        <div className="filter-chips" role="tablist">
+          {FILTERS.filter((f) => f.id === 'all' || counts[f.id] > 0).map((f) => (
+            <button
+              type="button" key={f.id} role="tab" aria-selected={filter === f.id}
+              className={`filter-chip${filter === f.id ? ' filter-chip--on' : ''}`}
+              onClick={() => setFilter(f.id)} title={f.title} aria-label={f.title}
             >
-              {group.title}
-            </SimpleCell>
-            {openSlot === group.key && (
-              <div className="craft-expand">
-                {group.rows.map((row) => (group.kind === 'gear' ? gearRow(row) : stackRow(group.kind, row)))}
-              </div>
-            )}
+              <span aria-hidden="true">{f.icon}</span>
+              <small>{counts[f.id]}</small>
+            </button>
+          ))}
+        </div>
+        {shown.length === 0 ? (
+          <Empty icon="🎒">Сумка пуста. Вещи падают с мобов, из ларцов и рейдов.</Empty>
+        ) : (
+          <div className="bag-grid" key={filter}>
+            {shown.map((entry) => (
+              <BagCell
+                key={entry.key} entry={entry} isNew={seen ? !seen.has(entry.key) : false}
+                onOpen={() => openEntry(entry)}
+              />
+            ))}
           </div>
-        ))}
+        )}
+        {foodBuff && (
+          <p className="bag-buff-line">{foodBuff.emoji} {foodBuff.name}: {foodBuff.effect}. Ещё {foodBuff.minutes_left} мин.</p>
+        )}
       </Group>
 
       {detail && (
-        <ItemSheet entry={detail} onClose={() => setDetail(null)} />
+        <ItemSheet
+          entry={detail}
+          onClose={() => setDetail(null)}
+          compare={detail.kind === 'gear'}
+          worn={detail.kind === 'gear' ? worn[detail.data.slot] : null}
+          actions={sheetActions(detail)}
+        />
       )}
       {roulette && (
         <ChestRoulette

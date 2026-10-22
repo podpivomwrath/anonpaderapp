@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
-import { Group, Header, Div, Text, Placeholder, Button, Input, Checkbox } from '@vkontakte/vkui';
+import { Group, Header, Div, Text, Placeholder, Button, Input } from '@vkontakte/vkui';
 import { getPresets, savePreset, switchPreset, buyPresetSlot } from '../api.js';
 import Skeleton from './Skeleton.jsx';
+import { SectionHead } from './ui.jsx';
 
 // Коды ошибок сервера, у которых нет человеческого текста на той стороне.
 const ERROR_TEXTS = {
@@ -9,6 +10,17 @@ const ERROR_TEXTS = {
   no_subclass: 'Сначала выбери подкласс.',
   bad_request: 'Не удалось сохранить: проверь название и состав.',
 };
+
+// Цвет бафа по категории (2026-10-22): урон, оборона, лечение и прочее
+// различаются с первого взгляда. Класс CSS, а не текст на экране.
+const CATEGORY_TONE = {
+  damage: 'red', defense: 'blue', healing: 'green', control_utility: 'violet', group_support: 'gold',
+};
+const tone = (b) => CATEGORY_TONE[b?.category] || 'gray';
+
+function BuffChip({ buff }) {
+  return <span className={`buff-chip buff-chip--${tone(buff)}`}>{buff?.name || '?'}</span>;
+}
 
 function saveErrorText(err) {
   const code = err?.message;
@@ -121,19 +133,26 @@ export default function PresetsTab({ character }) {
           <Input placeholder="Название" value={editName} onChange={(e) => setEditName(e.target.value)} />
         </Div>
         <Div style={{ fontSize: 13, opacity: 0.7 }}>{data.rule_hint}</Div>
-        {data.buffs.map((b) => (
-          <div className="stat-row" key={b.id}>
-            <Checkbox disabled={!b.unlocked} checked={editBuffs.includes(b.id)} onChange={() => toggleBuff(b.id)}>
-              {b.unlocked ? '' : '🔒 '}
-              {b.name}
-              <span style={{ opacity: 0.6 }}> · {b.category_label || b.category}</span>
-              {/* без описания пресет собирался вслепую, по одним названиям */}
-              {b.description && (
-                <div style={{ opacity: 0.7, fontSize: 13, marginTop: 2 }}>{b.description}</div>
-              )}
-            </Checkbox>
-          </div>
-        ))}
+        <div className="buff-pick">
+          {data.buffs.map((b) => {
+            const on = editBuffs.includes(b.id);
+            return (
+              <button
+                type="button" key={b.id} disabled={!b.unlocked} aria-pressed={on}
+                className={`buff-tile buff-tile--${tone(b)}${on ? ' buff-tile--on' : ''}`}
+                onClick={() => toggleBuff(b.id)}
+              >
+                <span className="buff-tile__head">
+                  <b>{b.unlocked ? '' : '🔒 '}{b.name}</b>
+                  <span className="buff-tile__check" aria-hidden="true">{on ? '✓' : ''}</span>
+                </span>
+                <small className="buff-tile__cat">{b.category_label}</small>
+                {/* без описания пресет собирался вслепую, по одним названиям */}
+                {b.description && <small className="buff-tile__desc">{b.description}</small>}
+              </button>
+            );
+          })}
+        </div>
         {errorMsg && (
           <Div>
             <Text style={{ color: '#c81e3a' }}>{errorMsg}</Text>
@@ -151,6 +170,7 @@ export default function PresetsTab({ character }) {
     );
   }
 
+  const active = data.presets.find((p) => p.is_active) || null;
   const slots = [];
   for (let i = 0; i < data.preset_slots; i++) {
     slots.push(data.presets[i] || null);
@@ -158,45 +178,43 @@ export default function PresetsTab({ character }) {
 
   return (
     <>
-      <Group
-        header={
-          <Header>
-            Пресеты ({data.presets.length}/{data.preset_slots})
-          </Header>
-        }
-      >
-        {slots.map((preset, idx) => (
-          <div className="stat-row" key={preset ? preset.id : `empty-${idx}`}>
-            <div>
-              <div className="stat-row__label">
-                {preset ? `${preset.is_active ? '✅ ' : ''}${idx + 1}. ${preset.name}` : `${idx + 1}. Пусто`}
-              </div>
-              {preset && (
-                <Text style={{ opacity: 0.7, fontSize: 13 }}>
-                  {preset.buff_ids.map((id) => data.buffs.find((b) => b.id === id)?.name || id).join(', ')}
-                </Text>
-              )}
-            </div>
-            <div style={{ display: 'flex', gap: 6 }}>
-              {preset ? (
-                <>
+      <SectionHead
+        kind="trials" icon="⚔️" value={active ? active.name : 'нет'}
+        label="активный пресет"
+        aside={<>{data.presets.length}/{data.preset_slots}<br /><small>слотов занято</small></>}
+      />
+      <Group header={<Header>Пресеты</Header>}>
+        <div className="card-list">
+          {slots.map((preset, idx) => (preset ? (
+            <div className={`preset-card${preset.is_active ? ' preset-card--active' : ''}`} key={preset.id}>
+              <span className="preset-card__num">{idx + 1}</span>
+              <div className="preset-card__body">
+                <b className="preset-card__name">
+                  {preset.name}
+                  {preset.is_active && <span className="preset-card__badge">активен</span>}
+                </b>
+                <span className="preset-card__chips">
+                  {preset.buff_ids.map((id) => <BuffChip key={id} buff={data.buffs.find((x) => x.id === id)} />)}
+                </span>
+                <span className="preset-card__actions">
                   {!preset.is_active && (
-                    <Button mode="secondary" size="s" disabled={busy} onClick={() => handleSwitch(preset.id)}>
+                    <button type="button" className="pill-btn pill-btn--main" disabled={busy} onClick={() => handleSwitch(preset.id)}>
                       Активировать
-                    </Button>
+                    </button>
                   )}
-                  <Button mode="tertiary" size="s" disabled={busy} onClick={() => startEdit(preset)}>
-                    Изменить
-                  </Button>
-                </>
-              ) : (
-                <Button mode="secondary" size="s" disabled={busy} onClick={() => startEdit(null)}>
-                  Собрать
-                </Button>
-              )}
+                  <button type="button" className="pill-btn" disabled={busy} onClick={() => startEdit(preset)}>
+                    ✎ Изменить
+                  </button>
+                </span>
+              </div>
             </div>
-          </div>
-        ))}
+          ) : (
+            <button type="button" className="preset-card preset-card--empty" key={`empty-${idx}`} disabled={busy} onClick={() => startEdit(null)}>
+              <span className="preset-card__num">{idx + 1}</span>
+              <span className="preset-card__plus">+ Собрать пресет</span>
+            </button>
+          )))}
+        </div>
       </Group>
 
       {data.next_slot_cost !== null && (
