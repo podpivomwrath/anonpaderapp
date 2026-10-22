@@ -194,7 +194,7 @@ export default function StatsTab({ character, onCharacterUpdate }) {
       <Group header={<Header>Свободных очков: {remaining}</Header>}>
         <StatRadar current={withGear(character.stats)} preview={withGear(previewStats)} burst={saved} />
         {STAT_DEFS.map((stat) => (
-          <div className={pending[stat.key] ? 'stat-row stat-row--pending' : 'stat-row'} key={stat.key}>
+          <div className={pending[stat.key] ? 'stat-row stat-row--stat stat-row--pending' : 'stat-row stat-row--stat'} key={stat.key}>
             <span className="stat-row__bar" aria-hidden="true">
               <i style={{ width: `${(100 * (previewStats[stat.key] + (character.gear_bonus?.[stat.key] || 0))) / barScale}%` }} />
             </span>
