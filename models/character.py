@@ -29,8 +29,9 @@ class Character(Base):
     subclass: Mapped[str | None] = mapped_column(String(32), nullable=True)
     level: Mapped[int] = mapped_column(default=1)
     experience: Mapped[int] = mapped_column(BigInteger, default=0)
-    # Пол (2026-10-22): "m" | "f" - пока только силуэт героя в мини-аппе.
-    gender: Mapped[str] = mapped_column(String(1), default="m", server_default="m")
+    # Пол (2026-10-22): "m" | "f" | None - ещё не выбран. Выбирается один раз
+    # при первом заходе в профиль мини-аппа; пока влияет только на силуэт.
+    gender: Mapped[str | None] = mapped_column(String(1), nullable=True)
     # Текущее HP между боями (NULL = полное). Восстанавливается отдыхом/респавном.
     current_hp: Mapped[int | None] = mapped_column(nullable=True)
     # Момент, до которого персонаж мёртв (NULL — жив)

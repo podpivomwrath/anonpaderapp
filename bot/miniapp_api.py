@@ -107,7 +107,7 @@ def _character_payload(
         # Кольцо опыта вокруг эмблемы (2026-10-22). На потолке уровня - None.
         "xp": character.experience,
         "xp_to_next": experience_service.xp_to_next(character.level) if character.level < bc.MAX_LEVEL else None,
-        "gender": character.gender or "m",
+        "gender": character.gender,
         # Гильдии: вкладка видна с 20 уровня - и всегда тому, кто уже в гильдии.
         "in_guild": character.guild_id is not None,
         # Патч 111: Мощь - одно число силы персонажа (services/power_service.py).

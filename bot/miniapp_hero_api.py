@@ -45,6 +45,9 @@ async def handle_post_gender(request: web.Request) -> web.Response:
         character = await miniapp_api._load_character(session, request[VK_USER_ID_KEY])
         if character is None:
             return web.json_response({"error": "character_not_found"}, status=404)
+        # Один раз (2026-10-22, владелец): сменить пол пока нельзя.
+        if character.gender is not None:
+            return web.json_response({"error": "already_set", "gender": character.gender}, status=409)
         character.gender = gender
         await session.commit()
         return web.json_response({"gender": gender})

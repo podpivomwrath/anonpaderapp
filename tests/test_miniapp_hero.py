@@ -14,7 +14,7 @@ from tests.test_miniapp_api import (  # noqa: F401 - фикстуры
 async def test_character_has_xp_ring_and_gender(client, session_factory) -> None:
     await _make_character(session_factory, vk_id=701)
     data = await (await client.get("/api/miniapp/character", params=_signed_query(701))).json()
-    assert data["gender"] == "m"
+    assert data["gender"] is None  # ещё не выбирал
     assert data["xp"] == 0 and data["xp_to_next"] > 0
 
 
@@ -26,6 +26,9 @@ async def test_gender_is_saved_and_validated(client, session_factory) -> None:
     assert (await ok.json()) == {"gender": "f"}
     data = await (await client.get("/api/miniapp/character", params=_signed_query(702))).json()
     assert data["gender"] == "f"
+    # Второй раз - нельзя.
+    again = await client.post("/api/miniapp/gender", params=_signed_query(702), json={"gender": "m"})
+    assert again.status == 409
 
 
 async def test_trophies_shelf(client, session_factory) -> None:
