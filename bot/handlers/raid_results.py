@@ -438,7 +438,7 @@ async def _grant_stage_clear_bonus(battle: raid_combat.RaidBattle) -> None:
             )
             peer_id = battle.participants[scalpel_winner.id].peer_id
             from services import raid_service
-            await raid_service.finish_run(db, battle.run_id)
+            await raid_service.finish_run(db, battle.run_id, won=True)
             await db.commit()
         try:
             await raid_combat._bot_api.messages.send(
@@ -616,7 +616,7 @@ async def _cleanup_and_return(session_id: int, battle: raid_combat.RaidBattle, t
             else:
                 defeats[cid] = (await encounter_service.resolve_defeat(db, character), character.respawn_at)
         from services import raid_service
-        await raid_service.finish_run(db, battle.run_id)
+        await raid_service.finish_run(db, battle.run_id, won=not defeated)
         if battle.is_rift:
             from services import rift_service
 

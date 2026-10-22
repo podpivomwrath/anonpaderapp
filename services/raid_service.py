@@ -211,10 +211,12 @@ async def record_run(db: AsyncSession, snapshot: LobbySnapshot) -> RaidRun:
     return run
 
 
-async def finish_run(db: AsyncSession, run_id: int | None) -> None:
+async def finish_run(db: AsyncSession, run_id: int | None, won: bool = False) -> None:
+    """won - босс повержен (2026-10-22: полка трофеев в профиле); иначе
+    finished. До этой даты победы тоже лежат как finished."""
     if run_id is not None:
         await db.execute(update(RaidRun).where(RaidRun.id == run_id, RaidRun.status == "active")
-                         .values(status="finished"))
+                         .values(status="won" if won else "finished"))
 
 
 async def recover_interrupted(db: AsyncSession, run_id: int | None = None) -> list[int]:

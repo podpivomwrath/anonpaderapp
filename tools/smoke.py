@@ -42,7 +42,7 @@ class FakeRequest(dict):
 
 
 async def main() -> int:
-    from bot import miniapp_api, miniapp_guild_api, miniapp_map_api, miniapp_shop_api
+    from bot import miniapp_api, miniapp_guild_api, miniapp_hero_api, miniapp_map_api, miniapp_shop_api
     from bot.app_keys import SESSION_FACTORY_KEY, SETTINGS_KEY
     from config import get_settings
     from bot.handlers import world as world_handlers
@@ -54,6 +54,7 @@ async def main() -> int:
     checks = {
         "персонаж": miniapp_api.handle_get_character,
         "сумка": miniapp_api.handle_get_inventory,
+        "трофеи": miniapp_hero_api.handle_get_trophies,
         "карта": miniapp_map_api.handle_get_state,
         "гильдия": miniapp_guild_api.handle_get,
         "магазин": miniapp_shop_api.handle_get,

@@ -15,6 +15,7 @@ from sqlalchemy.orm import selectinload
 from bot.app_keys import SESSION_FACTORY_KEY, SETTINGS_KEY
 from bot import dailies_texts
 from bot.miniapp_auth import VK_USER_ID_KEY
+from game.combat import balance_config as bc
 from game.economy import crafting
 from services import naming, subclass_service, transfer_service
 from bot.onboarding_texts import REGION_TITLES
@@ -26,6 +27,7 @@ from services import (
     daily_service,
     elixir_service,
     derived_stats_service,
+    experience_service,
     item_service,
     crown_service,
     leaderboard_service,
@@ -102,6 +104,10 @@ def _character_payload(
         "region": character.region,
         "region_title": REGION_TITLES.get(character.region, "-") if character.region else "-",
         "level": character.level,
+        # Кольцо опыта вокруг эмблемы (2026-10-22). На потолке уровня - None.
+        "xp": character.experience,
+        "xp_to_next": experience_service.xp_to_next(character.level) if character.level < bc.MAX_LEVEL else None,
+        "gender": character.gender or "m",
         # Гильдии: вкладка видна с 20 уровня - и всегда тому, кто уже в гильдии.
         "in_guild": character.guild_id is not None,
         # Патч 111: Мощь - одно число силы персонажа (services/power_service.py).
