@@ -40,6 +40,16 @@
   box-sizing: border-box;
 }
 
+/* С картинкой (assets/sections) шапка выше, а затемнение мягче: левая
+   треть баннеров и так тёмная, текст читается. */
+.section-head--art {
+  min-height: 96px;
+  background:
+    linear-gradient(90deg, rgba(10, 10, 12, 0.8) 0%, rgba(10, 10, 12, 0.35) 45%, transparent 75%),
+    var(--section-art) right center / cover no-repeat,
+    #0c0c0e;
+}
+
 .section-head--dailies { --tint: rgba(224, 120, 40, 0.45); }
 .section-head--login { --tint: rgba(224, 180, 90, 0.4); }
 .section-head--inventory { --tint: rgba(150, 120, 80, 0.4); }
@@ -799,22 +809,6 @@ body.lite .empty-state__icon {
   font-weight: 600;
   font-variant-numeric: tabular-nums;
   line-height: 16px;
-}
-
-.bag-cell__up {
-  position: absolute;
-  top: 3px;
-  right: 5px;
-  color: var(--up);
-  font-size: 11px;
-  text-shadow: 0 0 6px rgba(110, 220, 120, 0.9);
-}
-
-.bag-cell__lock {
-  position: absolute;
-  bottom: 3px;
-  left: 4px;
-  font-size: 11px;
 }
 
 .bag-cell__new {
@@ -2074,4 +2068,202 @@ body.lite .shop-showcase::after { animation: none; display: none; }
   border-radius: 50%;
   background: rgba(255, 255, 255, 0.06);
   font-size: 17px;
+}
+
+
+/* --- Инвентарь: группы, уровень/статы/стрелка на ячейке, список, разбор --------- */
+
+.bag-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-right: 12px;
+}
+
+.bag-toolbar .filter-chips { flex: 1; min-width: 0; }
+
+.view-switch {
+  display: flex;
+  flex-shrink: 0;
+  padding: 2px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.view-switch__btn {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 30px;
+  border: 0;
+  border-radius: 8px;
+  background: none;
+  color: inherit;
+  opacity: 0.5;
+  cursor: pointer;
+}
+
+.view-switch__btn--on { background: var(--blood-soft); opacity: 1; color: #ffd0d6; }
+
+.bag-group .list-caption { padding-top: 10px; }
+.bag-group .bag-grid { padding-top: 2px; }
+
+/* Ячейка: уровень слева вверху, стрелка справа, статы полосой внизу. */
+.bag-cell__level {
+  position: absolute;
+  top: 3px;
+  left: 4px;
+  padding: 0 4px;
+  border-radius: 5px;
+  background: rgba(0, 0, 0, 0.65);
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 15px;
+  font-variant-numeric: tabular-nums;
+}
+
+.bag-cell__trend {
+  position: absolute;
+  top: 2px;
+  right: 4px;
+}
+
+.bag-trend { font-size: 12px; line-height: 1; }
+.bag-trend--up { color: var(--up); text-shadow: 0 0 6px rgba(110, 220, 120, 0.9); }
+.bag-trend--down { color: var(--down); text-shadow: 0 0 6px rgba(230, 70, 60, 0.8); }
+
+.bag-cell__lock {
+  position: absolute;
+  top: 3px;
+  right: 3px;
+  padding: 0 3px;
+  border-radius: 5px;
+  background: rgba(0, 0, 0, 0.65);
+  font-size: 9.5px;
+  line-height: 15px;
+}
+
+.bag-cell__stats {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  padding: 8px 2px 2px;
+  border-radius: 0 0 11px 11px;
+  background: linear-gradient(transparent, rgba(0, 0, 0, 0.85) 55%);
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 1.1;
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Новая вещь: точка сверху по центру - углы заняты уровнем и стрелкой. */
+.bag-cell__new {
+  top: 4px;
+  left: 50%;
+  margin-left: -4px;
+}
+
+.bag-list {
+  display: flex;
+  flex-direction: column;
+  padding: 0 8px 8px;
+}
+
+.bag-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 7px 8px;
+  border: 0;
+  border-radius: 10px;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  animation: row-in 0.3s var(--ease-out, ease-out) backwards;
+}
+
+.bag-row:active { background: rgba(255, 255, 255, 0.05); }
+.bag-row--locked { opacity: 0.6; }
+
+.bag-row__pic {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: 44px;
+  height: 44px;
+  border-radius: 10px;
+  border: 1px solid var(--rar, rgba(255, 255, 255, 0.1));
+  background: rgba(0, 0, 0, 0.32);
+}
+
+.bag-row__pic .item-icon { box-shadow: none; background: transparent; }
+.bag-row__pic .bag-cell__emoji { font-size: 22px; }
+
+.bag-row__text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+  min-width: 0;
+}
+
+.bag-row__name {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 14.5px;
+  overflow-wrap: anywhere;
+}
+
+.bag-row__new {
+  width: 7px;
+  height: 7px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  background: var(--blood);
+  box-shadow: 0 0 6px var(--blood);
+}
+
+.bag-row__sub {
+  font-size: 12px;
+  opacity: 0.65;
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+}
+
+.pill-btn--danger {
+  border-color: rgba(255, 138, 128, 0.5);
+  background: rgba(255, 138, 128, 0.08);
+  color: #ffc2bb;
+}
+
+.break-confirm {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 10px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 138, 128, 0.35);
+  background: rgba(255, 138, 128, 0.06);
+}
+
+.break-confirm__text {
+  flex-basis: 100%;
+  font-size: 13.5px;
+}
+
+.bag-dust-burst {
+  position: fixed;
+  left: 50%;
+  top: 40%;
+  pointer-events: none;
 }

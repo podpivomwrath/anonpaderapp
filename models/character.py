@@ -139,6 +139,10 @@ class Character(Base):
     # Намеренно НЕ трогается trophy_service (transfer_all/split_among/sell_all)
     # — не теряется в PvP, не продаётся скупщику, просто другая колонка.
     raid_keys: Mapped[int] = mapped_column(default=0)
+    # Звёздная пыль (2026-10-22): разбор уникальной вещи даёт 1. На что её
+    # тратить - решим позже; пока только копится. Как ключи - не теряется
+    # в PvP и не продаётся.
+    star_dust: Mapped[int] = mapped_column(default=0, server_default="0")
 
     # Патч 58, рыбалка. Уровень БЕЗ потолка (в отличие от боевого с
     # MAX_LEVEL=60): каждый следующий дороже предыдущего, расти можно

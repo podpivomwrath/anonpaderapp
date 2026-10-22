@@ -116,6 +116,9 @@ def _inventory_payload(items: list, level: int | None = None) -> dict:
                 # transfer_service, клиент их не пересказывает.
                 "transfer_command": _transfer_command(item),
                 "description": _unique_flavor(item),
+                # Уникальную (с босса или кованую) можно разобрать в
+                # звёздную пыль (2026-10-22). Правило - на сервере.
+                "disassemble": item_service.can_disassemble(item),
             }
             for item, equipped in items
         ]
@@ -151,6 +154,7 @@ async def _full_inventory(session, character_id: int) -> dict:
     payload["food"] = _food_payload(await cooking_service.get_food(session, character_id))
     if character is not None:
         payload["food_buff"] = food_buff_payload(character)
+        payload["star_dust"] = character.star_dust or 0
     return payload
 
 
@@ -467,5 +471,29 @@ async def handle_post_unequip(request: web.Request) -> web.Response:
             return web.json_response({"error": item_service.IN_BATTLE_TEXT}, status=409)
         if not await item_service.unequip_item(session, character.id, item_id):
             return web.json_response({"error": "cannot_unequip"}, status=400)
+        await session.commit()
+        return web.json_response(await _full_inventory(session, character.id))
+
+
+async def handle_post_disassemble(request: web.Request) -> web.Response:
+    """Разобрать уникальную вещь в звёздную пыль (2026-10-22). Подтверждение -
+    в мини-аппе вторым нажатием; надетую не разобрать."""
+    vk_user_id = request[VK_USER_ID_KEY]
+    try:
+        body = await request.json()
+    except Exception:
+        return web.json_response({"error": "bad_request"}, status=400)
+    item_id = body.get("item_id") if isinstance(body, dict) else None
+    if not isinstance(item_id, int):
+        return web.json_response({"error": "bad_request"}, status=400)
+    session_factory = request.app[SESSION_FACTORY_KEY]
+    async with session_factory() as session:
+        character = await miniapp_api._load_character(session, vk_user_id)
+        if character is None:
+            return web.json_response({"error": "character_not_found"}, status=404)
+        dust = await item_service.disassemble_unique(session, character, item_id)
+        if dust is None:
+            await session.rollback()
+            return web.json_response({"error": "Эту вещь разобрать нельзя: надетую сначала сними."}, status=400)
         await session.commit()
         return web.json_response(await _full_inventory(session, character.id))

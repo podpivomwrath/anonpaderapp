@@ -399,6 +399,44 @@ async def sell_all_gear(
     return total
 
 
+def can_disassemble(item: Item) -> bool:
+    """Уникальная вещь (с рейд-босса или уже кованая) - не служебная."""
+    return item.rarity == UNIQUE_RARITY_ID and not item.admin_only
+
+
+async def disassemble_unique(db: AsyncSession, character: Character, item_id: int) -> int | None:
+    """Разбор уникальной вещи в звёздную пыль (2026-10-22). Надетую не
+    разобрать - сначала снять. Забирается условным удалением, как в
+    sell_item: два параллельных нажатия не дадут пыль дважды. Возвращает
+    сколько пыли теперь у персонажа, None - разбирать нечего."""
+    from game.economy import craft_config as cc
+    from services import resource_log
+
+    row = await get_inventory_entry(db, character.id, item_id)
+    if row is None or row.equipped:
+        return None
+    item = await db.get(Item, item_id)
+    if item is None or not can_disassemble(item):
+        return None
+    claimed = await db.execute(
+        delete(Inventory).where(
+            Inventory.character_id == character.id,
+            Inventory.item_id == item_id,
+            Inventory.equipped.is_(False),
+        )
+    )
+    if not claimed.rowcount:
+        return None
+    resource_log.add(db, character.id, "item", str(item_id), -1)
+    db.expunge(row)
+    await db.execute(delete(Item).where(Item.id == item_id))
+    db.expunge(item)
+    character.star_dust = (character.star_dust or 0) + cc.STAR_DUST_PER_UNIQUE
+    resource_log.add(db, character.id, "star_dust", None, cc.STAR_DUST_PER_UNIQUE)
+    await db.flush()
+    return character.star_dust
+
+
 async def sell_item(
     db: AsyncSession, character: Character, item_id: int, price_multiplier: float = 1.0
 ) -> int:

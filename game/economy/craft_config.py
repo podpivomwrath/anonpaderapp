@@ -140,3 +140,8 @@ RECRAFT_COST_MULT = 2.0
 def recraft_ore_cost(recrafts_done: int) -> int:
     """Сколько руды стоит следующий перекрафт предмета."""
     return round(CRAFT_ORE_COST * RECRAFT_COST_MULT ** (recrafts_done + 1))
+
+# --- Разбор уникальных вещей (2026-10-22, решение владельца) ---
+# Любая уникальная вещь - с босса или уже кованая - разбирается в звёздную
+# пыль. На что тратить пыль - позже.
+STAR_DUST_PER_UNIQUE = 1

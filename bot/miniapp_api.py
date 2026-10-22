@@ -366,7 +366,9 @@ async def handle_post_title(request: web.Request) -> web.Response:
 # safe_route (2026-10-13) - безопасный путь верхом: включают на карте,
 # действует и при отправке маунта из чата.
 #: fish_auto_keep (2026-10-21) - вытащенная рыба сразу в садок, без «Отпустить».
-UI_FLAGS = {"intro": int, "tour": int, "sound": bool, "safe_route": bool, "fish_auto_keep": bool}
+UI_FLAGS = {"intro": int, "tour": int, "sound": bool, "safe_route": bool, "fish_auto_keep": bool,
+            # «Убрать картинки в игре» (2026-10-22): bot/no_images.py.
+            "no_images": bool}
 UI_HINTS_MAX = 32
 
 
@@ -400,6 +402,10 @@ async def handle_post_ui(request: web.Request) -> web.Response:
             flags["hints"] = hints
         character.ui_flags = flags  # новый dict: JSON-поле не следит за изменением на месте
         await session.commit()
+        if "no_images" in flags:
+            from bot import no_images
+
+            no_images.set_muted(request[VK_USER_ID_KEY], bool(flags["no_images"]))
         return web.json_response({"ui": flags})
 
 
@@ -643,6 +649,7 @@ def register_routes(app: web.Application) -> None:
     app.router.add_post("/api/miniapp/terms", handle_post_terms)
     app.router.add_post("/api/miniapp/equip", handle_post_equip)
     app.router.add_post("/api/miniapp/unequip", handle_post_unequip)
+    app.router.add_post("/api/miniapp/disassemble", handle_post_disassemble)
     app.router.add_post("/api/miniapp/chest/open", handle_post_chest_open)
     app.router.add_post("/api/miniapp/eat", handle_post_eat)
     app.router.add_get("/api/miniapp/presets", handle_get_presets)
@@ -687,6 +694,7 @@ from bot.miniapp_inventory_api import (  # noqa: E402,F401
     food_buff_payload,
     handle_get_inventory,
     handle_post_chest_open,
+    handle_post_disassemble,
     handle_post_eat,
     handle_post_equip,
     handle_post_unequip,

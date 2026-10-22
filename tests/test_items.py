@@ -439,3 +439,36 @@ async def test_derived_stats_include_gear_bonus(db_session, character_at) -> Non
 
     with_gear = derived_stats_service.compute(character, stats, bonus)
     assert with_gear.damage > without_gear.damage  # предмет добавил int (dmg-стат мага)
+
+
+# --- Разбор уникальных вещей в звёздную пыль (2026-10-22) ---
+
+
+async def test_disassemble_unique_gives_star_dust(db_session, character_at) -> None:
+    character = await character_at(0, 30)
+    unique_id = next(iter(item_service.unique_items()))
+    item = await item_service.grant_unique_item(db_session, character, unique_id)
+    assert item_service.can_disassemble(item)
+
+    assert await item_service.disassemble_unique(db_session, character, item.id) == 1
+    assert character.star_dust == 1
+    assert await item_service.get_inventory(db_session, character.id) == []
+    # второй раз - вещи уже нет
+    assert await item_service.disassemble_unique(db_session, character, item.id) is None
+    assert character.star_dust == 1
+
+
+async def test_disassemble_refuses_ordinary_and_equipped(db_session, character_at) -> None:
+    character = await character_at(0, 30)
+    character.level = 20
+    ordinary = await item_service.grant_from_kill(db_session, character, 20, FixedRng(0.0))
+    assert not item_service.can_disassemble(ordinary)
+    assert await item_service.disassemble_unique(db_session, character, ordinary.id) is None
+
+    unique_id = next(iter(item_service.unique_items()))
+    item = await item_service.grant_unique_item(db_session, character, unique_id)
+    item.craft_spec = "dps"  # кованая уникалка - тоже разбирается, но надетая - нет
+    character.level = 60
+    await item_service.equip_item(db_session, character.id, item.id)
+    assert await item_service.disassemble_unique(db_session, character, item.id) is None
+    assert (character.star_dust or 0) == 0

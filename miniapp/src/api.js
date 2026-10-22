@@ -140,6 +140,11 @@ export function setFishAutoKeep(on) {
   return saveUi({ set: { fish_auto_keep: on } });
 }
 
+// «Убрать картинки в игре» (2026-10-22): бот перестаёт слать фото.
+export function setNoImages(on) {
+  return saveUi({ set: { no_images: on } });
+}
+
 export function glance() {
   return request('/glance', { method: 'POST' });
 }
@@ -154,6 +159,15 @@ export function getInventory() {
 
 export function equipItem(itemId) {
   return request('/equip', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ item_id: itemId }),
+  });
+}
+
+// Разобрать уникальную вещь в звёздную пыль (2026-10-22).
+export function disassembleItem(itemId) {
+  return request('/disassemble', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ item_id: itemId }),

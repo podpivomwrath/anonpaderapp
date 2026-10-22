@@ -337,6 +337,12 @@ async def run() -> None:
     from bot import top_places
 
     top_places.setup(redis)  # 2026-10-22: места в топах вчера - стрелки в мини-аппе
+    from bot import no_images
+
+    # 2026-10-22: кто выключил картинки в игре - фото ему не шлём
+    muted = await no_images.load(get_session_factory())
+    if muted:
+        logger.info("Без картинок: {} игроков", muted)
     resumed = await world_handlers.resume_after_restart()
     # Рыбалка и добыча: их состояние в базе, таймеры - в памяти (2026-10-12).
     resumed["fishing"] = await fishing_handlers.resume_after_restart()

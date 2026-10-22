@@ -143,6 +143,7 @@ def catalog() -> list[dict]:
             _entry("gold", "💰 Золото"),
             _entry("gems", "💎 Самоцветы"),
             _entry("raid_keys", "🗝 Ключи Монолита"),
+            _entry("star_dust", "✨ Звёздная пыль"),
         ]},
         {"id": "gear", "title": "🗡 Экипировка", "entries": gear},
         {"id": "unique", "title": "⭐ Уникальные", "entries": unique},
@@ -224,6 +225,11 @@ async def grant(
                                         getattr(wallet, field), "admin.grant_any")
     elif kind == "raid_keys":
         character.raid_keys += amount
+    elif kind == "star_dust":
+        from services import resource_log
+
+        character.star_dust = (character.star_dust or 0) + amount
+        resource_log.add(db, character.id, "star_dust", None, amount)
     elif kind == "gear":
         slot, rarity = rest
         for _ in range(amount):

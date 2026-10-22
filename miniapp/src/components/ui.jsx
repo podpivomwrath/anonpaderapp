@@ -17,7 +17,7 @@ const ART = Object.fromEntries(
 export function SectionHead({ kind, icon, value, label, aside }) {
   const art = ART[kind];
   return (
-    <div className={`section-head section-head--${kind}`} style={art ? { '--section-art': `url(${art})` } : undefined}>
+    <div className={`section-head section-head--${kind}${art ? ' section-head--art' : ''}`} style={art ? { '--section-art': `url(${art})` } : undefined}>
       <span className="section-head__icon" aria-hidden="true">{icon}</span>
       <span className="section-head__main">
         <b className="section-head__value">{value}</b>

@@ -18,7 +18,7 @@ import time
 
 from loguru import logger
 
-from bot import background
+from bot import background, no_images
 from vkbottle import BaseMiddleware
 from vkbottle.bot import Message
 
@@ -44,6 +44,9 @@ def install(api) -> None:
     original = api.request
 
     async def request(method, data, version=None):
+        # «Убрать картинки в игре» (2026-10-22): фото вырезаются здесь, для всех
+        # отправок разом - bot/no_images.py.
+        data = no_images.strip(method, data)
         if method in ("messages.send", "messages.edit"):
             now = time.time()
             peer = data.get("peer_id")

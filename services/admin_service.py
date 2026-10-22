@@ -388,6 +388,7 @@ async def player_card(db: AsyncSession, character_id: int) -> dict | None:
         } if derived is not None else None,
         "gold": wallet.farm_currency,
         "gems": wallet.donate_currency,
+        "star_dust": character.star_dust or 0,
         "trophies": {
             d.id: trophy_stock.get(d.id, 0) for d in trophy_service.trophy_defs_ordered()
         },
@@ -508,7 +509,7 @@ async def wallet_journal(db: AsyncSession, character_id: int) -> list[dict]:
     ]
 
 
-RESOURCE_KINDS = {"ore": "⛏", "fish": "🐟", "herb": "🌿", "food": "🍲", "elixir": "🧪", "trophy": "💀", "item": "⚔️"}
+RESOURCE_KINDS = {"ore": "⛏", "fish": "🐟", "herb": "🌿", "food": "🍲", "elixir": "🧪", "trophy": "💀", "item": "⚔️", "star_dust": "✨"}
 
 
 async def _resource_label(db: AsyncSession, kind: str, ref: str) -> str:
@@ -538,6 +539,8 @@ async def _resource_label(db: AsyncSession, kind: str, ref: str) -> str:
     if kind == "item" and head.isdigit():
         item = await db.get(Item, int(head))
         return f"{item.name} #{head}" if item else f"вещь #{head}"
+    if kind == "star_dust":
+        return "Звёздная пыль"
     return ref
 
 

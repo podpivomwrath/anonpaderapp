@@ -769,6 +769,7 @@ function PlayerCard({ card, onRefresh }) {
 
       <Fold title={<>Ресурсы</>}>
         <StatRow label="Золото / Самоцветы" value={`${card.gold} / ${card.gems}`} />
+        <StatRow label="Звёздная пыль" value={card.star_dust ?? 0} />
         {Object.entries(card.trophies).map(([id, count]) => (
           <StatRow key={id} label={`Трофей: ${id}`} value={count} />
         ))}

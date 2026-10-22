@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Group, Header } from '@vkontakte/vkui';
-import { equipItem, getCharacter, getInventory, getTrophies, setGender, unequipItem } from '../api.js';
+import { Group, Header, SimpleCell, Switch } from '@vkontakte/vkui';
+import {
+  equipItem, getCharacter, getInventory, getTrophies, setGender, setNoImages, unequipItem,
+} from '../api.js';
 import { silhouetteUrl } from '../silhouettes.js';
 import { itemIcon } from '../itemIcons.js';
 import ItemIcon from './ItemIcon.jsx';
@@ -179,6 +181,29 @@ function TrophyShelf({ trophies }) {
   );
 }
 
+// «Убрать картинки в игре» (2026-10-22): бот шлёт сообщения без картинок -
+// некоторым так удобнее (bot/no_images.py).
+function Settings({ character, onCharacterUpdate }) {
+  const [off, setOff] = useState(Boolean(character.ui?.no_images));
+  const toggle = (next) => {
+    setOff(next);
+    setNoImages(next)
+      .then(() => onCharacterUpdate((prev) => ({ ...prev, ui: { ...(prev.ui || {}), no_images: next } })))
+      .catch(() => setOff(!next));
+  };
+  return (
+    <Group header={<Header>Настройки</Header>}>
+      <SimpleCell
+        Component="label" multiline
+        subtitle="Бот будет присылать сообщения без картинок."
+        after={<Switch checked={off} onChange={(e) => toggle(e.target.checked)} />}
+      >
+        Убрать картинки в игре
+      </SimpleCell>
+    </Group>
+  );
+}
+
 function GenderChoice({ character, onPick, busy }) {
   return (
     <Group>
@@ -343,6 +368,7 @@ export default function HeroTab({ character, onCharacterUpdate }) {
       </Group>
 
       <TrophyShelf trophies={trophies} />
+      <Settings character={character} onCharacterUpdate={onCharacterUpdate} />
 
       {openSlot && (
         <SlotSheet
