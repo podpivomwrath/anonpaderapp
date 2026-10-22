@@ -571,9 +571,14 @@ async def start_raid(
     await _broadcast_board(battle_id, battle, None, boss_lines=_take_opening_lines(battle))
 
 
-async def begin_combat_stage(battle_id: int, stage: int = 3, lame: dict[int, int] | None = None) -> None:
+async def begin_combat_stage(
+    battle_id: int, stage: int = 3, lame: dict[int, int] | None = None,
+    hp_share: dict[int, float] | None = None,
+) -> None:
     """Небоевые этапы позади: архив - бой с Архивариусом (3), жернова -
-    обоз (2). lame - хромота шествия: каждый стак - минус здоровье на старте."""
+    обоз (2). lame - хромота шествия: каждый стак - минус здоровье на старте.
+    hp_share - с какой долей здоровья начинает бой (Тропа: не успевшие к
+    воротам)."""
     battle = _battles.get(battle_id)
     if battle is None:
         return
@@ -584,6 +589,10 @@ async def begin_combat_stage(battle_id: int, stage: int = 3, lame: dict[int, int
         if c is not None and stacks > 0:
             c.current_hp = max(1, c.current_hp - round(c.max_hp * mc.LAME_HP_PCT * stacks))
             battle.opening_lines.append(f"🩼 {c.name} хромает: -{round(mc.LAME_HP_PCT * stacks * 100)}% здоровья")
+    for cid, share in (hp_share or {}).items():
+        c = state.combatants.get(cid)
+        if c is not None:
+            c.current_hp = max(1, round(c.max_hp * share))
     _engine.start_session(state)
     for p in list(battle.participants.values()):
         await _bot_api.messages.send(
@@ -593,12 +602,13 @@ async def begin_combat_stage(battle_id: int, stage: int = 3, lame: dict[int, int
     await _broadcast_board(battle_id, battle, None, boss_lines=_take_opening_lines(battle))
 
 
-async def award_stage(battle_id: int) -> dict[int, str]:
-    """Архив: награда за пройденный небоевой этап - всем участникам."""
+async def award_stage(battle_id: int, skip: set[int] | frozenset = frozenset()) -> dict[int, str]:
+    """Архив: награда за пройденный небоевой этап - всем участникам, кроме
+    skip (Тропа: не успевшие к воротам)."""
     battle = _battles.get(battle_id)
     if battle is None:
         return {}
-    return await _stage_rewards(battle, list(battle.participants))
+    return await _stage_rewards(battle, [cid for cid in battle.participants if cid not in skip])
 
 
 def _take_opening_lines(battle: RaidBattle) -> list[str] | None:

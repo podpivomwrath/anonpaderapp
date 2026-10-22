@@ -2,7 +2,8 @@
 
 Логика - game/raid_trail.py. Здесь клавиатура-карта (5×5 кнопок, цвет -
 состояние клетки), шаги, рассылка событий, шаги Безымянного и общий таймер:
-не успели - гибнет вся группа. Бой с Безымянным - третьим этапом через
+не успели - гибнет вся группа; Следы собраны и у ворот кто-то есть - гибнут
+только отставшие и идут к боссу с 10% здоровья (2026-10-22). Бой с Безымянным - третьим этапом через
 bot/handlers/raid_combat.py (begin_combat_stage). Состояние - в памяти.
 """
 
@@ -313,7 +314,7 @@ async def _after_move(run: TrailRun, cid: int, result: lab_rules.MoveResult, now
         header.append(tt.EVENT_GRATE)
         photo = photo or "grate"
     if "caught" in result.events:
-        await _caught(run, [cid])
+        await _caught(run, [cid], retreated="retreat" in result.events)
         return
     if lab.done(now):
         await _show_cell(run, cid, header, photo)
@@ -327,15 +328,17 @@ async def _after_move(run: TrailRun, cid: int, result: lab_rules.MoveResult, now
     await _show_cell(run, cid, header, photo)
 
 
-async def _caught(run: TrailRun, cids: list[int]) -> None:
+async def _caught(run: TrailRun, cids: list[int], retreated: bool = False) -> None:
+    """retreated - поймал у входа и ушёл в дальний угол: строка всем."""
+    tail = f"\n\n{tt.EVENT_RETREAT}" if retreated else ""
     for cid in cids:
         walk = run.walking.pop(cid, None)
         if walk is not None:
             walk.cancel()
-        await _tell(run, cid, tt.EVENT_CAUGHT.format(seconds=round(tc.CAUGHT_SECONDS)), "caught")
+        await _tell(run, cid, tt.EVENT_CAUGHT.format(seconds=round(tc.CAUGHT_SECONDS)) + tail, "caught")
         for other in run.peers:
-            if other != cid:
-                await _tell(run, other, tt.EVENT_CAUGHT_OTHERS.format(name=run.names[cid]))
+            if other not in cids:
+                await _tell(run, other, tt.EVENT_CAUGHT_OTHERS.format(name=run.names[cid]) + tail)
 
 
 @labeler.message(payload_contains={"type": "trl_where"})
@@ -357,9 +360,12 @@ async def where_all(message: Message) -> None:
 # --- Финиш ---------------------------------------------------------------------------
 
 
-async def _finish(run: TrailRun) -> None:
+async def _finish(run: TrailRun, late: list[int] | None = None) -> None:
+    """late - не дошли к воротам до конца времени: этап им не засчитан, к
+    Безымянному они идут с tc.LATE_HP_SHARE здоровья."""
     from bot.handlers import raid_combat
 
+    late = late or []
     run.done = True
     _stop_walks(run)
     if run.task is not None:
@@ -368,12 +374,21 @@ async def _finish(run: TrailRun) -> None:
     _runs.pop(run.battle_id, None)
     for peer in run.peers.values():
         _peer_run.pop(peer, None)
-    notices = await raid_combat.award_stage(run.battle_id)
+    notices = await raid_combat.award_stage(run.battle_id, skip=set(late))
+    late_names = ", ".join(run.names[c] for c in late)
+    hp = round(tc.LATE_HP_SHARE * 100)
     for cid, peer in run.peers.items():
+        if cid in late:
+            text = tt.LATE_TEXT.format(hp=hp)
+        elif late:
+            text = f"{tt.STAGE1_DONE_TEXT}\n\n{tt.LATE_OTHERS_TEXT.format(names=late_names, hp=hp)}"
+        else:
+            text = tt.STAGE1_DONE_TEXT
         notice = notices.get(cid)
-        text = tt.STAGE1_DONE_TEXT
         await _send(peer, f"{text}\n\n{notice}" if notice else text, raid_kb.raid_waiting_keyboard())
-    await raid_combat.begin_combat_stage(run.battle_id, stage=3)
+    await raid_combat.begin_combat_stage(
+        run.battle_id, stage=3, hp_share={c: tc.LATE_HP_SHARE for c in late},
+    )
 
 
 # --- Таймер и Безымянный ------------------------------------------------------------
@@ -404,6 +419,18 @@ async def _watch(battle_id: int, token: int) -> None:
     run = _runs.get(battle_id)
     if run is None or run.done or run.token != token:
         return
+    async with run.lock:
+        if run.done:
+            return
+        late = run.lab.late_at_timeout(time.monotonic())
+        if late is not None:
+            # Следы собраны, у ворот есть кто-то: гибнут только отставшие.
+            run.task = None
+            try:
+                await _finish(run, late)
+            except Exception:
+                logger.exception("Тропа: сбой при выходе к Безымянному по таймеру {}", battle_id)
+            return
     run.done = True
     from bot.handlers import raid_combat
 
@@ -425,7 +452,7 @@ async def _world_tick(run: TrailRun, now: float) -> None:
     if not hunted.moved:
         return
     if hunted.caught:
-        await _caught(run, hunted.caught)
+        await _caught(run, hunted.caught, retreated=hunted.retreated)
     for cid in hunted.near:
         if cid not in near_before:
             await _tell(run, cid, tt.EVENT_NEAR, "near")

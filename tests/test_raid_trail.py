@@ -149,6 +149,56 @@ def test_hunter_catches_and_releases_to_start() -> None:
     assert not lab.hunter_tick(100.0).moved
 
 
+def test_hunter_leaves_the_spawn_after_a_catch_there() -> None:
+    """2026-10-22, владелец: поймал у входа - уходит в дальний угол и стоит,
+    а не сторожит выход со старта."""
+    for seed in range(30):
+        lab = lab_rules.Labyrinth([1, 2], random.Random(seed))
+        lab.grate_open = True
+        target = _path(lab, lab_rules.START, lab_rules.GATE)[0]
+        lab.pos[1] = target
+        lab.hunter = next(n for n in lab_rules.neighbors(target).values()
+                          if lab.maze.connected(n, target, True) and n != lab_rules.START
+                          and lab.hunter_can_enter(n))
+        lab.hunter_next = 0.0
+        res = lab.hunter_tick(0.0)
+        assert res.caught == [1] and res.retreated, seed
+        dist = lab_rules._bfs_open(lab.maze, lab_rules.START, True)
+        assert dist[lab.hunter] > tc.SPAWN_ZONE_STEPS, seed
+        assert lab.hunter_can_enter(lab.hunter)
+        # стоит: следующий шаг не раньше паузы
+        assert not lab.hunter_tick(tc.HUNTER_RETREAT_SECONDS - 1).moved
+
+
+def test_hunter_stays_after_a_catch_far_from_the_spawn() -> None:
+    lab = lab_rules.Labyrinth([1], random.Random(9))
+    lab.grate_open = True
+    dist = lab_rules._bfs_open(lab.maze, lab_rules.START, True)
+    far = max((i for i in dist if lab.hunter_can_enter(i) and i != lab_rules.GATE), key=dist.get)
+    lab.pos[1] = far
+    lab.hunter = next(n for n in lab_rules.neighbors(far).values()
+                      if lab.maze.connected(n, far, True) and lab.hunter_can_enter(n))
+    lab.hunter_next = 0.0
+    res = lab.hunter_tick(0.0)
+    assert res.caught == [1] and not res.retreated and lab.hunter == far
+
+
+def test_timeout_kills_only_the_late_when_someone_is_at_the_gate() -> None:
+    """2026-10-22, владелец: трое у ворот, один не успел - гибнет он один."""
+    lab = lab_rules.Labyrinth([1, 2, 3], random.Random(2))
+    lab.found = set(lab.footprints_left())
+    lab.pos[1] = lab.pos[2] = lab_rules.GATE
+    lab.pos[3] = 7
+    assert lab.late_at_timeout(1.0) == [3]
+    # Следы не собраны - как раньше, гибнут все.
+    lab.found = set()
+    assert lab.late_at_timeout(1.0) is None
+    # У ворот никого - тоже все.
+    lab.found = {i for i, k in lab.maze.kinds.items() if k == lab_rules.FOOTPRINT}
+    lab.pos[1] = lab.pos[2] = 7
+    assert lab.late_at_timeout(1.0) is None
+
+
 def test_no_pits_next_to_the_start() -> None:
     """2026-10-22: «второй выход ведёт сразу в могилу» - яма была соседом входа."""
     start_exits = set(lab_rules.neighbors(lab_rules.START).values())
@@ -335,10 +385,10 @@ async def test_handler_walks_the_labyrinth_and_starts_the_fight(monkeypatch) -> 
     monkeypatch.setattr(raid_combat, "_bot_api", api)
     started = []
 
-    async def award(battle_id):
+    async def award(battle_id, skip=frozenset()):
         return {}
 
-    async def begin(battle_id, stage=3, lame=None):
+    async def begin(battle_id, stage=3, lame=None, hp_share=None):
         started.append(stage)
 
     monkeypatch.setattr(raid_combat, "award_stage", award)
@@ -369,6 +419,47 @@ async def test_handler_walks_the_labyrinth_and_starts_the_fight(monkeypatch) -> 
             await handler.on_step(_Msg(70, {"type": "trl", "t": run.token, "c": cell}))
     assert started == [3]
     assert -500 not in handler._runs
+
+
+async def test_timeout_sends_the_gate_to_the_boss_and_the_late_with_low_hp(monkeypatch) -> None:
+    """2026-10-22, владелец: по таймеру гибнет только не успевший, остальные
+    идут к Безымянному; не успевший - тоже, но с 10% здоровья и без награды."""
+    from bot.handlers import raid_combat
+    from bot.handlers import raid_trail as handler
+
+    api = _FakeApi()
+    monkeypatch.setattr(raid_combat, "_bot_api", api)
+    calls = {}
+
+    async def award(battle_id, skip=frozenset()):
+        calls["skip"] = set(skip)
+        return {}
+
+    async def begin(battle_id, stage=3, lame=None, hp_share=None):
+        calls["hp_share"] = hp_share
+
+    async def wipe(battle_id, text):
+        calls["wipe"] = True
+
+    monkeypatch.setattr(raid_combat, "award_stage", award)
+    monkeypatch.setattr(raid_combat, "begin_combat_stage", begin)
+    monkeypatch.setattr(raid_combat, "wipe", wipe)
+    battle = SimpleNamespace(participants={
+        1: SimpleNamespace(peer_id=11, name="Чача"), 2: SimpleNamespace(peer_id=12, name="Гостус"),
+    })
+    await handler.start(-501, battle)
+    run = handler._runs[-501]
+    run.task.cancel()
+    lab = run.lab
+    _calm(lab)
+    lab.found = set(lab.footprints_left())
+    lab.pos[1] = lab_rules.GATE
+    run.deadline = 0.0
+    await handler._watch(-501, run.token)
+    assert "wipe" not in calls
+    assert calls["skip"] == {2} and calls["hp_share"] == {2: tc.LATE_HP_SHARE}
+    late_msgs = [m for p, m, _ in api.sent if p == 12 and "не успел" in m]
+    assert late_msgs and -501 not in handler._runs
 
 
 async def test_step_takes_time_and_blocks_new_presses(monkeypatch) -> None:

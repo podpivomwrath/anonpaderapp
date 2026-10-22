@@ -115,6 +115,19 @@ def _bfs(maze_passages, start: int, blocked: frozenset | None = None) -> dict[in
     return dist
 
 
+def _bfs_open(maze: "Maze", start: int, grate_open: bool) -> dict[int, int]:
+    """Шаги от start по проходам с учётом решётки."""
+    dist = {start: 0}
+    queue = deque([start])
+    while queue:
+        cur = queue.popleft()
+        for n in neighbors(cur).values():
+            if n not in dist and maze.connected(cur, n, grate_open):
+                dist[n] = dist[cur] + 1
+                queue.append(n)
+    return dist
+
+
 def _bfs_avoiding(passages, start: int, avoid: set[int]) -> set[int]:
     """Клетки, достижимые от start, не заходя в avoid (решётка открыта)."""
     seen = {start}
@@ -227,6 +240,8 @@ class HunterResult:
     moved: bool = False
     caught: list[int] = field(default_factory=list)
     near: list[int] = field(default_factory=list)
+    #: поймал у входа и ушёл в дальний угол
+    retreated: bool = False
 
 
 def compass(frm: int, to: int) -> str:
@@ -339,12 +354,35 @@ class Labyrinth:
         if self.pos[cid] == self.hunter and target != GATE:
             self._catch(cid, now)
             out.events.append("caught")
+            if self._retreat_if_spawn(self.pos[cid], now):
+                out.events.append("retreat")
         if self.update_plates(now):
             out.events.append("grate")
         return out
 
     def _catch(self, cid: int, now: float) -> None:
         self.frozen_until[cid] = now + tc.CAUGHT_SECONDS
+
+    def _retreat_if_spawn(self, cell: int, now: float) -> bool:
+        """Поймал у входа - уходит в дальний от входа угол и стоит
+        tc.HUNTER_RETREAT_SECONDS (2026-10-22, владелец): иначе он сторожил
+        выход со старта и ловил каждого, кого Тропа туда выплюнула.
+        Угол - из досягаемых с входа клеток, куда ему можно, без игроков и
+        не рядом с ними."""
+        dist = _bfs_open(self.maze, START, self.grate_open)
+        if dist.get(cell, N * N) > tc.SPAWN_ZONE_STEPS:
+            return False
+        taken = set(self.pos.values())
+        options = [
+            i for i in dist
+            if self.hunter_can_enter(i) and i != START and i not in taken
+            and not taken & set(neighbors(i).values())
+        ] or [i for i in dist if self.hunter_can_enter(i) and i != START and i not in taken]
+        if not options:
+            return False
+        self.hunter = max(options, key=lambda i: (dist[i], self.rng.random()))
+        self.hunter_next = now + tc.HUNTER_RETREAT_SECONDS
+        return True
 
     def release(self, now: float) -> list[int]:
         """Пойманные, чьё время вышло, - на старт."""
@@ -399,11 +437,23 @@ class Labyrinth:
             if self.pos[cid] == self.hunter:
                 self._catch(cid, now)
                 out.caught.append(cid)
-            elif self.hunter_near(cid):
+        if out.caught and self._retreat_if_spawn(step, now):
+            out.retreated = True
+        for cid in prey:
+            if cid not in out.caught and self.hunter_near(cid):
                 out.near.append(cid)
         return out
 
     # --- итог ---
+
+    def late_at_timeout(self, now: float) -> list[int] | None:
+        """Время вышло. None - гибнет вся группа (Следы не собраны или у
+        ворот никого). Иначе - кто не дошёл: гибнут они одни, а дошедшие идут
+        к Безымянному (2026-10-22, владелец)."""
+        at_gate = [c for c in self.players if self.pos[c] == GATE and not self.is_frozen(c, now)]
+        if self.footprints_left() or not at_gate:
+            return None
+        return [c for c in self.players if c not in at_gate]
 
     def done(self, now: float) -> bool:
         return (
