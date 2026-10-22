@@ -438,11 +438,11 @@ export const createPayment = (packId) =>
     body: JSON.stringify({ pack_id: packId, from: IN_VK ? 'vk' : 'web' }),
   });
 
-export const buyShop = (item, days) =>
+export const buyShop = (item, days, qty) =>
   request('/shop', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ item, days }),
+    body: JSON.stringify({ item, days, qty }),
   });
 
 // Смена фракции за самоцветы (2026-10-19): region - id нового города.

@@ -156,13 +156,16 @@ function BundleSheet({ item, gems, onClose, onBought }) {
   const [confirming, setConfirming] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
-  const enough = gems >= item.price;
+  // Повторяемый товар - сразу несколько штук ползунком (2026-10-22, владелец).
+  const [qty, setQty] = useState(1);
+  const total = item.price * qty;
+  const enough = gems >= total;
 
   const buy = async () => {
     setBusy(true);
     setError(null);
     try {
-      onBought(await buyShop(item.id));
+      onBought(await buyShop(item.id, undefined, item.max_qty ? qty : undefined));
     } catch (err) {
       setError(err.details?.error || 'Не удалось купить.');
       setConfirming(false);
@@ -188,6 +191,23 @@ function BundleSheet({ item, gems, onClose, onBought }) {
           {item.perks.map((perk) => <li key={perk}>{perk}</li>)}
         </ul>
         <p className="craft-hint">{item.note}</p>
+        {item.max_qty > 1 && (
+          <div className="shop-sheet__slider">
+            <div className="shop-sheet__days">
+              <b>×{qty}</b>
+              <span>💎 {money(total)}</span>
+            </div>
+            <input
+              type="range" min={1} max={item.max_qty} step={1} value={qty}
+              onChange={(e) => { setQty(Number(e.target.value)); setConfirming(false); }}
+              aria-label="Количество"
+            />
+            <div className="shop-sheet__scale">
+              <span>×1</span>
+              <span>×{item.max_qty}</span>
+            </div>
+          </div>
+        )}
         {item.available === false && <p className="shop-sheet__error">{item.unavailable}</p>}
         {error && <p className="shop-sheet__error">{error}</p>}
         {!enough && item.available !== false && (
@@ -197,13 +217,13 @@ function BundleSheet({ item, gems, onClose, onBought }) {
           {confirming ? (
             <>
               <Button size="l" stretched disabled={busy} onClick={buy}>
-                {busy ? 'Покупаем…' : `Да, купить за 💎 ${money(item.price)}`}
+                {busy ? 'Покупаем…' : `Да, купить за 💎 ${money(total)}`}
               </Button>
               <Button size="l" mode="secondary" stretched disabled={busy} onClick={() => setConfirming(false)}>Отмена</Button>
             </>
           ) : (
             <Button size="l" stretched disabled={!enough || item.available === false} onClick={() => setConfirming(true)}>
-              Купить за 💎 {money(item.price)}
+              Купить за 💎 {money(total)}
             </Button>
           )}
         </div>

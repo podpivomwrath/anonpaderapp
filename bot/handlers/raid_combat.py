@@ -111,6 +111,10 @@ class RaidBattle:
     run_id: int | None = None
     stage: int = 1
     mob_ids: set[int] = field(default_factory=set)
+    #: Скованы механикой рейда в этот ход: пропуск за них объявлен сам, но
+    #: кнопки боя у них остаются (2026-10-22, жалоба: «оглушение отключает
+    #: клавиатуру»). Нажатие отвечает HELD_TEXT. Снимается с началом хода.
+    frozen_now: set[int] = field(default_factory=set)
     last_combatants: dict[int, object] = field(default_factory=dict)
     # --- Этап 2: Вельды ---
     veld_combatant_ids: dict[str, int] = field(default_factory=dict)
@@ -191,6 +195,7 @@ def rift_progress(rift_id: int) -> tuple[int, int] | None:
     return None
 _peer_battle: dict[int, int] = {}
 _declared_this_tick: dict[int, set[int]] = {}
+HELD_TEXT = "Ты скован и этот ход пропускаешь. Кнопки заработают на следующем."
 _chosen_target: dict[int, int] = {}
 _character_in_raid: set[int] = set()
 
@@ -229,7 +234,9 @@ def rebuild_keyboard(peer_id: int) -> str | None:
     state = _engine.sessions.get(battle_id) if _engine else None
     cid = _character_id_for_peer(battle, peer_id)
     c = state.combatants.get(cid) if state else None
-    if c is None or not c.alive or cid in _declared_this_tick.get(battle_id, set()):
+    if c is None or not c.alive or (
+        cid in _declared_this_tick.get(battle_id, set()) and cid not in battle.frozen_now
+    ):
         return kb.raid_waiting_keyboard()
     p = battle.participants[cid]
     return _combat_keyboard(battle, p, c)
@@ -719,7 +726,7 @@ async def _broadcast_board(
         # пропуск, кнопки боя ему ни к чему.
         keyboard = (
             _combat_keyboard(battle, p, combatant)
-            if combatant is not None and combatant.alive and cid not in skipping
+            if combatant is not None and combatant.alive and (cid not in skipping or cid in battle.frozen_now)
             else kb.raid_waiting_keyboard()
         )
         personal = text
@@ -799,6 +806,9 @@ async def _raid_action(message: Message, action: DeclaredAction) -> None:
     cid = _character_id_for_peer(battle, peer_id)
     if cid is None:
         return
+    if cid in battle.frozen_now:
+        await message.answer(HELD_TEXT)
+        return
 
     is_defensive = action.type == ActionType.DEFEND or (
         action.type == ActionType.SKILL and action.skill_id in DEFENSIVE_SKILLS
@@ -838,6 +848,9 @@ async def raid_carry(message: Message) -> None:
     cid = _character_id_for_peer(battle, message.peer_id)
     if not isinstance(stage, raid_mill.CargoStage) or state is None or cid is None:
         return
+    if cid in battle.frozen_now:
+        await message.answer(HELD_TEXT)
+        return
     if cid in _declared_this_tick.get(battle_id, set()):
         return
     if stage.can_carry(state, cid):
@@ -862,6 +875,9 @@ async def raid_step(message: Message) -> None:
     cid = _character_id_for_peer(battle, message.peer_id)
     cell = (message.get_payload_json() or {}).get("c")
     if not isinstance(stage, trail_combat.NamelessStage) or cid is None or not isinstance(cell, int):
+        return
+    if cid in battle.frozen_now:
+        await message.answer(HELD_TEXT)
         return
     if cid in _declared_this_tick.get(battle_id, set()):
         return
@@ -896,7 +912,8 @@ async def raid_bread(message: Message) -> None:
     combatant = state.combatants.get(cid)
     await _tell_others(battle, cid, line)
     keyboard = (
-        kb.raid_waiting_keyboard() if cid in _declared_this_tick.get(battle_id, set())
+        kb.raid_waiting_keyboard()
+        if cid in _declared_this_tick.get(battle_id, set()) and cid not in battle.frozen_now
         else _combat_keyboard(battle, p, combatant)
     )
     await _bot_api.messages.send(peer_id=p.peer_id, message=line, random_id=0, keyboard=keyboard)

@@ -72,7 +72,7 @@ export const TAB_HINTS = {
       text: 'Тут курс по закрытым дням. Посмотри, прежде чем продавать.' },
   ],
   shop: [
-    { target: '.shop-card', title: 'Товар', voice: 'hint_shop_1', pose: 2,
+    { target: '.shop-showcase', title: 'Товар', voice: 'hint_shop_1', pose: 2,
       text: 'Нажми на карточку. Ползунком выберешь срок, цена посчитается сама.' },
   ],
 };

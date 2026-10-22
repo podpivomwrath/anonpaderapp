@@ -500,7 +500,7 @@ async def handle_explore_done(peer_id: int) -> None:
                                           has_mount=has_mount),
         )
         vein_token = f"{random.getrandbits(48):x}"
-        await pending_activity.offer_vein(peer_id, vein_token)
+        await pending_activity.offer_vein(peer_id, vein_token, (character.pos_x, character.pos_y))
         await world._bot_api.messages.send(
             peer_id=peer_id,
             message=f"{event.title}" + chr(10) * 2 + event.text,

@@ -341,7 +341,7 @@ async def dig_event_vein(message: Message) -> None:
             return
         # Жила одноразовая (2026-10-14): старая кнопка больше не копает.
         token = (message.get_payload_json() or {}).get("t")
-        if not await pending_activity.take_vein(message.peer_id, token):
+        if not await pending_activity.take_vein(message.peer_id, token, (character.pos_x, character.pos_y)):
             await message.answer(mt.VEIN_GONE_TEXT)
             return
         started = await mining_service.start_dig(db, character, None, _rng)

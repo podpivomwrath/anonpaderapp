@@ -62,3 +62,18 @@ async def test_elixir_pack_gives_ten_large_heals_and_two_of_each_combat(db_sessi
     assert stock == {cid: 2 for cid in combat} and len(combat) >= 5
     with pytest.raises(shop_service.ShopError):
         await shop_service.buy_elixir_pack(db_session, character)
+
+
+async def test_elixir_pack_by_quantity(db_session, make_character) -> None:
+    """2026-10-22, владелец: повторяемые товары - ползунком до 100 штук."""
+    from services import elixir_service
+
+    character = await make_character()
+    await wallet_service.deposit(db_session, character.id, "donate", shop_service.ELIXIR_PACK_PRICE * 3)
+    await shop_service.buy_elixir_pack(db_session, character, 3)
+    assert (await wallet_service.get_wallet(db_session, character.id)).donate_currency == 0
+    stock = {d.id: n for d, n in await elixir_service.get_stock(db_session, character.id)}
+    assert stock["heal_large"] == 30
+    for bad in (0, shop_service.MAX_QTY + 1, "5", True):
+        with pytest.raises(shop_service.ShopError):
+            await shop_service.buy_elixir_pack(db_session, character, bad)

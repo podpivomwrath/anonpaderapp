@@ -389,6 +389,10 @@ function ToolForge({ data, busy, run, need, itemName }) {
           {groups.length === 0 && <p className="craft-hint">Подходящей руды нет: нужна руда 1-5 тиров с рудников.</p>}
           {groups.map((g) => {
             const enough = g.grades.some((row) => row.count >= row.tool_cost);
+            // Градации не смешиваются: считаем самую большую кучку одной
+            // градации, а не всю руду (2026-10-22, жалоба: «нужно 8, у тебя 9
+            // - не хватает»).
+            const best = Math.max(0, ...g.grades.map((row) => row.count));
             return (
               <button key={g.id} type="button" disabled={!enough}
                 className={`crown-sheet__item${g.id === oreId ? ' crown-sheet__item--active' : ''}`}
@@ -397,7 +401,9 @@ function ToolForge({ data, busy, run, need, itemName }) {
                 <span className="crown-sheet__text">
                   <b>{g.name} → до {g.tool_ceiling}%</b>
                   <small>
-                    нужно {g.tool_cost} · у тебя {g.total}{enough ? '' : ' - не хватает'}
+                    нужно {g.tool_cost} одной градации · у тебя {best}
+                    {g.total > best ? ` (всего ${g.total}, градации не смешиваются)` : ''}
+                    {enough ? '' : ' - не хватает'}
                     {weak(g) ? ' · слабоват для этой вещи' : ''}
                   </small>
                 </span>

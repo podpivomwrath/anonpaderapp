@@ -73,9 +73,9 @@ async def handle_post(request: web.Request) -> web.Response:
                 until = await shop_service.buy_premium(db, character, body.get("days"))
                 done = {"item": item, "days": body.get("days"), "until": until.isoformat()}
             elif item == shop_service.ELIXIR_PACK_ID:
-                done = {"item": item, "contents": await shop_service.buy_elixir_pack(db, character)}
+                done = {"item": item, "contents": await shop_service.buy_elixir_pack(db, character, body.get("qty"))}
             elif item == shop_service.TINCTURE_ID:
-                until = await shop_service.buy_tincture(db, character)
+                until = await shop_service.buy_tincture(db, character, qty=body.get("qty"))
                 done = {"item": item, "until": until.isoformat()}
             elif item == shop_service.POCKET_ID:
                 await shop_service.buy_pocket(db, character)

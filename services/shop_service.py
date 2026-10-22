@@ -77,27 +77,42 @@ def _elixir_pack_contents() -> list[tuple[object, int]]:
     return [(d, n) for d, n in rows if d is not None]
 
 
+#: Сколько штук повторяемого товара (набор зелий, настойка) берётся за одну
+#: покупку ползунком (2026-10-22, владелец).
+MAX_QTY = 100
+
+
+def check_qty(qty) -> int:
+    if qty is None:
+        return 1
+    if not isinstance(qty, int) or isinstance(qty, bool) or not 1 <= qty <= MAX_QTY:
+        raise ShopError(f"Количество - от 1 до {MAX_QTY}.")
+    return qty
+
+
 def elixir_pack_item() -> dict:
     return {
         "id": ELIXIR_PACK_ID, "title": "Набор зелий", "emoji": "🧪", "kind": "bundle",
-        "price": ELIXIR_PACK_PRICE,
+        "price": ELIXIR_PACK_PRICE, "max_qty": MAX_QTY,
         "perks": [f"{d.emoji} {d.name} ×{n}" for d, n in _elixir_pack_contents()],
         "note": "Зелья сразу попадают в сумку.",
     }
 
 
-async def buy_elixir_pack(db: AsyncSession, character: Character) -> list[str]:
-    """Списать самоцветы и выдать набор. Возвращает строки содержимого."""
+async def buy_elixir_pack(db: AsyncSession, character: Character, qty: int = 1) -> list[str]:
+    """Списать самоцветы и выдать qty наборов. Возвращает строки содержимого."""
     from services import elixir_service
 
+    qty = check_qty(qty)
+    price = ELIXIR_PACK_PRICE * qty
     try:
-        await wallet_service.charge(db, character.id, "donate", ELIXIR_PACK_PRICE)
+        await wallet_service.charge(db, character.id, "donate", price)
     except wallet_service.NotEnoughCurrency:
-        raise ShopError(f"Не хватает самоцветов: нужно 💎{ELIXIR_PACK_PRICE}.") from None
+        raise ShopError(f"Не хватает самоцветов: нужно 💎{price}.") from None
     contents = _elixir_pack_contents()
     for d, n in contents:
-        await elixir_service.grant(db, character.id, d.id, n)
-    return [f"{d.emoji} {d.name} ×{n}" for d, n in contents]
+        await elixir_service.grant(db, character.id, d.id, n * qty)
+    return [f"{d.emoji} {d.name} ×{n * qty}" for d, n in contents]
 
 
 async def buy_premium(db: AsyncSession, character: Character, days: int) -> datetime:
@@ -221,27 +236,30 @@ def tincture_item(character: Character) -> dict:
     active = death_service.tincture_active(character)
     return {
         "id": TINCTURE_ID, "title": "Настойка пепла", "emoji": "🫗", "kind": "bundle",
-        "price": ggc.TINCTURE_PRICE,
+        "price": ggc.TINCTURE_PRICE, "max_qty": MAX_QTY,
         "perks": [
             f"{ggc.TINCTURE_HOURS} часа после покупки смерть не отнимает опыт",
             "Действует и в PvP, если на тебе клеймо",
-            f"Ещё одна покупка добавляет {ggc.TINCTURE_HOURS} часа к оставшемуся времени",
+            f"Каждая настойка добавляет {ggc.TINCTURE_HOURS} часа к оставшемуся времени",
         ],
         "note": "Пьётся сразу при покупке. Таймер идёт и когда ты не в игре.",
         "active_until": character.ash_tincture_until.isoformat() if active else None,
     }
 
 
-async def buy_tincture(db: AsyncSession, character: Character, now: datetime | None = None) -> datetime:
-    """Выпить настойку: срок от сейчас или сверху оставшегося."""
+async def buy_tincture(
+    db: AsyncSession, character: Character, now: datetime | None = None, qty: int = 1,
+) -> datetime:
+    """Выпить qty настоек: срок от сейчас или сверху оставшегося."""
     from services import death_service
 
+    qty = check_qty(qty)
     now = now or datetime.now(timezone.utc)
-    await _charge(db, character, ggc.TINCTURE_PRICE)
+    await _charge(db, character, ggc.TINCTURE_PRICE * qty)
     start = character.ash_tincture_until if death_service.tincture_active(character, now) else now
     if start.tzinfo is None:
         start = start.replace(tzinfo=timezone.utc)
-    character.ash_tincture_until = start + timedelta(hours=ggc.TINCTURE_HOURS)
+    character.ash_tincture_until = start + timedelta(hours=ggc.TINCTURE_HOURS * qty)
     await db.flush()
     return character.ash_tincture_until
 

@@ -138,16 +138,32 @@ def _vein_key(peer_id: int) -> str:
     return f"vein:{peer_id}"
 
 
-async def offer_vein(peer_id: int, token: str) -> None:
-    _veins[peer_id] = token
+def _vein_value(token: str, cell: tuple[int, int] | None) -> str:
+    """Жила привязана к клетке (2026-10-22, баг-репорт: старую жилу копали
+    через несколько исследований и с другой клетки)."""
+    return f"{token}@{cell[0]},{cell[1]}" if cell is not None else token
+
+
+async def offer_vein(peer_id: int, token: str, cell: tuple[int, int] | None = None) -> None:
+    value = _vein_value(token, cell)
+    _veins[peer_id] = value
     if _redis is not None:
-        await _redis.set(_vein_key(peer_id), token, ex=VEIN_TTL_SECONDS)
+        await _redis.set(_vein_key(peer_id), value, ex=VEIN_TTL_SECONDS)
 
 
-async def take_vein(peer_id: int, token: str | None) -> bool:
-    """Забрать жилу: True ровно один раз на выданный токен."""
+async def drop_vein(peer_id: int) -> None:
+    """Новое исследование - жила из прошлого сгорает."""
+    _veins.pop(peer_id, None)
+    if _redis is not None:
+        await _redis.delete(_vein_key(peer_id))
+
+
+async def take_vein(peer_id: int, token: str | None, cell: tuple[int, int] | None = None) -> bool:
+    """Забрать жилу: True ровно один раз на выданный токен, и только на той
+    клетке, где её нашли."""
     if not token:
         return False
+    token = _vein_value(token, cell)
     if _redis is None:
         if _veins.get(peer_id) != token:
             return False

@@ -33,6 +33,8 @@ async def start(kind: str, peer_id: int, delay_seconds: float) -> None:
     """Отметка ставится до первого await - двойное нажатие уже видит занятость."""
     _peers[kind].add(peer_id)
     await pending_activity.remember(kind, peer_id, delay_seconds)
+    if kind == "explore":
+        await pending_activity.drop_vein(peer_id)
 
 
 def restore(kind: str, peer_id: int) -> None:

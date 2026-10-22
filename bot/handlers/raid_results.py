@@ -55,6 +55,7 @@ async def on_raid_tick_resolved(session_id: int, tick: int, result: TickResult) 
     if battle is None:
         return
     raid_combat._declared_this_tick.pop(session_id, None)
+    battle.frozen_now = set()
     _record_contribution(battle, result)
     battle.stage_ticks += 1
     state = raid_combat._engine.sessions.get(session_id)
@@ -166,9 +167,11 @@ async def on_raid_tick_resolved(session_id: int, tick: int, result: TickResult) 
 
     if frozen_ids and not field_cleared:
         raid_combat._declared_this_tick.setdefault(session_id, set()).update(frozen_ids)
+        battle.frozen_now = set(frozen_ids)
         for cid in frozen_ids:
             held = (
                 "📖 Каталог сковал тебя: в следующем ходу ты пропускаешь." if battle.is_archive
+                else "⛓ Тебя держат: в следующем ходу ты пропускаешь." if battle.is_rift
                 else "🦴 Руки держат крепко: в следующем ходу ты пропускаешь."
             )
             notices[cid] = f"{notices[cid]}\n{held}" if notices.get(cid) else held

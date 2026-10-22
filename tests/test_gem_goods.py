@@ -237,3 +237,9 @@ async def test_bought_while_dead_waits_for_respawn(db_session, make_character, s
     c.respawn_at = NOW + timedelta(minutes=5)
     await shop_service.change_faction(db_session, c, "docks", NOW)
     assert (c.region, c.pending_faction) == ("ridge", "docks")
+
+
+async def test_tinctures_by_quantity_stack_time(db_session, make_character) -> None:
+    c = await make_character(donate=ggc.TINCTURE_PRICE * 5)
+    until = await shop_service.buy_tincture(db_session, c, NOW, qty=5)
+    assert until == NOW + timedelta(hours=5 * ggc.TINCTURE_HOURS)
