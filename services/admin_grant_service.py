@@ -229,7 +229,7 @@ async def grant(
         from services import resource_log
 
         character.star_dust = (character.star_dust or 0) + amount
-        resource_log.add(db, character.id, "star_dust", None, amount)
+        resource_log.add(db, character.id, "dust", None, amount)
     elif kind == "gear":
         slot, rarity = rest
         for _ in range(amount):

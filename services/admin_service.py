@@ -509,7 +509,7 @@ async def wallet_journal(db: AsyncSession, character_id: int) -> list[dict]:
     ]
 
 
-RESOURCE_KINDS = {"ore": "⛏", "fish": "🐟", "herb": "🌿", "food": "🍲", "elixir": "🧪", "trophy": "💀", "item": "⚔️", "star_dust": "✨"}
+RESOURCE_KINDS = {"ore": "⛏", "fish": "🐟", "herb": "🌿", "food": "🍲", "elixir": "🧪", "trophy": "💀", "item": "⚔️", "dust": "✨"}
 
 
 async def _resource_label(db: AsyncSession, kind: str, ref: str) -> str:
@@ -539,7 +539,7 @@ async def _resource_label(db: AsyncSession, kind: str, ref: str) -> str:
     if kind == "item" and head.isdigit():
         item = await db.get(Item, int(head))
         return f"{item.name} #{head}" if item else f"вещь #{head}"
-    if kind == "star_dust":
+    if kind == "dust":
         return "Звёздная пыль"
     return ref
 

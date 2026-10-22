@@ -43,7 +43,7 @@ class ResourceLog(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True)
     character_id: Mapped[int] = mapped_column(ForeignKey("characters.id", ondelete="CASCADE"), index=True)
-    kind: Mapped[str] = mapped_column(String(8))         # ore | fish | herb | food | elixir | trophy | item
+    kind: Mapped[str] = mapped_column(String(8))         # ore | fish | herb | food | elixir | trophy | item | dust (до 8 знаков!)
     ref: Mapped[str] = mapped_column(String(80))         # «руда:градация», id травы, id вещи...
     delta: Mapped[int] = mapped_column(BigInteger)       # у рыбы - граммы
     reason: Mapped[str] = mapped_column(String(80))      # модуль.функция, откуда пришло

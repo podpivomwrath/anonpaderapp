@@ -432,7 +432,7 @@ async def disassemble_unique(db: AsyncSession, character: Character, item_id: in
     await db.execute(delete(Item).where(Item.id == item_id))
     db.expunge(item)
     character.star_dust = (character.star_dust or 0) + cc.STAR_DUST_PER_UNIQUE
-    resource_log.add(db, character.id, "star_dust", None, cc.STAR_DUST_PER_UNIQUE)
+    resource_log.add(db, character.id, "dust", None, cc.STAR_DUST_PER_UNIQUE)
     await db.flush()
     return character.star_dust
 
