@@ -23,7 +23,7 @@ import random
 from game.combat import balance_config as bc
 from game.combat import base_skills, subclass_skills
 from game.combat.raid_bosses import _boss_combatant
-from game.combat.raid_field import StageTick, _players, _target_of
+from game.combat.raid_field import StageTick, _players, _target_of, stage_hurt
 from game.combat.resolver import TickResult
 from game.combat.session import ActionType, CombatantState, CombatSessionState, EffectKind
 from game.combat.skills import PendingHit, compute_hit
@@ -172,12 +172,8 @@ class ArchiveStage:
             copied = False
             if damage > 0:
                 copied = True
-                player.current_hp -= damage
                 out.lines.append(f"📖 Каталог: «{name}» → {player.name} - {damage} урона")
-                if player.current_hp <= 0:
-                    player.current_hp = 0
-                    out.deaths.append(cid)
-                    out.lines.append(f"☠ {player.name} погибает")
+                stage_hurt(player, damage, out)
             if heal > 0:
                 copied = True
                 before = boss.current_hp
@@ -217,13 +213,9 @@ class ArchiveStage:
             out.lines.append("Страница остаётся чистой - цитировать нечего.")
             return
         target = rng.choice(players)
-        target.current_hp -= strongest.amount
         source = session.combatants[strongest.source_id].name
         out.lines.append(f"📖 Цитата: удар {source} → {target.name} - {strongest.amount} урона")
-        if target.current_hp <= 0:
-            target.current_hp = 0
-            out.deaths.append(target.id)
-            out.lines.append(f"☠ {target.name} погибает")
+        stage_hurt(target, strongest.amount, out)
 
     # --- Ластик ---
 

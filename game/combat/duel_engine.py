@@ -200,7 +200,7 @@ class DuelEngine:
         # работали бы «Разъедающий токсин»/«Некроз», а яд шёл бы сквозь щиты.
         for effect in actor.effects_of(EffectKind.DOT):
             source = state.combatants.get(effect.source_id)
-            dot = shared_rules.poison_tick_damage(effect, source)
+            dot = shared_rules.cap_incoming(actor, shared_rules.poison_tick_damage(effect, source))
             dot = shared_rules.absorb_by_shields(
                 actor, dot, result.lines, pierce=shared_rules.poison_shield_pierce(source)
             )
@@ -366,16 +366,28 @@ class DuelEngine:
             # добавлять сюда SHIELD_POOL, которого движок не знал.
             # Сколько съел щит, видно в самой строке удара (shielded), поэтому
             # отдельные строки щитов не нужны.
+            capped = shared_rules.cap_incoming(target, hit.amount)
             amount = shared_rules.absorb_by_shields(
-                target, hit.amount, [],
+                target, capped, [],
                 pierce=shared_rules.poison_shield_pierce(actor) if hit.is_dot else 0.0,
             )
             target.current_hp -= amount
             result.lines.append(combat_flavor.render_hit(
                 actor.name, target.name, label=hit.label, amount=amount, crit=hit.crit,
                 missed=False, is_dot=hit.is_dot, hp_before=before, hp_after=target.current_hp,
-                max_hp=target.max_hp, shielded=hit.amount - amount, blocked=hit.blocked,
+                max_hp=target.max_hp, shielded=capped - amount, blocked=hit.blocked,
             ))
+            # Глухая оборона: лечение за удар в стойку - в тот же миг, что и
+            # удар (в тиковом бою они складываются в одну сумму и спасают от
+            # смертельного удара так же).
+            block_heal = shared_rules.block_heal_amount(target, capped)
+            if block_heal:
+                heal_before = target.current_hp
+                target.current_hp = min(target.current_hp + block_heal, target.max_hp)
+                result.lines.append(display.action_line(
+                    target.name, "Глухая оборона гасит удар", target.name,
+                    heal_before, target.current_hp, target.max_hp, display.MODE_PVP,
+                ))
             _apply_last_breath_guard(target, result)
             # Страж, «Отражение»: доля срезанного блоком урона возвращается
             # атакующему. Общее правило с тиковым движком.
@@ -383,6 +395,7 @@ class DuelEngine:
             if blocked_back and actor.id != target.id and actor.alive:
                 actor_before = actor.current_hp
                 # Через щиты ударившего (2026-10-22), как в тиковом движке.
+                blocked_back = shared_rules.cap_incoming(actor, blocked_back)
                 back = shared_rules.absorb_by_shields(actor, blocked_back, [])
                 actor.current_hp -= back
                 result.lines.append(combat_flavor.render_hit(
@@ -397,6 +410,7 @@ class DuelEngine:
             if reflect_pct > 0 and amount > 0 and actor.id != target.id and actor.alive:
                 reflect_amount = max(round(amount * reflect_pct), 1)
                 actor_before = actor.current_hp
+                reflect_amount = shared_rules.cap_incoming(actor, reflect_amount)
                 back = shared_rules.absorb_by_shields(actor, reflect_amount, [])
                 actor.current_hp -= back
                 result.lines.append(combat_flavor.render_hit(

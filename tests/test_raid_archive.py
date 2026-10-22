@@ -290,6 +290,18 @@ def test_quote_returns_the_strongest_hit() -> None:
     assert any("Цитата" in line for line in out.lines)
 
 
+def test_quote_is_held_by_shields() -> None:
+    """2026-10-22: «Цитата» шла мимо щитов."""
+    state, stage, boss = _fight()
+    stage.quote_open = True
+    for c in (1, 2):
+        state.combatants[c].apply_effect(EffectKind.SHIELD_POOL, 10**6, 5, c)
+    result = _tick(state, {1: DeclaredAction(type=ActionType.ATTACK, target_id=boss.id)})
+    hp = {c: state.combatants[c].current_hp for c in (1, 2)}
+    stage.after_tick(state, result, random.Random(1))
+    assert all(state.combatants[c].current_hp == hp[c] for c in (1, 2))
+
+
 def test_eraser_strips_buffs_and_shields() -> None:
     state, stage, boss = _fight()
     player = state.combatants[1]

@@ -329,6 +329,30 @@ def test_count_answers_everyone_who_struck_past_the_limit() -> None:
     assert state.combatants[5].current_hp == hp_before[5]
 
 
+def test_count_answer_is_held_by_shields() -> None:
+    """2026-10-22: ответ генерала шёл мимо щитов."""
+    state, stage, general = _general(players=5)
+    _force(stage, general, state, rf.COUNT)
+    result = _tick(state, {cid: _attack(general.id) for cid in (1, 2, 3, 4)})
+    for cid in (1, 2, 3, 4):
+        state.combatants[cid].apply_effect(EffectKind.SHIELD_POOL, 10**6, 5, cid)
+    hp_before = {cid: state.combatants[cid].current_hp for cid in (1, 2, 3, 4)}
+    stage.after_tick(state, result, random.Random(1), {})
+    assert all(state.combatants[cid].current_hp == hp_before[cid] for cid in (1, 2, 3, 4))
+
+
+def test_stage_hurt_respects_last_breath() -> None:
+    from game.combat.raid_field import StageTick, stage_hurt
+
+    p = combatant(1, 0, name="Игрок")
+    p.apply_effect(EffectKind.LAST_BREATH, 1.0, 3, 1)
+    out = StageTick()
+    stage_hurt(p, p.max_hp * 5, out)
+    assert p.current_hp == 1 and not out.deaths
+    stage_hurt(p, 10, out)
+    assert p.current_hp == 0 and out.deaths == [1]
+
+
 def test_count_within_the_limit_costs_nothing() -> None:
     state, stage, general = _general(players=5)
     _force(stage, general, state, rf.COUNT)

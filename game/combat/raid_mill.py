@@ -28,7 +28,7 @@ import random
 from game.classes.base import REGISTRY
 from game.combat.raid_archive import _skills_of
 from game.combat.raid_bosses import _boss_combatant
-from game.combat.raid_field import StageTick, _idle, _players, _strike, _target_of
+from game.combat.raid_field import StageTick, _idle, _players, _strike, _target_of, stage_hurt
 from game.combat.resolver import TickResult
 from game.combat.session import ActionType, CombatantState, CombatSessionState, EffectKind
 from game.combat.skills import PendingHit, compute_hit
@@ -58,21 +58,9 @@ def carry_order(subclasses: list[str | None]) -> list[str | None]:
 
 
 def _hurt(player: CombatantState, amount: int, out: StageTick, through_shields: bool = False) -> None:
-    """Сценарный урон мимо резолвера; гибель - в out.deaths. Щиты его держат,
-    как обычный удар (2026-10-20, жалоба: жернова шли сквозь щиты);
-    through_shields - только гибель всей группы, её щитом не закрыть."""
-    if amount <= 0 or not player.alive:
-        return
-    if not through_shields:
-        from game.combat.shared_rules import absorb_by_shields
-
-        amount = absorb_by_shields(player, amount, out.lines)
-        if amount <= 0:
-            return
-    player.current_hp = max(0, player.current_hp - amount)
-    if player.current_hp <= 0:
-        out.deaths.append(player.id)
-        out.lines.append(f"☠ {player.name} погибает")
+    """Сценарный урон - общая stage_hurt (щиты держат: 2026-10-20, жалоба на
+    жернова сквозь щиты)."""
+    stage_hurt(player, amount, out, through_shields=through_shields)
 
 
 def _shields(player: CombatantState) -> dict[int, float]:

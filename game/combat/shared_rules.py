@@ -90,6 +90,25 @@ def absorb_by_shields(
     return amount
 
 
+def cap_incoming(target: CombatantState, amount: int) -> int:
+    """«Несокрушимый» (DAMAGE_CAP): урон за один удар не выше доли макс. HP.
+    До щитов - щит гасит то, что осталось. В дуэли до 2026-10-22 не работал."""
+    cap = target.effect_total(EffectKind.DAMAGE_CAP)
+    if cap <= 0 or amount <= 0:
+        return amount
+    return min(amount, max(round(target.max_hp * cap), 1))
+
+
+def block_heal_amount(target: CombatantState, amount: int) -> int:
+    """«Глухая оборона» (BLOCK_STANCE + BLOCK_HEAL): лечение за каждый удар,
+    пришедшийся в стойку. 0 - стойки нет или удар пустой. В дуэли до
+    2026-10-22 не работало."""
+    if amount <= 0 or target.effect_total(EffectKind.BLOCK_STANCE) <= 0:
+        return 0
+    pct = target.effect_total(EffectKind.BLOCK_HEAL)
+    return round(target.max_hp * pct) if pct > 0 else 0
+
+
 def block_reflect_amount(target: CombatantState, blocked: int) -> int:
     """Страж, «Отражение»: доля СРЕЗАННОГО блоком урона уходит обратно
     атакующему. Считается от заблокированного, а не от прошедшего, поэтому
@@ -119,8 +138,11 @@ def poison_end_effects(
             burst_pct = source.buff_modifiers.get("poison_expire_burst_pct", 0.0)
             if burst_pct > 0 and combatant.alive:
                 amount = max(round(effect.value * effect.stacks * burst_pct), 1)
-                combatant.current_hp -= amount
-                lines.append(f"☠ Яд на {combatant.name} вспыхивает напоследок - {amount} урона")
+                # Через щиты, как сам яд (2026-10-22).
+                amount = absorb_by_shields(combatant, amount, lines, pierce=poison_shield_pierce(source))
+                if amount > 0:
+                    combatant.current_hp -= amount
+                    lines.append(f"☠ Яд на {combatant.name} вспыхивает напоследок - {amount} урона")
         combatant._expired_dots = []
 
     for cid in alive_before:

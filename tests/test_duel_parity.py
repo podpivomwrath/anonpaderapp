@@ -240,3 +240,62 @@ def test_shield_pool_absorbs_direct_hit_in_duel() -> None:
         state, DeclaredAction(type=ActionType.ATTACK, target_id=target.id)
     ))
     assert target.current_hp == hp_before  # щит поглотил удар целиком
+
+
+def _duel_hit_on(target, attacker, rng=None) -> None:
+    """Один удар attacker по target в дуэли."""
+    engine = DuelEngine(rng=rng or NoCritRng())
+    engine.start_duel(1, attacker, target)
+    state = engine.duels[1]
+    if state.combatants[state.current_actor_id].id != attacker.id:
+        state.turn_number += 1
+    asyncio.run(engine._resolve_turn(
+        state, DeclaredAction(type=ActionType.ATTACK, target_id=target.id)
+    ))
+
+
+def test_damage_cap_works_in_duel() -> None:
+    """«Несокрушимый» (2026-10-22): в дуэли потолка урона за удар не было."""
+    attacker = combatant(1, side=0, strength=5000)
+    target = combatant(2, side=1, agility=0, vitality=500)
+    target.apply_effect(EffectKind.DAMAGE_CAP, 0.05, 3, target.id)
+    before = target.current_hp
+    _duel_hit_on(target, attacker)
+    assert before - target.current_hp == round(target.max_hp * 0.05)
+
+
+def test_block_heal_works_in_duel() -> None:
+    """«Глухая оборона» лечит за удар в стойку и в дуэли (2026-10-22)."""
+    attacker = combatant(1, side=0)
+    target = combatant(2, side=1, agility=0, vitality=500)
+    target.apply_effect(EffectKind.BLOCK_STANCE, 1.0, 3, target.id)
+    target.apply_effect(EffectKind.BLOCK_HEAL, 0.05, 3, target.id)
+    target.current_hp = target.max_hp // 2
+    before = target.current_hp
+    _duel_hit_on(target, attacker)
+    assert target.current_hp > before  # удар срезан стойкой, лечение пришло
+
+
+def test_every_effect_the_tick_engine_reads_is_known_to_the_duel() -> None:
+    """Сверка (2026-10-22): эффект, который читает тиковый бой, обязан читаться
+    и в дуэли (сам движок, общие правила или навыки) - иначе он молча не
+    работает в 1x1, как было с «Кровью за кровь», «Несокрушимым» и «Глухой
+    обороной». Исключение - только с причиной."""
+    import re
+    from pathlib import Path
+
+    combat = Path(__file__).resolve().parents[1] / "game" / "combat"
+
+    def kinds(*names: str) -> set[str]:
+        return {
+            k for n in names
+            for k in re.findall(r"EffectKind\.([A-Z_]+)", (combat / f"{n}.py").read_text(encoding="utf-8"))
+        }
+
+    exempt = {
+        # В резолвере - только в списке «тикает сразу» (эликсиры); саму
+        # невосприимчивость проверяет control.py, общий для обоих движков.
+        "CONTROL_IMMUNE",
+    }
+    missing = kinds("resolver") - kinds("duel_engine", "shared_rules", "skills", "control") - exempt
+    assert not missing, f"дуэль не знает эффектов: {sorted(missing)}"

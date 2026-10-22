@@ -45,6 +45,31 @@ class StageTick:
     frozen: list[int] = field(default_factory=list)
 
 
+def stage_hurt(player: CombatantState, amount: int, out: StageTick, *, through_shields: bool = False) -> int:
+    """Урон механики рейда мимо резолвера (2026-10-22: одна функция на все
+    рейды). Щиты держат его, как обычный удар; «Последний вздох» спасает, как
+    в резолвере; гибель - в out.deaths, движок про такие смерти не знает.
+    through_shields - только гибель всей группы, её щитом не закрыть.
+    Возвращает урон, дошедший до здоровья."""
+    from game.combat.shared_rules import absorb_by_shields
+
+    if amount <= 0 or not player.alive:
+        return 0
+    if not through_shields:
+        amount = absorb_by_shields(player, amount, out.lines)
+        if amount <= 0:
+            return 0
+    player.current_hp = max(0, player.current_hp - amount)
+    if player.current_hp <= 0 and player.has_effect(EffectKind.LAST_BREATH):
+        player.effects = [e for e in player.effects if e.kind != EffectKind.LAST_BREATH]
+        player.current_hp = 1
+        out.lines.append(f"✨ Последний вздох удерживает {player.name} на грани (1 HP)")
+    if player.current_hp <= 0:
+        out.deaths.append(player.id)
+        out.lines.append(f"☠ {player.name} погибает")
+    return amount
+
+
 def _players(session: CombatSessionState) -> list[CombatantState]:
     return [c for c in session.combatants.values() if c.kind == "character" and c.alive]
 
@@ -358,12 +383,8 @@ class SummonerStage:
             for receiver, amount in ((b, got[a.id]), (a, got[b.id])):
                 if amount <= 0 or not receiver.alive:
                     continue
-                receiver.current_hp -= amount
                 out.lines.append(f"⛓ Цепь передаёт урон: {receiver.name} -{amount} HP.")
-                if receiver.current_hp <= 0:
-                    receiver.current_hp = 0
-                    out.deaths.append(receiver.id)
-                    out.lines.append(f"☠ {receiver.name} погибает")
+                stage_hurt(receiver, amount, out)
 
     def _tick_bell(self, session: CombatSessionState, summoner: CombatantState, out: StageTick) -> None:
         if self._alive_object(session, BELL) is None or summoner.current_hp <= summoner.hp_floor:
@@ -668,12 +689,8 @@ class GeneralStage:
             if player is None or not player.alive:
                 continue
             damage = max(round(player.max_hp * fc.COUNT_RETALIATION_FRACTION), 1)
-            player.current_hp -= damage
             out.lines.append(f"Генерал → ответ по {player.name} - {damage} урона")
-            if player.current_hp <= 0:
-                player.current_hp = 0
-                out.deaths.append(cid)
-                out.lines.append(f"☠ {player.name} погибает")
+            stage_hurt(player, damage, out)
 
     @staticmethod
     def _count_allowed(session: CombatSessionState) -> int:

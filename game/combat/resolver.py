@@ -237,22 +237,18 @@ def _apply_phase(
             amount = max(target.incoming_hit_hook(hit, session.combatants.get(hit.source_id), amount), 0)
         # Несокрушимый (патч 39): входящий урон за удар не может превышать
         # value*maxHP, применяется ДО щитов (щит гасит то, что осталось).
-        damage_cap = target.effect_total(EffectKind.DAMAGE_CAP)
-        if damage_cap > 0 and amount > 0:
-            amount = min(amount, max(round(target.max_hp * damage_cap), 1))
+        amount = shared_rules.cap_incoming(target, amount)
         # Глухая оборона (патч 39): лечит цель за каждый удар, срезанный блоком
         # (block_reduction/BLOCK_STANCE уже применены в compute_hit — здесь
         # только считаем факт "удар пришёлся по блокирующей стойке").
-        block_stance = target.effect_total(EffectKind.BLOCK_STANCE)
-        if block_stance > 0 and amount > 0:
-            block_heal_pct = target.effect_total(EffectKind.BLOCK_HEAL)
-            if block_heal_pct > 0:
-                heals.append(
-                    PendingHeal(
-                        source_id=target.id, target_id=target.id,
-                        amount=round(target.max_hp * block_heal_pct), label="Глухая оборона гасит удар",
-                    )
+        block_heal = shared_rules.block_heal_amount(target, amount)
+        if block_heal:
+            heals.append(
+                PendingHeal(
+                    source_id=target.id, target_id=target.id,
+                    amount=block_heal, label="Глухая оборона гасит удар",
                 )
+            )
         # Щиты (однотиковый + «Второе сердце») и «Токсикология» - общие с
         # дуэлью, см. game/combat/shared_rules.py.
         pierce = (
@@ -291,6 +287,7 @@ def _apply_phase(
     # Ответный урон - тоже через щиты ударившего (2026-10-22, баг: «возврат
     # урона бьёт сквозь щиты»).
     for hit in reflect_hits:
+        hit.amount = shared_rules.cap_incoming(session.combatants[hit.target_id], hit.amount)
         before_shields = hit.amount
         amount = shared_rules.absorb_by_shields(session.combatants[hit.target_id], hit.amount, [])
         shielded_by_hit[id(hit)] = before_shields - amount

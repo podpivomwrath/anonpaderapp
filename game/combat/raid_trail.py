@@ -18,10 +18,9 @@
 import random
 
 from game.combat.raid_bosses import _boss_combatant
-from game.combat.raid_field import StageTick, _players, _target_of
+from game.combat.raid_field import StageTick, _players, _target_of, stage_hurt
 from game.combat.resolver import TickResult
 from game.combat.session import ActionType, CombatantState, CombatSessionState
-from game.combat.shared_rules import absorb_by_shields
 from game.combat.skills import PendingHit, compute_hit
 from game.economy import raid_trail_config as tc
 
@@ -39,15 +38,7 @@ def adjacent(a: int, b: int) -> bool:
 
 
 def _hurt(player: CombatantState, amount: int, out: StageTick) -> None:
-    if amount <= 0 or not player.alive:
-        return
-    amount = absorb_by_shields(player, amount, out.lines)
-    if amount <= 0:
-        return
-    player.current_hp = max(0, player.current_hp - amount)
-    if player.current_hp <= 0:
-        out.deaths.append(player.id)
-        out.lines.append(f"☠ {player.name} погибает")
+    stage_hurt(player, amount, out)
 
 
 class NamelessAI:
