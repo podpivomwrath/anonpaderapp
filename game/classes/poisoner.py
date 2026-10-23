@@ -167,4 +167,12 @@ def toxic_burst(ctx: SkillContext) -> None:
     remaining_total = tick_damage * max(poison.remaining_ticks, 1)
     amount = max(round(remaining_total * skill.effect_value), 1)
     ctx.hits.append(PendingHit(source_id=actor.id, target_id=target.id, amount=amount, label="взрывает ядом", is_dot=True))
+    # «Токсичный всплеск» (2026-10-23, владелец): выброс - тоже конец яда,
+    # он вспыхивает напоследок, как при истечении (shared_rules.poison_end_effects).
+    burst_pct = actor.buff_modifiers.get("poison_expire_burst_pct", 0.0)
+    if burst_pct > 0:
+        ctx.hits.append(PendingHit(
+            source_id=actor.id, target_id=target.id, is_dot=True, label="яд вспыхивает напоследок",
+            amount=max(round(poison.value * poison.stacks * burst_pct), 1),
+        ))
     target.effects.remove(poison)  # весь яд, как и сказано в описании

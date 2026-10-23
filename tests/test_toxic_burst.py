@@ -154,3 +154,15 @@ def test_burst_without_poison_does_nothing() -> None:
     )
     assert enemy.current_hp == before
     assert any("нет яда" in line for line in result.lines)
+
+
+def test_toxic_surge_fires_on_burst() -> None:
+    """2026-10-23, владелец: «Токсичный всплеск» срабатывает и от выброса -
+    яд кончается, и он вспыхивает напоследок, как при истечении."""
+    _, _, (_enemy, plain) = _burst()
+    assert not any(h.label == "яд вспыхивает напоследок" for h in plain.hits)
+    _, _, (_enemy, surged) = _burst(mods={"poison_expire_burst_pct": bc.POISONER_TOXIC_BURST_EXPIRE_PCT})
+    poisoner, _enemy2, poison, _state = _setup()
+    expected = round(poison.value * poison.stacks * bc.POISONER_TOXIC_BURST_EXPIRE_PCT)
+    surge = [h.amount for h in surged.hits if h.label == "яд вспыхивает напоследок"]
+    assert surge == [expected]

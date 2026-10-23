@@ -44,3 +44,16 @@ def test_link_targets_exist() -> None:
 def test_only_bold_markup_in_text() -> None:
     text = json.dumps(DATA, ensure_ascii=False)
     assert not re.search(r"<(?!/?b>)[a-z]", text), "в тексте только <b>"
+
+
+def test_buff_descriptions_match_the_game() -> None:
+    """Описания баффов в путеводителе - копия игровых; поменял бафф - запусти
+    tools/handbook_sync_buffs.py."""
+    import copy
+    import sys
+
+    sys.path.insert(0, str(SRC.parent.parent / "tools"))
+    import handbook_sync_buffs as hs
+
+    stale = hs.sync(copy.deepcopy(DATA), hs.current_descriptions())
+    assert not stale, f"устарели в путеводителе: {stale} - python tools/handbook_sync_buffs.py"

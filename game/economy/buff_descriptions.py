@@ -158,7 +158,7 @@ def _describe_blood_knight_blood_rage(b: BuffDef) -> str:
 
 def _describe_blood_knight_thirst(b: BuffDef) -> str:
     return (
-        f"Пока у тебя меньше 50% здоровья, навыки, которые лечат тебя от нанесённого урона, лечат "
+        f"Пока у тебя меньше 50% здоровья, навыки, которые лечат тебя от нанесённого урона (Кровопуск, Жатва, Багровый пир), лечат "
         f"больше: к их доле прибавляется {_points(bc.BLOOD_KNIGHT_THIRST_LOW_HP_LIFESTEAL_BONUS)} "
         "(например, было 20% от урона - станет 28%)."
     )
@@ -166,7 +166,7 @@ def _describe_blood_knight_thirst(b: BuffDef) -> str:
 
 def _describe_blood_knight_vein_rupture(b: BuffDef) -> str:
     return (
-        f"Если удар критический, лечение от нанесённого урона больше: к доле прибавляется "
+        f"Если навык, который лечит от нанесённого урона (Кровопуск, Жатва, Багровый пир), бьёт критически, лечение больше: к доле прибавляется "
         f"{_points(bc.BLOOD_KNIGHT_VEIN_RUPTURE_CRIT_LIFESTEAL_BONUS)} (было 20% от урона - станет 28%)."
     )
 
@@ -177,7 +177,7 @@ def _describe_blood_knight_recklessness(b: BuffDef) -> str:
 
 def _describe_blood_knight_insatiable(b: BuffDef) -> str:
     return (
-        f"Навыки, которые лечат тебя от нанесённого урона, всегда лечат больше: к доле прибавляется "
+        f"Навыки, которые лечат тебя от нанесённого урона (Кровопуск, Жатва, Багровый пир), всегда лечат больше: к доле прибавляется "
         f"{_points(bc.BLOOD_KNIGHT_INSATIABLE_LIFESTEAL_BONUS)} (было 20% от урона - станет 25%)."
     )
 
@@ -185,7 +185,7 @@ def _describe_blood_knight_insatiable(b: BuffDef) -> str:
 def _describe_blood_knight_eternal_hunger(b: BuffDef) -> str:
     total = bc.BLOOD_KNIGHT_HEAL_CAP_PER_TURN + bc.BLOOD_KNIGHT_ETERNAL_HUNGER_HEAL_CAP_BONUS
     return (
-        f"За один ход лечение от урона может вернуть тебе до {_pct(total)} максимального здоровья "
+        f"За один ход лечение от урона (Кровопуск, Жатва, Багровый пир) может вернуть тебе до {_pct(total)} максимального здоровья "
         f"вместо {_pct(bc.BLOOD_KNIGHT_HEAL_CAP_PER_TURN)}."
     )
 
@@ -213,7 +213,7 @@ def _describe_blood_knight_feast(b: BuffDef) -> str:
 
 def _describe_blood_knight_shared_thirst(b: BuffDef) -> str:
     return (
-        f"Когда ты лечишься от нанесённого урона, {_pct(bc.BLOOD_KNIGHT_SHARED_THIRST_ALLY_HEAL_PCT)} "
+        f"Когда ты лечишься от нанесённого урона (Кровопуск, Жатва, Багровый пир), {_pct(bc.BLOOD_KNIGHT_SHARED_THIRST_ALLY_HEAL_PCT)} "
         f"этого лечения получает союзник с самым низким здоровьем. {_ALLIES_ONLY}"
     )
 
@@ -270,7 +270,8 @@ def _describe_shadow_blade_carve(b: BuffDef) -> str:
 
 def _describe_shadow_blade_bloodlust(b: BuffDef) -> str:
     return (
-        "После твоего критического удара следующий удар тоже будет критическим. "
+        "После твоего критического удара следующий удар (обычная атака или навык) тоже будет критическим. "
+        "Казнь всегда бьёт критически - она тоже его включает. "
         f"Срабатывает не чаще раза в {_turns(bc.SHADOW_BLADE_BLOODLUST_COOLDOWN)}."
     )
 
@@ -291,19 +292,20 @@ def _describe_shadow_blade_shadow(b: BuffDef) -> str:
 
 def _describe_shadow_blade_slip_away(b: BuffDef) -> str:
     return (
-        f"После того как ты уклонился, шанс уклониться от следующего удара +{_points(bc.SHADOW_BLADE_SLIP_AWAY)}."
+        f"После того как ты уклонился (от удара или навыка), шанс уклониться от следующего удара "
+        f"+{_points(bc.SHADOW_BLADE_SLIP_AWAY)}."
     )
 
 
 def _describe_shadow_blade_blade_dancer(b: BuffDef) -> str:
     return (
-        f"Когда ты уклоняешься, Метки добычи, которые уже висят на врагах, снова держатся "
+        f"Когда ты уклоняешься (от удара или навыка), Метки добычи, которые уже висят на врагах, снова держатся "
         f"{_turns(bc.SHADOW_BLADE_MARK_DURATION)}."
     )
 
 
 def _describe_shadow_blade_blade_hunger(b: BuffDef) -> str:
-    return "Когда ты уклоняешься, тот, кто промахнулся, получает заряд Метки добычи."
+    return "Когда ты уклоняешься (от удара или навыка), тот, кто промахнулся, получает заряд Метки добычи."
 
 
 def _describe_shadow_blade_hunters_solitude(b: BuffDef) -> str:
@@ -367,20 +369,24 @@ def _describe_poisoner_double_dose(b: BuffDef) -> str:
 
 
 def _describe_poisoner_corroding_toxin(b: BuffDef) -> str:
-    return f"Твой яд наносит на {_pct(bc.POISONER_CORRODING_TOXIN_BONUS)} больше урона."
+    return (
+        f"Твой яд наносит на {_pct(bc.POISONER_CORRODING_TOXIN_BONUS)} больше урона. "
+        "Токсический выброс тоже: он взрывает яд по этому урону."
+    )
 
 
 def _describe_poisoner_necrosis(b: BuffDef) -> str:
     total = bc.POISONER_NECROSIS_PER_STACK * bc.POISONER_MAX_STACKS
     return (
         f"Чем больше зарядов яда на цели, тем сильнее он жжёт: +{_pct(bc.POISONER_NECROSIS_PER_STACK)} "
-        f"урона яда за каждый заряд, до +{_pct(total)} при {bc.POISONER_MAX_STACKS} зарядах."
+        f"урона яда за каждый заряд, до +{_pct(total)} при {bc.POISONER_MAX_STACKS} зарядах. "
+        "Токсический выброс считает яд с этой прибавкой."
     )
 
 
 def _describe_poisoner_toxic_burst(b: BuffDef) -> str:
     return (
-        "Когда яд на цели заканчивается, он напоследок наносит ещё "
+        "Когда яд на цели заканчивается или его взрывает Токсический выброс, он напоследок наносит ещё "
         f"{_pct(bc.POISONER_TOXIC_BURST_EXPIRE_PCT)} от своего урона за ход."
     )
 
@@ -418,7 +424,8 @@ def _describe_poisoner_paralytic(b: BuffDef) -> str:
 
 def _describe_poisoner_toxicology(b: BuffDef) -> str:
     return (
-        f"{_pct(bc.POISONER_TOXICOLOGY_SHIELD_PIERCE)} урона яда проходит сквозь щит цели прямо в здоровье. "
+        f"{_pct(bc.POISONER_TOXICOLOGY_SHIELD_PIERCE)} урона яда и Токсического выброса проходит сквозь щит "
+        "цели прямо в здоровье. "
         "Выносливость цели яд и так не уменьшает."
     )
 
@@ -490,7 +497,8 @@ def _describe_elementalist_universal_element(b: BuffDef) -> str:
 
 def _describe_elementalist_heat_shock(b: BuffDef) -> str:
     return (
-        "Когда Горение на цели заканчивается, на 1 ход её проще оглушить или заморозить: "
+        "Когда Горение на цели заканчивается (и то, что перекинул Огненный дождь), на 1 ход её проще "
+        "оглушить или заморозить: "
         f"её защита от этого -{_points(bc.ELEMENTALIST_HEAT_SHOCK_RESIST_DOWN)}."
     )
 
@@ -549,7 +557,8 @@ def _describe_dark_mystic_dark_resonance(b: BuffDef) -> str:
 
 def _describe_dark_mystic_blood_pact_plus(b: BuffDef) -> str:
     return (
-        f"Навыки, которые забирают твоё здоровье, забирают на {_pct(bc.DARK_MYSTIC_HP_COST_REDUCTION)} меньше."
+        f"Навыки, которые забирают твоё здоровье (Круг тьмы и доплата Самоотречения за Кровавый пакт), "
+        f"забирают на {_pct(bc.DARK_MYSTIC_HP_COST_REDUCTION)} меньше."
     )
 
 
@@ -563,15 +572,16 @@ def _describe_dark_mystic_self_denial(b: BuffDef) -> str:
 
 def _describe_dark_mystic_dark_reward(b: BuffDef) -> str:
     return (
-        "После навыка, который забрал твоё здоровье, следующий Кровавый пакт бьёт и лечит на "
+        "После навыка, который забрал твоё здоровье (Круг тьмы или Кровавый пакт с доплатой Самоотречения), "
+        "следующий Кровавый пакт бьёт и лечит на "
         f"{_pct(bc.DARK_MYSTIC_DARK_REWARD_BONUS)} сильнее."
     )
 
 
 def _describe_dark_mystic_edge(b: BuffDef) -> str:
     return (
-        f"Пока у тебя меньше {_pct(bc.DARK_MYSTIC_EDGE_HP_THRESHOLD)} здоровья, твой урон и лечение "
-        f"больше на {_pct(bc.DARK_MYSTIC_EDGE_BONUS)}."
+        f"Пока у тебя меньше {_pct(bc.DARK_MYSTIC_EDGE_HP_THRESHOLD)} здоровья, Кровавый пакт и Круг тьмы "
+        f"бьют и лечат на {_pct(bc.DARK_MYSTIC_EDGE_BONUS)} сильнее."
     )
 
 
