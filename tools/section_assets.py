@@ -29,12 +29,20 @@ KINDS = (
     "guild", "trade", "exchange", "shop", "trials",
 )
 
+#: Шапки страниц ремёсел на вкладке «Герой» (2026-10-23, CraftGear.jsx):
+#: имя файла на выходе -> имя исходника img/шапка_<...>.png.
+GEAR_KINDS = {
+    "gear_herbalism": "ремесло_травник", "gear_alchemy": "ремесло_алхимик", "gear_mining": "ремесло_горняк",
+    "gear_cooking": "ремесло_кулинар", "gear_fishing": "ремесло_рыбак",
+}
+
 
 def main() -> None:
     OUT.mkdir(parents=True, exist_ok=True)
     done = 0
-    for kind in KINDS:
-        src = SRC / f"шапка_{kind}.png"
+    sources = {kind: kind for kind in KINDS} | GEAR_KINDS
+    for kind, name in sources.items():
+        src = SRC / f"шапка_{name}.png"
         if not src.exists():
             continue
         img = Image.open(src).convert("RGB")
@@ -43,7 +51,7 @@ def main() -> None:
         img.resize((WIDTH, height), Image.LANCZOS).save(target, "WEBP", quality=QUALITY, method=6)
         print(f"{src.name} -> {target.name} {target.stat().st_size // 1024} КБ")
         done += 1
-    missing = [k for k in KINDS if not (SRC / f"шапка_{k}.png").exists()]
+    missing = [n for n in sources.values() if not (SRC / f"шапка_{n}.png").exists()]
     if missing:
         print("нет исходников:", ", ".join(missing))
     print(f"готово: {done}")

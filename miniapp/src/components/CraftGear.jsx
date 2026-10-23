@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Button } from '@vkontakte/vkui';
 import { makeGear } from '../api.js';
 import { itemIcon } from '../itemIcons.js';
-import { Sheet } from './ui.jsx';
+import { SectionHead, Sheet } from './ui.jsx';
 import Sparks from './Sparks.jsx';
 
 // Страница ремесла на вкладке «Герой» (2026-10-23): уровень и два слота
@@ -115,13 +115,11 @@ export default function CraftGear({ craft, onUpdate }) {
 
   return (
     <div className="gear-page">
-      <div className="gear-page__head">
-        <span className="gear-page__emoji" aria-hidden="true">{craft.emoji}</span>
-        <div>
-          <b className="gear-page__title">{craft.level} уровень</b>
-          <small>Инструменты не ломаются и остаются с тобой</small>
-        </div>
-      </div>
+      {/* Шапка с картинкой ремесла - assets/sections/gear_<ремесло>.webp. */}
+      <SectionHead
+        kind={`gear_${craft.id}`} icon={craft.emoji} value={`${craft.level} уровень`}
+        label="Инструменты не ломаются и остаются с тобой"
+      />
       <div className="gear-page__tools">
         {craft.tools.map((t) => (
           <ToolCard key={t.id} tool={t} flash={flashes[t.id] || 0} onOpen={() => setOpen(t.id)} />
