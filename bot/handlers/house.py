@@ -96,9 +96,23 @@ def _with_back(kb_: Keyboard, label: str, payload: dict, miniapp: bool = True) -
     return kb_.get_json()
 
 
-def alchemy_keyboard(level: int) -> str:
+BTN_MASTER = "✨ Мастерский отвар"
+MASTER_DONE_TEXT = (
+    "Камень шипит в котле, тварь растворяется без следа, пыль ложится на поверхность "
+    "и гаснет. Когда пар уходит, на дне лежит перстень, а рядом - флакон с тёмным отваром.\n\n"
+    "💍 Перстень Мастера - на пальце: всё, что добывают и делают ремёсла, теперь приходит вдвое.\n"
+    "🧪 Эликсир Мастера - в сумке, в еде: выпей, когда будешь готов.\n"
+    "👑 Новый титул: Мастер всех ремёсел."
+)
+
+
+def alchemy_keyboard(level: int, master: bool = False) -> str:
+    """master - в сумке всё для мастерского рецепта (кнопка только тогда)."""
     kb_ = Keyboard(one_time=False)
-    _rows_of_three(kb_, [(SHORT[r.elixir_id], {"type": "brew", "id": r.elixir_id}) for r in alchemy.known(level)])
+    rows = [(SHORT[r.elixir_id], {"type": "brew", "id": r.elixir_id}) for r in alchemy.known(level)]
+    if master:
+        rows.append((BTN_MASTER, {"type": "brew_master"}))
+    _rows_of_three(kb_, rows)
     return _with_back(kb_, BTN_HOUSE_BACK, {"type": "house_back"}, miniapp=False)
 
 
@@ -257,7 +271,11 @@ async def rebuild(db, character: Character) -> tuple[str, str] | None:
     if alchemy_service.is_working(character):
         return work_text(character), work_keyboard(character)
     if character.screen in ("alchemy", "brewing"):
-        return await alchemy_text(db, character), alchemy_keyboard(character.alchemy_level)
+        from services import master_recipe_service
+
+        return await alchemy_text(db, character), alchemy_keyboard(
+            character.alchemy_level, await master_recipe_service.ready(db, character),
+        )
     if character.screen in ("oven", "oven_fish", "cooking"):
         return await oven_text(db, character), oven_keyboard(character.cooking_level)
     return None
@@ -316,8 +334,30 @@ async def open_alchemy(message: Message) -> None:
         await screen_service.set_screen(db, character, "alchemy")
         await db.commit()
         text = await alchemy_text(db, character)
-    await message.answer(text, keyboard=alchemy_keyboard(character.alchemy_level),
+        from services import master_recipe_service
+
+        master = await master_recipe_service.ready(db, character)
+    await message.answer(text, keyboard=alchemy_keyboard(character.alchemy_level, master),
                          attachment=photo_attachment(TABLE_PHOTO))
+
+
+@labeler.message(payload_contains={"type": "brew_master"})
+async def brew_master(message: Message) -> None:
+    from services import master_recipe_service
+
+    async with get_session_factory()() as db:
+        character = await _home_character(db, message)
+        if character is None or await _busy(message, character):
+            return
+        level = character.alchemy_level
+        try:
+            await master_recipe_service.brew(db, character)
+        except master_recipe_service.MasterError as exc:
+            await db.rollback()
+            await message.answer(str(exc), keyboard=alchemy_keyboard(level))
+            return
+        await db.commit()
+    await message.answer(MASTER_DONE_TEXT, keyboard=alchemy_keyboard(level))
 
 
 @labeler.message(payload_contains={"type": "brew"})

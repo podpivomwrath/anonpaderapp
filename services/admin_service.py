@@ -610,12 +610,19 @@ async def _crafts_card(db: AsyncSession, character: Character) -> dict:
         "ore_pieces": await mining_service.total_ore(db, character.id),
         "flags": {
             "courier": character.has_courier, "pocket": character.secret_pocket, "donka": character.has_donka,
+            "ring": master_recipe_service_has_ring(character), "perm_pct": round((character.perm_stat_pct or 0) * 100),
             "subclass_declined": character.subclass_declined,
         },
         "guild": {
             "tag": guild.tag, "name": guild.name, "rank": gc.RANK_TITLES.get(member.rank, member.rank),
         } if guild is not None else None,
     }
+
+
+def master_recipe_service_has_ring(character) -> bool:
+    from services import master_recipe_service
+
+    return master_recipe_service.has_ring(character)
 
 
 async def _craft_gear_rows(db: AsyncSession, character_id: int) -> list[dict]:

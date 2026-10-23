@@ -176,6 +176,9 @@ async def finish(db: AsyncSession, character: Character) -> Cooked | None:
     pot = await craft_gear_service.tier(db, character.id, "pot")
     if pot and random.random() < craft_gear.pot_extra_chance(pot):
         n += 1
+    from services import master_recipe_service
+
+    n *= master_recipe_service.ring_mult(character)
     await add_food(db, character.id, dish.dish_id, grade, n)
     level = character.cooking_level
     xp = cooking.cook_xp(dish)

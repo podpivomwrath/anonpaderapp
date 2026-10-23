@@ -333,6 +333,9 @@ async def finish_dig(
     # рудника ушёл один кусок ещё при старте - второй сверху, не из жилы.
     chance = crown_service.mining_double_chance(character)
     count = 2 if chance and rng.random() < chance else 1
+    from services import master_recipe_service
+
+    count *= master_recipe_service.ring_mult(character)  # перстень - последним
     await add_ore(db, character.id, ore_id, grade_id, count)
     db.add(MiningEvent(
         kind="dig", mine_id=character.mining_mine_id, character_id=character.id,

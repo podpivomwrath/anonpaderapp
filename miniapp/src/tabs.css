@@ -2496,3 +2496,9 @@ body.lite .shop-showcase::after { animation: none; display: none; }
   opacity: 0.45;
   filter: grayscale(1);
 }
+.gear-slot__ring {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 11px;
+}

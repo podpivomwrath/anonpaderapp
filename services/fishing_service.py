@@ -315,7 +315,10 @@ async def keep_catch(db: AsyncSession, character: Character) -> Decision | None:
     if row is None:
         row = CharacterFish(character_id=character.id, fish_id=fish_id, grade=grade_id, total_grams=0)
         db.add(row)
-    row.total_grams += grams
+    from services import master_recipe_service
+
+    # Перстень: вторая такая же рыба (2026-10-23).
+    row.total_grams += grams * master_recipe_service.ring_mult(character)
     clear_cast(character)
     await db.flush()
     return Decision(fish=fish, grams=grams, kept=True)

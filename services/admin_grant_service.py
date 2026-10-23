@@ -172,6 +172,12 @@ def catalog() -> list[dict]:
         {"id": "ore", "title": "⛏ Руда", "entries": ores},
         {"id": "tools", "title": "🔧 Инструменты", "entries": tools},
         {"id": "craft_gear", "title": "🧰 Ремесленные инструменты", "entries": craft_tools},
+        # Мастерский рецепт (2026-10-23) - игрокам о нём не говорим, тут для проверок.
+        {"id": "master", "title": "🔒 Мастерский рецепт", "entries": [
+            _entry("master:old_vial", "🧪 Пыльная склянка"),
+            _entry("master:master_draught", "🧪 Эликсир Мастера"),
+            _entry("master:ring", "💍 Перстень Мастера", "one"),
+        ]},
         {"id": "fish", "title": "🐟 Рыба", "entries": fish},
         {"id": "herbs", "title": "🌿 Травы", "entries": herbs},
         {"id": "food", "title": "🍲 Еда", "entries": dishes},
@@ -308,6 +314,16 @@ async def grant(
             row = CharacterFish(character_id=character.id, fish_id=fish_id, grade=grade, total_grams=0)
             db.add(row)
         row.total_grams += _fish_grams(fish_id, grade) * amount
+    elif kind == "master":
+        from game.economy import craft_gear_config as gearc
+        from services import master_recipe_service
+
+        if rest[0] == "ring":
+            if master_recipe_service.has_ring(character):
+                raise GrantError("Перстень у игрока уже есть.")
+            character.ring_id = gearc.RING_ID
+        else:
+            await master_recipe_service._add(db, character.id, rest[0], amount)
     elif kind == "craftgear":
         from game.economy import craft_gear
         from models import CharacterCraftGear

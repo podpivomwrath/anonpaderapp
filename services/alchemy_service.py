@@ -99,6 +99,9 @@ async def finish(db: AsyncSession, character: Character, rng: random.Random) -> 
     still = await craft_gear_service.tier(db, character.id, "still")
     if still and rng.random() < craft_gear.still_extra_chance(still):
         amount += recipe.out
+    from services import master_recipe_service
+
+    amount *= master_recipe_service.ring_mult(character)
     await elixir_service.grant(db, character.id, recipe.elixir_id, amount)
     xp = alchemy.brew_xp(recipe)
     alchemy.grant_xp(character, xp)

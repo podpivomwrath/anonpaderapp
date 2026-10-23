@@ -498,6 +498,16 @@ async def compute_gear_bonus(db: AsyncSession, character_id: int) -> dict[str, i
     equipped = await get_equipped(db, character_id)
     bonus = gear_bonus(equipped)
     character = await db.get(Character, character_id)
+    # Эликсир мастерского рецепта (2026-10-23): доля ко всем характеристикам.
+    pct = (getattr(character, "perm_stat_pct", 0) or 0) if character is not None else 0
+    if pct > 0:
+        from models import CharacterStats
+
+        stats = await db.scalar(select(CharacterStats).where(CharacterStats.character_id == character_id))
+        if stats is not None:
+            for key, value in (("str", stats.strength), ("agi", stats.agility), ("int", stats.intellect),
+                               ("vit", stats.vitality), ("wil", stats.will)):
+                bonus[key] = bonus.get(key, 0) + round((value + bonus.get(key, 0)) * pct)
     if character is not None and character.guild_id is not None:
         from models import CharacterStats
         from services import guild_territory_service

@@ -589,6 +589,7 @@ class Arrival:
     order_crates: int = 0
     toll: int = 0
     no_trade_xp: bool = False
+    vial: bool = False
 
     def text(self) -> str:
         lines = [f"🐂 Повозка №{self.slot} фирмы «{self.firm_name}» прибыла в {city_title(self.to_city)}."]
@@ -609,6 +610,10 @@ class Arrival:
             lines.append(f"💥 Обшивка выбита, рассыпалось: {lost_text(self.lost)}.")
         if self.chests:
             lines.append(f"🎁 В ящиках нашёлся Пепельный ларец ×{self.chests}!")
+        if self.vial:
+            from services import master_recipe_service
+
+            lines.append(master_recipe_service.VIAL_LINE)
         if self.crates and self.no_trade_xp:
             lines.append("📉 Рейс без прибыли - опыта торговли нет.")
         if self.level_up:
@@ -713,6 +718,10 @@ async def arrive(
         out.level_up = firm.trade_level
     for _ in range(out.chests):
         await lootbox_service.grant_chest(db, character, 0)
+    if out.crates:
+        from services import master_recipe_service
+
+        out.vial = await master_recipe_service.roll_vial(db, character.id, rng)
     if out.crates:
         from services import experience_service
 

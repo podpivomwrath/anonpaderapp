@@ -92,7 +92,7 @@ async def notify_nearby(peer_id: int, character) -> None:
 
 def picked_text(result, character=None) -> str:
     herb = result.herb
-    bunches = "два пучка" if result.amount == 2 else "пучок"
+    bunches = {1: "пучок", 2: "два пучка", 3: "три пучка"}.get(result.amount, f"{result.amount} пучков")
     text = f"{herb.emoji} {herb.name}: {bunches} в сумке травника. Травничество +{result.xp} опыта."
     if result.level_after > result.level_before:
         text += f"\n🌿 Травничество: {result.level_after} уровень."

@@ -850,6 +850,7 @@ function PlayerCard({ card, onRefresh }) {
           <StatRow label="Курьер" value={card.flags.courier ? 'есть' : 'нет'} />
           <StatRow label="Тайный карман" value={card.flags.pocket ? 'есть' : 'нет'} />
           <StatRow label="Пепельная донка" value={card.flags.donka ? 'есть' : 'нет'} />
+          <StatRow label="Перстень Мастера" value={card.flags.ring ? `есть, эликсир +${card.flags.perm_pct}%` : `нет${card.flags.perm_pct ? `, эликсир +${card.flags.perm_pct}%` : ''}`} />
           <StatRow label="Подкласс" value={card.flags.subclass_declined ? 'отказался, путь базового класса' : (card.subclass_title || 'не выбран')} />
         </Fold>
       )}

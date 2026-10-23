@@ -200,6 +200,9 @@ class Character(Base):
     food_boost: Mapped[float] = mapped_column(default=0.0, server_default="0")
     #: Прикормка (2026-10-23): до какого времени клюёт быстрее.
     bait_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    #: Мастерский рецепт (2026-10-23): перстень в слоте и прибавка эликсира.
+    ring_id: Mapped[str | None] = mapped_column(String(16), nullable=True)
+    perm_stat_pct: Mapped[float] = mapped_column(default=0.0, server_default="0")
     # Состояние добычи. Добыча БЛОКИРУЕТ все действия, пока идёт, и живёт в
     # БД, а не в памяти: она длится минутами (до полутора часов новичку в
     # глубоком руднике), и терять её из-за деплоя нельзя.

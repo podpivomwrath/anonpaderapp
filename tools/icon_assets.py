@@ -163,6 +163,9 @@ EXTRA_FILES = {
     "gear:rod": "инструмент_удочка.png",
     "gear:line": "инструмент_леска.png",
     "gear:bait": "инструмент_прикормка.png",
+    "special:vial": "особое_склянка.png",
+    "special:draught": "особое_зелье.png",
+    "special:ring": "особое_кольцо.png",
     # Добыча кровавого разлома (tools/blood_rift_loot_prompts.md)
     "chest:ore": "ларец_руды.png",
     "chest:supply": "ларец_расходников.png",

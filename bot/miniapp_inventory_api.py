@@ -153,6 +153,7 @@ async def _full_inventory(session, character_id: int) -> dict:
 
     payload["food"] = _food_payload(await cooking_service.get_food(session, character_id))
     payload["food"] += await _bait_payload(session, character_id)
+    await _master_payload(session, character_id, payload)
     if character is not None:
         payload["food_buff"] = food_buff_payload(character)
         payload["star_dust"] = character.star_dust or 0
@@ -245,6 +246,32 @@ async def _bait_payload(session, character_id: int) -> list[dict]:
     }]
 
 
+async def _master_payload(session, character_id: int, payload: dict) -> None:
+    """Находки мастерского рецепта (2026-10-23): склянка - среди расходников
+    (без применения и без подсказки, зачем она), эликсир - в еде, пьётся."""
+    from game.economy import craft_gear_config as gc
+    from services import master_recipe_service
+
+    vials = await master_recipe_service.count_of(session, character_id, gc.VIAL_ID)
+    if vials:
+        payload["consumables"].append({
+            "id": gc.VIAL_ID, "name": "Пыльная склянка", "count": vials, "icon": "special:vial",
+            "category_title": "Находка",
+            "description": "Толстое зелёное стекло, на воске оттиск печати, которой никто не знает. Внутри пусто.",
+            "transfer_prefix": None,
+        })
+    draughts = await master_recipe_service.count_of(session, character_id, gc.DRAUGHT_ID)
+    if draughts:
+        payload["food"].append({
+            "id": f"{gc.DRAUGHT_ID}:common", "dish": gc.DRAUGHT_ID, "grade": "common",
+            "name": master_recipe_service.DRAUGHT_TITLE, "emoji": "🧪", "icon": "special:draught",
+            "count": draughts, "description": "Тёмный отвар со дна котла. Пьют один раз в жизни.",
+            "grade_title": "навсегда",
+            "effect": f"+{round(gc.DRAUGHT_STAT_PCT * 100)}% ко всем характеристикам навсегда",
+            "transfer_prefix": None,
+        })
+
+
 def food_buff_payload(character) -> dict | None:
     from game.economy import cooking
     from services import cooking_service
@@ -303,7 +330,14 @@ async def handle_post_eat(request: web.Request) -> web.Response:
             body = {}
         body = body if isinstance(body, dict) else {}
         try:
-            if body.get("dish") == "bait":
+            if body.get("dish") == "master_draught":
+                from services import master_recipe_service
+
+                try:
+                    await master_recipe_service.drink(session, character)
+                except master_recipe_service.MasterError as exc:
+                    raise cooking_service.CookingError(str(exc)) from None
+            elif body.get("dish") == "bait":
                 from services import craft_gear_service
 
                 try:

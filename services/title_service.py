@@ -14,6 +14,8 @@ TITLE_NAMES = {
     # Секрет: 100 нажатий подряд на тлеющую трещину Монолита на экране
     # персонажа (miniapp BackgroundScene). Нигде не объявляется.
     "attentive": "Внимательный",
+    # Секрет: мастерский рецепт алхимика (craft_gear_config). Нигде не объявляется.
+    "all_crafts": "Мастер всех ремёсел",
 }
 
 
@@ -24,6 +26,7 @@ TITLE_TIERS = {
     "season_lords": "epic",
     "relentless": "legendary",
     "attentive": "legendary",
+    "all_crafts": "legendary",
 }
 
 

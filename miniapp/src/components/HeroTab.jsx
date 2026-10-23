@@ -8,6 +8,7 @@ import { silhouetteUrl } from '../silhouettes.js';
 import { itemIcon } from '../itemIcons.js';
 import ItemIcon from './ItemIcon.jsx';
 import Sparks from './Sparks.jsx';
+import { Sheet } from './ui.jsx';
 
 // Вкладка «Герой» (2026-10-22): силуэт персонажа, по бокам окна слотов
 // (линии от окна к телу владелец убрал - и так понятно). Нажал окно - снизу список вещей из сумки для
@@ -228,6 +229,34 @@ function Settings({ character, onCharacterUpdate }) {
   );
 }
 
+// Окно кольца (2026-10-23): под оружием. Кольцо одно и снимать его незачем -
+// по нажатию только что оно даёт. Пустое окно молчит.
+function RingSlot({ ring }) {
+  const [open, setOpen] = useState(false);
+  const art = itemIcon('special:ring');
+  return (
+    <>
+      <button
+        type="button" data-slot="ring"
+        className={`gear-slot${ring ? ' gear-slot--filled gear-slot--legendary' : ''}`}
+        style={{ top: '72%' }}
+        onClick={() => ring && setOpen(true)}
+        aria-label={ring ? ring.name : 'Кольцо'}
+      >
+        {ring && art ? <img src={art} alt="" className="gear-slot__ring" /> : (
+          <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6"
+            aria-hidden="true"><circle cx="12" cy="14" r="6" /><path d="M9 6l3-3 3 3-3 2z" /></svg>
+        )}
+      </button>
+      {open && ring && (
+        <Sheet title={ring.name} icon="💍" onClose={() => setOpen(false)}>
+          <p className="gear-sheet__effect">{ring.effect}.</p>
+        </Sheet>
+      )}
+    </>
+  );
+}
+
 export function GenderChoice({ character, onPick, busy }) {
   return (
     <Group>
@@ -421,7 +450,10 @@ export default function HeroTab({ character, onCharacterUpdate }) {
         {craft ? <CraftGear key={craft.id} craft={craft} onUpdate={setGear} /> : (
         <div className={`hero-stage hero-stage--${path}`}>
           <div className="hero-row">
-            <div className="hero-col hero-col--left">{SLOTS.filter((x) => x.side === 'left').map(slotButton)}</div>
+            <div className="hero-col hero-col--left">
+              {SLOTS.filter((x) => x.side === 'left').map(slotButton)}
+              <RingSlot ring={character.ring} />
+            </div>
             <div className="hero-figure">
               <img key={url} className="hero-figure__img" src={url} alt="" draggable="false" />
             </div>

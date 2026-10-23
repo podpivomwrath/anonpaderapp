@@ -151,6 +151,8 @@ def _character_payload(
         # вложении очка и без этого поля считал бы "после" без бонусов
         # экипировки, расходясь с "до" (derived ниже, который её уже учитывает).
         "gear_bonus": gear_bonus or {},
+        # Перстень мастерского рецепта (2026-10-23) - окно в снаряжении.
+        "ring": _ring_payload(character),
         # Что игрок уже видел в мини-аппе и включён ли звук (handle_post_ui).
         "ui": dict(character.ui_flags or {}),
         "derived": {
@@ -706,3 +708,12 @@ from bot.miniapp_inventory_api import (  # noqa: E402,F401
     handle_post_unequip,
     herbalism_payload,
 )
+
+
+def _ring_payload(character) -> dict | None:
+    """Перстень мастерского рецепта (2026-10-23): окно в снаряжении «Героя»."""
+    from services import master_recipe_service
+
+    if not master_recipe_service.has_ring(character):
+        return None
+    return {"name": master_recipe_service.RING_TITLE, "effect": master_recipe_service.RING_EFFECT}

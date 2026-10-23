@@ -145,7 +145,13 @@ async def pick(
     if herb is None or not herbalism.can_see(character.herbalism_level, herb):
         return PickResult("unseen")
     await db.delete(patch)
-    amount = 2 if rng.random() < herbalism.double_chance(character.herbalism_level) else 1
+    lucky = rng.random() < herbalism.double_chance(character.herbalism_level)
+    amount = 2 if lucky else 1
+    from services import master_recipe_service
+
+    if master_recipe_service.has_ring(character):
+        # Перстень: всегда вдвое, шанс двойного сбора становится шансом тройного.
+        amount = 3 if lucky else 2
     await add_herb(db, character.id, herb.id, amount)
     xp = herbalism.pick_xp(herb)
     before = character.herbalism_level
