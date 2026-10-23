@@ -329,14 +329,18 @@ async def handle_post_eat(request: web.Request) -> web.Response:
         except Exception:
             body = {}
         body = body if isinstance(body, dict) else {}
+        from bot import buff_notice
+
         try:
             if body.get("dish") == "master_draught":
+                from game.economy import craft_gear_config as gc
                 from services import master_recipe_service
 
                 try:
                     await master_recipe_service.drink(session, character)
                 except master_recipe_service.MasterError as exc:
                     raise cooking_service.CookingError(str(exc)) from None
+                note = f"🧪 Выпит Эликсир Мастера: +{round(gc.DRAUGHT_STAT_PCT * 100)}% ко всем характеристикам, навсегда."
             elif body.get("dish") == "bait":
                 from services import craft_gear_service
 
@@ -344,12 +348,15 @@ async def handle_post_eat(request: web.Request) -> web.Response:
                     await craft_gear_service.use_bait(session, character)
                 except craft_gear_service.GearError as exc:
                     raise cooking_service.CookingError(str(exc)) from None
+                note = buff_notice.line(character, "bait", "рассыпана")
             else:
                 await cooking_service.eat(session, character, str(body.get("dish")), str(body.get("grade")))
+                note = buff_notice.line(character, "food", "съедено")
         except cooking_service.CookingError as exc:
             await session.rollback()
             return web.json_response({"error": str(exc)}, status=409)
         await session.commit()
+        buff_notice.tell(vk_user_id, note)
         return web.json_response(await _full_inventory(session, character.id))
 
 

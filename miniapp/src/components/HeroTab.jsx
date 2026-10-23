@@ -268,6 +268,44 @@ function WornList({ equipped, onOpen }) {
 
 // Окно кольца (2026-10-23): под оружием. Кольцо одно и снимать его незачем -
 // по нажатию только что оно даёт. Пустое окно молчит.
+function leftText(until, now) {
+  const min = Math.ceil((new Date(until).getTime() - now) / 60000);
+  if (min <= 0) return null;
+  return min >= 120 ? `${Math.floor(min / 60)} ч ${min % 60} мин` : `${min} мин`;
+}
+
+function fightsText(n) {
+  const d = n % 10;
+  const word = d === 1 && n % 100 !== 11 ? 'бой' : d >= 2 && d <= 4 && (n % 100 < 12 || n % 100 > 14) ? 'боя' : 'боёв';
+  return `${n} ${word}`;
+}
+
+// Действующие баффы (2026-10-23): еда, прикормка, молитва, настойка, эффекты
+// событий - коротко, слева от силуэта над оружием. Сервер -
+// services/buffs_service.py, приходит вместе со страницами ремёсел.
+function BuffList({ buffs }) {
+  const [now, setNow] = useState(Date.now());
+  useEffect(() => {
+    const id = setInterval(() => setNow(Date.now()), 30000);
+    return () => clearInterval(id);
+  }, []);
+  const shown = (buffs || [])
+    .map((b) => ({ ...b, left: b.until ? leftText(b.until, now) : fightsText(b.fights) }))
+    .filter((b) => b.left);
+  if (!shown.length) return null;
+  return (
+    <ul className="hero-buffs">
+      {shown.map((b) => (
+        <li key={b.id} className={`hero-buff${b.bad ? ' hero-buff--bad' : ''}`}>
+          <b>{b.emoji} {b.name}</b>
+          {b.value && <span>{b.value}</span>}
+          <small>{b.left}</small>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
 function RingSlot({ ring }) {
   const [open, setOpen] = useState(false);
   const art = itemIcon('special:ring');
@@ -488,6 +526,7 @@ export default function HeroTab({ character, onCharacterUpdate }) {
         <div className={`hero-stage hero-stage--${path}`}>
           <div className="hero-row">
             <div className="hero-col hero-col--left">
+              <BuffList buffs={gear?.buffs} />
               {SLOTS.filter((x) => x.side === 'left').map(slotButton)}
               <RingSlot ring={character.ring} />
             </div>

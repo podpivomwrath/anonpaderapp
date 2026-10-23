@@ -565,6 +565,11 @@ async def _act(db, character: Character, vk_user_id: int, body: dict) -> list:
         notes.append(("self_move", x, y))
     elif action == "pray":
         await guild_territory_service.pray(db, character, _str(body, "stat"))
+        from bot import buff_notice
+
+        note = buff_notice.line(character, "prayer", "услышана")
+        if note:
+            notes.append(("char", character.id, note))
     elif action == "respawn_pref":
         await guild_service.require_member(db, character)
         character.respawn_at_chapel = bool(body.get("on"))

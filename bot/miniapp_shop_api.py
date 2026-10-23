@@ -116,6 +116,10 @@ async def handle_post(request: web.Request) -> web.Response:
         done["name"] = next(i for i in state["items"] if i["id"] == item)["current"]
     if moved is not None:
         await after_faction_move(peer_id, *moved)
+    if item == shop_service.TINCTURE_ID:
+        from bot import buff_notice
+
+        buff_notice.tell(peer_id, buff_notice.line(character, "tincture", "выпита"))
     state["done"] = done
     return web.json_response(state)
 

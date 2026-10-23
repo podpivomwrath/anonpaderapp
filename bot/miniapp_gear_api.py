@@ -11,7 +11,7 @@ from bot.app_keys import SESSION_FACTORY_KEY
 from bot.miniapp_auth import VK_USER_ID_KEY
 from game.economy import craft_gear
 from game.economy import craft_gear_config as gc
-from services import craft_gear_service
+from services import buffs_service, craft_gear_service
 from services import onboarding_service as onboarding_svc
 
 #: Инструменты, у которых ещё нет механики в игре: показываем «скоро», не даём
@@ -89,7 +89,8 @@ async def _payload(db, character) -> dict:
             "id": craft_id, "emoji": emoji, "title": title,
             "level": getattr(character, level_field), "tools": tools,
         })
-    return {"crafts": crafts}
+    # Действующие баффы - плашки слева от силуэта (2026-10-23).
+    return {"crafts": crafts, "buffs": await buffs_service.active(db, character)}
 
 
 async def handle_get(request: web.Request) -> web.Response:
