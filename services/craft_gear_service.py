@@ -67,7 +67,10 @@ async def grant_drop(db: AsyncSession, character_id: int, tool_id: str) -> bool:
 
 
 ALMANAC_LINE = "📗 Среди вещей моба - потрёпанный альманах травника. Теперь видно траву на соседних клетках."
-LAMP_LINE = "🏮 В разломе нашлась шахтёрская лампа. Свет её пригодится в жилах."
+LAMP_LINE = (
+    "🏮 В разломе нашлась шахтёрская лампа: жилы с исследования копаются быстрее, "
+    "а в руде иногда попадается 💎."
+)
 
 
 async def roll_almanac(db: AsyncSession, character: Character, rng: random.Random) -> str | None:

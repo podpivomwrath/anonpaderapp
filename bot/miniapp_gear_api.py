@@ -19,8 +19,8 @@ from services import onboarding_service as onboarding_svc
 NOT_READY: set[str] = set()
 
 SOURCE_HINTS = {
-    "almanac": "Выпадает с мобов - очень редко.",
-    "lamp": "Находят в разломах: шанс за каждый пройденный.",
+    "almanac": "Добывается с мобов, очень редко.",
+    "lamp": "Добывается в разломах.",
 }
 
 

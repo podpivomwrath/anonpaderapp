@@ -71,31 +71,33 @@ def sickle_cuts(sickle_tier: int, herb_tier: int) -> bool:
 def effect_line(tool_id: str, tier: int) -> str:
     """Что даёт инструмент - строка для мини-аппа."""
     pct = lambda x: f"{round(x * 100)}%"  # noqa: E731
+    # Формулировки переписаны 2026-10-23 (владелец: «очень непонятно»).
     if tool_id == "sickle":
-        return f"Сам срезает траву до {tier} тира, когда заходишь на клетку"
+        return f"Сам срезает траву до {tier} тира на клетке, куда ты заходишь"
     if tool_id == "almanac":
-        return ("При входе на клетку пишет, где рядом трава: 8 соседних клеток, с диагоналями. "
-                "Видит всю траву, которую ты различаешь")
+        return ("Когда заходишь на клетку, пишет, на каких из 8 соседних клеток растёт трава. "
+                "Показывает только ту, которую ты уже различаешь")
     if tool_id == "pick":
-        return (f"Добыча быстрее на {pct(gc.PICK_SPEED_PER_TIER * tier)} (в руднике тира выше - вдвое меньше), "
-                f"чаще руда получше")
+        return (f"Копаешь на {pct(gc.PICK_SPEED_PER_TIER * tier)} быстрее и чаще достаёшь руду лучшей градации. "
+                f"В руднике тира выше кирки ускорение вдвое меньше")
     if tool_id == "lamp":
-        return (f"Жила из исследования копается на {pct(gc.LAMP_VEIN_SPEED)} быстрее; "
-                f"шанс {pct(gc.LAMP_GEM_CHANCE)} найти самоцвет")
+        return (f"Жилу, найденную при исследовании, копаешь на {pct(gc.LAMP_VEIN_SPEED)} быстрее. "
+                f"С каждого куска руды шанс {pct(gc.LAMP_GEM_CHANCE)} найти 💎 самоцвет")
     if tool_id == "rod":
-        return (f"Рыба тяжелее, шанс {pct(rod_tier_up_chance(tier))}, что клюнет рыба тиром выше "
-                f"(не выше тира озера)")
+        return (f"Рыба попадается тяжелее. Шанс {pct(rod_tier_up_chance(tier))}, что клюнет рыба на тир выше, "
+                f"чем позволяет уровень рыбалки (но не выше тира озера)")
     if tool_id == "line":
-        return f"Леска рвётся реже на {pct(gc.LINE_BREAK_CUT_PER_TIER * tier)}"
+        return f"Леска рвётся на {pct(gc.LINE_BREAK_CUT_PER_TIER * tier)} реже"
     if tool_id == "pot":
-        return f"Шанс {pct(pot_extra_chance(tier))} на лишнюю порцию"
+        return f"Шанс {pct(pot_extra_chance(tier))} приготовить лишнюю порцию"
     if tool_id == "spices":
-        return f"Бафф блюда сильнее на {pct(spice_boost(tier))}, заряд на порцию"
+        return f"Бафф от еды на {pct(spice_boost(tier))} сильнее. Каждая съеденная порция тратит 1 заряд"
     if tool_id == "still":
-        return f"Шанс {pct(still_extra_chance(tier))} сварить зелье сверх обычного"
+        return f"Шанс {pct(still_extra_chance(tier))} сварить лишнее зелье"
     if tool_id == "flasks":
-        return "Зелье из склянки действует на всю группу, но слабее"
+        return (f"В групповом бою и рейде зелье можно метнуть на всю группу. "
+                f"Действует с силой {pct(gc.FLASK_POWER)}")
     if tool_id == "bait":
-        return (f"Из сумки, как еда: {gc.BAIT_MINUTES} минут клюёт на "
+        return (f"Рассыпь из сумки (раздел еды): {gc.BAIT_MINUTES} минут рыба клюёт на "
                 f"{round(gc.BAIT_SPEED * 100)}% быстрее")
     return ""
