@@ -1,0 +1,335 @@
+/* Путеводитель Меченого (2026-10-23) - components/HandbookTab.jsx.
+   Тёмная бумага мини-аппа, заголовки серифом, как шапки разделов. */
+
+.handbook {
+  padding: 0 12px 24px;
+  scroll-margin-top: 64px;
+  color: rgba(255, 255, 255, 0.88);
+  font-size: 15px;
+  line-height: 1.55;
+}
+
+.handbook .section-head {
+  margin-inline: 0;
+}
+
+.hb-lede {
+  margin: 10px 2px 14px;
+  color: rgba(255, 255, 255, 0.6);
+  font-size: 14px;
+}
+
+/* --- Оглавление --- */
+
+.hb-contents {
+  display: grid;
+  gap: 6px;
+}
+
+.hb-chapter-btn {
+  display: grid;
+  grid-template-columns: 44px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 11px 12px;
+  border: 1px solid var(--card-line);
+  border-radius: 12px;
+  background: var(--card);
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.hb-chapter-btn:active {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.hb-chapter-btn__no {
+  font-family: var(--serif);
+  font-size: 19px;
+  color: var(--gold);
+  text-align: center;
+}
+
+.hb-chapter-btn__text {
+  display: grid;
+  gap: 1px;
+  min-width: 0;
+}
+
+.hb-chapter-btn__text b {
+  font-weight: 600;
+}
+
+.hb-chapter-btn__text small {
+  color: rgba(255, 255, 255, 0.5);
+  font-size: 12px;
+}
+
+.hb-chapter-btn__go {
+  color: rgba(255, 255, 255, 0.35);
+  font-size: 22px;
+}
+
+/* --- Глава --- */
+
+.hb-page {
+  padding-top: 8px;
+}
+
+.hb-back {
+  padding: 6px 0;
+  border: 0;
+  background: none;
+  color: var(--gold);
+  font: inherit;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.hb-stamp {
+  display: block;
+  margin-top: 10px;
+  color: #e0566b;
+  font-size: 11px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+}
+
+.hb-page h2,
+.hb-page h3,
+.hb-page h4 {
+  font-family: var(--serif);
+  font-weight: 600;
+  margin: 0;
+  text-wrap: balance;
+}
+
+.hb-page h2 {
+  margin-top: 2px;
+  font-size: 26px;
+  line-height: 1.15;
+  color: #fff;
+}
+
+.hb-page h3 {
+  margin-top: 22px;
+  font-size: 20px;
+  color: var(--gold);
+}
+
+.hb-page h4 {
+  margin-top: 18px;
+  font-size: 17px;
+  color: #e0566b;
+}
+
+.hb-page p {
+  margin: 10px 0 0;
+}
+
+.hb-page b {
+  color: #fff;
+  font-weight: 600;
+}
+
+.hb-page ul,
+.hb-page ol {
+  margin: 10px 0 0;
+  padding-left: 20px;
+}
+
+.hb-page li {
+  margin-top: 6px;
+}
+
+.hb-page li::marker {
+  color: var(--blood);
+}
+
+.hb-levels {
+  color: var(--gold);
+  font-size: 13px;
+}
+
+.hb-quote {
+  margin: 14px 0 0;
+  padding: 4px 0 4px 12px;
+  border-left: 2px solid var(--blood);
+  color: rgba(255, 255, 255, 0.65);
+  font-style: italic;
+}
+
+.hb-note {
+  margin-top: 14px;
+  padding: 10px 12px;
+  border: 1px solid var(--card-line);
+  border-left: 3px solid var(--gold);
+  border-radius: 10px;
+  background: var(--card);
+  font-size: 14px;
+  color: rgba(255, 255, 255, 0.75);
+}
+
+.hb-ladder {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 12px;
+}
+
+.hb-ladder span {
+  padding: 4px 8px;
+  border: 1px solid var(--card-line);
+  border-radius: 8px;
+  background: var(--card);
+  font-size: 13px;
+}
+
+.hb-ladder .hb-ladder__peak {
+  border-color: var(--blood);
+  color: #ff8a9b;
+}
+
+.hb-dl {
+  display: grid;
+  gap: 10px;
+  margin: 12px 0 0;
+}
+
+.hb-dl dt {
+  font-weight: 600;
+  color: #fff;
+}
+
+.hb-dl dd {
+  margin: 2px 0 0;
+  color: rgba(255, 255, 255, 0.72);
+}
+
+/* Широкие таблицы листаются внутри себя, страница не ездит вбок. */
+.hb-table {
+  margin-top: 12px;
+  overflow-x: auto;
+  border: 1px solid var(--card-line);
+  border-radius: 10px;
+}
+
+.hb-table table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+
+.hb-table th,
+.hb-table td {
+  padding: 7px 10px;
+  text-align: left;
+  vertical-align: top;
+  border-bottom: 1px solid var(--card-line);
+}
+
+.hb-table th {
+  background: rgba(255, 255, 255, 0.04);
+  color: rgba(255, 255, 255, 0.55);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.hb-table tr:last-child td {
+  border-bottom: 0;
+}
+
+.hb-details {
+  margin-top: 12px;
+  padding: 6px 12px;
+  border: 1px solid var(--card-line);
+  border-radius: 10px;
+  background: var(--card);
+}
+
+.hb-details summary {
+  cursor: pointer;
+  padding: 4px 0;
+  color: var(--gold);
+  font-size: 14px;
+}
+
+.hb-details[open] summary {
+  margin-bottom: 4px;
+}
+
+.hb-pager {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-top: 28px;
+}
+
+.hb-pager button {
+  display: grid;
+  gap: 2px;
+  padding: 10px 12px;
+  border: 1px solid var(--card-line);
+  border-radius: 12px;
+  background: var(--card);
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.hb-pager button small {
+  color: var(--gold);
+  font-size: 12px;
+}
+
+.hb-pager button b {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.hb-pager .hb-pager__next {
+  text-align: right;
+}
+
+/* Ссылка на другой раздел путеводителя - слово в тексте. */
+.hb-link {
+  display: inline;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--gold);
+  font: inherit;
+  text-decoration: underline dotted rgba(224, 180, 90, 0.6);
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+
+.hb-page h3,
+.hb-page h4 {
+  scroll-margin-top: 72px;
+}
+
+.hb-return {
+  position: fixed;
+  z-index: 20;
+  right: 16px;
+  bottom: calc(16px + env(safe-area-inset-bottom, 0px));
+  padding: 10px 16px;
+  border: 1px solid rgba(224, 180, 90, 0.5);
+  border-radius: 999px;
+  background: rgba(20, 20, 24, 0.92);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  color: var(--gold);
+  font: inherit;
+  font-size: 14px;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.45);
+  cursor: pointer;
+}

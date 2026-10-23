@@ -38,6 +38,8 @@ const GuildTab = lazy(() => import('./GuildTab.jsx'));
 const MapTab = lazy(() => import('./MapTab.jsx'));
 const TopsTab = lazy(() => import('./TopsTab.jsx'));
 const BoardTab = lazy(() => import('./BoardTab.jsx'));
+// Путеводитель (2026-10-23): свой раздел, не в меню - открывается книгой в шапке.
+const HandbookTab = lazy(() => import('./HandbookTab.jsx'));
 
 // Патч 14, ч.1: было 5 вкладок (Характеристики/Инвентарь/Пресеты/Испытания/
 // Биржа) - Характеристики+Пресеты+Испытания объединены в «Персонаж».
@@ -63,9 +65,6 @@ const SECTIONS = [
   { id: 'shop', label: 'Магазин' },
 ];
 
-// Общий справочник по игре - статья в группе. Ссылка наружу, а не раздел:
-// текст правится в редакторе статей VK без пересборки мини-аппа.
-const GUIDE_URL = 'https://vk.com/@-240167847-putevoditel-mechenogo';
 const PLAYERS_CHAT_URL = 'https://vk.me/join/xuy8wXu8_zoubce24lDXooe6aB_sV1eB3zE=';
 
 const GUILD_MIN_LEVEL = 20;
@@ -162,7 +161,7 @@ export default function Hub() {
     if (prev !== id) {
       playTab();
       haptic();
-      const order = [...SECTIONS.map((s) => s.id), 'admin'];
+      const order = [...SECTIONS.map((s) => s.id), 'admin', 'handbook'];
       setDirection(order.indexOf(id) < order.indexOf(prev) ? 'back' : 'fwd');
     }
     setActiveTab(id);
@@ -298,7 +297,9 @@ export default function Hub() {
   const sections = character?.is_admin
     ? [...visible, { id: 'admin', label: 'Админ' }]
     : visible;
-  const current = sections.find((s) => s.id === activeTab) || sections[0];
+  const current = activeTab === 'handbook'
+    ? { id: 'handbook', label: 'Путеводитель' }
+    : sections.find((s) => s.id === activeTab) || sections[0];
 
   // Гайд переключает разделы молча (без звука и вибрации) и заодно
   // засчитывает короткие подсказки этих разделов - он их уже объяснил.
@@ -380,9 +381,7 @@ export default function Hub() {
         <PanelHeaderButton
           aria-label="Путеводитель"
           title="Путеводитель Меченого"
-          href={GUIDE_URL}
-          target="_blank"
-          rel="noopener noreferrer"
+          onClick={() => openTab('handbook')}
         >
           <NavIcon id="guide" className="hub-icon" />
         </PanelHeaderButton>
@@ -411,7 +410,8 @@ export default function Hub() {
   }, [load]);
 
   useEffect(() => {
-    if (!SECTIONS.some((s) => s.id === activeTab) && !(activeTab === 'admin' && character?.is_admin)) {
+    if (!SECTIONS.some((s) => s.id === activeTab) && activeTab !== 'handbook'
+      && !(activeTab === 'admin' && character?.is_admin)) {
       setActiveTab('character');
     }
   }, [activeTab, character?.is_admin]);
@@ -645,6 +645,7 @@ export default function Hub() {
           />
         )}
         {activeTab === 'admin' && character.is_admin && <AdminTab />}
+        {activeTab === 'handbook' && <HandbookTab />}
         </Suspense>
         </div>
       </div>
