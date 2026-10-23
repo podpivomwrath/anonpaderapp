@@ -45,6 +45,10 @@ class Good:
     name: str
     emoji: str
     icon: str | None
+    #: Группа в списке (2026-10-23): градации руды и блюда - под одной
+    #: строкой вида, variant - подпись градации внутри неё.
+    base: str = ""
+    variant: str | None = None
 
 
 @lru_cache(maxsize=1)
@@ -61,7 +65,7 @@ def goods() -> dict[str, Good]:
             mark = mc.GRADE_EMOJI.get(grade, "")
             out[f"ore:{ore.id}:{grade}"] = Good(
                 f"ore:{ore.id}:{grade}", "ore", f"{ore.name} ({grade_name})",
-                mark or ore.emoji, f"ore:{ore.id}",
+                mark or ore.emoji, f"ore:{ore.id}", base=ore.name, variant=grade_name.capitalize(),
             )
     for herb in herbalism.herb_defs_ordered():
         out[f"herb:{herb.id}"] = Good(f"herb:{herb.id}", "herb", herb.name, herb.emoji, f"herb:{herb.id}")
@@ -69,7 +73,8 @@ def goods() -> dict[str, Good]:
         d = cooking.dish_def(dish.dish_id)
         for grade in cc.GRADE_ORDER:
             key = f"food:{dish.dish_id}:{grade}"
-            out[key] = Good(key, "food", f"{d.name} (рыба {fishing.grade_name(grade)})", d.emoji, f"dish:{dish.dish_id}")
+            out[key] = Good(key, "food", f"{d.name} (рыба {fishing.grade_name(grade)})", d.emoji, f"dish:{dish.dish_id}",
+                            base=d.name, variant=f"Рыба {fishing.grade_name(grade)}")
     for tool_id in CRAFT_GOODS:
         tool = craft_gear_config.TOOLS[tool_id]
         out[f"craft:{tool_id}"] = Good(f"craft:{tool_id}", "craft", tool.title, tool.emoji, f"gear:{tool_id}")

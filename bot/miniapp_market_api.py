@@ -23,7 +23,8 @@ def _error(message: str, status: int = 400) -> web.Response:
 
 
 def _good(g) -> dict:
-    return {"key": g.key, "category": g.category, "name": g.name, "emoji": g.emoji, "icon": g.icon}
+    return {"key": g.key, "category": g.category, "name": g.name, "emoji": g.emoji, "icon": g.icon,
+            "base": g.base or g.name, "variant": g.variant}
 
 
 async def _order(db, o) -> dict:

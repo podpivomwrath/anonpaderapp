@@ -162,3 +162,30 @@
   font-size: 16px;
   font-variant-numeric: tabular-nums;
 }
+
+/* Группа градаций (руда, блюда): строка вида раскрывается. */
+.market-group {
+  display: grid;
+  gap: 4px;
+}
+
+.market-group__chevron {
+  color: rgba(255, 255, 255, 0.4);
+  font-size: 22px;
+  transition: transform 0.15s ease;
+}
+
+.market-group.is-open .market-group__chevron {
+  transform: rotate(90deg);
+}
+
+.market-row--sub {
+  margin-left: 22px;
+  padding: 6px 10px;
+}
+
+.market-emoji--small {
+  width: 22px;
+  height: 22px;
+  font-size: 14px;
+}

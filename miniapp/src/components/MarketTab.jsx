@@ -104,15 +104,40 @@ function GoodSheet({ good, rules, gold, onClose, act, busy }) {
   );
 }
 
+function summaryLine(sell, buy, have) {
+  return [
+    sell ? `продают от ${money(sell)}` : 'не продают',
+    buy ? `покупают до ${money(buy)}` : 'не покупают',
+    have ? `у тебя ${have}` : null,
+  ].filter(Boolean).join(' · ');
+}
+
 function Goods({ data, act, busy }) {
   const [category, setCategory] = useState(data.categories[0].id);
   const [open, setOpen] = useState(null);
-  const goods = data.goods.filter((g) => g.category === category);
-  // Сначала то, чем торгуют и что есть у игрока.
-  const sorted = useMemo(() => [...goods].sort((a, b) => {
-    const score = (g) => (g.sell || g.buy ? 2 : 0) + (data.have[g.key] ? 1 : 0);
-    return score(b) - score(a);
-  }), [goods, data.have]);
+  const [expanded, setExpanded] = useState({});
+  // Градации руды и блюда - под одной строкой вида (2026-10-23, владелец:
+  // «тиры под вкладку, чтобы не было хаоса»). Сверху - то, чем торгуют
+  // и что есть у игрока.
+  const groups = useMemo(() => {
+    const byBase = new Map();
+    for (const g of data.goods.filter((x) => x.category === category)) {
+      if (!byBase.has(g.base)) byBase.set(g.base, []);
+      byBase.get(g.base).push(g);
+    }
+    const list = [...byBase.entries()].map(([base, items]) => {
+      const sells = items.map((g) => g.sell).filter(Boolean);
+      const buys = items.map((g) => g.buy).filter(Boolean);
+      const have = items.reduce((sum, g) => sum + (data.have[g.key] || 0), 0);
+      return {
+        base, items, have,
+        sell: sells.length ? Math.min(...sells) : null,
+        buy: buys.length ? Math.max(...buys) : null,
+      };
+    });
+    const score = (grp) => (grp.sell || grp.buy ? 2 : 0) + (grp.have ? 1 : 0);
+    return list.sort((a, b) => score(b) - score(a));
+  }, [data.goods, data.have, category]);
   const good = open ? data.goods.find((g) => g.key === open) : null;
 
   return (
@@ -125,20 +150,46 @@ function Goods({ data, act, busy }) {
         ))}
       </div>
       <div className="market-list">
-        {sorted.map((g) => (
-          <button key={g.key} type="button" className="market-row" onClick={() => setOpen(g.key)}>
-            <Icon icon={g.icon} emoji={g.emoji} />
-            <span className="market-row__text">
-              <b>{g.name}</b>
-              <small>
-                {g.sell ? `продают от ${money(g.sell)}` : 'не продают'}
-                {' · '}
-                {g.buy ? `покупают до ${money(g.buy)}` : 'не покупают'}
-                {data.have[g.key] ? ` · у тебя ${data.have[g.key]}` : ''}
-              </small>
-            </span>
-          </button>
-        ))}
+        {groups.map((grp) => {
+          const single = grp.items.length === 1 && !grp.items[0].variant;
+          const first = grp.items[0];
+          if (single) {
+            return (
+              <button key={first.key} type="button" className="market-row" onClick={() => setOpen(first.key)}>
+                <Icon icon={first.icon} emoji={first.emoji} />
+                <span className="market-row__text">
+                  <b>{first.name}</b>
+                  <small>{summaryLine(first.sell, first.buy, data.have[first.key])}</small>
+                </span>
+              </button>
+            );
+          }
+          const isOpen = !!expanded[grp.base];
+          return (
+            <div key={grp.base} className={`market-group${isOpen ? ' is-open' : ''}`}>
+              <button
+                type="button" className="market-row"
+                onClick={() => setExpanded((e) => ({ ...e, [grp.base]: !e[grp.base] }))}
+              >
+                <Icon icon={first.icon} emoji={first.emoji} />
+                <span className="market-row__text">
+                  <b>{grp.base}</b>
+                  <small>{summaryLine(grp.sell, grp.buy, grp.have)}</small>
+                </span>
+                <span className="market-group__chevron" aria-hidden="true">›</span>
+              </button>
+              {isOpen && grp.items.map((g) => (
+                <button key={g.key} type="button" className="market-row market-row--sub" onClick={() => setOpen(g.key)}>
+                  <span className="market-emoji market-emoji--small" aria-hidden="true">{g.emoji}</span>
+                  <span className="market-row__text">
+                    <b>{g.variant}</b>
+                    <small>{summaryLine(g.sell, g.buy, data.have[g.key])}</small>
+                  </span>
+                </button>
+              ))}
+            </div>
+          );
+        })}
       </div>
       {good && (
         <GoodSheet good={good} rules={data.rules} gold={data.gold} busy={busy} act={act} onClose={() => setOpen(null)} />
