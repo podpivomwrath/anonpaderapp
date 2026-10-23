@@ -119,14 +119,22 @@ class CastResult:
 
 
 def start_cast(
-    character: Character, lake: LakeDef, rng: random.Random, now: datetime | None = None
+    character: Character, lake: LakeDef, rng: random.Random, now: datetime | None = None,
+    rod_tier: int = 0,
 ) -> CastResult:
+    """rod_tier - удочка (2026-10-23): рыба тяжелее, изредка тиром выше."""
+    from game.economy import craft_gear
+
     now = now or datetime.now(timezone.utc)
     character.fishing_cast_at = now
 
     wait, f_bonus = fishing.roll_bite(rng)
-    fish_id = fishing.roll_fish_id(rng, lake.tier, character.fishing_level)
-    grams, _fraction = fishing.roll_weight(rng, fish_id, character.fishing_level, f_bonus)
+    fish_id = fishing.roll_fish_id(
+        rng, lake.tier, character.fishing_level, craft_gear.rod_tier_up_chance(rod_tier),
+    )
+    grams, _fraction = fishing.roll_weight(
+        rng, fish_id, character.fishing_level, f_bonus + craft_gear.rod_weight_bonus(rod_tier),
+    )
     character.fishing_bite_at = now + timedelta(seconds=wait)
     character.fishing_pending_fish = fish_id
     character.fishing_pending_grams = grams
@@ -181,7 +189,12 @@ async def strike(
         return await _apply_break(db, character, lake, fish_id, grams, missed=True)
 
     fraction = fishing.fraction_of(fish_id, grams)
-    if rng.random() < fishing.line_break_chance(lake.tier, character.fishing_level, fraction):
+    # Леска (2026-10-23): рвётся реже.
+    from game.economy import craft_gear
+    from services import craft_gear_service
+
+    line = craft_gear.line_break_mult(await craft_gear_service.tier(db, character.id, "line"))
+    if rng.random() < fishing.line_break_chance(lake.tier, character.fishing_level, fraction) * line:
         return await _apply_break(db, character, lake, fish_id, grams)
 
     return await _apply_catch(db, character, fish_id, grams, fraction)

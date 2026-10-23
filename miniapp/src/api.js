@@ -496,3 +496,16 @@ export function setGender(gender) {
 export function getTrophies() {
   return request('/trophies');
 }
+
+// Ремесленные инструменты (2026-10-23): страницы ремёсел на вкладке «Герой».
+export function getGear() {
+  return request('/gear');
+}
+
+export function makeGear(tool, tier) {
+  return request('/gear', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ tool, tier }),
+  });
+}

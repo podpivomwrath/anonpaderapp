@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Group, Header, SimpleCell, Switch } from '@vkontakte/vkui';
 import {
-  equipItem, getCharacter, getInventory, getTrophies, setGender, setNoImages, setShortLog, unequipItem,
+  equipItem, getCharacter, getGear, getInventory, getTrophies, setGender, setNoImages, setShortLog, unequipItem,
 } from '../api.js';
+import CraftGear from './CraftGear.jsx';
 import { silhouetteUrl } from '../silhouettes.js';
 import { itemIcon } from '../itemIcons.js';
 import ItemIcon from './ItemIcon.jsx';
@@ -294,6 +295,9 @@ export default function HeroTab({ character, onCharacterUpdate }) {
   // Сколько раз в слот надевали вещь - каждое надевание даёт вспышку искр.
   const [flashes, setFlashes] = useState({});
   const [gender, setGenderState] = useState(character.gender || null);
+  // Страницы: 0 - снаряжение, дальше ремёсла (2026-10-23, стрелкой вправо).
+  const [page, setPage] = useState(0);
+  const [gear, setGear] = useState(null);
   const [choosing, setChoosing] = useState(false);
   // Облик могли выбрать на экране выбора при входе (GenderGate) - подхватить.
   useEffect(() => {
@@ -303,6 +307,7 @@ export default function HeroTab({ character, onCharacterUpdate }) {
   useEffect(() => {
     getInventory().then((res) => setItems(res.items)).catch(() => setFailed(true));
     getTrophies().then(setTrophies).catch(() => {});
+    getGear().then(setGear).catch(() => {});
   }, []);
 
   const equipped = useMemo(
@@ -398,9 +403,22 @@ export default function HeroTab({ character, onCharacterUpdate }) {
     );
   };
 
+  const pages = 1 + (gear?.crafts?.length || 0);
+  const craft = page > 0 ? gear?.crafts?.[page - 1] : null;
+  const pageTitle = craft ? `${craft.emoji} ${craft.title}` : '🛡 Снаряжение';
+  const turn = (step) => setPage((p) => (p + step + pages) % pages);
+
   return (
     <>
       <Group>
+        {pages > 1 && (
+          <div className="hero-pager">
+            <button type="button" className="hero-pager__arrow" onClick={() => turn(-1)} aria-label="Назад">‹</button>
+            <span className="hero-pager__title">{pageTitle}</span>
+            <button type="button" className="hero-pager__arrow" onClick={() => turn(1)} aria-label="Дальше">›</button>
+          </div>
+        )}
+        {craft ? <CraftGear key={craft.id} craft={craft} onUpdate={setGear} /> : (
         <div className={`hero-stage hero-stage--${path}`}>
           <div className="hero-row">
             <div className="hero-col hero-col--left">{SLOTS.filter((x) => x.side === 'left').map(slotButton)}</div>
@@ -418,6 +436,7 @@ export default function HeroTab({ character, onCharacterUpdate }) {
           )}
           {error && <p className="hero-error">{error}</p>}
         </div>
+        )}
       </Group>
 
       <TrophyShelf trophies={trophies} />

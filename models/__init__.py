@@ -34,6 +34,7 @@ from models.guild import (
     GuildSiege,
     GuildWeekly,
 )
+from models.craft_gear import CharacterCraftGear
 from models.food import CharacterFood
 from models.herb import CharacterHerb, HerbPatch
 from models.item import Inventory, Item, ItemUpgradeHistory
@@ -64,6 +65,7 @@ from models.world_boss import WorldBoss, WorldBossContribution, WorldBossMeter
 __all__ = [
     "WalletLog",
     "ResourceLog",
+    "CharacterCraftGear",
     "CharacterFood",
     "CharacterHerb",
     "HerbPatch",

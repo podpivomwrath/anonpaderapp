@@ -193,6 +193,8 @@ class Character(Base):
     food_dish: Mapped[str | None] = mapped_column(String(32), nullable=True)
     food_grade: Mapped[str | None] = mapped_column(String(16), nullable=True)
     food_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    #: Пряности (2026-10-23): на сколько сильнее действующий бафф еды.
+    food_boost: Mapped[float] = mapped_column(default=0.0, server_default="0")
     # Состояние добычи. Добыча БЛОКИРУЕТ все действия, пока идёт, и живёт в
     # БД, а не в памяти: она длится минутами (до полутора часов новичку в
     # глубоком руднике), и терять её из-за деплоя нельзя.

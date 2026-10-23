@@ -120,7 +120,9 @@ def pool_tier_for(lake_tier: int, fishing_level: int) -> int:
     return min(lake_tier, unlocked_tier(fishing_level))
 
 
-def roll_fish_id(rng: random.Random, lake_tier: int, fishing_level: int = 10**9) -> str:
+def roll_fish_id(
+    rng: random.Random, lake_tier: int, fishing_level: int = 10**9, tier_up_chance: float = 0.0,
+) -> str:
     """Какой вид клюнул.
 
     Безымянная тварь проверяется ДО пула и порогом НЕ ограничено: 0.3% на заброс —
@@ -129,7 +131,12 @@ def roll_fish_id(rng: random.Random, lake_tier: int, fishing_level: int = 10**9)
     """
     if rng.random() < fc.NAMELESS_CHANCE:
         return fc.NAMELESS_ID
-    pool = fc.LAKE_POOLS[pool_tier_for(lake_tier, fishing_level)]
+    pool_tier = pool_tier_for(lake_tier, fishing_level)
+    # Удочка (2026-10-23): изредка клюёт рыба тиром выше доступной по
+    # уровню - но не выше тира самого озера.
+    if tier_up_chance and pool_tier < lake_tier and rng.random() < tier_up_chance:
+        pool_tier += 1
+    pool = fc.LAKE_POOLS[pool_tier]
     total = sum(pool.values())
     roll = rng.random() * total
     cumulative = 0.0

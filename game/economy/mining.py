@@ -164,24 +164,25 @@ def roll_ore_id(
     return ore_id  # защита от погрешности с плавающей точкой
 
 
-def grade_k(mine_tier: int, mining_level: int, event_vein: bool = False) -> float:
-    """Кривизна броска градации. Меньше — лучше руда."""
+def grade_k(mine_tier: int, mining_level: int, event_vein: bool = False, k_mult: float = 1.0) -> float:
+    """Кривизна броска градации. Меньше — лучше руда. k_mult - кирка
+    (craft_gear.pick_grade_k_mult, 2026-10-23)."""
     level_mult = mc.GRADE_K_LEVEL_FLOOR + (1 - mc.GRADE_K_LEVEL_FLOOR) * (
         mc.GRADE_K_LEVEL_DECAY ** (mining_level - 1)
     )
     k = mc.MINE_GRADE_K[mine_tier] * level_mult
     if event_vein:
         k *= mc.EVENT_VEIN_GRADE_K_PENALTY
-    return k
+    return k * k_mult
 
 
 def roll_grade(
-    rng: random.Random, mine_tier: int, mining_level: int, event_vein: bool = False
+    rng: random.Random, mine_tier: int, mining_level: int, event_vein: bool = False, k_mult: float = 1.0,
 ) -> tuple[str, str]:
     """(id градации, название). Разыгрывается в момент ДОБЫЧИ, а не при спавне
     руды в жиле: жила хранит только количество, иначе игроки выцепляли бы из
     общих рудников легендарное, оставляя другим обычное."""
-    roll = rng.random() ** grade_k(mine_tier, mining_level, event_vein)
+    roll = rng.random() ** grade_k(mine_tier, mining_level, event_vein, k_mult)
     result = mc.GRADES[0]
     for grade in mc.GRADES:
         if roll >= grade[0]:

@@ -99,6 +99,10 @@ async def reward_mob_kill(
         item = await item_service.grant_from_kill(db, character, mob_level, rng)
         raid_key_dropped = await raid_key_service.maybe_grant(db, character, rng)
         elixir_line = await elixir_service.grant_heal_from_kill(db, character, rng)
+        from services import craft_gear_service
+
+        almanac = await craft_gear_service.roll_almanac(db, character, rng)
+        elixir_line = " ".join(x for x in (elixir_line, almanac) if x) or None
         rewards.append(
             MobKillReward(
                 character_id=character.id, xp_gained=levelup.xp_awarded,

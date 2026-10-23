@@ -95,6 +95,27 @@ async def visible_here(db: AsyncSession, character: Character, now: datetime | N
     return patch, herb
 
 
+async def visible_around(
+    db: AsyncSession, character: Character, now: datetime | None = None,
+) -> list[tuple[tuple[int, int], HerbDef]]:
+    """Трава на восьми соседних клетках, которую персонаж различает:
+    [((dx, dy), трава)] - для альманаха травника (2026-10-23)."""
+    now = now or _now()
+    x, y = character.pos_x, character.pos_y
+    rows = (await db.scalars(select(HerbPatch).where(
+        HerbPatch.x.between(x - 1, x + 1), HerbPatch.y.between(y - 1, y + 1),
+        HerbPatch.spawned_at >= _fresh_since(now),
+    ))).all()
+    out = []
+    for patch in rows:
+        if (patch.x, patch.y) == (x, y):
+            continue
+        herb = herbalism.herb_def(patch.herb_id)
+        if herb is not None and herbalism.can_see(character.herbalism_level, herb):
+            out.append(((patch.x - x, patch.y - y), herb))
+    return sorted(out, key=lambda item: item[0])
+
+
 @dataclass
 class PickResult:
     #: ok | gone | elsewhere | unseen

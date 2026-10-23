@@ -48,7 +48,11 @@ def active(character: Character, now: datetime | None = None) -> tuple[cc.Dish, 
 
 def buff(character: Character, now: datetime | None = None) -> dict[str, float]:
     found = active(character, now)
-    return cooking.buff_values(*found) if found else {}
+    if not found:
+        return {}
+    # Пряности (2026-10-23): заряд при еде делает бафф сильнее.
+    boost = 1.0 + (getattr(character, "food_boost", 0.0) or 0.0)
+    return {k: round(v * boost, 4) for k, v in cooking.buff_values(*found).items()}
 
 
 def combat_modifiers(character: Character) -> dict[str, float]:
@@ -163,6 +167,15 @@ async def finish(db: AsyncSession, character: Character) -> Cooked | None:
     if found is None:
         return None
     dish, grade, n = found
+    # Котелок (2026-10-23): шанс лишней порции.
+    import random
+
+    from game.economy import craft_gear
+    from services import craft_gear_service
+
+    pot = await craft_gear_service.tier(db, character.id, "pot")
+    if pot and random.random() < craft_gear.pot_extra_chance(pot):
+        n += 1
     await add_food(db, character.id, dish.dish_id, grade, n)
     level = character.cooking_level
     xp = cooking.cook_xp(dish)
@@ -231,6 +244,11 @@ async def eat(db: AsyncSession, character: Character, dish_id: str, grade: str, 
     if row is None or row.count < 1 or dish is None:
         raise CookingError("Этого блюда у тебя нет.")
     row.count -= 1
+    # Пряности: заряд уходит на каждую съеденную порцию, пока они есть.
+    from game.economy import craft_gear
+    from services import craft_gear_service
+
+    character.food_boost = craft_gear.spice_boost(await craft_gear_service.use_charge(db, character.id, "spices"))
     character.food_dish = dish_id
     character.food_grade = grade
     character.food_until = (now or _now()) + timedelta(minutes=cooking.food_minutes(character.cooking_level))

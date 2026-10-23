@@ -129,6 +129,15 @@ def catalog() -> list[dict]:
         ])
         for d in cookc.DISHES
     ]
+    from game.economy import craft_gear_config as gearc
+
+    craft_tools = [
+        _entry(f"craftgear:{t.id}", f"{t.emoji} {t.title}", "one" if t.source == "drop" else "count",
+               variants=[] if t.source in ("drop", "stock") else [
+                   {"key": f"craftgear:{t.id}:{tier}", "label": f"{tier} тир"} for tier in gearc.TIERS
+               ])
+        for t in gearc.TOOLS.values()
+    ]
     purchases = [
         _entry("flag:has_house", "🏠 Дом", "one"),
         _entry("flag:has_courier", "🏃 Курьер", "one"),
@@ -161,6 +170,7 @@ def catalog() -> list[dict]:
         ]},
         {"id": "ore", "title": "⛏ Руда", "entries": ores},
         {"id": "tools", "title": "🔧 Инструменты", "entries": tools},
+        {"id": "craft_gear", "title": "🧰 Ремесленные инструменты", "entries": craft_tools},
         {"id": "fish", "title": "🐟 Рыба", "entries": fish},
         {"id": "herbs", "title": "🌿 Травы", "entries": herbs},
         {"id": "food", "title": "🍲 Еда", "entries": dishes},
@@ -297,6 +307,21 @@ async def grant(
             row = CharacterFish(character_id=character.id, fish_id=fish_id, grade=grade, total_grams=0)
             db.add(row)
         row.total_grams += _fish_grams(fish_id, grade) * amount
+    elif kind == "craftgear":
+        from game.economy import craft_gear
+        from models import CharacterCraftGear
+        from services import craft_gear_service
+
+        tool = craft_gear.tool_def(rest[0])
+        tier = int(rest[1]) if len(rest) > 1 else 1
+        row = (await craft_gear_service.gear(db, character.id)).get(rest[0])
+        if row is None:
+            row = CharacterCraftGear(character_id=character.id, tool_id=rest[0], tier=tier, count=0)
+            db.add(row)
+        row.tier = tier
+        if tool.source in ("charges", "stock"):
+            row.count = (row.count or 0) + amount
+        await db.flush()
     elif kind == "herb":
         from services import herb_service
 

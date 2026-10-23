@@ -192,7 +192,10 @@ async def cast(message: Message) -> None:
         if fishing_service.has_catch(character):
             await message.answer(ft.DECIDE_FIRST_TEXT, keyboard=kb.catch_keyboard())
             return
-        result = fishing_service.start_cast(character, lake, _rng)
+        from services import craft_gear_service
+
+        rod = await craft_gear_service.tier(db, character.id, "rod")
+        result = fishing_service.start_cast(character, lake, _rng, rod_tier=rod)
         await db.commit()
 
     if _bite_scheduler is not None:

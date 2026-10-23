@@ -338,6 +338,7 @@ async def send_cell_buttons(peer_id: int, character) -> None:
     from bot.handlers import herbs as herb_handlers
 
     await herb_handlers.notify(peer_id, character)
+    await herb_handlers.notify_nearby(peer_id, character)
 
 
 async def _deliver_daily_notice(peer_id: int, character) -> None:

@@ -276,6 +276,13 @@ async def _grant_stage_reward(battle: raid_combat.RaidBattle, reward: StageRewar
                 gold_owner = next((c for c in characters if c.id == r.character_id), None)
                 if gold_owner is not None:
                     lines.append(await _rift_gold(db, battle, gold_owner, reward.stage))
+                if reward.stage >= battle.final_stage:
+                    # Шахтёрская лампа (2026-10-23) - находка за пройденный разлом.
+                    from services import craft_gear_service
+
+                    lamp = await craft_gear_service.roll_lamp(db, r.character_id, battle.rng)
+                    if lamp:
+                        lines.append(lamp)
             if r.raid_key_dropped:
                 lines.append(raid_key_texts.raid_key_drop_line())
             if r.group_kick is not None and r.group_kick.kicked_character_id == r.character_id:

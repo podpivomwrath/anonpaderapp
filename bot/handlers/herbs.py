@@ -36,17 +36,58 @@ def pick_keyboard(patch_id: int) -> str:
 
 
 async def notify(peer_id: int, character) -> None:
-    """Если на клетке трава, которую персонаж различает, - сказать об этом."""
+    """Если на клетке трава, которую персонаж различает, - сказать об этом.
+    С серпом нужного тира трава срезается сама (2026-10-23)."""
+    from game.economy import craft_gear
+    from services import craft_gear_service
+
     async with get_session_factory()() as db:
         found = await herb_service.visible_here(db, character)
-    if found is None:
-        return
-    patch, herb = found
+        if found is None:
+            return
+        patch, herb = found
+        sickle = await craft_gear_service.tier(db, character.id, "sickle")
+        if craft_gear.sickle_cuts(sickle, herb.tier) and not in_any_battle(peer_id):
+            fresh = await db.get(type(character), character.id)
+            result = await herb_service.pick(db, fresh, patch.id, _rng)
+            progress = await daily_service.record_craft(db, fresh, "herb_pick") if result.status == "ok" else None
+            await db.commit()
+            if result.status == "ok":
+                await _api().messages.send(
+                    peer_id=peer_id, random_id=0, message="🌙 Серп срезал траву.\n" + picked_text(result, fresh),
+                )
+                notice = dailies_texts.progress_notice(progress) if progress is not None else None
+                if notice:
+                    await _api().messages.send(peer_id=peer_id, random_id=0, message=notice)
+            return
     await _api().messages.send(
         peer_id=peer_id, random_id=0,
         message=f"{herb.emoji} Здесь растет {herb.name}.",
         keyboard=pick_keyboard(patch.id),
     )
+
+
+#: Север - рост y (Кряж на (0;30)).
+_SIDES = {
+    (-1, 1): "северо-запад", (0, 1): "север", (1, 1): "северо-восток",
+    (-1, 0): "запад", (1, 0): "восток",
+    (-1, -1): "юго-запад", (0, -1): "юг", (1, -1): "юго-восток",
+}
+
+
+async def notify_nearby(peer_id: int, character) -> None:
+    """Альманах травника (2026-10-23): трава на соседних клетках, включая
+    диагональные. Только при входе на клетку - одна строка на всё."""
+    from services import craft_gear_service
+
+    async with get_session_factory()() as db:
+        if not await craft_gear_service.tier(db, character.id, "almanac"):
+            return
+        found = await herb_service.visible_around(db, character)
+    if not found:
+        return
+    parts = [f"{herb.emoji} {herb.name} - {_SIDES[(dx, dy)]}" for (dx, dy), herb in found]
+    await _api().messages.send(peer_id=peer_id, random_id=0, message="📗 Альманах: рядом трава.\n" + "\n".join(parts))
 
 
 def picked_text(result, character=None) -> str:

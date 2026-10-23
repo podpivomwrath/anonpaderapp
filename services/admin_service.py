@@ -471,7 +471,7 @@ WALLET_REASONS = {
     "guild_service.withdraw": "Выдача из казны гильдии", "guild_territory_service.pray": "Гильдия: молитва",
     "guild_tree_service.reset": "Сброс древа гильдии", "item_service.sell_item": "Продажа снаряжения",
     "lootbox_service._apply_part": "Ларец", "miniapp_guild_api._act": "Гильдия",
-    "mining_service.sell_ore": "Продажа руды", "payment_service.apply_status": "Покупка самоцветов (донат)",
+    "mining_service.sell_ore": "Продажа руды", "mining_service.finish_dig": "Самоцвет в свете лампы", "payment_service.apply_status": "Покупка самоцветов (донат)",
     "pk_service.settle": "Кровавое клеймо", "preset_service.buy_preset_slot": "Слот пресета",
     "preset_service.save_preset": "Новый пресет", "promo_service._apply_reward": "Промокод",
     "raid_combat._rift_gold": "Разлом", "raid_results._rift_gold": "Разлом",
@@ -604,6 +604,8 @@ async def _crafts_card(db: AsyncSession, character: Character) -> dict:
             {"name": f"{d.emoji} {d.name}", "grade": fishing.grade_name(g), "count": n}
             for d, _dish, g, n in await cooking_service.get_food(db, character.id)
         ],
+        # Ремесленные инструменты (2026-10-23).
+        "craft_gear": await _craft_gear_rows(db, character.id),
         "fish_kg": round(await fishing_service.bag_total_grams(db, character.id) / 1000, 1),
         "ore_pieces": await mining_service.total_ore(db, character.id),
         "flags": {
@@ -614,6 +616,20 @@ async def _crafts_card(db: AsyncSession, character: Character) -> dict:
             "tag": guild.tag, "name": guild.name, "rank": gc.RANK_TITLES.get(member.rank, member.rank),
         } if guild is not None else None,
     }
+
+
+async def _craft_gear_rows(db: AsyncSession, character_id: int) -> list[dict]:
+    from game.economy import craft_gear
+    from services import craft_gear_service
+
+    out = []
+    for tool_id, row in (await craft_gear_service.gear(db, character_id)).items():
+        tool = craft_gear.tool_def(tool_id)
+        if tool is None:
+            continue
+        what = f"×{row.count}" if tool.source in ("charges", "stock") else f"{row.tier} тир"
+        out.append({"name": f"{tool.emoji} {tool.title}", "value": what})
+    return out
 
 
 CRAFT_FIELDS = {

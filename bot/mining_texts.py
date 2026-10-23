@@ -115,6 +115,8 @@ def dig_result_text(result, character=None) -> str:
         + (f" ×{result.count} - венец «Жила»" if result.count > 1 else ""),
         f"⛏ +{result.xp} опыта горного дела",
     ]
+    if getattr(result, "gem", False):
+        lines.append("🏮 В свете лампы блеснул самоцвет: +1 💎")
     if result.levels_gained:
         lines.append(f"⬆️ Уровень горного дела: {result.new_level}")
     if character is not None:

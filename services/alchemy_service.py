@@ -92,6 +92,13 @@ async def finish(db: AsyncSession, character: Character, rng: random.Random) -> 
         return None
     level = character.alchemy_level
     amount = recipe.out + (alchemy.bonus_amount(recipe) if rng.random() < alchemy.bonus_chance(level) else 0)
+    # Перегонный куб (2026-10-23): шанс ещё одной порции сверх бонуса уровня.
+    from game.economy import craft_gear
+    from services import craft_gear_service
+
+    still = await craft_gear_service.tier(db, character.id, "still")
+    if still and rng.random() < craft_gear.still_extra_chance(still):
+        amount += recipe.out
     await elixir_service.grant(db, character.id, recipe.elixir_id, amount)
     xp = alchemy.brew_xp(recipe)
     alchemy.grant_xp(character, xp)

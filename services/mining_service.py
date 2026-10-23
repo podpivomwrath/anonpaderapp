@@ -232,6 +232,8 @@ class DigResult:
     new_level: int
     #: Сколько кусков пришло: 2 - сработал венец «Жила».
     count: int = 1
+    #: Шахтёрская лампа нашла самоцвет (2026-10-23).
+    gem: bool = False
 
 
 async def start_dig(
@@ -274,6 +276,16 @@ async def start_dig(
     from services import guild_service
 
     seconds *= 1 - guild_service.perk(character, "mining_speed_pct") / 100
+    # Кирка (2026-10-23): быстрее; ниже тира рудника - вдвое слабее.
+    from game.economy import craft_gear
+    from services import craft_gear_service
+
+    gear = await craft_gear_service.gear(db, character.id)
+    seconds *= 1 - craft_gear.pick_speed(gear["pick"].tier if "pick" in gear else 0, tier)
+    if event_vein and "lamp" in gear:
+        from game.economy import craft_gear_config as gear_cfg
+
+        seconds *= 1 - gear_cfg.LAMP_VEIN_SPEED
     character.mining_ends_at = now + timedelta(seconds=seconds)
     character.mining_mine_id = mine.id if mine is not None else None
     await db.flush()
@@ -302,7 +314,21 @@ async def finish_dig(
         tier = mine.tier if mine is not None else 1
 
     ore_id = mining.roll_ore_id(rng, tier, event_vein, character.mining_level)
-    grade_id, grade_label = mining.roll_grade(rng, tier, character.mining_level, event_vein)
+    from game.economy import craft_gear
+    from game.economy import craft_gear_config as gear_cfg
+    from services import craft_gear_service
+
+    gear = await craft_gear_service.gear(db, character.id)
+    pick = gear["pick"].tier if "pick" in gear else 0
+    grade_id, grade_label = mining.roll_grade(
+        rng, tier, character.mining_level, event_vein, craft_gear.pick_grade_k_mult(pick),
+    )
+    # Шахтёрская лампа: изредка в породе самоцвет.
+    gem = "lamp" in gear and rng.random() < gear_cfg.LAMP_GEM_CHANCE
+    if gem:
+        from services import wallet_service
+
+        await wallet_service.deposit(db, character.id, "donate", 1)
     # Венец «Жила» (2026-10-22): шанс второго куска той же руды. Из жилы
     # рудника ушёл один кусок ещё при старте - второй сверху, не из жилы.
     chance = crown_service.mining_double_chance(character)
@@ -326,7 +352,7 @@ async def finish_dig(
 
     return DigResult(
         ore=mining.ore_def(ore_id), grade_id=grade_id, grade_label=grade_label,
-        xp=xp, levels_gained=levels, new_level=level, count=count,
+        xp=xp, levels_gained=levels, new_level=level, count=count, gem=gem,
     )
 
 

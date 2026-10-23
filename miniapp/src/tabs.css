@@ -2359,3 +2359,130 @@ body.lite .shop-showcase::after { animation: none; display: none; }
   font-size: 13px;
   line-height: 1.6;
 }
+
+/* --- Ремёсла на вкладке «Герой» (2026-10-23): страницы и инструменты --- */
+.hero-pager {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 6px 12px 0;
+}
+.hero-pager__title {
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+.hero-pager__arrow {
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.05);
+  color: inherit;
+  font-size: 24px;
+  line-height: 1;
+  cursor: pointer;
+}
+.gear-page {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 12px 12px 16px;
+}
+.gear-page__head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.gear-page__emoji {
+  font-size: 40px;
+  line-height: 1;
+}
+.gear-page__title {
+  display: block;
+  font-size: 18px;
+}
+.gear-page__head small {
+  color: var(--vkui--color_text_secondary, #aab);
+}
+.gear-page__tools {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.gear-tool {
+  display: grid;
+  grid-template-columns: 56px 1fr auto;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  border-radius: 14px;
+  border: 1px dashed rgba(255, 255, 255, 0.18);
+  background: rgba(14, 14, 18, 0.42);
+}
+.gear-tool--owned {
+  border-style: solid;
+  border-color: rgba(214, 160, 90, 0.55);
+  box-shadow: 0 0 14px -6px rgba(214, 160, 90, 0.8);
+}
+.gear-tool__icon {
+  position: relative;
+  width: 56px;
+  height: 56px;
+  display: grid;
+  place-items: center;
+  font-size: 30px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.05);
+}
+.gear-tool:not(.gear-tool--owned) .gear-tool__icon span {
+  opacity: 0.4;
+  filter: grayscale(1);
+}
+.gear-tool__tier {
+  position: absolute;
+  right: -4px;
+  bottom: -4px;
+  padding: 1px 6px;
+  border-radius: 8px;
+  font-style: normal;
+  font-size: 11px;
+  font-weight: 700;
+  background: #d6a05a;
+  color: #1b1208;
+}
+.gear-tool__text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.gear-tool__text small {
+  color: var(--vkui--color_text_secondary, #aab);
+  line-height: 1.35;
+}
+.gear-tool__soon {
+  color: #d6a05a !important;
+}
+.gear-sheet__effect {
+  margin: 0 0 12px;
+  line-height: 1.4;
+}
+.gear-sheet__needs {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+.gear-need {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: rgba(220, 70, 60, 0.1);
+  font-variant-numeric: tabular-nums;
+}
+.gear-need--ok {
+  background: rgba(121, 199, 127, 0.1);
+}
