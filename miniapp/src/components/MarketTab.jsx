@@ -229,7 +229,7 @@ function Mine({ data, act, busy }) {
       <Group header={<Header>Мои заявки · {data.orders.length} из {data.rules.max_orders}</Header>}>
         {!data.orders.length && <Div className="market-muted">Открытых заявок нет.</Div>}
         {data.orders.map((o) => (
-          <div key={o.id} className="market-row market-row--static">
+          <div key={o.id} className="market-row market-row--static market-row--noicon">
             <span className="market-row__text">
               <b>{o.side === 'sell' ? 'Продаю' : 'Куплю'}: {o.name}</b>
               <small>×{o.qty_left}{o.qty_left !== o.qty_total ? ` из ${o.qty_total}` : ''} по {money(o.price)} · ещё {left(o.expires_at)}</small>

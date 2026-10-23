@@ -40,6 +40,7 @@ no text, no letters, no frame, no people in focus
 | `шапка_guild.png` | Гильдия | a long dark hall with a heavy oak table, several tattered guild banners hanging from the beams, a fireplace burning at the far end |
 | `шапка_trade.png` | Фракция, торговля | an ox-drawn covered cargo cart on a dusty road at dusk, wooden crates stacked in it, a distant walled town on the horizon |
 | `шапка_exchange.png` | Биржа | a merchant's scale on a counter, one pan heavy with gold coins, the other with deep blue glowing gems, a ledger and a quill nearby |
+| `шапка_market.png` | Рынок (2026-10-23) | a crowded night market street seen from a stall: wooden counters stacked with ore chunks, bundles of herbs, dried fish and small iron-bound chests, paper price tags on strings, lanterns hanging overhead, merchants' silhouettes far in the background |
 | `шапка_shop.png` | Магазин | a dim merchant stall with shelves of glowing blue gems, small potions and a mysterious sealed book with a silver emblem, warm lantern light |
 | `шапка_trials.png` | Испытания и пресеты | a stone altar with carved runes, several runes glowing pale blue, an old sword lying across it, faint mist |
 

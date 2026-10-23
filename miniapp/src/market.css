@@ -52,6 +52,10 @@
   margin: 0 12px 6px;
 }
 
+.market-row--noicon {
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+
 .market-row__text {
   display: grid;
   gap: 2px;

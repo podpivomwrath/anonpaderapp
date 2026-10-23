@@ -26,7 +26,7 @@ QUALITY = 78
 #: Разделы, у которых есть шапка: ключ - имя файла, как в SectionHead kind.
 KINDS = (
     "dailies", "login", "inventory", "craft", "crafts", "tops", "board",
-    "guild", "trade", "exchange", "shop", "trials",
+    "guild", "trade", "exchange", "market", "shop", "trials",
 )
 
 #: Шапки страниц ремёсел на вкладке «Герой» (2026-10-23, CraftGear.jsx):
