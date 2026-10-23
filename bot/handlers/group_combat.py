@@ -683,7 +683,7 @@ async def group_use_item(message: Message) -> None:
         await message.answer("Этого зелья больше нет в сумке.", keyboard=battle_kb)
         return
     consumable_limit.spend(combatant)
-    throw = mode == "throw" and await flask_throw.spend(cid)
+    throw = mode == "throw" and flask_throw.can_throw(elixir) and await flask_throw.spend(cid)
 
     await editable_message.send_or_edit(
         _bot_api, "group_pve_item", peer_id, f"Использовано: {elixir.emoji} {elixir.name}.", no_keyboard()

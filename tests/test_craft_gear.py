@@ -148,3 +148,14 @@ def test_flask_spreads_elixir_to_group_weaker() -> None:
     a.current_hp = b.current_hp = 1
     elixir_effects.throw_flask(a, "heal_large", everyone, gc.FLASK_POWER)
     assert 1 < a.current_hp < a.max_hp and b.current_hp > 1
+
+
+def test_last_breath_is_not_throwable() -> None:
+    """2026-10-23, владелец: «Последний вздох» склянкой на группу - слишком сильно."""
+    from types import SimpleNamespace
+
+    from bot import flask_throw
+
+    assert not flask_throw.can_throw(SimpleNamespace(id="last_breath", category="combat"))
+    assert flask_throw.can_throw(SimpleNamespace(id="second_heart", category="combat"))
+    assert not flask_throw.can_throw(SimpleNamespace(id="scroll_ward", category="scroll"))

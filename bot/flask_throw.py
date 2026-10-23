@@ -3,12 +3,14 @@
 зовут ask() до траты зелья и spend() после.
 
 Спрашиваем только когда есть смысл: склянки есть, рядом живые союзники,
-и это не свиток (свиток и так на всех).
+и это не свиток (свиток и так на всех). Часть зелий метать нельзя
+(craft_gear_config.FLASK_FORBIDDEN) - их только пьют сами.
 """
 
 from vkbottle import Keyboard, KeyboardButtonColor, Text
 
 from bot import editable_message
+from game.economy import craft_gear_config as gc
 from services import craft_gear_service
 from services.db import get_session_factory
 
@@ -25,9 +27,13 @@ def _keyboard(use_type: str, elixir_id: str, flasks: int) -> str:
     return kb.get_json()
 
 
+def can_throw(elixir) -> bool:
+    return elixir.category != "scroll" and elixir.id not in gc.FLASK_FORBIDDEN
+
+
 async def ask(api, key: str, peer_id: int, character_id: int, use_type: str, elixir, mode, allies: int) -> bool:
     """True - спросили (обработчик выходит и ждёт выбора)."""
-    if mode is not None or allies <= 0 or elixir.category == "scroll":
+    if mode is not None or allies <= 0 or not can_throw(elixir):
         return False
     async with get_session_factory()() as db:
         row = (await craft_gear_service.gear(db, character_id)).get("flasks")

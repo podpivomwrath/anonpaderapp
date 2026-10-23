@@ -67,6 +67,31 @@ class LevelUp:
     premium_applied: bool = False
 
 
+def final_amount(
+    character: Character, amount: int, apply_premium: bool = True, game_gain: bool = True,
+) -> tuple[int, bool]:
+    """Сколько опыта реально придёт из amount и был ли премиум. Одна цепочка
+    для начисления и для обещаний (карточки ежедневок, 2026-10-23: игрок
+    видел 11 299, а получил 21 250 - множители не были видны)."""
+    if game_gain and amount > 0:
+        # Облегчение прогрессии (2026-10-13, решение владельца): требования к
+        # уровню прежние, весь игровой опыт x1.25 - уровни ~на 20% быстрее.
+        # Ручная выдача (админ, промокод) - ровно то число, что задано.
+        amount = round(amount * bc.XP_GAIN_MULT)
+    premium_applied = apply_premium and amount > 0 and premium_service.is_premium(character)
+    if premium_applied:
+        amount = round(amount * pc.PREMIUM_XP_MULTIPLIER)
+    if apply_premium and amount > 0:
+        # Древо гильдии (ветвь «Братство»). Сам опыт копией на персонаже -
+        # сессии БД здесь нет, как и у венцов.
+        from services import guild_service
+
+        guild_xp = guild_service.perk(character, "xp_pct")
+        if guild_xp:
+            amount = round(amount * (1 + guild_xp / 100))
+    return amount, premium_applied
+
+
 def add_experience(
     character: Character, stats: CharacterStats, amount: int, apply_premium: bool = True,
     game_gain: bool = True,
@@ -94,22 +119,7 @@ def add_experience(
         # записывали и тут же обнуляли, а игроку показывали «+105 опыта».
         # Ноль в xp_awarded - сигнал текстам не печатать строку опыта.
         return LevelUp(levels_gained=0, new_level=character.level)
-    if game_gain and amount > 0:
-        # Облегчение прогрессии (2026-10-13, решение владельца): требования к
-        # уровню прежние, весь игровой опыт x1.25 - уровни ~на 20% быстрее.
-        # Ручная выдача (админ, промокод) - ровно то число, что задано.
-        amount = round(amount * bc.XP_GAIN_MULT)
-    premium_applied = apply_premium and amount > 0 and premium_service.is_premium(character)
-    if premium_applied:
-        amount = round(amount * pc.PREMIUM_XP_MULTIPLIER)
-    if apply_premium and amount > 0:
-        # Древо гильдии (ветвь «Братство»). Сам опыт копией на персонаже -
-        # сессии БД здесь нет, как и у венцов.
-        from services import guild_service
-
-        guild_xp = guild_service.perk(character, "xp_pct")
-        if guild_xp:
-            amount = round(amount * (1 + guild_xp / 100))
+    amount, premium_applied = final_amount(character, amount, apply_premium, game_gain)
     if amount > 0:
         character.experience += amount
     levels = 0

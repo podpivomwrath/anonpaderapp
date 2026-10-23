@@ -95,7 +95,7 @@ def effect_line(tool_id: str, tier: int) -> str:
     if tool_id == "still":
         return f"Шанс {pct(still_extra_chance(tier))} сварить лишнее зелье"
     if tool_id == "flasks":
-        return (f"В групповом бою и рейде зелье можно метнуть на всю группу. "
+        return (f"В групповом бою и рейде зелье можно метнуть на всю группу, кроме «Последнего вздоха». "
                 f"Действует с силой {pct(gc.FLASK_POWER)}")
     if tool_id == "bait":
         return (f"Рассыпь из сумки (раздел еды): {gc.BAIT_MINUTES} минут рыба клюёт на "

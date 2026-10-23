@@ -307,7 +307,7 @@ async def _finish(
         await lootbox_service.grant_chest(db, character, character.daily_streak)
         notice_parts.append(
             f"🗃️ Пепельный ларец - в сумке. День серии: {character.daily_streak}\n"
-            f"Открыть его можно в мини-аппе: Инвентарь → Редкости."
+            f"Открыть его можно в мини-аппе: Инвентарь → Ларцы."
         )
 
         milestone = dc.STREAK_MILESTONES.get(character.daily_streak)
@@ -521,6 +521,9 @@ async def get_dailies_overview(
     xp, gold = dc.daily_reward(character.level)
     if character.level >= bc.MAX_LEVEL:
         xp = 0  # на потолке опыт не начисляется - и обещать его незачем
+    else:
+        # Обещаем то, что придёт: со всеми множителями (x1.25, Метка, древо).
+        xp, _ = experience_service.final_amount(character, xp)
     quests = []
     for row in rows:
         qdef = quest_def(row.quest_id)
