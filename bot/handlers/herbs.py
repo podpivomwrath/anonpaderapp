@@ -47,24 +47,40 @@ async def notify(peer_id: int, character) -> None:
             return
         patch, herb = found
         sickle = await craft_gear_service.tier(db, character.id, "sickle")
-        if craft_gear.sickle_cuts(sickle, herb.tier) and not in_any_battle(peer_id):
-            fresh = await db.get(type(character), character.id)
-            result = await herb_service.pick(db, fresh, patch.id, _rng)
-            progress = await daily_service.record_craft(db, fresh, "herb_pick") if result.status == "ok" else None
-            await db.commit()
-            if result.status == "ok":
-                await _api().messages.send(
-                    peer_id=peer_id, random_id=0, message="🌙 Серп срезал траву.\n" + picked_text(result, fresh),
-                )
-                notice = dailies_texts.progress_notice(progress) if progress is not None else None
-                if notice:
-                    await _api().messages.send(peer_id=peer_id, random_id=0, message=notice)
-            return
+    if craft_gear.sickle_cuts(sickle, herb.tier) and not in_any_battle(peer_id):
+        # Фоном, а не здесь: notify зовут и изнутри открытой сессии, где строка
+        # персонажа ещё не закоммичена. Срезание пишет опыт в ту же строку и
+        # ждало бы её, а вызывающий - срезание (memory: nested-session-deadlock).
+        from bot import background
+
+        background.spawn(_auto_cut(peer_id, character.id, patch.id))
+        return
     await _api().messages.send(
         peer_id=peer_id, random_id=0,
         message=f"{herb.emoji} Здесь растет {herb.name}.",
         keyboard=pick_keyboard(patch.id),
     )
+
+
+async def _auto_cut(peer_id: int, character_id: int, patch_id: int) -> None:
+    """Серп срезает траву (2026-10-23): своя сессия, после вызывающего."""
+    from models import Character
+
+    async with get_session_factory()() as db:
+        character = await db.get(Character, character_id)
+        if character is None:
+            return
+        result = await herb_service.pick(db, character, patch_id, _rng)
+        if result.status != "ok":
+            await db.rollback()
+            return
+        progress = await daily_service.record_craft(db, character, "herb_pick")
+        await db.commit()
+        text = "🌙 Серп срезал траву.\n" + picked_text(result, character)
+    await _api().messages.send(peer_id=peer_id, random_id=0, message=text)
+    notice = dailies_texts.progress_notice(progress) if progress is not None else None
+    if notice:
+        await _api().messages.send(peer_id=peer_id, random_id=0, message=notice)
 
 
 #: Север - рост y (Кряж на (0;30)).

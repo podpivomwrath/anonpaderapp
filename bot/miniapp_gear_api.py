@@ -35,7 +35,16 @@ async def _next_step(db, character, tool: gc.ToolDef, row) -> dict | None:
     stackable = tool.source in ("charges", "stock")
     level = getattr(character, gc.CRAFTS[tool.craft][2])
     if stackable:
-        tier = craft_gear.max_tier(tool, level) if tool.source == "charges" else 1
+        tier = 1
+        if tool.source == "charges":
+            # Самый высокий доступный тир, на который хватает трав; не хватает
+            # ни на какой - показываем верхний, чтобы было видно, к чему идти.
+            top = craft_gear.max_tier(tool, level)
+            tier = top
+            for t in range(top, 0, -1):
+                if await craft_gear_service.herbs_have(db, character.id, t) >= tool.cost:
+                    tier = t
+                    break
     else:
         tier = (row.tier + 1) if row is not None else 1
         if tier > max(gc.TIERS):

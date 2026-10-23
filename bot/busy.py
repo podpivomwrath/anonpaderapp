@@ -49,9 +49,14 @@ class Busy:
     text: str
 
 
-async def busy(db, character, peer_id: int, now: datetime | None = None, skip: tuple[str, ...] = ()) -> Busy | None:
+async def busy(
+    db, character, peer_id: int, now: datetime | None = None, skip: tuple[str, ...] = (),
+    leaving: bool = False,
+) -> Busy | None:
     """Первое занятие, которое не даёт начать новое действие, или None.
-    skip - коды, которые этот вход проверяет сам по-своему."""
+    skip - коды, которые этот вход проверяет сам по-своему. leaving - вход
+    уводит с клетки (ходьба, маунт): тогда держит и снасть в воде. Остальным
+    занятиям она не мешает - передать вещь или исследовать можно и с удочкой."""
     from bot.battle_keyboard import in_any_battle
     from bot.handlers import pvp as pvp_handlers
     from bot.handlers import world
@@ -79,7 +84,7 @@ async def busy(db, character, peer_id: int, now: datetime | None = None, skip: t
         checks.append(hit("digging", mining_texts.busy_text(mining_service.remaining_seconds(character))))
     # Рыбалка (2026-10-23, баг-репорт: со снастью в воде уходили с клетки).
     # Держит, пока снасть в воде и окно подсечки не прошло.
-    if character.screen == "lake":
+    if leaving and character.screen == "lake":
         from services import fishing_service
 
         if fishing_service.is_casting(character) and not fishing_service.cast_is_stale(character, now):

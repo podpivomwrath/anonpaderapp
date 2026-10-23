@@ -686,6 +686,13 @@ async def _move(message: Message, direction: tuple[int, int] | None) -> None:
         if explore_rest.resting(message.peer_id):
             await message.answer("🛏️ Ты отдыхаешь. Дай себе минуту.")
             return
+        # Снасть в воде держит на клетке (2026-10-23, баг-репорт).
+        casting = fishing_service.is_casting(character) and not fishing_service.cast_is_stale(character, now)
+        if character.screen == "lake" and casting:
+            from bot import busy as busy_mod
+
+            await message.answer(busy_mod.STATES["fishing"])
+            return
         if movement_service.resolve_arrival(character, now):
             if subclass_service.buff_pool(character) is not None:
                 await trial_service.record_cell_moved(db, character)

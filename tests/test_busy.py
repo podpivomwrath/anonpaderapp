@@ -83,8 +83,10 @@ async def test_cast_line_holds_on_the_cell() -> None:
     """2026-10-23, баг-репорт: со снастью в воде уходили с клетки."""
     now = datetime.now(timezone.utc)
     cast = _char(screen="lake", fishing_cast_at=now, fishing_bite_at=now + timedelta(seconds=20))
-    found = await busy_mod.busy(None, cast, peer_id=777003, now=now, skip=("riding",))
+    found = await busy_mod.busy(None, cast, peer_id=777003, now=now, skip=("riding",), leaving=True)
     assert found is not None and found.code == "fishing"
+    # Остальным занятиям (передача, исследование, вход к воде) снасть не мешает.
+    assert await busy_mod.busy(None, cast, peer_id=777003, now=now, skip=("riding",)) is None
     # Окно подсечки давно прошло (рестарт) - не держит.
     stale = _char(screen="lake", fishing_cast_at=now - timedelta(hours=1), fishing_bite_at=now - timedelta(hours=1))
     assert await busy_mod.busy(None, stale, peer_id=777003, now=now, skip=("riding",)) is None

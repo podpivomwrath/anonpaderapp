@@ -273,7 +273,7 @@ async def _blocked_reason(db, character: Character, peer_id: int) -> str | None:
     в пути проверяется ниже отдельно (свой код already_on_mount)."""
     from bot.busy import busy
 
-    found = await busy(db, character, peer_id, skip=("riding",))
+    found = await busy(db, character, peer_id, skip=("riding",), leaving=True)
     return _MAP_REASONS.get(found.code, "busy") if found is not None else None
 
 
