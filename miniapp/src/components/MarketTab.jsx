@@ -55,7 +55,7 @@ function GoodSheet({ good, rules, gold, onClose, act, busy }) {
   const have = info?.have || 0;
   const tooSmall = total < rules.min_gold;
   const cant = side === 'sell' ? qty > have : total + fee > gold;
-  const points = (info?.history || []).map(([t, avg]) => ({ t, buy: avg, sell: avg }));
+  const points = (info?.history || []).map(([t, avg, qty]) => ({ t, buy: avg, sell: avg, qty }));
 
   return (
     <Sheet title={good.name} icon={good.emoji} onClose={onClose} className="market-sheet">
@@ -75,7 +75,7 @@ function GoodSheet({ good, rules, gold, onClose, act, busy }) {
           {info && !info.book.buys.length && <small className="market-muted">никто</small>}
         </div>
       </div>
-      {points.length > 0 && <PriceChart points={points} />}
+      {points.length > 0 && <PriceChart points={points} market />}
 
       <div className="market-switch">
         <button type="button" className={side === 'buy' ? 'is-on' : ''} onClick={() => setSide('buy')}>Купить</button>

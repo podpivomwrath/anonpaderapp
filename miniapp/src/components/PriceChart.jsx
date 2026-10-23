@@ -40,7 +40,9 @@ function stamp(ms, withTime) {
   return withTime ? `${date} ${d.toLocaleTimeString('ru-RU', { ...zone, hour: '2-digit', minute: '2-digit' })}` : date;
 }
 
-export default function PriceChart({ points }) {
+/** market - график рынка (2026-10-24): одна линия, средняя цена сделок за
+ *  день, у точки {t, buy, sell, qty}. Без него - биржа с лотами и kind. */
+export default function PriceChart({ points, market = false }) {
   const box = useRef(null);
   const [width, setWidth] = useState(320);
   const [hover, setHover] = useState(null);
@@ -133,28 +135,41 @@ export default function PriceChart({ points }) {
         ))}
         <path d={area} fill="url(#price-chart-fill)" />
         <path className="price-chart__line price-chart__line--buy" d={path('buy')} />
-        <path className="price-chart__line price-chart__line--sell" d={path('sell')} />
+        {!market && <path className="price-chart__line price-chart__line--sell" d={path('sell')} />}
         {cur && <line className="price-chart__cursor" x1={x(cur.ms)} x2={x(cur.ms)} y1={PAD.top} y2={y(yMin)} />}
         {data.map((p, i) => (
           <g key={`${p.t}:${i}`}>
             <circle className="price-chart__dot price-chart__dot--buy" cx={x(p.ms)} cy={y(p.buy)} r={hover === i ? 5.5 : 3.2} />
-            <circle className="price-chart__dot price-chart__dot--sell" cx={x(p.ms)} cy={y(p.sell)} r={hover === i ? 5 : 2.6} />
+            {!market && <circle className="price-chart__dot price-chart__dot--sell" cx={x(p.ms)} cy={y(p.sell)} r={hover === i ? 5 : 2.6} />}
           </g>
         ))}
       </svg>
-      {cur && (
+      {cur && market && (
+        <div className="price-chart__tip" style={{ left: tipLeft, top: PAD.top }}>
+          <div className="price-chart__tip-time">{stamp(cur.ms, false)}</div>
+          <div><i className="price-chart__key price-chart__key--buy" />Средняя цена: <b>{money(cur.buy)}</b></div>
+          <div className="price-chart__tip-note">куплено за день: {money(cur.qty)} шт.</div>
+        </div>
+      )}
+      {cur && !market && (
         <div className="price-chart__tip" style={{ left: tipLeft, top: PAD.top }}>
           <div className="price-chart__tip-time">{cur.kind === 'close' ? stamp(cur.ms, false) : `${stamp(cur.ms, true)} МСК`}</div>
           <div><i className="price-chart__key price-chart__key--buy" />Покупка лота: <b>{money(cur.buy)}</b></div>
           <div><i className="price-chart__key price-chart__key--sell" />Продажа лота: <b>{money(cur.sell)}</b></div>
-          <div className="price-chart__tip-note">{KIND[cur.kind](cur)}</div>
+          <div className="price-chart__tip-note">{KIND[cur.kind]?.(cur)}</div>
         </div>
       )}
-      <div className="price-chart__legend">
-        <span><i className="price-chart__key price-chart__key--buy" />покупка</span>
-        <span><i className="price-chart__key price-chart__key--sell" />продажа</span>
-        <span className="craft-hint">обновляется раз в сутки</span>
-      </div>
+      {market ? (
+        <div className="price-chart__legend">
+          <span><i className="price-chart__key price-chart__key--buy" />средняя цена сделок за день</span>
+        </div>
+      ) : (
+        <div className="price-chart__legend">
+          <span><i className="price-chart__key price-chart__key--buy" />покупка</span>
+          <span><i className="price-chart__key price-chart__key--sell" />продажа</span>
+          <span className="craft-hint">обновляется раз в сутки</span>
+        </div>
+      )}
     </div>
   );
 }
