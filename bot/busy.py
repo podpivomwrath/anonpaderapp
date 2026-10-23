@@ -102,15 +102,16 @@ async def busy(
     return None
 
 
-#: Открытое событие исследования - только для маунта (2026-10-23, владелец:
-#: «сначала закончить событие, потом ехать»). В busy() его нет: пешком и
-#: остальные занятия событие не держит, у него свои кнопки.
+#: Открытое событие исследования держит маунт (2026-10-23, владелец:
+#: «сначала закончить событие, потом ехать») и вход в рудник и на озеро
+#: (2026-10-24: экран рудника закрывал кнопки события, и оно терялось).
+#: В busy() его нет: пешком и остальные занятия событие не держит.
 EVENT_TEXT = "Сначала закончи событие - потом в седло."
 
 
-async def open_event(peer_id: int) -> Busy | None:
+async def open_event(peer_id: int, text: str = EVENT_TEXT) -> Busy | None:
     from bot.handlers import scene_events, world
 
     if scene_events.has_pending(peer_id) or await world._pending_event_id(peer_id) is not None:
-        return Busy("event", EVENT_TEXT)
+        return Busy("event", text)
     return None

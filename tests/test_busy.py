@@ -102,3 +102,14 @@ async def test_open_event_blocks_the_mount() -> None:
         assert found is not None and found.code == "event"
     finally:
         world_handlers._pending_events.pop(peer, None)
+
+
+def test_open_event_guards_mine_and_lake_entry() -> None:
+    """2026-10-24: /рудник с открытым событием закрывал его кнопки, и событие
+    терялось. Вход в рудник и на озеро ждёт, пока событие закроют."""
+    import inspect
+
+    from bot.handlers import fishing, mining
+
+    assert "open_event(" in inspect.getsource(mining._enter_mine)
+    assert "open_event(" in inspect.getsource(fishing._enter_lake)

@@ -15,6 +15,7 @@ from vkbottle.bot import BotLabeler, Message
 
 from bot import fishing_texts as ft
 from bot.activity import activity_action, blocked_reason
+from bot.busy import open_event
 from bot.keyboards import fishing as kb
 from bot.keyboards.world import movement_keyboard
 from game.economy import fishing
@@ -154,6 +155,11 @@ async def _enter_lake(message: Message) -> None:
         reason = await blocked_reason(db, character, message.peer_id)
         if reason:
             await message.answer(reason)
+            return
+        # Как у рудника: экран озера закрыл бы кнопки события (2026-10-24).
+        event = await open_event(message.peer_id, "Сначала закончи событие - потом к воде.")
+        if event is not None:
+            await message.answer(event.text)
             return
 
         if character.screen != "lake":
