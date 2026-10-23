@@ -115,6 +115,8 @@ def reward_lines(got) -> list[str]:
             elixirs.append(f"{elixir.emoji} {elixir.name}" + (f" ×{amount}" if amount > 1 else ""))
     if elixirs:
         lines.append("🎒 " + ", ".join(elixirs) + ".")
+    if getattr(got, "almanac", None):
+        lines.append(got.almanac)
     return lines
 
 

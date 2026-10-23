@@ -94,6 +94,13 @@ async def reward_mob_kill(
             line for line in [await elixir_service.grant_heal_from_kill(db, character, rng) for _ in range(loot_mult)]
             if line
         ]
+        # Альманах травника и здесь (2026-10-23, владелец: «со всех мобов,
+        # боссы тоже мобы») - один бросок за этап, без множителя добычи.
+        from services import craft_gear_service
+
+        almanac = await craft_gear_service.roll_almanac(db, character, rng)
+        if almanac:
+            elixir_lines.append(almanac)
         rewards.append(
             MobKillReward(
                 character_id=character.id, xp_gained=levelup.xp_awarded,

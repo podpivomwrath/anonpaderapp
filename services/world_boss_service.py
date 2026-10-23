@@ -308,6 +308,7 @@ class Granted:
     trophies: dict[str, int] = field(default_factory=dict)
     elixirs: dict[str, int] = field(default_factory=dict)
     group_kick: object | None = None
+    almanac: str | None = None
 
 
 def pool_share(boss: WorldBoss) -> float:
@@ -354,6 +355,11 @@ async def distribute(db: AsyncSession, boss: WorldBoss, rng: random.Random) -> l
             await elixir_service.grant(db, character_id, elixir_id, amount)
         got.trophies = dict(share.trophies)
         got.elixirs = dict(share.elixirs)
+        if boss.status == KILLED:
+            # Альманах травника (2026-10-23): босс - тоже моб, один бросок.
+            from services import craft_gear_service
+
+            got.almanac = await craft_gear_service.roll_almanac(db, character, rng)
         granted.append(got)
     await db.flush()
     return granted

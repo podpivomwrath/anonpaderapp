@@ -61,6 +61,27 @@ async def test_drops_are_granted_once(db_session, make_character) -> None:
     assert await craft_gear_service.tier(db_session, c.id, "almanac") == 1
 
 
+async def test_almanac_rolls_once_in_raid_and_rift(db_session, make_character, monkeypatch) -> None:
+    """2026-10-23: альманах и с рейдов/разломов, один бросок за этап -
+    множитель добычи рейда его не умножает."""
+    from services import raid_combat_service
+
+    c = await make_character(level=30)
+    c.pos_x, c.pos_y = 15, 0
+    calls = []
+    real = craft_gear_service.roll_almanac
+
+    async def counted(db, character, rng):
+        calls.append(character.id)
+        return await real(db, character, rng)
+
+    monkeypatch.setattr(craft_gear_service, "roll_almanac", counted)
+    monkeypatch.setattr(gc, "ALMANAC_DROP_CHANCE", 1.0)
+    rewards = await raid_combat_service.reward_mob_kill(db_session, [c], 30, random.Random(1), 3)
+    assert calls == [c.id]
+    assert craft_gear_service.ALMANAC_LINE in rewards[0].elixir_lines
+
+
 def test_pick_and_rod_and_line_effects() -> None:
     assert craft_gear.pick_speed(3, 3) == pytest.approx(0.18)
     assert craft_gear.pick_speed(2, 5) == pytest.approx(0.06)  # ниже тира рудника - вдвое

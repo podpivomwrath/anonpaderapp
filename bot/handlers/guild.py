@@ -394,6 +394,8 @@ async def _boss_finished(result) -> None:
             extra += f" После налога: {got.net_gold}."
         if got and got.xp:
             extra += f" Опыт: +{got.xp}."
+        if got and got.almanac:
+            extra += "\n" + got.almanac
         await send(peer, text + extra)
         if got and got.levelup is not None:
             from bot.handlers import stats_window  # избегаем цикла импортов

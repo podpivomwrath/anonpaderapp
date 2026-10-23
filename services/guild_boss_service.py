@@ -10,6 +10,7 @@
 уйдёт недобитым, всё это - по доле снятого здоровья.
 """
 
+import random
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 
@@ -29,6 +30,8 @@ from services.guild_service import GuildError, aware, now_utc
 
 BOSS_NAME = "Страж цитадели"
 BOSS_LEVEL = 60
+#: Бросок альманаха травника при убийстве стража (2026-10-23).
+_rng = random.Random()
 
 
 async def active_boss(db: AsyncSession, guild_id: int, now: datetime | None = None) -> GuildBoss | None:
@@ -212,6 +215,7 @@ class BossGrant:
     net_gold: int = 0
     xp: int = 0
     levelup: object | None = None
+    almanac: str | None = None
 
 
 @dataclass
@@ -253,8 +257,15 @@ async def distribute(db: AsyncSession, boss: GuildBoss) -> BossResult:
         await guild_service.add_contribution(db, character_id, max(1, round(50 * dealt / total)))
         member = await db.get(Character, character_id)
         xp, levelup = await _grant_xp(db, member, xp_each * (0.5 + 0.5 * len(damage) * dealt / total))
+        almanac = None
+        if boss.status == "killed" and member is not None:
+            # Альманах травника (2026-10-23): страж - тоже моб, один бросок.
+            from services import craft_gear_service
+
+            almanac = await craft_gear_service.roll_almanac(db, member, _rng)
         result.granted.append(BossGrant(
             character_id, dealt, gold, guild_service.after_tax(member, gold) if member else gold, xp, levelup,
+            almanac,
         ))
     status = "повержен" if boss.status == "killed" else "уходит недобитым"
     await guild_service.log(
