@@ -221,22 +221,41 @@
   z-index: 3;
   top: 0;
   left: 0;
-  width: 112px;
-  max-height: calc(46% - 34px);
+  width: 122px;
+  max-height: calc(46% - 30px);
   overflow: hidden;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  text-align: left;
+  cursor: pointer;
+}
+
+.hero-buffs ul,
+.hero-buffs-sheet {
   display: flex;
   flex-direction: column;
   gap: 4px;
   margin: 0;
   padding: 0;
   list-style: none;
-  pointer-events: none;
+}
+
+.hero-buffs-sheet .hero-buff {
+  font-size: 14px;
+  padding: 8px 10px;
+}
+
+.hero-buffs-sheet .hero-buff small {
+  font-size: 13px;
 }
 
 .hero-buff {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: 1px;
-  padding: 4px 6px;
+  padding: 3px 6px;
   border-left: 2px solid rgba(120, 200, 120, 0.8);
   border-radius: 6px;
   background: rgba(14, 14, 18, 0.62);
@@ -252,6 +271,11 @@
   overflow: hidden;
   white-space: nowrap;
   text-overflow: ellipsis;
+}
+
+.hero-buff--more {
+  color: rgba(255, 255, 255, 0.7);
+  border-left-color: rgba(255, 255, 255, 0.3);
 }
 
 .hero-buff span {

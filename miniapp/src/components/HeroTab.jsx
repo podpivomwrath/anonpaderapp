@@ -292,19 +292,34 @@ function BuffList({ buffs }) {
   const shown = (buffs || [])
     .map((b) => ({ ...b, left: b.until ? leftText(b.until, now) : fightsText(b.fights) }))
     .filter((b) => b.left);
+  const [open, setOpen] = useState(false);
   if (!shown.length) return null;
+  // Над оружием место на три плашки; остальное - в списке по нажатию.
+  const more = shown.length > BUFFS_SHOWN ? shown.length - (BUFFS_SHOWN - 1) : 0;
+  const row = (b) => (
+    <li key={b.id} className={`hero-buff${b.bad ? ' hero-buff--bad' : ''}`}>
+      <b>{b.emoji} {b.name}</b>
+      <span>{b.value}{b.value ? ' · ' : ''}<small>{b.left}</small></span>
+    </li>
+  );
   return (
-    <ul className="hero-buffs">
-      {shown.map((b) => (
-        <li key={b.id} className={`hero-buff${b.bad ? ' hero-buff--bad' : ''}`}>
-          <b>{b.emoji} {b.name}</b>
-          {b.value && <span>{b.value}</span>}
-          <small>{b.left}</small>
-        </li>
-      ))}
-    </ul>
+    <>
+      <button type="button" className="hero-buffs" onClick={() => setOpen(true)} aria-label="Действующие баффы">
+        <ul>
+          {(more ? shown.slice(0, BUFFS_SHOWN - 1) : shown).map(row)}
+          {more > 0 && <li className="hero-buff hero-buff--more">+ ещё {more}</li>}
+        </ul>
+      </button>
+      {open && (
+        <Sheet title="Действует сейчас" icon="✨" onClose={() => setOpen(false)}>
+          <ul className="hero-buffs-sheet">{shown.map(row)}</ul>
+        </Sheet>
+      )}
+    </>
   );
 }
+
+const BUFFS_SHOWN = 3;
 
 function RingSlot({ ring }) {
   const [open, setOpen] = useState(false);
