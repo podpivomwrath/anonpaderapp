@@ -503,8 +503,8 @@ async def _donka_bite(db, character, peer_id: int) -> tuple[str, str | None, flo
     if last is not None and datetime.now(timezone.utc) - last > timedelta(minutes=DONKA_IDLE_MINUTES):
         fishing_service.clear_cast(character)
         return ft.DONKA_IDLE_TEXT, kb.lake_keyboard(True), None
-    # Опыта за донку нет - ни рыбалки, ни персонажа (2026-10-23, владелец).
-    result = await fishing_service.strike(db, character, lake, _rng, give_xp=False)
+    # Опыт за донку - как за рыбалку руками (2026-10-23, владелец вернул).
+    result = await fishing_service.strike(db, character, lake, _rng)
     capacity = fishing.bag_capacity_grams(character.fishing_level)
     if result.landed:
         await guild_quest_service.record(db, character, "fish", 1)
@@ -513,9 +513,22 @@ async def _donka_bite(db, character, peer_id: int) -> tuple[str, str | None, flo
             fishing_service.drop_catch(character)
             fishing_service.clear_cast(character)
             return ft.DONKA_FULL_TEXT, kb.lake_keyboard(True), None
+        char_xp = await experience_service.grant_activity_xp(
+            db, character, "fish", place_level=grid.mob_level_at(character.pos_x, character.pos_y, character.level),
+        )
         text = ft.donka_catch_line(result.fish, result.grams, result.grade_label)
+        text += "\n" + ft.donka_xp_lines(result, character)
+        xp_line = experience_service.activity_xp_line(char_xp) if char_xp else ""
+        if xp_line:
+            text += "\n" + xp_line
+        if char_xp is not None and char_xp.levels_gained:
+            from bot.handlers import stats_window  # избегаем цикла импортов
+
+            await stats_window.notify_levelup(peer_id, char_xp.levels_gained, char_xp.new_level)
     else:
         text = ft.DONKA_BREAK_TEXT
+        if result.xp:
+            text += "\n" + ft.donka_xp_lines(result, character)
     if await fishing_service.bag_total_grams(db, character.id) >= capacity:
         fishing_service.clear_cast(character)
         return f"{text}\n{ft.DONKA_FULL_TEXT}", kb.lake_keyboard(True), None

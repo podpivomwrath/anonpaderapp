@@ -176,7 +176,7 @@ async def strike(
     db: AsyncSession, character: Character, lake: LakeDef,
     rng: random.Random, now: datetime | None = None, give_xp: bool = True,
 ) -> StrikeResult:
-    """give_xp=False - Пепельная донка: опыта рыбалки за неё нет (2026-10-23)."""
+    """give_xp=False - подсечка без опыта рыбалки."""
     now = now or datetime.now(timezone.utc)
     fish_id = character.fishing_pending_fish
     grams = character.fishing_pending_grams

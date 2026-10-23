@@ -212,7 +212,7 @@ DONKA_NAME = "Пепельная донка"
 BTN_DONKA_ON = "🪝 Поставить донку"
 BTN_DONKA_OFF = "🪝 Снять донку"
 DONKA_ON_TEXT = (
-    "🪝 Донка на дне. Тянет сама, но вчетверо медленнее, чем руками, и без опыта; "
+    "🪝 Донка на дне. Тянет сама, но вчетверо медленнее, чем руками; "
     "рыба идёт прямо в садок. Пока донка стоит, от воды не отойти."
 )
 DONKA_OFF_TEXT = "🪝 Донка смотана. Можно рыбачить руками или поставить её снова."
@@ -224,3 +224,12 @@ DONKA_CHOICE_LINE = "🪝 Можно рыбачить самому или пос
 
 def donka_catch_line(fish, grams: int, grade_label: str) -> str:
     return f"🪝 Донка: {fish.emoji} {fish.name}, {fishing.format_kg(grams)} ({grade_label}) - в садке."
+
+
+def donka_xp_lines(result, character) -> str:
+    """Опыт рыбалки с поклёвки донки: прибавка, новый уровень, шкала."""
+    lines = [f"🎣 +{result.xp} опыта рыбалки"]
+    if result.levels_gained:
+        lines.append(f"⬆️ Уровень рыбалки: {result.new_level}")
+    lines.append(fishing_xp_line(character))
+    return chr(10).join(lines)
