@@ -124,6 +124,8 @@ class Character(Base):
     #: Пепельная донка (2026-10-23): авторыбалка из магазина и стоит ли она у воды.
     has_donka: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
     fishing_auto: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
+    #: До какого времени донка ловит: час с постановки (2026-10-23).
+    donka_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     #: Дом (2026-10-21, game/economy/house_config.py): куплен навсегда, стоит
     #: в родном городе и переезжает вместе с игроком.
     has_house: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")

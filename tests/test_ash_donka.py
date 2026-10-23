@@ -34,12 +34,26 @@ async def test_donka_is_four_times_slower_and_keeps_fishing(db_session, characte
     assert "опыта рыбалки" in text
 
 
-async def test_donka_stops_when_player_idle(db_session, character_at) -> None:
+async def test_donka_works_one_hour_from_setting(db_session, character_at) -> None:
+    """2026-10-23: час с постановки, активность игрока не продлевает."""
     c, lake = await _at_lake(character_at)
+    before = datetime.now(timezone.utc)
     await handler._donka_cast(db_session, c, lake)
-    c.last_active_at = datetime.now(timezone.utc) - timedelta(hours=2)
+    until = c.donka_until
+    assert timedelta(minutes=59) < until - before <= timedelta(minutes=61)
+    # Повторный заброс того же часа срок не сдвигает.
+    await handler._donka_cast(db_session, c, lake)
+    assert c.donka_until == until
+    # Поклёвка не назначается позже конца срока.
+    c.donka_until = datetime.now(timezone.utc) + timedelta(seconds=5)
+    wait = await handler._donka_cast(db_session, c, lake)
+    assert wait <= 5
+    # Срок вышел - донку сматывают, даже если игрок только что что-то делал.
+    c.donka_until = datetime.now(timezone.utc) - timedelta(seconds=1)
+    c.last_active_at = datetime.now(timezone.utc)
     text, _kb, nxt = await handler._donka_bite(db_session, c, 777011)
     assert nxt is None and not c.fishing_auto and not fishing_service.is_casting(c)
+    assert c.donka_until is None and "Час прошёл" in text
 
 
 async def test_donka_bought_once(db_session, make_character) -> None:

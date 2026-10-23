@@ -427,8 +427,8 @@ async def cancel_cast(message: Message) -> None:
 
 #: Донка ждёт поклёвку во столько раз дольше обычного заброса (владелец: «в 4 раза медленнее»).
 DONKA_SLOWDOWN = 4
-#: Игрок молчит дольше - донку сматывает: ловит только пока ты рядом.
-DONKA_IDLE_MINUTES = ggc.DONKA_IDLE_MINUTES
+#: Сколько донка ловит с постановки.
+DONKA_MINUTES = ggc.DONKA_MINUTES
 
 
 async def _donka_cast(db, character, lake) -> float:
@@ -441,10 +441,22 @@ async def _donka_cast(db, character, lake) -> float:
     result = fishing_service.start_cast(
         character, lake, _rng, rod_tier=rod, bite_mult=craft_gear_service.bite_mult(character),
     )
-    wait = result.seconds * DONKA_SLOWDOWN
-    character.fishing_bite_at = datetime.now(timezone.utc) + timedelta(seconds=wait)
+    now = datetime.now(timezone.utc)
+    if character.donka_until is None:
+        character.donka_until = now + timedelta(minutes=DONKA_MINUTES)
+    until = _aware(character.donka_until)
+    # Поклёвка не позже конца срока: в этот миг таймер сработает и смотает
+    # донку (после перезапуска таймер встаёт по той же отметке).
+    wait = min(result.seconds * DONKA_SLOWDOWN, max((until - now).total_seconds(), 1))
+    character.fishing_bite_at = now + timedelta(seconds=wait)
     character.fishing_auto = True
     return wait
+
+
+def _aware(dt):
+    from datetime import timezone
+
+    return dt if dt is None or dt.tzinfo else dt.replace(tzinfo=timezone.utc)
 
 
 @labeler.message(payload_contains=kb.DONKA_ON_PAYLOAD)
@@ -467,6 +479,8 @@ async def donka_on(message: Message) -> None:
         if await fishing_service.bag_total_grams(db, character.id) >= fishing.bag_capacity_grams(character.fishing_level):
             await message.answer(ft.DONKA_FULL_TEXT, keyboard=kb.lake_keyboard(True))
             return
+        # Час идёт с постановки (2026-10-23): новая постановка - новый час.
+        character.donka_until = None
         wait = await _donka_cast(db, character, lake)
         await db.commit()
     if _bite_scheduler is not None:
@@ -498,12 +512,13 @@ async def _donka_bite(db, character, peer_id: int) -> tuple[str, str | None, flo
     if lake is None:
         fishing_service.clear_cast(character)
         return ft.DONKA_OFF_TEXT, None, None
-    last = character.last_active_at
-    if last is not None and last.tzinfo is None:
-        last = last.replace(tzinfo=timezone.utc)
-    if last is not None and datetime.now(timezone.utc) - last > timedelta(minutes=DONKA_IDLE_MINUTES):
+    # Срок вышел - сматываем. Активность игрока не считаем (2026-10-23): от
+    # неё донка продлевалась без конца.
+    until = _aware(character.donka_until)
+    if until is None or datetime.now(timezone.utc) >= until:
         fishing_service.clear_cast(character)
-        return ft.DONKA_IDLE_TEXT, kb.lake_keyboard(True), None
+        character.donka_until = None
+        return ft.DONKA_TIME_TEXT, kb.lake_keyboard(True), None
     # Опыт за донку - как за рыбалку руками (2026-10-23, владелец вернул).
     result = await fishing_service.strike(db, character, lake, _rng)
     capacity = fishing.bag_capacity_grams(character.fishing_level)
