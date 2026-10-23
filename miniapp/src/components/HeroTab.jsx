@@ -229,6 +229,43 @@ function Settings({ character, onCharacterUpdate }) {
   );
 }
 
+// Надетое списком (2026-10-23, жалоба игрока: «вижу только итог бонусов, чтобы
+// понять, что качать, прокликиваю каждую вещь»): по слоту - вещь, уровень,
+// ковка и её статы. Нажатие открывает слот, как окно у силуэта.
+function WornList({ equipped, onOpen }) {
+  return (
+    <div className="worn-list">
+      {SLOTS.map(({ slot }) => {
+        const item = equipped[slot];
+        const marks = item ? [
+          item.ilvl ? `ур. ${item.ilvl}` : null,
+          item.craft_efficiency ? `⚒ ${item.craft_efficiency}%` : null,
+        ].filter(Boolean) : [];
+        return (
+          <button type="button" key={slot} className="worn-row" onClick={() => onOpen(slot)}>
+            {item
+              ? <ItemIcon icon={item.icon} rarity={item.rarity} alt={item.name} size={36} />
+              : <span className="worn-row__empty"><SlotGlyph slot={slot} /></span>}
+            <span className="worn-row__text">
+              <span className={item ? rarityText(item.rarity) : 'worn-row__none'}>
+                {item ? item.name : `${SLOT_TITLES[slot]}: пусто`}
+              </span>
+              {item && (
+                <span className="worn-row__meta">
+                  {marks.join(' · ')}
+                  {STAT_ORDER.filter((k) => item.base_stats?.[k]).map((k) => (
+                    <span key={k} className="gear-chip">{STAT_ICONS[k]} +{item.base_stats[k]}</span>
+                  ))}
+                </span>
+              )}
+            </span>
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
 // Окно кольца (2026-10-23): под оружием. Кольцо одно и снимать его незачем -
 // по нажатию только что оно даёт. Пустое окно молчит.
 function RingSlot({ ring }) {
@@ -467,6 +504,7 @@ export default function HeroTab({ character, onCharacterUpdate }) {
             </div>
           )}
           {error && <p className="hero-error">{error}</p>}
+          <WornList equipped={equipped} onOpen={setOpenSlot} />
         </div>
         )}
       </Group>

@@ -2502,3 +2502,53 @@ body.lite .shop-showcase::after { animation: none; display: none; }
   object-fit: cover;
   border-radius: 11px;
 }
+
+/* Надетое списком под силуэтом (2026-10-23, жалоба игрока). */
+.worn-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 12px;
+}
+.worn-row {
+  display: grid;
+  grid-template-columns: 36px 1fr;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 8px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  background: rgba(14, 14, 18, 0.45);
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.worn-row__empty {
+  width: 36px;
+  height: 36px;
+  display: grid;
+  place-items: center;
+  border: 1px dashed rgba(255, 255, 255, 0.2);
+  border-radius: 10px;
+  color: rgba(255, 255, 255, 0.45);
+}
+.worn-row__text {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+.worn-row__none {
+  color: var(--vkui--color_text_secondary, #aab);
+}
+.worn-row__meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 6px;
+  font-size: 12px;
+  color: var(--vkui--color_text_secondary, #aab);
+}
+.worn-row__meta .gear-chip {
+  font-size: 11px;
+}
