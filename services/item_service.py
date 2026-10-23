@@ -371,6 +371,29 @@ def stronger_than_equipped(
     return result
 
 
+def weaker_than_equipped(items: list[Item], equipped: dict[str, Item | None]) -> list[Item]:
+    """Предметы слабее (по item_power) надетого в том же слоте - кнопка
+    «Слабее надетого» у скупщика (2026-10-23). Слот пустой - вещь не трогаем:
+    её не с чем сравнить, а надеть её ещё можно."""
+    return [
+        item for item in items
+        if (current := equipped.get(item.slot)) is not None and item_power(item) < item_power(current)
+    ]
+
+
+async def sell_weaker(
+    db: AsyncSession, character: Character, price_multiplier: float = 1.0
+) -> int:
+    """Продаёт скупщику всё, что слабее надетого в том же слоте."""
+    items = await get_inventory(db, character.id)
+    loose = [item for item, equipped in items if not equipped and not is_unsellable(item)]
+    targets = weaker_than_equipped(loose, await get_equipped(db, character.id))
+    total = 0
+    for item in targets:
+        total += await sell_item(db, character, item.id, price_multiplier)
+    return total
+
+
 async def sell_by_rarity(
     db: AsyncSession, character: Character, rarity_id: str, price_multiplier: float = 1.0
 ) -> int:

@@ -251,6 +251,10 @@ async def sell_trophies(message: Message) -> None:
             await _bot_api.messages.send(peer_id=peer_id, message=daily_notice, random_id=0)
 
 
+#: _sell_now: продать то, что слабее надетого (не id редкости).
+WEAKER = "_weaker"
+
+
 def _sellable(items: list[tuple], mult: float) -> list[tuple]:
     """Только то, что скупщик реально купит. Раньше отсеивались лишь служебные
     вещи, и уникальная Игла Хирурга висела в списке «за 0 зол.» с кнопкой
@@ -283,10 +287,16 @@ async def _render_gear_main(db, character, mult: float, prefix: str = "") -> tup
     lines = "\n".join(
         f"{rdef.emoji} {rdef.name} - {len(gitems)} шт. · {total} зол." for rdef, gitems, total in groups
     )
+    weak = set(item_service.weaker_than_equipped(
+        [item for item, _ in sellable], await item_service.get_equipped(db, character.id),
+    ))
+    weaker = (len(weak), sum(price for item, price in sellable if item in weak))
     text = f"🗡 Продать снаряжение\n\n{lines}"
+    if weaker[0]:
+        text += f"\n\n⬇️ Слабее надетого: {weaker[0]} шт. · {weaker[1]} зол."
     if prefix:
         text = f"{prefix}\n\n{text}"
-    return text, sell_gear_main_keyboard(groups, grand_total)
+    return text, sell_gear_main_keyboard(groups, grand_total, weaker)
 
 
 async def _render_gear_detail(db, character, mult: float, page: int, prefix: str = "") -> tuple[str, str]:
@@ -315,7 +325,8 @@ async def _render_gear_detail(db, character, mult: float, page: int, prefix: str
 
 
 async def _sell_now(peer_id: int, from_id: int, rarity_id: str | None) -> None:
-    """rarity_id=None продаёт всё снаряжение разом, иначе — одну редкость."""
+    """rarity_id=None продаёт всё снаряжение разом, WEAKER - то, что слабее
+    надетого, иначе — одну редкость."""
     async with get_session_factory()() as db:
         character = await onboarding_svc.get_character(db, from_id)
         if character is None or character.creation_state is not None:
@@ -323,6 +334,8 @@ async def _sell_now(peer_id: int, from_id: int, rarity_id: str | None) -> None:
         mult = _price_multiplier(character, grid.city_region_at(character.pos_x, character.pos_y))
         if rarity_id is None:
             gold = await item_service.sell_all_gear(db, character, mult)
+        elif rarity_id == WEAKER:
+            gold = await item_service.sell_weaker(db, character, mult)
         else:
             gold = await item_service.sell_by_rarity(db, character, rarity_id, mult)
         daily_progress = await daily_service.record_sell_gold(db, character, gold)
@@ -450,6 +463,13 @@ async def sell_all_gear(message: Message) -> None:
         return
 
     await _sell_now(peer_id, message.from_id, None)
+
+
+@labeler.message(payload_contains={"type": "sell_weaker_gear"})
+async def sell_weaker_gear(message: Message) -> None:
+    """Продать всё, что слабее надетого (2026-10-23). Подтверждения нет:
+    вещи лучше надетого сюда не попадают по определению."""
+    await _sell_now(message.peer_id, message.from_id, WEAKER)
 
 
 @labeler.message(payload_contains={"type": "sell_all_gear_confirm"})

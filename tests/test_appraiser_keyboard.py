@@ -121,7 +121,7 @@ def test_sell_gear_main_keyboard_one_button_per_present_rarity() -> None:
     rarity_labels = {
         b["action"]["label"] for b in buttons if b["action"].get("payload", {}).get("type") == "sell_rarity"
     }
-    assert rarity_labels == {"Продать ⚪ ×12 - 216 зол.", "Продать 🟣 ×1 - 80 зол."}
+    assert rarity_labels == {"⚪ ×12 - 216 зол.", "🟣 ×1 - 80 зол."}
 
 
 def test_sell_gear_main_keyboard_rows_bounded_even_with_many_items() -> None:
@@ -134,6 +134,22 @@ def test_sell_gear_main_keyboard_rows_bounded_even_with_many_items() -> None:
     ]
     rows = _kb_rows(sell_gear_main_keyboard(groups, 500))
     assert len(rows) <= 10
+
+
+def test_sell_gear_main_keyboard_weaker_button_and_five_rows(monkeypatch) -> None:
+    """2026-10-23: «Слабее надетого» рядом с «Продать всё»; при всех пяти
+    редкостях и кнопке мини-аппа экран не длиннее 5 рядов."""
+    monkeypatch.setattr(world_kb, "get_settings", lambda: Settings(vk_miniapp_url="https://vk.com/app1"))
+    groups = [
+        (_rdef(rid, "⚪"), [Item(id=i, name="X", slot="weapon", base_stats={}) for i in range(3)], 10)
+        for rid in ["common", "uncommon", "rare", "epic", "legendary"]
+    ]
+    rows = _kb_rows(sell_gear_main_keyboard(groups, 50, (4, 30)))
+    assert len(rows) <= 5
+    assert [b["action"]["payload"]["type"] for b in rows[0]] == ["sell_all_gear", "sell_weaker_gear"]
+    assert "×4 - 30 зол." in rows[0][1]["action"]["label"]
+    no_weak = _kb_rows(sell_gear_main_keyboard(groups, 50))
+    assert [b["action"]["payload"]["type"] for b in no_weak[0]] == ["sell_all_gear"]
 
 
 def test_sell_gear_main_keyboard_empty_groups_has_only_back() -> None:

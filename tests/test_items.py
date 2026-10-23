@@ -353,6 +353,23 @@ async def test_sell_by_rarity_skips_equipped_and_admin_only(db_session, characte
     assert [item.id for item, _ in remaining] == [equipped_item.id]
 
 
+async def test_sell_weaker_sells_only_weaker_than_equipped(db_session, character_at) -> None:
+    """2026-10-23: «Слабее надетого» - только вещи слабее надетой в том же
+    слоте; равная, сильнее и вещь под пустой слот остаются."""
+    character = await character_at(0, 30, farm=0)
+    worn = await _add_item(db_session, character, slot="weapon", rarity="common", ilvl=10, stats={"str": 5}, equipped=True)
+    weak = await _add_item(db_session, character, slot="weapon", rarity="rare", ilvl=10, stats={"str": 3})
+    equal = await _add_item(db_session, character, slot="weapon", rarity="common", ilvl=10, stats={"str": 5})
+    strong = await _add_item(db_session, character, slot="weapon", rarity="common", ilvl=10, stats={"str": 8})
+    free_slot = await _add_item(db_session, character, slot="helmet", rarity="common", ilvl=10, stats={"str": 1})
+
+    gold = await item_service.sell_weaker(db_session, character)
+    assert gold == item_service.sell_price(weak)
+
+    remaining = {item.id for item, _ in await item_service.get_inventory(db_session, character.id)}
+    assert remaining == {worn.id, equal.id, strong.id, free_slot.id}
+
+
 async def test_sell_all_gear_sells_every_unequipped_item(db_session, character_at) -> None:
     character = await character_at(0, 30, farm=0)
     a = await _add_item(db_session, character, slot="weapon", rarity="common", ilvl=10, stats={"str": 2})

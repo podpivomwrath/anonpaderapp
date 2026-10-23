@@ -87,28 +87,38 @@ def appraiser_trophies_keyboard(stock: list[tuple[TrophyDef, int]]) -> str:
 
 
 def sell_gear_main_keyboard(
-    groups: list[tuple[ItemRarityDef, list[Item], int]], grand_total: int
+    groups: list[tuple[ItemRarityDef, list[Item], int]], grand_total: int, weaker: tuple[int, int] = (0, 0),
 ) -> str:
     """Основной экран продажи снаряжения (патч 35/37) — до 5 кнопок продажи (по
     одной на присутствующую редкость) + «Продать всё» + подробный режим +
     назад, вместо одной кнопки на предмет и вместо инлайн-наложения на город.
-    Патч 41: редкости — по 2 в ряд, «Продать всё» остаётся главным действием."""
+
+    2026-10-23: рядом с «Продать всё» - «Слабее надетого» (weaker: штук,
+    золото). Чтобы экран остался в 5 рядов: редкости по 3 в ряд, «По
+    предметам» - в одном ряду с «Назад»."""
     kb = Keyboard(one_time=False)
     if groups:
         kb.add(
             Text(f"Продать всё - {grand_total} зол.", payload={"type": "sell_all_gear"}),
             color=KeyboardButtonColor.POSITIVE,
         )
+        if weaker[0]:
+            kb.add(
+                Text(f"Слабее надетого ×{weaker[0]} - {weaker[1]} зол.", payload={"type": "sell_weaker_gear"}),
+                color=KeyboardButtonColor.POSITIVE,
+            )
         kb.row()
-        items = [
-            (f"Продать {rdef.emoji} ×{len(items_)} - {total} зол.", KeyboardButtonColor.SECONDARY,
-             {"type": "sell_rarity", "rarity": rdef.id})
-            for rdef, items_, total in groups
-        ]
-        items.append((BTN_GEAR_DETAIL, KeyboardButtonColor.SECONDARY, {"type": "gear_detail", "page": 1}))
-        add_paired(kb, items)
+        for i, (rdef, items_, total) in enumerate(groups):
+            if i and i % 3 == 0:
+                kb.row()
+            kb.add(
+                Text(f"{rdef.emoji} ×{len(items_)} - {total} зол.", payload={"type": "sell_rarity", "rarity": rdef.id}),
+                color=KeyboardButtonColor.SECONDARY,
+            )
     add_miniapp_button(kb)
     kb.row()
+    if groups:
+        kb.add(Text(BTN_GEAR_DETAIL, payload={"type": "gear_detail", "page": 1}), color=KeyboardButtonColor.SECONDARY)
     kb.add(Text(BTN_BACK, payload={"type": "appraiser_root"}), color=KeyboardButtonColor.SECONDARY)
     return kb.get_json()
 
