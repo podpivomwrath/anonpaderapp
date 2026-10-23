@@ -10,6 +10,7 @@
 """
 
 import random
+from datetime import datetime, timezone
 
 from vkbottle.bot import BotLabeler, Message
 
@@ -17,17 +18,16 @@ from bot import fishing_texts as ft
 from bot.activity import activity_action, blocked_reason
 from bot.busy import open_event
 from bot.keyboards import fishing as kb
-from bot.keyboards.world import movement_keyboard
 from game.economy import fishing
 from game.economy import fishing_config as fc
 from game.economy import gem_goods_config as ggc
 from game.world import grid
 from game.world.scheduler import PeerScheduler
-from services import experience_service, guild_quest_service
 from services import (
+    experience_service,
     fishing_service,
+    guild_quest_service,
     item_service,
-    mount_service,
     raid_key_service,
     screen_service,
     trophy_service,
@@ -577,14 +577,16 @@ async def leave_lake(message: Message) -> None:
             _bite_scheduler.cancel(message.peer_id)
         fishing_service.clear_cast(character)
         await screen_service.set_screen(db, character, None)
-        has_mount = await mount_service.has_any_mount(db, character.id)
+        # Открытое событие на клетке - его кнопки, а не карта (2026-10-24).
+        keyboard = await _root_keyboard(db, character, message.peer_id)
         await db.commit()
-    await message.answer(
-        "Ты отходишь от воды.",
-        keyboard=movement_keyboard(
-            character.pos_x, character.pos_y, message.peer_id, has_mount
-        ),
-    )
+    await message.answer("Ты отходишь от воды.", keyboard=keyboard)
+
+
+async def _root_keyboard(db, character, peer_id: int) -> str:
+    from bot.handlers import world
+
+    return await world._current_keyboard(db, character, peer_id, datetime.now(timezone.utc))
 
 
 @labeler.message(regex=r"(?i)^\s*/(?:рыба|fish)\s*(\d*)\s*$")

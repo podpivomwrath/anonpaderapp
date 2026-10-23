@@ -10,6 +10,7 @@ bot/activity.py::blocked_reason). Ограничителя, кроме врем�
 """
 
 import random
+from datetime import datetime, timezone
 
 from vkbottle.bot import BotLabeler, Message
 
@@ -18,10 +19,14 @@ from bot import pending_activity
 from bot.activity import activity_action, blocked_reason
 from bot.busy import open_event
 from bot.keyboards import mining as kb
-from bot.keyboards.world import movement_keyboard
 from game.world import grid
 from game.world.scheduler import PeerScheduler
-from services import experience_service, guild_quest_service, mining_service, mount_service, screen_service
+from services import (
+    experience_service,
+    guild_quest_service,
+    mining_service,
+    screen_service,
+)
 from services import onboarding_service as onboarding_svc
 from services.db import get_session_factory
 
@@ -319,15 +324,13 @@ async def leave_mine(message: Message) -> None:
             )
             return
         await screen_service.set_screen(db, character, None)
-        has_mount = await mount_service.has_any_mount(db, character.id)
+        # Открытое событие на клетке - его кнопки, а не карта (2026-10-24).
+        from bot.handlers import world
+
+        keyboard = await world._current_keyboard(db, character, message.peer_id, datetime.now(timezone.utc))
         await db.commit()
     _cancel_finish(message.peer_id)
-    await message.answer(
-        "Ты поднимаешься наверх.",
-        keyboard=movement_keyboard(
-            character.pos_x, character.pos_y, message.peer_id, has_mount
-        ),
-    )
+    await message.answer("Ты поднимаешься наверх.", keyboard=keyboard)
 
 
 @labeler.message(payload_contains={"type": "dig_vein"})

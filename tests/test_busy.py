@@ -113,3 +113,15 @@ def test_open_event_guards_mine_and_lake_entry() -> None:
 
     assert "open_event(" in inspect.getsource(mining._enter_mine)
     assert "open_event(" in inspect.getsource(fishing._enter_lake)
+
+
+def test_leaving_mine_or_lake_restores_event_buttons() -> None:
+    """2026-10-24: «Отойти от воды» с открытым событием давало карту без его
+    кнопок, а маунт отвечал «сначала закончи событие». Выход берёт общую
+    клавиатуру мира - там кнопки события важнее карты."""
+    import inspect
+
+    from bot.handlers import fishing, mining
+
+    assert "_current_keyboard" in inspect.getsource(mining.leave_mine)
+    assert "_root_keyboard" in inspect.getsource(fishing.leave_lake)
