@@ -197,7 +197,12 @@ export function ItemSheet({ entry, onClose, worn, compare = false, actions = nul
     herb: 'Из трав варят зелья на алхимическом столе и готовят блюда в печи - для этого нужен дом.',
     ore: 'Руда идёт на ковку в мастерской и не теряется при смерти. Лишнее железо и кварц дёшево берёт Иргал.',
   };
-  const note = NOTES[kind] || null;
+  // Прикормка и Эликсир Мастера лежат в разделе еды, но блюдо не заменяют.
+  const DISH_NOTES = {
+    bait: 'Рассыпать можно только вне боя. Прикормка действует вместе с блюдом, одно другое не заменяет. Новая горсть добавляет 30 минут к оставшимся.',
+    master_draught: 'Пить можно только вне боя. Прибавка остаётся навсегда и с блюдом не спорит.',
+  };
+  const note = (kind === 'food' && DISH_NOTES[data.dish]) || NOTES[kind] || null;
   return (
     <>
       <div className="nav-scrim" onClick={onClose} aria-hidden="true" />
