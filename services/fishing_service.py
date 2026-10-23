@@ -101,6 +101,7 @@ def drop_catch(character: Character) -> None:
 
 
 def clear_cast(character: Character) -> None:
+    character.fishing_auto = False  # снасть из воды - донка тоже снята
     character.fishing_cast_at = None
     character.fishing_bite_at = None
     character.fishing_pending_fish = None

@@ -1020,9 +1020,15 @@ async def _screen_keyboard(db, character) -> str | None:
     if character.screen == "lake" and fishing_service.lake_at(character) is None:
         return None
     if character.screen == "lake":
+        if fishing_service.is_casting(character) and character.fishing_auto:
+            return fishing_kb.donka_keyboard()
         if fishing_service.is_casting(character):
+            if fishing_service.bite_ready(character) and not fishing_service.strike_expired(character):
+                return fishing_kb.bite_keyboard()
             return fishing_kb.casting_keyboard()
-        return fishing_kb.lake_keyboard()
+        if fishing_service.has_catch(character):
+            return fishing_kb.catch_keyboard()
+        return fishing_kb.lake_keyboard(character.has_donka)
     for rebuild in _SCREEN_REBUILDERS:
         result = await rebuild(db, character)
         if result is not None:

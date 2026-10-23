@@ -115,8 +115,8 @@ export default function CraftGear({ craft, onUpdate }) {
       <div className="gear-page__head">
         <span className="gear-page__emoji" aria-hidden="true">{craft.emoji}</span>
         <div>
-          <b className="gear-page__title">{craft.title}</b>
-          <small>{craft.level} уровень</small>
+          <b className="gear-page__title">{craft.level} уровень</b>
+          <small>Инструменты не ломаются и остаются с тобой</small>
         </div>
       </div>
       <div className="gear-page__tools">

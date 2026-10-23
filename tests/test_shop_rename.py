@@ -46,7 +46,7 @@ def test_catalog_lists_rename_items(make_character):
 
     from datetime import datetime, timezone
 
-    c = SimpleNamespace(name="Ник", premium_until=datetime(2000, 1, 1, tzinfo=timezone.utc), region="ridge",
+    c = SimpleNamespace(name="Ник", premium_until=datetime(2000, 1, 1, tzinfo=timezone.utc), region="ridge", has_donka=False,
                         ash_tincture_until=None, secret_pocket=False, faction_changed_at=None,
                         pending_faction=None, has_courier=False, has_house=False)
     items = {i["id"]: i for i in shop_service.catalog(c, 0)["items"]}
@@ -62,7 +62,7 @@ def test_every_catalog_item_is_buyable() -> None:
 
     from bot.miniapp_shop_api import BUYABLE
 
-    c = SimpleNamespace(name="Ник", premium_until=datetime(2000, 1, 1, tzinfo=timezone.utc), region="ridge",
+    c = SimpleNamespace(name="Ник", premium_until=datetime(2000, 1, 1, tzinfo=timezone.utc), region="ridge", has_donka=False,
                         ash_tincture_until=None, secret_pocket=False, faction_changed_at=None,
                         pending_faction=None, has_courier=False, has_house=False)
     ids = {i["id"] for i in shop_service.catalog(c, 0, "Фирма")["items"]}

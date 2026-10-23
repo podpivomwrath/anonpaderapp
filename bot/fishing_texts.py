@@ -205,3 +205,22 @@ def lake_attachment(lake: LakeDef) -> str | None:
     там была бы шумом."""
     photo_id = lake.image or TIER_PHOTO_IDS.get(lake.tier)
     return photo_attachment(photo_id) if photo_id else None
+
+
+# --- Пепельная донка (2026-10-23): авторыбалка из магазина ----------------------
+DONKA_NAME = "Пепельная донка"
+BTN_DONKA_ON = "🪝 Поставить донку"
+BTN_DONKA_OFF = "🪝 Снять донку"
+DONKA_ON_TEXT = (
+    "🪝 Донка на дне. Тянет сама, но вчетверо медленнее, чем руками; "
+    "рыба идёт прямо в садок. Пока донка стоит, от воды не отойти."
+)
+DONKA_OFF_TEXT = "🪝 Донка смотана. Можно рыбачить руками или поставить её снова."
+DONKA_BREAK_TEXT = "🪝 Донка: сорвалась."
+DONKA_FULL_TEXT = "🪝 Садок полон - донка смотана."
+DONKA_IDLE_TEXT = "🪝 Ты давно не подавал признаков жизни - донку смотали."
+DONKA_CHOICE_LINE = "🪝 Можно рыбачить самому или поставить донку."
+
+
+def donka_catch_line(fish, grams: int, grade_label: str) -> str:
+    return f"🪝 Донка: {fish.emoji} {fish.name}, {fishing.format_kg(grams)} ({grade_label}) - в садке."

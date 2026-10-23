@@ -18,7 +18,7 @@ async def test_card_shows_crafts_house_and_bags(db_session, make_character) -> N
     assert [x["title"] for x in card["crafts"]][2:] == ["🌿 Травничество", "⚗️ Алхимия", "🔥 Кулинария"]
     assert "Малое исцеление" in card["house"]["work"]
     assert card["herbs"][0]["count"] == 3 and card["food"][0]["grade"] == "крупная"
-    assert card["flags"] == {"courier": False, "pocket": False, "subclass_declined": False}
+    assert card["flags"] == {"courier": False, "pocket": False, "donka": False, "subclass_declined": False}
 
 
 async def test_set_craft_level_and_clear_work(db_session, make_character) -> None:

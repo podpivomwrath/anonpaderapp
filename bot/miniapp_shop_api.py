@@ -42,7 +42,7 @@ async def handle_get(request: web.Request) -> web.Response:
 BUYABLE = (
     shop_service.PREMIUM_ID, shop_service.RENAME_ID, shop_service.FIRM_RENAME_ID,
     shop_service.ELIXIR_PACK_ID, shop_service.TINCTURE_ID, shop_service.POCKET_ID,
-    shop_service.FACTION_ID, shop_service.COURIER_ID, shop_service.HOUSE_ID,
+    shop_service.FACTION_ID, shop_service.COURIER_ID, shop_service.HOUSE_ID, shop_service.DONKA_ID,
 )
 
 
@@ -85,6 +85,9 @@ async def handle_post(request: web.Request) -> web.Response:
                 done = {"item": item}
             elif item == shop_service.HOUSE_ID:
                 await shop_service.buy_house(db, character)
+                done = {"item": item}
+            elif item == shop_service.DONKA_ID:
+                await shop_service.buy_donka(db, character)
                 done = {"item": item}
             elif item == shop_service.FACTION_ID:
                 region = body.get("region")

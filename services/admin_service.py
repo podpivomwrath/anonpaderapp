@@ -609,7 +609,7 @@ async def _crafts_card(db: AsyncSession, character: Character) -> dict:
         "fish_kg": round(await fishing_service.bag_total_grams(db, character.id) / 1000, 1),
         "ore_pieces": await mining_service.total_ore(db, character.id),
         "flags": {
-            "courier": character.has_courier, "pocket": character.secret_pocket,
+            "courier": character.has_courier, "pocket": character.secret_pocket, "donka": character.has_donka,
             "subclass_declined": character.subclass_declined,
         },
         "guild": {

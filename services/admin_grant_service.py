@@ -142,6 +142,7 @@ def catalog() -> list[dict]:
         _entry("flag:has_house", "🏠 Дом", "one"),
         _entry("flag:has_courier", "🏃 Курьер", "one"),
         _entry("flag:secret_pocket", "🧥 Тайный карман", "one"),
+        _entry("flag:has_donka", "🪝 Пепельная донка", "one"),
     ]
     service = [
         _entry(f"admin_weapon:{w.id}", f"🛠 {w.name} (только себе)", "pieces")

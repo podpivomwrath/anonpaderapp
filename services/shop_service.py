@@ -55,7 +55,7 @@ def catalog(character: Character, gems: int, firm_name: str | None = None) -> di
             "note": "Без силовых преимуществ: статы, урон и HP не меняются. Срок складывается с оставшимся.",
             "active_until": until.isoformat() if active and until is not None else None,
         }, elixir_pack_item(), tincture_item(character), pocket_item(character), faction_item(character),
-            courier_item(character), *house_items(character),
+            courier_item(character), donka_item(character), *house_items(character),
             *rename_items(character, firm_name)],
     }
 
@@ -482,3 +482,33 @@ async def buy_courier(db: AsyncSession, character: Character) -> None:
         await courier_service.buy(db, character)
     except courier_service.CourierError as exc:
         raise ShopError(str(exc)) from None
+
+
+# --- Пепельная донка (2026-10-23, владелец): авторыбалка ---
+
+DONKA_ID = "ash_donka"
+DONKA_PRICE = 500
+
+
+def donka_item(character: Character) -> dict:
+    return {
+        "id": DONKA_ID, "title": "Пепельная донка", "emoji": "🪝", "kind": "bundle", "price": DONKA_PRICE,
+        "perks": [
+            "Ставишь у озера - снасть забрасывается и подсекает сама",
+            "Рыба сразу идёт в садок, удочка и леска работают как обычно",
+            "Ловит вчетверо медленнее, чем руками, и только пока ты у воды",
+            "Покупается один раз и навсегда",
+        ],
+        "note": "У воды появится выбор: рыбачить самому или поставить донку. "
+                "Если долго не заходить в игру, донку смотают.",
+        "available": not character.has_donka,
+        "unavailable": "Донка у тебя уже есть.",
+    }
+
+
+async def buy_donka(db: AsyncSession, character: Character) -> None:
+    if character.has_donka:
+        raise ShopError("Донка у тебя уже есть.")
+    await _charge(db, character, DONKA_PRICE)
+    character.has_donka = True
+    await db.flush()

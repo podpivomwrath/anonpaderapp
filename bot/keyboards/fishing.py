@@ -9,10 +9,14 @@ from vkbottle import Keyboard, KeyboardButtonColor, Text
 
 from bot.keyboards.world import add_miniapp_button
 
-from bot.fishing_texts import BTN_BAG, BTN_CANCEL_CAST, BTN_CAST, BTN_FISH, BTN_LEAVE_LAKE, BTN_STRIKE
+from bot.fishing_texts import (
+    BTN_BAG, BTN_CANCEL_CAST, BTN_CAST, BTN_DONKA_OFF, BTN_DONKA_ON, BTN_FISH, BTN_LEAVE_LAKE, BTN_STRIKE,
+)
 
 CANCEL_CAST_PAYLOAD = {"type": "fish_cancel_cast"}
 KEEP_PAYLOAD = {"type": "fish_keep"}
+DONKA_ON_PAYLOAD = {"type": "fish_donka_on"}
+DONKA_OFF_PAYLOAD = {"type": "fish_donka_off"}
 RELEASE_PAYLOAD = {"type": "fish_release"}
 BTN_KEEP = "🧺 В садок"
 BTN_RELEASE = "🐟 Отпустить"
@@ -28,10 +32,13 @@ def catch_keyboard() -> str:
     return kb.get_json()
 
 
-def lake_keyboard() -> str:
-    """Стоим у воды, снасть не заброшена."""
+def lake_keyboard(donka: bool = False) -> str:
+    """Стоим у воды, снасть не заброшена. donka - куплена Пепельная донка:
+    рядом с забросом кнопка поставить её (2026-10-23)."""
     kb = Keyboard(one_time=False)
     kb.add(Text(BTN_CAST), color=KeyboardButtonColor.POSITIVE)
+    if donka:
+        kb.add(Text(BTN_DONKA_ON, payload=DONKA_ON_PAYLOAD), color=KeyboardButtonColor.PRIMARY)
     kb.row()
     kb.add(Text(BTN_BAG), color=KeyboardButtonColor.SECONDARY)
     kb.add(Text(BTN_LEAVE_LAKE), color=KeyboardButtonColor.SECONDARY)
@@ -59,6 +66,16 @@ def bite_keyboard() -> str:
     kb.add(Text(BTN_STRIKE), color=KeyboardButtonColor.PRIMARY)
     kb.row()
     kb.add(Text(BTN_CANCEL_CAST, payload=CANCEL_CAST_PAYLOAD), color=KeyboardButtonColor.SECONDARY)
+    add_miniapp_button(kb)
+    return kb.get_json()
+
+
+def donka_keyboard() -> str:
+    """Донка стоит: снять её или заглянуть в садок."""
+    kb = Keyboard(one_time=False)
+    kb.add(Text(BTN_DONKA_OFF, payload=DONKA_OFF_PAYLOAD), color=KeyboardButtonColor.NEGATIVE)
+    kb.row()
+    kb.add(Text(BTN_BAG), color=KeyboardButtonColor.SECONDARY)
     add_miniapp_button(kb)
     return kb.get_json()
 

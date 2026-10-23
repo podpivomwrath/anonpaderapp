@@ -116,6 +116,13 @@ async def on_bite(peer_id: int) -> None:
             return
         if character.fishing_pending_fish is None:
             return
+        if character.fishing_auto:
+            text, keyboard, wait = await _donka_bite(db, character, peer_id)
+            await db.commit()
+            if wait is not None and _bite_scheduler is not None:
+                _bite_scheduler.schedule(peer_id, wait)
+            await _bot_api.messages.send(peer_id=peer_id, message=text, random_id=0, keyboard=keyboard)
+            return
     await _bot_api.messages.send(
         peer_id=peer_id, message=_rng.choice(ft.BITE_TEXTS), random_id=0,
         keyboard=kb.bite_keyboard(),
@@ -155,7 +162,14 @@ async def _enter_lake(message: Message) -> None:
         f"{ft.SEP}"
     )
     # Вытащенная рыба ждёт решения - сначала оно, потом заброс.
-    keyboard = kb.catch_keyboard() if fishing_service.has_catch(character) else kb.lake_keyboard()
+    if fishing_service.has_catch(character):
+        keyboard = kb.catch_keyboard()
+    elif character.fishing_auto:
+        keyboard = kb.donka_keyboard()
+    else:
+        keyboard = kb.lake_keyboard(character.has_donka)
+        if character.has_donka:
+            text += f"\n{ft.DONKA_CHOICE_LINE}"
     await message.answer(text, keyboard=keyboard, attachment=ft.lake_attachment(lake))
 
 
@@ -269,7 +283,9 @@ async def strike(message: Message) -> None:
         # Садок - после решения «В садок» / «Отпустить» (2026-10-21).
         text, keyboard = body, kb.catch_keyboard()
     else:
-        text, keyboard = f"{body}\n\n{ft.SEP}\n{ft.bag_line(grams, capacity)}\n{ft.SEP}", kb.lake_keyboard()
+        text, keyboard = (
+            f"{body}\n\n{ft.SEP}\n{ft.bag_line(grams, capacity)}\n{ft.SEP}", kb.lake_keyboard(character.has_donka),
+        )
     if guild_lines:
         text += "\n\n" + "\n".join(guild_lines)
     await message.answer(text, keyboard=keyboard)
@@ -320,7 +336,7 @@ async def _decide(message: Message, keep: bool) -> None:
     line = ft.kept_line(decision) if decision.kept else ft.released_line(decision)
     await message.answer(
         f"{line}\n\n{ft.SEP}\n{ft.bag_line(grams, capacity)}\n{ft.SEP}",
-        keyboard=kb.lake_keyboard() if at_lake else None,
+        keyboard=kb.lake_keyboard(character.has_donka) if at_lake else None,
     )
 
 
@@ -369,7 +385,8 @@ async def bag(message: Message) -> None:
         value = await fishing_service.bag_value(db, character.id, fc.APPRAISER_FISH_MULTIPLIER)
         capacity = fishing.bag_capacity_grams(character.fishing_level)
     await message.answer(
-        ft.bag_screen(rows, grams, capacity, value), keyboard=kb.bag_keyboard()
+        ft.bag_screen(rows, grams, capacity, value),
+        keyboard=kb.donka_keyboard() if character.fishing_auto else kb.bag_keyboard(),
     )
 
 
@@ -386,7 +403,108 @@ async def cancel_cast(message: Message) -> None:
             _bite_scheduler.cancel(message.peer_id)
         fishing_service.clear_cast(character)
         await db.commit()
-    await message.answer(ft.CANCEL_CAST_TEXT, keyboard=kb.lake_keyboard())
+    await message.answer(ft.CANCEL_CAST_TEXT, keyboard=kb.lake_keyboard(character.has_donka))
+
+
+# --- Пепельная донка (2026-10-23): авторыбалка из магазина ------------------------
+
+#: Донка ждёт поклёвку во столько раз дольше обычного заброса (владелец: «в 4 раза медленнее»).
+DONKA_SLOWDOWN = 4
+#: Игрок молчит дольше - донку сматывает: ловит только пока ты рядом.
+DONKA_IDLE_MINUTES = 30
+
+
+async def _donka_cast(db, character, lake) -> float:
+    """Новый заброс донки: поклёвка вчетверо дольше. Секунды до неё."""
+    from datetime import datetime, timedelta, timezone
+
+    from services import craft_gear_service
+
+    rod = await craft_gear_service.tier(db, character.id, "rod")
+    result = fishing_service.start_cast(character, lake, _rng, rod_tier=rod)
+    wait = result.seconds * DONKA_SLOWDOWN
+    character.fishing_bite_at = datetime.now(timezone.utc) + timedelta(seconds=wait)
+    character.fishing_auto = True
+    return wait
+
+
+@labeler.message(payload_contains=kb.DONKA_ON_PAYLOAD)
+@activity_action
+async def donka_on(message: Message) -> None:
+    async with get_session_factory()() as db:
+        character = await onboarding_svc.get_character(db, message.from_id)
+        if character is None or character.screen != "lake" or not character.has_donka:
+            return
+        lake = fishing_service.lake_at(character)
+        if lake is None:
+            await message.answer(ft.NOT_AT_LAKE_TEXT)
+            return
+        if fishing_service.has_catch(character):
+            await message.answer(ft.DECIDE_FIRST_TEXT, keyboard=kb.catch_keyboard())
+            return
+        if fishing_service.is_casting(character) and not fishing_service.cast_is_stale(character):
+            await message.answer(ft.ALREADY_CASTING_TEXT)
+            return
+        if await fishing_service.bag_total_grams(db, character.id) >= fishing.bag_capacity_grams(character.fishing_level):
+            await message.answer(ft.DONKA_FULL_TEXT, keyboard=kb.lake_keyboard(True))
+            return
+        wait = await _donka_cast(db, character, lake)
+        await db.commit()
+    if _bite_scheduler is not None:
+        _bite_scheduler.schedule(message.peer_id, wait)
+    await message.answer(ft.DONKA_ON_TEXT, keyboard=kb.donka_keyboard())
+
+
+@labeler.message(payload_contains=kb.DONKA_OFF_PAYLOAD)
+@activity_action
+async def donka_off(message: Message) -> None:
+    async with get_session_factory()() as db:
+        character = await onboarding_svc.get_character(db, message.from_id)
+        if character is None:
+            return
+        if _bite_scheduler is not None:
+            _bite_scheduler.cancel(message.peer_id)
+        fishing_service.clear_cast(character)
+        await db.commit()
+    keyboard = kb.lake_keyboard(character.has_donka) if character.screen == "lake" else None
+    await message.answer(ft.DONKA_OFF_TEXT, keyboard=keyboard)
+
+
+async def _donka_bite(db, character, peer_id: int) -> tuple[str, str | None, float | None]:
+    """Поклёвка у донки: подсечка сама, рыба в садок, следующий заброс.
+    (текст, клавиатура, через сколько следующая поклёвка или None - донка снята)."""
+    from datetime import datetime, timedelta, timezone
+
+    lake = fishing_service.lake_at(character)
+    if lake is None:
+        fishing_service.clear_cast(character)
+        return ft.DONKA_OFF_TEXT, None, None
+    last = character.last_active_at
+    if last is not None and last.tzinfo is None:
+        last = last.replace(tzinfo=timezone.utc)
+    if last is not None and datetime.now(timezone.utc) - last > timedelta(minutes=DONKA_IDLE_MINUTES):
+        fishing_service.clear_cast(character)
+        return ft.DONKA_IDLE_TEXT, kb.lake_keyboard(True), None
+    result = await fishing_service.strike(db, character, lake, _rng)
+    capacity = fishing.bag_capacity_grams(character.fishing_level)
+    if result.landed:
+        await guild_quest_service.record(db, character, "fish", 1)
+        await experience_service.grant_activity_xp(
+            db, character, "fish", place_level=grid.mob_level_at(character.pos_x, character.pos_y, character.level),
+        )
+        kept = await fishing_service.keep_catch(db, character)
+        if kept is None or kept.bag_full:
+            fishing_service.drop_catch(character)
+            fishing_service.clear_cast(character)
+            return ft.DONKA_FULL_TEXT, kb.lake_keyboard(True), None
+        text = ft.donka_catch_line(result.fish, result.grams, result.grade_label)
+    else:
+        text = ft.DONKA_BREAK_TEXT
+    if await fishing_service.bag_total_grams(db, character.id) >= capacity:
+        fishing_service.clear_cast(character)
+        return f"{text}\n{ft.DONKA_FULL_TEXT}", kb.lake_keyboard(True), None
+    wait = await _donka_cast(db, character, lake)
+    return text, None, wait
 
 
 def cancel_bite(peer_id: int) -> None:
