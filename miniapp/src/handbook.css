@@ -324,9 +324,16 @@
   background: none;
   color: var(--gold);
   font: inherit;
-  text-decoration: underline dotted rgba(224, 180, 90, 0.6);
+  text-decoration: underline rgba(224, 180, 90, 0.55);
+  text-decoration-thickness: 1px;
   text-underline-offset: 3px;
   cursor: pointer;
+}
+
+.hb-link:hover,
+.hb-link:focus-visible {
+  color: #f3cd7f;
+  text-decoration-color: currentColor;
 }
 
 .hb-page h3,
