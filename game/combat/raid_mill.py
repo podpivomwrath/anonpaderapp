@@ -124,21 +124,24 @@ class CargoStage:
 
     # --- Очередь носильщиков ---
 
-    def carrier(self, session: CombatSessionState) -> str | None:
-        """Чей подкласс несёт сейчас. Павших пропускаем: очередь идёт дальше."""
+    def carrier(self, session: CombatSessionState) -> tuple[bool, str | None]:
+        """(есть ли носильщик, чей подкласс несёт). Павших пропускаем: очередь
+        идёт дальше. Подкласс None - игроки без подкласса, тоже очередь:
+        раньше None значил и «нести некому», и строка писала «-» (2026-10-24)."""
         alive = {p.subclass_id for p in _players(session)}
         for shift in range(len(self.order)):
             sid = self.order[(self.turn + shift) % len(self.order)]
             if sid in alive:
                 self.turn = (self.turn + shift) % len(self.order)
-                return sid
-        return None
+                return True, sid
+        return False, None
 
     def can_carry(self, session: CombatSessionState, cid: int) -> bool:
         player = session.combatants.get(cid)
         if player is None or not player.alive or self.carried:
             return False
-        return player.subclass_id == self.carrier(session)
+        found, sid = self.carrier(session)
+        return found and player.subclass_id == sid
 
     def claim(self) -> None:
         self.carried = True
@@ -148,8 +151,8 @@ class CargoStage:
         было только «несёт: <подкласс>» - чья очередь ДАЛЬШЕ, и её читали как
         «кто нёс» (2026-10-22, просьба владельца). Теперь отдельно: кто нёс в
         ходу и кто несёт следующим - подкласс и ники живых с ним."""
-        carrier = self.carrier(session)
-        if carrier is not None or self.order == [None]:
+        found, carrier = self.carrier(session)
+        if found:
             names = [p.name for p in _players(session) if p.subclass_id == carrier]
             nxt = subclass_title(carrier) + (f" ({', '.join(names)})" if names else "")
         else:

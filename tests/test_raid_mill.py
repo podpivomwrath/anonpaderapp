@@ -114,9 +114,9 @@ def test_carry_rotates_through_subclasses_and_skips_the_dead() -> None:
     assert stage.order == ["guardian", "poisoner"]
     assert stage.can_carry(state, 1) and stage.can_carry(state, 3) and not stage.can_carry(state, 2)
     stage.after_tick(state, _carry_result(1), random.Random(1))
-    assert stage.carrier(state) == "poisoner" and stage.progress == 1
+    assert stage.carrier(state)[1] == "poisoner" and stage.progress == 1
     b.current_hp = 0
-    assert stage.carrier(state) == "guardian"
+    assert stage.carrier(state)[1] == "guardian"
 
 
 def test_only_one_carry_per_turn() -> None:
@@ -412,8 +412,8 @@ async def test_full_run_reaches_the_miller(monkeypatch) -> None:
 
         # Этап 2: не тот подкласс хватает груз - ход впустую.
         state = engine.sessions[battle_id]
-        wrong = next(m for m in members if m.character.subclass != cargo.carrier(state))
-        right = next(m for m in members if m.character.subclass == cargo.carrier(state))
+        wrong = next(m for m in members if m.character.subclass != cargo.carrier(state)[1])
+        right = next(m for m in members if m.character.subclass == cargo.carrier(state)[1])
         await raid_combat.raid_carry(_Msg(wrong.peer_id, {"type": "raid_carry"}))
         await raid_combat.raid_carry(_Msg(right.peer_id, {"type": "raid_carry"}))
         assert cargo.progress == 1
@@ -423,7 +423,7 @@ async def test_full_run_reaches_the_miller(monkeypatch) -> None:
         assert f"нёс: {right.character.name}" in board
         while battle.stage == 2:
             state = engine.sessions[battle_id]
-            carrier = cargo.carrier(state)
+            carrier = cargo.carrier(state)[1]
             for m in members:
                 if not state.combatants[m.character.id].alive:
                     continue
@@ -440,3 +440,15 @@ async def test_full_run_reaches_the_miller(monkeypatch) -> None:
     finally:
         raid_combat.abort_run(-777)
         engine.shutdown()
+
+
+def test_status_names_players_without_subclass() -> None:
+    """2026-10-24: в очереди после подкласса шёл игрок без подкласса, а строка
+    обоза писала «следующим несёт: -»."""
+    a = combatant(1, side=0, level=60, subclass_id="guardian")
+    b = combatant(2, side=0, level=60, subclass_id=None)
+    stage, state = _cargo([a, b])
+    stage.after_tick(state, _carry_result(1), random.Random(1))
+    assert stage.carrier(state) == (True, None)
+    assert "следующим несёт: без подкласса" in stage.status_line(state)
+    assert stage.can_carry(state, 2) and not stage.can_carry(state, 1)
