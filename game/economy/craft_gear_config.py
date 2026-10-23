@@ -48,17 +48,22 @@ class ToolDef:
     herbs: int = 0
     #: Сколько зарядов/штук даёт одно изготовление (charges/stock).
     yield_: int = 0
+    #: Граммов любой рыбы на изготовление (склянки - чешуя, прикормка).
+    fish_g: int = 0
 
 
 TOOLS: dict[str, ToolDef] = {t.id: t for t in (
     ToolDef("sickle", "herbalism", 1, "Серп", "🌙", "forge", cost=6),
     ToolDef("almanac", "herbalism", 2, "Альманах травника", "📗", "drop"),
-    ToolDef("flasks", "alchemy", 1, "Метательные склянки", "🧴", "stock", yield_=3),
+    ToolDef("flasks", "alchemy", 1, "Метательные склянки", "🧴", "stock", cost=1, fish_g=500, yield_=3),
     ToolDef("still", "alchemy", 2, "Перегонный куб", "⚗️", "forge", cost=8, herbs=4),
     ToolDef("pick", "mining", 1, "Кирка", "⛏", "forge", cost=8),
     ToolDef("lamp", "mining", 2, "Шахтёрская лампа", "🏮", "drop"),
     ToolDef("pot", "cooking", 1, "Котелок", "🫕", "forge", cost=6),
     ToolDef("spices", "cooking", 2, "Набор пряностей", "🧂", "charges", cost=5, yield_=10),
+    # Прикормка - не слот, а расходник рыбака, который варит кулинар (2026-10-23):
+    # третьей строкой на странице кулинара, применяется из сумки как еда.
+    ToolDef("bait", "cooking", 3, "Прикормка", "🪱", "stock", herbs=1, fish_g=300, yield_=3),
     ToolDef("rod", "fishing", 1, "Удочка", "🎣", "forge", cost=8),
     ToolDef("line", "fishing", 2, "Леска", "🧵", "herbs", cost=6),
 )}
@@ -89,6 +94,9 @@ POT_EXTRA_PER_TIER = 0.05
 SPICE_BOOST_PER_TIER = 0.04
 #: Перегонный куб: шанс второго зелья за тир (сверх бонуса уровня).
 STILL_EXTRA_PER_TIER = 0.05
+#: Прикормка: столько минут клюёт быстрее; ожидание поклёвки короче на долю.
+BAIT_MINUTES = 30
+BAIT_SPEED = 0.3
 
 # --- Добыча инструментов -------------------------------------------------------
 

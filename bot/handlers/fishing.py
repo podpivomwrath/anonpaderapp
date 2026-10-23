@@ -161,6 +161,11 @@ async def _enter_lake(message: Message) -> None:
         f"{ft.bag_line(grams, capacity)}\n"
         f"{ft.SEP}"
     )
+    from services import craft_gear_service
+
+    bait = craft_gear_service.bait_minutes_left(character)
+    if bait:
+        text += f"\n🪱 Прикормка: клюёт быстрее ещё {bait} мин."
     # Вытащенная рыба ждёт решения - сначала оно, потом заброс.
     if fishing_service.has_catch(character):
         keyboard = kb.catch_keyboard()
@@ -209,7 +214,9 @@ async def cast(message: Message) -> None:
         from services import craft_gear_service
 
         rod = await craft_gear_service.tier(db, character.id, "rod")
-        result = fishing_service.start_cast(character, lake, _rng, rod_tier=rod)
+        result = fishing_service.start_cast(
+            character, lake, _rng, rod_tier=rod, bite_mult=craft_gear_service.bite_mult(character),
+        )
         await db.commit()
 
     if _bite_scheduler is not None:
@@ -421,7 +428,9 @@ async def _donka_cast(db, character, lake) -> float:
     from services import craft_gear_service
 
     rod = await craft_gear_service.tier(db, character.id, "rod")
-    result = fishing_service.start_cast(character, lake, _rng, rod_tier=rod)
+    result = fishing_service.start_cast(
+        character, lake, _rng, rod_tier=rod, bite_mult=craft_gear_service.bite_mult(character),
+    )
     wait = result.seconds * DONKA_SLOWDOWN
     character.fishing_bite_at = datetime.now(timezone.utc) + timedelta(seconds=wait)
     character.fishing_auto = True

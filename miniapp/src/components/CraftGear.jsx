@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Button } from '@vkontakte/vkui';
 import { makeGear } from '../api.js';
+import { itemIcon } from '../itemIcons.js';
 import { Sheet } from './ui.jsx';
 import Sparks from './Sparks.jsx';
 
@@ -79,11 +80,13 @@ function MakeSheet({ tool, level, onClose, onDone }) {
 }
 
 function ToolCard({ tool, onOpen, flash }) {
+  // Картинка - когда нарисуют (tools/craft_gear_art_prompts.md), пока эмодзи.
+  const art = itemIcon(`gear:${tool.id}`);
   const tierMark = tool.owned && tool.source !== 'drop' && tool.source !== 'stock' ? ROMAN[tool.tier] : null;
   return (
     <div className={`gear-tool${tool.owned ? ' gear-tool--owned' : ''}`}>
       <div className="gear-tool__icon" aria-hidden="true">
-        <span>{tool.emoji}</span>
+        {art ? <img src={art} alt="" draggable="false" /> : <span>{tool.emoji}</span>}
         {tierMark && <i className="gear-tool__tier">{tierMark}</i>}
         <Sparks burst={flash} />
       </div>

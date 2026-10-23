@@ -87,3 +87,23 @@ async def test_pick_makes_digging_faster(db_session, character_at) -> None:
     await db_session.flush()
     faster = await mining_service.start_dig(db_session, c, mine, random.Random(1))
     assert faster.seconds == pytest.approx(plain.seconds * (1 - gc.PICK_SPEED_PER_TIER))
+
+
+async def test_bait_made_by_cook_speeds_up_bites(db_session, make_character) -> None:
+    from services import fishing_service
+
+    c = await make_character()
+    await herb_service.add_herb(db_session, c.id, _herb(1), 1)
+    from models import CharacterFish
+
+    db_session.add(CharacterFish(character_id=c.id, fish_id="ashen_roach", grade="common", total_grams=400))
+    await db_session.flush()
+    row = await craft_gear_service.make(db_session, c, "bait", 1)
+    assert row.count == gc.TOOLS["bait"].yield_
+    assert craft_gear_service.bite_mult(c) == 1.0
+    assert await craft_gear_service.use_bait(db_session, c) == gc.BAIT_MINUTES
+    assert craft_gear_service.bite_mult(c) == pytest.approx(1 - gc.BAIT_SPEED)
+    lake = fishing.all_lakes()[0]
+    slow = fishing_service.start_cast(c, lake, random.Random(5)).seconds
+    fast = fishing_service.start_cast(c, lake, random.Random(5), bite_mult=craft_gear_service.bite_mult(c)).seconds
+    assert fast == pytest.approx(slow * (1 - gc.BAIT_SPEED))

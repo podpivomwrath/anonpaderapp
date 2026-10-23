@@ -773,7 +773,7 @@ export default function InventoryTab({ onOpenTab }) {
       out.push(
         <button key="eat" type="button" className="pill-btn pill-btn--main" disabled={eating === data.id}
           onClick={() => handleEat(data)}>
-          🍴 Съесть
+          {data.dish === 'bait' ? '🪱 Рассыпать' : '🍴 Съесть'}
         </button>,
       );
     }

@@ -121,15 +121,17 @@ class CastResult:
 
 def start_cast(
     character: Character, lake: LakeDef, rng: random.Random, now: datetime | None = None,
-    rod_tier: int = 0,
+    rod_tier: int = 0, bite_mult: float = 1.0,
 ) -> CastResult:
-    """rod_tier - удочка (2026-10-23): рыба тяжелее, изредка тиром выше."""
+    """rod_tier - удочка (2026-10-23): рыба тяжелее, изредка тиром выше.
+    bite_mult - прикормка: ожидание поклёвки короче."""
     from game.economy import craft_gear
 
     now = now or datetime.now(timezone.utc)
     character.fishing_cast_at = now
 
     wait, f_bonus = fishing.roll_bite(rng)
+    wait *= bite_mult
     fish_id = fishing.roll_fish_id(
         rng, lake.tier, character.fishing_level, craft_gear.rod_tier_up_chance(rod_tier),
     )

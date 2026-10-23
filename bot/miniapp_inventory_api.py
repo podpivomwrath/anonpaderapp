@@ -152,6 +152,7 @@ async def _full_inventory(session, character_id: int) -> dict:
     from services import cooking_service
 
     payload["food"] = _food_payload(await cooking_service.get_food(session, character_id))
+    payload["food"] += await _bait_payload(session, character_id)
     if character is not None:
         payload["food_buff"] = food_buff_payload(character)
         payload["star_dust"] = character.star_dust or 0
@@ -229,6 +230,21 @@ def _food_payload(food) -> list[dict]:
     ]
 
 
+async def _bait_payload(session, character_id: int) -> list[dict]:
+    """Прикормка (2026-10-23): лежит в еде - применяется той же кнопкой."""
+    from game.economy import craft_gear
+    from services import craft_gear_service
+
+    row = (await craft_gear_service.gear(session, character_id)).get("bait")
+    if row is None or row.count <= 0:
+        return []
+    return [{
+        "id": "bait:common", "dish": "bait", "grade": "common", "name": "Прикормка", "emoji": "🪱",
+        "icon": "gear:bait", "count": row.count, "description": "Рассыпать у воды - рыба подходит ближе.",
+        "grade_title": "для рыбалки", "effect": craft_gear.effect_line("bait", 1), "transfer_prefix": None,
+    }]
+
+
 def food_buff_payload(character) -> dict | None:
     from game.economy import cooking
     from services import cooking_service
@@ -287,7 +303,15 @@ async def handle_post_eat(request: web.Request) -> web.Response:
             body = {}
         body = body if isinstance(body, dict) else {}
         try:
-            await cooking_service.eat(session, character, str(body.get("dish")), str(body.get("grade")))
+            if body.get("dish") == "bait":
+                from services import craft_gear_service
+
+                try:
+                    await craft_gear_service.use_bait(session, character)
+                except craft_gear_service.GearError as exc:
+                    raise cooking_service.CookingError(str(exc)) from None
+            else:
+                await cooking_service.eat(session, character, str(body.get("dish")), str(body.get("grade")))
         except cooking_service.CookingError as exc:
             await session.rollback()
             return web.json_response({"error": str(exc)}, status=409)

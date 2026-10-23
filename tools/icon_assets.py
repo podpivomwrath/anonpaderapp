@@ -151,6 +151,18 @@ EXTRA_FILES = {
     "crown:fishing": "рамка_топ1_рыбалка_мастер_лески.png",
     "crown:fish_weight": "рамка_топ1_рекорд_рыбы_трофей.png",
     "crown:mining": "рамка_топ1_горное_дело_жила.png",
+    # Ремесленные инструменты (tools/craft_gear_art_prompts.md, 2026-10-23)
+    "gear:sickle": "инструмент_серп.png",
+    "gear:almanac": "инструмент_альманах.png",
+    "gear:flasks": "инструмент_склянки.png",
+    "gear:still": "инструмент_куб.png",
+    "gear:pick": "инструмент_кирка.png",
+    "gear:lamp": "инструмент_лампа.png",
+    "gear:pot": "инструмент_котелок.png",
+    "gear:spices": "инструмент_пряности.png",
+    "gear:rod": "инструмент_удочка.png",
+    "gear:line": "инструмент_леска.png",
+    "gear:bait": "инструмент_прикормка.png",
     # Добыча кровавого разлома (tools/blood_rift_loot_prompts.md)
     "chest:ore": "ларец_руды.png",
     "chest:supply": "ларец_расходников.png",

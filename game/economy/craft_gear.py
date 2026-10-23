@@ -94,4 +94,7 @@ def effect_line(tool_id: str, tier: int) -> str:
         return f"Шанс {pct(still_extra_chance(tier))} сварить зелье сверх обычного"
     if tool_id == "flasks":
         return "Зелье из склянки действует на всю группу, но слабее"
+    if tool_id == "bait":
+        return (f"Из сумки, как еда: {gc.BAIT_MINUTES} минут клюёт на "
+                f"{round(gc.BAIT_SPEED * 100)}% быстрее")
     return ""

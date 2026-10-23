@@ -14,10 +14,6 @@ from game.economy import craft_gear, fishing, herbalism, mining
 from game.economy import craft_gear_config as gc
 from models import Character, CharacterCraftGear, CharacterFish, CharacterHerb, CharacterOre
 
-#: Склянки: руда 1 тира («песок») и столько граммов любой рыбы («чешуя»).
-FLASK_ORE = 1
-FLASK_FISH_GRAMS = 500
-
 _GRADE_RANK = {"common": 0, "rare": 1, "epic": 2, "legendary": 3}
 
 
@@ -140,7 +136,8 @@ def recipe(tool: gc.ToolDef, tier: int) -> dict[str, int]:
     if tool.source in ("herbs", "charges"):
         return {"herbs": tool.cost}
     if tool.source == "stock":
-        return {"ore": FLASK_ORE, "fish_g": FLASK_FISH_GRAMS}
+        out = {k: v for k, v in (("ore", tool.cost), ("herbs", tool.herbs), ("fish_g", tool.fish_g)) if v}
+        return out
     return {}
 
 
@@ -208,3 +205,39 @@ async def make(db: AsyncSession, character: Character, tool_id: str, tier: int) 
         row.tier = tier
     await db.flush()
     return row
+
+
+# --- Прикормка (2026-10-23) -----------------------------------------------------
+
+
+def bait_minutes_left(character: Character, now=None) -> int:
+    """Сколько минут ещё клюёт быстрее; 0 - прикормки нет."""
+    from datetime import datetime, timezone
+
+    until = character.bait_until
+    if until is None:
+        return 0
+    if until.tzinfo is None:
+        until = until.replace(tzinfo=timezone.utc)
+    left = (until - (now or datetime.now(timezone.utc))).total_seconds()
+    return max(0, -(-int(left) // 60))
+
+
+def bite_mult(character: Character) -> float:
+    """Во сколько раз короче ожидание поклёвки (прикормка)."""
+    return 1.0 - gc.BAIT_SPEED if bait_minutes_left(character) > 0 else 1.0
+
+
+async def use_bait(db: AsyncSession, character: Character) -> int:
+    """Рассыпать прикормку: время складывается с оставшимся. Минут всего."""
+    from datetime import datetime, timedelta, timezone
+
+    if not await use_charge(db, character.id, "bait"):
+        raise GearError("Прикормки нет.")
+    now = datetime.now(timezone.utc)
+    start = now
+    if bait_minutes_left(character, now) > 0:
+        start = character.bait_until if character.bait_until.tzinfo else character.bait_until.replace(tzinfo=timezone.utc)
+    character.bait_until = start + timedelta(minutes=gc.BAIT_MINUTES)
+    await db.flush()
+    return bait_minutes_left(character, now)
