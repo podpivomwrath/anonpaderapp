@@ -95,7 +95,8 @@ function ToolCard({ tool, onOpen, flash }) {
           {tool.title}
           {tool.owned && (tool.source === 'charges' || tool.source === 'stock') ? ` · ${tool.count}` : ''}
         </b>
-        <small>{tool.owned ? tool.effect : (tool.hint || tool.next?.effect || '')}</small>
+        <small>{tool.owned ? tool.effect : (tool.about || tool.next?.effect || '')}</small>
+        {!tool.owned && tool.hint && <small>{tool.hint}</small>}
         {tool.soon && <small className="gear-tool__soon">Скоро</small>}
         {!tool.owned && !tool.soon && tool.source === 'drop' && <small className="gear-tool__soon">Нет</small>}
       </div>

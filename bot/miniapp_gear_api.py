@@ -81,6 +81,9 @@ async def _payload(db, character) -> dict:
                 "effect": craft_gear.effect_line(tool.id, row.tier) if have else None,
                 "next": await _next_step(db, character, tool, row),
                 "hint": SOURCE_HINTS.get(tool.id), "soon": tool.id in NOT_READY,
+                # Что делает - видно и до находки (2026-10-23: у альманаха было
+                # только «выпадает с мобов», а зачем он - нет).
+                "about": craft_gear.effect_line(tool.id, 1) if tool.source == "drop" else None,
             })
         crafts.append({
             "id": craft_id, "emoji": emoji, "title": title,
