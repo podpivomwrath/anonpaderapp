@@ -89,7 +89,7 @@ def effect_line(tool_id: str, tier: int) -> str:
     if tool_id == "line":
         return f"Леска рвётся на {pct(gc.LINE_BREAK_CUT_PER_TIER * tier)} реже"
     if tool_id == "pot":
-        return f"Шанс {pct(pot_extra_chance(tier))} приготовить лишнюю порцию"
+        return f"Шанс {pct(pot_extra_chance(tier))} приготовить дополнительную порцию"
     if tool_id == "spices":
         return f"Бафф от еды на {pct(spice_boost(tier))} сильнее. Каждая съеденная порция тратит 1 заряд"
     if tool_id == "still":

@@ -14,7 +14,7 @@ from game.economy import craft_gear_config as gc
 from game.economy import guild_config as ggc
 from models import Character
 
-#: Короткие подписи эффектов блюд - в плашку длинное «к шансу лишней
+#: Короткие подписи эффектов блюд - в плашку длинное «к шансу дополнительной
 #: реликвии с моба» не влезает.
 FOOD_SHORT = {
     "max_hp_bonus": "здоровье",

@@ -12,7 +12,7 @@
   xp_bonus                 - доля к опыту за мобов (соло и группа)
   damage_bonus             - доля к урону (тот же ключ, что у пресетов)
   incoming_damage_reduction - доля снижения входящего урона
-  relic_bonus              - шанс лишнего броска реликвий с моба (соло)
+  relic_bonus              - шанс дополнительного броска реликвий с моба (соло)
 """
 
 from dataclasses import dataclass, field
@@ -48,7 +48,7 @@ BUFF_TITLES = {
     "xp_bonus": "опыта с мобов",
     "damage_bonus": "урона",
     "incoming_damage_reduction": "защиты",
-    "relic_bonus": "к шансу лишней реликвии с моба",
+    "relic_bonus": "к шансу дополнительной реликвии с моба",
 }
 
 #: Сила блюда от градации рыбы (градации - fishing_config.GRADES).
