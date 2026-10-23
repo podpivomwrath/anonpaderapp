@@ -26,6 +26,7 @@ from services import (
     guild_season_service,
     guild_service,
     guild_siege_service,
+    guild_stock_service,
     guild_territory_service,
     guild_tree_service,
     item_service,
@@ -86,6 +87,25 @@ def _warehouse_item(item, level: int) -> dict:
         "craft_efficiency": item.craft_efficiency,
         "need_level": None if item_service.can_wear(item, level) else item_service.required_level(item),
     }
+
+
+def _goods_line(line) -> dict:
+    return {
+        "kind": line.kind, "ref": line.ref, "grade": line.grade, "count": line.count,
+        "name": line.name, "emoji": line.emoji, "grade_name": line.grade_name,
+        "kind_title": guild_stock_service.KIND_TITLES[line.kind],
+        "label": guild_stock_service.amount_text(line),
+    }
+
+
+async def _my_items(db, character: Character) -> list[dict]:
+    """Снаряжение, которое можно сдать: не надето, не привязано."""
+    out = []
+    for item, equipped in await item_service.get_inventory(db, character.id):
+        if equipped or item.bound or item.admin_only:
+            continue
+        out.append(_warehouse_item(item, character.level))
+    return out
 
 
 async def _no_guild_state(db, character: Character) -> dict:
@@ -336,6 +356,14 @@ async def _state(db, character: Character) -> dict:
             "ore": [_ore_line(o.ore_id, o.grade, o.count) for o in await guild_service.ore_stock(db, guild.id)],
             "items": [_warehouse_item(i, character.level) for i in stored],
             "my_ore": [_ore_line(d.id, grade, count) for d, grade, count in my_ore if count > 0],
+            # Припасы (2026-10-23): травы, рыба, еда, зелья - и снаряжение на сдачу.
+            "goods_total": await guild_stock_service.goods_units(db, guild.id),
+            "goods": [_goods_line(x) for x in [
+                guild_stock_service.describe(s.kind, s.ref, s.grade, s.count)
+                for s in await guild_stock_service.stock(db, guild.id)
+            ]],
+            "my_goods": [_goods_line(x) for x in await guild_stock_service.mine(db, character.id)],
+            "my_items": await _my_items(db, character),
         },
         "slots": {
             "cells": len(held_cells), "cells_max": gc.cell_slots(guild.level),
@@ -489,6 +517,19 @@ async def _act(db, character: Character, vk_user_id: int, body: dict) -> list:
         ore = mining.ore_def(ore_id)
         name = f"{ore.emoji} {ore.name}" if ore else ore_id
         _note_receiver(notes, character, receiver, f"со склада гильдии: {name} ({mining.grade_name(grade)}) ×{count}")
+    elif action == "deposit_goods":
+        await guild_stock_service.deposit(
+            db, character, _str(body, "kind"), _str(body, "ref"), str(body.get("grade") or ""), _int(body, "count"),
+        )
+    elif action == "withdraw_goods":
+        to = body.get("to")
+        receiver, line = await guild_stock_service.withdraw(
+            db, character, _str(body, "kind"), _str(body, "ref"), str(body.get("grade") or ""), _int(body, "count"),
+            to if isinstance(to, int) else None,
+        )
+        _note_receiver(notes, character, receiver, f"со склада гильдии: {guild_stock_service.amount_text(line)}")
+    elif action == "deposit_item":
+        await guild_service.deposit_item(db, character, _int(body, "item_id"))
     elif action == "withdraw_item":
         to = body.get("to")
         item_id = _int(body, "item_id")

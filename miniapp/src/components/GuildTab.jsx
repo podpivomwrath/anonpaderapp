@@ -510,6 +510,17 @@ function groupItems(items) {
   return [...groups.values()];
 }
 
+/** Припасы (2026-10-23) - по виду: травы, рыба, еда, зелья. */
+function groupGoods(rows) {
+  const groups = new Map();
+  rows.forEach((o) => {
+    const g = groups.get(o.kind) || { id: o.kind, title: o.kind_title, rows: [] };
+    g.rows.push(o);
+    groups.set(o.kind, g);
+  });
+  return [...groups.values()];
+}
+
 const TREASURY_MODES = [
   { id: 'stock', label: 'Склад и выдача' },
   { id: 'give', label: 'Сдать' },
@@ -544,6 +555,13 @@ function Treasury({ state, run, busy }) {
           </span>
           <Bar value={warehouse.ore_total} max={warehouse.capacity.ore} tone={warehouse.ore_full ? 'red' : 'blue'} thin />
           {warehouse.ore_full && <small className="milestone__reward">Склад полон, шахты стоят.</small>}
+        </div>
+        <div className="milestone milestone--flat">
+          <span className="milestone__head">
+            <span>🧺 Припасы (рыба - по кг)</span>
+            <span>{warehouse.goods_total || 0}/{warehouse.capacity.ore}</span>
+          </span>
+          <Bar value={warehouse.goods_total || 0} max={warehouse.capacity.ore} tone="blue" thin />
         </div>
         <p className="craft-hint">
           🪙 Налог гильдии: {guild.gold_tax}% с любого золота участников (собрано всего {money(guild.tax_collected)}).
@@ -601,6 +619,46 @@ function Treasury({ state, run, busy }) {
             </Folder>
           ))}
         </Group>
+        <Group header={<Header>Сдать припасы</Header>}>
+          {(warehouse.my_goods || []).length === 0 && <Div style={{ opacity: 0.8 }}>Трав, рыбы, еды и зелий у тебя нет.</Div>}
+          {groupGoods(warehouse.my_goods || []).map((g) => (
+            <Folder key={g.id} title={g.title} count={g.rows.length}>
+              {g.rows.map((o) => {
+                const key = `mygoods:${o.kind}:${o.ref}:${o.grade}`;
+                const count = amount(key, o.count);
+                return (
+                  <SimpleCell key={key} multiline subtitle={o.label} after={(
+                    <span className="guild-row guild-row--tight">
+                      {o.kind !== 'fish' && <NumberInput value={count} onChange={(v) => setAmount(key, v)} placeholder="шт" />}
+                      <Button size="s" disabled={busy || (o.kind !== 'fish' && !Number(count))}
+                        onClick={() => run('deposit_goods', {
+                          kind: o.kind, ref: o.ref, grade: o.grade, count: o.kind === 'fish' ? o.count : Number(count),
+                        }, 'Сдано на склад.')}>
+                        {o.kind === 'fish' ? 'Сдать всё' : 'Сдать'}
+                      </Button>
+                    </span>
+                  )}>
+                    {o.emoji} {o.name}
+                  </SimpleCell>
+                );
+              })}
+            </Folder>
+          ))}
+        </Group>
+        {(warehouse.my_items || []).length > 0 && (
+          <Group header={<Header>Сдать снаряжение</Header>}>
+            {groupItems(warehouse.my_items).map((g) => (
+              <Folder key={g.id} title={g.title} count={g.rows.length}>
+                {g.rows.map((i) => (
+                  <SimpleCell key={i.id} multiline before={<ItemIcon icon={i.icon} rarity={i.rarity} alt={i.name} />}
+                    subtitle={itemSubtitle(i)} after={(
+                      <Button size="s" disabled={busy} onClick={() => run('deposit_item', { item_id: i.id }, 'Сдано на склад.')}>Сдать</Button>
+                    )}>{i.name}</SimpleCell>
+                ))}
+              </Folder>
+            ))}
+          </Group>
+        )}
       </>
     );
   }
@@ -669,6 +727,33 @@ function Treasury({ state, run, busy }) {
           </Folder>
         ))}
       </Group>
+      {(warehouse.goods || []).length > 0 && (
+        <Group header={<Header>Припасы на складе</Header>}>
+          {groupGoods(warehouse.goods).map((g) => (
+            <Folder key={g.id} title={g.title} count={g.rows.length}>
+              {g.rows.map((o) => {
+                const key = `whgoods:${o.kind}:${o.ref}:${o.grade}`;
+                const count = amount(key, o.count);
+                return (
+                  <SimpleCell key={key} multiline subtitle={o.label} after={canGive && (
+                    <span className="guild-row guild-row--tight">
+                      {o.kind !== 'fish' && <NumberInput value={count} onChange={(v) => setAmount(key, v)} placeholder="шт" />}
+                      <Button size="s" mode="secondary" disabled={busy || (o.kind !== 'fish' && !Number(count))}
+                        onClick={() => run('withdraw_goods', {
+                          kind: o.kind, ref: o.ref, grade: o.grade, count: o.kind === 'fish' ? o.count : Number(count), to: target,
+                        }, 'Выдано.')}>
+                        {o.kind === 'fish' ? 'Выдать всё' : 'Выдать'}
+                      </Button>
+                    </span>
+                  )}>
+                    {o.emoji} {o.name}
+                  </SimpleCell>
+                );
+              })}
+            </Folder>
+          ))}
+        </Group>
+      )}
       {warehouse.items.length > 0 && (
       <Group header={<Header>Снаряжение на складе</Header>}>
         {groupItems(warehouse.items).map((g) => (

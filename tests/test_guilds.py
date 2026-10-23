@@ -780,3 +780,28 @@ def test_tithe_line_does_not_follow_the_player_onto_the_road() -> None:
     assert guild_handlers.take_tithe_line(555) is None
     guild_handlers.remember_tithe(555, character, outcome)
     assert guild_handlers.take_tithe_line(555) == "🏰 +40 золота в казну гильдии"
+
+
+async def test_warehouse_goods_herbs_fish_food_elixirs(db_session, make_character) -> None:
+    """2026-10-23, владелец: на склад гильдии - и все новые вещи."""
+    from models import CharacterFish
+    from services import cooking_service, elixir_service, guild_stock_service, herb_service
+
+    guild, leader = await _found(db_session, make_character)
+    await herb_service.add_herb(db_session, leader.id, "bitter_wormwood", 5)
+    await elixir_service.grant(db_session, leader.id, "heal_small", 3)
+    await cooking_service.add_food(db_session, leader.id, "wormwood_soup", "big", 2)
+    db_session.add(CharacterFish(character_id=leader.id, fish_id="ashen_roach", grade="common", total_grams=2500))
+    await db_session.flush()
+    await guild_stock_service.deposit(db_session, leader, "herb", "bitter_wormwood", "", 4)
+    await guild_stock_service.deposit(db_session, leader, "elixir", "heal_small", "", 3)
+    await guild_stock_service.deposit(db_session, leader, "food", "wormwood_soup", "big", 2)
+    await guild_stock_service.deposit(db_session, leader, "fish", "ashen_roach", "common", 2500)
+    assert await guild_stock_service.goods_units(db_session, guild.id) == 4 + 3 + 2 + 3  # рыба - 3 кг вверх
+    with pytest.raises(GuildError):
+        await guild_stock_service.deposit(db_session, leader, "herb", "bitter_wormwood", "", 2)
+    receiver, line = await guild_stock_service.withdraw(db_session, leader, "herb", "bitter_wormwood", "", 3)
+    assert receiver.id == leader.id and line.count == 3
+    assert dict((h.id, n) for h, n in await herb_service.get_bag(db_session, leader.id))["bitter_wormwood"] == 4
+    with pytest.raises(GuildError):
+        await guild_stock_service.deposit(db_session, leader, "trophy", "x", "", 1)

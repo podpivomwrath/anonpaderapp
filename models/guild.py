@@ -121,6 +121,23 @@ class GuildOre(Base):
     count: Mapped[int] = mapped_column(BigInteger, default=0)
 
 
+class GuildStock(Base):
+    """Припасы на складе (2026-10-23): травы, рыба, блюда, зелья - стаком.
+
+    kind: herb | fish | food | elixir. ref - id вида, grade - градация (у рыбы
+    и блюд; у трав и зелий пусто). count - штуки, у рыбы - граммы."""
+
+    __tablename__ = "guild_stock"
+    __table_args__ = (UniqueConstraint("guild_id", "kind", "ref", "grade", name="uq_guild_stock"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    guild_id: Mapped[int] = mapped_column(ForeignKey("guilds.id", ondelete="CASCADE"), index=True)
+    kind: Mapped[str] = mapped_column(String(8))
+    ref: Mapped[str] = mapped_column(String(32))
+    grade: Mapped[str] = mapped_column(String(16), default="")
+    count: Mapped[int] = mapped_column(BigInteger, default=0)
+
+
 class GuildItem(Base):
     """Снаряжение на складе. Сам предмет остаётся строкой items - со склада
     он уходит обратно в инвентарь тем же экземпляром."""
