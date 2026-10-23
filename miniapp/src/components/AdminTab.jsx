@@ -457,7 +457,6 @@ function ActionForm({ playerId, playerName, onDone }) {
             { value: 'grant_trophy', label: 'Выдать трофей' },
             { value: 'grant_item', label: 'Выдать случайный предмет' },
             { value: 'grant_admin_mount', label: '🛠 Выдать тестовый маунт (себе)' },
-            { value: 'grant_admin_weapon', label: '🛠 Выдать тестовое оружие (себе)' },
             { value: 'set_level', label: 'Изменить уровень' },
             { value: 'set_craft_level', label: 'Уровень ремесла' },
             { value: 'clear_house_work', label: 'Снять работу в доме (варка/готовка)' },

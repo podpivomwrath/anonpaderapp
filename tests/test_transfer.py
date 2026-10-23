@@ -108,7 +108,6 @@ async def test_unique_item_moves_and_number_picks_the_exact_one(db_session, make
 
 @pytest.mark.parametrize("extra, reason_part", [
     ({"bound": True, "craft_spec": "dps"}, "Скованная"),
-    ({"admin_only": True}, "Служебные"),
 ])
 async def test_forbidden_items_are_refused(db_session, make_character, extra, reason_part) -> None:
     a = await make_character()
@@ -189,20 +188,13 @@ def test_command_for_names_the_exact_item() -> None:
     assert ts.command_for(SimpleNamespace(name="Скальпель Хирурга", id=1212)) == "/передать Скальпель Хирурга 1212"
 
 
-async def test_equipped_service_item_says_it_is_never_transferable(db_session, make_character) -> None:
-    """Перо Хранителя надето и служебное: «сначала сними» обещало бы то, чего нет."""
-    a = await make_character()
-    await _item(db_session, a, name="Перо Хранителя", rarity="admin", equipped=True, admin_only=True)
-    assert "Служебные" in (await ts.find(db_session, a.id, "перо хранителя")).refusal
-
-
 def test_miniapp_offers_the_command_for_every_transferable_item() -> None:
     from types import SimpleNamespace
 
     from bot.miniapp_api import _transfer_command
 
     def item(**kw):
-        base = {"id": 7, "name": "Пепельный клинок", "rarity": "common", "admin_only": False,
+        base = {"id": 7, "name": "Пепельный клинок", "rarity": "common",
                 "bound": False, "craft_spec": None}
         base.update(kw)
         return SimpleNamespace(**base)
@@ -210,7 +202,6 @@ def test_miniapp_offers_the_command_for_every_transferable_item() -> None:
     assert _transfer_command(item()) == "/передать Пепельный клинок 7"
     assert _transfer_command(item(rarity="unique", name="Скальпель Хирурга")) == "/передать Скальпель Хирурга 7"
     assert _transfer_command(item(bound=True, craft_spec="dps")) is None
-    assert _transfer_command(item(admin_only=True)) is None
 
 
 def test_short_forms_and_number_first() -> None:

@@ -5,8 +5,7 @@
 
 Статы персонажа - распределённые (без экипировки); у вещей берётся их
 текущая раскладка, поэтому заточка кованого оружия и рост уровня вещей
-учтены сами собой. Служебные вещи (Перо Хранителя и т.п.) не считаются: это
-инструмент проверки, и в топах они показали бы не силу, а доступ к админке.
+учтены сами собой.
 
 Только отображение: в бою Мощь не участвует и ничего не меняет.
 """
@@ -53,7 +52,7 @@ async def power_of(db: AsyncSession, character: Character) -> Power:
     equipped = await item_service.get_equipped(db, character.id)
     gear_sum = sum(
         item_service.item_power(item) for item in equipped.values()
-        if item is not None and not item.admin_only
+        if item is not None
     )
     buffs = 0
     # Путь без подкласса считается как подкласс (2026-10-20, владелец).

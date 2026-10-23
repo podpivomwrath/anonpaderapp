@@ -72,14 +72,6 @@ async def test_gold_and_logging(db_session, make_character) -> None:
     assert [a.action_type for a in await admin_service.action_journal(db_session)] == ["grant_any"]
 
 
-async def test_service_items_only_to_self(db_session, make_character) -> None:
-    me = await make_character()
-    other = await make_character()
-    admin = await _vk_id(db_session, me)
-    with pytest.raises(admin_service.NotSelfTarget):
-        await ag.grant(db_session, admin, other, "admin_weapon:guardian_quill", 1, None, random.Random(1))
-
-
 async def test_bad_key_amount_and_duplicate_mount(db_session, make_character) -> None:
     me = await make_character()
     with pytest.raises(ag.GrantError):

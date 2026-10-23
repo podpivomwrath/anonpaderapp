@@ -492,28 +492,9 @@ def load_item_rarities(content_dir: Path = CONTENT_DIR) -> dict[str, ItemRarityD
     }
 
 
-class AdminWeaponDef(BaseModel):
-    """Тестовый предмет админки (патч 34, ч.3, content/items/admin_items.json)
-    — ФИКСИРОВАННЫЕ статы, не через item_gen.generate_item (та процедурная
-    система про него ничего не знает — только так и гарантируется, что он
-    не может выпасть из обычного дропа)."""
-
-    id: str
-    name: str
-    slot: str
-    rarity: str
-    stats: dict[str, int]
-    flavor: str
-
-
-def load_admin_weapons(content_dir: Path = CONTENT_DIR) -> list[AdminWeaponDef]:
-    raw = _load_json_dict(content_dir / "items" / "admin_items.json")
-    return [AdminWeaponDef(**w) for w in raw.get("weapons", [])]
-
-
 class UniqueItemDef(BaseModel):
     """Уникальный предмет (патч 53, content/items/unique_items.json) —
-    ФИКСИРОВАННЫЕ статы, как AdminWeaponDef: не через item_gen.generate_item,
+    ФИКСИРОВАННЫЕ статы: не через item_gen.generate_item,
     только явная выдача по id (services/raid_service.py). power — очки
     основного стата класса получателя (100% в один стат, как у обычного
     оружия) — фактический base_stats собирается в момент выдачи, не здесь."""

@@ -823,7 +823,7 @@ async def deposit_item(db: AsyncSession, character: Character, item_id: int) -> 
         raise GuildError("Такой вещи у тебя нет.")
     if entry.equipped:
         raise GuildError("Сначала сними вещь.")
-    if item.bound or item.admin_only:
+    if item.bound:
         raise GuildError("Эта вещь привязана к тебе.")
     cap = await capacity(db, guild)
     if await item_count(db, guild.id) >= cap.items:

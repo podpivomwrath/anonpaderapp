@@ -156,7 +156,6 @@ const ICONS = {
   'ore:living_stone': new URL('./assets/items/ore_living_stone.webp', import.meta.url).href,
   'ore:salt_quartz': new URL('./assets/items/ore_salt_quartz.webp', import.meta.url).href,
   'ore:taint_pyrite': new URL('./assets/items/ore_taint_pyrite.webp', import.meta.url).href,
-  'rarity:admin': new URL('./assets/items/rarity_admin.webp', import.meta.url).href,
   'rarity:common': new URL('./assets/items/rarity_common.webp', import.meta.url).href,
   'rarity:epic': new URL('./assets/items/rarity_epic.webp', import.meta.url).href,
   'rarity:legendary': new URL('./assets/items/rarity_legendary.webp', import.meta.url).href,

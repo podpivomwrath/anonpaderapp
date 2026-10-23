@@ -9,7 +9,7 @@ from services import item_service
 
 
 def _item(**kw):
-    base = {"name": "Вещь", "rarity": "common", "ilvl": 10, "admin_only": False, "bound": False,
+    base = {"name": "Вещь", "rarity": "common", "ilvl": 10, "bound": False,
             "slot": "weapon", "base_stats": {"str": 5}}
     base.update(kw)
     return SimpleNamespace(**base)
@@ -18,10 +18,9 @@ def _item(**kw):
 def test_appraiser_lists_only_what_it_buys() -> None:
     unique = _item(name="Игла Хирурга", rarity="unique", ilvl=None)
     bound = _item(name="Скованное", bound=True)
-    admin = _item(name="Перо", rarity="admin", ilvl=None, admin_only=True)
     plain = _item(name="Клинок")
     listed = [item.name for item, _ in appraiser._sellable(
-        [(unique, False), (bound, False), (admin, False), (plain, False)], 1.0)]
+        [(unique, False), (bound, False), (plain, False)], 1.0)]
     assert listed == ["Клинок"]
 
 

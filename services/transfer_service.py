@@ -146,9 +146,7 @@ async def _craft_offers(db: AsyncSession, character_id: int, name: str) -> list[
 
 def is_transferable(item: Item, equipped: bool) -> str | None:
     """None - можно; иначе причина отказа. Сначала то, что не передать
-    никогда: «сначала сними» у служебной вещи обещало бы то, чего нет."""
-    if item.admin_only:
-        return "Служебные вещи не передаются."
+    никогда, потом «сначала сними»."""
     if item.bound or item.craft_spec is not None:
         return "Скованная экипировка привязана к хозяину - её не передать."
     if equipped:
@@ -321,7 +319,7 @@ async def take(db: AsyncSession, sender_id: int, offer: Offer, amount: int) -> i
         _log_stack(db, CharacterFish, {"character_id": sender_id, "fish_id": fish_id, "grade": grade}, -int(grams))
     elif offer.kind == "item":
         item = await db.get(Item, int(offer.ref), with_for_update=True)
-        if item is None or item.admin_only or item.bound or item.craft_spec is not None:
+        if item is None or item.bound or item.craft_spec is not None:
             raise TransferFailed("Эту вещь не передать.")
         moved = await db.execute(
             delete(Inventory).where(

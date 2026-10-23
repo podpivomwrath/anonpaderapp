@@ -64,7 +64,12 @@ def maybe_upgrade_rarity(
     (common → ... → legendary), используется для поиска "следующей ступени"."""
     if rng.random() >= chance:
         return rarity_id
-    ids = list(rarities.keys())
+    # Только процедурная лестница (обычная → легендарная): следующая запись
+    # файла редкостей - не ступень. 2026-10-23: после легендарной там стояла
+    # служебная, и Метка превращала легендарный дроп в «Служебный жезл».
+    ids = [r for r in ic.ITEM_RARITY_CHANCES if r in rarities]
+    if rarity_id not in ids:
+        return rarity_id
     idx = ids.index(rarity_id)
     if idx + 1 >= len(ids):
         return rarity_id

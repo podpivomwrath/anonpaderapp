@@ -314,8 +314,6 @@ async def handle_post_action(request: web.Request) -> web.Response:
                 await admin_service.unban(db, admin_vk_id, character)
             elif action == "grant_admin_mount":
                 await admin_service.grant_admin_mount(db, admin_vk_id, character)
-            elif action == "grant_admin_weapon":
-                await admin_service.grant_admin_weapon(db, admin_vk_id, character)
             elif action == "grant_any":
                 # Патч 107: выдача любой позиции каталога (admin_grant_service).
                 key, amount, ilvl = body.get("key"), body.get("amount"), body.get("ilvl")

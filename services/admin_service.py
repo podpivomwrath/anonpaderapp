@@ -16,7 +16,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from game.classes.base import REGISTRY
 from game.combat import balance_config as bc
-from game.content_loader import load_admin_weapons
 from game.economy import mount_config as mc
 from game.world import grid
 from game.world import world_config as wc
@@ -755,26 +754,6 @@ async def grant_admin_mount(db: AsyncSession, admin_vk_id: int, character: Chara
     await _require_self(db, admin_vk_id, character)
     await mount_service.grant(db, character, mc.ADMIN_MOUNT_ID)
     await log_action(db, admin_vk_id, "grant_admin_mount", character.id, note=mc.ADMIN_MOUNT_ID)
-
-
-async def grant_admin_weapon(db: AsyncSession, admin_vk_id: int, character: Character) -> Item:
-    """«Перо Хранителя» (патч 34, ч.3) — +1000 к каждому стату, служебная
-    редкость (не продаётся — Item.admin_only). Только себе."""
-    await _require_self(db, admin_vk_id, character)
-    weapon_def = load_admin_weapons()[0]
-    item = Item(
-        name=weapon_def.name, slot=weapon_def.slot, base_stats=dict(weapon_def.stats),
-        rarity=weapon_def.rarity, ilvl=None, admin_only=True,
-    )
-    db.add(item)
-    await db.flush()
-    db.add(Inventory(character_id=character.id, item_id=item.id, equipped=False))
-    await db.flush()
-    await log_action(
-        db, admin_vk_id, "grant_admin_weapon", character.id,
-        new_value={"item_id": item.id, "name": item.name},
-    )
-    return item
 
 
 async def teleport(db: AsyncSession, admin_vk_id: int, character: Character, x: int, y: int) -> None:

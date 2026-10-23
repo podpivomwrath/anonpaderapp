@@ -102,7 +102,7 @@ async def _my_items(db, character: Character) -> list[dict]:
     """Снаряжение, которое можно сдать: не надето, не привязано."""
     out = []
     for item, equipped in await item_service.get_inventory(db, character.id):
-        if equipped or item.bound or item.admin_only:
+        if equipped or item.bound:
             continue
         out.append(_warehouse_item(item, character.level))
     return out

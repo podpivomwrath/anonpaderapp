@@ -14,7 +14,6 @@ import random
 from sqlalchemy import select
 
 from game.combat import balance_config as bc
-from game.content_loader import load_admin_weapons
 from game.economy import craft_config as cc
 from game.economy import crafting, fishing, item_gen, mining
 from game.economy import fishing_config as fc
@@ -144,10 +143,6 @@ def catalog() -> list[dict]:
         _entry("flag:secret_pocket", "🧥 Тайный карман", "one"),
         _entry("flag:has_donka", "🪝 Пепельная донка", "one"),
     ]
-    service = [
-        _entry(f"admin_weapon:{w.id}", f"🛠 {w.name} (только себе)", "pieces")
-        for w in load_admin_weapons()
-    ]
     return [
         {"id": "currency", "title": "💰 Валюта и ключи", "entries": [
             _entry("gold", "💰 Золото"),
@@ -183,7 +178,6 @@ def catalog() -> list[dict]:
         {"id": "food", "title": "🍲 Еда", "entries": dishes},
         {"id": "purchases", "title": "🏠 Разовые покупки", "entries": purchases},
         {"id": "mounts", "title": "🐎 Маунты", "entries": mounts},
-        {"id": "service", "title": "🛠 Служебное", "entries": service},
     ]
 
 
@@ -356,14 +350,6 @@ async def grant(
             await _require_self(db, admin_vk_id, character)
         if not await mount_service.grant(db, character, rest[0]):
             raise GrantError("Этот маунт у игрока уже есть.")
-    elif kind == "admin_weapon":
-        await _require_self(db, admin_vk_id, character)
-        weapon = next(w for w in load_admin_weapons() if w.id == rest[0])
-        for _ in range(amount):
-            await _add_item(db, character, Item(
-                name=weapon.name, slot=weapon.slot, base_stats=dict(weapon.stats),
-                rarity=weapon.rarity, ilvl=None, admin_only=True,
-            ))
     else:
         raise GrantError("Такого предмета нет в каталоге.")
 

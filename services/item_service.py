@@ -190,7 +190,7 @@ async def grant_unique_item(
 
 
 def is_unsellable(item: Item) -> bool:
-    """Служебные (admin_only), уникальные (патч 53) и привязанные (патч 72)
+    """Уникальные (патч 53) и привязанные (патч 72)
     предметы скупщик не принимает никогда — единая точка проверки для
     sell_price/sell_item/sell_by_rarity/sell_all_gear.
 
@@ -198,7 +198,7 @@ def is_unsellable(item: Item) -> bool:
     уникальная редкость: правило «привязанное не продаётся» принадлежит
     крафту, а не редкости, и не должно молча сломаться, если редкость
     когда-нибудь поменяют."""
-    return item.admin_only or item.bound or item.rarity in (None, UNIQUE_RARITY_ID)
+    return item.bound or item.rarity in (None, UNIQUE_RARITY_ID)
 
 
 async def get_equipped(db: AsyncSession, character_id: int) -> dict[str, Item | None]:
@@ -260,8 +260,8 @@ UNIQUE_REQUIRED_LEVEL = bc.MAX_LEVEL
 
 def required_level(item: Item) -> int | None:
     """С какого уровня персонажа вещь можно надеть: её уровень (ilvl).
-    Уникальные вещи рейдов - с 60 уровня. У служебных ограничения нет."""
-    if item.rarity == UNIQUE_RARITY_ID and not item.admin_only:
+    Уникальные вещи рейдов - с 60 уровня."""
+    if item.rarity == UNIQUE_RARITY_ID:
         return UNIQUE_REQUIRED_LEVEL
     return item.ilvl
 
@@ -423,8 +423,8 @@ async def sell_all_gear(
 
 
 def can_disassemble(item: Item) -> bool:
-    """Уникальная вещь (с рейд-босса или уже кованая) - не служебная."""
-    return item.rarity == UNIQUE_RARITY_ID and not item.admin_only
+    """Уникальная вещь (с рейд-босса или уже кованая)."""
+    return item.rarity == UNIQUE_RARITY_ID
 
 
 async def disassemble_unique(db: AsyncSession, character: Character, item_id: int) -> int | None:

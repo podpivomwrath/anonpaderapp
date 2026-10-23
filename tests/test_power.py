@@ -23,11 +23,10 @@ async def _equip(db, character, stats: dict, **extra) -> Item:
     return item
 
 
-async def test_counts_stats_and_equipped_gear_but_not_service_items(db_session, make_character) -> None:
+async def test_counts_stats_and_equipped_gear(db_session, make_character) -> None:
     me = await make_character()
     base = (await power_service.power_of(db_session, me)).total
     await _equip(db_session, me, {"str": 20, "vit": 10})
-    await _equip(db_session, me, {"str": 1000}, slot="helmet", admin_only=True, rarity="admin")
     power = await power_service.power_of(db_session, me)
     assert power.gear == 30
     assert power.total == base + 30

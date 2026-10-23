@@ -42,11 +42,6 @@ class Item(Base):
     socketed_gem_id: Mapped[int | None] = mapped_column(
         ForeignKey("items.id"), nullable=True
     )
-    # Патч 34, ч.3: тестовые предметы админки (content/items/admin_items.json)
-    # — не выпадают из обычных источников, не продаются скупщику (см.
-    # services/item_service.py::sell_item). Выдаются ТОЛЬКО через
-    # services/admin_service.py::grant_admin_weapon, себе же.
-    admin_only: Mapped[bool] = mapped_column(Boolean, default=False)
 
     # --- Крафт (патч 72) ---
     # Из какого уникального предмета скован (ключ content/crafting/recipes.json).

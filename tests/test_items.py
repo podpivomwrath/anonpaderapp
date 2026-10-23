@@ -339,7 +339,7 @@ async def test_sell_by_rarity_sells_only_matching_rarity(db_session, character_a
     assert [item.id for item, _ in remaining] == [rare.id]
 
 
-async def test_sell_by_rarity_skips_equipped_and_admin_only(db_session, character_at) -> None:
+async def test_sell_by_rarity_skips_equipped(db_session, character_at) -> None:
     character = await character_at(0, 30, farm=0)
     equipped_item = await _add_item(
         db_session, character, slot="weapon", rarity="common", ilvl=10, stats={"str": 2}, equipped=True,
@@ -489,3 +489,18 @@ async def test_disassemble_refuses_ordinary_and_equipped(db_session, character_a
     await item_service.equip_item(db_session, character.id, item.id)
     assert await item_service.disassemble_unique(db_session, character, item.id) is None
     assert (character.star_dust or 0) == 0
+
+
+def test_premium_upgrade_never_leaves_the_drop_ladder() -> None:
+    """2026-10-23: Метка поднимала легендарный дроп до служебной редкости
+    («Служебный жезл» с мобов). Легендарная - потолок, уникальной тоже нет."""
+    from game.economy import item_gen
+
+    class Always(random.Random):
+        def random(self):
+            return 0.0
+
+    rarities = item_service.rarities()
+    assert "admin" not in rarities
+    assert item_gen.maybe_upgrade_rarity("legendary", rarities, Always(), 1.0) == "legendary"
+    assert item_gen.maybe_upgrade_rarity("epic", rarities, Always(), 1.0) == "legendary"
