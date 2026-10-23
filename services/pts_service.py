@@ -44,15 +44,20 @@ def pair_points(winner: Character, victim: Character) -> PairResult:
     """Очки за победу winner над victim по рейтингам ДО боя."""
     from services import pk_service
 
-    # Клеймёный (2026-10-15) - честная добыча при любой разнице уровней.
-    if victim.level <= winner.level - pc.LEVEL_GAP and not pk_service.marks(victim):
-        return PairResult(0.0, NO_LEVEL)
     w, v = _pts(winner), _pts(victim)
+    # Клеймёный (2026-10-15) - честная добыча при любой разнице уровней.
+    # Младший, обогнавший старшего по PTS (2026-10-23, владелец), - тоже:
+    # иначе рейтинг прятал бы низких от высоких. Очки за него - обычные, без
+    # надбавки за победу над сильнейшим: в бою сильнее не он.
+    outranks = v > w
+    low = victim.level <= winner.level - pc.LEVEL_GAP
+    if low and not outranks and not pk_service.marks(victim):
+        return PairResult(0.0, NO_LEVEL)
     if w - v >= pc.CUTOFF:
         return PairResult(0.0, NO_GAP)
     expected = 1 / (1 + 10 ** ((v - w) / pc.SCALE))
     points = pc.K * (1 - expected)
-    if v - w >= pc.UPSET_GAP:
+    if v - w >= pc.UPSET_GAP and not (low and outranks):
         points *= pc.UPSET_MULT
     return PairResult(points)
 
@@ -78,7 +83,10 @@ def apply_mass(
     """Массовый бой: за каждую гибель - очки всем, кто бил жертву, по доле
     урона. Рейтинги - снимок до боя. Вернёт {id: изменение PTS}."""
     before = {cid: _pts(c) for cid, c in characters.items()}
-    snapshot = {cid: _Snap(c.level, before[cid]) for cid, c in characters.items()}
+    snapshot = {
+        cid: _Snap(c.level, before[cid], getattr(c, "pk_marks", 0) or 0, getattr(c, "pk_marks_at", None))
+        for cid, c in characters.items()
+    }
     deltas: dict[int, float] = {}
     for victim_id in dead_ids:
         victim = snapshot.get(victim_id)
@@ -106,6 +114,10 @@ def apply_mass(
 class _Snap:
     level: int
     pts: int
+    # Клеймо: pair_points читает его через pk_service.marks (getattr) - без
+    # этих полей клеймёный в массовом бою считался чистым.
+    pk_marks: int = 0
+    pk_marks_at: datetime | None = None
 
 
 def delta_line(delta: int, character: Character, reason: str | None = None) -> str:

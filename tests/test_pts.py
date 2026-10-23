@@ -35,6 +35,24 @@ def test_no_points_for_victim_five_levels_lower() -> None:
     assert pts_service.pair_points(_c(1000, level=30), _c(1000, level=26)).points > 0
 
 
+def test_low_level_above_in_rating_is_fair_game() -> None:
+    """2026-10-23: младший, обогнавший старшего по PTS, не прячется за
+    разницей уровней - очки обычные, без надбавки за сильнейшего."""
+    res = pts_service.pair_points(_c(1000, level=50), _c(1300, level=20))
+    assert res.reason is None and round(res.points) == round(40 * (1 - 1 / (1 + 10 ** (300 / 400))))
+    # Ниже по рейтингу - по-прежнему ничего.
+    assert pts_service.pair_points(_c(1300, level=50), _c(1000, level=20)).reason == pts_service.NO_LEVEL
+
+
+def test_mass_branded_low_level_victim_counts() -> None:
+    from datetime import datetime, timezone
+
+    a = SimpleNamespace(id=1, pts=1000, level=50, pk_marks=0, pk_marks_at=None)
+    v = SimpleNamespace(id=2, pts=1000, level=20, pk_marks=3, pk_marks_at=datetime.now(timezone.utc))
+    deltas = pts_service.apply_mass({1: a, 2: v}, [2], {(1, 2): 100}, {1: 0, 2: 1})
+    assert deltas == {1: 20, 2: -20}
+
+
 def test_duel_moves_points_both_ways() -> None:
     w, l = _c(1000), _c(1000, cid=2)
     delta, reason = pts_service.apply_duel(w, l)
