@@ -276,10 +276,11 @@ class MobBrain:
         if self.has("relic_hunger"):
             self._steal_relics(mob, target, turn)
         if self.has("lifesteal"):
-            amount = max(round(hit.amount * self.one("lifesteal").value), 1)
+            ratio = self.one("lifesteal").value
+            amount = max(round(hit.amount * ratio), 1)
             turn.heals.append(PendingHeal(
                 source_id=mob.id, target_id=mob.id, amount=amount,
-                label="пьёт кровь",
+                label="пьёт кровь", of_hit=hit, ratio=ratio, floor=1,
             ))
         return hit
 

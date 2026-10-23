@@ -299,3 +299,44 @@ def test_every_effect_the_tick_engine_reads_is_known_to_the_duel() -> None:
     }
     missing = kinds("resolver") - kinds("duel_engine", "shared_rules", "skills", "control") - exempt
     assert not missing, f"дуэль не знает эффектов: {sorted(missing)}"
+
+
+def _capped_guardian():
+    """Страж под «Несокрушимым»: удар не выше 5% его макс. HP."""
+    g = combatant(2, side=1, subclass_id="guardian", vitality=200)
+    g.effects.append(Effect(kind=EffectKind.DAMAGE_CAP, value=0.05, remaining_ticks=3, source_id=2))
+    return g
+
+
+def test_lifesteal_heals_from_damage_that_got_through() -> None:
+    """2026-10-24, жалоба: Кровопуск по Стражу под «Несокрушимым» лечил от
+    полного удара, а не от срезанного потолком. Оба движка."""
+    from game.combat.subclass_skills import SUBCLASS_SKILL_DEFS
+
+    cap_pct = 0.05
+    ratio = SUBCLASS_SKILL_DEFS["blood_knight_lifesteal_strike"].effect_value
+    # Тиковый бой
+    knight = combatant(1, side=0, level=60, subclass_id="blood_knight", strength=300)
+    knight.current_hp = knight.max_hp // 4
+    g = _capped_guardian()
+    s = CombatSessionState(session_id=1, mode=CombatMode.DUEL)
+    s.add(knight)
+    s.add(g)
+    before = knight.current_hp
+    resolve_tick(s, {1: DeclaredAction(type=ActionType.SKILL, skill_id="blood_knight_lifesteal_strike",
+                                       target_id=2)}, NoCritRng(1))
+    dealt = round(g.max_hp * cap_pct)
+    assert knight.current_hp - before <= round(dealt * ratio) + 1
+    # Дуэль
+    engine = DuelEngine(rng=NoCritRng(1))
+    knight = combatant(1, side=0, level=60, subclass_id="blood_knight", strength=300)
+    knight.current_hp = knight.max_hp // 4
+    g = _capped_guardian()
+    engine.start_duel(2, knight, g)
+    state = engine.duels[2]
+    if state.current_actor_id != knight.id:
+        state.turn_number += 1
+    before = knight.current_hp
+    asyncio.run(engine._resolve_turn(state, DeclaredAction(
+        type=ActionType.SKILL, skill_id="blood_knight_lifesteal_strike", target_id=2)))
+    assert knight.current_hp - before <= round(dealt * ratio) + 1

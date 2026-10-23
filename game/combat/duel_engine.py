@@ -353,6 +353,7 @@ class DuelEngine:
         # Ход резолвится СРАЗУ — противник увидит результат перед своим ходом.
         # Единый краткий формат лога (патч 43, ч.1) — combat_flavor.render_hit,
         # без образности.
+        dealt: dict[int, int] = {}  # id(удара) -> прошедший урон, для вампиризма
         for hit in ctx.hits:
             target = state.combatants[hit.target_id]
             if hit.missed:
@@ -370,6 +371,7 @@ class DuelEngine:
             # Сколько съел щит, видно в самой строке удара (shielded), поэтому
             # отдельные строки щитов не нужны.
             capped = shared_rules.cap_incoming(target, hit.amount)
+            dealt[id(hit)] = capped
             amount = shared_rules.absorb_by_shields(
                 target, capped, [],
                 pierce=shared_rules.poison_shield_pierce(actor) if hit.is_dot else 0.0,
@@ -422,7 +424,10 @@ class DuelEngine:
                     max_hp=actor.max_hp, shielded=reflect_amount - back,
                 ))
                 _apply_last_breath_guard(actor, result)
+        shared_rules.settle_lifesteal(ctx.heals, dealt)
         for heal in ctx.heals:
+            if heal.of_hit is not None and heal.amount <= 0:
+                continue  # удар не прошёл - лечить нечем
             target = state.combatants[heal.target_id]
             before = target.current_hp
             target.current_hp = min(target.current_hp + heal.amount, target.max_hp)

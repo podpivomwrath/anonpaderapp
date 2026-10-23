@@ -99,6 +99,19 @@ def cap_incoming(target: CombatantState, amount: int) -> int:
     return min(amount, max(round(target.max_hp * cap), 1))
 
 
+def settle_lifesteal(heals: list, dealt: dict[int, int]) -> None:
+    """Вампиризм - от урона, который прошёл (2026-10-24, жалоба: удар по
+    Стражу под «Несокрушимым» лечил от полного удара). dealt - id(удара) ->
+    урон после потолка и купола (щит - тоже попадание). Удар, которого нет в
+    dealt, не прошёл вовсе."""
+    for heal in heals:
+        if heal.of_hit is None:
+            continue
+        hit_dealt = dealt.get(id(heal.of_hit), 0)
+        amount = max(round(hit_dealt * heal.ratio), 0)
+        heal.amount = max(amount, heal.floor) if hit_dealt > 0 else 0
+
+
 def block_heal_amount(target: CombatantState, amount: int) -> int:
     """«Глухая оборона» (BLOCK_STANCE + BLOCK_HEAL): лечение за каждый удар,
     пришедшийся в стойку. 0 - стойки нет или удар пустой. В дуэли до

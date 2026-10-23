@@ -58,6 +58,13 @@ class PendingHeal:
     target_id: int
     amount: int
     label: str = "исцеляет"
+    #: Вампиризм (2026-10-24): лечение - доля урона этого удара, и считается
+    #: от прошедшего (после потолка «Несокрушимого», купола рейда, щита), а
+    #: не от удара до них. amount выше - прикидка, её пересчитает
+    #: shared_rules.settle_lifesteal. floor - минимум, если урон прошёл.
+    of_hit: "PendingHit | None" = None
+    ratio: float = 0.0
+    floor: int = 0
 
 
 @dataclass

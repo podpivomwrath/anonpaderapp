@@ -293,6 +293,9 @@ def _apply_phase(
         shielded_by_hit[id(hit)] = before_shields - amount
         applied_by_hit[id(hit)] = amount
         damage_taken[hit.target_id] = damage_taken.get(hit.target_id, 0) + amount
+    shared_rules.settle_lifesteal(
+        heals, {hid: applied + shielded_by_hit.get(hid, 0) for hid, applied in applied_by_hit.items()},
+    )
     for heal in heals:
         heal_taken[heal.target_id] = heal_taken.get(heal.target_id, 0) + heal.amount
 

@@ -59,10 +59,12 @@ def _lifesteal_heal(ctx: SkillContext, hit, ratio: float) -> None:
         ratio += actor.buff_modifiers.get("low_hp_lifesteal_bonus", 0.0)
     ratio += actor.buff_modifiers.get("lifesteal_ratio_bonus", 0.0)
 
+    # Сумму пересчитает резолвер от прошедшего урона (shared_rules.settle_lifesteal).
     heal = max(round(hit.amount * ratio), 0)  # страховка (патч 45, ч.1) — лечение не может быть отрицательным
     if heal > 0:
         ctx.heals.append(
-            PendingHeal(source_id=actor.id, target_id=actor.id, amount=heal, label="восполняет кровью")
+            PendingHeal(source_id=actor.id, target_id=actor.id, amount=heal, label="восполняет кровью",
+                        of_hit=hit, ratio=ratio)
         )
         shared_pct = actor.buff_modifiers.get("shared_heal_pct", 0.0)
         if shared_pct > 0:
@@ -73,7 +75,7 @@ def _lifesteal_heal(ctx: SkillContext, hit, ratio: float) -> None:
                     ctx.heals.append(
                         PendingHeal(
                             source_id=actor.id, target_id=ally.id, amount=shared_heal,
-                            label="делится кровью",
+                            label="делится кровью", of_hit=hit, ratio=ratio * shared_pct,
                         )
                     )
 
