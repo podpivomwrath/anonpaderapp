@@ -19,6 +19,7 @@ from bot.keyboards import fishing as kb
 from bot.keyboards.world import movement_keyboard
 from game.economy import fishing
 from game.economy import fishing_config as fc
+from game.economy import gem_goods_config as ggc
 from game.world import grid
 from game.world.scheduler import PeerScheduler
 from services import experience_service, guild_quest_service
@@ -427,7 +428,7 @@ async def cancel_cast(message: Message) -> None:
 #: Донка ждёт поклёвку во столько раз дольше обычного заброса (владелец: «в 4 раза медленнее»).
 DONKA_SLOWDOWN = 4
 #: Игрок молчит дольше - донку сматывает: ловит только пока ты рядом.
-DONKA_IDLE_MINUTES = 60  # было 30, владелец 2026-10-23: «на час»
+DONKA_IDLE_MINUTES = ggc.DONKA_IDLE_MINUTES
 
 
 async def _donka_cast(db, character, lake) -> float:
