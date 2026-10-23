@@ -707,15 +707,17 @@ def resolve_tick(
             if not combatant.alive:
                 continue
             before_hp = combatant.current_hp
-            self_dmg = max(round(combatant.max_hp * ec.ASHEN_FEVER_SELF_DAMAGE_PCT_MAX_HP), 1)
+            # Метнутая склянкой - и жжёт слабее, и растёт с той же силой.
+            power = getattr(effect, "power", 1.0)
+            self_dmg = max(round(combatant.max_hp * ec.ASHEN_FEVER_SELF_DAMAGE_PCT_MAX_HP * power), 1)
             combatant.current_hp -= self_dmg
             _apply_last_breath_guard(combatant, result)
             result.lines.append(
                 f"🔥 Пепельная лихорадка жжёт {combatant.name} "
                 f"{display.hp_delta_line(before_hp, combatant.current_hp, combatant.max_hp, _display_mode(session))}"
             )
-            step = round(effect.value / ec.ASHEN_FEVER_DAMAGE_BONUS_STEP)
-            effect.value = ec.ASHEN_FEVER_DAMAGE_BONUS_STEP * (step + 1)
+            step = round(effect.value / (ec.ASHEN_FEVER_DAMAGE_BONUS_STEP * power))
+            effect.value = ec.ASHEN_FEVER_DAMAGE_BONUS_STEP * power * (step + 1)
 
         for effect in combatant.effects:
             # Немедленные эффекты (FREEZE, эликсиры-патч16) тикают всегда;

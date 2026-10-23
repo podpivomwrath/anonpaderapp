@@ -153,6 +153,48 @@ def test_ashen_fever_escalates_and_self_damages_each_turn() -> None:
     assert player.effect_total(EffectKind.ASHEN_FEVER) == 0.0  # истёк после 3 ходов
 
 
+def test_thrown_flask_spends_only_thrower_limits_and_keeps_own_effects() -> None:
+    """2026-10-23, репорт: «диверсант подкидывает две банки, и вся команда не
+    может пить». Лимиты союзников склянка не трогает; уже выпитый союзником
+    эффект не перезаписывает."""
+    from game.combat import consumable_limit
+
+    thrower = combatant(1, side=0)
+    ally = combatant(3, side=0)
+    mob = combatant(2, side=1, kind="mob")
+    session = make_session(thrower, ally, mob)
+    elixir_effects.apply_combat_elixir(ally, "shard_blood")
+    own = next(e for e in ally.effects if e.kind != EffectKind.ASHEN_FEVER)
+    own_value, own_ticks = own.value, own.remaining_ticks
+    own.remaining_ticks = 1
+    elixir_effects.throw_flask(thrower, "shard_blood", session.combatants, 0.5)
+    elixir_effects.throw_flask(thrower, "heal_small", session.combatants, 0.5)
+    assert ally.combat_elixirs_used == 0 and consumable_limit.left(ally) == consumable_limit.LIMIT
+    assert not consumable_limit.heal_taken(ally)
+    assert own.value == own_value and own.remaining_ticks == 1 and own_ticks >= 1
+
+
+def test_thrown_ashen_fever_is_weaker_in_both_ways() -> None:
+    """2026-10-23, жалоба: метнутая склянкой лихорадка жгла как выпитая, а со
+    второго хода и разгоняла урон как выпитая."""
+    rng = NoCritRng()
+    thrower = combatant(1, side=0, strength=50, vitality=500)
+    ally = combatant(3, side=0, strength=50, vitality=500)
+    mob = combatant(2, side=1, kind="mob", strength=0, vitality=5000)
+    session = make_session(thrower, ally, mob)
+    elixir_effects.throw_flask(thrower, "ashen_fever", session.combatants, 0.5)
+    step = ec.ASHEN_FEVER_DAMAGE_BONUS_STEP * 0.5
+    assert ally.effect_total(EffectKind.ASHEN_FEVER) == pytest.approx(step)
+
+    hp_before = ally.current_hp
+    resolve_tick(session, {1: attack(2), 3: attack(2)}, rng)
+    half_burn = max(round(ally.max_hp * ec.ASHEN_FEVER_SELF_DAMAGE_PCT_MAX_HP * 0.5), 1)
+    assert hp_before - ally.current_hp == half_burn
+    assert ally.effect_total(EffectKind.ASHEN_FEVER) == pytest.approx(2 * step)
+    resolve_tick(session, {1: attack(2), 3: attack(2)}, rng)
+    assert ally.effect_total(EffectKind.ASHEN_FEVER) == pytest.approx(3 * step)
+
+
 def test_ashen_fever_boosts_outgoing_damage() -> None:
     rng = NoCritRng()
     attacker = combatant(1, side=0)

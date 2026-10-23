@@ -135,14 +135,20 @@ def throw_flask(actor: CombatantState, elixir_id: str, combatants, power: float)
                 healed.append(f"{c.name} +{c.current_hp - before}")
         return "🧴 Склянка разбивается над своими: " + (", ".join(healed) if healed else "все и так целы") + "."
     for c in allies:
-        before = list(c.effects)
+        # Уже действующий свой эффект склянка не трогает (2026-10-23): раньше
+        # она перезаписывала его - выпитый в полную силу освежался и
+        # продлевался, хотя метнули слабее.
+        before = [(e, e.value, e.remaining_ticks, e.power) for e in c.effects]
         apply_combat_elixir(c, elixir_id, combatants)
+        for e, value, ticks, power_was in before:
+            e.value, e.remaining_ticks, e.power = value, ticks, power_was
         for effect in c.effects:
-            if any(effect is e for e in before):
+            if any(effect is e for e, *_ in before):
                 continue
             if effect.kind in _BINARY_KINDS:
                 effect.remaining_ticks = max(1, round(effect.remaining_ticks * power))
             else:
                 effect.value = effect.value * power
+                effect.power = power
     names = ", ".join(c.name for c in allies)
     return f"🧴 Склянка разбивается над своими ({names}): на каждого слабее, чем выпить самому."
