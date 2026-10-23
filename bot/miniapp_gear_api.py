@@ -16,7 +16,7 @@ from services import onboarding_service as onboarding_svc
 
 #: Инструменты, у которых ещё нет механики в игре: показываем «скоро», не даём
 #: делать (не продаём то, что не работает).
-NOT_READY = {"flasks"}
+NOT_READY: set[str] = set()
 
 SOURCE_HINTS = {
     "almanac": "Выпадает с мобов - очень редко.",

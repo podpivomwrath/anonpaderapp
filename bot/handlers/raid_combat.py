@@ -1102,6 +1102,16 @@ async def raid_use_item(message: Message) -> None:
         await message.answer("Больше твоё тело не выдержит за один бой.", keyboard=battle_kb)
         return
 
+    # Метательная склянка (2026-10-23): спросить, пить самому или на группу.
+    from bot import flask_throw
+    from game.economy import craft_gear_config as gear_cfg
+
+    mode = payload.get("mode")
+    live = _live_state(battle_id, battle)
+    allies = sum(1 for c in live.values() if c.alive and c.side == combatant.side and c.id != cid)
+    if await flask_throw.ask(_bot_api, "raid_item", peer_id, cid, "raid_use_item", elixir, mode, allies):
+        return
+
     async with get_session_factory()() as db:
         character = await onboarding_svc.get_character(db, peer_id)
         if character is None:
@@ -1112,13 +1122,21 @@ async def raid_use_item(message: Message) -> None:
         await message.answer("Этого зелья больше нет в сумке.", keyboard=battle_kb)
         return
     consumable_limit.spend(combatant)
+    throw = mode == "throw" and await flask_throw.spend(cid)
 
     await editable_message.send_or_edit(
         _bot_api, "raid_item", peer_id, f"Использовано: {elixir.emoji} {elixir.name}.", no_keyboard()
     )
 
+    if throw:
+        line = elixir_effects.throw_flask(combatant, elixir_id, live, gear_cfg.FLASK_POWER)
+        if elixir.category == "heal":
+            consumable_limit.mark_heal(combatant)
+        else:
+            combatant.combat_elixirs_used += 1
+        await _tell_others(battle, cid, f"{p.name}: {line}")
     # Лечебное зелье - тоже без траты хода (2026-10-14).
-    if elixir.category == "heal":
+    elif elixir.category == "heal":
         line = elixir_effects.drink_heal(combatant, elixir_id)
         consumable_limit.mark_heal(combatant)
     else:

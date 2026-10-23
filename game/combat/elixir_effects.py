@@ -111,3 +111,38 @@ def apply_combat_elixir(actor: CombatantState, elixir_id: str, combatants=None) 
         return f"⚡ Осколки въедаются в клинок - каждый удар несёт +{bonus} урона."
 
     return "Эликсир не оказывает эффекта."
+
+
+#: Эффекты «да/нет» (спасение, иммунитет): у склянки на группу слабеет не
+#: сила, а срок - вдвое, но не меньше хода.
+_BINARY_KINDS = (EffectKind.LAST_BREATH, EffectKind.CONTROL_IMMUNE)
+
+
+def throw_flask(actor: CombatantState, elixir_id: str, combatants, power: float) -> str:
+    """Метательная склянка (2026-10-23): зелье на всю свою сторону, но
+    слабее - power от силы (лечение, величина эффекта; у эффектов «да/нет» -
+    срок). Свитки сюда не идут: они и так на всех."""
+    from game.combat.session import white_max_hp
+
+    allies = [c for c in (combatants or {actor.id: actor}).values() if c.alive and c.side == actor.side]
+    if ec.heal_amount(elixir_id, white_max_hp(actor)) is not None:
+        healed = []
+        for c in allies:
+            amount = round((ec.heal_amount(elixir_id, white_max_hp(c)) or 0) * power)
+            before = c.current_hp
+            c.current_hp = min(c.max_hp, before + amount)
+            if c.current_hp > before:
+                healed.append(f"{c.name} +{c.current_hp - before}")
+        return "🧴 Склянка разбивается над своими: " + (", ".join(healed) if healed else "все и так целы") + "."
+    for c in allies:
+        before = list(c.effects)
+        apply_combat_elixir(c, elixir_id, combatants)
+        for effect in c.effects:
+            if any(effect is e for e in before):
+                continue
+            if effect.kind in _BINARY_KINDS:
+                effect.remaining_ticks = max(1, round(effect.remaining_ticks * power))
+            else:
+                effect.value = effect.value * power
+    names = ", ".join(c.name for c in allies)
+    return f"🧴 Склянка разбивается над своими ({names}): на каждого слабее, чем выпить самому."

@@ -107,3 +107,23 @@ async def test_bait_made_by_cook_speeds_up_bites(db_session, make_character) -> 
     slow = fishing_service.start_cast(c, lake, random.Random(5)).seconds
     fast = fishing_service.start_cast(c, lake, random.Random(5), bite_mult=craft_gear_service.bite_mult(c)).seconds
     assert fast == pytest.approx(slow * (1 - gc.BAIT_SPEED))
+
+
+def test_flask_spreads_elixir_to_group_weaker() -> None:
+    from game.combat import elixir_effects
+    from game.combat.session import EffectKind
+    from tests.conftest import combatant
+
+    a, b = combatant(1, side=0), combatant(2, side=0)
+    foe = combatant(3, side=1)
+    everyone = {1: a, 2: b, 3: foe}
+    elixir_effects.throw_flask(a, "ashen_haze", everyone, gc.FLASK_POWER)
+    solo = combatant(4, side=0)
+    elixir_effects.apply_combat_elixir(solo, "ashen_haze")
+    full = solo.effects_of(EffectKind.DODGE)[0].value
+    assert a.effects_of(EffectKind.DODGE)[0].value == pytest.approx(full * gc.FLASK_POWER)
+    assert b.effects_of(EffectKind.DODGE) and not foe.effects_of(EffectKind.DODGE)
+    # Лечение - каждому, слабее.
+    a.current_hp = b.current_hp = 1
+    elixir_effects.throw_flask(a, "heal_large", everyone, gc.FLASK_POWER)
+    assert 1 < a.current_hp < a.max_hp and b.current_hp > 1
