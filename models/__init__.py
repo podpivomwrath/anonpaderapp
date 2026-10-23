@@ -8,6 +8,7 @@ from models.combat import CombatParticipant, CombatSession
 from models.consumable import CharacterConsumable
 from models.dailies import CharacterDaily, CharacterTitle
 from models.economy import ExchangeDaily, ExchangeOrder, ExchangeState, ResourceLog, Wallet, WalletLog
+from models.market import MarketInbox, MarketOrder, MarketTrade
 from models.enums import (
     BaseClass,
     CombatStatus,
@@ -65,6 +66,9 @@ from models.world_boss import WorldBoss, WorldBossContribution, WorldBossMeter
 
 __all__ = [
     "WalletLog",
+    "MarketInbox",
+    "MarketOrder",
+    "MarketTrade",
     "ResourceLog",
     "CharacterCraftGear",
     "CharacterFood",

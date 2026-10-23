@@ -454,7 +454,7 @@ async def handle_post_chest_open(request: web.Request) -> web.Response:
         except lootbox_service.ChestGone:
             await session.rollback()
             return web.json_response({"error": "no_chest"}, status=409)
-        strip, win_index = lootbox_service.roulette_strip(result, chest.streak or 1, _chest_rng)
+        strip, win_index = lootbox_service.roulette_strip(result, character.daily_streak or 1, _chest_rng)
         await session.commit()
         inventory = await _full_inventory(session, character.id)
         return web.json_response({

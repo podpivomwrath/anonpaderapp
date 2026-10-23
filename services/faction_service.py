@@ -214,10 +214,19 @@ async def tax_transfer(
     (налог, город получателя). Доля первого поставщика фракции получателя
     копится в faction_payouts; остальное уходит из игры."""
     tax = fc.transfer_tax(amount)
-    recipient = await db.get(Character, recipient_id)
-    city = recipient.region if recipient is not None and recipient.region in fc.CITIES else None
+    return tax, await pay_tax(db, recipient_id, currency, tax, now)
+
+
+async def pay_tax(
+    db: AsyncSession, payer_id: int, currency: str, tax: int, now: datetime | None = None,
+) -> str | None:
+    """Налог в казну фракции игрока (переводы, рынок - 2026-10-23): доля
+    первому поставщику фракции копится в faction_payouts, остальное уходит
+    из игры. Сам налог уже снят с суммы вызывающим. Возвращает город."""
+    payer = await db.get(Character, payer_id)
+    city = payer.region if payer is not None and payer.region in fc.CITIES else None
     if tax <= 0 or city is None:
-        return tax, city
+        return city
     share = fc.leader_share(tax)
     leader = await first_supplier(db, city, now)
     if share > 0 and leader is not None:
@@ -233,7 +242,7 @@ async def tax_transfer(
         else:
             row.gems = (row.gems or 0) + share
         await db.flush()
-    return tax, city
+    return city
 
 
 @dataclass

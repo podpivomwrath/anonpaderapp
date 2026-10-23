@@ -31,7 +31,7 @@ import Skeleton from './Skeleton.jsx';
 // телефоне в слабой сети персонаж открывался долго.
 const AdminTab = lazy(() => import('./AdminTab.jsx'));
 const CraftTab = lazy(() => import('./CraftTab.jsx'));
-const ExchangeTab = lazy(() => import('./ExchangeTab.jsx'));
+const MarketTab = lazy(() => import('./MarketTab.jsx'));
 const ShopTab = lazy(() => import('./ShopTab.jsx'));
 const FactionTab = lazy(() => import('./FactionTab.jsx'));
 const GuildTab = lazy(() => import('./GuildTab.jsx'));
@@ -61,7 +61,8 @@ const SECTIONS = [
   { id: 'tops', label: 'Топы' },
   { id: 'board', label: 'Доска' },
   { id: 'trade', label: 'Фракция' },
-  { id: 'exchange', label: 'Биржа' },
+  // Рынок (2026-10-23): заявки, витрина и биржа - вкладками внутри.
+  { id: 'market', label: 'Рынок' },
   { id: 'shop', label: 'Магазин' },
 ];
 
@@ -635,8 +636,8 @@ export default function Hub() {
         {activeTab === 'trade' && (
           <FactionTab onWallet={(w) => setCharacter((prev) => ({ ...prev, ...w }))} />
         )}
-        {activeTab === 'exchange' && (
-          <ExchangeTab onWallet={(w) => setCharacter((prev) => ({ ...prev, ...w }))} />
+        {activeTab === 'market' && (
+          <MarketTab onWallet={(w) => setCharacter((prev) => ({ ...prev, ...w }))} />
         )}
         {activeTab === 'shop' && (
           <ShopTab

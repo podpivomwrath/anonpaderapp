@@ -405,6 +405,11 @@ async def run() -> None:
 
     respawn_scheduler.add_job(miniapp_shop_api.move_pending_job, "interval", seconds=5,
                              id="faction_pending", max_instances=1, coalesce=True)
+    # Рынок (2026-10-23): заявки по сроку снимаются, товар и золото - назад.
+    from bot import market_notice
+
+    respawn_scheduler.add_job(market_notice.expire_job, "interval", seconds=60,
+                             id="market_expire", max_instances=1, coalesce=True)
 
     # Венцы топ-1 (патч 91): раз в сутки. Не вживую - движок боя берёт
     # характеристики на старте сессии, и смена венца посреди боя

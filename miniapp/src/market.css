@@ -1,0 +1,160 @@
+/* Рынок (2026-10-23) - components/MarketTab.jsx. Тёмные плашки, как в разделах. */
+
+.market-cats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 8px 12px 4px;
+}
+
+.market-cats button,
+.market-switch button {
+  padding: 6px 10px;
+  border: 1px solid var(--card-line);
+  border-radius: 999px;
+  background: var(--card);
+  color: inherit;
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.market-cats button.is-on,
+.market-switch button.is-on {
+  border-color: var(--gold);
+  color: var(--gold);
+  background: var(--gold-soft);
+}
+
+.market-list {
+  display: grid;
+  gap: 6px;
+  padding: 6px 12px 12px;
+}
+
+.market-row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border: 1px solid var(--card-line);
+  border-radius: 12px;
+  background: rgba(10, 10, 13, 0.7);
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.market-row--static {
+  cursor: default;
+  margin: 0 12px 6px;
+}
+
+.market-row__text {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.market-row__text b {
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.market-row__text small {
+  color: rgba(255, 255, 255, 0.55);
+  font-size: 12px;
+}
+
+.market-emoji {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  font-size: 22px;
+}
+
+.market-muted {
+  color: rgba(255, 255, 255, 0.5);
+  font-size: 13px;
+}
+
+.market-line {
+  font-size: 14px;
+}
+
+.market-book {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.market-book > div {
+  display: grid;
+  gap: 4px;
+  align-content: start;
+}
+
+.market-book b {
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.market-book button {
+  display: flex;
+  justify-content: space-between;
+  padding: 5px 8px;
+  border: 1px solid var(--card-line);
+  border-radius: 8px;
+  background: var(--card);
+  color: inherit;
+  font: inherit;
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+}
+
+.market-book > div:first-child button {
+  color: #ff9aa8;
+}
+
+.market-book > div:last-child button {
+  color: var(--green);
+}
+
+.market-switch {
+  display: flex;
+  gap: 6px;
+  margin: 12px 0 8px;
+}
+
+.market-form {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.market-field {
+  display: grid;
+  gap: 4px;
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.market-field input {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 8px 10px;
+  border: 1px solid var(--card-line);
+  border-radius: 10px;
+  background: rgba(0, 0, 0, 0.35);
+  color: #fff;
+  font: inherit;
+  font-size: 16px;
+  font-variant-numeric: tabular-nums;
+}

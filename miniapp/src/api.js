@@ -509,3 +509,20 @@ export function makeGear(tool, tier) {
     body: JSON.stringify({ tool, tier }),
   });
 }
+
+// Рынок (2026-10-23): заявки на товары, витрина, ящик купленного.
+export function getMarket() {
+  return request('/market');
+}
+
+export function getMarketGood(key) {
+  return request(`/market?good=${encodeURIComponent(key)}`);
+}
+
+export function marketAction(action, params = {}) {
+  return request('/market', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ action, ...params }),
+  });
+}

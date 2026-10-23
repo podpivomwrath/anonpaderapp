@@ -230,9 +230,9 @@ async def open_owned(
     if not claimed.rowcount:
         raise ChestGone()
     chest = await db.get(CharacterLootbox, chest_id)
-    result = await _roll_and_apply(
-        db, character, chest.streak or character.daily_streak, rng, chest.kind or ASHEN,
-    )
+    # Шансы - от серии того, кто открывает (2026-10-23, владелец: «стрик
+    # привязывай к игроку»): ларцы одинаковые, их можно продавать на рынке.
+    result = await _roll_and_apply(db, character, character.daily_streak, rng, chest.kind or ASHEN)
     chest.grade = result.grade.id
     chest.reward_summary = "; ".join(result.lines)[:256]
     await db.flush()

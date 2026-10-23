@@ -456,6 +456,11 @@ async def player_card(db: AsyncSession, character_id: int) -> dict | None:
 #: Причина операции в журнале кошелька («модуль.функция») -> по-русски.
 #: Незнакомая показывается как есть - новая трата не потеряется.
 WALLET_REASONS = {
+    "market.listing_fee": "Рынок: комиссия за заявку", "market.buy_order": "Рынок: золото под заявку на покупку",
+    "market.buy_item": "Рынок: покупка с витрины", "market.sale": "Рынок: выручка",
+    "market.refund": "Рынок: возврат золота",
+    "market_service._charge": "Рынок: списание", "market_service._pay_seller": "Рынок: выручка",
+    "market_service._refund": "Рынок: возврат золота",
     "admin.grant_currency": "Админка: валюта", "admin.grant_any": "Админка: выдача",
     "alchemy_service.start": "Варка зелья", "cooking_service.start": "Готовка в печи",
     "contract_service.create": "Заказ на голову", "contract_service.on_kill": "Награда за заказ",

@@ -61,6 +61,11 @@ export const SECTION_ICONS = {
     emoji: '💱',
     path: 'M5 9h12l-3-3 M19 15H7l3 3',
   },
+  // Рынок — весы.
+  market: {
+    emoji: '🏪',
+    path: 'M12 4v16 M8 20h8 M5 8h14 M5 8l-3 6a3 3 0 0 0 6 0z M19 8l-3 6a3 3 0 0 0 6 0z',
+  },
   // Торговля — повозка: кузов на двух колёсах.
   trade: {
     emoji: '🐂',

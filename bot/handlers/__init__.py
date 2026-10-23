@@ -6,6 +6,7 @@
 """
 
 from bot.handlers.appraiser import labeler as appraiser_labeler
+from bot.handlers.market import labeler as market_labeler
 from bot.handlers.arena import labeler as arena_labeler
 from bot.handlers.house import labeler as house_labeler
 from bot.handlers.rest import labeler as rest_labeler
@@ -59,7 +60,7 @@ LABELERS = [
     # Соглашение (2026-10-15): кнопка «Принимаю» - раньше всех.
     # Короткий боевой лог (2026-10-22): «📜 Сводка» - раньше боевых
     # обработчиков, которые молчат на чужие кнопки в ходе.
-    terms_labeler, onboarding_labeler, combat_log_labeler, voyage_labeler, rift_labeler, raid_archive_labeler, raid_procession_labeler, raid_trail_labeler, scene_events_labeler, group_events_labeler, turbo_ishak_labeler, world_labeler, explore_labeler, rest_labeler, stuck_labeler, combat_labeler, group_combat_labeler, pvp_labeler, arena_labeler, house_labeler, herbs_labeler, appraiser_labeler,
+    terms_labeler, onboarding_labeler, combat_log_labeler, voyage_labeler, rift_labeler, raid_archive_labeler, raid_procession_labeler, raid_trail_labeler, scene_events_labeler, group_events_labeler, turbo_ishak_labeler, world_labeler, explore_labeler, rest_labeler, stuck_labeler, combat_labeler, group_combat_labeler, pvp_labeler, arena_labeler, house_labeler, herbs_labeler, appraiser_labeler, market_labeler,
     inventory_labeler, list_keeper_labeler, presets_labeler, elixir_shop_labeler,
     dailies_labeler, mounts_labeler, stats_window_labeler, moderation_labeler, basic_labeler,
     # Патч 53: рейд — до fallback/promo, как и остальные боевые/меню лейблеры.
