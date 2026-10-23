@@ -57,7 +57,8 @@ def test_final_value_shown_not_delta_for_percentage_stat_bonuses() -> None:
     показывает итог "X вместо Y", либо (если итог зависит от статов цели)
     прибавку словами — но никогда не голое "+N%"."""
     buffs = load_content().buffs
-    for buff_id in ("blood_knight_eternal_hunger", "blood_knight_feast", "blood_knight_blood_pact"):
+    # «Вечный голод» с 2026-10-23 не прибавляет процентов - снимает условие Жатвы.
+    for buff_id in ("blood_knight_feast", "blood_knight_blood_pact"):
         text = buff_descriptions.describe(buffs[buff_id])
         assert "вместо" in text, buff_id
 

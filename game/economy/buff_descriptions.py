@@ -183,10 +183,12 @@ def _describe_blood_knight_insatiable(b: BuffDef) -> str:
 
 
 def _describe_blood_knight_eternal_hunger(b: BuffDef) -> str:
-    total = bc.BLOOD_KNIGHT_HEAL_CAP_PER_TURN + bc.BLOOD_KNIGHT_ETERNAL_HUNGER_HEAL_CAP_BONUS
+    from game.combat.subclass_skills import SUBCLASS_SKILL_DEFS
+
+    share = SUBCLASS_SKILL_DEFS["blood_knight_harvest"].effect_value
     return (
-        f"За один ход лечение от урона (Кровопуск, Жатва, Багровый пир) может вернуть тебе до {_pct(total)} максимального здоровья "
-        f"вместо {_pct(bc.BLOOD_KNIGHT_HEAL_CAP_PER_TURN)}."
+        f"Жатва лечит тебя на {_pct(share)} нанесённого урона, пока у тебя меньше "
+        f"{_pct(bc.BLOOD_KNIGHT_ETERNAL_HUNGER_HP_THRESHOLD)} здоровья, а не {_pct(bc.BLOOD_KNIGHT_HARVEST_HP_THRESHOLD)}."
     )
 
 

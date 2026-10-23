@@ -33,7 +33,7 @@
   "blood_knight_harvest": {
     "id": "blood_knight_harvest", "name": "Жатва", "subclass_id": "blood_knight",
     "multiplier": 1.57, "cd": 3, "effect": "custom",
-    "effect_value": 0.3,
+    "effect_value": 0.27,
     "flavor": "Чем меньше в тебе крови, тем жаднее клинок."
   },
   "blood_knight_blood_seal": {
@@ -45,7 +45,7 @@
   "blood_knight_crimson_feast": {
     "id": "blood_knight_crimson_feast", "name": "Багровый пир", "subclass_id": "blood_knight",
     "multiplier": 2.1, "cd": 5, "effect": "custom",
-    "effect_value": 0.45,
+    "effect_value": 0.32,
     "flavor": "Ты платишь своей кровью вперёд - и забираешь с процентами."
   },
 

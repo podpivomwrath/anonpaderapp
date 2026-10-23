@@ -54,20 +54,18 @@ def test_lifesteal_heals_20_percent_of_damage() -> None:
     assert healed == round(damage_dealt * 0.2)
 
 
-def test_lifesteal_capped_at_10_percent_max_hp() -> None:
-    """Кап обязателен: без него лайфстил бесконтрольно скейлится (патч 44:
-    общий кап для ВСЕХ навыков лайфстила, не только Кровопуска)."""
+def test_lifesteal_is_a_share_of_damage_without_cap() -> None:
+    """2026-10-23: потолка лечения за ход нет - лечение ровно доля урона
+    навыка (силу держат сами доли)."""
     rng = NoCritRng()
-    # гигантский урон: высокий уровень + куча STR — лайфстил должен упереться в кап
-    knight = combatant(1, side=0, subclass_id="blood_knight", level=100, strength=2000)
-    knight.current_hp = knight.max_hp // 3
-    enemy = combatant(2, side=1, level=100, vitality=500)
+    knight = combatant(1, side=0, subclass_id="blood_knight", strength=300)
+    knight.current_hp = 1
+    enemy = combatant(2, side=1, vitality=5000)
     state = make_session(knight, enemy)
-    hp_before = knight.current_hp
 
     resolve_tick(state, {1: skill("blood_knight_lifesteal_strike", 2)}, rng)
-    healed = knight.current_hp - hp_before
-    assert healed == round(knight.max_hp * bc.BLOOD_KNIGHT_HEAL_CAP_PER_TURN)
+    damage_dealt = enemy.max_hp - enemy.current_hp
+    assert knight.current_hp - 1 == round(damage_dealt * 0.2)
 
 
 def test_blood_seal_boosts_lifesteal_on_marked_target() -> None:
@@ -87,7 +85,7 @@ def test_blood_seal_boosts_lifesteal_on_marked_target() -> None:
     resolve_tick(state, {1: skill("blood_knight_lifesteal_strike", 2)}, rng)
     damage_dealt = enemy_hp_before - enemy.current_hp
     healed = knight.current_hp - hp_before_hp
-    expected = min(round(damage_dealt * 0.2 * bc.BLOOD_KNIGHT_BLOOD_SEAL_MULT), round(knight.max_hp * bc.BLOOD_KNIGHT_HEAL_CAP_PER_TURN))
+    expected = round(damage_dealt * 0.2 * bc.BLOOD_KNIGHT_BLOOD_SEAL_MULT)
     assert healed == expected
 
 
@@ -106,10 +104,11 @@ def test_crimson_feast_heal_log_shows_isolated_positive_heal() -> None:
     enemy = combatant(2, side=1, level=100, vitality=500)
     state = make_session(knight, enemy)
 
+    enemy_before = enemy.current_hp
     result = resolve_tick(state, {1: skill("blood_knight_crimson_feast", 2)}, rng)
     heal_line = next(line for line in result.lines if "восполняет кровью" in line)
-    cap = round(knight.max_hp * bc.BLOOD_KNIGHT_HEAL_CAP_PER_TURN)
-    assert f"+{cap} HP" in heal_line  # ровно капнутое лечение, без знака себестоимости
+    assert "+" in heal_line and "-" not in heal_line.split("восполняет кровью")[1].split("HP")[0]
+    assert enemy_before > enemy.current_hp
 
 
 # --- Отравитель: яд ---
@@ -588,17 +587,18 @@ def test_insatiable_adds_unconditional_lifesteal() -> None:
     assert healed == round(damage_dealt * 0.25)  # 0.20 + 0.05 безусловно
 
 
-def test_eternal_hunger_raises_heal_cap() -> None:
+def test_eternal_hunger_raises_harvest_threshold() -> None:
+    """2026-10-23: без потолка «Вечный голод» - Жатва лечит до 60% здоровья."""
     rng = NoCritRng()
-    knight = combatant(1, side=0, subclass_id="blood_knight", strength=500)
-    knight.buff_modifiers["heal_cap_bonus"] = 0.03
-    knight.current_hp = 1  # есть куда лечить без дополнительного капа по остатку HP
-    enemy = combatant(2, side=1, vitality=5000)
-    state = make_session(knight, enemy)
-
-    resolve_tick(state, {1: skill("blood_knight_lifesteal_strike", 2)}, rng)
-    healed = knight.current_hp - 1
-    assert healed == round(knight.max_hp * (bc.BLOOD_KNIGHT_HEAL_CAP_PER_TURN + 0.03))
+    for hunger, heals in ((False, False), (True, True)):
+        knight = combatant(1, side=0, subclass_id="blood_knight", strength=300)
+        if hunger:
+            knight.buff_modifiers["harvest_hp_threshold"] = bc.BLOOD_KNIGHT_ETERNAL_HUNGER_HP_THRESHOLD
+        knight.current_hp = round(knight.max_hp * 0.55)
+        enemy = combatant(2, side=1, vitality=5000)
+        before = knight.current_hp
+        resolve_tick(make_session(knight, enemy), {1: skill("blood_knight_harvest", 2)}, rng)
+        assert (knight.current_hp > before) is heals
 
 
 def test_second_wind_reduces_incoming_damage_when_low_hp() -> None:
@@ -664,7 +664,7 @@ def test_feast_boosts_crimson_feast_heal_only() -> None:
     damage_dealt = enemy.max_hp - enemy.current_hp
     cost = round(hp_before * bc.BLOOD_KNIGHT_CRIMSON_FEAST_HP_COST)
     healed = knight.current_hp - (hp_before - cost)
-    assert healed == round(damage_dealt * 0.55)  # 0.45 базовых + 0.10 бафф
+    assert healed == round(damage_dealt * 0.42)  # 0.32 базовых + 0.10 бафф
 
     # тот же бафф НЕ действует на Кровопуск (только на Багровый пир)
     knight2 = combatant(3, side=0, subclass_id="blood_knight")
@@ -769,7 +769,7 @@ def test_calibrated_blood_knight_buff_values_in_content() -> None:
     assert buffs["blood_knight_vein_rupture"].stat_modifiers["crit_lifesteal_bonus"] == bc.BLOOD_KNIGHT_VEIN_RUPTURE_CRIT_LIFESTEAL_BONUS
     assert buffs["blood_knight_recklessness"].stat_modifiers["reckless_damage_bonus"] == bc.BLOOD_KNIGHT_RECKLESSNESS_DAMAGE_BONUS
     assert buffs["blood_knight_insatiable"].stat_modifiers["lifesteal_ratio_bonus"] == bc.BLOOD_KNIGHT_INSATIABLE_LIFESTEAL_BONUS
-    assert buffs["blood_knight_eternal_hunger"].stat_modifiers["heal_cap_bonus"] == bc.BLOOD_KNIGHT_ETERNAL_HUNGER_HEAL_CAP_BONUS
+    assert buffs["blood_knight_eternal_hunger"].stat_modifiers["harvest_hp_threshold"] == bc.BLOOD_KNIGHT_ETERNAL_HUNGER_HP_THRESHOLD
     assert buffs["blood_knight_second_wind"].stat_modifiers["low_hp_damage_reduction"] == bc.BLOOD_KNIGHT_SECOND_WIND_DAMAGE_REDUCTION
     assert buffs["blood_knight_blood_armor"].stat_modifiers["incoming_damage_reduction"] == bc.BLOOD_KNIGHT_BLOOD_ARMOR_DAMAGE_REDUCTION
     assert buffs["blood_knight_pain_resistant"].stat_modifiers["crit_damage_taken_reduction"] == bc.BLOOD_KNIGHT_PAIN_RESISTANT_CRIT_REDUCTION

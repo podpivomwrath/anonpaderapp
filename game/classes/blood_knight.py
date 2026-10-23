@@ -7,8 +7,9 @@ HP), Кровавая печать (метка цели — усиливает �
 Патч 44: срезано только лечение — 87% PvP-винрейт без единого проигрышного
 матчапа. Сломало идентичность подкласса (сустейн-ДД перестал восстанавливаться).
 Патч 45, ч.2: вектор нерфа сменён на урон (множители снижены до уровня Клинка
-теней), лайфстил частично возвращён — кап BLOOD_KNIGHT_HEAL_CAP_PER_TURN
-(единый на все 4 навыка лайфстила, патч 44) остаётся в силе.
+теней), лайфстил частично возвращён.
+2026-10-23: потолка лечения за ход больше нет - вместо него доли навыков
+(Багровый пир 32%, Жатва 27%, Кровавая печать x1.5), см. balance_config.
 """
 
 from game.classes.base import Role, SubclassDef, register
@@ -42,13 +43,11 @@ def _most_injured_ally(ctx: SkillContext, actor: CombatantState) -> CombatantSta
 
 def _lifesteal_heal(ctx: SkillContext, hit, ratio: float) -> None:
     """Лечение от лайфстила: усиливается BLOOD_KNIGHT_BLOOD_SEAL_MULT, если
-    цель под Кровавой печатью этого рыцаря (EffectKind.BLOOD_SEAL), и всегда
-    капается BLOOD_KNIGHT_HEAL_CAP_PER_TURN — единообразно для всех навыков
-    лайфстила (патч 44: раньше кап применялся только к Кровопуску).
+    цель под Кровавой печатью этого рыцаря (EffectKind.BLOOD_SEAL). Потолка
+    за ход нет (2026-10-23) - сила лечения задана долями навыков.
 
     Патч 47, ч.2 — микробаффы пула: «Жажда» (низкий HP), «Разрыв вен» (крит),
-    «Ненасытность» (безусловно) добавляются к ratio ДО капа; «Вечный голод»
-    поднимает сам кап; «Разделённая жажда» отдаёт долю итогового лечения
+    «Ненасытность» (безусловно) добавляются к ratio; «Разделённая жажда» отдаёт долю итогового лечения
     самому раненому живому союзнику (нет-оп в бою 1×1 — союзников не бывает)."""
     actor = ctx.actor
     target = ctx.session.combatants.get(hit.target_id)
@@ -60,10 +59,7 @@ def _lifesteal_heal(ctx: SkillContext, hit, ratio: float) -> None:
         ratio += actor.buff_modifiers.get("low_hp_lifesteal_bonus", 0.0)
     ratio += actor.buff_modifiers.get("lifesteal_ratio_bonus", 0.0)
 
-    cap_pct = bc.BLOOD_KNIGHT_HEAL_CAP_PER_TURN + actor.buff_modifiers.get("heal_cap_bonus", 0.0)
-    heal = round(hit.amount * ratio)
-    heal = min(heal, round(actor.max_hp * cap_pct))
-    heal = max(heal, 0)  # страховка (патч 45, ч.1) — лечение не может быть отрицательным
+    heal = max(round(hit.amount * ratio), 0)  # страховка (патч 45, ч.1) — лечение не может быть отрицательным
     if heal > 0:
         ctx.heals.append(
             PendingHeal(source_id=actor.id, target_id=actor.id, amount=heal, label="восполняет кровью")
@@ -99,7 +95,8 @@ def lifesteal_strike(ctx: SkillContext) -> None:
 
 @offensive_skill("blood_knight_harvest")
 def harvest(ctx: SkillContext) -> None:
-    """Жатва: 135% урона. Если HP актёра ниже 50% — лечит на 30% нанесённого."""
+    """Жатва: если HP актёра ниже 50% — лечит на 27% нанесённого. «Вечный
+    голод» (2026-10-23) поднимает порог до 60%."""
     skill = SUBCLASS_SKILL_DEFS["blood_knight_harvest"]
     actor = ctx.actor
     actor.cooldowns[skill.id] = skill.cd
@@ -108,7 +105,8 @@ def harvest(ctx: SkillContext) -> None:
         return
     hit = compute_hit(actor, target, ctx.rng, skill.name, skill.multiplier, is_ability=True)
     ctx.hits.append(hit)
-    if actor.current_hp < actor.max_hp * 0.5:
+    threshold = max(bc.BLOOD_KNIGHT_HARVEST_HP_THRESHOLD, actor.buff_modifiers.get("harvest_hp_threshold", 0.0))
+    if actor.current_hp < actor.max_hp * threshold:
         _lifesteal_heal(ctx, hit, skill.effect_value)
 
 
@@ -129,7 +127,7 @@ def blood_seal(ctx: SkillContext) -> None:
 
 @offensive_skill("blood_knight_crimson_feast")
 def crimson_feast(ctx: SkillContext) -> None:
-    """Багровый пир: тратит 15% текущего HP, 219% урона, лечит на 45% нанесённого.
+    """Багровый пир: тратит 15% текущего HP, 210% урона, лечит на 32% нанесённого.
 
     Патч 47, ч.2: «Кровавый пакт» снижает себестоимость HP, «Пиршество»
     добавляет к ratio лечения — только у этого навыка (не у всех четырёх)."""
