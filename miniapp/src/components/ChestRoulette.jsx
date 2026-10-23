@@ -167,7 +167,7 @@ export default function ChestRoulette({ strip, winIndex, result, onClose, left =
           {done ? (
             <>
               <b className={`roulette__result-grade roulette__result-grade--${grade}`}>
-                {result.title ? result.grade_name : `${result.grade_name} ларец`}
+                {result.title ? result.grade_name : (result.grade_title || `${result.grade_name} ларец`)}
               </b>
               <div className="loot-drops">
                 {result.lines.map((line, i) => (

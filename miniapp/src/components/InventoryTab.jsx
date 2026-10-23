@@ -124,7 +124,7 @@ function detailRows(entry) {
   }
   if (kind === 'chest') {
     return [['В сумке', `×${data.count}`]].concat(
-      (data.grades || []).map((g) => [`${g.name} ларец`, `${g.chance}%`]),
+      (data.grades || []).map((g) => [g.title || `${g.name} ларец`, `${g.chance}%`]),
     );
   }
   if (kind === 'fish') {

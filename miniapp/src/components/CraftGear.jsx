@@ -11,6 +11,12 @@ import Sparks from './Sparks.jsx';
 
 const ROMAN = ['', 'I', 'II', 'III', 'IV', 'V'];
 
+function chargesWord(n) {
+  const d = n % 10;
+  if (d === 1 && n % 100 !== 11) return 'заряд';
+  return d >= 2 && d <= 4 && (n % 100 < 12 || n % 100 > 14) ? 'заряда' : 'зарядов';
+}
+
 function kg(grams) {
   return `${Math.round(grams / 100) / 10} кг`;
 }
@@ -26,7 +32,7 @@ function needsLines(next) {
 }
 
 function actionLabel(tool, next) {
-  if (tool.source === 'charges') return `Собрать: +${next.yield} зарядов`;
+  if (tool.source === 'charges') return `Собрать: +${next.yield} ${chargesWord(next.yield)}`;
   if (tool.source === 'stock') return `Сделать: +${next.yield} шт.`;
   if (tool.source === 'herbs') return tool.owned ? `Сплести ${ROMAN[next.tier]} тир` : 'Сплести';
   return tool.owned ? `Перековать в ${ROMAN[next.tier]} тир` : 'Сковать';

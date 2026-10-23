@@ -68,7 +68,7 @@ def render_readonly(
         lines.append(f"{emoji} {name}: {char_stats[key]}")
     if pvp_wins is not None and pvp_losses is not None:
         lines.append("")
-        lines.append(f"⚔️ PvP: {pvp_wins} побед · {pvp_losses} поражений")
+        lines.append(f"⚔️ PvP: побед {pvp_wins} · поражений {pvp_losses}")
         if pts is not None:
             from services import pts_service
 

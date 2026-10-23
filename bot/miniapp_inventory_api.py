@@ -428,7 +428,7 @@ def _chests_payload(chests) -> list[dict]:
             # Ларцы кровавого разлома - легендарное свечение вокруг иконки.
             "rarity": None if kind == lootbox_service.ASHEN else "legendary",
             "description": info.description,
-            "grades": [{"name": g.name, "icon": f"chest:{g.id}", "grade": g.id,
+            "grades": [{"name": g.name, "title": lootbox_service.grade_title(g.name), "icon": f"chest:{g.id}", "grade": g.id,
                         "chance": round(100 * g.chance / total, 1)} for g in grades],
         })
     return out
@@ -461,7 +461,8 @@ async def handle_post_chest_open(request: web.Request) -> web.Response:
             "strip": strip,
             "win_index": win_index,
             "result": {
-                "grade": result.grade.id, "grade_name": result.grade.name, "lines": result.lines,
+                "grade": result.grade.id, "grade_name": result.grade.name,
+                "grade_title": lootbox_service.grade_title(result.grade.name), "lines": result.lines,
                 "kind": kind, "title": lootbox_service.CHEST_KINDS[kind].name,
                 "chest_icon": lootbox_service.CHEST_KINDS[kind].icon if kind != lootbox_service.ASHEN else None,
             },

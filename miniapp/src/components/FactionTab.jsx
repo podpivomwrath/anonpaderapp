@@ -20,6 +20,12 @@ const TIER_CLASS = { 1: '', 2: 'trade-tier--2', 3: 'trade-tier--3', 4: 'trade-ti
 
 const money = (v) => Number(v ?? 0).toLocaleString('ru-RU');
 
+function pointsWord(n) {
+  const d = n % 10;
+  if (d === 1 && n % 100 !== 11) return 'очко';
+  return d >= 2 && d <= 4 && (n % 100 < 12 || n % 100 > 14) ? 'очка' : 'очков';
+}
+
 function duration(seconds) {
   const m = Math.max(Math.round(seconds / 60), 1);
   const h = Math.floor(m / 60);
@@ -556,7 +562,7 @@ function Factions({ data }) {
               </div>
               <UiBar value={fill} max={100} tone={home ? 'red' : 'gold'} />
               <p className="craft-hint">
-                {f.next ? `До ступени «${f.next.name}» - ${money(f.next.min_points - f.points)} очков.` : 'Высшая ступень.'}
+                {f.next ? `До ступени «${f.next.name}» - ${money(f.next.min_points - f.points)} ${pointsWord(f.next.min_points - f.points)}.` : 'Высшая ступень.'}
                 {' '}Сегодня торговцы принесли +{money(f.today)}, падение за сутки ~{money(f.decay_day)}.
               </p>
               {f.first_supplier && <p className="guild-line">🏆 Первый поставщик недели: <b>{f.first_supplier}</b></p>}

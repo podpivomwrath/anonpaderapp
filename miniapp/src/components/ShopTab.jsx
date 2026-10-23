@@ -293,7 +293,7 @@ function FactionSheet({ item, gems, onClose, onBought }) {
           {confirming ? (
             <>
               <Button size="l" stretched disabled={busy} onClick={buy}>
-                {busy ? 'Переезжаем…' : `Да, в ${chosen?.title} за 💎 ${money(item.price)}`}
+                {busy ? 'Переезжаем…' : `Переехать: ${chosen?.title} за 💎 ${money(item.price)}`}
               </Button>
               <Button size="l" mode="secondary" stretched disabled={busy} onClick={() => setConfirming(false)}>Отмена</Button>
             </>

@@ -5,6 +5,7 @@ POST {"item": "premium", "days": N} - покупка; в ответ катало
 итог покупки. Цена считается на сервере, личность - только из подписи.
 """
 
+from game import plural
 from aiohttp import web
 
 from bot.app_keys import SESSION_FACTORY_KEY
@@ -284,7 +285,7 @@ async def handle_yookassa_notify(request: web.Request) -> web.Response:
         from bot.handlers import world as world_handlers
 
         await world_handlers.send_plain_notice(
-            credited.vk_id, f"💎 Оплата прошла: +{credited.gems} самоцветов ({credited.pack_name}). Спасибо!",
+            credited.vk_id, f"💎 Оплата прошла: +{plural.gems(credited.gems)} ({credited.pack_name}). Спасибо!",
         )
     return web.Response(text="ok")
 

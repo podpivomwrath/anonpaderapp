@@ -7,6 +7,7 @@ bot/miniapp_trade_api.py); здесь - доставка повозок и ко�
 
 import random
 
+from game import plural
 from loguru import logger
 from sqlalchemy import select
 
@@ -140,7 +141,7 @@ def payout_text(payout) -> str:
     if payout.gold:
         parts.append(f"{payout.gold} золота")
     if payout.gems:
-        parts.append(f"{payout.gems} самоцветов")
+        parts.append(plural.gems(payout.gems))
     return (
         f"🏆 Доля первого поставщика за сутки: {' и '.join(parts)} - из налога с переводов игрокам твоей фракции."
     )

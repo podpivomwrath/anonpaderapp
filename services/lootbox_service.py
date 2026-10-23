@@ -268,12 +268,20 @@ def _card_icon(grade: LootboxGradeDef, kind: str, option: list[LootboxRewardPart
     return f"chest:{grade.id}"
 
 
+def grade_title(name: str) -> str:
+    """«Пыльный» → «Пыльный ларец»; «Свиток» - как есть (2026-10-23: в
+    Ларце расходников висело «Свиток ларец»). Прилагательное узнаём по
+    окончанию."""
+    return f"{name} ларец" if name.endswith(("ый", "ий", "ой")) else name
+
+
 def _card(grade: LootboxGradeDef, label: str, kind: str = ASHEN,
           option: list[LootboxRewardPart] | None = None) -> dict:
     # Подпись карточки - название градации по Пепельному ларцу (Пыльный,
     # Тусклый...): у ларцов разлома своё имя градации - это имя руды.
     tier = next((g.name for g in _load(ASHEN) if g.id == grade.id), grade.name)
-    return {"grade": grade.id, "grade_name": tier, "icon": _card_icon(grade, kind, option), "label": label}
+    return {"grade": grade.id, "grade_name": tier, "grade_title": grade_title(tier),
+            "icon": _card_icon(grade, kind, option), "label": label}
 
 
 ROULETTE_LENGTH = 44

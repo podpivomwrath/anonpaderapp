@@ -6,6 +6,7 @@
 следующего сезона), титул участникам и самоцветы в казну.
 """
 
+from game import plural
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta
 
@@ -122,7 +123,7 @@ async def close_if_due(db: AsyncSession, now: datetime | None = None) -> SeasonR
         ids.append(character.id)
     await guild_service.log(
         db, winner.id, "season",
-        f"Гильдия - лучшая в сезоне {season}: {points} очков. Венец сезона и 💎 {gc.SEASON_GEMS_TO_TREASURY} в казну.",
+        f"Гильдия - лучшая в сезоне {season}: {plural.count(points, 'очко', 'очка', 'очков')}. Венец сезона и 💎 {gc.SEASON_GEMS_TO_TREASURY} в казну.",
     )
     await db.flush()
     return SeasonResult(season, winner, points, ids)

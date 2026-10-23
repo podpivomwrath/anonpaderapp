@@ -5,6 +5,7 @@
 личное дело игроков (решение владельца). Награды за голову нет (2026-10-16).
 """
 
+from game import plural
 from datetime import datetime, timedelta, timezone
 from zoneinfo import ZoneInfo
 
@@ -200,7 +201,7 @@ async def handle_post_contracts(request: web.Request) -> web.Response:
                 created = await contract_service.create(
                     db, character, body.get("name"), body.get("kills"), body.get("price"),
                 )
-                done = f"📜 Заказ оформлен: {created.kills_total} убийств по 💎{created.price}. Заказчик никому не виден."
+                done = f"📜 Заказ оформлен: {plural.count(created.kills_total, 'убийство', 'убийства', 'убийств')} по 💎{created.price}. Заказчик никому не виден."
             else:
                 contract = await contract_service.take(db, character, body.get("id"))
                 target = await db.get(Character, contract.target_id)

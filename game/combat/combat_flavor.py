@@ -12,6 +12,7 @@
 базовая атака — «атакует», крит — суффикс `(крит!)`, промах — «уклоняется».
 """
 
+from game import plural
 from game.combat import balance_config as bc
 from game.combat import display
 
@@ -70,7 +71,7 @@ def self_buff_line(actor_name: str, skill_name: str, what: str, value: float, tu
     """Навык без урона, усиливающий самого бойца (Боевой клич, Дымовая
     завеса). Без строки он молча пропадал из лога: удар есть только у
     атакующих навыков, а эффект на себя отдельной строки не давал."""
-    return f"{actor_name} → {skill_name}: {what} +{round(value * 100)}% на {turns} хода"
+    return f"{actor_name} → {skill_name}: {what} +{round(value * 100)}% на {plural.count(turns, 'ход', 'хода', 'ходов')}"
 
 
 def control_resisted_line(target_name: str) -> str:
@@ -82,7 +83,7 @@ def control_reduced_line(target_name: str) -> str:
 
 
 def control_immune_line(target_name: str, turns: int) -> str:
-    return f"{target_name} получает иммунитет к контролю на {turns} хода."
+    return f"{target_name} получает иммунитет к контролю на {plural.count(turns, 'ход', 'хода', 'ходов')}."
 
 
 def control_blocked_line(target_name: str, reason: str | None = None) -> str:

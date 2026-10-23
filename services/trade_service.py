@@ -19,6 +19,7 @@ from datetime import datetime, timedelta, timezone
 from sqlalchemy import func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from game import plural
 from game.economy import faction_config as fc
 from game.economy import trade_config as tc
 from game.world import grid
@@ -605,7 +606,7 @@ class Arrival:
         if self.event:
             lines.append(f"🛤 {tc.TRIP_EVENTS_BY_ID[self.event].text}")
         if self.ambushes:
-            lines.append(f"⚔ В пути напали {self.ambushes} раз(а), обшивка {self.durability}/{self.max_durability}.")
+            lines.append(f"⚔ В пути напали {plural.count(self.ambushes, 'раз', 'раза', 'раз')}, обшивка {self.durability}/{self.max_durability}.")
         if self.lost:
             lines.append(f"💥 Обшивка выбита, рассыпалось: {lost_text(self.lost)}.")
         if self.chests:
