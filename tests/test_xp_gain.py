@@ -13,13 +13,14 @@ async def _stats(db_session, character):
     return await db_session.scalar(select(CharacterStats).where(CharacterStats.character_id == character.id))
 
 
-async def test_game_xp_is_boosted_but_manual_grants_are_exact(db_session, make_character, monkeypatch) -> None:
-    monkeypatch.setattr(bc, "XP_GAIN_MULT", 1.25)
+async def test_no_hidden_xp_multiplier(db_session, make_character) -> None:
+    """2026-10-23: x1.25 вшит в источники - начисление отдаёт ровно то, что
+    посчитал источник (без Метки и древа)."""
     character = await make_character(level=10)
     stats = await _stats(db_session, character)
-    assert experience_service.add_experience(character, stats, 100).xp_awarded == 125
-    manual = experience_service.add_experience(character, stats, 100, apply_premium=False, game_gain=False)
-    assert manual.xp_awarded == 100
+    assert experience_service.add_experience(character, stats, 100).xp_awarded == 100
+    # Облегчение - в самой формуле моба: было 15 + 6*L, стало x1.25.
+    assert experience_service.xp_per_mob(10) == round((15 + 6 * 10) * 1.25)
     # требования к уровню прежние
     assert experience_service.xp_to_next(10) == int(bc.XP_BASE * 10 ** bc.XP_EXP)
 

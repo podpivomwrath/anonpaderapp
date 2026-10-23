@@ -33,7 +33,7 @@ def scaled_target(base_target: int, level: int) -> int:
 # одна ежедневка = DAILY_XP_SHARE полосы опыта до след. уровня НЕЗАВИСИМО от
 # уровня, три — примерно 3×DAILY_XP_SHARE. Золото по-прежнему растёт линейно
 # от уровня — мягче, чем опыт (экономика чувствительнее к вливаниям золота).
-DAILY_XP_SHARE = 0.15
+DAILY_XP_SHARE = 0.1875  # 0.15 x1.25 (облегчение прогрессии вшито, 2026-10-23)
 DAILY_GOLD_BASE = 30
 DAILY_GOLD_PER_LEVEL = 6
 

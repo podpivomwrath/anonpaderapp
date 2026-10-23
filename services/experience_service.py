@@ -23,7 +23,7 @@ def xp_to_next(level: int) -> int:
 
 
 def xp_per_mob(mob_level: int) -> int:
-    return bc.XP_MOB_FLAT + bc.XP_MOB_PER_LEVEL * mob_level
+    return round(bc.XP_MOB_FLAT + bc.XP_MOB_PER_LEVEL * mob_level)
 
 
 def mob_xp_level_diff_multiplier(mob_level: int, player_level: int) -> float:
@@ -67,17 +67,12 @@ class LevelUp:
     premium_applied: bool = False
 
 
-def final_amount(
-    character: Character, amount: int, apply_premium: bool = True, game_gain: bool = True,
-) -> tuple[int, bool]:
+def final_amount(character: Character, amount: int, apply_premium: bool = True) -> tuple[int, bool]:
     """Сколько опыта реально придёт из amount и был ли премиум. Одна цепочка
     для начисления и для обещаний (карточки ежедневок, 2026-10-23: игрок
-    видел 11 299, а получил 21 250 - множители не были видны)."""
-    if game_gain and amount > 0:
-        # Облегчение прогрессии (2026-10-13, решение владельца): требования к
-        # уровню прежние, весь игровой опыт x1.25 - уровни ~на 20% быстрее.
-        # Ручная выдача (админ, промокод) - ровно то число, что задано.
-        amount = round(amount * bc.XP_GAIN_MULT)
+    видел 11 299, а получил 21 250 - множители не были видны). Общего x1.25
+    здесь больше нет: он вшит в сами источники (bc.XP_MOB_*, доля ежедневки,
+    награды квестов)."""
     premium_applied = apply_premium and amount > 0 and premium_service.is_premium(character)
     if premium_applied:
         amount = round(amount * pc.PREMIUM_XP_MULTIPLIER)
@@ -94,7 +89,6 @@ def final_amount(
 
 def add_experience(
     character: Character, stats: CharacterStats, amount: int, apply_premium: bool = True,
-    game_gain: bool = True,
 ) -> LevelUp:
     """Начисляет опыт в текущий уровень, обрабатывает левелап(ы) в цикле.
 
@@ -119,7 +113,7 @@ def add_experience(
         # записывали и тут же обнуляли, а игроку показывали «+105 опыта».
         # Ноль в xp_awarded - сигнал текстам не печатать строку опыта.
         return LevelUp(levels_gained=0, new_level=character.level)
-    amount, premium_applied = final_amount(character, amount, apply_premium, game_gain)
+    amount, premium_applied = final_amount(character, amount, apply_premium)
     if amount > 0:
         character.experience += amount
     levels = 0

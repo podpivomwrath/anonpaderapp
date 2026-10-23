@@ -12,15 +12,6 @@ from models import Base, Character, CharacterStats, User, Wallet
 
 
 @pytest.fixture(autouse=True)
-def _plain_xp_gain(monkeypatch):
-    """Тесты сверяют точные числа опыта, написанные до облегчения прогрессии
-    (XP_GAIN_MULT, 2026-10-13). Сам множитель проверяет tests/test_xp_gain.py."""
-    from game.combat import balance_config as bc
-
-    monkeypatch.setattr(bc, "XP_GAIN_MULT", 1.0)
-
-
-@pytest.fixture(autouse=True)
 def _terms_accepted(request, monkeypatch):
     """Пользовательское соглашение (2026-10-15) в тестах считается принятым -
     иначе мини-апп отвечал бы terms_required на всё. Сам гейт проверяют тесты

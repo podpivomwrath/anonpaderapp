@@ -62,7 +62,7 @@ async def test_turn_in_gives_xp_not_gold(db_session, make_character, seed_quests
 
     result = await svc.turn_in(db_session, character)
     assert result is not None
-    assert result.xp_reward == 500       # из данных квеста
+    assert result.xp_reward == 625       # из данных квеста
     assert result.gold_reward == 0       # золото — хук, пока не начисляется
     assert result.levels_gained >= 1     # 500 опыта поднимает уровень со старта
     assert character.level == result.new_level

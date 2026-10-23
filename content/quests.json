@@ -5,7 +5,7 @@
     "title": "Пепельные твари",
     "progress_label": "Пепельные твари",
     "target_count": 10,
-    "xp_reward": 500,
+    "xp_reward": 625,
     "gold_reward": 50
   },
   {
@@ -14,7 +14,7 @@
     "title": "Пепельные твари",
     "progress_label": "Пепельные твари",
     "target_count": 10,
-    "xp_reward": 500,
+    "xp_reward": 625,
     "gold_reward": 50
   },
   {
@@ -23,7 +23,7 @@
     "title": "Пепельные твари",
     "progress_label": "Пепельные твари",
     "target_count": 10,
-    "xp_reward": 500,
+    "xp_reward": 625,
     "gold_reward": 50
   },
   {
@@ -32,7 +32,7 @@
     "title": "Пепельные твари",
     "progress_label": "Пепельные твари",
     "target_count": 10,
-    "xp_reward": 500,
+    "xp_reward": 625,
     "gold_reward": 50
   }
 ]

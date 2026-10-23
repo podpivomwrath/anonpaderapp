@@ -42,8 +42,8 @@ def test_plateau_kink_at_50() -> None:
 
 
 def test_xp_per_mob_formula() -> None:
-    assert svc.xp_per_mob(1) == bc.XP_MOB_FLAT + bc.XP_MOB_PER_LEVEL
-    assert svc.xp_per_mob(10) == bc.XP_MOB_FLAT + bc.XP_MOB_PER_LEVEL * 10
+    assert svc.xp_per_mob(1) == round(bc.XP_MOB_FLAT + bc.XP_MOB_PER_LEVEL)
+    assert svc.xp_per_mob(10) == round(bc.XP_MOB_FLAT + bc.XP_MOB_PER_LEVEL * 10)
 
 
 # --- Патч 26: опыт за разницу уровней ---

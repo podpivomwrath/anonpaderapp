@@ -142,7 +142,7 @@ async def test_travel_combat_ready_grants_reward_and_advances(db_session, make_c
     stats = await db_session.get(CharacterStats, character.id)
     result = await story_service.visit_mentor(db_session, character, stats)
     assert "Значит, не сплетни" in result.text
-    assert "800" in result.text  # xp_reward ridge_1_2
+    assert "1000" in result.text  # xp_reward ridge_1_2
 
     quest = await story_service.current_quest_def(db_session, character)
     assert quest.id == "ridge_1_3"
@@ -153,7 +153,7 @@ async def test_city_scene_resolves_in_one_visit(db_session, make_character) -> N
     await _set_progress(db_session, character, "ridge_1_3", act=1, status="active")
     stats = await db_session.get(CharacterStats, character.id)
     result = await story_service.visit_mentor(db_session, character, stats)
-    assert "400" in result.text  # xp_reward ridge_1_3
+    assert "500" in result.text  # xp_reward ridge_1_3
     assert result.region_completed is False
 
     quest = await story_service.current_quest_def(db_session, character)
@@ -239,7 +239,7 @@ async def test_advance_past_subclass_gate_grants_and_advances(db_session, make_c
     await _set_progress(db_session, character, "ridge_3_2", act=3, status="active")
     stats = await db_session.get(CharacterStats, character.id)
     reward_text = await story_service.advance_past_subclass_gate(db_session, character, stats)
-    assert "800" in reward_text  # xp_reward ridge_3_2
+    assert "1000" in reward_text  # xp_reward ridge_3_2
 
     quest = await story_service.current_quest_def(db_session, character)
     assert quest.id == "ridge_4_1"
