@@ -164,6 +164,43 @@ async def _render_trophies(db, character, mult: float, prefix: str = "") -> tupl
     return text, appraiser_trophies_keyboard(stock)
 
 
+RELICS_EMPTY_TEXT = "💀 Реликвий в сумке нет. Их приносят с убитых мобов."
+
+
+def relics_text(stock: list, mult: float, foreign: bool) -> str:
+    """/реликвии (2026-10-23): реликвии по ступеням и что за них даст скупщик.
+    Цена - теми же множителями, что у скупщика; в чужом городе - его скидка."""
+    if not stock:
+        return RELICS_EMPTY_TEXT
+    lines = ["💀 Реликвии и цена у скупщика" + (" этого города" if foreign else "") + ":", ""]
+    total = 0
+    for d, count in stock:
+        each = round(d.sell_price * mult)
+        total += each * count
+        lines.append(f"{d.emoji} {d.name} ×{count} - по {each}, всего {each * count} зол.")
+    lines += ["", f"💰 Всё вместе: {total} зол."]
+    if foreign:
+        lines.append("В родном городе скупщик заплатит больше.")
+    return "\n".join(lines)
+
+
+@labeler.message(text=["/реликвии", "/relics"])
+async def relics_command(message: Message) -> None:
+    from bot import info_reply
+
+    async with get_session_factory()() as db:
+        character = await onboarding_svc.get_character(db, message.from_id)
+        if character is None or character.creation_state is not None:
+            return
+        region = grid.city_region_at(character.pos_x, character.pos_y)
+        mult = _price_multiplier(character, region)
+        mult *= await faction_service.relic_mult(db, character)
+        mult *= trophy_service.display_multiplier(character)
+        stock = await trophy_service.get_stock(db, character.id)
+        text = relics_text(stock, mult, foreign=region is not None and region != character.region)
+    await info_reply.answer(message, text)
+
+
 @labeler.message(payload_contains={"type": "appraiser_trophies"})
 async def appraiser_trophies(message: Message) -> None:
     peer_id = message.peer_id
