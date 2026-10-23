@@ -25,9 +25,12 @@ async def test_donka_is_four_times_slower_and_keeps_fishing(db_session, characte
     assert c.fishing_bite_at >= before + timedelta(seconds=wait - 1)
     # Поклёвка: подсечка сама, следующий заброс - снова донкой.
     c.fishing_bite_at = datetime.now(timezone.utc) - timedelta(seconds=1)
+    xp_before = (c.fishing_level, c.fishing_xp, c.experience)
     text, keyboard, nxt = await handler._donka_bite(db_session, c, 777010)
     assert text.startswith("🪝 Донка") and nxt is not None and c.fishing_auto
     assert keyboard is None
+    # Опыта за донку нет (2026-10-23, владелец).
+    assert (c.fishing_level, c.fishing_xp, c.experience) == xp_before
 
 
 async def test_donka_stops_when_player_idle(db_session, character_at) -> None:

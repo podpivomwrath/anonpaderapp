@@ -494,13 +494,11 @@ async def _donka_bite(db, character, peer_id: int) -> tuple[str, str | None, flo
     if last is not None and datetime.now(timezone.utc) - last > timedelta(minutes=DONKA_IDLE_MINUTES):
         fishing_service.clear_cast(character)
         return ft.DONKA_IDLE_TEXT, kb.lake_keyboard(True), None
-    result = await fishing_service.strike(db, character, lake, _rng)
+    # Опыта за донку нет - ни рыбалки, ни персонажа (2026-10-23, владелец).
+    result = await fishing_service.strike(db, character, lake, _rng, give_xp=False)
     capacity = fishing.bag_capacity_grams(character.fishing_level)
     if result.landed:
         await guild_quest_service.record(db, character, "fish", 1)
-        await experience_service.grant_activity_xp(
-            db, character, "fish", place_level=grid.mob_level_at(character.pos_x, character.pos_y, character.level),
-        )
         kept = await fishing_service.keep_catch(db, character)
         if kept is None or kept.bag_full:
             fishing_service.drop_catch(character)

@@ -174,8 +174,9 @@ class StrikeResult:
 
 async def strike(
     db: AsyncSession, character: Character, lake: LakeDef,
-    rng: random.Random, now: datetime | None = None,
+    rng: random.Random, now: datetime | None = None, give_xp: bool = True,
 ) -> StrikeResult:
+    """give_xp=False - Пепельная донка: опыта рыбалки за неё нет (2026-10-23)."""
     now = now or datetime.now(timezone.utc)
     fish_id = character.fishing_pending_fish
     grams = character.fishing_pending_grams
@@ -189,7 +190,7 @@ async def strike(
         return StrikeResult(too_early=True)
     if strike_expired(character, now):
         # Прозевал окно — рыба ушла сама. Опыт как за обрыв, текст другой.
-        return await _apply_break(db, character, lake, fish_id, grams, missed=True)
+        return await _apply_break(db, character, lake, fish_id, grams, missed=True, give_xp=give_xp)
 
     fraction = fishing.fraction_of(fish_id, grams)
     # Леска (2026-10-23): рвётся реже.
@@ -198,17 +199,17 @@ async def strike(
 
     line = craft_gear.line_break_mult(await craft_gear_service.tier(db, character.id, "line"))
     if rng.random() < fishing.line_break_chance(lake.tier, character.fishing_level, fraction) * line:
-        return await _apply_break(db, character, lake, fish_id, grams)
+        return await _apply_break(db, character, lake, fish_id, grams, give_xp=give_xp)
 
-    return await _apply_catch(db, character, fish_id, grams, fraction)
+    return await _apply_catch(db, character, fish_id, grams, fraction, give_xp=give_xp)
 
 
 async def _apply_break(
     db: AsyncSession, character: Character, lake: LakeDef, fish_id: str, grams: int,
-    missed: bool = False,
+    missed: bool = False, give_xp: bool = True,
 ) -> StrikeResult:
     fraction = fishing.fraction_of(fish_id, grams)
-    xp = fishing.break_xp(lake.tier, character.fishing_level)
+    xp = fishing.break_xp(lake.tier, character.fishing_level) if give_xp else 0
     level, remainder, levels = fishing.add_fishing_xp(
         character.fishing_level, character.fishing_xp, xp
     )
@@ -227,7 +228,7 @@ async def _apply_break(
 
 
 async def _apply_catch(
-    db: AsyncSession, character: Character, fish_id: str, grams: int, fraction: float
+    db: AsyncSession, character: Character, fish_id: str, grams: int, fraction: float, give_xp: bool = True,
 ) -> StrikeResult:
     grade_id, grade_label, _mult = fishing.grade_for(fraction)
 
@@ -235,7 +236,7 @@ async def _apply_catch(
     # отпустить (keep_catch / release_catch). Опыт и рекорд - за саму поимку.
     is_record = await _update_record(db, character.id, fish_id, grams)
 
-    xp = fishing.catch_xp(fish_id, fraction)
+    xp = fishing.catch_xp(fish_id, fraction) if give_xp else 0
     level, remainder, levels = fishing.add_fishing_xp(
         character.fishing_level, character.fishing_xp, xp
     )
