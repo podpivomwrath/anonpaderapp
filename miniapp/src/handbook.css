@@ -35,7 +35,9 @@
   padding: 11px 12px;
   border: 1px solid var(--card-line);
   border-radius: 12px;
-  background: var(--card);
+  background: rgba(10, 10, 13, 0.86);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
   color: inherit;
   font: inherit;
   text-align: left;
@@ -43,7 +45,7 @@
 }
 
 .hb-chapter-btn:active {
-  background: rgba(255, 255, 255, 0.08);
+  background: rgba(40, 40, 46, 0.92);
 }
 
 .hb-chapter-btn__no {
@@ -75,8 +77,24 @@
 
 /* --- Глава --- */
 
+/* Под текстом - тёмная подложка: фон мини-аппа местами светлый, и буквы с
+   ним сливались (2026-10-23, жалоба владельца). */
+.hb-page,
+.hb-lede {
+  border: 1px solid var(--card-line);
+  border-radius: 16px;
+  background: rgba(10, 10, 13, 0.86);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+}
+
 .hb-page {
-  padding-top: 8px;
+  margin-top: 8px;
+  padding: 8px 14px 16px;
+}
+
+.hb-lede {
+  padding: 12px 14px;
 }
 
 .hb-back {
