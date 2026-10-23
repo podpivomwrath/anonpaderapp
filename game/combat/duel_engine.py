@@ -214,6 +214,9 @@ class DuelEngine:
                     before, actor.current_hp, actor.max_hp, display.MODE_PVP,
                 )
             )
+            # Горение и яд тоже ловит «Последний вздох» (2026-10-23, жалоба:
+            # в дуэли ДоТ в начале хода добивал мимо эликсира).
+            _apply_last_breath_guard(actor, result)
 
         if action is None:
             result.lines.append(f"⏳ {actor.name} не успел походить - ход пропущен")

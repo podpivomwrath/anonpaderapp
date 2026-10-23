@@ -143,6 +143,11 @@ def poison_end_effects(
                 if amount > 0:
                     combatant.current_hp -= amount
                     lines.append(f"☠ Яд на {combatant.name} вспыхивает напоследок - {amount} урона")
+                    # «Последний вздох» ловит и этот урон (2026-10-23).
+                    if combatant.current_hp <= 0 and combatant.has_effect(EffectKind.LAST_BREATH):
+                        combatant.effects = [e for e in combatant.effects if e.kind != EffectKind.LAST_BREATH]
+                        combatant.current_hp = 1
+                        lines.append(f"✨ Последний вздох удерживает {combatant.name} на грани (1 HP)")
         combatant._expired_dots = []
 
     for cid in alive_before:

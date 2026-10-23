@@ -323,6 +323,28 @@ async def test_last_breath_saves_from_lethal_hit_in_duel() -> None:
         engine.shutdown()
 
 
+async def test_last_breath_saves_from_lethal_dot_in_duel() -> None:
+    """2026-10-23, жалоба: горение в начале хода добивало мимо «Последнего
+    вздоха» (Злой против Чачи, 4% и 🔥)."""
+    engine = make_engine()
+    engine.start()
+    try:
+        a = combatant(1, side=0)
+        b = combatant(2, side=1)
+        engine.start_duel(10, a, b)
+        await engine.act(10, 1, skip())
+        a.current_hp = 1
+        a.apply_effect(EffectKind.DOT, 50, 3, b.id)
+        elixir_effects.apply_combat_elixir(a, "last_breath")
+        await engine.act(10, 2, skip())
+        result = await engine.act(10, 1, skip())
+        assert a.alive and a.current_hp == 1
+        assert not a.has_effect(EffectKind.LAST_BREATH)
+        assert any("Последний вздох" in line for line in result.lines)
+    finally:
+        engine.shutdown()
+
+
 async def test_chill_window_survives_the_frozen_turn() -> None:
     """2026-10-18, баг-репорт: «Схождение стихий» после удачных «Ледяных
     оков» не критовало в дуэли - окно «по холоду» гасло в пропущенный ход."""
