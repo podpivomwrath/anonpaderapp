@@ -108,8 +108,17 @@ async def on_bite(peer_id: int) -> None:
     """
     if _bot_api is None:
         return
+    from sqlalchemy import select
+
+    from models import Character, User
+
     async with get_session_factory()() as db:
-        character = await onboarding_svc.get_character(db, peer_id)
+        # Не через onboarding.get_character: та отмечает игрока активным, и
+        # каждая поклёвка донки продлевала бы «игрок рядом» - донка не
+        # сматывалась никогда (2026-10-23, жалоба владельца).
+        character = await db.scalar(
+            select(Character).join(User, User.id == Character.user_id).where(User.vk_id == peer_id)
+        )
         if character is None or character.screen != "lake":
             return
         if not fishing_service.is_casting(character):
