@@ -49,6 +49,11 @@
     filter: brightness(1.22) saturate(1.1);
   }
 
+  /* Кнопка во всю ширину не растёт - ей некуда, только светлеет. */
+  .vkuiButton__host.vkuiButton__stretched:not(:disabled):hover {
+    transform: none;
+  }
+
   .vkuiTabsItem__host:hover,
   .nav-drawer__item:hover {
     filter: brightness(1.25);
