@@ -540,6 +540,16 @@ async def _recover_stranded(peer_id: int) -> None:
         character = await onboarding_svc.get_character(db, peer_id)
         if character is None:
             return
+        # Кнопка под сообщением о нападении живёт и после «Продолжить путь»:
+        # второе нажатие писало «Путь прерван» и давало карту посреди
+        # поездки (2026-10-24). Едет - так и говорим, клавиатура пути.
+        travel = await mount_service.active_travel(db, character.id)
+        if travel is not None and travel.status == "traveling":
+            await _bot_api.messages.send(
+                peer_id=peer_id, message="🐎 Ты и так в пути.", random_id=0,
+                keyboard=kb.mount_travel_keyboard(),
+            )
+            return
         has_mount = await mount_service.has_any_mount(db, character.id)
         pos = (character.pos_x, character.pos_y)
     await _bot_api.messages.send(
