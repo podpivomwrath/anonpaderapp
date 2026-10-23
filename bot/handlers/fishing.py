@@ -418,7 +418,7 @@ async def cancel_cast(message: Message) -> None:
 #: Донка ждёт поклёвку во столько раз дольше обычного заброса (владелец: «в 4 раза медленнее»).
 DONKA_SLOWDOWN = 4
 #: Игрок молчит дольше - донку сматывает: ловит только пока ты рядом.
-DONKA_IDLE_MINUTES = 30
+DONKA_IDLE_MINUTES = 60  # было 30, владелец 2026-10-23: «на час»
 
 
 async def _donka_cast(db, character, lake) -> float:
