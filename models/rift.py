@@ -44,3 +44,24 @@ class RiftMeter(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True)
     explorations: Mapped[int] = mapped_column(default=0)
+
+
+class RiftRun(Base):
+    """Заход в разлом (2026-10-23): кто, куда и чем кончилось - для баланса.
+    Раньше погибшая группа просто освобождала разлом, и поражений не было
+    видно вовсе. outcome: cleared | wiped | interrupted (перезапуск бота) |
+    None - заход ещё идёт."""
+
+    __tablename__ = "rift_runs"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    rift_id: Mapped[int] = mapped_column(index=True)
+    kind: Mapped[str] = mapped_column(String(32))
+    ring: Mapped[int] = mapped_column()
+    level: Mapped[int] = mapped_column()
+    blood: Mapped[bool] = mapped_column(default=False)
+    #: [[id, уровень, путь], ...] - состав на входе
+    members: Mapped[list] = mapped_column(JSON, default=list)
+    outcome: Mapped[str | None] = mapped_column(String(16), nullable=True, index=True)
+    started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)

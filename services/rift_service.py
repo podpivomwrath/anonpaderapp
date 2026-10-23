@@ -17,7 +17,7 @@ from game.economy import rift_config as rc
 from game.world import grid
 from game.world import world_boss as world_boss_world
 from game.world import world_config as wc
-from models import Character, Rift, RiftMeter
+from models import Character, Rift, RiftMeter, RiftRun
 
 ACTIVE, CLEARED, EXPIRED = "active", "cleared", "expired"
 FREE, WAITING, RUNNING = "free", "waiting", "running"
@@ -320,8 +320,23 @@ async def start_run(db: AsyncSession, rift: Rift, characters: list[Character]) -
     rift.members = [c.id for c in characters]
     rift.wait_until = None
     rift.level = run_level(rift, [c.level for c in characters])
+    # Заход - в журнал (2026-10-23): исход допишут finish_run/recover.
+    db.add(RiftRun(
+        rift_id=rift.id, kind=rift.kind, ring=rift.ring, level=rift.level, blood=is_blood(rift),
+        members=[[c.id, c.level, c.subclass or c.base_class] for c in characters],
+    ))
     await db.flush()
     return rift.level
+
+
+async def _close_run(db: AsyncSession, rift_id: int, outcome: str, now: datetime) -> None:
+    run = await db.scalar(
+        select(RiftRun).where(RiftRun.rift_id == rift_id, RiftRun.outcome.is_(None))
+        .order_by(RiftRun.id.desc()).limit(1)
+    )
+    if run is not None:
+        run.outcome = outcome
+        run.finished_at = now
 
 
 async def finish_run(db: AsyncSession, rift_id: int, cleared: bool, now: datetime | None = None) -> None:
@@ -330,6 +345,7 @@ async def finish_run(db: AsyncSession, rift_id: int, cleared: bool, now: datetim
     rift = await lock(db, rift_id)
     if rift is None or rift.status != ACTIVE:
         return
+    await _close_run(db, rift_id, "cleared" if cleared else "wiped", now or _now())
     if cleared:
         rift.status = CLEARED
         rift.state = FREE
@@ -364,6 +380,7 @@ async def recover(db: AsyncSession, now: datetime | None = None) -> list[int]:
     affected: list[int] = []
     for rift in rows:
         affected += list(rift.members or [])
+        await _close_run(db, rift.id, "interrupted", now)
         _release(rift, now)
     for cid in affected:
         character = await db.get(Character, cid)

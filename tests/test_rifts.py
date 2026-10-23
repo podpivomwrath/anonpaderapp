@@ -147,6 +147,26 @@ async def test_cleared_rift_closes_and_failed_one_is_free_again(db_session, make
     assert rift.status == rift_service.CLEARED
 
 
+async def test_runs_are_logged_with_outcome(db_session, make_character) -> None:
+    """2026-10-23: каждый заход пишется в rift_runs - видно и поражения."""
+    from sqlalchemy import select
+
+    from models import RiftRun
+
+    rift = await _rift(db_session)
+    a = await _at(await make_character(), rift, 20)
+    await rift_service.start_run(db_session, rift, [a])
+    await rift_service.finish_run(db_session, rift.id, cleared=False, now=NOW)
+    await rift_service.start_run(db_session, rift, [a])
+    await rift_service.recover(db_session, NOW)
+    await rift_service.start_run(db_session, rift, [a])
+    await rift_service.finish_run(db_session, rift.id, cleared=True, now=NOW)
+    runs = (await db_session.scalars(select(RiftRun).order_by(RiftRun.id))).all()
+    assert [r.outcome for r in runs] == ["wiped", "interrupted", "cleared"]
+    assert runs[0].members == [[a.id, a.level, a.subclass or a.base_class]]
+    assert runs[0].kind == rift.kind and runs[0].level == rift.level
+
+
 async def test_recover_frees_held_rifts(db_session, make_character) -> None:
     rift = await _rift(db_session)
     a = await _at(await make_character(), rift, 20)

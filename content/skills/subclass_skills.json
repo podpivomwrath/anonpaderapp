@@ -44,7 +44,7 @@
   },
   "blood_knight_crimson_feast": {
     "id": "blood_knight_crimson_feast", "name": "Багровый пир", "subclass_id": "blood_knight",
-    "multiplier": 2.19, "cd": 5, "effect": "custom",
+    "multiplier": 2.1, "cd": 5, "effect": "custom",
     "effect_value": 0.45,
     "flavor": "Ты платишь своей кровью вперёд - и забираешь с процентами."
   },
