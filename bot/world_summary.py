@@ -107,7 +107,8 @@ def location_summary(
     from services import pvp_shield
 
     shield_left, shield_why = pvp_shield.left(getattr(character, "id", None))
-    if shield_left:
+    # На мирной клетке и так не нападают - строка о щите там лишняя.
+    if shield_left and not grid.pvp_forbidden(x, y):
         monolith_block += f"🛡 Защита {shield_why}: на тебя не нападут ещё {shield_left} сек.\n"
     # Патч 58: озеро — как Монолит: кнопка приходит только при ВХОДЕ на
     # клетку, поэтому у воды обязана быть вторая дверь командой словом.

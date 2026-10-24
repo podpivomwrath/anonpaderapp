@@ -133,7 +133,7 @@ def test_rift_wait_drops_any_shield() -> None:
     from services import pvp_shield
 
     pvp_shield.grant(9901, pvp_shield.DRAW)
-    pvp_shield.grant(9902, pvp_shield.MONOLITH)
+    pvp_shield.grant(9902, pvp_shield.CHAPEL)
     try:
         assert pvp_shield.drop(9901) and pvp_shield.drop(9902)
         assert pvp_shield.left(9901) == (0, "") and pvp_shield.left(9902) == (0, "")

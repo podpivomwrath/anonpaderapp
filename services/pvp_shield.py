@@ -1,8 +1,9 @@
 """Щит от нападения игроков на пару минут (против PvP-снайпинга).
 
 Даётся после ничьей (той стороне, на которую напали), на выходе из разлома
-и рейда, при входе на клетку Монолита (2026-10-18, решение владельца)
-и после возрождения у часовни гильдии (2026-10-21):
+и рейда (2026-10-18, решение владельца) и после возрождения у часовни
+гильдии (2026-10-21). На мирных клетках (города, ворота, Монолит) щит не
+нужен и не выдаётся (2026-10-24: щит Монолита убран, клетка мирная):
 игроки должны успеть уйти или собраться в рейд, а не ловиться на выходе.
 Напал сам - щит теряешь. Ушёл с клетки, где его получил, - тоже
 (2026-10-18): щит, чтобы уйти, а не чтобы с ним гулять.
@@ -13,11 +14,11 @@
 import time
 
 from game.combat import balance_config as bc
+from game.world import grid
 
 DRAW = "после ничьей"
 RIFT = "после разлома"
 RAID = "после рейда"
-MONOLITH = "у Монолита"
 CHAPEL = "после возрождения"
 
 # character_id -> (до какого time.time(), причина, клетка, где выдан)
@@ -30,6 +31,8 @@ def grant(
 ) -> None:
     """Щит не укорачивается: если уже действует дольше, оставляем его.
     cell - клетка, с которой уходить нельзя без потери щита."""
+    if cell is not None and grid.pvp_forbidden(*cell):
+        return
     until = time.time() + seconds
     current = _shields.get(character_id)
     if current is None or current[0] < until:
@@ -55,11 +58,8 @@ def drop(character_id: int) -> bool:
 
 
 def on_moved(character) -> None:
-    """Персонаж ступил на клетку: ушёл с клетки щита - щит пропал;
-    пришёл на Монолит - новый щит."""
+    """Персонаж ступил на клетку: ушёл с клетки щита - щит пропал."""
     here = (character.pos_x, character.pos_y)
     entry = _shields.get(getattr(character, "id", None))
     if entry is not None and entry[2] is not None and entry[2] != here:
         _shields.pop(character.id, None)
-    if here == (0, 0):
-        grant(character.id, MONOLITH, cell=here)
