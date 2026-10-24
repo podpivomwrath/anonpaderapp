@@ -19,7 +19,7 @@ import random
 from dataclasses import dataclass
 
 from game.combat import balance_config as bc
-from game.combat import formulas
+from game.combat import stat_model
 from game.combat.session import CombatantState, EffectKind
 
 
@@ -85,7 +85,7 @@ def try_apply_control(
     effective_will = target.stats.will
     if pvp:
         effective_will = round(effective_will * bc.CC_RESIST_MULT_PER_HIT ** target.control_hits)
-    resist = max(formulas.control_resist(effective_will) - chance_bonus - resist_down, 0.0)
+    resist = max(stat_model.ACTIVE.control_resist(effective_will) - chance_bonus - resist_down, 0.0)
     if rng.random() < resist:
         return ControlResult(applied=False, resisted=True)
 

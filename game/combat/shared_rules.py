@@ -15,6 +15,7 @@ PvE и групповой PvP) и дуэльного (game/combat/duel_engine.py
 """
 
 from game.combat import balance_config as bc
+from game.combat import stat_model
 from game.combat.session import (
     CombatantState,
     CombatSessionState,
@@ -34,6 +35,7 @@ def poison_tick_damage(effect: Effect, source: CombatantState | None) -> int:
     if source is not None:
         multiplier += source.buff_modifiers.get("poison_damage_bonus", 0.0)
         multiplier += source.buff_modifiers.get("poison_damage_per_stack", 0.0) * effect.stacks
+        multiplier *= stat_model.ACTIVE.effect_power(source.stats)
     return max(round(effect.value * effect.stacks * multiplier), 1)
 
 

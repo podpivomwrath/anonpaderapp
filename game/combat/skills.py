@@ -10,16 +10,16 @@
 """
 
 import random
+from collections.abc import Callable
 from dataclasses import dataclass, field
-from typing import Callable
 
 from game.combat import balance_config as bc
-from game.combat import formulas
+from game.combat import formulas, stat_model
 from game.combat.session import (
     CombatantState,
-    Effect,
     CombatSessionState,
     DeclaredAction,
+    Effect,
     EffectKind,
 )
 
@@ -227,7 +227,7 @@ def retribution_bonus(actor: CombatantState) -> float:
 
 def effective_mitigation(target: CombatantState) -> float:
     """Митигация с учётом штрафа (групповой щит стража отдаёт часть защиты)."""
-    base = formulas.mitigation(target.stats.vitality)
+    base = stat_model.ACTIVE.mitigation(target.stats)
     return base * (1.0 - target.mitigation_penalty)
 
 
@@ -252,10 +252,8 @@ def compute_hit(
     EffectKind.DODGE — эликсиры/микробаффы) складываются АДДИТИВНО, общий
     потолок DODGE_HARD_CAP (не DODGE_STAT_CAP — тот лимитирует только вклад
     самого стата)."""
-    stat_dodge = (
-        formulas.ability_dodge_chance(target.stats.agility) if is_ability
-        else formulas.dodge_chance(target.stats.agility)
-    )
+    stat_dodge = stat_model.ACTIVE.dodge(target.stats, is_ability)
+    stat_dodge += stat_model.subclass_dodge_bonus(target.subclass_id)
     # Патч 56, Клинок теней: «Тень» (пассивный уворот), «Ускользание» (после
     # удачного уворота по нему сложнее попасть в следующий ход), «Второй шанс»
     # (раз в N ходов удар гарантированно мимо; флаг ставит резолвер).
@@ -325,7 +323,8 @@ def compute_hit(
     # Патч 56, Клинок теней: «Смертельная точность» (+шанс крита), «Передача
     # метки» (союзники чаще критуют по помеченной цели), «Жажда крови»
     # (следующий удар после крита критует гарантированно).
-    crit_chance = formulas.crit_chance(actor.stats.agility)
+    crit_chance = stat_model.ACTIVE.crit_chance(actor.stats)
+    crit_chance += stat_model.subclass_crit_bonus(actor.subclass_id)
     crit_chance += actor.buff_modifiers.get("crit_chance_bonus", 0.0)
     crit_chance += formulas.class_crit_bonus(actor.base_class, actor.subclass_id)  # пассивка разбойника до подкласса
     if target.has_effect(EffectKind.MARK):
@@ -336,7 +335,7 @@ def compute_hit(
         actor.guaranteed_crit_next = False
     if crit:
         actor.crit_this_tick = True
-        base *= crit_multiplier if crit_multiplier is not None else bc.CRIT_MULTIPLIER
+        base *= (crit_multiplier if crit_multiplier is not None else bc.CRIT_MULTIPLIER) +             stat_model.ACTIVE.crit_multiplier_bonus(actor.stats)
         # Кровавый рыцарь, «Стойкий к боли» (патч 47, ч.2): свой крит-урон не
         # трогает, только входящий по себе.
         base *= 1.0 - target.buff_modifiers.get("crit_damage_taken_reduction", 0.0)

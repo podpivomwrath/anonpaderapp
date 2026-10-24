@@ -14,6 +14,7 @@ HP), Кровавая печать (метка цели — усиливает �
 
 from game.classes.base import Role, SubclassDef, register
 from game.combat import balance_config as bc
+from game.combat import stat_model
 from game.combat.session import CombatantState, EffectKind
 from game.combat.skills import PendingHeal, SkillContext, compute_hit, offensive_skill
 from game.combat.subclass_skills import SUBCLASS_SKILL_DEFS
@@ -58,6 +59,7 @@ def _lifesteal_heal(ctx: SkillContext, hit, ratio: float) -> None:
     if actor.current_hp < actor.max_hp * 0.5:
         ratio += actor.buff_modifiers.get("low_hp_lifesteal_bonus", 0.0)
     ratio += actor.buff_modifiers.get("lifesteal_ratio_bonus", 0.0)
+    ratio *= stat_model.ACTIVE.effect_power(actor.stats)
 
     # Сумму пересчитает резолвер от прошедшего урона (shared_rules.settle_lifesteal).
     heal = max(round(hit.amount * ratio), 0)  # страховка (патч 45, ч.1) — лечение не может быть отрицательным

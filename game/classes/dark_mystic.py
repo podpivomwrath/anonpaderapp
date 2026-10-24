@@ -10,7 +10,7 @@ HP, массовое исцеление союзников (вне группы 
 
 from game.classes.base import Role, SubclassDef, register
 from game.combat import balance_config as bc
-from game.combat import formulas
+from game.combat import stat_model
 from game.combat.session import WARD_TAG, EffectKind
 from game.combat.skills import PendingHeal, SkillContext, compute_hit, offensive_skill
 from game.combat.subclass_skills import SUBCLASS_SKILL_DEFS
@@ -167,7 +167,7 @@ def ward(ctx: SkillContext) -> None:
     bonus = actor.buff_modifiers.get("ward_shield_bonus", 0.0) + steadfast
     absorb = round(
         actor.max_hp
-        * formulas.support_power(actor.stats.will)
+        * stat_model.ACTIVE.support_power(actor.stats)
         * bc.DARK_MYSTIC_WARD_SHIELD_COEF
         * (1.0 + bonus)
     )
@@ -226,7 +226,7 @@ def circle_of_dark(ctx: SkillContext) -> None:
     # support_power(WIL) - ДОЛЯ, а не плоское число (см. formulas.py), поэтому
     # и щит Оберега, и Круг тьмы считаются от максимума здоровья мистика.
     power = (
-        actor.max_hp * formulas.support_power(actor.stats.will)
+        actor.max_hp * stat_model.ACTIVE.support_power(actor.stats)
         * skill.effect_value * _edge_multiplier(actor)
     )
     allies = ctx.session.alive_allies_of(actor)
