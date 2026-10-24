@@ -48,8 +48,10 @@ def left(character_id: int) -> tuple[int, str]:
     return int(remaining) + 1, entry[1]
 
 
-def drop(character_id: int) -> None:
-    _shields.pop(character_id, None)
+def drop(character_id: int) -> bool:
+    """Снять щит. True - он ещё действовал."""
+    entry = _shields.pop(character_id, None)
+    return entry is not None and entry[0] > time.time()
 
 
 def on_moved(character) -> None:

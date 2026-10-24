@@ -125,3 +125,22 @@ def test_leaving_mine_or_lake_restores_event_buttons() -> None:
 
     assert "_current_keyboard" in inspect.getsource(mining.leave_mine)
     assert "_root_keyboard" in inspect.getsource(fishing.leave_lake)
+
+
+def test_rift_wait_drops_any_shield() -> None:
+    """2026-10-24, владелец: встал к разлому - снимается любая защита."""
+    from bot.handlers import rift
+    from services import pvp_shield
+
+    pvp_shield.grant(9901, pvp_shield.DRAW)
+    pvp_shield.grant(9902, pvp_shield.MONOLITH)
+    try:
+        assert pvp_shield.drop(9901) and pvp_shield.drop(9902)
+        assert pvp_shield.left(9901) == (0, "") and pvp_shield.left(9902) == (0, "")
+        assert not pvp_shield.drop(9903)
+    finally:
+        pvp_shield.drop(9901)
+        pvp_shield.drop(9902)
+    import inspect
+
+    assert "pvp_shield.drop(" in inspect.getsource(rift)

@@ -24,7 +24,7 @@ from bot.dispatch_rules import is_info_command
 from bot.keyboards.world import BTN_LOOK_AROUND, add_miniapp_button
 from bot import text_match
 from models import Character
-from services import death_service, group_service, rift_service
+from services import death_service, group_service, pvp_shield, rift_service
 from services import onboarding_service as onboarding_svc
 from services.db import get_session_factory
 
@@ -212,9 +212,14 @@ async def enter(message: Message) -> None:
             return
         await db.commit()
         text = texts.wait_text(rift)
+    # Встал к разлому - любая защита снята: под щитом ничьей или Монолита
+    # заходили в разлом и выходили со свежим щитом «после разлома», так по
+    # кругу (2026-10-24, жалоба игроков; владелец: «снимать всю защиту»).
+    dropped = {cid for cid in peers if pvp_shield.drop(cid)}
     for cid, peer in peers.items():
         _waiting[peer] = rift_id
-        await _send(peer, text, keyboard=waiting_keyboard())
+        note = f"\n\n{texts.SHIELD_DROPPED}" if cid in dropped else ""
+        await _send(peer, text + note, keyboard=waiting_keyboard())
 
 
 def _busy_elsewhere(peer_id: int, character) -> bool:
