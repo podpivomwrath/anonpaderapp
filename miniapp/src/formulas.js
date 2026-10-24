@@ -55,7 +55,7 @@ const POISON_MAX_STACKS = 3;
 // Уворот - от Воли (2026-10-24, было от Ловкости).
 const DODGE_CAP = 0.45;
 // Подклассы разбойника: крит и уворот сверху (stat_model.GAME.base_crit/base_dodge).
-const SUBCLASS_CRIT = { shadow_blade: 0.1, poisoner: 0.1 };
+const SUBCLASS_CRIT = { shadow_blade: 0.15, poisoner: 0.1 };
 const SUBCLASS_DODGE = { shadow_blade: 0.05, poisoner: 0.05 };
 const DODGE_K = 250;
 const ABILITY_DODGE_RATIO = 0.25;
@@ -65,8 +65,11 @@ const DODGE_HARD_CAP = 0.8;
 
 const hyper = (x, cap, k) => (x > 0 ? (cap * x) / (x + k) : 0);
 
-export function primaryEffective(value, level) {
-  const threshold = PRIMARY_SOFT_BASE + PRIMARY_SOFT_PER_LEVEL * level;
+// Порог Ловкости выше в 2/1.5 раза - одинаковый по урону с Силой и Интеллектом.
+const PRIMARY_SOFT_STAT_MULT = { agi: 4 / 3 };
+
+export function primaryEffective(value, level, stat = 'str') {
+  const threshold = (PRIMARY_SOFT_BASE + PRIMARY_SOFT_PER_LEVEL * level) * (PRIMARY_SOFT_STAT_MULT[stat] ?? 1);
   return value <= threshold ? value : threshold + (value - threshold) * PRIMARY_OVER;
 }
 
@@ -122,7 +125,7 @@ export function computeDerived({ level, baseClass, subclass = null, stats, gearB
     roundHalfToEven((HP_BASE + HP_PER_LEVEL * level + HP_PER_VIT * vit + HP_PER_TIER * tierMult) * hpMult) * buffHpMult,
   );
   const damage = roundHalfToEven(
-    (WEAPON_BASE_PER_TIER * tierMult + kDmg * primaryEffective(primaryValue, level)) * dmgMult * 10,
+    (WEAPON_BASE_PER_TIER * tierMult + kDmg * primaryEffective(primaryValue, level, primaryStat)) * dmgMult * 10,
   ) / 10;
   const critChance = Math.min(
     hyper(agi, CRIT_CAP, CRIT_K) + critBonus + (SUBCLASS_CRIT[subclass] ?? 0) + (m.crit_chance_bonus ?? 0), 1,

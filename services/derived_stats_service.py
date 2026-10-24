@@ -79,7 +79,7 @@ def compute(
                            * formulas.class_hp_mult(character.base_class, character.subclass))
                      * hp_mult),
         damage=round(formulas.damage(
-            tier_mult, model.primary_value(primary_value, character.level, True), k_dmg) * dmg_mult, 1),
+            tier_mult, model.primary_value(primary_value, character.level, True, primary_stat), k_dmg) * dmg_mult, 1),
         crit_chance=min(model.crit_chance(s) + stat_model.subclass_crit_bonus(character.subclass)
                         + formulas.class_crit_bonus(character.base_class, character.subclass)
                         + m.get("crit_chance_bonus", 0.0), 1.0),

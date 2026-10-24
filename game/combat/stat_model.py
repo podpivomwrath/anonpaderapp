@@ -27,7 +27,7 @@ def hyper(x: float, cap: float, k: float) -> float:
 class StatModel:
     name: str = "current"
 
-    def primary_value(self, value: int, level: int, is_player: bool) -> float:
+    def primary_value(self, value: int, level: int, is_player: bool, stat: str = "str") -> float:
         """Сколько основного стата идёт в урон. Сейчас - всё, линейно."""
         return value
 
@@ -84,11 +84,15 @@ class HyperModel(StatModel):
     #: Множитель урона от основного стата игрока - вернуть урон, срезанный
     #: порогом, чтобы контент (разломы, рейды) не стал сложнее для всех.
     primary_k_mult: float = 1.0
+    #: Порог по стату: Ловкость даёт 1.5 урона за очко против 2 у Силы и
+    #: Интеллекта, поэтому её порог выше в 2/1.5 раза - одинаковый по урону
+    #: (2026-10-24, разбойники после ребаланса потеряли больше всех).
+    primary_soft_stat_mult: dict | None = None
 
-    def primary_value(self, value: int, level: int, is_player: bool) -> float:
+    def primary_value(self, value: int, level: int, is_player: bool, stat: str = "str") -> float:
         if self.primary_over is None or not is_player:
             return value
-        threshold = self.primary_soft_base + self.primary_soft_per_level * level
+        threshold = (self.primary_soft_base + self.primary_soft_per_level * level) *             (self.primary_soft_stat_mult or {}).get(stat, 1.0)
         eff = value if value <= threshold else threshold + (value - threshold) * self.primary_over
         return eff * self.primary_k_mult
 
@@ -126,7 +130,9 @@ CURRENT = StatModel()
 #: часть (tools/balance_check.py: все подклассы в коридорах).
 GAME = HyperModel(
     name="game", dodge_stat="will", primary_over=0.35, resist_hyper=False,
-    base_crit={"shadow_blade": 0.10, "poisoner": 0.10},
+    primary_soft_stat_mult={"agi": 4 / 3},
+    # Клинок теней живёт критами - ему больше (2026-10-24, владелец: «урон плох»).
+    base_crit={"shadow_blade": 0.15, "poisoner": 0.10},
     base_dodge={"shadow_blade": 0.05, "poisoner": 0.05},
 )
 ACTIVE: StatModel = GAME

@@ -24,7 +24,7 @@ def test_current_equals_old_formulas() -> None:
         assert m.support_power(s) == formulas.support_power(v)
         assert m.crit_multiplier_bonus(s) == 0.0 and m.effect_power(s) == 1.0
     # Прибавки подкласса - только у модели игры (разбойникам вместо крита и уворота с Ловкости).
-    assert stat_model.subclass_crit_bonus("shadow_blade") == 0.10
+    assert stat_model.subclass_crit_bonus("shadow_blade") == 0.15
     assert stat_model.subclass_dodge_bonus("poisoner") == 0.05
     assert stat_model.subclass_crit_bonus("guardian") == 0.0
     assert stat_model.GAME.control_resist(50) == formulas.control_resist(50)
