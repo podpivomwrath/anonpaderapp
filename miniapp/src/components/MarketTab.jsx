@@ -39,6 +39,46 @@ function NumberField({ label, value, onChange, max }) {
   );
 }
 
+// Страничка товара (2026-10-24, владелец): что это и что даёт - для еды
+// особенно, бафф видно до покупки. Тексты - те же, что в инвентаре.
+function About({ about }) {
+  if (!about || (!about.description && !about.effect)) return null;
+  return (
+    <div className="market-about">
+      {about.description && <p>{about.description}</p>}
+      {about.effect && <p className="market-about__effect">{about.effect}</p>}
+    </div>
+  );
+}
+
+function AboutSheet({ good, onClose, onTrade }) {
+  const [info, setInfo] = useState(null);
+  useEffect(() => {
+    getMarketGood(good.key).then(setInfo).catch(() => setInfo({}));
+  }, [good.key]);
+  return (
+    <Sheet title={good.name} icon={good.emoji} onClose={onClose} className="market-sheet">
+      <div className="market-about__head">
+        <Icon icon={good.icon} emoji={good.emoji} size={56} />
+        {info?.have > 0 && <small className="market-muted">у тебя {info.have}</small>}
+      </div>
+      {info ? <About about={info.about} /> : <p className="market-muted">Загрузка…</p>}
+      <Button size="l" stretched onClick={onTrade}>Торговать</Button>
+    </Sheet>
+  );
+}
+
+/** Кнопка «что это» в строке товара: строка сама - кнопка, поэтому span. */
+function InfoButton({ onOpen }) {
+  const open = (e) => { e.stopPropagation(); onOpen(); };
+  return (
+    <span
+      role="button" tabIndex={0} className="market-info" aria-label="Что это"
+      onClick={open} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') open(e); }}
+    >i</span>
+  );
+}
+
 function GoodSheet({ good, rules, gold, onClose, act, busy }) {
   const [info, setInfo] = useState(null);
   const [side, setSide] = useState('buy');
@@ -59,6 +99,7 @@ function GoodSheet({ good, rules, gold, onClose, act, busy }) {
 
   return (
     <Sheet title={good.name} icon={good.emoji} onClose={onClose} className="market-sheet">
+      <About about={info?.about} />
       <div className="market-book">
         <div>
           <b>Продают</b>
@@ -115,6 +156,7 @@ function summaryLine(sell, buy, have) {
 function Goods({ data, act, busy }) {
   const [category, setCategory] = useState(data.categories[0].id);
   const [open, setOpen] = useState(null);
+  const [aboutKey, setAboutKey] = useState(null);
   const [expanded, setExpanded] = useState({});
   // Градации руды и блюда - под одной строкой вида (2026-10-23, владелец:
   // «тиры под вкладку, чтобы не было хаоса»). Сверху - то, чем торгуют
@@ -139,6 +181,7 @@ function Goods({ data, act, busy }) {
     return list.sort((a, b) => score(b) - score(a));
   }, [data.goods, data.have, category]);
   const good = open ? data.goods.find((g) => g.key === open) : null;
+  const aboutGood = aboutKey ? data.goods.find((g) => g.key === aboutKey) : null;
 
   return (
     <Group>
@@ -161,6 +204,7 @@ function Goods({ data, act, busy }) {
                   <b>{first.name}</b>
                   <small>{summaryLine(first.sell, first.buy, data.have[first.key])}</small>
                 </span>
+                <InfoButton onOpen={() => setAboutKey(first.key)} />
               </button>
             );
           }
@@ -185,6 +229,7 @@ function Goods({ data, act, busy }) {
                     <b>{g.variant}</b>
                     <small>{summaryLine(g.sell, g.buy, data.have[g.key])}</small>
                   </span>
+                  <InfoButton onOpen={() => setAboutKey(g.key)} />
                 </button>
               ))}
             </div>
@@ -193,6 +238,12 @@ function Goods({ data, act, busy }) {
       </div>
       {good && (
         <GoodSheet good={good} rules={data.rules} gold={data.gold} busy={busy} act={act} onClose={() => setOpen(null)} />
+      )}
+      {aboutGood && (
+        <AboutSheet
+          good={aboutGood} onClose={() => setAboutKey(null)}
+          onTrade={() => { setAboutKey(null); setOpen(aboutGood.key); }}
+        />
       )}
     </Group>
   );
@@ -274,6 +325,16 @@ function Mine({ data, act, busy }) {
           <Div>
             <Button size="l" stretched disabled={busy || !data.in_city} onClick={() => act('claim')}>Забрать</Button>
             {!data.in_city && <p className="craft-hint">Купленное забирают в городе - в любом.</p>}
+            {/* Курьер (2026-10-24): принесёт ящик туда, где стоишь. */}
+            {data.courier && (
+              <Button
+                className="market-courier" size="l" stretched mode="secondary"
+                disabled={busy || data.courier_busy} onClick={() => act('courier')}
+              >
+                🏃 Принести курьером
+              </Button>
+            )}
+            {data.courier && data.courier_busy && <p className="craft-hint">Курьер ещё бегает с прошлой посылкой.</p>}
           </Div>
         )}
       </Group>
@@ -328,6 +389,7 @@ export default function MarketTab({ onWallet }) {
         buy_item: 'Куплено - забери в городе.',
         cancel: 'Заявка снята.',
         claim: `Забрано: ${(done.lines || []).join(', ')}.`,
+        courier: `Курьер побежал к тебе: ${(done.lines || []).join(', ')}.`,
       }[action];
       setNotice({ ok: true, text });
       after?.();

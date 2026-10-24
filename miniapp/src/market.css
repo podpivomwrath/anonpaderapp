@@ -189,3 +189,48 @@
   height: 22px;
   font-size: 14px;
 }
+
+.market-courier {
+  margin-top: 8px;
+}
+
+/* Кнопка «что это» в строке товара и страничка товара (2026-10-24). */
+.market-info {
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border: 1px solid rgba(224, 180, 90, 0.5);
+  border-radius: 50%;
+  color: var(--gold);
+  font: italic 600 14px/1 Georgia, serif;
+  cursor: pointer;
+}
+
+.market-info:hover,
+.market-info:focus-visible {
+  background: var(--gold-soft);
+}
+
+.market-about {
+  display: grid;
+  gap: 6px;
+  margin-bottom: 10px;
+  font-size: 14px;
+}
+
+.market-about p {
+  margin: 0;
+}
+
+.market-about__effect {
+  color: var(--green);
+  font-weight: 600;
+}
+
+.market-about__head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 8px;
+}

@@ -2,7 +2,7 @@
 
 GET - каталог с лучшими ценами, свои товары, свои заявки, ящик купленного,
 витрина и свои вещи для неё. GET ?good=<ключ> - стакан и история цен товара.
-POST {action: sell|buy|list_item|buy_item|cancel|claim, ...} - действие; в ответ
+POST {action: sell|buy|list_item|buy_item|cancel|claim|courier, ...} - действие; в ответ
 то же, что GET, плюс done. Логика - services/market_service.py.
 """
 
@@ -14,7 +14,7 @@ from bot.miniapp_auth import VK_USER_ID_KEY
 from game.economy import market_config as mc
 from game.world import grid
 from models import Item
-from services import item_service, market_service, naming, wallet_service
+from services import courier_service, item_service, market_service, naming, wallet_service
 from services import onboarding_service as onboarding_svc
 
 
@@ -25,6 +25,34 @@ def _error(message: str, status: int = 400) -> web.Response:
 def _good(g) -> dict:
     return {"key": g.key, "category": g.category, "name": g.name, "emoji": g.emoji, "icon": g.icon,
             "base": g.base or g.name, "variant": g.variant}
+
+
+def _about(key: str) -> dict:
+    """Страничка товара (2026-10-24, владелец: «для еды - посмотреть бафф»):
+    описание и что даёт - те же тексты, что в инвентаре."""
+    from game.economy import cooking, craft_gear, herbalism, mining
+    from game.economy import cooking_config as cc
+    from services import lootbox_service
+
+    kind, _, rest = key.partition(":")
+    if kind == "ore":
+        ore = mining.ore_def(rest.split(":")[0])
+        return {"description": ore.description if ore else None, "effect": None}
+    if kind == "herb":
+        herb = herbalism.herb_def(rest)
+        return {"description": herb.description if herb else None, "effect": None}
+    if kind == "food":
+        dish_id, _, grade = rest.partition(":")
+        dish, d = cc.DISHES_BY_ID.get(dish_id), cooking.dish_def(dish_id)
+        if dish is None or d is None:
+            return {"description": None, "effect": None}
+        return {"description": d.description, "effect": cooking.buff_text(dish, grade)}
+    if kind == "craft":
+        return {"description": None, "effect": craft_gear.effect_line(rest, 1) or None}
+    if kind == "chest":
+        info = lootbox_service.CHEST_KINDS.get(rest)
+        return {"description": info.description if info else None, "effect": None}
+    return {"description": None, "effect": None}
 
 
 async def _order(db, o) -> dict:
@@ -68,6 +96,9 @@ async def _state(db, character) -> dict:
         "inbox": [{"good": r.good, "name": await market_service.label(db, r.good), "qty": r.qty}
                   for r in await market_service.inbox(db, character.id)],
         "in_city": grid.city_region_at(character.pos_x, character.pos_y) is not None,
+        # Курьер (2026-10-24): есть ли он и свободен ли - для кнопки «Принести курьером».
+        "courier": bool(character.has_courier),
+        "courier_busy": await courier_service.active_of(db, character.id) is not None,
         "showcase": showcase,
         "my_items": [_item(i) for i in await market_service.sellable_items(db, character.id)],
         "trades": trades,
@@ -93,6 +124,7 @@ async def handle_get(request: web.Request) -> web.Response:
                 "book": await market_service.book(db, key),
                 "history": await market_service.history(db, key),
                 "have": (await market_service.holdings(db, character.id)).get(key, 0),
+                "about": _about(key),
             })
         return web.json_response(await _state(db, character))
 
@@ -136,6 +168,8 @@ async def handle_post(request: web.Request) -> web.Response:
                 await market_service.cancel(db, character, _int(body, "order_id"))
             elif action == "claim":
                 done["lines"] = await market_service.claim(db, character)
+            elif action == "courier":
+                done["lines"] = await market_service.send_courier(db, character)
             else:
                 return _error("bad_request")
             await db.commit()

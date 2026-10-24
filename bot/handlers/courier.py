@@ -88,6 +88,11 @@ async def tick_job() -> None:
     for kind, d, sender_name, sender_peer, recipient_peer in notices:
         what = _what(d)
         from_whom = f" от {sender_name}" if d.reveal_sender and sender_name else ""
+        if d.sender_id == d.recipient_id:
+            # Покупки с рынка (2026-10-24): курьер несёт игроку его же ящик.
+            if kind == "delivered":
+                await _send(recipient_peer, f"📦 Курьер принёс покупки с рынка: {what}.")
+            continue
         if kind == "picked":
             await _send(sender_peer, f"{cc.EMOJI} Курьер забрал посылку ({what}) и побежал к получателю.")
             await _send(recipient_peer, f"{cc.EMOJI} К тебе бежит курьер с посылкой{from_whom}: {what}.")

@@ -130,6 +130,33 @@ async def send_batch(
     return delivery
 
 
+#: Часть посылки с рынка: ref - ключ товара рынка (market_config.goods).
+MARKET = "market"
+
+
+async def send_market(
+    db: AsyncSession, character: Character, parts: list[tuple[str, int]], label: str,
+    now: datetime | None = None,
+) -> CourierDelivery:
+    """Купленное на рынке - курьером (2026-10-24, владелец). Ящик уже
+    списан вызывающим (market_service.send_courier). Курьер берёт посылку в
+    родном городе и бежит сразу к игроку: отправитель и получатель - он сам."""
+    if not character.has_courier:
+        raise CourierError("Курьера у тебя нет. Его покупают в Магазине.")
+    if await active_of(db, character.id) is not None:
+        raise CourierError("Курьер ещё бегает с прошлой посылкой. Дождись, пока он её отдаст.")
+    x, y = start_cell(character)
+    delivery = CourierDelivery(
+        sender_id=character.id, recipient_id=character.id, kind=BATCH,
+        ref=json.dumps([[MARKET, key, qty] for key, qty in parts], ensure_ascii=False),
+        label=label[:160], amount=len(parts), reveal_sender=False,
+        phase=DELIVER, status=ACTIVE, x=x, y=y, last_step_at=now or _now(), waiting=False,
+    )
+    db.add(delivery)
+    await db.flush()
+    return delivery
+
+
 def _parts(d: CourierDelivery) -> list[tuple[str, str | None, int]]:
     if d.kind == BATCH:
         return [tuple(p) for p in json.loads(d.ref or "[]")]
@@ -138,6 +165,11 @@ def _parts(d: CourierDelivery) -> list[tuple[str, str | None, int]]:
 
 async def _hand_over(db: AsyncSession, d: CourierDelivery, to_id: int, log: bool) -> None:
     for kind, ref, amount in _parts(d):
+        if kind == MARKET:
+            from services import market_service
+
+            await market_service.give_good(db, to_id, ref, amount)
+            continue
         await transfer_service.give(db, to_id, kind, ref, amount)
         if log:
             transfer_service.log(db, d.sender_id, to_id, kind, ref, d.label, amount)

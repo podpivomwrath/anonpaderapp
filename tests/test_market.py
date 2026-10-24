@@ -136,3 +136,39 @@ def test_catalog_has_goods_of_every_category() -> None:
     cats = {g.category for g in mc.goods().values()}
     assert cats == {c for c, _ in mc.CATEGORIES}
     assert "chest:ashen" in mc.goods()
+
+
+def test_every_good_has_a_page() -> None:
+    """2026-10-24: у каждого товара рынка есть страничка - описание или
+    что даёт (еда - бафф)."""
+    from bot.miniapp_market_api import _about
+    from game.economy import market_config as mc
+
+    for key in mc.goods():
+        about = _about(key)
+        assert about["description"] or about["effect"], key
+        if key.startswith("food:"):
+            assert about["effect"], key
+
+
+async def test_courier_brings_the_box(db_session, make_character) -> None:
+    """2026-10-24, владелец: «Принести курьером» - ящик уходит курьеру, а
+    курьер отдаёт товар там, где игрок стоит, не в городе."""
+    from services import courier_service
+
+    seller, buyer = await _pair(make_character, db_session)
+    await ms.place_sell(db_session, seller, ORE, 5, 100)
+    await ms.place_buy(db_session, buyer, ORE, 5, 100)
+    buyer.pos_x, buyer.pos_y = 5, 5
+    with pytest.raises(ms.MarketError):
+        await ms.send_courier(db_session, buyer)  # курьера нет
+    buyer.has_courier = True
+    assert await ms.send_courier(db_session, buyer)
+    assert not (await db_session.scalars(select(MarketInbox).where(MarketInbox.character_id == buyer.id))).all()
+    with pytest.raises(ms.MarketError):
+        await ms.send_courier(db_session, buyer)  # курьер занят, ящик пуст
+    assert await _ore(db_session, buyer) == 0
+    later = datetime.now(timezone.utc) + timedelta(hours=2)
+    events = await courier_service.advance(db_session, set(), now=later)
+    assert [e.kind for e in events] == ["delivered"]
+    assert await _ore(db_session, buyer) == 5

@@ -455,6 +455,37 @@ async def claim(db: AsyncSession, character: Character) -> list[str]:
     return lines
 
 
+async def give_good(db: AsyncSession, character_id: int, key: str, qty: int) -> None:
+    """Выдать товар рынка - для курьера, который принёс ящик."""
+    await _give(db, character_id, key, qty)
+
+
+async def send_courier(db: AsyncSession, character: Character) -> list[str]:
+    """Купленное - курьером, где бы игрок ни был (2026-10-24, владелец).
+    Ящик списывается сразу, товар отдаёт курьер (courier_service.send_market)."""
+    from services import courier_service
+
+    if not character.has_courier:
+        raise MarketError("Курьера у тебя нет. Его покупают в Магазине.")
+    if await courier_service.active_of(db, character.id) is not None:
+        raise MarketError("Курьер ещё бегает с прошлой посылкой. Дождись, пока он её отдаст.")
+    rows = (await db.scalars(
+        select(MarketInbox).where(MarketInbox.character_id == character.id).with_for_update()
+    )).all()
+    if not rows:
+        raise MarketError("Ящик пуст.")
+    lines = [f"{await label(db, row.good)} ×{row.qty}" for row in rows]
+    parts = [(row.good, row.qty) for row in rows]
+    for row in rows:
+        await db.delete(row)
+    try:
+        await courier_service.send_market(db, character, parts, ", ".join(lines))
+    except courier_service.CourierError as exc:
+        raise MarketError(str(exc)) from None
+    await db.flush()
+    return lines
+
+
 # --- Обзор -------------------------------------------------------------------------
 
 
