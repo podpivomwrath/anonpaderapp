@@ -62,12 +62,13 @@ async def test_kill_pays_split_and_closes(db_session, make_character):
     await cs.take(db_session, b, c.id, now=NOW)
     # Бой: бил a, b и посторонний (без заказа) - делят только взявшие.
     payout = await cs.on_kill(db_session, target, [a.id, outsider.id, b.id], now=NOW)
-    assert await _gems(db_session, a.id) == 151 and await _gems(db_session, b.id) == 150
+    # 301 минус комиссия 10% (30) = 271: 136 + 135 (2026-10-24).
+    assert await _gems(db_session, a.id) == 136 and await _gems(db_session, b.id) == 135
     assert await _gems(db_session, outsider.id) == 0
     assert c.kills_left == 1 and payout.victim_lines and payout.orderer_notes
     # Один охотник - вся сумма ему; последнее убийство закрывает заказ.
     payout = await cs.on_kill(db_session, target, [b.id], now=NOW)
-    assert await _gems(db_session, b.id) == 150 + 301
+    assert await _gems(db_session, b.id) == 135 + 271  # вся сумма за вычетом комиссии
     assert c.status == "done" and payout.finished_for_target
 
 

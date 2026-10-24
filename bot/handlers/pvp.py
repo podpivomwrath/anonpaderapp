@@ -398,29 +398,17 @@ async def look_around(message: Message) -> None:
         # нападать здесь всё равно нельзя.
         safe_craft = _is_safe_craft_cell(character)
         at_boss = await _at_world_boss(db, character)
+        # 2026-10-24, владелец: мирная клетка спасает и цель заказа - охотник
+        # её здесь как цель не видит и напасть не может.
         if safe_craft or at_boss or grid.pvp_forbidden(character.pos_x, character.pos_y):
             solo, _battles = await _scene_at(db, character)
-            hunted = await _hunted_here(db, character, solo) if safe_craft and not at_boss and not grid.pvp_forbidden(
-                character.pos_x, character.pos_y) else []
-            if not hunted:
-                await message.answer(_peaceful_scene_text(solo, await _guild_tags(db, solo)))
-                return
-            # Заказ: мирная клетка цель не спасает - охотнику видна только она.
-            solo, battles = hunted, []
-        else:
-            solo, battles = await _scene_at(db, character)
+            await message.answer(_peaceful_scene_text(solo, await _guild_tags(db, solo)))
+            return
+        solo, battles = await _scene_at(db, character)
         tags = await _guild_tags(db, solo)
         busy = await _busy_marks(db, solo)
         _remember_look(peer_id, character, solo, battles)
     await message.answer(_scene_text(solo, battles, tags, busy))
-
-
-async def _hunted_here(db, character, solo: list[Character]) -> list[Character]:
-    """Цели взятых заказов среди тех, кто на клетке."""
-    from services import contract_service
-
-    hunted = await contract_service.hunted_ids(db, character.id)
-    return [c for c in solo if c.id in hunted]
 
 
 def _peaceful_scene_text(solo: list[Character], tags: dict[int, str] | None = None) -> str:
@@ -525,13 +513,10 @@ async def attack_command(message: Message, target: str) -> None:
                 return
 
         if safe_craft:
-            # Мирная клетка (озеро, рудник): нападать можно только на цель
-            # взятого заказа (2026-10-16), в чужие бои здесь не вступают.
-            from services import contract_service
-
-            if victim is None or victim.id not in await contract_service.hunted_ids(db, character.id):
-                await message.answer(LAKE_NO_PVP_TEXT)
-                return
+            # Мирная клетка (озеро, рудник): не нападают ни на кого, и на цель
+            # заказа тоже (2026-10-24; с 2026-10-16 по 2026-10-24 было можно).
+            await message.answer(LAKE_NO_PVP_TEXT)
+            return
 
         if victim is not None and await _same_group(db, character, victim.id):
             await message.answer(GROUPMATE_NO_PVP_TEXT)

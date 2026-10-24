@@ -163,14 +163,17 @@ async def on_kill(
         paid = [k for k in killer_ids if k in takers]
         if not paid:
             continue
-        share, rest = divmod(contract.price, len(paid))
+        # Комиссия с выплаты охотникам (2026-10-24) - сгорает.
+        net = contract.price - round(contract.price * cc.HUNTER_FEE)
+        share, rest = divmod(net, len(paid))
         for i, hunter_id in enumerate(paid):
             amount = share + (rest if i == 0 else 0)
             if amount > 0:
                 await wallet_service.deposit(db, hunter_id, "donate", amount)
             split = f" (делёж на {len(paid)})" if len(paid) > 1 else ""
             out.hunter_lines.setdefault(hunter_id, []).append(
-                f"📜 Заказ на {victim.name} выполнен: +💎{amount}{split}. Осталось убийств: {contract.kills_left - 1}."
+                f"📜 Заказ на {victim.name} выполнен: +💎{amount}{split}, комиссия {round(cc.HUNTER_FEE * 100)}%. "
+                f"Осталось убийств: {contract.kills_left - 1}."
             )
         contract.kills_left -= 1
         if contract.kills_left <= 0:
@@ -184,7 +187,7 @@ async def on_kill(
     await db.flush()
     if out.victim_lines and not await is_target(db, victim.id, now):
         out.finished_for_target = True
-        out.victim_lines.append("Заказов на тебя больше нет - мирные клетки и АФК снова защищают.")
+        out.victim_lines.append("Заказов на тебя больше нет - АФК снова защищает.")
     return out
 
 
