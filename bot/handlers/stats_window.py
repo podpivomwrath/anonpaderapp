@@ -14,6 +14,7 @@ import asyncio
 from loguru import logger
 from sqlalchemy import select
 from vkbottle.bot import BotLabeler, Message
+from vkbottle.dispatch.rules.base import FuncRule
 
 from bot import background
 from bot import editable_message
@@ -178,6 +179,43 @@ async def stat_alloc(message: Message) -> None:
         await message.answer("Очков не осталось.")
         return
     pending[stat_key] = pending.get(stat_key, 0) + 1
+
+    header = _window_header.get(peer_id, "📊 Характеристики")
+    text = sas.render_window(header, unspent, char_stats, pending)
+    await _send_or_edit(peer_id, text, stats_alloc_keyboard())
+
+
+def typed_alloc_expected(message: Message) -> bool:
+    """Окно распределения открыто, и игрок написал «сила 10» (2026-10-24)."""
+    return (
+        message.payload is None and message.peer_id in _window_header
+        and sas.parse_typed(message.text) is not None
+    )
+
+
+@labeler.message(FuncRule(typed_alloc_expected))
+async def typed_alloc(message: Message) -> None:
+    """Вложить текстом: «сила 10», «воля 5 ловкость 3». Не больше свободных
+    очков - лишнее не встаёт, а не отказ целиком."""
+    peer_id = message.peer_id
+    wanted = sas.parse_typed(message.text) or {}
+    async with get_session_factory()() as db:
+        character = await onboarding_svc.get_character(db, peer_id)
+        if character is None or character.creation_state is not None:
+            return
+        stats = await _get_stats(db, character.id)
+        unspent = stats.unspent_points
+        char_stats = sas.snapshot(stats)
+
+    pending = _pending.setdefault(peer_id, {})
+    short = False
+    for key in sas.STAT_ORDER:
+        add = min(wanted.get(key, 0), unspent - sum(pending.values()))
+        short = short or add < wanted.get(key, 0)
+        if add > 0:
+            pending[key] = pending.get(key, 0) + add
+    if short:
+        await message.answer("Очков меньше, чем написано: вложено, сколько было.")
 
     header = _window_header.get(peer_id, "📊 Характеристики")
     text = sas.render_window(header, unspent, char_stats, pending)

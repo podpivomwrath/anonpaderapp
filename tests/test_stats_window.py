@@ -116,3 +116,30 @@ async def test_finalize_char_stats_reflects_post_apply_values(db_session, make_c
 
     assert result.char_stats["wil"] == 18
     assert result.char_stats == sas.snapshot(stats)
+
+
+def test_typed_stats_parse() -> None:
+    """2026-10-24, владелец: характеристики можно вложить числом в чате."""
+    from services.stat_alloc_service import parse_typed
+
+    assert parse_typed("сила 10") == {"str": 10}
+    assert parse_typed("+5 воля") == {"wil": 5}
+    assert parse_typed("Сила 10, воля 5") == {"str": 10, "wil": 5}
+    assert parse_typed("ловкость 3 выносливость 2") == {"agi": 3, "vit": 2}
+    for text in ("привет", "сила", "10", "сила 10 привет", "", "дракон 5"):
+        assert parse_typed(text) is None, text
+
+
+def test_typed_stats_only_while_window_open() -> None:
+    from types import SimpleNamespace
+
+    from bot.handlers import stats_window
+
+    msg = SimpleNamespace(payload=None, peer_id=4242, text="сила 10")
+    assert not stats_window.typed_alloc_expected(msg)
+    stats_window._window_header[4242] = "📊 Характеристики"
+    try:
+        assert stats_window.typed_alloc_expected(msg)
+        assert not stats_window.typed_alloc_expected(SimpleNamespace(payload=None, peer_id=4242, text="привет"))
+    finally:
+        stats_window._window_header.pop(4242, None)

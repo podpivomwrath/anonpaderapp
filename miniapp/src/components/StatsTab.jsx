@@ -167,6 +167,24 @@ export default function StatsTab({ character, onCharacterUpdate }) {
     setPending((p) => ({ ...p, [key]: p[key] - 1 }));
   }
 
+  // Ввод числом (2026-10-24, владелец): нажал на значение - пишешь, сколько
+  // вложить; больше свободных очков не встанет.
+  const [editing, setEditing] = useState(null);
+  const [draft, setDraft] = useState('');
+  function startEdit(key) {
+    if (character.unspent_points <= 0) return;
+    setEditing(key);
+    setDraft(pending[key] ? String(pending[key]) : '');
+  }
+  function commitEdit() {
+    if (editing === null) return;
+    const key = editing;
+    const wanted = Math.max(0, Math.floor(Number(draft) || 0));
+    const cap = remaining + pending[key];
+    setPending((p) => ({ ...p, [key]: Math.min(wanted, cap) }));
+    setEditing(null);
+  }
+
   function reset() {
     setPending(EMPTY_PENDING);
     setConfirming(false);
@@ -208,12 +226,28 @@ export default function StatsTab({ character, onCharacterUpdate }) {
               >
                 −
               </Button>
-              <span className="stat-row__value">
-                {previewStats[stat.key]}
-                {character.gear_bonus?.[stat.key] ? (
-                  <span className="stat-row__gear" title="от снаряжения"> +{character.gear_bonus[stat.key]}</span>
-                ) : null}
-              </span>
+              {editing === stat.key ? (
+                <input
+                  className="stat-row__input" type="number" inputMode="numeric" min="0"
+                  max={remaining + pending[stat.key]} placeholder="+?" autoFocus aria-label={`Сколько вложить: ${stat.label}`}
+                  value={draft} onChange={(e) => setDraft(e.target.value)} onBlur={commitEdit}
+                  onKeyDown={(e) => { if (e.key === 'Enter') commitEdit(); if (e.key === 'Escape') setEditing(null); }}
+                />
+              ) : (
+                <span
+                  className={character.unspent_points > 0 ? 'stat-row__value stat-row__value--editable' : 'stat-row__value'}
+                  role={character.unspent_points > 0 ? 'button' : undefined}
+                  tabIndex={character.unspent_points > 0 ? 0 : undefined}
+                  title={character.unspent_points > 0 ? 'Нажми, чтобы ввести число' : undefined}
+                  onClick={() => startEdit(stat.key)}
+                  onKeyDown={(e) => { if (e.key === 'Enter') startEdit(stat.key); }}
+                >
+                  {previewStats[stat.key]}
+                  {character.gear_bonus?.[stat.key] ? (
+                    <span className="stat-row__gear" title="от снаряжения"> +{character.gear_bonus[stat.key]}</span>
+                  ) : null}
+                </span>
+              )}
               <Button mode="secondary" size="s" disabled={remaining <= 0} onClick={() => increment(stat.key)}>
                 +
               </Button>

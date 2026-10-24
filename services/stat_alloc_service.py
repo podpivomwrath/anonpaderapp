@@ -3,6 +3,7 @@
 поле unspent_points).
 """
 
+import re
 from dataclasses import dataclass
 
 from sqlalchemy import select, update
@@ -19,6 +20,33 @@ STAT_META = {
     "vit": ("❤️", "Выносливость"),
     "wil": ("✨", "Воля"),
 }
+
+
+#: Начала слов для ввода текстом: «сила 10», «ловк 5», «вын 3».
+_STAT_WORDS = {"сил": "str", "лов": "agi", "инт": "int", "вын": "vit", "вол": "wil"}
+_PAIR = re.compile(r"([а-яё]+)\s*\+?\s*(\d{1,4})|\+?(\d{1,4})\s*([а-яё]+)")
+
+
+def parse_typed(text: str) -> dict[str, int] | None:
+    """«сила 10», «+5 воля», «сила 10 воля 5» -> {стат: сколько}. None - это
+    не ввод статов (2026-10-24, владелец: «текстово ввести количество»)."""
+    text = (text or "").strip().lower().replace(",", " ")
+    if not text:
+        return None
+    out: dict[str, int] = {}
+    pos = 0
+    for m in _PAIR.finditer(text):
+        if text[pos:m.start()].strip():
+            return None
+        word, num = (m.group(1), m.group(2)) if m.group(1) else (m.group(4), m.group(3))
+        key = _STAT_WORDS.get(word[:3])
+        if key is None:
+            return None
+        out[key] = out.get(key, 0) + int(num)
+        pos = m.end()
+    if text[pos:].strip() or not out:
+        return None
+    return out
 
 
 def snapshot(stats: CharacterStats) -> dict[str, int]:
@@ -47,6 +75,8 @@ def render_window(header: str, unspent: int, char_stats: dict[str, int], pending
         add = pending.get(key, 0)
         suffix = f" (+{add})" if add else ""
         lines.append(f"{emoji} {name}: {value}{suffix}")
+    if remaining > 0:
+        lines += ["", "Можно и числом: напиши «сила 10» или «воля 5 ловкость 3»."]
     return "\n".join(lines)
 
 

@@ -29,6 +29,7 @@ TYPED_INPUTS: dict[str, str] = {
     "rift.cancel": "кнопка «Отмена» (метка есть), FuncRule только сужает",
     "scene_events.riddle_answer": "RiddleAnswer: загадка ждёт ответа",
     "scene_events.stake_answer": "StakeAnswer: кости ждут ставку",
+    "stats_window.typed_alloc": "окно характеристик открыто: «сила 10»",
     "turbo_ishak.name_reply": "_naming: имя пойманного ишака",
     # Состояния диспенсера (state=...) - state_peer: создание персонажа,
     # выбор подкласса у Хранителя, координаты маунта.
@@ -43,7 +44,7 @@ async def _typed_input_expected(message: Message) -> bool:
     (диспенсер состояний), код арены, ответ загадке Архива и сцены, ставку в
     костях и Котле, имя ишака, выбор стороны в PvP цифрой. Команды - только
     через «/» (2026-10-21, владелец)."""
-    from bot.handlers import arena, group_events, pvp, raid_archive, scene_events, turbo_ishak
+    from bot.handlers import arena, group_events, pvp, raid_archive, scene_events, stats_window, turbo_ishak
 
     peer = message.peer_id
     if message.state_peer is not None:
@@ -53,6 +54,8 @@ async def _typed_input_expected(message: Message) -> bool:
     if peer in turbo_ishak._naming or pvp._pending_join_prompt.get(peer) in pvp._battles:
         return True
     if group_events._pot_scene_of(peer) is not None:
+        return True
+    if stats_window.typed_alloc_expected(message):
         return True
     for rule in (arena.CodeInput(), raid_archive.ArchiveAnswer(), scene_events.RiddleAnswer(),
                  scene_events.StakeAnswer()):
