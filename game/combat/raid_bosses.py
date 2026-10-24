@@ -27,8 +27,13 @@ SURGEON_STAT_MULT = 3.0
 
 
 def _boss_combatant(
-    id: int, name: str, hp: int, stat_mult: float, primary_stat: str = "str",
+    id: int, name: str, hp: int, stat_mult: float, primary_stat: str = "str", fighter: bool = True,
 ) -> CombatantState:
+    """fighter=False - механический предмет этапа (жернова, цепь): рейдовые
+    множители бойцов (rc.RAID_FIGHTER_*) его не трогают."""
+    if fighter:
+        hp = round(hp * rc.RAID_FIGHTER_HP_MULT)
+        stat_mult *= rc.RAID_FIGHTER_DMG_MULT
     base = balanced_mob_stats(BOSS_LEVEL, primary_stat)
     scaled = Stats(
         strength=round(base.strength * stat_mult),

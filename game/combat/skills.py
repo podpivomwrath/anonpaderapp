@@ -317,7 +317,7 @@ def compute_hit(
 
     base = formulas.damage(
         actor.tier_mult,
-        actor.stats.by_key(actor.primary_stat),
+        stat_model.ACTIVE.primary_value(actor.stats.by_key(actor.primary_stat), actor.level, actor.kind == "character"),
         formulas.k_dmg_for(actor.primary_stat),
     ) * multiplier
     # Патч 56, Клинок теней: «Смертельная точность» (+шанс крита), «Передача

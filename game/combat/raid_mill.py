@@ -113,7 +113,7 @@ class CargoStage:
             session.add(pilgrim)
         # Жернова стоят на доске, чтобы этап не кончился смертью последнего
         # паломника: цель этапа - донести груз, а не перебить всех.
-        stones = _boss_combatant(self._new_id(), MILLSTONES_NAME, 1, 1.0)
+        stones = _boss_combatant(self._new_id(), MILLSTONES_NAME, 1, 1.0, fighter=False)
         stones.scripted_hit = _idle
         stones.hp_floor = 1
         stones.control_immune_always = True
@@ -394,7 +394,7 @@ class MillerStage:
         if not players:
             return
         victim = rng.choice(players)
-        chain = _boss_combatant(self._new_id(), CHAIN_NAME, mc.CHAIN_HP, 1.0)
+        chain = _boss_combatant(self._new_id(), CHAIN_NAME, mc.CHAIN_HP, 1.0, fighter=False)
         chain.scripted_hit = _idle
         chain.control_immune_always = True
         session.add(chain)

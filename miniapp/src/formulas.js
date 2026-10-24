@@ -24,15 +24,22 @@ const HP_PER_TIER = 30;
 const WEAPON_BASE_PER_TIER = 10;
 const K_DMG = { str: 2.0, int: 2.0, agi: 1.5 };
 
-const CRIT_PER_AGI = 0.003;
+// Ребаланс статов 2026-10-24 - зеркало game/combat/stat_model.py::GAME.
+// Проценты с убывающей отдачей: cap * x / (x + k).
+const CRIT_CAP = 0.6;
+const CRIT_K = 200;
 // Пассивки базовых классов до подкласса - зеркало
 // game/combat/balance_config.py::BASE_CLASS_HP_MULT / BASE_CLASS_CRIT_BONUS.
 const BASE_CLASS_HP_MULT = { warrior: 1.1 };
 const BASE_CLASS_CRIT_BONUS = { rogue: 0.1 };
-const CRIT_CAP = 0.7; // как balance_config.CRIT_CAP
 
-const MITIGATION_PER_VIT = 0.002;
 const MITIGATION_CAP = 0.5;
+const MITIGATION_K = 250;
+
+// Урон основного стата: до порога 30 + 2 x уровень - полностью, сверх - 0.35.
+const PRIMARY_SOFT_BASE = 30;
+const PRIMARY_SOFT_PER_LEVEL = 2;
+const PRIMARY_OVER = 0.35;
 
 const CONTROL_RESIST_PER_WIL = 0.01;
 const CONTROL_RESIST_CAP = 0.75;
@@ -45,10 +52,20 @@ const POISON_PER_WIL = 0.95;
 const POISON_PER_AGI = 0.65;
 const POISON_MAX_STACKS = 3;
 
-// Уворот от Ловкости (патч 34, ч.1).
-const DODGE_PER_AGI = 0.00297;
-const DODGE_STAT_CAP = 0.6;
+// Уворот - от Воли (2026-10-24, было от Ловкости).
+const DODGE_CAP = 0.45;
+// Подклассы разбойника: крит и уворот сверху (stat_model.GAME.base_crit/base_dodge).
+const SUBCLASS_CRIT = { shadow_blade: 0.1, poisoner: 0.1 };
+const SUBCLASS_DODGE = { shadow_blade: 0.05, poisoner: 0.05 };
+const DODGE_K = 250;
 const ABILITY_DODGE_RATIO = 0.25;
+
+const hyper = (x, cap, k) => (x > 0 ? (cap * x) / (x + k) : 0);
+
+export function primaryEffective(value, level) {
+  const threshold = PRIMARY_SOFT_BASE + PRIMARY_SOFT_PER_LEVEL * level;
+  return value <= threshold ? value : threshold + (value - threshold) * PRIMARY_OVER;
+}
 
 export const PRIMARY_STAT_BY_CLASS = { warrior: 'str', rogue: 'agi', mage: 'int' };
 
@@ -94,17 +111,21 @@ export function computeDerived({ level, baseClass, subclass = null, stats, gearB
   const hpMult = subclass ? 1 : (BASE_CLASS_HP_MULT[baseClass] ?? 1);
   const critBonus = subclass ? 0 : (BASE_CLASS_CRIT_BONUS[baseClass] ?? 0);
   const maxHp = roundHalfToEven((HP_BASE + HP_PER_LEVEL * level + HP_PER_VIT * vit + HP_PER_TIER * tierMult) * hpMult);
-  const damage = roundHalfToEven((WEAPON_BASE_PER_TIER * tierMult + kDmg * primaryValue) * 10) / 10;
-  const critChance = Math.min(Math.min(CRIT_PER_AGI * agi, CRIT_CAP) + critBonus, 1);
-  const mitigation = Math.min(MITIGATION_PER_VIT * vit, MITIGATION_CAP);
+  const damage = roundHalfToEven(
+    (WEAPON_BASE_PER_TIER * tierMult + kDmg * primaryEffective(primaryValue, level)) * 10,
+  ) / 10;
+  const critChance = Math.min(hyper(agi, CRIT_CAP, CRIT_K) + critBonus + (SUBCLASS_CRIT[subclass] ?? 0), 1);
+  const mitigation = hyper(vit, MITIGATION_CAP, MITIGATION_K);
   const controlResist = Math.min(CONTROL_RESIST_PER_WIL * wil, CONTROL_RESIST_CAP);
   const supportPower = SUPPORT_POWER_PER_WIL * wil;
   // урон за ход при полном числе стаков: делится на стаки и тут же
   // умножается обратно, но так формула читается так же, как в движке
   const poisonPower =
     ((POISON_PER_WIL * wil + POISON_PER_AGI * agi) / POISON_MAX_STACKS) * POISON_MAX_STACKS;
-  const dodgeChance = Math.min(DODGE_PER_AGI * agi, DODGE_STAT_CAP);
-  const abilityDodgeChance = dodgeChance * ABILITY_DODGE_RATIO;
+  // Прибавка подкласса - к обоим уворотам целиком, как в бою (skills.compute_hit).
+  const subclassDodge = SUBCLASS_DODGE[subclass] ?? 0;
+  const dodgeChance = hyper(wil, DODGE_CAP, DODGE_K) + subclassDodge;
+  const abilityDodgeChance = hyper(wil, DODGE_CAP, DODGE_K) * ABILITY_DODGE_RATIO + subclassDodge;
 
   return {
     maxHp, damage, critChance, mitigation, controlResist, supportPower,

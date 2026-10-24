@@ -60,7 +60,42 @@ MODELS: dict[str, stat_model.StatModel] = {
         name="C", dodge_stat="will", crit_dmg_per_str=0.004, effect_per_int=0.003,
         base_crit=ROGUE_CRIT, base_dodge=ROGUE_DODGE,
     ),
+    # D: B + убывание урона основного стата (порог 30 + 2 x уровень: 130 на 50,
+    # 150 на 60 - примерно столько у сборки «половина в основной» с вещами).
+    "D B+урон сверх порога x0.5": stat_model.HyperModel(name="D", dodge_stat="will", primary_over=0.5),
+    "D2 B+урон сверх порога x0.35": stat_model.HyperModel(name="D2", dodge_stat="will", primary_over=0.35),
+    # D3: D2, но урон основного стата x1.45 - сборка «65% + Выносливость»
+    # бьёт как нынешний моностат, моностат с большими вещами - почти как сейчас.
+    "D3 D2+урон x1.45": stat_model.HyperModel(name="D3", dodge_stat="will", primary_over=0.35,
+                                              primary_k_mult=1.45),
+    "D4 D2+урон x1.3": stat_model.HyperModel(name="D4", dodge_stat="will", primary_over=0.35,
+                                             primary_k_mult=1.3),
 }
+
+#: Варианты PvE: правки констант balance_config на время прогона.
+PVE = {
+    "сейчас": {},
+    # Моб выше уровнем бьёт +12% за уровень (было 8), обычные мобы на треть
+    # больнее (MOB_DAMAGE_MULTIPLIER 0.7 -> 0.93).
+    "E": {"LVL_DIFF_DMG_BONUS": 0.12, "MOB_DAMAGE_MULTIPLIER": 0.93},
+    # Крутая кривая разницы уровней (2026-10-24, владелец: «сложности уже на
+    # +2-3»): за уровень моб бьёт больнее и держит удар лучше, свой уровень
+    # не меняется. F: +15% урона и -8% входящего за уровень; G: +20% и -10%.
+    "F": {"LVL_DIFF_DMG_BONUS": 0.15, "LVL_DIFF_DEF_BONUS": 0.08},
+    "G": {"LVL_DIFF_DMG_BONUS": 0.20, "LVL_DIFF_DEF_BONUS": 0.10},
+    # F и обычные мобы чуть больнее (свой уровень тоже стоит здоровья).
+    "F+": {"LVL_DIFF_DMG_BONUS": 0.15, "LVL_DIFF_DEF_BONUS": 0.08, "MOB_DAMAGE_MULTIPLIER": 0.85},
+}
+
+
+def use_pve(name: str) -> None:
+    for key, value in PVE_DEFAULTS.items():
+        setattr(bc, key, value)
+    for key, value in PVE[name].items():
+        setattr(bc, key, value)
+
+
+PVE_DEFAULTS = {k: getattr(bc, k) for v in PVE.values() for k in v}
 
 
 # ----------------------------------------------------------------------------
@@ -131,26 +166,107 @@ def rift_solo(b: dict, rounds: int, rng: random.Random) -> float:
 # Режим live: живые сборки как есть
 # ----------------------------------------------------------------------------
 
-def live(builds: list[dict], rounds: int, models: list[str]) -> None:
+DIFFS = (0, 2, 3, 5, 10)
+
+
+def live(builds: list[dict], rounds: int, models: list[str], with_rift: bool = False) -> None:
+    """Разница уровней считается только у тех, кому есть куда расти: игрок
+    58 ур. против «+5» дрался бы с мобом 60, то есть почти своим."""
     builds = [b for b in builds if b["subclass"]]
     for name in models:
         stat_model.use(MODELS[name])
         rng = random.Random(5)
-        rows = defaultdict(list)
+        rows: dict = defaultdict(lambda: defaultdict(list))
+        rifts = defaultdict(list)
         for b in builds:
-            r0, r5, r10 = (pve(b, d, rounds, rng) for d in (0, 5, 10))
-            rift = rift_solo(b, max(rounds // 3, 6), rng) if name == "сейчас" else None
-            rows[b["subclass"]].append((b, r0, r5, r10, rift))
-        print(f"\n=== Модель: {name}  (живые сборки 30+, бои против мобов кольца)")
-        print(f"{'подкласс':14} {'n':>2}  {'свой: побед/HP-':>16}  {'+5: побед/HP-':>14}  {'+10: побед/HP-':>15}"
-              + ("  разлом соло" if name == "сейчас" else ""))
-        for sub, rs in sorted(rows.items()):
-            def cell(i, rs=rs):
-                return f"{100 * statistics.fmean(r[i]['win'] for r in rs):3.0f}% / {100 * statistics.fmean(r[i]['lost'] for r in rs):3.0f}%"
-            line = f"{sub:14} {len(rs):2}  {cell(1):>16}  {cell(2):>14}  {cell(3):>15}"
-            if name == "сейчас":
-                line += f"  {100 * statistics.fmean(r[4] for r in rs):5.0f}%"
+            for d in DIFFS:
+                if b["level"] + d <= bc.MAX_LEVEL:
+                    rows[b["subclass"]][d].append(pve(b, d, rounds, rng))
+            if with_rift:
+                rifts[b["subclass"]].append(rift_solo(b, max(rounds // 3, 6), rng))
+        print(f"\n=== Модель: {name}  (живые сборки 30+; побед / сколько HP теряет за бой; n - игроков в колонке)")
+        print(f"{'подкласс':14}" + "".join(f"{('свой' if d == 0 else f'+{d}'):>16}" for d in DIFFS)
+              + ("  разлом соло" if with_rift else ""))
+        for sub, by_diff in sorted(rows.items()):
+            cells = []
+            for d in DIFFS:
+                rs = by_diff.get(d, [])
+                cells.append(
+                    f"{100 * statistics.fmean(r['win'] for r in rs):3.0f}%/{100 * statistics.fmean(r['lost'] for r in rs):3.0f}% n{len(rs):<2}"
+                    if rs else "-")
+            line = f"{sub:14}" + "".join(f"{c:>16}" for c in cells)
+            if with_rift:
+                line += f"  {100 * statistics.fmean(rifts[sub]):5.0f}%"
             print(line)
+    stat_model.use(stat_model.CURRENT)
+
+
+# ----------------------------------------------------------------------------
+# Режим content: кровавый разлом и Скупщик реликвий (2026-10-24, владелец:
+# «они сейчас сделаны очень хорошо») - правка статов не должна их сдвинуть.
+# ----------------------------------------------------------------------------
+
+def respec(b: dict, share: float = 0.65) -> dict:
+    """Свои очки сборки заново: share в основной стат, остальное в Выносливость
+    - так игрок пересоберётся под новую модель (сброс бесплатный)."""
+    sub = b["subclass"]
+    start = {k.lower(): v for k, v in bc.STARTING_STATS[b["base_class"]].items()}
+    points = sum(b["stats"].values()) - sum(start.values())
+    prim = REGISTRY[sub].primary_stat if sub else bc.PRIMARY_STAT_BY_CLASS[b["base_class"]]
+    out = dict(start)
+    out[prim] += round(points * share)
+    out["vit"] += points - round(points * share)
+    return out
+
+
+def dealer_fight(b: dict, rng: random.Random, stats: dict | None = None) -> tuple[bool, float]:
+    from game.world import relic_dealer
+
+    p = fighter(1, 0, b, stats)
+    dist = _dist_for_level(b["level"])
+    mob = relic_dealer.build_dealer(2, dist, rng, {1}).combatant
+    res = sb.run_tick_fight([p], [mob], rng)
+    return res.won, (1.0 - res.hp_left_share if res.won else 1.0)
+
+
+def blood_rift(party: list[dict], rng: random.Random, respecced: bool) -> bool:
+    level = min(b["level"] for b in party)
+    keep_party, keep_stage = sim_rift._party, sim_rift.rift.build_stage
+    orig = keep_stage
+    sim_rift._party = lambda size, lvl: [
+        fighter(i + 1, 0, b, respec(b) if respecced else None) for i, b in enumerate(party)
+    ]
+    sim_rift.rift.build_stage = lambda *a, **k: orig(*a, blood=True, **k)
+    try:
+        kinds = list(rc.RIFT_TYPES)
+        return sim_rift.run(kinds[rng.randrange(len(kinds))], len(party), level, rng)["won"]
+    finally:
+        sim_rift._party, sim_rift.rift.build_stage = keep_party, keep_stage
+
+
+def content(builds: list[dict], rounds: int, models: list[str]) -> None:
+    builds = [b for b in builds if b["subclass"]]
+    high = [b for b in builds if b["level"] >= 50]
+    for name in models:
+        stat_model.use(MODELS[name])
+        variants = [("как есть", False)] + ([("пересобраны 65%+Вын", True)] if name != "сейчас" else [])
+        for vname, re_ in variants:
+            rng = random.Random(21)
+            dealer = defaultdict(list)
+            for b in builds:
+                for _ in range(rounds):
+                    dealer[b["subclass"]].append(dealer_fight(b, rng, respec(b) if re_ else None))
+            parties = 0
+            won = 0
+            for _ in range(rounds * 4):
+                party = rng.sample(high, 3)
+                parties += 1
+                won += blood_rift(party, rng, re_)
+            print(f"\n=== Модель: {name}, сборки {vname}")
+            print(f"  кровавый разлом, группа из 3 живых 50+: {100 * won / parties:.0f}% прохождений")
+            print("  Скупщик соло (побед / HP-):  " + "  ".join(
+                f"{sub} {100 * statistics.fmean(w for w, _ in rs):.0f}%/{100 * statistics.fmean(lo for _, lo in rs):.0f}%"
+                for sub, rs in sorted(dealer.items())))
     stat_model.use(stat_model.CURRENT)
 
 
@@ -251,14 +367,23 @@ def builds_mode(builds: list[dict], rounds: int, models: list[str]) -> None:
 
 def main() -> None:
     ap = argparse.ArgumentParser()
-    ap.add_argument("mode", choices=("live", "builds"))
+    ap.add_argument("mode", choices=("live", "builds", "content"))
     ap.add_argument("builds")
     ap.add_argument("--rounds", type=int, default=30)
     ap.add_argument("--models", default=",".join(MODELS))
+    ap.add_argument("--pve", default="сейчас", choices=tuple(PVE))
+    ap.add_argument("--rift", action="store_true", help="live: ещё соло обычный разлом")
     args = ap.parse_args()
     data = json.loads(Path(args.builds).read_text(encoding="utf-8"))
     models = [m for m in args.models.split(",") if m in MODELS]
-    (live if args.mode == "live" else builds_mode)(data, args.rounds, models)
+    use_pve(args.pve)
+    print(f"PvE: {args.pve} {PVE[args.pve] or ''}")
+    if args.mode == "live":
+        live(data, args.rounds, models, with_rift=args.rift)
+    elif args.mode == "content":
+        content(data, args.rounds, models)
+    else:
+        builds_mode(data, args.rounds, models)
 
 
 if __name__ == "__main__":

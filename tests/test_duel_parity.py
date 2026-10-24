@@ -133,7 +133,7 @@ def test_bloodlust_arms_after_crit_in_duel() -> None:
         "bloodlust_cooldown": float(bc.SHADOW_BLADE_BLOODLUST_COOLDOWN),
         "crit_chance_bonus": 1.0,
     }
-    enemy = combatant(2, side=1, vitality=5000, agility=0)
+    enemy = combatant(2, side=1, vitality=5000, agility=0, will=0)
     engine.start_duel(1, blade, enemy)
     state = engine.duels[1]
     if state.combatants[state.current_actor_id].id != blade.id:
@@ -201,7 +201,7 @@ def test_block_reflection_works_in_duel() -> None:
 
     engine = DuelEngine(rng=AlwaysBlockRng())
     attacker = combatant(1, side=0, vitality=500)
-    guard = combatant(2, side=1, subclass_id="guardian", agility=0, vitality=500)
+    guard = combatant(2, side=1, subclass_id="guardian", agility=0, will=0, vitality=500)
     guard.buff_modifiers = {
         "full_block_chance": 1.0,
         "block_reflect_pct": bc.GUARDIAN_REFLECTION_PCT,
@@ -228,7 +228,7 @@ def test_shield_pool_absorbs_direct_hit_in_duel() -> None:
     которое чинил патч 52: «Второе сердце» работает и в дуэли."""
     engine = DuelEngine(rng=NoCritRng())
     attacker = combatant(1, side=0)
-    target = combatant(2, side=1, agility=0, vitality=500)
+    target = combatant(2, side=1, agility=0, will=0, vitality=500)
     target.effects.append(Effect(kind=EffectKind.SHIELD_POOL, value=100000,
                                  remaining_ticks=5, source_id=target.id))
     engine.start_duel(1, attacker, target)
@@ -257,7 +257,7 @@ def _duel_hit_on(target, attacker, rng=None) -> None:
 def test_damage_cap_works_in_duel() -> None:
     """«Несокрушимый» (2026-10-22): в дуэли потолка урона за удар не было."""
     attacker = combatant(1, side=0, strength=5000)
-    target = combatant(2, side=1, agility=0, vitality=500)
+    target = combatant(2, side=1, agility=0, will=0, vitality=500)
     target.apply_effect(EffectKind.DAMAGE_CAP, 0.05, 3, target.id)
     before = target.current_hp
     _duel_hit_on(target, attacker)
@@ -267,7 +267,7 @@ def test_damage_cap_works_in_duel() -> None:
 def test_block_heal_works_in_duel() -> None:
     """«Глухая оборона» лечит за удар в стойку и в дуэли (2026-10-22)."""
     attacker = combatant(1, side=0)
-    target = combatant(2, side=1, agility=0, vitality=500)
+    target = combatant(2, side=1, agility=0, will=0, vitality=500)
     target.apply_effect(EffectKind.BLOCK_STANCE, 1.0, 3, target.id)
     target.apply_effect(EffectKind.BLOCK_HEAL, 0.05, 3, target.id)
     target.current_hp = target.max_hp // 2

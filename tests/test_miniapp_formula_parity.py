@@ -39,11 +39,14 @@ const levels = %s;
 const builds = %s;
 const out = [];
 for (const level of levels) {
+  const subs = { warrior: [null, 'blood_knight'], rogue: [null, 'shadow_blade', 'poisoner'], mage: [null, 'dark_mystic'] };
   for (const baseClass of ['warrior', 'rogue', 'mage']) {
-    for (const b of builds) {
-      const stats = { str: b[0], agi: b[1], int: b[2], vit: b[3], wil: b[4] };
-      out.push({ level, baseClass, stats, tier: tierForLevel(level),
-                 ...computeDerived({ level, baseClass, stats }) });
+    for (const subclass of subs[baseClass]) {
+      for (const b of builds) {
+        const stats = { str: b[0], agi: b[1], int: b[2], vit: b[3], wil: b[4] };
+        out.push({ level, baseClass, subclass, stats, tier: tierForLevel(level),
+                   ...computeDerived({ level, baseClass, subclass, stats }) });
+      }
     }
   }
 }
@@ -65,11 +68,10 @@ def _client_rows() -> list[dict]:
 
 
 class _Character:
-    subclass = None
-
-    def __init__(self, level: int, base_class: str) -> None:
+    def __init__(self, level: int, base_class: str, subclass: str | None = None) -> None:
         self.level = level
         self.base_class = base_class
+        self.subclass = subclass
 
 
 class _Stats:
@@ -81,7 +83,7 @@ class _Stats:
 def test_client_preview_matches_server_formulas() -> None:
     mismatches: list[str] = []
     for row in _client_rows():
-        server = compute(_Character(row["level"], row["baseClass"]), _Stats(row["stats"]))
+        server = compute(_Character(row["level"], row["baseClass"], row["subclass"]), _Stats(row["stats"]))
         pairs = {
             "max_hp": (row["maxHp"], server.max_hp),
             "damage": (row["damage"], server.damage),
@@ -96,7 +98,7 @@ def test_client_preview_matches_server_formulas() -> None:
         for name, (client, srv) in pairs.items():
             if abs(client - srv) > 1e-9:
                 mismatches.append(
-                    f"ур.{row['level']} {row['baseClass']} {row['stats']} "
+                    f"ур.{row['level']} {row['baseClass']}/{row['subclass']} {row['stats']} "
                     f"{name}: клиент {client} != сервер {srv}"
                 )
     assert not mismatches, "предпросмотр мини-аппа разошёлся с сервером:\n" + "\n".join(

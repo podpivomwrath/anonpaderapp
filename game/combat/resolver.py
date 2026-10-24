@@ -112,7 +112,7 @@ def _dies_this_tick(mob: CombatantState, incoming: list, session: CombatSessionS
         amount = hit.amount
         source = session.combatants.get(hit.source_id) if session is not None else None
         if source is not None and source.kind == "character" and amount > 0:
-            _, taken_mult = formulas.level_diff_modifiers(mob.level, source.level)
+            _, taken_mult = formulas.level_diff_modifiers(mob.level, source.level, mob.field_mob)
             amount = max(round(amount * taken_mult), 1)
         if cap > 0 and amount > 0:
             amount = min(amount, max(round(mob.max_hp * cap), 1))
@@ -577,10 +577,10 @@ def resolve_tick(
             if source is None or target is None:
                 continue
             if source.kind == "mob" and target.kind == "character":
-                dmg_mult, _ = formulas.level_diff_modifiers(source.level, target.level)
+                dmg_mult, _ = formulas.level_diff_modifiers(source.level, target.level, source.field_mob)
                 hit.amount = max(round(hit.amount * dmg_mult), 1)
             elif target.kind == "mob" and source.kind == "character":
-                _, taken_mult = formulas.level_diff_modifiers(target.level, source.level)
+                _, taken_mult = formulas.level_diff_modifiers(target.level, source.level, target.field_mob)
                 hit.amount = max(round(hit.amount * taken_mult), 1)
     # Отражение моба - доля урона, который удар нанёс на самом деле (см. PendingHit.reflect_of).
     for hit in ctx.hits:

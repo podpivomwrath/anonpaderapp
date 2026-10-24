@@ -8,7 +8,8 @@ from dataclasses import dataclass
 
 from game.classes.poisoner import poison_tick_damage_per_stack
 from game.combat import balance_config as bc
-from game.combat import formulas
+from game.combat import formulas, stat_model
+from game.combat.session import Stats
 from models import Character, CharacterStats
 
 
@@ -47,19 +48,23 @@ def compute(
     primary_stat = bc.PRIMARY_STAT_BY_CLASS[character.base_class]
     primary_value = {"str": strength, "agi": agility, "int": intellect}[primary_stat]
     k_dmg = formulas.k_dmg_for(primary_stat)
+    # Проценты и урон - той же моделью статов, что и бой (game/combat/stat_model).
+    model = stat_model.ACTIVE
+    s = Stats(strength=strength, agility=agility, intellect=intellect, vitality=vitality, will=will)
 
     return DerivedStats(
         max_hp=round(round(formulas.hp(character.level, vitality, tier_mult)
                            * formulas.class_hp_mult(character.base_class, character.subclass))
                      * _food_hp_mult(character)),
-        damage=round(formulas.damage(tier_mult, primary_value, k_dmg), 1),
-        crit_chance=min(formulas.crit_chance(agility)
+        damage=round(formulas.damage(
+            tier_mult, model.primary_value(primary_value, character.level, True), k_dmg), 1),
+        crit_chance=min(model.crit_chance(s) + stat_model.subclass_crit_bonus(character.subclass)
                         + formulas.class_crit_bonus(character.base_class, character.subclass), 1.0),
-        mitigation=formulas.mitigation(vitality),
-        control_resist=formulas.control_resist(will),
-        support_power=formulas.support_power(will),
-        dodge_chance=formulas.dodge_chance(agility),
-        ability_dodge_chance=formulas.ability_dodge_chance(agility),
+        mitigation=model.mitigation(s),
+        control_resist=model.control_resist(will),
+        support_power=model.support_power(s),
+        dodge_chance=model.dodge(s, False) + stat_model.subclass_dodge_bonus(character.subclass),
+        ability_dodge_chance=model.dodge(s, True) + stat_model.subclass_dodge_bonus(character.subclass),
         poison_power=round(
             poison_tick_damage_per_stack(will, agility) * bc.POISONER_MAX_STACKS, 1
         ),

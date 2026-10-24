@@ -368,7 +368,7 @@ def test_stat_dodge_zero_agility_never_triggers_alone() -> None:
 def test_ability_dodge_uses_quarter_chance_not_full() -> None:
     """is_ability=True — уворот 25% от обычного; ролл, который сработал бы
     для атаки, не обязан сработать для способности."""
-    from game.combat import formulas
+    from game.combat import stat_model
 
     class _FixedRng(random.Random):
         def __init__(self, value: float) -> None:
@@ -379,9 +379,10 @@ def test_ability_dodge_uses_quarter_chance_not_full() -> None:
             return self.value
 
     attacker = combatant(1, side=0)
-    target = combatant(2, side=1, agility=202)  # dodge_chance ~0.6, ability ~0.15
+    target = combatant(2, side=1, will=300)  # уворот от Воли с 2026-10-24
     # ролл между ability-порогом и полным порогом: попадает под атаку, но НЕ под способность
-    roll = (formulas.ability_dodge_chance(202) + formulas.dodge_chance(202)) / 2
+    m = stat_model.ACTIVE
+    roll = (m.dodge(target.stats, True) + m.dodge(target.stats, False)) / 2
     hit_attack = compute_hit(attacker, target, _FixedRng(roll), is_ability=False)
     hit_ability = compute_hit(attacker, target, _FixedRng(roll), is_ability=True)
     assert hit_attack.missed is True

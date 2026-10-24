@@ -112,12 +112,12 @@ def test_reflection_returns_part_of_blocked_damage() -> None:
     rng = AlwaysLowRng()
     # agility=0: иначе AlwaysLowRng заставляет Стража УКЛОНИТЬСЯ от удара, и
     # блокировать становится нечего - тест не про уворот.
-    guardian = combatant(1, side=0, subclass_id="guardian", agility=0)
+    guardian = combatant(1, side=0, subclass_id="guardian", agility=0, will=0)
     guardian.buff_modifiers = {
         "full_block_chance": 1.0,
         "block_reflect_pct": bc.GUARDIAN_REFLECTION_PCT,
     }
-    attacker = combatant(2, side=1, agility=0)
+    attacker = combatant(2, side=1, agility=0, will=0)
     hp_before = attacker.current_hp
 
     result = resolve_tick(
@@ -139,7 +139,7 @@ def test_counterattack_requires_full_block() -> None:
     rng = AlwaysLowRng()
     guardian = combatant(1, side=0, subclass_id="guardian")
     guardian.buff_modifiers = {"counterstrike_mult": bc.GUARDIAN_COUNTERATTACK_MULT}
-    enemy = combatant(2, side=1, agility=0)
+    enemy = combatant(2, side=1, agility=0, will=0)
     resolve_tick(make_session(guardian, enemy), {1: skill("guardian_block")}, rng)
     assert enemy.current_hp == enemy.max_hp
 
@@ -147,7 +147,7 @@ def test_counterattack_requires_full_block() -> None:
     guardian2.buff_modifiers = {
         "counterstrike_mult": bc.GUARDIAN_COUNTERATTACK_MULT, "full_block_chance": 1.0,
     }
-    enemy2 = combatant(2, side=1, agility=0)
+    enemy2 = combatant(2, side=1, agility=0, will=0)
     resolve_tick(make_session(guardian2, enemy2), {1: skill("guardian_block")}, rng)
     assert enemy2.current_hp < enemy2.max_hp
 

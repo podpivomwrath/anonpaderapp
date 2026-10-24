@@ -168,6 +168,7 @@ def spawn_mob(
         primary_stat=mob.primary_stat,
     )
     mob_abilities.prepare(combatant, mob.ability)
+    combatant.field_mob = True
     return Encounter(
         combatant=combatant, flavor=mob.flavor, image=mob.image,
         ability_line=ability_line(mob.ability),

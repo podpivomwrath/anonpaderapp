@@ -1,13 +1,13 @@
 """Как характеристики превращаются в проценты боя (2026-10-24).
 
-Одна точка для крита, уворота, снижения урона, сопротивления контролю, силы
-поддержки и силы эффектов. Игра считает по CURRENT - те же формулы, что в
-game/combat/formulas.py, число в число (tests/test_stat_model.py).
+Одна точка для урона основного стата, крита, уворота, снижения урона,
+сопротивления контролю, силы поддержки и силы эффектов.
 
-Зачем модель, а не только функции formulas: обсуждается ребаланс статов
-(игроки качают один стат - остальные почти ничего не дают). Симулятор
-(tools/sim_stat_model.py) подставляет сюда другие правила через use() и
-сравнивает сборки, не трогая игру. В бою модель меняют только инструменты.
+Игра считает по GAME (ребаланс 2026-10-24, владелец: игроки качали один стат,
+остальные почти ничего не давали): проценты - с убывающей отдачей, уворот -
+от Воли, урон основного стата сверх порога 30 + 2 x уровень идёт по 0.35.
+CURRENT - прежние формулы game/combat/formulas.py, для сравнения в
+симуляторе (tools/sim_stat_model.py подменяет модель через use()).
 """
 
 from __future__ import annotations
@@ -26,6 +26,10 @@ def hyper(x: float, cap: float, k: float) -> float:
 @dataclass
 class StatModel:
     name: str = "current"
+
+    def primary_value(self, value: int, level: int, is_player: bool) -> float:
+        """Сколько основного стата идёт в урон. Сейчас - всё, линейно."""
+        return value
 
     def crit_chance(self, s) -> float:
         return formulas.crit_chance(s.agility)
@@ -69,8 +73,24 @@ class HyperModel(StatModel):
     crit_dmg_per_str: float = 0.0        # прибавка к множителю крита за очко Силы
     effect_per_int: float = 0.0          # сила яда, горения, вампиризма за очко Интеллекта
     support_per_int: float = 0.0         # доля силы поддержки от Интеллекта вместо Воли
+    resist_hyper: bool = True            # False - сопротивление контролю по-старому, линейно
     base_crit: dict | None = None        # подкласс -> прибавка к криту (компенсация)
     base_dodge: dict | None = None
+    #: Убывание урона основного стата у игроков: до порога base + per_level *
+    #: уровень - полностью, сверх - доля over. over=None - линейно, как сейчас.
+    primary_soft_base: float = 30.0
+    primary_soft_per_level: float = 2.0
+    primary_over: float | None = None
+    #: Множитель урона от основного стата игрока - вернуть урон, срезанный
+    #: порогом, чтобы контент (разломы, рейды) не стал сложнее для всех.
+    primary_k_mult: float = 1.0
+
+    def primary_value(self, value: int, level: int, is_player: bool) -> float:
+        if self.primary_over is None or not is_player:
+            return value
+        threshold = self.primary_soft_base + self.primary_soft_per_level * level
+        eff = value if value <= threshold else threshold + (value - threshold) * self.primary_over
+        return eff * self.primary_k_mult
 
     def crit_chance(self, s) -> float:
         return hyper(s.agility, self.crit_cap, self.crit_k)
@@ -86,6 +106,8 @@ class HyperModel(StatModel):
         return hyper(s.vitality, self.mit_cap, self.mit_k)
 
     def control_resist(self, will: int) -> float:
+        if not self.resist_hyper:
+            return formulas.control_resist(will)
         return hyper(will, self.resist_cap, self.resist_k)
 
     def effect_power(self, s) -> float:
@@ -98,7 +120,16 @@ class HyperModel(StatModel):
 
 
 CURRENT = StatModel()
-ACTIVE: StatModel = CURRENT
+#: Правила игры с 2026-10-24 (вариант D2 симулятора). Сопротивление контролю
+#: оставлено прежним: правка про PvE и моностат, PvP-контроль не трогаем.
+#: Разбойники теряли сразу крит и уворот с Ловкости - подкласс возвращает
+#: часть (tools/balance_check.py: все подклассы в коридорах).
+GAME = HyperModel(
+    name="game", dodge_stat="will", primary_over=0.35, resist_hyper=False,
+    base_crit={"shadow_blade": 0.10, "poisoner": 0.10},
+    base_dodge={"shadow_blade": 0.05, "poisoner": 0.05},
+)
+ACTIVE: StatModel = GAME
 
 
 def use(model: StatModel) -> None:

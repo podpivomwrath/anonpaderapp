@@ -85,14 +85,17 @@ def ability_dodge_chance(agi: int) -> float:
     return dodge_chance(agi) * bc.ABILITY_DODGE_RATIO
 
 
-def level_diff_modifiers(mob_level: int, player_level: int) -> tuple[float, float]:
+def level_diff_modifiers(mob_level: int, player_level: int, field: bool = False) -> tuple[float, float]:
     """Патч 26: моб выше уровнем бьёт сильнее и получает меньше урона.
-    Возвращает (mob_damage_mult, mob_taken_mult); (1.0, 1.0), если моб не выше."""
+    Возвращает (mob_damage_mult, mob_taken_mult); (1.0, 1.0), если моб не выше.
+    field - моб клетки: кривая круче (LVL_DIFF_FIELD_*, 2026-10-24)."""
     diff = mob_level - player_level
     if diff <= 0:
         return 1.0, 1.0
-    mob_damage_mult = min(1 + bc.LVL_DIFF_DMG_BONUS * diff, bc.LVL_DIFF_DMG_CAP)
-    mob_taken_mult = max(1 - bc.LVL_DIFF_DEF_BONUS * diff, bc.LVL_DIFF_DEF_FLOOR)
+    dmg_bonus = bc.LVL_DIFF_FIELD_DMG_BONUS if field else bc.LVL_DIFF_DMG_BONUS
+    def_bonus = bc.LVL_DIFF_FIELD_DEF_BONUS if field else bc.LVL_DIFF_DEF_BONUS
+    mob_damage_mult = min(1 + dmg_bonus * diff, bc.LVL_DIFF_DMG_CAP)
+    mob_taken_mult = max(1 - def_bonus * diff, bc.LVL_DIFF_DEF_FLOOR)
     return mob_damage_mult, mob_taken_mult
 
 

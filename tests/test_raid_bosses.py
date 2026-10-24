@@ -39,20 +39,26 @@ def make_session(*combatants) -> CombatSessionState:
 
 # --- Построение участников ---
 
+
+
+def _hp(base: int) -> int:
+    """Бойцы рейда крепче на RAID_FIGHTER_HP_MULT (2026-10-24)."""
+    return round(base * rc.RAID_FIGHTER_HP_MULT)
 
 def test_build_stage1_mobs_count_and_hp():
     mobs = rb.build_stage1_mobs(start_id=100)
     assert len(mobs) == rc.STAGE1_MOB_COUNT == 3
-    assert all(m.max_hp == rc.STAGE1_MOB_HP == 8_000 for m in mobs)
+    assert rc.STAGE1_MOB_HP == 8_000
+    assert all(m.max_hp == _hp(8_000) for m in mobs)
     assert all(m.current_hp == m.max_hp for m in mobs)
     assert {m.id for m in mobs} == {100, 101, 102}
 
 
 def test_build_veld_mobs_hp_and_names():
     velds = rb.build_veld_mobs(start_id=200)
-    assert velds[rc.VELD_OSWALD].max_hp == 14_000
-    assert velds[rc.VELD_IRMA].max_hp == 9_000
-    assert velds[rc.VELD_LITTA].max_hp == 6_000
+    assert velds[rc.VELD_OSWALD].max_hp == _hp(14_000)
+    assert velds[rc.VELD_IRMA].max_hp == _hp(9_000)
+    assert velds[rc.VELD_LITTA].max_hp == _hp(6_000)
     # Показ (и номера в выборе цели) - Ирма, Литта, Освальд: не в порядке
     # убийства, чтобы первая кнопка не оказывалась правильной случайно.
     assert velds[rc.VELD_IRMA].id == 200
@@ -65,7 +71,8 @@ def test_build_veld_mobs_hp_and_names():
 
 def test_build_surgeon_hp():
     boss = rb.build_surgeon(id=300)
-    assert boss.max_hp == rc.SURGEON_HP == 45_000
+    assert rc.SURGEON_HP == 45_000
+    assert boss.max_hp == _hp(45_000)
     assert boss.name == "Хирург"
 
 
@@ -85,8 +92,8 @@ def test_veld_order_correct_no_violation():
     assert result.lines == []
     assert killed == [rc.VELD_OSWALD]
     # Ирма/Литта не тронуты
-    assert combatants[ids_by_veld[rc.VELD_IRMA]].max_hp == 9_000
-    assert combatants[ids_by_veld[rc.VELD_LITTA]].max_hp == 6_000
+    assert combatants[ids_by_veld[rc.VELD_IRMA]].max_hp == _hp(9_000)
+    assert combatants[ids_by_veld[rc.VELD_LITTA]].max_hp == _hp(6_000)
 
 
 def test_veld_order_first_violation_doubles_remaining():
@@ -104,9 +111,9 @@ def test_veld_order_first_violation_doubles_remaining():
 
     oswald = combatants[ids_by_veld[rc.VELD_OSWALD]]
     litta = combatants[ids_by_veld[rc.VELD_LITTA]]
-    assert oswald.max_hp == 14_000 * 2
-    assert oswald.current_hp == 14_000 * 2
-    assert litta.max_hp == 6_000 * 2
+    assert oswald.max_hp == _hp(14_000) * 2
+    assert oswald.current_hp == _hp(14_000) * 2
+    assert litta.max_hp == _hp(6_000) * 2
 
 
 def test_veld_order_second_violation_compounds_to_times_ten():
@@ -124,8 +131,8 @@ def test_veld_order_second_violation_compounds_to_times_ten():
 
     litta = combatants[ids_by_veld[rc.VELD_LITTA]]
     # x2 (первая ошибка) затем x5 поверх текущего состояния = x10 от базы
-    assert litta.max_hp == 6_000 * 2 * 5
-    assert litta.current_hp == 6_000 * 2 * 5
+    assert litta.max_hp == _hp(6_000) * 2 * 5
+    assert litta.current_hp == _hp(6_000) * 2 * 5
 
 
 def test_veld_order_full_kill_no_extra_violation_on_last():

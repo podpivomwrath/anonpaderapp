@@ -59,7 +59,8 @@ def test_cleave_multiplier_180() -> None:
     resolve_tick(s2, {3: skill("warrior_cleave", 4)}, rng)
     cleaved = b2.max_hp - b2.current_hp
 
-    assert cleaved == round(plain * 1.5)  # 2026-10-21: было 1.8
+    # 2026-10-21: было 1.8. ±1 - округление снижения урона (убывающая отдача с 2026-10-24).
+    assert abs(cleaved - round(plain * 1.5)) <= 1
 
 
 def test_double_stab_two_hits() -> None:
@@ -116,7 +117,7 @@ def test_double_stab_hits_crit_independently() -> None:
     # agility=0 (патч 34, ч.1) — иначе цель роллит СВОЙ стат-уворот ПЕРЕД
     # критом каждого удара, сдвигая последовательность вызовов rng.random()
     # и ломая предположение теста "1-й вызов — крит, 2-й — не крит".
-    b = combatant(2, side=1, vitality=500, agility=0)
+    b = combatant(2, side=1, vitality=500, agility=0, will=0)
     state = make_session(a, b)
     result = resolve_tick(state, {1: skill("rogue_double_stab", 2)}, rng)
 
