@@ -59,6 +59,9 @@ const SUBCLASS_CRIT = { shadow_blade: 0.1, poisoner: 0.1 };
 const SUBCLASS_DODGE = { shadow_blade: 0.05, poisoner: 0.05 };
 const DODGE_K = 250;
 const ABILITY_DODGE_RATIO = 0.25;
+// Баффы уворота против навыков - вдвое слабее; общий потолок уворота.
+const EFFECT_ABILITY_DODGE_RATIO = 0.5;
+const DODGE_HARD_CAP = 0.8;
 
 const hyper = (x, cap, k) => (x > 0 ? (cap * x) / (x + k) : 0);
 
@@ -96,7 +99,10 @@ export function tierForLevel(level) {
 // сервере (services/derived_stats_service.py::compute). Без этого "до"
 // (derived с сервера, уже учитывает экипировку) и "после" (этот предпросмотр)
 // расходились у любого игрока с надетыми вещами.
-export function computeDerived({ level, baseClass, subclass = null, stats, gearBonus = {} }) {
+// mods - баффы пресета и еды, которые видны в сводке (character.derived_mods,
+// services/derived_stats_service.py::SHOWN_MODS), как в бою.
+export function computeDerived({ level, baseClass, subclass = null, stats, gearBonus = {}, mods = null }) {
+  const m = mods ?? {};
   const tierMult = TIER_MULTIPLIERS[tierForLevel(level)];
   const primaryStat = PRIMARY_STAT_BY_CLASS[baseClass] ?? 'str';
 
@@ -108,14 +114,20 @@ export function computeDerived({ level, baseClass, subclass = null, stats, gearB
   const primaryValue = { str, agi, int: int_ }[primaryStat] ?? 0;
   const kDmg = K_DMG[primaryStat];
 
-  const hpMult = subclass ? 1 : (BASE_CLASS_HP_MULT[baseClass] ?? 1);
+  const hpMult = (subclass ? 1 : (BASE_CLASS_HP_MULT[baseClass] ?? 1));
+  const buffHpMult = 1 + (m.max_hp_bonus ?? 0);
+  const dmgMult = (1 + (m.damage_bonus ?? 0)) * (1 + (m.reckless_damage_bonus ?? 0));
   const critBonus = subclass ? 0 : (BASE_CLASS_CRIT_BONUS[baseClass] ?? 0);
-  const maxHp = roundHalfToEven((HP_BASE + HP_PER_LEVEL * level + HP_PER_VIT * vit + HP_PER_TIER * tierMult) * hpMult);
+  const maxHp = roundHalfToEven(
+    roundHalfToEven((HP_BASE + HP_PER_LEVEL * level + HP_PER_VIT * vit + HP_PER_TIER * tierMult) * hpMult) * buffHpMult,
+  );
   const damage = roundHalfToEven(
-    (WEAPON_BASE_PER_TIER * tierMult + kDmg * primaryEffective(primaryValue, level)) * 10,
+    (WEAPON_BASE_PER_TIER * tierMult + kDmg * primaryEffective(primaryValue, level)) * dmgMult * 10,
   ) / 10;
-  const critChance = Math.min(hyper(agi, CRIT_CAP, CRIT_K) + critBonus + (SUBCLASS_CRIT[subclass] ?? 0), 1);
-  const mitigation = hyper(vit, MITIGATION_CAP, MITIGATION_K);
+  const critChance = Math.min(
+    hyper(agi, CRIT_CAP, CRIT_K) + critBonus + (SUBCLASS_CRIT[subclass] ?? 0) + (m.crit_chance_bonus ?? 0), 1,
+  );
+  const mitigation = 1 - (1 - hyper(vit, MITIGATION_CAP, MITIGATION_K)) * (1 - (m.incoming_damage_reduction ?? 0));
   const controlResist = Math.min(CONTROL_RESIST_PER_WIL * wil, CONTROL_RESIST_CAP);
   const supportPower = SUPPORT_POWER_PER_WIL * wil;
   // урон за ход при полном числе стаков: делится на стаки и тут же
@@ -124,8 +136,12 @@ export function computeDerived({ level, baseClass, subclass = null, stats, gearB
     ((POISON_PER_WIL * wil + POISON_PER_AGI * agi) / POISON_MAX_STACKS) * POISON_MAX_STACKS;
   // Прибавка подкласса - к обоим уворотам целиком, как в бою (skills.compute_hit).
   const subclassDodge = SUBCLASS_DODGE[subclass] ?? 0;
-  const dodgeChance = hyper(wil, DODGE_CAP, DODGE_K) + subclassDodge;
-  const abilityDodgeChance = hyper(wil, DODGE_CAP, DODGE_K) * ABILITY_DODGE_RATIO + subclassDodge;
+  const extraDodge = m.dodge_bonus ?? 0;
+  const dodgeChance = Math.min(hyper(wil, DODGE_CAP, DODGE_K) + subclassDodge + extraDodge, DODGE_HARD_CAP);
+  const abilityDodgeChance = Math.min(
+    hyper(wil, DODGE_CAP, DODGE_K) * ABILITY_DODGE_RATIO + subclassDodge + extraDodge * EFFECT_ABILITY_DODGE_RATIO,
+    DODGE_HARD_CAP,
+  );
 
   return {
     maxHp, damage, critChance, mitigation, controlResist, supportPower,

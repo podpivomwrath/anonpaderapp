@@ -33,19 +33,29 @@ BUILDS = (
     (100, 100, 100, 100, 100),
 )
 
+#: Баффы пресета и еды в сводке (2026-10-24): без них и с типичным набором.
+MODS = (
+    None,
+    {"damage_bonus": 0.12, "reckless_damage_bonus": 0.06, "crit_chance_bonus": 0.1, "dodge_bonus": 0.08,
+     "incoming_damage_reduction": 0.12, "max_hp_bonus": 0.16},
+)
+
 SCRIPT = """
 import { computeDerived, tierForLevel } from './miniapp/src/formulas.js';
 const levels = %s;
 const builds = %s;
+const modsList = %s;
 const out = [];
 for (const level of levels) {
   const subs = { warrior: [null, 'blood_knight'], rogue: [null, 'shadow_blade', 'poisoner'], mage: [null, 'dark_mystic'] };
   for (const baseClass of ['warrior', 'rogue', 'mage']) {
     for (const subclass of subs[baseClass]) {
       for (const b of builds) {
-        const stats = { str: b[0], agi: b[1], int: b[2], vit: b[3], wil: b[4] };
-        out.push({ level, baseClass, subclass, stats, tier: tierForLevel(level),
-                   ...computeDerived({ level, baseClass, subclass, stats }) });
+        for (let mi = 0; mi < modsList.length; mi++) {
+          const stats = { str: b[0], agi: b[1], int: b[2], vit: b[3], wil: b[4] };
+          out.push({ level, baseClass, subclass, stats, mi, tier: tierForLevel(level),
+                     ...computeDerived({ level, baseClass, subclass, stats, mods: modsList[mi] }) });
+        }
       }
     }
   }
@@ -56,7 +66,7 @@ console.log(JSON.stringify(out));
 
 def _client_rows() -> list[dict]:
     script = ROOT / "_formula_parity_probe.mjs"
-    script.write_text(SCRIPT % (json.dumps(LEVELS), json.dumps(BUILDS)), encoding="utf-8")
+    script.write_text(SCRIPT % (json.dumps(LEVELS), json.dumps(BUILDS), json.dumps(MODS)), encoding="utf-8")
     try:
         proc = subprocess.run(
             [NODE, script.name], cwd=ROOT, capture_output=True, text=True, timeout=120
@@ -83,7 +93,8 @@ class _Stats:
 def test_client_preview_matches_server_formulas() -> None:
     mismatches: list[str] = []
     for row in _client_rows():
-        server = compute(_Character(row["level"], row["baseClass"], row["subclass"]), _Stats(row["stats"]))
+        server = compute(_Character(row["level"], row["baseClass"], row["subclass"]), _Stats(row["stats"]),
+                         mods=MODS[row["mi"]])
         pairs = {
             "max_hp": (row["maxHp"], server.max_hp),
             "damage": (row["damage"], server.damage),

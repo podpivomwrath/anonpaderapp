@@ -73,10 +73,10 @@ async def _load_character(session: AsyncSession, vk_user_id: int) -> Character |
 
 def _character_payload(
     character: Character, gear_bonus: dict[str, int] | None = None, wallet=None, is_admin: bool = False,
-    power=None, titles: list[dict] | None = None,
+    power=None, titles: list[dict] | None = None, mods: dict | None = None,
 ) -> dict:
     stats = character.stats
-    derived = derived_stats_service.compute(character, stats, gear_bonus)
+    derived = derived_stats_service.compute(character, stats, gear_bonus, mods)
     return {
         "name": character.name,
         "is_admin": is_admin,
@@ -151,6 +151,9 @@ def _character_payload(
         # вложении очка и без этого поля считал бы "после" без бонусов
         # экипировки, расходясь с "до" (derived ниже, который её уже учитывает).
         "gear_bonus": gear_bonus or {},
+        # Баффы пресета и еды, которые видны в сводке (2026-10-24): предпросмотр
+        # «станет» считает с ними же, как сервер.
+        "derived_mods": derived_stats_service.shown_mods(mods),
         # Перстень мастерского рецепта (2026-10-23) - окно в снаряжении.
         "ring": _ring_payload(character),
         # Что игрок уже видел в мини-аппе и включён ли звук (handle_post_ui).
@@ -209,9 +212,10 @@ async def handle_get_character(request: web.Request) -> web.Response:
         wallet = await get_wallet(session, character.id)
         power = await power_service.power_of(session, character)
         titles = await title_service.menu(session, character)
+        mods = await preset_service.resolve_active_modifiers(session, character)
         await session.commit()
         return web.json_response(
-            _character_payload(character, gear_bonus, wallet, _is_admin(request, vk_user_id), power, titles)
+            _character_payload(character, gear_bonus, wallet, _is_admin(request, vk_user_id), power, titles, mods)
         )
 
 
@@ -261,9 +265,10 @@ async def handle_post_stats(request: web.Request) -> web.Response:
         wallet = await get_wallet(session, character.id)
         power = await power_service.power_of(session, character)
         titles = await title_service.menu(session, character)
+        mods = await preset_service.resolve_active_modifiers(session, character)
         await session.commit()
         return web.json_response(
-            _character_payload(character, gear_bonus, wallet, _is_admin(request, vk_user_id), power, titles)
+            _character_payload(character, gear_bonus, wallet, _is_admin(request, vk_user_id), power, titles, mods)
         )
 
 

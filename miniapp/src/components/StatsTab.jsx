@@ -150,9 +150,10 @@ export default function StatsTab({ character, onCharacterUpdate }) {
   const previewDerived = useMemo(
     () => computeDerived({
       level: character.level, baseClass: character.base_class, subclass: character.subclass,
-      stats: previewStats, gearBonus: character.gear_bonus,
+      stats: previewStats, gearBonus: character.gear_bonus, mods: character.derived_mods,
     }),
-    [character.level, character.base_class, character.subclass, previewStats, character.gear_bonus],
+    [character.level, character.base_class, character.subclass, previewStats, character.gear_bonus,
+      character.derived_mods],
   );
 
   const withGear = (stats) => Object.fromEntries(
@@ -262,6 +263,7 @@ export default function StatsTab({ character, onCharacterUpdate }) {
       {/* Рыбалка и горное дело (2026-10-21) - во вкладке «Ремёсла». */}
 
       <Group header={<Header>Предпросмотр</Header>}>
+        <Caption level="1" className="stat-row__hint">Числа - как в бою: с вещами, активным пресетом и едой.</Caption>
         {DERIVED_DEFS.filter((row) => !row.onlyFor || row.onlyFor === character.subclass).map((row) => {
           const before = character.derived[row.key];
           const after = previewDerived[row.clientKey];

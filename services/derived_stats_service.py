@@ -29,12 +29,28 @@ class DerivedStats:
     poison_power: float
 
 
+#: Баффы пресета и еды, которые работают в бою всегда (без условий «на низком
+#: здоровье», «в группе», «после уворота») - их видно в сводке (2026-10-24).
+SHOWN_MODS = (
+    "damage_bonus", "reckless_damage_bonus", "crit_chance_bonus", "dodge_bonus",
+    "incoming_damage_reduction", "max_hp_bonus",
+)
+
+
+def shown_mods(mods: dict | None) -> dict[str, float]:
+    return {k: float(v) for k, v in (mods or {}).items() if k in SHOWN_MODS and v}
+
+
 def compute(
-    character: Character, stats: CharacterStats, gear_bonus: dict[str, int] | None = None
+    character: Character, stats: CharacterStats, gear_bonus: dict[str, int] | None = None,
+    mods: dict[str, float] | None = None,
 ) -> DerivedStats:
     """gear_bonus (патч 11, блок 2) — сумма статов надетой экипировки
     (services.item_service.gear_bonus), прибавляется к собственным статам ДО
-    расчёта формул. None/пусто — экипировка не учитывается (как раньше)."""
+    расчёта формул. None/пусто — экипировка не учитывается (как раньше).
+    mods - баффы активного пресета и еды (preset_service.resolve_active_modifiers):
+    из них в сводку идут SHOWN_MODS, как в бою (skills.compute_hit). None -
+    без пресета; здоровье от еды тогда берётся напрямую, как раньше."""
     bonus = gear_bonus or {}
     strength = stats.strength + bonus.get("str", 0)
     agility = stats.agility + bonus.get("agi", 0)
@@ -51,20 +67,29 @@ def compute(
     # Проценты и урон - той же моделью статов, что и бой (game/combat/stat_model).
     model = stat_model.ACTIVE
     s = Stats(strength=strength, agility=agility, intellect=intellect, vitality=vitality, will=will)
+    m = shown_mods(mods)
+    hp_mult = (1 + m.get("max_hp_bonus", 0.0)) if mods is not None else _food_hp_mult(character)
+    dmg_mult = (1 + m.get("damage_bonus", 0.0)) * (1 + m.get("reckless_damage_bonus", 0.0))
+    stat_dodge = model.dodge(s, False) + stat_model.subclass_dodge_bonus(character.subclass)
+    ability_dodge = model.dodge(s, True) + stat_model.subclass_dodge_bonus(character.subclass)
+    extra = m.get("dodge_bonus", 0.0)
 
     return DerivedStats(
         max_hp=round(round(formulas.hp(character.level, vitality, tier_mult)
                            * formulas.class_hp_mult(character.base_class, character.subclass))
-                     * _food_hp_mult(character)),
+                     * hp_mult),
         damage=round(formulas.damage(
-            tier_mult, model.primary_value(primary_value, character.level, True), k_dmg), 1),
+            tier_mult, model.primary_value(primary_value, character.level, True), k_dmg) * dmg_mult, 1),
         crit_chance=min(model.crit_chance(s) + stat_model.subclass_crit_bonus(character.subclass)
-                        + formulas.class_crit_bonus(character.base_class, character.subclass), 1.0),
-        mitigation=model.mitigation(s),
+                        + formulas.class_crit_bonus(character.base_class, character.subclass)
+                        + m.get("crit_chance_bonus", 0.0), 1.0),
+        # Снижение от Выносливости и от баффа - множителями, как в бою.
+        mitigation=1 - (1 - model.mitigation(s)) * (1 - m.get("incoming_damage_reduction", 0.0)),
         control_resist=model.control_resist(will),
         support_power=model.support_power(s),
-        dodge_chance=model.dodge(s, False) + stat_model.subclass_dodge_bonus(character.subclass),
-        ability_dodge_chance=model.dodge(s, True) + stat_model.subclass_dodge_bonus(character.subclass),
+        # Бафф уворота от навыков - вдвое слабее (EFFECT_ABILITY_DODGE_RATIO), как в бою; общий потолок.
+        dodge_chance=min(stat_dodge + extra, bc.DODGE_HARD_CAP),
+        ability_dodge_chance=min(ability_dodge + extra * bc.EFFECT_ABILITY_DODGE_RATIO, bc.DODGE_HARD_CAP),
         poison_power=round(
             poison_tick_damage_per_stack(will, agility) * bc.POISONER_MAX_STACKS, 1
         ),
