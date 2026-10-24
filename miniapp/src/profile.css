@@ -41,7 +41,7 @@
 @media (hover: hover) and (pointer: fine) {
   .vkuiButton__host:not(:disabled):not([aria-disabled='true']):hover,
   .gear-slot:hover,
-  .slot-row:not(:disabled):hover,
+  button.slot-row:not(:disabled):hover,
   .relic:hover,
   .copy-transfer:hover,
   .crown-sheet__item:not(:disabled):hover {
@@ -62,7 +62,9 @@
 
 .vkuiButton__host:not(:disabled):active,
 .gear-slot:active,
-.slot-row:not(:disabled):active,
+/* Только кнопки-строки: строка надетой вещи - не кнопка, а при нажатии на её
+   крестик сжималась, крестик уезжал из-под мыши, и клик терялся (2026-10-24). */
+button.slot-row:not(:disabled):active,
 .relic:active,
 .crown-sheet__item:not(:disabled):active {
   transform: scale(0.94);
