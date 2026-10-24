@@ -216,6 +216,11 @@ async def on_tick(peer_id: int, tick: int, result) -> None:
         return
     mob = state.combatants[combat_handlers.MOB_ID]
     dealt = max(0, _known_hp.get(peer_id, mob.max_hp) - mob.current_hp)
+    # Классовые испытания и у мирового босса (2026-10-24): криты, контроль,
+    # серии навыков. Победой заход не считается - босса бьют всем миром.
+    from bot import trial_tracking
+
+    trial_tracking.observe(peer_id, state.combatants, result, {combat_handlers.PLAYER_ID: character_id})
 
     granted = None
     async with get_session_factory()() as db:
@@ -266,6 +271,9 @@ async def _close_attempt(peer_id: int, boss_gone: bool, got_result: bool = False
     from bot.handlers import world as world_handlers  # избегаем цикла импортов
 
     combat_handlers.end_world_boss_fight(peer_id)
+    from bot import trial_tracking
+
+    opened = await trial_tracking.settle(peer_id, won=False)
     _fighter.pop(peer_id, None)
     _known_hp.pop(peer_id, None)
     _attempt_damage.pop(peer_id, None)
@@ -278,6 +286,8 @@ async def _close_attempt(peer_id: int, boss_gone: bool, got_result: bool = False
         summary = await world_handlers.location_summary_parts(db, character, peer_id)
     if not got_result:
         await _send(peer_id, texts.attempt_over_text(boss_gone))
+    for buffs in opened.values():
+        await _send(peer_id, trial_tracking.opened_text(buffs))
     text, attachment, keyboard = summary
     await _send(peer_id, text, attachment=attachment, keyboard=keyboard)
 

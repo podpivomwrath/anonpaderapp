@@ -1,9 +1,11 @@
 """Сводка боя игрока для трекера классовых испытаний (патч 12).
 
 Строится инкрементально по TickResult каждого хода (BattleTracker.update),
-финализируется on_battle_finished. Бой всегда 1 игрок vs 1 моб (см.
-bot/handlers/combat.py: PLAYER_ID=1, MOB_ID=2) — групповых/дуэльных
-условий испытания не имеют (см. патч 12, "не делать").
+финализируется on_battle_finished. Соло - 1 игрок против 1 моба (mob_id).
+С 2026-10-24 (владелец: «во все бои все должно работать») тот же трекер
+ведёт каждого участника группового боя, рейда и разлома: врагами считается
+вся другая сторона (enemy_ids), добивание - удар по павшему в этом ходу
+(bot/trial_tracking.py).
 """
 
 from dataclasses import dataclass
@@ -47,9 +49,11 @@ class BattleReport:
 
 
 class BattleTracker:
-    def __init__(self, player_id: int, mob_id: int, mob_level: int, max_hp: int, start_hp: int) -> None:
+    def __init__(self, player_id: int, mob_id: int | None, mob_level: int, max_hp: int, start_hp: int,
+                 enemy_ids: set[int] | None = None) -> None:
         self.player_id = player_id
         self.mob_id = mob_id
+        self.enemy_ids = set(enemy_ids or ())
         start_pct = (start_hp / max_hp) if max_hp else 1.0
         self.report = BattleReport(mob_level=mob_level, max_hp=max_hp, start_hp_pct=start_pct, hp_min_pct=start_pct)
         self._last_player_crit = False
@@ -57,7 +61,11 @@ class BattleTracker:
         self._last_skill_id: str | None = None
         self._last_was_skill = False
 
-    def update(self, result: TickResult, current_hp: int, mob_died: bool) -> None:
+    def _enemy(self, cid: int) -> bool:
+        return cid == self.mob_id or cid in self.enemy_ids
+
+    def update(self, result: TickResult, current_hp: int, mob_died: bool = False,
+               died_ids: set[int] | None = None) -> None:
         r = self.report
         r.turns += 1
         if r.max_hp:
@@ -94,18 +102,18 @@ class BattleTracker:
         for hit in result.hits:
             if hit.is_dot or hit.missed:
                 continue
-            if hit.source_id == self.player_id and hit.target_id == self.mob_id:
+            if hit.source_id == self.player_id and self._enemy(hit.target_id):
                 if hit.crit:
                     r.crits_dealt += 1
                     if self._last_player_crit:
                         r.consecutive_crits = True
                 self._last_player_crit = hit.crit
-                if mob_died:
+                if mob_died or (died_ids is not None and hit.target_id in died_ids):
                     r.finisher_is_crit = hit.crit
                     r.finisher_skill_id = (
                         action.skill_id if action is not None and action.type == ActionType.SKILL else None
                     )
-            elif hit.target_id == self.player_id and hit.source_id == self.mob_id:
+            elif hit.target_id == self.player_id and self._enemy(hit.source_id):
                 r.hits_taken += 1
                 r.total_damage_taken += hit.amount
                 if hit.crit:

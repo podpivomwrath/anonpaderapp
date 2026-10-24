@@ -642,6 +642,9 @@ def abort_run(run_id: int) -> None:
             raid_trail.abort(battle_id)
         _battles.pop(battle_id, None)
         _declared_this_tick.pop(battle_id, None)
+        from bot import trial_tracking  # бой прерван - незаконченный этап не считается
+
+        trial_tracking.drop(battle_id)
         for p in list(battle.participants.values()):
             _peer_battle.pop(p.peer_id, None)
             _chosen_target.pop(p.character_id, None)

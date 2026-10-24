@@ -21,6 +21,7 @@ from vkbottle.bot import BotLabeler, Message
 from bot.keyboards import combat_modes
 from bot.keyboards.combat_items import page_of
 from bot import ash_handful_state, dailies_texts, editable_message, group_texts, raid_key_texts, short_log
+from bot import trial_tracking
 from bot.handlers import respawn as respawn_handlers
 from bot.battle_keyboard import answer_battle_gone
 from bot.handlers import stats_window
@@ -69,7 +70,6 @@ from services import (
     vitals_service,
 )
 from services import onboarding_service as onboarding_svc
-from services import subclass_service
 from services import story_service
 from services.db import get_session_factory
 
@@ -432,6 +432,7 @@ def _drop_stale(battle_id: int) -> None:
     прерывает намеренно)."""
     battle = _battles.pop(battle_id, None)
     _declared_this_tick.pop(battle_id, None)
+    trial_tracking.drop(battle_id)
     for peer, bid in list(_peer_battle.items()):
         if bid == battle_id:
             _peer_battle.pop(peer, None)
@@ -720,6 +721,8 @@ async def on_group_tick_resolved(session_id: int, tick: int, result: TickResult)
     if battle is None:
         return
     _declared_this_tick.pop(session_id, None)
+    # Классовые испытания и в групповом бою (2026-10-24, bot/trial_tracking.py).
+    trial_tracking.observe(session_id, _live_state(session_id, battle), result, list(battle.participants))
 
     dead_mob_ids = [cid for cid in result.deaths if cid in battle.mob_ids]
     notices: dict[int, str] = {}
@@ -847,7 +850,10 @@ async def on_group_battle_finished(session_id: int, result: TickResult) -> None:
         sum(1 for c in combatants.values() if c.kind == "mob" and not c.alive), len(battle.participants),
     )
     battle_dailies: dict[int, object] = {}
-    trial_buffs: dict[int, list[str]] = {}
+    # Испытания - по отчёту каждого участника, как в соло (2026-10-24): раньше
+    # группа двигала только «дойди до места и победи там».
+    reports = {cid: t.report for cid, t in trial_tracking._trackers.get(session_id, {}).items()}
+    trial_buffs: dict[int, list[str]] = await trial_tracking.settle(session_id, won=bool(survivor_ids))
     async with get_session_factory()() as db:
         has_mount_by_cid = {}
         positions = {}
@@ -862,14 +868,12 @@ async def on_group_battle_finished(session_id: int, result: TickResult) -> None:
             if cid in survivor_ids:
                 has_mount_by_cid[cid] = await mount_service.has_any_mount(db, cid)
                 me = combatants[cid]
-                report = BattleReport(
+                report = reports.get(cid) or BattleReport(
                     won=True, mob_level=mob_level, max_hp=me.max_hp,
                     hp_min_pct=me.current_hp / me.max_hp if me.max_hp else 1.0,
                     only_skills=False, only_basic_attack=False,
                 )
                 battle_dailies[cid] = await daily_service.record_battle(db, character, report)
-                if subclass_service.buff_pool(character) is not None:
-                    trial_buffs[cid] = await trial_service.record_group_win(db, character)
                 # HP после боя остаётся как есть, как в соло (2026-10-13):
                 # раньше группа шла в следующий бой с полным HP без отдыха.
                 # Кто хочет - отдыхает, кто нет - сразу жмёт готовность.

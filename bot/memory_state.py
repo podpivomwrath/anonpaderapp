@@ -9,6 +9,7 @@ tests/test_memory_state.py: впиши, когда оно очищается.
 
 #: «модуль.имя» -> кто и когда снимает запись.
 STATE: dict[str, str] = {
+    "bot.trial_tracking._trackers": "конец боя или этапа (settle), снятый бой (drop)",
     # --- общие службы
     "bot.activity._owners": "выход из activity.transition (finally)",
     "bot.ash_handful_state._pending": "сбор горстки, новое исследование, уход с клетки",

@@ -12,6 +12,7 @@ from dataclasses import dataclass
 from loguru import logger
 from bot import background
 from bot import dailies_texts, group_texts, raid_key_texts, raid_texts as rt
+from bot import trial_tracking
 from bot.handlers import respawn as respawn_handlers
 from bot.handlers import stats_window
 from bot.keyboards import raid as kb
@@ -59,6 +60,9 @@ async def on_raid_tick_resolved(session_id: int, tick: int, result: TickResult) 
     _record_contribution(battle, result)
     battle.stage_ticks += 1
     state = raid_combat._engine.sessions.get(session_id)
+    # Классовые испытания и в рейде/разломе (2026-10-24, bot/trial_tracking.py).
+    trial_tracking.observe(session_id, state.combatants if state is not None else None, result,
+                           list(battle.participants))
     extra_lines: list[str] = []
     scripted_death_ids: list[int] = []
     field_cleared = False
@@ -371,14 +375,32 @@ async def on_raid_battle_finished(session_id: int, result: TickResult) -> None:
     if battle is None:
         return
     if result.winner_side != 0:
+        await _settle_trials(session_id, battle, won=False)
         await raid_combat._finish_wipe(session_id, battle)
         return
     await _advance_or_finish(session_id, battle)
 
 
+async def _settle_trials(session_id: int, battle: raid_combat.RaidBattle, won: bool) -> None:
+    """Этап окончен - отчёты участников в классовые испытания (каждый этап -
+    отдельный бой) и весть, если открылся бафф."""
+    opened = await trial_tracking.settle(session_id, won)
+    for cid, buffs in opened.items():
+        p = battle.participants.get(cid)
+        if p is None:
+            continue
+        try:
+            await raid_combat._bot_api.messages.send(
+                peer_id=p.peer_id, message=trial_tracking.opened_text(buffs), random_id=0,
+            )
+        except Exception:  # noqa: BLE001 - баффы уже открыты, весть вторична
+            pass
+
+
 async def _advance_or_finish(session_id: int, battle: raid_combat.RaidBattle) -> None:
     """Этап зачищен (сторона игроков победила). stage<3 — пауза 5-10 сек +
     переход к следующему этапу; stage==3 — рейд пройден целиком."""
+    await _settle_trials(session_id, battle, won=True)
     stage_cleared = battle.stage
     if stage_cleared >= battle.final_stage:
         await _finish_victory(session_id, battle)
@@ -576,6 +598,7 @@ async def _cleanup_and_return(session_id: int, battle: raid_combat.RaidBattle, t
     персонажей не менялась на всём протяжении рейда, поэтому достаточно
     показать обычную клавиатуру перемещения ИМЕННО для этой клетки."""
     raid_combat._battles.pop(session_id, None)
+    trial_tracking.drop(session_id)
     raid_combat._declared_this_tick.pop(session_id, None)
     combatants = battle.last_combatants
     state = raid_combat._engine.sessions.get(session_id)
