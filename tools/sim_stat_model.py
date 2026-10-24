@@ -34,16 +34,16 @@ sys.stdout.reconfigure(encoding="utf-8")
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-import sim_balance as sb  # noqa: E402
-import sim_rift  # noqa: E402
+import sim_balance as sb
+import sim_rift
 
-from game.classes.base import REGISTRY  # noqa: E402
-from game.combat import balance_config as bc  # noqa: E402
-from game.combat import stat_model  # noqa: E402
-from game.combat.session import Stats, build_combatant  # noqa: E402
-from game.economy import rift_config as rc  # noqa: E402
-from game.world import encounters  # noqa: E402
-from game.world import world_config as wc  # noqa: E402
+from game.classes.base import REGISTRY
+from game.combat import balance_config as bc
+from game.combat import stat_model
+from game.combat.session import Stats, build_combatant
+from game.economy import rift_config as rc
+from game.world import encounters
+from game.world import world_config as wc
 
 FIELD = {"str": "strength", "agi": "agility", "int": "intellect", "vit": "vitality", "wil": "will"}
 KEYS = ("str", "agi", "int", "vit", "wil")
@@ -145,7 +145,7 @@ def live(builds: list[dict], rounds: int, models: list[str]) -> None:
         print(f"{'подкласс':14} {'n':>2}  {'свой: побед/HP-':>16}  {'+5: побед/HP-':>14}  {'+10: побед/HP-':>15}"
               + ("  разлом соло" if name == "сейчас" else ""))
         for sub, rs in sorted(rows.items()):
-            def cell(i):
+            def cell(i, rs=rs):
                 return f"{100 * statistics.fmean(r[i]['win'] for r in rs):3.0f}% / {100 * statistics.fmean(r[i]['lost'] for r in rs):3.0f}%"
             line = f"{sub:14} {len(rs):2}  {cell(1):>16}  {cell(2):>14}  {cell(3):>15}"
             if name == "сейчас":

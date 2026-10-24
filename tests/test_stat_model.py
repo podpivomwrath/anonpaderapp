@@ -1,6 +1,8 @@
 """Модель статов (2026-10-24): игра считает по CURRENT, и это ровно прежние
 формулы. Другие модели подставляют только инструменты (tools/sim_stat_model.py)."""
 
+import itertools
+
 from game.combat import formulas, stat_model
 from game.combat.session import Stats
 
@@ -27,6 +29,6 @@ def test_current_equals_old_formulas() -> None:
 def test_hyper_has_diminishing_returns() -> None:
     m = stat_model.HyperModel()
     gains = [m.crit_chance(Stats(agility=a)) for a in (0, 100, 200, 300)]
-    steps = [b - a for a, b in zip(gains, gains[1:])]
+    steps = [b - a for a, b in itertools.pairwise(gains)]
     assert steps[0] > steps[1] > steps[2] > 0
     assert gains[-1] < m.crit_cap
