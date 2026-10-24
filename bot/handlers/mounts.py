@@ -417,6 +417,10 @@ async def start_travel_and_notify(
     from bot.handlers import guild as guild_handlers
 
     guild_handlers.forget_tithe(peer_id)
+    # Горстка пепла лежит на клетке - уехал, её больше нет (2026-10-24).
+    from bot import ash_handful_state
+
+    ash_handful_state.clear(peer_id)
     seconds = mount_service.total_travel_seconds(mount_id, len(path))
     await db.commit()
     await notify_travel_started(

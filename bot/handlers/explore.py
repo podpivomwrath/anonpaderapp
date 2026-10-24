@@ -318,6 +318,11 @@ async def collect_ash_handful(message: Message) -> None:
         character = await onboarding_svc.get_character(db, message.from_id)
         if character is None or character.creation_state is not None:
             return
+        # Ушёл с клетки - горстка осталась там (2026-10-24).
+        if not ash_handful_state.is_here(peer_id, (character.pos_x, character.pos_y)):
+            ash_handful_state.clear(peer_id)
+            await message.answer(ASH_BURNED_LINE)
+            return
         stats = await world._get_stats(db, character.id)
         result = await ash_service.collect(db, character, stats, world._rng)
         ash_handful_state.clear(peer_id)
@@ -638,7 +643,7 @@ async def event_choice(message: Message) -> None:
         await stats_window.notify_levelup(peer_id, c.levels_gained, c.new_level)
         await group_texts.notify_group_kick(world._bot_api, c.group_kick)
     if ash_service.roll_appears(world._rng):
-        ash_handful_state.mark(peer_id)
+        ash_handful_state.mark(peer_id, (character.pos_x, character.pos_y))
     await message.answer(
         world._map_text(character, stats, farm_currency, gear_bonus, quest_line, donate_currency, group_block),
         attachment=location_attachment(character),

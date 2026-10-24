@@ -913,7 +913,7 @@ async def on_group_battle_finished(session_id: int, result: TickResult) -> None:
             # Горстка пепла - каждому своя (2026-10-13): у одного выпала,
             # у другого нет, как после соло-победы.
             if ash_service.roll_appears(_rng):
-                ash_handful_state.mark(p.peer_id)
+                ash_handful_state.mark(p.peer_id, positions.get(cid))
                 await _bot_api.messages.send(
                     peer_id=p.peer_id, message=ASH_OFFER_TEXT, random_id=0, keyboard=ash_handful_keyboard(),
                 )

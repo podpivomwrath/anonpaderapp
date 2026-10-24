@@ -144,3 +144,16 @@ def test_rift_wait_drops_any_shield() -> None:
     import inspect
 
     assert "pvp_shield.drop(" in inspect.getsource(rift)
+
+
+def test_ash_handful_stays_on_its_cell() -> None:
+    """2026-10-24: горстку пепла подбирали после перехода на другую клетку."""
+    from bot import ash_handful_state as ash
+
+    ash.mark(9911, (3, 4))
+    try:
+        assert ash.is_here(9911, (3, 4))
+        assert not ash.is_here(9911, (3, 5))
+        assert ash.clear(9911) and not ash.clear(9911)
+    finally:
+        ash.clear(9911)

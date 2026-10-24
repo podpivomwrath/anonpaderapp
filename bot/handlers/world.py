@@ -46,7 +46,7 @@ from bot.keyboards import raid as raid_kb
 from bot.keyboards import world as kb
 from bot.onboarding_texts import REGION_TITLES
 from bot.world_summary import location_attachment, location_summary
-from bot import explore_rest, pending_activity
+from bot import ash_handful_state, explore_rest, pending_activity
 from bot.world_texts import (
     FOREIGN_NPC_REJECTION,
     act_attachment,
@@ -745,6 +745,7 @@ async def _move(message: Message, direction: tuple[int, int] | None) -> None:
         # всплывали бы потом в любой команде (2026-10-15).
         await _drop_pending_event(message.peer_id)
         scene_event_handlers.cancel(message.peer_id)
+        ash_handful_state.clear(message.peer_id)  # горстка осталась на клетке (2026-10-24)
         # в пути - одна кнопка «Отменить переход» (2026-10-19), остальные вернём по прибытии
         await message.answer(flavor.travel_line(_rng), keyboard=kb.walking_keyboard())
         _travel_scheduler.schedule(message.peer_id, travel_seconds)

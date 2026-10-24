@@ -676,7 +676,7 @@ async def on_battle_finished(session_id: int, result: TickResult) -> None:
             return
 
         if ash_service.roll_appears(_rng):
-            ash_handful_state.mark(peer_id)
+            ash_handful_state.mark(peer_id, (character.pos_x, character.pos_y))
         await _bot_api.messages.send(
             peer_id=peer_id,
             message=location_summary(
