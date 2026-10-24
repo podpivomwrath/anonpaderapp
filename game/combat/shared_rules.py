@@ -150,7 +150,9 @@ def poison_end_effects(
                 continue
             burst_pct = source.buff_modifiers.get("poison_expire_burst_pct", 0.0)
             if burst_pct > 0 and combatant.alive:
-                amount = max(round(effect.value * effect.stacks * burst_pct), 1)
+                # Доля от настоящего тика яда - с «Разъедающим токсином» и
+                # «Некрозом» (2026-10-24: от голого яда выходила треть, не половина).
+                amount = max(round(poison_tick_damage(effect, source) * burst_pct), 1)
                 # Через щиты, как сам яд (2026-10-22).
                 amount = absorb_by_shields(combatant, amount, lines, pierce=poison_shield_pierce(source))
                 if amount > 0:

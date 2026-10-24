@@ -163,6 +163,15 @@ def test_toxic_surge_fires_on_burst() -> None:
     assert not any(h.label == "яд вспыхивает напоследок" for h in plain.hits)
     _, _, (_enemy, surged) = _burst(mods={"poison_expire_burst_pct": bc.POISONER_TOXIC_BURST_EXPIRE_PCT})
     poisoner, _enemy2, poison, _state = _setup()
-    expected = round(poison.value * poison.stacks * bc.POISONER_TOXIC_BURST_EXPIRE_PCT)
+    expected = round(shared_rules.poison_tick_damage(poison, poisoner) * bc.POISONER_TOXIC_BURST_EXPIRE_PCT)
     surge = [h.amount for h in surged.hits if h.label == "яд вспыхивает напоследок"]
     assert surge == [expected]
+
+
+def test_surge_is_half_of_the_real_tick_with_poison_buffs() -> None:
+    """2026-10-24, жалоба: вспышка обещает 50% урона яда, а с «Разъедающим
+    токсином» и «Некрозом» выходила треть - считалась от голого яда."""
+    mods = {"poison_expire_burst_pct": 0.5, "poison_damage_bonus": 0.25, "poison_damage_per_stack": 0.08}
+    _, tick, (_enemy, result) = _burst(mods=mods)
+    surge = [h.amount for h in result.hits if h.label == "яд вспыхивает напоследок"]
+    assert surge == [round(tick * 0.5)]

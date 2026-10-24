@@ -173,6 +173,6 @@ def toxic_burst(ctx: SkillContext) -> None:
     if burst_pct > 0:
         ctx.hits.append(PendingHit(
             source_id=actor.id, target_id=target.id, is_dot=True, label="яд вспыхивает напоследок",
-            amount=max(round(poison.value * poison.stacks * burst_pct), 1),
+            amount=max(round(tick_damage * burst_pct), 1),
         ))
     target.effects.remove(poison)  # весь яд, как и сказано в описании
