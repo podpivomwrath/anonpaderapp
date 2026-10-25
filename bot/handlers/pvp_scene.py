@@ -9,7 +9,7 @@ from sqlalchemy import select
 from bot.handlers import combat as combat_handlers
 from bot.pvp_texts import ALONE_ON_CELL
 from models import Character
-from services import pk_service, pvp_shield
+from services import fishing_service, mining_service, pk_service, pvp_shield
 from services import daily_service, premium_service, pvp_service
 from services import onboarding_service as onboarding_svc
 from bot.handlers import pvp
@@ -105,6 +105,11 @@ async def _busy_marks(db, characters: list[Character]) -> dict[int, str]:
             marks[c.id] = " · 🌀 в разломе, напасть нельзя"
         elif combat_handlers.has_active_encounter(peer) or group_combat.has_active_group_battle(peer):
             marks[c.id] = " · ⚔️ в бою с мобами"
+        # Работу нападение обрывает (2026-10-25) - видно, кого от чего оторвёшь.
+        elif c.screen == "lake" and fishing_service.is_casting(c):
+            marks[c.id] = " · 🎣 рыбачит"
+        elif c.screen == "mine" and mining_service.is_digging(c):
+            marks[c.id] = " · ⛏ в забое"
     return marks
 
 

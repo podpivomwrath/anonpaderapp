@@ -398,24 +398,44 @@ async def look_around(message: Message) -> None:
         # нападать здесь всё равно нельзя.
         safe_craft = _is_safe_craft_cell(character)
         at_boss = await _at_world_boss(db, character)
-        # 2026-10-24, владелец: мирная клетка спасает и цель заказа - охотник
-        # её здесь как цель не видит и напасть не может.
-        if safe_craft or at_boss or grid.pvp_forbidden(character.pos_x, character.pos_y):
+        if at_boss or grid.pvp_forbidden(character.pos_x, character.pos_y):
             solo, _battles = await _scene_at(db, character)
             await message.answer(_peaceful_scene_text(solo, await _guild_tags(db, solo)))
             return
+        from services import contract_service
+
         solo, battles = await _scene_at(db, character)
+        hunted = await contract_service.hunted_ids(db, character.id)
+        if safe_craft:
+            # Озеро и рудник цель заказа не спасают (2026-10-25, владелец):
+            # охотник видит её под номером, даже за удочкой или киркой. Бой
+            # здесь (а он тут бывает только по заказу) видят все.
+            targets = [c for c in solo if c.id in hunted]
+            if not targets and not (hunted and battles):
+                await message.answer(_peaceful_scene_text(solo, await _guild_tags(db, solo), battles))
+                return
+            solo = targets
         tags = await _guild_tags(db, solo)
         busy = await _busy_marks(db, solo)
+        for c in solo:
+            if c.id in hunted:
+                busy[c.id] = " · 📜 цель заказа" + busy.get(c.id, "")
         _remember_look(peer_id, character, solo, battles)
     await message.answer(_scene_text(solo, battles, tags, busy))
 
 
-def _peaceful_scene_text(solo: list[Character], tags: dict[int, str] | None = None) -> str:
-    if not solo:
+def _peaceful_scene_text(solo: list[Character], tags: dict[int, str] | None = None,
+                         battles: list | None = None) -> str:
+    if not solo and not battles:
         return "👁 Ты оглядываешься.\n\nТы один. Место мирное - здесь не нападают."
-    lines = ["👁 Ты оглядываешься. Место мирное - здесь не нападают.", "", "Рядом:"]
-    lines += [f"• {_class_line(c, tags)}" for c in solo]
+    lines = ["👁 Ты оглядываешься. Место мирное - здесь не нападают.", ""]
+    if solo:
+        lines.append("Рядом:")
+        lines += [f"• {_class_line(c, tags)}" for c in solo]
+    if battles:
+        # Бой на мирной клетке - только по заказу (2026-10-25).
+        lines += ["", "Дерутся по заказу:"] if solo else ["Дерутся по заказу:"]
+        lines += [f"• {_battle_scene_line(b)}" for _, b in battles]
     return "\n".join(lines)
 
 
@@ -513,10 +533,17 @@ async def attack_command(message: Message, target: str) -> None:
                 return
 
         if safe_craft:
-            # Мирная клетка (озеро, рудник): не нападают ни на кого, и на цель
-            # заказа тоже (2026-10-24; с 2026-10-16 по 2026-10-24 было можно).
-            await message.answer(LAKE_NO_PVP_TEXT)
-            return
+            # Мирная клетка (озеро, рудник): нападать можно только на цель
+            # взятого заказа или вступить в бой, где она дерётся (2026-10-16;
+            # 2026-10-24 запрещали, 2026-10-25 владелец вернул).
+            from services import contract_service
+
+            hunted = await contract_service.hunted_ids(db, character.id)
+            allowed = victim.id in hunted if victim is not None else any(
+                cid in hunted for cid in battle_entry[1].participants)
+            if not allowed:
+                await message.answer(LAKE_NO_PVP_TEXT)
+                return
 
         if victim is not None and await _same_group(db, character, victim.id):
             await message.answer(GROUPMATE_NO_PVP_TEXT)
@@ -575,6 +602,13 @@ async def _start_forced_duel_impl(
     ride = await mount_service.active_travel(db, victim.id)
     if ride is not None and await mount_service.stop_travel(db, ride, victim):
         await db.commit()
+    # Напали за работой (по заказу на озере и в руднике, 2026-10-25): снасть
+    # сматывается, кирка брошена, экран закрыт - после боя игрок на клетке.
+    dropped = await _drop_craft_work(db, victim)
+    if dropped is not None:
+        await db.commit()
+    if dropped:
+        await _bot_api.messages.send(peer_id=victim_peer_id, message=f"⚔️ На тебя напали! {dropped}", random_id=0)
 
     if combat_handlers.has_active_encounter(victim_peer_id):
         await combat_handlers.interrupt_for_pvp(victim_peer_id)
@@ -614,6 +648,24 @@ async def _start_forced_duel_impl(
         location=(attacker.pos_x, attacker.pos_y),
         intro=f"⚔️ {attacker.name} нападает на {victim.name}!",
     )
+
+
+async def _drop_craft_work(db, victim: Character) -> str | None:
+    """Обрывает рыбалку и добычу у того, на кого напали. Текст для него
+    (пустой - только закрыли экран) или None, если он был не у воды и не в
+    руднике."""
+    from services import screen_service
+
+    if victim.screen not in ("lake", "mine"):
+        return None
+    text = ""
+    if fishing_service.is_casting(victim):  # неубранная в садок рыба уходит, как при уходе от воды
+        fishing_service.clear_cast(victim)
+        text = "Удочку пришлось смотать."
+    if await mining_service.cancel_dig(db, victim):
+        text = "Добычу пришлось бросить."
+    await screen_service.set_screen(db, victim, None)
+    return text
 
 
 async def start_arena_duel(db, first: Character, first_peer: int, second: Character, second_peer: int) -> None:

@@ -187,7 +187,7 @@ async def on_kill(
     await db.flush()
     if out.victim_lines and not await is_target(db, victim.id, now):
         out.finished_for_target = True
-        out.victim_lines.append("Заказов на тебя больше нет - АФК снова защищает.")
+        out.victim_lines.append("Заказов на тебя больше нет - мирные клетки и АФК снова защищают.")
     return out
 
 
