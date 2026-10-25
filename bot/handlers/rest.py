@@ -10,7 +10,7 @@ from datetime import datetime, timezone
 
 from vkbottle.bot import BotLabeler, Message
 
-from bot import explore_rest, mining_texts
+from bot import ash_handful_state, explore_rest, mining_texts
 from bot.activity import activity_action
 from bot.battle_keyboard import in_any_battle
 from bot.handlers import world
@@ -85,6 +85,9 @@ async def rest(message: Message) -> None:
     else:
         delay = world._rng.uniform(wc.REST_SECONDS_MIN, wc.REST_SECONDS_MAX)
     await explore_rest.start(explore_rest.REST, peer_id, delay)
+    # Сел отдыхать - горстка пепла развеялась, как при новом исследовании
+    # (2026-10-25, баг: подбирали после отдыха).
+    ash_handful_state.clear(peer_id)
     # отдых — кнопки убираем на время (чистка шума)
     await message.answer(flavor.rest_start(), keyboard=kb.waiting_keyboard())
     if hint_peers:

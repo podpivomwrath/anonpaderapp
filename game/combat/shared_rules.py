@@ -27,15 +27,20 @@ from game.combat.session import (
 # --- Яд ---
 
 
-def poison_tick_damage(effect: Effect, source: CombatantState | None) -> int:
+def poison_tick_damage(effect: Effect, source: CombatantState | None,
+                       target: CombatantState | None = None) -> int:
     """Урон одного тика ДоТа с учётом баффов ИСТОЧНИКА яда, а не жертвы:
     «Разъедающий токсин» (+% ко всему яду) и «Некроз» (+% за каждый стак).
-    Без баффов множитель ровно 1.0 - число то же, что было до патча 56."""
+    Без баффов множитель ровно 1.0 - число то же, что было до патча 56.
+    target - жертва: её Уязвимость усиливает и яд (2026-10-25, жалоба: уязвимость
+    Отравителя не работала - его урон почти весь ядом, а яд её не видел)."""
     multiplier = 1.0
     if source is not None:
         multiplier += source.buff_modifiers.get("poison_damage_bonus", 0.0)
         multiplier += source.buff_modifiers.get("poison_damage_per_stack", 0.0) * effect.stacks
         multiplier *= stat_model.ACTIVE.effect_power(source.stats)
+    if target is not None:
+        multiplier *= 1.0 + target.effect_total(EffectKind.VULNERABILITY)
     return max(round(effect.value * effect.stacks * multiplier), 1)
 
 
@@ -154,7 +159,7 @@ def poison_end_effects(
             if burst_pct > 0 and combatant.alive:
                 # Доля от настоящего тика яда - с «Разъедающим токсином» и
                 # «Некрозом» (2026-10-24: от голого яда выходила треть, не половина).
-                amount = max(round(poison_tick_damage(effect, source) * burst_pct), 1)
+                amount = max(round(poison_tick_damage(effect, source, combatant) * burst_pct), 1)
                 # Через щиты, как сам яд (2026-10-22).
                 amount = absorb_by_shields(combatant, amount, lines, pierce=poison_shield_pierce(source))
                 if amount > 0:

@@ -272,6 +272,29 @@ def test_arena_keyboard_fits_vk() -> None:
     assert rows[1][1]["color"] == "negative"  # союзник на отпечатке - красным
 
 
+
+def test_own_cell_under_mark_is_red() -> None:
+    """2026-10-25, жалоба: «пропало отображение панелек» - своя клетка всегда
+    зелёная прятала отпечаток под тобой, а один отпечаток всегда под кем-то."""
+    from bot.handlers import raid_combat
+
+    stage = trail.NamelessStage(0)
+    stage.pos = {1: 0, 2: 4}
+    stage.marks = {0}
+    grid = raid_combat._arena_grid(SimpleNamespace(participants={1: None, 2: None}), stage, 1)
+    assert grid[0][0][0] == "📍" and grid[0][0][2] == "negative"
+
+
+def test_fog_has_its_own_mark() -> None:
+    """2026-10-25: туман - значком 🌫, цвет в части тем ВК не отличить."""
+    from bot.handlers import raid_trail as handler
+
+    lab = lab_rules.Labyrinth([1], random.Random(1))
+    run = handler.TrailRun(battle_id=-1, peers={1: 11}, names={1: "a"}, numbers={1: 1}, lab=lab)
+    labels = [b["action"]["label"] for r in _rows(handler.map_keyboard(run, 1)) for b in r]
+    assert "🌫" in labels
+
+
 # --- Бой с Безымянным ---------------------------------------------------------------
 
 

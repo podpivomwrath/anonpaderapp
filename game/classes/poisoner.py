@@ -55,7 +55,10 @@ def venom(ctx: SkillContext) -> None:
     if target is None:
         return
 
-    ctx.hits.append(compute_hit(actor, target, ctx.rng, skill.name, skill.multiplier, is_ability=True))
+    hit = compute_hit(actor, target, ctx.rng, skill.name, skill.multiplier, is_ability=True)
+    ctx.hits.append(hit)
+    if hit.missed:
+        return  # промах - яда нет (2026-10-25, баг: яд вешался и мимо)
 
     per_stack = poison_tick_damage_per_stack(actor.stats.will, actor.stats.agility)
     # Патч 47: «Затяжной яд» — +duration_bonus ходов к длительности; 0 без баффа.
@@ -105,7 +108,10 @@ def disrupt(ctx: SkillContext) -> None:
     if target is None:
         return
 
-    ctx.hits.append(compute_hit(actor, target, ctx.rng, skill.name, skill.multiplier, is_ability=True))
+    hit = compute_hit(actor, target, ctx.rng, skill.name, skill.multiplier, is_ability=True)
+    ctx.hits.append(hit)
+    if hit.missed:
+        return  # промах - ни ослабления, ни сбоя (2026-10-25)
     # Патч 56: «Иссушение» усиливает Ослабление (0.25 -> 0.33).
     weaken_bonus = actor.buff_modifiers.get("weaken_bonus", 0.0)
     weaken = bc.POISONER_DISRUPT_WEAKEN + weaken_bonus
@@ -163,7 +169,7 @@ def toxic_burst(ctx: SkillContext) -> None:
     if poison is None:
         ctx.lines.append(f"{actor.name} бьёт впустую - на {target.name} нет яда")
         return
-    tick_damage = shared_rules.poison_tick_damage(poison, actor)
+    tick_damage = shared_rules.poison_tick_damage(poison, actor, target)
     remaining_total = tick_damage * max(poison.remaining_ticks, 1)
     amount = max(round(remaining_total * skill.effect_value), 1)
     ctx.hits.append(PendingHit(source_id=actor.id, target_id=target.id, amount=amount, label="взрывает ядом", is_dot=True))

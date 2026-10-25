@@ -324,6 +324,11 @@ async def handle_post_eat(request: web.Request) -> web.Response:
             return web.json_response({"error": "character_not_found"}, status=404)
         if in_any_battle(vk_user_id) or world_handlers.is_busy(vk_user_id):
             return web.json_response({"error": "Сейчас не до еды: сначала закончи бой или исследование."}, status=409)
+        from services import death_service
+
+        # Мёртвый не ест (2026-10-25, баг: бафф еды ложился, пока лежишь).
+        if death_service.is_dead(character):
+            return web.json_response({"error": "Сначала очнись."}, status=409)
         try:
             body = await request.json() if request.can_read_body else {}
         except Exception:

@@ -387,3 +387,32 @@ async def test_group_win_counts_location_trial(db_session, make_character):
     assert "dark_mystic_echo" in unlocked
     c.pos_x, c.pos_y = 0, 28  # не Кострища - ничего
     assert "dark_mystic_echo" not in await trial_service.record_group_win(db_session, c)
+
+
+async def test_never_below_hp_resets_when_broken(db_session, make_character) -> None:
+    """2026-10-25, жалоба: «ни разу не ниже половины» не сбивалось - бой ниже
+    половины (или проигранный) обнуляет счёт."""
+    character = await make_character(subclass="guardian")
+    for _ in range(3):
+        await trial_service.record_battle(db_session, character, _report(hp_min_pct=0.6))
+    assert await _progress(db_session, character, "guardian_sturdy_armor") == 3
+    await trial_service.record_battle(db_session, character, _report(hp_min_pct=0.3))
+    assert await _progress(db_session, character, "guardian_sturdy_armor") == 0
+    await trial_service.record_battle(db_session, character, _report(hp_min_pct=0.6))
+    await trial_service.record_defeat(db_session, character)
+    assert await _progress(db_session, character, "guardian_sturdy_armor") == 0
+
+
+async def test_streak_no_rest_breaks_on_lost_fight_and_city_heal(db_session, make_character) -> None:
+    """2026-10-25: серия «подряд без отдыха» рвётся проигранным боем (бегство,
+    вайп) и лечением в городе."""
+    from services import vitals_service
+
+    character = await make_character(subclass="guardian")
+    await trial_service.record_battle(db_session, character, _report())
+    await trial_service.record_battle(db_session, character, _report(won=False))
+    assert await _progress(db_session, character, "guardian_vital_block") == 0
+    await trial_service.record_battle(db_session, character, _report())
+    vitals_service._city_healed.add(character.id)
+    await trial_service.record_battle(db_session, character, _report())
+    assert await _progress(db_session, character, "guardian_vital_block") == 1

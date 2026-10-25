@@ -231,6 +231,20 @@ async def _persist_hp(peer_id: int, hp: int) -> None:
         await db.commit()
 
 
+async def _flee_breaks_streaks(peer_id: int) -> None:
+    """Сбежал - для испытаний «подряд» и «ни разу» это поражение (2026-10-25,
+    жалоба: серия не сбивалась)."""
+    from services import subclass_service
+    from services.onboarding_service import get_character
+
+    async with get_session_factory()() as db:
+        character = await get_character(db, peer_id)
+        if character is None or subclass_service.buff_pool(character) is None:
+            return
+        await trial_service.record_defeat(db, character)
+        await db.commit()
+
+
 def _combat_kb(state: CombatSessionState, peer_id: int) -> str:
     base_class = _encounter_class.get(peer_id, "warrior")
     player = state.combatants[PLAYER_ID]
@@ -965,6 +979,7 @@ async def flee(message: Message) -> None:
         _engine.abort_session(peer_id)
         travel_line = await _release_encounter(peer_id)
         await _persist_hp(peer_id, hp)
+        await _flee_breaks_streaks(peer_id)
         pos_x, pos_y, has_mount = await _get_position(peer_id)
         text = "🏃 Ты срываешься прочь - и темнота глотает твой след."
         if travel_line:

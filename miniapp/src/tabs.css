@@ -2351,15 +2351,6 @@ body.lite .shop-showcase::after { animation: none; display: none; }
   animation: result-in 0.5s var(--spring, ease-out) backwards;
 }
 
-/* Расшифровка значков короткого боевого лога (HeroTab, 2026-10-22). */
-.short-log-legend {
-  background: rgba(255, 255, 255, 0.04);
-  border-color: rgba(255, 255, 255, 0.12);
-  color: var(--vkui--color_text_secondary, #aab);
-  font-size: 13px;
-  line-height: 1.6;
-}
-
 /* --- Ремёсла на вкладке «Герой» (2026-10-23): страницы и инструменты --- */
 .hero-pager {
   display: flex;

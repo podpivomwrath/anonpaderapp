@@ -100,7 +100,9 @@ def _cell_button(run: TrailRun, viewer: int, i: int) -> tuple[str, KeyboardButto
     if i == lab_rules.GATE:
         return "🚪", _COLOR_SEEN if seen else _COLOR_FOG
     if not seen:
-        return "·", _COLOR_FOG
+        # Туман - своим значком (2026-10-25: синий цвет в части тем ВК не
+        # отличить от серого, и игроки не видели тумана вовсе).
+        return "🌫", _COLOR_FOG
     if i == lab_rules.START:
         return "🏁", _COLOR_SEEN
     if kind == lab_rules.PIT:

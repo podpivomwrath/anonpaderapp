@@ -200,7 +200,7 @@ class DuelEngine:
         # работали бы «Разъедающий токсин»/«Некроз», а яд шёл бы сквозь щиты.
         for effect in actor.effects_of(EffectKind.DOT):
             source = state.combatants.get(effect.source_id)
-            dot = shared_rules.cap_incoming(actor, shared_rules.poison_tick_damage(effect, source))
+            dot = shared_rules.cap_incoming(actor, shared_rules.poison_tick_damage(effect, source, actor))
             dot = shared_rules.absorb_by_shields(
                 actor, dot, result.lines, pierce=shared_rules.poison_shield_pierce(source)
             )
@@ -412,7 +412,7 @@ class DuelEngine:
             # Патч 52, баг 2: Кровь за кровь (BLOOD_REFLECT) — раньше не
             # читалось здесь вовсе, эликсир не давал эффекта в дуэли.
             reflect_pct = target.effect_total(EffectKind.BLOOD_REFLECT)
-            if reflect_pct > 0 and amount > 0 and actor.id != target.id and actor.alive:
+            if reflect_pct > 0 and amount > 0 and actor.id != target.id and actor.alive and not hit.is_dot:
                 reflect_amount = max(round(amount * reflect_pct), 1)
                 actor_before = actor.current_hp
                 reflect_amount = shared_rules.cap_incoming(actor, reflect_amount)

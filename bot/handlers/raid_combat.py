@@ -267,7 +267,9 @@ def _arena_grid(battle: RaidBattle, stage, cid: int) -> list[list[tuple[str, dic
             cell = r * tc.ARENA + c
             others = [numbers[o] for o, pos in stage.pos.items() if pos == cell and o != cid]
             if stage.pos.get(cid) == cell:
-                label, color = "📍", "positive"
+                # Под тобой отпечаток - клетка красная (2026-10-25: зелёная
+                # своя клетка прятала опасность, а один отпечаток всегда под кем-то).
+                label, color = "📍", "negative" if cell in danger else "positive"
             elif cell in danger:
                 label, color = (str(min(others)) if others else "👣"), "negative"
             elif others:

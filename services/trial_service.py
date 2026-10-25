@@ -181,10 +181,14 @@ def _battle_delta(condition_type: str, params: dict, report: BattleReport, chara
 
 # Стрики, сбрасываемые НЕвыполнением (а не просто +0) — единственный тип,
 # завязанный на исход конкретного боя, не на отдых/поражение отдельно.
-_RESET_ON_UNMET_BATTLE = {"win_streak_start_hp_below"}
+# 2026-10-25, жалоба: испытания «ни разу» не сбивались при нарушении. Теперь
+# серия «подряд без отдыха» рвётся и проигранным боем (бегство, поражение
+# группы, вайп этапа), а «ни разу не ниже N% здоровья» - любым боем, где
+# здоровье опустилось ниже (или бой не выигран): счёт начинается заново.
+_RESET_ON_UNMET_BATTLE = {"win_streak_start_hp_below", "win_streak_no_rest", "win_count_never_below_hp"}
 # Стрики, сбрасываемые отдыхом и поражением (отдельные хуки ниже), не исходом боя.
 _RESET_ON_REST = {"win_streak_no_rest"}
-_RESET_ON_DEFEAT = {"win_streak_no_rest", "win_streak_start_hp_below"}
+_RESET_ON_DEFEAT = {"win_streak_no_rest", "win_streak_start_hp_below", "win_count_never_below_hp"}
 
 
 async def record_level_kill(db: AsyncSession, character: Character, mob_level: int) -> list[str]:
@@ -205,6 +209,11 @@ async def record_level_kill(db: AsyncSession, character: Character, mob_level: i
 
 async def record_battle(db: AsyncSession, character: Character, report: BattleReport) -> list[str]:
     """Вызывать после КАЖДОГО PvE-боя игрока (и победы, и поражения)."""
+    from services import vitals_service
+
+    # Город вылечил между боями - это тоже отдых (2026-10-25).
+    if vitals_service.take_city_heal(character.id):
+        await record_rest(db, character)
     unlocked: list[str] = []
     for trial in await _active_trials(db, character):
         ct = trial.condition_type
@@ -248,7 +257,8 @@ async def record_group_win(db: AsyncSession, character: Character) -> list[str]:
 
 
 async def record_defeat(db: AsyncSession, character: Character) -> None:
-    """Поражение сбрасывает стрики «подряд» — не только бой без отдыха."""
+    """Поражение сбрасывает стрики «подряд» — не только бой без отдыха.
+    Побег из боя - тоже поражение для серий (2026-10-25)."""
     for trial in await _active_trials(db, character):
         if trial.condition_type in _RESET_ON_DEFEAT:
             await _reset(db, character.id, trial)

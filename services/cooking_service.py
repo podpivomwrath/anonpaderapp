@@ -240,6 +240,11 @@ async def find_food(db: AsyncSession, character_id: int, query: str) -> list[tup
 
 async def eat(db: AsyncSession, character: Character, dish_id: str, grade: str, now: datetime | None = None) -> cc.Dish:
     """Съесть порцию: новое блюдо заменяет действующее."""
+    from services import death_service
+
+    # Мёртвый не ест (2026-10-25, баг) - и в мини-аппе, и командой /съесть.
+    if death_service.is_dead(character, now):
+        raise CookingError("Сначала очнись.")
     row = await db.scalar(select(CharacterFood).where(
         CharacterFood.character_id == character.id, CharacterFood.dish_id == dish_id, CharacterFood.grade == grade,
     ).with_for_update().execution_options(populate_existing=True))

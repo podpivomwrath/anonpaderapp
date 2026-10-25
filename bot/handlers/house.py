@@ -537,7 +537,12 @@ async def eat_command(message: Message, name: str | None = None) -> None:
             await message.answer("🍲 Подходит несколько блюд: " + ", ".join(sorted(names)) + ". Напиши название точнее.")
             return
         d, dish, grade, _n = found[0]  # лучшая градация рыбы - первой
-        await cooking_service.eat(db, character, dish.dish_id, grade)
+        try:
+            await cooking_service.eat(db, character, dish.dish_id, grade)
+        except cooking_service.CookingError as exc:
+            await db.rollback()
+            await message.answer(f"🍲 {exc}")
+            return
         await db.commit()
         minutes = cooking_service.minutes_left(character)
     await message.answer(

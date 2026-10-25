@@ -175,3 +175,35 @@ def test_surge_is_half_of_the_real_tick_with_poison_buffs() -> None:
     _, tick, (_enemy, result) = _burst(mods=mods)
     surge = [h.amount for h in result.hits if h.label == "яд вспыхивает напоследок"]
     assert surge == [round(tick * 0.5)]
+
+
+def test_vulnerability_boosts_poison_ticks() -> None:
+    """2026-10-25, жалоба: уязвимость Отравителя не работала - его урон почти
+    весь ядом, а яд уязвимость не видел."""
+    poisoner, enemy, poison, _state = _setup()
+    plain = shared_rules.poison_tick_damage(poison, poisoner, enemy)
+    enemy.apply_effect(EffectKind.VULNERABILITY, 0.34, 3, poisoner.id)
+    assert shared_rules.poison_tick_damage(poison, poisoner, enemy) == round(poison.value * poison.stacks * 1.34)
+    assert plain == round(poison.value * poison.stacks)
+
+
+def test_venom_miss_applies_no_poison() -> None:
+    """2026-10-25, баг: яд вешался и при промахе."""
+    import random
+
+    from game.combat.skills import SkillContext
+
+    class _Zero(random.Random):
+        def random(self) -> float:
+            return 0.0
+
+    poisoner, enemy, poison, state = _setup(stacks=1)
+    enemy.effects = [e for e in enemy.effects if e is not poison]
+    enemy.apply_effect(EffectKind.DODGE, 0.8, 3, enemy.id)
+    ctx = SkillContext(session=state, actor=poisoner, rng=_Zero(),
+                       action=DeclaredAction(type=ActionType.SKILL, skill_id="poisoner_venom", target_id=enemy.id))
+    from game.classes import poisoner as poisoner_skills
+
+    poisoner_skills.venom(ctx)
+    assert ctx.hits[0].missed
+    assert enemy.effect_from(EffectKind.DOT, poisoner.id) is None

@@ -271,9 +271,10 @@ def _apply_phase(
                         amount=reflected, label="отражает щитом",
                     )
                 )
-        # Кровь за кровь (патч 16): доля полученного урона возвращается атакующему
+        # Кровь за кровь (патч 16): доля полученного урона возвращается атакующему.
+        # Только за удар: яд и горение не возвращаются (2026-10-25, баг).
         reflect_pct = target.effect_total(EffectKind.BLOOD_REFLECT)
-        if reflect_pct > 0 and amount > 0 and hit.source_id != target.id:
+        if reflect_pct > 0 and amount > 0 and hit.source_id != target.id and not hit.is_dot:
             attacker = session.combatants.get(hit.source_id)
             if attacker is not None and attacker.alive:
                 reflect_hits.append(
@@ -558,7 +559,7 @@ def resolve_tick(
                 PendingHit(
                     source_id=effect.source_id,
                     target_id=combatant.id,
-                    amount=shared_rules.poison_tick_damage(effect, source),
+                    amount=shared_rules.poison_tick_damage(effect, source, combatant),
                     label="обжигает (ДоТ)",
                     is_dot=True,
                     is_tick=True,
