@@ -171,7 +171,7 @@ function Forge({ data, busy, run, strike }) {
   const [confirming, setConfirming] = useState(false);
 
   const item = data.items.find((i) => i.id === itemId) || null;
-  const cost = item ? item.next_craft_cost : data.ore[0]?.craft_cost;
+  const cost = item ? item.next_craft_cost : data.craft_cost;
   const oreRow = ore ? data.ore.find((o) => o.id === ore.id && o.grade === ore.grade) : null;
   const specs = item ? (data.specs_by_source?.[item.source_id] ?? data.specs) : data.specs;
   const chosen = specs.find((s) => s.id === spec) || null;

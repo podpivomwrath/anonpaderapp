@@ -162,6 +162,8 @@ async def handle_get_craft(request: web.Request) -> web.Response:
             "tools": tools,
             "specs": specs,
             "specs_by_source": specs_by_source,
+            # Цена первой ковки и без руды в сумке (было «нужно undefined шт.»).
+            "craft_cost": craft_service.first_craft_cost(character),
             "efficiency": {
                 "min": cc.EFFICIENCY_MIN,
                 "craft_max": cc.EFFICIENCY_CRAFT_MAX,
