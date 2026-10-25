@@ -331,8 +331,8 @@ BLOOD_KNIGHT_CRIMSON_FEAST_HP_COST = 0.15   # Багровый пир: доля 
 
 # Отравитель — сила яда ОБЯЗАНА масштабироваться от статов (иначе класс
 # математически нежизнеспособен независимо от текста способностей)
-POISONER_POISON_WIL_COEF = 0.95             # вклад WIL в силу яда (на стак)
-POISONER_POISON_AGI_COEF = 0.65             # вклад AGI
+POISONER_POISON_WIL_COEF = 0.7125           # вклад WIL в силу яда (на стак)
+POISONER_POISON_AGI_COEF = 0.4875           # вклад AGI
 POISONER_MAX_STACKS = 3                     # тик-урон = сила яда / макс. стаки
 POISONER_POISON_DURATION_TICKS = 4          # в игре как есть, отдельно не калибровалось (2026-10-22)
 

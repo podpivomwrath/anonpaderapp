@@ -48,8 +48,8 @@ const SUPPORT_POWER_PER_WIL = 0.005;
 
 // Сила яда Отравителя. Считается НЕ от урона атаки, а от Воли и Ловкости,
 // причём Воля весит больше, хотя основной стат подкласса - Ловкость.
-const POISON_PER_WIL = 0.95;
-const POISON_PER_AGI = 0.65;
+const POISON_PER_WIL = 0.7125;
+const POISON_PER_AGI = 0.4875;
 const POISON_MAX_STACKS = 3;
 
 // Уворот - от Воли (2026-10-24, было от Ловкости).
