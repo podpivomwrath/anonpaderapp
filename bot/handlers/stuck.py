@@ -65,6 +65,9 @@ async def force_unstick(db, character, peer_id: int, *, admin_override: bool = F
     if (raid_combat_handlers.has_active_battle(peer_id)
             or group_combat_handlers.has_active_group_battle(peer_id)):
         return True  # restore the battle UI; never escape a raid via /stuck
+    # Отметка боя, которого уже нет (2026-10-26) - снимаем, иначе игрок
+    # «в бою» навсегда.
+    pvp_handlers.drop_stale(peer_id)
     if pvp_handlers.rebuild_keyboard(peer_id) is not None:
         if not admin_override:
             return True

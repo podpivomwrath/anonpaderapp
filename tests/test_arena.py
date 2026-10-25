@@ -99,3 +99,39 @@ def test_waiting_state_and_cancel():
         arena._random_queue.clear()
         arena._codes.clear()
         arena._entering.clear()
+
+
+def test_queued_joiner_is_freed_when_duel_ends_first(monkeypatch):
+    """Вступил в дуэль, а она кончилась тем же ходом - отметка «в бою» не
+    остаётся навсегда (2026-10-26, Бубылда)."""
+    class Db:
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *exc):
+            return False
+
+        async def get(self, model, key):
+            return None
+
+    monkeypatch.setattr(pvp, "get_session_factory", lambda: Db)
+    monkeypatch.setattr(pvp, "on_arena_finished", None)
+    battle = pvp.Battle(
+        battle_type="duel", location=pvp.ARENA_LOCATION, arena=True,
+        participants={
+            1: pvp.Participant(1, 101, "Альфа", "warrior", "Воин"),
+            2: pvp.Participant(2, 102, "Бета", "mage", "Маг"),
+        },
+        side_of={1: 0, 2: 1},
+    )
+    battle.join_queue.append((pvp.Participant(3, 103, "Гамма", "rogue", "Ловкач"), None))
+    pvp._battles[-779] = battle
+    pvp._peer_battle[101] = pvp._peer_battle[102] = pvp._peer_battle[103] = -779
+    asyncio.run(pvp.on_duel_finished(-779, DuelResult(finished=True, winner_id=1)))
+    assert 103 not in pvp._peer_battle and not battle.join_queue
+
+
+def test_stale_battle_mark_is_dropped():
+    pvp._peer_battle[104] = -780
+    assert pvp.drop_stale(104) and not pvp.has_active_battle(104)
+    assert not pvp.drop_stale(104)

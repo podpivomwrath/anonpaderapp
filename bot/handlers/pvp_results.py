@@ -78,6 +78,7 @@ async def on_duel_finished(session_id: int, result: DuelResult) -> None:
         return
     for p in list(battle.participants.values()):
         pvp._peer_battle.pop(p.peer_id, None)
+    await pvp.release_queue(session_id, battle)
 
     if battle.arena:
         # Арена: ни смерти, ни трофеев, ни рейтинга - игроки возвращаются на арену.

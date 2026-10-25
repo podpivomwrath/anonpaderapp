@@ -1014,6 +1014,43 @@ def battle_at(location: tuple[int, int]) -> int | None:
     return None
 
 
+async def release_queue(battle_id: int, battle: Battle) -> None:
+    """Дуэль кончилась раньше, чем вступившие дождались хода: они тоже
+    свободны. Раньше их отметка «в бою» оставалась навсегда, и не снимал её
+    даже админский сброс (2026-10-26, Бубылда)."""
+    from bot.handlers import world as world_handlers
+
+    queued = [p for p, _ in battle.join_queue]
+    battle.join_queue.clear()
+    for p in queued:
+        if _peer_battle.get(p.peer_id) == battle_id:
+            _peer_battle.pop(p.peer_id, None)
+    if not queued:
+        return
+    async with get_session_factory()() as db:
+        for p in queued:
+            character = await db.get(Character, p.character_id)
+            if character is None:
+                continue
+            keyboard = await world_handlers._current_keyboard(db, character, p.peer_id, datetime.now(timezone.utc))
+            try:
+                await _bot_api.messages.send(
+                    peer_id=p.peer_id, random_id=0, keyboard=keyboard,
+                    message="Бой закончился раньше, чем ты успел вступить.",
+                )
+            except Exception:  # noqa: BLE001 - закрыл диалог с ботом
+                pass
+
+
+def drop_stale(peer_id: int) -> bool:
+    """Снимает отметку «в бою», если самого боя уже нет. True - сняли."""
+    battle_id = _peer_battle.get(peer_id)
+    if battle_id is None or battle_id in _battles:
+        return False
+    _peer_battle.pop(peer_id, None)
+    return True
+
+
 def release_participants(battle: Battle) -> None:
     for p in list(battle.participants.values()):
         _peer_battle.pop(p.peer_id, None)
