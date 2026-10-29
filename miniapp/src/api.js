@@ -511,11 +511,12 @@ export function makeGear(tool, tier) {
 }
 
 // Альманах (2026-10-29): какой тир травы подсказывать; null - любую.
-export function setAlmanacTier(herbTier) {
+// herbIds: null - вся трава, [] - альманах молчит.
+export function setAlmanacHerbs(herbIds) {
   return request('/gear', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ action: 'almanac_tier', herb_tier: herbTier }),
+    body: JSON.stringify({ action: 'almanac_herbs', herb_ids: herbIds }),
   });
 }
 

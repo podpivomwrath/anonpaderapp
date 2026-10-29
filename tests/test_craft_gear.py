@@ -194,8 +194,8 @@ async def test_almanac_page_drops_only_to_owner_and_adds_two(db_session, make_ch
     assert (await craft_gear_service.almanac_use(db_session, c.id)) == (11, 12)
 
 
-async def test_almanac_tier_filter_only_seen_tiers(db_session, make_character) -> None:
-    """2026-10-29, просьба игрока: альманах подсказывает выбранный тир травы."""
+async def test_almanac_herb_filter_only_seen_herbs(db_session, make_character) -> None:
+    """2026-10-29, владелец: галочки по траве; пусто - альманах молчит."""
     import pytest
 
     from services import craft_gear_service
@@ -203,11 +203,18 @@ async def test_almanac_tier_filter_only_seen_tiers(db_session, make_character) -
     c = await make_character(level=20)
     c.herbalism_level = 12  # различает I и II тир
     with pytest.raises(craft_gear_service.GearError):
-        await craft_gear_service.set_almanac_filter(db_session, c, 2)  # альманаха нет
+        await craft_gear_service.set_almanac_herbs(db_session, c, ["salt_orache"])  # альманаха нет
     await craft_gear_service.grant_drop(db_session, c.id, "almanac")
-    await craft_gear_service.set_almanac_filter(db_session, c, 2)
-    assert await craft_gear_service.almanac_filter(db_session, c.id) == 2
+    await craft_gear_service.set_almanac_herbs(db_session, c, ["salt_orache", "bitter_wormwood"])
+    assert await craft_gear_service.almanac_filter(db_session, c.id) == {"salt_orache", "bitter_wormwood"}
     with pytest.raises(craft_gear_service.GearError):
-        await craft_gear_service.set_almanac_filter(db_session, c, 4)
-    await craft_gear_service.set_almanac_filter(db_session, c, None)
+        await craft_gear_service.set_almanac_herbs(db_session, c, ["ash_poppy"])  # IV тир не различает
+    await craft_gear_service.set_almanac_herbs(db_session, c, [])
+    assert await craft_gear_service.almanac_filter(db_session, c.id) == set()
+    # Отмечена вся различимая трава - это «вся», и новая трава попадёт сама.
+    await craft_gear_service.set_almanac_herbs(
+        db_session, c, ["bitter_wormwood", "ash_plantain", "salt_orache", "rusty_thistle"],
+    )
+    assert await craft_gear_service.almanac_filter(db_session, c.id) is None
+    await craft_gear_service.set_almanac_herbs(db_session, c, None)
     assert await craft_gear_service.almanac_filter(db_session, c.id) is None

@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Button } from '@vkontakte/vkui';
-import { makeGear, setAlmanacTier } from '../api.js';
+import { makeGear, setAlmanacHerbs } from '../api.js';
 import { itemIcon } from '../itemIcons.js';
 import { SectionHead, Sheet } from './ui.jsx';
 import Sparks from './Sparks.jsx';
@@ -86,23 +86,24 @@ function MakeSheet({ tool, level, onClose, onDone }) {
 }
 
 // Окно альманаха (2026-10-29, просьба игрока): найденные страницы, запас
-// подсказок и какой тир травы подсказывать.
+// подсказок и галочки: какую траву подсказывать (по траве - 2026-10-29).
 function AlmanacSheet({ tool, onClose, onDone }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
   const a = tool.almanac;
-  const pick = async (tier) => {
+  const on = a.herbs.filter((h) => h.on).map((h) => h.id);
+  const save = async (ids) => {
     setBusy(true);
     setError(null);
     try {
-      onDone(await setAlmanacTier(tier));
+      onDone(await setAlmanacHerbs(ids));
     } catch (err) {
       setError(err.details?.error || err.message || 'Не вышло.');
     } finally {
       setBusy(false);
     }
   };
-  const options = [[null, 'Любая'], ...a.tiers.map((t) => [t, `${ROMAN[t]} тир`])];
+  const toggle = (id) => save(on.includes(id) ? on.filter((x) => x !== id) : [...on, id]);
   return (
     <Sheet title={tool.title} icon={tool.emoji} onClose={onClose}>
       <p className="craft-hint">
@@ -110,18 +111,28 @@ function AlmanacSheet({ tool, onClose, onDone }) {
       </p>
       {tool.status && <p className="craft-hint">{tool.status}</p>}
       <p className="craft-hint">Какую траву подсказывать:</p>
-      <div className="filter-chips">
-        {options.map(([tier, label]) => (
-          <button
-            key={label} type="button" disabled={busy}
-            className={`filter-chip${a.herb_tier === tier ? ' filter-chip--on' : ''}`}
-            onClick={() => pick(tier)}
-          >
-            {label}
-          </button>
+      <div className="almanac-herbs">
+        {a.herbs.map((h) => (
+          <label key={h.id} className="almanac-herb">
+            <input type="checkbox" checked={h.on} disabled={busy} onChange={() => toggle(h.id)} />
+            <span>{h.emoji} {h.name}</span>
+            <i>{ROMAN[h.tier]}</i>
+          </label>
         ))}
       </div>
-      <p className="craft-hint">Подсказка тратится, только когда рядом нашлась трава выбранного тира.</p>
+      <div className="filter-chips">
+        <button type="button" disabled={busy} className="filter-chip" onClick={() => save(null)}>
+          Отметить все
+        </button>
+        <button type="button" disabled={busy} className="filter-chip" onClick={() => save([])}>
+          Снять все
+        </button>
+      </div>
+      <p className="craft-hint">
+        {on.length
+          ? 'Подсказка тратится, только когда рядом нашлась отмеченная трава.'
+          : 'Ничего не отмечено: альманах молчит и подсказки не тратит.'}
+      </p>
       {error && <p className="shop-sheet__error">{error}</p>}
     </Sheet>
   );

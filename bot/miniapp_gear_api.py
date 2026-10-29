@@ -40,15 +40,19 @@ def _status(tool_id: str, row) -> str | None:
 
 
 def _almanac(character, row) -> dict:
-    """Окно альманаха: страницы, запас подсказок и выбор тира травы."""
+    """Окно альманаха: страницы, запас подсказок и галочки по траве."""
     from game.economy import herbalism
 
+    chosen = craft_gear_service.almanac_herb_set(row)
     return {
         "pages": row.count or 0,
         "uses": craft_gear.almanac_uses(row.count),
         "per_page": gc.ALMANAC_USES_PER_PAGE,
-        "herb_tier": row.herb_tier,
-        "tiers": list(range(1, herbalism.visible_tier(character.herbalism_level) + 1)),
+        "herbs": [
+            {"id": h.id, "name": h.name, "emoji": h.emoji, "tier": h.tier,
+             "on": chosen is None or h.id in chosen}
+            for h in herbalism.herb_defs_ordered() if herbalism.can_see(character.herbalism_level, h)
+        ],
     }
 
 
@@ -137,8 +141,8 @@ async def handle_post(request: web.Request) -> web.Response:
         body = await request.json()
     except Exception:
         return _error("bad_request")
-    if isinstance(body, dict) and body.get("action") == "almanac_tier":
-        return await _set_almanac_tier(request, body.get("herb_tier"))
+    if isinstance(body, dict) and body.get("action") == "almanac_herbs":
+        return await _set_almanac_herbs(request, body.get("herb_ids"))
     tool_id = body.get("tool") if isinstance(body, dict) else None
     tier = body.get("tier") if isinstance(body, dict) else None
     if not isinstance(tool_id, str) or not isinstance(tier, int) or tool_id in NOT_READY:
@@ -159,15 +163,17 @@ async def handle_post(request: web.Request) -> web.Response:
     return web.json_response(payload)
 
 
-async def _set_almanac_tier(request: web.Request, herb_tier) -> web.Response:
-    if herb_tier is not None and not isinstance(herb_tier, int):
+async def _set_almanac_herbs(request: web.Request, herb_ids) -> web.Response:
+    if herb_ids is not None and not (
+        isinstance(herb_ids, list) and all(isinstance(h, str) for h in herb_ids) and len(herb_ids) <= 50
+    ):
         return _error("bad_request")
     async with request.app[SESSION_FACTORY_KEY]() as db:
         character = await onboarding_svc.get_character(db, request[VK_USER_ID_KEY])
         if character is None:
             return _error("character_not_found", 404)
         try:
-            await craft_gear_service.set_almanac_filter(db, character, herb_tier)
+            await craft_gear_service.set_almanac_herbs(db, character, herb_ids)
         except craft_gear_service.GearError as exc:
             await db.rollback()
             return _error(str(exc), 409)

@@ -69,23 +69,43 @@ async def almanac_use(db: AsyncSession, character_id: int, now=None) -> tuple[in
     return max(total - row.used, 0), total
 
 
-async def almanac_filter(db: AsyncSession, character_id: int) -> int | None:
-    """Какой тир травы подсказывает альманах; None - любую."""
+def almanac_herb_set(row) -> set[str] | None:
+    """Какие травы подсказывает альманах: None - всю, что персонаж различает;
+    пустое множество - никакую. У строк до 0097 - травы выбранного тира."""
+    if row is None:
+        return None
+    if row.herb_ids is not None:
+        return {h for h in row.herb_ids.split(",") if h}
+    if row.herb_tier is not None:
+        return {h.id for h in herbalism.herb_defs_ordered() if h.tier == row.herb_tier}
+    return None
+
+
+async def almanac_filter(db: AsyncSession, character_id: int) -> set[str] | None:
+    """Травы, которые подсказывает альманах (см. almanac_herb_set)."""
     row = await db.scalar(select(CharacterCraftGear).where(
         CharacterCraftGear.character_id == character_id, CharacterCraftGear.tool_id == "almanac",
     ))
-    return row.herb_tier if row is not None else None
+    return almanac_herb_set(row)
 
 
-async def set_almanac_filter(db: AsyncSession, character: Character, herb_tier: int | None) -> None:
-    """Выбрать тир для подсказок (2026-10-29, просьба игрока). Только из тех,
-    что персонаж уже различает."""
+async def set_almanac_herbs(db: AsyncSession, character: Character, herb_ids: list[str] | None) -> None:
+    """Галочки по траве (2026-10-29, владелец): None - вся трава, пустой
+    список - альманах молчит. Только трава, которую персонаж различает.
+    Отмечена вся, что различает, - пишем «всю»: новая трава после роста
+    травничества тогда тоже попадёт в подсказки."""
     row = await _row(db, character.id, "almanac")
     if row is None:
         raise GearError("Альманаха нет.")
-    if herb_tier is not None and not 1 <= herb_tier <= herbalism.visible_tier(character.herbalism_level):
-        raise GearError("Траву этого тира ты пока не различаешь.")
-    row.herb_tier = herb_tier
+    ordered = herbalism.herb_defs_ordered()
+    visible = {h.id for h in ordered if herbalism.can_see(character.herbalism_level, h)}
+    if herb_ids is not None:
+        chosen = set(herb_ids)
+        if not chosen <= visible:
+            raise GearError("Эту траву ты пока не различаешь.")
+        herb_ids = None if chosen == visible else [h.id for h in ordered if h.id in chosen]
+    row.herb_ids = None if herb_ids is None else ",".join(herb_ids)
+    row.herb_tier = None
     await db.flush()
 
 

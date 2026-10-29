@@ -10,7 +10,7 @@ count - заряды пряностей или число склянок; у о�
 
 from datetime import datetime
 
-from sqlalchemy import BigInteger, DateTime, ForeignKey, String, UniqueConstraint
+from sqlalchemy import BigInteger, DateTime, ForeignKey, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 
 from models.base import Base
@@ -30,4 +30,8 @@ class CharacterCraftGear(Base):
     cycle_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     used: Mapped[int] = mapped_column(default=0, server_default="0")
     #: Альманах: подсказывать только траву этого тира; None - любую.
+    #: С 2026-10-29 вместо него herb_ids, тир читается только у старых строк.
     herb_tier: Mapped[int | None] = mapped_column(nullable=True)
+    #: Альманах: какие травы подсказывать, id через запятую; None - всю, что
+    #: различает, пустая строка - никакую (миграция 0097).
+    herb_ids: Mapped[str | None] = mapped_column(Text, nullable=True)

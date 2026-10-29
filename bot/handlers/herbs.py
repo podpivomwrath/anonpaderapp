@@ -98,10 +98,10 @@ async def notify_nearby(peer_id: int, character) -> None:
 
     async with get_session_factory()() as db:
         found = await herb_service.visible_around(db, character)
-        # Только выбранный в мини-аппе тир (2026-10-29, просьба игрока).
+        # Только отмеченная в мини-аппе трава (2026-10-29, владелец).
         wanted = await craft_gear_service.almanac_filter(db, character.id) if found else None
         if wanted is not None:
-            found = [(d, h) for d, h in found if h.tier == wanted]
+            found = [(d, h) for d, h in found if h.id in wanted]
         # 10 подсказок, потом час зарядки (2026-10-29). Тратит подсказку только
         # найденная трава, а не пустая клетка.
         uses = await craft_gear_service.almanac_use(db, character.id) if found else None
