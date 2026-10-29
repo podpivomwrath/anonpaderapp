@@ -51,3 +51,17 @@ def test_city_gates_are_pvp_free() -> None:
     assert not grid.pvp_forbidden(0, 27) and not grid.pvp_forbidden(3, 29)
     assert not grid.pvp_forbidden(10, 10)
     assert grid.pvp_forbidden(0, 0)  # Монолит (2026-10-22)
+
+
+async def test_contract_target_is_safe_only_inside_the_shaft(make_character) -> None:
+    """2026-10-29, владелец: на руднике цель заказа не тронут, пока она в
+    штольне; вышла наверх - защиты нет. У озера защиты нет вовсе."""
+    from game.economy import mining
+
+    x, y = next((m.x, m.y) for m in mining.all_mines() if mining.is_safe_mine(m.x, m.y))
+    target = await make_character(level=20)
+    target.pos_x, target.pos_y = x, y
+    target.screen = "mine"
+    assert pvp._in_shaft(target)
+    target.screen = None
+    assert not pvp._in_shaft(target)

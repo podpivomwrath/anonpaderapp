@@ -108,8 +108,9 @@ async def _busy_marks(db, characters: list[Character]) -> dict[int, str]:
         # Работу нападение обрывает (2026-10-25) - видно, кого от чего оторвёшь.
         elif c.screen == "lake" and fishing_service.is_casting(c):
             marks[c.id] = " · 🎣 рыбачит"
-        elif c.screen == "mine" and mining_service.is_digging(c):
-            marks[c.id] = " · ⛏ в забое"
+        elif c.screen == "mine":
+            # В штольне цель заказа не достать - видно, что он там (2026-10-29).
+            marks[c.id] = " · ⛏ в забое" if mining_service.is_digging(c) else " · ⛏ в штольне"
     return marks
 
 

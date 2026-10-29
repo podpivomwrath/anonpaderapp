@@ -104,6 +104,15 @@ from services import onboarding_service as onboarding_svc
 from services.db import get_session_factory
 
 
+#: Цель заказа в штольне (2026-10-29, владелец).
+SHAFT_NO_PVP_TEXT = "Цель в штольне. В узком забое не подраться - жди, пока выйдет наверх."
+
+
+def _in_shaft(character) -> bool:
+    """Внутри штольни рудника (экран рудника открыт)."""
+    return character.screen == "mine" and mining_service.is_safe_mine(character.pos_x, character.pos_y)
+
+
 def _is_safe_craft_cell(character) -> bool:
     """Мирная клетка ремесла: озеро или рудник первых двух колец.
 
@@ -393,7 +402,9 @@ async def look_around(message: Message) -> None:
             # Озеро и рудник цель заказа не спасают (2026-10-25, владелец):
             # охотник видит её под номером, даже за удочкой или киркой. Бой
             # здесь (а он тут бывает только по заказу) видят все.
-            targets = [c for c in solo if c.id in hunted]
+            # В штольне рудника цель заказа в безопасности: достать можно, только
+            # когда выйдет наружу (2026-10-29, владелец). У озера защиты нет.
+            targets = [c for c in solo if c.id in hunted and not _in_shaft(c)]
             if not targets and not (hunted and battles):
                 await message.answer(_peaceful_scene_text(solo, await _guild_tags(db, solo), battles,
                                                           await _busy_marks(db, solo)))
@@ -529,6 +540,9 @@ async def attack_command(message: Message, target: str) -> None:
                 cid in hunted for cid in battle_entry[1].participants)
             if not allowed:
                 await message.answer(LAKE_NO_PVP_TEXT)
+                return
+            if victim is not None and _in_shaft(victim):
+                await message.answer(SHAFT_NO_PVP_TEXT)
                 return
 
         if victim is not None and await _same_group(db, character, victim.id):
