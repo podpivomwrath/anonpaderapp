@@ -351,7 +351,7 @@ class Labyrinth:
                 nearest = min(left, key=lambda i: abs(rc(i)[0] - rc(target)[0]) + abs(rc(i)[1] - rc(target)[1]))
                 out.echo = compass(target, nearest)
             out.events.append("echo")
-        if self.pos[cid] == self.hunter and target != GATE:
+        if self.pos[cid] == self.hunter:
             self._catch(cid, now)
             out.events.append("caught")
             if self._retreat_if_spawn(self.pos[cid], now):
@@ -395,20 +395,21 @@ class Labyrinth:
     # --- Безымянный ---
 
     def hunter_can_enter(self, i: int) -> bool:
-        """Безымянный не заходит на ворота (там ждут своих) и в ямы: раньше
-        шагал в провал и стоял в нём (2026-10-22)."""
-        return i != GATE and self.kind(i) != PIT
+        """Безымянный не заходит на вход и в ямы: раньше шагал в провал и
+        стоял в нём (2026-10-22). Ворота с 2026-10-30 (владелец) - обычная
+        клетка: ждать там своих можно, но он придёт и туда."""
+        return i != START and self.kind(i) != PIT
 
     def hunter_tick(self, now: float) -> HunterResult:
         out = HunterResult()
         if now < self.hunter_next:
             return out
         self.hunter_next = now + tc.HUNTER_STEP_SECONDS
-        # Вход и ворота - убежища: у ворот группа ждёт отставших (2026-10-22,
-        # жалоба: ждали у ворот, а он ловил там по одному, пока не вышло время).
+        # Убежище - только вход. Ворота были убежищем с 2026-10-22, с
+        # 2026-10-30 (владелец) - нет: у ворот он тоже ловит.
         prey = [
             cid for cid in self.players
-            if not self.is_frozen(cid, now) and self.pos[cid] not in (START, GATE)
+            if not self.is_frozen(cid, now) and self.pos[cid] != START
         ]
         if not prey:
             return out

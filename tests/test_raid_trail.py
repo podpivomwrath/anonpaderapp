@@ -208,34 +208,51 @@ def test_no_pits_next_to_the_start() -> None:
         assert len(pits) == tc.PITS and not pits & start_exits, seed
 
 
-def test_hunter_never_steps_into_pits_or_onto_the_gate() -> None:
-    """2026-10-22: Безымянный наступал в яму и ловил ждущих у ворот."""
+def test_hunter_never_steps_into_pits_or_onto_the_start() -> None:
+    """2026-10-22: Безымянный наступал в яму. 2026-10-30: вход - убежище,
+    ворота - нет."""
     for seed in range(40):
         lab = lab_rules.Labyrinth([1, 2], random.Random(seed))
         lab.grate_open = True
         free = [i for i in range(lab_rules.N * lab_rules.N)
                 if i not in (lab_rules.START, lab_rules.GATE) and lab.kind(i) != lab_rules.PIT]
         rng = random.Random(seed)
-        lab.pos[2] = lab_rules.GATE
+        lab.pos[2] = lab_rules.START
         for t in range(200):
             if t % 5 == 0:
                 lab.pos[1] = rng.choice(free)
                 lab.frozen_until.clear()
             lab.hunter_next = 0.0
             res = lab.hunter_tick(float(t))
-            assert lab.hunter != lab_rules.GATE or not res.moved
+            assert lab.hunter != lab_rules.START
             assert lab.kind(lab.hunter) != lab_rules.PIT
             assert 2 not in res.caught and not lab.is_frozen(2, float(t))
 
 
-def test_stepping_onto_the_gate_is_safe_even_with_the_hunter_there() -> None:
+def test_hunter_catches_at_the_gate() -> None:
+    """2026-10-30, владелец: ворота больше не убежище."""
+    caught = False
+    for seed in range(40):
+        lab = lab_rules.Labyrinth([1], random.Random(seed))
+        lab.grate_open = True
+        lab.pos[1] = lab_rules.GATE
+        lab.hunter = next(n for n in lab_rules.neighbors(lab_rules.GATE).values()
+                          if lab.maze.connected(n, lab_rules.GATE, True) and lab.hunter_can_enter(n))
+        lab.hunter_next = 0.0
+        res = lab.hunter_tick(0.0)
+        assert lab.hunter == lab_rules.GATE and 1 in res.caught
+        caught = True
+    assert caught
+
+
+def test_stepping_onto_the_hunter_at_the_gate_is_caught() -> None:
     lab = lab_rules.Labyrinth([1], random.Random(4))
     lab.grate_open = True
     lab.pos[1] = next(n for n in lab_rules.neighbors(lab_rules.GATE).values()
                       if lab.maze.connected(n, lab_rules.GATE, True))
     assert lab.hunter == lab_rules.GATE
     res = lab.move(1, lab_rules.GATE, 0.0)
-    assert res.ok and "caught" not in res.events and not lab.is_frozen(1, 1.0)
+    assert res.ok and "caught" in res.events and lab.is_frozen(1, 1.0)
 
 
 # --- Клавиатуры под лимиты VK ------------------------------------------------------
