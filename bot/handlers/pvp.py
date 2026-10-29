@@ -381,7 +381,8 @@ async def look_around(message: Message) -> None:
         at_boss = await _at_world_boss(db, character)
         if at_boss or grid.pvp_forbidden(character.pos_x, character.pos_y):
             solo, _battles = await _scene_at(db, character)
-            await message.answer(_peaceful_scene_text(solo, await _guild_tags(db, solo)))
+            await message.answer(_peaceful_scene_text(solo, await _guild_tags(db, solo),
+                                                      busy=await _busy_marks(db, solo)))
             return
         from services import contract_service
 
@@ -393,7 +394,8 @@ async def look_around(message: Message) -> None:
             # здесь (а он тут бывает только по заказу) видят все.
             targets = [c for c in solo if c.id in hunted]
             if not targets and not (hunted and battles):
-                await message.answer(_peaceful_scene_text(solo, await _guild_tags(db, solo), battles))
+                await message.answer(_peaceful_scene_text(solo, await _guild_tags(db, solo), battles,
+                                                          await _busy_marks(db, solo)))
                 return
             solo = targets
         tags = await _guild_tags(db, solo)
@@ -406,13 +408,15 @@ async def look_around(message: Message) -> None:
 
 
 def _peaceful_scene_text(solo: list[Character], tags: dict[int, str] | None = None,
-                         battles: list | None = None) -> str:
+                         battles: list | None = None, busy: dict[int, str] | None = None) -> str:
+    """busy - кто чем занят (бой с мобами, рыбалка, забой): видно и на
+    мирной клетке (2026-10-29, баг-репорт)."""
     if not solo and not battles:
         return "👁 Ты оглядываешься.\n\nТы один. Место мирное - здесь не нападают."
     lines = ["👁 Ты оглядываешься. Место мирное - здесь не нападают.", ""]
     if solo:
         lines.append("Рядом:")
-        lines += [f"• {_class_line(c, tags)}" for c in solo]
+        lines += [f"• {_class_line(c, tags)}{(busy or {}).get(c.id, '')}" for c in solo]
     if battles:
         # Бой на мирной клетке - только по заказу (2026-10-25).
         lines += ["", "Дерутся по заказу:"] if solo else ["Дерутся по заказу:"]

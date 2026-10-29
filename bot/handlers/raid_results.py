@@ -8,6 +8,8 @@
 """
 
 import asyncio
+import time
+from datetime import timedelta
 from dataclasses import dataclass
 from loguru import logger
 from bot import background
@@ -60,6 +62,7 @@ async def on_raid_tick_resolved(session_id: int, tick: int, result: TickResult) 
     _record_contribution(battle, result)
     battle.stage_ticks += 1
     state = raid_combat._engine.sessions.get(session_id)
+    _note_deaths(battle, state.combatants if state is not None else battle.last_combatants)
     # Классовые испытания и в рейде/разломе (2026-10-24, bot/trial_tracking.py).
     trial_tracking.observe(session_id, state.combatants if state is not None else None, result,
                            list(battle.participants))
@@ -604,6 +607,7 @@ async def _cleanup_and_return(session_id: int, battle: raid_combat.RaidBattle, t
     state = raid_combat._engine.sessions.get(session_id)
     if state is not None:
         combatants = dict(state.combatants)
+    _note_deaths(battle, combatants)
     for p in list(battle.participants.values()):
         raid_combat._peer_battle.pop(p.peer_id, None)
         raid_combat._chosen_target.pop(p.character_id, None)
@@ -647,7 +651,9 @@ async def _cleanup_and_return(session_id: int, battle: raid_combat.RaidBattle, t
                     cid, pvp_shield.RIFT if battle.is_rift else pvp_shield.RAID, cell=tuple(battle.home),
                 )
             else:
-                defeats[cid] = (await encounter_service.resolve_defeat(db, character), character.respawn_at)
+                defeat = await encounter_service.resolve_defeat(db, character)
+                _backdate_respawn(battle, cid, character)
+                defeats[cid] = (defeat, character.respawn_at)
         from services import raid_service
         await raid_service.finish_run(db, battle.run_id, won=not defeated)
         if battle.is_rift:
@@ -693,6 +699,27 @@ async def _cleanup_and_return(session_id: int, battle: raid_combat.RaidBattle, t
                 peer_id=p.peer_id, message=text, random_id=0,
                 keyboard=movement_keyboard(*battle.home, p.peer_id, has_mount=False),
             )
+
+
+def _note_deaths(battle, combatants: dict) -> None:
+    """Время гибели бойцов (монотонные часы процесса)."""
+    now = time.monotonic()
+    for cid in battle.participants:
+        c = combatants.get(cid)
+        if c is not None and not c.alive:
+            battle.died_at.setdefault(cid, now)
+
+
+def _backdate_respawn(battle, cid: int, character) -> None:
+    """Таймер воскрешения - с момента гибели в рейде, а не с конца захода."""
+    died = battle.died_at.get(cid)
+    if died is None or character.respawn_at is None:
+        return
+    elapsed = max(time.monotonic() - died, 0.0)
+    from datetime import datetime, timezone
+
+    floor = datetime.now(timezone.utc) + timedelta(seconds=5)
+    character.respawn_at = max(character.respawn_at - timedelta(seconds=elapsed), floor)
 
 
 SAFE_EXIT_LINE = f"\n\n🛡 {bc.PVP_SAFE_SECONDS // 60} мин. на тебя нельзя нападать, пока не ушёл с этой клетки. Нападёшь сам - защита пропадёт."

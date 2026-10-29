@@ -738,6 +738,11 @@ async def scan() -> None:
                 daily_announce.append((peer_id, await daily_service.record_cell_moved(
                     db, character, step.cells,
                 )))
+                from services import trial_service
+
+                # «Одиночка» - тоже каждая клетка верхом (2026-10-29).
+                if subclass_service.buff_pool(character) is not None:
+                    await trial_service.record_cell_moved(db, character, step.cells)
             if step.moved:
                 from bot.handlers import guild as guild_handlers  # избегаем цикла импортов
 
@@ -766,10 +771,6 @@ async def scan() -> None:
                 continue
 
             if step.arrived:
-                from services import trial_service
-
-                if subclass_service.buff_pool(character) is not None:
-                    await trial_service.record_cell_moved(db, character)
                 stats = await _stats(db, character.id)
                 wallet = await wallet_service.get_wallet(db, character.id)
                 gear_bonus = await item_service.compute_gear_bonus(db, character.id)

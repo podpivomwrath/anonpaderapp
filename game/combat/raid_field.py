@@ -566,6 +566,11 @@ class GeneralAI:
             if target is None:
                 return []
             label, mult = ("Выпад", fc.LUNGE_MULT) if stance == LUNGE else ("Поединок", fc.CHALLENGE_MULT)
+            if target.id != self.target_id:
+                # Удар ушёл не тому, на кого указывал (провокация или цель
+                # пала) - в логе это видно (2026-10-29, баг-репорт: «указывает
+                # на одного, бьёт другого»).
+                label = f"{label} (перехвачен)" if boss.taunted_by == target.id else f"{label} (цель пала)"
             return [compute_hit(boss, target, rng, label=label, multiplier=mult, is_ability=True)]
         target = _target_of(boss, session, rng)
         if target is None:

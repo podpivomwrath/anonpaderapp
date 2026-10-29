@@ -677,7 +677,8 @@ async def capacity(db: AsyncSession, guild: Guild) -> WarehouseCapacity:
 
 async def ore_stock(db: AsyncSession, guild_id: int) -> list[GuildOre]:
     return list(
-        (await db.scalars(select(GuildOre).where(GuildOre.guild_id == guild_id, GuildOre.count > 0))).all()
+        (await db.scalars(select(GuildOre).where(GuildOre.guild_id == guild_id, GuildOre.count > 0)
+                          .order_by(GuildOre.ore_id, GuildOre.grade))).all()
     )
 
 

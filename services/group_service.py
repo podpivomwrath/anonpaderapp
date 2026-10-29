@@ -171,10 +171,19 @@ async def accept_invite(db: AsyncSession, invite_id: int, character_id: int) -> 
 
     newly_created = False
     if invite.group_id is None:
-        if await get_membership(db, invite.from_character_id) is not None:
-            invite.status = "declined"
-            await db.flush()
-            raise GroupError("Это приглашение больше не действует.")
+        inviter_membership = await get_membership(db, invite.from_character_id)
+        if inviter_membership is not None:
+            # Позвал двоих сразу, первый уже принял и группа создана - второй
+            # вступает в неё же (2026-10-29, баг-репорт: второе приглашение
+            # «больше не действовало»). Если пригласивший теперь не лидер -
+            # звать он уже не вправе.
+            leader_group = await db.get(Group, inviter_membership.group_id)
+            if leader_group is None or leader_group.leader_character_id != invite.from_character_id:
+                invite.status = "declined"
+                await db.flush()
+                raise GroupError("Это приглашение больше не действует.")
+            invite.group_id = leader_group.id
+    if invite.group_id is None:
         group = Group(leader_character_id=invite.from_character_id)
         db.add(group)
         await db.flush()

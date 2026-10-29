@@ -89,13 +89,30 @@ def _warehouse_item(item, level: int) -> dict:
     }
 
 
+#: Качество припасов от лучшего: рыбы/еды и зелий-трав (у тех свои градации).
+_GRADE_RANK = {g: i for i, g in enumerate(("legendary", "epic", "trophy", "rare", "big", "common", "small"))}
+
+
 def _goods_line(line) -> dict:
     return {
         "kind": line.kind, "ref": line.ref, "grade": line.grade, "count": line.count,
         "name": line.name, "emoji": line.emoji, "grade_name": line.grade_name,
         "kind_title": guild_stock_service.KIND_TITLES[line.kind],
-        "label": guild_stock_service.amount_text(line),
+        "label": _with_effect(line),
     }
+
+
+def _with_effect(line) -> str:
+    """У еды - что она даёт (2026-10-29, баг-репорт: из какой рыбы - видно,
+    а какой бонус - нет)."""
+    label = guild_stock_service.amount_text(line)
+    if line.kind != "food":
+        return label
+    from game.economy import cooking
+    from game.economy import cooking_config as cc
+
+    dish = cc.DISHES_BY_ID.get(line.ref)
+    return f"{label} · {cooking.buff_text(dish, line.grade)}" if dish is not None else label
 
 
 async def _my_items(db, character: Character) -> list[dict]:
@@ -358,10 +375,13 @@ async def _state(db, character: Character) -> dict:
             "my_ore": [_ore_line(d.id, grade, count) for d, grade, count in my_ore if count > 0],
             # Припасы (2026-10-23): травы, рыба, еда, зелья - и снаряжение на сдачу.
             "goods_total": await guild_stock_service.goods_units(db, guild.id),
-            "goods": [_goods_line(x) for x in [
-                guild_stock_service.describe(s.kind, s.ref, s.grade, s.count)
-                for s in await guild_stock_service.stock(db, guild.id)
-            ]],
+            # Постоянный порядок: название, затем качество от лучшего (2026-10-29,
+            # баг-репорт: строки скакали по складу после каждой выдачи).
+            "goods": [_goods_line(x) for x in sorted(
+                (guild_stock_service.describe(s.kind, s.ref, s.grade, s.count)
+                 for s in await guild_stock_service.stock(db, guild.id)),
+                key=lambda line: (line.kind, line.name, _GRADE_RANK.get(line.grade, 99), line.grade),
+            )],
             "my_goods": [_goods_line(x) for x in await guild_stock_service.mine(db, character.id)],
             "my_items": await _my_items(db, character),
         },
@@ -455,12 +475,28 @@ async def _vk_ids(db, characters: list[Character]) -> dict[int, int]:
     return dict((await db.execute(select(User.id, User.vk_id).where(User.id.in_(user_ids)))).all())
 
 
+_TREASURY_ACTIONS = {
+    "deposit", "withdraw", "deposit_ore", "withdraw_ore",
+    "deposit_goods", "withdraw_goods", "deposit_item", "withdraw_item",
+}
+
+
 async def _act(db, character: Character, vk_user_id: int, body: dict) -> list:
     """Выполняет действие. Возвращает отложенные уведомления [(peers|guild_id, text)]."""
     from bot.activity import blocked_reason
 
     action = body.get("action")
     notes: list = []
+    if action in _TREASURY_ACTIONS:
+        # Казна и склад - не из боя и не с того света (2026-10-29, баг-репорт:
+        # мёртвый клал вещи в казну и так передавал их другим).
+        from bot.battle_keyboard import in_any_battle
+        from services import death_service
+
+        if death_service.is_dead(character):
+            raise GuildError("Сначала очнись.")
+        if in_any_battle(vk_user_id):
+            raise GuildError("В бою не до казны.")
     if action == "create":
         await guild_service.create(db, character, _str(body, "name"), _str(body, "tag"))
     elif action == "apply":

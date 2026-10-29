@@ -84,6 +84,10 @@ async def contribute(
     if row is None:
         row = TradeContribution(character_id=character.id, day=day, city=character.region, points=0, raw=0)
         db.add(row)
+    elif row.city != character.region:
+        # Переехал сегодня - недельный рейтинг торговцев считает его уже в
+        # новом городе (2026-10-29, баг-репорт: вклад шёл за старый).
+        row.city = character.region
     credited = max(min(raw, fc.daily_cap(trade_level) - (row.points or 0)), 0)
     row.points = (row.points or 0) + credited
     row.raw = (row.raw or 0) + raw

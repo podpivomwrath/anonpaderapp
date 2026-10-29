@@ -38,6 +38,9 @@ def poison_tick_damage(effect: Effect, source: CombatantState | None,
     if source is not None:
         multiplier += source.buff_modifiers.get("poison_damage_bonus", 0.0)
         multiplier += source.buff_modifiers.get("poison_damage_per_stack", 0.0) * effect.stacks
+        # Общий бонус урона (еда, пресет) - и к ДоТу (2026-10-29, баг-репорт:
+        # блюдо на урон не усиливало яд, а у Отравителя он почти весь урон).
+        multiplier += source.buff_modifiers.get("damage_bonus", 0.0)
         multiplier *= stat_model.ACTIVE.effect_power(source.stats)
     if target is not None:
         multiplier *= 1.0 + target.effect_total(EffectKind.VULNERABILITY)

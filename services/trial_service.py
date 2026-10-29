@@ -277,11 +277,13 @@ async def record_combat_started(db: AsyncSession, character: Character) -> None:
             await _reset(db, character.id, trial)
 
 
-async def record_cell_moved(db: AsyncSession, character: Character) -> list[str]:
+async def record_cell_moved(db: AsyncSession, character: Character, cells: int = 1) -> list[str]:
+    """cells - клеток за раз: верхом засчитывается каждая клетка пути
+    (2026-10-29, баг-репорт: поездка шла за одну клетку)."""
     unlocked: list[str] = []
     for trial in await _active_trials(db, character):
         if trial.condition_type == "walk_cells_no_combat":
-            buff = await _apply_delta(db, character.id, trial, 1)
+            buff = await _apply_delta(db, character.id, trial, cells)
             if buff:
                 unlocked.append(buff)
     return unlocked

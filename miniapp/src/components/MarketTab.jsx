@@ -139,7 +139,11 @@ function GoodSheet({ good, rules, gold, onClose, act, busy }) {
         size="l" stretched disabled={busy || !qty || !price || tooSmall || cant}
         onClick={() => act(side, { good: good.key, qty, price }, onClose)}
       >
-        {side === 'buy' ? `Купить ×${qty} по ${money(price)}` : `Продать ×${qty} по ${money(price)}`}
+        {/* Причина на самой кнопке (2026-10-29, баг-репорт: серая кнопка без объяснений). */}
+        {!qty || !price ? 'Укажи количество и цену'
+          : tooSmall ? `Заявка - от ${money(rules.min_gold)} золота`
+            : cant ? (side === 'sell' ? 'Столько у тебя нет' : 'Не хватает золота')
+              : side === 'buy' ? `Купить ×${qty} по ${money(price)}` : `Продать ×${qty} по ${money(price)}`}
       </Button>
     </Sheet>
   );

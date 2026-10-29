@@ -136,7 +136,10 @@ def disrupt(ctx: SkillContext) -> None:
         if res.immune:
             ctx.lines.append(combat_flavor.control_blocked_line(target.name, res.reason))
         elif res.resisted:
-            ctx.lines.append(combat_flavor.control_resisted_line(target.name))
+            # В PvP сопротивление сбою не выдаём (2026-10-29, баг-репорт):
+            # сбой и так срабатывает с шансом, пусть сорвалось молча.
+            if not pvp:
+                ctx.lines.append(combat_flavor.control_resisted_line(target.name))
         else:
             # Патч 56, «Паралитик»: удачный сбой роняет сопротивление контролю
             # цели на 1 ход (тот же эффект, что «Тепловой шок» Элементалиста).

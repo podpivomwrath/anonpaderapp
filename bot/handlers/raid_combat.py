@@ -130,6 +130,9 @@ class RaidBattle:
     # Выдаются только при победе; вайп - ничего. Элемент - StageReward.
     pending_rewards: list = field(default_factory=list)
     contribution: dict[int, RaidContribution] = field(default_factory=dict)
+    #: когда пал каждый боец - таймер воскрешения идёт с этого момента, а
+    #: не с конца захода (2026-10-29, баг-репорт: пал в начале, ждал весь рейд)
+    died_at: dict[int, float] = field(default_factory=dict)
     # --- Рейд «Безмогильное поле» (game/combat/raid_field.py) ---
     raid_id: str = rc.RAID_PUPPET_THEATRE_ID
     field_stage: object | None = None   # FogStage / SummonerStage / GeneralStage

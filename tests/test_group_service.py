@@ -34,6 +34,20 @@ async def test_accept_invite_creates_group_with_leader_and_member(db_session, ma
     assert {m.id for m in result.group.members} == {leader.id, target.id}
 
 
+async def test_two_invites_at_once_land_in_one_group(db_session, make_character) -> None:
+    """Позвал двоих сразу, без группы: второй принявший вступает в группу,
+    которую создал первый (2026-10-29, баг-репорт)."""
+    leader = await make_character(level=10)
+    first = await make_character(level=11)
+    second = await make_character(level=12)
+    invite_a = await gs.send_invite(db_session, leader, first)
+    invite_b = await gs.send_invite(db_session, leader, second)
+    await gs.accept_invite(db_session, invite_a.id, first.id)
+    result = await gs.accept_invite(db_session, invite_b.id, second.id)
+    assert result.newly_created is False
+    assert {m.id for m in result.group.members} == {leader.id, first.id, second.id}
+
+
 async def test_decline_invite_marks_declined(db_session, make_character) -> None:
     leader = await make_character()
     target = await make_character()

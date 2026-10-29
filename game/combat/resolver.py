@@ -21,6 +21,7 @@ import game.combat.subclass_skills as subclass_skills  # регистрация 
 from game.combat import balance_config as bc
 from game.combat import combat_flavor, control, display, formulas, shared_rules
 from game.combat.session import (
+    BURN_TAG,
     ECHO_TAG,
     ActionType,
     CombatantState,
@@ -560,7 +561,9 @@ def resolve_tick(
                     source_id=effect.source_id,
                     target_id=combatant.id,
                     amount=shared_rules.poison_tick_damage(effect, source, combatant),
-                    label="обжигает (ДоТ)",
+                    # Свой ярлык у горения и яда (2026-10-29, баг-репорт: оба
+                    # были «обжигает», и тик яда принимали за огонь).
+                    label="горение" if effect.tag == BURN_TAG else "яд",
                     is_dot=True,
                     is_tick=True,
                 )

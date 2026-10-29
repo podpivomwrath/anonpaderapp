@@ -195,8 +195,11 @@ async def _render(db, character, stats, p: Pending, peer_id: int, rebuild: bool 
         if not rebuild:
             p.riddle = _rng.choice(scene.riddles)
             p.deadline = time.monotonic() + RIDDLE_SECONDS
-            text += f"\n\n«{p.riddle.q}»\n\nОтвет напиши сообщением."
             p.task = asyncio.create_task(_expire(peer_id, p.token, p.scene_id, RIDDLE_SECONDS, "giveup"))
+        # И при пересборке экрана: раньше возвращалась одна кнопка «Не знаю»,
+        # а вопрос пропадал (2026-10-29, баг-репорт).
+        if p.riddle is not None:
+            text += f"\n\n«{p.riddle.q}»\n\nОтвет напиши сообщением."
 
     elif scene.type == "dice":
         # Одна партия в три шага, на каждом - «Отменить»: валюта -> сумма

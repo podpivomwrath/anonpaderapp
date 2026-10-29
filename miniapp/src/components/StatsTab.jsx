@@ -250,7 +250,10 @@ export default function StatsTab({ character, onCharacterUpdate }) {
                 >
                   {previewStats[stat.key]}
                   {character.gear_bonus?.[stat.key] ? (
-                    <span className="stat-row__gear" title="от снаряжения"> +{character.gear_bonus[stat.key]}</span>
+                    // Итог рядом с прибавкой (2026-10-29, баг-репорт: суммы не было видно).
+                    <span className="stat-row__gear" title="от снаряжения">
+                      {' '}+{character.gear_bonus[stat.key]} = {previewStats[stat.key] + character.gear_bonus[stat.key]}
+                    </span>
                   ) : null}
                 </span>
               )}
