@@ -1355,12 +1355,15 @@ async def pvp_use_item(message: Message) -> None:
     # Боевой эликсир и (с 2026-10-14) лечебное зелье - бесплатное действие:
     # эффект сразу, ход не тратится.
     if elixir.category == "heal":
+        before = combatant.current_hp
         line = elixir_effects.drink_heal(combatant, elixir_id)
         consumable_limit.mark_heal(combatant)
+        await _tell_others(battle, cid, elixir_effects.heal_seen(
+            combatant, participant.name, combatant.current_hp - before))
     else:
         line = elixir_effects.apply_combat_elixir(combatant, elixir_id, _live_state(battle_id, battle))
         combatant.combat_elixirs_used += 1
-    if elixir.category in ("scroll", "heal"):
+    if elixir.category == "scroll":
         await _tell_others(battle, cid, f"{participant.name}: {line}")
     text = f"{line} Твой ход.\n\n{_battle_board_text(battle_id, battle, [])}"
     await _bot_api.messages.send(

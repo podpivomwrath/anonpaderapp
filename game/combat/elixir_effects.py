@@ -30,6 +30,13 @@ def drink_heal(actor: CombatantState, elixir_id: str) -> str:
     return f"🧪 Зелье лечит: +{healed} HP ({actor.current_hp}/{actor.max_hp})."
 
 
+def heal_seen(actor: CombatantState, name: str, healed: int) -> str:
+    """Строка для остальных бойцов: союзник выпил лечебное (2026-10-30, владелец)."""
+    if healed <= 0:
+        return f"🧪 {name} пьёт лечебное зелье, но здоровье и так полное."
+    return f"🧪 {name} пьёт лечебное зелье: +{healed} HP ({actor.current_hp}/{actor.max_hp})."
+
+
 def _apply_scroll(actor: CombatantState, elixir_id: str, combatants) -> str:
     """Свитки (2026-10-13): на всю сторону бойца или на всех врагов. Без
     списка бойцов (вызов из старого кода) - только на себя."""

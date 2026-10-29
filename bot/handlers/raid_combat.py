@@ -1150,8 +1150,10 @@ async def raid_use_item(message: Message) -> None:
         await _tell_others(battle, cid, f"{p.name}: {line}")
     # Лечебное зелье - тоже без траты хода (2026-10-14).
     elif elixir.category == "heal":
+        before = combatant.current_hp
         line = elixir_effects.drink_heal(combatant, elixir_id)
         consumable_limit.mark_heal(combatant)
+        await _tell_others(battle, cid, elixir_effects.heal_seen(combatant, p.name, combatant.current_hp - before))
     else:
         line = elixir_effects.apply_combat_elixir(combatant, elixir_id, _live_state(battle_id, battle))
         combatant.combat_elixirs_used += 1
