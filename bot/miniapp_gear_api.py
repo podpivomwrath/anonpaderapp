@@ -24,6 +24,20 @@ SOURCE_HINTS = {
 }
 
 
+def _status(tool_id: str, row) -> str | None:
+    """Альманах на зарядке (2026-10-29): работает или заряжается и сколько."""
+    if tool_id != "almanac":
+        return None
+    from datetime import datetime, timezone
+
+    phase, left = craft_gear.almanac_phase(row.cycle_at, datetime.now(timezone.utc))
+    if phase == "active":
+        return f"Работает ещё {left} мин."
+    if phase == "charging":
+        return f"Заряжается ещё {left} мин."
+    return "Готов: включится, как только рядом найдётся трава."
+
+
 def _error(message: str, status: int = 400) -> web.Response:
     return web.json_response({"error": message}, status=status)
 
@@ -84,6 +98,7 @@ async def _payload(db, character) -> dict:
                 # Что делает - видно и до находки (2026-10-23: у альманаха было
                 # только «выпадает с мобов», а зачем он - нет).
                 "about": craft_gear.effect_line(tool.id, 1) if tool.source == "drop" else None,
+                "status": _status(tool.id, row) if have else None,
             })
         crafts.append({
             "id": craft_id, "emoji": emoji, "title": title,

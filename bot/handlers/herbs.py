@@ -97,11 +97,12 @@ async def notify_nearby(peer_id: int, character) -> None:
     from services import craft_gear_service
 
     async with get_session_factory()() as db:
-        if not await craft_gear_service.tier(db, character.id, "almanac"):
-            return
         found = await herb_service.visible_around(db, character)
-    if not found:
-        return
+        # Час работает, час заряжается (2026-10-29). Цикл открывает первая
+        # найденная трава, а не пустая клетка.
+        if not found or not await craft_gear_service.almanac_works(db, character.id):
+            return
+        await db.commit()
     parts = [f"{herb.emoji} {herb.name} - {_SIDES[(dx, dy)]}" for (dx, dy), herb in found]
     await _api().messages.send(peer_id=peer_id, random_id=0, message="📗 Альманах: рядом трава.\n" + "\n".join(parts))
 

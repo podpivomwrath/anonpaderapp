@@ -63,6 +63,28 @@ def still_extra_chance(still_tier: int) -> float:
     return gc.STILL_EXTRA_PER_TIER * max(still_tier, 0)
 
 
+def almanac_phase(cycle_at, now) -> tuple[str, int]:
+    """("ready" | "active" | "charging", минут до смены). ready - цикл
+    закончился или не начинался: следующий показ травы откроет новый."""
+    from datetime import timedelta
+
+    from game.economy import craft_gear_config as gc
+
+    if cycle_at is None:
+        return "ready", 0
+    if cycle_at.tzinfo is None:
+        from datetime import timezone
+
+        cycle_at = cycle_at.replace(tzinfo=timezone.utc)
+    active_end = cycle_at + timedelta(minutes=gc.ALMANAC_ACTIVE_MINUTES)
+    charge_end = active_end + timedelta(minutes=gc.ALMANAC_CHARGE_MINUTES)
+    if now < active_end:
+        return "active", max(1, round((active_end - now).total_seconds() / 60))
+    if now < charge_end:
+        return "charging", max(1, round((charge_end - now).total_seconds() / 60))
+    return "ready", 0
+
+
 def sickle_cuts(sickle_tier: int, herb_tier: int) -> bool:
     """Серп срезает траву своего тира и ниже."""
     return sickle_tier > 0 and herb_tier <= sickle_tier
@@ -76,7 +98,7 @@ def effect_line(tool_id: str, tier: int) -> str:
         return f"Сам срезает траву до {tier} тира на клетке, куда ты заходишь"
     if tool_id == "almanac":
         return ("Когда заходишь на клетку, пишет, на каких из 8 соседних клеток растёт трава. "
-                "Показывает только ту, которую ты уже различаешь")
+                "Показывает только ту, которую ты уже различаешь. Час работает, потом час заряжается")
     if tool_id == "pick":
         return (f"Копаешь на {pct(gc.PICK_SPEED_PER_TIER * tier)} быстрее и чаще достаёшь руду лучшей градации. "
                 f"В руднике тира выше кирки ускорение вдвое меньше")

@@ -38,14 +38,12 @@ def test_boost_multiplier_thresholds() -> None:
     assert lc.boost_multiplier(1000) == 2.0
 
 
-def test_chances_boost_favors_rare_grades_and_sums_to_one() -> None:
+def test_chances_do_not_depend_on_streak_and_sum_to_one() -> None:
+    """2026-10-29, владелец: шансы ларца одинаковые при любой серии."""
     base = lootbox_service._chances(1)
-    boosted = lootbox_service._chances(112)
-    assert boosted["crimson"] > base["crimson"]
-    assert boosted["searing"] > base["searing"]
-    assert boosted["tear"] > base["tear"]
-    assert boosted["dusty"] < base["dusty"]
-    assert abs(sum(boosted.values()) - 1.0) < 1e-9
+    long_streak = lootbox_service._chances(112)
+    assert long_streak == base
+    assert abs(sum(base.values()) - 1.0) < 1e-9
 
 
 async def test_open_chest_tear_grade_deterministic(db_session, make_character) -> None:

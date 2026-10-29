@@ -227,9 +227,10 @@ def _xp_to_next(craft: str, level: int) -> int:
             "alchemy": alchemy.xp_to_next, "cooking": cooking.xp_to_next}[craft](level)
 
 
-def craft_xp(character: Character, rng: random.Random) -> str | None:
+async def craft_xp(db: AsyncSession, character: Character, rng: random.Random) -> str | None:
     """Шанс опыта случайного ремесла за час похода: отдельная строка под
-    вестью часа («что было в пути» и опыт в скобках) или None."""
+    вестью часа («что было в пути» и опыт в скобках) или None. С опытом -
+    и добыча этого ремесла по уровню игрока (2026-10-29, владелец)."""
     if rng.random() >= vc.CRAFT_XP_CHANCE:
         return None
     open_crafts = [c for c, (lvl, _xp, _t, _n) in CRAFTS.items() if _xp_to_next(c, getattr(character, lvl)) > 0]
@@ -256,7 +257,73 @@ def craft_xp(character: Character, rng: random.Random) -> str | None:
             character, amount)
     after = getattr(character, level_field)
     reward = f"+{amount} опыта {title}" + (f", {name} {after} ур." if after > before else "")
+    found = await _craft_drop(db, character, craft, before, rng)
+    if found:
+        reward += f", {found}"
     return f"{rng.choice(vc.CRAFT_XP_TEXTS[craft])} ({reward})"
+
+
+async def _craft_drop(db: AsyncSession, character: Character, craft: str, level: int, rng: random.Random) -> str | None:
+    """Добыча ремесла по его уровню: руда, трава, рыба, зелье или блюдо.
+    Редкости (Живой камень, Безымянная тварь) в поход не попадают."""
+    from game.economy import alchemy, cooking, fishing, herbalism, mining
+    from game.economy import fishing_config as fc
+    from game.economy import mining_config as mc
+    from services import cooking_service, elixir_service, herb_service, mining_service
+
+    if craft == "mining":
+        tier = mining.unlocked_tier(level)
+        ore_id = mc.LIVING_STONE_ID
+        while ore_id == mc.LIVING_STONE_ID:
+            ore_id = mining.roll_ore_id(rng, tier, False, level)
+        count = rng.randint(1, 2)
+        await mining_service.add_ore(db, character.id, ore_id, "common", count)
+        ore = mining.ore_def(ore_id)
+        return f"{ore.emoji} {ore.name} ×{count}" if ore else None
+    if craft == "herbalism":
+        herbs = [h for h in herbalism.herb_defs_ordered() if herbalism.can_see(level, h)]
+        if not herbs:
+            return None
+        herb = rng.choice(herbs)
+        count = rng.randint(1, 2)
+        await herb_service.add_herb(db, character.id, herb.id, count)
+        return f"{herb.emoji} {herb.name} ×{count}"
+    if craft == "fishing":
+        tier = fishing.unlocked_tier(level)
+        fish_id = fc.NAMELESS_ID
+        while fish_id == fc.NAMELESS_ID:
+            fish_id = fishing.roll_fish_id(rng, tier, level)
+        grams, _f = fishing.roll_weight(rng, fish_id, level)
+        from models import CharacterFish
+
+        row = await db.scalar(select(CharacterFish).where(
+            CharacterFish.character_id == character.id, CharacterFish.fish_id == fish_id,
+            CharacterFish.grade == "common",
+        ))
+        if row is None:
+            row = CharacterFish(character_id=character.id, fish_id=fish_id, grade="common", total_grams=0)
+            db.add(row)
+        row.total_grams += grams
+        await db.flush()
+        fish = fishing.fish_def(fish_id)
+        return f"{fish.emoji} {fish.name} {fishing.format_kg(grams)}" if fish else None
+    if craft == "alchemy":
+        recipes = alchemy.known(level)
+        if not recipes:
+            return None
+        recipe = rng.choice(recipes)
+        await elixir_service.grant(db, character.id, recipe.elixir_id, 1)
+        elixir = elixir_service.elixir_def(recipe.elixir_id)
+        return f"🧪 {elixir.name}" if elixir else None
+    if craft == "cooking":
+        dishes = cooking.known(level)
+        if not dishes:
+            return None
+        dish = rng.choice(dishes)
+        await cooking_service.add_food(db, character.id, dish.dish_id, "common", 1)
+        d = cooking.dish_def(dish.dish_id)
+        return f"{d.emoji} {d.name}" if d else None
+    return None
 
 
 def _item_label(key: str, count: int) -> str:
@@ -298,7 +365,7 @@ async def tick(db: AsyncSession, rng: random.Random | None = None, now: datetime
             tier, index, text, kind = _roll_event(voyage, rng)
             voyage.last_event = f"{tier}:{index}"
             lines, xp, gold, levels = await _reward(db, character, stats, voyage, kind)
-            craft_line = craft_xp(character, rng)
+            craft_line = await craft_xp(db, character, rng)
             voyage.hours_done += 1
             voyage.trip_xp += xp
             voyage.trip_gold += gold

@@ -8,7 +8,9 @@ tier - тир (1-5) у кованых и травяных; у добычи (ал
 count - заряды пряностей или число склянок; у остальных 0.
 """
 
-from sqlalchemy import BigInteger, ForeignKey, String, UniqueConstraint
+from datetime import datetime
+
+from sqlalchemy import BigInteger, DateTime, ForeignKey, String, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 
 from models.base import Base
@@ -23,3 +25,5 @@ class CharacterCraftGear(Base):
     tool_id: Mapped[str] = mapped_column(String(16))
     tier: Mapped[int] = mapped_column(default=1)
     count: Mapped[int] = mapped_column(BigInteger, default=0)
+    #: Альманах (2026-10-29): когда начался текущий цикл «работает - заряжается».
+    cycle_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)

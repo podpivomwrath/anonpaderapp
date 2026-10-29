@@ -47,6 +47,24 @@ async def _row(db: AsyncSession, character_id: int, tool_id: str) -> CharacterCr
     ).with_for_update().execution_options(populate_existing=True))
 
 
+async def almanac_works(db: AsyncSession, character_id: int, now=None) -> bool:
+    """Альманах подсказывает траву сейчас? Готовый к работе - открывает новый
+    час работы. Нет альманаха или он заряжается - False."""
+    from datetime import datetime, timezone
+
+    row = await _row(db, character_id, "almanac")
+    if row is None:
+        return False
+    now = now or datetime.now(timezone.utc)
+    phase, _left = craft_gear.almanac_phase(row.cycle_at, now)
+    if phase == "charging":
+        return False
+    if phase == "ready":
+        row.cycle_at = now
+        await db.flush()
+    return True
+
+
 async def use_charge(db: AsyncSession, character_id: int, tool_id: str) -> int:
     """Потратить заряд (пряности) или штуку (склянки). Тир или 0 - нечего тратить."""
     row = await _row(db, character_id, tool_id)

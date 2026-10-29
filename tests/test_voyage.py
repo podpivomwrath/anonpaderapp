@@ -125,19 +125,25 @@ async def test_max_level_gets_gold_instead_of_xp(db_session, character_at) -> No
     assert xp == 0 and gold > 0 and lines == [f"+{gold} золота"]
 
 
-def test_craft_xp_in_voyage_hour(monkeypatch) -> None:
-    """Ремесла в походе (2026-10-21): своя строка с вестью и опытом, ремесло на потолке не выпадает."""
-    from types import SimpleNamespace
+async def test_craft_xp_in_voyage_hour(db_session, make_character, monkeypatch) -> None:
+    """Ремесла в походе (2026-10-21): своя строка с вестью и опытом, ремесло на
+    потолке не выпадает. С 2026-10-29 - ещё и добыча этого ремесла."""
+    from sqlalchemy import select
+
+    from models import CharacterFish, CharacterOre
 
     monkeypatch.setattr(voyage_service.vc, "CRAFT_XP_CHANCE", 1.0)
-    c = SimpleNamespace(fishing_level=1, fishing_xp=0, fishing_level_at=None, mining_level=1, mining_xp=0,
-                        mining_level_at=None, herbalism_level=50, herbalism_xp=0, alchemy_level=50, alchemy_xp=0,
-                        cooking_level=50, cooking_xp=0)
+    c = await make_character(level=30)
+    c.fishing_level, c.mining_level = 1, 1
+    c.herbalism_level = c.alchemy_level = c.cooking_level = 50
     seen = set()
     for seed in range(40):
-        line = voyage_service.craft_xp(c, random.Random(seed))
+        line = await voyage_service.craft_xp(db_session, c, random.Random(seed))
         assert line and "опыта " in line and line.endswith(")")
         seen.add(line.split()[0])
     assert seen <= {"🎣", "⛏"}  # травничество, алхимия, кулинария на потолке
+    ore = (await db_session.scalars(select(CharacterOre).where(CharacterOre.character_id == c.id))).all()
+    fish = (await db_session.scalars(select(CharacterFish).where(CharacterFish.character_id == c.id))).all()
+    assert ore and fish  # добыча ремесла дошла до сумки
     monkeypatch.setattr(voyage_service.vc, "CRAFT_XP_CHANCE", 0.0)
-    assert voyage_service.craft_xp(c, random.Random(1)) is None
+    assert await voyage_service.craft_xp(db_session, c, random.Random(1)) is None
