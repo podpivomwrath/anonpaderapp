@@ -217,6 +217,11 @@ class TickResult:
     # по эвристике имени комбатанта; средний срез дублирует hit_renders/
     # heal_renders текстом и рендером не используется напрямую.
     prelude_line_count: int = 0
+    # Лечение мимо heal_renders - остаток щита, обращённый в здоровье
+    # (Оберег, Второе сердце): (кто повесил щит, кого лечит, сколько).
+    # Отдельно, чтобы не сдвигать срез строк лога выше; читает его подсчёт
+    # вклада рейда (2026-10-29, баг-репорт: такое лечение не попадало в итог).
+    shield_heals: list[tuple[int, int, int]] = field(default_factory=list)
 
 
 def _apply_phase(
@@ -751,6 +756,7 @@ def resolve_tick(
                     f"🛡️ {shield_name(effect)} {combatant.name} обращается в исцеление "
                     f"{display.hp_delta_line(before_hp, combatant.current_hp, combatant.max_hp, _display_mode(session))}"
                 )
+                result.shield_heals.append((effect.source_id, combatant.id, combatant.current_hp - before_hp))
                 effect.value = 0
 
         # Элементалист, «Тепловой шок» (патч 49, ч.2): именно в момент, когда

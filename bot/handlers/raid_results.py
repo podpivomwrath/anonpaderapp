@@ -371,6 +371,10 @@ def _record_contribution(battle: raid_combat.RaidBattle, result: TickResult) -> 
     for heal in result.heal_renders:
         if heal.source_id in battle.participants and heal.amount > 0:
             battle.contribution.setdefault(heal.source_id, raid_combat.RaidContribution()).healed += heal.amount
+    # Остаток Оберега, обращённый в лечение, - тоже лечение того, кто его повесил.
+    for source_id, _target_id, amount in getattr(result, "shield_heals", ()):
+        if source_id in battle.participants and amount > 0:
+            battle.contribution.setdefault(source_id, raid_combat.RaidContribution()).healed += amount
 
 
 async def on_raid_battle_finished(session_id: int, result: TickResult) -> None:
