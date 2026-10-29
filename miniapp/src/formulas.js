@@ -41,10 +41,13 @@ const PRIMARY_SOFT_BASE = 30;
 const PRIMARY_SOFT_PER_LEVEL = 2;
 const PRIMARY_OVER = 0.35;
 
-const CONTROL_RESIST_PER_WIL = 0.01;
+// С убывающей отдачей (2026-10-29), как в stat_model.GAME.
+const CONTROL_RESIST_K = 50;
 const CONTROL_RESIST_CAP = 0.75;
 
-const SUPPORT_POWER_PER_WIL = 0.005;
+// Сила поддержки - с убывающей отдачей от Воли (2026-10-29), как в stat_model.GAME.
+const SUPPORT_CAP = 1.0;
+const SUPPORT_K = 125;
 
 // Сила яда Отравителя. Считается НЕ от урона атаки, а от Воли и Ловкости,
 // причём Воля весит больше, хотя основной стат подкласса - Ловкость.
@@ -131,8 +134,8 @@ export function computeDerived({ level, baseClass, subclass = null, stats, gearB
     hyper(agi, CRIT_CAP, CRIT_K) + critBonus + (SUBCLASS_CRIT[subclass] ?? 0) + (m.crit_chance_bonus ?? 0), 1,
   );
   const mitigation = 1 - (1 - hyper(vit, MITIGATION_CAP, MITIGATION_K)) * (1 - (m.incoming_damage_reduction ?? 0));
-  const controlResist = Math.min(CONTROL_RESIST_PER_WIL * wil, CONTROL_RESIST_CAP);
-  const supportPower = SUPPORT_POWER_PER_WIL * wil;
+  const controlResist = hyper(wil, CONTROL_RESIST_CAP, CONTROL_RESIST_K);
+  const supportPower = hyper(wil, SUPPORT_CAP, SUPPORT_K);
   // урон за ход при полном числе стаков: делится на стаки и тут же
   // умножается обратно, но так формула читается так же, как в движке
   const poisonPower =

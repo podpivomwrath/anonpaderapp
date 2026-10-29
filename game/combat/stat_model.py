@@ -73,6 +73,10 @@ class HyperModel(StatModel):
     crit_dmg_per_str: float = 0.0        # прибавка к множителю крита за очко Силы
     effect_per_int: float = 0.0          # сила яда, горения, вампиризма за очко Интеллекта
     support_per_int: float = 0.0         # доля силы поддержки от Интеллекта вместо Воли
+    #: Сила поддержки (Круг тьмы, Оберег) от Воли - с убывающей отдачей.
+    #: None - линейно, как было до 2026-10-29.
+    support_cap: float | None = None
+    support_k: float = 125.0
     resist_hyper: bool = True            # False - сопротивление контролю по-старому, линейно
     base_crit: dict | None = None        # подкласс -> прибавка к криту (компенсация)
     base_dodge: dict | None = None
@@ -120,20 +124,29 @@ class HyperModel(StatModel):
     def support_power(self, s) -> float:
         if self.support_per_int:
             return self.support_per_int * s.intellect
+        if self.support_cap is not None:
+            return hyper(s.will, self.support_cap, self.support_k)
         return formulas.support_power(s.will)
 
 
 CURRENT = StatModel()
-#: Правила игры с 2026-10-24 (вариант D2 симулятора). Сопротивление контролю
-#: оставлено прежним: правка про PvE и моностат, PvP-контроль не трогаем.
+#: Правила игры с 2026-10-24 (вариант D2 симулятора). С 2026-10-29 убывающая
+#: отдача и у сопротивления контролю и силы поддержки (Круг тьмы, Оберег).
 #: Разбойники теряли сразу крит и уворот с Ловкости - подкласс возвращает
 #: часть (tools/balance_check.py: все подклассы в коридорах).
 GAME = HyperModel(
-    name="game", dodge_stat="will", primary_over=0.35, resist_hyper=False,
+    name="game", dodge_stat="will", primary_over=0.35,
+    # Сопротивление контролю - с убывающей отдачей (2026-10-29, владелец: потолок
+    # 75% наступал уже на 75 Воли). K=50 оставляет мобов почти как было
+    # (60 ур. - 25% вместо 26%), у игроков 75 Воли - 45%, 200 - 60%.
+    resist_k=50.0,
     primary_soft_stat_mult={"agi": 4 / 3},
     # Клинок теней живёт критами - ему больше (2026-10-24, владелец: «урон плох»).
     base_crit={"shadow_blade": 0.15, "poisoner": 0.10},
     base_dodge={"shadow_blade": 0.05, "poisoner": 0.05},
+    # Круг тьмы при 200 Воли лечил всю группу на полторы полоски мистика
+    # (2026-10-29, владелец): до ~80 Воли как было, выше - всё слабее.
+    support_cap=1.0, support_k=125.0,
 )
 ACTIVE: StatModel = GAME
 

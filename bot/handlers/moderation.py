@@ -116,7 +116,8 @@ def _format_report(report_id: int, vk_id: int, snapshot: dict, text: str, sent_a
     lines = [
         f"🐞 РЕПОРТ #{report_id}",
         "",
-        f"От: {snapshot['name']} (vk_id {vk_id})",
+        # Ник - ссылка на страницу VK (2026-10-29, владелец: вместо голого vk_id).
+        f"От: [id{vk_id}|{snapshot['name']}]",
         f"Уровень {snapshot['level']} · {snapshot['class_title']} · {snapshot['region']}",
         f"Позиция: ({snapshot['pos_x']}; {snapshot['pos_y']}) · состояние: {snapshot['state']}",
     ]

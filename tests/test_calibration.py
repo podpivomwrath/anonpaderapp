@@ -364,10 +364,10 @@ def test_without_numbness_freeze_consumed_same_tick() -> None:
 
 
 def test_deep_freeze_reduces_effective_resist_chance() -> None:
-    from game.combat import control, formulas
+    from game.combat import control, stat_model
 
     target = combatant(2, side=1, will=200)
-    base_resist = formulas.control_resist(target.stats.will)
+    base_resist = stat_model.ACTIVE.control_resist(target.stats.will)
     assert base_resist > 0.15  # иначе тест не показателен
 
     roll = base_resist - 0.05  # без бонуса резист сработал бы (roll < resist)

@@ -27,7 +27,9 @@ def test_current_equals_old_formulas() -> None:
     assert stat_model.subclass_crit_bonus("shadow_blade") == 0.15
     assert stat_model.subclass_dodge_bonus("poisoner") == 0.05
     assert stat_model.subclass_crit_bonus("guardian") == 0.0
-    assert stat_model.GAME.control_resist(50) == formulas.control_resist(50)
+    # С 2026-10-29 у игры убывающая отдача: потолок больше не наступает на 75 Воли.
+    assert stat_model.GAME.control_resist(75) < formulas.control_resist(75)
+    assert stat_model.GAME.support_power(Stats(will=200)) < formulas.support_power(200)
 
 
 def test_hyper_has_diminishing_returns() -> None:

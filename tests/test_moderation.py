@@ -38,7 +38,7 @@ def test_format_report_includes_quest_line_when_present() -> None:
     }
     text = _format_report(47, 123456789, snapshot, "после боя пропали кнопки", datetime(2026, 8, 12, 14, 32))
     assert "🐞 РЕПОРТ #47" in text
-    assert "Валгар (vk_id 123456789)" in text
+    assert "[id123456789|Валгар]" in text
     assert "Квест: Пропавший патруль" in text
     assert "HP: 41%" in text
     assert "после боя пропали кнопки" in text
