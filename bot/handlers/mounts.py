@@ -502,17 +502,20 @@ async def send_progress(peer_id: int, travel) -> None:
         logger.exception("Не удалось отправить сообщение пути ({})", peer_id)
 
 
-async def close_progress(peer_id: int, text: str) -> None:
-    """Путь кончился (прибытие, нападение, остановка): итог вместо отсчёта."""
+async def close_progress(peer_id: int, text: str) -> bool:
+    """Путь кончился (прибытие, нападение, остановка): итог вместо отсчёта.
+    False - сообщения пути не было или его не удалось поправить."""
     msg_id = _travel_message.pop(peer_id, None)
     _countdown_edited.pop(peer_id, None)
     _progress_cell.pop(peer_id, None)
     if msg_id is None or _bot_api is None:
-        return
+        return False
     try:
         await _bot_api.messages.edit(peer_id=peer_id, message_id=msg_id, message=text)
     except Exception:  # noqa: BLE001
         logger.debug("Не удалось закрыть сообщение пути для {}", peer_id)
+        return False
+    return True
 
 
 async def offer_continue(peer_id: int, travel_id: int) -> None:
@@ -808,12 +811,11 @@ async def scan() -> None:
         await db.commit()
 
     for peer_id, character, stats, gear_bonus, buff_modifiers, travel_id, encounter in ambush_starts:
-        await close_progress(peer_id, f"⚠ Путь прерван нападением на ({character.pos_x}; {character.pos_y}).")
-        await _bot_api.messages.send(
-            peer_id=peer_id,
-            message=f"⚠ ({character.pos_x}; {character.pos_y}): на пути внезапно возникает опасность - ты встаёшь.",
-            random_id=0,
-        )
+        # Одно сообщение о нападении (2026-10-29, владелец): правим отсчёт пути,
+        # а если его нет - пишем новым. Дальше - карточка моба.
+        ambush_text = f"⚠ В пути на ({character.pos_x}; {character.pos_y}) на тебя нападают."
+        if not await close_progress(peer_id, ambush_text):
+            await _bot_api.messages.send(peer_id=peer_id, message=ambush_text, random_id=0)
         await combat_handlers.start_mount_ambush_encounter(
             peer_id, character, stats, gear_bonus, buff_modifiers, travel_id, encounter,
         )
