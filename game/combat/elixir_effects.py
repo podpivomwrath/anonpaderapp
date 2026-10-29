@@ -10,12 +10,18 @@ from game.combat.session import SCROLL_WARD_TAG, SECOND_HEART_TAG, CombatantStat
 from game.economy import elixir_config as ec
 
 
+def _recovered(target: CombatantState, amount: int) -> int:
+    from game.combat import shared_rules
+
+    return shared_rules.recovered(target, amount)
+
+
 def drink_heal(actor: CombatantState, elixir_id: str) -> str:
     """Лечебное зелье - тоже бесплатное действие (2026-10-14, решение
     владельца): лечит сразу, ход не тратится. Раньше шло действием хода."""
     from game.combat.session import white_max_hp
 
-    amount = ec.heal_amount(elixir_id, white_max_hp(actor)) or 0
+    amount = _recovered(actor, ec.heal_amount(elixir_id, white_max_hp(actor)) or 0)
     before = actor.current_hp
     actor.current_hp = min(actor.max_hp, before + amount)
     healed = actor.current_hp - before
@@ -34,7 +40,7 @@ def _apply_scroll(actor: CombatantState, elixir_id: str, combatants) -> str:
         healed = []
         for c in allies:
             before = c.current_hp
-            c.current_hp = min(c.max_hp, c.current_hp + round(c.max_hp * ec.SCROLL_HEAL_PCT))
+            c.current_hp = min(c.max_hp, c.current_hp + _recovered(c, round(c.max_hp * ec.SCROLL_HEAL_PCT)))
             if c.current_hp > before:
                 healed.append(f"{c.name} +{c.current_hp - before}")
         tail = ", ".join(healed) if healed else "все и так целы"
@@ -92,6 +98,9 @@ def apply_combat_elixir(actor: CombatantState, elixir_id: str, combatants=None) 
             EffectKind.SHIELD_POOL, float(shield_amount), ec.SECOND_HEART_DURATION, actor.id,
             tag=SECOND_HEART_TAG,
         )
+        shield_amount = round(sum(
+            e.value for e in actor.effects_of(EffectKind.SHIELD_POOL) if getattr(e, "tag", None) == SECOND_HEART_TAG
+        ))
         return f"🛡️ Второе сердце укрывает тебя щитом ({shield_amount} поглощения)."
 
     if elixir_id == "ashen_haze":
@@ -128,7 +137,7 @@ def throw_flask(actor: CombatantState, elixir_id: str, combatants, power: float)
     if ec.heal_amount(elixir_id, white_max_hp(actor)) is not None:
         healed = []
         for c in allies:
-            amount = round((ec.heal_amount(elixir_id, white_max_hp(c)) or 0) * power)
+            amount = _recovered(c, round((ec.heal_amount(elixir_id, white_max_hp(c)) or 0) * power))
             before = c.current_hp
             c.current_hp = min(c.max_hp, before + amount)
             if c.current_hp > before:

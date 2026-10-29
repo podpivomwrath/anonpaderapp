@@ -169,6 +169,9 @@ class RenderedHit:
     marked: int = 0
     #: сколько срезал блок (Глухая оборона и пр.) - пишется в строке удара
     blocked: int = 0
+    #: сколько съел щит - тоже в строке удара (2026-10-29: в логе хода щит
+    #: был не виден, только урон, который до здоровья дошёл)
+    shielded: int = 0
 
 
 @dataclass
@@ -304,6 +307,9 @@ def _apply_phase(
         heals, {hid: applied + shielded_by_hit.get(hid, 0) for hid, applied in applied_by_hit.items()},
     )
     for heal in heals:
+        # Затухание лечения в PvP (shared_rules.recovered); amount правим на
+        # месте - лог и вклад видят то, что дошло.
+        heal.amount = shared_rules.recovered(session.combatants[heal.target_id], heal.amount)
         heal_taken[heal.target_id] = heal_taken.get(heal.target_id, 0) + heal.amount
 
     # Патч 56, «Отголосок» Тёмного мистика: лечение сверх максимума HP не
@@ -679,6 +685,7 @@ def resolve_tick(
                     hp_before=h_before, hp_after=h_after, max_hp=target.max_hp,
                     absorbed=hit.blocked + max(hit.amount - applied, 0),
                     marked=hit.marked, blocked=hit.blocked,
+                    shielded=shielded_by_hit.get(id(hit), 0),
                 )
             )
         for heal in heals:
@@ -745,7 +752,7 @@ def resolve_tick(
                     # лечение -> щит -> лечение ходили по кругу.
                     effect.value = 0
                     continue
-                heal = round(effect.value)
+                heal = shared_rules.recovered(combatant, round(effect.value))
                 before_hp = combatant.current_hp
                 combatant.current_hp = min(combatant.current_hp + heal, combatant.max_hp)
                 if combatant.current_hp == before_hp:

@@ -238,6 +238,10 @@ class CombatantState:
     # Есть ли живые союзники: ставит резолвер в начале хода. Нужен там, где
     # до сессии не дотянуться (compute_hit), и отделяет соло-бонусы от групповых.
     has_allies: bool = False
+    # Сила входящего лечения и новых щитов в этот ход: в PvP падает от 1.0 в
+    # первый ход до 0 в последний (2026-10-29, владелец). Ставит движок при
+    # открытии хода - эликсиры пьются в окне хода, до резолва.
+    recovery_mult: float = 1.0
     # Патч 56 (Тёмный мистик): предыдущий навык потратил собственное HP,
     # значит «Тёмное вознаграждение» усилит следующий Кровавый пакт.
     dark_reward_ready: bool = False
@@ -304,6 +308,10 @@ class CombatantState:
         if kind in bc.DECAYING_DEBUFFS and value > 0 and decays:
             # getattr: соло-бой из pickle-снимка до появления поля.
             value *= getattr(self, "debuff_fatigue", {}).get(kind.value, 1.0)
+        if kind == EffectKind.SHIELD_POOL and tag != ECHO_TAG:
+            # Затухание щитов в PvP. Отголосок не режем второй раз: он из
+            # лечения, которое уже срезано.
+            value = round(value * getattr(self, "recovery_mult", 1.0))
         for effect in self.effects:
             # Щиты с разными метками не сливаются: мистик со своим Оберегом
             # выпил «Второе сердце» - это два щита, а не один перезаписанный.

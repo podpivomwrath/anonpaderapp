@@ -104,6 +104,10 @@ from services import onboarding_service as onboarding_svc
 from services.db import get_session_factory
 
 
+#: Затухание лечения и щитов (shared_rules.recovery_mult) - в начале боя.
+RECOVERY_INTRO = f"Лечение и щиты слабеют с каждым ходом, на {bc.PVP_MAX_TURNS}-м ходу их уже нет."
+
+
 #: Цель заказа в штольне (2026-10-29, владелец).
 SHAFT_NO_PVP_TEXT = "Цель в штольне. В узком забое не подраться - жди, пока выйдет наверх."
 
@@ -698,7 +702,7 @@ async def _launch_duel(
     _mass_engine.start_session(state)
     for cid in list(battle.participants):
         _init_target(session_id, battle, cid)
-    intro = f"{intro} Оба действуют одновременно, ход - {round(bc.PVP_GROUP_TURN_SECONDS)} секунд."
+    intro = f"{intro} Оба действуют одновременно, ход - {round(bc.PVP_GROUP_TURN_SECONDS)} секунд. {RECOVERY_INTRO}"
     for p in list(battle.participants.values()):
         combatant = state.combatants[p.character_id]
         await _bot_api.messages.send(
@@ -733,7 +737,7 @@ async def _start_group_ambush(db, attacker: Character, attacker_peer_id: int, vi
     intro = (
         f"⚔️ {attacker.name} нападает на {victim.name} посреди боя с мобами! "
         f"Бой с мобами прерван без итога, вся группа ({names}) вступает в схватку. "
-        f"Все действуют одновременно, ход - {round(bc.PVP_GROUP_TURN_SECONDS)} секунд."
+        f"Все действуют одновременно, ход - {round(bc.PVP_GROUP_TURN_SECONDS)} секунд. {RECOVERY_INTRO}"
     )
     for p in list(battle.participants.values()):
         board = intro + "\n\n" + _render_mass(state, [])
@@ -836,6 +840,10 @@ def _join_mass_battle_now(battle_id: int, battle: Battle, participant: Participa
         return
     battle.participants[participant.character_id] = participant
     battle.side_of[participant.character_id] = combatant.side
+    # Вступивший посреди боя лечится так же слабо, как все в этом ходу.
+    combatant.recovery_mult = next(
+        (getattr(c, "recovery_mult", 1.0) for c in session.combatants.values()), 1.0,
+    )
     session.add(combatant)
     _peer_battle[participant.peer_id] = battle_id
 

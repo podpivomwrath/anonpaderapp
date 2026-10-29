@@ -206,6 +206,26 @@ def poison_end_effects(
 # --- Клинок теней и Страж: память между ходами ---
 
 
+def recovery_mult(turn_number: int, max_turns: int | None) -> float:
+    """Сила лечения и щитов в PvP: 1.0 в первый ход, 0 в последний."""
+    if not bc.PVP_RECOVERY_DECAY or not max_turns or max_turns <= 1:
+        return 1.0
+    return min(max((max_turns - turn_number) / (max_turns - 1), 0.0), 1.0)
+
+
+def set_recovery(session: CombatSessionState, max_turns: int | None) -> None:
+    """Открыт новый ход PvP-боя: затухание лечения и щитов для всех бойцов."""
+    mult = recovery_mult(session.tick_number, max_turns)
+    for c in session.combatants.values():
+        c.recovery_mult = mult
+
+
+def recovered(target: CombatantState, amount: int) -> int:
+    """Входящее лечение после затухания в PvP (вне PvP множитель 1)."""
+    mult = getattr(target, "recovery_mult", 1.0)
+    return amount if mult >= 1.0 else round(amount * mult)
+
+
 def begin_turn_flags(session: CombatSessionState, turn_number: int) -> None:
     """Флаги, к которым compute_hit не имеет доступа (сессии он не видит):
     есть ли живые союзники и открыт ли в этот ход «Второй шанс». Ставятся
@@ -261,7 +281,7 @@ def inspiration_on_deaths(
             heal_pct = owner.buff_modifiers["inspiration_heal_pct"]
             dmg_bonus = owner.buff_modifiers.get("inspiration_damage_bonus", 0.0)
             for ally in allies:
-                ally.current_hp = min(ally.current_hp + round(ally.max_hp * heal_pct), ally.max_hp)
+                ally.current_hp = min(ally.current_hp + recovered(ally, round(ally.max_hp * heal_pct)), ally.max_hp)
                 if dmg_bonus > 0:
                     ally.apply_effect(
                         EffectKind.DAMAGE_BUFF, dmg_bonus, bc.SHADOW_BLADE_INSPIRATION_TURNS, owner.id

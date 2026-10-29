@@ -23,6 +23,7 @@ from apscheduler.triggers.date import DateTrigger
 from loguru import logger
 
 from game.combat import balance_config as bc
+from game.combat import shared_rules
 from game.combat.resolver import TickResult, resolve_tick
 from game.combat.session import CombatMode, CombatSessionState, DeclaredAction
 
@@ -169,6 +170,8 @@ class TickEngine:
 
     def _open_tick(self, state: CombatSessionState) -> None:
         state.tick_number += 1
+        if state.mode == CombatMode.PVP_GROUP and self.max_turns is not None:
+            shared_rules.set_recovery(state, self.max_turns)
         # Патч 51, ч.4: групповой PvE (is_raid) идёт по таймеру, как групповой
         # PvP — соло PvE (is_raid=False) остаётся без таймера (см. __init__).
         window = None
@@ -257,8 +260,15 @@ class TickEngine:
                     result.lines.append(bc.PVP_DRAW_TURN_LIMIT_TEXT)
                 else:
                     remaining = self.max_turns - tick
+                    notes = []
                     if remaining <= bc.PVP_MAX_TURNS_WARNING_AT:
-                        result.lines.append(f"⏳ Ходов до исхода: {remaining}")
+                        notes.append(f"⏳ Ходов до исхода: {remaining}")
+                    # Сила лечения и щитов на следующий ход (shared_rules.recovery_mult).
+                    if bc.PVP_RECOVERY_DECAY and state.mode == CombatMode.PVP_GROUP:
+                        power = round(100 * shared_rules.recovery_mult(tick + 1, self.max_turns))
+                        notes.append(f"🩹 Лечение и щиты в следующем ходу: {power}%")
+                    if notes:
+                        result.lines.append(" · ".join(notes))
 
             logger.info("Сессия {}: тик {} разрешён одновременно", session_id, tick)
             for line in result.lines:
