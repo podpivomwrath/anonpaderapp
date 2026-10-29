@@ -1040,3 +1040,17 @@ body.lite .sparks {
 @media (prefers-reduced-motion: reduce) {
   .narrator { animation: none; }
 }
+
+/* «Дар первопроходцев» в «Герое» (2026-10-29). */
+.gift-card {
+  padding: 0 16px 12px;
+}
+
+.gift-card__list {
+  margin: 6px 0 0;
+  padding-left: 18px;
+  display: grid;
+  gap: 4px;
+  font-size: 14px;
+  line-height: 1.35;
+}

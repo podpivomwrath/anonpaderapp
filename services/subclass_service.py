@@ -62,8 +62,11 @@ def paths_for(base_class: str) -> list[SubclassDef]:
 
 
 def free_repick(character: Character) -> bool:
-    """Путь выбирается заново после смены класса/подкласса - без платы (временно)."""
-    return bc.FREE_SUBCLASS_REPICK and bool(getattr(character, "subclass_free_repick", False))
+    """Путь выбирается заново после смены класса/подкласса - без платы, пока
+    действует «Дар первопроходцев»."""
+    from game.economy import prerelease_config
+
+    return prerelease_config.free_path_repick() and bool(getattr(character, "subclass_free_repick", False))
 
 
 async def pay_unlock(db, character: Character) -> int:

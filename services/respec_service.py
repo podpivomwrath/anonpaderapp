@@ -5,9 +5,8 @@
   2. изменение состава пресета — за фарм-валюту (preset_service);
   3. смена класса/подкласса и сброс характеристик — этот модуль.
 
-На время альфа-теста третий уровень бесплатен и без ограничений: флаг
-bc.ALPHA_FREE_RESPEC. Когда альфа кончится, флаг выключается - и списание
-включается обратно само, трогать вызывающий код не придётся.
+До релиза третий уровень бесплатен и без ограничений - «Дар первопроходцев»
+(game/economy/prerelease_config.py). Выключат дар - списание включится само.
 
 ВАЖНО про пресеты. Пул баффов у каждого подкласса свой. С 2026-10-19 пресеты
 при смене класса и подкласса НЕ удаляются (решение владельца): каждый пресет
@@ -19,6 +18,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from game.combat import balance_config as bc
+from game.economy import prerelease_config
 from models import BaseClass, Character, CharacterStats
 from services import subclass_service
 from services.wallet_service import charge
@@ -49,7 +49,7 @@ async def full_class_reset(
     - сбрасывает подкласс (пресеты остаются - см. докстринг модуля);
     - статы возвращаются к стартовым, очки прокачки — в unspent_points.
     """
-    if not bc.ALPHA_FREE_RESPEC:
+    if not prerelease_config.free_respec():
         await charge(db, character.id, "donate", bc.CLASS_RESET_COST_DONATE)
 
     character.base_class = new_base_class
@@ -69,7 +69,7 @@ async def reset_subclass(db: AsyncSession, character: Character) -> Character:
     Прогресс испытаний не трогаем: он привязан к id баффов, и если игрок
     вернётся к прежнему подклассу, открытое останется открытым.
     """
-    if not bc.ALPHA_FREE_RESPEC:
+    if not prerelease_config.free_respec():
         await charge(db, character.id, "donate", bc.SUBCLASS_RESET_COST_DONATE)
 
     if subclass_service.path_chosen(character):
@@ -85,7 +85,7 @@ async def reset_stats(db: AsyncSession, character: Character) -> Character:
 
     Пресеты не трогаем — они от статов не зависят.
     """
-    if not bc.ALPHA_FREE_RESPEC:
+    if not prerelease_config.free_respec():
         await charge(db, character.id, "farm", bc.STATS_RESET_COST_FARM)
 
     await _reset_stats_rows(db, character, character.base_class)

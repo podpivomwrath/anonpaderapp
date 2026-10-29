@@ -876,7 +876,10 @@ async def add_fame(db: AsyncSession, guild_id: int, amount: int) -> FameResult:
     if guild is None or amount <= 0:
         return FameResult(0, 0, guild.level if guild else 0)
     effects = guild_tree.total_effects(set(guild.tree_nodes or []))
-    gained = round(amount * (1 + effects.get("fame_pct", 0) / 100))
+    # «Дар первопроходцев» до релиза - слава вдвое (2026-10-29, владелец).
+    from game.economy import prerelease_config
+
+    gained = round(amount * (1 + effects.get("fame_pct", 0) / 100) * prerelease_config.guild_fame_mult())
     guild.fame += gained
     guild.fame_total += gained
     guild.fame_month += gained

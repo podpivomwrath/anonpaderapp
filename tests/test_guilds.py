@@ -206,11 +206,21 @@ async def test_spend_ore_takes_worst_grades_first(db_session, make_character) ->
 # --- Слава и задания -----------------------------------------------------------------
 
 
-async def test_fame_levels_up(db_session, make_character) -> None:
+async def test_fame_levels_up(db_session, make_character, monkeypatch) -> None:
+    from game.economy import prerelease_config
+
+    monkeypatch.setattr(prerelease_config, "ACTIVE", False)  # правило как на самом деле
     guild, _leader = await _found(db_session, make_character)
     result = await guild_service.add_fame(db_session, guild.id, gc.fame_to_next(1) + gc.fame_to_next(2) + 5)
     assert result.levels_gained == 2 and result.new_level == 3
     assert guild_service.tree_points_available(guild) == 2
+
+
+async def test_pioneer_gift_doubles_guild_fame(db_session, make_character) -> None:
+    """«Дар первопроходцев» (2026-10-29): до релиза слава гильдии вдвое."""
+    guild, _leader = await _found(db_session, make_character)
+    result = await guild_service.add_fame(db_session, guild.id, 10)
+    assert result.gained == 20
 
 
 async def test_guild_daily_and_weekly(db_session, make_character) -> None:

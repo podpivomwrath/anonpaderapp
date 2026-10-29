@@ -176,7 +176,9 @@ async def test_full_class_reset_charges_when_alpha_is_over(
 ) -> None:
     """Флаг альфы выключается одной строкой - списание обязано вернуться само,
     без правок вызывающего кода."""
-    monkeypatch.setattr(bc, "ALPHA_FREE_RESPEC", False)
+    from game.economy import prerelease_config
+
+    monkeypatch.setattr(prerelease_config, "FREE_RESPEC", False)
     character = await make_character(
         level=10, farm=0, donate=bc.CLASS_RESET_COST_DONATE, subclass="guardian"
     )

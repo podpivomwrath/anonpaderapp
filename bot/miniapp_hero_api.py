@@ -9,7 +9,7 @@ from sqlalchemy import or_, select
 
 from bot.app_keys import SESSION_FACTORY_KEY
 from bot.miniapp_auth import VK_USER_ID_KEY
-from game.economy import fishing
+from game.economy import fishing, prerelease_config
 from game.economy import raid_archive_config as ac
 from game.economy import raid_config as rc
 from game.economy import raid_field_config as fc
@@ -121,6 +121,8 @@ async def handle_get_trophies(request: web.Request) -> web.Response:
             "best_fish": best_fish,
             "titles_open": titles_open,
             "titles_total": len(TITLE_NAMES),
+            # Дорелизные поблажки одной карточкой (2026-10-29).
+            "gift": prerelease_config.card(),
         })
 
 

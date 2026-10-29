@@ -141,6 +141,21 @@ function SlotSheet({ slot, items, onClose, onEquip, onUnequip, busyId }) {
   );
 }
 
+// «Дар первопроходцев» (2026-10-29): все дорелизные бонусы одной карточкой.
+function GiftCard({ gift }) {
+  if (!gift) return null;
+  return (
+    <Group header={<Header>{gift.emoji} {gift.title}</Header>}>
+      <div className="gift-card">
+        <p className="craft-hint">{gift.about}</p>
+        <ul className="gift-card__list">
+          {gift.lines.map((line) => <li key={line}>{line}</li>)}
+        </ul>
+      </div>
+    </Group>
+  );
+}
+
 function TrophyShelf({ trophies }) {
   const [picked, setPicked] = useState(null);
   if (!trophies) return null;
@@ -557,6 +572,7 @@ export default function HeroTab({ character, onCharacterUpdate }) {
         )}
       </Group>
 
+      <GiftCard gift={trophies?.gift} />
       <TrophyShelf trophies={trophies} />
       <Settings character={character} onCharacterUpdate={onCharacterUpdate} />
 

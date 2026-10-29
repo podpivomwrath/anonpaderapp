@@ -47,7 +47,7 @@ class Character(Base):
     # Шаг FSM сцены «Раскол пути» у Хранителя (патч 12); NULL = не в процессе
     subclass_select_state: Mapped[str | None] = mapped_column(String(32), nullable=True)
     # Подкласс сброшен сменой класса/подкласса - новый путь выбирается без
-    # платы (2026-10-16, временно: balance_config.FREE_SUBCLASS_REPICK).
+    # платы (2026-10-16; пока действует prerelease_config.FREE_PATH_REPICK).
     subclass_free_repick: Mapped[bool] = mapped_column(default=False, server_default="false")
     # Отказ от подкласса у Хранителя (2026-10-20): subclass остаётся NULL,
     # пресеты - из пула базового класса ("<класс>_path"). Необратимо, как

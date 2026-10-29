@@ -74,7 +74,9 @@ async def spawn_ore(db: AsyncSession, rng: random.Random) -> str | None:
     Выбор только среди неполных: иначе часть бросков уходила бы в уже полные
     жилы, и реальная скорость наполнения была бы ниже расчётной.
     """
-    if rng.random() >= mc.ORE_SPAWN_CHANCE_PER_EXPLORATION * mc.TEST_ORE_SPAWN_MULT:
+    from game.economy import prerelease_config
+
+    if rng.random() >= mc.ORE_SPAWN_CHANCE_PER_EXPLORATION * prerelease_config.ore_spawn_mult():
         return None
 
     rows = (await db.execute(select(MineVein))).scalars().all()

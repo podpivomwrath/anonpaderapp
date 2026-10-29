@@ -424,7 +424,7 @@ async def _back_to_path_select(message: Message) -> None:
 
 # --- Переделка персонажа (альфа-тест) -------------------------------------
 # На время альфы бесплатно и без ограничений: цена включится сама, когда
-# выключат bc.ALPHA_FREE_RESPEC (см. services/respec_service.py).
+# выключат «Дар первопроходцев» (game/economy/prerelease_config.py).
 
 _REMAKE_INTRO = (
     "- Запись можно переписать. - Хранитель разворачивает страницу к тебе. - "

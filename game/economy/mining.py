@@ -11,6 +11,7 @@ import random
 
 from game.content_loader import MineDef, OreDef, load_mines, load_ore_defs
 from game.economy import mining_config as mc
+from game.economy import prerelease_config
 from game.economy.fishing import ring_tier  # noqa: F401 - общее правило колец
 
 _ore_defs: dict[str, OreDef] | None = None
@@ -209,7 +210,7 @@ def xp_to_next(mining_level: int) -> int:
 def dig_xp(ore_id: str, grade_id: str) -> int:
     definition = ore_def(ore_id)
     tier = definition.tier if definition else 1
-    base = mc.MINING_TIER_XP.get(tier, 1) * mc.MINING_GRADE_XP_MULT.get(grade_id, 1.0) * mc.TEST_MINING_XP_MULT
+    base = mc.MINING_TIER_XP.get(tier, 1) * mc.MINING_GRADE_XP_MULT.get(grade_id, 1.0) * prerelease_config.mining_xp_mult()
     return max(round(base), 1)
 
 
