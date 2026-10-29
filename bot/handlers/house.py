@@ -229,12 +229,12 @@ def fish_text(dish: cc.Dish, options: list) -> str:
     d = cooking.dish_def(dish.dish_id)
     if not options:
         return (f"{d.emoji} {d.name}: нужна рыба {dish.fish_tier}-го тира, хотя бы "
-                f"{fishing.format_kg(cc.PORTION_GRAMS[dish.fish_tier])} кг одного вида и градации. В садке такой нет.")
+                f"{fishing.format_kg(cc.PORTION_GRAMS[dish.fish_tier])} одного вида и градации. В садке такой нет.")
     lines = [f"{d.emoji} {d.name} - какую рыбу взять?", ""]
     for opt in options[:FISH_CHOICES]:
         mark = fc.GRADE_EMOJI.get(opt.grade, "")
         lines.append(
-            f"{mark}{opt.fish.name} ({fishing.grade_name(opt.grade)}, {fishing.format_kg(opt.grams)} кг) - "
+            f"{mark}{opt.fish.name} ({fishing.grade_name(opt.grade)}, {fishing.format_kg(opt.grams)}) - "
             f"{opt.portions} порц., {cooking.buff_text(dish, opt.grade)}"
         )
     return "\n".join(lines)

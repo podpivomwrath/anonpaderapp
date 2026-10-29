@@ -136,7 +136,7 @@ async def _owned_item(db: AsyncSession, character_id: int, item_id: int) -> Item
 
 
 def _primary_stat(character: Character) -> str:
-    return bc.PRIMARY_STAT_BY_CLASS[character.base_class]
+    return bc.primary_stat_of(character)
 
 
 def source_of(item: Item) -> str | None:

@@ -128,7 +128,7 @@ async def grant_guaranteed_item(
     участнику" за этапы 1/2/3 соответственно."""
     rarity_id = _roll_rarity_at_least(rng, floor_rarity)
     slot = item_gen.roll_slot(rng)
-    primary_stat = bc.PRIMARY_STAT_BY_CLASS[character.base_class]
+    primary_stat = bc.primary_stat_of(character)
     generated = item_gen.generate_item(
         rng, ilvl=ilvl, slot=slot, rarity_id=rarity_id,
         primary_stat=primary_stat, bases=item_service.bases(), rarities=item_service.rarities(),

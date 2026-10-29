@@ -170,7 +170,7 @@ async def catch_chance(db: AsyncSession, character: Character) -> tuple[str, flo
 
     stats = await db.scalar(select(CharacterStats).where(CharacterStats.character_id == character.id))
     totals = await scene_event_service.total_stats(db, character, stats)
-    stat = bc.PRIMARY_STAT_BY_CLASS[character.base_class]
+    stat = bc.primary_stat_of(character)
     return stat, ti.catch_chance(stat, totals)
 
 

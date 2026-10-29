@@ -100,7 +100,7 @@ async def grant_from_kill(
     if premium_service.is_premium(character):
         rarity_id = item_gen.maybe_upgrade_rarity(rarity_id, rarities(), rng, pc.PREMIUM_RARITY_UPGRADE_CHANCE)
     slot = item_gen.roll_slot(rng)
-    primary_stat = bc.PRIMARY_STAT_BY_CLASS[character.base_class]
+    primary_stat = bc.primary_stat_of(character)
     generated = item_gen.generate_item(
         rng, ilvl=mob_level, slot=slot, rarity_id=rarity_id,
         primary_stat=primary_stat, bases=bases(), rarities=rarities(),
@@ -139,7 +139,7 @@ async def grant_random_item(
     if premium_service.is_premium(character):
         rarity_id = item_gen.maybe_upgrade_rarity(rarity_id, rarities(), rng, pc.PREMIUM_RARITY_UPGRADE_CHANCE)
     slot = item_gen.roll_slot(rng)
-    primary_stat = bc.PRIMARY_STAT_BY_CLASS[character.base_class]
+    primary_stat = bc.primary_stat_of(character)
     generated = item_gen.generate_item(
         rng, ilvl=ilvl, slot=slot, rarity_id=rarity_id,
         primary_stat=primary_stat, bases=bases(), rarities=rarities(),
@@ -173,7 +173,7 @@ async def grant_unique_item(
     рецепт, причём и для уже скованного оружия — так перекрафт в соседнюю
     специализацию не требует обратных рецептов на каждую пару."""
     unique_def = unique_items()[unique_id]
-    primary_stat = bc.PRIMARY_STAT_BY_CLASS[character.base_class]
+    primary_stat = bc.primary_stat_of(character)
     item = Item(
         name=unique_def.name, slot=unique_def.slot,
         base_stats=crafting.roll_boss_item_stats(

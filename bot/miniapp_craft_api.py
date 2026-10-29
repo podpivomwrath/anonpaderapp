@@ -144,7 +144,7 @@ async def handle_get_craft(request: web.Request) -> web.Response:
         ]
         from game.combat import balance_config as bc
 
-        primary = bc.PRIMARY_STAT_BY_CLASS.get(character.base_class, "str")
+        primary = bc.primary_stat_of(character)  # у Тёмного мистика - Воля (2026-10-29)
         specs = (
             _spec_payload(items[0]["source_id"], primary) if items else _spec_payload("surgeon_scalpel", primary)
         )

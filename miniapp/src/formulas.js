@@ -77,6 +77,8 @@ export function primaryEffective(value, level, stat = 'str') {
 }
 
 export const PRIMARY_STAT_BY_CLASS = { warrior: 'str', rogue: 'agi', mage: 'int' };
+const DARK_MYSTIC_DAMAGE_WILL_SHARE = 0.6;
+const DARK_MYSTIC_DAMAGE_INT_SHARE = 0.4;
 
 /**
  * Округление «половина к чётному» - то же, что делает round() в Python.
@@ -117,7 +119,11 @@ export function computeDerived({ level, baseClass, subclass = null, stats, gearB
   const int_ = stats.int + (gearBonus.int ?? 0);
   const vit = stats.vit + (gearBonus.vit ?? 0);
   const wil = stats.wil + (gearBonus.wil ?? 0);
-  const primaryValue = { str, agi, int: int_ }[primaryStat] ?? 0;
+  // Тёмный мистик бьёт от Воли, Интеллект вторичный (2026-10-29), как в
+  // stat_model.damage_stat_value.
+  const primaryValue = subclass === 'dark_mystic'
+    ? DARK_MYSTIC_DAMAGE_WILL_SHARE * wil + DARK_MYSTIC_DAMAGE_INT_SHARE * int_
+    : ({ str, agi, int: int_ }[primaryStat] ?? 0);
   const kDmg = K_DMG[primaryStat];
 
   const hpMult = (subclass ? 1 : (BASE_CLASS_HP_MULT[baseClass] ?? 1));

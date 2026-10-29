@@ -191,7 +191,7 @@ def _find_entry(key: str) -> dict:
 
 
 def _primary_stat(character: Character) -> str:
-    return bc.PRIMARY_STAT_BY_CLASS[character.base_class]
+    return bc.primary_stat_of(character)
 
 
 async def _add_item(db, character: Character, item: Item) -> Item:

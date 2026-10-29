@@ -62,11 +62,11 @@ def compute(
     tier_mult = formulas.tier_multiplier(tier)
 
     primary_stat = bc.PRIMARY_STAT_BY_CLASS[character.base_class]
-    primary_value = {"str": strength, "agi": agility, "int": intellect}[primary_stat]
     k_dmg = formulas.k_dmg_for(primary_stat)
     # Проценты и урон - той же моделью статов, что и бой (game/combat/stat_model).
     model = stat_model.ACTIVE
     s = Stats(strength=strength, agility=agility, intellect=intellect, vitality=vitality, will=will)
+    primary_value = stat_model.damage_stat_value(s, primary_stat, character.subclass)
     m = shown_mods(mods)
     hp_mult = (1 + m.get("max_hp_bonus", 0.0)) if mods is not None else _food_hp_mult(character)
     dmg_mult = (1 + m.get("damage_bonus", 0.0)) * (1 + m.get("reckless_damage_bonus", 0.0))

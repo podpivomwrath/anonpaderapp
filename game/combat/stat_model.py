@@ -129,6 +129,14 @@ class HyperModel(StatModel):
         return formulas.support_power(s.will)
 
 
+def damage_stat_value(stats, primary_stat: str, subclass_id: str | None) -> float:
+    """Сколько очков идёт в урон до порога. У Тёмного мистика - Воля плюс
+    доля Интеллекта, у остальных - основной стат класса."""
+    if subclass_id == "dark_mystic":
+        return bc.DARK_MYSTIC_DAMAGE_WILL_SHARE * stats.will + bc.DARK_MYSTIC_DAMAGE_INT_SHARE * stats.intellect
+    return stats.by_key(primary_stat)
+
+
 CURRENT = StatModel()
 #: Правила игры с 2026-10-24 (вариант D2 симулятора). С 2026-10-29 убывающая
 #: отдача и у сопротивления контролю и силы поддержки (Круг тьмы, Оберег).

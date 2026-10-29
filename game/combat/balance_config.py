@@ -337,6 +337,24 @@ POISONER_MAX_STACKS = 3                     # тик-урон = сила яда 
 POISONER_POISON_DURATION_TICKS = 4          # в игре как есть, отдельно не калибровалось (2026-10-22)
 
 # Тёмный мистик
+#: Тёмный мистик бьёт от Воли, Интеллект - вторичный: урон считается от
+#: 0.6 × Воля + 0.4 × Интеллект (2026-10-29, владелец: лекарь в соло-PvE не мог
+#: и лечить, и бить - Воля шла в лечение, Интеллект в урон). При поровну
+#: вложенных Воле и Интеллекте урон как был. 1.0/0.5 давало мистику 83% дуэлей
+#: в tools/balance_check.py (Воля ещё и лечит, и уворачивает), 0.6/0.4 - 26%.
+DARK_MYSTIC_DAMAGE_WILL_SHARE = 0.6
+DARK_MYSTIC_DAMAGE_INT_SHARE = 0.4
+
+
+def primary_stat_of(character) -> str:
+    """Основной стат персонажа для вещей, крафта и бонусов «к основному
+    стату». У Тёмного мистика - Воля (2026-10-29), у остальных - стат класса.
+    Урон считает stat_model.damage_stat_value."""
+    if getattr(character, "subclass", None) == "dark_mystic":
+        return "wil"
+    return PRIMARY_STAT_BY_CLASS[character.base_class]
+
+
 DARK_MYSTIC_WARD_SHIELD_COEF = 0.85         # Оберег: поглощение = support_power(WIL) * коэф
 DARK_MYSTIC_CIRCLE_HP_COST = 0.20           # Круг тьмы: доля ТЕКУЩЕГО HP, платится за навык
 DARK_MYSTIC_DRAIN_CONTROLLED_MULT = 1.40   # Иссушение: множитель урона по цели под контролем

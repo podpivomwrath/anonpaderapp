@@ -25,6 +25,12 @@ const PRIMARY_HINT = {
   rogue: '1,5 за каждое очко Ловкости',
 };
 
+// Тёмный мистик бьёт от Воли, Интеллект вторичный (2026-10-29).
+function damageSource(c) {
+  if (c.subclass === 'dark_mystic') return '1,2 за каждое очко Воли и 0,8 за каждое очко Интеллекта';
+  return PRIMARY_HINT[c.base_class] || 'основной стат';
+}
+
 const DERIVED_DEFS = [
   {
     key: 'max_hp', clientKey: 'maxHp', label: 'Макс. HP', format: (v) => Math.round(v),
@@ -33,7 +39,7 @@ const DERIVED_DEFS = [
   },
   {
     key: 'damage', clientKey: 'damage', label: '⚔️ Урон', format: (v) => (v + EPS).toFixed(1),
-    hint: (c) => `Сила обычной атаки: база ранга уровня + ${PRIMARY_HINT[c.base_class] || 'основной стат'}. `
+    hint: (c) => `Сила обычной атаки: база ранга уровня + ${damageSource(c)}. `
       + `Основной стат с вещами считается полностью до порога 30 + 2 за уровень, у Ловкости - на треть выше `
       + `(у тебя сейчас: ${Math.round((30 + 2 * c.level) * (c.base_class === 'rogue' ? 4 / 3 : 1))}), `
       + 'каждое очко сверх - на треть. Навыки бьют на свой процент от этого числа, крит - в 1,5 раза сильнее.',

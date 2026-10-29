@@ -195,7 +195,7 @@ async def garrison(db: AsyncSession, siege: GuildSiege, first_id: int) -> list[C
     return result
 
 
-_PRIMARY_FIELD = {"str": "strength", "agi": "agility", "int": "intellect"}
+_PRIMARY_FIELD = {"str": "strength", "agi": "agility", "int": "intellect", "wil": "will"}
 
 
 def siege_modifiers(stats: Stats, character, attacker: bool) -> Stats:
@@ -207,7 +207,7 @@ def siege_modifiers(stats: Stats, character, attacker: bool) -> Stats:
         vitality=stats.vitality, will=stats.will,
     )
     if dmg:
-        field_name = _PRIMARY_FIELD[bc.PRIMARY_STAT_BY_CLASS[character.base_class]]
+        field_name = _PRIMARY_FIELD[bc.primary_stat_of(character)]
         setattr(result, field_name, round(getattr(result, field_name) * (1 + dmg)))
     return result
 

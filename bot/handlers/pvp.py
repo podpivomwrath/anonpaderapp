@@ -313,10 +313,11 @@ async def _build_combatant_for(db, character: Character) -> CombatantState:
     )
     primary = bc.PRIMARY_STAT_BY_CLASS[character.base_class]
     pvp_bonus = guild_service.perk(character, "pvp_damage_pct") / 100
+    gear_primary = bc.primary_stat_of(character)  # у мистика урон от Воли
     if pvp_bonus:
         # Древо гильдии: урон в PvP - через основную характеристику, как и
         # остальная сила персонажа.
-        field_name = {"str": "strength", "agi": "agility", "int": "intellect"}[primary]
+        field_name = {"str": "strength", "agi": "agility", "int": "intellect", "wil": "will"}[gear_primary]
         setattr(stats, field_name, round(getattr(stats, field_name) * (1 + pvp_bonus)))
     # Патч 22: перед PvP-боем ОБА восстанавливаются до полного HP — build_combatant
     # всегда стартует с current_hp=max_hp, что ровно и нужно (никакого переноса
