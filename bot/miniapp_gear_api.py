@@ -106,7 +106,8 @@ async def _payload(db, character) -> dict:
                 "id": tool.id, "slot": tool.slot, "title": tool.title, "emoji": tool.emoji,
                 "source": tool.source, "owned": have,
                 "tier": row.tier if have else 0, "count": row.count if row is not None else 0,
-                "effect": craft_gear.effect_line(tool.id, row.tier) if have else None,
+                "effect": craft_gear.effect_line(tool.id, row.tier, row.count if tool.id == "almanac" else 0)
+                if have else None,
                 "next": await _next_step(db, character, tool, row),
                 "hint": SOURCE_HINTS.get(tool.id), "soon": tool.id in NOT_READY,
                 # Что делает - видно и до находки (2026-10-23: у альманаха было

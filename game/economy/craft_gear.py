@@ -91,15 +91,18 @@ def sickle_cuts(sickle_tier: int, herb_tier: int) -> bool:
     return sickle_tier > 0 and herb_tier <= sickle_tier
 
 
-def effect_line(tool_id: str, tier: int) -> str:
-    """Что даёт инструмент - строка для мини-аппа."""
+def effect_line(tool_id: str, tier: int, pages: int = 0) -> str:
+    """Что даёт инструмент - строка для мини-аппа. pages - страницы альманаха:
+    прибавка к 10 подсказкам видна в скобках (2026-10-29, владелец)."""
     pct = lambda x: f"{round(x * 100)}%"  # noqa: E731
     # Формулировки переписаны 2026-10-23 (владелец: «очень непонятно»).
     if tool_id == "sickle":
         return f"Сам срезает траву до {tier} тира на клетке, куда ты заходишь"
     if tool_id == "almanac":
         return ("Когда заходишь на клетку, пишет, на каких из 8 соседних клеток растёт трава. "
-                "Показывает только ту, которую ты уже различаешь. Хватает на 10 раз, потом час заряжается")
+                "Показывает только ту, которую ты уже различаешь. "
+                f"Хватает на {gc.ALMANAC_USES} раз{f' (+{gc.ALMANAC_USES_PER_PAGE * pages})' if pages else ''}, "
+                "потом час заряжается")
     if tool_id == "pick":
         return (f"Копаешь на {pct(gc.PICK_SPEED_PER_TIER * tier)} быстрее и чаще достаёшь руду лучшей градации. "
                 f"В руднике тира выше кирки ускорение вдвое меньше")
