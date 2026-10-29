@@ -1,4 +1,4 @@
-"""PvP: лечение и щиты слабеют от 100% в первый ход до 0 в последний
+"""PvP: лечение и щиты слабеют от 100% в первый ход до 30% в последний
 (2026-10-29, владелец); щит виден в строке удара лога хода."""
 
 from game.combat import balance_config as bc
@@ -8,12 +8,12 @@ from game.combat.session import ECHO_TAG, EffectKind, CombatSessionState, Combat
 from tests.conftest import combatant as make_combatant
 
 
-def test_recovery_mult_runs_from_full_to_zero() -> None:
+def test_recovery_mult_runs_from_full_to_floor() -> None:
     turns = bc.PVP_MAX_TURNS
     assert shared_rules.recovery_mult(1, turns) == 1.0
-    assert shared_rules.recovery_mult(turns, turns) == 0.0
+    assert shared_rules.recovery_mult(turns, turns) == bc.PVP_RECOVERY_FLOOR == 0.3
     mid = shared_rules.recovery_mult(turns // 2, turns)
-    assert 0.0 < mid < 1.0
+    assert bc.PVP_RECOVERY_FLOOR < mid < 1.0
     # Вне PvP (лимита ходов нет) - всегда в полную силу.
     assert shared_rules.recovery_mult(50, None) == 1.0
 
@@ -25,13 +25,13 @@ def test_shield_and_heal_scaled_by_turn() -> None:
     session.tick_number = bc.PVP_MAX_TURNS
     shared_rules.set_recovery(session, bc.PVP_MAX_TURNS)
     c.apply_effect(EffectKind.SHIELD_POOL, 500, 3, c.id)
-    assert sum(e.value for e in c.effects_of(EffectKind.SHIELD_POOL)) == 0
-    assert shared_rules.recovered(c, 300) == 0
+    assert sum(e.value for e in c.effects_of(EffectKind.SHIELD_POOL)) == 150
+    assert shared_rules.recovered(c, 300) == 90
 
     session.tick_number = 1
     shared_rules.set_recovery(session, bc.PVP_MAX_TURNS)
     c.apply_effect(EffectKind.SHIELD_POOL, 500, 3, c.id, tag="ward")
-    assert sum(e.value for e in c.effects_of(EffectKind.SHIELD_POOL)) == 500
+    assert sum(e.value for e in c.effects_of(EffectKind.SHIELD_POOL)) == 150 + 500
     assert shared_rules.recovered(c, 300) == 300
 
 

@@ -15,7 +15,6 @@ from bot.keyboards.world import (
     BTN_GATE,
     BTN_INVENTORY,
     BTN_KEEPER,
-    BTN_MARKET,
     BTN_MARKET_QUARTER,
     BTN_MENTOR,
     BTN_MOUNT,
@@ -140,7 +139,8 @@ def test_tavern_none_character_still_works() -> None:
 def test_market_quarter_own_city_shows_all_and_back_last() -> None:
     kb_json = market_quarter_keyboard(is_foreign=False)
     labels = _labels(kb_json)
-    assert {BTN_APPRAISER, BTN_ELIXIR_SHOP, BTN_INVENTORY, BTN_MARKET, BTN_SQUARE_BACK}.issubset(labels)
+    assert {BTN_APPRAISER, BTN_ELIXIR_SHOP, BTN_INVENTORY, BTN_SQUARE_BACK}.issubset(labels)
+    assert "🏬 Рынок" not in labels
     rows = _rows(kb_json)
     assert rows[-1][-1]["action"]["label"] == BTN_SQUARE_BACK
 
@@ -148,7 +148,6 @@ def test_market_quarter_own_city_shows_all_and_back_last() -> None:
 def test_market_quarter_foreign_hides_elixir_and_market_keeps_appraiser_inventory() -> None:
     labels = _labels(market_quarter_keyboard(is_foreign=True))
     assert BTN_ELIXIR_SHOP not in labels
-    assert BTN_MARKET not in labels
     assert BTN_APPRAISER in labels
     assert BTN_INVENTORY in labels
     assert BTN_SQUARE_BACK in labels

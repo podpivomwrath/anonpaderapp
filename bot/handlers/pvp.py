@@ -105,7 +105,10 @@ from services.db import get_session_factory
 
 
 #: Затухание лечения и щитов (shared_rules.recovery_mult) - в начале боя.
-RECOVERY_INTRO = f"Лечение и щиты слабеют с каждым ходом, на {bc.PVP_MAX_TURNS}-м ходу их уже нет."
+RECOVERY_INTRO = (
+    f"Лечение и щиты слабеют с каждым ходом, на {bc.PVP_MAX_TURNS}-м ходу "
+    f"от них остаётся {round(bc.PVP_RECOVERY_FLOOR * 100)}%."
+)
 
 
 #: Цель заказа в штольне (2026-10-29, владелец).

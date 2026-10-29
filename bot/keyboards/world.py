@@ -21,7 +21,6 @@ from game.world import grid
 
 BTN_MENTOR = "🧙 Наставник"
 BTN_MENTOR_BADGE = f"{BTN_MENTOR} ❗"  # патч 21: есть что взять/сдать у наставника
-BTN_MARKET = "🏬 Рынок"  # патч 39: 🏬 — отличать от 🏪 «Торговый квартал» (сам квартал)
 BTN_APPRAISER = "💰 Скупщик"
 BTN_GATE = "🚪 За ворота"
 BTN_REST = "🛏️ Отдых"
@@ -182,15 +181,13 @@ def market_quarter_keyboard(is_foreign: bool = False) -> str:
     недоступны чужаку (та же логика, что была у city_menu_keyboard); Инвентарь
     — личное имущество, доступно всегда.
 
-    Патч 41: 2 колонки — ровно как в мокапе патча (Скупщик/Лавка, Инвентарь/
-    Рынок), до 2 рядов вместо 4."""
+    Патч 41: 2 колонки, до 2 рядов вместо 4. Кнопку «Рынок» (заглушку) убрали
+    2026-10-29: рынок живёт в мини-аппе."""
     kb = Keyboard(one_time=False)
     items: list[tuple[str, KeyboardButtonColor, dict | None]] = [(BTN_APPRAISER, KeyboardButtonColor.SECONDARY, None)]
     if not is_foreign:
         items.append((BTN_ELIXIR_SHOP, KeyboardButtonColor.SECONDARY, None))
     items.append((BTN_INVENTORY, KeyboardButtonColor.SECONDARY, None))
-    if not is_foreign:
-        items.append((BTN_MARKET, KeyboardButtonColor.SECONDARY, None))
     add_paired(kb, items)
     add_miniapp_button(kb)
     kb.row()

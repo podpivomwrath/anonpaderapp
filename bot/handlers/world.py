@@ -898,20 +898,6 @@ async def talk_to_mentor(message: Message) -> None:
         )
 
 
-@labeler.message(text=[kb.BTN_MARKET])
-async def visit_market(message: Message) -> None:
-    async with get_session_factory()() as db:
-        character = await onboarding_svc.get_character(db, message.from_id)
-        if character is None or character.creation_state is not None:
-            return
-        region = grid.city_region_at(character.pos_x, character.pos_y)
-        if region is not None and region != character.region:
-            # патч 26: рынок недоступен в чужом городе
-            await message.answer(FOREIGN_NPC_REJECTION)
-            return
-    await message.answer("Торговцы раскладывают товар. Скоро здесь можно будет торговать.")
-
-
 # --- Патч 39: кварталы города — переходы между Площадью/Таверной/Торговым квартаром ---
 
 

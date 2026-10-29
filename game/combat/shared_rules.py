@@ -207,10 +207,11 @@ def poison_end_effects(
 
 
 def recovery_mult(turn_number: int, max_turns: int | None) -> float:
-    """Сила лечения и щитов в PvP: 1.0 в первый ход, 0 в последний."""
+    """Сила лечения и щитов в PvP: 1.0 в первый ход, PVP_RECOVERY_FLOOR в последний."""
     if not bc.PVP_RECOVERY_DECAY or not max_turns or max_turns <= 1:
         return 1.0
-    return min(max((max_turns - turn_number) / (max_turns - 1), 0.0), 1.0)
+    share = min(max((max_turns - turn_number) / (max_turns - 1), 0.0), 1.0)
+    return bc.PVP_RECOVERY_FLOOR + (1.0 - bc.PVP_RECOVERY_FLOOR) * share
 
 
 def set_recovery(session: CombatSessionState, max_turns: int | None) -> None:
