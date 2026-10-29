@@ -260,7 +260,7 @@ async def on_mass_battle_finished(session_id: int, result: TickResult) -> None:
         # Арена: ни смерти, ни трофеев, ни рейтинга - игроки возвращаются на арену.
         if pvp.on_arena_finished is not None:
             winner = survivor_ids[0] if not result.draw and len(survivor_ids) == 1 else None
-            await pvp.on_arena_finished(battle, winner)
+            await pvp.on_arena_finished(battle, winner, result.draw)
         return
     if (battle.siege_id is None and not result.draw and len(battle.participants) == 2
             and len(dead_ids) == 1 and len(survivor_ids) == 1):

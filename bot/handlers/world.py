@@ -462,7 +462,7 @@ async def _render_city_screen(db, character, screen: str | None) -> tuple[str, s
     if screen == "arena" and not is_foreign:
         from bot.handlers import arena as arena_handlers  # избегаем цикла импортов
 
-        return arena_handlers.ARENA_TEXT, arena_handlers.arena_kb.arena_keyboard()
+        return arena_handlers._arena_text(), arena_handlers.keyboard_for_character(character.id)
     if screen == "market_quarter":
         return market_quarter_text(region, is_foreign), kb.market_quarter_keyboard(is_foreign)
     has_mount = await mount_service.has_any_mount(db, character.id)

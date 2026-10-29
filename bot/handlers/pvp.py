@@ -77,6 +77,7 @@ from game.combat.subclass_skills import SUBCLASS_SKILL_DEFS
 from game.combat.tick_engine import TickEngine
 from game.combat import consumable_limit
 from game.economy import elixir_config as ec
+from game.economy import prerelease_config
 from game.economy import fishing as game_fishing
 from game.economy import premium_config as pc
 from game.world import grid
@@ -174,6 +175,8 @@ class Battle:
     # Арена (2026-10-18): тренировочный бой - без смерти, потерь и рейтинга,
     # с клетки не виден, вступить нельзя, итог - bot/handlers/arena.py.
     arena: bool = False
+    #: Код комнаты арены, если бой из комнаты (2026-10-29).
+    arena_room: str | None = None
 
 
 #: Картинка начала осады (2026-10-19).
@@ -681,6 +684,42 @@ async def start_arena_duel(db, first: Character, first_peer: int, second: Charac
         db, first, first_peer, second, second_peer, location=ARENA_LOCATION, arena=True,
         intro=f"🏟 Арена: {first.name} против {second.name}! Бой тренировочный - ничего не теряется.",
     )
+
+
+async def start_arena_room(db, roster: list[tuple[Character, int, int]], code: str) -> None:
+    """Массовый бой комнаты арены (2026-10-29): roster - (персонаж, peer,
+    сторона 0/1). Без потерь, все с полным здоровьем."""
+    session_id = _new_battle_id()
+    battle = Battle(battle_type="mass", location=ARENA_LOCATION, arena=True, arena_room=code)
+    state = CombatSessionState(session_id=session_id, mode=CombatMode.PVP_GROUP)
+    for character, peer, side in roster:
+        combatant = await _build_combatant_for(db, character)
+        combatant.side = side
+        state.add(combatant)
+        battle.participants[character.id] = _participant(character, peer)
+        battle.side_of[character.id] = side
+        _peer_battle[peer] = session_id
+    _battles[session_id] = battle
+    battle.last_combatants = dict(state.combatants)
+    _mass_engine.start_session(state)
+    for cid in list(battle.participants):
+        _init_target(session_id, battle, cid)
+    intro = (
+        f"🏟 Арена, комната {code}: бой начался! Бой тренировочный - ничего не теряется. "
+        f"Все действуют одновременно, ход - {round(bc.PVP_GROUP_TURN_SECONDS)} секунд. {RECOVERY_INTRO}"
+    )
+    for p in list(battle.participants.values()):
+        board = intro + "\n\n" + _render_mass(state, [])
+        target_line = _target_line(session_id, battle, p.character_id)
+        if target_line:
+            board += f"\n{target_line}"
+        combatant = state.combatants[p.character_id]
+        await _bot_api.messages.send(
+            peer_id=p.peer_id, message=board, random_id=0,
+            keyboard=pvp_combat_keyboard(
+                p.base_class, combatant.cooldowns, subclass_id=combatant.subclass_id, show_target=True,
+            ),
+        )
 
 
 async def _launch_duel(
@@ -1215,7 +1254,8 @@ async def pvp_open_items(message: Message) -> None:
     if combatant is None or participant is None:
         return
     battle_kb = pvp_combat_keyboard(participant.base_class, combatant.cooldowns, subclass_id=combatant.subclass_id, show_target=battle.battle_type == "mass")
-    if battle.arena:
+    free = battle.arena and prerelease_config.arena_free_elixirs()
+    if battle.arena and not free:
         # Арена - бой без потерь: тратить эликсиры здесь нельзя.
         await message.answer("🏟 На арене эликсиры не используются - бой тренировочный.", keyboard=battle_kb)
         return
@@ -1223,11 +1263,15 @@ async def pvp_open_items(message: Message) -> None:
         await message.answer("Скован - не до зелий сейчас. ❄️", keyboard=battle_kb)
         return
 
-    async with get_session_factory()() as db:
-        character = await onboarding_svc.get_character(db, peer_id)
-        if character is None:
-            return
-        stock = await elixir_service.get_stock(db, character.id)
+    if free:
+        # Дар первопроходцев: на арене под рукой всё, сумка не тратится.
+        stock = [(d, "∞") for d in elixir_service.elixir_defs_ordered()]
+    else:
+        async with get_session_factory()() as db:
+            character = await onboarding_svc.get_character(db, peer_id)
+            if character is None:
+                return
+            stock = await elixir_service.get_stock(db, character.id)
 
     if not stock:
         await message.answer("🎒 В сумке пусто.", keyboard=battle_kb)
@@ -1272,7 +1316,8 @@ async def pvp_use_item(message: Message) -> None:
     if combatant is None or participant is None:
         return
     battle_kb = pvp_combat_keyboard(participant.base_class, combatant.cooldowns, subclass_id=combatant.subclass_id, show_target=battle.battle_type == "mass")
-    if battle.arena:
+    free = battle.arena and prerelease_config.arena_free_elixirs()
+    if battle.arena and not free:
         # Арена - бой без потерь: тратить эликсиры здесь нельзя.
         await message.answer("🏟 На арене эликсиры не используются - бой тренировочный.", keyboard=battle_kb)
         return
@@ -1289,12 +1334,15 @@ async def pvp_use_item(message: Message) -> None:
         await message.answer("Больше твоё тело не выдержит за один бой.", keyboard=battle_kb)
         return
 
-    async with get_session_factory()() as db:
-        character = await onboarding_svc.get_character(db, peer_id)
-        if character is None:
-            return
-        consumed = await elixir_service.consume(db, character.id, elixir_id)
-        await db.commit()
+    if free:
+        consumed = True
+    else:
+        async with get_session_factory()() as db:
+            character = await onboarding_svc.get_character(db, peer_id)
+            if character is None:
+                return
+            consumed = await elixir_service.consume(db, character.id, elixir_id)
+            await db.commit()
     if not consumed:
         await message.answer("Этого зелья больше нет в сумке.", keyboard=battle_kb)
         return

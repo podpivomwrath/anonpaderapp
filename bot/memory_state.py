@@ -67,6 +67,8 @@ STATE: dict[str, str] = {
     # --- мир и занятия
     "bot.handlers.arena._codes": "вход по коду, отмена ожидания",
     "bot.handlers.arena._entering": "код введён, отмена, ошибка",
+    "bot.handlers.arena._rooms": "выход хозяина, уход последнего, «← Таверна»",
+    "bot.handlers.arena._room_of": "выход из комнаты, роспуск, «← Таверна»",
     "bot.handlers.courier._last_busy": "время последнего боя получателя - перезаписывается, растёт до числа игроков",
     "bot.handlers.guild._tasks": "готовая рассылка сама себя снимает",
     "bot.handlers.guild._fighter": "конец захода к Стражу",

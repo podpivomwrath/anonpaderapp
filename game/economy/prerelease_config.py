@@ -17,6 +17,7 @@ MINING_XP_MULT = 2.0     # опыт горного дела
 GUILD_FAME_MULT = 2.0    # слава гильдии - её уровень
 FREE_RESPEC = True       # переделка у Хранителя Списков: класс, подкласс, характеристики
 FREE_PATH_REPICK = True  # новый путь после смены класса или подкласса
+ARENA_FREE_ELIXIRS = True  # на арене все зелья, эликсиры и свитки - бесплатно, без сумки
 
 #: Что показать игроку в «Герое»: (включено ли, строка).
 BONUSES = (
@@ -25,6 +26,7 @@ BONUSES = (
     (MINING_XP_MULT > 1, f"Горное дело: опыт ×{MINING_XP_MULT:g}"),
     (ORE_SPAWN_MULT > 1, f"Руда в рудниках появляется в {ORE_SPAWN_MULT:g} раза чаще"),
     (GUILD_FAME_MULT > 1, f"Слава гильдии растёт ×{GUILD_FAME_MULT:g}"),
+    (ARENA_FREE_ELIXIRS, "Арена: любые зелья, эликсиры и свитки бесплатно, сумка не тратится"),
 )
 
 
@@ -46,6 +48,10 @@ def free_respec() -> bool:
 
 def free_path_repick() -> bool:
     return ACTIVE and FREE_PATH_REPICK
+
+
+def arena_free_elixirs() -> bool:
+    return ACTIVE and ARENA_FREE_ELIXIRS
 
 
 def card() -> dict | None:
