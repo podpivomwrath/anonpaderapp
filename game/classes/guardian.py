@@ -47,7 +47,8 @@ def shield_bash(ctx: SkillContext) -> None:
     actor.cooldowns[skill.id] = skill.cd
     target = ctx.resolve_target()
     if target is not None:
-        ctx.hits.append(compute_hit(actor, target, ctx.rng, skill.name, skill.multiplier, is_ability=True))
+        ctx.hits.append(compute_hit(actor, target, ctx.rng, skill.name, skill.multiplier, is_ability=True,
+                                    dodge_marks=False))
 
     enemies = ctx.session.alive_enemies_of(actor)
     if ctx.session.mode == CombatMode.PVE:
@@ -121,7 +122,7 @@ def block(ctx: SkillContext) -> None:
             ctx.hits.append(
                 compute_hit(
                     actor, target, ctx.rng, label="контратакует",
-                    multiplier=counterstrike_mult, is_ability=True,
+                    multiplier=counterstrike_mult, is_ability=True, dodge_marks=False,
                 )
             )
 

@@ -625,12 +625,12 @@ async def _cleanup_and_return(session_id: int, battle: raid_combat.RaidBattle, t
             combatant = combatants.get(cid)
             survived = combatant is not None and combatant.alive and not defeated
             if (
-                not survived and battle.is_rift and not defeated and combatant is not None
+                not survived and not defeated and combatant is not None
                 and any(c.alive and c.kind == "character" for c in combatants.values())
             ):
-                # Разлом пройден - павших поднимают свои (2026-10-16, как в
-                # групповом PvE): на месте, с RIFT_RAISED_HP_PCT здоровья, без
-                # смерти и потери опыта.
+                # Разлом или рейд пройден - павших поднимают свои (разлом -
+                # 2026-10-16, рейд - 2026-10-29, владелец): на месте, с
+                # RIFT_RAISED_HP_PCT здоровья, без смерти и потери опыта.
                 from sqlalchemy import select
 
                 from models import CharacterStats
@@ -675,7 +675,7 @@ async def _cleanup_and_return(session_id: int, battle: raid_combat.RaidBattle, t
     for cid, p in list(battle.participants.items()):
         if cid in has_mount_by_cid:
             raised_line = (
-                f"\n\n🩸 Ты пал в разломе, но группа его прошла и подняла тебя: "
+                f"\n\n🩸 Ты пал в {'разломе' if battle.is_rift else 'рейде'}, но группа его прошла и подняла тебя: "
                 f"{round(RIFT_RAISED_HP_PCT * 100)}% здоровья, опыт не потерян."
                 if cid in raised else ""
             )

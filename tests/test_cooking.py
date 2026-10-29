@@ -45,7 +45,8 @@ async def test_cook_from_fish_portions_by_weight(db_session, make_character) -> 
     assert (await wallet_service.get_wallet(db_session, c.id)).farm_currency == 480
     assert [x.id for x in await cooking_service.due(db_session, NOW + timedelta(seconds=31))] == [c.id]
     res = await cooking_service.finish(db_session, c)
-    assert res.portions == 3 and res.xp == 22
+    # Опыт за каждую порцию и по ценности рыбы (2026-10-29): 22 × 3 × 1.25.
+    assert res.portions == 3 and res.xp == round(22 * 3 * 1.25)
     food = await cooking_service.get_food(db_session, c.id)
     assert [(d.id, g, n) for d, _, g, n in food] == [("wormwood_soup", "big", 3)]
     assert "×3" in house_handlers.cooked_text(res)

@@ -220,6 +220,24 @@ async def enter(message: Message) -> None:
         _waiting[peer] = rift_id
         note = f"\n\n{texts.SHIELD_DROPPED}" if cid in dropped else ""
         await _send(peer, text + note, keyboard=waiting_keyboard())
+    await _warn_bystanders(character, rift, members)
+
+
+async def _warn_bystanders(character: Character, rift, members: list[Character]) -> None:
+    """Остальным на клетке - что к разлому встала группа: у них минута
+    вмешаться (2026-10-29, баг-репорт). Без кнопок - клавиатуру не трогаем."""
+    from services import pvp_service
+
+    member_ids = {m.id for m in members}
+    async with get_session_factory()() as db:
+        others = [c for c in await pvp_service.others_at(db, character) if c.id not in member_ids]
+        peers = await _peers(db, [c.id for c in others])
+    text = texts.rival_text(rift, [m.name for m in members])
+    for peer in peers.values():
+        try:
+            await _bot_api.messages.send(peer_id=peer, message=text, random_id=0)
+        except Exception:  # noqa: BLE001 - закрыл диалог с ботом
+            pass
 
 
 def _busy_elsewhere(peer_id: int, character) -> bool:

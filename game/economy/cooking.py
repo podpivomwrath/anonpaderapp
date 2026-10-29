@@ -45,8 +45,11 @@ def unlocked_between(old: int, new: int) -> list[cc.Dish]:
     return [d for d in cc.DISHES if old < d.level <= new]
 
 
-def cook_xp(dish: cc.Dish) -> int:
-    return cc.COOK_XP_BASE + cc.COOK_XP_PER_LEVEL * dish.level
+def cook_xp(dish: cc.Dish, portions: int = 1, grade: str = "common") -> int:
+    """Опыт за готовку: за каждую порцию, и чем ценнее рыба, тем больше
+    (2026-10-29, баг-репорт: за одну порцию и за три давали поровну)."""
+    per_portion = cc.COOK_XP_BASE + cc.COOK_XP_PER_LEVEL * dish.level
+    return round(per_portion * max(portions, 1) * cc.GRADE_MULT.get(grade, 1.0))
 
 
 def fish_fits(fish_tier: int, dish: cc.Dish) -> bool:

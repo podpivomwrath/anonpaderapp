@@ -573,6 +573,24 @@ button.slot-row:not(:disabled):active,
   object-fit: cover;
 }
 
+.relic {
+  position: relative;
+}
+
+/* Сколько вещей с босса при себе (2026-10-29). Внутри круга: он режет углы. */
+.relic__count {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 3px;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1;
+  text-align: center;
+  color: #fff;
+  text-shadow: 0 0 3px #000, 0 0 2px #000;
+}
+
 .relic--won {
   filter: none;
   border-color: rgba(200, 30, 58, 0.7);

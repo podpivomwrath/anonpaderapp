@@ -57,11 +57,13 @@ async def _raid_shelf(session, character_id: int) -> list[dict]:
     """Трофей рейда горит, если игрок был в победившем заходе (победы пишутся
     с 2026-10-22) или у него есть вещь с этого босса - так видны и прошлые
     победы того, кому досталась уникальная вещь."""
-    won = set()
+    # Сколько раз побеждал и сколько вещей с босса при себе (2026-10-29,
+    # баг-репорт: полка показывала только «был / не был»).
+    wins: dict[str, int] = {}
     rows = await session.execute(select(RaidRun.raid_id, RaidRun.members).where(RaidRun.status == "won"))
     for raid_id, members in rows:
         if character_id in (members or []):
-            won.add(raid_id)
+            wins[raid_id] = wins.get(raid_id, 0) + 1
     uniques = item_service.unique_items()
     names = {uid: uniques[uid].name for _, uid in RAIDS if uid in uniques}
     owned_rows = await session.execute(
@@ -72,16 +74,19 @@ async def _raid_shelf(session, character_id: int) -> list[dict]:
             or_(Item.craft_source_id.in_(list(names)), Item.name.in_(list(names.values()))),
         )
     )
-    owned = set()
+    owned: dict[str, int] = {}
     for source_id, name in owned_rows:
-        owned.add(source_id or next((u for u, n in names.items() if n == name), None))
+        uid = source_id or next((u for u, n in names.items() if n == name), None)
+        owned[uid] = owned.get(uid, 0) + 1
     shelf = []
     for raid_id, uid in RAIDS:
         shelf.append({
             "raid": raid_id,
             "icon": f"unique:{uid}",
             "name": names.get(uid, uid),
-            "won": raid_id in won or uid in owned,
+            "won": raid_id in wins or uid in owned,
+            "wins": wins.get(raid_id, 0),
+            "owned": owned.get(uid, 0),
         })
     return shelf
 

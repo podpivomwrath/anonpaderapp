@@ -127,6 +127,21 @@ def test_blade_hunger_adds_mark_on_successful_dodge() -> None:
     assert enemy.effect_from(EffectKind.MARK, blade.id) is not None
 
 
+def test_blade_hunger_ignores_guardian_shield_bash() -> None:
+    """Уворот от Удара щитом - защитного навыка Стража - Метку не даёт
+    (2026-10-29, владелец): Метка только за атаку по Клинку."""
+    blade = combatant(1, side=0, subclass_id="shadow_blade", agility=0)
+    blade.buff_modifiers = {"dodge_bonus": 1.0, "mark_on_dodge": 1.0}
+    guard = combatant(2, side=1, subclass_id="guardian")
+    result = resolve_tick(
+        make_session(blade, guard),
+        {2: DeclaredAction(type=ActionType.SKILL, skill_id="guardian_shield_bash", target_id=1)},
+        AlwaysLowRng(),
+    )
+    assert any(h.missed for h in result.hits if h.source_id == guard.id)  # уворот был
+    assert guard.effect_from(EffectKind.MARK, blade.id) is None
+
+
 def test_slip_away_remembers_previous_dodge() -> None:
     rng = DodgeRng()
     blade = combatant(1, side=0, subclass_id="shadow_blade", agility=0)

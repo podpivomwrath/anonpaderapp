@@ -162,12 +162,14 @@ function TrophyShelf({ trophies }) {
             aria-label={r.name}
           >
             {itemIcon(r.icon) ? <img src={itemIcon(r.icon)} alt="" /> : <span>?</span>}
+            {r.owned > 0 && <small className="relic__count">×{r.owned}</small>}
           </button>
         ))}
       </div>
       {relic && (
         <p className="relic-caption">
-          {relic.name}{relic.won ? '' : ' - ещё не добыто'}
+          {relic.name}
+          {relic.won ? ` · побед: ${relic.wins} · у тебя: ${relic.owned}` : ' - ещё не добыто'}
         </p>
       )}
       <div className="trophy-tiles">

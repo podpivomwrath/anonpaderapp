@@ -241,6 +241,7 @@ def compute_hit(
     is_ability: bool = False,
     crit_multiplier: float | None = None,
     ignore_dodge: bool = False,
+    dodge_marks: bool = True,
 ) -> PendingHit:
     """Расчёт удара. multiplier — множитель урона навыка (Атака = 1.0);
     force_crit — гарантированный крит (Теневой рывок); is_ability (патч 34,
@@ -298,7 +299,10 @@ def compute_hit(
         # «Голод клинка»: каждый удачный уворот добавляет стак Метки добычи
         # атакующему-жертве. Без баффа - нет-оп.
         marked = 0
-        if target.buff_modifiers.get("mark_on_dodge", 0.0) > 0:
+        # dodge_marks=False - удар защитного навыка (Удар щитом, контрудар):
+        # Метку дают только за атаку по Клинку, а не за оборону рядом с ним
+        # (2026-10-29, владелец: «даже если не бить Клинка, метка вешается»).
+        if dodge_marks and target.buff_modifiers.get("mark_on_dodge", 0.0) > 0:
             mark = actor.effect_from(EffectKind.MARK, target.id)
             if mark is not None:
                 mark.stacks = min(mark.stacks + 1, bc.SHADOW_BLADE_MARK_MAX_STACKS)

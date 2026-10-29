@@ -290,6 +290,21 @@ def test_quote_returns_the_strongest_hit() -> None:
     assert any("Цитата" in line for line in out.lines)
 
 
+def test_quote_of_poisoned_blade_also_poisons() -> None:
+    """2026-10-29, владелец: Цитата Отравленного клинка переносит и яд."""
+    state, stage, boss = _fight()
+    stage.quote_open = True
+    result = _tick(state, {})
+    result.hit_renders = [type("H", (), {
+        "target_id": boss.id, "source_id": 1, "source_side": 0, "missed": False, "is_tick": False,
+        "amount": 50, "label": "Отравленный клинок",
+    })()]
+    boss.apply_effect(EffectKind.DOT, 12, 4, 1)
+    out = stage.after_tick(state, result, random.Random(1))
+    poisoned = [c for c in (1, 2) if state.combatants[c].effect_from(EffectKind.DOT, 1) is not None]
+    assert len(poisoned) == 1 and any("отравлен" in line for line in out.lines)
+
+
 def test_quote_is_held_by_shields() -> None:
     """2026-10-22: «Цитата» шла мимо щитов."""
     state, stage, boss = _fight()

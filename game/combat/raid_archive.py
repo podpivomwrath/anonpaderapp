@@ -25,7 +25,7 @@ from game.combat import base_skills, subclass_skills
 from game.combat.raid_bosses import _boss_combatant
 from game.combat.raid_field import StageTick, _players, _target_of, stage_hurt
 from game.combat.resolver import TickResult
-from game.combat.session import ActionType, CombatantState, CombatSessionState, EffectKind
+from game.combat.session import BURN_TAG, ActionType, CombatantState, CombatSessionState, EffectKind
 from game.combat.skills import PendingHit, compute_hit
 from game.economy import raid_archive_config as ac
 
@@ -216,6 +216,15 @@ class ArchiveStage:
         source = session.combatants[strongest.source_id].name
         out.lines.append(f"📖 Цитата: удар {source} → {target.name} - {strongest.amount} урона")
         stage_hurt(target, strongest.amount, out)
+        # Цитата повторяет навык целиком: Отравленный клинок отравляет, Огненная
+        # плеть поджигает (2026-10-29, владелец). Яд копирует тот, что этот
+        # навык повесил на Архивариуса, одним стаком и на полный срок.
+        if strongest.label in _DOT_SKILL_NAMES and target.alive:
+            dot = boss.effect_from(EffectKind.DOT, strongest.source_id)
+            if dot is not None:
+                target.apply_effect(EffectKind.DOT, dot.value, dot.remaining_ticks, dot.source_id, tag=dot.tag)
+                word = "горит" if dot.tag == BURN_TAG else "отравлен"
+                out.lines.append(f"📖 Цитата дословная: {target.name} {word}")
 
     # --- Ластик ---
 
@@ -248,6 +257,16 @@ class ArchiveStage:
             drawn.append(f"{player.name} - {_PAGE_WORD[page]}")
         if drawn:
             out.lines.append("📜 " + ", ".join(drawn))
+
+
+def _dot_skill_names() -> set[str]:
+    from game.combat.subclass_skills import SUBCLASS_SKILL_DEFS
+
+    return {SUBCLASS_SKILL_DEFS[s].name for s in ("poisoner_venom", "elementalist_fire") if s in SUBCLASS_SKILL_DEFS}
+
+
+#: Навыки, что вешают ДоТ, - их Цитата переносит вместе с ядом или огнём.
+_DOT_SKILL_NAMES = _dot_skill_names()
 
 
 def _erase_effects(session) -> int:

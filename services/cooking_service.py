@@ -167,6 +167,7 @@ async def finish(db: AsyncSession, character: Character) -> Cooked | None:
     if found is None:
         return None
     dish, grade, n = found
+    cooked = n  # опыт - за то, что сготовил сам, без даровой порции котелка
     # Котелок (2026-10-23): шанс лишней порции.
     import random
 
@@ -181,7 +182,7 @@ async def finish(db: AsyncSession, character: Character) -> Cooked | None:
     n *= master_recipe_service.ring_mult(character)
     await add_food(db, character.id, dish.dish_id, grade, n)
     level = character.cooking_level
-    xp = cooking.cook_xp(dish)
+    xp = cooking.cook_xp(dish, cooked, grade)
     cooking.grant_xp(character, xp)
     await db.flush()
     return Cooked(dish, grade, n, xp, level, character.cooking_level,
