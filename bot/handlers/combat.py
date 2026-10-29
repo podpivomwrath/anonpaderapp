@@ -8,6 +8,8 @@
 import random
 import time
 
+from loguru import logger
+
 from vkbottle import BaseStateGroup  # noqa: F401  (совместимость импортов)
 from vkbottle.bot import BotLabeler, Message
 
@@ -340,12 +342,17 @@ async def start_encounter(
             await scene_event_service.start_fight_effects(db, character.id)
             await db.commit()
     _engine.start_session(state)
+    # Уровни обоих - в лог сервера, для замеров баланса (2026-10-29); игрок
+    # видит только уровень моба.
+    logger.info("Встреча: {} ур. {} - {} ур. {}", character.name, character.level,
+                encounter.combatant.name, encounter.combatant.level)
     # флейвор моба перед боем + боевой интерфейс
     await _bot_api.messages.send(
         peer_id=peer_id,
         # Патч 103: строка о способности - одна, под описанием. Моба узнают
-        # по поведению, а не гадают, почему он вдруг лечится.
-        message=f"⚠️ {encounter.combatant.name}\n\n{encounter.flavor}"
+        # по поведению, а не гадают, почему он вдруг лечится. Уровень моба -
+        # рядом с именем (2026-10-29, владелец).
+        message=f"⚠️ {encounter.combatant.name} {encounter.combatant.level} уровень\n\n{encounter.flavor}"
         + (f"\n\n{encounter.ability_line}" if encounter.ability_line else ""),
         random_id=0,
         attachment=photo_attachment(encounter.image) if encounter.image else None,

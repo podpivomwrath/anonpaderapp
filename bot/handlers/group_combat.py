@@ -266,7 +266,13 @@ async def start_group_encounter(
 
     _engine.start_session(state)
 
-    mob_names = ", ".join(enc.combatant.name for enc in mob_encounters)
+    mob_names = ", ".join(f"{enc.combatant.name} {enc.combatant.level} уровень" for enc in mob_encounters)
+    # Уровни игроков и мобов - в лог сервера, для замеров баланса (2026-10-29).
+    logger.info(
+        "Встреча группы: {} - {}",
+        ", ".join(f"{c.name} ур. {c.level}" for c in state.combatants.values() if c.kind == "character"),
+        ", ".join(f"{enc.combatant.name} ур. {enc.combatant.level}" for enc in mob_encounters),
+    )
     flavor = mob_encounters[0].flavor if mob_encounters else ""
     # Патч 103: способности всех мобов пачки - по строке на каждого, без
     # повторов (два одинаковых моба - одна строка).
