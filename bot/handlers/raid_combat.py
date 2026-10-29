@@ -125,6 +125,11 @@ class RaidBattle:
     surgeon_id: int | None = None
     surgeon_phase3_hp_at_start: int | None = None
     surgeon_phase3_failed: bool = False
+    #: Шприцы (2026-10-29): ходов без шприца, набранный цвет, что действует и сколько ещё.
+    syringe_clock: int = 0
+    syringe_drawn: str | None = None
+    syringe_active: str | None = None
+    syringe_left: int = 0
     # Награды этапов ждут конца захода (2026-10-18, решение владельца): раньше
     # брали ключ, проходили лёгкий этап, получали опыт и нарочно погибали.
     # Выдаются только при победе; вайп - ничего. Элемент - StageReward.

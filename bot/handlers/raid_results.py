@@ -24,6 +24,7 @@ from game.combat import display, raid_archive, raid_bosses, raid_field, raid_mil
 from game.combat import raid_trail as trail_combat
 from game.combat.resolver import TickResult
 from game.combat.session import ActionType, CombatSessionState, DeclaredAction
+from game import plural
 from game.economy import raid_config as rc
 from game.economy import raid_field_config as fc
 from game.economy import rift_config as rfc
@@ -99,6 +100,7 @@ async def on_raid_tick_resolved(session_id: int, tick: int, result: TickResult) 
             # так что ждать FREEZE значило бы сделать окно непроходимым. Цель
             # проверяется отдельно - контроль по другому противнику навык не
             # сбивает.
+            _syringe_tick(battle, surgeon, result, extra_lines)
             if ai.awaiting_interrupt:
                 if result.control_attempts_on.get(battle.surgeon_id):
                     extra_lines.append(rt.SURGEON_INTERRUPTED_LINE)
@@ -143,6 +145,13 @@ async def on_raid_tick_resolved(session_id: int, tick: int, result: TickResult) 
                 victim_id = await _kill_random_survivor(session_id, battle)
                 if victim_id is not None:
                     scripted_death_ids.append(victim_id)
+            elif ai.phase3_turns_left is None and battle.syringe_drawn is None and battle.syringe_left <= 0:
+                # Ход без других событий - тикают часы шприца.
+                battle.syringe_clock += 1
+                if battle.syringe_clock >= rc.SURGEON_SYRINGE_EVERY:
+                    battle.syringe_clock = 0
+                    battle.syringe_drawn = battle.rng.choice(rc.SURGEON_SYRINGES)
+                    extra_lines.append(rt.SURGEON_SYRINGE_DRAW[battle.syringe_drawn])
 
     if scripted_death_ids and state is not None:
         alive_players_left = [c for c in state.combatants.values() if c.kind == "character" and c.alive]
@@ -724,6 +733,41 @@ def _backdate_respawn(battle, cid: int, character) -> None:
 
     floor = datetime.now(timezone.utc) + timedelta(seconds=5)
     character.respawn_at = max(character.respawn_at - timedelta(seconds=elapsed), floor)
+
+
+def _syringe_tick(battle, surgeon, result, extra_lines: list[str]) -> None:
+    """Шприцы Хирурга (2026-10-29): набранный в прошлый ход колется сейчас,
+    если по Хирургу в этот ход не было попытки контроля; действующий
+    затягивает раны и истекает."""
+    from game.combat.session import EffectKind
+
+    turns = plural.count(rc.SURGEON_SYRINGE_TURNS, "ход", "хода", "ходов")
+    if battle.syringe_left > 0:
+        battle.syringe_left -= 1
+        if battle.syringe_active == "green":
+            before = surgeon.current_hp
+            surgeon.current_hp = min(surgeon.max_hp, surgeon.current_hp + round(surgeon.max_hp * rc.SURGEON_SYRINGE_HEAL))
+            if surgeon.current_hp > before:
+                extra_lines.append(rt.SURGEON_SYRINGE_HEAL_LINE.format(amount=surgeon.current_hp - before))
+        if battle.syringe_left <= 0:
+            if battle.syringe_active == "black":
+                surgeon.buff_modifiers["incoming_damage_reduction"] = 0.0
+            battle.syringe_active = None
+    drawn = battle.syringe_drawn
+    if drawn is None:
+        return
+    battle.syringe_drawn = None
+    if result.control_attempts_on.get(battle.surgeon_id):
+        extra_lines.append(rt.SURGEON_SYRINGE_KNOCKED)
+        return
+    battle.syringe_active, battle.syringe_left = drawn, rc.SURGEON_SYRINGE_TURNS
+    if drawn == "red":
+        surgeon.apply_effect(EffectKind.DAMAGE_BUFF, rc.SURGEON_SYRINGE_DAMAGE, rc.SURGEON_SYRINGE_TURNS, surgeon.id)
+    elif drawn == "grey":
+        surgeon.apply_effect(EffectKind.DODGE, rc.SURGEON_SYRINGE_DODGE, rc.SURGEON_SYRINGE_TURNS, surgeon.id)
+    elif drawn == "black":
+        surgeon.buff_modifiers["incoming_damage_reduction"] = rc.SURGEON_SYRINGE_ARMOR
+    extra_lines.append(rt.SURGEON_SYRINGE_INJECT[drawn].format(turns=turns))
 
 
 SAFE_EXIT_LINE = f"\n\n🛡 {bc.PVP_SAFE_SECONDS // 60} мин. на тебя нельзя нападать, пока не ушёл с этой клетки. Нападёшь сам - защита пропадёт."

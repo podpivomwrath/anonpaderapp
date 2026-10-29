@@ -286,7 +286,7 @@ def test_quote_returns_the_strongest_hit() -> None:
     hp = {c: state.combatants[c].current_hp for c in (1, 2)}
     out = stage.after_tick(state, result, random.Random(1))
     lost = sum(hp[c] - state.combatants[c].current_hp for c in (1, 2))
-    assert lost == strongest
+    assert lost == strongest * 2  # с 2026-10-29 Цитата бьёт двоих
     assert any("Цитата" in line for line in out.lines)
 
 
@@ -302,7 +302,7 @@ def test_quote_of_poisoned_blade_also_poisons() -> None:
     boss.apply_effect(EffectKind.DOT, 12, 4, 1)
     out = stage.after_tick(state, result, random.Random(1))
     poisoned = [c for c in (1, 2) if state.combatants[c].effect_from(EffectKind.DOT, 1) is not None]
-    assert len(poisoned) == 1 and any("отравлен" in line for line in out.lines)
+    assert len(poisoned) == 2 and any("отравлен" in line for line in out.lines)
 
 
 def test_quote_is_held_by_shields() -> None:

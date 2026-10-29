@@ -212,16 +212,18 @@ class ArchiveStage:
         if strongest is None or strongest.amount <= 0 or not players:
             out.lines.append("Страница остаётся чистой - цитировать нечего.")
             return
-        target = rng.choice(players)
+        targets = rng.sample(players, min(ac.QUOTE_TARGETS, len(players)))
         source = session.combatants[strongest.source_id].name
-        out.lines.append(f"📖 Цитата: удар {source} → {target.name} - {strongest.amount} урона")
-        stage_hurt(target, strongest.amount, out)
-        # Цитата повторяет навык целиком: Отравленный клинок отравляет, Огненная
-        # плеть поджигает (2026-10-29, владелец). Яд копирует тот, что этот
-        # навык повесил на Архивариуса, одним стаком и на полный срок.
-        if strongest.label in _DOT_SKILL_NAMES and target.alive:
-            dot = boss.effect_from(EffectKind.DOT, strongest.source_id)
-            if dot is not None:
+        names = ", ".join(t.name for t in targets)
+        out.lines.append(f"📖 Цитата: удар {source} → {names} - {strongest.amount} урона")
+        dot = (boss.effect_from(EffectKind.DOT, strongest.source_id)
+               if strongest.label in _DOT_SKILL_NAMES else None)
+        for target in targets:
+            stage_hurt(target, strongest.amount, out)
+            # Цитата повторяет навык целиком: Отравленный клинок отравляет, Огненная
+            # плеть поджигает (2026-10-29, владелец). Яд копирует тот, что этот
+            # навык повесил на Архивариуса, одним стаком и на полный срок.
+            if dot is not None and target.alive:
                 target.apply_effect(EffectKind.DOT, dot.value, dot.remaining_ticks, dot.source_id, tag=dot.tag)
                 word = "горит" if dot.tag == BURN_TAG else "отравлен"
                 out.lines.append(f"📖 Цитата дословная: {target.name} {word}")

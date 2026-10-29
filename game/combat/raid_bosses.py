@@ -23,7 +23,7 @@ BOSS_LEVEL = 60
 # крутить здесь, а не в тексте патча.
 STAGE1_STAT_MULT = 2.0
 VELD_STAT_MULT = 2.5
-SURGEON_STAT_MULT = 3.0
+SURGEON_STAT_MULT = 4.5  # 2026-10-29, владелец: было 3.0 - бил 900 за ход по группе в 12 тыс. HP
 
 
 def _boss_combatant(

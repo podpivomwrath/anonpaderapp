@@ -61,6 +61,18 @@ SURGEON_MATERIAL_WORK_MULT = 1.1             # бьёт ВСЕХ живых иг
 SURGEON_STITCH_PULL_MULT = 1.5
 SURGEON_STITCH_PULL_LIFESTEAL = 0.30         # доля нанесённого урона — хил Хирургу
 
+#: Шприцы Хирурга (2026-10-29, владелец: босс был слишком лёгким). Раз в
+#: SYRINGE_EVERY ходов он набирает шприц - цвет виден, - а следующим ходом
+#: колет себе усиление на SYRINGE_TURNS ходов. Попытка контроля по нему в ход
+#: набора выбивает шприц - то же окно, что прерывание инструмента.
+SURGEON_SYRINGE_EVERY = 4
+SURGEON_SYRINGE_TURNS = 3
+SURGEON_SYRINGE_DAMAGE = 0.40     # красный: урон +40%
+SURGEON_SYRINGE_DODGE = 0.30      # серый: уворот +30%
+SURGEON_SYRINGE_HEAL = 0.04       # зелёный: лечит долю макс. HP каждый ход
+SURGEON_SYRINGE_ARMOR = 0.30      # чёрный: получаемый урон -30%
+SURGEON_SYRINGES = ("red", "grey", "green", "black")
+
 STAGE3_LOOT_MULT = 5
 
 #: Опыт за этап рейда (2026-10-17, решение владельца) - как в разломах:
