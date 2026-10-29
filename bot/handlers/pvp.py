@@ -1,9 +1,9 @@
 """Открытое PvP на карте (патч 22): осмотреться, /напасть, дуэли и массовые бои.
 
 Архитектура:
-  - Дуэль (1×1, последовательные ходы) — game.combat.duel_engine.DuelEngine,
-    существовал и раньше, здесь только подключение.
-  - Массовый бой (N vs M, одновременный резолв) — ОТДЕЛЬНЫЙ TickEngine
+  - Любой бой игроков, и 1×1, и N vs M, - одновременный резолв на ОТДЕЛЬНОМ
+    TickEngine (2026-10-29, владелец: дуэль переехала с duel_engine - два
+    движка расходились в правилах, а очередь на вход в дуэль теряла игроков)
     (не combat.py's _engine: там PLAYER_ID=1/MOB_ID=2 фиксированы под ровно
     одного игрока и одного моба; здесь комбатанты — реальные character.id,
     участников может быть много с обеих сторон).
@@ -61,7 +61,6 @@ from bot.pvp_texts import (
 from game.combat import balance_config as bc
 from game.combat import battle_log, display, elixir_effects
 from game.combat.base_skills import BASE_SKILL_DEFS
-from game.combat.duel_engine import DuelEngine, DuelResult, DuelState
 from game.combat.resolver import TickResult
 from game.combat.session import (
     ActionType,
@@ -127,7 +126,6 @@ async def _at_world_boss(db, character) -> bool:
 labeler = BotLabeler()
 labeler.vbml_ignore_case = True  # команды без учёта регистра: «Пригласить» = «пригласить»
 
-_duel_engine: DuelEngine | None = None
 _mass_engine: TickEngine | None = None
 _bot_api = None
 _rng = random.Random()
@@ -146,12 +144,11 @@ class Participant:
 
 @dataclass
 class Battle:
-    battle_type: str  # "duel" | "mass"
+    battle_type: str  # "mass" (с 2026-10-29 и 1×1 - тоже массовый бой)
     location: tuple[int, int]
     participants: dict[int, Participant] = field(default_factory=dict)   # character_id -> Participant
     side_of: dict[int, int] = field(default_factory=dict)                # character_id -> 0/1
     damage_by_pair: dict[tuple[int, int], int] = field(default_factory=dict)  # (attacker, victim) -> total
-    join_queue: list[tuple[Participant, "CombatantState"]] = field(default_factory=list)
     last_combatants: dict[int, "CombatantState"] = field(default_factory=dict)  # снимок на конец последнего хода
     # Гильдии: бой - осада. Стороны подписаны тегами, опоздавшие встают
     # только к своей гильдии, итог считает bot/handlers/guild_siege.py.
@@ -168,7 +165,7 @@ SIEGE_PHOTO_ID = "457239249"
 
 #: Бой арены ни на какой клетке не стоит: «Осмотреться» и вступление его не видят.
 ARENA_LOCATION = (10**6, 10**6)
-#: Итог боя арены (ставит bot/handlers/arena.py): (battle, result) -> None.
+#: Итог боя арены (ставит bot/handlers/arena.py): (battle, winner_id | None) -> None.
 on_arena_finished = None
 
 _battles: dict[int, Battle] = {}
@@ -208,9 +205,8 @@ _declared_this_tick: dict[int, set[int]] = {}
 _chosen_target: dict[int, int] = {}
 
 
-def setup(duel_engine: DuelEngine, mass_engine: TickEngine, bot_api) -> None:
-    global _duel_engine, _mass_engine, _bot_api
-    _duel_engine = duel_engine
+def setup(mass_engine: TickEngine, bot_api) -> None:
+    global _mass_engine, _bot_api
     _mass_engine = mass_engine
     _bot_api = bot_api
 
@@ -250,11 +246,8 @@ def rebuild_keyboard(peer_id: int) -> str | None:
     НЕ прерывается, только пересобирается клавиатура — защита от абьюза).
     None — peer_id ни в какой активной PvP-битве.
 
-    Патч 31, п.6: боевые кнопки — ТОЛЬКО тому, чей сейчас ход. В дуэли это
-    duel.current_actor_id (здесь читается ВНЕ колбэка резолва хода, поэтому
-    не имеет проблемы устаревания значения, описанной в _render_duel); в
-    групповом бою — все, кто ещё не объявил действие в текущем окне
-    (_declared_this_tick)."""
+    Патч 31, п.6: боевые кнопки - только тем, кто ещё не объявил действие в
+    текущем окне (_declared_this_tick)."""
     battle_id = _peer_battle.get(peer_id)
     if battle_id is None:
         return None
@@ -264,25 +257,16 @@ def rebuild_keyboard(peer_id: int) -> str | None:
     participant = next((p for p in battle.participants.values() if p.peer_id == peer_id), None)
     if participant is None:
         return None
-    if battle.battle_type == "duel":
-        duel = _duel_engine.duels.get(battle_id) if _duel_engine else None
-        combatant = duel.combatants.get(participant.character_id) if duel else None
-        if combatant is None or not combatant.alive:
-            return pvp_waiting_keyboard()
-        if duel is not None and participant.character_id != duel.current_actor_id:
-            return pvp_waiting_keyboard()
-    else:
-        session = _mass_engine.sessions.get(battle_id) if _mass_engine else None
-        combatant = (
-            session.combatants.get(participant.character_id) if session
-            else battle.last_combatants.get(participant.character_id)
-        )
-        if combatant is None or not combatant.alive:
-            return pvp_waiting_keyboard()
-        if participant.character_id in _declared_this_tick.get(battle_id, set()):
-            return pvp_waiting_keyboard()
-    show_target = battle.battle_type == "mass"
-    return pvp_combat_keyboard(participant.base_class, combatant.cooldowns, subclass_id=combatant.subclass_id, show_target=show_target)
+    session = _mass_engine.sessions.get(battle_id) if _mass_engine else None
+    combatant = (
+        session.combatants.get(participant.character_id) if session
+        else battle.last_combatants.get(participant.character_id)
+    )
+    if combatant is None or not combatant.alive:
+        return pvp_waiting_keyboard()
+    if participant.character_id in _declared_this_tick.get(battle_id, set()):
+        return pvp_waiting_keyboard()
+    return pvp_combat_keyboard(participant.base_class, combatant.cooldowns, subclass_id=combatant.subclass_id, show_target=True)
 
 
 def _new_battle_id() -> int:
@@ -353,9 +337,6 @@ def _character_id_for_peer(battle: Battle, peer_id: int) -> int | None:
 
 
 def _live_state(battle_id: int, battle: Battle) -> dict[int, CombatantState]:
-    if battle.battle_type == "duel":
-        duel = _duel_engine.duels.get(battle_id)
-        return duel.combatants if duel is not None else {}
     session = _mass_engine.sessions.get(battle_id)
     return session.combatants if session is not None else {}
 
@@ -680,50 +661,32 @@ async def _launch_duel(
     db, attacker: Character, attacker_peer_id: int, victim: Character, victim_peer_id: int,
     location: tuple[int, int], intro: str, arena: bool = False,
 ) -> None:
-    attacker_combatant = await _build_combatant_for(db, attacker)
-    victim_combatant = await _build_combatant_for(db, victim)
-    # Патч 30, баг 3: _build_combatant_for всегда ставит side=0 — без явного
-    # разведения сторон здесь оба комбатанта дуэли остаются на стороне 0, и
-    # _default_enemy_target (фильтр "side != моей") ни для кого не находит
-    # цель, из-за чего ЛЮБОЕ атакующее действие молча отбрасывается ДО
-    # вызова duel_engine.act. Ходы при этом всё равно идут по таймеру
-    # (_on_timeout не проверяет наличие цели) — отсюда "счётчик растёт, но
-    # никто не может походить".
-    attacker_combatant.side = 0
-    victim_combatant.side = 1
-
+    """Бой 1×1 - тот же тиковый движок, что и массовый (2026-10-29): оба
+    объявляют действие одновременно, третий вступает сразу."""
     session_id = _new_battle_id()
-    battle = Battle(
-        battle_type="duel",
-        location=location,
-        participants={
-            attacker.id: _participant(attacker, attacker_peer_id),
-            victim.id: _participant(victim, victim_peer_id),
-        },
-        side_of={attacker.id: 0, victim.id: 1},
-        arena=arena,
-    )
+    battle = Battle(battle_type="mass", location=location, arena=arena)
+    state = CombatSessionState(session_id=session_id, mode=CombatMode.PVP_GROUP)
+    # Стороны разводятся явно: _build_combatant_for ставит всем side=0.
+    for side, character, peer in ((0, attacker, attacker_peer_id), (1, victim, victim_peer_id)):
+        combatant = await _build_combatant_for(db, character)
+        combatant.side = side
+        state.add(combatant)
+        battle.participants[character.id] = _participant(character, peer)
+        battle.side_of[character.id] = side
+        _peer_battle[peer] = session_id
     _battles[session_id] = battle
-    _peer_battle[attacker_peer_id] = session_id
-    _peer_battle[victim_peer_id] = session_id
-
-    first_id = _duel_engine.start_duel(session_id, attacker_combatant, victim_combatant)
-    duel = _duel_engine.duels[session_id]
-    intro = f"{intro} Первым ходит {duel.combatants[first_id].name}."
-    board = _render_duel(duel, [], finished=False)
-
-    # Патч 31, п.6: боевая клавиатура — только тому, кто ходит первым;
-    # второй игрок ждёт с убранными кнопками, чтобы не жать их вне очереди.
-    for cid, participant in list(battle.participants.items()):
-        combatant = duel.combatants[cid]
-        if cid == first_id:
-            text = f"{board}\n\n▶️ Твой ход!"
-            keyboard = pvp_combat_keyboard(participant.base_class, combatant.cooldowns, subclass_id=combatant.subclass_id)
-        else:
-            text = f"{board}\n\n⏳ Ход противника. Ожидание..."
-            keyboard = pvp_waiting_keyboard()
+    battle.last_combatants = dict(state.combatants)
+    _mass_engine.start_session(state)
+    for cid in list(battle.participants):
+        _init_target(session_id, battle, cid)
+    intro = f"{intro} Оба действуют одновременно, ход - {round(bc.PVP_GROUP_TURN_SECONDS)} секунд."
+    for p in list(battle.participants.values()):
+        combatant = state.combatants[p.character_id]
         await _bot_api.messages.send(
-            peer_id=participant.peer_id, message=f"{intro}\n\n{text}", random_id=0, keyboard=keyboard,
+            peer_id=p.peer_id, message=f"{intro}\n\n{_render_mass(state, [])}", random_id=0,
+            keyboard=pvp_combat_keyboard(
+                p.base_class, combatant.cooldowns, subclass_id=combatant.subclass_id, show_target=True,
+            ),
         )
 
 
@@ -765,47 +728,6 @@ async def _start_group_ambush(db, attacker: Character, attacker_peer_id: int, vi
                 p.base_class, combatant.cooldowns, subclass_id=combatant.subclass_id, show_target=True,
             ),
         )
-
-
-def _render_duel(
-    duel: DuelState, lines: list[str], finished: bool, next_actor_id: int | None = None,
-) -> str:
-    """finished — явно передаётся вызывающим (DuelResult.finished), а не
-    читается из duel.finished: в колбэке on_turn_resolved этот флаг движок
-    выставляет только ПОСЛЕ вызова колбэка, так что на последнем ходу
-    duel.finished ещё False, даже когда бой уже фактически завершён.
-
-    next_actor_id — та же история (патч 31, п.6): duel.current_actor_id
-    внутри on_duel_turn_resolved ещё указывает на актёра ТОЛЬКО ЧТО
-    завершившегося хода — turn_number движок инкрементирует уже ПОСЛЕ
-    колбэка. Вызывающий, знающий реального следующего актёра, передаёт его
-    явно; на живых вызовах вне колбэка (старт дуэли, /клавиатура) — None,
-    тогда используется duel.current_actor_id как есть (там он корректен)."""
-    a_id, b_id = duel.order
-    a, b = duel.combatants[a_id], duel.combatants[b_id]
-    header = f"⚔️ ДУЭЛЬ - ход {duel.turn_number}"
-    a_line = f"{a.name}: {display.health_bar(a.current_hp, a.max_hp)}{display.shield_suffix(a)}{display.vuln_suffix(a)}"
-    b_line = f"{b.name}: {display.health_bar(b.current_hp, b.max_hp)}{display.shield_suffix(b)}{display.vuln_suffix(b)}"
-    actor_id = next_actor_id if next_actor_id is not None else duel.current_actor_id
-    turn_line = "" if finished else f"Ходит: {duel.combatants[actor_id].name}"
-    log = " ".join(lines) if lines else "Бой начался."
-    parts = [header, a_line, b_line]
-    if turn_line:
-        parts.append(turn_line)
-    parts.append("")
-    parts.append(log)
-    return "\n".join(parts)
-
-
-def _render_duel_short(duel: DuelState, finished: bool) -> str:
-    """Короткий лог дуэли (bot/short_log.py): полоски и значки эффектов, без
-    строк хода."""
-    lines = [f"⚔️ ДУЭЛЬ - ход {duel.turn_number}"]
-    for cid in duel.order:
-        lines.append(battle_log.short_bar(duel.combatants[cid], display.MODE_PVP))
-    if finished:
-        lines += [f"☠ {c.name} падает" for c in duel.combatants.values() if not c.alive]
-    return "\n".join(lines)
 
 
 # --- Присоединение к идущему бою ---
@@ -876,14 +798,6 @@ async def _handle_join_choice(message: Message, battle_id, side) -> None:
 
     combatant.side = side - 1
 
-    if battle.battle_type == "duel":
-        battle.join_queue.append((participant, combatant))
-        _peer_battle[peer_id] = battle_id
-        await message.answer(
-            "Ты готовишься вступить в бой - присоединишься, как только закончится текущий ход."
-        )
-        return
-
     _join_mass_battle_now(battle_id, battle, participant, combatant)
     _init_target(battle_id, battle, participant.character_id)  # патч 38: автоцель при входе
     target_line = _target_line(battle_id, battle, participant.character_id)
@@ -905,51 +819,6 @@ def _join_mass_battle_now(battle_id: int, battle: Battle, participant: Participa
     battle.side_of[participant.character_id] = combatant.side
     session.add(combatant)
     _peer_battle[participant.peer_id] = battle_id
-
-
-async def _convert_duel_to_mass(session_id: int, battle: Battle) -> None:
-    duel = _duel_engine.duels.pop(session_id, None)
-    if duel is None:
-        return
-    try:
-        _duel_engine.scheduler.remove_job(_duel_engine._job_id(session_id))
-    except Exception:
-        pass
-
-    state = CombatSessionState(session_id=session_id, mode=CombatMode.PVP_GROUP)
-    for cid, combatant in duel.combatants.items():
-        combatant.side = battle.side_of.get(cid, combatant.side)
-        state.add(combatant)
-
-    joined_now = list(battle.join_queue)
-    battle.join_queue.clear()
-    for participant, combatant in joined_now:
-        battle.participants[participant.character_id] = participant
-        battle.side_of[participant.character_id] = combatant.side
-        state.add(combatant)
-        _peer_battle[participant.peer_id] = session_id
-
-    battle.battle_type = "mass"
-    battle.last_combatants = dict(state.combatants)
-    _mass_engine.start_session(state)
-
-    # Патч 38: с этого момента возможен выбор цели — каждому участнику
-    # назначается автоцель (первый противник из списка).
-    for cid in list(battle.participants):
-        _init_target(session_id, battle, cid)
-
-    for p in list(battle.participants.values()):
-        target_line = _target_line(session_id, battle, p.character_id)
-        board = "⚔️ В бой вступает третий! Теперь это массовая схватка - все стороны действуют " \
-            "одновременно, ход - 30 секунд.\n\n" + _render_mass(state, [])
-        if target_line:
-            board += f"\n{target_line}"
-        await _bot_api.messages.send(
-            peer_id=p.peer_id,
-            message=board,
-            random_id=0,
-            keyboard=pvp_combat_keyboard(p.base_class, state.combatants[p.character_id].cooldowns, subclass_id=state.combatants[p.character_id].subclass_id, show_target=True),
-        )
 
 
 async def start_siege_battle(
@@ -1012,34 +881,6 @@ def battle_at(location: tuple[int, int]) -> int | None:
         if battle.location == location and battle.siege_id is not None:
             return battle_id
     return None
-
-
-async def release_queue(battle_id: int, battle: Battle) -> None:
-    """Дуэль кончилась раньше, чем вступившие дождались хода: они тоже
-    свободны. Раньше их отметка «в бою» оставалась навсегда, и не снимал её
-    даже админский сброс (2026-10-26, Бубылда)."""
-    from bot.handlers import world as world_handlers
-
-    queued = [p for p, _ in battle.join_queue]
-    battle.join_queue.clear()
-    for p in queued:
-        if _peer_battle.get(p.peer_id) == battle_id:
-            _peer_battle.pop(p.peer_id, None)
-    if not queued:
-        return
-    async with get_session_factory()() as db:
-        for p in queued:
-            character = await db.get(Character, p.character_id)
-            if character is None:
-                continue
-            keyboard = await world_handlers._current_keyboard(db, character, p.peer_id, datetime.now(timezone.utc))
-            try:
-                await _bot_api.messages.send(
-                    peer_id=p.peer_id, random_id=0, keyboard=keyboard,
-                    message="Бой закончился раньше, чем ты успел вступить.",
-                )
-            except Exception:  # noqa: BLE001 - закрыл диалог с ботом
-                pass
 
 
 def drop_stale(peer_id: int) -> bool:
@@ -1118,23 +959,12 @@ async def _pvp_action(message: Message, action: DeclaredAction) -> None:
         action.type == ActionType.SKILL and action.skill_id in DEFENSIVE_SKILLS
     )
     if not is_defensive:
-        # Патч 38: в массовом бою действие бьёт по ВЫБРАННОЙ игроком цели
-        # (см. pvp_pick_target/_chosen_target), не по случайной; в дуэли
-        # выбора нет — противник ровно один.
-        target = (
-            _resolve_chosen_target(battle_id, battle, cid) if battle.battle_type == "mass"
-            else _default_enemy_target(battle_id, battle, cid)
-        )
+        # Патч 38: действие бьёт по ВЫБРАННОЙ игроком цели (см.
+        # pvp_pick_target/_chosen_target), не по случайной.
+        target = _resolve_chosen_target(battle_id, battle, cid)
         if target is None:
             return
         action = action.model_copy(update={"target_id": target})
-
-    if battle.battle_type == "duel":
-        try:
-            await _duel_engine.act(battle_id, cid, action)
-        except (KeyError, ValueError):
-            pass
-        return
 
     # Патч 31, п.6: в групповом PvP клавиатура убирается сразу после
     # объявления действия, до резолва окна — иначе игрок мог жать кнопки
@@ -1216,9 +1046,6 @@ def _target_line(battle_id: int, battle: Battle, cid: int) -> str:
 
 
 def _battle_board_text(battle_id: int, battle: Battle, lines: list[str]) -> str:
-    if battle.battle_type == "duel":
-        duel = _duel_engine.duels.get(battle_id)
-        return _render_duel(duel, lines, finished=False) if duel is not None else "\n".join(lines)
     session = _mass_engine.sessions.get(battle_id)
     return _render_mass(session, lines) if session is not None else "\n".join(lines)
 
@@ -1483,8 +1310,6 @@ from bot.handlers.pvp_results import (  # noqa: E402,F401
     _notify_orderers,
     _render_mass,
     _render_mass_tick,
-    on_duel_finished,
-    on_duel_turn_resolved,
     on_mass_battle_finished,
     on_mass_tick_resolved,
 )

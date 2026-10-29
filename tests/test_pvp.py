@@ -13,7 +13,6 @@ _resolve_target), либо не трогают БД вовсе (форматир
 import pytest
 
 from bot.handlers import pvp as pvp_handlers
-from game.combat.duel_engine import DuelEngine, DuelState
 from game.combat.session import CombatMode, CombatSessionState
 from game.combat.tick_engine import InMemoryActionStore, TickEngine
 from models import CharacterTrophy
@@ -129,7 +128,7 @@ async def test_scene_at_afk_does_not_affect_ongoing_battle_listing(db_session, c
     fighter_b = await character_at(7, 7, region="ridge")
     fighter_a.last_active_at = datetime.now(timezone.utc) - timedelta(hours=1)
 
-    battle = _make_battle("duel", (7, 7))
+    battle = _make_battle("mass", (7, 7))
     battle.participants[fighter_a.id] = pvp_handlers._participant(fighter_a, peer_id=111)
     battle.participants[fighter_b.id] = pvp_handlers._participant(fighter_b, peer_id=222)
     battle.side_of = {fighter_a.id: 0, fighter_b.id: 1}
@@ -304,9 +303,9 @@ def _reset_pvp_module():
     pvp_handlers._peer_battle.clear()
     pvp_handlers._pending_join_prompt.clear()
     pvp_handlers._declared_this_tick.clear()
-    duel_engine = DuelEngine()
+
     mass_engine = TickEngine(InMemoryActionStore())
-    pvp_handlers.setup(duel_engine, mass_engine, bot_api=None)
+    pvp_handlers.setup(mass_engine, bot_api=None)
     yield
     pvp_handlers._battles.clear()
     pvp_handlers._peer_battle.clear()
@@ -324,7 +323,7 @@ async def test_scene_at_excludes_busy_participants(db_session, character_at) -> 
     fighter_b = await character_at(1, 1, region="ridge")
     bystander = await character_at(1, 1, region="ridge")
 
-    battle = _make_battle("duel", (1, 1))
+    battle = _make_battle("mass", (1, 1))
     battle.participants[fighter_a.id] = pvp_handlers._participant(fighter_a, peer_id=111)
     battle.participants[fighter_b.id] = pvp_handlers._participant(fighter_b, peer_id=222)
     battle.side_of = {fighter_a.id: 0, fighter_b.id: 1}
@@ -359,7 +358,7 @@ async def test_resolve_target_battle_number_after_solo_players(db_session, chara
     fighter_a = await character_at(3, 3, region="ridge")
     fighter_b = await character_at(3, 3, region="ridge")
 
-    battle = _make_battle("duel", (3, 3))
+    battle = _make_battle("mass", (3, 3))
     battle.participants[fighter_a.id] = pvp_handlers._participant(fighter_a, peer_id=111)
     battle.participants[fighter_b.id] = pvp_handlers._participant(fighter_b, peer_id=222)
     battle.side_of = {fighter_a.id: 0, fighter_b.id: 1}
@@ -385,44 +384,6 @@ def test_format_transfer_line_orders_expensive_first() -> None:
 # --- Патч 31, п.6: клавиатура только у ходящего игрока ---
 
 
-def test_render_duel_turn_line_uses_explicit_next_actor_override() -> None:
-    """Регрессия: duel.current_actor_id внутри on_duel_turn_resolved ещё
-    указывает на актёра ТОЛЬКО ЧТО завершившегося хода (turn_number движок
-    инкрементирует ПОСЛЕ колбэка) — без явного override «Ходит:» показывал бы
-    неверное имя. next_actor_id=None (вызов вне колбэка) сохраняет старое
-    поведение — используется duel.current_actor_id как есть."""
-    a = combatant(1, side=0, name="Атакующий")
-    b = combatant(2, side=1, name="Защитник")
-    duel = DuelState(session_id=-1, combatants={1: a, 2: b}, order=(1, 2), turn_number=1)
-
-    text_live = pvp_handlers._render_duel(duel, [], finished=False)
-    assert "Ходит: Атакующий" in text_live  # order[0] = текущий актёр хода 1
-
-    text_after_turn = pvp_handlers._render_duel(duel, [], finished=False, next_actor_id=2)
-    assert "Ходит: Защитник" in text_after_turn
-
-
-def test_rebuild_keyboard_duel_only_current_actor_gets_combat_kb() -> None:
-    a = combatant(1, side=0, name="Атакующий")
-    b = combatant(2, side=1, name="Защитник")
-    duel = DuelState(session_id=-1, combatants={1: a, 2: b}, order=(1, 2), turn_number=1)
-    pvp_handlers._duel_engine.duels[-1] = duel
-
-    battle = _make_battle("duel", (0, 0))
-    battle.participants = {
-        1: pvp_handlers.Participant(1, 111, "Атакующий", "warrior", "Воин"),
-        2: pvp_handlers.Participant(2, 222, "Защитник", "warrior", "Воин"),
-    }
-    pvp_handlers._battles[-1] = battle
-    pvp_handlers._peer_battle[111] = -1
-    pvp_handlers._peer_battle[222] = -1
-
-    kb_active = pvp_handlers.rebuild_keyboard(111)
-    kb_waiting = pvp_handlers.rebuild_keyboard(222)
-    assert kb_active != kb_waiting
-    assert kb_waiting == pvp_handlers.pvp_waiting_keyboard()
-
-
 def test_rebuild_keyboard_mass_hides_after_declaring() -> None:
     session = CombatSessionState(session_id=-7, mode=CombatMode.PVP_GROUP)
     me = combatant(1, side=0, name="Я")
@@ -445,7 +406,7 @@ def test_format_transfer_line_empty_is_none() -> None:
 
 
 def test_battle_scene_line_groups_by_side() -> None:
-    battle = _make_battle("duel", (0, 0))
+    battle = _make_battle("mass", (0, 0))
     battle.participants = {
         1: pvp_handlers.Participant(1, 111, "Тень_В_Ночи", "rogue", "Клинок теней"),
         2: pvp_handlers.Participant(2, 222, "Гримм", "mage", "Отравитель"),
@@ -552,7 +513,7 @@ async def test_force_unstick_admin_override_defeats_pvp_and_still_resets_rest(
 
 
 def test_character_id_for_peer() -> None:
-    battle = _make_battle("duel", (0, 0))
+    battle = _make_battle("mass", (0, 0))
     battle.participants[7] = pvp_handlers.Participant(7, 555, "Кто-то", "warrior", "Воин")
     assert pvp_handlers._character_id_for_peer(battle, 555) == 7
     assert pvp_handlers._character_id_for_peer(battle, 999) is None
@@ -772,9 +733,8 @@ async def test_start_forced_duel_assigns_distinct_sides(db_session, character_at
     side=0 — без явного разведения сторон в _start_forced_duel оба
     комбатанта дуэли оставались на стороне 0, из-за чего
     _default_enemy_target никогда не находил цель и ЛЮБОЕ атакующее
-    действие молча отбрасывалось раньше вызова duel_engine.act (ходы при
-    этом продолжали идти по таймеру — отсюда "счётчик растёт, действовать
-    нельзя")."""
+    действие молча отбрасывалось (ходы при этом продолжали идти по таймеру -
+    отсюда "счётчик растёт, действовать нельзя")."""
     import bot.handlers.combat as combat_handlers
 
     class _FakeCombatEngine:
@@ -788,8 +748,10 @@ async def test_start_forced_duel_assigns_distinct_sides(db_session, character_at
     await pvp_handlers._start_forced_duel(db_session, attacker, 111, victim, 222)
 
     battle_id = pvp_handlers._peer_battle[111]
-    duel = pvp_handlers._duel_engine.duels[battle_id]
-    assert duel.combatants[attacker.id].side != duel.combatants[victim.id].side
+    # 2026-10-29: бой 1×1 идёт на тиковом движке массового боя.
+    session = pvp_handlers._mass_engine.sessions[battle_id]
+    assert session.combatants[attacker.id].side != session.combatants[victim.id].side
+    assert pvp_handlers._chosen_target[attacker.id] == victim.id
 
     target = pvp_handlers._default_enemy_target(battle_id, pvp_handlers._battles[battle_id], attacker.id)
     assert target == victim.id
@@ -802,7 +764,7 @@ async def test_name_of_a_fighter_leads_into_his_battle(db_session, character_at)
     fighter_a = await character_at(3, 3, region="ridge")
     fighter_b = await character_at(3, 3, region="ridge")
     fighter_a.name = "Драчун"
-    battle = _make_battle("duel", (3, 3))
+    battle = _make_battle("mass", (3, 3))
     battle.participants[fighter_a.id] = pvp_handlers._participant(fighter_a, peer_id=111)
     battle.participants[fighter_b.id] = pvp_handlers._participant(fighter_b, peer_id=222)
     battle.side_of = {fighter_a.id: 0, fighter_b.id: 1}

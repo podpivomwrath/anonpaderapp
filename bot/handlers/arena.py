@@ -5,7 +5,7 @@
 - «Ждать соперника» - игрок получает код и ждёт, пока его не введут;
 - «Найти соперника» - игрок вводит чужой код, и бой начинается.
 
-Бой - обычная дуэль (bot/handlers/pvp.py, Battle.arena), но без смерти,
+Бой - обычный бой 1×1 (bot/handlers/pvp.py, Battle.arena), но без смерти,
 трофеев, рейтинга и эликсиров; оба начинают с полным здоровьем. После боя,
 каким бы ни был итог, оба возвращаются на экран арены.
 
@@ -264,11 +264,12 @@ async def _start(db, first, first_peer: int, second, second_peer: int) -> None:
     await pvp.start_arena_duel(db, first, first_peer, second, second_peer)
 
 
-async def on_arena_finished(battle, result) -> None:
-    """Итог боя арены: только сообщение, и оба снова на арене."""
-    winner = battle.participants.get(result.winner_id) if result.winner_id is not None else None
+async def on_arena_finished(battle, winner_id: int | None) -> None:
+    """Итог боя арены: только сообщение, и оба снова на арене. winner_id
+    None - ничья."""
+    winner = battle.participants.get(winner_id) if winner_id is not None else None
     for cid, p in battle.participants.items():
-        if result.draw or winner is None:
+        if winner is None:
             text = "🤝 Ничья на арене."
         elif cid == winner.character_id:
             loser = next(o for o in battle.participants.values() if o.character_id != cid)

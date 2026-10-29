@@ -41,7 +41,6 @@ from bot.handlers import world_boss as world_boss_handlers
 from bot.webhook import WEBHOOK_PATH, create_app
 from config import Settings, get_settings
 from game.combat import balance_config as bc
-from game.combat.duel_engine import DuelEngine
 from game.combat.tick_engine import InMemoryActionStore, RedisActionStore, TickEngine
 from game.economy import mount_config as mc
 from game.world.scheduler import PeerScheduler
@@ -258,19 +257,12 @@ async def run() -> None:
     transfer_handlers.setup(bot.api)
     moderation_handlers.setup(bot.api)  # патч 27: ЛС администратору с /баг-репортами
 
-    # Открытое PvP (патч 22): дуэль (последовательные ходы) + массовый бой
-    # (одновременный резолв) — ОТДЕЛЬНЫЕ движки от PvE tick_engine выше:
-    # там PLAYER_ID=1/MOB_ID=2 фиксированы под одного игрока и одного моба,
-    # здесь комбатанты — реальные character.id, участников может быть много.
-    # Реестр боёв (bot/handlers/pvp.py) целиком в памяти — как и у duel_engine,
-    # поэтому массовому PvP тоже достаточно InMemoryActionStore, без Redis.
-    duel_engine = DuelEngine(
-        on_turn_resolved=pvp_handlers.on_duel_turn_resolved,
-        on_duel_finished=pvp_handlers.on_duel_finished,
-        max_turns=bc.PVP_MAX_TURNS,
-    )
-    duel_engine.start()
-
+    # Открытое PvP (патч 22): любой бой игроков, с 2026-10-29 и 1×1, -
+    # одновременный резолв на ОТДЕЛЬНОМ движке от PvE tick_engine выше: там
+    # PLAYER_ID=1/MOB_ID=2 фиксированы под одного игрока и одного моба, здесь
+    # комбатанты - реальные character.id, участников может быть много.
+    # Реестр боёв (bot/handlers/pvp.py) целиком в памяти, поэтому достаточно
+    # InMemoryActionStore, без Redis.
     pvp_tick_engine = TickEngine(
         InMemoryActionStore(),
         on_tick_resolved=pvp_handlers.on_mass_tick_resolved,
@@ -278,7 +270,7 @@ async def run() -> None:
         max_turns=bc.PVP_MAX_TURNS,
     )
     pvp_tick_engine.start()
-    pvp_handlers.setup(duel_engine, pvp_tick_engine, bot.api)
+    pvp_handlers.setup(pvp_tick_engine, bot.api)
     arena_handlers.setup(bot.api)  # 2026-10-18: арена в таверне
 
     # Патч 51, ч.4: групповой PvE — ОТДЕЛЬНЫЙ экземпляр TickEngine от соло
@@ -586,7 +578,6 @@ async def run() -> None:
         rest_scheduler.shutdown()
         explore_scheduler.shutdown()
         travel_scheduler.shutdown()
-        duel_engine.shutdown()
         pvp_tick_engine.shutdown()
         group_pve_tick_engine.shutdown()
         raid_tick_engine.shutdown()

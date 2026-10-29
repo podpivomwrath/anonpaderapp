@@ -7,7 +7,9 @@ from types import SimpleNamespace
 from bot.handlers import arena, pvp
 from bot.keyboards import arena as arena_kb
 from bot.keyboards import world as world_kb
-from game.combat.duel_engine import DuelResult
+from game.combat.resolver import TickResult
+from game.combat.session import CombatMode, CombatSessionState
+from tests.conftest import combatant
 
 
 def _labels(keyboard_json: str) -> list[list[str]]:
@@ -30,7 +32,7 @@ def test_arena_keyboards_are_small():
 
 
 def test_arena_battle_is_not_visible_on_any_cell():
-    battle = pvp.Battle(battle_type="duel", location=pvp.ARENA_LOCATION, arena=True)
+    battle = pvp.Battle(battle_type="mass", location=pvp.ARENA_LOCATION, arena=True)
     pvp._battles[-777] = battle
     try:
         assert pvp._battles_at(*pvp.ARENA_LOCATION) == []
@@ -50,17 +52,20 @@ def test_arena_finish_skips_death_and_sends_both_back(monkeypatch):
     monkeypatch.setattr(arena, "_bot_api", Api)
     monkeypatch.setattr(pvp, "on_arena_finished", arena.on_arena_finished)
     battle = pvp.Battle(
-        battle_type="duel", location=pvp.ARENA_LOCATION, arena=True,
+        battle_type="mass", location=pvp.ARENA_LOCATION, arena=True,
         participants={
             1: pvp.Participant(1, 101, "Альфа", "warrior", "Воин"),
             2: pvp.Participant(2, 102, "Бета", "mage", "Маг"),
         },
         side_of={1: 0, 2: 1},
     )
+    loser = combatant(2, side=1, name="Бета")
+    loser.current_hp = 0
+    battle.last_combatants = {1: combatant(1, side=0, name="Альфа"), 2: loser}
     pvp._battles[-778] = battle
     pvp._peer_battle[101] = pvp._peer_battle[102] = -778
     # Путь смерти/трофеев трогал бы БД - на арене до него дойти не должно.
-    asyncio.run(pvp.on_duel_finished(-778, DuelResult(finished=True, winner_id=1)))
+    asyncio.run(pvp.on_mass_battle_finished(-778, TickResult(lines=[], deaths=[2])))
     assert 101 not in pvp._peer_battle and 102 not in pvp._peer_battle
     texts = dict(sent)
     assert "Победа на арене" in texts[101] and "Поражение на арене" in texts[102]
@@ -101,34 +106,33 @@ def test_waiting_state_and_cancel():
         arena._entering.clear()
 
 
-def test_queued_joiner_is_freed_when_duel_ends_first(monkeypatch):
-    """Вступил в дуэль, а она кончилась тем же ходом - отметка «в бою» не
-    остаётся навсегда (2026-10-26, Бубылда)."""
-    class Db:
-        async def __aenter__(self):
-            return self
+def test_one_on_one_on_mass_engine_ends_like_a_duel(monkeypatch):
+    """1×1 идёт на движке массового боя (2026-10-29), а итог - как у дуэли:
+    все трофеи победителю."""
+    from bot.handlers import pvp_results
 
-        async def __aexit__(self, *exc):
-            return False
+    calls = []
 
-        async def get(self, model, key):
-            return None
+    async def fake_finish(battle, winner, loser):
+        calls.append((winner, loser))
 
-    monkeypatch.setattr(pvp, "get_session_factory", lambda: Db)
-    monkeypatch.setattr(pvp, "on_arena_finished", None)
+    monkeypatch.setattr(pvp_results, "_finish_duel", fake_finish)
     battle = pvp.Battle(
-        battle_type="duel", location=pvp.ARENA_LOCATION, arena=True,
+        battle_type="mass", location=(5, 5),
         participants={
             1: pvp.Participant(1, 101, "Альфа", "warrior", "Воин"),
             2: pvp.Participant(2, 102, "Бета", "mage", "Маг"),
         },
         side_of={1: 0, 2: 1},
     )
-    battle.join_queue.append((pvp.Participant(3, 103, "Гамма", "rogue", "Ловкач"), None))
+    loser = combatant(2, side=1, name="Бета")
+    loser.current_hp = 0
+    battle.last_combatants = {1: combatant(1, side=0, name="Альфа"), 2: loser}
     pvp._battles[-779] = battle
-    pvp._peer_battle[101] = pvp._peer_battle[102] = pvp._peer_battle[103] = -779
-    asyncio.run(pvp.on_duel_finished(-779, DuelResult(finished=True, winner_id=1)))
-    assert 103 not in pvp._peer_battle and not battle.join_queue
+    pvp._peer_battle[101] = pvp._peer_battle[102] = -779
+    asyncio.run(pvp.on_mass_battle_finished(-779, TickResult(lines=[], deaths=[2])))
+    assert calls == [(1, 2)]
+    assert 101 not in pvp._peer_battle and 102 not in pvp._peer_battle
 
 
 def test_stale_battle_mark_is_dropped():

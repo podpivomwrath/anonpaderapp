@@ -11,7 +11,7 @@ from services import pvp_shield
 
 
 def test_draw_shield_goes_to_attacked_side_only():
-    battle = pvp.Battle(battle_type="duel", location=(5, 5), side_of={1: 0, 2: 1})
+    battle = pvp.Battle(battle_type="mass", location=(5, 5), side_of={1: 0, 2: 1})
     try:
         assert pvp._grant_draw_shield(battle, [1, 2]) == [2]
         assert 0 < pvp.draw_shield_left(2) <= bc.PVP_DRAW_SHIELD_SECONDS + 1

@@ -7,7 +7,6 @@ import pytest
 from sqlalchemy.ext.asyncio import async_sessionmaker
 
 from bot.handlers import pvp as pvp_handlers
-from game.combat.duel_engine import DuelEngine
 from game.combat.tick_engine import InMemoryActionStore, TickEngine
 
 
@@ -24,7 +23,7 @@ def api(db_session, monkeypatch):
     factory = async_sessionmaker(db_session.bind, expire_on_commit=False)
     monkeypatch.setattr(pvp_handlers, "get_session_factory", lambda: factory)
     api = SimpleNamespace(messages=_Messages())
-    pvp_handlers.setup(DuelEngine(), TickEngine(InMemoryActionStore()), api)
+    pvp_handlers.setup(TickEngine(InMemoryActionStore()), api)
     yield api
     pvp_handlers._battles.clear()
     pvp_handlers._peer_battle.clear()

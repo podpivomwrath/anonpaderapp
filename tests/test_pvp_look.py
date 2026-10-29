@@ -16,7 +16,7 @@ async def test_peaceful_scene_lists_players_without_numbers(make_character) -> N
 
 def test_peaceful_scene_shows_contract_fight() -> None:
     """Бой по заказу на озере видят все на клетке (2026-10-25)."""
-    battle = pvp.Battle(battle_type="duel", location=(5, 5))
+    battle = pvp.Battle(battle_type="mass", location=(5, 5))
     for cid, name, side in ((1, "Охотник", 0), (2, "Цель", 1)):
         battle.participants[cid] = pvp.Participant(cid, cid, name, "warrior", "Воин")
         battle.side_of[cid] = side

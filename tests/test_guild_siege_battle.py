@@ -14,7 +14,6 @@ from sqlalchemy.ext.asyncio import async_sessionmaker
 from bot.handlers import guild as guild_handlers
 from bot.handlers import guild_siege
 from bot.handlers import pvp as pvp_handlers
-from game.combat.duel_engine import DuelEngine
 from game.combat.tick_engine import InMemoryActionStore, TickEngine
 from game.economy import guild_config as gc
 from models import GuildBuilding, GuildCell, GuildSiege, User
@@ -42,7 +41,7 @@ def wired(db_session, monkeypatch):
     api = _Api()
     pvp_handlers._battles.clear()
     pvp_handlers._peer_battle.clear()
-    pvp_handlers.setup(DuelEngine(), TickEngine(InMemoryActionStore()), api)
+    pvp_handlers.setup(TickEngine(InMemoryActionStore()), api)
     guild_handlers.setup(api)
 
     async def _no_block(db, character, peer):

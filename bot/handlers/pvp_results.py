@@ -1,5 +1,5 @@
-"""PvP: итоги боёв - колбэки дуэльного и тикового движков, рендер массового
-боя, победа и поражение, вести заказчикам контрактов.
+"""PvP: итоги боёв - колбэки тикового движка (и 1×1, и массовый), рендер боя,
+победа и поражение, вести заказчикам контрактов.
 
 Вынесено из bot/handlers/pvp.py без изменений логики (2026-10-22, нарезка).
 Общее состояние боёв (_battles, _bot_api, движки) по-прежнему живёт в pvp.py -
@@ -14,7 +14,6 @@ from bot.keyboards.pvp import pvp_combat_keyboard, pvp_waiting_keyboard
 from bot.pvp_texts import NOTHING_TO_TAKE
 from game.combat import balance_config as bc
 from game.combat import battle_log, display
-from game.combat.duel_engine import DuelResult
 from game.combat.resolver import TickResult
 from game.combat.session import CombatSessionState
 from game.economy import fishing as game_fishing
@@ -25,112 +24,7 @@ from services import onboarding_service as onboarding_svc
 from bot.handlers import pvp
 
 
-# --- Колбэки дуэльного движка ---
-
-
-async def on_duel_turn_resolved(session_id: int, turn: int, result: DuelResult) -> None:
-    # ПРИМЕЧАНИЕ: duel_engine вызывает этот колбэк ДО pop из self.duels и ДО
-    # простановки state.finished — на последнем ходу дуэль ещё присутствует
-    # в _duel_engine.duels, поэтому duel почти никогда не None здесь (кроме
-    # гонки с ручной конверсией); используем result.finished, а не duel.finished.
-    battle = pvp._battles.get(session_id)
-    if battle is None:
-        return
-    duel = pvp._duel_engine.duels.get(session_id)
-    # Патч 31, п.6: следующий актёр — order[turn_number % 2], НЕ
-    # duel.current_actor_id (см. докстринг _render_duel выше — тот всё ещё
-    # указывает на актёра только что резолвленного хода в этой точке).
-    next_actor_id = duel.order[duel.turn_number % 2] if duel is not None else None
-
-    for p in list(battle.participants.values()):
-        combatant = duel.combatants.get(p.character_id) if duel is not None else None
-        text = (
-            pvp._render_duel(duel, result.lines, finished=result.finished, next_actor_id=next_actor_id)
-            if duel is not None
-            else "\n".join(result.lines)
-        )
-        short = pvp._render_duel_short(duel, finished=result.finished) if duel is not None else text
-        own = battle_log.class_line(duel.combatants, p.character_id) if duel is not None else None
-        if own and not result.finished:
-            text += f"\n\n{own}"
-        if result.finished or combatant is None:
-            keyboard = kb.waiting_keyboard()
-        elif p.character_id == next_actor_id:
-            text += "\n\n▶️ Твой ход!"
-            short += "\n\n▶️ Твой ход!"
-            keyboard = pvp_combat_keyboard(p.base_class, combatant.cooldowns, subclass_id=combatant.subclass_id)
-        else:
-            text += "\n\n⏳ Ход противника. Ожидание..."
-            short += "\n\n⏳ Ход противника. Ожидание..."
-            keyboard = pvp_waiting_keyboard()
-        await short_log.send(pvp._bot_api, p.peer_id, short, text, keyboard)
-
-    if result.finished:
-        return  # on_duel_finished разрулит исход и очистку
-
-    if battle.join_queue:
-        await pvp._convert_duel_to_mass(session_id, battle)
-
-
-async def on_duel_finished(session_id: int, result: DuelResult) -> None:
-    battle = pvp._battles.pop(session_id, None)
-    if battle is None:
-        return
-    for p in list(battle.participants.values()):
-        pvp._peer_battle.pop(p.peer_id, None)
-    await pvp.release_queue(session_id, battle)
-
-    if battle.arena:
-        # Арена: ни смерти, ни трофеев, ни рейтинга - игроки возвращаются на арену.
-        if pvp.on_arena_finished is not None:
-            await pvp.on_arena_finished(battle, result)
-        return
-
-    if result.draw or result.winner_id is None:
-        # Патч 40, баг 1: ничья по лимиту ходов оставляла ОБОИХ живых дуэлянтов
-        # с kb.waiting_keyboard() навсегда — она рассчитана как ВРЕМЕННАЯ,
-        # исправляется либо respawn-сканом (для мёртвых), либо следующим
-        # сообщением (тут его не было). "Взаимное истощение" (draw_reason=None)
-        # — оба реально погибли, но смерть никогда не применялась: respawn-скан
-        # их тоже не подхватывал, зависали на 0 HP без таймера навсегда.
-        is_turn_limit = result.draw_reason == "turn_limit"
-        positions: dict[int, tuple[int, int]] = {}
-        has_mount_by_cid: dict[int, bool] = {}
-        async with pvp.get_session_factory()() as db:
-            await pvp_service.log_battle(db, "duel", list(battle.participants), [])
-            for cid in list(battle.participants):
-                character = await db.get(Character, cid)
-                if character is None:
-                    continue
-                if is_turn_limit:
-                    positions[cid] = (character.pos_x, character.pos_y)
-                    has_mount_by_cid[cid] = await mount_service.has_any_mount(db, cid)
-                else:
-                    death_service.apply_pvp_death(character)
-                    await admin_service.log_death(db, character, "pvp")
-                    respawn_handlers.register_pvp_death(battle.participants[cid].peer_id)
-            await db.commit()
-        # Патч 30: лимит ходов — отдельный лорный текст от "взаимного истощения".
-        draw_text = (
-            bc.PVP_DRAW_TURN_LIMIT_TEXT if is_turn_limit
-            else "🤝 Ничья: взаимное истощение. Трофеи остаются при каждом."
-        )
-        shielded = pvp._grant_draw_shield(battle, list(battle.participants)) if is_turn_limit else []
-        for cid, p in list(battle.participants.items()):
-            text = f"{draw_text}\n\n{pvp.DRAW_SHIELD_LINE}" if cid in shielded else draw_text
-            if is_turn_limit:
-                pos = positions.get(cid, (0, 0))
-                keyboard = kb.movement_keyboard(*pos, p.peer_id, has_mount=has_mount_by_cid.get(cid, False))
-            else:
-                keyboard = kb.waiting_keyboard()  # смерть зарегистрирована — respawn-скан подхватит
-            await pvp._bot_api.messages.send(
-                peer_id=p.peer_id, message=text, random_id=0, keyboard=keyboard,
-            )
-        return
-
-    winner_cid = result.winner_id
-    loser_cid = next(cid for cid in battle.participants if cid != winner_cid)
-    await _finish_duel(battle, winner_cid, loser_cid)
+# --- Итог боя 1×1 ---
 
 
 async def _finish_duel(battle: pvp.Battle, winner_cid: int, loser_cid: int) -> None:
@@ -361,6 +255,19 @@ async def on_mass_battle_finished(session_id: int, result: TickResult) -> None:
     combatants = battle.last_combatants
     dead_ids = [cid for cid in battle.participants if cid in combatants and not combatants[cid].alive]
     survivor_ids = [cid for cid in battle.participants if cid in combatants and combatants[cid].alive]
+
+    if battle.arena:
+        # Арена: ни смерти, ни трофеев, ни рейтинга - игроки возвращаются на арену.
+        if pvp.on_arena_finished is not None:
+            winner = survivor_ids[0] if not result.draw and len(survivor_ids) == 1 else None
+            await pvp.on_arena_finished(battle, winner)
+        return
+    if (battle.siege_id is None and not result.draw and len(battle.participants) == 2
+            and len(dead_ids) == 1 and len(survivor_ids) == 1):
+        # Бой один на один (2026-10-29: дуэль идёт на этом же движке) - итог
+        # как у дуэли: все трофеи победителю, очки PTS по правилу дуэли.
+        await _finish_duel(battle, survivor_ids[0], dead_ids[0])
+        return
 
     if battle.siege_id is not None:
         from bot.handlers import guild_siege  # избегаем цикла импортов
