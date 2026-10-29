@@ -35,3 +35,6 @@ class CharacterCraftGear(Base):
     #: Альманах: какие травы подсказывать, id через запятую; None - всю, что
     #: различает, пустая строка - никакую (миграция 0097).
     herb_ids: Mapped[str | None] = mapped_column(Text, nullable=True)
+    #: Альманах: id кустов (herb_patches), на которые уже указал, через
+    #: запятую - второй раз не указывает (миграция 0098).
+    hinted: Mapped[str | None] = mapped_column(Text, nullable=True)

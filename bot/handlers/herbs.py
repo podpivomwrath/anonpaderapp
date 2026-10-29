@@ -101,14 +101,19 @@ async def notify_nearby(peer_id: int, character) -> None:
         # Только отмеченная в мини-аппе трава (2026-10-29, владелец).
         wanted = await craft_gear_service.almanac_filter(db, character.id) if found else None
         if wanted is not None:
-            found = [(d, h) for d, h in found if h.id in wanted]
+            found = [(p, d, h) for p, d, h in found if h.id in wanted]
+        # На один куст - одна подсказка (2026-10-29, владелец).
+        if found:
+            fresh = await craft_gear_service.almanac_not_hinted(db, character.id, {p for p, _, _ in found})
+            found = [(p, d, h) for p, d, h in found if p in fresh]
         # 10 подсказок, потом час зарядки (2026-10-29). Тратит подсказку только
         # найденная трава, а не пустая клетка.
         uses = await craft_gear_service.almanac_use(db, character.id) if found else None
         if uses is None:
             return
+        await craft_gear_service.almanac_mark_hinted(db, character.id, {p for p, _, _ in found})
         await db.commit()
-    parts = [f"{herb.emoji} {herb.name} - {_SIDES[(dx, dy)]}" for (dx, dy), herb in found]
+    parts = [f"{herb.emoji} {herb.name} - {_SIDES[(dx, dy)]}" for _, (dx, dy), herb in found]
     left, total = uses
     from game.economy import craft_gear_config as gc
 

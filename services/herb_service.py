@@ -97,9 +97,9 @@ async def visible_here(db: AsyncSession, character: Character, now: datetime | N
 
 async def visible_around(
     db: AsyncSession, character: Character, now: datetime | None = None,
-) -> list[tuple[tuple[int, int], HerbDef]]:
+) -> list[tuple[int, tuple[int, int], HerbDef]]:
     """Трава на восьми соседних клетках, которую персонаж различает:
-    [((dx, dy), трава)] - для альманаха травника (2026-10-23)."""
+    [(id куста, (dx, dy), трава)] - для альманаха травника (2026-10-23)."""
     now = now or _now()
     x, y = character.pos_x, character.pos_y
     rows = (await db.scalars(select(HerbPatch).where(
@@ -112,8 +112,18 @@ async def visible_around(
             continue
         herb = herbalism.herb_def(patch.herb_id)
         if herb is not None and herbalism.can_see(character.herbalism_level, herb):
-            out.append(((patch.x - x, patch.y - y), herb))
-    return sorted(out, key=lambda item: item[0])
+            out.append((patch.id, (patch.x - x, patch.y - y), herb))
+    return sorted(out, key=lambda item: item[1])
+
+
+async def fresh_patch_ids(db: AsyncSession, ids: set[int], now: datetime | None = None) -> set[int]:
+    """Какие из этих кустов ещё растут (не сорваны и не завяли)."""
+    if not ids:
+        return set()
+    now = now or _now()
+    return set(await db.scalars(select(HerbPatch.id).where(
+        HerbPatch.id.in_(ids), HerbPatch.spawned_at >= _fresh_since(now),
+    )))
 
 
 @dataclass

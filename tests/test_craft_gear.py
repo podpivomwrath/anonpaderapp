@@ -194,6 +194,32 @@ async def test_almanac_page_drops_only_to_owner_and_adds_two(db_session, make_ch
     assert (await craft_gear_service.almanac_use(db_session, c.id)) == (11, 12)
 
 
+async def test_almanac_hints_each_patch_once(db_session, make_character) -> None:
+    """2026-10-29, владелец: на один куст альманах указывает один раз;
+    сорванный куст из памяти уходит."""
+    from datetime import datetime, timezone
+
+    from sqlalchemy import delete
+
+    from models import HerbPatch
+    from services import craft_gear_service
+
+    c = await make_character(level=20)
+    await craft_gear_service.grant_drop(db_session, c.id, "almanac")
+    now = datetime.now(timezone.utc)
+    a = HerbPatch(x=50, y=50, herb_id="bitter_wormwood", spawned_at=now)
+    b = HerbPatch(x=51, y=50, herb_id="ash_plantain", spawned_at=now)
+    db_session.add_all([a, b])
+    await db_session.flush()
+    assert await craft_gear_service.almanac_not_hinted(db_session, c.id, {a.id, b.id}) == {a.id, b.id}
+    await craft_gear_service.almanac_mark_hinted(db_session, c.id, {a.id})
+    assert await craft_gear_service.almanac_not_hinted(db_session, c.id, {a.id, b.id}) == {b.id}
+    await db_session.execute(delete(HerbPatch).where(HerbPatch.id == a.id))
+    await craft_gear_service.almanac_mark_hinted(db_session, c.id, {b.id})
+    row = await craft_gear_service._row(db_session, c.id, "almanac")
+    assert row.hinted == str(b.id)
+
+
 async def test_almanac_herb_filter_only_seen_herbs(db_session, make_character) -> None:
     """2026-10-29, владелец: галочки по траве; пусто - альманах молчит."""
     import pytest

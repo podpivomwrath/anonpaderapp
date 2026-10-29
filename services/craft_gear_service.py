@@ -89,6 +89,30 @@ async def almanac_filter(db: AsyncSession, character_id: int) -> set[str] | None
     return almanac_herb_set(row)
 
 
+def _hinted(row) -> set[int]:
+    return {int(p) for p in (row.hinted or "").split(",") if p.isdigit()}
+
+
+async def almanac_not_hinted(db: AsyncSession, character_id: int, patch_ids: set[int]) -> set[int]:
+    """Кусты, на которые альманах этому персонажу ещё не указывал
+    (2026-10-29, владелец: на одну траву - один раз)."""
+    row = await _row(db, character_id, "almanac")
+    return set(patch_ids) - (_hinted(row) if row is not None else set())
+
+
+async def almanac_mark_hinted(db: AsyncSession, character_id: int, patch_ids: set[int]) -> None:
+    """Запомнить кусты, на которые указал. Сорванные и завявшие из памяти
+    выкидываем - список не растёт."""
+    from services import herb_service
+
+    row = await _row(db, character_id, "almanac")
+    if row is None:
+        return
+    keep = await herb_service.fresh_patch_ids(db, _hinted(row) | set(patch_ids))
+    row.hinted = ",".join(str(p) for p in sorted(keep))
+    await db.flush()
+
+
 async def set_almanac_herbs(db: AsyncSession, character: Character, herb_ids: list[str] | None) -> None:
     """Галочки по траве (2026-10-29, владелец): None - вся трава, пустой
     список - альманах молчит. Только трава, которую персонаж различает.
