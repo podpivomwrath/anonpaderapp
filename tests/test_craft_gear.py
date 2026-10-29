@@ -57,7 +57,8 @@ async def test_drops_are_granted_once(db_session, make_character) -> None:
             return 0.0
 
     assert await craft_gear_service.roll_almanac(db_session, c, Lucky()) == craft_gear_service.ALMANAC_LINE
-    assert await craft_gear_service.roll_almanac(db_session, c, Lucky()) is None
+    # Второй раз - уже не альманах, а страница к нему (2026-10-29).
+    assert "Страница" in await craft_gear_service.roll_almanac(db_session, c, Lucky())
     assert await craft_gear_service.tier(db_session, c.id, "almanac") == 1
 
 
@@ -161,20 +162,8 @@ def test_last_breath_is_not_throwable() -> None:
     assert not flask_throw.can_throw(SimpleNamespace(id="scroll_ward", category="scroll"))
 
 
-def test_almanac_works_an_hour_then_charges_an_hour() -> None:
-    """2026-10-29, владелец: час работает, час заряжается."""
-    from datetime import datetime, timedelta, timezone
-
-    from game.economy import craft_gear
-
-    start = datetime(2026, 10, 29, 12, 0, tzinfo=timezone.utc)
-    assert craft_gear.almanac_phase(None, start)[0] == "ready"
-    assert craft_gear.almanac_phase(start, start + timedelta(minutes=59))[0] == "active"
-    assert craft_gear.almanac_phase(start, start + timedelta(minutes=61))[0] == "charging"
-    assert craft_gear.almanac_phase(start, start + timedelta(minutes=121))[0] == "ready"
-
-
-async def test_almanac_opens_a_cycle_and_then_rests(db_session, make_character) -> None:
+async def test_almanac_ten_hints_then_an_hour_of_charging(db_session, make_character) -> None:
+    """2026-10-29, владелец: 10 подсказок, потом час зарядки, потом снова 10."""
     from datetime import datetime, timedelta, timezone
 
     from services import craft_gear_service
@@ -182,7 +171,24 @@ async def test_almanac_opens_a_cycle_and_then_rests(db_session, make_character) 
     c = await make_character(level=20)
     await craft_gear_service.grant_drop(db_session, c.id, "almanac")
     now = datetime(2026, 10, 29, 12, 0, tzinfo=timezone.utc)
-    assert await craft_gear_service.almanac_works(db_session, c.id, now)
-    assert await craft_gear_service.almanac_works(db_session, c.id, now + timedelta(minutes=30))
-    assert not await craft_gear_service.almanac_works(db_session, c.id, now + timedelta(minutes=90))
-    assert await craft_gear_service.almanac_works(db_session, c.id, now + timedelta(minutes=125))
+    left = [(await craft_gear_service.almanac_use(db_session, c.id, now))[0] for _ in range(10)]
+    assert left == [9, 8, 7, 6, 5, 4, 3, 2, 1, 0]
+    assert await craft_gear_service.almanac_use(db_session, c.id, now + timedelta(minutes=59)) is None
+    assert await craft_gear_service.almanac_use(db_session, c.id, now + timedelta(minutes=61)) == (9, 10)
+
+
+async def test_almanac_page_drops_only_to_owner_and_adds_two(db_session, make_character) -> None:
+    import random
+
+    from services import craft_gear_service
+
+    class Lucky(random.Random):
+        def random(self) -> float:
+            return 0.0
+
+    c = await make_character(level=20)
+    first = await craft_gear_service.roll_almanac(db_session, c, Lucky())
+    assert first == craft_gear_service.ALMANAC_LINE  # сначала сам альманах
+    page = await craft_gear_service.roll_almanac(db_session, c, Lucky())
+    assert page and "Страница" in page and "12" in page
+    assert (await craft_gear_service.almanac_use(db_session, c.id)) == (11, 12)

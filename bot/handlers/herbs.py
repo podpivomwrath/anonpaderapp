@@ -98,13 +98,21 @@ async def notify_nearby(peer_id: int, character) -> None:
 
     async with get_session_factory()() as db:
         found = await herb_service.visible_around(db, character)
-        # Час работает, час заряжается (2026-10-29). Цикл открывает первая
+        # 10 подсказок, потом час зарядки (2026-10-29). Тратит подсказку только
         # найденная трава, а не пустая клетка.
-        if not found or not await craft_gear_service.almanac_works(db, character.id):
+        uses = await craft_gear_service.almanac_use(db, character.id) if found else None
+        if uses is None:
             return
         await db.commit()
     parts = [f"{herb.emoji} {herb.name} - {_SIDES[(dx, dy)]}" for (dx, dy), herb in found]
-    await _api().messages.send(peer_id=peer_id, random_id=0, message="📗 Альманах: рядом трава.\n" + "\n".join(parts))
+    left, total = uses
+    from game.economy import craft_gear_config as gc
+
+    tail = (f"Подсказок до зарядки: {left} из {total}." if left
+            else f"Это была последняя подсказка: альманах заряжается {gc.ALMANAC_CHARGE_MINUTES} мин.")
+    await _api().messages.send(
+        peer_id=peer_id, random_id=0, message="📗 Альманах: рядом трава.\n" + "\n".join(parts) + "\n" + tail,
+    )
 
 
 def picked_text(result, character=None) -> str:

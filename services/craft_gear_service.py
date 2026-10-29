@@ -47,22 +47,26 @@ async def _row(db: AsyncSession, character_id: int, tool_id: str) -> CharacterCr
     ).with_for_update().execution_options(populate_existing=True))
 
 
-async def almanac_works(db: AsyncSession, character_id: int, now=None) -> bool:
-    """Альманах подсказывает траву сейчас? Готовый к работе - открывает новый
-    час работы. Нет альманаха или он заряжается - False."""
+async def almanac_use(db: AsyncSession, character_id: int, now=None) -> tuple[int, int] | None:
+    """Альманах подсказывает траву сейчас? Тратит одно срабатывание; последнее
+    запускает час зарядки, после неё запас снова полный. (осталось, всего)
+    после этого срабатывания; None - альманаха нет или он заряжается."""
     from datetime import datetime, timezone
 
     row = await _row(db, character_id, "almanac")
     if row is None:
-        return False
+        return None
     now = now or datetime.now(timezone.utc)
-    phase, _left = craft_gear.almanac_phase(row.cycle_at, now)
-    if phase == "charging":
-        return False
-    if phase == "ready":
+    if row.cycle_at is not None:
+        if craft_gear.almanac_charge_left(row.cycle_at, now):
+            return None
+        row.cycle_at, row.used = None, 0
+    total = craft_gear.almanac_uses(row.count)
+    row.used = (row.used or 0) + 1
+    if row.used >= total:
         row.cycle_at = now
-        await db.flush()
-    return True
+    await db.flush()
+    return max(total - row.used, 0), total
 
 
 async def use_charge(db: AsyncSession, character_id: int, tool_id: str) -> int:
@@ -92,10 +96,17 @@ LAMP_LINE = (
 
 
 async def roll_almanac(db: AsyncSession, character: Character, rng: random.Random) -> str | None:
-    """Альманах с моба: шанс gc.ALMANAC_DROP_CHANCE, если его ещё нет."""
+    """Альманах с моба: шанс gc.ALMANAC_DROP_CHANCE, если его ещё нет. У кого
+    уже есть - с тем же шансом страница: +2 срабатывания навсегда (2026-10-29)."""
     if rng.random() >= gc.ALMANAC_DROP_CHANCE:
         return None
-    return ALMANAC_LINE if await grant_drop(db, character.id, "almanac") else None
+    row = await _row(db, character.id, "almanac")
+    if row is None:
+        return ALMANAC_LINE if await grant_drop(db, character.id, "almanac") else None
+    row.count = (row.count or 0) + 1
+    await db.flush()
+    return (f"📗 Страница альманаха: +{gc.ALMANAC_USES_PER_PAGE} подсказки до зарядки, "
+            f"теперь {craft_gear.almanac_uses(row.count)}.")
 
 
 async def roll_lamp(db: AsyncSession, character_id: int, rng: random.Random) -> str | None:

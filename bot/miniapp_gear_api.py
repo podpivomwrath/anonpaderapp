@@ -30,12 +30,13 @@ def _status(tool_id: str, row) -> str | None:
         return None
     from datetime import datetime, timezone
 
-    phase, left = craft_gear.almanac_phase(row.cycle_at, datetime.now(timezone.utc))
-    if phase == "active":
-        return f"Работает ещё {left} мин."
-    if phase == "charging":
-        return f"Заряжается ещё {left} мин."
-    return "Готов: включится, как только рядом найдётся трава."
+    total = craft_gear.almanac_uses(row.count)
+    pages = f" Страниц: {row.count}." if row.count else ""
+    left = craft_gear.almanac_charge_left(row.cycle_at, datetime.now(timezone.utc))
+    if left:
+        return f"Заряжается ещё {left} мин.{pages}"
+    used = 0 if row.cycle_at is not None else (row.used or 0)
+    return f"Подсказок до зарядки: {total - used} из {total}.{pages}"
 
 
 def _error(message: str, status: int = 400) -> web.Response:

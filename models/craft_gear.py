@@ -25,5 +25,7 @@ class CharacterCraftGear(Base):
     tool_id: Mapped[str] = mapped_column(String(16))
     tier: Mapped[int] = mapped_column(default=1)
     count: Mapped[int] = mapped_column(BigInteger, default=0)
-    #: Альманах (2026-10-29): когда начался текущий цикл «работает - заряжается».
+    #: Альманах (2026-10-29): когда кончились срабатывания и пошла зарядка;
+    #: used - сколько срабатываний потрачено, count - найденные страницы.
     cycle_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    used: Mapped[int] = mapped_column(default=0, server_default="0")
