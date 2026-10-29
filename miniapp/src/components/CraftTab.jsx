@@ -22,6 +22,7 @@ import { Empty, SectionHead, Sheet } from './ui.jsx';
 const STAT_TITLES = {
   str: 'Сила', agi: 'Ловкость', int: 'Интеллект', vit: 'Выносливость', wil: 'Воля',
   primary: 'Основной стат',
+  second: 'Основной стат',
 };
 
 const SUBTABS = [

@@ -71,7 +71,10 @@ def resolve_weights(
     """
     resolved: dict[str, float] = {}
     for key, weight in weights.items():
-        stat = primary_stat if key == "primary" else key
+        if key == "second":
+            stat = "int" if primary_stat == "wil" else primary_stat
+        else:
+            stat = primary_stat if key == "primary" else key
         resolved[stat] = resolved.get(stat, 0.0) + weight
     return {stat: weight ** focus for stat, weight in resolved.items()}
 
