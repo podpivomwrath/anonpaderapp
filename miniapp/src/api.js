@@ -510,6 +510,15 @@ export function makeGear(tool, tier) {
   });
 }
 
+// Альманах (2026-10-29): какой тир травы подсказывать; null - любую.
+export function setAlmanacTier(herbTier) {
+  return request('/gear', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ action: 'almanac_tier', herb_tier: herbTier }),
+  });
+}
+
 // Рынок (2026-10-23): заявки на товары, витрина, ящик купленного.
 export function getMarket() {
   return request('/market');

@@ -29,3 +29,5 @@ class CharacterCraftGear(Base):
     #: used - сколько срабатываний потрачено, count - найденные страницы.
     cycle_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     used: Mapped[int] = mapped_column(default=0, server_default="0")
+    #: Альманах: подсказывать только траву этого тира; None - любую.
+    herb_tier: Mapped[int | None] = mapped_column(nullable=True)

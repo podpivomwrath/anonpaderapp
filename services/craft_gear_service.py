@@ -69,6 +69,26 @@ async def almanac_use(db: AsyncSession, character_id: int, now=None) -> tuple[in
     return max(total - row.used, 0), total
 
 
+async def almanac_filter(db: AsyncSession, character_id: int) -> int | None:
+    """Какой тир травы подсказывает альманах; None - любую."""
+    row = await db.scalar(select(CharacterCraftGear).where(
+        CharacterCraftGear.character_id == character_id, CharacterCraftGear.tool_id == "almanac",
+    ))
+    return row.herb_tier if row is not None else None
+
+
+async def set_almanac_filter(db: AsyncSession, character: Character, herb_tier: int | None) -> None:
+    """Выбрать тир для подсказок (2026-10-29, просьба игрока). Только из тех,
+    что персонаж уже различает."""
+    row = await _row(db, character.id, "almanac")
+    if row is None:
+        raise GearError("Альманаха нет.")
+    if herb_tier is not None and not 1 <= herb_tier <= herbalism.visible_tier(character.herbalism_level):
+        raise GearError("Траву этого тира ты пока не различаешь.")
+    row.herb_tier = herb_tier
+    await db.flush()
+
+
 async def use_charge(db: AsyncSession, character_id: int, tool_id: str) -> int:
     """Потратить заряд (пряности) или штуку (склянки). Тир или 0 - нечего тратить."""
     row = await _row(db, character_id, tool_id)

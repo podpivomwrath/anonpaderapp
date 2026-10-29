@@ -39,6 +39,19 @@ def _status(tool_id: str, row) -> str | None:
     return f"Подсказок до зарядки: {total - used} из {total}.{pages}"
 
 
+def _almanac(character, row) -> dict:
+    """Окно альманаха: страницы, запас подсказок и выбор тира травы."""
+    from game.economy import herbalism
+
+    return {
+        "pages": row.count or 0,
+        "uses": craft_gear.almanac_uses(row.count),
+        "per_page": gc.ALMANAC_USES_PER_PAGE,
+        "herb_tier": row.herb_tier,
+        "tiers": list(range(1, herbalism.visible_tier(character.herbalism_level) + 1)),
+    }
+
+
 def _error(message: str, status: int = 400) -> web.Response:
     return web.json_response({"error": message}, status=status)
 
@@ -100,6 +113,7 @@ async def _payload(db, character) -> dict:
                 # только «выпадает с мобов», а зачем он - нет).
                 "about": craft_gear.effect_line(tool.id, 1) if tool.source == "drop" else None,
                 "status": _status(tool.id, row) if have else None,
+                "almanac": _almanac(character, row) if tool.id == "almanac" and have else None,
             })
         crafts.append({
             "id": craft_id, "emoji": emoji, "title": title,
@@ -122,6 +136,8 @@ async def handle_post(request: web.Request) -> web.Response:
         body = await request.json()
     except Exception:
         return _error("bad_request")
+    if isinstance(body, dict) and body.get("action") == "almanac_tier":
+        return await _set_almanac_tier(request, body.get("herb_tier"))
     tool_id = body.get("tool") if isinstance(body, dict) else None
     tier = body.get("tier") if isinstance(body, dict) else None
     if not isinstance(tool_id, str) or not isinstance(tier, int) or tool_id in NOT_READY:
@@ -139,6 +155,23 @@ async def handle_post(request: web.Request) -> web.Response:
         await db.commit()
         payload = await _payload(db, character)
     payload["done"] = done
+    return web.json_response(payload)
+
+
+async def _set_almanac_tier(request: web.Request, herb_tier) -> web.Response:
+    if herb_tier is not None and not isinstance(herb_tier, int):
+        return _error("bad_request")
+    async with request.app[SESSION_FACTORY_KEY]() as db:
+        character = await onboarding_svc.get_character(db, request[VK_USER_ID_KEY])
+        if character is None:
+            return _error("character_not_found", 404)
+        try:
+            await craft_gear_service.set_almanac_filter(db, character, herb_tier)
+        except craft_gear_service.GearError as exc:
+            await db.rollback()
+            return _error(str(exc), 409)
+        await db.commit()
+        payload = await _payload(db, character)
     return web.json_response(payload)
 
 

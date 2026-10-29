@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Button } from '@vkontakte/vkui';
-import { makeGear } from '../api.js';
+import { makeGear, setAlmanacTier } from '../api.js';
 import { itemIcon } from '../itemIcons.js';
 import { SectionHead, Sheet } from './ui.jsx';
 import Sparks from './Sparks.jsx';
@@ -85,6 +85,48 @@ function MakeSheet({ tool, level, onClose, onDone }) {
   );
 }
 
+// Окно альманаха (2026-10-29, просьба игрока): найденные страницы, запас
+// подсказок и какой тир травы подсказывать.
+function AlmanacSheet({ tool, onClose, onDone }) {
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState(null);
+  const a = tool.almanac;
+  const pick = async (tier) => {
+    setBusy(true);
+    setError(null);
+    try {
+      onDone(await setAlmanacTier(tier));
+    } catch (err) {
+      setError(err.details?.error || err.message || 'Не вышло.');
+    } finally {
+      setBusy(false);
+    }
+  };
+  const options = [[null, 'Любая'], ...a.tiers.map((t) => [t, `${ROMAN[t]} тир`])];
+  return (
+    <Sheet title={tool.title} icon={tool.emoji} onClose={onClose}>
+      <p className="craft-hint">
+        Найдено страниц: {a.pages}. Подсказок до зарядки: {a.uses}, каждая страница добавляет {a.per_page}.
+      </p>
+      {tool.status && <p className="craft-hint">{tool.status}</p>}
+      <p className="craft-hint">Какую траву подсказывать:</p>
+      <div className="filter-chips">
+        {options.map(([tier, label]) => (
+          <button
+            key={label} type="button" disabled={busy}
+            className={`filter-chip${a.herb_tier === tier ? ' filter-chip--on' : ''}`}
+            onClick={() => pick(tier)}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+      <p className="craft-hint">Подсказка тратится, только когда рядом нашлась трава выбранного тира.</p>
+      {error && <p className="shop-sheet__error">{error}</p>}
+    </Sheet>
+  );
+}
+
 function ToolCard({ tool, onOpen, flash }) {
   // Картинка - когда нарисуют (tools/craft_gear_art_prompts.md), пока эмодзи.
   const art = itemIcon(`gear:${tool.id}`);
@@ -112,6 +154,9 @@ function ToolCard({ tool, onOpen, flash }) {
           {tool.owned && tool.source !== 'charges' && tool.source !== 'stock' ? '▲' : '+'}
         </button>
       )}
+      {tool.almanac && (
+        <button type="button" className="pill-btn" onClick={onOpen} aria-label="Настроить альманах">⚙</button>
+      )}
     </div>
   );
 }
@@ -133,6 +178,9 @@ export default function CraftGear({ craft, onUpdate }) {
           <ToolCard key={t.id} tool={t} flash={flashes[t.id] || 0} onOpen={() => setOpen(t.id)} />
         ))}
       </div>
+      {tool && tool.almanac && (
+        <AlmanacSheet tool={tool} onClose={() => setOpen(null)} onDone={onUpdate} />
+      )}
       {tool && tool.next && (
         <MakeSheet
           tool={tool} level={craft.level} onClose={() => setOpen(null)}

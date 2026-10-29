@@ -192,3 +192,22 @@ async def test_almanac_page_drops_only_to_owner_and_adds_two(db_session, make_ch
     page = await craft_gear_service.roll_almanac(db_session, c, Lucky())
     assert page and "Страница" in page and "12" in page
     assert (await craft_gear_service.almanac_use(db_session, c.id)) == (11, 12)
+
+
+async def test_almanac_tier_filter_only_seen_tiers(db_session, make_character) -> None:
+    """2026-10-29, просьба игрока: альманах подсказывает выбранный тир травы."""
+    import pytest
+
+    from services import craft_gear_service
+
+    c = await make_character(level=20)
+    c.herbalism_level = 12  # различает I и II тир
+    with pytest.raises(craft_gear_service.GearError):
+        await craft_gear_service.set_almanac_filter(db_session, c, 2)  # альманаха нет
+    await craft_gear_service.grant_drop(db_session, c.id, "almanac")
+    await craft_gear_service.set_almanac_filter(db_session, c, 2)
+    assert await craft_gear_service.almanac_filter(db_session, c.id) == 2
+    with pytest.raises(craft_gear_service.GearError):
+        await craft_gear_service.set_almanac_filter(db_session, c, 4)
+    await craft_gear_service.set_almanac_filter(db_session, c, None)
+    assert await craft_gear_service.almanac_filter(db_session, c.id) is None
