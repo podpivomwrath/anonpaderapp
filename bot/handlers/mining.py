@@ -203,6 +203,7 @@ async def _enter_mine(message: Message) -> None:
 
         await screen_service.set_screen(db, character, "mine")
         ore_left = await mining_service.ore_in_mine(db, mine.id)
+        speed = await mining_service.speed_mult(db, character, mine.tier)
         remaining = mining_service.remaining_seconds(character)
         await db.commit()
 
@@ -220,9 +221,7 @@ async def _enter_mine(message: Message) -> None:
         mt.mine_intro(mine, _rng, ore_left) + chr(10) * 2
         + mt.SEP + chr(10) + mt.level_line(character) + chr(10) + mt.SEP
     )
-    warning = mt.depth_warning(mine, character.mining_level)
-    if warning:
-        text += chr(10) + warning
+    text += chr(10) + mt.dig_time_line(mine, character.mining_level, speed)
     await message.answer(
         text, keyboard=kb.mine_keyboard(ore_left > 0), attachment=mt.mine_attachment(mine),
     )

@@ -49,28 +49,27 @@ def mine_intro(mine: MineDef, rng: random.Random, ore_count: int) -> str:
     )
 
 
-def depth_warning(mine: MineDef, mining_level: int) -> str | None:
-    """Строка-предупреждение, если рудник игроку не по уровню. None - по уровню.
+def dig_time_line(mine: MineDef, mining_level: int, speed: float = 1.0) -> str:
+    """Сколько займёт кусок - при каждом входе в рудник (2026-10-30, владелец;
+    раньше строка была только у рудника не по уровню). speed - множитель
+    кирки и гильдии (mining_service.speed_mult).
 
-    Штраф за глубину - намеренный барьер (mining.time_multiplier), но его не
-    было видно: новичок у глубокой жилы узнавал о нём, только начав копать,
-    а о том, что руда всё равно будет по его уровню, - не узнавал вовсе.
-    Выходил час ожидания ради того, что рядом с городом добывается за
-    десять минут. Одна строка: вход в рудник видят часто, а лор - в описании.
+    Штраф за глубину - намеренный барьер (mining.time_multiplier): новичок у
+    глубокой жилы должен узнать о нём до того, как начнёт копать, и о том,
+    что руда всё равно будет по его уровню. Одна строка: вход в рудник видят
+    часто, а лор - в описании.
     """
-    factor = mining.time_multiplier(mine.tier, mining_level)
-    if factor <= 1.0:
-        return None
+    factor = mining.time_multiplier(mine.tier, mining_level) * speed
     low, high = (sec * factor for sec in mc.STATIC_MINE_SECONDS)
+    span = f"от {mining.format_duration(low)} до {mining.format_duration(high)}"
+    if mining.time_multiplier(mine.tier, mining_level) <= 1.0:
+        return f"⏳ Кусок займёт {span}."
     need = mc.MINE_REQUIRED_LEVEL[mine.tier]
     ore_note = (
         " Руда глубже твоего уровня отсюда не пойдёт."
         if mining.unlocked_tier(mining_level) < mine.tier else ""
     )
-    return (
-        f"⚠️ Не по уровню (нужен {need}): кусок займёт от "
-        f"{mining.format_duration(low)} до {mining.format_duration(high)}.{ore_note}"
-    )
+    return f"⚠️ Не по уровню (нужен {need}): кусок займёт {span}.{ore_note}"
 
 
 def level_line(character) -> str:

@@ -275,23 +275,28 @@ async def start_dig(
     seed = hashlib.sha256(f"{character.id}:{place}:{digs}".encode()).digest()
     roll_rng = random.Random(int.from_bytes(seed[:8], "big"))
     seconds = mining.roll_dig_seconds(roll_rng, tier, character.mining_level, event_vein)
-    from services import guild_service
-
-    seconds *= 1 - guild_service.perk(character, "mining_speed_pct") / 100
-    # Кирка (2026-10-23): быстрее; ниже тира рудника - вдвое слабее.
-    from game.economy import craft_gear
-    from services import craft_gear_service
-
-    gear = await craft_gear_service.gear(db, character.id)
-    seconds *= 1 - craft_gear.pick_speed(gear["pick"].tier if "pick" in gear else 0, tier)
-    if event_vein and "lamp" in gear:
-        from game.economy import craft_gear_config as gear_cfg
-
-        seconds *= 1 - gear_cfg.LAMP_VEIN_SPEED
+    seconds *= await speed_mult(db, character, tier, event_vein)
     character.mining_ends_at = now + timedelta(seconds=seconds)
     character.mining_mine_id = mine.id if mine is not None else None
     await db.flush()
     return DigStart(seconds=seconds, ends_at=character.mining_ends_at)
+
+
+async def speed_mult(db: AsyncSession, character: Character, tier: int, event_vein: bool = False) -> float:
+    """Множитель времени куска от снаряжения и гильдии (поверх уровня): его же
+    берёт и строка времени при входе в рудник, чтобы она не врала."""
+    from game.economy import craft_gear
+    from services import craft_gear_service, guild_service
+
+    mult = 1 - guild_service.perk(character, "mining_speed_pct") / 100
+    # Кирка (2026-10-23): быстрее; ниже тира рудника - вдвое слабее.
+    gear = await craft_gear_service.gear(db, character.id)
+    mult *= 1 - craft_gear.pick_speed(gear["pick"].tier if "pick" in gear else 0, tier)
+    if event_vein and "lamp" in gear:
+        from game.economy import craft_gear_config as gear_cfg
+
+        mult *= 1 - gear_cfg.LAMP_VEIN_SPEED
+    return mult
 
 
 async def finish_dig(
