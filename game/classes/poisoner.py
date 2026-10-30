@@ -72,10 +72,13 @@ def venom(ctx: SkillContext) -> None:
         # вниз, если пересчитанная duration вдруг окажется меньше остатка.
         existing.remaining_ticks = max(existing.remaining_ticks, duration)
     else:
-        target.effects.append(
-            Effect(kind=EffectKind.DOT, value=per_stack, remaining_ticks=duration,
-                   source_id=actor.id, stacks=1)
-        )
+        existing = Effect(kind=EffectKind.DOT, value=per_stack, remaining_ticks=duration,
+                          source_id=actor.id, stacks=1)
+        target.effects.append(existing)
+    # Руна «Гнилая рана» (2026-10-31): яд с шансом держится на ход дольше.
+    wound = actor.buff_modifiers.get("rune:rotten_wound", 0.0)
+    if wound and ctx.rng.random() < wound:
+        existing.remaining_ticks += 1
     ctx.lines.append(f"{target.name} под действием яда ({actor.name}) ☠")
 
     # Патч 56, «Ядовитое облако»: раз в N ходов тот же удар разносит по стаку
@@ -132,6 +135,7 @@ def disrupt(ctx: SkillContext) -> None:
         pvp = ctx.session.mode != CombatMode.PVE
         res = control.try_apply_control(
             target, base_duration=bc.CONTROL_BASE_DURATION_TICKS, source_id=actor.id, rng=ctx.rng, pvp=pvp,
+            chance_bonus=actor.buff_modifiers.get(f"rune:grip@{skill.id}", 0.0),
         )
         if res.immune:
             ctx.lines.append(combat_flavor.control_blocked_line(target.name, res.reason))

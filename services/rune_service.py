@@ -138,7 +138,7 @@ def _slot_open(character: Character, kind: str, slot: str) -> bool:
 def _fits(character: Character, rune_def: rc.RuneDef, kind: str, slot: str) -> str | None:
     """Почему руна не встаёт в слот; None - встаёт."""
     if rune_def.kind != kind:
-        return f"Это {rc.KIND_TITLES[rune_def.kind].lower().replace('руны', 'руна', 1)}."
+        return f"Это {rc.KIND_ONE[rune_def.kind].lower()}."
     place = slot.partition(":")[0]
     if kind == rc.GEAR and not runes.fits_gear(rune_def, place, character.base_class):
         if rune_def.classes and character.base_class not in rune_def.classes:

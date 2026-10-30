@@ -21,7 +21,8 @@ def drink_heal(actor: CombatantState, elixir_id: str) -> str:
     владельца): лечит сразу, ход не тратится. Раньше шло действием хода."""
     from game.combat.session import white_max_hp
 
-    amount = _recovered(actor, ec.heal_amount(elixir_id, white_max_hp(actor)) or 0)
+    amount = ec.heal_amount(elixir_id, white_max_hp(actor)) or 0
+    amount = _recovered(actor, round(amount * (1 + actor.buff_modifiers.get("rune:clean_still", 0.0))))  # руна
     before = actor.current_hp
     actor.current_hp = min(actor.max_hp, before + amount)
     healed = actor.current_hp - before
@@ -77,7 +78,24 @@ def _apply_scroll(actor: CombatantState, elixir_id: str, combatants) -> str:
 
 
 def apply_combat_elixir(actor: CombatantState, elixir_id: str, combatants=None) -> str:
-    """combatants - все бойцы боя (id -> боец): нужны свиткам."""
+    """combatants - все бойцы боя (id -> боец): нужны свиткам. Руна «Чистая
+    перегонка» (2026-10-31) усиливает величину эффекта своего эликсира;
+    эффекты «да/нет» и свитки - без изменений."""
+    boost = actor.buff_modifiers.get("rune:clean_still", 0.0)
+    if not boost or elixir_id.startswith("scroll_"):
+        return _apply_elixir(actor, elixir_id, combatants)
+    before = {id(e): e.value for e in actor.effects}
+    text = _apply_elixir(actor, elixir_id, combatants)
+    for e in actor.effects:
+        if e.source_id != actor.id or e.kind in _BINARY_KINDS:
+            continue
+        old = before.get(id(e), 0.0)
+        if e.value > old:
+            e.value = old + (e.value - old) * (1 + boost)
+    return text
+
+
+def _apply_elixir(actor: CombatantState, elixir_id: str, combatants=None) -> str:
     if elixir_id.startswith("scroll_"):
         return _apply_scroll(actor, elixir_id, combatants)
     if elixir_id == "ashen_fever":

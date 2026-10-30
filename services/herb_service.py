@@ -179,7 +179,9 @@ async def pick(
 def grant_xp(character: Character, xp: int) -> None:
     if character.herbalism_level >= hc.MAX_LEVEL:
         return
-    character.herbalism_xp += xp
+    from game.economy import runes
+
+    character.herbalism_xp += runes.craft_xp(character, xp)  # руна «Мозоли»
     while character.herbalism_level < hc.MAX_LEVEL:
         need = herbalism.xp_to_next(character.herbalism_level)
         if character.herbalism_xp < need:

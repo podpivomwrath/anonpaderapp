@@ -35,6 +35,12 @@ def next_threshold(curve: str, absorbed: int) -> tuple[int, int]:
     return threshold(curve, step + 1), 100 + 10 * (step + 1)
 
 
+def craft_xp(character, xp: int) -> int:
+    """Опыт ремесла с руной «Мозоли» - копия эффектов лежит на персонаже."""
+    bonus = (getattr(character, "rune_effects", None) or {}).get("rune:calluses", 0.0)
+    return round(xp * (1 + bonus)) if bonus and xp > 0 else xp
+
+
 def rune(rune_id: str) -> rc.RuneDef | None:
     return rc.BY_ID.get(rune_id)
 

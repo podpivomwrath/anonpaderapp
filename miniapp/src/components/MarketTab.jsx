@@ -228,7 +228,9 @@ function Goods({ data, act, busy }) {
               </button>
               {isOpen && grp.items.map((g) => (
                 <button key={g.key} type="button" className="market-row market-row--sub" onClick={() => setOpen(g.key)}>
-                  <span className="market-emoji market-emoji--small" aria-hidden="true">{g.emoji}</span>
+                  {g.category === 'rune'
+                    ? <Icon icon={g.icon} emoji={g.emoji} size={28} />
+                    : <span className="market-emoji market-emoji--small" aria-hidden="true">{g.emoji}</span>}
                   <span className="market-row__text">
                     <b>{g.variant}</b>
                     <small>{summaryLine(g.sell, g.buy, data.have[g.key])}</small>

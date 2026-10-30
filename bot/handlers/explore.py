@@ -370,7 +370,11 @@ async def handle_explore_done(peer_id: int) -> None:
             return
         stats = await world._get_stats(db, character.id)
 
-        outcome_kind = "combat" if world._rng.random() < wc.EXPLORE_COMBAT_CHANCE else "event"
+        # Руна «Кривая тропа» (2026-10-31): событие чаще на свою долю.
+        from services import rune_service
+
+        event_chance = (1 - wc.EXPLORE_COMBAT_CHANCE) * (1 + rune_service.effect(character, "crooked_path"))
+        outcome_kind = "combat" if world._rng.random() >= event_chance else "event"
         # Патч 110: след события обрывается на этой клетке - вместо обычного
         # исхода его финал. Событие со сценами - средний/глубокий слой.
         scene_event = None

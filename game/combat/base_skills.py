@@ -67,7 +67,8 @@ def _make_handler(skill: BaseSkillDef):
                 # до действий целей); резист WIL — оба режима, DR — только PvP
                 pvp = ctx.session.mode != CombatMode.PVE
                 res = control.try_apply_control(
-                    target, base_duration=bc.CONTROL_BASE_DURATION_TICKS, source_id=actor.id, rng=ctx.rng, pvp=pvp
+                    target, base_duration=bc.CONTROL_BASE_DURATION_TICKS, source_id=actor.id, rng=ctx.rng, pvp=pvp,
+                    chance_bonus=actor.buff_modifiers.get(f"rune:grip@{skill.id}", 0.0),
                 )
                 # Единый краткий текст независимо от режима (патч 43, ч.1).
                 if res.immune:

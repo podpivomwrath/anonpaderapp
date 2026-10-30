@@ -64,6 +64,9 @@ def stage_hurt(player: CombatantState, amount: int, out: StageTick, *, through_s
         player.effects = [e for e in player.effects if e.kind != EffectKind.LAST_BREATH]
         player.current_hp = 1
         out.lines.append(f"✨ Последний вздох удерживает {player.name} на грани (1 HP)")
+    from game.combat import shared_rules
+
+    shared_rules.rune_guard(player, out.lines)  # руны (2026-10-31)
     if player.current_hp <= 0:
         out.deaths.append(player.id)
         out.lines.append(f"☠ {player.name} погибает")

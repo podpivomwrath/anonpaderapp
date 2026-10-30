@@ -72,6 +72,7 @@ def _make_handler(skill: SubclassSkillDef):
                 # «Глубокая заморозка» (+шанс). 0 у всех остальных подклассов.
                 duration_bonus = int(actor.buff_modifiers.get("freeze_duration_bonus", 0))
                 chance_bonus = actor.buff_modifiers.get("control_chance_bonus", 0.0)
+                chance_bonus += actor.buff_modifiers.get(f"rune:grip@{skill.id}", 0.0)  # руна (2026-10-31)
                 res = control.try_apply_control(
                     target, base_duration=bc.CONTROL_BASE_DURATION_TICKS, source_id=actor.id, rng=ctx.rng, pvp=pvp,
                     duration_bonus=duration_bonus, chance_bonus=chance_bonus,

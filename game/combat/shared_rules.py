@@ -19,6 +19,7 @@ from game.combat import stat_model
 from game.combat.session import (
     CombatantState,
     CombatSessionState,
+    BURN_TAG,
     Effect,
     EffectKind,
     shield_name,
@@ -43,7 +44,10 @@ def poison_tick_damage(effect: Effect, source: CombatantState | None,
         multiplier += source.buff_modifiers.get("damage_bonus", 0.0)
         multiplier *= stat_model.ACTIVE.effect_power(source.stats)
     if target is not None:
-        multiplier *= 1.0 + target.effect_total(EffectKind.VULNERABILITY)
+        # Руна «Литая кираса» ослабляет уязвимость и для яда, как для ударов.
+        multiplier *= 1.0 + target.effect_total(EffectKind.VULNERABILITY) * max(
+            1.0 - target.buff_modifiers.get("rune:cast_cuirass", 0.0), 0.0)
+    multiplier *= rune_dot_mult(effect, source, target)  # руны (2026-10-31)
     return max(round(effect.value * effect.stacks * multiplier), 1)
 
 
@@ -237,6 +241,7 @@ def begin_turn_flags(session: CombatSessionState, turn_number: int) -> None:
         c.crit_this_tick = False
         interval = int(c.buff_modifiers.get("second_chance_interval", 0))
         c.second_chance_active = bool(interval) and turn_number % interval == 0
+    rune_gaze(session)  # руна «Тяжёлый взгляд» (2026-10-31)
 
 
 def end_turn_memory(combatant: CombatantState, turn_number: int) -> None:
@@ -324,3 +329,181 @@ def passive_mark(actor: CombatantState | None, target: CombatantState, hit, rng,
         return
     add_mark(actor, target)
     lines.append(f"{target.name} помечен добычей ({actor.name}) 🎯")
+
+
+# --- Руны (2026-10-31) --------------------------------------------------------
+# Общие для тикового боя и дуэли правила рун. Ключи «rune:...» кладёт в
+# buff_modifiers preset_service.resolve_active_modifiers (в PvP уже ослаблены).
+# Поля бойца читаем через getattr: старые снимки боя их не знают.
+
+def _rune(c: CombatantState | None, key: str) -> float:
+    return c.buff_modifiers.get(key, 0.0) if c is not None else 0.0
+
+
+def rune_guard(combatant: CombatantState, lines: list[str], rng=None) -> None:
+    """После урона: «Не сегодня» - шанс пережить смертельный удар, «Запас
+    дыхания» - лечение, когда здоровья меньше 30%. Оба - раз за бой."""
+    import random as _random
+
+    rng = rng or _random
+    if combatant.current_hp <= 0:
+        chance = _rune(combatant, "rune:not_today")
+        if chance and not getattr(combatant, "rune_saved", False) and rng.random() < chance:
+            combatant.rune_saved = True
+            combatant.current_hp = 1
+            lines.append(f"🪨 Не сегодня: {combatant.name} остаётся на ногах с 1 HP")
+        return
+    heal = _rune(combatant, "rune:spare_breath")
+    if heal and not getattr(combatant, "rune_breath_used", False) and combatant.current_hp < combatant.max_hp * 0.3:
+        combatant.rune_breath_used = True
+        amount = recovered(combatant, max(round(combatant.max_hp * heal), 1))
+        combatant.current_hp = min(combatant.current_hp + amount, combatant.max_hp)
+        lines.append(f"🪨 Запас дыхания: {combatant.name} +{amount} HP")
+
+
+def rune_on_hit(source: CombatantState | None, target: CombatantState, hit, heals: list) -> float:
+    """Удар лёг: вампиризм «Красной жажды» и «Кровяной кромки» (лечением от
+    прошедшего урона, через settle_lifesteal), счётчик «Злобы». Возвращает
+    долю «Колючей брони» цели для ответного урона."""
+    from game.combat.skills import PendingHeal
+
+    if hit.missed or hit.is_dot or hit.amount <= 0:
+        return 0.0
+    target.hits_taken = getattr(target, "hits_taken", 0) + 1
+    if source is not None and source.id != target.id:
+        ratio = _rune(source, "rune:red_thirst")
+        skill_id = getattr(hit, "skill_id", None)
+        if skill_id:
+            ratio += _rune(source, f"rune:blood_edge@{skill_id}")
+        if ratio > 0:
+            heals.append(PendingHeal(source_id=source.id, target_id=source.id, amount=round(hit.amount * ratio),
+                                     label="пьёт кровь", of_hit=hit, ratio=ratio))
+    return _rune(target, "rune:thorn_plate")
+
+
+def rune_dot_mult(effect: Effect, source: CombatantState | None, target: CombatantState | None) -> float:
+    """Яд и горение: «Едкость» навыка, «Жар и иней» (горение) у источника,
+    «Горькая кровь» у жертвы."""
+    mult = 1.0
+    if source is not None:
+        burn = getattr(effect, "tag", None) == BURN_TAG
+        skills = ("elementalist_fire",) if burn else ("poisoner_venom", "poisoner_toxic_burst")
+        mult += max(_rune(source, f"rune:acrid@{s}") for s in skills)
+        if burn:
+            mult += _rune(source, "rune:heat_frost")
+    if target is not None:
+        mult *= max(1.0 - _rune(target, "rune:bitter_blood"), 0.1)
+    return mult
+
+
+def rune_gaze(session: CombatSessionState) -> None:
+    """«Тяжёлый взгляд»: у мобов клетки меньше здоровья - по самой сильной
+    руне среди игроков боя, один раз на моба."""
+    gaze = max((_rune(c, "rune:heavy_gaze") for c in session.combatants.values() if c.kind == "character"),
+               default=0.0)
+    if gaze <= 0:
+        return
+    for mob in session.combatants.values():
+        if mob.kind != "mob" or not mob.field_mob or getattr(mob, "rune_gaze_done", False):
+            continue
+        mob.rune_gaze_done = True
+        mob.max_hp = max(round(mob.max_hp * (1 - gaze)), 1)
+        mob.current_hp = min(mob.current_hp, mob.max_hp)
+
+
+def run_skill(handler, ctx, skill_id: str | None) -> None:
+    """Навык с рунами: какой навык бьёт (руны навыков в compute_hit) и
+    что сделать после него. Общий для тикового боя и дуэли."""
+    actor = ctx.actor
+    combatants = list(ctx.session.combatants.values())
+    before = skill_snapshot(actor, combatants)
+    heals_from = len(ctx.heals)
+    cd_before = actor.cooldowns.get(skill_id, 0) if skill_id else 0
+    actor.current_skill = skill_id
+    try:
+        handler(ctx)
+    finally:
+        actor.current_skill = None
+    rune_cooldown(actor, skill_id, cd_before, ctx.rng)
+    rune_after_skill(actor, skill_id, before, combatants, ctx, heals_from)
+
+
+def rune_cooldown(actor: CombatantState, skill_id: str | None, cd_before: int, rng) -> None:
+    """«Холодный счёт» и «Короткий взмах» - здесь, а не в set_cooldown:
+    навыки подклассов ставят перезарядку напрямую, мимо него."""
+    if not skill_id:
+        return
+    cd = actor.cooldowns.get(skill_id, 0)
+    if cd <= cd_before:
+        return  # навык перезарядку не ставил
+    cold = _rune(actor, f"rune:cold_count@{skill_id}")
+    if cold and rng.random() < cold:
+        actor.cooldowns[skill_id] = cd_before
+        return
+    swing = _rune(actor, f"rune:short_swing@{skill_id}")
+    if swing and cd > 1 and rng.random() < swing:
+        actor.cooldowns[skill_id] = cd - 1
+
+
+def skill_snapshot(actor: CombatantState, combatants) -> dict:
+    """Что висело от бойца до навыка: для рун «Тягучесть» и «Подпорка»."""
+    return {id(e): (e.remaining_ticks, e.value) for c in combatants for e in c.effects if e.source_id == actor.id}
+
+
+def rune_after_skill(actor: CombatantState, skill_id: str | None, before: dict, combatants, ctx, heals_from: int) -> None:
+    """После навыка: «Тягучесть» (эффекты навыка дольше), «Подпорка» (щиты и
+    лечение навыка сильнее), «Обратная молитва» (часть лечения бьёт врага),
+    «Отскок» (вторая цель в группе)."""
+    if not skill_id:
+        return
+    mods = actor.buff_modifiers
+    if not any(key.startswith("rune:") for key in mods):
+        return
+    rng = ctx.rng
+    fresh = [e for c in combatants for e in c.effects
+             if e.source_id == actor.id and (id(e) not in before or e.remaining_ticks > before[id(e)][0])]
+    viscous = mods.get(f"rune:viscous@{skill_id}", 0.0)
+    if viscous and fresh and rng.random() < viscous:
+        for e in fresh:
+            e.remaining_ticks += 1
+        ctx.lines.append(f"🪨 Тягучесть: эффект «{skill_id_name(skill_id)}» продержится на ход дольше")
+    prop = mods.get(f"rune:prop@{skill_id}", 0.0)
+    new_heals = [h for h in ctx.heals[heals_from:] if h.source_id == actor.id]
+    if prop:
+        for e in fresh:
+            if e.kind == EffectKind.SHIELD_POOL:
+                # apply_effect перезаписывает щит целиком - усиливаем весь.
+                e.value = round(e.value * (1 + prop))
+        for h in new_heals:
+            h.amount = round(h.amount * (1 + prop))
+            h.ratio *= 1 + prop
+    prayer = mods.get("rune:reverse_prayer", 0.0)
+    healed = sum(max(h.amount, 0) for h in new_heals)
+    if prayer and healed > 0:
+        enemies = [c for c in combatants if c.side != actor.side and c.alive]
+        if enemies:
+            from game.combat.skills import PendingHit
+
+            target = min(enemies, key=lambda c: c.current_hp)
+            ctx.hits.append(PendingHit(source_id=actor.id, target_id=target.id,
+                                       amount=max(round(healed * prayer), 1), label="обратная молитва"))
+    ricochet = mods.get(f"rune:ricochet@{skill_id}", 0.0)
+    if ricochet and rng.random() < ricochet:
+        hit_ids = {h.target_id for h in ctx.hits if h.source_id == actor.id}
+        others = [c for c in combatants if c.side != actor.side and c.alive and c.id not in hit_ids]
+        if hit_ids and others:
+            from game.combat.skills import compute_hit
+
+            ctx.hits.append(compute_hit(actor, rng.choice(others), rng, label="отскок", multiplier=0.4,
+                                        is_ability=True))
+
+
+def skill_id_name(skill_id: str) -> str:
+    from game.combat.base_skills import BASE_SKILL_DEFS
+
+    skill = BASE_SKILL_DEFS.get(skill_id)
+    if skill is None:
+        from game.combat.subclass_skills import SUBCLASS_SKILL_DEFS
+
+        skill = SUBCLASS_SKILL_DEFS.get(skill_id)
+    return skill.name if skill is not None else skill_id

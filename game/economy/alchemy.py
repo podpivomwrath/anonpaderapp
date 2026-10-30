@@ -14,7 +14,9 @@ def xp_to_next(level: int) -> int:
 def grant_xp(character, xp: int) -> None:
     if character.alchemy_level >= ac.MAX_LEVEL:
         return
-    character.alchemy_xp += xp
+    from game.economy import runes
+
+    character.alchemy_xp += runes.craft_xp(character, xp)  # руна «Мозоли»
     while character.alchemy_level < ac.MAX_LEVEL:
         need = xp_to_next(character.alchemy_level)
         if character.alchemy_xp < need:

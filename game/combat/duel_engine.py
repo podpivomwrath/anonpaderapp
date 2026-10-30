@@ -45,6 +45,7 @@ def _apply_last_breath_guard(combatant: CombatantState, result: "DuelResult") ->
     """Последний вздох (патч 16, зеркало resolver.py::_apply_last_breath_guard —
     патч 52, баг 2: в дуэли этой проверки не было вовсе, эликсир не спасал)."""
     if combatant.current_hp > 0 or not combatant.has_effect(EffectKind.LAST_BREATH):
+        shared_rules.rune_guard(combatant, result.lines)  # руны (2026-10-31)
         return
     combatant.effects = [e for e in combatant.effects if e.kind != EffectKind.LAST_BREATH]
     combatant.current_hp = 1
@@ -323,7 +324,7 @@ class DuelEngine:
 
         if action.type == ActionType.SKILL and action.skill_id in DEFENSIVE_SKILLS:
             # защита сохраняется до начала следующего хода актёра
-            DEFENSIVE_SKILLS[action.skill_id](ctx)
+            shared_rules.run_skill(DEFENSIVE_SKILLS[action.skill_id], ctx, action.skill_id)
         elif action.type == ActionType.ITEM:
             # Патч 30, баг 3, п.3: лечебное зелье в PvP-дуэли — тратит ход,
             # как обычное действие (те же правила, что в PvE, патч 16).
@@ -344,11 +345,7 @@ class DuelEngine:
                 if action.type == ActionType.ATTACK
                 else OFFENSIVE_SKILLS[action.skill_id]
             )
-            actor.current_skill = action.skill_id if action.type == ActionType.SKILL else None
-            try:
-                handler(ctx)
-            finally:
-                actor.current_skill = None
+            shared_rules.run_skill(handler, ctx, action.skill_id if action.type == ActionType.SKILL else None)
         else:
             result.lines.append(
                 combat_flavor.unimplemented_skill_line(actor.name, action.skill_id)
@@ -398,6 +395,19 @@ class DuelEngine:
                     heal_before, target.current_hp, target.max_hp, display.MODE_PVP,
                 ))
             _apply_last_breath_guard(target, result)
+            # Руны (2026-10-31): вампиризм, «Злоба», «Колючая броня».
+            thorns = shared_rules.rune_on_hit(actor, target, hit, ctx.heals)
+            if thorns > 0 and amount > 0 and actor.id != target.id and actor.alive:
+                thorn_amount = shared_rules.cap_incoming(actor, max(round(amount * thorns), 1))
+                actor_before = actor.current_hp
+                back = shared_rules.absorb_by_shields(actor, thorn_amount, [])
+                actor.current_hp -= back
+                result.lines.append(combat_flavor.render_hit(
+                    target.name, actor.name, label="шипы руны", amount=back, crit=False,
+                    missed=False, is_dot=False, hp_before=actor_before, hp_after=actor.current_hp,
+                    max_hp=actor.max_hp, shielded=thorn_amount - back,
+                ))
+                _apply_last_breath_guard(actor, result)
             # Страж, «Отражение»: доля срезанного блоком урона возвращается
             # атакующему. Общее правило с тиковым движком.
             blocked_back = shared_rules.block_reflect_amount(target, hit.blocked)

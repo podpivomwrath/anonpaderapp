@@ -353,7 +353,9 @@ async def finish_dig(
         seconds=round(dig_seconds) if dig_seconds is not None else None,
     ))
 
-    xp = mining.dig_xp(ore_id, grade_id)
+    from game.economy import runes
+
+    xp = runes.craft_xp(character, mining.dig_xp(ore_id, grade_id))  # руна «Мозоли»
     level, remainder, levels = mining.add_mining_xp(
         character.mining_level, character.mining_xp, xp
     )

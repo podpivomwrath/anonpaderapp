@@ -66,7 +66,7 @@ def rune_about(rune_id: str, absorbed: int = 0) -> dict:
     r = rc.BY_ID.get(rune_id)
     if r is None:
         return {"description": None, "effect": None}
-    lines = [f"{rc.KIND_TITLES[r.kind][:-1]}а, {rc.RARITY_TITLES[r.rarity]}."]
+    lines = [f"{rc.KIND_ONE[r.kind]}, {rc.RARITY_TITLES[r.rarity]}."]
     classes = {"warrior": "воина", "rogue": "разбойника", "mage": "мага"}
     if r.kind == rc.GEAR:
         who = ", ".join(classes[c] for c in r.classes) if r.classes else "любого класса"

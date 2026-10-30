@@ -126,6 +126,7 @@ def _apply_last_breath_guard(combatant: CombatantState, result: "TickResult") ->
     """Последний вздох (патч 16): если HP<=0 и эффект активен — спасение
     на 1 HP, один раз, эффект снимается."""
     if combatant.current_hp > 0 or not combatant.has_effect(EffectKind.LAST_BREATH):
+        shared_rules.rune_guard(combatant, result.lines)  # руны (2026-10-31)
         return
     combatant.effects = [e for e in combatant.effects if e.kind != EffectKind.LAST_BREATH]
     combatant.current_hp = 1
@@ -292,6 +293,12 @@ def _apply_phase(
                         amount=max(round(amount * reflect_pct), 1), label=target.reflect_label,
                     )
                 )
+        # Руны (2026-10-31): вампиризм, «Злоба», «Колючая броня» - общее с дуэлью.
+        attacker = session.combatants.get(hit.source_id)
+        thorns = shared_rules.rune_on_hit(attacker, target, hit, heals)
+        if thorns > 0 and amount > 0 and attacker is not None and attacker.alive and attacker.id != target.id:
+            reflect_hits.append(PendingHit(source_id=target.id, target_id=attacker.id,
+                                           amount=max(round(amount * thorns), 1), label="шипы руны"))
         applied_by_hit[id(hit)] = amount
         damage_taken[hit.target_id] = damage_taken.get(hit.target_id, 0) + amount
     # Ответный урон - тоже через щиты ударившего (2026-10-22, баг: «возврат
@@ -334,6 +341,10 @@ def _apply_phase(
             # союзника на полном HP некуда было отдать, и оно пропадало.
             group = [*session.alive_allies_of(source), *([source] if source.alive else [])]
             candidates = [c for c in group if c.id != target_id]
+            # Руна «Излишек» (2026-10-31): некому отдать - щит себе. У
+            # отголоска мистика правило прежнее (только союзнику).
+            if not candidates and source.buff_modifiers.get("rune:surplus", 0.0) > 0:
+                candidates = [target]
             if not candidates:
                 continue
             ally = min(candidates, key=lambda c: c.current_hp / c.max_hp)
@@ -386,11 +397,7 @@ def _run_offensive(ctx: SkillContext, cid: int, action: DeclaredAction, session,
     elif action.type == ActionType.ITEM:
         _consume_heal_item(ctx, action.item_id)
     elif action.type == ActionType.SKILL and action.skill_id in OFFENSIVE_SKILLS:
-        ctx.actor.current_skill = action.skill_id  # руны навыков (2026-10-31)
-        try:
-            OFFENSIVE_SKILLS[action.skill_id](ctx)
-        finally:
-            ctx.actor.current_skill = None
+        shared_rules.run_skill(OFFENSIVE_SKILLS[action.skill_id], ctx, action.skill_id)  # руны (2026-10-31)
     elif action.type == ActionType.SKILL and action.skill_id not in DEFENSIVE_SKILLS:
         result.lines.append(
             combat_flavor.unimplemented_skill_line(ctx.actor.name, action.skill_id)
@@ -442,7 +449,7 @@ def resolve_tick(
         if action.type == ActionType.SKILL and action.skill_id in DEFENSIVE_SKILLS:
             ctx.actor = session.combatants[cid]
             ctx.action = action
-            DEFENSIVE_SKILLS[action.skill_id](ctx)
+            shared_rules.run_skill(DEFENSIVE_SKILLS[action.skill_id], ctx, action.skill_id)
 
     # --- Фаза 2: контроль-умения — вешают FREEZE в этот же ход ---
     control_actors: set[int] = set()

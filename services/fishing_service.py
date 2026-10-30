@@ -26,7 +26,7 @@ from sqlalchemy import delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from game.content_loader import FishDef, LakeDef
-from game.economy import fishing
+from game.economy import fishing, runes
 from game.economy import fishing_config as fc
 from models import Character, CharacterFish, CharacterFishRecord
 from services import crown_service, rune_service, wallet_service
@@ -211,7 +211,7 @@ async def _apply_break(
     missed: bool = False, give_xp: bool = True,
 ) -> StrikeResult:
     fraction = fishing.fraction_of(fish_id, grams)
-    xp = fishing.break_xp(lake.tier, character.fishing_level) if give_xp else 0
+    xp = runes.craft_xp(character, fishing.break_xp(lake.tier, character.fishing_level)) if give_xp else 0
     level, remainder, levels = fishing.add_fishing_xp(
         character.fishing_level, character.fishing_xp, xp
     )
@@ -238,7 +238,7 @@ async def _apply_catch(
     # отпустить (keep_catch / release_catch). Опыт и рекорд - за саму поимку.
     is_record = await _update_record(db, character.id, fish_id, grams)
 
-    xp = fishing.catch_xp(fish_id, fraction) if give_xp else 0
+    xp = runes.craft_xp(character, fishing.catch_xp(fish_id, fraction)) if give_xp else 0
     level, remainder, levels = fishing.add_fishing_xp(
         character.fishing_level, character.fishing_xp, xp
     )

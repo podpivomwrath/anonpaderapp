@@ -30,7 +30,7 @@ from game.world import scene_events as se
 from game.world.scene_events import Riddle, Scene, SceneEvent, SceneResult
 from models import CharacterStats
 from services import guild_service
-from services import item_service, preset_service, scene_event_service, wallet_service
+from services import item_service, preset_service, rune_service, scene_event_service, wallet_service
 from services import onboarding_service as onboarding_svc
 from services.db import get_session_factory
 
@@ -341,7 +341,8 @@ async def _dispatch(peer_id: int, p: Pending, payload: dict) -> None:
                 text, keyboard = await _render(db, character, stats, p, peer_id)
                 await _send(peer_id, "Нечем заплатить.\n\n" + text, keyboard)
                 return
-            result, pre = _choice_result(choice, await scene_event_service.total_stats(db, character, stats))
+            result, pre = _choice_result(choice, await scene_event_service.total_stats(db, character, stats),
+                                         rune_service.effect(character, "battered"))
             await _resolve(peer_id, db, character, stats, p, result, pre)
             return
 
@@ -367,15 +368,17 @@ async def _dispatch(peer_id: int, p: Pending, payload: dict) -> None:
             return
 
 
-def _choice_result(choice, totals: dict[str, int]) -> tuple[SceneResult, list[str]]:
+def _choice_result(choice, totals: dict[str, int], fail_cut: float = 0.0) -> tuple[SceneResult, list[str]]:
+    """fail_cut - руна «Битый опыт» (2026-10-31): провал на эту долю реже."""
     if choice.check is not None:
         chance = se.check_chance(choice.check.stat, totals, choice.check.difficulty)
+        chance = 1 - (1 - chance) * (1 - fail_cut)
         ok = _rng.random() < chance
         emoji = se.STAT_EMOJI[choice.check.stat]
         verdict = "удалось" if ok else "не вышло"
         return (choice.success if ok else choice.failure), [f"{emoji} {round(chance * 100)}% - {verdict}."]
     if choice.success is not None and choice.failure is not None:
-        ok = _rng.random() < se.CLASS_OPTION_CHANCE
+        ok = _rng.random() < 1 - (1 - se.CLASS_OPTION_CHANCE) * (1 - fail_cut)
         return (choice.success if ok else choice.failure), []
     if choice.outcomes:
         return se.pick_result(_rng, choice.outcomes), []
@@ -433,7 +436,7 @@ async def _push(peer_id, db, character, stats, p: Pending, scene: Scene, action:
     if action != "pull":
         return
     p.step += 1
-    if _rng.random() < se.push_risk(scene, p.step):
+    if _rng.random() < se.push_risk(scene, p.step) * (1 - rune_service.effect(character, "battered")):
         penalty = se.push_penalty(p.step)
         applied = scene_event_service.Applied(new_level=character.level)
         if penalty == "light":

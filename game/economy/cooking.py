@@ -22,7 +22,9 @@ def xp_to_next(level: int) -> int:
 def grant_xp(character, xp: int) -> None:
     if character.cooking_level >= cc.MAX_LEVEL:
         return
-    character.cooking_xp += xp
+    from game.economy import runes
+
+    character.cooking_xp += runes.craft_xp(character, xp)  # руна «Мозоли»
     while character.cooking_level < cc.MAX_LEVEL:
         need = xp_to_next(character.cooking_level)
         if character.cooking_xp < need:

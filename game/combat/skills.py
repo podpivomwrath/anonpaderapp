@@ -50,6 +50,8 @@ class PendingHit:
     #: превращались в 140% (сырой урон до среза x усиление моба).
     reflect_of: "PendingHit | None" = None
     reflect_pct: float = 0.0
+    #: Каким навыком нанесён (руны навыков: «Кровяная кромка»).
+    skill_id: str | None = None
 
 
 @dataclass
@@ -110,12 +112,8 @@ def set_cooldown(actor: CombatantState, skill_id: str, cd: int, rng: random.Rand
     на КД). Для всех остальных актёров buff_modifiers не содержит этих
     ключей — поведение не отличается от прямого actor.cooldowns[skill_id] = cd."""
     chance = actor.buff_modifiers.get("no_cooldown_chance", 0.0)
-    chance += actor.buff_modifiers.get(f"rune:cold_count@{skill_id}", 0.0)  # руна навыка
     if chance > 0 and rng.random() < chance:
         return
-    swing = actor.buff_modifiers.get(f"rune:short_swing@{skill_id}", 0.0)  # руна навыка
-    if swing > 0 and cd > 1 and rng.random() < swing:
-        cd -= 1
     if actor.overload_ready:
         actor.overload_ready = False
         return
@@ -152,7 +150,7 @@ def tick_overload(actor: CombatantState) -> None:
     """Перегрузка (патч 46, ч.1): раз в OVERLOAD_INTERVAL_TURNS ходов —
     следующий навык не уходит на КД. Вызывать раз за ход актёра, вместе с
     tick_cooldowns (резолвер/дуэль). Нет-оп без overload_active в buff_modifiers."""
-    actor.turns_done += 1  # руны первых ходов боя (2026-10-31)
+    actor.turns_done = getattr(actor, "turns_done", 0) + 1  # руны первых ходов боя (2026-10-31)
     if actor.buff_modifiers.get("overload_active", 0.0) <= 0:
         return
     actor.overload_turn_counter += 1
@@ -217,6 +215,7 @@ def outgoing_multiplier(actor: CombatantState, target: CombatantState) -> float:
 
 
 _DEBUFFS = (EffectKind.VULNERABILITY, EffectKind.WEAKEN, EffectKind.DOT)
+DEAF_SHIELD_LABEL = "глухой щит"
 
 
 def rune_outgoing(actor: CombatantState, target: CombatantState) -> float:
@@ -226,18 +225,22 @@ def rune_outgoing(actor: CombatantState, target: CombatantState) -> float:
     if not any(key.startswith("rune:") for key in mods):
         return 1.0
     mult = 1.0
-    if actor.turns_done < 2:
+    if getattr(actor, "turns_done", 0) < 2:
         mult *= 1.0 + mods.get("rune:doorstep_rush", 0.0)
     if target.has_effect(EffectKind.FREEZE) or target.has_effect(EffectKind.CHILLED):
         mult *= 1.0 + mods.get("rune:hammer_down", 0.0)
+        mult *= 1.0 + mods.get("rune:heat_frost", 0.0)  # «Жар и иней»: по замороженным
     if target.max_hp > 0 and target.current_hp < target.max_hp * 0.3:
         mult *= 1.0 + mods.get("rune:last_cut", 0.0)
     if actor.dodged_last_tick:
         mult *= 1.0 + mods.get("rune:riposte", 0.0)
     if any(target.has_effect(kind) for kind in _DEBUFFS):
         mult *= 1.0 + mods.get("rune:echo", 0.0)
-    if actor.current_skill:
-        mult *= 1.0 + mods.get(f"rune:press@{actor.current_skill}", 0.0)
+    skill_id = getattr(actor, "current_skill", None)
+    if skill_id:
+        mult *= 1.0 + mods.get(f"rune:press@{skill_id}", 0.0)
+    # «Злоба»: за каждый полученный удар, до пяти.
+    mult *= 1.0 + mods.get("rune:spite", 0.0) * min(getattr(actor, "hits_taken", 0), 5)
     return mult
 
 
@@ -325,6 +328,11 @@ def compute_hit(
     dodges = (not ignore_dodge and second_chance) or (
         total_dodge > 0 and rng.random() < total_dodge
     )
+    # Руна «Глухой щит» (2026-10-31): обычную атаку - целиком в щит. Не
+    # уворот: «Ответный выпад», метки и прочее за уворот не срабатывают.
+    shield = target.buff_modifiers.get("rune:deaf_shield", 0.0)
+    if not dodges and not is_ability and shield > 0 and rng.random() < shield:
+        return PendingHit(source_id=actor.id, target_id=target.id, amount=0, label=DEAF_SHIELD_LABEL, missed=True)
     if dodges:
         target.second_chance_active = False
         target.dodged_this_tick = True
@@ -388,7 +396,7 @@ def compute_hit(
     # Кровавый рыцарь, «Кровавый доспех»/«Второе дыхание» (патч 47, ч.2) —
     # безусловное и низко-HP-условное снижение входящего урона.
     base *= 1.0 - target.buff_modifiers.get("incoming_damage_reduction", 0.0)
-    if target.turns_done < 3:  # руна «Свежая броня» (2026-10-31)
+    if getattr(target, "turns_done", 0) < 3:  # руна «Свежая броня» (2026-10-31)
         base *= 1.0 - min(target.buff_modifiers.get("rune:fresh_armor", 0.0), 0.9)
     # Патч 56: порог низкого HP - ПАРАМЕТР БАФФА, а не общая константа. У
     # Кровавого рыцаря он 40% (патч 47), у «Стойкости» Стража 30%; раньше
@@ -419,6 +427,7 @@ def compute_hit(
         amount=max(round(base), 1),
         crit=crit,
         label=label,
+        skill_id=getattr(actor, "current_skill", None),
     )
 
 

@@ -86,6 +86,8 @@ def try_apply_control(
     if pvp:
         effective_will = round(effective_will * bc.CC_RESIST_MULT_PER_HIT ** target.control_hits)
     resist = max(stat_model.ACTIVE.control_resist(effective_will) - chance_bonus - resist_down, 0.0)
+    # Руна «Упрямый лоб» (2026-10-31) - сверху, после всех срезов.
+    resist = min(resist + target.buff_modifiers.get("rune:stubborn_brow", 0.0), bc.CONTROL_RESIST_CAP)
     if rng.random() < resist:
         return ControlResult(applied=False, resisted=True)
 
