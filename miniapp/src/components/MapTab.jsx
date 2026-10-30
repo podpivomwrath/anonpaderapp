@@ -212,7 +212,8 @@ export default function MapTab({ focus = null }) {
   // Пока едешь верхом, значок ползёт между клетками плавно: раз в 200 мс
   // перерисовка, позиция считается от последнего опроса (ridePos).
   const riding = Boolean(mapState?.mount_travel && !mapState.mount_travel.paused)
-    || Boolean(mapState?.turbo?.running);
+    || Boolean(mapState?.turbo?.running)
+    || Boolean(mapState?.hunts?.some((h) => h.travel && !h.travel.paused));
   const [, setFrame] = useState(0);
   useEffect(() => {
     if (!riding) return undefined;
@@ -650,9 +651,6 @@ export default function MapTab({ focus = null }) {
     ]),
     ...(questTarget ? [[questTarget.x, questTarget.y, 'map-pin--quest', '📜', questTarget.label, 1]] : []),
     ...(worldBoss ? [[worldBoss.x, worldBoss.y, 'map-pin--boss', '💀', worldBoss.name, 1.3]] : []),
-    // Курьер с посылкой (2026-10-19): свой и тот, что бежит к тебе.
-    ...(mapState.couriers || []).map((c) => [c.x, c.y, 'map-pin--courier', '🏃',
-      c.own ? `Твой курьер: ${c.label}` : `К тебе бежит курьер: ${c.label}`, 1.05]),
     // Турбоишак дня (2026-10-19): бегает по всей карте, поймать - зайти на клетку.
     ...(turboPos ? [[turboPos.x, turboPos.y, 'map-pin--turbo', '🫏',
       mapState.turbo.running ? 'Турбоишак на бегу' : 'Турбоишак стоит - поймай, пока не убежал', 1.25]] : []),
@@ -665,7 +663,12 @@ export default function MapTab({ focus = null }) {
       `[${g.tag}] ${g.status === 'claiming' ? 'закладка знамени' : 'земля гильдии'}`, 0.8,
     ]),
     // Цели взятых заказов (2026-10-16): видны, пока вне городов.
-    ...(mapState.hunts || []).map((h) => [h.x, h.y, 'map-pin--hunt', '🎯', `Цель заказа: ${h.name}, ${h.level} ур.`, 1.1]),
+    // Цель верхом едет плавно, как свой значок (2026-10-30): между опросами
+    // её ведёт ridePos по клетке, где она сейчас, и следующей.
+    ...(mapState.hunts || []).map((h) => {
+      const live = ridePos(h.travel, mapState.fetchedAt)?.pos || h;
+      return [live.x, live.y, 'map-pin--hunt', '🎯', `Цель заказа: ${h.name}, ${h.level} ур.`, 1.1];
+    }),
     // Повозки торговой фирмы в пути - там, где они сейчас (стоящие ждут в городах).
     ...(mapState.carts || []).filter((c) => c.traveling)
       .map((c) => [c.x, c.y, 'map-pin--cart', '🐂', `Твоя повозка №${c.num} в пути`, 0.9]),

@@ -84,6 +84,17 @@ export default function ContractsSection() {
     getContracts().then((d) => { setData(d); setStatus('ready'); }).catch(() => setStatus('error'));
   }, []);
 
+  // Взял заказ - «📍 где цель» обновляется сама (2026-10-30): раньше клетка
+  // оставалась той, что была при открытии, а цель уже уехала.
+  const tracking = Boolean(data?.contracts?.some((c) => c.where));
+  useEffect(() => {
+    if (!tracking) return undefined;
+    const id = setInterval(() => {
+      getContracts().then(setData).catch(() => {});
+    }, 5000);
+    return () => clearInterval(id);
+  }, [tracking]);
+
   const act = async (action, params) => {
     setBusy(true);
     try {

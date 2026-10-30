@@ -86,6 +86,25 @@ _STATIC_CATALOG = {
 }
 
 
+async def _hunt_travel(db, target: Character) -> dict | None:
+    """Цель заказа верхом (2026-10-30, жалоба: метка стояла, а цель уже
+    уехала): карта ведёт метку плавно, как свой значок. Только клетка, где
+    цель сейчас, и следующая - весь путь выдал бы, куда она едет."""
+    row = await mount_service.active_travel(db, target.id)
+    if row is None or row.status != "traveling" or row.next_cell_at is None:
+        return None
+    path = [[row.from_x, row.from_y]] + [list(c) for c in mount_service.path_of(row)]
+    idx = min(row.cell_index, len(path) - 1)
+    next_at = row.next_cell_at.replace(tzinfo=row.next_cell_at.tzinfo or timezone.utc)
+    # В бою или в событии поездка стоит - и метка не должна ползти дальше.
+    user = await db.get(User, target.user_id)
+    return {
+        "path": path[idx:idx + 2], "cell_index": 0, "step_seconds": row.step_seconds,
+        "next_cell_in": max((next_at - datetime.now(timezone.utc)).total_seconds(), 0.0),
+        "paused": user is not None and mounts_handlers.is_paused(user.vk_id),
+    }
+
+
 async def handle_get_state(request: web.Request) -> web.Response:
     vk_user_id = request[VK_USER_ID_KEY]
     session_factory = request.app[SESSION_FACTORY_KEY]
@@ -168,19 +187,8 @@ async def handle_get_state(request: web.Request) -> web.Response:
                     "step_seconds": turbo_ishak_service.step_seconds(), "next_cell_in": left,
                 })
 
-        # Курьер (2026-10-19): свой - пока бежит к тебе за посылкой, чужой - когда
-        # уже бежит к тебе. Где он сейчас; путь не рисуем. С посылкой к получателю
-        # свой курьер не виден (2026-10-21): он бежит прямо на получателя и ждёт
-        # на его клетке - за 1 кусок руды выходил трекер любого игрока.
-        from services import courier_service
-
-        courier_marks = []
-        mine = await courier_service.active_of(db, character.id)
-        if mine is not None and mine.phase == courier_service.PICKUP:
-            courier_marks.append({"x": mine.x, "y": mine.y, "own": True, "label": mine.label})
-        for d in await courier_service.incoming(db, character.id):
-            if mine is None or d.id != mine.id:
-                courier_marks.append({"x": d.x, "y": d.y, "own": False, "label": d.label})
+        # Курьера на карте нет (2026-10-30, владелец: «он там не нужен»). Он
+        # бежит к получателю и ждёт на его клетке - метка выдавала, где игрок.
 
         # Гильдии: владения и закладки - цветом гильдии на карте.
         from services import guild_territory_service
@@ -217,7 +225,10 @@ async def handle_get_state(request: web.Request) -> web.Response:
         for target_id in await contract_service.hunted_ids(db, character.id):
             target = await db.get(Character, target_id)
             if target is not None and contract_service.visible_on_map(target):
-                hunt_marks.append({"x": target.pos_x, "y": target.pos_y, "name": target.name, "level": target.level})
+                hunt_marks.append({
+                    "x": target.pos_x, "y": target.pos_y, "name": target.name, "level": target.level,
+                    "travel": await _hunt_travel(db, target),
+                })
         cart_marks = []
         for cart in await trade_service.carts(db, character.id):
             x, y = trade_service.position(cart)
@@ -242,7 +253,6 @@ async def handle_get_state(request: web.Request) -> web.Response:
                 "quest_target": quest_target,
                 "world_boss": world_boss_mark,
                 "turbo": turbo_mark,
-                "couriers": courier_marks,
                 "trail": trail_mark,
                 "mounts": [
                     {
