@@ -245,16 +245,41 @@ export default function RunesPage({ data, onData, kind, onKind }) {
   );
 }
 
+// Эллипс нарисованного круга в долях блока (2.4:1): центр, полуоси.
+const RING = { cx: 50, cy: 46, rx: 37, ry: 24, aspect: 2.4 };
+
+/** n точек по эллипсу на РАВНЫХ расстояниях по линии, а не по равным углам:
+ * на сплюснутом эллипсе равные углы сбивают гнёзда в кучу по бокам. */
+function ringPoints(n) {
+  const steps = 720;
+  const rx = RING.rx;
+  const ry = RING.ry / RING.aspect; // в тех же единицах, что ширина
+  const pts = [];
+  const acc = [0];
+  for (let k = 0; k <= steps; k += 1) {
+    const t = -Math.PI / 2 + (Math.PI * 2 * k) / steps;
+    pts.push([Math.cos(t), Math.sin(t)]);
+    if (k) acc.push(acc[k - 1] + Math.hypot(rx * (pts[k][0] - pts[k - 1][0]), ry * (pts[k][1] - pts[k - 1][1])));
+  }
+  const total = acc[steps];
+  const out = [];
+  let k = 0;
+  for (let i = 0; i < n; i += 1) {
+    const want = (total * i) / n;
+    while (acc[k] < want) k += 1;
+    out.push([RING.cx + RING.rx * pts[k][0], RING.cy + RING.ry * pts[k][1]]);
+  }
+  return out;
+}
+
 /** Круг рун героя под ногами силуэта: 12 гнёзд по эллипсу картинки. */
 export function RuneRing({ data, onOpen }) {
   if (!data) return null;
   return (
     <button type="button" className="rune-ring" onClick={onOpen} aria-label="Руны героя">
       <img className="rune-ring__bg" src={RUNE_ART.circle} alt="" draggable="false" />
-      {data.hero.map((s, i) => {
-        const angle = (Math.PI * 2 * i) / data.hero.length - Math.PI / 2;
-        const x = 50 + 37 * Math.cos(angle);
-        const y = 46 + 24 * Math.sin(angle);
+      {ringPoints(data.hero.length).map(([x, y], i) => {
+        const s = data.hero[i];
         return (
           <span key={s.slot} className={`rune-ring__dot${s.open ? '' : ' rune-ring__dot--locked'}`} style={{ left: `${x}%`, top: `${y}%` }}>
             <img src={RUNE_ART[s.open ? 'socket_hero' : 'socket_lock']} alt="" draggable="false" />
