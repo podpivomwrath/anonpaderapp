@@ -462,6 +462,7 @@ WALLET_REASONS = {
     "market_service._charge": "Рынок: списание", "market_service._pay_seller": "Рынок: выручка",
     "market_service._refund": "Рынок: возврат золота",
     "admin.grant_currency": "Админка: валюта", "admin.grant_any": "Админка: выдача",
+    "admin.refund": "Админка: возврат",
     "alchemy_service.start": "Варка зелья", "cooking_service.start": "Готовка в печи",
     "contract_service.create": "Заказ на голову", "contract_service.on_kill": "Награда за заказ",
     "courier_service.buy": "Курьер (магазин)", "daily_service._apply_delta": "Ежедневное задание",
