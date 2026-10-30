@@ -56,11 +56,16 @@ def status_lines(character, stats, farm_currency: int, donate_currency: int = 0,
     города (2026-10-21: в городе статуса не было вовсе)."""
     max_hp = vitals_service.max_hp(character, stats, vit_bonus)
     current_hp = vitals_service.current_hp(character, stats, vit_bonus)
+    # Ключ Монолита - в общем статусе (2026-10-30): в городе и в пути его
+    # строки не было, и выпавший ключ видели только в сводке клетки в поле.
+    keys = getattr(character, "raid_keys", 0) or 0
+    key_line = f"\n{raid_key_texts.raid_key_inventory_line(keys)}" if keys > 0 else ""
     return (
         f"❤️ Здоровье: {display.health_bar(current_hp, max_hp)}\n"
         f"⚔️ Уровень: {character.level}\n"
         f"{xp_bar(character.level, character.experience)}\n"
         f"{wallet_line(farm_currency, donate_currency)}"
+        f"{key_line}"
     )
 
 
@@ -93,10 +98,6 @@ def location_summary(
     zone_line = f"📍 ({x}; {y}) - {loc_type.name} · мобы {lo}-{hi} ур."
     description = rng.choice(loc_type.descriptions)
     quest_block = f"{quest_line}\n" if quest_line else ""
-    key_block = (
-        f"{raid_key_texts.raid_key_inventory_line(character.raid_keys)}\n"
-        if character.raid_keys > 0 else ""
-    )
     group_suffix = "\n\n" + group_block if group_block else ""
     # Монолит стоит ровно на (0; 0) - на остальных клетках строка не нужна.
     monolith_block = (
@@ -140,7 +141,6 @@ def location_summary(
         f"{zone_line}\n{description}\n\n"
         f"{_SEP}\n"
         f"{status_lines(character, stats, farm_currency, donate_currency, vit_bonus)}\n"
-        f"{key_block}"
         f"{monolith_block}"
         f"{lake_block}"
         f"{mine_block}"

@@ -86,6 +86,11 @@
   font-variant-numeric: tabular-nums;
   color: #f4e6c8;
   text-shadow: 0 2px 10px rgba(0, 0, 0, 0.6);
+  /* Длинное название (2026-10-30): переносится по слогам с дефисом, по
+     мягким переносам из softHyphens (ui.jsx), а не «Ротфрон / т».
+     anywhere - запасной вариант для слова, которое не делится. */
+  -webkit-hyphens: manual;
+  hyphens: manual;
   overflow-wrap: anywhere;
 }
 

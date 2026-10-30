@@ -13,6 +13,41 @@ const ART = Object.fromEntries(
     .map(([path, url]) => [path.split('/').pop().replace('.webp', ''), url]),
 );
 
+const VOWELS = 'аеёиоуыэюяaeiouy';
+const STICKY = 'йьъ';
+
+/**
+ * Мягкие переносы в длинных словах (2026-10-30, владелец): «Ротфронт»
+ * рвался как «Ротфрон / т». Перенос - по слогам, не меньше трёх букв на
+ * каждой строке; браузер ставит дефис только там, где строка и правда
+ * кончилась. Встроенный словарь переносов есть не в каждом вебвью.
+ */
+export function softHyphens(text) {
+  if (typeof text !== 'string') return text;
+  return text.replace(/[A-Za-zА-Яа-яЁё]{7,}/g, (word) => {
+    const low = word.toLowerCase();
+    const isV = (i) => VOWELS.includes(low[i]);
+    const hasV = (s) => [...s].some((c) => VOWELS.includes(c));
+    const cuts = [];
+    for (let i = 3; i <= word.length - 3; i += 1) {
+      if (!hasV(low.slice(0, i)) || !hasV(low.slice(i)) || STICKY.includes(low[i])) continue;
+      // Слог кончается гласной (ко|мар), делит пару согласных (рот|фронт)
+      // или кончается на й/ь/ъ (боль|шой); й, ь, ъ остаются слева.
+      const open = isV(i - 1) && !isV(i) && isV(i + 1);
+      const split = !isV(i - 1) && !isV(i) && (isV(i - 2) || STICKY.includes(low[i - 1]));
+      if (open || split) cuts.push(i);
+    }
+    let out = '';
+    let last = 0;
+    cuts.forEach((i) => {
+      if (i - last < 3) return;
+      out += word.slice(last, i) + '­';
+      last = i;
+    });
+    return out + word.slice(last);
+  });
+}
+
 /** Шапка раздела: значок, главная цифра раздела и подпись к ней. */
 export function SectionHead({ kind, icon, value, label, aside }) {
   const art = ART[kind];
@@ -20,7 +55,7 @@ export function SectionHead({ kind, icon, value, label, aside }) {
     <div className={`section-head section-head--${kind}${art ? ' section-head--art' : ''}`} style={art ? { '--section-art': `url(${art})` } : undefined}>
       <span className="section-head__icon" aria-hidden="true">{icon}</span>
       <span className="section-head__main">
-        <b className="section-head__value">{value}</b>
+        <b className="section-head__value">{softHyphens(value)}</b>
         {label && <small className="section-head__label">{label}</small>}
       </span>
       {aside && <span className="section-head__aside">{aside}</span>}
