@@ -344,7 +344,11 @@ class DuelEngine:
                 if action.type == ActionType.ATTACK
                 else OFFENSIVE_SKILLS[action.skill_id]
             )
-            handler(ctx)
+            actor.current_skill = action.skill_id if action.type == ActionType.SKILL else None
+            try:
+                handler(ctx)
+            finally:
+                actor.current_skill = None
         else:
             result.lines.append(
                 combat_flavor.unimplemented_skill_line(actor.name, action.skill_id)

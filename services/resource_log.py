@@ -22,6 +22,7 @@ from models import (
     CharacterFood,
     CharacterHerb,
     CharacterOre,
+    CharacterRune,
     CharacterTrophy,
     Inventory,
     ResourceLog,
@@ -37,6 +38,7 @@ TRACKED = {
     CharacterFood: ("food", "count", lambda r: f"{r.dish_id}:{r.grade}"),
     CharacterConsumable: ("elixir", "count", lambda r: r.elixir_id),
     CharacterTrophy: ("trophy", "count", lambda r: r.trophy_id),
+    CharacterRune: ("rune", "count", lambda r: r.rune_id),
 }
 
 _SKIP_MODULES = ("services.resource_log", "services.db")

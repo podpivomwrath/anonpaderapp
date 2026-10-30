@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Group, Header, SimpleCell, Switch } from '@vkontakte/vkui';
 import {
-  equipItem, getCharacter, getGear, getInventory, getTrophies, setGender, setNoImages, setShortLog, unequipItem,
+  equipItem, getCharacter, getGear, getInventory, getRunes, getTrophies, setGender, setNoImages, setShortLog, unequipItem,
 } from '../api.js';
 import CraftGear from './CraftGear.jsx';
+import RunesPage, { RuneRing } from './RunesPage.jsx';
 import { silhouetteUrl } from '../silhouettes.js';
 import { itemIcon } from '../itemIcons.js';
 import ItemIcon from './ItemIcon.jsx';
@@ -423,9 +424,12 @@ export default function HeroTab({ character, onCharacterUpdate }) {
   // Сколько раз в слот надевали вещь - каждое надевание даёт вспышку искр.
   const [flashes, setFlashes] = useState({});
   const [gender, setGenderState] = useState(character.gender || null);
-  // Страницы: 0 - снаряжение, дальше ремёсла (2026-10-23, стрелкой вправо).
+  // Страницы: 0 - снаряжение, 1 - руны (2026-10-31), дальше ремёсла
+  // (2026-10-23, стрелкой вправо).
   const [page, setPage] = useState(0);
   const [gear, setGear] = useState(null);
+  const [runes, setRunes] = useState(null);
+  const [runeKind, setRuneKind] = useState('hero');
   const [choosing, setChoosing] = useState(false);
   // Облик могли выбрать на экране выбора при входе (GenderGate) - подхватить.
   useEffect(() => {
@@ -436,6 +440,7 @@ export default function HeroTab({ character, onCharacterUpdate }) {
     getInventory().then((res) => setItems(res.items)).catch(() => setFailed(true));
     getTrophies().then(setTrophies).catch(() => {});
     getGear().then(setGear).catch(() => {});
+    getRunes().then(setRunes).catch(() => {});
   }, []);
 
   const equipped = useMemo(
@@ -531,9 +536,9 @@ export default function HeroTab({ character, onCharacterUpdate }) {
     );
   };
 
-  const pages = 1 + (gear?.crafts?.length || 0);
-  const craft = page > 0 ? gear?.crafts?.[page - 1] : null;
-  const pageTitle = craft ? `${craft.emoji} ${craft.title}` : '🛡 Снаряжение';
+  const pages = 2 + (gear?.crafts?.length || 0);
+  const craft = page > 1 ? gear?.crafts?.[page - 2] : null;
+  const pageTitle = craft ? `${craft.emoji} ${craft.title}` : page === 1 ? '🪨 Руны' : '🛡 Снаряжение';
   const turn = (step) => setPage((p) => (p + step + pages) % pages);
 
   return (
@@ -546,7 +551,9 @@ export default function HeroTab({ character, onCharacterUpdate }) {
             <button type="button" className="hero-pager__arrow" onClick={() => turn(1)} aria-label="Дальше">›</button>
           </div>
         )}
-        {craft ? <CraftGear key={craft.id} craft={craft} onUpdate={setGear} /> : (
+        {page === 1 ? (
+          <RunesPage data={runes} onData={setRunes} kind={runeKind} onKind={setRuneKind} />
+        ) : craft ? <CraftGear key={craft.id} craft={craft} onUpdate={setGear} /> : (
         <div className={`hero-stage hero-stage--${path}`}>
           <div className="hero-row">
             <div className="hero-col hero-col--left">
@@ -559,6 +566,7 @@ export default function HeroTab({ character, onCharacterUpdate }) {
             </div>
             <div className="hero-col hero-col--right">{SLOTS.filter((x) => x.side === 'right').map(slotButton)}</div>
           </div>
+          <RuneRing data={runes} onOpen={() => { setRuneKind('hero'); setPage(1); }} />
           {bonus.length > 0 && (
             <div className="hero-bonus">
               {bonus.map((k) => (

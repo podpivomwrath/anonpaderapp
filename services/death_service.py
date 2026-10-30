@@ -53,10 +53,10 @@ def _respawn_minutes(character: Character) -> float:
     """Часовня гильдии и древо сокращают ожидание, Дар первопроходцев -
     ещё вдвое (2026-10-30)."""
     from game.economy import prerelease_config
-    from services import guild_territory_service
+    from services import guild_territory_service, rune_service
 
     return (respawn_time_minutes(character.level) * guild_territory_service.respawn_multiplier(character)
-            * prerelease_config.respawn_mult())
+            * prerelease_config.respawn_mult() / (1 + rune_service.effect(character, "tenacious")))
 
 
 def is_dead(character: Character, now: datetime | None = None) -> bool:

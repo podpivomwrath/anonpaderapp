@@ -86,6 +86,9 @@ async def reward_mob_kill(
         from services import cooking_service
 
         xp_amount = round(share * mult * cooking_service.xp_mult(character))  # еда (2026-10-21)
+        from services import rune_service
+
+        xp_amount = round(xp_amount * (1 + rune_service.effect(character, "monolith_mark")))  # руна
         stats = await db.scalar(
             select(CharacterStats).where(CharacterStats.character_id == character.id)
         )
@@ -102,7 +105,8 @@ async def reward_mob_kill(
         from services import craft_gear_service
 
         almanac = await craft_gear_service.roll_almanac(db, character, rng)
-        elixir_line = " ".join(x for x in (elixir_line, almanac) if x) or None
+        rune_line = await rune_service.drop_line(db, character, rng)
+        elixir_line = " ".join(x for x in (elixir_line, almanac, rune_line) if x) or None
         rewards.append(
             MobKillReward(
                 character_id=character.id, xp_gained=levelup.xp_awarded,

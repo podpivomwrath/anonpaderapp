@@ -84,6 +84,9 @@ async def rest(message: Message) -> None:
         delay = world._rng.uniform(pc.REST_SECONDS_MIN, pc.REST_SECONDS_MAX)
     else:
         delay = world._rng.uniform(wc.REST_SECONDS_MIN, wc.REST_SECONDS_MAX)
+    from services import rune_service
+
+    delay /= 1 + rune_service.effect(character, "stone_sleep")  # руна (2026-10-31)
     await explore_rest.start(explore_rest.REST, peer_id, delay)
     # Сел отдыхать - горстка пепла развеялась, как при новом исследовании
     # (2026-10-25, баг: подбирали после отдыха).

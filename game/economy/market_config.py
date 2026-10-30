@@ -35,6 +35,7 @@ CATEGORIES = (
     ("food", "🍲 Еда"),
     ("craft", "🧰 Расходники ремёсел"),
     ("chest", "🗃 Ларцы"),
+    ("rune", "🪨 Руны"),
 )
 
 
@@ -82,6 +83,13 @@ def goods() -> dict[str, Good]:
     for kind in (lootbox_service.ASHEN, lootbox_service.ORE, lootbox_service.SUPPLY):
         info = lootbox_service.CHEST_KINDS[kind]
         out[f"chest:{kind}"] = Good(f"chest:{kind}", "chest", info.name, "🗃️", info.icon)
+    from game.economy import runes_config as rc
+
+    # Руны (2026-10-31): продаются как выпали, мастерство остаётся у игрока.
+    kind_emoji = {rc.HERO: "🟠", rc.GEAR: "🔴", rc.SKILL: "🔵"}
+    for r in rc.RUNES:
+        out[f"rune:{r.id}"] = Good(f"rune:{r.id}", "rune", r.name, kind_emoji[r.kind], f"rune:{r.id}",
+                                    base=rc.KIND_TITLES[r.kind], variant=r.name)
     return out
 
 

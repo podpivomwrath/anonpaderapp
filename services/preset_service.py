@@ -226,7 +226,21 @@ def resolve_buff_modifiers(buff_ids: list[str], catalog: dict[str, BuffDef]) -> 
     return merged
 
 
-async def resolve_active_modifiers(db: AsyncSession, character: Character) -> dict[str, float]:
+async def resolve_active_modifiers(db: AsyncSession, character: Character, pvp: bool = False) -> dict[str, float]:
+    """Пресет, еда и руны (2026-10-31). pvp - руны с поправкой PvP."""
+    merged = await _preset_and_food(db, character)
+    from services import rune_service
+
+    runes = rune_service.combat_modifiers(character, pvp)
+    merged.update(runes)
+    # Здоровье руны - тем же ключом, что у еды: его читает session.
+    hp = runes.get("rune:ash_skin", 0.0)
+    if hp:
+        merged["max_hp_bonus"] = merged.get("max_hp_bonus", 0.0) + hp
+    return merged
+
+
+async def _preset_and_food(db: AsyncSession, character: Character) -> dict[str, float]:
     """Шорткат: активный пресет персонажа → смерженные stat_modifiers
     (патч 14, ч.3). Пусто, если подкласс не выбран или пресет не активирован.
     2026-10-21: сюда же - боевая часть баффа от еды (урон, защита, здоровье),

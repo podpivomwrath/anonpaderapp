@@ -289,6 +289,9 @@ async def speed_mult(db: AsyncSession, character: Character, tier: int, event_ve
     from services import craft_gear_service, guild_service
 
     mult = 1 - guild_service.perk(character, "mining_speed_pct") / 100
+    from services import rune_service
+
+    mult /= 1 + rune_service.effect(character, "miner_sense")  # руна (2026-10-31)
     # Кирка (2026-10-23): быстрее; ниже тира рудника - вдвое слабее.
     gear = await craft_gear_service.gear(db, character.id)
     mult *= 1 - craft_gear.pick_speed(gear["pick"].tier if "pick" in gear else 0, tier)

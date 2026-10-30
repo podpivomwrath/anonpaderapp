@@ -29,7 +29,7 @@ from game.content_loader import FishDef, LakeDef
 from game.economy import fishing
 from game.economy import fishing_config as fc
 from models import Character, CharacterFish, CharacterFishRecord
-from services import crown_service, wallet_service
+from services import crown_service, rune_service, wallet_service
 
 # --- Клетка ------------------------------------------------------------------
 
@@ -137,7 +137,8 @@ def start_cast(
         rng, lake.tier, character.fishing_level, craft_gear.rod_tier_up_chance(rod_tier),
     )
     grams, _fraction = fishing.roll_weight(
-        rng, fish_id, character.fishing_level, f_bonus + craft_gear.rod_weight_bonus(rod_tier),
+        rng, fish_id, character.fishing_level,
+        f_bonus + craft_gear.rod_weight_bonus(rod_tier) + rune_service.effect(character, "heavy_catch"),
     )
     character.fishing_bite_at = now + timedelta(seconds=wait)
     character.fishing_pending_fish = fish_id

@@ -379,6 +379,8 @@ def write_map(mapping: dict[str, str]) -> None:
         " * подпись искать не нужно: есть ore_id — есть иконка.",
         " */",
         "",
+        "import { RUNE_ICONS } from './runeIcons.js';",
+        "",
         "const ICONS = {",
     ]
     for key in sorted(mapping):
@@ -391,6 +393,7 @@ def write_map(mapping: dict[str, str]) -> None:
         "",
         "/** Картинка предмета или null — вызывающий сам решает, чем заменить. */",
         "export function itemIcon(key) {",
+        "  if (key?.startsWith('rune:')) return RUNE_ICONS[key.slice(5)] ?? null;",
         "  return ICONS[key] ?? null;",
         "}",
         "",

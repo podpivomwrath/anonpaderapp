@@ -396,7 +396,7 @@ async def handle_get_route(request: web.Request) -> web.Response:
         "path": [[fx, fy]] + [list(c) for c in path],
         "mounts": {
             m.mount_id: {
-                "seconds": mount_service.total_travel_seconds(m.mount_id, len(path)),
+                "seconds": mount_service.total_travel_seconds(m.mount_id, len(path), character),
                 "ambush": mount_service.trip_ambush_chance(m.mount_id, fx, fy, x, y, path=path),
             }
             for m in owned

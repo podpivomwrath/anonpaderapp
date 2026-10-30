@@ -1054,3 +1054,102 @@ body.lite .sparks {
   font-size: 14px;
   line-height: 1.35;
 }
+
+/* --- Руны (2026-10-31): страница на «Герое» и круг под ногами силуэта --- */
+.rune-ring {
+  position: relative;
+  display: block;
+  width: min(100%, 420px);
+  margin: -46px auto 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  aspect-ratio: 2 / 1;
+  cursor: pointer;
+}
+.rune-ring__bg { width: 100%; height: 100%; object-fit: cover; opacity: 0.9; pointer-events: none; }
+.rune-ring__dot {
+  position: absolute;
+  width: 26px;
+  height: 26px;
+  margin: -13px 0 0 -13px;
+  border-radius: 50%;
+  background: rgba(240, 170, 80, 0.16);
+  box-shadow: 0 0 8px rgba(240, 160, 70, 0.35);
+}
+.rune-ring__dot--locked { background: rgba(0, 0, 0, 0.45); box-shadow: none; opacity: 0.6; }
+.rune-ring__dot .rune-icon { border-radius: 50%; }
+
+.runes { display: flex; flex-direction: column; gap: 10px; padding: 0 12px 12px; }
+.rune-warn { margin: 0; padding: 8px 10px; border-radius: 10px; background: var(--blood-soft); font-size: 13px; }
+.rune-hint { margin: 0; opacity: 0.7; font-size: 13px; }
+.rune-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; justify-items: center; }
+.rune-grid--gear { grid-template-columns: repeat(5, 1fr); }
+.rune-socket {
+  position: relative;
+  width: 64px;
+  height: 64px;
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: pointer;
+}
+.rune-socket__bg { position: absolute; inset: 0; width: 100%; height: 100%; border-radius: 50%; }
+.rune-socket--locked .rune-socket__bg { filter: grayscale(0.4) brightness(0.8); }
+.rune-socket__rune { position: absolute; inset: 12px; display: grid; place-items: center; }
+.rune-socket__rune .rune-icon { border-radius: 50%; }
+.rune-socket__price, .rune-socket__label {
+  position: absolute;
+  left: 50%;
+  bottom: -14px;
+  transform: translateX(-50%);
+  white-space: nowrap;
+  font-size: 10px;
+  opacity: 0.85;
+}
+.rune-grid--gear .rune-socket, .rune-grid .rune-socket { margin-bottom: 12px; }
+.rune-skills { display: flex; flex-direction: column; gap: 8px; }
+.rune-skill { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 6px 10px;
+  border-radius: 12px; background: var(--card); border: 1px solid var(--card-line); }
+.rune-skill__name { min-width: 0; font-size: 14px; }
+.rune-skill__slots { display: flex; gap: 8px; }
+.rune-skill__slots .rune-socket { width: 52px; height: 52px; margin-bottom: 12px; }
+.rune-skill__slots .rune-socket__rune { inset: 9px; }
+.rune-skill__slots .rune-socket__rune .rune-icon { width: 34px; height: 34px; }
+.rune-bag__title { margin: 6px 0 0; font-family: var(--serif); font-size: 16px; }
+.rune-bag { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; }
+.rune-bag__item, .rune-option {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  border: 1px solid var(--card-line);
+  border-radius: 12px;
+  background: var(--card);
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.rune-bag__main, .rune-option__main { display: flex; flex-direction: column; gap: 3px; min-width: 0; flex: 1; }
+.rune-bag__main b, .rune-option__main b { font-size: 13px; }
+.rune-bag__main small, .rune-option__main small { font-size: 11px; opacity: 0.75; }
+.rune-option { width: 100%; }
+.rune-option__count { opacity: 0.7; }
+.rune-options { display: flex; flex-direction: column; gap: 6px; }
+.rune-icon { display: block; object-fit: contain; border-radius: 10px; }
+.rune-icon--empty { background: rgba(255, 255, 255, 0.06); }
+.rune-icon--rare { box-shadow: 0 0 0 1px var(--rar-rare); }
+.rune-icon--epic { box-shadow: 0 0 0 1px var(--rar-epic); }
+.rune-icon--mythic { box-shadow: 0 0 0 1px var(--rar-legendary), 0 0 10px rgba(200, 169, 74, 0.45); }
+.rune-info { display: flex; flex-direction: column; gap: 6px; }
+.rune-info__text { margin: 0; font-size: 14px; }
+.rune-info__meta, .rune-info__soon { font-size: 12px; opacity: 0.75; }
+.rune-info__soon { color: var(--gold); opacity: 1; }
+.rune-mastery { display: flex; flex-direction: column; gap: 4px; }
+.rune-mastery__row { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+.rune-mastery__row small { font-size: 12px; opacity: 0.75; }
+.rune-sheet__have, .rune-sheet__sub { margin: 8px 0 4px; font-size: 13px; }
+.rune-absorb { display: flex; flex-direction: column; gap: 8px; margin-top: 6px; }
+.rune-absorb__hint { margin: 0; font-size: 12px; opacity: 0.75; }
+.rune-absorb__row { display: flex; align-items: center; gap: 10px; }
+.rune-absorb__row input { flex: 1; min-width: 0; }

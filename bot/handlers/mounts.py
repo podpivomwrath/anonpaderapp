@@ -421,7 +421,7 @@ async def start_travel_and_notify(
     from bot import ash_handful_state
 
     ash_handful_state.clear(peer_id)
-    seconds = mount_service.total_travel_seconds(mount_id, len(path))
+    seconds = mount_service.total_travel_seconds(mount_id, len(path), character)
     await db.commit()
     await notify_travel_started(
         peer_id, to_x, to_y, seconds,

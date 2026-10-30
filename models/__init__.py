@@ -48,6 +48,7 @@ from models.promo import PromoActivation, PromoCode
 from models.pvp import PvpBattle, PvpSeasonResult
 from models.quest import CharacterQuest, Quest
 from models.raid import RaidLobby, RaidLobbyMember, RaidRun
+from models.rune import CharacterRune, CharacterRuneMastery, CharacterRuneSlot
 from models.scene_event import CharacterEventEffect, EventTrail
 from models.song import CharacterSongFragment
 from models.story import CharacterStoryProgress
@@ -65,6 +66,9 @@ from models.voyage import CharacterVoyage
 from models.world_boss import WorldBoss, WorldBossContribution, WorldBossMeter
 
 __all__ = [
+    "CharacterRune",
+    "CharacterRuneMastery",
+    "CharacterRuneSlot",
     "PvpSeasonResult",
     "WalletLog",
     "MarketInbox",

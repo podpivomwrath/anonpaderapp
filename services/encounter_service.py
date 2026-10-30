@@ -86,6 +86,9 @@ async def resolve_victory(
     from services import cooking_service
 
     xp = round(xp * cooking_service.xp_mult(character))  # еда (2026-10-21)
+    from services import rune_service
+
+    xp = round(xp * (1 + rune_service.effect(character, "monolith_mark")))  # руна (2026-10-31)
     levelup = experience_service.add_experience(character, stats, xp)
     group_kick = None
     if levelup.levels_gained > 0:
@@ -119,6 +122,7 @@ async def resolve_victory(
 
     bonus = await scene_event_service.trophy_bonus(db, character.id)
     bonus += cooking_service.relic_bonus(character)  # еда (2026-10-21)
+    bonus += rune_service.effect(character, "junk_nose")  # руна (2026-10-31)
     if bonus > 0 and rng.random() < bonus:
         extra = await scene_event_service.extra_kill_trophies(db, character, rng)
         for trophy_id, count in extra.items():
@@ -131,7 +135,8 @@ async def resolve_victory(
 
     # Альманах травника (2026-10-23): редкая находка с моба - строкой к зелью.
     almanac = await craft_gear_service.roll_almanac(db, character, rng)
-    elixir_line = " ".join(x for x in (elixir_line, almanac) if x) or None
+    rune_line = await rune_service.drop_line(db, character, rng)
+    elixir_line = " ".join(x for x in (elixir_line, almanac, rune_line) if x) or None
 
     unlocked: list[str] = []
     if subclass_service.buff_pool(character) is not None:

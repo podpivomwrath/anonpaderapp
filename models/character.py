@@ -267,6 +267,12 @@ class Character(Base):
     # бонус опыта читается в experience_service.add_experience, у которого
     # нет сессии БД. Пересчитывается при изменении древа и составе.
     guild_perks: Mapped[dict] = mapped_column(JSON, default=dict, server_default="{}")
+    # Руны (2026-10-31): купленные слоты героя, навыки со вторым слотом и
+    # сумма эффектов вставленных рун - копия, как guild_perks: её читают места
+    # без сессии БД. Пересчитывает rune_service.recompute.
+    rune_hero_slots: Mapped[int] = mapped_column(default=4, server_default="4")
+    rune_skill_slots: Mapped[list] = mapped_column(JSON, default=list, server_default="[]")
+    rune_effects: Mapped[dict] = mapped_column(JSON, default=dict, server_default="{}")
     # Когда последний раз ушёл из гильдии - защита от прыжков.
     guild_left_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     # Молитва в часовне: какая характеристика и до какого момента.

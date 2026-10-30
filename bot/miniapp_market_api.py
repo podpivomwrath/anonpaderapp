@@ -14,7 +14,7 @@ from bot.miniapp_auth import VK_USER_ID_KEY
 from game.economy import market_config as mc
 from game.world import grid
 from models import Item
-from services import courier_service, item_service, market_service, naming, wallet_service
+from services import courier_service, item_service, market_service, naming, rune_service, wallet_service
 from services import onboarding_service as onboarding_svc
 
 
@@ -49,10 +49,40 @@ def _about(key: str) -> dict:
         return {"description": d.description, "effect": cooking.buff_text(dish, grade)}
     if kind == "craft":
         return {"description": None, "effect": craft_gear.effect_line(rest, 1) or None}
+    if kind == "rune":
+        return rune_about(rest)
     if kind == "chest":
         info = lootbox_service.CHEST_KINDS.get(rest)
         return {"description": info.description if info else None, "effect": None}
     return {"description": None, "effect": None}
+
+
+def rune_about(rune_id: str, absorbed: int = 0) -> dict:
+    """Сводка руны на рынке (2026-10-31, владелец): вид, для кого, что даёт,
+    как растёт и как в PvP."""
+    from game.economy import runes
+    from game.economy import runes_config as rc
+
+    r = rc.BY_ID.get(rune_id)
+    if r is None:
+        return {"description": None, "effect": None}
+    lines = [f"{rc.KIND_TITLES[r.kind][:-1]}а, {rc.RARITY_TITLES[r.rarity]}."]
+    classes = {"warrior": "воина", "rogue": "разбойника", "mage": "мага"}
+    if r.kind == rc.GEAR:
+        who = ", ".join(classes[c] for c in r.classes) if r.classes else "любого класса"
+        lines.append(f"Вставляется в {'оружие' if r.place == 'weapon' else 'доспех'}, для {who}.")
+    if r.kind == rc.SKILL:
+        lines.append(f"Вставляется в {rc.SKILL_TAG_TITLES[r.tag] if r.tag else 'любой навык'}.")
+    first, second = runes.threshold(r.curve, 1), runes.threshold(r.curve, 2)
+    lines.append(f"Мастерство: 110% - {first} копий, 120% - {second}.")
+    lines.append({"full": "В PvP в полную силу.", "half": "В PvP вполсилы.",
+                  "none": "В PvP не действует."}[r.pvp])
+    if not r.ready:
+        lines.append("Пока не действует - подключим в ближайших обновлениях.")
+    effect = "При 100%: " + runes.describe(r, 0)
+    if absorbed:
+        effect += f". У тебя {runes.efficiency(r.curve, absorbed) * 100:.0f}%: " + runes.describe(r, absorbed)
+    return {"description": " ".join(lines), "effect": effect + "."}
 
 
 async def _order(db, o) -> dict:
@@ -124,7 +154,8 @@ async def handle_get(request: web.Request) -> web.Response:
                 "book": await market_service.book(db, key),
                 "history": await market_service.history(db, key),
                 "have": (await market_service.holdings(db, character.id)).get(key, 0),
-                "about": _about(key),
+                "about": rune_about(key[5:], (await rune_service.mastery(db, character.id)).get(key[5:], 0))
+                if key.startswith("rune:") else _about(key),
             })
         return web.json_response(await _state(db, character))
 

@@ -317,6 +317,7 @@ def _apply_phase(
     for source_id in {h.source_id for h in heals}:
         source = session.combatants[source_id]
         echo = source.buff_modifiers.get("heal_overflow_shield", 0.0)
+        echo += source.buff_modifiers.get("rune:surplus", 0.0)  # руна «Излишек» (2026-10-31)
         if echo <= 0:
             continue
         for target_id in {h.target_id for h in heals if h.source_id == source_id}:
@@ -385,7 +386,11 @@ def _run_offensive(ctx: SkillContext, cid: int, action: DeclaredAction, session,
     elif action.type == ActionType.ITEM:
         _consume_heal_item(ctx, action.item_id)
     elif action.type == ActionType.SKILL and action.skill_id in OFFENSIVE_SKILLS:
-        OFFENSIVE_SKILLS[action.skill_id](ctx)
+        ctx.actor.current_skill = action.skill_id  # руны навыков (2026-10-31)
+        try:
+            OFFENSIVE_SKILLS[action.skill_id](ctx)
+        finally:
+            ctx.actor.current_skill = None
     elif action.type == ActionType.SKILL and action.skill_id not in DEFENSIVE_SKILLS:
         result.lines.append(
             combat_flavor.unimplemented_skill_line(ctx.actor.name, action.skill_id)

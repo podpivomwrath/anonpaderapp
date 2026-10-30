@@ -110,8 +110,12 @@ def set_cooldown(actor: CombatantState, skill_id: str, cd: int, rng: random.Rand
     на КД). Для всех остальных актёров buff_modifiers не содержит этих
     ключей — поведение не отличается от прямого actor.cooldowns[skill_id] = cd."""
     chance = actor.buff_modifiers.get("no_cooldown_chance", 0.0)
+    chance += actor.buff_modifiers.get(f"rune:cold_count@{skill_id}", 0.0)  # руна навыка
     if chance > 0 and rng.random() < chance:
         return
+    swing = actor.buff_modifiers.get(f"rune:short_swing@{skill_id}", 0.0)  # руна навыка
+    if swing > 0 and cd > 1 and rng.random() < swing:
+        cd -= 1
     if actor.overload_ready:
         actor.overload_ready = False
         return
@@ -148,6 +152,7 @@ def tick_overload(actor: CombatantState) -> None:
     """Перегрузка (патч 46, ч.1): раз в OVERLOAD_INTERVAL_TURNS ходов —
     следующий навык не уходит на КД. Вызывать раз за ход актёра, вместе с
     tick_cooldowns (резолвер/дуэль). Нет-оп без overload_active в buff_modifiers."""
+    actor.turns_done += 1  # руны первых ходов боя (2026-10-31)
     if actor.buff_modifiers.get("overload_active", 0.0) <= 0:
         return
     actor.overload_turn_counter += 1
@@ -193,6 +198,7 @@ def outgoing_multiplier(actor: CombatantState, target: CombatantState) -> float:
     mult *= 1.0 + actor.buff_modifiers.get("reckless_damage_bonus", 0.0)
     mult *= 1.0 + actor.buff_modifiers.get("group_damage_bonus", 0.0)
     mult *= 1.0 + retribution_bonus(actor)  # Страж, «Возмездие» (патч 56)
+    mult *= rune_outgoing(actor, target)
     # Клинок теней, «Одиночество охотника» (патч 56): бонус только когда
     # Клинок дерётся один. Флаг ставит резолвер - здесь нет доступа к сессии.
     if actor.buff_modifiers.get("solo_damage_bonus", 0.0) > 0 and not actor.has_allies:
@@ -208,6 +214,31 @@ def outgoing_multiplier(actor: CombatantState, target: CombatantState) -> float:
     if provokes and all(target.id != effect.source_id for effect in provokes):
         mult *= 1.0 - max(effect.value for effect in provokes)
     return max(mult, 0.0)
+
+
+_DEBUFFS = (EffectKind.VULNERABILITY, EffectKind.WEAKEN, EffectKind.DOT)
+
+
+def rune_outgoing(actor: CombatantState, target: CombatantState) -> float:
+    """Руны на исходящий урон (2026-10-31). Ключи «rune:...» кладёт
+    preset_service.resolve_active_modifiers, в PvP уже ослабленные."""
+    mods = actor.buff_modifiers
+    if not any(key.startswith("rune:") for key in mods):
+        return 1.0
+    mult = 1.0
+    if actor.turns_done < 2:
+        mult *= 1.0 + mods.get("rune:doorstep_rush", 0.0)
+    if target.has_effect(EffectKind.FREEZE) or target.has_effect(EffectKind.CHILLED):
+        mult *= 1.0 + mods.get("rune:hammer_down", 0.0)
+    if target.max_hp > 0 and target.current_hp < target.max_hp * 0.3:
+        mult *= 1.0 + mods.get("rune:last_cut", 0.0)
+    if actor.dodged_last_tick:
+        mult *= 1.0 + mods.get("rune:riposte", 0.0)
+    if any(target.has_effect(kind) for kind in _DEBUFFS):
+        mult *= 1.0 + mods.get("rune:echo", 0.0)
+    if actor.current_skill:
+        mult *= 1.0 + mods.get(f"rune:press@{actor.current_skill}", 0.0)
+    return mult
 
 
 def retribution_bonus(actor: CombatantState) -> float:
@@ -259,6 +290,7 @@ def compute_hit(
     # удачного уворота по нему сложнее попасть в следующий ход), «Второй шанс»
     # (раз в N ходов удар гарантированно мимо; флаг ставит резолвер).
     extra_dodge = target.buff_modifiers.get("dodge_bonus", 0.0)
+    extra_dodge += target.buff_modifiers.get("rune:light_step", 0.0)  # руна (2026-10-31)
     if target.dodged_last_tick:
         extra_dodge += target.buff_modifiers.get("slip_away_bonus", 0.0)
     # Пепельный морок обещает 80% «независимо от ловкости», а общий потолок
@@ -344,15 +376,20 @@ def compute_hit(
     if crit:
         actor.crit_this_tick = True
         base *= (crit_multiplier if crit_multiplier is not None else bc.CRIT_MULTIPLIER) +             stat_model.ACTIVE.crit_multiplier_bonus(actor.stats)
+        base *= 1.0 + actor.buff_modifiers.get("rune:thin_sting", 0.0)  # руна (2026-10-31)
         # Кровавый рыцарь, «Стойкий к боли» (патч 47, ч.2): свой крит-урон не
         # трогает, только входящий по себе.
         base *= 1.0 - target.buff_modifiers.get("crit_damage_taken_reduction", 0.0)
     base *= outgoing_multiplier(actor, target)
-    base *= 1.0 + target.effect_total(EffectKind.VULNERABILITY)
+    # Руна «Литая кираса» (2026-10-31): уязвимость на цели слабее.
+    base *= 1.0 + target.effect_total(EffectKind.VULNERABILITY) * max(
+        1.0 - target.buff_modifiers.get("rune:cast_cuirass", 0.0), 0.0)
     base *= 1.0 - effective_mitigation(target)
     # Кровавый рыцарь, «Кровавый доспех»/«Второе дыхание» (патч 47, ч.2) —
     # безусловное и низко-HP-условное снижение входящего урона.
     base *= 1.0 - target.buff_modifiers.get("incoming_damage_reduction", 0.0)
+    if target.turns_done < 3:  # руна «Свежая броня» (2026-10-31)
+        base *= 1.0 - min(target.buff_modifiers.get("rune:fresh_armor", 0.0), 0.9)
     # Патч 56: порог низкого HP - ПАРАМЕТР БАФФА, а не общая константа. У
     # Кровавого рыцаря он 40% (патч 47), у «Стойкости» Стража 30%; раньше
     # здесь был жёстко зашит порог Кровавого рыцаря на оба подкласса.

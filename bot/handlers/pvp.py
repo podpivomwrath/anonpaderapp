@@ -317,7 +317,7 @@ async def _build_combatant_for(db, character: Character) -> CombatantState:
         select(CharacterStats).where(CharacterStats.character_id == character.id)
     )
     gear_bonus = await item_service.compute_gear_bonus(db, character.id)
-    buff_modifiers = dict(await preset_service.resolve_active_modifiers(db, character))
+    buff_modifiers = dict(await preset_service.resolve_active_modifiers(db, character, pvp=True))
     if character.revenge_target_id is not None:
         bonus = pk_service.revenge_bonus(character, character.revenge_target_id)
         if bonus:

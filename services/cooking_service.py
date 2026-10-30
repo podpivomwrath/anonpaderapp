@@ -62,7 +62,10 @@ def combat_modifiers(character: Character) -> dict[str, float]:
 
 
 def hp_mult(character: Character) -> float:
-    return 1.0 + buff(character).get("max_hp_bonus", 0.0)
+    from services import rune_service
+
+    # И руна «Пепельная кожа» (2026-10-31) - здоровье вне боя.
+    return 1.0 + buff(character).get("max_hp_bonus", 0.0) + rune_service.effect(character, "ash_skin")
 
 
 def xp_mult(character: Character) -> float:
@@ -260,6 +263,9 @@ async def eat(db: AsyncSession, character: Character, dish_id: str, grade: str, 
     character.food_boost = craft_gear.spice_boost(await craft_gear_service.use_charge(db, character.id, "spices"))
     character.food_dish = dish_id
     character.food_grade = grade
-    character.food_until = (now or _now()) + timedelta(minutes=cooking.food_minutes(character.cooking_level))
+    from services import rune_service
+
+    minutes = cooking.food_minutes(character.cooking_level) * (1 + rune_service.effect(character, "full_belly"))
+    character.food_until = (now or _now()) + timedelta(minutes=minutes)
     await db.flush()
     return dish

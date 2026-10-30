@@ -121,8 +121,15 @@ def food_command(dish_name: str, grade: str) -> str:
 
 async def _craft_offers(db: AsyncSession, character_id: int, name: str) -> list[Offer]:
     """Травы, рыба и блюда (2026-10-21)."""
-    from services import cooking_service, fishing_service, herb_service
+    from services import cooking_service, fishing_service, herb_service, rune_service
+    from game.economy import runes_config as rc
 
+    # Руны (2026-10-31): «/передать руна тугой кошель 5» или просто название.
+    rune_name = name[5:] if name.startswith("руна ") else name
+    bag = await rune_service.bag(db, character_id)
+    for r in rc.RUNES:
+        if r.name.lower() == rune_name and bag.get(r.id):
+            return [Offer("rune", r.id, f"{rune_service.KIND_EMOJI[r.kind]} Руна «{r.name}»", bag[r.id])]
     for herb, count in await herb_service.get_bag(db, character_id):
         if herb.name.lower() == name:
             return [Offer("herb", herb.id, f"{herb.emoji} {herb.name}", count)]
@@ -260,7 +267,7 @@ async def _take_stack(db: AsyncSession, model, key: dict, amount: int) -> bool:
 #: Из рук в руки (2026-10-19, решение владельца): вещи, зелья и руду - только
 #: тому, кто на одной клетке с тобой (город - тоже клетка). Дальше - курьер
 #: (services/courier_service.py). Золото и самоцветы - на любое расстояние.
-NEEDS_NEAR = ("elixir", "ore", "item", "herb", "fish", "food")
+NEEDS_NEAR = ("elixir", "ore", "item", "herb", "fish", "food", "rune")
 
 
 def same_cell(sender, recipient) -> bool:
@@ -296,6 +303,11 @@ async def take(db: AsyncSession, sender_id: int, offer: Offer, amount: int) -> i
         ore_id, grade = offer.ref.split(":", 1)
         key = {"character_id": sender_id, "ore_id": ore_id, "grade": grade}
         if not await _take_stack(db, CharacterOre, key, amount):
+            raise TransferFailed("Столько у тебя нет.")
+    elif offer.kind == "rune":
+        from models import CharacterRune
+
+        if not await _take_stack(db, CharacterRune, {"character_id": sender_id, "rune_id": offer.ref}, amount):
             raise TransferFailed("Столько у тебя нет.")
     elif offer.kind == "herb":
         if not await _take_stack(db, CharacterHerb, {"character_id": sender_id, "herb_id": offer.ref}, amount):
@@ -356,6 +368,10 @@ async def give(db: AsyncSession, recipient_id: int, kind: str, ref: str | None, 
         await _credit_stack(db, CharacterOre, {"character_id": recipient_id, "ore_id": ore_id, "grade": grade}, amount)
     elif kind == "item":
         db.add(Inventory(character_id=recipient_id, item_id=int(ref), equipped=False))
+    elif kind == "rune":
+        from models import CharacterRune
+
+        await _credit_stack(db, CharacterRune, {"character_id": recipient_id, "rune_id": ref}, amount)
     elif kind == "herb":
         await _credit_stack(db, CharacterHerb, {"character_id": recipient_id, "herb_id": ref}, amount)
     elif kind == "food":

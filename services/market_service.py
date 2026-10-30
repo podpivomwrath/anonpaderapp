@@ -34,6 +34,7 @@ from models import (
     CharacterHerb,
     CharacterLootbox,
     CharacterOre,
+    CharacterRune,
     Inventory,
     Item,
     MarketInbox,
@@ -101,6 +102,8 @@ def _stack(key: str, character_id: int):
         return CharacterFood, {"character_id": character_id, "dish_id": dish_id, "grade": grade}
     if kind == "craft":
         return CharacterCraftGear, {"character_id": character_id, "tool_id": rest}
+    if kind == "rune":
+        return CharacterRune, {"character_id": character_id, "rune_id": rest}
     return None, None
 
 
@@ -126,6 +129,9 @@ async def holdings(db: AsyncSession, character_id: int) -> dict[str, int]:
         ).group_by(CharacterLootbox.kind)
     )).all():
         out[f"chest:{kind or 'ashen'}"] = count
+    for rune_id, count in (await db.execute(select(CharacterRune.rune_id, CharacterRune.count)
+                                            .where(CharacterRune.character_id == character_id))).all():
+        out[f"rune:{rune_id}"] = count
     return {k: v for k, v in out.items() if v > 0 and k in mc.goods()}
 
 

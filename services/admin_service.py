@@ -464,6 +464,8 @@ WALLET_REASONS = {
     "admin.grant_currency": "Админка: валюта", "admin.grant_any": "Админка: выдача",
     "admin.refund": "Админка: возврат",
     "pts_service.season_close": "Награда сезона PvP",
+    "rune_service.buy_hero_slot": "Слот руны героя",
+    "rune_service.buy_skill_slot": "Второй слот руны навыка",
     "alchemy_service.start": "Варка зелья", "cooking_service.start": "Готовка в печи",
     "contract_service.create": "Заказ на голову", "contract_service.on_kill": "Награда за заказ",
     "courier_service.buy": "Курьер (магазин)", "daily_service._apply_delta": "Ежедневное задание",
@@ -612,6 +614,8 @@ async def _crafts_card(db: AsyncSession, character: Character) -> dict:
         ],
         # Ремесленные инструменты (2026-10-23).
         "craft_gear": await _craft_gear_rows(db, character.id),
+        # Руны (2026-10-31): слоты, вставленные, сумка и мастерство.
+        "runes": await _rune_rows(db, character),
         "fish_kg": round(await fishing_service.bag_total_grams(db, character.id) / 1000, 1),
         "ore_pieces": await mining_service.total_ore(db, character.id),
         "flags": {
@@ -642,6 +646,24 @@ async def _craft_gear_rows(db: AsyncSession, character_id: int) -> list[dict]:
             continue
         what = f"×{row.count}" if tool.source in ("charges", "stock") else f"{row.tier} тир"
         out.append({"name": f"{tool.emoji} {tool.title}", "value": what})
+    return out
+
+
+async def _rune_rows(db: AsyncSession, character: Character) -> list[dict]:
+    from game.economy import runes
+    from game.economy import runes_config as rc
+    from services import rune_service
+
+    bag = await rune_service.bag(db, character.id)
+    known = await rune_service.mastery(db, character.id)
+    worn = {r.rune_id for r in await rune_service.slots(db, character.id)}
+    out = [{"name": "🪨 Слоты рун героя", "value": f"{character.rune_hero_slots} из {rc.HERO_SLOTS_MAX}"}]
+    for r in rc.RUNES:
+        if r.id not in bag and r.id not in known and r.id not in worn:
+            continue
+        eff = round(runes.efficiency(r.curve, known.get(r.id, 0)) * 100, 1)
+        value = f"×{bag.get(r.id, 0)}, {eff}% ({known.get(r.id, 0)} впит.)" + (", вставлена" if r.id in worn else "")
+        out.append({"name": f"{rune_service.KIND_EMOJI[r.kind]} {r.name}", "value": value})
     return out
 
 

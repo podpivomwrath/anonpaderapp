@@ -137,6 +137,13 @@ def catalog() -> list[dict]:
                ])
         for t in gearc.TOOLS.values()
     ]
+    from game.economy import runes_config as runec
+
+    runes_entries = [
+        _entry(f"rune:{r.id}", f"{'🟠' if r.kind == runec.HERO else '🔴' if r.kind == runec.GEAR else '🔵'} {r.name}"
+               + ("" if r.ready else " (пока не действует)"))
+        for r in runec.RUNES
+    ]
     purchases = [
         _entry("flag:has_house", "🏠 Дом", "one"),
         _entry("flag:has_courier", "🏃 Курьер", "one"),
@@ -178,6 +185,7 @@ def catalog() -> list[dict]:
         {"id": "food", "title": "🍲 Еда", "entries": dishes},
         {"id": "purchases", "title": "🏠 Разовые покупки", "entries": purchases},
         {"id": "mounts", "title": "🐎 Маунты", "entries": mounts},
+        {"id": "runes", "title": "🪨 Руны", "entries": runes_entries},
     ]
 
 
@@ -341,6 +349,10 @@ async def grant(
         from services import cooking_service
 
         await cooking_service.add_food(db, character.id, rest[0], rest[1], amount)
+    elif kind == "rune":
+        from services import rune_service
+
+        await rune_service.grant(db, character.id, rest[0], amount)
     elif kind == "flag":
         if getattr(character, rest[0]):
             raise GrantError("Это у игрока уже есть.")

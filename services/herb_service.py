@@ -155,7 +155,10 @@ async def pick(
     if herb is None or not herbalism.can_see(character.herbalism_level, herb):
         return PickResult("unseen")
     await db.delete(patch)
-    lucky = rng.random() < herbalism.double_chance(character.herbalism_level)
+    from services import rune_service
+
+    chance = herbalism.double_chance(character.herbalism_level) + rune_service.effect(character, "green_fingers")
+    lucky = rng.random() < chance
     amount = 2 if lucky else 1
     from services import master_recipe_service
 

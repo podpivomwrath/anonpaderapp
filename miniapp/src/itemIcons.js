@@ -6,6 +6,8 @@
  * подпись искать не нужно: есть ore_id — есть иконка.
  */
 
+import { RUNE_ICONS } from './runeIcons.js';
+
 const ICONS = {
   'base:armor:Бригантина': new URL('./assets/items/base_armor_brigantina.webp', import.meta.url).href,
   'base:armor:Кираса': new URL('./assets/items/base_armor_kirasa.webp', import.meta.url).href,
@@ -190,5 +192,6 @@ const ICONS = {
 
 /** Картинка предмета или null — вызывающий сам решает, чем заменить. */
 export function itemIcon(key) {
+  if (key?.startsWith('rune:')) return RUNE_ICONS[key.slice(5)] ?? null;
   return ICONS[key] ?? null;
 }

@@ -515,6 +515,21 @@ export function makeGear(tool, tier) {
   });
 }
 
+// Руны (2026-10-31): страница на вкладке «Герой».
+export function getRunes() {
+  return request('/runes');
+}
+
+// action: equip {kind, slot, rune} | unequip {kind, slot} | absorb {rune, count}
+// | buy_hero | buy_skill {skill}
+export function runeAction(action, params = {}) {
+  return request('/runes', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ action, ...params }),
+  });
+}
+
 // Альманах (2026-10-29): какой тир травы подсказывать; null - любую.
 // herbIds: null - вся трава, [] - альманах молчит.
 export function setAlmanacHerbs(herbIds) {

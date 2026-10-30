@@ -132,7 +132,10 @@ def display_multiplier(character: Character) -> float:
 def _guild_sell_multiplier(character: Character) -> float:
     from services import guild_service
 
-    return 1 + guild_service.perk(character, "sell_pct") / 100
+    from services import rune_service
+
+    # И руна «Тугой кошель» (2026-10-31) - тот же множитель цены у скупщика.
+    return (1 + guild_service.perk(character, "sell_pct") / 100) * (1 + rune_service.effect(character, "tight_purse"))
 
 
 async def sell_all(db: AsyncSession, character: Character, price_multiplier: float = 1.0) -> int:

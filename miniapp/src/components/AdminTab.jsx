@@ -839,6 +839,7 @@ function PlayerCard({ card, onRefresh }) {
           <StatRow label="Садок / руда" value={`${card.fish_kg} кг / ${card.ore_pieces} шт.`} />
           {card.herbs.map((h) => <StatRow key={h.name} label={h.name} value={`×${h.count}`} />)}
           {(card.craft_gear || []).map((g) => <StatRow key={g.name} label={g.name} value={g.value} />)}
+          {(card.runes || []).map((g) => <StatRow key={g.name} label={g.name} value={g.value} />)}
           {card.food.map((f) => <StatRow key={f.name + f.grade} label={`${f.name} (рыба ${f.grade})`} value={`×${f.count}`} />)}
         </Fold>
       )}

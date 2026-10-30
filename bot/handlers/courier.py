@@ -27,7 +27,7 @@ def setup(bot_api) -> None:
 
 def _what(d: CourierDelivery) -> str:
     # У пачки количества уже в подписи (courier_service.send_batch).
-    return f"{d.label}" + (f" ×{d.amount}" if d.kind in ("elixir", "ore", "herb", "food") else "")
+    return f"{d.label}" + (f" ×{d.amount}" if d.kind in ("elixir", "ore", "herb", "food", "rune") else "")
 
 
 async def _busy_ids(db) -> set[int]:

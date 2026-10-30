@@ -126,13 +126,18 @@ async def active_travel(db: AsyncSession, character_id: int) -> MountTravel | No
     )
 
 
-def total_travel_seconds(mount_id: str, cells: int) -> float:
+def total_travel_seconds(mount_id: str, cells: int, character: Character | None = None) -> float:
     """Патч 34, ч.3: «Пепельный вестник» (ADMIN_MOUNT_ID) — фиксированное
     время НА ВЕСЬ путь (ADMIN_MOUNT_TRAVEL_SECONDS), а не за клетку, вне
     зависимости от расстояния. Остальные маунты — как раньше."""
     if mount_id == mc.ADMIN_MOUNT_ID:
         return mc.ADMIN_MOUNT_TRAVEL_SECONDS
-    return cells * seconds_per_cell(mount_id)
+    seconds = cells * seconds_per_cell(mount_id)
+    if character is not None:  # руна «Лёгкое седло» (2026-10-31)
+        from services import rune_service
+
+        seconds /= 1 + rune_service.effect(character, "light_saddle")
+    return seconds
 
 
 def route(from_x: int, from_y: int, to_x: int, to_y: int, safe: bool = False) -> list[tuple[int, int]]:
@@ -195,7 +200,7 @@ async def start_travel(
     if step_seconds is not None:
         seconds = cells * step_seconds
     else:
-        seconds = total_travel_seconds(mount_id, cells)
+        seconds = total_travel_seconds(mount_id, cells, character)
     step = seconds / cells if cells else 0.0
     travel = MountTravel(
         character_id=character.id, mount_id=mount_id,

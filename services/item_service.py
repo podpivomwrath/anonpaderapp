@@ -94,11 +94,20 @@ async def grant_from_kill(
 ) -> Item | None:
     """Дроп предмета с убитого моба — таблица НЕЗАВИСИМА от трофеев (патч 9).
     None — предмет не выпал. Новый предмет сразу в инвентаре, НЕ экипирован."""
+    from services import rune_service
+
     rarity_id = item_gen.roll_rarity(rng)
+    # Руна «Цепкие пальцы» (2026-10-31): второй бросок на вещь с её шансом.
+    grabby = rune_service.effect(character, "grabby_fingers")
+    if rarity_id is None and grabby and rng.random() < grabby:
+        rarity_id = item_gen.roll_rarity(rng)
     if rarity_id is None:
         return None
     if premium_service.is_premium(character):
         rarity_id = item_gen.maybe_upgrade_rarity(rarity_id, rarities(), rng, pc.PREMIUM_RARITY_UPGRADE_CHANCE)
+    keen = rune_service.effect(character, "keen_eye")  # руна «Намётанный глаз»
+    if keen:
+        rarity_id = item_gen.maybe_upgrade_rarity(rarity_id, rarities(), rng, keen)
     slot = item_gen.roll_slot(rng)
     primary_stat = bc.primary_stat_of(character)
     generated = item_gen.generate_item(

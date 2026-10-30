@@ -692,6 +692,9 @@ async def arrive(
         revenue = round(revenue * event.revenue_mult)
         out.toll = min(event.toll, revenue)
         revenue -= out.toll
+    from services import rune_service
+
+    revenue = round(revenue * (1 + rune_service.effect(character, "loose_tongue")))  # руна (2026-10-31)
     out.revenue, out.profit = revenue, revenue - cost
     if revenue:
         from services import guild_service  # избегаем цикла импортов
