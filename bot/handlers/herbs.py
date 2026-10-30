@@ -106,7 +106,7 @@ async def notify_nearby(peer_id: int, character) -> None:
         if found:
             fresh = await craft_gear_service.almanac_not_hinted(db, character.id, {p for p, _, _ in found})
             found = [(p, d, h) for p, d, h in found if p in fresh]
-        # 10 подсказок, потом час зарядки (2026-10-29). Тратит подсказку только
+        # 10 подсказок, каждая возвращается сама (2026-10-30). Тратит подсказку только
         # найденная трава, а не пустая клетка.
         uses = await craft_gear_service.almanac_use(db, character.id) if found else None
         if uses is None:
@@ -117,8 +117,8 @@ async def notify_nearby(peer_id: int, character) -> None:
     left, total = uses
     from game.economy import craft_gear_config as gc
 
-    tail = (f"Подсказок до зарядки: {left} из {total}." if left
-            else f"Это была последняя подсказка: альманах заряжается {gc.ALMANAC_CHARGE_MINUTES} мин.")
+    tail = (f"Подсказок: {left} из {total}." if left
+            else f"Подсказки кончились, следующая вернётся через {gc.ALMANAC_RECHARGE_MINUTES} мин.")
     await _api().messages.send(
         peer_id=peer_id, random_id=0, message="📗 Альманах: рядом трава.\n" + "\n".join(parts) + "\n" + tail,
     )

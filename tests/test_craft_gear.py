@@ -162,19 +162,41 @@ def test_last_breath_is_not_throwable() -> None:
     assert not flask_throw.can_throw(SimpleNamespace(id="scroll_ward", category="scroll"))
 
 
-async def test_almanac_ten_hints_then_an_hour_of_charging(db_session, make_character) -> None:
-    """2026-10-29, владелец: 10 подсказок, потом час зарядки, потом снова 10."""
+async def test_almanac_hints_come_back_one_by_one(db_session, make_character) -> None:
+    """2026-10-30, владелец: каждая потраченная подсказка возвращается сама
+    через ALMANAC_RECHARGE_MINUTES, а не весь запас после полного расхода."""
     from datetime import datetime, timedelta, timezone
 
+    from game.economy import craft_gear_config as gc
     from services import craft_gear_service
 
+    step = gc.ALMANAC_RECHARGE_MINUTES
     c = await make_character(level=20)
     await craft_gear_service.grant_drop(db_session, c.id, "almanac")
     now = datetime(2026, 10, 29, 12, 0, tzinfo=timezone.utc)
     left = [(await craft_gear_service.almanac_use(db_session, c.id, now))[0] for _ in range(10)]
     assert left == [9, 8, 7, 6, 5, 4, 3, 2, 1, 0]
-    assert await craft_gear_service.almanac_use(db_session, c.id, now + timedelta(minutes=59)) is None
-    assert await craft_gear_service.almanac_use(db_session, c.id, now + timedelta(minutes=61)) == (9, 10)
+    assert await craft_gear_service.almanac_use(db_session, c.id, now + timedelta(minutes=step - 1)) is None
+    # Одна вернулась - её и тратим.
+    assert await craft_gear_service.almanac_use(db_session, c.id, now + timedelta(minutes=step)) == (0, 10)
+    # Ещё через три шага вернулись три (отсчёт ближайшей не сбился).
+    assert await craft_gear_service.almanac_use(
+        db_session, c.id, now + timedelta(minutes=4 * step)) == (2, 10)
+
+
+async def test_almanac_partial_use_also_recharges(db_session, make_character) -> None:
+    from datetime import datetime, timedelta, timezone
+
+    from game.economy import craft_gear_config as gc
+    from services import craft_gear_service
+
+    c = await make_character(level=20)
+    await craft_gear_service.grant_drop(db_session, c.id, "almanac")
+    now = datetime(2026, 10, 29, 12, 0, tzinfo=timezone.utc)
+    for _ in range(3):
+        await craft_gear_service.almanac_use(db_session, c.id, now)
+    later = now + timedelta(minutes=gc.ALMANAC_RECHARGE_MINUTES * 10)
+    assert await craft_gear_service.almanac_use(db_session, c.id, later) == (9, 10)
 
 
 async def test_almanac_page_drops_only_to_owner_and_adds_two(db_session, make_character) -> None:

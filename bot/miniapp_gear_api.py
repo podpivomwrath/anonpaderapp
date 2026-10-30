@@ -25,18 +25,20 @@ SOURCE_HINTS = {
 
 
 def _status(tool_id: str, row) -> str | None:
-    """Альманах на зарядке (2026-10-29): работает или заряжается и сколько."""
+    """Альманах: сколько подсказок есть и когда вернётся ближайшая (2026-10-30)."""
     if tool_id != "almanac":
         return None
     from datetime import datetime, timezone
 
     total = craft_gear.almanac_uses(row.count)
     pages = f" Страниц: {row.count}." if row.count else ""
-    left = craft_gear.almanac_charge_left(row.cycle_at, datetime.now(timezone.utc))
-    if left:
-        return f"Заряжается ещё {left} мин.{pages}"
-    used = 0 if row.cycle_at is not None else (row.used or 0)
-    return f"Подсказок до зарядки: {total - used} из {total}.{pages}"
+    now = datetime.now(timezone.utc)
+    used, _ = craft_gear.almanac_settle(row.used, row.cycle_at, now)
+    text = f"Подсказок: {max(total - used, 0)} из {total}."
+    nxt = craft_gear.almanac_next_in(row.used, row.cycle_at, now)
+    if nxt:
+        text += f" Следующая через {nxt} мин."
+    return text + pages
 
 
 def _almanac(character, row) -> dict:

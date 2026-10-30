@@ -866,6 +866,10 @@ async def _handle_join_choice(message: Message, battle_id, side) -> None:
     _join_mass_battle_now(battle_id, battle, participant, combatant)
     _init_target(battle_id, battle, participant.character_id)  # патч 38: автоцель при входе
     target_line = _target_line(battle_id, battle, participant.character_id)
+    # Остальные видят, кто вошёл (баг 255, 2026-10-30): раньше новичок
+    # бил с первого хода, а в логе его появления не было.
+    await _tell_others(battle, participant.character_id,
+                       f"⚔️ {participant.name} вступает в бой на стороне {side}.")
     text = f"⚔️ Ты вступаешь в бой на стороне {side}!"
     if target_line:
         text += f"\n{target_line}"
@@ -1363,6 +1367,8 @@ async def pvp_use_item(message: Message) -> None:
     else:
         line = elixir_effects.apply_combat_elixir(combatant, elixir_id, _live_state(battle_id, battle))
         combatant.combat_elixirs_used += 1
+        if elixir.category != "scroll":
+            await _tell_others(battle, cid, elixir_effects.elixir_seen(participant.name, elixir))
     if elixir.category == "scroll":
         await _tell_others(battle, cid, f"{participant.name}: {line}")
     text = f"{line} Твой ход.\n\n{_battle_board_text(battle_id, battle, [])}"

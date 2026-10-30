@@ -205,6 +205,11 @@ async def on_tick(peer_id: int, tick: int, result) -> None:
 
     state = combat_handlers._engine.sessions.get(peer_id)
     boss_pk = combat_handlers.world_boss_of(peer_id)
+    if boss_pk == combat_handlers.ARENA_DUMMY:
+        from bot.handlers import arena  # избегаем цикла импортов
+
+        await arena.dummy_on_tick(peer_id, tick, result)
+        return
     if boss_pk is not None and boss_pk < 0:
         # Отрицательный id - Страж цитадели гильдии: ходы ведёт свой модуль.
         from bot.handlers import guild as guild_handlers  # избегаем цикла импортов
@@ -258,7 +263,14 @@ async def on_tick(peer_id: int, tick: int, result) -> None:
 
 async def leave(peer_id: int) -> None:
     """Кнопка отступления: заход кончается сразу, урон уже записан."""
+    from bot.handlers import combat as combat_handlers  # избегаем цикла импортов
     from bot.handlers import guild as guild_handlers  # избегаем цикла импортов
+
+    if combat_handlers.is_arena_dummy(peer_id):
+        from bot.handlers import arena  # избегаем цикла импортов
+
+        await arena.dummy_close(peer_id)
+        return
 
     guild_handlers.forget(peer_id)
     await _close_attempt(peer_id, boss_gone=False)

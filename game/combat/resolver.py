@@ -752,7 +752,9 @@ def resolve_tick(
                     # лечение -> щит -> лечение ходили по кругу.
                     effect.value = 0
                     continue
-                heal = shared_rules.recovered(combatant, round(effect.value))
+                # Без затухания PvP: щит уже срезан, когда его вешали, второй
+                # срез на остатке - двойной (баг 241, 2026-10-30).
+                heal = round(effect.value)
                 before_hp = combatant.current_hp
                 combatant.current_hp = min(combatant.current_hp + heal, combatant.max_hp)
                 if combatant.current_hp == before_hp:

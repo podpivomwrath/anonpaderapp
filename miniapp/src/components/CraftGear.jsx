@@ -107,7 +107,7 @@ function AlmanacSheet({ tool, onClose, onDone }) {
   return (
     <Sheet title={tool.title} icon={tool.emoji} onClose={onClose}>
       <p className="craft-hint">
-        Найдено страниц: {a.pages}. Подсказок до зарядки: {a.uses}, каждая страница добавляет {a.per_page}.
+        Найдено страниц: {a.pages}. Подсказок в запасе: {a.uses}, каждая страница добавляет {a.per_page}.
       </p>
       {tool.status && <p className="craft-hint">{tool.status}</p>}
       <p className="craft-hint">Какую траву подсказывать:</p>

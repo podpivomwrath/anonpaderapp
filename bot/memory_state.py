@@ -32,6 +32,7 @@ STATE: dict[str, str] = {
     "bot.handlers.combat._story_encounter": "конец боя, /застрял",
     "bot.handlers.combat._mount_ambush": "конец боя, /застрял, прерывание нападения",
     "bot.handlers.combat._world_boss": "конец захода к мировому боссу",
+    "bot.handlers.arena._dummy": "конец боя с манекеном (arena.dummy_close)",
     "bot.handlers.combat._event_bonus": "конец боя, /застрял",
     "bot.handlers.combat._relic_deal": "конец боя, /застрял",
     "bot.handlers.combat._flee_confirm": "ответ на «Сбежать?» и следующий ход",

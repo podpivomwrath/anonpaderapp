@@ -712,6 +712,8 @@ async def group_use_item(message: Message) -> None:
     else:
         line = elixir_effects.apply_combat_elixir(combatant, elixir_id, _live_state(battle_id, battle))
         combatant.combat_elixirs_used += 1
+        if elixir.category != "scroll":
+            await _tell_others(battle, cid, elixir_effects.elixir_seen(p.name, elixir))
     if elixir.category == "scroll":
         await _tell_others(battle, cid, f"{p.name}: {line}")
     text = f"{line} Твой ход.\n\n{_render_board(_engine.sessions.get(battle_id))}"

@@ -101,6 +101,12 @@ async def register_death(
 ) -> None:
     """Смерть игрока: убрать кнопки, показать атмосферный текст (+ штраф опыта
     и сгоревшие реликвии - отдельной строкой, её не трогает отсчёт)."""
+    from bot.handlers import scene_events, world
+
+    # Событие, прерванное смертью, не ждёт воскрешения (баг 257, 2026-10-30):
+    # встал на той же клетке - и прежняя карточка события продолжалась.
+    await world._drop_pending_event(peer_id)
+    scene_events.cancel(peer_id)
     now = datetime.now(timezone.utc)
     resp = await _bot_api.messages.send(
         peer_id=peer_id, message=_death_text(respawn_at, now, xp_lost), random_id=0,

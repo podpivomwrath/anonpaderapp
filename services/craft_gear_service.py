@@ -48,23 +48,23 @@ async def _row(db: AsyncSession, character_id: int, tool_id: str) -> CharacterCr
 
 
 async def almanac_use(db: AsyncSession, character_id: int, now=None) -> tuple[int, int] | None:
-    """Альманах подсказывает траву сейчас? Тратит одно срабатывание; последнее
-    запускает час зарядки, после неё запас снова полный. (осталось, всего)
-    после этого срабатывания; None - альманаха нет или он заряжается."""
+    """Альманах подсказывает траву сейчас? Тратит одну подсказку, каждая
+    возвращается сама через ALMANAC_RECHARGE_MINUTES (2026-10-30). (осталось,
+    всего) после этого срабатывания; None - альманаха нет или подсказок 0."""
     from datetime import datetime, timezone
 
     row = await _row(db, character_id, "almanac")
     if row is None:
         return None
     now = now or datetime.now(timezone.utc)
-    if row.cycle_at is not None:
-        if craft_gear.almanac_charge_left(row.cycle_at, now):
-            return None
-        row.cycle_at, row.used = None, 0
     total = craft_gear.almanac_uses(row.count)
-    row.used = (row.used or 0) + 1
-    if row.used >= total:
-        row.cycle_at = now
+    used, cycle_at = craft_gear.almanac_settle(row.used, row.cycle_at, now)
+    if used >= total:
+        row.used, row.cycle_at = used, cycle_at
+        await db.flush()
+        return None
+    row.used = used + 1
+    row.cycle_at = cycle_at or now
     await db.flush()
     return max(total - row.used, 0), total
 
@@ -169,7 +169,7 @@ async def roll_almanac(db: AsyncSession, character: Character, rng: random.Rando
         return ALMANAC_LINE if await grant_drop(db, character.id, "almanac") else None
     row.count = (row.count or 0) + 1
     await db.flush()
-    return (f"📗 Страница альманаха: +{gc.ALMANAC_USES_PER_PAGE} подсказки до зарядки, "
+    return (f"📗 Страница альманаха: +{gc.ALMANAC_USES_PER_PAGE} подсказки в запас, "
             f"теперь {craft_gear.almanac_uses(row.count)}.")
 
 

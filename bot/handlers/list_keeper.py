@@ -195,14 +195,20 @@ async def open_keeper(message: Message) -> None:
         elif not subclass_service.can_offer(character):
             await message.answer(KEEPER["too_low_level"])
             return
-        elif subclass_service.free_repick(character):
+        elif subclass_service.free_repick(character) or character.subclass_select_state in (
+            STATE_PATH_SELECT, STATE_PATH_CONFIRM,
+        ):
             # После смены класса/подкласса - сразу к выбору пути, без платы.
+            # Уже заплатил, но путь не выбрал (ушёл, рестарт) - тоже сюда:
+            # раньше Хранитель снова просил 20 000 (баг 246, 2026-10-30).
             await _set_select_state(db, character, STATE_PATH_SELECT)
             await db.commit()
             titles = [s.title for s in subclass_service.paths_for(character.base_class)]
             await _dispenser.set(peer_id, SubclassSelectState.PATH_SELECT)
+            repick = subclass_service.free_repick(character)
+            line = FREE_REPICK_LINE if repick else "Плата уже внесена, осталось выбрать путь."
             await message.answer(
-                f"{FREE_REPICK_LINE}\n\n{KEEPER['path_intro']}", keyboard=paths_keyboard(titles, decline=True),
+                f"{line}\n\n{KEEPER['path_intro']}", keyboard=paths_keyboard(titles, decline=repick),
                 attachment=KEEPER_ATTACHMENT,
             )
             return

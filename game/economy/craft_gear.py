@@ -70,19 +70,35 @@ def almanac_uses(pages: int) -> int:
     return gc.ALMANAC_USES + gc.ALMANAC_USES_PER_PAGE * max(pages, 0)
 
 
-def almanac_charge_left(cycle_at, now) -> int:
-    """Минут до конца зарядки; 0 - не заряжается."""
+def almanac_settle(used: int, cycle_at, now):
+    """Подсказки возвращаются по одной (2026-10-30, владелец). used -
+    потрачено, cycle_at - с какого момента заряжается ближайшая. Возвращает
+    (used, cycle_at) на момент now."""
     from datetime import timedelta, timezone
 
     from game.economy import craft_gear_config as gc
 
-    if cycle_at is None:
-        return 0
+    used = used or 0
+    if used <= 0 or cycle_at is None:
+        return used, None if used <= 0 else now
     if cycle_at.tzinfo is None:
         cycle_at = cycle_at.replace(tzinfo=timezone.utc)
-    end = cycle_at + timedelta(minutes=gc.ALMANAC_CHARGE_MINUTES)
-    if now >= end:
+    step = timedelta(minutes=gc.ALMANAC_RECHARGE_MINUTES)
+    back = min(int((now - cycle_at) / step), used) if now > cycle_at else 0
+    used -= back
+    return used, (cycle_at + step * back if used > 0 else None)
+
+
+def almanac_next_in(used: int, cycle_at, now) -> int:
+    """Минут до возврата ближайшей подсказки; 0 - запас полный."""
+    from datetime import timedelta
+
+    from game.economy import craft_gear_config as gc
+
+    used, cycle_at = almanac_settle(used, cycle_at, now)
+    if used <= 0 or cycle_at is None:
         return 0
+    end = cycle_at + timedelta(minutes=gc.ALMANAC_RECHARGE_MINUTES)
     return max(1, round((end - now).total_seconds() / 60))
 
 
@@ -101,8 +117,8 @@ def effect_line(tool_id: str, tier: int, pages: int = 0) -> str:
     if tool_id == "almanac":
         return ("Когда заходишь на клетку, пишет, на каких из 8 соседних клеток растёт трава. "
                 "Показывает только ту, которую ты уже различаешь, и на каждый куст - один раз. "
-                f"Хватает на {gc.ALMANAC_USES} раз{f' (+{gc.ALMANAC_USES_PER_PAGE * pages})' if pages else ''}, "
-                "потом час заряжается")
+                f"Подсказок {gc.ALMANAC_USES}{f' (+{gc.ALMANAC_USES_PER_PAGE * pages})' if pages else ''}, "
+                f"каждая потраченная возвращается через {gc.ALMANAC_RECHARGE_MINUTES} мин.")
     if tool_id == "pick":
         return (f"Копаешь на {pct(gc.PICK_SPEED_PER_TIER * tier)} быстрее и чаще достаёшь руду лучшей градации. "
                 f"В руднике тира выше кирки ускорение вдвое меньше")

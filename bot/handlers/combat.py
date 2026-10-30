@@ -102,6 +102,9 @@ _mount_ambush: dict[int, int] = {}
 # Ходы такого боя ведёт bot/handlers/world_boss.py: общее здоровье, лимит
 # ходов, свой итог вместо победы/смерти.
 _world_boss: dict[int, int] = {}
+#: Метка в _world_boss для манекена арены (2026-10-30): ходы ведёт
+#: bot/handlers/arena.py. Мировые боссы - от 1, Страж гильдии - меньше нуля.
+ARENA_DUMMY = 0
 # peer_id -> награда события за победу, в мобах (патч 110: вожак в финале следа)
 _event_bonus: dict[int, float] = {}
 # peer_id -> (выставленная партия реликвий, меняла) - бой с Пепельным менялой
@@ -305,6 +308,9 @@ async def start_encounter(
     )
     # HP переносится между боями (отдых/респавн лечат) — не всегда полное
     player.current_hp = vitals_service.current_hp(character, char_stats, bonus.get("vit", 0))
+    dummy = is_arena_dummy(peer_id)
+    if dummy:
+        player.current_hp = player.max_hp  # арена: все с полным здоровьем
     if forced_encounter is not None:
         encounter = forced_encounter
     else:
@@ -327,7 +333,7 @@ async def start_encounter(
     _battle_trackers[peer_id] = BattleTracker(
         PLAYER_ID, MOB_ID, encounter.combatant.level, player.max_hp, player.current_hp
     )
-    if character.subclass is not None:
+    if character.subclass is not None and not dummy:
         async with get_session_factory()() as db:
             from services.onboarding_service import get_character  # избегаем цикла импортов
 
@@ -433,6 +439,27 @@ async def start_world_boss_encounter(
     await start_encounter(
         peer_id, character, char_stats, gear_bonus, buff_modifiers, forced_encounter=encounter
     )
+
+
+async def start_arena_dummy_encounter(
+    peer_id: int, character, char_stats, gear_bonus, buff_modifiers, encounter: encounters.Encounter,
+) -> None:
+    """Манекен арены: соло-бой с теми же кнопками, ходы ведёт arena.py."""
+    _world_boss[peer_id] = ARENA_DUMMY
+    await start_encounter(
+        peer_id, character, char_stats, gear_bonus, buff_modifiers, forced_encounter=encounter
+    )
+
+
+def is_arena_dummy(peer_id: int) -> bool:
+    return _world_boss.get(peer_id) == ARENA_DUMMY
+
+
+def _free_items(peer_id: int) -> bool:
+    """У манекена расходники бесплатны, пока идёт Дар первопроходцев."""
+    from game.economy import prerelease_config
+
+    return is_arena_dummy(peer_id) and prerelease_config.arena_free_elixirs()
 
 
 def world_boss_of(peer_id: int) -> int | None:
@@ -814,6 +841,8 @@ async def use_item(message: Message) -> None:
         if character is None:
             return
         stock = await elixir_service.get_stock(db, character.id)
+    if _free_items(peer_id):
+        stock = [(d, "∞") for d in elixir_service.elixir_defs_ordered()]
 
     if not stock:
         await message.answer("🎒 В сумке пусто.", keyboard=_combat_kb(state, peer_id))
@@ -866,7 +895,7 @@ async def use_combat_item(message: Message) -> None:
         character = await onboarding_svc.get_character(db, peer_id)
         if character is None:
             return
-        consumed = await elixir_service.consume(db, character.id, elixir_id)
+        consumed = _free_items(peer_id) or await elixir_service.consume(db, character.id, elixir_id)
         await db.commit()
     if not consumed:
         await message.answer("Этого зелья больше нет в сумке.", keyboard=_combat_kb(state, peer_id))
@@ -965,7 +994,9 @@ async def flee(message: Message) -> None:
     asked = _flee_confirm.pop(peer_id, None)
     if asked is None or time.monotonic() - asked > FLEE_CONFIRM_SECONDS:
         _flee_confirm[peer_id] = time.monotonic()
-        if peer_id in _world_boss:
+        if is_arena_dummy(peer_id):
+            ask = "🏃 Закончить с манекеном? Урон за эти ходы покажу."
+        elif peer_id in _world_boss:
             ask = "🏃 Точно уйти от босса? Нанесённый урон засчитан, но бой для тебя закончится."
         else:
             ask = (f"🏃 Точно бежать? Шанс уйти: {round(chance * 100)}%. "

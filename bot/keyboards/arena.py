@@ -14,6 +14,9 @@ BTN_ROOM_SIDE_1 = "🔴 Сторона 1"
 BTN_ROOM_SIDE_2 = "🔵 Сторона 2"
 BTN_ROOM_START = "▶ Начать бой"
 BTN_ROOM_LEAVE = "✖ Выйти из комнаты"
+# Манекен для замеров урона (2026-10-30, владелец).
+BTN_DUMMY_BOSS = "🗿 Манекен-босс"
+BTN_DUMMY_MOB = "🎯 Манекен-моб"
 
 
 def arena_keyboard() -> str:
@@ -23,6 +26,9 @@ def arena_keyboard() -> str:
     kb.row()
     kb.add(Text(BTN_ARENA_HOST), color=KeyboardButtonColor.PRIMARY)
     kb.add(Text(BTN_ARENA_FIND), color=KeyboardButtonColor.PRIMARY)
+    kb.row()
+    kb.add(Text(BTN_DUMMY_BOSS), color=KeyboardButtonColor.SECONDARY)
+    kb.add(Text(BTN_DUMMY_MOB), color=KeyboardButtonColor.SECONDARY)
     kb.row()
     kb.add(Text(BTN_ARENA_BACK), color=KeyboardButtonColor.SECONDARY)
     return kb.get_json()

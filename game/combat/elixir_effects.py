@@ -37,6 +37,12 @@ def heal_seen(actor: CombatantState, name: str, healed: int) -> str:
     return f"🧪 {name} пьёт лечебное зелье: +{healed} HP ({actor.current_hp}/{actor.max_hp})."
 
 
+def elixir_seen(name: str, elixir) -> str:
+    """Строка для остальных бойцов: кто-то выпил боевой эликсир (баг 243,
+    2026-10-30: в PvP не было видно, что соперник пьёт)."""
+    return f"{elixir.emoji} {name} пьёт «{elixir.name}»."
+
+
 def _apply_scroll(actor: CombatantState, elixir_id: str, combatants) -> str:
     """Свитки (2026-10-13): на всю сторону бойца или на всех врагов. Без
     списка бойцов (вызов из старого кода) - только на себя."""
@@ -141,6 +147,7 @@ def throw_flask(actor: CombatantState, elixir_id: str, combatants, power: float)
     from game.combat.session import white_max_hp
 
     allies = [c for c in (combatants or {actor.id: actor}).values() if c.alive and c.side == actor.side]
+    flask = _flask_name(elixir_id)
     if ec.heal_amount(elixir_id, white_max_hp(actor)) is not None:
         healed = []
         for c in allies:
@@ -149,7 +156,7 @@ def throw_flask(actor: CombatantState, elixir_id: str, combatants, power: float)
             c.current_hp = min(c.max_hp, before + amount)
             if c.current_hp > before:
                 healed.append(f"{c.name} +{c.current_hp - before}")
-        return "🧴 Склянка разбивается над своими: " + (", ".join(healed) if healed else "все и так целы") + "."
+        return f"🧴 {flask} разбивается над своими: " + (", ".join(healed) if healed else "все и так целы") + "."
     for c in allies:
         # Уже действующий свой эффект склянка не трогает (2026-10-23): раньше
         # она перезаписывала его - выпитый в полную силу освежался и
@@ -167,4 +174,13 @@ def throw_flask(actor: CombatantState, elixir_id: str, combatants, power: float)
                 effect.value = effect.value * power
                 effect.power = power
     names = ", ".join(c.name for c in allies)
-    return f"🧴 Склянка разбивается над своими ({names}): на каждого слабее, чем выпить самому."
+    return f"🧴 {flask} разбивается над своими ({names}): на каждого слабее, чем выпить самому."
+
+
+def _flask_name(elixir_id: str) -> str:
+    """Склянка с названием зелья (баг 173, 2026-10-30): раньше в логе было
+    не понять, что именно разбилось."""
+    from game.content_loader import load_elixirs
+
+    edef = load_elixirs().get(elixir_id)
+    return f"Склянка «{edef.name}»" if edef else "Склянка"

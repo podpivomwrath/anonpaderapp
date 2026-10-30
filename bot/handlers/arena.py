@@ -28,8 +28,9 @@ from bot.keyboards import arena as arena_kb
 from bot.keyboards.world import BTN_ARENA
 from bot.vk_media import photo_attachment
 from bot.world_texts import FOREIGN_NPC_REJECTION
+from game import plural
 from game.economy import prerelease_config
-from game.world import grid
+from game.world import arena_dummy, encounters, grid
 from models import Character
 from services import screen_service
 from services import onboarding_service as onboarding_svc
@@ -50,6 +51,9 @@ _random_queue: list[tuple[int, int]] = []
 _codes: dict[str, tuple[int, int]] = {}
 #: Кто сейчас вводит чужой код.
 _entering: set[int] = set()
+
+#: Манекен: peer -> вид (arena_dummy.BOSS/MOB) и сколько ходов прошло.
+_dummy: dict[int, tuple[str, int]] = {}
 
 #: Игроков в комнате, не больше.
 ROOM_MAX = 10
@@ -78,7 +82,9 @@ def _arena_text() -> str:
         "🎲 Случайный бой - сразиться с первым, кто тоже ищет бой.\n"
         "⏳ Ждать соперника - получить код и ждать, пока его введут.\n"
         "👥 Комната на бой - код для нескольких игроков, стороны выбирают сами, начинаешь ты.\n"
-        "🔎 Найти по коду - ввести код соперника или комнаты."
+        "🔎 Найти по коду - ввести код соперника или комнаты.\n"
+        f"🗿 Манекен - {arena_dummy.TURNS} ходов по цели на {arena_dummy.HP} здоровья, "
+        "он не бьёт. Босс не поддаётся контролю, как в рейде, моб - обычный, твоего уровня."
     )
 
 
@@ -513,3 +519,89 @@ async def _room_finished(battle, room: Room | None, draw: bool) -> None:
             await _bot_api.messages.send(peer_id=p.peer_id, message=text + tail, random_id=0, keyboard=keyboard)
         except Exception:
             pass
+
+
+# --- Манекен (2026-10-30, владелец) ---
+
+
+_DUMMY_KIND = {arena_kb.BTN_DUMMY_BOSS: arena_dummy.BOSS, arena_kb.BTN_DUMMY_MOB: arena_dummy.MOB}
+
+
+@labeler.message(text=list(_DUMMY_KIND))
+async def start_dummy(message: Message) -> None:
+    from sqlalchemy import select
+
+    from bot.handlers import combat as combat_handlers
+    from models import CharacterStats
+    from services import item_service, preset_service
+
+    peer_id = message.peer_id
+    character = await _arena_character(message)
+    if character is None:
+        return
+    if is_waiting(peer_id):
+        await message.answer("Сначала выйди из ожидания или комнаты.", keyboard=keyboard_for(peer_id))
+        return
+    kind = _DUMMY_KIND[message.text.strip()] if message.text.strip() in _DUMMY_KIND else arena_dummy.MOB
+    async with get_session_factory()() as db:
+        me = await _ready(db, character.id, peer_id)
+        if me is None:
+            await message.answer("Сейчас на арену не выйти: закончи текущие дела.")
+            return
+        stats = await db.scalar(select(CharacterStats).where(CharacterStats.character_id == me.id))
+        gear_bonus = await item_service.compute_gear_bonus(db, me.id)
+        buff_modifiers = await preset_service.resolve_active_modifiers(db, me)
+    dummy = arena_dummy.build(combat_handlers.MOB_ID, kind, me.level)
+    if kind == arena_dummy.BOSS:
+        flavor = "Соломенный манекен в латах. Контроль на него не ложится, как на рейдовых боссов."
+    else:
+        flavor = f"Соломенный манекен, держит удар как моб {me.level} уровня. Оглушай, замораживай - всё ложится."
+    flavor += f" Не бьёт. {arena_dummy.TURNS} ходов, потом подсчёт урона."
+    _dummy[peer_id] = (kind, 0)
+    await combat_handlers.start_arena_dummy_encounter(
+        peer_id, me, stats, gear_bonus, buff_modifiers,
+        encounters.Encounter(combatant=dummy, flavor=flavor),
+    )
+
+
+def _dummy_dealt(peer_id: int) -> int:
+    from bot.handlers import combat as combat_handlers
+
+    state = combat_handlers._engine.sessions.get(peer_id)
+    if state is None:
+        return 0
+    return arena_dummy.HP - max(state.combatants[combat_handlers.MOB_ID].current_hp, 0)
+
+
+async def dummy_on_tick(peer_id: int, tick: int, result) -> None:
+    from bot.handlers import combat as combat_handlers
+
+    state = combat_handlers._engine.sessions.get(peer_id)
+    if state is None or peer_id not in _dummy:
+        return
+    _dummy[peer_id] = (_dummy[peer_id][0], tick)
+    finished = tick >= arena_dummy.TURNS or result.finished
+    board = combat_handlers.render_board(state, result)
+    board = board.replace(board.split("\n", 1)[0], f"🗿 МАНЕКЕН - ход {tick}/{arena_dummy.TURNS}", 1)
+    board += f"\n\n🗡 Урон по манекену: {_dummy_dealt(peer_id)}"
+    if not finished:
+        await _bot_api.messages.send(peer_id=peer_id, message=board, random_id=0,
+                                     keyboard=combat_handlers.rebuild_keyboard(peer_id))
+        return
+    await _bot_api.messages.send(peer_id=peer_id, message=board, random_id=0)
+    await dummy_close(peer_id)
+
+
+async def dummy_close(peer_id: int) -> None:
+    """Конец боя с манекеном (10 ходов или «Побег»): итог и снова арена."""
+    from bot.handlers import combat as combat_handlers
+
+    dealt = _dummy_dealt(peer_id)
+    kind, turns = _dummy.pop(peer_id, (arena_dummy.MOB, 0))
+    combat_handlers.end_world_boss_fight(peer_id)
+    name = "босс" if kind == arena_dummy.BOSS else "моб"
+    text = f"🗿 Манекен-{name}: {dealt} урона за {plural.count(turns, 'ход', 'хода', 'ходов')}"
+    if turns:
+        text += f", в среднем {round(dealt / turns)} за ход"
+    text += "."
+    await _bot_api.messages.send(peer_id=peer_id, message=text, random_id=0, keyboard=keyboard_for(peer_id))

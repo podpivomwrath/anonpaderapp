@@ -27,7 +27,7 @@ def test_arena_button_fits_tavern_limits():
 
 
 def test_arena_keyboards_are_small():
-    assert sum(len(r) for r in _labels(arena_kb.arena_keyboard())) == 5
+    assert sum(len(r) for r in _labels(arena_kb.arena_keyboard())) == 7
     assert _labels(arena_kb.arena_waiting_keyboard()) == [[arena_kb.BTN_ARENA_CANCEL]]
 
 
