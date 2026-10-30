@@ -204,7 +204,17 @@ def grade_name(grade_id: str) -> str:
 
 def xp_to_next(mining_level: int) -> int:
     """Потолка нет, каждый следующий уровень дороже — как у рыбалки."""
-    return round(mc.MINING_XP_BASE * mining_level ** mc.MINING_XP_EXP)
+    return round(mc.MINING_XP_BASE * mining_level ** mc.MINING_XP_EXP * xp_curve_mult(mining_level))
+
+
+def xp_curve_mult(mining_level: int) -> float:
+    """До 25 дёшево, 25-50 дорожает до старой шкалы, после 50 круче неё."""
+    easy, hard = mc.MINING_XP_EASY_UNTIL, mc.MINING_XP_HARD_FROM
+    if mining_level < easy:
+        return mc.MINING_XP_EASY_MULT
+    if mining_level <= hard:
+        return mc.MINING_XP_EASY_MULT + (1 - mc.MINING_XP_EASY_MULT) * (mining_level - easy) / (hard - easy)
+    return 1 + mc.MINING_XP_HARD_PER_LEVEL * (mining_level - hard)
 
 
 def dig_xp(ore_id: str, grade_id: str) -> int:
