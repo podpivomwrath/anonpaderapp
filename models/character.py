@@ -64,6 +64,11 @@ class Character(Base):
     # (services/pts_service.py). Топ PvP - по PTS.
     pts: Mapped[int] = mapped_column(default=1000, server_default="1000")
     pts_season: Mapped[str | None] = mapped_column(String(7), nullable=True)
+    #: PTS на конец прошлого сезона, до сжатия (2026-10-30) - для итога в
+    #: катсцене. None - в прошлом сезоне персонажа ещё не было.
+    pts_prev: Mapped[int | None] = mapped_column(nullable=True)
+    #: Сезон, итог которого игрок уже посмотрел в мини-аппе.
+    pvp_season_seen: Mapped[str | None] = mapped_column(String(7), nullable=True)
 
     # Стрики и ежедневный цикл (патч 23) — даты в московской зоне (см.
     # game.economy.dailies_config.DAILY_RESET_TZ), не UTC.

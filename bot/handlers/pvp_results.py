@@ -6,6 +6,8 @@
 здесь к нему обращаются как pvp.X, чтобы копия была одна и тесты подменяли там же.
 """
 
+from loguru import logger
+
 from bot import dailies_texts, short_log
 from bot.handlers import respawn as respawn_handlers
 from bot.handlers import stats_window
@@ -448,3 +450,39 @@ async def on_mass_battle_finished(session_id: int, result: TickResult) -> None:
                 random_id=0, keyboard=kb.waiting_keyboard(),
             )
     await _notify_orderers(orderer_notes)
+
+
+# --- Итог сезона PvP (2026-10-30, владелец) ---
+
+
+def season_result_text(result) -> str:
+    from game import plural
+    from services import title_service
+
+    return (
+        f"🏆 Сезон PvP {result.season} окончен: ты на {result.place} месте, "
+        f"{result.pts} PTS за {plural.count(result.fights, 'бой', 'боя', 'боёв')}.\n"
+        f"Титул «{title_service.name_of(result.title_id)}» твой на весь новый сезон, "
+        f"на счёт пришло 💎 {result.gems}. Чтобы оставить титул, войди в пятёрку снова."
+    )
+
+
+async def notify_season_results() -> None:
+    """Личное сообщение каждому призёру сезона, один раз (notified)."""
+    from sqlalchemy import select
+
+    from models import PvpSeasonResult, User
+
+    async with pvp.get_session_factory()() as db:
+        rows = (await db.scalars(select(PvpSeasonResult).where(PvpSeasonResult.notified.is_(False)))).all()
+        for result in rows:
+            character = await db.get(Character, result.character_id)
+            user = await db.get(User, character.user_id) if character is not None else None
+            result.notified = True
+            if user is None:
+                continue
+            try:
+                await pvp._bot_api.messages.send(peer_id=user.vk_id, random_id=0, message=season_result_text(result))
+            except Exception:
+                logger.warning("Сезон PvP: итог не доставлен {}", user.vk_id)
+        await db.commit()

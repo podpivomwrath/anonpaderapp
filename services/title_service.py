@@ -16,6 +16,10 @@ TITLE_NAMES = {
     "attentive": "Внимательный",
     # Секрет: мастерский рецепт алхимика (craft_gear_config). Нигде не объявляется.
     "all_crafts": "Мастер всех ремёсел",
+    # Сезон PvP (2026-10-30): держатся один следующий сезон, pts_service.season_close.
+    "pvp_first": "Первый клинок",
+    "pvp_crimson": "Багряный клинок",
+    "pvp_steel": "Стальной клинок",
 }
 
 
@@ -27,6 +31,9 @@ TITLE_TIERS = {
     "relentless": "legendary",
     "attentive": "legendary",
     "all_crafts": "legendary",
+    "pvp_first": "legendary",
+    "pvp_crimson": "epic",
+    "pvp_steel": "rare",
 }
 
 

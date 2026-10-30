@@ -24,6 +24,24 @@ MONTHS = ["январь", "февраль", "март", "апрель", "май"
           "сентябрь", "октябрь", "ноябрь", "декабрь"]
 
 
+def _season_name(key: str) -> str:
+    year, month = key.split("-")
+    return f"{MONTHS[int(month) - 1].capitalize()} {year}"
+
+
+def _recap_json(recap: dict | None) -> dict | None:
+    """Итог прошлого сезона: названия месяцев и титулов - здесь, клиент
+    их не пересказывает."""
+    if recap is None:
+        return None
+    from services import title_service
+
+    for row in recap["top"] + [recap["me"]]:
+        if row.get("title_id"):
+            row["title"] = title_service.name_of(row["title_id"])
+    return {**recap, "season_name": _season_name(recap["season"]), "next_name": _season_name(recap["next"])}
+
+
 def _season(now: datetime) -> dict:
     local = now.astimezone(ZoneInfo(ptc.SEASON_TZ))
     nxt = (local.replace(day=28) + timedelta(days=4)).replace(day=1, hour=0, minute=0, second=0, microsecond=0)
@@ -34,7 +52,18 @@ def _season(now: datetime) -> dict:
         "keep_pct": round(ptc.SEASON_KEEP * 100),
         "start": ptc.START,
         "ranks": [{"from": floor, "name": name} for floor, name in ptc.RANKS],
+        "min_fights": ptc.SEASON_MIN_FIGHTS,
+        "prizes": [
+            {"place": place, "title": title_name(title_id), "gems": gems}
+            for place, (title_id, gems) in sorted(ptc.SEASON_PRIZES.items())
+        ],
     }
+
+
+def title_name(title_id: str) -> str:
+    from services import title_service
+
+    return title_service.name_of(title_id)
 
 
 def _next_decay_minutes(c: Character, now: datetime) -> int | None:
@@ -99,8 +128,11 @@ async def handle_get(request: web.Request) -> web.Response:
         )
         for w in wanted:
             w["crown_frame"] = frames.get(w["id"])
+        medals = await pts_service.season_medals(db, now)
+        recap = _recap_json(await pts_service.season_recap(db, character, now))
         data = {
             "season": _season(now),
+            "recap": recap,
             "me": {
                 "pts": character.pts, "rank": pts_service.rank_name(character.pts), "place": my_rank, "rated_total": rated_total or 0, "fought": fought,
                 "marks": my_marks,
@@ -119,7 +151,8 @@ async def handle_get(request: web.Request) -> web.Response:
                 {"rank": e.rank, "name": e.name, "value": e.value, "premium": e.premium,
                  "base_class": e.base_class, "subclass": e.subclass,
                  "title": e.title, "title_tier": e.title_tier,
-                 "crown_frame": frames.get(e.character_id)}
+                 "crown_frame": frames.get(e.character_id),
+                 "season_medal": medals.get(e.character_id)}
                 for e in rating
             ],
         }
@@ -220,7 +253,19 @@ async def handle_post_contracts(request: web.Request) -> web.Response:
     return web.json_response(state)
 
 
+async def handle_post_season_seen(request: web.Request) -> web.Response:
+    """Катсцена итога сезона досмотрена (или пропущена) - больше не показывать."""
+    async with request.app[SESSION_FACTORY_KEY]() as db:
+        character = await onboarding_svc.get_character(db, request[VK_USER_ID_KEY])
+        if character is None:
+            return web.json_response({"error": "character_not_found"}, status=404)
+        character.pvp_season_seen = pts_service.season_key()
+        await db.commit()
+    return web.json_response({"ok": True})
+
+
 def register_routes(app: web.Application) -> None:
     app.router.add_get("/api/miniapp/board", handle_get)
+    app.router.add_post("/api/miniapp/board/season_seen", handle_post_season_seen)
     app.router.add_get("/api/miniapp/contracts", handle_get_contracts)
     app.router.add_post("/api/miniapp/contracts", handle_post_contracts)

@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react';
 import { Div, Group, Header, Placeholder, TabsItem } from '@vkontakte/vkui';
 import Tabs from './ScrollTabs.jsx';
-import { getBoard } from '../api.js';
+import { getBoard, markSeasonSeen } from '../api.js';
 import ClassIcon from './ClassIcon.jsx';
+import SeasonScene from './SeasonScene.jsx';
 import ContractsSection from './ContractsSection.jsx';
 import Skeleton from './Skeleton.jsx';
 import { Bar, Empty, Podium, SectionHead } from './ui.jsx';
@@ -112,7 +113,7 @@ function Rating({ data }) {
         {rating.length === 0 && <Empty icon="🕯️">В этом сезоне ещё никто не дрался в PvP.</Empty>}
         {rating.length > 0 && (
           <Podium
-            entries={rating.slice(0, 3).map((e) => ({ key: e.rank, name: e.name, value: e.value.split(' · ')[0], raw: e, sub: e.value.split(' · ')[1] }))}
+            entries={rating.slice(0, 3).map((e) => ({ key: e.rank, name: (e.season_medal ? `${e.season_medal} ` : '') + e.name, value: e.value.split(' · ')[0], raw: e, sub: e.value.split(' · ')[1] }))}
             renderBadge={(e, place) => (
               <ClassIcon subclass={e.raw.subclass} baseClass={e.raw.base_class} crown={e.raw.crown_frame || null} size={place === 1 ? 64 : 52} />
             )}
@@ -126,7 +127,8 @@ function Rating({ data }) {
                 {/* Рамка венца, которую носит игрок (своя у каждого). */}
                 <ClassIcon subclass={e.subclass} baseClass={e.base_class} crown={e.crown_frame || null} size={40} />
                 <span className="top-who">
-                  <span className="top-name">{e.premium && '💠 '}{e.name}</span>
+                  {/* Значок - место в прошлом сезоне PvP (2026-10-30). */}
+                  <span className="top-name">{e.premium && '💠 '}{e.season_medal && `${e.season_medal} `}{e.name}</span>
                   {e.title && <span className={`top-title title-tier title-tier--${e.title_tier || 'common'}`}>«{e.title}»</span>}
                 </span>
               </span>
@@ -150,6 +152,20 @@ function Season({ data }) {
         kind="board" icon="📅" value={`${season.days_left} дн.`} label={`до конца сезона «${season.name}»`}
         aside={<>{me.rank}<br /><small>{money(me.pts)} PTS</small></>}
       />
+      {season.prizes && (
+        <Group header={<Header>Награды сезона</Header>}>
+          <Div className="craft-hint">
+            Пятёрка лучших по PTS среди тех, кто провёл за сезон не меньше {season.min_fights} PvP-боёв
+            (арена не в счёт). Титул держится весь следующий сезон.
+          </Div>
+          {season.prizes.map((p) => (
+            <div className="stat-row" key={p.place}>
+              <span className="stat-row__label">{p.place} место · «{p.title}»</span>
+              <span className="stat-row__value">💎 {money(p.gems)}</span>
+            </div>
+          ))}
+        </Group>
+      )}
       <Group header={<Header>Ранги</Header>}>
         {next && (
           <div className="milestone">
@@ -186,6 +202,8 @@ export default function BoardTab() {
   const [section, setSection] = useState('wanted');
   const [data, setData] = useState(null);
   const [status, setStatus] = useState('loading');
+  // Итог прошлого сезона - катсцена один раз (2026-10-30).
+  const [recap, setRecap] = useState(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -193,14 +211,22 @@ export default function BoardTab() {
       .then((res) => {
         if (cancelled) return;
         setData(res);
+        setRecap(res.recap || null);
         setStatus('ready');
       })
       .catch(() => !cancelled && setStatus('error'));
     return () => { cancelled = true; };
   }, []);
 
+  const recapDone = () => {
+    setRecap(null);
+    setSection('rating');
+    markSeasonSeen().catch(() => {});
+  };
+
   return (
     <>
+      {recap && <SeasonScene recap={recap} onDone={recapDone} />}
       <Tabs>
         {SECTIONS.map((s) => (
           <TabsItem key={s.id} selected={section === s.id} onClick={() => setSection(s.id)}>{s.title}</TabsItem>

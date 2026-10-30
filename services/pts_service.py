@@ -8,15 +8,17 @@
 
 from __future__ import annotations
 
+from collections import Counter
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from zoneinfo import ZoneInfo
 
-from sqlalchemy import or_, update
+from sqlalchemy import case, delete, or_, select, update
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from game.economy import pts_config as pc
-from models import Character
+from models import Character, CharacterTitle, PvpBattle, PvpSeasonResult
 
 NO_LEVEL = "level"     # жертва слабее на LEVEL_GAP+ уровней
 NO_GAP = "gap"         # у победителя на CUTOFF+ PTS больше
@@ -140,16 +142,126 @@ def season_key(now: datetime | None = None) -> str:
     return f"{now.year:04d}-{now.month:02d}"
 
 
+def season_bounds(key: str) -> tuple[datetime, datetime]:
+    """Начало и конец сезона «ГГГГ-ММ» (по Москве)."""
+    tz = ZoneInfo(pc.SEASON_TZ)
+    year, month = (int(x) for x in key.split("-"))
+    start = datetime(year, month, 1, tzinfo=tz)
+    end = datetime(year + month // 12, month % 12 + 1, 1, tzinfo=tz)
+    return start, end
+
+
+async def season_fights(db: AsyncSession, key: str) -> Counter:
+    """Сколько PvP-боёв за сезон провёл каждый (character_id -> боёв)."""
+    start, end = season_bounds(key)
+    rows = (await db.scalars(select(PvpBattle.participant_ids).where(
+        PvpBattle.started_at >= start, PvpBattle.started_at < end,
+    ))).all()
+    return Counter(int(cid) for ids in rows for cid in ids)
+
+
+async def season_close(db: AsyncSession, now: datetime | None = None) -> list[PvpSeasonResult]:
+    """Итог прошлого сезона - ДО сжатия рейтинга (зовёт season_rollover).
+    Пятёрка лучших по PTS среди тех, кто провёл SEASON_MIN_FIGHTS боёв:
+    титул на следующий сезон и самоцветы. Сезонные титулы прошлых
+    победителей снимаются. Пусто - закрывать нечего или уже закрыто."""
+    from services import title_service, wallet_service
+
+    key = season_key(now)
+    prev = await db.scalar(select(Character.pts_season).where(
+        Character.pts_season.is_not(None), Character.pts_season != key,
+    ).limit(1))
+    if prev is None:
+        return []
+    fights = await season_fights(db, prev)
+    rows = (await db.scalars(select(Character).where(
+        Character.pts_season == prev, Character.creation_state.is_(None),
+    ).order_by(Character.pts.desc(), Character.id))).all()
+    top = [c for c in rows if fights[c.id] >= pc.SEASON_MIN_FIGHTS][:len(pc.SEASON_PRIZES)]
+    results = [
+        PvpSeasonResult(
+            season=prev, place=place, character_id=c.id, pts=c.pts, fights=fights[c.id],
+            title_id=pc.SEASON_PRIZES[place][0], gems=pc.SEASON_PRIZES[place][1],
+        )
+        for place, c in enumerate(top, start=1)
+    ]
+    if results:
+        # Сначала запись итога: второй одновременный вызов упрётся в
+        # уникальность места и ничего не выдаст и не снимет.
+        try:
+            async with db.begin_nested():
+                db.add_all(results)
+                await db.flush()
+        except IntegrityError:
+            return []
+    await db.execute(update(Character).where(Character.active_title_id.in_(pc.SEASON_TITLES))
+                     .values(active_title_id=None).execution_options(synchronize_session=False))
+    await db.execute(delete(CharacterTitle).where(CharacterTitle.title_id.in_(pc.SEASON_TITLES)))
+    for result, character in zip(results, top):
+        await db.refresh(character, ["active_title_id"])
+        await title_service.unlock(db, character, result.title_id)
+        # Сезонный титул надевается сразу: он на месяц, и его должны видеть.
+        character.active_title_id = result.title_id
+        await wallet_service.deposit(db, character.id, "donate", result.gems, taxable=False,
+                                     reason="pts_service.season_close")
+    await db.flush()
+    return results
+
+
+def previous_key(key: str) -> str:
+    year, month = (int(x) for x in key.split("-"))
+    return f"{year - (month == 1):04d}-{(month - 2) % 12 + 1:02d}"
+
+
+async def season_recap(db: AsyncSession, character: Character, now: datetime | None = None) -> dict | None:
+    """Итог прошлого сезона для катсцены - пока игрок его не посмотрел.
+    None - уже видел или в прошлом сезоне его не было."""
+    key = season_key(now)
+    if character.pvp_season_seen == key or character.pts_prev is None or character.pts_season != key:
+        return None
+    prev = previous_key(key)
+    rows = (await db.execute(
+        select(PvpSeasonResult, Character.name)
+        .join(Character, Character.id == PvpSeasonResult.character_id)
+        .where(PvpSeasonResult.season == prev).order_by(PvpSeasonResult.place)
+    )).all()
+    mine = next((r for r, _ in rows if r.character_id == character.id), None)
+    return {
+        "season": prev, "next": key, "min_fights": pc.SEASON_MIN_FIGHTS,
+        "top": [{"place": r.place, "name": name, "pts": r.pts, "title_id": r.title_id} for r, name in rows],
+        "me": {
+            "place": mine.place if mine else None,
+            "title_id": mine.title_id if mine else None,
+            "gems": mine.gems if mine else 0,
+            "pts_was": character.pts_prev,
+            "pts_now": character.pts,
+        },
+    }
+
+
+async def season_medals(db: AsyncSession, now: datetime | None = None) -> dict[int, str]:
+    """character_id -> значок за место в прошлом сезоне (весь текущий)."""
+    prev = previous_key(season_key(now))
+    rows = (await db.execute(select(PvpSeasonResult.character_id, PvpSeasonResult.place).where(
+        PvpSeasonResult.season == prev, PvpSeasonResult.place.in_(list(pc.SEASON_MEDALS)),
+    ))).all()
+    return {cid: pc.SEASON_MEDALS[place] for cid, place in rows}
+
+
 async def season_rollover(db: AsyncSession, now: datetime | None = None) -> int:
     """Новый сезон: рейтинг всех, кто ещё в прошлом, сжимается к START.
-    Безопасно звать часто - тронет только тех, у кого сезон не текущий."""
+    Безопасно звать часто - тронет только тех, у кого сезон не текущий.
+    Перед сжатием - итог и награды прошлого сезона (season_close)."""
     key = season_key(now)
+    await season_close(db, now)
     result = await db.execute(
         update(Character)
         .where(or_(Character.pts_season.is_(None), Character.pts_season != key))
         .values(
             pts=pc.START + (Character.pts - pc.START) * pc.SEASON_KEEP,
             pts_season=key,
+            # Новичок без сезона - без итога: показывать ему нечего.
+            pts_prev=case((Character.pts_season.is_(None), None), else_=Character.pts),
         )
         .execution_options(synchronize_session=False)
     )

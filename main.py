@@ -129,6 +129,9 @@ async def _pts_season_job() -> None:
     async with get_session_factory()() as db:
         await pts_service.season_rollover(db)
         await db.commit()
+    from bot.handlers import pvp_results
+
+    await pvp_results.notify_season_results()
 
 
 async def _vk_names_job(api) -> None:

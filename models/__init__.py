@@ -45,7 +45,7 @@ from models.mining import CharacterCraftTool, CharacterOre, MineVein, MiningEven
 from models.payment import GemPayment
 from models.mount import CharacterMount, MountTravel, TurboIshakDay
 from models.promo import PromoActivation, PromoCode
-from models.pvp import PvpBattle
+from models.pvp import PvpBattle, PvpSeasonResult
 from models.quest import CharacterQuest, Quest
 from models.raid import RaidLobby, RaidLobbyMember, RaidRun
 from models.scene_event import CharacterEventEffect, EventTrail
@@ -65,6 +65,7 @@ from models.voyage import CharacterVoyage
 from models.world_boss import WorldBoss, WorldBossContribution, WorldBossMeter
 
 __all__ = [
+    "PvpSeasonResult",
     "WalletLog",
     "MarketInbox",
     "MarketOrder",

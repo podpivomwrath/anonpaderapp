@@ -239,6 +239,11 @@ export async function getBoard() {
   return request('/board');
 }
 
+// Катсцена итога сезона PvP досмотрена (2026-10-30).
+export function markSeasonSeen() {
+  return request('/board/season_seen', { method: 'POST' });
+}
+
 export async function getLeaderboard(board) {
   return request(`/leaderboard?board=${encodeURIComponent(board)}`);
 }
