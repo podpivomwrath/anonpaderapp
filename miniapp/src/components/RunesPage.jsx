@@ -254,10 +254,11 @@ export function RuneRing({ data, onOpen }) {
       {data.hero.map((s, i) => {
         const angle = (Math.PI * 2 * i) / data.hero.length - Math.PI / 2;
         const x = 50 + 37 * Math.cos(angle);
-        const y = 46.5 + 20 * Math.sin(angle);
+        const y = 46 + 24 * Math.sin(angle);
         return (
           <span key={s.slot} className={`rune-ring__dot${s.open ? '' : ' rune-ring__dot--locked'}`} style={{ left: `${x}%`, top: `${y}%` }}>
-            {s.rune ? <RuneIcon rune={s.rune} size={26} /> : null}
+            <img src={RUNE_ART[s.open ? 'socket_hero' : 'socket_lock']} alt="" draggable="false" />
+            {s.rune && <RuneIcon rune={s.rune} size={22} />}
           </span>
         );
       })}

@@ -1056,29 +1056,39 @@ body.lite .sparks {
 }
 
 /* --- Руны (2026-10-31): страница на «Герое» и круг под ногами силуэта --- */
+/* Круг - отдельным блоком под силуэтом (владелец: «сделать раздельными»).
+   Края картинки растворяются в фоне маской, чёрное уходит через lighten -
+   прямоугольника не видно; пустая темнота сверху и снизу обрезана. */
 .rune-ring {
   position: relative;
   display: block;
-  width: min(100%, 420px);
-  margin: -46px auto 0;
+  width: min(92%, 380px);
+  margin: 6px auto -14px;
   padding: 0;
   border: 0;
   background: none;
-  aspect-ratio: 2 / 1;
+  aspect-ratio: 2.4 / 1;
   cursor: pointer;
 }
-.rune-ring__bg { width: 100%; height: 100%; object-fit: cover; opacity: 0.9; pointer-events: none; }
+.rune-ring__bg {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  pointer-events: none;
+  mix-blend-mode: lighten;
+  -webkit-mask-image: radial-gradient(ellipse 50% 50% at 50% 46%, #000 60%, transparent 100%);
+  mask-image: radial-gradient(ellipse 50% 50% at 50% 46%, #000 60%, transparent 100%);
+}
 .rune-ring__dot {
   position: absolute;
-  width: 26px;
-  height: 26px;
-  margin: -13px 0 0 -13px;
-  border-radius: 50%;
-  background: rgba(240, 170, 80, 0.16);
-  box-shadow: 0 0 8px rgba(240, 160, 70, 0.35);
+  width: 30px;
+  height: 30px;
+  margin: -15px 0 0 -15px;
+  pointer-events: none;
 }
-.rune-ring__dot--locked { background: rgba(0, 0, 0, 0.45); box-shadow: none; opacity: 0.6; }
-.rune-ring__dot .rune-icon { border-radius: 50%; }
+.rune-ring__dot img { position: absolute; inset: 0; width: 100%; height: 100%; border-radius: 50%; }
+.rune-ring__dot .rune-icon { position: absolute; inset: 4px; width: 22px; height: 22px; filter: drop-shadow(0 0 4px rgba(240, 160, 70, 0.7)); }
+.rune-ring__dot--locked { width: 24px; height: 24px; margin: -12px 0 0 -12px; opacity: 0.9; }
 
 .runes { display: flex; flex-direction: column; gap: 10px; padding: 0 12px 12px; }
 .rune-warn { margin: 0; padding: 8px 10px; border-radius: 10px; background: var(--blood-soft); font-size: 13px; }
