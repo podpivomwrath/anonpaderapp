@@ -75,7 +75,7 @@
     },
     {
       "id": "mage_blood_seal",
-      "name": "Кровавая печать",
+      "name": "Стихийная печать",
       "multiplier": 0.9,
       "cd": 4,
       "effect": "target_vuln",

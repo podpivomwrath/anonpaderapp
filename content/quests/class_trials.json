@@ -107,6 +107,6 @@
   {"id": "mage_path_thrift", "buff_id": "mage_path_thrift", "subclass": "mage_path", "condition_type": "win_count_skills_only", "params": {"count": 10}, "text": "Победи 10 тварей, используя только навыки, без обычной атаки."},
   {"id": "mage_path_sharp_shards", "buff_id": "mage_path_sharp_shards", "subclass": "mage_path", "condition_type": "kill_count_in_ring", "params": {"count": 25, "ring_min": 31, "ring_max": 45}, "text": "Убей 25 мобов 31-45 уровня."},
   {"id": "mage_path_hard_ice", "buff_id": "mage_path_hard_ice", "subclass": "mage_path", "condition_type": "win_count_control_each_fight", "params": {"count": 5}, "text": "Победи 5 тварей, в каждом бою хоть раз сковав врага льдом."},
-  {"id": "mage_path_deep_seal", "buff_id": "mage_path_deep_seal", "subclass": "mage_path", "condition_type": "win_count_debuff_skill_each_fight", "params": {"count": 5}, "text": "Победи 5 тварей, в каждом бою наложив Кровавую печать."},
+  {"id": "mage_path_deep_seal", "buff_id": "mage_path_deep_seal", "subclass": "mage_path", "condition_type": "win_count_debuff_skill_each_fight", "params": {"count": 5}, "text": "Победи 5 тварей, в каждом бою наложив Стихийную печать."},
   {"id": "mage_path_long_seal", "buff_id": "mage_path_long_seal", "subclass": "mage_path", "condition_type": "defeat_higher_level", "params": {}, "text": "Победи моба или игрока выше тебя уровнем (рейдовый босс тоже засчитывается)."}
 ]
