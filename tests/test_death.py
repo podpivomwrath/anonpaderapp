@@ -2,10 +2,19 @@
 
 from datetime import datetime, timedelta, timezone
 
+import pytest
+
 from game.combat import balance_config as bc
+from game.economy import prerelease_config
 from services.death_service import apply_death, is_dead, respawn_if_ready
 
 NOW = datetime(2026, 7, 16, 12, 0, 0, tzinfo=timezone.utc)
+
+
+@pytest.fixture(autouse=True)
+def _no_gift(monkeypatch):
+    """Базовые сроки - без Дара первопроходцев (он делит их пополам)."""
+    monkeypatch.setattr(prerelease_config, "ACTIVE", False)
 
 
 async def test_death_costs_experience_and_time(db_session, make_character) -> None:
@@ -29,3 +38,11 @@ async def test_dead_then_respawn(db_session, make_character) -> None:
     assert respawn_if_ready(character, now=NOW + timedelta(minutes=2))
     assert character.respawn_at is None
     assert not is_dead(character, now=NOW + timedelta(minutes=2))
+
+
+async def test_pioneer_gift_halves_respawn(db_session, make_character, monkeypatch) -> None:
+    monkeypatch.setattr(prerelease_config, "ACTIVE", True)
+    character = await make_character(level=bc.MAX_LEVEL)
+    apply_death(character, now=NOW)
+    assert character.respawn_at == NOW + timedelta(minutes=15)
+    assert any("Воскрешение" in line for line in prerelease_config.card()["lines"])

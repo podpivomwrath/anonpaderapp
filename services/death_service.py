@@ -50,10 +50,13 @@ def tincture_active(character: Character, now: datetime | None = None) -> bool:
 
 
 def _respawn_minutes(character: Character) -> float:
-    """Часовня гильдии и древо сокращают ожидание."""
+    """Часовня гильдии и древо сокращают ожидание, Дар первопроходцев -
+    ещё вдвое (2026-10-30)."""
+    from game.economy import prerelease_config
     from services import guild_territory_service
 
-    return respawn_time_minutes(character.level) * guild_territory_service.respawn_multiplier(character)
+    return (respawn_time_minutes(character.level) * guild_territory_service.respawn_multiplier(character)
+            * prerelease_config.respawn_mult())
 
 
 def is_dead(character: Character, now: datetime | None = None) -> bool:
