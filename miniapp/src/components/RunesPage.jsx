@@ -77,6 +77,7 @@ function RuneInfo({ rune }) {
   return (
     <div className="rune-info">
       <p className="rune-info__text">{rune.text}</p>
+      {rune.class_note && <p className="rune-info__text">{rune.class_note}</p>}
       <small className="rune-info__meta">
         {rune.rarity_title}, {PVP[rune.pvp]}
         {rune.tag ? `, только в ${rune.tag}` : ''}
