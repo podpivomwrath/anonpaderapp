@@ -46,3 +46,22 @@ async def test_no_attacking_a_groupmate(db_session, make_character) -> None:
     assert await pvp._same_group(db_session, a, b.id)
     assert not await pvp._same_group(db_session, a, c.id)
     assert await group_service.get_membership(db_session, c.id) is None
+
+
+async def test_guildmates_do_not_fight_in_open_pvp(db_session, make_character) -> None:
+    """2026-10-31: открытого PvP между согильдийцами нет - только арена."""
+    from models import Guild
+
+    guild = Guild(name="Свои", tag="СВО")
+    db_session.add(guild)
+    await db_session.flush()
+    a = await make_character(level=60)
+    b = await make_character(level=60)
+    c = await make_character(level=60)
+    stranger = await make_character(level=60)
+    a.guild_id = b.guild_id = c.guild_id = guild.id
+    await db_session.flush()
+    assert await pvp._guildmate_ids(db_session, a, [b.id, stranger.id, a.id]) == {b.id}
+    assert await pvp._guildmate_ids(db_session, stranger, [a.id]) == set()
+    assert await pvp._guildmate_sides(db_session, a, _battle({b.id: 1, stranger.id: 0})) == {2}
+    assert await pvp._guildmate_sides(db_session, a, _battle({b.id: 0, c.id: 1})) == {1, 2}

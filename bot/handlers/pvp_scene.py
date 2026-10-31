@@ -213,6 +213,32 @@ async def _same_group(db, character, other_id: int) -> bool:
     return mine is not None and theirs is not None and mine.group_id == theirs.group_id
 
 
+#: Открытого PvP между согильдийцами нет (2026-10-31, владелец: набивка PTS
+#: на своих). Подраться со своими - только на арене таверны.
+GUILDMATE_NO_PVP_TEXT = "Это твой согильдиец - со своими дерутся только на арене в таверне."
+GUILDMATE_IN_GROUP_TEXT = "В группе, на которую нападаешь, твой согильдиец - со своими дерутся только на арене в таверне."
+GUILDMATES_BOTH_SIDES_TEXT = "Согильдийцы бьются на обеих сторонах - вступить можно только против своих, а это нельзя."
+
+
+async def _guildmate_ids(db, character, ids) -> set[int]:
+    """Кто из ids в одной гильдии с персонажем (сам он не в счёт)."""
+    if character.guild_id is None:
+        return set()
+    ids = [cid for cid in ids if cid != character.id]
+    if not ids:
+        return set()
+    rows = await db.scalars(
+        select(Character.id).where(Character.id.in_(ids), Character.guild_id == character.guild_id)
+    )
+    return set(rows)
+
+
+async def _guildmate_sides(db, character, battle: pvp.Battle) -> set[int]:
+    """Стороны (1/2), на которых бьются согильдийцы персонажа."""
+    mates = await _guildmate_ids(db, character, list(battle.participants))
+    return {battle.side_of.get(cid, 0) + 1 for cid in mates}
+
+
 async def _groupmate_side(db, character, battle: pvp.Battle) -> int | None:
     """Сторона (1/2), на которой бьются согруппники персонажа. None - их в
     бою нет или они на обеих сторонах."""

@@ -558,6 +558,18 @@ async def attack_command(message: Message, target: str) -> None:
         if victim is not None and await _same_group(db, character, victim.id):
             await message.answer(GROUPMATE_NO_PVP_TEXT)
             return
+        if victim is not None and await _guildmate_ids(db, character, [victim.id]):
+            await message.answer(GUILDMATE_NO_PVP_TEXT)
+            return
+        if victim is not None and await _guildmate_in_fighting_group(db, character, victim):
+            await message.answer(GUILDMATE_IN_GROUP_TEXT)
+            return
+        guild_sides: set[int] = set()
+        if battle_entry is not None and battle_entry[1].side_guilds is None:
+            guild_sides = await _guildmate_sides(db, character, battle_entry[1])
+            if len(guild_sides) > 1:
+                await message.answer(GUILDMATES_BOTH_SIDES_TEXT)
+                return
 
         # Напал сам - свой щит теряешь: прячась за ним, не нападают.
         pvp_shield.drop(character.id)
@@ -566,6 +578,8 @@ async def attack_command(message: Message, target: str) -> None:
             # Согруппник уже в бою - сразу на его сторону, без вопроса
             # (2026-10-13). Согруппники на обеих сторонах - спрашиваем.
             side = await _groupmate_side(db, character, battle)
+            if side is None and guild_sides:
+                side = next(iter(guild_sides))  # к своим, без вопроса
             if side is not None:
                 await db.commit()  # своя сессия у вступления ждала бы эту строку
                 await _handle_join_choice(message, battle_id, side)
@@ -582,6 +596,23 @@ async def attack_command(message: Message, target: str) -> None:
             await message.answer("Здесь нет такой цели.")
             return
         await _start_forced_duel(db, character, peer_id, victim, victim_peer_id)
+
+
+async def _guildmate_in_fighting_group(db, attacker, victim) -> bool:
+    """Жертва дерётся с мобами в группе, и в группе согильдиец нападающего:
+    нападение втянуло бы его в бой против своих."""
+    from bot.handlers import group_combat
+    from services import group_service
+
+    if attacker.guild_id is None:
+        return False
+    victim_peer = await onboarding_svc.vk_id_for_character(db, victim.id)
+    if victim_peer is None or not group_combat.has_active_group_battle(victim_peer):
+        return False
+    group = await group_service.get_group_snapshot(db, victim.id)
+    if group is None:
+        return False
+    return bool(await _guildmate_ids(db, attacker, [m.id for m in group.members]))
 
 
 async def _start_forced_duel(db, attacker, attacker_peer_id, victim, victim_peer_id) -> None:
@@ -850,6 +881,17 @@ async def _handle_join_choice(message: Message, battle_id, side) -> None:
         mate_side = await _groupmate_side(db, character, battle)
         if mate_side is not None and battle.side_guilds is None:
             side = mate_side
+        if battle.side_guilds is None:
+            guild_sides = await _guildmate_sides(db, character, battle)
+            if len(guild_sides) > 1:
+                await message.answer(GUILDMATES_BOTH_SIDES_TEXT)
+                return
+            if guild_sides and side not in guild_sides:
+                if mate_side is not None:
+                    # Согруппник на одной стороне, согильдиец на другой.
+                    await message.answer(GUILDMATES_BOTH_SIDES_TEXT)
+                    return
+                side = next(iter(guild_sides))
         if battle.side_guilds is not None:
             if character.guild_id not in battle.side_guilds:
                 await message.answer("Это осада - чужим в ней места нет.")
@@ -1406,6 +1448,9 @@ from bot.handlers.pvp_results import (  # noqa: E402,F401
 # Старые адреса (pvp.X в других модулях и тестах) работают через ссылку.
 from bot.handlers.pvp_scene import (  # noqa: E402,F401
     GROUPMATE_NO_PVP_TEXT,
+    GUILDMATE_IN_GROUP_TEXT,
+    GUILDMATE_NO_PVP_TEXT,
+    GUILDMATES_BOTH_SIDES_TEXT,
     TARGET_GONE_TEXT,
     _afk_target_named,
     _battle_roster_text,
@@ -1415,6 +1460,8 @@ from bot.handlers.pvp_scene import (  # noqa: E402,F401
     _class_line,
     _groupmate_side,
     _guild_tags,
+    _guildmate_ids,
+    _guildmate_sides,
     _looked_entry,
     _remember_look,
     _resolve_target,
