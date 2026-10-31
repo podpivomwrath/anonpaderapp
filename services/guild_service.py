@@ -243,22 +243,42 @@ def _validate_name(name: str, tag: str) -> None:
         raise GuildError("Такое название не пройдёт.")
 
 
-def rejoin_wait_hours(character: Character, now: datetime | None = None) -> float:
+def rejoin_wait_hours(character: Character, now: datetime | None = None, guild_id: int | None = None) -> float:
+    """Сколько ждать до вступления. guild_id - та гильдия, из которой ушёл:
+    в неё ждать SAME_GUILD_REJOIN_DAYS, в любую другую - REJOIN_COOLDOWN_HOURS."""
     left_at = aware(character.guild_left_at)
     if left_at is None:
         return 0.0
-    ready = left_at + timedelta(hours=gc.REJOIN_COOLDOWN_HOURS)
+    hours = gc.REJOIN_COOLDOWN_HOURS
+    if guild_id is not None and guild_id == getattr(character, "guild_left_id", None):
+        hours = gc.SAME_GUILD_REJOIN_DAYS * 24
+    ready = left_at + timedelta(hours=hours)
     remaining = (ready - (now or now_utc())).total_seconds() / 3600
     return max(0.0, remaining)
 
 
-def _check_free(character: Character) -> None:
+def pvp_ties(character, now: datetime | None = None) -> set[int]:
+    """Гильдии, чьи члены для открытого PvP - свои: нынешняя и та, из
+    которой ушёл меньше EX_GUILDMATE_PVP_HOURS назад."""
+    ties = {character.guild_id} if character.guild_id is not None else set()
+    left_id, left_at = getattr(character, "guild_left_id", None), aware(getattr(character, "guild_left_at", None))
+    if left_id is not None and left_at is not None:
+        if (now or now_utc()) - left_at < timedelta(hours=gc.EX_GUILDMATE_PVP_HOURS):
+            ties.add(left_id)
+    return ties
+
+
+def _check_free(character: Character, guild_id: int | None = None) -> None:
     if character.guild_id is not None:
         raise GuildError("Ты уже в гильдии.")
     if character.level < gc.JOIN_MIN_LEVEL:
         raise GuildError(f"В гильдии вступают с {gc.JOIN_MIN_LEVEL} уровня.")
-    wait = rejoin_wait_hours(character)
+    wait = rejoin_wait_hours(character, guild_id=guild_id)
     if wait > 0:
+        if guild_id is not None and guild_id == getattr(character, "guild_left_id", None):
+            days = wait / 24
+            when = f"{max(1, round(days))} дн." if days >= 1 else f"{max(1, round(wait))} ч."
+            raise GuildError(f"В гильдию, из которой ушёл, вернуться можно через {when}")
         raise GuildError(f"После ухода из гильдии вступить можно через {max(1, round(wait))} ч.")
 
 
@@ -293,7 +313,7 @@ async def create(db: AsyncSession, character: Character, name: str, tag: str) ->
 
 
 async def _join(db: AsyncSession, guild: Guild, character: Character) -> None:
-    _check_free(character)
+    _check_free(character, guild.id)
     if await member_count(db, guild.id) >= gc.member_cap(guild.level):
         raise GuildError("В гильдии нет мест.")
     db.add(GuildMember(guild_id=guild.id, character_id=character.id, rank=gc.RANK_RECRUIT))
@@ -359,7 +379,7 @@ REFUSED = "refused"
 
 
 async def apply(db: AsyncSession, character: Character, guild_id: int) -> Guild:
-    _check_free(character)
+    _check_free(character, guild_id)
     guild = await db.get(Guild, guild_id)
     if guild is None:
         raise GuildError("Такой гильдии нет.")
@@ -458,6 +478,7 @@ async def _remove_member(db: AsyncSession, member: GuildMember, character: Chara
     character.guild_id = None
     character.guild_perks = {}
     character.guild_left_at = now_utc()
+    character.guild_left_id = member.guild_id
     character.prayer_stat = None
     character.prayer_until = None
     await db.flush()

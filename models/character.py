@@ -275,6 +275,8 @@ class Character(Base):
     rune_effects: Mapped[dict] = mapped_column(JSON, default=dict, server_default="{}")
     # Когда последний раз ушёл из гильдии - защита от прыжков.
     guild_left_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    # Из какой гильдии ушёл (2026-10-31): возврат туда и бывшие свои в PvP.
+    guild_left_id: Mapped[int | None] = mapped_column(nullable=True)
     # Молитва в часовне: какая характеристика и до какого момента.
     prayer_stat: Mapped[str | None] = mapped_column(String(3), nullable=True)
     prayer_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)

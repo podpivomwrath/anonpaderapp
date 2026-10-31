@@ -604,8 +604,6 @@ async def _guildmate_in_fighting_group(db, attacker, victim) -> bool:
     from bot.handlers import group_combat
     from services import group_service
 
-    if attacker.guild_id is None:
-        return False
     victim_peer = await onboarding_svc.vk_id_for_character(db, victim.id)
     if victim_peer is None or not group_combat.has_active_group_battle(victim_peer):
         return False

@@ -815,3 +815,21 @@ async def test_warehouse_goods_herbs_fish_food_elixirs(db_session, make_characte
     assert dict((h.id, n) for h, n in await herb_service.get_bag(db_session, leader.id))["bitter_wormwood"] == 4
     with pytest.raises(GuildError):
         await guild_stock_service.deposit(db_session, leader, "trophy", "x", "", 1)
+
+
+async def test_same_guild_rejoin_waits_a_week(db_session, make_character) -> None:
+    """2026-10-31: в другую гильдию - через сутки, в ту же - через неделю."""
+    from datetime import timedelta
+
+    guild, leader = await _found(db_session, make_character)
+    newbie = await make_character(level=20)
+    await guild_service.invite(db_session, leader, newbie.name)
+    await guild_service.accept_invite(db_session, newbie, guild.id)
+    await guild_service.leave(db_session, newbie)
+    assert newbie.guild_left_id == guild.id
+    newbie.guild_left_at = guild_service.now_utc() - timedelta(hours=25)
+    assert guild_service.rejoin_wait_hours(newbie) == 0
+    assert guild_service.rejoin_wait_hours(newbie, guild_id=guild.id) == pytest.approx(24 * 7 - 25, abs=0.1)
+    await guild_service.invite(db_session, leader, newbie.name)
+    with pytest.raises(GuildError, match="дн"):
+        await guild_service.accept_invite(db_session, newbie, guild.id)

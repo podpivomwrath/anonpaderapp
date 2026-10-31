@@ -65,3 +65,26 @@ async def test_guildmates_do_not_fight_in_open_pvp(db_session, make_character) -
     assert await pvp._guildmate_ids(db_session, stranger, [a.id]) == set()
     assert await pvp._guildmate_sides(db_session, a, _battle({b.id: 1, stranger.id: 0})) == {2}
     assert await pvp._guildmate_sides(db_session, a, _battle({b.id: 0, c.id: 1})) == {1, 2}
+
+
+async def test_ex_guildmates_stay_own_for_48_hours(db_session, make_character) -> None:
+    """2026-10-31: ушедший 48 часов - свой для бывшей гильдии в открытом PvP."""
+    from datetime import timedelta
+    from models import Guild
+    from services import guild_service
+    from services.guild_service import now_utc
+
+    guild = Guild(name="Бывшие", tag="БЫВ")
+    db_session.add(guild)
+    await db_session.flush()
+    stay = await make_character(level=60)
+    left = await make_character(level=60)
+    stay.guild_id = guild.id
+    left.guild_left_id, left.guild_left_at = guild.id, now_utc() - timedelta(hours=47)
+    await db_session.flush()
+    assert await pvp._guildmate_ids(db_session, stay, [left.id]) == {left.id}
+    assert await pvp._guildmate_ids(db_session, left, [stay.id]) == {stay.id}
+    left.guild_left_at = now_utc() - timedelta(hours=49)
+    await db_session.flush()
+    assert await pvp._guildmate_ids(db_session, stay, [left.id]) == set()
+    assert guild_service.pvp_ties(left) == set()
