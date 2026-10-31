@@ -7,6 +7,7 @@
 
 from datetime import datetime, timezone
 
+from sqlalchemy import or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from game.economy import cooking
@@ -92,4 +93,33 @@ async def active(db: AsyncSession, character: Character, now: datetime | None = 
             # Событие может и навредить («Хрип в груди») - плашка красная.
             "bad": any(v < 0 for v in e.modifiers.values()),
         })
+    return out
+
+
+async def expired(db: AsyncSession, since: datetime, now: datetime) -> list[tuple[int, list[str]]]:
+    """Баффы со сроком, кончившиеся в (since, now]: [(id персонажа, строки)].
+    Репорт 262: конец баффа нигде не было видно."""
+    fields = (Character.food_until, Character.bait_until, Character.prayer_until, Character.ash_tincture_until)
+    rows = (await db.scalars(select(Character).where(
+        or_(*[(f > since) & (f <= now) for f in fields]),
+    ))).all()
+
+    def ended(moment: datetime | None) -> bool:
+        moment = _aware(moment)
+        return moment is not None and since < moment <= now
+
+    out = []
+    for c in rows:
+        lines = []
+        if ended(c.food_until) and c.food_dish:
+            d = cooking.dish_def(c.food_dish)
+            lines.append(f"{d.emoji if d else '🍲'} {d.name if d else 'Еда'} - сытость прошла.")
+        if ended(c.bait_until):
+            lines.append("🪱 Прикормка кончилась.")
+        if ended(c.prayer_until):
+            lines.append("🙏 Молитва больше не действует.")
+        if ended(c.ash_tincture_until):
+            lines.append("🫗 Настойка пепла выдохлась: смерть снова отнимает опыт.")
+        if lines:
+            out.append((c.id, lines))
     return out

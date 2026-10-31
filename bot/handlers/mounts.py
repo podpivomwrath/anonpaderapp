@@ -245,6 +245,13 @@ async def _quick_targets(db, character) -> list[tuple[str, int, int]]:
     trail = await scene_event_service.get_trail(db, character.id)
     if trail is not None and scene_event_service.trail_alive(trail):
         targets.append(("🐾 К следу", trail.x, trail.y))
+    # Домой - в родной город (владелец, 2026-10-31). С клеймом в город не
+    # пускают - кнопка была бы только отказом.
+    from services import pk_service
+
+    home = wc.CITY_COORDS.get(character.region) if character.region else None
+    if home is not None and not pk_service.city_banned(character):
+        targets.append((HOME_LABEL, home[0], home[1]))
     here = (character.pos_x, character.pos_y)
     return [t for t in targets if (t[1], t[2]) != here]
 
@@ -257,6 +264,7 @@ def _route_line(safe: bool) -> str:
 
 
 BTN_CHOOSE_MOUNT = "🐎 Выбор маунта"
+HOME_LABEL = "🏠 Домой"
 #: Inline-клавиатура VK: не больше 6 рядов и 10 кнопок.
 MOUNT_LIST_MAX = 6
 
@@ -284,7 +292,10 @@ def _route_keyboard(safe: bool, targets: list[tuple[str, int, int]] | None = Non
     keyboard = Keyboard(inline=True)
     for label, x, y in targets or []:
         keyboard.add(
-            Text(f"{label} ({x}; {y})", payload={"type": "mount_go", "x": x, "y": y}),
+            # Дом - флагом: город сменили, пока кнопка висела в чате, -
+            # ехать в новый (2026-10-31).
+            Text(f"{label} ({x}; {y})", payload={"type": "mount_go", "x": x, "y": y,
+                                                 **({"home": True} if label == HOME_LABEL else {})}),
             color=KeyboardButtonColor.PRIMARY,
         )
         keyboard.row()
@@ -324,9 +335,16 @@ async def route_toggle(message: Message) -> None:
 @labeler.message(payload_contains={"type": "mount_go"}, state=MountCoordState.COORD_INPUT)
 @activity_action
 async def quick_target(message: Message) -> None:
-    """Кнопка быстрой цели (квест, след) - то же, что прислать её координаты."""
+    """Кнопка быстрой цели (квест, след, дом) - то же, что прислать её координаты."""
     payload = message.get_payload_json() or {}
     x, y = payload.get("x"), payload.get("y")
+    if payload.get("home"):
+        async with get_session_factory()() as db:
+            character = await onboarding_svc.get_character(db, message.from_id)
+        home = wc.CITY_COORDS.get(character.region) if character is not None and character.region else None
+        if home is None:
+            return
+        x, y = home
     if not isinstance(x, int) or not isinstance(y, int):
         return
     await _travel_to(message, x, y)

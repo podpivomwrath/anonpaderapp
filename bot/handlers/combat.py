@@ -603,7 +603,8 @@ async def on_battle_finished(session_id: int, result: TickResult) -> None:
             group_block = await group_texts.group_summary_block(db, character.id)
         else:  # моб выиграл или ничья — смерть игрока (авто-респавн по таймеру)
             defeat = await encounter_service.resolve_defeat(db, character)
-            await scene_event_service.finish_fight_effects(db, character.id)
+            # Репорт 262: о конце эффекта - и при поражении, не только в победе.
+            event_lines += await scene_event_service.finish_fight_effects(db, character.id)
             if relic_deal is not None:
                 from game.world import relic_dealer
                 from services import relic_dealer_service
@@ -745,6 +746,8 @@ async def on_battle_finished(session_id: int, result: TickResult) -> None:
         await on_defeat_hook(peer_id, respawn_at, xp_lost, relics_lost, fish_lost)
         if stolen_line:
             await _bot_api.messages.send(peer_id=peer_id, message=stolen_line, random_id=0)
+        if event_lines:
+            await _bot_api.messages.send(peer_id=peer_id, message="\n".join(event_lines), random_id=0)
         if travel_id is not None:
             # патч 25, п.7: смерть в бою нападения отменяет поездку
             from models import MountTravel

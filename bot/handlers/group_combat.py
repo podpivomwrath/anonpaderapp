@@ -868,12 +868,14 @@ async def on_group_battle_finished(session_id: int, result: TickResult) -> None:
         has_mount_by_cid = {}
         positions = {}
         defeats: dict[int, object] = {}
+        ended: dict[int, list[str]] = {}
         for cid in list(battle.participants):
             character = await db.get(Character, cid)
             if character is None:
                 continue
             character.mobs_killed += kills_each
-            await scene_event_service.finish_fight_effects(db, cid)
+            # Репорт 262: строка о конце эффекта события - и в группе.
+            ended[cid] = await scene_event_service.finish_fight_effects(db, cid)
             positions[cid] = (character.pos_x, character.pos_y)
             if cid in survivor_ids:
                 has_mount_by_cid[cid] = await mount_service.has_any_mount(db, cid)
@@ -901,6 +903,8 @@ async def on_group_battle_finished(session_id: int, result: TickResult) -> None:
             pos = positions.get(cid, (0, 0))
             keyboard = movement_keyboard(*pos, p.peer_id, has_mount=has_mount_by_cid.get(cid, False))
             await _bot_api.messages.send(peer_id=p.peer_id, message="🏆 Группа побеждает!", random_id=0)
+            if ended.get(cid):
+                await _bot_api.messages.send(peer_id=p.peer_id, message="\n".join(ended[cid]), random_id=0)
             if dealer_lines.get(cid):
                 await _bot_api.messages.send(peer_id=p.peer_id, message="\n".join(dealer_lines[cid]), random_id=0)
             for buff_id in trial_buffs.get(cid, []):
@@ -935,6 +939,8 @@ async def on_group_battle_finished(session_id: int, result: TickResult) -> None:
         elif cid in dead_ids and cid in defeats:
             defeat, respawn_at = defeats[cid]
             await respawn_handlers.register_death(p.peer_id, respawn_at, defeat.xp_lost, defeat.relics_lost, defeat.fish_lost)
+            if ended.get(cid):
+                await _bot_api.messages.send(peer_id=p.peer_id, message="\n".join(ended[cid]), random_id=0)
             if dealer_lines.get(cid):
                 await _bot_api.messages.send(peer_id=p.peer_id, message="\n".join(dealer_lines[cid]), random_id=0)
 

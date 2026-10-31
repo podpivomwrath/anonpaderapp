@@ -395,6 +395,12 @@ async def run() -> None:
     house_handlers.setup(bot.api)
     respawn_scheduler.add_job(house_handlers.tick_job, "interval", seconds=2,
                              id="house_work", max_instances=1, coalesce=True)
+    # Конец баффов со сроком - сообщением (репорт 262, 2026-10-31).
+    from bot.handlers import buff_expiry
+
+    buff_expiry.setup(bot.api)
+    respawn_scheduler.add_job(buff_expiry.tick_job, "interval", seconds=buff_expiry.TICK_SECONDS,
+                             id="buff_expiry", max_instances=1, coalesce=True)
     # Смена фракции, купленная в бою, - переезд, когда бой кончился.
     from bot import miniapp_shop_api
 
