@@ -437,6 +437,28 @@ async def test_full_run_reaches_the_miller(monkeypatch) -> None:
         assert isinstance(battle.field_stage, raid_mill.MillerStage)
         boards = [s for s in api.sent if "Груз" in (s.get("message") or "")]
         assert boards
+
+        # Цепь на доске, Страж выбирает её целью и бьёт Ударом щитом - удар
+        # уходит в цепь, а не в Мельника (жалоба Панды, 2026-11-01).
+        miller = battle.field_stage
+        state = engine.sessions[battle_id]
+        miller._spawn_chain(state, random.Random(1), StageTick())
+        tank = next(m for m in members if m.character.subclass == "guardian")
+        other = next(m for m in members if m is not tank)
+        await raid_combat.raid_pick_target(_Msg(tank.peer_id, {"type": "raid_target_pick", "target": miller.chain_id}))
+        assert raid_combat._chosen_target[tank.character.id] == miller.chain_id
+        seen: list = []
+        original = raid_combat.on_raid_tick_resolved
+
+        async def spy(session_id, tick, result):
+            seen.append(result)
+            await original(session_id, tick, result)
+
+        engine.on_tick_resolved = spy
+        await raid_combat.raid_defend(_Msg(other.peer_id, {"type": "raid_defend"}))
+        await raid_combat.raid_skill(_Msg(tank.peer_id, {"type": "raid_skill", "id": "guardian_shield_bash"}))
+        bash = [h for r in seen for h in r.hit_renders if h.source_id == tank.character.id]
+        assert bash and all(h.target_id == miller.chain_id for h in bash)
     finally:
         raid_combat.abort_run(-777)
         engine.shutdown()

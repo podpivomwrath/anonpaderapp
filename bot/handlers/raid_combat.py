@@ -697,6 +697,9 @@ def _resolve_chosen_target(battle_id: int, battle: RaidBattle, cid: int) -> int 
     enemies = _enemies_of(battle_id, battle, cid)
     fallback = enemies[0] if enemies else None
     if fallback is not None:
+        if target_id is not None:
+            logger.info("Рейд {}: {} - цель {} пропала ({}), новая {}", battle_id, cid, target_id,
+                        "нет в бою" if target is None else "мертва", fallback)
         _chosen_target[cid] = fallback
     return fallback
 
@@ -834,11 +837,15 @@ async def _raid_action(message: Message, action: DeclaredAction) -> None:
     if action.type != ActionType.DEFEND:
         # Защитные навыки тоже берут выбранную цель: «Удар щитом» бьёт и
         # провоцирует её, а не случайного врага (2026-10-31, репорт 272).
+        chosen = _chosen_target.get(cid)
         target = _resolve_chosen_target(battle_id, battle, cid)
         if target is None and not is_defensive:
             return
         if target is not None:
             action = action.model_copy(update={"target_id": target})
+        # Диагностика «Удар щитом бьёт не ту цель» (2026-11-01, Панда): какая
+        # цель была выбрана и с какой ушло действие.
+        logger.info("Рейд {}: {} - {} {}, выбрана {}, цель {}", battle_id, cid, action.type, action.skill_id, chosen, target)
 
     _declared_this_tick.setdefault(battle_id, set()).add(cid)
     _declared_actions.setdefault(battle_id, {})[cid] = action
@@ -1002,10 +1009,11 @@ async def raid_pick_target(message: Message) -> None:
     if me is None or target is None or target.side == me.side or not target.alive:
         return
     _chosen_target[cid] = target_id
+    logger.info("Рейд {}: {} выбирает цель {}", battle_id, cid, target_id)
     p = battle.participants.get(cid)
     if p is None:
         return
-    declared = _declared_actions.get(battle_id, {}).get(cid)
+    declared =_declared_actions.get(battle_id, {}).get(cid)
     if declared is not None and declared.target_id is not None and declared.target_id != target_id:
         # Ход уже объявлен - удар уходит по новой цели, а не по старой.
         declared = declared.model_copy(update={"target_id": target_id})
