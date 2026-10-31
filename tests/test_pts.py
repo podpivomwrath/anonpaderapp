@@ -95,3 +95,29 @@ def test_rank_names() -> None:
     assert pts_service.rank_name(850) == "Пепел"
     assert pts_service.rank_name(1000) == "Сталь"
     assert pts_service.rank_name(1550) == "Монолит"
+
+
+def test_repeat_duels_halve_then_zero() -> None:
+    """2026-10-31: вторая дуэль пары за 12 часов - половина, третья - ноль."""
+    full, _ = pts_service.apply_duel(_c(1000, cid=1), _c(1000, cid=2), prior=0, loser_damage=100)
+    half, _ = pts_service.apply_duel(_c(1000, cid=1), _c(1000, cid=2), prior=1, loser_damage=100)
+    zero, why = pts_service.apply_duel(_c(1000, cid=1), _c(1000, cid=2), prior=2, loser_damage=100)
+    assert (full, half, zero, why) == (20, 10, 0, pts_service.NO_REPEAT)
+
+
+def test_no_points_when_loser_never_hit() -> None:
+    w, l = _c(1000, cid=1), _c(1000, cid=2)
+    assert pts_service.apply_duel(w, l, loser_damage=0) == (0, pts_service.NO_FIGHT)
+    assert (w.pts, l.pts) == (1000, 1000)
+
+
+async def test_recent_duels_counts_pair_within_window(db_session) -> None:
+    from datetime import timedelta
+    from models import PvpBattle
+    now = datetime(2026, 10, 31, 15, 0, tzinfo=timezone.utc)
+    for ids, ago in (([1, 2], 1), ([2, 1], 11), ([1, 2], 13), ([1, 3], 1)):
+        db_session.add(PvpBattle(battle_type="duel", participant_ids=ids, winner_ids=ids[:1],
+                                 finished_at=now - timedelta(hours=ago)))
+    db_session.add(PvpBattle(battle_type="mass", participant_ids=[1, 2], winner_ids=[1], finished_at=now))
+    await db_session.flush()
+    assert await pts_service.recent_duels(db_session, 1, 2, now) == 2

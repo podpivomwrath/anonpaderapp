@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from collections import Counter
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from zoneinfo import ZoneInfo
 
 from sqlalchemy import case, delete, or_, select, update
@@ -22,6 +22,8 @@ from models import Character, CharacterTitle, PvpBattle, PvpSeasonResult
 
 NO_LEVEL = "level"     # жертва слабее на LEVEL_GAP+ уровней
 NO_GAP = "gap"         # у победителя на CUTOFF+ PTS больше
+NO_REPEAT = "repeat"   # третья+ дуэль той же пары за REPEAT_WINDOW_HOURS
+NO_FIGHT = "nofight"   # проигравший не нанёс ни единицы урона
 
 
 def rank_name(pts: int) -> str:
@@ -68,10 +70,35 @@ def _apply(character: Character, delta: int) -> None:
     character.pts = max(pc.FLOOR, _pts(character) + delta)
 
 
-def apply_duel(winner: Character, loser: Character) -> tuple[int, str | None]:
-    """Начисляет PTS за дуэль. Вернёт (очки, причина нуля)."""
+def repeat_mult(prior: int) -> float:
+    """Множитель очков дуэли, если у пары уже было prior дуэлей за окно."""
+    return pc.REPEAT_MULTS[prior] if prior < len(pc.REPEAT_MULTS) else 0.0
+
+
+async def recent_duels(db: AsyncSession, a: int, b: int, now: datetime | None = None) -> int:
+    """Сколько дуэлей a и b провели за REPEAT_WINDOW_HOURS (ничьи тоже)."""
+    now = now or datetime.now(timezone.utc)
+    since = now - timedelta(hours=pc.REPEAT_WINDOW_HOURS)
+    rows = await db.scalars(
+        select(PvpBattle.participant_ids)
+        .where(PvpBattle.battle_type == "duel", PvpBattle.finished_at >= since)
+    )
+    return sum(1 for ids in rows if a in (ids or []) and b in (ids or []))
+
+
+def apply_duel(
+    winner: Character, loser: Character, *, prior: int = 0, loser_damage: int | None = None,
+) -> tuple[int, str | None]:
+    """Начисляет PTS за дуэль. Вернёт (очки, причина нуля). prior - дуэли
+    этой пары за окно до боя, loser_damage - урон проигравшего по победителю
+    (None - неизвестен, не проверяем)."""
+    if loser_damage is not None and loser_damage <= 0:
+        return 0, NO_FIGHT
+    mult = repeat_mult(prior)
+    if mult <= 0:
+        return 0, NO_REPEAT
     pair = pair_points(winner, loser)
-    delta = round(pair.points)
+    delta = round(pair.points * mult)
     if delta:
         _apply(winner, delta)
         _apply(loser, -delta)
@@ -131,6 +158,10 @@ def delta_line(delta: int, character: Character, reason: str | None = None) -> s
         return "🏅 PTS не начислены: соперник слабее на 5+ уровней."
     if reason == NO_GAP:
         return "🏅 PTS не начислены: соперник намного ниже по рейтингу."
+    if reason == NO_REPEAT:
+        return f"🏅 PTS не начислены: третья дуэль с этим соперником за {pc.REPEAT_WINDOW_HOURS} часов."
+    if reason == NO_FIGHT:
+        return "🏅 PTS не начислены: соперник ни разу тебя не задел."
     return ""
 
 

@@ -49,7 +49,11 @@ async def _finish_duel(battle: pvp.Battle, winner_cid: int, loser_cid: int) -> N
         await pts_service.season_rollover(db)
         await db.refresh(winner, ["pts", "pts_season"])
         await db.refresh(loser, ["pts", "pts_season"])
-        pts_delta, pts_reason = pts_service.apply_duel(winner, loser)
+        # Повторы той же пары и бой без сопротивления (2026-10-31): набивка PTS.
+        prior = await pts_service.recent_duels(db, winner.id, loser.id)
+        pts_delta, pts_reason = pts_service.apply_duel(
+            winner, loser, prior=prior, loser_damage=battle.damage_by_pair.get((loser_cid, winner_cid), 0),
+        )
         winner_pts_line = pts_service.delta_line(pts_delta, winner, pts_reason)
         loser_pts_line = pts_service.delta_line(-pts_delta, loser) if pts_delta else ""
         # Клеймо 3+: защита «слабого не обирают» снята - трофеи с него заберёт
