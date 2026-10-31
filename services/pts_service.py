@@ -23,7 +23,7 @@ from models import Character, CharacterTitle, PvpBattle, PvpSeasonResult
 NO_LEVEL = "level"     # жертва слабее на LEVEL_GAP+ уровней
 NO_GAP = "gap"         # у победителя на CUTOFF+ PTS больше
 NO_REPEAT = "repeat"   # третья+ дуэль той же пары за REPEAT_WINDOW_HOURS
-NO_FIGHT = "nofight"   # проигравший не нанёс ни единицы урона
+NO_FIGHT = "nofight"   # проигравший ни разу не пытался ударить
 
 
 def rank_name(pts: int) -> str:
@@ -87,12 +87,12 @@ async def recent_duels(db: AsyncSession, a: int, b: int, now: datetime | None = 
 
 
 def apply_duel(
-    winner: Character, loser: Character, *, prior: int = 0, loser_damage: int | None = None,
+    winner: Character, loser: Character, *, prior: int = 0, loser_tried: bool = True,
 ) -> tuple[int, str | None]:
     """Начисляет PTS за дуэль. Вернёт (очки, причина нуля). prior - дуэли
-    этой пары за окно до боя, loser_damage - урон проигравшего по победителю
-    (None - неизвестен, не проверяем)."""
-    if loser_damage is not None and loser_damage <= 0:
+    этой пары за окно до боя, loser_tried - проигравший хоть раз бил или
+    применял атакующий навык (промахи в счёт; только защита - нет)."""
+    if not loser_tried:
         return 0, NO_FIGHT
     mult = repeat_mult(prior)
     if mult <= 0:
@@ -161,7 +161,7 @@ def delta_line(delta: int, character: Character, reason: str | None = None) -> s
     if reason == NO_REPEAT:
         return f"🏅 PTS не начислены: третья дуэль с этим соперником за {pc.REPEAT_WINDOW_HOURS} часов."
     if reason == NO_FIGHT:
-        return "🏅 PTS не начислены: соперник ни разу тебя не задел."
+        return "🏅 PTS не начислены: соперник ни разу не пытался ударить."
     return ""
 
 

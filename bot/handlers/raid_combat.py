@@ -203,6 +203,10 @@ def rift_progress(rift_id: int) -> tuple[int, int] | None:
     return None
 _peer_battle: dict[int, int] = {}
 _declared_this_tick: dict[int, set[int]] = {}
+#: Объявленные в этом ходу действия: {battle_id: {cid: действие}}. Смена цели
+#: после объявления переобъявляет удар по новой цели (2026-10-31, репорт 271:
+#: «бил жернова, ударило мельника» - цель вшивалась в момент нажатия).
+_declared_actions: dict[int, dict[int, DeclaredAction]] = {}
 HELD_TEXT = "Ты скован и этот ход пропускаешь. Кнопки заработают на следующем."
 _chosen_target: dict[int, int] = {}
 _character_in_raid: set[int] = set()
@@ -652,6 +656,7 @@ def abort_run(run_id: int) -> None:
             raid_trail.abort(battle_id)
         _battles.pop(battle_id, None)
         _declared_this_tick.pop(battle_id, None)
+        _declared_actions.pop(battle_id, None)
         from bot import trial_tracking  # бой прерван - незаконченный этап не считается
 
         trial_tracking.drop(battle_id)
@@ -833,10 +838,12 @@ async def _raid_action(message: Message, action: DeclaredAction) -> None:
         action = action.model_copy(update={"target_id": target})
 
     _declared_this_tick.setdefault(battle_id, set()).add(cid)
+    _declared_actions.setdefault(battle_id, {})[cid] = action
     try:
         await _engine.declare_action(battle_id, cid, action)
     except (KeyError, ValueError):
         _declared_this_tick.get(battle_id, set()).discard(cid)
+        _declared_actions.get(battle_id, {}).pop(cid, None)
         return
     if cid in _declared_this_tick.get(battle_id, set()):
         p = battle.participants.get(cid)
@@ -994,6 +1001,20 @@ async def raid_pick_target(message: Message) -> None:
     _chosen_target[cid] = target_id
     p = battle.participants.get(cid)
     if p is None:
+        return
+    declared = _declared_actions.get(battle_id, {}).get(cid)
+    if declared is not None and declared.target_id is not None and declared.target_id != target_id:
+        # Ход уже объявлен - удар уходит по новой цели, а не по старой.
+        declared = declared.model_copy(update={"target_id": target_id})
+        _declared_actions[battle_id][cid] = declared
+        try:
+            await _engine.declare_action(battle_id, cid, declared)
+        except (KeyError, ValueError):
+            pass
+    if cid in _declared_this_tick.get(battle_id, set()):
+        await editable_message.send_or_edit(
+            _bot_api, "raid_target", peer_id, f"🎯 Новая цель: {target.name}. Удар этого хода - по ней.", no_keyboard(),
+        )
         return
     await editable_message.send_or_edit(_bot_api, "raid_target", peer_id, f"🎯 Новая цель: {target.name}.", no_keyboard())
     board = f"🎯 Цель: {target.name}.\n\n{_render_board(_engine.sessions.get(battle_id))}"

@@ -452,3 +452,13 @@ def test_status_names_players_without_subclass() -> None:
     assert stage.carrier(state) == (True, None)
     assert "следующим несёт: без подкласса" in stage.status_line(state)
     assert stage.can_carry(state, 2) and not stage.can_carry(state, 1)
+
+
+def test_chain_falls_with_the_miller_and_the_stage_ends() -> None:
+    """Репорт 273 (2026-10-31): Мельник пал при целой цепи - цепь не держит бой."""
+    stage, state, _ = _miller()
+    stage._spawn_chain(state, random.Random(1), StageTick())
+    chain = state.combatants[stage.chain_id]
+    state.combatants[stage.boss_id].current_hp = 0
+    out = stage.after_tick(state, TickResult(), random.Random(1))
+    assert out.cleared and not chain.alive and stage.chain_id is None

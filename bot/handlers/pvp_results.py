@@ -17,7 +17,8 @@ from bot.pvp_texts import NOTHING_TO_TAKE
 from game.combat import balance_config as bc
 from game.combat import battle_log, display
 from game.combat.resolver import TickResult
-from game.combat.session import CombatSessionState
+from game.combat.session import ActionType, CombatSessionState
+from game.combat.skills import DEFENSIVE_SKILLS
 from game.economy import fishing as game_fishing
 from models import Character
 from services import pk_service, pts_service, subclass_service, trial_service
@@ -52,7 +53,7 @@ async def _finish_duel(battle: pvp.Battle, winner_cid: int, loser_cid: int) -> N
         # Повторы той же пары и бой без сопротивления (2026-10-31): набивка PTS.
         prior = await pts_service.recent_duels(db, winner.id, loser.id)
         pts_delta, pts_reason = pts_service.apply_duel(
-            winner, loser, prior=prior, loser_damage=battle.damage_by_pair.get((loser_cid, winner_cid), 0),
+            winner, loser, prior=prior, loser_tried=loser_cid in battle.tried_attack,
         )
         winner_pts_line = pts_service.delta_line(pts_delta, winner, pts_reason)
         loser_pts_line = pts_service.delta_line(-pts_delta, loser) if pts_delta else ""
@@ -176,6 +177,11 @@ async def on_mass_tick_resolved(session_id: int, tick: int, result: TickResult) 
             continue
         key = (hit.source_id, hit.target_id)
         battle.damage_by_pair[key] = battle.damage_by_pair.get(key, 0) + hit.amount
+    for cid, action in result.actions.items():
+        if action.type == ActionType.ATTACK or (
+            action.type == ActionType.SKILL and action.skill_id not in DEFENSIVE_SKILLS
+        ):
+            battle.tried_attack.add(cid)
 
     session = pvp._mass_engine.sessions.get(session_id)
     if session is not None:

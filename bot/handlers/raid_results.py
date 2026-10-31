@@ -59,6 +59,7 @@ async def on_raid_tick_resolved(session_id: int, tick: int, result: TickResult) 
     if battle is None:
         return
     raid_combat._declared_this_tick.pop(session_id, None)
+    raid_combat._declared_actions.pop(session_id, None)
     battle.frozen_now = set()
     _record_contribution(battle, result)
     battle.stage_ticks += 1
@@ -616,6 +617,7 @@ async def _cleanup_and_return(session_id: int, battle: raid_combat.RaidBattle, t
     raid_combat._battles.pop(session_id, None)
     trial_tracking.drop(session_id)
     raid_combat._declared_this_tick.pop(session_id, None)
+    raid_combat._declared_actions.pop(session_id, None)
     combatants = battle.last_combatants
     state = raid_combat._engine.sessions.get(session_id)
     if state is not None:

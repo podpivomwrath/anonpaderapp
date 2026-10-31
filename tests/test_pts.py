@@ -99,15 +99,16 @@ def test_rank_names() -> None:
 
 def test_repeat_duels_halve_then_zero() -> None:
     """2026-10-31: вторая дуэль пары за 12 часов - половина, третья - ноль."""
-    full, _ = pts_service.apply_duel(_c(1000, cid=1), _c(1000, cid=2), prior=0, loser_damage=100)
-    half, _ = pts_service.apply_duel(_c(1000, cid=1), _c(1000, cid=2), prior=1, loser_damage=100)
-    zero, why = pts_service.apply_duel(_c(1000, cid=1), _c(1000, cid=2), prior=2, loser_damage=100)
+    full, _ = pts_service.apply_duel(_c(1000, cid=1), _c(1000, cid=2), prior=0)
+    half, _ = pts_service.apply_duel(_c(1000, cid=1), _c(1000, cid=2), prior=1)
+    zero, why = pts_service.apply_duel(_c(1000, cid=1), _c(1000, cid=2), prior=2)
     assert (full, half, zero, why) == (20, 10, 0, pts_service.NO_REPEAT)
 
 
-def test_no_points_when_loser_never_hit() -> None:
+def test_no_points_when_loser_never_tried_to_hit() -> None:
+    """Только защита или бездействие - ноль; промахи - попытка, очки идут."""
     w, l = _c(1000, cid=1), _c(1000, cid=2)
-    assert pts_service.apply_duel(w, l, loser_damage=0) == (0, pts_service.NO_FIGHT)
+    assert pts_service.apply_duel(w, l, loser_tried=False) == (0, pts_service.NO_FIGHT)
     assert (w.pts, l.pts) == (1000, 1000)
 
 

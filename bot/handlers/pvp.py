@@ -166,6 +166,10 @@ class Battle:
     participants: dict[int, Participant] = field(default_factory=dict)   # character_id -> Participant
     side_of: dict[int, int] = field(default_factory=dict)                # character_id -> 0/1
     damage_by_pair: dict[tuple[int, int], int] = field(default_factory=dict)  # (attacker, victim) -> total
+    #: Кто хоть раз пытался ударить - удар или атакующий навык, промах тоже
+    #: в счёт (2026-10-31): дуэль, где проигравший только защищался или
+    #: стоял, PTS не даёт.
+    tried_attack: set[int] = field(default_factory=set)
     last_combatants: dict[int, "CombatantState"] = field(default_factory=dict)  # снимок на конец последнего хода
     # Гильдии: бой - осада. Стороны подписаны тегами, опоздавшие встают
     # только к своей гильдии, итог считает bot/handlers/guild_siege.py.

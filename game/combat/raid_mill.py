@@ -294,6 +294,12 @@ class MillerStage:
         out = StageTick()
         boss = session.combatants[self.boss_id]
         if not boss.alive:
+            # Мельник пал, а цепь цела: без него она - просто кусок железа.
+            # Раньше цепь оставалась живым противником и бой не кончался
+            # (репорт 273, 2026-10-31).
+            if self.chain_id is not None:
+                self._drop_chain(session.combatants.get(self.chain_id))
+                out.cleared = True
             return out
         self._check_hold(session, result, out)
         self._count_damage(result)

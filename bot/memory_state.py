@@ -55,6 +55,7 @@ STATE: dict[str, str] = {
     "bot.handlers.raid_combat._battles": "конец рейдового боя",
     "bot.handlers.raid_combat._peer_battle": "конец рейдового боя",
     "bot.handlers.raid_combat._declared_this_tick": "резолв хода, конец боя",
+    "bot.handlers.raid_combat._declared_actions": "резолв хода, конец боя",
     "bot.handlers.raid_combat._chosen_target": "конец боя",
     "bot.handlers.raid_combat._character_in_raid": "конец боя",
     "bot.handlers.raid_procession._runs": "конец рейда Шествия",
