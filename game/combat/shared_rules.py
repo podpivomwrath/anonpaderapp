@@ -20,6 +20,7 @@ from game.combat.session import (
     CombatantState,
     CombatSessionState,
     BURN_TAG,
+    ECHO_TAG,
     Effect,
     EffectKind,
     shield_name,
@@ -241,7 +242,7 @@ def begin_turn_flags(session: CombatSessionState, turn_number: int) -> None:
         c.crit_this_tick = False
         interval = int(c.buff_modifiers.get("second_chance_interval", 0))
         c.second_chance_active = bool(interval) and turn_number % interval == 0
-    rune_gaze(session)  # руна «Тяжёлый взгляд» (2026-10-31)
+    rune_gaze(session)  # «Тяжёлый взгляд»: срез в start_session, здесь - мобы, подошедшие посреди боя
 
 
 def end_turn_memory(combatant: CombatantState, turn_number: int) -> None:
@@ -394,6 +395,37 @@ def rune_dot_mult(effect: Effect, source: CombatantState | None, target: Combata
     if target is not None:
         mult *= max(1.0 - _rune(target, "rune:bitter_blood"), 0.1)
     return mult
+
+
+def overflow_echo(source: CombatantState) -> float:
+    """Доля лечения сверх максимума, которая уходит в щит: «Отголосок»
+    Тёмного мистика (патч 56) и руна «Излишек» (2026-10-31)."""
+    return source.buff_modifiers.get("heal_overflow_shield", 0.0) + _rune(source, "rune:surplus")
+
+
+def overflow_shield(source: CombatantState, ally: CombatantState, overflow: int) -> int:
+    """Перелечивание -> щит «Отголосок» на ally. Общее для тикового боя и
+    дуэли. Возвращает, сколько щита добавилось (0 - упёрлись в потолок)."""
+    amount = round(overflow * overflow_echo(source))
+    cap = round(ally.max_hp * bc.DARK_MYSTIC_ECHO_CAP_PCT)
+    # Свой щит, отдельно от Оберега (ECHO_TAG): раньше отголосок затирал
+    # Оберег, а потом новый Оберег - накопленный отголосок. Новый
+    # отголосок прибавляется к уже висящему.
+    current = next(
+        (e for e in ally.effects_of(EffectKind.SHIELD_POOL)
+         if e.source_id == source.id and getattr(e, "tag", None) == ECHO_TAG),
+        None,
+    )
+    # Не выше потолка (2026-10-18): прибавляем только до cap.
+    amount = min(amount, cap - round(current.value if current is not None else 0))
+    if amount <= 0:
+        return 0
+    if current is not None:
+        current.value += amount
+        current.remaining_ticks = max(current.remaining_ticks, bc.DARK_MYSTIC_ECHO_DURATION)
+    else:
+        ally.apply_effect(EffectKind.SHIELD_POOL, amount, bc.DARK_MYSTIC_ECHO_DURATION, source.id, tag=ECHO_TAG)
+    return amount
 
 
 def rune_gaze(session: CombatSessionState) -> None:

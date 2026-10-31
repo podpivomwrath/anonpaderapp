@@ -135,6 +135,9 @@ class TickEngine:
     def start_session(self, state: CombatSessionState) -> None:
         if state.mode not in (CombatMode.PVE, CombatMode.PVP_GROUP):
             raise ValueError("Тиковый движок обслуживает pve и pvp_group; дуэль - duel_engine")
+        # «Тяжёлый взгляд» - сразу при создании боя (владелец, 2026-10-31): на
+        # стартовом экране у моба уже срезанное здоровье.
+        shared_rules.rune_gaze(state)
         self.sessions[state.session_id] = state
         self._generations[state.session_id] = uuid4().hex
         self._resolve_locks[state.session_id] = asyncio.Lock()

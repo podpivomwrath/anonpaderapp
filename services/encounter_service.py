@@ -136,7 +136,8 @@ async def resolve_victory(
     # Альманах травника (2026-10-23): редкая находка с моба - строкой к зелью.
     almanac = await craft_gear_service.roll_almanac(db, character, rng)
     rune_line = await rune_service.drop_line(db, character, rng)
-    elixir_line = " ".join(x for x in (elixir_line, almanac, rune_line) if x) or None
+    # Каждая находка - своей строкой (репорт 263: руна липла к зелью).
+    elixir_line = "\n".join(x for x in (elixir_line, almanac, rune_line) if x) or None
 
     unlocked: list[str] = []
     if subclass_service.buff_pool(character) is not None:

@@ -444,6 +444,7 @@ class DuelEngine:
                 continue  # удар не прошёл - лечить нечем
             target = state.combatants[heal.target_id]
             before = target.current_hp
+            overflow = before + heal.amount - target.max_hp
             target.current_hp = min(target.current_hp + heal.amount, target.max_hp)
             result.lines.append(
                 display.action_line(
@@ -451,4 +452,13 @@ class DuelEngine:
                     before, target.current_hp, target.max_hp, display.MODE_PVP,
                 )
             )
+            # Перелечивание в щит (владелец, 2026-10-31): «Отголосок» мистика и
+            # руна «Излишек». Союзников в дуэли нет - щит лечащему себе.
+            source = state.combatants.get(heal.source_id)
+            if overflow > 0 and source is not None and source.alive:
+                shield = shared_rules.overflow_shield(source, source, overflow)
+                if shield:
+                    result.lines.append(
+                        f"{source.name}: отголосок - {overflow} лишнего лечения становится щитом +{shield}"
+                    )
         result.lines.extend(ctx.lines)

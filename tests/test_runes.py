@@ -112,6 +112,39 @@ async def test_skill_rune_second_slot_and_tag(db_session, make_character) -> Non
     assert "warrior_cleave" in c.rune_skill_slots
 
 
+async def test_bought_skill_slot_moves_to_subclass_skill(db_session, make_character) -> None:
+    """Владелец, 2026-10-31: 1 покупка = 1 доп. слот. Подкласс заменил навыки -
+    купленный слот переносится бесплатно, руны прежних навыков - в сумку."""
+    c = await make_character(level=30, base_class="warrior", farm=rc.SKILL_SLOT_PRICE)
+    _home(c)
+    await rune_service.buy_skill_slot(db_session, c, "warrior_cleave")
+    await rune_service.grant(db_session, c.id, "press")
+    await rune_service.equip(db_session, c, rc.SKILL, "warrior_cleave:1", "press")
+    c.subclass = "blood_knight"
+    assert rune_service.spare_skill_slots(c) == 1
+    assert await rune_service.release_lost_runes(db_session, c)
+    assert (await rune_service.bag(db_session, c.id)).get("press") == 1
+    await rune_service.buy_skill_slot(db_session, c, "blood_knight_harvest")  # золота уже нет
+    assert c.rune_skill_slots == ["blood_knight_harvest"]
+    assert rune_service.spare_skill_slots(c) == 0
+    with pytest.raises(rune_service.RuneError):  # второй перенос - уже за золото
+        await rune_service.buy_skill_slot(db_session, c, "blood_knight_blood_seal")
+
+
+async def test_class_change_returns_foreign_gear_rune(db_session, make_character) -> None:
+    """Репорт 266: руна чужого класса после смены класса - в сумку, не действует."""
+    from models import BaseClass
+    from services import respec_service
+
+    c = await make_character(level=10, base_class="warrior")
+    _home(c)
+    await rune_service.grant(db_session, c.id, "hammer_down")
+    await rune_service.equip(db_session, c, rc.GEAR, "weapon:0", "hammer_down")
+    await respec_service.full_class_reset(db_session, c, BaseClass("mage"))
+    assert rune_service.effect(c, "hammer_down") == 0
+    assert (await rune_service.bag(db_session, c.id)).get("hammer_down") == 1
+
+
 def test_drop_rolls_only_ready_runes() -> None:
     rng = random.Random(3)
     for _ in range(300):

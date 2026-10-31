@@ -206,23 +206,61 @@ async def buy_hero_slot(db: AsyncSession, character: Character) -> int:
     return character.rune_hero_slots
 
 
+def spare_skill_slots(character: Character) -> int:
+    """Купленные вторые слоты у навыков, которых у героя больше нет (подкласс
+    заменил навыки класса, сброс пути). Владелец, 2026-10-31: 1 покупка = 1
+    доп. слот - такой слот переносится на любой текущий навык бесплатно."""
+    skill_ids = {s.id for s in skills_of(character)}
+    return sum(1 for sid in character.rune_skill_slots or [] if sid not in skill_ids)
+
+
 async def buy_skill_slot(db: AsyncSession, character: Character, skill_id: str) -> None:
-    if skill_id not in {s.id for s in skills_of(character)}:
+    skill_ids = {s.id for s in skills_of(character)}
+    if skill_id not in skill_ids:
         raise RuneError("Нет такого навыка.")
     owned = list(character.rune_skill_slots or [])
     if skill_id in owned:
         raise RuneError("Второй слот уже открыт.")
+    spare = next((i for i, sid in enumerate(owned) if sid not in skill_ids), None)
+    if spare is not None:
+        owned[spare] = skill_id  # перенос купленного слота, без платы
+        character.rune_skill_slots = owned  # JSON заменяется целиком
+        await db.flush()
+        return
     try:
         await wallet_service.charge(db, character.id, "farm", rc.SKILL_SLOT_PRICE)
     except wallet_service.NotEnoughCurrency:
         raise RuneError(f"Нужно {rc.SKILL_SLOT_PRICE:,} золота.".replace(",", " ")) from None
-    character.rune_skill_slots = owned + [skill_id]  # JSON заменяется целиком
+    character.rune_skill_slots = owned + [skill_id]
     await db.flush()
 
 
+def _lost(character: Character, row: CharacterRuneSlot, skill_ids: set[str]) -> bool:
+    """Руна, которой после смены класса или пути здесь не место."""
+    if row.kind == rc.SKILL:
+        return row.slot.partition(":")[0] not in skill_ids
+    rune_def = rc.BY_ID.get(row.rune_id)
+    return (row.kind == rc.GEAR and rune_def is not None
+            and bool(rune_def.classes) and character.base_class not in rune_def.classes)
+
+
+async def release_lost_runes(db: AsyncSession, character: Character) -> bool:
+    """Руны из слотов навыков, которых у героя больше нет, и руны экипировки
+    чужого класса (репорт 266) - обратно в сумку."""
+    skill_ids = {s.id for s in skills_of(character)}
+    lost = [r for r in await slots(db, character.id) if _lost(character, r, skill_ids)]
+    for row in lost:
+        await grant(db, character.id, row.rune_id)
+        await db.delete(row)
+    if lost:
+        await db.flush()
+    return bool(lost)
+
+
 async def recompute(db: AsyncSession, character: Character) -> dict[str, float]:
-    """Пересчитать копию эффектов на персонаже. Руна навыка, которого больше
-    нет (сменил путь), не действует, но остаётся в слоте."""
+    """Пересчитать копию эффектов на персонаже. Руны навыков, которых больше
+    нет (сменил путь), возвращаются в сумку."""
+    await release_lost_runes(db, character)
     known = await mastery(db, character.id)
     skill_ids = {s.id for s in skills_of(character)}
     effects: dict[str, float] = {}
@@ -276,4 +314,4 @@ async def drop_line(db: AsyncSession, character: Character, rng: random.Random) 
     if rune_id is None:
         return None
     rune_def = rc.BY_ID[rune_id]
-    return f"{KIND_EMOJI[rune_def.kind]} Руна «{rune_def.name}»."
+    return f"{KIND_EMOJI[rune_def.kind]} Выпала {rc.KIND_ONE[rune_def.kind].lower()}: «{rune_def.name}»"

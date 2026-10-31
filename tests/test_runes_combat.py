@@ -98,6 +98,33 @@ def test_heavy_gaze_cuts_field_mobs_once() -> None:
     assert mob.max_hp == round(full * 0.94)
 
 
+def test_heavy_gaze_applies_when_battle_is_created() -> None:
+    from game.combat.tick_engine import TickEngine
+
+    player, mob = combatant(1, 0), combatant(2, 1, kind="mob")
+    mob.field_mob = True
+    player.buff_modifiers["rune:heavy_gaze"] = 0.06
+    full = mob.max_hp
+    session = CombatSessionState(session_id=1, mode=CombatMode.PVE, combatants={1: player, 2: mob})
+    engine = TickEngine.__new__(TickEngine)
+    engine.sessions, engine._generations, engine._resolve_locks = {}, {}, {}
+    engine._open_tick = lambda state: None
+    engine.start_session(session)
+    assert mob.max_hp == round(full * 0.94) and mob.current_hp == mob.max_hp
+
+
+def test_duel_overheal_becomes_own_shield() -> None:
+    """В дуэли союзников нет: перелечивание («Излишек», «Отголосок») - щит себе."""
+    healer = combatant(1, 0)
+    healer.buff_modifiers["rune:surplus"] = 0.5
+    assert shared_rules.overflow_shield(healer, healer, 40) == 20
+    assert healer.effect_total(EffectKind.SHIELD_POOL) == 20
+    # Повтор прибавляется к тому же щиту, не выше потолка.
+    shared_rules.overflow_shield(healer, healer, 10 ** 6)
+    from game.combat import balance_config as bc
+    assert healer.effect_total(EffectKind.SHIELD_POOL) == round(healer.max_hp * bc.DARK_MYSTIC_ECHO_CAP_PCT)
+
+
 def test_deaf_shield_blocks_only_basic_attacks() -> None:
     a, t = combatant(1, 0), combatant(2, 1)
     t.buff_modifiers["rune:deaf_shield"] = 0.06

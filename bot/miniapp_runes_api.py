@@ -57,10 +57,19 @@ async def _payload(db, character) -> dict:
         for place in rc.GEAR_PLACES
     ]
     second = set(character.rune_skill_slots or [])
+    spare = rune_service.spare_skill_slots(character)
+
+    def second_socket(skill_id: str) -> dict:
+        if skill_id in second:
+            return socket(rc.SKILL, f"{skill_id}:1")
+        # Купленный слот от прежних навыков переносится бесплатно.
+        out = socket(rc.SKILL, f"{skill_id}:1", False, None if spare else rc.SKILL_SLOT_PRICE)
+        out["moved"] = bool(spare)
+        return out
+
     skills = [
         {"id": s.id, "name": s.name, "tags": sorted(runes.skill_tags(s)),
-         "slots": [socket(rc.SKILL, f"{s.id}:0"),
-                   socket(rc.SKILL, f"{s.id}:1", s.id in second, None if s.id in second else rc.SKILL_SLOT_PRICE)]}
+         "slots": [socket(rc.SKILL, f"{s.id}:0"), second_socket(s.id)]}
         for s in rune_service.skills_of(character)
     ]
     owned = [
@@ -72,7 +81,7 @@ async def _payload(db, character) -> dict:
         "home": rune_service.at_home(character), "gold": wallet.farm_currency,
         "base_class": character.base_class,
         "hero": hero, "gear": gear, "skills": skills, "runes": owned,
-        "titles": rc.KIND_TITLES, "skill_slot_price": rc.SKILL_SLOT_PRICE,
+        "titles": rc.KIND_TITLES, "skill_slot_price": rc.SKILL_SLOT_PRICE, "spare_skill_slots": spare,
     }
 
 
@@ -81,6 +90,10 @@ async def handle_get(request: web.Request) -> web.Response:
         character = await onboarding_svc.get_character(db, request[VK_USER_ID_KEY])
         if character is None:
             return _error("character_not_found", 404)
+        # Сменил путь - руны из слотов прежних навыков возвращаются в сумку.
+        if await rune_service.release_lost_runes(db, character):
+            await rune_service.recompute(db, character)
+            await db.commit()
         return web.json_response(await _payload(db, character))
 
 

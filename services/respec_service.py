@@ -59,7 +59,16 @@ async def full_class_reset(
     character.subclass = None
     character.subclass_declined = False
     await _reset_stats_rows(db, character, new_base_class)
+    await _release_runes(db, character)
     return character
+
+
+async def _release_runes(db: AsyncSession, character: Character) -> None:
+    """Сменились класс или навыки - руны не к месту в сумку, эффекты заново
+    (репорт 266: руна чужого класса оставалась в слоте)."""
+    from services import rune_service
+
+    await rune_service.recompute(db, character)
 
 
 async def reset_subclass(db: AsyncSession, character: Character) -> Character:
@@ -77,6 +86,7 @@ async def reset_subclass(db: AsyncSession, character: Character) -> Character:
     character.subclass = None
     # Отказ от подкласса сбрасывается так же, как подкласс (2026-10-21).
     character.subclass_declined = False
+    await _release_runes(db, character)
     return character
 
 

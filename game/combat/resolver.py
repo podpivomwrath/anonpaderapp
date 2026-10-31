@@ -323,9 +323,7 @@ def _apply_phase(
     # пропадает, а становится щитом следующему по низкому HP союзнику.
     for source_id in {h.source_id for h in heals}:
         source = session.combatants[source_id]
-        echo = source.buff_modifiers.get("heal_overflow_shield", 0.0)
-        echo += source.buff_modifiers.get("rune:surplus", 0.0)  # руна «Излишек» (2026-10-31)
-        if echo <= 0:
+        if shared_rules.overflow_echo(source) <= 0:  # и руна «Излишек» (2026-10-31)
             continue
         for target_id in {h.target_id for h in heals if h.source_id == source_id}:
             target = session.combatants[target_id]
@@ -348,27 +346,9 @@ def _apply_phase(
             if not candidates:
                 continue
             ally = min(candidates, key=lambda c: c.current_hp / c.max_hp)
-            amount = round(overflow * echo)
-            cap = round(ally.max_hp * bc.DARK_MYSTIC_ECHO_CAP_PCT)
-            # Свой щит, отдельно от Оберега (ECHO_TAG): раньше отголосок затирал
-            # Оберег, а потом новый Оберег - накопленный отголосок. Новый
-            # отголосок прибавляется к уже висящему.
-            current = next(
-                (e for e in ally.effects_of(EffectKind.SHIELD_POOL)
-                 if e.source_id == source.id and getattr(e, "tag", None) == ECHO_TAG),
-                None,
-            )
-            # Не выше потолка (2026-10-18): прибавляем только до cap.
-            amount = min(amount, cap - round(current.value if current is not None else 0))
+            amount = shared_rules.overflow_shield(source, ally, overflow)
             if amount <= 0:
                 continue
-            if current is not None:
-                current.value += amount
-                current.remaining_ticks = max(current.remaining_ticks, bc.DARK_MYSTIC_ECHO_DURATION)
-            else:
-                ally.apply_effect(
-                    EffectKind.SHIELD_POOL, amount, bc.DARK_MYSTIC_ECHO_DURATION, source.id, tag=ECHO_TAG,
-                )
             ctx.lines.append(
                 f"{source.name}: отголосок - {overflow} лишнего лечения ({target.name}) "
                 f"становится щитом +{amount} на {ally.name}"

@@ -43,6 +43,7 @@ function Socket({ kind, socket, onPick, label }) {
       <img className="rune-socket__bg" src={art} alt="" draggable="false" />
       {socket.rune && <span className="rune-socket__rune"><RuneIcon rune={socket.rune} size={40} /></span>}
       {!socket.open && socket.price && <small className="rune-socket__price">💰 {gold(socket.price)}</small>}
+      {!socket.open && socket.moved && <small className="rune-socket__price">бесплатно</small>}
       {label && <small className="rune-socket__label">{label}</small>}
     </button>
   );
@@ -114,7 +115,12 @@ function SocketSheet({ kind, socket, data, skill, busy, onEquip, onUnequip, onBu
   if (!socket.open) {
     return (
       <Sheet title="Закрытый слот" icon="🔒" onClose={onClose}>
-        {socket.price ? (
+        {socket.moved ? (
+          <>
+            <p>Слот, купленный для прежних навыков, переносится сюда бесплатно. Свободных: {data.spare_skill_slots}.</p>
+            <button type="button" className="pill-btn" disabled={busy} onClick={onBuy}>Перенести слот</button>
+          </>
+        ) : socket.price ? (
           <>
             <p>Открыть слот за 💰 {gold(socket.price)}? У тебя 💰 {gold(data.gold)}.</p>
             <button type="button" className="pill-btn" disabled={busy || data.gold < socket.price} onClick={onBuy}>

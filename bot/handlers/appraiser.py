@@ -155,13 +155,13 @@ async def _render_trophies(db, character, mult: float, prefix: str = "") -> tupl
         text = appraiser_empty()
     else:
         lines = "\n".join(
-            f"{d.emoji} {d.name} ×{count} - {round(d.sell_price * mult) * count} зол." for d, count in stock
+            f"{d.emoji} {d.name} ×{count} - {round(d.sell_price * count * mult)} зол." for d, count in stock
         )
         note = await faction_service.city_line(db, character, relics=True)
         text = f"{note}\n\n{lines}" if note else lines
     if prefix:
         text = f"{prefix}\n\n{text}"
-    return text, appraiser_trophies_keyboard(stock)
+    return text, appraiser_trophies_keyboard(stock, mult)
 
 
 RELICS_EMPTY_TEXT = "💀 Реликвий в сумке нет. Их приносят с убитых мобов."

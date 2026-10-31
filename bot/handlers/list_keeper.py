@@ -383,6 +383,10 @@ async def path_confirm(message: Message) -> None:
         if character is None or character.subclass is not None:
             return
         subclass_service.apply_subclass(character, subclass_id)
+        # Навыки сменились - руны прежних навыков в сумку, эффекты заново.
+        from services import rune_service
+
+        await rune_service.recompute(db, character)
         await _set_select_state(db, character, None)
         # патч 18: если сюжет стоял на паузе на subclass_gate-квесте — продвигаем
         stats = await db.scalar(

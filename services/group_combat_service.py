@@ -106,7 +106,7 @@ async def reward_mob_kill(
 
         almanac = await craft_gear_service.roll_almanac(db, character, rng)
         rune_line = await rune_service.drop_line(db, character, rng)
-        elixir_line = " ".join(x for x in (elixir_line, almanac, rune_line) if x) or None
+        elixir_line = "\n".join(x for x in (elixir_line, almanac, rune_line) if x) or None
         rewards.append(
             MobKillReward(
                 character_id=character.id, xp_gained=levelup.xp_awarded,

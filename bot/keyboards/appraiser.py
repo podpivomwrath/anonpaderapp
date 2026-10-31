@@ -62,12 +62,13 @@ def appraiser_root_keyboard() -> str:
     return kb.get_json()
 
 
-def appraiser_trophies_keyboard(stock: list[tuple[TrophyDef, int]]) -> str:
+def appraiser_trophies_keyboard(stock: list[tuple[TrophyDef, int]], mult: float = 1.0) -> str:
     """Патч 41: «Продать всё» — во всю ширину (главное действие), остальные
-    градации трофеев — по 2 в ряд."""
+    градации трофеев — по 2 в ряд. mult - тот же множитель, что в тексте
+    (город, венец, гильдия, руна): репорт 265, кнопки показывали голую цену."""
     kb = Keyboard(one_time=False)
     if stock:
-        total = sum(d.sell_price * count for d, count in stock)
+        total = round(sum(d.sell_price * count for d, count in stock) * mult)
         kb.add(
             Text(f"Продать всё - {total} зол.", payload={"type": "sell_trophies", "id": SELL_ALL_ID}),
             color=KeyboardButtonColor.POSITIVE,
@@ -77,7 +78,7 @@ def appraiser_trophies_keyboard(stock: list[tuple[TrophyDef, int]]) -> str:
             (f"Продать {trophy_def.emoji} ×{count} - {price} зол.", KeyboardButtonColor.SECONDARY,
              {"type": "sell_trophies", "id": trophy_def.id})
             for trophy_def, count in stock
-            for price in [trophy_def.sell_price * count]
+            for price in [round(trophy_def.sell_price * count * mult)]
         ]
         add_paired(kb, items)
     add_miniapp_button(kb)
