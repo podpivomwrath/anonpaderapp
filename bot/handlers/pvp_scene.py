@@ -33,7 +33,13 @@ async def _scene_at(db, character: Character) -> tuple[list[Character], list[tup
     from services import contract_service
 
     hunted = await contract_service.hunted_ids(db, character.id)
-    solo = [c for c in others if c.id not in busy_ids and (not pvp_service.is_afk(c) or c.id in hunted)]
+    # Жилу из исследования копают незаметно (2026-10-31, владелец): такого
+    # игрока видит только взявший на него заказ.
+    solo = [
+        c for c in others
+        if c.id not in busy_ids
+        and ((not pvp_service.is_afk(c) and not mining_service.is_event_vein(c)) or c.id in hunted)
+    ]
     return solo, battles
 
 
@@ -111,6 +117,8 @@ async def _busy_marks(db, characters: list[Character]) -> dict[int, str]:
         elif c.screen == "mine":
             # В штольне цель заказа не достать - видно, что он там (2026-10-29).
             marks[c.id] = " · ⛏ в забое" if mining_service.is_digging(c) else " · ⛏ в штольне"
+        elif mining_service.is_event_vein(c):
+            marks[c.id] = " · ⛏ копает жилу"
     return marks
 
 

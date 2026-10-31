@@ -124,6 +124,31 @@ async def test_afk_target_visible_only_to_hunter(db_session, make_character):
     assert target.id not in {x.id for x in stranger_view}
 
 
+async def test_event_vein_digger_visible_only_to_hunter(db_session, make_character):
+    """2026-10-31: копающий жилу из исследования пропадает из «Осмотреться»,
+    кроме как для взявшего на него заказ."""
+    from bot.handlers import pvp
+
+    orderer = await make_character(level=20, donate=1000)
+    target = await make_character(level=20)
+    hunter = await make_character(level=20)
+    stranger = await make_character(level=20)
+    for c in (target, hunter, stranger):
+        c.pos_x, c.pos_y = 3, 12
+    await db_session.flush()
+    stranger_view, _ = await pvp._scene_at(db_session, stranger)
+    assert target.id in {x.id for x in stranger_view}
+    target.mining_ends_at = datetime.now(timezone.utc) + timedelta(seconds=30)
+    target.mining_mine_id = None
+    await db_session.flush()
+    c = await cs.create(db_session, orderer, target.name, 1, 100)
+    await cs.take(db_session, hunter, c.id)
+    hunter_view, _ = await pvp._scene_at(db_session, hunter)
+    stranger_view, _ = await pvp._scene_at(db_session, stranger)
+    assert target.id in {x.id for x in hunter_view}
+    assert target.id not in {x.id for x in stranger_view}
+
+
 async def test_guildmate_cannot_take_contract(db_session, make_character):
     from models import Guild
 
