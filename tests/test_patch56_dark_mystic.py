@@ -159,6 +159,19 @@ def test_blood_ward_and_steadfast_ward_raise_absorption() -> None:
     assert absorb({"ward_absorb_bonus": bc.DARK_MYSTIC_STEADFAST_WARD_BONUS}) > plain
 
 
+def test_ward_is_weaker_without_allies() -> None:
+    """2026-10-31: штраф одиночки касается и Оберега - иначе мистик в
+    одиночку держал мобов на 7-10 уровней выше."""
+    rng = NoCritRng()
+    solo = mystic()
+    resolve_tick(make_session(solo, combatant(2, side=1)), {1: skill("dark_mystic_ward")}, rng)
+    grouped = mystic()
+    ally = combatant(3, side=0)
+    resolve_tick(make_session(grouped, ally, combatant(2, side=1)), {1: skill("dark_mystic_ward")}, rng)
+    shield = grouped.effect_total(EffectKind.SHIELD_POOL) + ally.effect_total(EffectKind.SHIELD_POOL)
+    assert abs(solo.effect_total(EffectKind.SHIELD_POOL) - shield * bc.DARK_MYSTIC_SOLO_HEAL_PENALTY) <= 1
+
+
 def test_steadfast_ward_costs_extra_cooldown() -> None:
     rng = NoCritRng()
     from game.combat.subclass_skills import SUBCLASS_SKILL_DEFS

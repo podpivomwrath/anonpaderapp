@@ -170,6 +170,9 @@ def ward(ctx: SkillContext) -> None:
         * stat_model.ACTIVE.support_power(actor.stats)
         * bc.DARK_MYSTIC_WARD_SHIELD_COEF
         * (1.0 + bonus)
+        # 2026-10-31: в одиночку щит слабее, как и лечение. Без штрафа Оберег
+        # гасил три удара из четырёх, и мистик фармил мобов на +7-10.
+        * _solo_heal_penalty(ctx)
     )
     if steadfast > 0:
         actor.cooldowns[skill.id] = skill.cd + bc.DARK_MYSTIC_STEADFAST_WARD_CD
