@@ -11,7 +11,9 @@ import re
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-BUTTONS = ("maybe_send_lake_button", "maybe_send_mine_button", "maybe_send_here_button")
+#: Монолит - тоже только при входе (2026-10-31): после ответа на событие у
+#: Монолита вместо итога приходил его зов.
+BUTTONS = ("_maybe_send_monolith_button", "maybe_send_lake_button", "maybe_send_mine_button", "maybe_send_here_button")
 
 
 def _calls(text: str, name: str) -> int:

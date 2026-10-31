@@ -655,7 +655,6 @@ async def event_choice(message: Message) -> None:
     )
     if ash_handful_state.is_pending(peer_id):
         await message.answer(kb.ASH_OFFER_TEXT, keyboard=kb.ash_handful_keyboard())
-    await world._maybe_send_monolith_button(peer_id, character)
     from bot.handlers import herbs as herb_handlers  # цикл импортов
 
     await herb_handlers.notify(peer_id, character)
@@ -700,4 +699,3 @@ async def read_song(message: Message) -> None:
         attachment=location_attachment(character),
         keyboard=kb.movement_keyboard(character.pos_x, character.pos_y, peer_id, has_mount=True),
     )
-    await world._maybe_send_monolith_button(peer_id, character)
