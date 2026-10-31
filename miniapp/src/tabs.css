@@ -1277,6 +1277,8 @@ body.lite .rank-ladder__step--now .rank-ladder__dot { animation: none; }
 
 .contract-card__side small { font-size: 12px; opacity: 0.65; }
 
+.contract-card__buyout { display: flex; gap: 6px; }
+
 .contract-card__price {
   font: 600 18px/1 var(--serif);
   font-variant-numeric: tabular-nums;

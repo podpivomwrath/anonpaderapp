@@ -185,6 +185,7 @@ async def _contracts_state(db, character, now: datetime) -> dict:
             "crown_frame": frames.get(target.id),
             "power": (await power_service.power_of(db, target)).total,
             "kills_left": c.kills_left, "kills_total": c.kills_total, "price": c.price,
+            "buyout": contract_service.buyout_cost(c) if target.id == character.id else None,
             "minutes_left": max(int((expires - now).total_seconds() // 60), 0),
             "hunters": counts.get(c.id, 0), "taken": taken,
             "guildmate": character.guild_id is not None and target.guild_id == character.guild_id,
@@ -196,6 +197,7 @@ async def _contracts_state(db, character, now: datetime) -> dict:
         "gems": wallet.donate_currency if wallet is not None else 0,
         "rules": {
             "min_kills": cc.MIN_KILLS, "max_kills": cc.MAX_KILLS, "min_price": cc.MIN_PRICE,
+            "buyout_mult": cc.BUYOUT_MULT, "reorder_hours": cc.BUYOUT_REORDER_HOURS,
             "hours": cc.HOURS, "target_min_level": cc.TARGET_MIN_LEVEL,
         },
         "contracts": items,
@@ -214,16 +216,16 @@ async def handle_get_contracts(request: web.Request) -> web.Response:
 
 
 async def handle_post_contracts(request: web.Request) -> web.Response:
-    """{"action": "create", "name", "kills", "price"} | {"action": "take", "id"}."""
+    """{"action": "create", "name", "kills", "price"} | {"action": "take" | "buyout", "id"}."""
     from services import contract_service
 
     try:
         body = await request.json()
     except Exception:
         return web.json_response({"error": "bad_request"}, status=400)
-    if not isinstance(body, dict) or body.get("action") not in ("create", "take"):
+    if not isinstance(body, dict) or body.get("action") not in ("create", "take", "buyout"):
         return web.json_response({"error": "bad_request"}, status=400)
-    created = None
+    created = bought = None
     async with request.app[SESSION_FACTORY_KEY]() as db:
         character = await onboarding_svc.get_character(db, request[VK_USER_ID_KEY])
         if character is None:
@@ -234,7 +236,18 @@ async def handle_post_contracts(request: web.Request) -> web.Response:
                 created = await contract_service.create(
                     db, character, body.get("name"), body.get("kills"), body.get("price"),
                 )
-                done = f"📜 Заказ оформлен: {plural.count(created.kills_total, 'убийство', 'убийства', 'убийств')} по 💎{created.price}. Заказчик никому не виден."
+                done = (
+                    f"📜 Заказ оформлен: {plural.count(created.kills_total, 'убийство', 'убийства', 'убийств')} "
+                    f"по 💎{created.price}. Заказчик скрыт, пока цель не откупится."
+                )
+            elif body["action"] == "buyout":
+                from bot.battle_keyboard import in_any_battle
+
+                if in_any_battle(request[VK_USER_ID_KEY]):
+                    raise contract_service.ContractError("Откупиться можно только вне боя.")
+                bought = await contract_service.buyout(db, character, body.get("id"))
+                who = f"Заказчик - {bought.orderer_name}." if bought.orderer_name else "Заказчика уже нет в игре."
+                done = f"💸 Ты откупился за 💎{bought.cost}, заказ снят. {who}"
             else:
                 contract = await contract_service.take(db, character, body.get("id"))
                 target = await db.get(Character, contract.target_id)
@@ -249,6 +262,10 @@ async def handle_post_contracts(request: web.Request) -> web.Response:
         from bot.handlers import contracts as contracts_handlers  # избегаем цикла импортов
 
         await contracts_handlers.notify_target(created.target_id, created.kills_total)
+    if bought is not None:
+        from bot.handlers import contracts as contracts_handlers  # избегаем цикла импортов
+
+        await contracts_handlers.notify_bought(bought, character.name)
     state["done"] = done
     return web.json_response(state)
 

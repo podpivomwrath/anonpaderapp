@@ -18,20 +18,43 @@ function left(minutes) {
   return h ? `${h} ч ${minutes % 60} мин` : `${minutes} мин`;
 }
 
+function BuyoutButton({ c, gems, busy, act }) {
+  const [confirming, setConfirming] = useState(false);
+  if (confirming) {
+    return (
+      <span className="contract-card__buyout">
+        <button type="button" className="pill-btn pill-btn--main" disabled={busy}
+          onClick={async () => { await act('buyout', { id: c.id }); setConfirming(false); }}>
+          Да, 💎{money(c.buyout)}
+        </button>
+        <button type="button" className="pill-btn" disabled={busy} onClick={() => setConfirming(false)}>Нет</button>
+      </span>
+    );
+  }
+  return (
+    <button type="button" className="pill-btn pill-btn--main" disabled={busy || c.buyout > gems}
+      onClick={() => setConfirming(true)}>
+      Откуп 💎{money(c.buyout)}
+    </button>
+  );
+}
+
 function OrderForm({ data, busy, act }) {
   const { rules } = data;
   const [name, setName] = useState('');
-  const [kills, setKills] = useState(1);
+  const [kills, setKills] = useState(String(rules.min_kills));
   const [price, setPrice] = useState(String(rules.min_price));
   const [confirming, setConfirming] = useState(false);
   const priceNum = parseInt(price, 10) || 0;
-  const total = kills * priceNum;
-  const valid = name.trim().length >= 3 && priceNum >= rules.min_price;
+  const killsNum = parseInt(kills, 10) || 0;
+  const total = killsNum * priceNum;
+  const valid = name.trim().length >= 3 && priceNum >= rules.min_price
+    && killsNum >= rules.min_kills && killsNum <= rules.max_kills;
 
   const submit = async () => {
-    const ok = await act('create', { name: name.trim(), kills, price: priceNum });
+    const ok = await act('create', { name: name.trim(), kills: killsNum, price: priceNum });
     setConfirming(false);
-    if (ok) { setName(''); setKills(1); setPrice(String(rules.min_price)); }
+    if (ok) { setName(''); setKills(String(rules.min_kills)); setPrice(String(rules.min_price)); }
   };
 
   return (
@@ -41,13 +64,10 @@ function OrderForm({ data, busy, act }) {
           <input className="guild-input" placeholder="Ник цели" maxLength={16} value={name}
             onChange={(e) => { setName(e.target.value); setConfirming(false); }} />
         </div>
-        <div className="contract-kills">
-          <span className="craft-hint">Убийств:</span>
-          {Array.from({ length: rules.max_kills - rules.min_kills + 1 }, (_, i) => rules.min_kills + i).map((n) => (
-            <button key={n} type="button"
-              className={`faction-choice__item contract-kills__n${n === kills ? ' faction-choice__item--active' : ''}`}
-              onClick={() => { setKills(n); setConfirming(false); }}>{n}</button>
-          ))}
+        <div className="guild-row">
+          <span className="craft-hint">Убийств ({rules.min_kills}-{rules.max_kills}):</span>
+          <input className="guild-input guild-input--short" type="number" min={rules.min_kills} max={rules.max_kills}
+            value={kills} onChange={(e) => { setKills(e.target.value); setConfirming(false); }} />
         </div>
         <div className="guild-row">
           <span className="craft-hint">💎 за одно убийство:</span>
@@ -56,8 +76,8 @@ function OrderForm({ data, busy, act }) {
         </div>
         <p className="craft-hint">
           Итого 💎{money(total)} (у тебя 💎{money(data.gems)}), списываются сразу. Заказ висит {rules.hours} ч,
-          невыполненный остаток сгорает. Цель - с {rules.target_min_level} уровня. Кто заказал, не узнает никто;
-          цели придёт весть, что на неё заказ.
+          невыполненный остаток сгорает. Цель - с {rules.target_min_level} уровня. Цели придёт весть, что на неё
+          заказ; кто заказал, она узнает, только если откупится.
         </p>
         {confirming ? (
           <div className="guild-row">
@@ -144,7 +164,7 @@ export default function ContractsSection() {
               </div>
               <span className="contract-card__side">
                 <b className="contract-card__price">💎{money(c.price)}</b>
-                {c.on_me ? <small>на тебя</small>
+                {c.on_me ? <><small>на тебя</small><BuyoutButton c={c} gems={data.gems} busy={busy} act={act} /></>
                   : c.mine ? <small>твой заказ</small>
                     : c.taken ? <small>взят</small>
                       : c.guildmate ? <small>согильдиец</small>
@@ -159,6 +179,8 @@ export default function ContractsSection() {
             её даже в АФК и на озере: там нападение обрывает рыбалку. На руднике цель не тронут, пока она внутри штольни. Не тронут и в городе, у Монолита и у мирового босса.
             Убили вместе - награда делится поровну между теми, кто взял заказ и бил цель.
             Клейма за такое убийство нет. Где цели - команда /заказ.
+            Цель может откупиться вне боя за двойную цену оставшихся убийств: самоцветы сгорают, заказ снимается,
+            цель узнаёт ник заказчика, а он не может заказать её снова {data.rules.reorder_hours} ч.
           </p>
         </Div>
       </Group>

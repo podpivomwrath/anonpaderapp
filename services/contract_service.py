@@ -57,6 +57,11 @@ async def create(db: AsyncSession, orderer: Character, target_name, kills, price
         raise ContractError("Себя заказать нельзя.")
     if target.level < cc.TARGET_MIN_LEVEL:
         raise ContractError(f"Заказать можно игрока с {cc.TARGET_MIN_LEVEL} уровня.")
+    wait = await reorder_wait_hours(db, orderer.id, target.id, now)
+    if wait > 0:
+        raise ContractError(
+            f"{target.name} откупился от твоего заказа. Снова заказать его можно через {max(1, round(wait))} ч."
+        )
     total = kills * price
     try:
         await wallet_service.charge(db, orderer.id, "donate", total)
@@ -91,6 +96,59 @@ async def take(db: AsyncSession, hunter: Character, contract_id, now: datetime |
     db.add(ContractTaker(contract_id=contract.id, character_id=hunter.id, taken_at=now))
     await db.flush()
     return contract
+
+
+async def reorder_wait_hours(db: AsyncSession, orderer_id: int, target_id: int, now: datetime | None = None) -> float:
+    """Сколько ещё ждать заказчику, от которого цель откупилась. При откупе
+    expires_at становится моментом откупа."""
+    now = now or _now()
+    since = now - timedelta(hours=cc.BUYOUT_REORDER_HOURS)
+    last = await db.scalar(
+        select(func.max(Contract.expires_at)).where(
+            Contract.orderer_id == orderer_id, Contract.target_id == target_id,
+            Contract.status == "bought", Contract.expires_at > since,
+        )
+    )
+    if last is None:
+        return 0.0
+    return max(0.0, (_aware(last) + timedelta(hours=cc.BUYOUT_REORDER_HOURS) - now).total_seconds() / 3600)
+
+
+def buyout_cost(contract: Contract) -> int:
+    return contract.kills_left * contract.price * cc.BUYOUT_MULT
+
+
+@dataclass
+class Buyout:
+    contract: Contract
+    cost: int
+    orderer_name: str | None      # ник и только ник; None - заказчика уже нет
+    taker_ids: list[int]
+
+
+async def buyout(db: AsyncSession, target: Character, contract_id, now: datetime | None = None) -> Buyout:
+    """Цель откупается от заказа (2026-11-01, владелец). Самоцветы сгорают,
+    остаток заказа тоже; цель узнаёт ник заказчика. Бой проверяет вызывающий."""
+    now = now or _now()
+    cid = _int(contract_id)
+    contract = await db.get(Contract, cid, with_for_update=True) if cid is not None else None
+    if contract is None or contract.status != "active" or _aware(contract.expires_at) <= now or contract.kills_left <= 0:
+        raise ContractError("Этот заказ уже закрыт.")
+    if contract.target_id != target.id:
+        raise ContractError("Откупиться можно только от заказа на себя.")
+    cost = buyout_cost(contract)
+    try:
+        await wallet_service.charge(db, target.id, "donate", cost)
+    except wallet_service.NotEnoughCurrency:
+        raise ContractError(f"Не хватает самоцветов: откуп стоит 💎{cost}.") from None
+    contract.status = "bought"
+    contract.expires_at = now
+    orderer = await db.get(Character, contract.orderer_id) if contract.orderer_id else None
+    takers = list((await db.scalars(
+        select(ContractTaker.character_id).where(ContractTaker.contract_id == contract.id)
+    )).all())
+    await db.flush()
+    return Buyout(contract, cost, orderer.name if orderer is not None else None, takers)
 
 
 async def active_contracts(db: AsyncSession, now: datetime | None = None) -> list[Contract]:

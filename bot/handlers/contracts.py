@@ -76,11 +76,36 @@ async def notify_target(target_id: int, kills: int) -> None:
             message=(
                 f"📜 На тебя оформлен заказ: убийств - {kills}. Пока он действует (до 20 ч), охотники, "
                 "взявшие его, видят тебя на карте, а озёра и АФК от них не спасают. На руднике "
-                "не тронут, пока ты внутри штольни. Спасение - города, Монолит и клетка мирового босса."
+                "не тронут, пока ты внутри штольни. Спасение - города, Монолит и клетка мирового босса. "
+                "Вне боя можно откупиться на «Доске» за двойную цену оставшихся убийств - тогда узнаешь, кто заказал."
             ),
         )
     except Exception:  # noqa: BLE001 - цель закрыла диалог с ботом
         logger.warning("Заказы: не удалось известить цель {}", target_id)
+
+
+async def notify_bought(bought: contract_service.Buyout, target_name: str) -> None:
+    """Цель откупилась: заказчику и взявшим - что заказа больше нет."""
+    from game.economy import contract_config as cc
+
+    if _bot_api is None:
+        return
+    notes = []
+    if bought.contract.orderer_id:
+        notes.append((bought.contract.orderer_id, (
+            f"📜 {target_name} откупился от твоего заказа и узнал, что заказчик - ты. Остаток заказа сгорел, "
+            f"снова заказать {target_name} можно через {cc.BUYOUT_REORDER_HOURS} ч."
+        )))
+    notes += [(cid, f"📜 {target_name} откупился - заказ на него снят.") for cid in bought.taker_ids]
+    async with get_session_factory()() as db:
+        peers = [(await onboarding_svc.vk_id_for_character(db, cid), text) for cid, text in notes]
+    for peer, text in peers:
+        if peer is None:
+            continue
+        try:
+            await _bot_api.messages.send(peer_id=peer, random_id=0, message=text)
+        except Exception:  # noqa: BLE001 - закрыл диалог с ботом
+            pass
 
 
 async def expire_job() -> None:

@@ -467,7 +467,7 @@ WALLET_REASONS = {
     "rune_service.buy_hero_slot": "Слот руны героя",
     "rune_service.buy_skill_slot": "Второй слот руны навыка",
     "alchemy_service.start": "Варка зелья", "cooking_service.start": "Готовка в печи",
-    "contract_service.create": "Заказ на голову", "contract_service.on_kill": "Награда за заказ",
+    "contract_service.create": "Заказ на голову", "contract_service.buyout": "Откуп от заказа", "contract_service.rules_refund": "Возврат заказа: новые правила", "contract_service.on_kill": "Награда за заказ",
     "courier_service.buy": "Курьер (магазин)", "daily_service._apply_delta": "Ежедневное задание",
     "daily_service._grant_reward": "Ежедневное задание", "elixir_service.buy_bulk": "Лавка зелий",
     "exchange.buy_donate": "Биржа: купил самоцветы", "exchange.sell_donate": "Биржа: продал самоцветы",
