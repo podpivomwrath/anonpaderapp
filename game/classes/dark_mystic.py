@@ -216,8 +216,9 @@ def drain(ctx: SkillContext) -> None:
 
 @offensive_skill("dark_mystic_circle")
 def circle_of_dark(ctx: SkillContext) -> None:
-    """Круг тьмы: тратит 20% текущего HP, лечит всю группу вместе с мистиком
-    силой поддержки (Воля). Вне группы лечит только себя."""
+    """Круг тьмы: тратит 20% текущего HP, лечит всю группу вместе с мистиком -
+    каждого на долю ЕГО здоровья от силы поддержки (Воля). Вне группы лечит
+    только себя, со штрафом одиночки."""
     skill = SUBCLASS_SKILL_DEFS["dark_mystic_circle"]
     actor = ctx.actor
     actor.cooldowns[skill.id] = skill.cd
@@ -227,18 +228,18 @@ def circle_of_dark(ctx: SkillContext) -> None:
     if actor.buff_modifiers.get("dark_reward_bonus", 0.0) > 0:
         actor.dark_reward_ready = True
 
-    # support_power(WIL) - ДОЛЯ, а не плоское число (см. formulas.py), поэтому
-    # и щит Оберега, и Круг тьмы считаются от максимума здоровья мистика.
-    power = (
-        actor.max_hp * stat_model.ACTIVE.support_power(actor.stats)
-        * skill.effect_value * _edge_multiplier(actor)
-    )
+    # support_power(WIL) - ДОЛЯ, а не плоское число (см. formulas.py). С
+    # 2026-10-31 доля берётся от здоровья ЛЕЧИМОГО, не мистика: раньше Круг
+    # всем лечил на здоровье мистика x1.5, и лёгкий союзник с 0% вставал до
+    # 96% (живой бой). В одиночку - со штрафом, как остальное лечение.
+    share = stat_model.ACTIVE.support_power(actor.stats) * skill.effect_value * _edge_multiplier(actor)
     allies = ctx.session.alive_allies_of(actor)
     if allies:
         # Круг лечит всю группу ВМЕСТЕ с мистиком (2026-10-16, решение
         # владельца): раньше себя он не лечил, и в группе мистик почти не
         # восстанавливался сам - игроки жаловались.
         for ally in [*allies, actor]:
-            ctx.heals.append(PendingHeal(source_id=actor.id, target_id=ally.id, amount=round(power), label="исцеляет кругом тьмы"))
+            ctx.heals.append(PendingHeal(source_id=actor.id, target_id=ally.id, amount=round(ally.max_hp * share), label="исцеляет кругом тьмы"))
     else:
-        ctx.heals.append(PendingHeal(source_id=actor.id, target_id=actor.id, amount=round(power * bc.DARK_MYSTIC_CIRCLE_SOLO_MULT), label="исцеляет кругом тьмы"))
+        amount = actor.max_hp * share * bc.DARK_MYSTIC_CIRCLE_SOLO_MULT * _solo_heal_penalty(ctx)
+        ctx.heals.append(PendingHeal(source_id=actor.id, target_id=actor.id, amount=round(amount), label="исцеляет кругом тьмы"))

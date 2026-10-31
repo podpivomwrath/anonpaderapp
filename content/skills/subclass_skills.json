@@ -141,7 +141,7 @@
   "dark_mystic_circle": {
     "id": "dark_mystic_circle", "name": "Круг тьмы", "subclass_id": "dark_mystic",
     "multiplier": 0, "cd": 6, "effect": "custom",
-    "effect_value": 1.5,
+    "effect_value": 0.6,
     "flavor": "Ты платишь собой - и платёж расходится кругами."
   }
 }

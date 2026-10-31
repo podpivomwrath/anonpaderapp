@@ -319,6 +319,21 @@ def test_drain_bonus_damage_on_controlled_target() -> None:
     assert frozen_damage > plain_damage
 
 
+def test_circle_of_dark_heals_share_of_each_target_hp() -> None:
+    """2026-10-31: Круг лечит долю здоровья ЛЕЧИМОГО - хрупкий союзник
+    больше не встаёт с нуля почти до полной от здоровья толстого мистика."""
+    from game.combat import stat_model
+    from game.combat.subclass_skills import SUBCLASS_SKILL_DEFS
+
+    mystic = combatant(1, side=0, subclass_id="dark_mystic", will=200, vitality=400)
+    ally = combatant(2, side=0)
+    mystic.current_hp, ally.current_hp = 1, 1
+    resolve_tick(make_session(mystic, ally), {1: skill("dark_mystic_circle")}, NoCritRng())
+    share = stat_model.ACTIVE.support_power(mystic.stats) * SUBCLASS_SKILL_DEFS["dark_mystic_circle"].effect_value
+    assert abs(ally.current_hp - 1 - ally.max_hp * share) <= 1
+    assert ally.current_hp < ally.max_hp * 0.5
+
+
 def test_circle_of_dark_heals_whole_group_with_mystic() -> None:
     """2026-10-16: Круг тьмы в группе лечит и самого мистика (раньше - только
     союзников, и в группе мистик себя почти не лечил)."""
