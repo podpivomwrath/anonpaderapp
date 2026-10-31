@@ -107,9 +107,9 @@ from services.db import get_session_factory
 
 #: Затухание лечения и щитов (shared_rules.recovery_mult) - в начале боя.
 RECOVERY_INTRO = (
-    f"Лечение и щиты слабеют с каждым ходом, на {bc.PVP_MAX_TURNS}-м ходу "
+    f" Лечение и щиты слабеют с каждым ходом, на {bc.PVP_MAX_TURNS}-м ходу "
     f"от них остаётся {round(bc.PVP_RECOVERY_FLOOR * 100)}%."
-)
+) if bc.PVP_RECOVERY_DECAY else ""
 
 
 #: Цель заказа в штольне (2026-10-29, владелец).
@@ -706,7 +706,7 @@ async def start_arena_room(db, roster: list[tuple[Character, int, int]], code: s
         _init_target(session_id, battle, cid)
     intro = (
         f"🏟 Арена, комната {code}: бой начался! Бой тренировочный - ничего не теряется. "
-        f"Все действуют одновременно, ход - {round(bc.PVP_GROUP_TURN_SECONDS)} секунд. {RECOVERY_INTRO}"
+        f"Все действуют одновременно, ход - {round(bc.PVP_GROUP_TURN_SECONDS)} секунд.{RECOVERY_INTRO}"
     )
     for p in list(battle.participants.values()):
         board = intro + "\n\n" + _render_mass(state, [])
@@ -744,7 +744,7 @@ async def _launch_duel(
     _mass_engine.start_session(state)
     for cid in list(battle.participants):
         _init_target(session_id, battle, cid)
-    intro = f"{intro} Оба действуют одновременно, ход - {round(bc.PVP_GROUP_TURN_SECONDS)} секунд. {RECOVERY_INTRO}"
+    intro = f"{intro} Оба действуют одновременно, ход - {round(bc.PVP_GROUP_TURN_SECONDS)} секунд.{RECOVERY_INTRO}"
     for p in list(battle.participants.values()):
         combatant = state.combatants[p.character_id]
         await _bot_api.messages.send(
@@ -779,7 +779,7 @@ async def _start_group_ambush(db, attacker: Character, attacker_peer_id: int, vi
     intro = (
         f"⚔️ {attacker.name} нападает на {victim.name} посреди боя с мобами! "
         f"Бой с мобами прерван без итога, вся группа ({names}) вступает в схватку. "
-        f"Все действуют одновременно, ход - {round(bc.PVP_GROUP_TURN_SECONDS)} секунд. {RECOVERY_INTRO}"
+        f"Все действуют одновременно, ход - {round(bc.PVP_GROUP_TURN_SECONDS)} секунд.{RECOVERY_INTRO}"
     )
     for p in list(battle.participants.values()):
         board = intro + "\n\n" + _render_mass(state, [])

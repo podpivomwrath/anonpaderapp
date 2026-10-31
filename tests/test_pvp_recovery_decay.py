@@ -8,6 +8,22 @@ from game.combat.session import ECHO_TAG, EffectKind, CombatSessionState, Combat
 from tests.conftest import combatant as make_combatant
 
 
+import pathlib
+
+import pytest
+
+
+@pytest.fixture(autouse=True)
+def _decay_on(monkeypatch):
+    """Затухание выключено с 2026-10-31; механику проверяем, включив флаг."""
+    monkeypatch.setattr(bc, "PVP_RECOVERY_DECAY", True)
+
+
+def test_decay_is_off_in_config() -> None:
+    src = pathlib.Path(bc.__file__).read_text(encoding="utf-8")
+    assert "PVP_RECOVERY_DECAY = False" in src
+
+
 def test_recovery_mult_runs_from_full_to_floor() -> None:
     turns = bc.PVP_MAX_TURNS
     assert shared_rules.recovery_mult(1, turns) == 1.0
