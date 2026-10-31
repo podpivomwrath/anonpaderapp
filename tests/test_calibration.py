@@ -960,3 +960,28 @@ def test_control_blocked_line_names_the_reason() -> None:
     assert "повторного контроля" in combat_flavor.control_blocked_line("Тест", "chain")
     for reason in ("always", "effect", "chain", None):
         assert "уже под контролем" not in combat_flavor.control_blocked_line("Тест", reason)
+
+
+def test_pvp_provoke_only_on_struck_target() -> None:
+    """2026-10-31: в PvP провокация - только на того, кого ударил Удар щитом."""
+    rng = NoCritRng()
+    guardian = combatant(1, side=0, subclass_id="guardian")
+    struck = combatant(2, side=1)
+    other = combatant(3, side=1)
+    state = make_session(guardian, struck, other)
+
+    resolve_tick(state, {1: skill("guardian_shield_bash", 2)}, rng)
+    assert struck.effect_from(EffectKind.PROVOKE_PVP, guardian.id) is not None
+    assert other.effect_from(EffectKind.PROVOKE_PVP, guardian.id) is None
+
+
+def test_pve_provoke_still_taunts_every_mob() -> None:
+    """В PvE провокация, как и раньше, форсит всех мобов, а не только ударенного."""
+    rng = NoCritRng()
+    guardian = combatant(1, side=0, subclass_id="guardian")
+    mobs = [combatant(i, side=1, kind="mob") for i in (2, 3, 4)]
+    state = CombatSessionState(session_id=1, mode=CombatMode.PVE)
+    for c in (guardian, *mobs):
+        state.add(c)
+    resolve_tick(state, {1: skill("guardian_shield_bash", 2)}, rng)
+    assert all(m.taunted_by == guardian.id for m in mobs)

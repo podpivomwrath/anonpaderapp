@@ -1075,13 +1075,16 @@ async def _pvp_action(message: Message, action: DeclaredAction) -> None:
     is_defensive = action.type == ActionType.DEFEND or (
         action.type == ActionType.SKILL and action.skill_id in DEFENSIVE_SKILLS
     )
-    if not is_defensive:
+    if action.type != ActionType.DEFEND:
         # Патч 38: действие бьёт по ВЫБРАННОЙ игроком цели (см.
         # pvp_pick_target/_chosen_target), не по случайной.
+        # Защитные навыки тоже берут выбранную цель: «Удар щитом» бьёт и
+        # провоцирует её, а не случайного врага (2026-10-31, репорт 272).
         target = _resolve_chosen_target(battle_id, battle, cid)
-        if target is None:
+        if target is None and not is_defensive:
             return
-        action = action.model_copy(update={"target_id": target})
+        if target is not None:
+            action = action.model_copy(update={"target_id": target})
 
     # Патч 31, п.6: в групповом PvP клавиатура убирается сразу после
     # объявления действия, до резолва окна — иначе игрок мог жать кнопки

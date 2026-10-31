@@ -831,11 +831,14 @@ async def _raid_action(message: Message, action: DeclaredAction) -> None:
     is_defensive = action.type == ActionType.DEFEND or (
         action.type == ActionType.SKILL and action.skill_id in DEFENSIVE_SKILLS
     )
-    if not is_defensive:
+    if action.type != ActionType.DEFEND:
+        # Защитные навыки тоже берут выбранную цель: «Удар щитом» бьёт и
+        # провоцирует её, а не случайного врага (2026-10-31, репорт 272).
         target = _resolve_chosen_target(battle_id, battle, cid)
-        if target is None:
+        if target is None and not is_defensive:
             return
-        action = action.model_copy(update={"target_id": target})
+        if target is not None:
+            action = action.model_copy(update={"target_id": target})
 
     _declared_this_tick.setdefault(battle_id, set()).add(cid)
     _declared_actions.setdefault(battle_id, {})[cid] = action

@@ -110,7 +110,7 @@ def _describe_guardian_command(b: BuffDef) -> str:
 def _describe_guardian_provoker_mark(b: BuffDef) -> str:
     total = bc.PROVOKE_PVP_DAMAGE_REDUCTION + bc.GUARDIAN_PROVOKER_MARK_BONUS
     return (
-        f"В бою с игроками: пока действует твоя Провокация, противник, который бьёт не тебя, "
+        f"В бою с игроками: пока действует твоя Провокация, спровоцированный противник, бьющий не тебя, "
         f"наносит на {_pct(total)} меньше урона (без этого баффа - на {_pct(bc.PROVOKE_PVP_DAMAGE_REDUCTION)})."
     )
 

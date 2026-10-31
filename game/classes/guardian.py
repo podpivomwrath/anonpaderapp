@@ -39,7 +39,7 @@ _UNBREAKABLE = SUBCLASS_SKILL_DEFS["guardian_unbreakable"]
 @defensive_skill("guardian_shield_bash")
 def shield_bash(ctx: SkillContext) -> None:
     """Удар щитом: 150% урона + Провокация на 2 хода (PvE — форс цели мобов,
-    PvP — дебаф урона противника по остальным целям). ЗАЩИТНЫЙ навык (не
+    PvP — дебаф урона ударенного противника по остальным целям). ЗАЩИТНЫЙ навык (не
     зависит от фазы атаки моба — провокация должна успеть подействовать в
     этот же ход)."""
     skill = SUBCLASS_SKILL_DEFS["guardian_shield_bash"]
@@ -50,8 +50,8 @@ def shield_bash(ctx: SkillContext) -> None:
         ctx.hits.append(compute_hit(actor, target, ctx.rng, skill.name, skill.multiplier, is_ability=True,
                                     dodge_marks=False))
 
-    enemies = ctx.session.alive_enemies_of(actor)
     if ctx.session.mode == CombatMode.PVE:
+        enemies = ctx.session.alive_enemies_of(actor)
         # Те же 2 хода (+«Несгибаемый»), что и в PvP.
         taunt_ticks = bc.PROVOKE_PVP_DURATION_TICKS + int(actor.buff_modifiers.get("provoke_duration_bonus", 0))
         for enemy in enemies:
@@ -71,9 +71,11 @@ def shield_bash(ctx: SkillContext) -> None:
         # независимые эффекты от одного источника, и game/combat/skills.py::
         # outgoing_multiplier перемножал снижение урона за КАЖДЫЙ — двойная
         # провокация давала -51% вместо -30%.
-        for enemy in enemies:
-            enemy.apply_effect(EffectKind.PROVOKE_PVP, reduction, duration, actor.id)
-        ctx.lines.append(f"{actor.name} провоцирует: урон противников по другим целям снижен")
+        # 2026-10-31 (владелец): в PvP провокация - только на того, кого
+        # Страж ударил, а не на всю вражескую сторону.
+        if target is not None and target.side != actor.side and target.alive:
+            target.apply_effect(EffectKind.PROVOKE_PVP, reduction, duration, actor.id)
+            ctx.lines.append(f"{actor.name} провоцирует {target.name}: его урон по другим целям снижен")
 
 
 @defensive_skill("guardian_block")

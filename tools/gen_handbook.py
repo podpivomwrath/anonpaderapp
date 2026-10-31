@@ -75,7 +75,7 @@ def skill_mechanics() -> dict[str, str]:
     return {
         "guardian_shield_bash":
             f"Провокация на {turns(bc.PROVOKE_PVP_DURATION_TICKS)}. В бою с мобами все мобы бьют только тебя. "
-            f"В бою с игроками противник, который бьёт не тебя, наносит на "
+            f"В бою с игроками провоцируешь того, кого ударил: пока он бьёт не тебя, он наносит на "
             f"{pct(bc.PROVOKE_PVP_DAMAGE_REDUCTION)} меньше урона.",
         "guardian_block":
             f"Глухая оборона: каждый удар по тебе на {pct(_s('guardian_block').effect_value)} слабее, "
