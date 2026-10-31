@@ -833,3 +833,21 @@ async def test_same_guild_rejoin_waits_a_week(db_session, make_character) -> Non
     await guild_service.invite(db_session, leader, newbie.name)
     with pytest.raises(GuildError, match="дн"):
         await guild_service.accept_invite(db_session, newbie, guild.id)
+
+
+async def test_fort_watch_sees_strangers_around(db_session, make_character) -> None:
+    """2026-11-01: форт и выше видит чужих на базе и на 8 соседних клетках."""
+    guild, leader = await _found(db_session, make_character)
+    fort = await _held_base(db_session, guild, 10, 10, tier=gc.BASE_FORT)
+    await _held_base(db_session, guild, 14, 10)  # застава - дозора нет
+    stranger = await make_character(level=30)
+    for (x, y), where in (((9, 11), "на северо-западе"), ((10, 9), "на юге"), ((10, 10), "прямо на базе")):
+        stranger.pos_x, stranger.pos_y = x, y
+        seen = await guild_territory_service.fort_sightings(db_session, stranger)
+        assert [(c.cell_id, c.where) for c in seen] == [(fort.id, where)]
+    stranger.pos_x, stranger.pos_y = 12, 10      # две клетки от форта
+    assert await guild_territory_service.fort_sightings(db_session, stranger) == []
+    stranger.pos_x, stranger.pos_y = 14, 11      # рядом с заставой
+    assert await guild_territory_service.fort_sightings(db_session, stranger) == []
+    leader.pos_x, leader.pos_y = 9, 9            # свои не в счёт
+    assert await guild_territory_service.fort_sightings(db_session, leader) == []

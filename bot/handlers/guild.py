@@ -38,6 +38,9 @@ labeler.vbml_ignore_case = True  # команды без учёта регист
 _bot_api = None
 _rng = random.Random()
 _tasks: set[asyncio.Task] = set()
+#: Дозор форта: {(id клетки базы, id чужого): когда писали}. Записи старше
+#: кулдауна выбрасываются при каждой новой записи.
+_watch_seen: dict[tuple[int, int], float] = {}
 
 BTN_BOSS_ATTACK = "⚔️ Бить Стража"
 
@@ -129,12 +132,38 @@ async def after_exploration(peer_id: int, character: Character, outcome) -> None
 
 
 async def on_arrival(db, character: Character) -> None:
-    """Чужой зашёл на клетку с башней - офицеры владельца узнают."""
+    """Чужой зашёл на клетку с башней - офицеры владельца узнают; рядом с
+    фортом - вся гильдия (дозор форта)."""
+    await on_watch(db, character)
     alarm = await guild_territory_service.on_cell_enter(db, character)
     if alarm is None:
         return
     who = f"[{alarm.intruder_guild}] {alarm.intruder}" if alarm.intruder_guild else alarm.intruder
     notify_peers(alarm.peers, f"🗼 Башня на ({alarm.x}; {alarm.y}): чужой на нашей земле - {who}.")
+
+
+async def on_watch(db, character: Character) -> None:
+    """Дозор форта: чужой на базе или рядом - пишем всей гильдии базы."""
+    import time
+
+    sightings = await guild_territory_service.fort_sightings(db, character)
+    if not sightings:
+        return
+    now = time.monotonic()
+    ttl = gc.WATCH_COOLDOWN_MINUTES * 60
+    for key in [k for k, t in _watch_seen.items() if now - t >= ttl]:
+        del _watch_seen[key]
+    other = None
+    for s in sightings:
+        key = (s.cell_id, character.id)
+        if key in _watch_seen:
+            continue
+        _watch_seen[key] = now
+        if other is None:
+            other = await guild_service.guild_of(db, character) or False
+        who = f"[{other.tag}] {character.name}" if other else character.name
+        peers = await guild_service.peers_of(db, s.guild_id)
+        notify_peers(peers, f"🏰 Форт на ({s.x}; {s.y}): {s.where} замечен игрок {who}.")
 
 
 # --- Фоновые задачи ------------------------------------------------------------------

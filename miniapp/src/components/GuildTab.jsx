@@ -890,11 +890,15 @@ function Cell({ cell, state, run, busy }) {
               )}
             </div>
           ))}
+          {cell.watch && (
+            <p className="craft-hint">👁 Дозор: о чужих на базе и на соседних клетках узнаёт вся гильдия.</p>
+          )}
           {cell.upgrade && perms.treasury && !cell.upgrade_to && (
             <div className="guild-row">
               <span className="craft-hint">
                 → {cell.upgrade.title}: {money(cell.upgrade.gold)} 💰 · {cell.upgrade.ore} ×{cell.upgrade.ore_count} · {cell.upgrade.hours} ч
                 (с {cell.upgrade.level_needed} ур. гильдии)
+                {cell.upgrade.new_watch && <><br />Форт даёт дозор: о чужих на базе и на соседних клетках узнаёт вся гильдия.</>}
               </span>
               <Button size="s" disabled={busy || state.guild.level < cell.upgrade.level_needed}
                 onClick={() => run('upgrade_base', { cell_id: cell.id }, 'Перестройка началась.')}>

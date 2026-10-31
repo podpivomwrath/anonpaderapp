@@ -675,6 +675,41 @@ async def on_cell_enter(db: AsyncSession, character: Character) -> TowerAlarm | 
     return TowerAlarm(cell.guild_id, cell.x, cell.y, character.name, other.tag if other else None, peers)
 
 
+#: Где чужой относительно базы (север - +y, как на карте).
+_WATCH_WHERE = {
+    (0, 0): "прямо на базе",
+    (0, 1): "на севере", (0, -1): "на юге", (1, 0): "на востоке", (-1, 0): "на западе",
+    (1, 1): "на северо-востоке", (-1, 1): "на северо-западе",
+    (1, -1): "на юго-востоке", (-1, -1): "на юго-западе",
+}
+
+
+@dataclass
+class FortSighting:
+    cell_id: int
+    guild_id: int
+    x: int
+    y: int
+    where: str
+
+
+async def fort_sightings(db: AsyncSession, character: Character) -> list[FortSighting]:
+    """Дозор форта: чужие базы ступени WATCH_TIERS, на чьей клетке или по
+    соседству (квадрат 3x3) стоит персонаж. Кулдаун держит вызывающий."""
+    if character.pos_x is None:
+        return []
+    x, y = character.pos_x, character.pos_y
+    cells = (await db.scalars(select(GuildCell).where(
+        GuildCell.status == "held", GuildCell.base_tier.in_(gc.WATCH_TIERS),
+        GuildCell.x.between(x - 1, x + 1), GuildCell.y.between(y - 1, y + 1),
+    ))).all()
+    return [
+        FortSighting(c.id, c.guild_id, c.x, c.y, _WATCH_WHERE[(x - c.x, y - c.y)])
+        for c in cells
+        if c.guild_id != character.guild_id and not c.mine_id
+    ]
+
+
 async def territory_counts(db: AsyncSession, guild_id: int) -> dict[str, int]:
     cells = [c for c in await cells_of(db, guild_id) if c.status == "held"]
     return {

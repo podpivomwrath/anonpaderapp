@@ -12,6 +12,7 @@ STATE: dict[str, str] = {
     "bot.trial_tracking._trackers": "конец боя или этапа (settle), снятый бой (drop)",
     # --- общие службы
     "bot.activity._owners": "выход из activity.transition (finally)",
+    "bot.handlers.guild._watch_seen": "записи старше кулдауна дозора выбрасываются при каждой новой",
     "bot.ash_handful_state._pending": "сбор горстки, новое исследование, уход с клетки",
     "bot.background._tasks": "готовая задача сама себя снимает (done_callback)",
     "bot.craft_button_state._last_cell": "перезапись при входе на другую клетку; размер - число игроков",
