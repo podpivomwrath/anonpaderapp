@@ -199,7 +199,8 @@ function Forge({ data, busy, run, strike }) {
             <ForgeSlot label="Руда" filled={!!oreRow} onClick={() => { setPicker('ore'); reset(); }}>
               <ItemIcon icon={oreRow ? `ore:${oreRow.id}` : null} rarity={oreRow?.grade} alt={oreRow?.name} />
               <span className="forge-slot__name">{oreRow?.name}</span>
-              {oreRow && <span className="forge-slot__sub">{oreRow.grade_name} · ×{cost}</span>}
+              {oreRow && <span className="forge-slot__sub">{oreRow.grade_name} · {oreRow.count} / {cost}</span>}
+              {!oreRow && item && <span className="forge-slot__sub">нужно {cost} шт.</span>}
             </ForgeSlot>
           </div>
           <p className="craft-hint">
@@ -260,7 +261,7 @@ function Forge({ data, busy, run, strike }) {
             disabled={busy || !item || !oreRow || !chosen || oreRow.count < cost}
             onClick={() => setConfirming(true)}>
             {!item ? 'Выбери предмет' : !oreRow ? 'Выбери руду' : !chosen ? 'Выбери результат'
-              : oreRow.count < cost ? 'Не хватает руды' : 'Создать'}
+              : oreRow.count < cost ? `Не хватает руды: ${oreRow.count} из ${cost}` : 'Создать'}
           </Button>
         )}
       </Div>
@@ -305,7 +306,7 @@ function Forge({ data, busy, run, strike }) {
                   <small>
                     старт {row.craft_efficiency}%
                     {topChance(row.grade) ? ` · ${STAT_TITLES[topChance(row.grade).stat] || topChance(row.grade).stat} ${topChance(row.grade).pct}%` : ''}
-                    {' · '}у тебя {row.count}{enough ? '' : ' - не хватает'}
+                    {' · '}у тебя {row.count}{enough ? '' : ` - не хватает, нужно ${cost}`}
                   </small>
                 </span>
               </button>
@@ -375,7 +376,9 @@ function ToolForge({ data, busy, run, need, itemName }) {
             </div>
           ) : (
             <Button size="l" stretched mode="secondary" disabled={busy || !group || !pick} onClick={() => setConfirming(true)}>
-              {!group ? 'Выбери руду' : !pick ? 'Не хватает руды' : 'Выковать инструмент'}
+              {!group ? 'Выбери руду'
+                : !pick ? `Не хватает руды: нужно ${group.tool_cost} одной градации, есть ${Math.max(0, ...group.grades.map((row) => row.count))}`
+                  : 'Выковать инструмент'}
             </Button>
           )}
         </Div>
