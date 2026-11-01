@@ -19,9 +19,7 @@ def _recovered(target: CombatantState, amount: int) -> int:
 def drink_heal(actor: CombatantState, elixir_id: str) -> str:
     """Лечебное зелье - тоже бесплатное действие (2026-10-14, решение
     владельца): лечит сразу, ход не тратится. Раньше шло действием хода."""
-    from game.combat.session import white_max_hp
-
-    amount = ec.heal_amount(elixir_id, white_max_hp(actor)) or 0
+    amount = ec.heal_amount(elixir_id, actor.max_hp) or 0
     amount = _recovered(actor, round(amount * (1 + actor.buff_modifiers.get("rune:clean_still", 0.0))))  # руна
     before = actor.current_hp
     actor.current_hp = min(actor.max_hp, before + amount)
@@ -162,14 +160,12 @@ def throw_flask(actor: CombatantState, elixir_id: str, combatants, power: float)
     """Метательная склянка (2026-10-23): зелье на всю свою сторону, но
     слабее - power от силы (лечение, величина эффекта; у эффектов «да/нет» -
     срок). Свитки сюда не идут: они и так на всех."""
-    from game.combat.session import white_max_hp
-
     allies = [c for c in (combatants or {actor.id: actor}).values() if c.alive and c.side == actor.side]
     flask = _flask_name(elixir_id)
-    if ec.heal_amount(elixir_id, white_max_hp(actor)) is not None:
+    if ec.heal_amount(elixir_id, actor.max_hp) is not None:
         healed = []
         for c in allies:
-            amount = _recovered(c, round((ec.heal_amount(elixir_id, white_max_hp(c)) or 0) * power))
+            amount = _recovered(c, round((ec.heal_amount(elixir_id, c.max_hp) or 0) * power))
             before = c.current_hp
             c.current_hp = min(c.max_hp, before + amount)
             if c.current_hp > before:

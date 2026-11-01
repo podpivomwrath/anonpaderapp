@@ -330,9 +330,7 @@ class DuelEngine:
             # как обычное действие (те же правила, что в PvE, патч 16).
             # Раньше ActionType.ITEM здесь не обрабатывался ВООБЩЕ — падал в
             # страховочную ветку ниже, зелье молча пропадало без эффекта.
-            from game.combat.session import white_max_hp
-
-            amount = ec.heal_amount(action.item_id, white_max_hp(actor))
+            amount = ec.heal_amount(action.item_id, actor.max_hp)
             if amount is not None:
                 ctx.heals.append(
                     PendingHeal(source_id=actor.id, target_id=actor.id, amount=amount, label="пьёт зелье")

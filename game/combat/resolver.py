@@ -30,7 +30,6 @@ from game.combat.session import (
     DeclaredAction,
     EffectKind,
     shield_name,
-    white_max_hp,
 )
 from game.combat.skills import (
     DEFENSIVE_SKILLS,
@@ -82,7 +81,7 @@ def _choose_mob_target(session: CombatSessionState, mob: CombatantState, rng: ra
 def _consume_heal_item(ctx: SkillContext, item_id: str | None) -> None:
     """Лечебное зелье (патч 16): тратит ход, как атака/навык."""
     actor = ctx.actor
-    amount = ec.heal_amount(item_id, white_max_hp(actor))
+    amount = ec.heal_amount(item_id, actor.max_hp)
     if amount is None:
         return
     ctx.heals.append(
