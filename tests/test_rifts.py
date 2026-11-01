@@ -284,3 +284,20 @@ def test_rift_cell_level_fits_rift_band() -> None:
         for _ in range(40):
             x, y = _rs._pick_cell(ring, set(), rng)
             assert lo <= _wc.cell_base_level(_grid.monolith_distance(x, y)) <= hi
+
+
+def test_transfer_passes_rift_queue() -> None:
+    """2026-11-01: /передать у входа в разлом отвечал напоминанием об очереди."""
+    import json
+    from types import SimpleNamespace
+
+    from bot.handlers import rift as rift_handlers
+
+    def msg(text="", payload=None):
+        raw = json.dumps(payload) if payload else None
+        return SimpleNamespace(peer_id=-777, text=text, payload=raw,
+                               get_payload_json=lambda: json.loads(raw) if raw else None)
+
+    assert rift_handlers._passes_through(msg("/передать Кровавый тесак"))
+    assert rift_handlers._passes_through(msg("✅ Передать", {"type": "transfer_confirm", "t": "x"}))
+    assert not rift_handlers._passes_through(msg("🎒 Сумка"))

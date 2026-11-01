@@ -87,7 +87,9 @@ def is_waiting(peer_id: int) -> bool:
 
 
 def _passes_through(message: Message) -> bool:
-    """Чем можно пользоваться у входа: отбиться и оглядеться."""
+    """Чем можно пользоваться у входа: отбиться, оглядеться и передать вещь
+    (2026-11-01, жалоба игрока: /передать в очереди отвечал напоминанием -
+    передача с клетки не уводит)."""
     from bot.handlers import pvp
 
     if in_any_battle(message.peer_id) or message.peer_id in pvp._pending_join_prompt:
@@ -95,10 +97,10 @@ def _passes_through(message: Message) -> bool:
     if is_info_command(message):  # справочные команды ничего не меняют
         return True
     text = (message.text or "").strip().lower()
-    if text.startswith(("/напасть", "/attack")) or text_match.same(message.text, BTN_LOOK_AROUND):
+    if text.startswith(("/напасть", "/attack", "/передать")) or text_match.same(message.text, BTN_LOOK_AROUND):
         return True
     payload = message.get_payload_json() or {}
-    return isinstance(payload, dict) and str(payload.get("type", "")).startswith("pvp")
+    return isinstance(payload, dict) and str(payload.get("type", "")).startswith(("pvp", "transfer_"))
 
 
 WAITING = FuncRule(lambda m: m.peer_id in _waiting and not _passes_through(m))
