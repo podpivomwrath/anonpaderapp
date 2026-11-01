@@ -179,6 +179,9 @@ def toxic_burst(ctx: SkillContext) -> None:
     tick_damage = shared_rules.poison_tick_damage(poison, actor, target)
     remaining_total = tick_damage * max(poison.remaining_ticks, 1)
     amount = max(round(remaining_total * skill.effect_value), 1)
+    # Руна «Нажим» (2026-11-02, жалоба игрока): выброс бьёт мимо compute_hit,
+    # где руна считается для остальных навыков, - без этой строки она молчала.
+    amount = round(amount * (1 + actor.buff_modifiers.get(f"rune:press@{skill.id}", 0.0)))
     ctx.hits.append(PendingHit(source_id=actor.id, target_id=target.id, amount=amount, label="взрывает ядом", is_dot=True))
     # «Токсичный всплеск» (2026-10-23, владелец): выброс - тоже конец яда,
     # он вспыхивает напоследок, как при истечении (shared_rules.poison_end_effects).

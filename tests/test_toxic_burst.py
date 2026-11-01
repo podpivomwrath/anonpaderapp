@@ -207,3 +207,10 @@ def test_venom_miss_applies_no_poison() -> None:
     poisoner_skills.venom(ctx)
     assert ctx.hits[0].missed
     assert enemy.effect_from(EffectKind.DOT, poisoner.id) is None
+
+
+def test_press_rune_strengthens_burst() -> None:
+    """2026-11-02: «Нажим» в выбросе не работал - выброс бьёт мимо compute_hit."""
+    plain, _, _ = _burst()
+    pressed, _, _ = _burst(mods={"rune:press@poisoner_toxic_burst": 0.10})
+    assert pressed == round(plain * 1.10)
