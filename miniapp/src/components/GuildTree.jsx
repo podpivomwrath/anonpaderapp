@@ -28,6 +28,8 @@ export default function GuildTree({ onChanged }) {
   const [notice, setNotice] = useState(null);
   const [info, setInfo] = useState(false);
   const [resetting, setResetting] = useState(null); // 'branch' | 'all'
+  // Сброс - своя кнопка поверх древа (2026-11-01: в «Итогах» её не находили).
+  const [resetOpen, setResetOpen] = useState(false);
   const [branch, setBranch] = useState('war');
   const [arm, setArm] = useState(0);
   // Ширина экрана руки: картинка 2:3 целиком влезает до низа окна, сколько
@@ -89,6 +91,7 @@ export default function GuildTree({ onChanged }) {
 
   const pick = (id) => {
     setInfo(false);
+    setResetOpen(false);
     setSelected(id);
   };
 
@@ -128,7 +131,7 @@ export default function GuildTree({ onChanged }) {
 
       <div className="guild-tree__bar">
         <span>Очков: <b>{tree.points_available}</b> · узлов {tree.taken}/{tree.total_nodes}</span>
-        <button type="button" onClick={() => { setInfo(!info); setSelected(null); }}>
+        <button type="button" onClick={() => { setInfo(!info); setSelected(null); setResetOpen(false); }}>
           {info ? '✕' : 'Итоги'}
         </button>
       </div>
@@ -167,6 +170,51 @@ export default function GuildTree({ onChanged }) {
           })}
         </svg>
 
+        {tree.can_reset && tree.taken > 0 && !resetOpen && (
+          <button type="button" className="guild-tree__reset"
+            onClick={() => { setResetOpen(true); setInfo(false); setSelected(null); setResetting(null); }}>
+            Сброс
+          </button>
+        )}
+
+        {resetOpen && (
+          <div className="guild-tree__card guild-tree__card--top">
+            <button type="button" className="guild-tree__card-close" onClick={() => setResetOpen(false)}
+              aria-label="Закрыть">✕</button>
+            <p className="guild-tree__card-title">Сброс древа</p>
+            {resetting ? (
+              <div className="guild-row">
+                <Button size="s" disabled={busy}
+                  onClick={() => {
+                    const params = resetting === 'all' ? {} : { branch };
+                    const text = resetting === 'all' ? 'Древо сброшено.' : `Ветвь «${tree.branches[branch]}» сброшена.`;
+                    setResetting(null);
+                    setResetOpen(false);
+                    act('tree_reset', params, text);
+                  }}>
+                  Да, за {money(resetting === 'all' ? tree.reset_all_gold : tree.reset_branch_gold)} 💰
+                </Button>
+                <Button size="s" mode="secondary" disabled={busy} onClick={() => setResetting(null)}>Отмена</Button>
+              </div>
+            ) : (
+              <>
+                <p className="craft-hint">
+                  Сброс возвращает очки, золото за узлы не возвращается. Платит казна (в ней {money(tree.treasury_gold)} 💰),
+                  сбрасывают глава и казначеи.
+                </p>
+                <div className="guild-row">
+                  <Button size="s" mode="secondary" disabled={busy} onClick={() => setResetting('branch')}>
+                    Сбросить ветвь «{tree.branches[branch]}» - {money(tree.reset_branch_gold)} 💰
+                  </Button>
+                  <Button size="s" mode="secondary" disabled={busy} onClick={() => setResetting('all')}>
+                    Сбросить всё - {money(tree.reset_all_gold)} 💰
+                  </Button>
+                </div>
+              </>
+            )}
+          </div>
+        )}
+
         {info && (
           <div className="guild-tree__card guild-tree__card--top">
             <p className="guild-tree__card-title">Древо гильдии</p>
@@ -178,36 +226,6 @@ export default function GuildTree({ onChanged }) {
             {tree.effects.length === 0
               ? <p className="guild-line">Узлов пока нет.</p>
               : tree.effects.map((e) => <p key={e} className="guild-line">• {e}</p>)}
-            {tree.can_reset && tree.taken > 0 && (
-              resetting ? (
-                <div className="guild-row">
-                  <Button size="s" disabled={busy}
-                    onClick={() => {
-                      const params = resetting === 'all' ? {} : { branch };
-                      const text = resetting === 'all' ? 'Древо сброшено.' : `Ветвь «${tree.branches[branch]}» сброшена.`;
-                      setResetting(null);
-                      act('tree_reset', params, text);
-                    }}>
-                    Да, за {money(resetting === 'all' ? tree.reset_all_gold : tree.reset_branch_gold)} 💰
-                  </Button>
-                  <Button size="s" mode="secondary" disabled={busy} onClick={() => setResetting(null)}>Отмена</Button>
-                </div>
-              ) : (
-                <>
-                  <p className="craft-hint">
-                    Сброс возвращает очки, золото за узлы не возвращается. Платит казна, сбрасывают глава и казначеи.
-                  </p>
-                  <div className="guild-row">
-                    <Button size="s" mode="secondary" disabled={busy} onClick={() => setResetting('branch')}>
-                      Сбросить ветвь «{tree.branches[branch]}» - {money(tree.reset_branch_gold)} 💰
-                    </Button>
-                    <Button size="s" mode="secondary" disabled={busy} onClick={() => setResetting('all')}>
-                      Сбросить всё - {money(tree.reset_all_gold)} 💰
-                    </Button>
-                  </div>
-                </>
-              )
-            )}
           </div>
         )}
 
