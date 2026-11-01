@@ -542,6 +542,15 @@ def _can_set_rank(actor: GuildMember, target: GuildMember, rank: str) -> bool:
     return False
 
 
+def member_controls(actor: GuildMember, target: GuildMember) -> dict:
+    """Что actor может сделать с target - для мини-аппа (2026-11-01: рядовым
+    показывались выбор звания и «Исключить», сервер их всё равно отклонял)."""
+    return {
+        "kick": _can_kick(actor, target),
+        "ranks": [rank for rank in gc.RANK_ORDER if _can_set_rank(actor, target, rank)],
+    }
+
+
 async def set_rank(db: AsyncSession, actor: Character, character_id: int, rank: str) -> Character:
     if rank not in gc.RANK_ORDER:
         raise GuildError("Нет такого звания.")

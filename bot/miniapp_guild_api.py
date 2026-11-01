@@ -358,6 +358,7 @@ async def _state(db, character: Character) -> dict:
                 "seen_at": c.last_active_at.isoformat() if c.last_active_at else None,
                 "rank": m.rank, "rank_title": gc.RANK_TITLES[m.rank],
                 "week": m.contribution_week if m.week_start == week else 0, "total": m.contribution_total,
+                "controls": guild_service.member_controls(member, m),
             }
             for m, c in sorted(rows, key=lambda mc: (-gc.RANK_ORDER[mc[0].rank], mc[1].name))
         ],

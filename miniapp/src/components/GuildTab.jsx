@@ -415,16 +415,20 @@ function Members({ state, run, busy }) {
                 <small>{m.id === me.id ? 'ты' : 'за неделю'}</small>
               </span>
             </button>
-            {open === m.id && m.id !== me.id && (
+            {open === m.id && m.id !== me.id && (m.controls?.ranks.length > 0 || m.controls?.kick || me.perms.leader) && (
               <Div className="guild-member-actions">
-                <select className="guild-input" value={m.rank} disabled={busy}
-                  onChange={(e) => run('rank', { character_id: m.id, rank: e.target.value }, 'Звание изменено.')}>
-                  {Object.entries(state.config.ranks).filter(([id]) => id !== 'leader').map(([id, title]) => (
-                    <option key={id} value={id}>{title}</option>
-                  ))}
-                  {m.rank === 'leader' && <option value="leader">Глава</option>}
-                </select>
-                <Confirm disabled={busy} onConfirm={() => run('kick', { character_id: m.id }, 'Исключён.')}>Исключить</Confirm>
+                {m.controls.ranks.length > 0 && (
+                  <select className="guild-input" value={m.rank} disabled={busy}
+                    onChange={(e) => run('rank', { character_id: m.id, rank: e.target.value }, 'Звание изменено.')}>
+                    {!m.controls.ranks.includes(m.rank) && <option value={m.rank}>{m.rank_title}</option>}
+                    {Object.entries(state.config.ranks).filter(([id]) => m.controls.ranks.includes(id)).map(([id, title]) => (
+                      <option key={id} value={id}>{title}</option>
+                    ))}
+                  </select>
+                )}
+                {m.controls.kick && (
+                  <Confirm disabled={busy} onConfirm={() => run('kick', { character_id: m.id }, 'Исключён.')}>Исключить</Confirm>
+                )}
                 {me.perms.leader && (
                   <Confirm disabled={busy} onConfirm={() => run('transfer', { character_id: m.id }, 'Главенство передано.')}>Сделать главой</Confirm>
                 )}

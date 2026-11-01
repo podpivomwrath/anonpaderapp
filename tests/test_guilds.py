@@ -632,6 +632,22 @@ async def test_api_state_and_actions(db_session, make_character) -> None:
     assert len(tree["nodes"]) == len(guild_tree.build())
 
 
+
+async def test_api_member_controls_by_rank(db_session, make_character) -> None:
+    """2026-11-01: рядовой видел у других выбор звания и «Исключить»."""
+    from bot import miniapp_guild_api as api
+
+    guild, leader = await _found(db_session, make_character)
+    recruit = await _add(db_session, make_character, guild)
+    other = await _add(db_session, make_character, guild)
+    controls = {m["id"]: m["controls"] for m in (await api._state(db_session, recruit))["members"]}
+    assert controls[other.id] == {"kick": False, "ranks": []}
+    assert controls[leader.id] == {"kick": False, "ranks": []}
+    controls = {m["id"]: m["controls"] for m in (await api._state(db_session, leader))["members"]}
+    assert controls[other.id]["kick"] is True
+    assert gc.RANK_TREASURER in controls[other.id]["ranks"] and gc.RANK_LEADER not in controls[other.id]["ranks"]
+    assert controls[leader.id] == {"kick": False, "ranks": []}
+
 async def test_join_level_and_directory_sums(db_session, make_character) -> None:
     guild, leader = await _found(db_session, make_character)
     leader.mobs_killed, leader.pvp_wins = 100, 3
