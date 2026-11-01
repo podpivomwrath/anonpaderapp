@@ -462,12 +462,25 @@ def resolve_tick(
     def is_frozen(c: CombatantState) -> bool:
         return c.has_effect(EffectKind.FREEZE)
 
+    # Свежий контроль на того, кто уже сходил в фазе 1 (Удар щитом, блок,
+    # защита), сбивать нечего - он переносится на его следующий ход, а не
+    # сгорает с «теряет ход» (2026-11-02, решение владельца: дротик по Стражу
+    # с Ударом щитом пропадал, хотя удар уже прошёл).
+    deferred_freezes: set[int] = set()
+
     # --- Фаза 4a: атакующие действия игроков (кроме уже сходивших контролем) ---
     for cid, action in normalized.items():
         if cid in control_actors:
             continue
         combatant = session.combatants[cid]
-        if cid in frozen_at_start or is_frozen(combatant):
+        acted_early = action.type == ActionType.DEFEND or (
+            action.type == ActionType.SKILL and action.skill_id in DEFENSIVE_SKILLS
+        )
+        if acted_early and cid not in frozen_at_start:
+            deferred_freezes.update(
+                id(e) for e in combatant.effects_of(EffectKind.FREEZE) if id(e) not in preexisting_effects
+            )
+        if cid in frozen_at_start or (is_frozen(combatant) and not acted_early):
             # пропуск ИЗ-ЗА контроля — засчитывается в стрик DR (control-patch-8)
             combatant.skipped_by_control_this_turn = True
             # Патч 52, баг 1: единственное место, где печатается «теряет ход» —
@@ -732,6 +745,8 @@ def resolve_tick(
         for effect in combatant.effects:
             # Немедленные эффекты (FREEZE, эликсиры-патч16) тикают всегда;
             # прочие свежие эффекты не тикают в ход наложения
+            if id(effect) in deferred_freezes:
+                continue
             if id(effect) in preexisting_effects or effect.kind in _IMMEDIATE_EFFECT_KINDS:
                 effect.remaining_ticks -= 1
 
