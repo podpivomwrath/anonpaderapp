@@ -195,7 +195,7 @@ export default function GuildTree({ onChanged }) {
               ) : (
                 <>
                   <p className="craft-hint">
-                    Сброс возвращает очки, золото за узлы не возвращается. Платит казна, сбрасывает глава.
+                    Сброс возвращает очки, золото за узлы не возвращается. Платит казна, сбрасывают глава и казначеи.
                   </p>
                   <div className="guild-row">
                     <Button size="s" mode="secondary" disabled={busy} onClick={() => setResetting('branch')}>

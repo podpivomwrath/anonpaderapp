@@ -695,7 +695,7 @@ async def handle_get_tree(request: web.Request) -> web.Response:
         member = await guild_service.membership(db, character.id)
         payload = guild_tree_service.payload(guild)
         payload["can_edit"] = guild_service.can_manage_treasury(member)
-        payload["can_reset"] = member is not None and member.rank == gc.RANK_LEADER
+        payload["can_reset"] = payload["can_edit"]
         payload["treasury_gold"] = guild.treasury_gold if guild else 0
     return web.json_response(payload)
 

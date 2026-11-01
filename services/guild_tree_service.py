@@ -55,9 +55,8 @@ async def allocate(db: AsyncSession, actor: Character, node_id: str) -> guild_tr
 async def reset(db: AsyncSession, actor: Character, branch: str | None = None) -> int:
     """Сброс ветви (branch) или всего древа (None): очки возвращаются, золото
     за узлы - нет. Платит казна. Вернёт, сколько узлов снято."""
-    guild, member = await guild_service.require_treasurer(db, actor)
-    if member.rank != gc.RANK_LEADER:
-        raise GuildError("Сбросить древо может только глава.")
+    # Глава и казначеи (2026-11-01, владелец) - как и взятие узлов.
+    guild, _member = await guild_service.require_treasurer(db, actor)
     if branch is not None and branch not in guild_tree.BRANCH_TITLES:
         raise GuildError("Нет такой ветви.")
     taken = list(guild.tree_nodes or [])

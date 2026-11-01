@@ -532,16 +532,17 @@ async def test_tree_allocate_needs_adjacency_points_and_gold(db_session, make_ch
 
 
 async def test_tree_reset(db_session, make_character) -> None:
-    """2026-11-01: ветвь - 100 000 из казны, всё древо - 500 000; только глава."""
+    """2026-11-01: ветвь - 100 000 из казны, всё древо - 500 000; глава и казначеи."""
     guild, leader = await _found(db_session, make_character)
     treasurer = await _add(db_session, make_character, guild, rank=gc.RANK_TREASURER)
+    officer = await _add(db_session, make_character, guild, rank=gc.RANK_OFFICER)
     guild.tree_nodes = ["war:0:0", "war:0:1", "kin:1:0"]
     await guild_service.treasury_add(db_session, guild.id, gold=gc.TREE_RESET_BRANCH_GOLD + gc.TREE_RESET_ALL_GOLD)
-    with pytest.raises(GuildError, match="глава"):
-        await guild_tree_service.reset(db_session, treasurer, "war")
+    with pytest.raises(GuildError):
+        await guild_tree_service.reset(db_session, officer, "war")
     with pytest.raises(GuildError, match="нечего"):
         await guild_tree_service.reset(db_session, leader, "craft")
-    assert await guild_tree_service.reset(db_session, leader, "war") == 2
+    assert await guild_tree_service.reset(db_session, treasurer, "war") == 2
     assert guild.tree_nodes == ["kin:1:0"] and guild.treasury_gold == gc.TREE_RESET_ALL_GOLD
     assert await guild_tree_service.reset(db_session, leader) == 1
     assert guild.tree_nodes == [] and guild.treasury_gold == 0
