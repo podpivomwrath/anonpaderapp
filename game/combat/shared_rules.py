@@ -388,8 +388,7 @@ def rune_dot_mult(effect: Effect, source: CombatantState | None, target: Combata
     mult = 1.0
     if source is not None:
         burn = getattr(effect, "tag", None) == BURN_TAG
-        skills = ("elementalist_fire",) if burn else ("poisoner_venom", "poisoner_toxic_burst")
-        mult += max(_rune(source, f"rune:acrid@{s}") for s in skills)
+        mult += _rune(source, "rune:acrid@" + ("elementalist_fire" if burn else "poisoner_venom"))
         if burn:
             mult += _rune(source, "rune:heat_frost")
     if target is not None:

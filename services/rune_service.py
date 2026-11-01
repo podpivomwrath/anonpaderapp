@@ -236,10 +236,15 @@ async def buy_skill_slot(db: AsyncSession, character: Character, skill_id: str) 
 
 
 def _lost(character: Character, row: CharacterRuneSlot, skill_ids: set[str]) -> bool:
-    """Руна, которой после смены класса или пути здесь не место."""
-    if row.kind == rc.SKILL:
-        return row.slot.partition(":")[0] not in skill_ids
+    """Руна, которой после смены класса или пути здесь не место, или руна
+    навыка, которую этот навык больше не принимает (правка тегов)."""
     rune_def = rc.BY_ID.get(row.rune_id)
+    if row.kind == rc.SKILL:
+        place = row.slot.partition(":")[0]
+        if place not in skill_ids:
+            return True
+        skill = next(s for s in skills_of(character) if s.id == place)
+        return rune_def is not None and not runes.fits_skill(rune_def, skill)
     return (row.kind == rc.GEAR and rune_def is not None
             and bool(rune_def.classes) and character.base_class not in rune_def.classes)
 

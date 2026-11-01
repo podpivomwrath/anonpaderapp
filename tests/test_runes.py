@@ -149,3 +149,17 @@ def test_drop_rolls_only_ready_runes() -> None:
     rng = random.Random(3)
     for _ in range(300):
         assert rc.BY_ID[rune_service.roll_rune(rng)].ready
+
+
+async def test_misfit_skill_rune_returns_to_bag(db_session, make_character) -> None:
+    """2026-11-02: «Едкость» больше не встаёт в Токсичный выброс - стоявшая
+    там руна при пересчёте уходит в сумку."""
+    from models import CharacterRuneSlot
+
+    c = await make_character(level=40, base_class="mage")
+    c.subclass = "poisoner"
+    db_session.add(CharacterRuneSlot(character_id=c.id, kind=rc.SKILL, slot="poisoner_toxic_burst:0", rune_id="acrid"))
+    await db_session.flush()
+    effects = await rune_service.recompute(db_session, c)
+    assert "rune:acrid@poisoner_toxic_burst" not in effects
+    assert (await rune_service._bag_row(db_session, c.id, "acrid")).count == 1

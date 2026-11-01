@@ -179,8 +179,10 @@ SKILL_TAG_TITLES = {
 MANUAL_TAGS: dict[str, set[str]] = {
     "control": {"warrior_stagger", "mage_ice_bonds", "guardian_stonegrip", "elementalist_ice",
                 "poisoner_disrupt"},
-    # Только навыки, чей урон идёт ядом или горением: в них «Едкость» работает.
-    "dot": {"poisoner_venom", "elementalist_fire", "poisoner_toxic_burst"},
+    # Только навыки, что вешают яд или горение: в них «Едкость» работает.
+    # Токсичный выброс убран 2026-11-02 (владелец): он сам ничего не вешает,
+    # а считается от яда - «Едкость» в клинке его и так усиливает.
+    "dot": {"poisoner_venom", "elementalist_fire"},
     "duration": {"warrior_warcry", "rogue_smoke", "mage_blood_seal", "guardian_block", "guardian_unbreakable",
                  "blood_knight_blood_seal", "shadow_blade_shadow_dance", "poisoner_decay", "elementalist_fire",
                  "dark_mystic_ward"},
