@@ -634,7 +634,8 @@ async def _act(db, character: Character, vk_user_id: int, body: dict) -> list:
     elif action == "tree_allocate":
         await guild_tree_service.allocate(db, character, _str(body, "node_id"))
     elif action == "tree_reset":
-        await guild_tree_service.reset(db, character)
+        branch = body.get("branch")
+        await guild_tree_service.reset(db, character, branch if isinstance(branch, str) else None)
     elif action == "summon_boss":
         boss = await guild_boss_service.summon(db, character, body.get("difficulty") or 1)
         notes.append(("boss", boss.guild_id, boss.x, boss.y, boss.court))
@@ -694,6 +695,7 @@ async def handle_get_tree(request: web.Request) -> web.Response:
         member = await guild_service.membership(db, character.id)
         payload = guild_tree_service.payload(guild)
         payload["can_edit"] = guild_service.can_manage_treasury(member)
+        payload["can_reset"] = member is not None and member.rank == gc.RANK_LEADER
         payload["treasury_gold"] = guild.treasury_gold if guild else 0
     return web.json_response(payload)
 

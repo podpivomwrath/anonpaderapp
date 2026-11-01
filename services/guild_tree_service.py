@@ -10,7 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from game.economy import guild_config as gc
 from game.guild import tree as guild_tree
 from models import Character, Guild
-from services import guild_service, wallet_service
+from services import guild_service
 from services.guild_service import GuildError
 
 _KIND_GOLD = {
@@ -52,21 +52,27 @@ async def allocate(db: AsyncSession, actor: Character, node_id: str) -> guild_tr
     return node
 
 
-async def reset(db: AsyncSession, actor: Character) -> None:
-    """Сброс: очки возвращаются, золото - нет. Стоит самоцветов главы."""
+async def reset(db: AsyncSession, actor: Character, branch: str | None = None) -> int:
+    """Сброс ветви (branch) или всего древа (None): очки возвращаются, золото
+    за узлы - нет. Платит казна. Вернёт, сколько узлов снято."""
     guild, member = await guild_service.require_treasurer(db, actor)
     if member.rank != gc.RANK_LEADER:
         raise GuildError("Сбросить древо может только глава.")
-    if not guild.tree_nodes:
+    if branch is not None and branch not in guild_tree.BRANCH_TITLES:
+        raise GuildError("Нет такой ветви.")
+    taken = list(guild.tree_nodes or [])
+    dropped = [n for n in taken if branch is None or (guild_tree.node(n) and guild_tree.node(n).branch == branch)]
+    if not dropped:
         raise GuildError("Сбрасывать нечего.")
-    try:
-        await wallet_service.charge(db, actor.id, "donate", gc.TREE_RESET_GEMS)
-    except wallet_service.NotEnoughCurrency:
-        raise GuildError(f"Сброс древа стоит 💎 {gc.TREE_RESET_GEMS}.") from None
-    guild.tree_nodes = []
-    await guild_service.log(db, guild.id, "tree", f"{actor.name} сбрасывает древо гильдии.", actor.id)
+    gold = gc.TREE_RESET_ALL_GOLD if branch is None else gc.TREE_RESET_BRANCH_GOLD
+    await guild_service.treasury_spend(db, guild.id, gold=gold)
+    await db.refresh(guild)
+    guild.tree_nodes = [n for n in taken if n not in dropped]
+    what = "древо гильдии" if branch is None else f"ветвь «{guild_tree.BRANCH_TITLES[branch]}»"
+    await guild_service.log(db, guild.id, "tree", f"{actor.name} сбрасывает {what}.", actor.id)
     await db.flush()
     await guild_service.refresh_perks(db, guild)
+    return len(dropped)
 
 
 def payload(guild: Guild | None) -> dict:
@@ -92,5 +98,6 @@ def payload(guild: Guild | None) -> dict:
         "taken": len(taken),
         "total_nodes": sum(1 for n in nodes.values() if n.kind != guild_tree.KIND_ROOT),
         "effects": [guild_tree.effect_text(k, v) for k, v in sorted(effects.items())],
-        "reset_gems": gc.TREE_RESET_GEMS,
+        "reset_branch_gold": gc.TREE_RESET_BRANCH_GOLD,
+        "reset_all_gold": gc.TREE_RESET_ALL_GOLD,
     }

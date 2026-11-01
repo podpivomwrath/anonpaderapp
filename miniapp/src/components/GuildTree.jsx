@@ -27,6 +27,7 @@ export default function GuildTree({ onChanged }) {
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState(null);
   const [info, setInfo] = useState(false);
+  const [resetting, setResetting] = useState(null); // 'branch' | 'all'
   const [branch, setBranch] = useState('war');
   const [arm, setArm] = useState(0);
   // Ширина экрана руки: картинка 2:3 целиком влезает до низа окна, сколько
@@ -177,6 +178,36 @@ export default function GuildTree({ onChanged }) {
             {tree.effects.length === 0
               ? <p className="guild-line">Узлов пока нет.</p>
               : tree.effects.map((e) => <p key={e} className="guild-line">• {e}</p>)}
+            {tree.can_reset && tree.taken > 0 && (
+              resetting ? (
+                <div className="guild-row">
+                  <Button size="s" disabled={busy}
+                    onClick={() => {
+                      const params = resetting === 'all' ? {} : { branch };
+                      const text = resetting === 'all' ? 'Древо сброшено.' : `Ветвь «${tree.branches[branch]}» сброшена.`;
+                      setResetting(null);
+                      act('tree_reset', params, text);
+                    }}>
+                    Да, за {money(resetting === 'all' ? tree.reset_all_gold : tree.reset_branch_gold)} 💰
+                  </Button>
+                  <Button size="s" mode="secondary" disabled={busy} onClick={() => setResetting(null)}>Отмена</Button>
+                </div>
+              ) : (
+                <>
+                  <p className="craft-hint">
+                    Сброс возвращает очки, золото за узлы не возвращается. Платит казна, сбрасывает глава.
+                  </p>
+                  <div className="guild-row">
+                    <Button size="s" mode="secondary" disabled={busy} onClick={() => setResetting('branch')}>
+                      Сбросить ветвь «{tree.branches[branch]}» - {money(tree.reset_branch_gold)} 💰
+                    </Button>
+                    <Button size="s" mode="secondary" disabled={busy} onClick={() => setResetting('all')}>
+                      Сбросить всё - {money(tree.reset_all_gold)} 💰
+                    </Button>
+                  </div>
+                </>
+              )
+            )}
           </div>
         )}
 
