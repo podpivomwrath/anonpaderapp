@@ -240,7 +240,7 @@ class DigResult:
 
 async def start_dig(
     db: AsyncSession, character: Character, mine: MineDef | None,
-    rng: random.Random, now: datetime | None = None,
+    rng: random.Random, now: datetime | None = None, vein: str | None = None,
 ) -> DigStart | None:
     """Начинает добычу. None — в статичном руднике не осталось руды.
 
@@ -266,7 +266,10 @@ async def start_dig(
     # персонажа, места и числа уже добытых кусков, а оно растёт только с
     # законченной добычей. Раньше игроки садились, видели «16 мин», вставали
     # и садились снова, пока не выпадет минимум (2026-10-12).
-    place = mine.id if mine is not None else f"{character.pos_x}:{character.pos_y}"
+    # Жила из события (vein - её одноразовый токен) - каждая находка своя, и
+    # время у неё своё (2026-11-01, репорт: на одной клетке все жилы шли с
+    # одним таймером, пока не выкопаешь кусок или не уйдёшь).
+    place = mine.id if mine is not None else (f"vein:{vein}" if vein else f"{character.pos_x}:{character.pos_y}")
     digs = await db.scalar(
         select(func.count()).select_from(MiningEvent).where(
             MiningEvent.character_id == character.id, MiningEvent.kind == "dig"

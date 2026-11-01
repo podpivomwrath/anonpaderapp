@@ -242,6 +242,16 @@ function Overview({ state, run, busy }) {
         </div>
       </Group>
 
+      <Group header={<Header>🗼 Весть о чужих</Header>}>
+        <Div>
+          <label className="guild-check">
+            <input type="checkbox" checked={!me.alerts_off} disabled={busy}
+              onChange={(e) => run('alerts_pref', { on: e.target.checked })} />
+            Получать весть, когда чужой у нашей башни или рядом с фортом
+          </label>
+        </Div>
+      </Group>
+
       <Group header={<Header>Бонусы гильдии</Header>}>
         {guild.effects.length === 0
           ? <Empty icon="🌳">Пока нет: их дают узлы древа.</Empty>

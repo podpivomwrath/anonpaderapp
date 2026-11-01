@@ -352,7 +352,7 @@ async def dig_event_vein(message: Message) -> None:
         if not await pending_activity.take_vein(message.peer_id, token, (character.pos_x, character.pos_y)):
             await message.answer(mt.VEIN_GONE_TEXT)
             return
-        started = await mining_service.start_dig(db, character, None, _rng)
+        started = await mining_service.start_dig(db, character, None, _rng, vein=token)
         await screen_service.set_screen(db, character, "mine")
         await db.commit()
 

@@ -333,6 +333,7 @@ async def _state(db, character: Character) -> dict:
             "id": character.id, "rank": member.rank, "rank_title": gc.RANK_TITLES[member.rank],
             "perms": _perms(member), "gold": wallet.farm_currency, "gems": wallet.donate_currency,
             "respawn_at_chapel": character.respawn_at_chapel,
+            "alerts_off": bool((character.ui_flags or {}).get("guild_alerts_off")),
             # Возродиться можно только у часовни на базе на карте - у Двора
             # клетки нет (2026-10-17): без такой базы галочку не показываем.
             "chapel_on_map": await guild_territory_service.chapel_cell(db, guild.id) is not None,
@@ -611,6 +612,12 @@ async def _act(db, character: Character, vk_user_id: int, body: dict) -> list:
     elif action == "respawn_pref":
         await guild_service.require_member(db, character)
         character.respawn_at_chapel = bool(body.get("on"))
+    elif action == "alerts_pref":
+        # Весть о чужих (башня, дозор форта) - личный выключатель.
+        await guild_service.require_member(db, character)
+        flags = dict(character.ui_flags or {})
+        flags["guild_alerts_off"] = not bool(body.get("on"))
+        character.ui_flags = flags  # новый dict: JSON-поле не следит за изменением на месте
     elif action == "declare_siege":
         siege = await guild_siege_service.declare(db, character, _int(body, "cell_id"))
         attacker = await db.get(Guild, siege.attacker_guild_id)

@@ -654,8 +654,9 @@ class TowerAlarm:
 
 
 async def on_cell_enter(db: AsyncSession, character: Character) -> TowerAlarm | None:
-    """Чужой зашёл на клетку с башней - офицеры владельца узнают (не чаще раза
-    в TOWER_WARN_COOLDOWN_MINUTES на клетку)."""
+    """Чужой зашёл на клетку с башней - узнаёт вся гильдия владельца, кроме
+    отключивших весть (2026-11-01; раньше - только офицеры). Не чаще раза в
+    TOWER_WARN_COOLDOWN_MINUTES на клетку."""
     if character.pos_x is None:
         return None
     cell = await cell_at(db, character.pos_x, character.pos_y)
@@ -670,7 +671,7 @@ async def on_cell_enter(db: AsyncSession, character: Character) -> TowerAlarm | 
         return None
     cell.tower_warned_at = now
     other = await guild_service.guild_of(db, character)
-    peers = await guild_service.peers_of(db, cell.guild_id, min_rank=gc.RANK_OFFICER)
+    peers = await guild_service.peers_of(db, cell.guild_id, alerts=True)
     await db.flush()
     return TowerAlarm(cell.guild_id, cell.x, cell.y, character.name, other.tag if other else None, peers)
 

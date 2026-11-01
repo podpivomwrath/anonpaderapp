@@ -132,8 +132,8 @@ async def after_exploration(peer_id: int, character: Character, outcome) -> None
 
 
 async def on_arrival(db, character: Character) -> None:
-    """Чужой зашёл на клетку с башней - офицеры владельца узнают; рядом с
-    фортом - вся гильдия (дозор форта)."""
+    """Чужой на клетке с башней или рядом с фортом - весть гильдии (кроме
+    отключивших её во вкладке гильдии)."""
     await on_watch(db, character)
     alarm = await guild_territory_service.on_cell_enter(db, character)
     if alarm is None:
@@ -162,7 +162,7 @@ async def on_watch(db, character: Character) -> None:
         if other is None:
             other = await guild_service.guild_of(db, character) or False
         who = f"[{other.tag}] {character.name}" if other else character.name
-        peers = await guild_service.peers_of(db, s.guild_id)
+        peers = await guild_service.peers_of(db, s.guild_id, alerts=True)
         notify_peers(peers, f"🏰 Форт на ({s.x}; {s.y}): {s.where} замечен игрок {who}.")
 
 

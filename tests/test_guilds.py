@@ -552,7 +552,8 @@ async def test_season_close(db_session, make_character) -> None:
     first = datetime(2026, 10, 1, 9, 0, tzinfo=timezone.utc)
     result = await guild_season_service.close_if_due(db_session, first)
     assert result.winner.id == guild.id and result.points == 1 + 10
-    assert guild_season_service.has_crown(guild)
+    # Корона - до конца следующего месяца от закрытия, а не от сегодняшней даты.
+    assert guild_service.aware(guild.crown_until) > first
     assert guild.fame_month == 0
     assert await guild_season_service.close_if_due(db_session, first) is None
 
@@ -851,3 +852,21 @@ async def test_fort_watch_sees_strangers_around(db_session, make_character) -> N
     assert await guild_territory_service.fort_sightings(db_session, stranger) == []
     leader.pos_x, leader.pos_y = 9, 9            # свои не в счёт
     assert await guild_territory_service.fort_sightings(db_session, leader) == []
+
+
+async def test_guild_alerts_go_to_everyone_except_who_turned_them_off(db_session, make_character) -> None:
+    """2026-11-01: весть о чужих - всей гильдии, кроме отключивших; обычные
+    рассылки отключение не трогает."""
+    from unittest.mock import AsyncMock, patch
+
+    guild, leader = await _found(db_session, make_character)
+    quiet = await _add(db_session, make_character, guild)
+    loud = await _add(db_session, make_character, guild)
+    quiet.ui_flags = {"guild_alerts_off": True}
+    await db_session.flush()
+    peer = AsyncMock(side_effect=lambda db, cid: 1000 + cid)
+    with patch("services.onboarding_service.vk_id_for_character", peer):
+        alerts = await guild_service.peers_of(db_session, guild.id, alerts=True)
+        everyone = await guild_service.peers_of(db_session, guild.id)
+    assert 1000 + quiet.id not in alerts and {1000 + leader.id, 1000 + loud.id} <= set(alerts)
+    assert 1000 + quiet.id in everyone

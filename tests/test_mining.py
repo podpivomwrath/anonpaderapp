@@ -655,3 +655,17 @@ def test_living_stone_stays_available_to_everyone() -> None:
             return 0.0
 
     assert mining.roll_ore_id(_AlwaysLottery(), 1, False, 1) == mc.LIVING_STONE_ID
+
+
+async def test_each_event_vein_rolls_its_own_time(db_session, make_character) -> None:
+    """2026-11-01: на одной клетке каждая найденная жила - со своим временем
+    (раньше все шли с одним, пока не выкопаешь кусок или не уйдёшь)."""
+    character = await make_character()
+    character.pos_x, character.pos_y = 3, 20
+    await db_session.flush()
+    rolls = set()
+    for token in ("a1", "b2", "c3", "d4"):
+        started = await mining_service.start_dig(db_session, character, None, random.Random(0), vein=token)
+        rolls.add(round(started.seconds, 6))
+        await mining_service.cancel_dig(db_session, character)
+    assert len(rolls) > 1
