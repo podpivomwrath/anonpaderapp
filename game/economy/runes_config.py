@@ -154,7 +154,7 @@ RUNES: list[RuneDef] = [
     RuneDef("press", SKILL, "Нажим", 0.10, "навык бьёт сильнее на {v}", pvp="half"),
     RuneDef("blood_edge", SKILL, "Кровяная кромка", 0.05, "{v} урона навыка возвращается здоровьем",
             pvp="half", tag="damage"),
-    RuneDef("ricochet", SKILL, "Отскок", 0.12, "в групповом бою шанс {v} задеть вторую цель с силой 40%",
+    RuneDef("ricochet", SKILL, "Отскок", 0.12, "в групповом бою шанс {v} задеть вторую цель обычным ударом с силой 40% (без эффектов навыка)",
             pvp="none", tag="damage"),
     RuneDef("grip", SKILL, "Хватка", 0.15, "+{v} к пробитию сопротивления контролю", pvp="half", tag="control"),
     RuneDef("acrid", SKILL, "Едкость", 0.15, "урон за ход от навыка сильнее на {v}", pvp="half", tag="dot"),
