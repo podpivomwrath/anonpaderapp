@@ -24,6 +24,7 @@ STATES: dict[str, str] = {
     "house_work": "Сначала закончи варку в доме.",
     "traveling_on_foot": "Сначала дождись прибытия.",
     "riding": "Сначала дождись окончания поездки.",
+    "voyage": "Ты в долгом пути. Вернуться можно кнопкой «⚓ Вернуться».",
 }
 
 #: Как каждое состояние кончается - чтобы ни одно не держало игрока вечно.
@@ -40,6 +41,8 @@ ENDS_BY: dict[str, str] = {
     "house_work": "timer",
     "traveling_on_foot": "unstick",
     "riding": "unstick",
+    # Долгий путь кончается сам по времени или кнопкой «⚓ Вернуться».
+    "voyage": "timer",
 }
 
 
@@ -59,6 +62,7 @@ async def busy(
     занятиям она не мешает - передать вещь или исследовать можно и с удочкой."""
     from bot.battle_keyboard import in_any_battle
     from bot.handlers import pvp as pvp_handlers
+    from bot.handlers import voyage as voyage_handlers
     from bot.handlers import world
     from services import death_service, mining_service, mount_service, movement_service
 
@@ -93,6 +97,10 @@ async def busy(
         checks.append(hit("house_work"))
     if movement_service.is_traveling(character, now):
         checks.append(hit("traveling_on_foot"))
+    # Долгий путь (2026-11-01, баг: в пути уезжали на маунте с карты
+    # мини-аппа - чат держит путь своим фильтром, а карта его не знала).
+    if voyage_handlers.is_away(peer_id):
+        checks.append(hit("voyage"))
     found = next((c for c in checks if c is not None), None)
     if found is not None or "riding" in skip:
         return found

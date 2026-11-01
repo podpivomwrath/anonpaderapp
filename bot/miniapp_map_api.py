@@ -273,7 +273,7 @@ async def handle_get_state(request: web.Request) -> web.Response:
 _MAP_REASONS = {
     "dead": "dead", "pvp": "in_pvp", "battle": "in_combat", "busy": "busy",
     "traveling_on_foot": "traveling_on_foot", "digging": "mining", "house_work": "house_work",
-    "fishing": "fishing",
+    "fishing": "fishing", "voyage": "voyage",
 }
 
 
