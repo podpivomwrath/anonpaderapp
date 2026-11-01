@@ -120,6 +120,28 @@ async def test_nickname_unique_case_insensitive(db_session) -> None:
     assert await svc.try_set_nickname(db_session, second, "Petya") is None
 
 
+
+def test_nickname_mixed_scripts_and_sticks() -> None:
+    """2026-11-01: «Ecтa» (латинские E, c, a + русская т) и lllIII."""
+    assert svc.validate_nickname_format("Ecтa") == "mixed"
+    assert svc.validate_nickname_format("lllIIIlll") == "sticks"
+    assert svc.validate_nickname_format("Il1ya") == "sticks"
+    assert svc.validate_nickname_format("Mayckillo") is None   # две l подряд - можно
+    assert svc.validate_nickname_format("Котёнок") is None
+
+
+async def test_lookalike_nickname_is_taken(db_session) -> None:
+    """Еста / Ёста / Ecta / ECTA - для глаза один ник."""
+    _, first = await start_creation(db_session, vk_id=1)
+    assert await svc.try_set_nickname(db_session, first, "Еста") is None
+    _, second = await start_creation(db_session, vk_id=2)
+    for twin in ("Ёста", "ЕСТА", "Ecta", "ECTA"):
+        assert await svc.try_set_nickname(db_session, second, twin) == "taken", twin
+    _, third = await start_creation(db_session, vk_id=3)
+    assert await svc.try_set_nickname(db_session, third, "Il0") is None
+    assert await svc.try_set_nickname(db_session, second, "lio") == "taken"
+    assert await svc.try_set_nickname(db_session, second, "Веста") is None
+
 async def test_nickname_errors_keep_state(db_session) -> None:
     """Отказ валидации не двигает FSM — повторный запрос на том же шаге."""
     _, char = await start_creation(db_session)
@@ -135,7 +157,7 @@ def test_keeper_texts_loaded_from_content() -> None:
     from bot import onboarding_texts as texts
 
     assert "Хранитель Списков" in texts.KEEPER["scene_awakening"]
-    assert set(texts.NICKNAME_ERRORS) == {"invalid", "banned", "taken"}
+    assert set(texts.NICKNAME_ERRORS) == {"invalid", "banned", "taken", "mixed", "sticks"}
     assert set(texts.KEEPER["class_paths"]) == {"warrior", "rogue", "mage"}
     assert set(texts.KEEPER["regions"]) == {"ridge", "woods", "docks", "scorched"}
 

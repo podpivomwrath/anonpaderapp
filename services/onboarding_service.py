@@ -30,6 +30,18 @@ STATE_REGION_SELECT = "region_select"
 STATE_REGION_CONFIRM = "region_confirm"
 
 NICKNAME_RE = re.compile(r"^[A-Za-zА-Яа-яЁё0-9_]{3,16}$")
+#: Ники-двойники (2026-11-01: «Еста», «Ёста» и «Ecтa» с латиницей - три
+#: разных игрока). Буквы, которые на экране не отличить, сводятся к одной:
+#: латиница -> кириллица, ё -> е, цифры-двойники, палочки l/I/1 -> l.
+_LOOKALIKE = str.maketrans({
+    "a": "а", "b": "в", "c": "с", "e": "е", "h": "н", "k": "к", "m": "м", "o": "о", "p": "р",
+    "t": "т", "x": "х", "y": "у", "ё": "е", "0": "о", "3": "з", "6": "б",
+    "i": "l", "1": "l",
+})
+_LATIN = re.compile(r"[A-Za-z]")
+_CYRILLIC = re.compile(r"[А-Яа-яЁё]")
+#: lllIII и подобное: больше двух палочек подряд не читается.
+_STICKS = re.compile(r"[lI1]{3,}")
 
 
 def _placeholder_name(vk_id: int) -> str:
@@ -126,12 +138,22 @@ async def set_state(db: AsyncSession, character: Character, state: str | None) -
 
 
 def validate_nickname_format(nickname: str) -> str | None:
-    """Код ошибки "invalid" (длина/символы) или None."""
+    """Код ошибки или None: "invalid" (длина/символы), "mixed" (латиница с
+    кириллицей вперемешку), "sticks" (больше двух l, I, 1 подряд)."""
     if not (3 <= len(nickname) <= 16):
         return "invalid"
     if not NICKNAME_RE.match(nickname):
         return "invalid"
+    if _LATIN.search(nickname) and _CYRILLIC.search(nickname):
+        return "mixed"
+    if _STICKS.search(nickname):
+        return "sticks"
     return None
+
+
+def nickname_skeleton(nickname: str) -> str:
+    """Ник, каким его видит глаз: похожие буквы сведены к одной."""
+    return nickname.lower().translate(_LOOKALIKE)
 
 
 def contains_banned_word(nickname: str) -> bool:
@@ -142,10 +164,14 @@ def contains_banned_word(nickname: str) -> bool:
 async def is_nickname_taken(
     db: AsyncSession, nickname: str, exclude_character_id: int | None = None
 ) -> bool:
-    query = select(Character.id).where(func.lower(Character.name) == nickname.lower())
+    """Занят такой же ник или неотличимый на глаз (nickname_skeleton).
+    Сравнение в питоне: персонажей сотни, а SQLite в тестах не опускает
+    регистр кириллицы."""
+    query = select(Character.name).where(Character.name.is_not(None))
     if exclude_character_id is not None:
         query = query.where(Character.id != exclude_character_id)
-    return (await db.scalar(query)) is not None
+    skeleton = nickname_skeleton(nickname)
+    return any(nickname_skeleton(name) == skeleton for name in (await db.scalars(query)).all())
 
 
 async def try_set_nickname(

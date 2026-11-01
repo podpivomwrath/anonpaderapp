@@ -67,6 +67,8 @@ NICKNAME_ERRORS = {
     "invalid": KEEPER["nickname_invalid"],
     "banned": KEEPER["nickname_banned"],
     "taken": KEEPER["nickname_taken"],
+    "mixed": KEEPER["nickname_mixed"],
+    "sticks": KEEPER["nickname_sticks"],
 }
 
 
