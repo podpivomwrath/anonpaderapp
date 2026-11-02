@@ -327,7 +327,7 @@ class MillerStage:
             self._excommunicate(session, rng, out)
         if self.ticks > 1 and self.ticks % mc.BREAD_EVERY == mc.BREAD_OFFSET:
             self.bread_open = True
-            out.lines.append("🍞 На жернов ложится каравай. Взять его может только один.")
+            out.lines.append("🍞 На жёрнов ложится каравай. Взять его может только один.")
             self._hint("bread", "Взявший лечится, но следующий удар Мельника - по нему и вдвое сильнее.", out)
 
         if not self.final and boss.current_hp <= boss.max_hp * mc.FINAL_HP:

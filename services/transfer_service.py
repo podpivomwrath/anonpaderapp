@@ -69,6 +69,12 @@ class Lookup:
     refusal: str | None = None
 
 
+def name_key(name: str) -> str:
+    """Для сравнения названий: без регистра и без разницы «е»/«ё» - игроки
+    пишут «Кровохлебка», а в каталоге «Кровохлёбка»."""
+    return name.lower().replace("ё", "е")
+
+
 def parse(text: str) -> tuple[str, int | None]:
     """«Малое исцеление 5» -> ("малое исцеление", 5); «золото» -> ("золото", None).
     Число можно ставить и перед названием: «100 зол», «3 малое исцеление».
@@ -78,10 +84,10 @@ def parse(text: str) -> tuple[str, int | None]:
     text = re.sub(r"\s+(?:шт\.?|штук[аи]?)$", "", text, flags=re.IGNORECASE)
     first = re.match(r"^(\d+)\s+(\D.*)$", text)
     if first:
-        return first.group(2).strip().lower(), int(first.group(1))
+        return name_key(first.group(2).strip()), int(first.group(1))
     match = re.match(r"^(.*?)(?:\s+(\d+))?$", text)
     name, qty = match.group(1), match.group(2)
-    return name.strip().lower(), (int(qty) if qty else None)
+    return name_key(name.strip()), (int(qty) if qty else None)
 
 
 def _split_grade(name: str) -> tuple[str, str | None]:
@@ -127,7 +133,7 @@ async def _craft_offers(db: AsyncSession, character_id: int, name: str) -> list[
     from game.economy import resists
 
     # Перстень Несгоревшего (2026-11-02): только ненадетые, из сумки.
-    if name == resists.RING_TITLE.lower():
+    if name == name_key(resists.RING_TITLE):
         from services import resist_service
 
         spare = await resist_service.spare_rings(db, character_id)
@@ -137,10 +143,10 @@ async def _craft_offers(db: AsyncSession, character_id: int, name: str) -> list[
     rune_name = name[5:] if name.startswith("руна ") else name
     bag = await rune_service.bag(db, character_id)
     for r in rc.RUNES:
-        if r.name.lower() == rune_name and bag.get(r.id):
+        if name_key(r.name) == rune_name and bag.get(r.id):
             return [Offer("rune", r.id, f"{rune_service.KIND_EMOJI[r.kind]} Руна «{r.name}»", bag[r.id])]
     for herb, count in await herb_service.get_bag(db, character_id):
-        if herb.name.lower() == name:
+        if name_key(herb.name) == name:
             return [Offer("herb", herb.id, f"{herb.emoji} {herb.name}", count)]
     base, grade = _split_fish_grade(name)
     fish = [
@@ -148,7 +154,7 @@ async def _craft_offers(db: AsyncSession, character_id: int, name: str) -> list[
               f"{definition.emoji} {definition.name} ({fishing.grade_name(grade_id)}, {fishing.format_kg(grams)})",
               1, stackable=False)
         for definition, grade_id, grams in await fishing_service.get_bag(db, character_id)
-        if definition.name.lower() == base and (grade is None or grade_id == grade)
+        if name_key(definition.name) == base and (grade is None or grade_id == grade)
     ]
     if fish:
         return fish
@@ -156,7 +162,7 @@ async def _craft_offers(db: AsyncSession, character_id: int, name: str) -> list[
         Offer("food", f"{dish.dish_id}:{grade_id}",
               f"{d.emoji} {d.name} (рыба {fishing.grade_name(grade_id)})", count)
         for d, dish, grade_id, count in await cooking_service.get_food(db, character_id)
-        if d.name.lower() == base and (grade is None or grade_id == grade)
+        if name_key(d.name) == base and (grade is None or grade_id == grade)
     ]
 
 
@@ -189,7 +195,7 @@ async def find(db: AsyncSession, character_id: int, name: str, number: int | Non
         return Lookup([Offer("gems", None, "💎 Пепельные самоцветы", wallet.donate_currency)])
 
     for elixir, count in await elixir_service.get_stock(db, character_id):
-        if elixir.name.lower() == name:
+        if name_key(elixir.name) == name:
             return Lookup([Offer("elixir", elixir.id, f"{elixir.emoji} {elixir.name}", count)])
 
     ore_name, grade = _split_grade(name)
@@ -197,7 +203,7 @@ async def find(db: AsyncSession, character_id: int, name: str, number: int | Non
         Offer("ore", f"{definition.id}:{grade_id}",
               f"{definition.emoji} {definition.name} ({mining.grade_name(grade_id)})", count)
         for definition, grade_id, count in await mining_service.get_ore(db, character_id)
-        if definition.name.lower() == ore_name and (grade is None or grade_id == grade)
+        if name_key(definition.name) == ore_name and (grade is None or grade_id == grade)
     ]
     if ore_offers:
         return Lookup(ore_offers)
@@ -207,7 +213,7 @@ async def find(db: AsyncSession, character_id: int, name: str, number: int | Non
         return Lookup(craft)
 
     matches = [(item, equipped) for item, equipped in await item_service.get_inventory(db, character_id)
-               if item.name.lower() == name]
+               if name_key(item.name) == name]
     if number is not None:
         # «передать Скальпель Хирурга 1212» - число у экипировки это номер
         # вещи (его копирует кнопка в мини-аппе), а не количество: так
@@ -225,7 +231,7 @@ async def find(db: AsyncSession, character_id: int, name: str, number: int | Non
     if matches:
         return Lookup([], is_transferable(*matches[0]))
 
-    if any(t.name.lower() == name for t in trophy_service.trophy_defs_ordered()):
+    if any(name_key(t.name) == name for t in trophy_service.trophy_defs_ordered()):
         return Lookup([], "Трофеи не передаются - их можно только продать.")
     return Lookup([])
 

@@ -42,6 +42,11 @@ def _turns(n: int) -> str:
     return f"{n} {word}"
 
 
+def _num(value: float) -> str:
+    """Множитель по-русски: 1,8, а не 1.8."""
+    return f"{value:g}".replace(".", ",")
+
+
 #: Правило текстов (2026-10-15, просьба владельца): понятно самому
 #: неопытному игроку. Без жаргона («стак», «митигация», «пп», «PvE»): «заряд»,
 #: «бой с мобами», «союзник» - и всегда, что именно и когда срабатывает.
@@ -266,7 +271,7 @@ def _describe_shadow_blade_deadly_precision(b: BuffDef) -> str:
 def _describe_shadow_blade_carve(b: BuffDef) -> str:
     return (
         f"Если Жатва меток тратит {bc.SHADOW_BLADE_CARVE_MIN_STACKS} или больше зарядов Метки и бьёт критически, "
-        f"урон умножается на {bc.SHADOW_BLADE_CARVE_CRIT_MULT:g} вместо обычных {bc.CRIT_MULTIPLIER:g}."
+        f"урон умножается на {_num(bc.SHADOW_BLADE_CARVE_CRIT_MULT)} вместо обычных {_num(bc.CRIT_MULTIPLIER)}."
     )
 
 

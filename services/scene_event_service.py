@@ -436,7 +436,7 @@ async def create_trail(db: AsyncSession, character: Character, kind: str, rng: r
     await db.flush()
     direction = story_service.compass_direction(character.pos_x, character.pos_y, *cell)
     mult = scene_events.trail_reward_mult(cells)
-    reward = f" Путь долгий - и добыча богаче (x{mult:g})." if mult > 1 else ""
+    reward = f" Путь долгий - и добыча богаче (×{mult:g})." if mult > 1 else ""
     return (
         f"{trail_def.emoji} {trail_def.hint} {direction}, клетка ({cell[0]}; {cell[1]}). "
         f"Остынет через {trail_def.minutes} мин.{reward}"

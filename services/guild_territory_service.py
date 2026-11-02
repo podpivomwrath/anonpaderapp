@@ -336,7 +336,7 @@ async def start_base_upgrade(db: AsyncSession, actor: Character, cell_id: int) -
         raise GuildError("Выше цитадели ничего нет.")
     target = gc.BASE_ORDER[index + 1]
     if guild.level < gc.BASE_UNLOCK_LEVEL[target]:
-        raise GuildError(f"{gc.BASE_TITLES[target]} доступна с {gc.BASE_UNLOCK_LEVEL[target]} уровня гильдии.")
+        raise GuildError(f"Ступень «{gc.BASE_TITLES[target]}» открывается с {gc.BASE_UNLOCK_LEVEL[target]} уровня гильдии.")
     if target == gc.BASE_CITADEL:
         cells = await cells_of(db, guild.id)
         if any(c.base_tier == gc.BASE_CITADEL or c.upgrade_to == gc.BASE_CITADEL for c in cells):
@@ -375,7 +375,7 @@ async def complete_due(db: AsyncSession, now: datetime | None = None) -> list[tu
         building.level = building.upgrading_to
         building.upgrading_to = None
         building.done_at = None
-        text = f"{gc.BUILDING_TITLES[building.building]} {building.level} ур. на ({cell.x}; {cell.y}) достроена."
+        text = f"Стройка закончена: {gc.BUILDING_TITLES[building.building]} {building.level} ур. на ({cell.x}; {cell.y})."
         await guild_service.log(db, cell.guild_id, "build", text)
         done.append((cell.guild_id, text))
         touched.add(cell.guild_id)
@@ -390,7 +390,7 @@ async def complete_due(db: AsyncSession, now: datetime | None = None) -> list[tu
         building.level = building.upgrading_to
         building.upgrading_to = None
         building.done_at = None
-        text = f"{gc.BUILDING_TITLES[building.building]} {building.level} ур. во Дворе достроена."
+        text = f"Стройка во Дворе закончена: {gc.BUILDING_TITLES[building.building]} {building.level} ур."
         await guild_service.log(db, building.guild_id, "build", text)
         done.append((building.guild_id, text))
         touched.add(building.guild_id)

@@ -300,7 +300,7 @@ class MobBrain:
         steals[target.id] = steals.get(target.id, 0) + 1
         mob.apply_effect(EffectKind.DAMAGE_BUFF, trait.step * sum(steals.values()), FOREVER, mob.id)
         pct = round(min(steals[target.id] * trait.value, trait.cap) * 100)
-        turn.lines.append(f"💰 {mob.name} срывает с {target.name} реликвии: уже {pct}% партии")
+        turn.lines.append(f"💰 {mob.name} срывает с {target.name} реликвии: унесено уже {pct}% выставленного")
 
     def _afflict(
         self, mob: CombatantState, target: CombatantState, trait: MobTraitDef,

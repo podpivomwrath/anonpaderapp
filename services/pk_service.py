@@ -147,7 +147,7 @@ def mass_killer_lines(killer: Character, outcomes: list[KillOutcome]) -> list[st
     branded = sum(o.branded for o in outcomes)
     if branded:
         n = killer.pk_marks or 0
-        lines.append(f"🩸 Клеймо x{branded} (меток: {n}). {BOARD_HINT}")
+        lines.append(f"🩸 Клеймо ×{branded} (меток: {n}). {BOARD_HINT}")
     return lines
 
 

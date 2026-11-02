@@ -91,7 +91,7 @@ async def test_gap_resets_login_streak_with_notice(db_session, make_character) -
     assert character.login_streak == 1
     assert character.login_cycle_day == 1
     assert notice is not None
-    assert any("обнулён" in line for line in notice.lines)
+    assert any("обнулена" in line for line in notice.lines)
 
 
 async def test_login_cycle_wraps_after_14_days(db_session, make_character) -> None:

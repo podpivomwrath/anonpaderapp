@@ -199,7 +199,7 @@ class KeeperStage(_BossStage):
                 boss.buff_modifiers["incoming_damage_reduction"] = 0.0
                 out.lines.append("⚱️ Камень на Хранителе трескается - он снова уязвим.")
         elif self.ticks % rc.STONE_EVERY == rc.STONE_EVERY - 1:
-            out.lines.append("⚱️ Хранитель замирает. Кожа серееет - следующий ход он будет камнем.")
+            out.lines.append("⚱️ Хранитель замирает. Кожа сереет - следующий ход он будет камнем.")
         elif self.ticks % rc.STONE_EVERY == 0:
             self.stone_left = rc.STONE_TICKS
             boss.buff_modifiers["incoming_damage_reduction"] = rc.STONE_REDUCTION

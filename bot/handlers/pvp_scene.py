@@ -85,7 +85,7 @@ def _class_line(c: Character, tags: dict[int, str] | None = None) -> str:
 def _battle_scene_line(battle: pvp.Battle) -> str:
     side0 = [p.name for cid, p in battle.participants.items() if battle.side_of.get(cid) == 0]
     side1 = [p.name for cid, p in battle.participants.items() if battle.side_of.get(cid) == 1]
-    return f"⚔️ Бой: {' и '.join(side0)} vs {' и '.join(side1)}"
+    return f"⚔️ Бой: {' и '.join(side0)} против {' и '.join(side1)}"
 
 
 # Патч 35, аудит: список игроков на клетке — ТЕКСТ, без единой инлайн-кнопки

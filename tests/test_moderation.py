@@ -28,7 +28,7 @@ def test_ban_message_with_reason_and_expiry() -> None:
     until = datetime(2026, 8, 12, 14, 32, tzinfo=timezone.utc)
     text = ban_message(_character(is_banned=True, ban_reason="спам", banned_until=until))
     assert "Причина: спам" in text
-    assert "12.08.2026 14:32" in text
+    assert "12.08.2026 17:32 МСК" in text  # в базе UTC, игроку - Москва
 
 
 def test_format_report_includes_quest_line_when_present() -> None:

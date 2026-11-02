@@ -115,8 +115,8 @@ def skill_mechanics() -> dict[str, str]:
             f"Отравляет цель: каждый ход {turns(bc.POISONER_POISON_DURATION_TICKS)} яд наносит урон. "
             f"Можно отравить до {bc.POISONER_MAX_STACKS} раз подряд - тогда яд бьёт за все разы сразу. "
             "Сила яда зависит не от урона удара, а от твоих Воли и Ловкости (Воля важнее): "
-            f"каждое очко Воли даёт {bc.POISONER_POISON_WIL_COEF / bc.POISONER_MAX_STACKS:.2f} урона за ход "
-            f"за каждое отравление, очко Ловкости - {bc.POISONER_POISON_AGI_COEF / bc.POISONER_MAX_STACKS:.2f}. "
+            f"каждое очко Воли даёт {num(bc.POISONER_POISON_WIL_COEF / bc.POISONER_MAX_STACKS)} урона за ход "
+            f"за каждое отравление, очко Ловкости - {num(bc.POISONER_POISON_AGI_COEF / bc.POISONER_MAX_STACKS)}. "
             "Яд всегда попадает и не бывает критическим, но щит цели его задерживает.",
         "poisoner_decay":
             f"Цель становится уязвимой на {turns(_s('poisoner_decay').effect_duration)}: "

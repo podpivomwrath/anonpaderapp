@@ -52,7 +52,7 @@ def catalog(character: Character, gems: int, firm_name: str | None = None) -> di
             "max": pc.SHOP_MAX_DAYS,
             "prices": {d: pc.shop_price(d) for d in range(pc.SHOP_MIN_DAYS, pc.SHOP_MAX_DAYS + 1)},
             "perks": _premium_perks(),
-            "note": "Без силовых преимуществ: статы, урон и HP не меняются. Срок складывается с оставшимся.",
+            "note": "Без силовых преимуществ: характеристики, урон и здоровье не меняются. Срок складывается с оставшимся.",
             "active_until": until.isoformat() if active and until is not None else None,
         }, elixir_pack_item(), tincture_item(character), pocket_item(character), faction_item(character),
             courier_item(character), donka_item(character), *house_items(character),
@@ -207,7 +207,7 @@ async def rename_firm(db: AsyncSession, character: Character, new_name) -> str:
     if firm is None or not firm.name:
         raise ShopError("Сначала открой торговую фирму и дай ей название.")
     if isinstance(new_name, str) and trade_service.clean_name(new_name) == firm.name:
-        raise ShopError("Фирма и так так называется.")
+        raise ShopError("У фирмы уже такое название.")
     try:
         name = await trade_service._check_name(db, new_name)
     except trade_service.TradeError as exc:
@@ -275,7 +275,7 @@ def pocket_item(character: Character) -> dict:
             "Работает и в PvP: победитель забирает только вторую половину",
             "Покупается один раз и навсегда",
         ],
-        "note": "Из нечётного стака в кармане остаётся на одну больше, так что одиночная реликвия не сгорает.",
+        "note": "Если реликвий одного вида нечётное число, в кармане остаётся на одну больше: одиночная реликвия не сгорает.",
         "available": not character.secret_pocket,
         "unavailable": "Карман уже пришит.",
     }

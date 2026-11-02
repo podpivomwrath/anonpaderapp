@@ -802,7 +802,7 @@ async def test_ore_journal_names_the_grade_and_receiver_hears(db_session, make_c
     _note_receiver(notes, leader, leader, "x")
     assert notes == []  # себе - без вести
     _note_receiver(notes, leader, SimpleNamespace(id=leader.id + 1), "со склада гильдии: кварц")
-    assert notes == [("char", leader.id + 1, f"🏰 {leader.name} выдает тебе со склада гильдии: кварц.")]
+    assert notes == [("char", leader.id + 1, f"🏰 {leader.name} выдаёт тебе со склада гильдии: кварц.")]
 
 
 def test_tithe_line_does_not_follow_the_player_onto_the_road() -> None:

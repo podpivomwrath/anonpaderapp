@@ -467,7 +467,7 @@ def _note_receiver(notes: list, actor, receiver, what: str) -> None:
     """Выдача из казны или со склада другому - получателю весть в чат
     (2026-10-21): «Ник выдает тебе ...». Себе - без вести."""
     if receiver is not None and receiver.id != actor.id:
-        notes.append(("char", receiver.id, f"🏰 {actor.name} выдает тебе {what}."))
+        notes.append(("char", receiver.id, f"🏰 {actor.name} выдаёт тебе {what}."))
 
 
 async def _vk_ids(db, characters: list[Character]) -> dict[int, int]:

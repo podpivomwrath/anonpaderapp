@@ -85,7 +85,7 @@ function powerHint(parts) {
   const bonuses = [];
   if (parts.subclass_pct) bonuses.push(`подкласс +${parts.subclass_pct}%`);
   if (parts.buffs) bonuses.push(`микробаффы ${parts.buffs} × ${parts.buff_pct}%`);
-  return `Статы ${parts.stats} + вещи ${parts.gear}` + (bonuses.length ? `, ${bonuses.join(', ')}` : '');
+  return `Характеристики ${parts.stats} + вещи ${parts.gear}` + (bonuses.length ? `, ${bonuses.join(', ')}` : '');
 }
 
 /** Числа с разрядами: без них четырёхзначное золото читается как каша. */

@@ -662,7 +662,7 @@ async def on_battle_finished(session_id: int, result: TickResult) -> None:
         if outcome.item_dropped is not None:
             # Вещь сразу в сумке, без окна «Надеть?» (2026-10-13, решение
             # владельца): надевают из профиля мини-аппа.
-            where = "Слабее надетого - убрано в сумку." if weaker_drop else "В сумке - надеть можно в профиле."
+            where = "Слабее надетого - убрано в сумку." if weaker_drop else "В сумке - надеть можно в мини-аппе, во вкладке «Герой»."
             text += f"\n{item_service.format_drop_announcement(outcome.item_dropped)}. {where}"
         if outcome.quest_progress is not None:
             text += f"\n📜 {outcome.quest_label}: {outcome.quest_progress}/{outcome.quest_target}"

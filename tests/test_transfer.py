@@ -19,6 +19,12 @@ def test_parse_splits_name_and_number() -> None:
     assert ts.parse("Скальпель Хирурга") == ("скальпель хирурга", None)
 
 
+def test_names_match_with_or_without_yo() -> None:
+    # Игрок пишет «Легкий шаг», в каталоге «Лёгкий шаг» - это одно и то же.
+    assert ts.parse("Лёгкий шаг 2") == ts.parse("легкий шаг 2") == ("легкий шаг", 2)
+    assert ts.name_key("Пепельный осётр") == ts.parse("пепельный осетр")[0]
+
+
 async def _item(db, owner, name="Скальпель Хирурга", rarity="unique", equipped=False, **extra):
     item = Item(name=name, slot="weapon", base_stats={"int": 30}, rarity=rarity, ilvl=None, **extra)
     db.add(item)

@@ -253,7 +253,7 @@ async def host_fight(message: Message) -> None:
             code = "".join(_rng.choice("0123456789") for _ in range(CODE_DIGITS))
         _codes[code] = (character.id, peer_id)
     await message.answer(
-        f"⏳ Твой код: {code}\n\nПередай его сопернику: он нажимает «Найти соперника» на арене и вводит код. "
+        f"⏳ Твой код: {code}\n\nПередай его сопернику: он нажимает «Найти по коду» на арене и вводит код. "
         "Пока не отменишь, код ждёт.",
         keyboard=arena_kb.arena_waiting_keyboard(),
     )

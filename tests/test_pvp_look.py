@@ -21,7 +21,7 @@ def test_peaceful_scene_shows_contract_fight() -> None:
         battle.participants[cid] = pvp.Participant(cid, cid, name, "warrior", "Воин")
         battle.side_of[cid] = side
     text = pvp._peaceful_scene_text([], None, [(7, battle)])
-    assert "Ты один" not in text and "Охотник vs Цель" in text and "по заказу" in text
+    assert "Ты один" not in text and "Охотник против Цель" in text and "по заказу" in text
 
 
 async def test_attack_drops_fishing_and_closes_lake(db_session, make_character) -> None:

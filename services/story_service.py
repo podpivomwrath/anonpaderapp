@@ -353,7 +353,8 @@ async def namesake_hint(db: AsyncSession, character: Character, mob_name: str) -
     if quest.named_enemy.name.lower() != (mob_name or "").lower():
         return None
     return (
-        f"📜 Это обычный {quest.named_enemy.name}. Тот, что нужен по заданию, - у "
+        # Без рода: среди врагов есть и «Головня», и «Мать Углей».
+        f"📜 Это лишь тёзка: «{quest.named_enemy.name}» из задания ждёт у "
         f"({quest.target_x}; {quest.target_y}): исследуй местность там."
     )
 

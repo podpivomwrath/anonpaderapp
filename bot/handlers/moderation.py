@@ -55,7 +55,12 @@ def ban_message(character: Character) -> str:
     if character.ban_reason:
         lines.append(f"Причина: {character.ban_reason}")
     if character.banned_until is not None:
-        lines.append(f"До: {character.banned_until.strftime('%d.%m.%Y %H:%M')} (МСК+0, UTC)")
+        # В базе UTC, игроку - московское время, как везде в игре.
+        until = character.banned_until
+        if until.tzinfo is None:
+            until = until.replace(tzinfo=timezone.utc)
+        msk = until.astimezone(timezone(timedelta(hours=3)))
+        lines.append(f"До: {msk.strftime('%d.%m.%Y %H:%M')} МСК")
     else:
         lines.append("Срок: бессрочно")
     return "\n".join(lines)

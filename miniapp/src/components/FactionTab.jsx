@@ -36,7 +36,7 @@ function ago(minutes) {
   if (minutes < 1) return 'только что';
   if (minutes < 60) return `${minutes} мин назад`;
   const h = Math.floor(minutes / 60);
-  return h < 24 ? `${h} ч назад` : `${Math.floor(h / 24)} дн назад`;
+  return h < 24 ? `${h} ч назад` : `${Math.floor(h / 24)} дн. назад`;
 }
 
 // Товар: картинка, а пока её нет - эмодзи.
@@ -123,7 +123,7 @@ function DispatchSheet({ cart, gold, routeTitles, orders, market, busy, onSend, 
               onClick={() => setDest(d.city)}>
               {d.title}
               <span className="craft-hint">
-                {d.kind === 'deficit' ? 'ближний рынок, ×1.45 к базе' : 'дальний рынок, ×1.95 к базе'}
+                {d.kind === 'deficit' ? 'ближний рынок, ×1,45 к базе' : 'дальний рынок, ×1,95 к базе'}
                 {cart.goods.some((g) => orderFor(d.city, g.id)) ? ' · 📜 заказ' : ''}
               </span>
             </button>
@@ -500,8 +500,8 @@ function CitySummary({ city }) {
         </div>
       ))}
       <p className="craft-hint">
-        Цены без надбавки за твой уровень торговли. Ближний рынок платит ×1.45 к базовой цене товара, дальний
-        ×1.95. Каждый проданный ящик опускает цену на 1,2%, каждый купленный у производителя поднимает (до ±45%);
+        Цены без надбавки за твой уровень торговли. Ближний рынок платит ×1,45 к базовой цене товара, дальний
+        ×1,95. Каждый проданный ящик опускает цену на 1,2%, каждый купленный у производителя поднимает (до ±45%);
         со временем цена возвращается.
       </p>
       <div className="trade-dest__section">Лучшие торговцы города · фирм: {info.firms}</div>

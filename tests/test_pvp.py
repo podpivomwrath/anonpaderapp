@@ -413,7 +413,7 @@ def test_battle_scene_line_groups_by_side() -> None:
     }
     battle.side_of = {1: 0, 2: 1}
     line = pvp_handlers._battle_scene_line(battle)
-    assert line == "⚔️ Бой: Тень_В_Ночи vs Гримм"
+    assert line == "⚔️ Бой: Тень_В_Ночи против Гримм"
 
 
 def test_default_enemy_target_picks_alive_opponent() -> None:
