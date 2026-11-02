@@ -66,7 +66,7 @@ const ABILITY_DODGE_RATIO = 0.25;
 const EFFECT_ABILITY_DODGE_RATIO = 0.5;
 const DODGE_HARD_CAP = 0.8;
 
-// Стойкость к критам от Выносливости (2026-11-02), как stat_model.GAME.crit_resist_*.
+// Стойкость к крит-урону от Выносливости (2026-11-02), как stat_model.GAME.crit_resist_*.
 const CRIT_RESIST_CAP = 0.15;
 const CRIT_RESIST_K = 200;
 

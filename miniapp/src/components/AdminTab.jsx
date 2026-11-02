@@ -756,6 +756,9 @@ function PlayerCard({ card, onRefresh }) {
               <StatRow label="Шанс крита" value={`${Math.round(card.derived.crit_chance * 100)}%`} />
               <StatRow label="Снижение урона" value={`${Math.round(card.derived.mitigation * 100)}%`} />
               <StatRow label="Сопротивление контролю" value={`${Math.round(card.derived.control_resist * 100)}%`} />
+              <StatRow label="🪨 Стойкость к крит-урону" value={`${((card.derived.crit_resist || 0) * 100).toFixed(1)}%`} />
+              <StatRow label="🎯 Меткость" value={`${((card.derived.accuracy || 0) * 100).toFixed(1)}%`} />
+              <StatRow label="🧪 Стойкость к ядам" value={`${((card.derived.dot_resist || 0) * 100).toFixed(1)}%`} />
               <StatRow label="Сила поддержки" value={card.derived.support_power} />
               <StatRow
                 label="Уклонение"

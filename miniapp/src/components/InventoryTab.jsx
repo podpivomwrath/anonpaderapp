@@ -114,7 +114,7 @@ function detailRows(entry) {
     rows.push(['Слот', data.slot_title]);
     if (data.ilvl) rows.push(['Уровень', data.ilvl]);
     if (data.craft_efficiency) rows.push(['Эффективность', `${data.craft_efficiency}%`]);
-    if (data.resist) rows.push(['Сопротивление', data.resist]);
+    if (data.resist) rows.push(['Сопротивление', `${data.resist_chip?.emoji || ''} ${data.resist}`.trim()]);
     Object.entries(data.base_stats || {})
       .sort((a, b) => b[1] - a[1])
       .forEach(([key, amount]) => rows.push([STAT_NAMES[key] || key, `+${amount}`]));
@@ -184,6 +184,11 @@ function CompareLine({ item, worn }) {
             {STAT_ICONS[k]} {d > 0 ? `+${d}` : d}
           </span>
         ))}
+        {item.resist_chip && (
+          <span className="gear-chip gear-chip--resist" title={item.resist}>
+            {item.resist_chip.emoji} +{item.resist_chip.pct}%
+          </span>
+        )}
       </span>
     </div>
   );
@@ -482,7 +487,7 @@ function BagRow({ entry, isNew, onOpen }) {
         <small className="bag-row__sub">
           {gear
             ? [level && (data.craft_efficiency ? level : `ур. ${level}`), shortStats(data.base_stats, 5),
-              data.need_level && `🔒 с ${data.need_level} ур.`].filter(Boolean).join(' · ')
+              data.resist_chip && `${data.resist_chip.emoji}${data.resist_chip.pct}%`, data.need_level && `🔒 с ${data.need_level} ур.`].filter(Boolean).join(' · ')
             : [data.rarity_title || data.grade_title || data.category_title, data.count > 1 && `×${data.count}`]
               .filter(Boolean).join(' · ')}
         </small>

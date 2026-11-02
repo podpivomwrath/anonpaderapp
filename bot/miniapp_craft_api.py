@@ -83,6 +83,7 @@ def _item_payload(character: Character, item: Item) -> dict:
         "efficiency": item.craft_efficiency,
         # Сопротивление (2026-11-02): строка с силой на текущей эффективности.
         "resist": resist_service.item_line(item),
+        "resist_chip": resist_service.item_chip(item),
         "next_efficiency": (
             crafting.next_efficiency(item.craft_efficiency)
             if item.craft_efficiency is not None else None

@@ -143,7 +143,7 @@ function ResultSheet({ result, onClose }) {
         <p className="forge-result__big">Инструмент до {result.ceiling}%</p>
       )}
       {item && <p className="forge-result__stats">{statLine(item.stats)}</p>}
-      {item?.resist && <p className="forge-result__stats">🛡 {item.resist}</p>}
+      {item?.resist && <p className="forge-result__stats">{item.resist_chip?.emoji || '🛡'} {item.resist}</p>}
       <button type="button" className="pill-btn pill-btn--main forge-result__ok" onClick={onClose}>Забрать</button>
     </Sheet>
   );

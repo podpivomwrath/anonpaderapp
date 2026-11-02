@@ -1,4 +1,4 @@
-"""Сопротивления (2026-11-02, репорт 283): стойкость к критам, меткость,
+"""Сопротивления (2026-11-02, репорт 283): стойкость к крит-урону, меткость,
 стойкость к ядам. Источники - Выносливость (только криты, только у игроков),
 руны героя, кованые вещи, Перстень Несгоревшего. Частоты крита и уворота
 проверяются на большой выборке."""
@@ -38,23 +38,38 @@ def _dodge_rate(actor, target, seed=2) -> float:
     return missed / N
 
 
-def test_crit_resist_cuts_points_mobs_have_no_vitality_resist() -> None:
+def _crit_hit(actor, target) -> int:
+    target.current_hp = target.max_hp
+    return compute_hit(actor, target, random.Random(3), force_crit=True, ignore_dodge=True).amount
+
+
+def test_crit_resist_cuts_crit_damage_not_chance() -> None:
+    """Владелец (2026-11-02): стойкость режет прибавку крита, 100% - крит
+    бьёт как обычный удар. Шанс крита не трогает."""
     rogue = combatant(1, 0, agility=200)
     mob = combatant(2, 1, kind="mob", vitality=400)
-    base = stat_model.ACTIVE.crit_chance(rogue.stats)
-    assert _crit_rate(rogue, mob) == pytest.approx(base, abs=0.01)  # Выносливость моба не в счёт
+    mob.buff_modifiers["resist_crit"] = 1.0
+    plain = _crit_hit(rogue, mob)            # крит без прибавки = обычный удар
+    mob.buff_modifiers["resist_crit"] = 0.0
+    full = _crit_hit(rogue, mob)             # Выносливость моба не в счёт
+    mult = full / plain
+    assert mult > 1.3
+    mob.buff_modifiers["resist_crit"] = 0.2
+    assert _crit_hit(rogue, mob) == pytest.approx(plain * (1 + (mult - 1) * 0.8), abs=2)
+    mob.buff_modifiers["resist_crit"] = 5.0  # больше 100% - не лечит и не ниже обычного
+    assert _crit_hit(rogue, mob) == plain
+    # У игрока сверху - Выносливость.
     player = combatant(3, 1, vitality=400)
     vit = stat_model.ACTIVE.crit_resist(player.stats)
     assert vit == pytest.approx(0.10)
-    assert _crit_rate(rogue, player) == pytest.approx(base - vit, abs=0.01)
-    player.buff_modifiers["resist_crit"] = 0.07
-    assert _crit_rate(rogue, player) == pytest.approx(base - vit - 0.07, abs=0.01)
-    # Больше шанса - ноль критов, не ошибка; гарантированный крит остаётся.
-    player.buff_modifiers["resist_crit"] = 5.0
-    assert _crit_rate(rogue, player) == 0.0
-    rogue.crit_this_tick = False
-    compute_hit(rogue, player, random.Random(3), force_crit=True, ignore_dodge=True)
-    assert rogue.crit_this_tick
+    player.buff_modifiers["resist_crit"] = 1.0
+    p_plain = _crit_hit(rogue, player)
+    player.buff_modifiers["resist_crit"] = 0.0
+    assert _crit_hit(rogue, player) == pytest.approx(p_plain * (1 + (mult - 1) * (1 - vit)), abs=2)
+    # Частота крита прежняя.
+    player.buff_modifiers["resist_crit"] = 0.3
+    base = stat_model.ACTIVE.crit_chance(rogue.stats)
+    assert _crit_rate(rogue, player) == pytest.approx(base, abs=0.01)
 
 
 def test_accuracy_cuts_dodge_and_floors_at_zero() -> None:
@@ -83,11 +98,32 @@ def test_item_value_and_lines() -> None:
     assert resists.item_value(80) == pytest.approx(0.10 * 80 / 120)
     assert resists.item_value(None) == pytest.approx(0.10 * 100 / 120)
     item = Item(name="x", slot="weapon", craft_resist="crit", craft_efficiency=120)
-    assert resist_service.item_line(item) == "шанс крита по тебе ниже на 10 п.п."
+    assert resist_service.item_line(item) == "крит-урон по тебе ниже на 10%"
     item.craft_resist, item.craft_efficiency = "dot", 90
     assert resist_service.item_line(item) == "яд и горение по тебе слабее на 7.5%"
     item.craft_resist = None
     assert resist_service.item_line(item) is None
+
+
+def test_soft_cap() -> None:
+    # Владелец (2026-11-02): до 15% полностью, сверху вполовину, не выше 30%.
+    assert resists.capped(0.07) == pytest.approx(0.07)
+    assert resists.capped(0.15) == pytest.approx(0.15)
+    assert resists.capped(0.25) == pytest.approx(0.20)
+    assert resists.capped(0.38) == pytest.approx(0.265)
+    assert resists.capped(0.45) == pytest.approx(0.30)
+    assert resists.capped(5.0) == pytest.approx(0.30)
+
+
+async def test_stack_of_items_hits_cap(db_session, make_character) -> None:
+    c = await make_character()
+    c.resist_ring = True
+    for slot in ("weapon", "helmet", "armor", "legs", "boots"):
+        await _equip(db_session, c.id, Item(name=slot, slot=slot, craft_spec="tank", craft_resist="dot",
+                                            craft_efficiency=120, base_stats={}))
+    mods = await preset_service.resolve_active_modifiers(db_session, c)
+    assert mods["resist_dot"] == pytest.approx(resists.HARD_CAP)
+    assert mods["resist_crit"] == pytest.approx(0.15)  # один перстень - полностью
 
 
 def test_roll_spreads_evenly() -> None:
@@ -125,15 +161,15 @@ async def test_modifiers_sum_runes_items_ring(db_session, make_character) -> Non
                         base_stats={}))
     await db_session.flush()
     mods = await preset_service.resolve_active_modifiers(db_session, c)
-    assert mods["resist_crit"] == pytest.approx(0.07 + 0.10)
+    assert mods["resist_crit"] == pytest.approx(resists.capped(0.07 + 0.10))
     assert mods["accuracy"] == pytest.approx(0.077)
-    assert mods["resist_dot"] == pytest.approx(0.12 + 0.075)
+    assert mods["resist_dot"] == pytest.approx(resists.capped(0.12 + 0.075))
     c.resist_ring = True
     mods = await preset_service.resolve_active_modifiers(db_session, c, pvp=True)
-    assert mods["resist_crit"] == pytest.approx(0.07 + 0.10 + 0.15)
-    assert mods["accuracy"] == pytest.approx(0.077 + 0.15)
+    assert mods["resist_crit"] == pytest.approx(resists.capped(0.07 + 0.10 + 0.15))
+    assert mods["accuracy"] == pytest.approx(resists.capped(0.077 + 0.15))
     # «Горькая кровь» в PvP вполсилы, как и раньше.
-    assert mods["resist_dot"] == pytest.approx(0.06 + 0.075 + 0.15)
+    assert mods["resist_dot"] == pytest.approx(resists.capped(0.06 + 0.075 + 0.15))
 
 
 class _Lucky(random.Random):
@@ -152,7 +188,7 @@ async def test_ring_drops_worn_then_to_bag(db_session, make_character) -> None:
     other = await make_character()
     assert await resist_service.maybe_drop_ring(db_session, other, random.Random(1)) is None
     payload = await resist_service.ring_payload(db_session, c)
-    assert payload["name"] == resists.RING_TITLE and "15 п.п." in payload["effect"]
+    assert payload["name"] == resists.RING_TITLE and "15%" in payload["effect"]
     assert payload["worn"] and payload["spare"] == 2
     assert await resist_service.ring_payload(db_session, other) is None
 

@@ -111,6 +111,8 @@ def _inventory_payload(items: list, level: int | None = None) -> dict:
                 "craft_efficiency": item.craft_efficiency,
                 # Сопротивление кованой вещи (2026-11-02): строка или None.
                 "resist": resist_service.item_line(item),
+                # Плашка рядом со статами: значок вида и проценты.
+                "resist_chip": resist_service.item_chip(item),
                 "bound": item.bound,
                 # Готовая команда передачи с номером этого экземпляра - её
                 # копирует кнопка у каждой вещи, которую можно передать.

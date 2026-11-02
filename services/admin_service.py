@@ -326,6 +326,10 @@ async def player_card(db: AsyncSession, character_id: int) -> dict | None:
 
     gear_bonus = await item_service.compute_gear_bonus(db, character_id)
     derived = derived_stats_service.compute(character, stats, gear_bonus) if stats is not None else None
+    # Сопротивления (2026-11-02): руны, вещи, перстень - уже с потолком.
+    from services import rune_service
+
+    resist_mods = await resist_service.modifiers(db, character, rune_service.combat_modifiers(character, False))
     elixirs = await elixir_service.get_stock(db, character_id)
     owned_mounts = await mount_service.owned_mounts(db, character_id)
     mount_travel = await mount_service.active_travel(db, character_id)
@@ -385,6 +389,9 @@ async def player_card(db: AsyncSession, character_id: int) -> dict | None:
             "support_power": derived.support_power,
             "dodge_chance": derived.dodge_chance,
             "ability_dodge_chance": derived.ability_dodge_chance,
+            "crit_resist": derived.crit_resist + resist_mods.get("resist_crit", 0.0),
+            "accuracy": resist_mods.get("accuracy", 0.0),
+            "dot_resist": resist_mods.get("resist_dot", 0.0),
         } if derived is not None else None,
         "gold": wallet.farm_currency,
         "gems": wallet.donate_currency,

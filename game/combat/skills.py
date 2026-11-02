@@ -380,17 +380,20 @@ def compute_hit(
     if target.has_effect(EffectKind.MARK):
         for mark in target.effects_of(EffectKind.MARK):
             crit_chance += actor.buff_modifiers.get("mark_ally_crit_bonus", 0.0) if mark.source_id != actor.id else 0.0
-    # Стойкость к критам (2026-11-02): Выносливость игрока, руны, вещи, перстень.
-    crit_chance -= target.buff_modifiers.get("resist_crit", 0.0)
-    if target.kind == "character":
-        crit_chance -= stat_model.ACTIVE.crit_resist(target.stats)
     crit = True if (force_crit or actor.guaranteed_crit_next) else rng.random() < crit_chance
     if actor.guaranteed_crit_next:
         actor.guaranteed_crit_next = False
     if crit:
         actor.crit_this_tick = True
-        base *= (crit_multiplier if crit_multiplier is not None else bc.CRIT_MULTIPLIER) +             stat_model.ACTIVE.crit_multiplier_bonus(actor.stats)
-        base *= 1.0 + actor.buff_modifiers.get("rune:thin_sting", 0.0)  # руна (2026-10-31)
+        mult = (crit_multiplier if crit_multiplier is not None else bc.CRIT_MULTIPLIER) +             stat_model.ACTIVE.crit_multiplier_bonus(actor.stats)
+        mult *= 1.0 + actor.buff_modifiers.get("rune:thin_sting", 0.0)  # руна (2026-10-31)
+        # Стойкость к крит-урону (2026-11-02, владелец): режет прибавку крита,
+        # 100% - крит бьёт как обычный удар. Выносливость (только у игроков),
+        # руны, вещи, перстень.
+        resist = target.buff_modifiers.get("resist_crit", 0.0)
+        if target.kind == "character":
+            resist += stat_model.ACTIVE.crit_resist(target.stats)
+        base *= 1.0 + max(mult - 1.0, 0.0) * max(1.0 - resist, 0.0)
         # Кровавый рыцарь, «Стойкий к боли» (патч 47, ч.2): свой крит-урон не
         # трогает, только входящий по себе.
         base *= 1.0 - target.buff_modifiers.get("crit_damage_taken_reduction", 0.0)

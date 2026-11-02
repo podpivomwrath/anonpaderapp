@@ -1,6 +1,6 @@
 """Сопротивления персонажа (2026-11-02): руны, кованые вещи, Перстень
 Несгоревшего - в ключи resist_crit / accuracy / resist_dot для боя и сводки.
-Числа и правила - game/economy/resists.py. Стойкость к критам от Выносливости
+Числа и правила - game/economy/resists.py. Стойкость к крит-урону от Выносливости
 считает сам бой (stat_model.crit_resist), здесь её нет."""
 
 import random
@@ -22,6 +22,14 @@ def item_line(item: Item) -> str | None:
     return resists.describe(item.craft_resist, resists.item_value(item.craft_efficiency))
 
 
+def item_chip(item: Item) -> dict | None:
+    """Плашка сопротивления для мини-аппа: {"emoji", "pct"} или None."""
+    if item.craft_resist not in resists.KINDS:
+        return None
+    return {"emoji": resists.EMOJI[item.craft_resist],
+            "pct": round(resists.item_value(item.craft_efficiency) * 100, 1)}
+
+
 def roll_for(item: Item, rng: random.Random) -> None:
     """Ковка и перековка: новое случайное сопротивление."""
     item.craft_resist = resists.roll(rng)
@@ -40,7 +48,8 @@ async def modifiers(db: AsyncSession, character: Character, runes: dict[str, flo
     if character.resist_ring:
         for kind in resists.KINDS:
             resists.add(mods, kind, resists.RING_VALUE)
-    return mods
+    # Мягкий потолок на сумму вида: стопки вещей не обнуляют криты и яды.
+    return {key: resists.capped(value) for key, value in mods.items()}
 
 
 class RingError(Exception):

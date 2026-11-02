@@ -25,7 +25,7 @@ no border, square 1:1 composition, crisp readable silhouette at small size
 
 | Файл | Руна | Знак |
 |---|---|---|
-| `руна_закалка.png` | Закалка - шанс крита по тебе ниже | a blacksmith's anvil with a short blade lying flat on it, three small sparks bouncing off the blade |
+| `руна_закалка.png` | Закалка - крит-урон по тебе ниже | a blacksmith's anvil with a short blade lying flat on it, three small sparks bouncing off the blade |
 | `руна_верный_глаз.png` | Верный глаз - уворот цели ниже | an open eye with a straight arrow passing through the pupil and out the other side |
 
 ## Перстень Несгоревшего

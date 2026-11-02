@@ -35,6 +35,12 @@ const SLOT_TITLES = {
 
 export const STAT_ICONS = { str: '💪', agi: '🏃', int: '🧠', vit: '❤️', wil: '✨' };
 const STAT_ORDER = ['str', 'agi', 'int', 'vit', 'wil'];
+// Значки сопротивлений - те же, что в «Характеристиках».
+const RESIST_CHIPS = [
+  ['crit_resist', '🪨', 'Стойкость к крит-урону'],
+  ['accuracy', '🎯', 'Меткость'],
+  ['dot_resist', '🧪', 'Стойкость к ядам'],
+];
 
 // Значки слотов - для пустого окна: подпись словом там была бы лишней.
 function SlotGlyph({ slot }) {
@@ -62,6 +68,14 @@ function statDiff(item, current) {
   return STAT_ORDER.filter((k) => keys.has(k))
     .map((k) => [k, (item?.base_stats?.[k] || 0) - (current?.base_stats?.[k] || 0)])
     .filter(([, d]) => d !== 0);
+}
+
+// Сопротивление кованой вещи (2026-11-02) - плашкой рядом со статами:
+// 🪨 к критам, 🎯 меткость, 🧪 к ядам; полная строка - в подсказке.
+function ResistChip({ item }) {
+  const chip = item?.resist_chip;
+  if (!chip) return null;
+  return <span className="gear-chip gear-chip--resist" title={item.resist}>{chip.emoji} +{chip.pct}%</span>;
 }
 
 function DiffChips({ diff }) {
@@ -99,8 +113,8 @@ function SlotSheet({ slot, items, onClose, onEquip, onUnequip, busyId }) {
                 {STAT_ORDER.filter((k) => current.base_stats?.[k]).map((k) => (
                   <span key={k} className="gear-chip">{STAT_ICONS[k]} +{current.base_stats[k]}</span>
                 ))}
+                <ResistChip item={current} />
               </span>
-              {current.resist && <span className="slot-row__resist">🛡 {current.resist}</span>}
             </div>
             <button
               type="button" className="slot-row__off" disabled={busyId === current.id}
@@ -131,7 +145,7 @@ function SlotSheet({ slot, items, onClose, onEquip, onUnequip, busyId }) {
                   <span className="slot-row__chips">
                     {locked
                       ? <span className="gear-chip gear-chip--lock">🔒 {item.need_level}</span>
-                      : <DiffChips diff={statDiff(item, current)} />}
+                      : <><DiffChips diff={statDiff(item, current)} /><ResistChip item={item} /></>}
                   </span>
                 </span>
                 {busyId === item.id && <span className="slot-row__spin" aria-hidden="true" />}
@@ -268,9 +282,9 @@ function WornList({ equipped, onOpen }) {
                   {STAT_ORDER.filter((k) => item.base_stats?.[k]).map((k) => (
                     <span key={k} className="gear-chip">{STAT_ICONS[k]} +{item.base_stats[k]}</span>
                   ))}
+                  <ResistChip item={item} />
                 </span>
               )}
-              {item?.resist && <span className="worn-row__resist">🛡 {item.resist}</span>}
             </span>
           </button>
         );
@@ -558,6 +572,8 @@ export default function HeroTab({ character, onCharacterUpdate }) {
   const url = silhouetteUrl(character.subclass, character.base_class, gender);
   const path = character.subclass || character.base_class;
   const bonus = STAT_ORDER.filter((k) => character.gear_bonus?.[k]);
+  // Сопротивления героя итогом (2026-11-02): Выносливость, руны, вещи, перстень.
+  const resists = RESIST_CHIPS.filter(([k]) => character.derived?.[k] > 0);
 
   const slotButton = ({ slot, y }) => {
     const item = equipped[slot];
@@ -615,10 +631,15 @@ export default function HeroTab({ character, onCharacterUpdate }) {
             </div>
           </div>
           <RuneRing data={runes} onOpen={() => { setRuneKind('hero'); setPage(1); }} />
-          {bonus.length > 0 && (
+          {(bonus.length > 0 || resists.length > 0) && (
             <div className="hero-bonus">
               {bonus.map((k) => (
                 <span key={k} className="gear-chip">{STAT_ICONS[k]} +{character.gear_bonus[k]}</span>
+              ))}
+              {resists.map(([k, emoji, title]) => (
+                <span key={k} className="gear-chip gear-chip--resist" title={title}>
+                  {emoji} {(character.derived[k] * 100).toFixed(1)}%
+                </span>
               ))}
             </div>
           )}
