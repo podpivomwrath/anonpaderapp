@@ -78,7 +78,7 @@ def test_accuracy_cuts_dodge_and_floors_at_zero() -> None:
     target.buff_modifiers["dodge_bonus"] = 0.2
     base = _dodge_rate(attacker, target)
     attacker.buff_modifiers["accuracy"] = 0.15
-    assert _dodge_rate(attacker, target) == pytest.approx(base - 0.15, abs=0.012)
+    assert _dodge_rate(attacker, target) == pytest.approx(base * 0.85, abs=0.012)  # процент, не пункты
     attacker.buff_modifiers["accuracy"] = 3.0
     assert _dodge_rate(attacker, target) == 0.0
 
