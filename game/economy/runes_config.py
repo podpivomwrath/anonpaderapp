@@ -98,7 +98,7 @@ RUNES: list[RuneDef] = [
     RuneDef("tempered", HERO, "Закалка", 0.07, "крит-урон по тебе ниже на {v}"),
     RuneDef("true_eye", HERO, "Верный глаз", 0.07, "уворот цели ниже на {v}"),
     RuneDef("heavy_gaze", HERO, "Тяжёлый взгляд", 0.06, "у мобов клетки на {v} меньше здоровья", pvp="none"),
-    RuneDef("grabby_fingers", HERO, "Цепкие пальцы", 0.10, "+{v} к шансу, что с моба выпадет вещь", pvp="none"),
+    RuneDef("grabby_fingers", HERO, "Цепкие пальцы", 0.10, "+{v} к шансу, что с моба выпадет предмет экипировки", pvp="none"),
     RuneDef("junk_nose", HERO, "Нюх старьёвщика", 0.15, "+{v} к шансу лишней реликвии с моба", pvp="none", rarity="rare"),
     RuneDef("keen_eye", HERO, "Намётанный глаз", 0.06,
             "шанс {v}, что выпавшая вещь будет на ступень редкости выше", pvp="none", rarity="rare",
