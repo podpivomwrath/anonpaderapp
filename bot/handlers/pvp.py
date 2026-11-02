@@ -686,6 +686,9 @@ async def _start_forced_duel_impl(
     from bot.handlers import group as group_handlers  # избегаем цикла импортов
 
     await group_handlers.notify_attacked(db, victim, attacker)
+    from bot.handlers import guild as guild_handlers
+
+    await guild_handlers.on_fight(db, attacker, victim)
     await _launch_duel(
         db, attacker, attacker_peer_id, victim, victim_peer_id,
         location=(attacker.pos_x, attacker.pos_y),

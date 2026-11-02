@@ -711,6 +711,23 @@ async def fort_sightings(db: AsyncSession, character: Character) -> list[FortSig
     ]
 
 
+def fight_radius(base_tier: str) -> int:
+    return gc.FIGHT_ALERT_RADIUS_PER_TIER * (gc.BASE_ORDER.index(base_tier) + 1)
+
+
+async def guilds_near_fight(db: AsyncSession, x: int, y: int, guild_ids: set[int]) -> set[int]:
+    """Из guild_ids - гильдии, у которых база ближе радиуса вести о стычках
+    (квадрат, как у дозора форта). Клетки рудников базами не считаются."""
+    if not guild_ids:
+        return set()
+    reach = fight_radius(gc.BASE_ORDER[-1])
+    cells = (await db.scalars(select(GuildCell).where(
+        GuildCell.status == "held", GuildCell.guild_id.in_(guild_ids), GuildCell.mine_id.is_(None),
+        GuildCell.x.between(x - reach, x + reach), GuildCell.y.between(y - reach, y + reach),
+    ))).all()
+    return {c.guild_id for c in cells if max(abs(c.x - x), abs(c.y - y)) <= fight_radius(c.base_tier)}
+
+
 async def territory_counts(db: AsyncSession, guild_id: int) -> dict[str, int]:
     cells = [c for c in await cells_of(db, guild_id) if c.status == "held"]
     return {

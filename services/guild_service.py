@@ -103,14 +103,18 @@ async def member_ids(db: AsyncSession, guild_id: int) -> list[int]:
 
 async def peers_of(
     db: AsyncSession, guild_id: int, min_rank: str | None = None, alerts: bool = False,
+    fights: bool = False,
 ) -> list[int]:
     """vk id участников (для рассылок). min_rank - не ниже этого звания.
-    alerts - весть о чужих (башня, дозор форта): без тех, кто её отключил."""
+    alerts - весть о чужих (башня, дозор форта): без тех, кто её отключил.
+    fights - весть о стычках у баз: без отключивших."""
     result = []
     for member, character in await members(db, guild_id):
         if min_rank is not None and gc.RANK_ORDER[member.rank] < gc.RANK_ORDER[min_rank]:
             continue
         if alerts and (character.ui_flags or {}).get("guild_alerts_off"):
+            continue
+        if fights and (character.ui_flags or {}).get("guild_fights_off"):
             continue
         peer = await onboarding_service.vk_id_for_character(db, member.character_id)
         if peer is not None:

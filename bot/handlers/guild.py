@@ -166,6 +166,23 @@ async def on_watch(db, character: Character) -> None:
         notify_peers(peers, f"🏰 Форт на ({s.x}; {s.y}): {s.where} замечен игрок {who}.")
 
 
+async def on_fight(db, attacker: Character, victim: Character) -> None:
+    """Весть о стычке: игрок гильдии напал или на него напали рядом с базой
+    гильдии - пишем ей (кроме самих бойцов и отключивших весть)."""
+    x, y = attacker.pos_x, attacker.pos_y
+    if x is None:
+        return
+    sides = {g for g in (attacker.guild_id, victim.guild_id) if g}
+    guilds = await guild_territory_service.guilds_near_fight(db, x, y, sides)
+    if not guilds:
+        return
+    skip = {await onboarding_service.vk_id_for_character(db, c.id) for c in (attacker, victim)}
+    text = f"[{x};{y}] {attacker.name} ⚔️ {victim.name}"
+    for guild_id in guilds:
+        peers = await guild_service.peers_of(db, guild_id, fights=True)
+        notify_peers([p for p in peers if p not in skip], text)
+
+
 # --- Фоновые задачи ------------------------------------------------------------------
 
 

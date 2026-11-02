@@ -4,6 +4,7 @@ import json
 from datetime import datetime, timedelta, timezone
 
 import pytest
+from sqlalchemy import select
 
 from bot.handlers import house as house_handlers
 from game.combat.session import Stats, build_combatant
@@ -36,13 +37,13 @@ async def test_cook_from_fish_portions_by_weight(db_session, make_character) -> 
     c = await make_character(farm=500)
     await _fish(db_session, c.id, "pale_perch", "big", 1800)
     await _fish(db_session, c.id, "blind_gudgeon", "common", 300)  # меньше порции - не предлагается
-    await herb_service.add_herb(db_session, c.id, "bitter_wormwood", 1)
+    await herb_service.add_herb(db_session, c.id, "bitter_wormwood", 3)
     dish = cc.DISHES_BY_ID["wormwood_soup"]
     options = await cooking_service.fish_options(db_session, c.id, dish)
     assert [(o.fish.id, o.portions) for o in options] == [("pale_perch", 3)]
     await cooking_service.start(db_session, c, "wormwood_soup", "pale_perch", "big", NOW)
     assert cooking_service.cooking_now(c) == (dish, "big", 3)
-    assert (await wallet_service.get_wallet(db_session, c.id)).farm_currency == 480
+    assert (await wallet_service.get_wallet(db_session, c.id)).farm_currency == 440  # 20 за порцию
     assert [x.id for x in await cooking_service.due(db_session, NOW + timedelta(seconds=31))] == [c.id]
     res = await cooking_service.finish(db_session, c)
     # Опыт за каждую порцию и по ценности рыбы (2026-10-29): 22 × 3 × 1.25.
@@ -50,6 +51,19 @@ async def test_cook_from_fish_portions_by_weight(db_session, make_character) -> 
     food = await cooking_service.get_food(db_session, c.id)
     assert [(d.id, g, n) for d, _, g, n in food] == [("wormwood_soup", "big", 3)]
     assert "×3" in house_handlers.cooked_text(res)
+
+
+async def test_cook_pays_per_portion_and_caps_by_herbs(db_session, make_character) -> None:
+    """Трава и золото - за каждую порцию (2026-11-02, баг-репорт 284): травы
+    на две порции - готовится две, рыба на третью остаётся."""
+    c = await make_character(farm=500)
+    await _fish(db_session, c.id, "pale_perch", "big", 1800)
+    await herb_service.add_herb(db_session, c.id, "bitter_wormwood", 2)
+    dish, n = await cooking_service.start(db_session, c, "wormwood_soup", "pale_perch", "big", NOW)
+    assert n == 2 and await herb_service.get_bag(db_session, c.id) == []
+    assert (await wallet_service.get_wallet(db_session, c.id)).farm_currency == 460
+    fish = await db_session.scalar(select(CharacterFish).where(CharacterFish.character_id == c.id))
+    assert fish.total_grams == 800
 
 
 async def test_cook_refusals_keep_everything(db_session, make_character) -> None:

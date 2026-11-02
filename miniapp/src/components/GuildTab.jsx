@@ -242,12 +242,17 @@ function Overview({ state, run, busy }) {
         </div>
       </Group>
 
-      <Group header={<Header>🗼 Весть о чужих</Header>}>
-        <Div>
+      <Group header={<Header>🗼 Вести</Header>}>
+        <Div style={{ display: 'grid', gap: 10 }}>
           <label className="guild-check">
             <input type="checkbox" checked={!me.alerts_off} disabled={busy}
               onChange={(e) => run('alerts_pref', { on: e.target.checked })} />
             Получать весть, когда чужой у нашей башни или рядом с фортом
+          </label>
+          <label className="guild-check">
+            <input type="checkbox" checked={!me.fights_off} disabled={busy}
+              onChange={(e) => run('fights_pref', { on: e.target.checked })} />
+            Получать весть, когда наш игрок дерётся рядом с нашей базой: до 5 клеток от заставы, 10 от форта, 15 от цитадели
           </label>
         </Div>
       </Group>

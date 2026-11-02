@@ -294,10 +294,9 @@ def cooking_payload(character) -> dict:
     recipes = []
     for dish in cc.DISHES:
         d = cooking.dish_def(dish.dish_id)
-        needs = [f"рыба {dish.fish_tier}-го тира"]
-        if dish.herb:
-            needs.append(herbalism.herb_def(dish.herb).name)
-        needs.append(f"{dish.gold} зол.")
+        per = [herbalism.herb_def(dish.herb).name] if dish.herb else []
+        per.append(f"{dish.gold} зол.")
+        needs = [f"рыба {dish.fish_tier}-го тира; на порцию - {', '.join(per)}"]
         recipes.append({
             "id": dish.dish_id, "name": d.name, "emoji": d.emoji, "icon": f"dish:{dish.dish_id}", "level": dish.level,
             "known": dish.level <= level, "out": None,

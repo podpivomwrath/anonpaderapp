@@ -140,12 +140,19 @@ async def start(
     n = cooking.portions(row.total_grams, dish) if row is not None else 0
     if n < 1:
         raise CookingError("Этой рыбы не хватит даже на порцию.")
-    if (await wallet_service.get_wallet(db, character.id)).farm_currency < dish.gold:
+    # Трава и золото - на каждую порцию (2026-11-02, баг-репорт: три порции
+    # стоили как одна). Не хватает на все - готовим, на сколько хватает.
+    gold = (await wallet_service.get_wallet(db, character.id)).farm_currency
+    n = min(n, gold // dish.gold)
+    if n < 1:
         raise CookingError(f"Не хватает золота на соль и специи: нужно {dish.gold}.")
-    if dish.herb and not await herb_service.spend(db, character.id, {dish.herb: 1}):
-        raise CookingError("Не хватает травы.")
+    if dish.herb:
+        bag = {h.id: count for h, count in await herb_service.get_bag(db, character.id)}
+        n = min(n, bag.get(dish.herb, 0))
+        if n < 1 or not await herb_service.spend(db, character.id, {dish.herb: n}):
+            raise CookingError("Не хватает травы.")
     row.total_grams -= cooking.grams_used(n, dish)
-    await wallet_service.charge(db, character.id, "farm", dish.gold)
+    await wallet_service.charge(db, character.id, "farm", dish.gold * n)
     character.house_work = f"{PREFIX}{dish.dish_id}:{grade}:{n}"
     character.house_work_until = (now or _now()) + timedelta(seconds=cc.COOK_SECONDS)
     await db.flush()

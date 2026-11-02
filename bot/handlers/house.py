@@ -212,12 +212,13 @@ async def oven_text(db, character: Character) -> str:
     lines = ["🔥 Печь", f"Кулинария: {level} ур.{xp}", f"Блюдо действует {cooking.food_minutes(level)} мин.", ""]
     for dish in cooking.known(level):
         d = cooking.dish_def(dish.dish_id)
-        need = [f"рыба {dish.fish_tier}-го тира"]
+        per = []
         if dish.herb:
             h = herbalism.herb_def(dish.herb)
-            need.append(f"{h.name} 1 (есть {bag.get(dish.herb, 0)})")
-        need.append(f"{dish.gold} зол.")
-        lines.append(f"{d.emoji} {d.name}: {', '.join(need)}. {cooking.buff_text(dish, 'common')}")
+            per.append(f"{h.name} 1 (есть {bag.get(dish.herb, 0)})")
+        per.append(f"{dish.gold} зол.")
+        lines.append(f"{d.emoji} {d.name}: рыба {dish.fish_tier}-го тира; на порцию - {', '.join(per)}. "
+                     f"{cooking.buff_text(dish, 'common')}")
     nxt = cooking.next_locked(level)
     if nxt is not None:
         lines.append(f"🔒 Дальше: {cooking.dish_def(nxt.dish_id).name} с {nxt.level} ур.")

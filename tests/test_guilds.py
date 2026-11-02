@@ -898,3 +898,31 @@ async def test_guild_alerts_go_to_everyone_except_who_turned_them_off(db_session
         everyone = await guild_service.peers_of(db_session, guild.id)
     assert 1000 + quiet.id not in alerts and {1000 + leader.id, 1000 + loud.id} <= set(alerts)
     assert 1000 + quiet.id in everyone
+
+
+async def test_fight_alert_radius_by_base_tier(db_session, make_character) -> None:
+    """2026-11-02: весть о стычке - гильдии, у которой база в 5 клетках за
+    ступень (застава 5, форт 10, цитадель 15); дальше - тишина."""
+    guild, leader = await _found(db_session, make_character)
+    await _held_base(db_session, guild, 10, 10)                      # застава: 5
+    await _held_base(db_session, guild, 40, 10, tier=gc.BASE_FORT)   # форт: 10
+    near = guild_territory_service.guilds_near_fight
+    assert await near(db_session, 15, 5, {guild.id}) == {guild.id}
+    assert await near(db_session, 16, 10, {guild.id}) == set()
+    assert await near(db_session, 30, 20, {guild.id}) == {guild.id}
+    assert await near(db_session, 29, 10, {guild.id}) == set()
+    assert await near(db_session, 15, 5, set()) == set()
+
+
+async def test_fight_alert_respects_switch(db_session, make_character) -> None:
+    from unittest.mock import AsyncMock, patch
+
+    guild, leader = await _found(db_session, make_character)
+    quiet = await _add(db_session, make_character, guild)
+    quiet.ui_flags = {"guild_fights_off": True}
+    await db_session.flush()
+    peer = AsyncMock(side_effect=lambda db, cid: 1000 + cid)
+    with patch("services.onboarding_service.vk_id_for_character", peer):
+        fights = await guild_service.peers_of(db_session, guild.id, fights=True)
+        alerts = await guild_service.peers_of(db_session, guild.id, alerts=True)
+    assert fights == [1000 + leader.id] and 1000 + quiet.id in alerts
