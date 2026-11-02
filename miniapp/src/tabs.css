@@ -1084,10 +1084,14 @@ body.lite .eff-ladder__step--next { animation: none; }
   box-shadow: 0 8px 24px -8px rgba(0, 0, 0, 0.8);
 }
 
+/* Своё место - рамкой по форме иконки (квадрат со скруглением): круг
+   торчал из-за квадратной иконки сверху и снизу. line-height 0 - без
+   лишней строки под картинкой. */
 .podium__me {
   display: inline-block;
-  border-radius: 50%;
-  box-shadow: 0 0 0 2px var(--blood), 0 0 14px var(--blood);
+  line-height: 0;
+  border-radius: 12px;
+  box-shadow: 0 0 0 2px var(--blood), 0 0 12px var(--blood);
 }
 
 /* --- Доска: плакаты розыска, шкала рангов --------------------------------------- */
