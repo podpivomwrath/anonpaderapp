@@ -166,6 +166,7 @@ const ICONS = {
   'rarity:unique': new URL('./assets/items/rarity_unique.webp', import.meta.url).href,
   'special:draught': new URL('./assets/items/special_draught.webp', import.meta.url).href,
   'special:ring': new URL('./assets/items/special_ring.webp', import.meta.url).href,
+  'special:unburnt_ring': new URL('./assets/items/special_unburnt_ring.webp', import.meta.url).href,
   'special:vial': new URL('./assets/items/special_vial.webp', import.meta.url).href,
   'subclass:blood_knight': new URL('./assets/items/subclass_blood_knight.webp', import.meta.url).href,
   'subclass:dark_mystic': new URL('./assets/items/subclass_dark_mystic.webp', import.meta.url).href,

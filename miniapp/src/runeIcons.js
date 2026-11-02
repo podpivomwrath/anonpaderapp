@@ -5,6 +5,8 @@ export const RUNE_ICONS = {
   spare_breath: new URL('./assets/runes/spare_breath.webp', import.meta.url).href,
   stubborn_brow: new URL('./assets/runes/stubborn_brow.webp', import.meta.url).href,
   bitter_blood: new URL('./assets/runes/bitter_blood.webp', import.meta.url).href,
+  tempered: new URL('./assets/runes/tempered.webp', import.meta.url).href,
+  true_eye: new URL('./assets/runes/true_eye.webp', import.meta.url).href,
   heavy_gaze: new URL('./assets/runes/heavy_gaze.webp', import.meta.url).href,
   grabby_fingers: new URL('./assets/runes/grabby_fingers.webp', import.meta.url).href,
   junk_nose: new URL('./assets/runes/junk_nose.webp', import.meta.url).href,
