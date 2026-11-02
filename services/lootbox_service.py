@@ -13,6 +13,7 @@ promo_service).
 """
 
 import random
+import re
 from dataclasses import dataclass
 from datetime import datetime
 
@@ -237,6 +238,36 @@ async def open_owned(
     chest.reward_summary = "; ".join(result.lines)[:256]
     await db.flush()
     return chest, result
+
+
+_GOLD_LINE = re.compile(r"^(\d+) золота$")
+_GEMS_LINE = re.compile(r"^💎 (\d+) Пепельных самоцветов$")
+_COUNTED_LINE = re.compile(r"^(.+) ×(\d+)$")
+
+
+def summarize(lines: list[str]) -> list[str]:
+    """Строки наград многих ларцов - одним списком (2026-11-02, открытие
+    пачкой): золото и самоцветы складываются, «X ×N» - по названию, прочее
+    («Боевые эликсиры» через запятую, Ключ Монолита) - по штуке."""
+    gold = gems = 0
+    counts: dict[str, int] = {}
+    for line in lines:
+        if m := _GOLD_LINE.match(line):
+            gold += int(m.group(1))
+        elif m := _GEMS_LINE.match(line):
+            gems += int(m.group(1))
+        elif m := _COUNTED_LINE.match(line):
+            counts[m.group(1)] = counts.get(m.group(1), 0) + int(m.group(2))
+        else:
+            for name in line.split(", "):
+                counts[name] = counts.get(name, 0) + 1
+    out = []
+    if gold:
+        out.append(f"{gold} золота")
+    if gems:
+        out.append(f"💎 {gems} Пепельных самоцветов")
+    out.extend(f"{name} ×{n}" for name, n in counts.items())
+    return out
 
 
 # --- Лента рулетки ----------------------------------------------------------------

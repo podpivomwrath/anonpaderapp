@@ -4,14 +4,18 @@ import {
   Button, Group, Placeholder,
 } from '@vkontakte/vkui';
 import {
-  IN_VK, disassembleItem, eatFood, getInventory, openChest, transferByNick,
+  IN_VK, disassembleItem, eatFood, getInventory, openChest, openChests, transferByNick,
 } from '../api.js';
 import { itemIcon } from '../itemIcons.js';
 import ChestRoulette from './ChestRoulette.jsx';
+import MultiChestRoulette from './MultiChestRoulette.jsx';
 import ItemIcon from './ItemIcon.jsx';
 import Skeleton from './Skeleton.jsx';
 import Sparks from './Sparks.jsx';
 import { Empty, SectionHead } from './ui.jsx';
+
+// Столько ларцов сервер открывает за одно нажатие (MANY_CHESTS_MAX в miniapp_inventory_api).
+const MANY_CHESTS_MAX = 1000;
 
 // Патч 74: вместо одного плоского списка - сумка, свёрнутая по слотам.
 // Плоский список рос вместе с дропом и превращался в стену одинаковых строк.
@@ -519,6 +523,9 @@ export default function InventoryTab({ onOpenTab }) {
   const [notice, setNotice] = useState(null);
   const [roulette, setRoulette] = useState(null);  // ответ сервера на открытие ларца
   const [rouletteRun, setRouletteRun] = useState(0); // новый ключ - рулетка крутится заново
+  // Пачка ларцов (2026-11-02): ползунок «сколько» и ответ сервера с исходами.
+  const [manyPick, setManyPick] = useState(null); // {kind, max, qty} - открыт выбор
+  const [many, setMany] = useState(null);
   const [seen, setSeen] = useState(null);
   const [dustBurst, setDustBurst] = useState(0);
 
@@ -564,6 +571,27 @@ export default function InventoryTab({ onOpenTab }) {
     } finally {
       setOpening(false);
     }
+  }
+
+  async function handleOpenMany(chest, qty) {
+    if (opening) return;
+    setOpening(true);
+    setErrorMsg(null);
+    try {
+      const res = await openChests(chest.kind, qty);
+      setMany({ ...res, grades: chest.grades || [] });
+      setManyPick(null);
+      setDetail(null);
+    } catch (err) {
+      setErrorMsg(err?.message === 'no_chest' ? 'Ларцов в сумке больше нет.' : 'Не удалось открыть ларцы.');
+    } finally {
+      setOpening(false);
+    }
+  }
+
+  function closeMany() {
+    if (many?.inventory) apply(many.inventory);
+    setMany(null);
   }
 
   // Разбор уникальной вещи (2026-10-22): второе нажатие - подтверждение.
@@ -779,6 +807,29 @@ export default function InventoryTab({ onOpenTab }) {
           🗝 Открыть
         </button>,
       );
+      // «Открыть несколько» (2026-11-02): ползунком - сколько, потом ленты.
+      if (data.count > 1) {
+        const max = Math.min(data.count, MANY_CHESTS_MAX);
+        const pick = manyPick?.kind === data.kind ? manyPick : null;
+        out.push(pick ? (
+          <div key="many" className="qty-picker qty-picker--chests">
+            <input
+              type="range" min={2} max={max} step={1} value={pick.qty}
+              onChange={(e) => setManyPick({ ...pick, qty: Number(e.target.value) })}
+              aria-label="Сколько ларцов открыть"
+            />
+            <button type="button" className="pill-btn pill-btn--main" disabled={opening}
+              onClick={() => handleOpenMany(data, pick.qty)}>
+              🗝 Открыть {pick.qty}
+            </button>
+          </div>
+        ) : (
+          <button key="many" type="button" className="pill-btn" disabled={opening}
+            onClick={() => setManyPick({ kind: data.kind, qty: max })}>
+            🗝🗝 Открыть несколько
+          </button>
+        ));
+      }
     }
     if (kind === 'food') {
       out.push(
@@ -877,6 +928,16 @@ export default function InventoryTab({ onOpenTab }) {
           onClose={closeRoulette}
           left={chestsLeft}
           onAgain={openAnother}
+        />
+      )}
+      {many && (
+        <MultiChestRoulette
+          results={many.many}
+          grades={many.grades}
+          title={many.title}
+          chestIcon={many.chest_icon}
+          summary={many.summary}
+          onClose={closeMany}
         />
       )}
       {qtyEntry && (

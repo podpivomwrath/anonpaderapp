@@ -454,6 +454,38 @@ def _chests_payload(chests) -> list[dict]:
     return out
 
 
+#: Сколько ларцов открывается одним нажатием «Открыть несколько».
+MANY_CHESTS_MAX = 1000
+
+
+async def _open_many(session, character, kind: str, count: int) -> web.Response:
+    """Открыть пачку ларцов (2026-11-02, владелец: «для тех, кто копит»).
+    Исходы решает сервер, как и у одного ларца; ленты рулеток клиент
+    собирает сам из шансов градаций - так ответ на сотни ларцов остаётся
+    маленьким."""
+    chests = (await lootbox_service.closed_chests(session, character.id, kind))[:count]
+    if not chests:
+        return web.json_response({"error": "no_chest"}, status=409)
+    opened, lines = [], []
+    for chest in chests:
+        try:
+            _, result = await lootbox_service.open_owned(session, character, chest.id, _chest_rng, kind)
+        except lootbox_service.ChestGone:
+            continue  # открыли параллельно - просто следующий
+        opened.append({"grade": result.grade.id, "grade_name": result.grade.name})
+        lines.extend(result.lines)
+    await session.commit()
+    inventory = await _full_inventory(session, character.id)
+    return web.json_response({
+        "many": opened,
+        "summary": lootbox_service.summarize(lines),
+        "kind": kind,
+        "title": lootbox_service.CHEST_KINDS[kind].name,
+        "chest_icon": lootbox_service.CHEST_KINDS[kind].icon if kind != lootbox_service.ASHEN else None,
+        "inventory": inventory,
+    })
+
+
 async def handle_post_chest_open(request: web.Request) -> web.Response:
     """Открыть ларец из сумки: исход решает сервер, рулетка его показывает."""
     vk_user_id = request[VK_USER_ID_KEY]
@@ -469,6 +501,9 @@ async def handle_post_chest_open(request: web.Request) -> web.Response:
         kind = body.get("kind") if isinstance(body, dict) else None
         if kind not in lootbox_service.CHEST_KINDS:
             kind = lootbox_service.ASHEN
+        count = body.get("count", 1) if isinstance(body, dict) else 1
+        if isinstance(count, int) and not isinstance(count, bool) and count > 1:
+            return await _open_many(session, character, kind, min(count, MANY_CHESTS_MAX))
         try:
             chest, result = await lootbox_service.open_owned(session, character, None, _chest_rng, kind)
         except lootbox_service.ChestGone:

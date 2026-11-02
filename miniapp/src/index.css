@@ -2582,3 +2582,51 @@ body::before {
   font-size: 24px;
   line-height: 1;
 }
+
+/* --- Пачка ларцов (2026-11-02) ------------------------------------------------
+   До трёх узких лент друг под другом, крутятся по очереди и тем быстрее,
+   чем больше ларцов. В конце - сколько каких градаций и общая добыча. */
+
+.roulette__lanes {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.roulette__viewport--mini {
+  padding: 6px 0;
+}
+
+.roulette__card--mini {
+  flex: 0 0 64px;
+  min-height: 64px;
+  padding: 8px 6px;
+  justify-content: center;
+}
+
+.multi-tally {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 6px 14px;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.loot-drops--summary {
+  max-height: 40vh;
+  overflow-y: auto;
+}
+
+@media (max-width: 480px) {
+  .roulette__card--mini {
+    flex-basis: 56px;
+    min-height: 56px;
+  }
+}
+
+/* Ползунок «сколько ларцов» - во всю ширину ряда кнопок карточки. */
+.qty-picker--chests {
+  flex-basis: 100%;
+  margin: 0;
+}

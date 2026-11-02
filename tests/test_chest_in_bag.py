@@ -30,6 +30,32 @@ async def test_open_owned_rewards_once(db_session, make_character) -> None:
     assert len(history) == 1 and history[0].grade == result.grade.id
 
 
+def test_summary_adds_up_many_chests() -> None:
+    lines = ["420 золота", "100 золота", "💎 5 Пепельных самоцветов", "🧪 Малое исцеление ×2",
+             "🧪 Малое исцеление ×3", "🔥 Лихорадка, 🩸 Кровь", "🔥 Лихорадка, 🧿 Ясность", "🗝 Ключ Монолита"]
+    assert ls.summarize(lines) == [
+        "520 золота", "💎 5 Пепельных самоцветов", "🧪 Малое исцеление ×5",
+        "🔥 Лихорадка ×2", "🩸 Кровь ×1", "🧿 Ясность ×1", "🗝 Ключ Монолита ×1",
+    ]
+
+
+async def test_open_many_opens_the_asked_number(db_session, make_character) -> None:
+    import json
+
+    from bot import miniapp_api  # noqa: F401 - грузит модули мини-аппа в правильном порядке
+    from bot import miniapp_inventory_api as api
+
+    c = await make_character()
+    for _ in range(5):
+        await ls.grant_chest(db_session, c, daily_streak=2)
+    data = json.loads((await api._open_many(db_session, c, ls.ASHEN, 3)).body)
+    assert len(data["many"]) == 3 and data["summary"]
+    assert len(await ls.closed_chests(db_session, c.id)) == 2
+    # Просят больше, чем есть, - открываются оставшиеся.
+    data = json.loads((await api._open_many(db_session, c, ls.ASHEN, 50)).body)
+    assert len(data["many"]) == 2 and await ls.closed_chests(db_session, c.id) == []
+
+
 async def test_cannot_open_someone_elses_chest(db_session, make_character) -> None:
     owner = await make_character()
     thief = await make_character()

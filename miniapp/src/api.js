@@ -218,6 +218,11 @@ export function openChest(kind = 'ashen') {
   return request('/chest/open', { method: 'POST', body: JSON.stringify({ kind }) });
 }
 
+// Пачка ларцов одного вида: исходы и сводка наград одним ответом.
+export function openChests(kind, count) {
+  return request('/chest/open', { method: 'POST', body: JSON.stringify({ kind, count }) });
+}
+
 export function getPresets() {
   return request('/presets');
 }
