@@ -5,6 +5,7 @@
 
 import random
 
+from sqlalchemy import update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from game.economy import resists
@@ -42,21 +43,77 @@ async def modifiers(db: AsyncSession, character: Character, runes: dict[str, flo
     return mods
 
 
-def ring_payload(character: Character) -> dict | None:
-    if not character.resist_ring:
+class RingError(Exception):
+    pass
+
+
+async def spare_rings(db: AsyncSession, character_id: int) -> int:
+    """Ненадетые перстни в сумке (2026-11-02): их передают и продают.
+    Надетый - character.resist_ring, в сумке его нет."""
+    from services import master_recipe_service
+
+    return await master_recipe_service.count_of(db, character_id, resists.RING_ID)
+
+
+async def ring_payload(db: AsyncSession, character: Character) -> dict | None:
+    """Слот перстня в силуэте: worn - надет ли, spare - сколько в сумке.
+    None - перстней нет совсем, слота не видно."""
+    spare = await spare_rings(db, character.id)
+    if not character.resist_ring and spare <= 0:
         return None
     lines = [resists.describe(kind, resists.RING_VALUE) for kind in resists.KINDS]
-    return {"name": resists.RING_TITLE, "effect": "; ".join(lines), "flavor": resists.RING_FLAVOR}
+    return {"name": resists.RING_TITLE, "effect": "; ".join(lines), "flavor": resists.RING_FLAVOR,
+            "worn": bool(character.resist_ring), "spare": spare}
 
 
-async def maybe_drop_ring(db: AsyncSession, character: Character, rng: random.Random) -> bool:
-    """Шанс перстня за победу над мобом клетки. Уже есть - второго не бывает.
-    Без объявлений (владелец): игрок узнаёт по строке в добыче."""
-    if character.resist_ring or rng.random() >= resists.RING_DROP_CHANCE:
-        return False
+async def wear(db: AsyncSession, character: Character) -> None:
+    """Надеть перстень из сумки. Списание условным UPDATE: два нажатия
+    подряд не наденут один перстень дважды."""
+    from models import CharacterCraftGear
+
+    if character.resist_ring:
+        raise RingError("Перстень уже на пальце.")
+    taken = await db.execute(
+        update(CharacterCraftGear).where(
+            CharacterCraftGear.character_id == character.id, CharacterCraftGear.tool_id == resists.RING_ID,
+            CharacterCraftGear.count >= 1,
+        ).values(count=CharacterCraftGear.count - 1).execution_options(synchronize_session="fetch")
+    )
+    if not taken.rowcount:
+        raise RingError("Перстня в сумке нет.")
     character.resist_ring = True
+    await db.flush()
+
+
+async def remove(db: AsyncSession, character: Character) -> None:
+    """Снять перстень в сумку - тогда его можно передать или продать."""
+    from services import master_recipe_service
+
+    if not character.resist_ring:
+        raise RingError("Перстень не надет.")
+    character.resist_ring = False
+    await master_recipe_service._add(db, character.id, resists.RING_ID)
+
+
+async def add_ring(db: AsyncSession, character: Character) -> str:
+    """Новый перстень: слот пуст - сразу на палец ("worn"), занят - в
+    сумку ("bag"), лишний - товар на продажу."""
+    from services import master_recipe_service
+
+    if not character.resist_ring:
+        character.resist_ring = True
+        await db.flush()
+        return "worn"
+    await master_recipe_service._add(db, character.id, resists.RING_ID)
+    return "bag"
+
+
+async def maybe_drop_ring(db: AsyncSession, character: Character, rng: random.Random) -> str | None:
+    """Шанс перстня за победу над мобом (2026-11-02: второй тоже падает).
+    Без объявлений (владелец): игрок узнаёт по строке в добыче."""
+    if rng.random() >= resists.RING_DROP_CHANCE:
+        return None
     from services import resource_log
 
     resource_log.add(db, character.id, "ring", resists.RING_ID, 1)
-    await db.flush()
-    return True
+    return await add_ring(db, character)

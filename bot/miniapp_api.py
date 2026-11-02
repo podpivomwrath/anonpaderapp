@@ -156,8 +156,6 @@ def _character_payload(
         "derived_mods": derived_stats_service.shown_mods(mods),
         # Перстень мастерского рецепта (2026-10-23) - окно в снаряжении.
         "ring": _ring_payload(character),
-        # Перстень Несгоревшего (2026-11-02) - второе кольцо, только у нашедших.
-        "resist_ring": resist_service.ring_payload(character),
         # Что игрок уже видел в мини-аппе и включён ли звук (handle_post_ui).
         "ui": dict(character.ui_flags or {}),
         "derived": {
@@ -218,10 +216,12 @@ async def handle_get_character(request: web.Request) -> web.Response:
         power = await power_service.power_of(session, character)
         titles = await title_service.menu(session, character)
         mods = await preset_service.resolve_active_modifiers(session, character)
+        payload = _character_payload(character, gear_bonus, wallet, _is_admin(request, vk_user_id), power, titles, mods)
+        # Перстень Несгоревшего (2026-11-02) - второе кольцо: надет ли и
+        # сколько лишних в сумке. Нет ни одного - None, слота не видно.
+        payload["resist_ring"] = await resist_service.ring_payload(session, character)
         await session.commit()
-        return web.json_response(
-            _character_payload(character, gear_bonus, wallet, _is_admin(request, vk_user_id), power, titles, mods)
-        )
+        return web.json_response(payload)
 
 
 async def handle_post_stats(request: web.Request) -> web.Response:
@@ -265,10 +265,10 @@ async def handle_post_stats(request: web.Request) -> web.Response:
         power = await power_service.power_of(session, character)
         titles = await title_service.menu(session, character)
         mods = await preset_service.resolve_active_modifiers(session, character)
+        payload = _character_payload(character, gear_bonus, wallet, _is_admin(request, vk_user_id), power, titles, mods)
+        payload["resist_ring"] = await resist_service.ring_payload(session, character)
         await session.commit()
-        return web.json_response(
-            _character_payload(character, gear_bonus, wallet, _is_admin(request, vk_user_id), power, titles, mods)
-        )
+        return web.json_response(payload)
 
 
 async def handle_get_trials(request: web.Request) -> web.Response:
@@ -661,6 +661,7 @@ def register_routes(app: web.Application) -> None:
     app.router.add_post("/api/miniapp/terms", handle_post_terms)
     app.router.add_post("/api/miniapp/equip", handle_post_equip)
     app.router.add_post("/api/miniapp/unequip", handle_post_unequip)
+    app.router.add_post("/api/miniapp/resist-ring", handle_post_resist_ring)
     app.router.add_post("/api/miniapp/disassemble", handle_post_disassemble)
     app.router.add_post("/api/miniapp/chest/open", handle_post_chest_open)
     app.router.add_post("/api/miniapp/eat", handle_post_eat)
@@ -709,6 +710,7 @@ from bot.miniapp_inventory_api import (  # noqa: E402,F401
     handle_post_disassemble,
     handle_post_eat,
     handle_post_equip,
+    handle_post_resist_ring,
     handle_post_unequip,
     herbalism_payload,
 )

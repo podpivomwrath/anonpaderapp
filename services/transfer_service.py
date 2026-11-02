@@ -124,6 +124,15 @@ async def _craft_offers(db: AsyncSession, character_id: int, name: str) -> list[
     from services import cooking_service, fishing_service, herb_service, rune_service
     from game.economy import runes_config as rc
 
+    from game.economy import resists
+
+    # Перстень Несгоревшего (2026-11-02): только ненадетые, из сумки.
+    if name == resists.RING_TITLE.lower():
+        from services import resist_service
+
+        spare = await resist_service.spare_rings(db, character_id)
+        if spare:
+            return [Offer("ring", resists.RING_ID, f"💍 {resists.RING_TITLE}", spare)]
     # Руны (2026-10-31): «/передать руна тугой кошель 5» или просто название.
     rune_name = name[5:] if name.startswith("руна ") else name
     bag = await rune_service.bag(db, character_id)
@@ -267,7 +276,7 @@ async def _take_stack(db: AsyncSession, model, key: dict, amount: int) -> bool:
 #: Из рук в руки (2026-10-19, решение владельца): вещи, зелья и руду - только
 #: тому, кто на одной клетке с тобой (город - тоже клетка). Дальше - курьер
 #: (services/courier_service.py). Золото и самоцветы - на любое расстояние.
-NEEDS_NEAR = ("elixir", "ore", "item", "herb", "fish", "food", "rune")
+NEEDS_NEAR = ("elixir", "ore", "item", "herb", "fish", "food", "rune", "ring")
 
 
 def same_cell(sender, recipient) -> bool:
@@ -309,6 +318,12 @@ async def take(db: AsyncSession, sender_id: int, offer: Offer, amount: int) -> i
 
         if not await _take_stack(db, CharacterRune, {"character_id": sender_id, "rune_id": offer.ref}, amount):
             raise TransferFailed("Столько у тебя нет.")
+    elif offer.kind == "ring":
+        from models import CharacterCraftGear
+
+        # Надетый в сумке не лежит - передаются только лишние.
+        if not await _take_stack(db, CharacterCraftGear, {"character_id": sender_id, "tool_id": offer.ref}, amount):
+            raise TransferFailed("Столько ненадетых перстней у тебя нет.")
     elif offer.kind == "herb":
         if not await _take_stack(db, CharacterHerb, {"character_id": sender_id, "herb_id": offer.ref}, amount):
             raise TransferFailed("Столько у тебя нет.")
@@ -372,6 +387,10 @@ async def give(db: AsyncSession, recipient_id: int, kind: str, ref: str | None, 
         from models import CharacterRune
 
         await _credit_stack(db, CharacterRune, {"character_id": recipient_id, "rune_id": ref}, amount)
+    elif kind == "ring":
+        from models import CharacterCraftGear
+
+        await _credit_stack(db, CharacterCraftGear, {"character_id": recipient_id, "tool_id": ref}, amount)
     elif kind == "herb":
         await _credit_stack(db, CharacterHerb, {"character_id": recipient_id, "herb_id": ref}, amount)
     elif kind == "food":

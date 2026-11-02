@@ -120,7 +120,7 @@ async def holdings(db: AsyncSession, character_id: int) -> dict[str, int]:
                                                    .where(CharacterFood.character_id == character_id))).all():
         out[f"food:{dish_id}:{grade}"] = count
     for tool_id, count in (await db.execute(select(CharacterCraftGear.tool_id, CharacterCraftGear.count).where(
-        CharacterCraftGear.character_id == character_id, CharacterCraftGear.tool_id.in_(mc.CRAFT_GOODS),
+        CharacterCraftGear.character_id == character_id, CharacterCraftGear.tool_id.in_(mc.CRAFT_GOODS + mc.TREASURE_GOODS),
     ))).all():
         out[f"craft:{tool_id}"] = count
     for kind, count in (await db.execute(

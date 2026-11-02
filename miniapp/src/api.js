@@ -190,6 +190,16 @@ export function disassembleItem(itemId) {
 }
 
 // Патч 111: снять надетую вещь в сумку.
+// Перстень Несгоревшего (2026-11-02): action - 'wear' (из сумки на палец)
+// или 'remove' (с пальца в сумку). Ответ - { resist_ring } с новым слотом.
+export function resistRing(action) {
+  return request('/resist-ring', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ action }),
+  });
+}
+
 export function unequipItem(itemId) {
   return request('/unequip', {
     method: 'POST',

@@ -28,6 +28,9 @@ BOOK_DEPTH = 5
 #: Расходники ремёсел, что продаются штуками. Пряности - нет: у набора тир,
 #: и купленный набор другого тира заменил бы свой вместе с зарядами.
 CRAFT_GOODS = ("flasks", "bait")
+#: Ценности (2026-11-02): редкий торговый лут, лежит строкой CharacterCraftGear
+#: (как склянка мастерского рецепта). Продаются только ненадетые.
+TREASURE_GOODS = ("unburnt_ring",)
 
 CATEGORIES = (
     ("ore", "⛏ Руда"),
@@ -36,6 +39,7 @@ CATEGORIES = (
     ("craft", "🧰 Расходники ремёсел"),
     ("chest", "🗃 Ларцы"),
     ("rune", "🪨 Руны"),
+    ("treasure", "💍 Ценности"),
 )
 
 
@@ -90,6 +94,10 @@ def goods() -> dict[str, Good]:
     for r in rc.RUNES:
         out[f"rune:{r.id}"] = Good(f"rune:{r.id}", "rune", r.name, kind_emoji[r.kind], f"rune:{r.id}",
                                     base=rc.KIND_TITLES[r.kind], variant=r.name)
+    from game.economy import resists
+
+    out[f"craft:{resists.RING_ID}"] = Good(f"craft:{resists.RING_ID}", "treasure", resists.RING_TITLE, "💍",
+                                           "special:unburnt_ring")
     return out
 
 

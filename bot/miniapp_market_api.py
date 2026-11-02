@@ -48,6 +48,11 @@ def _about(key: str) -> dict:
             return {"description": None, "effect": None}
         return {"description": d.description, "effect": cooking.buff_text(dish, grade)}
     if kind == "craft":
+        from game.economy import resists
+
+        if rest == resists.RING_ID:
+            lines = [resists.describe(k, resists.RING_VALUE) for k in resists.KINDS]
+            return {"description": resists.RING_FLAVOR, "effect": "; ".join(lines).capitalize()}
         return {"description": None, "effect": craft_gear.effect_line(rest, 1) or None}
     if kind == "rune":
         return rune_about(rest)

@@ -324,7 +324,11 @@ async def drop_line(db: AsyncSession, character: Character, rng: random.Random) 
     if rune_id is not None:
         rune_def = rc.BY_ID[rune_id]
         lines.append(f"{KIND_EMOJI[rune_def.kind]} Выпала {rc.KIND_ONE[rune_def.kind].lower()}: «{rune_def.name}»")
-    if await resist_service.maybe_drop_ring(db, character, rng):
+    ring = await resist_service.maybe_drop_ring(db, character, rng)
+    if ring == "worn":
         lines.append(f"💍 Среди добычи - кольцо: «{resists.RING_TITLE}». Оно уже на пальце, "
-                     "смотри во вкладке «Героя».")
+                     "смотри во вкладке «Герой».")
+    elif ring == "bag":
+        lines.append(f"💍 Среди добычи - ещё один «{resists.RING_TITLE}». Второй на палец не налезет, "
+                     "он в сумке: его можно передать или продать на рынке.")
     return "\n".join(lines) or None

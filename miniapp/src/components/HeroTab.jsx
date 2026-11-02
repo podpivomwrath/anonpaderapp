@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Group, Header, SimpleCell, Switch } from '@vkontakte/vkui';
 import {
-  equipItem, getCharacter, getGear, getInventory, getRunes, getTrophies, setGender, setNoImages, setShortLog, unequipItem,
+  equipItem, getCharacter, getGear, getInventory, getRunes, getTrophies, resistRing, setGender, setNoImages, setShortLog,
+  unequipItem,
 } from '../api.js';
 import CraftGear from './CraftGear.jsx';
 import RunesPage, { RuneRing } from './RunesPage.jsx';
@@ -333,19 +334,39 @@ function BuffList({ buffs }) {
 
 const BUFFS_SHOWN = 3;
 
-function RingSlot({ ring, icon = 'special:ring' }) {
+// Слот кольца. Перстень мастера - всегда надет. Перстень Несгоревшего
+// (2026-11-02) снимается и надевается (onToggle): worn - на пальце,
+// spare - сколько лишних в сумке, их передают и продают.
+function RingSlot({ ring, icon = 'special:ring', onToggle = null }) {
   const [open, setOpen] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState(null);
   const art = itemIcon(icon);
+  const worn = ring && ring.worn !== false;
+
+  async function toggle() {
+    setBusy(true);
+    setError(null);
+    try {
+      await onToggle(worn ? 'remove' : 'wear');
+      setOpen(false);
+    } catch (err) {
+      setError(err?.message?.includes(' ') ? err.message : 'Не вышло.');
+    } finally {
+      setBusy(false);
+    }
+  }
+
   return (
     <>
       <button
         type="button" data-slot="ring"
-        className={`gear-slot${ring ? ' gear-slot--filled gear-slot--legendary' : ''}`}
+        className={`gear-slot${worn ? ' gear-slot--filled gear-slot--legendary' : ''}`}
         style={{ top: '72%' }}
         onClick={() => ring && setOpen(true)}
         aria-label={ring ? ring.name : 'Кольцо'}
       >
-        {ring && art ? <img src={art} alt="" className="gear-slot__ring" /> : (
+        {worn && art ? <img src={art} alt="" className="gear-slot__ring" /> : (
           <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6"
             aria-hidden="true"><circle cx="12" cy="14" r="6" /><path d="M9 6l3-3 3 3-3 2z" /></svg>
         )}
@@ -354,6 +375,18 @@ function RingSlot({ ring, icon = 'special:ring' }) {
         <Sheet title={ring.name} icon="💍" onClose={() => setOpen(false)}>
           <p className="gear-sheet__effect">{ring.effect}.</p>
           {ring.flavor && <p className="gear-sheet__flavor">{ring.flavor}</p>}
+          {onToggle && (
+            <>
+              <p className="gear-sheet__flavor">
+                {worn ? 'На пальце.' : 'Не надет.'}
+                {ring.spare > 0 ? ` В сумке ещё ${ring.spare} - их можно передать или продать на рынке.` : ''}
+              </p>
+              {error && <p className="hero-error">{error}</p>}
+              <button type="button" className="pill-btn pill-btn--main" disabled={busy} onClick={toggle}>
+                {worn ? 'Снять в сумку' : 'Надеть'}
+              </button>
+            </>
+          )}
         </Sheet>
       )}
     </>
@@ -464,6 +497,13 @@ export default function HeroTab({ character, onCharacterUpdate }) {
     try { onCharacterUpdate(await getCharacter()); } catch { /* шапка подтянется позже */ }
   }
 
+  // Ошибку показывает шторка перстня, поэтому здесь её не ловим.
+  async function handleResistRing(action) {
+    const res = await resistRing(action);
+    onCharacterUpdate((prev) => ({ ...prev, resist_ring: res.resist_ring }));
+    refreshCharacter();
+  }
+
   async function handleEquip(itemId) {
     const slot = openSlot;
     setBusyId(itemId);
@@ -569,7 +609,9 @@ export default function HeroTab({ character, onCharacterUpdate }) {
             </div>
             <div className="hero-col hero-col--right">
               {SLOTS.filter((x) => x.side === 'right').map(slotButton)}
-              {character.resist_ring && <RingSlot ring={character.resist_ring} icon="special:unburnt_ring" />}
+              {character.resist_ring && (
+                <RingSlot ring={character.resist_ring} icon="special:unburnt_ring" onToggle={handleResistRing} />
+              )}
             </div>
           </div>
           <RuneRing data={runes} onOpen={() => { setRuneKind('hero'); setPage(1); }} />
