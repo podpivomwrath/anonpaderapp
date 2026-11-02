@@ -114,6 +114,7 @@ function detailRows(entry) {
     rows.push(['Слот', data.slot_title]);
     if (data.ilvl) rows.push(['Уровень', data.ilvl]);
     if (data.craft_efficiency) rows.push(['Эффективность', `${data.craft_efficiency}%`]);
+    if (data.resist) rows.push(['Сопротивление', data.resist]);
     Object.entries(data.base_stats || {})
       .sort((a, b) => b[1] - a[1])
       .forEach(([key, amount]) => rows.push([STAT_NAMES[key] || key, `+${amount}`]));

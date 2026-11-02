@@ -27,13 +27,18 @@ class DerivedStats:
     #: урона атаки, а от Воли и Ловкости, поэтому по остальным статам его
     #: не видно вовсе - без этой строки игрок не может понять, что качать.
     poison_power: float
+    #: Сопротивления (2026-11-02): стойкость к критам (Выносливость + руны,
+    #: вещи, перстень), меткость, стойкость к ядам.
+    crit_resist: float = 0.0
+    accuracy: float = 0.0
+    dot_resist: float = 0.0
 
 
 #: Баффы пресета и еды, которые работают в бою всегда (без условий «на низком
 #: здоровье», «в группе», «после уворота») - их видно в сводке (2026-10-24).
 SHOWN_MODS = (
     "damage_bonus", "reckless_damage_bonus", "crit_chance_bonus", "dodge_bonus",
-    "incoming_damage_reduction", "max_hp_bonus",
+    "incoming_damage_reduction", "max_hp_bonus", "resist_crit", "accuracy", "resist_dot",
 )
 
 
@@ -93,6 +98,10 @@ def compute(
         poison_power=round(
             poison_tick_damage_per_stack(will, agility) * bc.POISONER_MAX_STACKS, 1
         ),
+        crit_resist=model.crit_resist(s) + m.get("resist_crit", 0.0),
+        accuracy=m.get("accuracy", 0.0),
+        # Как в бою (shared_rules.rune_dot_mult): не больше 90%.
+        dot_resist=min(m.get("resist_dot", 0.0), 0.9),
     )
 
 

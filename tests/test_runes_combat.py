@@ -61,7 +61,7 @@ def test_dot_runes_and_cuirass() -> None:
     effect = Effect(kind=EffectKind.DOT, value=100, remaining_ticks=3, source_id=1, stacks=1)
     base = shared_rules.poison_tick_damage(effect, src, tgt)
     src.buff_modifiers["rune:acrid@poisoner_venom"] = 0.15
-    tgt.buff_modifiers["rune:bitter_blood"] = 0.12
+    tgt.buff_modifiers["resist_dot"] = 0.12
     assert shared_rules.poison_tick_damage(effect, src, tgt) == round(base * 1.15 * 0.88)
     # Уязвимость на цели слабеет от «Литой кирасы» и для яда.
     tgt.buff_modifiers.clear()

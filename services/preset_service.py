@@ -233,6 +233,11 @@ async def resolve_active_modifiers(db: AsyncSession, character: Character, pvp: 
 
     runes = rune_service.combat_modifiers(character, pvp)
     merged.update(runes)
+    # Сопротивления (2026-11-02): руны, кованые вещи, Перстень Несгоревшего.
+    from services import resist_service
+
+    for key, value in (await resist_service.modifiers(db, character, runes)).items():
+        merged[key] = merged.get(key, 0.0) + value
     # Здоровье руны - тем же ключом, что у еды: его читает session.
     hp = runes.get("rune:ash_skin", 0.0)
     if hp:

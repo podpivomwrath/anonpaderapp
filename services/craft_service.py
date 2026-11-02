@@ -208,6 +208,10 @@ async def craft(
     item.craft_efficiency = efficiency
     item.craft_source_id = source_id
     item.bound = True
+    # Сопротивление (2026-11-02): каждая ковка и перековка бросает заново.
+    from services import resist_service
+
+    resist_service.roll_for(item, rng)
     if was_recraft:
         item.craft_recrafts += 1
     await db.flush()

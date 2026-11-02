@@ -319,6 +319,8 @@ def compute_hit(
     )
     # Патч 103, «Знает, где ты»: против такого бойца уворот цели не работает
     # вовсе - ни стат, ни эффекты, ни «Второй шанс» Клинка теней.
+    # Меткость (2026-11-02): руны, кованые вещи, Перстень Несгоревшего.
+    total_dodge = max(total_dodge - actor.buff_modifiers.get("accuracy", 0.0), 0.0)
     if ignore_dodge:
         total_dodge = 0.0
     # «Второй шанс» против навыка - с тем же коэффициентом, а не наверняка.
@@ -378,6 +380,10 @@ def compute_hit(
     if target.has_effect(EffectKind.MARK):
         for mark in target.effects_of(EffectKind.MARK):
             crit_chance += actor.buff_modifiers.get("mark_ally_crit_bonus", 0.0) if mark.source_id != actor.id else 0.0
+    # Стойкость к критам (2026-11-02): Выносливость игрока, руны, вещи, перстень.
+    crit_chance -= target.buff_modifiers.get("resist_crit", 0.0)
+    if target.kind == "character":
+        crit_chance -= stat_model.ACTIVE.crit_resist(target.stats)
     crit = True if (force_crit or actor.guaranteed_crit_next) else rng.random() < crit_chance
     if actor.guaranteed_crit_next:
         actor.guaranteed_crit_next = False

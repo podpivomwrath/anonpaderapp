@@ -179,6 +179,8 @@ def catalog() -> list[dict]:
             _entry("master:old_vial", "🧪 Пыльная склянка"),
             _entry("master:master_draught", "🧪 Эликсир Мастера"),
             _entry("master:ring", "💍 Перстень Мастера", "one"),
+            # Перстень Несгоревшего (2026-11-02) - о нём игрокам тоже не говорим.
+            _entry("master:unburnt_ring", "💍 Перстень Несгоревшего", "one"),
         ]},
         {"id": "fish", "title": "🐟 Рыба", "entries": fish},
         {"id": "herbs", "title": "🌿 Травы", "entries": herbs},
@@ -324,6 +326,10 @@ async def grant(
             if master_recipe_service.has_ring(character):
                 raise GrantError("Перстень у игрока уже есть.")
             character.ring_id = gearc.RING_ID
+        elif rest[0] == "unburnt_ring":
+            if character.resist_ring:
+                raise GrantError("Перстень у игрока уже есть.")
+            character.resist_ring = True
         else:
             await master_recipe_service._add(db, character.id, rest[0], amount)
     elif kind == "craftgear":

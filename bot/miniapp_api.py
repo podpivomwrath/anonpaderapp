@@ -17,7 +17,7 @@ from bot import dailies_texts, top_places
 from bot.miniapp_auth import VK_USER_ID_KEY
 from game.combat import balance_config as bc
 from game.economy import crafting
-from services import naming, subclass_service, transfer_service
+from services import naming, resist_service, subclass_service, transfer_service
 from bot.onboarding_texts import REGION_TITLES
 from config import Settings
 from game.content_loader import load_content
@@ -156,6 +156,8 @@ def _character_payload(
         "derived_mods": derived_stats_service.shown_mods(mods),
         # Перстень мастерского рецепта (2026-10-23) - окно в снаряжении.
         "ring": _ring_payload(character),
+        # Перстень Несгоревшего (2026-11-02) - второе кольцо, только у нашедших.
+        "resist_ring": resist_service.ring_payload(character),
         # Что игрок уже видел в мини-аппе и включён ли звук (handle_post_ui).
         "ui": dict(character.ui_flags or {}),
         "derived": {
@@ -168,6 +170,9 @@ def _character_payload(
             "dodge_chance": derived.dodge_chance,
             "ability_dodge_chance": derived.ability_dodge_chance,
             "poison_power": derived.poison_power,
+            "crit_resist": derived.crit_resist,
+            "accuracy": derived.accuracy,
+            "dot_resist": derived.dot_resist,
         },
     }
 

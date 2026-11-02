@@ -195,7 +195,7 @@ def test_mark_passed_on_helps_only_allies() -> None:
     Метки: ключ читается у бьющего, а метка должна быть от ДРУГОГО."""
     rng = NoCritRng()
     ally = combatant(3, side=0)
-    ally.buff_modifiers = {"mark_ally_crit_bonus": 1.0}  # гарантированный крит
+    ally.buff_modifiers = {"mark_ally_crit_bonus": 2.0}  # гарантированный крит, с запасом на стойкость цели
     blade = combatant(1, side=0, subclass_id="shadow_blade")
     enemy = combatant(2, side=1, agility=0, vitality=500)
     mark(enemy, source_id=blade.id, stacks=1)

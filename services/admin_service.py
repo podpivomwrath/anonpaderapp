@@ -620,7 +620,7 @@ async def _crafts_card(db: AsyncSession, character: Character) -> dict:
         "ore_pieces": await mining_service.total_ore(db, character.id),
         "flags": {
             "courier": character.has_courier, "pocket": character.secret_pocket, "donka": character.has_donka,
-            "ring": master_recipe_service_has_ring(character), "perm_pct": round((character.perm_stat_pct or 0) * 100),
+            "ring": master_recipe_service_has_ring(character), "resist_ring": bool(character.resist_ring), "perm_pct": round((character.perm_stat_pct or 0) * 100),
             "subclass_declined": character.subclass_declined,
         },
         "guild": {

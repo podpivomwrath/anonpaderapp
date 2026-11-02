@@ -61,6 +61,9 @@ class Item(Base):
     # Сколько раз этот экземпляр уже перековывали - цена следующего
     # перекрафта удваивается (craft_config.recraft_ore_cost).
     craft_recrafts: Mapped[int] = mapped_column(default=0)
+    # Сопротивление кованой вещи (2026-11-02): crit | dodge | dot, одно на
+    # вещь, сила от эффективности (game/economy/resists.py).
+    craft_resist: Mapped[str | None] = mapped_column(String(8), nullable=True)
     # Привязанное нельзя передать другому игроку и нельзя продать скупщику.
     bound: Mapped[bool] = mapped_column(Boolean, default=False)
 

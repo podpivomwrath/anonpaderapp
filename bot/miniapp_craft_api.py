@@ -18,7 +18,7 @@ from bot.miniapp_auth import VK_USER_ID_KEY
 from game.economy import craft_config as cc
 from game.economy import crafting, mining
 from models import Character, Item
-from services import craft_service, item_service, naming
+from services import craft_service, item_service, naming, resist_service
 from services import onboarding_service as onboarding_svc
 
 _rng = random.Random()
@@ -81,6 +81,8 @@ def _item_payload(character: Character, item: Item) -> dict:
         "spec": item.craft_spec,
         "spec_title": cc.SPEC_TITLES.get(item.craft_spec) if item.craft_spec else None,
         "efficiency": item.craft_efficiency,
+        # Сопротивление (2026-11-02): строка с силой на текущей эффективности.
+        "resist": resist_service.item_line(item),
         "next_efficiency": (
             crafting.next_efficiency(item.craft_efficiency)
             if item.craft_efficiency is not None else None

@@ -1,0 +1,175 @@
+"""Сопротивления (2026-11-02, репорт 283): стойкость к критам, меткость,
+стойкость к ядам. Источники - Выносливость (только криты, только у игроков),
+руны героя, кованые вещи, Перстень Несгоревшего. Частоты крита и уворота
+проверяются на большой выборке."""
+
+import random
+
+import pytest
+
+from game.combat import shared_rules, stat_model
+from game.combat.session import Effect, EffectKind
+from game.combat.skills import compute_hit
+from game.economy import resists
+from game.economy import runes_config as rc
+from models import Item
+from services import preset_service, resist_service
+from tests.conftest import combatant
+
+N = 40_000
+
+
+def _crit_rate(actor, target, seed=1) -> float:
+    rng = random.Random(seed)
+    crits = 0
+    for _ in range(N):
+        actor.crit_this_tick = False
+        compute_hit(actor, target, rng, ignore_dodge=True)
+        crits += actor.crit_this_tick
+    return crits / N
+
+
+def _dodge_rate(actor, target, seed=2) -> float:
+    rng = random.Random(seed)
+    missed = 0
+    for _ in range(N):
+        target.second_chance_active = False
+        missed += compute_hit(actor, target, rng).missed
+    return missed / N
+
+
+def test_crit_resist_cuts_points_mobs_have_no_vitality_resist() -> None:
+    rogue = combatant(1, 0, agility=200)
+    mob = combatant(2, 1, kind="mob", vitality=400)
+    base = stat_model.ACTIVE.crit_chance(rogue.stats)
+    assert _crit_rate(rogue, mob) == pytest.approx(base, abs=0.01)  # Выносливость моба не в счёт
+    player = combatant(3, 1, vitality=400)
+    vit = stat_model.ACTIVE.crit_resist(player.stats)
+    assert vit == pytest.approx(0.10)
+    assert _crit_rate(rogue, player) == pytest.approx(base - vit, abs=0.01)
+    player.buff_modifiers["resist_crit"] = 0.07
+    assert _crit_rate(rogue, player) == pytest.approx(base - vit - 0.07, abs=0.01)
+    # Больше шанса - ноль критов, не ошибка; гарантированный крит остаётся.
+    player.buff_modifiers["resist_crit"] = 5.0
+    assert _crit_rate(rogue, player) == 0.0
+    rogue.crit_this_tick = False
+    compute_hit(rogue, player, random.Random(3), force_crit=True, ignore_dodge=True)
+    assert rogue.crit_this_tick
+
+
+def test_accuracy_cuts_dodge_and_floors_at_zero() -> None:
+    attacker = combatant(1, 0)
+    target = combatant(2, 1, will=250)
+    target.buff_modifiers["dodge_bonus"] = 0.2
+    base = _dodge_rate(attacker, target)
+    attacker.buff_modifiers["accuracy"] = 0.15
+    assert _dodge_rate(attacker, target) == pytest.approx(base - 0.15, abs=0.012)
+    attacker.buff_modifiers["accuracy"] = 3.0
+    assert _dodge_rate(attacker, target) == 0.0
+
+
+def test_dot_resist_with_floor() -> None:
+    src, tgt = combatant(1, 0), combatant(2, 1)
+    effect = Effect(kind=EffectKind.DOT, value=100, remaining_ticks=3, source_id=1, stacks=1)
+    base = shared_rules.poison_tick_damage(effect, src, tgt)
+    tgt.buff_modifiers["resist_dot"] = 0.27
+    assert shared_rules.poison_tick_damage(effect, src, tgt) == round(base * 0.73)
+    tgt.buff_modifiers["resist_dot"] = 9.0
+    assert shared_rules.poison_tick_damage(effect, src, tgt) == round(base * 0.1)
+
+
+def test_item_value_and_lines() -> None:
+    assert resists.item_value(120) == pytest.approx(0.10)
+    assert resists.item_value(80) == pytest.approx(0.10 * 80 / 120)
+    assert resists.item_value(None) == pytest.approx(0.10 * 100 / 120)
+    item = Item(name="x", slot="weapon", craft_resist="crit", craft_efficiency=120)
+    assert resist_service.item_line(item) == "шанс крита по тебе ниже на 10 п.п."
+    item.craft_resist, item.craft_efficiency = "dot", 90
+    assert resist_service.item_line(item) == "яд и горение по тебе слабее на 7.5%"
+    item.craft_resist = None
+    assert resist_service.item_line(item) is None
+
+
+def test_roll_spreads_evenly() -> None:
+    rng = random.Random(5)
+    counts = {k: 0 for k in resists.KINDS}
+    for _ in range(30_000):
+        counts[resists.roll(rng)] += 1
+    assert all(abs(n / 30_000 - 1 / 3) < 0.015 for n in counts.values())
+
+
+def test_hero_runes_full_in_pvp() -> None:
+    for rune_id in ("tempered", "true_eye"):
+        rune = rc.BY_ID[rune_id]
+        assert rune.kind == rc.HERO and rune.value == 0.07 and rune.pvp == "full" and rune.ready
+
+
+async def _equip(db, character_id, item):
+    from models import Inventory
+
+    db.add(item)
+    await db.flush()
+    db.add(Inventory(character_id=character_id, item_id=item.id, equipped=True))
+    await db.flush()
+
+
+async def test_modifiers_sum_runes_items_ring(db_session, make_character) -> None:
+    c = await make_character()
+    c.rune_effects = {"rune:tempered": 0.07, "rune:true_eye": 0.077, "rune:bitter_blood": 0.12}
+    await _equip(db_session, c.id, Item(name="a", slot="weapon", craft_spec="dps", craft_resist="crit",
+                                        craft_efficiency=120, base_stats={}))
+    await _equip(db_session, c.id, Item(name="b", slot="armor", craft_spec="tank", craft_resist="dot",
+                                        craft_efficiency=90, base_stats={}))
+    # Не надетая вещь не считается.
+    db_session.add(Item(name="c", slot="helmet", craft_spec="tank", craft_resist="dodge", craft_efficiency=120,
+                        base_stats={}))
+    await db_session.flush()
+    mods = await preset_service.resolve_active_modifiers(db_session, c)
+    assert mods["resist_crit"] == pytest.approx(0.07 + 0.10)
+    assert mods["accuracy"] == pytest.approx(0.077)
+    assert mods["resist_dot"] == pytest.approx(0.12 + 0.075)
+    c.resist_ring = True
+    mods = await preset_service.resolve_active_modifiers(db_session, c, pvp=True)
+    assert mods["resist_crit"] == pytest.approx(0.07 + 0.10 + 0.15)
+    assert mods["accuracy"] == pytest.approx(0.077 + 0.15)
+    # «Горькая кровь» в PvP вполсилы, как и раньше.
+    assert mods["resist_dot"] == pytest.approx(0.06 + 0.075 + 0.15)
+
+
+async def test_ring_drops_once_and_quietly(db_session, make_character) -> None:
+    c = await make_character()
+
+    class Lucky(random.Random):
+        def random(self) -> float:
+            return 0.00005
+
+    assert await resist_service.maybe_drop_ring(db_session, c, Lucky())
+    assert c.resist_ring
+    assert not await resist_service.maybe_drop_ring(db_session, c, Lucky())  # второго нет
+    other = await make_character()
+    assert not await resist_service.maybe_drop_ring(db_session, other, random.Random(1))
+    payload = resist_service.ring_payload(c)
+    assert payload["name"] == resists.RING_TITLE and "15 п.п." in payload["effect"]
+    assert resist_service.ring_payload(other) is None
+
+
+def test_craft_rolls_resist() -> None:
+    item = Item(name="x", slot="weapon", craft_spec="dps", craft_efficiency=90, base_stats={})
+    resist_service.roll_for(item, random.Random(3))
+    assert item.craft_resist in resists.KINDS
+    seen = {resists.roll(random.Random(s)) for s in range(30)}
+    assert seen == set(resists.KINDS)
+
+
+def test_derived_stats_show_resists() -> None:
+    from services.derived_stats_service import compute
+
+    class Ch:
+        level, base_class, subclass = 60, "warrior", "guardian"
+
+    class St:
+        strength, agility, intellect, vitality, will = 10, 10, 10, 200, 10
+
+    d = compute(Ch(), St(), mods={"resist_crit": 0.07, "accuracy": 0.1, "resist_dot": 2.0})
+    assert d.crit_resist == pytest.approx(0.075 + 0.07)
+    assert d.accuracy == pytest.approx(0.1) and d.dot_resist == pytest.approx(0.9)

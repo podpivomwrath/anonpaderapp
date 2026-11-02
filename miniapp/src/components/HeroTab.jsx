@@ -99,6 +99,7 @@ function SlotSheet({ slot, items, onClose, onEquip, onUnequip, busyId }) {
                   <span key={k} className="gear-chip">{STAT_ICONS[k]} +{current.base_stats[k]}</span>
                 ))}
               </span>
+              {current.resist && <span className="slot-row__resist">🛡 {current.resist}</span>}
             </div>
             <button
               type="button" className="slot-row__off" disabled={busyId === current.id}
@@ -268,6 +269,7 @@ function WornList({ equipped, onOpen }) {
                   ))}
                 </span>
               )}
+              {item?.resist && <span className="worn-row__resist">🛡 {item.resist}</span>}
             </span>
           </button>
         );
@@ -331,9 +333,9 @@ function BuffList({ buffs }) {
 
 const BUFFS_SHOWN = 3;
 
-function RingSlot({ ring }) {
+function RingSlot({ ring, icon = 'special:ring' }) {
   const [open, setOpen] = useState(false);
-  const art = itemIcon('special:ring');
+  const art = itemIcon(icon);
   return (
     <>
       <button
@@ -351,6 +353,7 @@ function RingSlot({ ring }) {
       {open && ring && (
         <Sheet title={ring.name} icon="💍" onClose={() => setOpen(false)}>
           <p className="gear-sheet__effect">{ring.effect}.</p>
+          {ring.flavor && <p className="gear-sheet__flavor">{ring.flavor}</p>}
         </Sheet>
       )}
     </>
@@ -564,7 +567,10 @@ export default function HeroTab({ character, onCharacterUpdate }) {
             <div className="hero-figure">
               <img key={url} className="hero-figure__img" src={url} alt="" draggable="false" />
             </div>
-            <div className="hero-col hero-col--right">{SLOTS.filter((x) => x.side === 'right').map(slotButton)}</div>
+            <div className="hero-col hero-col--right">
+              {SLOTS.filter((x) => x.side === 'right').map(slotButton)}
+              {character.resist_ring && <RingSlot ring={character.resist_ring} icon="special:unburnt_ring" />}
+            </div>
           </div>
           <RuneRing data={runes} onOpen={() => { setRuneKind('hero'); setPage(1); }} />
           {bonus.length > 0 && (

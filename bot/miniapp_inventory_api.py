@@ -10,7 +10,7 @@ from aiohttp import web
 from bot.app_keys import SESSION_FACTORY_KEY
 from bot.miniapp_auth import VK_USER_ID_KEY
 from game.economy import crafting
-from services import naming, transfer_service
+from services import naming, resist_service, transfer_service
 from models import Character
 from services import elixir_service, item_service, lootbox_service, trophy_service
 from game.economy import fishing as game_fishing
@@ -109,6 +109,8 @@ def _inventory_payload(items: list, level: int | None = None) -> dict:
                 "craftable": crafting.is_craftable(item.craft_source_id),
                 "craft_spec": item.craft_spec,
                 "craft_efficiency": item.craft_efficiency,
+                # Сопротивление кованой вещи (2026-11-02): строка или None.
+                "resist": resist_service.item_line(item),
                 "bound": item.bound,
                 # Готовая команда передачи с номером этого экземпляра - её
                 # копирует кнопка у каждой вещи, которую можно передать.

@@ -44,6 +44,10 @@ class StatModel:
     def mitigation(self, s) -> float:
         return formulas.mitigation(s.vitality)
 
+    def crit_resist(self, s) -> float:
+        """Насколько ниже шанс крита по игроку (от Выносливости)."""
+        return 0.0
+
     def control_resist(self, will: int) -> float:
         return formulas.control_resist(will)
 
@@ -68,6 +72,9 @@ class HyperModel(StatModel):
     dodge_stat: str = "agility"          # agility | will
     mit_cap: float = 0.50
     mit_k: float = 250.0
+    #: Стойкость к критам от Выносливости (2026-11-02), 0 - нет.
+    crit_resist_cap: float = 0.0
+    crit_resist_k: float = 200.0
     resist_cap: float = 0.75
     resist_k: float = 100.0
     crit_dmg_per_str: float = 0.0        # прибавка к множителю крита за очко Силы
@@ -113,6 +120,9 @@ class HyperModel(StatModel):
     def mitigation(self, s) -> float:
         return hyper(s.vitality, self.mit_cap, self.mit_k)
 
+    def crit_resist(self, s) -> float:
+        return hyper(s.vitality, self.crit_resist_cap, self.crit_resist_k)
+
     def control_resist(self, will: int) -> float:
         if not self.resist_hyper:
             return formulas.control_resist(will)
@@ -155,6 +165,9 @@ GAME = HyperModel(
     # Круг тьмы при 200 Воли лечил всю группу на полторы полоски мистика
     # (2026-10-29, владелец): до ~80 Воли как было, выше - всё слабее.
     support_cap=1.0, support_k=125.0,
+    # Стойкость к критам от Выносливости (2026-11-02, владелец, репорт 283):
+    # 100 Выносливости - 5 п.п., 200 - 7.5, 400 - 10, потолок 15.
+    crit_resist_cap=0.15, crit_resist_k=200.0,
 )
 ACTIVE: StatModel = GAME
 

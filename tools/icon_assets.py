@@ -166,6 +166,7 @@ EXTRA_FILES = {
     "special:vial": "особое_склянка.png",
     "special:draught": "особое_зелье.png",
     "special:ring": "особое_кольцо.png",
+    "special:unburnt_ring": "особое_перстень_несгоревшего.png",  # tools/resist_art_prompts.md
     # Добыча кровавого разлома (tools/blood_rift_loot_prompts.md)
     "chest:ore": "ларец_руды.png",
     "chest:supply": "ларец_расходников.png",

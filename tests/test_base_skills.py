@@ -106,7 +106,7 @@ def test_double_stab_hits_crit_independently() -> None:
 
         def random(self) -> float:
             self._calls += 1
-            return 0.1 if self._calls == 1 else 0.9
+            return 0.05 if self._calls == 1 else 0.9  # крит ниже: 500 Выносливости цели режут его
 
         def choice(self, seq):
             return seq[0]

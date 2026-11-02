@@ -314,9 +314,17 @@ KIND_EMOJI = {rc.HERO: "🟠", rc.GEAR: "🔴", rc.SKILL: "🔵"}
 
 
 async def drop_line(db: AsyncSession, character: Character, rng: random.Random) -> str | None:
-    """Строка в итог победы, если выпала руна."""
+    """Строка в итог победы, если выпала руна. Тот же бросок победы - и
+    Перстень Несгоревшего (2026-11-02): строка только у нашедшего."""
+    from game.economy import resists
+    from services import resist_service
+
+    lines = []
     rune_id = await maybe_drop(db, character, rng)
-    if rune_id is None:
-        return None
-    rune_def = rc.BY_ID[rune_id]
-    return f"{KIND_EMOJI[rune_def.kind]} Выпала {rc.KIND_ONE[rune_def.kind].lower()}: «{rune_def.name}»"
+    if rune_id is not None:
+        rune_def = rc.BY_ID[rune_id]
+        lines.append(f"{KIND_EMOJI[rune_def.kind]} Выпала {rc.KIND_ONE[rune_def.kind].lower()}: «{rune_def.name}»")
+    if await resist_service.maybe_drop_ring(db, character, rng):
+        lines.append(f"💍 Среди добычи - кольцо: «{resists.RING_TITLE}». Оно уже на пальце, "
+                     "смотри во вкладке «Героя».")
+    return "\n".join(lines) or None

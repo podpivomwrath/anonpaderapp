@@ -66,6 +66,10 @@ const ABILITY_DODGE_RATIO = 0.25;
 const EFFECT_ABILITY_DODGE_RATIO = 0.5;
 const DODGE_HARD_CAP = 0.8;
 
+// Стойкость к критам от Выносливости (2026-11-02), как stat_model.GAME.crit_resist_*.
+const CRIT_RESIST_CAP = 0.15;
+const CRIT_RESIST_K = 200;
+
 const hyper = (x, cap, k) => (x > 0 ? (cap * x) / (x + k) : 0);
 
 // Порог Ловкости выше в 2/1.5 раза - одинаковый по урону с Силой и Интеллектом.
@@ -155,8 +159,12 @@ export function computeDerived({ level, baseClass, subclass = null, stats, gearB
     DODGE_HARD_CAP,
   );
 
+  const critResist = hyper(vit, CRIT_RESIST_CAP, CRIT_RESIST_K) + (m.resist_crit ?? 0);
+  const accuracy = m.accuracy ?? 0;
+  const dotResist = Math.min(m.resist_dot ?? 0, 0.9);
+
   return {
     maxHp, damage, critChance, mitigation, controlResist, supportPower,
-    dodgeChance, abilityDodgeChance, poisonPower,
+    dodgeChance, abilityDodgeChance, poisonPower, critResist, accuracy, dotResist,
   };
 }

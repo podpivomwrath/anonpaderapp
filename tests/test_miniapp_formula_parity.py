@@ -37,7 +37,8 @@ BUILDS = (
 MODS = (
     None,
     {"damage_bonus": 0.12, "reckless_damage_bonus": 0.06, "crit_chance_bonus": 0.1, "dodge_bonus": 0.08,
-     "incoming_damage_reduction": 0.12, "max_hp_bonus": 0.16},
+     "incoming_damage_reduction": 0.12, "max_hp_bonus": 0.16,
+     "resist_crit": 0.07, "accuracy": 0.17, "resist_dot": 0.27},
 )
 
 SCRIPT = """
@@ -105,6 +106,9 @@ def test_client_preview_matches_server_formulas() -> None:
             "dodge_chance": (row["dodgeChance"], server.dodge_chance),
             "ability_dodge": (row["abilityDodgeChance"], server.ability_dodge_chance),
             "poison_power": (round(row["poisonPower"], 1), server.poison_power),
+            "crit_resist": (row["critResist"], server.crit_resist),
+            "accuracy": (row["accuracy"], server.accuracy),
+            "dot_resist": (row["dotResist"], server.dot_resist),
         }
         for name, (client, srv) in pairs.items():
             if abs(client - srv) > 1e-9:

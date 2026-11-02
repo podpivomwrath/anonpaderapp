@@ -384,7 +384,8 @@ def rune_on_hit(source: CombatantState | None, target: CombatantState, hit, heal
 
 def rune_dot_mult(effect: Effect, source: CombatantState | None, target: CombatantState | None) -> float:
     """Яд и горение: «Едкость» навыка, «Жар и иней» (горение) у источника,
-    «Горькая кровь» у жертвы."""
+    стойкость к ядам у жертвы (руна «Горькая кровь», вещи, перстень -
+    preset_service сводит их в resist_dot)."""
     mult = 1.0
     if source is not None:
         burn = getattr(effect, "tag", None) == BURN_TAG
@@ -392,7 +393,7 @@ def rune_dot_mult(effect: Effect, source: CombatantState | None, target: Combata
         if burn:
             mult += _rune(source, "rune:heat_frost")
     if target is not None:
-        mult *= max(1.0 - _rune(target, "rune:bitter_blood"), 0.1)
+        mult *= max(1.0 - _rune(target, "resist_dot"), 0.1)
     return mult
 
 
