@@ -1136,16 +1136,20 @@ async def keyboard_command(message: Message) -> None:
 
 @labeler.message(text=["/ключ"])
 async def raid_key_command(message: Message) -> None:
-    """Патч 45, ч.4: осмотреть Ключ Монолита — пока без функционала, только
-    флейвор-текст."""
+    """Ключи Монолита: сколько из скольких можно накопить (2026-11-03)."""
+    from game.economy import raid_key_config
+    from services import premium_service, raid_key_service
+
     async with get_session_factory()() as db:
         character = await onboarding_svc.get_character(db, message.from_id)
         if character is None or character.creation_state is not None:
             return
-        if character.raid_keys <= 0:
-            await info_reply.answer(message, "У тебя нет Ключа Монолита.")
-            return
-    await info_reply.answer(message, raid_key_texts.RAID_KEY_USE_TEXT)
+        premium = premium_service.is_premium(character)
+        text = raid_key_texts.raid_key_status(
+            character.raid_keys, raid_key_service.current_cap(character),
+            None if premium else raid_key_config.RAID_KEY_CAP_PREMIUM,
+        )
+    await info_reply.answer(message, text)
 
 
 def activity_state(peer_id: int) -> str:
