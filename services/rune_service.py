@@ -329,6 +329,6 @@ async def drop_line(db: AsyncSession, character: Character, rng: random.Random) 
         lines.append(f"💍 Среди добычи - кольцо: «{resists.RING_TITLE}». Оно уже на пальце, "
                      "смотри во вкладке «Герой».")
     elif ring == "bag":
-        lines.append(f"💍 Среди добычи - ещё один «{resists.RING_TITLE}». Второй на палец не налезет, "
-                     "он в сумке: его можно передать или продать на рынке.")
+        lines.append(f"💍 Среди добычи - кольцо: «{resists.RING_TITLE}». Палец занят, оно в сумке: "
+                     "поменять кольца можно во вкладке «Герой», лишнее - передать или продать на рынке.")
     return "\n".join(lines) or None

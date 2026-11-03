@@ -5,11 +5,11 @@
 
 import random
 
-from sqlalchemy import update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from game.economy import resists
 from models import Character, Item
+from services.ring_slot_service import RingError
 
 #: Руна героя -> вид сопротивления. Значение уже с поправкой PvP.
 RUNE_KINDS = {"rune:tempered": resists.CRIT, "rune:true_eye": resists.DODGE, "rune:bitter_blood": resists.DOT}
@@ -52,10 +52,6 @@ async def modifiers(db: AsyncSession, character: Character, runes: dict[str, flo
     return {key: resists.capped(value) for key, value in mods.items()}
 
 
-class RingError(Exception):
-    pass
-
-
 async def spare_rings(db: AsyncSession, character_id: int) -> int:
     """Ненадетые перстни в сумке (2026-11-02): их передают и продают.
     Надетый - character.resist_ring, в сумке его нет."""
@@ -65,8 +61,8 @@ async def spare_rings(db: AsyncSession, character_id: int) -> int:
 
 
 async def ring_payload(db: AsyncSession, character: Character) -> dict | None:
-    """Слот перстня в силуэте: worn - надет ли, spare - сколько в сумке.
-    None - перстней нет совсем, слота не видно."""
+    """Перстень Несгоревшего: worn - надет ли, spare - сколько в сумке.
+    None - перстней нет совсем. Силуэт берёт ring_slot_service.payload."""
     spare = await spare_rings(db, character.id)
     if not character.resist_ring and spare <= 0:
         return None
@@ -76,45 +72,27 @@ async def ring_payload(db: AsyncSession, character: Character) -> dict | None:
 
 
 async def wear(db: AsyncSession, character: Character) -> None:
-    """Надеть перстень из сумки. Списание условным UPDATE: два нажатия
-    подряд не наденут один перстень дважды."""
-    from models import CharacterCraftGear
+    """Надеть из сумки; Перстень Мастера, если был на пальце, уходит в сумку."""
+    from services import ring_slot_service
 
-    if character.resist_ring:
-        raise RingError("Перстень уже на пальце.")
-    taken = await db.execute(
-        update(CharacterCraftGear).where(
-            CharacterCraftGear.character_id == character.id, CharacterCraftGear.tool_id == resists.RING_ID,
-            CharacterCraftGear.count >= 1,
-        ).values(count=CharacterCraftGear.count - 1).execution_options(synchronize_session="fetch")
-    )
-    if not taken.rowcount:
-        raise RingError("Перстня в сумке нет.")
-    character.resist_ring = True
-    await db.flush()
+    await ring_slot_service.wear(db, character, ring_slot_service.UNBURNT)
 
 
 async def remove(db: AsyncSession, character: Character) -> None:
     """Снять перстень в сумку - тогда его можно передать или продать."""
-    from services import master_recipe_service
+    from services import ring_slot_service
 
     if not character.resist_ring:
         raise RingError("Перстень не надет.")
-    character.resist_ring = False
-    await master_recipe_service._add(db, character.id, resists.RING_ID)
+    await ring_slot_service.remove(db, character)
 
 
 async def add_ring(db: AsyncSession, character: Character) -> str:
-    """Новый перстень: слот пуст - сразу на палец ("worn"), занят - в
-    сумку ("bag"), лишний - товар на продажу."""
-    from services import master_recipe_service
+    """Новый перстень: палец свободен - сразу надет ("worn"), занят (в том
+    числе Перстнем Мастера) - в сумку ("bag"), лишний - товар на продажу."""
+    from services import ring_slot_service
 
-    if not character.resist_ring:
-        character.resist_ring = True
-        await db.flush()
-        return "worn"
-    await master_recipe_service._add(db, character.id, resists.RING_ID)
-    return "bag"
+    return await ring_slot_service.give(db, character, ring_slot_service.UNBURNT)
 
 
 async def maybe_drop_ring(db: AsyncSession, character: Character, rng: random.Random) -> str | None:

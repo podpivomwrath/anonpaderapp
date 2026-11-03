@@ -273,7 +273,7 @@ async def _master_payload(session, character_id: int, payload: dict) -> None:
         payload["consumables"].append({
             "id": resists.RING_ID, "name": resists.RING_TITLE, "count": spare, "icon": "special:unburnt_ring",
             "category_title": "Кольцо",
-            "description": f"{resists.RING_FLAVOR} Надеть можно во вкладке «Герой», если палец свободен.",
+            "description": f"{resists.RING_FLAVOR} Надеть или поменять на надетое - во вкладке «Герой», окно кольца.",
             "transfer_prefix": f"/передать {resists.RING_TITLE}",
         })
     draughts = await master_recipe_service.count_of(session, character_id, gc.DRAUGHT_ID)
@@ -627,6 +627,40 @@ async def handle_post_resist_ring(request: web.Request) -> web.Response:
         ring = await resist_service.ring_payload(session, character)
         await session.commit()
         return web.json_response({"resist_ring": ring})
+
+
+async def handle_post_ring(request: web.Request) -> web.Response:
+    """Слот кольца (2026-11-03): надеть перстень из сумки (надетый уходит
+    в сумку) или снять. Ответ - новое состояние слота."""
+    from services import ring_slot_service
+
+    vk_user_id = request[VK_USER_ID_KEY]
+    try:
+        body = await request.json()
+    except Exception:
+        return web.json_response({"error": "bad_request"}, status=400)
+    if not isinstance(body, dict) or body.get("action") not in ("wear", "remove"):
+        return web.json_response({"error": "bad_request"}, status=400)
+
+    async with request.app[SESSION_FACTORY_KEY]() as session:
+        character = await miniapp_api._load_character(session, vk_user_id)
+        if character is None:
+            return web.json_response({"error": "character_not_found"}, status=404)
+        from bot.battle_keyboard import in_any_battle
+
+        if in_any_battle(vk_user_id):
+            return web.json_response({"error": item_service.IN_BATTLE_TEXT}, status=409)
+        try:
+            if body["action"] == "wear":
+                await ring_slot_service.wear(session, character, str(body.get("ring")))
+            else:
+                await ring_slot_service.remove(session, character)
+        except ring_slot_service.RingError as exc:
+            await session.rollback()
+            return web.json_response({"error": str(exc)}, status=400)
+        slot = await ring_slot_service.payload(session, character)
+        await session.commit()
+        return web.json_response({"ring_slot": slot})
 
 
 async def handle_post_disassemble(request: web.Request) -> web.Response:

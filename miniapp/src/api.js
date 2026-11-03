@@ -189,17 +189,17 @@ export function disassembleItem(itemId) {
   });
 }
 
-// Патч 111: снять надетую вещь в сумку.
-// Перстень Несгоревшего (2026-11-02): action - 'wear' (из сумки на палец)
-// или 'remove' (с пальца в сумку). Ответ - { resist_ring } с новым слотом.
-export function resistRing(action) {
-  return request('/resist-ring', {
+// Слот кольца (2026-11-03): action 'wear' (ring - id из сумки, надетое
+// уходит в сумку) или 'remove'. Ответ - { ring_slot }.
+export function ringAction(action, ring = null) {
+  return request('/ring', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ action }),
+    body: JSON.stringify({ action, ring }),
   });
 }
 
+// Патч 111: снять надетую вещь в сумку.
 export function unequipItem(itemId) {
   return request('/unequip', {
     method: 'POST',

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Group, Header, SimpleCell, Switch } from '@vkontakte/vkui';
 import {
-  equipItem, getCharacter, getGear, getInventory, getRunes, getTrophies, resistRing, setGender, setNoImages, setShortLog,
+  equipItem, getCharacter, getGear, getInventory, getRunes, getTrophies, ringAction, setGender, setNoImages, setShortLog,
   unequipItem,
 } from '../api.js';
 import CraftGear from './CraftGear.jsx';
@@ -348,21 +348,22 @@ function BuffList({ buffs }) {
 
 const BUFFS_SHOWN = 3;
 
-// Слот кольца. Перстень мастера - всегда надет. Перстень Несгоревшего
-// (2026-11-02) снимается и надевается (onToggle): worn - на пальце,
-// spare - сколько лишних в сумке, их передают и продают.
-function RingSlot({ ring, icon = 'special:ring', onToggle = null }) {
+// Слот кольца (2026-11-03, владелец: «слот кольца только один»). Как
+// у вещей: на пальце одно кольцо, остальные в сумке - снять, надеть,
+// поменять на другое. slot - {worn, bag} с сервера (ring_slot_service).
+function RingSlot({ slot, onAction }) {
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
-  const art = itemIcon(icon);
-  const worn = ring && ring.worn !== false;
+  const worn = slot?.worn || null;
+  const bag = slot?.bag || [];
+  const art = worn ? itemIcon(worn.icon) : null;
 
-  async function toggle() {
+  async function act(action, ring = null) {
     setBusy(true);
     setError(null);
     try {
-      await onToggle(worn ? 'remove' : 'wear');
+      await onAction(action, ring);
       setOpen(false);
     } catch (err) {
       setError(err?.message?.includes(' ') ? err.message : 'Не вышло.');
@@ -377,30 +378,40 @@ function RingSlot({ ring, icon = 'special:ring', onToggle = null }) {
         type="button" data-slot="ring"
         className={`gear-slot${worn ? ' gear-slot--filled gear-slot--legendary' : ''}`}
         style={{ top: '72%' }}
-        onClick={() => ring && setOpen(true)}
-        aria-label={ring ? ring.name : 'Кольцо'}
+        onClick={() => slot && setOpen(true)}
+        aria-label={worn ? worn.name : 'Кольцо'}
       >
         {worn && art ? <img src={art} alt="" className="gear-slot__ring" /> : (
           <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6"
             aria-hidden="true"><circle cx="12" cy="14" r="6" /><path d="M9 6l3-3 3 3-3 2z" /></svg>
         )}
       </button>
-      {open && ring && (
-        <Sheet title={ring.name} icon="💍" onClose={() => setOpen(false)}>
-          <p className="gear-sheet__effect">{ring.effect}.</p>
-          {ring.flavor && <p className="gear-sheet__flavor">{ring.flavor}</p>}
-          {onToggle && (
+      {open && slot && (
+        <Sheet title={worn ? worn.name : 'Кольцо'} icon="💍" onClose={() => setOpen(false)}>
+          {worn ? (
             <>
-              <p className="gear-sheet__flavor">
-                {worn ? 'На пальце.' : 'Не надет.'}
-                {ring.spare > 0 ? ` В сумке ещё ${ring.spare} - их можно передать или продать на рынке.` : ''}
-              </p>
-              {error && <p className="hero-error">{error}</p>}
-              <button type="button" className="pill-btn pill-btn--main" disabled={busy} onClick={toggle}>
-                {worn ? 'Снять в сумку' : 'Надеть'}
+              <p className="gear-sheet__effect">{worn.effect}.</p>
+              {worn.flavor && <p className="gear-sheet__flavor">{worn.flavor}</p>}
+              <button type="button" className="pill-btn" disabled={busy} onClick={() => act('remove')}>
+                Снять в сумку
               </button>
             </>
-          )}
+          ) : <p className="gear-sheet__flavor">Палец свободен.</p>}
+          {bag.length > 0 && <p className="gear-sheet__flavor">В сумке:</p>}
+          {bag.map((r) => (
+            <div key={r.id} className="ring-choice">
+              <ItemIcon icon={r.icon} alt="" size={40} />
+              <div className="ring-choice__text">
+                <b>{r.name}{r.count > 1 ? ` ×${r.count}` : ''}</b>
+                <span>{r.effect}.</span>
+                {r.tradable && <span className="ring-choice__note">Лишние можно передать или продать на рынке.</span>}
+              </div>
+              <button type="button" className="pill-btn pill-btn--main" disabled={busy} onClick={() => act('wear', r.id)}>
+                {worn ? 'Надеть вместо' : 'Надеть'}
+              </button>
+            </div>
+          ))}
+          {error && <p className="hero-error">{error}</p>}
         </Sheet>
       )}
     </>
@@ -511,10 +522,10 @@ export default function HeroTab({ character, onCharacterUpdate }) {
     try { onCharacterUpdate(await getCharacter()); } catch { /* шапка подтянется позже */ }
   }
 
-  // Ошибку показывает шторка перстня, поэтому здесь её не ловим.
-  async function handleResistRing(action) {
-    const res = await resistRing(action);
-    onCharacterUpdate((prev) => ({ ...prev, resist_ring: res.resist_ring }));
+  // Ошибку показывает шторка кольца, поэтому здесь её не ловим.
+  async function handleRing(action, ring) {
+    const res = await ringAction(action, ring);
+    onCharacterUpdate((prev) => ({ ...prev, ring_slot: res.ring_slot }));
     refreshCharacter();
   }
 
@@ -618,16 +629,13 @@ export default function HeroTab({ character, onCharacterUpdate }) {
             <div className="hero-col hero-col--left">
               <BuffList buffs={gear?.buffs} />
               {SLOTS.filter((x) => x.side === 'left').map(slotButton)}
-              <RingSlot ring={character.ring} />
+              <RingSlot slot={character.ring_slot} onAction={handleRing} />
             </div>
             <div className="hero-figure">
               <img key={url} className="hero-figure__img" src={url} alt="" draggable="false" />
             </div>
             <div className="hero-col hero-col--right">
               {SLOTS.filter((x) => x.side === 'right').map(slotButton)}
-              {character.resist_ring && (
-                <RingSlot ring={character.resist_ring} icon="special:unburnt_ring" onToggle={handleResistRing} />
-              )}
             </div>
           </div>
           <RuneRing data={runes} onOpen={() => { setRuneKind('hero'); setPage(1); }} />

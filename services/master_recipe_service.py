@@ -17,7 +17,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from game.economy import craft_gear_config as gc
 from game.economy import fishing_config as fc
-from models import Character, CharacterCraftGear, CharacterFish, CharacterFood, CharacterOre
+from models import (
+    Character,
+    CharacterCraftGear,
+    CharacterFish,
+    CharacterFood,
+    CharacterOre,
+)
 
 VIAL_LINE = "🧪 Среди ящиков нашлась пыльная склянка с чужой печатью."
 RING_TITLE = "Перстень Мастера"
@@ -30,7 +36,14 @@ class MasterError(Exception):
 
 
 def has_ring(character: Character) -> bool:
+    """Перстень на пальце - действует. Снятый (2026-11-03: слот кольца один
+    на оба перстня) лежит счётчиком gc.RING_ID в сумке и не действует."""
     return getattr(character, "ring_id", None) == gc.RING_ID
+
+
+async def owns_ring(db: AsyncSession, character: Character) -> bool:
+    """Перстень есть - на пальце или в сумке: второй раз рецепт не варится."""
+    return has_ring(character) or await count_of(db, character.id, gc.RING_ID) > 0
 
 
 def ring_mult(character: Character) -> int:
@@ -85,7 +98,7 @@ async def _rows(db: AsyncSession, character_id: int):
 
 async def ready(db: AsyncSession, character: Character) -> bool:
     """Всё на месте - на столе появится кнопка рецепта."""
-    if has_ring(character) or character.alchemy_level < gc.MASTER_ALCHEMY_LEVEL:
+    if character.alchemy_level < gc.MASTER_ALCHEMY_LEVEL or await owns_ring(db, character):
         return False
     if (character.star_dust or 0) < gc.MASTER_DUST:
         return False
@@ -108,7 +121,9 @@ async def brew(db: AsyncSession, character: Character) -> None:
 
     resource_log.add(db, character.id, "dust", None, -gc.MASTER_DUST)
     await _add(db, character.id, gc.DRAUGHT_ID)
-    character.ring_id = gc.RING_ID
+    from services import ring_slot_service
+
+    await ring_slot_service.give(db, character, ring_slot_service.MASTER)
     await title_service.unlock(db, character, gc.TITLE_ID)
     await db.flush()
 

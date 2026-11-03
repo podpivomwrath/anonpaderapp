@@ -319,13 +319,15 @@ async def grant(
             db.add(row)
         row.total_grams += _fish_grams(fish_id, grade) * amount
     elif kind == "master":
-        from game.economy import craft_gear_config as gearc
         from services import master_recipe_service
 
         if rest[0] == "ring":
-            if master_recipe_service.has_ring(character):
+            if await master_recipe_service.owns_ring(db, character):
                 raise GrantError("Перстень у игрока уже есть.")
-            character.ring_id = gearc.RING_ID
+            from services import ring_slot_service
+
+            # Слот кольца один (2026-11-03): занят - перстень в сумку.
+            await ring_slot_service.give(db, character, ring_slot_service.MASTER)
         elif rest[0] == "unburnt_ring":
             from services import resist_service
 
