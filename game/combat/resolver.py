@@ -359,7 +359,11 @@ def _apply_phase(
         combatant.current_hp = min(combatant.current_hp + delta, combatant.max_hp)
         if combatant.hp_floor > 0 and combatant.current_hp < combatant.hp_floor:
             combatant.current_hp = combatant.hp_floor
-        _apply_last_breath_guard(combatant, result)
+        # Только тем, кого били (2026-11-03, баг-репорт): с одним лечением
+        # «Запас дыхания» срабатывал от лечения, если здоровье упало раньше
+        # мимо этой проверки.
+        if damage_taken.get(cid, 0) > 0:
+            _apply_last_breath_guard(combatant, result)
 
     return reflect_hits
 

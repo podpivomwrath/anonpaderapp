@@ -157,6 +157,8 @@ class MatriarchStage(_BossStage):
                     if player.current_hp <= 0:
                         player.current_hp = 0
                         out.deaths.append(player.id)
+                    else:
+                        shared_rules.rune_guard(player, out.lines)  # «Запас дыхания» (2026-11-03)
                     # Кому сколько: раньше строка была без чисел, и погибший
                     # от взрыва не понимал, от чего умер (2026-10-13).
                     shielded = f", щит поглотил {raw - blast}" if raw > blast else ""

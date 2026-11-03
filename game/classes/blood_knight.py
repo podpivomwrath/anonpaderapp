@@ -14,7 +14,7 @@ HP), Кровавая печать (метка цели — усиливает �
 
 from game.classes.base import Role, SubclassDef, register
 from game.combat import balance_config as bc
-from game.combat import stat_model
+from game.combat import shared_rules, stat_model
 from game.combat.session import CombatantState, EffectKind
 from game.combat.skills import PendingHeal, SkillContext, compute_hit, offensive_skill
 from game.combat.subclass_skills import SUBCLASS_SKILL_DEFS
@@ -146,6 +146,7 @@ def crimson_feast(ctx: SkillContext) -> None:
     )
     cost = round(actor.current_hp * cost_pct)
     actor.current_hp = max(actor.current_hp - cost, 1)
+    shared_rules.rune_guard(actor, ctx.lines)  # «Запас дыхания» - от платы здоровьем
     hit = compute_hit(actor, target, ctx.rng, skill.name, skill.multiplier, is_ability=True)
     ctx.hits.append(hit)
     ratio = skill.effect_value + actor.buff_modifiers.get("crimson_feast_heal_bonus", 0.0)

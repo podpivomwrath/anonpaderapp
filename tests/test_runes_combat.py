@@ -42,6 +42,20 @@ def test_spare_breath_heals_below_30_once() -> None:
     assert c.current_hp == 1
 
 
+def test_spare_breath_fires_on_hp_cost_not_on_heal() -> None:
+    """Баг-репорт 2026-11-03: «Запас дыхания» срабатывал при лечении. Плата
+    здоровьем Тёмного мистика шла мимо проверки, и руна ждала конца хода, где
+    её будило лечение. Теперь - сразу от платы, а одно лечение её не будит."""
+    from game.classes import dark_mystic
+
+    mystic = combatant(1, 0, subclass_id="dark_mystic")
+    mystic.buff_modifiers["rune:spare_breath"] = 0.10
+    mystic.current_hp = round(mystic.max_hp * 0.35)
+    lines: list[str] = []
+    dark_mystic._pay_hp(mystic, 0.10, lines, from_max=True)
+    assert mystic.rune_breath_used and any("Запас дыхания" in x for x in lines)
+
+
 def test_on_hit_lifesteal_spite_thorns() -> None:
     a, t = combatant(1, 0), combatant(2, 1)
     a.buff_modifiers["rune:red_thirst"] = 0.03

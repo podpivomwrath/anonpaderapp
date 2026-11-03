@@ -441,6 +441,9 @@ class MillerStage:
         drained = min(round(healed * mc.CHAIN_SHARE), max(player.current_hp - 1, 0))
         if player.alive and drained > 0:
             player.current_hp -= drained
+            from game.combat import shared_rules
+
+            shared_rules.rune_guard(player, out.lines)  # «Запас дыхания» (2026-11-03)
         shield_cut = 0
         before = self.chain_shields
         for effect in player.effects_of(EffectKind.SHIELD_POOL):

@@ -49,7 +49,7 @@ def _allies_by_hp(ctx: SkillContext) -> list:
     return sorted(_party(ctx), key=lambda c: c.current_hp / c.max_hp)
 
 
-def _pay_hp(actor, pct: float, *, from_max: bool = False) -> int:
+def _pay_hp(actor, pct: float, lines: list[str], *, from_max: bool = False) -> int:
     """Плата собственным HP с учётом «Пакта крови+» (дешевле на долю).
 
     from_max=True берёт долю от МАКСИМУМА здоровья. Доля от текущего дешевеет
@@ -60,6 +60,9 @@ def _pay_hp(actor, pct: float, *, from_max: bool = False) -> int:
     reduction = actor.buff_modifiers.get("hp_cost_reduction", 0.0)
     cost = round(base * pct * (1.0 - reduction))
     actor.current_hp = max(actor.current_hp - cost, 1)
+    # Здоровье упало - «Запас дыхания» проверяется сразу (2026-11-03: раньше
+    # срабатывал позже, на лечении).
+    shared_rules.rune_guard(actor, lines)
     return cost
 
 
@@ -98,7 +101,7 @@ def blood_pact(ctx: SkillContext) -> None:
         and actor.current_hp > actor.max_hp * bc.DARK_MYSTIC_SELF_DENIAL_MIN_HP
     )
     if self_denial:
-        _pay_hp(actor, bc.DARK_MYSTIC_SELF_DENIAL_EXTRA_HP, from_max=True)
+        _pay_hp(actor, bc.DARK_MYSTIC_SELF_DENIAL_EXTRA_HP, ctx.lines, from_max=True)
         effect_mult *= 1.0 + bc.DARK_MYSTIC_SELF_DENIAL_BONUS
     if actor.dark_reward_ready:
         effect_mult *= 1.0 + actor.buff_modifiers.get("dark_reward_bonus", 0.0)
@@ -222,7 +225,7 @@ def circle_of_dark(ctx: SkillContext) -> None:
     skill = SUBCLASS_SKILL_DEFS["dark_mystic_circle"]
     actor = ctx.actor
     actor.cooldowns[skill.id] = skill.cd
-    _pay_hp(actor, bc.DARK_MYSTIC_CIRCLE_HP_COST)
+    _pay_hp(actor, bc.DARK_MYSTIC_CIRCLE_HP_COST, ctx.lines)
     # Патч 56: навык потратил собственное HP - «Тёмное вознаграждение» усилит
     # следующий Кровавый пакт.
     if actor.buff_modifiers.get("dark_reward_bonus", 0.0) > 0:

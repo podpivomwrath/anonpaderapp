@@ -178,6 +178,8 @@ def poison_end_effects(
                         combatant.effects = [e for e in combatant.effects if e.kind != EffectKind.LAST_BREATH]
                         combatant.current_hp = 1
                         lines.append(f"✨ Последний вздох удерживает {combatant.name} на грани (1 HP)")
+                    else:
+                        rune_guard(combatant, lines)
         combatant._expired_dots = []
 
     for cid in alive_before:
