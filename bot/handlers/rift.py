@@ -194,6 +194,14 @@ async def enter(message: Message) -> None:
             await message.answer("Ввести группу в разлом может только лидер группы.")
             return
         members = group.members if group is not None else [character]
+        # Идут те, кто стоит у разлома (2026-11-03, владелец): отставший
+        # согруппник не держит остальных. Состав входа фиксируется в
+        # rift.members - позже он не войдёт: занятый разлом никого не пускает.
+        left_behind = []
+        if group is not None:
+            rift_here = await rift_service.rift_at(db, character.pos_x, character.pos_y)
+            if rift_here is not None and rift_here.id == rift_id:
+                members, left_behind = rift_service.split_at_rift(rift_here, members, character.id)
         peers = await _peers(db, [c.id for c in members])
         for member in members:
             peer = peers.get(member.id)
@@ -214,6 +222,12 @@ async def enter(message: Message) -> None:
             return
         await db.commit()
         text = texts.wait_text(rift)
+        behind_peers = await _peers(db, [m.id for m in left_behind])
+    if left_behind:
+        names = ", ".join(m.name for m in left_behind)
+        text += f"\n\n{texts.left_behind_text(names)}"
+        for peer in behind_peers.values():
+            await _send(peer, texts.LEFT_OUT_TEXT)
     # Встал к разлому - любая защита снята: под щитом ничьей или Монолита
     # заходили в разлом и выходили со свежим щитом «после разлома», так по
     # кругу (2026-10-24, жалоба игроков; владелец: «снимать всю защиту»).

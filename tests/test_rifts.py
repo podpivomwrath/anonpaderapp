@@ -88,6 +88,24 @@ async def test_entry_rules(db_session, make_character) -> None:
     assert rift_service.entry_refusal(rift, [a], NOW) is None  # соло можно
 
 
+async def test_groupmate_away_stays_out_and_cannot_join_later(db_session, make_character) -> None:
+    rift = await _rift(db_session)
+    leader = await _at(await make_character(), rift, 20)
+    mate = await _at(await make_character(), rift, 20)
+    away = await make_character(level=20)
+    going, behind = rift_service.split_at_rift(rift, [leader, mate, away], leader.id)
+    assert going == [leader, mate] and behind == [away]
+    await rift_service.begin_wait(db_session, rift.id, going, None, NOW)
+    # Отставший дошёл, пока группа ждёт или уже внутри, - разлом его не пускает.
+    await _at(away, rift, 20)
+    with pytest.raises(rift_service.RiftError, match="занят"):
+        await rift_service.begin_wait(db_session, rift.id, [away], None, NOW)
+    level = await rift_service.start_run(db_session, rift, going)
+    assert level and rift.members == [leader.id, mate.id]
+    with pytest.raises(rift_service.RiftError, match="занят"):
+        await rift_service.begin_wait(db_session, rift.id, [away], None, NOW)
+
+
 async def test_one_group_at_a_time_and_cancel(db_session, make_character) -> None:
     rift = await _rift(db_session)
     first = await _at(await make_character(), rift, 20)

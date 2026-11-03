@@ -247,6 +247,19 @@ def entry_refusal(rift: Rift, characters: list[Character], now: datetime | None 
     return None
 
 
+def away_from(rift: Rift, character: Character) -> bool:
+    """Не у разлома: на другой клетке или в пути."""
+    return (character.pos_x, character.pos_y) != (rift.x, rift.y) or character.travel_target_x is not None
+
+
+def split_at_rift(rift: Rift, members: list[Character], leader_id: int) -> tuple[list[Character], list[Character]]:
+    """Кто из группы идёт, а кто остаётся снаружи (2026-11-03, владелец):
+    отставший согруппник не держит остальных. Лидер всегда в первом списке -
+    если его нет у разлома, вход откажет entry_refusal."""
+    going = [m for m in members if m.id == leader_id or not away_from(rift, m)]
+    return going, [m for m in members if m not in going]
+
+
 async def begin_wait(db: AsyncSession, rift_id: int, characters: list[Character], group_id: int | None,
                      now: datetime | None = None) -> Rift:
     """Группа встаёт у входа на ENTRY_WAIT_SECONDS. Первым в members -
