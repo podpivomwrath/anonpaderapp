@@ -97,9 +97,10 @@ def chain_lightning(ctx: SkillContext) -> None:
 
 @offensive_skill("elementalist_convergence")
 def convergence(ctx: SkillContext) -> None:
-    """Схождение стихий: 210% урона. Цель горит (Горение от ЛЮБОГО игрока,
-    своё или союзника) — +60% урона, один раз: несколько огней не суммируются;
-    цель заморожена — гарантированный крит."""
+    """Схождение стихий: урон по skill.multiplier. Перед ним две разные
+    стихии (огонь, лёд, молния в любом порядке) - +effect_value к урону и
+    гарантированный крит. Без них: цель горит (от любого игрока) - прибавка,
+    заморожена или только вышла из контроля - крит."""
     skill = SUBCLASS_SKILL_DEFS["elementalist_convergence"]
     actor = ctx.actor
     set_cooldown(actor, skill.id, skill.cd, ctx.rng)
@@ -107,12 +108,17 @@ def convergence(ctx: SkillContext) -> None:
     if target is None:
         return
     multiplier = skill.multiplier * element_damage_multiplier(actor, None)
-    if target.has_burning():
+    # Две разные стихии с прошлого Схождения, в любом порядке (2026-11-03,
+    # отзыв игроков: цепочка огонь-лёд не складывалась, лёд на боссах не
+    # проходит) - и прибавка, и крит, без условий на цели.
+    primed = len(set(getattr(actor, "convergence_elements", None) or [])) >= 2
+    actor.convergence_elements = []
+    if primed or target.has_burning():
         multiplier *= 1.0 + skill.effect_value
     # По холоду бьём гарантированным критом: цель либо ещё стоит, либо только
     # что оттуда вышла (EffectKind.CHILLED - окно после любого контроля, хоть
     # своего, хоть союзника).
-    force_crit = target.has_effect(EffectKind.FREEZE) or target.has_effect(EffectKind.CHILLED)
+    force_crit = primed or target.has_effect(EffectKind.FREEZE) or target.has_effect(EffectKind.CHILLED)
     ctx.hits.append(
         compute_hit(actor, target, ctx.rng, skill.name, multiplier, force_crit=force_crit, is_ability=True)
     )

@@ -350,3 +350,26 @@ def test_circle_of_dark_heals_whole_group_with_mystic() -> None:
     resolve_tick(state, {1: skill("dark_mystic_circle")}, rng)
     assert ally.current_hp > ally_hp_before  # союзник исцелён
     assert mystic.current_hp > hp_before - cost  # плата заплачена, но и себя подлечил
+
+
+def test_convergence_full_power_after_two_different_elements() -> None:
+    """2026-11-03 (отзыв игроков): две разные стихии до Схождения в любом
+    порядке - прибавка и гарантированный крит, без условий на цели. Одна
+    стихия дважды - не в счёт; после Схождения счёт заново."""
+    plain = _convergence_damage()
+    ele = combatant(1, side=0, subclass_id="elementalist")
+    enemy = combatant(2, side=1, vitality=500)
+    state = make_session(ele, enemy)
+
+    def hit() -> int:
+        result = resolve_tick(state, {1: skill("elementalist_convergence", 2)}, NoCritRng())
+        ele.cooldowns.clear()
+        return sum(h.amount for h in result.hit_renders if not h.is_tick and h.source_id == 1)
+
+    ele.convergence_elements = ["lightning", "lightning"]
+    assert hit() == plain  # одна стихия - обычное Схождение
+    ele.convergence_elements = ["lightning", "ice"]
+    full = hit()
+    assert full > plain * 1.3 * 1.4  # +30% и крит
+    assert ele.convergence_elements == []
+    assert hit() == plain  # счёт обнулился

@@ -3,7 +3,7 @@
 
   "guardian_shield_bash": {
     "id": "guardian_shield_bash", "name": "Удар щитом", "subclass_id": "guardian",
-    "multiplier": 1.75, "cd": 2, "effect": "custom",
+    "multiplier": 1.6, "cd": 2, "effect": "custom",
     "flavor": "Кромка щита входит в лицо. Теперь он смотрит только на тебя."
   },
   "guardian_block": {

@@ -59,8 +59,8 @@ def test_cleave_multiplier_180() -> None:
     resolve_tick(s2, {3: skill("warrior_cleave", 4)}, rng)
     cleaved = b2.max_hp - b2.current_hp
 
-    # 2026-10-21: было 1.8. ±1 - округление снижения урона (убывающая отдача с 2026-10-24).
-    assert abs(cleaved - round(plain * 1.5)) <= 1
+    # 2026-11-03: 1.65 (было 1.5, до 2026-10-21 - 1.8). ±1 - округление снижения урона (убывающая отдача с 2026-10-24).
+    assert abs(cleaved - round(plain * 1.65)) <= 1
 
 
 def test_double_stab_two_hits() -> None:

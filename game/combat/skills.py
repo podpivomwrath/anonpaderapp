@@ -124,11 +124,16 @@ def register_element_use(actor: CombatantState, skill_id: str) -> None:
     """«Стихийный поток» (патч 46, ч.1): 3 разные стихии подряд — следующее
     действие усилено на elemental_flow_bonus. Нет-оп без этого ключа в
     buff_modifiers (актёр не слотнул бафф) или для неэлементального умения."""
-    bonus = actor.buff_modifiers.get("elemental_flow_bonus", 0.0)
-    if bonus <= 0:
-        return
     element = ELEMENT_SKILL_TAGS.get(skill_id)
     if element is None:
+        return
+    # Схождение стихий (2026-11-03) копит стихии без всякого баффа.
+    # getattr: соло-бой из pickle-снимка до появления поля.
+    seen = getattr(actor, "convergence_elements", None) or []
+    if element not in seen:
+        actor.convergence_elements = [*seen, element]
+    bonus = actor.buff_modifiers.get("elemental_flow_bonus", 0.0)
+    if bonus <= 0:
         return
     actor.recent_elements = (actor.recent_elements + [element])[-3:]
     if len(actor.recent_elements) == 3 and len(set(actor.recent_elements)) == 3:

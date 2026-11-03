@@ -219,6 +219,9 @@ class CombatantState:
     overload_ready: bool = False
     # Стихийный поток: последние (до 3) применённые элементальные умения подряд
     recent_elements: list[str] = field(default_factory=list)
+    # Схождение стихий (2026-11-03): какие стихии применены с прошлого
+    # Схождения - две любые дают ему полную силу (game/classes/elementalist.py).
+    convergence_elements: list[str] = field(default_factory=list)
 
     # Патч 56 (Страж): сколько урона СРЕЗАНО блоком. blocked_this_tick -
     # однотиковое (нужно «Отражению»: вернуть долю атакующему в этот же ход),

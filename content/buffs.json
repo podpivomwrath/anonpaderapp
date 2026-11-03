@@ -92,7 +92,7 @@
   {"id": "rogue_path_loner", "name": "Одиночка", "subclass": "rogue_path", "category": "damage", "description": "", "stat_modifiers": {"solo_damage_bonus": 0.1}, "duration_ticks": 1, "implemented": true},
   {"id": "rogue_path_finisher", "name": "Добивание", "subclass": "rogue_path", "category": "damage", "description": "", "stat_modifiers": {"execute_damage_bonus": 0.25}, "duration_ticks": 1, "implemented": true},
   {"id": "rogue_path_third_stab", "name": "Третий укол", "subclass": "rogue_path", "category": "damage", "description": "", "stat_modifiers": {"third_stab_chance": 0.35}, "duration_ticks": 1, "implemented": true},
-  {"id": "rogue_path_sharp_stab", "name": "Острое жало", "subclass": "rogue_path", "category": "damage", "description": "", "stat_modifiers": {"skill_bonus:rogue_double_stab": 0.25}, "duration_ticks": 1, "implemented": true},
+  {"id": "rogue_path_sharp_stab", "name": "Острое жало", "subclass": "rogue_path", "category": "damage", "description": "", "stat_modifiers": {"skill_bonus:rogue_double_stab": 0.15}, "duration_ticks": 1, "implemented": true},
   {"id": "rogue_path_from_shadow", "name": "Из тени", "subclass": "rogue_path", "category": "control_utility", "description": "", "stat_modifiers": {"skill_cd:rogue_shadow_dash": 1}, "duration_ticks": 1, "implemented": true},
   {"id": "rogue_path_thick_smoke", "name": "Густой дым", "subclass": "rogue_path", "category": "defense", "description": "", "stat_modifiers": {"skill_duration:rogue_smoke": 1}, "duration_ticks": 1, "implemented": true},
   {"id": "mage_path_monolith", "name": "Сила Монолита", "subclass": "mage_path", "category": "damage", "description": "", "stat_modifiers": {"damage_bonus": 0.08}, "duration_ticks": 1, "implemented": true},
