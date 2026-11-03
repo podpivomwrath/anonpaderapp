@@ -538,6 +538,8 @@ async def eat_command(message: Message, name: str | None = None) -> None:
             await message.answer("🍲 Подходит несколько блюд: " + ", ".join(sorted(names)) + ". Напиши название точнее.")
             return
         d, dish, grade, _n = found[0]  # лучшая градация рыбы - первой
+        before = cooking_service.active(character)
+        stacked = before is not None and (character.food_dish, character.food_grade) == (dish.dish_id, grade)
         try:
             await cooking_service.eat(db, character, dish.dish_id, grade)
         except cooking_service.CookingError as exc:
@@ -546,7 +548,9 @@ async def eat_command(message: Message, name: str | None = None) -> None:
             return
         await db.commit()
         minutes = cooking_service.minutes_left(character)
+    left = f"{minutes // 60} ч {minutes % 60} мин" if minutes >= 60 else f"{minutes} мин"
+    tail = "Время сложилось с прежней порцией." if stacked else "Прежний бафф еды, если был, сменился этим."
     await message.answer(
         f"{d.emoji} Съедено: {d.name} (рыба {fishing.grade_name(grade)}). "
-        f"{cooking.buff_text(dish, grade)} на {minutes} мин. Прежний бафф еды, если был, сменился этим."
+        f"{cooking.buff_text(dish, grade)} на {left}. {tail}"
     )

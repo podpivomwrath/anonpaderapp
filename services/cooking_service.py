@@ -250,12 +250,18 @@ async def find_food(db: AsyncSession, character_id: int, query: str) -> list[tup
 
 
 async def eat(db: AsyncSession, character: Character, dish_id: str, grade: str, now: datetime | None = None) -> cc.Dish:
-    """Съесть порцию: новое блюдо заменяет действующее."""
+    """Съесть порцию: новое блюдо заменяет действующее, то же самое (с той же
+    градацией) добавляет время к оставшемуся - до FOOD_STACK_MAX_MINUTES."""
     from services import death_service
 
     # Мёртвый не ест (2026-10-25, баг) - и в мини-аппе, и командой /съесть.
     if death_service.is_dead(character, now):
         raise CookingError("Сначала очнись.")
+    now = now or _now()
+    cap = now + timedelta(minutes=cc.FOOD_STACK_MAX_MINUTES)
+    same = active(character, now) is not None and (character.food_dish, character.food_grade) == (dish_id, grade)
+    if same and _aware(character.food_until) >= cap - timedelta(minutes=1):
+        raise CookingError(f"Ты сыт: дольше {cc.FOOD_STACK_MAX_MINUTES // 60} ч одно блюдо не держится.")
     row = await db.scalar(select(CharacterFood).where(
         CharacterFood.character_id == character.id, CharacterFood.dish_id == dish_id, CharacterFood.grade == grade,
     ).with_for_update().execution_options(populate_existing=True))
@@ -273,6 +279,7 @@ async def eat(db: AsyncSession, character: Character, dish_id: str, grade: str, 
     from services import rune_service
 
     minutes = cooking.food_minutes(character.cooking_level) * (1 + rune_service.effect(character, "full_belly"))
-    character.food_until = (now or _now()) + timedelta(minutes=minutes)
+    start = _aware(character.food_until) if same else now
+    character.food_until = min(start + timedelta(minutes=minutes), cap)
     await db.flush()
     return dish

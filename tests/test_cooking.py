@@ -101,6 +101,26 @@ async def test_eat_gives_buff_replaces_old_and_reaches_combat(db_session, make_c
     assert cooking_service.buff(c) == {}
 
 
+async def test_same_dish_stacks_time_up_to_cap_other_dish_resets(db_session, make_character) -> None:
+    c = await make_character()
+    await cooking_service.add_food(db_session, c.id, "wormwood_soup", "trophy", 10)
+    await cooking_service.add_food(db_session, c.id, "orache_stew", "common", 1)
+    now = datetime.now(timezone.utc)
+    one = cooking.food_minutes(c.cooking_level)
+    await cooking_service.eat(db_session, c, "wormwood_soup", "trophy", now)
+    await cooking_service.eat(db_session, c, "wormwood_soup", "trophy", now)
+    assert cooking_service.minutes_left(c, now) == 2 * one
+    while cooking_service.minutes_left(c, now) < cc.FOOD_STACK_MAX_MINUTES:
+        await cooking_service.eat(db_session, c, "wormwood_soup", "trophy", now)
+    assert cooking_service.minutes_left(c, now) == cc.FOOD_STACK_MAX_MINUTES
+    # Сытому порция не тратится: отказ раньше, чем она списана.
+    with pytest.raises(cooking_service.CookingError, match="сыт"):
+        await cooking_service.eat(db_session, c, "wormwood_soup", "trophy", now)
+    # Смена блюда сбрасывает накопленное.
+    await cooking_service.eat(db_session, c, "orache_stew", "common", now)
+    assert cooking_service.minutes_left(c, now) == one
+
+
 def test_max_hp_bonus_applies_in_combatant() -> None:
     stats = Stats(strength=10, agility=10, intellect=10, vitality=10, will=10)
     plain = build_combatant(1, 0, "character", "a", 20, stats, "str", base_class="warrior")
