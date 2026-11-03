@@ -174,7 +174,7 @@ async def test_modifiers_sum_runes_items_ring(db_session, make_character) -> Non
 
 class _Lucky(random.Random):
     def random(self) -> float:
-        return 0.00005
+        return 0.0  # ниже любого шанса перстня
 
 
 async def test_ring_drops_worn_then_to_bag(db_session, make_character) -> None:
