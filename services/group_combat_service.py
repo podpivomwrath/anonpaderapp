@@ -49,6 +49,9 @@ class MobKillReward:
     raid_key_dropped: bool = False
     group_kick: "group_service.LevelGapKick | None" = None
     elixir_line: str | None = None
+    #: Кому досталась добыча с этого моба (2026-11-03): у остальных - строка
+    #: «добыча ушла такому-то», у самого - его находки.
+    looter_name: str | None = None
 
 
 def group_kills_share(mobs_killed: int, players: int) -> int:
@@ -74,9 +77,16 @@ async def reward_mob_kill(
     (патч 26, experience_service.mob_xp_level_diff_multiplier) — низкоуровневый
     всё равно получает бонус за то, что моб выше него. Выбывшие (погибшие до
     гибели этого моба) не в alive_members — не участвуют в делении и не
-    получают лут с него (см. bot/handlers/group_combat.py)."""
+    получают лут с него (см. bot/handlers/group_combat.py).
+
+    Добыча (2026-11-03, владелец: «3 моба = 3 разлута на всех»): один набор
+    бросков с моба, всё выпавшее - одному случайному живому участнику.
+    Раньше каждый бросал за каждого моба, и группа из трёх получала втрое
+    больше бросков, чем соло. Рейды и разломы - по-старому
+    (raid_combat_service)."""
     if not alive_members:
         return []
+    looter = rng.choice(alive_members)
     total_levels = sum(m.level for m in alive_members)
     base_total = experience_service.xp_per_mob(mob_level)
     rewards: list[MobKillReward] = []
@@ -98,6 +108,14 @@ async def reward_mob_kill(
             group_kick = await group_service.enforce_level_gap(db, character)
         # Счётчик убийств в группе - не здесь, а в конце боя: убитые мобы
         # делятся на число игроков (2026-10-13, см. group_kills_share).
+        if character is not looter:
+            rewards.append(MobKillReward(
+                character_id=character.id, xp_gained=levelup.xp_awarded,
+                xp_premium_applied=levelup.premium_applied,
+                levels_gained=levelup.levels_gained, new_level=levelup.new_level,
+                group_kick=group_kick, looter_name=looter.name,
+            ))
+            continue
         trophies = await trophy_service.grant_from_kill(db, character, rng)
         item = await item_service.grant_from_kill(db, character, mob_level, rng)
         raid_key_dropped = await raid_key_service.maybe_grant(db, character, rng)

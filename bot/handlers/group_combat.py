@@ -763,6 +763,8 @@ async def on_group_tick_resolved(session_id: int, tick: int, result: TickResult)
                     xp_line = display.xp_delta_line(r.xp_gained, premium=r.xp_premium_applied)
                     if xp_line:  # на 60 уровне опыта нет - и строки нет
                         lines.append(xp_line)
+                    if r.looter_name:
+                        lines.append(f"🎒 Добыча с него досталась: {r.looter_name}.")
                     drop_line = trophy_service.format_drop_line(r.trophies)
                     if drop_line:
                         lines.append(drop_line)
