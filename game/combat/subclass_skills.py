@@ -9,7 +9,7 @@ effect=null/stun/target_vuln/self_dodge_buff регистрируются ЗДЕ
 
 from game.combat import balance_config as bc
 from game.combat import combat_flavor, control
-from game.combat.session import CombatMode, EffectKind
+from game.combat.session import CombatMode, Effect, EffectKind
 from game.combat.skills import (
     ELEMENT_SKILL_TAGS,
     SkillContext,
@@ -44,9 +44,15 @@ def _apply_vulnerability(target, skill: SubclassSkillDef, value: float, source_i
     if mark is None:
         target.apply_effect(EffectKind.VULNERABILITY, value, skill.effect_duration, source_id, tag=DECAY_TAG)
         return
-    mark.value = max(mark.value, value)
-    mark.remaining_ticks = max(mark.remaining_ticks, skill.effect_duration)
-    mark.source_id = source_id
+    # Обновлённая метка - новым эффектом (2026-11-03, репорт «два разложения
+    # не обновляют длительность»): старый объект резолвер считал «висевшим
+    # с начала хода» и в тот же ход снимал с него ход и 30% силы - обновление
+    # через ход выходило ровно тем, что было без него.
+    target.effects.remove(mark)
+    target.effects.append(Effect(
+        kind=EffectKind.VULNERABILITY, value=max(mark.value, value),
+        remaining_ticks=max(mark.remaining_ticks, skill.effect_duration), source_id=source_id, tag=DECAY_TAG,
+    ))
 
 
 def _make_handler(skill: SubclassSkillDef):
