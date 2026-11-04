@@ -35,6 +35,23 @@ EXPECTED_SEND_ERRORS = {7, 9, 900, 901, 902, 909, 15}
 
 _last_out: dict[int, float] = {}
 _api = None
+#: Лимит частоты VK (код 9) - в журнал предупреждением, не чаще раза в
+#: FLOOD_LOG_SECONDS на игрока (2026-11-05, аудит: «Сводку» отбивал лимит, а
+#: в журнале не было ни следа).
+FLOOD_LOG_SECONDS = 60
+_flood_logged: dict[int, float] = {}
+
+
+def _note_flood(method: str, peer) -> None:
+    try:
+        peer = int(peer)
+    except (TypeError, ValueError):
+        return
+    now = time.time()
+    if now - _flood_logged.get(peer, 0.0) < FLOOD_LOG_SECONDS:
+        return
+    _flood_logged[peer] = now
+    logger.warning("VK {}: лимит частоты (9) для {} - сообщение не дошло", method, peer)
 
 
 def install(api) -> None:
@@ -62,6 +79,8 @@ def install(api) -> None:
             if code != 10:
                 if method in ("messages.send", "messages.edit") and code not in EXPECTED_SEND_ERRORS:
                     logger.error("VK {}: ошибка {} для {} - {}", method, code, data.get("peer_id"), exc)
+                elif code == 9:
+                    _note_flood(method, data.get("peer_id"))
                 raise
             logger.warning("VK {}: внутренняя ошибка VK (10), повтор", method)
             await asyncio.sleep(1.0)

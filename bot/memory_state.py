@@ -24,6 +24,7 @@ STATE: dict[str, str] = {
     "bot.peer_lock._locks": "замок на игрока, растёт до числа игроков - не очищается намеренно",
     "bot.pending_activity._veins": "сбор жилы или её истечение",
     "bot.silent_guard._last_out": "время последнего ответа на игрока - перезаписывается, растёт до числа игроков",
+    "bot.silent_guard._flood_logged": "когда последний раз писали лимит VK по игроку - перезаписывается, растёт до числа игроков",
     # --- одиночный бой
     "bot.handlers.combat._encounter_class": "конец боя (on_battle_finished), /застрял",
     "bot.handlers.combat._last_player_hp": "конец боя, /застрял",
