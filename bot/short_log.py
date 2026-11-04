@@ -168,8 +168,8 @@ async def send(api, peer_id: int, short: str, full: str, keyboard: str | None = 
                 message=previous.full if previous.expanded else previous.short,
                 keyboard=inline_keyboard(previous.message_id, previous.expanded),
             )
-        except Exception:  # noqa: BLE001 - лог уже удалён игроком; бой идёт дальше
-            logger.warning("Короткий лог: не удалось повесить кнопку на {} у {}", previous.message_id, peer)
+        except Exception as exc:  # noqa: BLE001 - лог уже удалён игроком; бой идёт дальше
+            logger.warning("Короткий лог: не удалось повесить кнопку на {} у {}: {}", previous.message_id, peer, exc)
 
 
 async def toggle_inline(api, peer_id: int, message_id: int, in_battle: bool) -> str | None:
