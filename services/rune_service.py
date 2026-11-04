@@ -214,6 +214,26 @@ def spare_skill_slots(character: Character) -> int:
     return sum(1 for sid in character.rune_skill_slots or [] if sid not in skill_ids)
 
 
+def settle_skill_slots(character: Character) -> bool:
+    """Купленные вторые слоты прежних навыков сами переходят на текущие
+    навыки без слота, по порядку навыков (2026-11-04, игроки: после смены
+    класса слоты приходилось переносить вручную в каждом навыке). Вернулся
+    к прежнему пути - слоты так же переедут обратно. True - что-то перенесли."""
+    skill_ids = [s.id for s in skills_of(character)]
+    owned = list(character.rune_skill_slots or [])
+    missing = [sid for sid in skill_ids if sid not in owned]
+    moved = False
+    for i, sid in enumerate(owned):
+        if not missing:
+            break
+        if sid not in skill_ids:
+            owned[i] = missing.pop(0)
+            moved = True
+    if moved:
+        character.rune_skill_slots = owned  # JSON заменяется целиком
+    return moved
+
+
 async def buy_skill_slot(db: AsyncSession, character: Character, skill_id: str) -> None:
     skill_ids = {s.id for s in skills_of(character)}
     if skill_id not in skill_ids:

@@ -95,9 +95,13 @@ async def handle_get(request: web.Request) -> web.Response:
         character = await onboarding_svc.get_character(db, request[VK_USER_ID_KEY])
         if character is None:
             return _error("character_not_found", 404)
-        # Сменил путь - руны из слотов прежних навыков возвращаются в сумку.
+        # Сменил путь - руны из слотов прежних навыков возвращаются в сумку,
+        # а купленные вторые слоты сами переходят на новые навыки.
+        changed = rune_service.settle_skill_slots(character)
         if await rune_service.release_lost_runes(db, character):
             await rune_service.recompute(db, character)
+            changed = True
+        if changed:
             await db.commit()
         return web.json_response(await _payload(db, character))
 

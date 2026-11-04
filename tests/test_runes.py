@@ -131,6 +131,25 @@ async def test_bought_skill_slot_moves_to_subclass_skill(db_session, make_charac
         await rune_service.buy_skill_slot(db_session, c, "blood_knight_blood_seal")
 
 
+def test_bought_skill_slots_follow_the_path_by_themselves() -> None:
+    """2026-11-04, игроки: после смены класса вторые слоты переносились вручную
+    в каждом навыке. Теперь сами - на навыки без слота, по порядку, и обратно."""
+    class C:
+        base_class, subclass, subclass_declined = "warrior", None, False
+        rune_skill_slots = ["warrior_cleave", "warrior_stagger", "warrior_warcry"]
+
+    c = C()
+    c.subclass = "blood_knight"
+    assert rune_service.settle_skill_slots(c)
+    current = [s.id for s in rune_service.skills_of(c)]
+    assert sorted(c.rune_skill_slots) == sorted(current[:3])
+    assert rune_service.spare_skill_slots(c) == 0
+    assert not rune_service.settle_skill_slots(c)  # уже на месте
+    c.subclass = None  # вернулся к навыкам класса
+    assert rune_service.settle_skill_slots(c)
+    assert sorted(c.rune_skill_slots) == sorted(["warrior_cleave", "warrior_stagger", "warrior_warcry"])
+
+
 async def test_class_change_returns_foreign_gear_rune(db_session, make_character) -> None:
     """Репорт 266: руна чужого класса после смены класса - в сумку, не действует."""
     from models import BaseClass
