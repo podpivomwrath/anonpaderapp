@@ -107,6 +107,9 @@ class GroupBattle:
     #: и id менялы. Группа пала - меняла уносит сорванное.
     relic_lots: dict[int, dict[str, int]] = field(default_factory=dict)
     dealer_id: int | None = None
+    #: Сколько мобов уже убито в этом бою: от номера зависит шанс добычи
+    #: (group_combat_service.loot_share, 2026-11-04).
+    kills: int = 0
 
 
 #: Сколько здоровья у павшего, если группа всё же победила.
@@ -754,7 +757,10 @@ async def on_group_tick_resolved(session_id: int, tick: int, result: TickResult)
                 mob = battle.last_combatants.get(mob_id)
                 mob_level = mob.level if mob is not None else 1
                 mob_name = mob.name if mob is not None else "Враг"
-                rewards = await group_combat_service.reward_mob_kill(db, characters, mob_level, _rng)
+                battle.kills = getattr(battle, "kills", 0) + 1
+                rewards = await group_combat_service.reward_mob_kill(
+                    db, characters, mob_level, _rng, loot_chance=group_combat_service.loot_share(battle.kills),
+                )
                 for r in rewards:
                     p = battle.participants.get(r.character_id)
                     if p is None:
@@ -763,8 +769,6 @@ async def on_group_tick_resolved(session_id: int, tick: int, result: TickResult)
                     xp_line = display.xp_delta_line(r.xp_gained, premium=r.xp_premium_applied)
                     if xp_line:  # на 60 уровне опыта нет - и строки нет
                         lines.append(xp_line)
-                    if r.looter_name:
-                        lines.append(f"🎒 Добыча с него досталась: {r.looter_name}.")
                     drop_line = trophy_service.format_drop_line(r.trophies)
                     if drop_line:
                         lines.append(drop_line)

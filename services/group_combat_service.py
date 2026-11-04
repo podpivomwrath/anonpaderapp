@@ -49,9 +49,6 @@ class MobKillReward:
     raid_key_dropped: bool = False
     group_kick: "group_service.LevelGapKick | None" = None
     elixir_line: str | None = None
-    #: Кому досталась добыча с этого моба (2026-11-03): у остальных - строка
-    #: «добыча ушла такому-то», у самого - его находки.
-    looter_name: str | None = None
 
 
 def group_kills_share(mobs_killed: int, players: int) -> int:
@@ -64,8 +61,17 @@ def group_kills_share(mobs_killed: int, players: int) -> int:
     return max(1, int(mobs_killed / players + 0.5))  # обычное округление: 2,5 -> 3
 
 
+def loot_share(kill_number: int) -> float:
+    """Шанс броска добычи за kill_number-го (с 1) убитого в бою моба."""
+    from game.economy import group_config as gc
+
+    shares = gc.LOOT_SHARE_BY_KILL
+    return shares[kill_number - 1] if 1 <= kill_number <= len(shares) else 0.0
+
+
 async def reward_mob_kill(
     db: AsyncSession, alive_members: list[Character], mob_level: int, rng: random.Random,
+    loot_chance: float = 1.0,
 ) -> list[MobKillReward]:
     """Опыт за ОДНОГО убитого моба делится пропорционально уровню между
     живыми на момент его гибели участниками:
@@ -79,14 +85,13 @@ async def reward_mob_kill(
     гибели этого моба) не в alive_members — не участвуют в делении и не
     получают лут с него (см. bot/handlers/group_combat.py).
 
-    Добыча (2026-11-03, владелец: «3 моба = 3 разлута на всех»): один набор
-    бросков с моба, всё выпавшее - одному случайному живому участнику.
-    Раньше каждый бросал за каждого моба, и группа из трёх получала втрое
-    больше бросков, чем соло. Рейды и разломы - по-старому
-    (raid_combat_service)."""
+    Добыча (2026-11-04, владелец): каждый живой бросает её сам, но с шансом
+    loot_chance - он падает с номером убитого в бою моба (loot_share).
+    Было: каждый за каждого моба целиком (группа из трёх - втрое больше
+    бросков, чем соло), потом один набор на всех. Рейды и разломы -
+    по-старому (raid_combat_service)."""
     if not alive_members:
         return []
-    looter = rng.choice(alive_members)
     total_levels = sum(m.level for m in alive_members)
     base_total = experience_service.xp_per_mob(mob_level)
     rewards: list[MobKillReward] = []
@@ -108,12 +113,12 @@ async def reward_mob_kill(
             group_kick = await group_service.enforce_level_gap(db, character)
         # Счётчик убийств в группе - не здесь, а в конце боя: убитые мобы
         # делятся на число игроков (2026-10-13, см. group_kills_share).
-        if character is not looter:
+        if loot_chance < 1.0 and rng.random() >= loot_chance:
             rewards.append(MobKillReward(
                 character_id=character.id, xp_gained=levelup.xp_awarded,
                 xp_premium_applied=levelup.premium_applied,
                 levels_gained=levelup.levels_gained, new_level=levelup.new_level,
-                group_kick=group_kick, looter_name=looter.name,
+                group_kick=group_kick,
             ))
             continue
         trophies = await trophy_service.grant_from_kill(db, character, rng)

@@ -61,11 +61,12 @@ async def test_reward_mob_kill_applies_level_diff_bonus_on_top_of_share(db_sessi
     assert reward.xp_gained == round(base * mult)
 
 
-async def test_reward_mob_kill_one_loot_roll_for_the_whole_group(db_session, make_character, monkeypatch) -> None:
-    """2026-11-03, владелец: «3 моба = 3 разлута на всех» - с моба один набор
-    бросков добычи, его получает один живой; опыт - всем."""
+async def test_group_loot_chance_falls_with_each_kill(db_session, make_character, monkeypatch) -> None:
+    """2026-11-04, владелец: каждый бросает добычу сам; за 1-го моба боя -
+    всегда, за 2-го - с шансом 50%, за 3-го - 12,5%, дальше ничего. Опыт - всем."""
     from services import trophy_service
 
+    assert [gcs.loot_share(n) for n in (1, 2, 3, 4, 5)] == [1.0, 0.5, 0.125, 0.0, 0.0]
     rolled = []
 
     async def fake_trophies(db, character, rng):
@@ -74,14 +75,16 @@ async def test_reward_mob_kill_one_loot_roll_for_the_whole_group(db_session, mak
 
     monkeypatch.setattr(trophy_service, "grant_from_kill", fake_trophies)
     group = [await character_pos(make_character, 5, 5, level=10) for _ in range(3)]
-    for _ in range(3):
-        rewards = await gcs.reward_mob_kill(db_session, group, mob_level=10, rng=random.Random(len(rolled)))
-        assert {r.character_id for r in rewards} == {c.id for c in group}
-        assert all(r.xp_gained > 0 for r in rewards)
-        looter = [r for r in rewards if r.looter_name is None]
-        assert len(looter) == 1 and looter[0].character_id == rolled[-1]
-        assert all(r.looter_name for r in rewards if r is not looter[0])
-    assert len(rolled) == 3  # три моба - три броска, а не девять
+    rewards = await gcs.reward_mob_kill(db_session, group, mob_level=10, rng=random.Random(1), loot_chance=1.0)
+    assert sorted(rolled) == sorted(c.id for c in group)  # первый моб - бросок каждому
+    rolled.clear()
+    rewards = await gcs.reward_mob_kill(db_session, group, mob_level=10, rng=random.Random(1), loot_chance=0.0)
+    assert rolled == [] and all(r.xp_gained > 0 for r in rewards)  # без добычи, но с опытом
+    # 50% на 2-го моба: на многих бросках - около половины.
+    rng = random.Random(7)
+    for _ in range(100):
+        await gcs.reward_mob_kill(db_session, group[:1], mob_level=10, rng=rng, loot_chance=0.5)
+    assert 30 <= len(rolled) <= 70
 
 
 async def test_reward_mob_kill_empty_alive_list_returns_empty(db_session) -> None:
