@@ -14,13 +14,14 @@
 клавиатура при этой правке не сбрасывается).
 
 Настройка - в ui_flags персонажа (ключ short_log), здесь копия в памяти по
-vk_id, как у bot/no_images.py. Логи боя - тоже в памяти и только на один бой:
-начался новый бой или бой кончился - кнопки старых логов отвечают, что бой
-уже окончен, и снимаются.
+vk_id, как у bot/no_images.py. Логи боя - тоже в памяти, на один бой и ещё
+KEEP_AFTER_SECONDS после него: потом (или с новым боем) кнопки старых логов
+отвечают, что бой окончен, и снимаются.
 """
 
 import asyncio
 import json
+import time
 from dataclasses import dataclass
 
 from loguru import logger
@@ -35,13 +36,15 @@ CALLBACK_TYPE = "log_cb"
 BTN_INLINE_OPEN = "📜 Подробнее"
 BTN_INLINE_HIDE = "📜 Свернуть"
 NOTHING_TEXT = "Лога этого хода уже нет: сводка доступна для последнего хода боя."
-ENDED_TEXT = "Бой окончен - этот лог уже не разворачивается."
+ENDED_TEXT = "Бой кончился больше минуты назад - этот лог уже не разворачивается."
 BUSY_TEXT = "VK просит не так часто - нажми ещё раз через пару секунд."
 #: Пауза между правками прошлых логов (0 - сразу, в тестах) и пауза, когда VK
 #: ответил «слишком часто», - столько раз подряд на один лог.
 ATTACH_DELAY = 1.5
 FLOOD_PAUSE = 5.0
 FLOOD_TRIES = 4
+#: Сколько секунд после последнего лога боя его логи ещё разворачиваются.
+KEEP_AFTER_SECONDS = 60
 
 _short: set[int] = set()
 
@@ -53,6 +56,7 @@ class LastLog:
     full: str
     keyboard: str | None
     expanded: bool = False
+    sent_at: float = 0.0
 
 
 @dataclass
@@ -168,12 +172,19 @@ async def send(api, peer_id: int, short: str, full: str, keyboard: str | None = 
     kb = with_toggle(keyboard)
     message_id = await api.messages.send(peer_id=peer, message=short, random_id=0, keyboard=kb)
     previous = entry.logs[-1] if entry.logs else None
+    current = None
     if isinstance(message_id, int) and message_id > 0:
-        entry.logs.append(LastLog(message_id, short, full, keyboard))
+        current = LastLog(message_id, short, full, keyboard, sent_at=time.time())
+        entry.logs.append(current)
     # Прошлый лог - кнопкой под сообщением. Правим после отправки нового: его
     # боевая клавиатура уже внизу и правкой не сбрасывается.
-    if previous is not None:
-        _queue.setdefault(peer, []).append((key, previous))
+    pending = [previous] if previous is not None else []
+    # Последний ход боя: «Сводки» внизу у него нет (клавиатура боя снята) -
+    # кнопка сразу под ним, чтобы минуту после боя развернуть и его.
+    if current is not None and kb == keyboard:
+        pending.append(current)
+    if pending:
+        _queue.setdefault(peer, []).extend((key, log) for log in pending)
         if peer not in _workers:
             _workers.add(peer)
             if ATTACH_DELAY:
@@ -226,6 +237,9 @@ async def toggle_inline(api, peer_id: int, message_id: int, in_battle: bool) -> 
     peer = int(peer_id)
     entry = _battles.get(peer)
     log = next((x for x in entry.logs if x.message_id == message_id), None) if entry else None
+    # Бой кончился - логи живут ещё минуту после последнего (2026-11-05).
+    if not in_battle and entry is not None and entry.logs:
+        in_battle = time.time() - entry.logs[-1].sent_at <= KEEP_AFTER_SECONDS
     if log is None or not in_battle:
         if entry is not None and not in_battle:
             _battles.pop(peer, None)

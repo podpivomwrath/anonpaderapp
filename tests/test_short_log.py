@@ -115,8 +115,26 @@ async def test_every_past_log_of_the_battle_gets_its_own_button(monkeypatch) -> 
         await short_log.send(api, 42, "новый бой", "новый бой полностью", combat_keyboard("mage", {}),
                              battle=type("Battle", (), {})())
         assert await short_log.toggle_inline(api, 42, 101, in_battle=True) == short_log.NOTHING_TEXT
-        # Бой кончился - кнопка отвечает и снимается.
+        # Бой кончился: минуту логи ещё разворачиваются (2026-11-05), потом
+        # кнопка отвечает и снимается.
+        assert await short_log.toggle_inline(api, 42, 104, in_battle=False) is None
+        short_log._battles[42].logs[-1].sent_at -= short_log.KEEP_AFTER_SECONDS + 1
         assert await short_log.toggle_inline(api, 42, 104, in_battle=False) == short_log.ENDED_TEXT
         assert json.loads(api.edited[-1]["keyboard"])["buttons"] == []
+    finally:
+        short_log.set_short(42, False)
+
+
+async def test_last_log_of_the_battle_gets_a_button_right_away(monkeypatch) -> None:
+    """Последний ход боя: нижней «Сводки» уже нет - кнопка сразу под ним."""
+    monkeypatch.setattr(short_log, "ATTACH_DELAY", 0)
+    api = _CountingApi()
+    battle = type("Battle", (), {})()
+    short_log.set_short(42, True)
+    try:
+        await short_log.send(api, 42, "ход", "ход полностью", combat_keyboard("mage", {}), battle=battle)
+        await short_log.send(api, 42, "конец", "конец полностью", json.dumps({"one_time": False, "buttons": []}),
+                             battle=battle)
+        assert [e["message_id"] for e in api.edited] == [101, 102]
     finally:
         short_log.set_short(42, False)
