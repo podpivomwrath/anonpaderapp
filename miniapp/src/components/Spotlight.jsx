@@ -107,8 +107,11 @@ export default function Spotlight({ steps, onDone, label, onNavigate, onMore }) 
         // Блоки раздела въезжают каскадом - через полсекунды они на месте.
         again = setTimeout(measure, 700);
         const r = el.getBoundingClientRect();
-        // Не на экране или под шапкой - сначала докрутить к нему.
-        if (el.closest('.hub-content') && (r.top < TOP_GAP || r.top > window.innerHeight * 0.45)) {
+        // Не на экране или под шапкой - сначала докрутить к нему. Карточка
+        // персонажа (баннер) тоже прокручивается со страницей: после
+        // «Подробнее» гид начинал с неё, а страница оставалась внизу, где её
+        // докрутили подсказки раздела (2026-11-04, репорт).
+        if (el.closest('.hub-content, .hub-banner') && (r.top < TOP_GAP || r.top > window.innerHeight * 0.45)) {
           window.scrollTo({ top: window.scrollY + r.top - TOP_GAP - 12, behavior: 'smooth' });
           settle = setTimeout(() => { measure(); setSearching(false); }, 420);
         } else {
