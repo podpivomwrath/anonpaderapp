@@ -320,7 +320,10 @@ export default function Hub() {
       from: activeRef.current,
       started: Date.now(),
       steps: (() => {
-        const steps = guideSteps(activeRef.current, { inGuild: character?.in_guild });
+        const steps = guideSteps(activeRef.current, {
+          inGuild: character?.in_guild,
+          hasPath: Boolean(character?.subclass || character?.subclass_declined),
+        });
         return steps.length ? steps : [{ target: null, title: 'Гайд', text: 'Для этого раздела гайда пока нет.' }];
       })(),
     });
