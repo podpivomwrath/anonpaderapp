@@ -360,6 +360,10 @@ async def run() -> None:
         respawn_handlers.scan, "interval", seconds=settings.respawn_scan_seconds, id="respawn_scan"
     )
     respawn_scheduler.start()
+    # Аудит нагрузки (2026-11-05): разовый снимок CPU через 2 минуты после старта.
+    from bot import cpu_sampler
+
+    cpu_sampler.start()
     respawn_scheduler.add_job(raid_handlers.reconcile_lobbies, "interval", seconds=3,
                              id="raid_lobbies", max_instances=1, coalesce=True)
     # Турбоишак дня (2026-10-19): появление, бег по карте, ожидание имени.
