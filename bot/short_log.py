@@ -36,8 +36,12 @@ BTN_INLINE_OPEN = "📜 Подробнее"
 BTN_INLINE_HIDE = "📜 Свернуть"
 NOTHING_TEXT = "Лога этого хода уже нет: сводка доступна для последнего хода боя."
 ENDED_TEXT = "Бой окончен - этот лог уже не разворачивается."
-#: Через сколько секунд после нового лога вешать кнопку на прошлый (0 - сразу, в тестах).
-ATTACH_DELAY = 1.2
+BUSY_TEXT = "VK просит не так часто - нажми ещё раз через пару секунд."
+#: Пауза между правками прошлых логов (0 - сразу, в тестах) и пауза, когда VK
+#: ответил «слишком часто», - столько раз подряд на один лог.
+ATTACH_DELAY = 1.5
+FLOOD_PAUSE = 5.0
+FLOOD_TRIES = 4
 
 _short: set[int] = set()
 
@@ -60,6 +64,10 @@ class BattleLogs:
 
 _battles: dict[int, BattleLogs] = {}
 _next_key = 0
+#: Прошлые логи, которым ещё вешать кнопку: (ключ боя, лог), и чья очередь уже
+#: разбирается (_attach_worker).
+_queue: dict[int, list[tuple[int | None, LastLog]]] = {}
+_workers: set[int] = set()
 
 
 def battle_key(battle) -> int | None:
@@ -165,32 +173,51 @@ async def send(api, peer_id: int, short: str, full: str, keyboard: str | None = 
     # Прошлый лог - кнопкой под сообщением. Правим после отправки нового: его
     # боевая клавиатура уже внизу и правкой не сбрасывается.
     if previous is not None:
-        if ATTACH_DELAY:
-            from bot import background
+        _queue.setdefault(peer, []).append((key, previous))
+        if peer not in _workers:
+            _workers.add(peer)
+            if ATTACH_DELAY:
+                from bot import background
 
-            background.spawn(_attach(api, peer, previous), name="short_log_attach")
-        else:
-            await _attach(api, peer, previous)
+                background.spawn(_attach_worker(api, peer), name="short_log_attach")
+            else:
+                await _attach_worker(api, peer)
 
 
-async def _attach(api, peer: int, log: LastLog) -> None:
-    """Повесить кнопку на прошлый лог. Не сразу: правка в ту же секунду, что и
-    новый лог, упиралась в ограничение частоты VK (ошибка 9) - кнопки не
-    появлялись (2026-11-05, репорт). При 9 - ещё одна попытка."""
-    for attempt in range(2):
-        await asyncio.sleep(ATTACH_DELAY * (attempt + 1))
-        try:
-            await api.messages.edit(
-                peer_id=peer, message_id=log.message_id,
-                message=log.full if log.expanded else log.short,
-                keyboard=inline_keyboard(log.message_id, log.expanded),
-            )
-            return
-        except Exception as exc:  # noqa: BLE001 - лог уже удалён игроком; бой идёт дальше
-            if getattr(exc, "code", None) == 9 and attempt == 0:
+async def _attach_worker(api, peer: int) -> None:
+    """Вешает кнопки на прошлые логи игрока по одной. Правка сообщения идёт в
+    тот же счётчик VK, что и новые: в быстром бою правка сразу за логом
+    упиралась в «Flood control» (ошибка 9), и кнопки не появлялись
+    (2026-11-05, репорт). Поэтому - очередь с паузой ATTACH_DELAY, а на 9 -
+    подождать FLOOD_PAUSE. Логи прошлого боя из очереди выбрасываются."""
+    delay = ATTACH_DELAY
+    tries = 0
+    try:
+        while _queue.get(peer):
+            await asyncio.sleep(delay)
+            key, log = _queue[peer][0]
+            entry = _battles.get(peer)
+            if entry is None or entry.key != key:
+                _queue[peer].pop(0)  # бой сменился - кнопка уже не нужна
                 continue
-            logger.warning("Короткий лог: не удалось повесить кнопку на {} у {}: {}", log.message_id, peer, exc)
-            return
+            try:
+                await api.messages.edit(
+                    peer_id=peer, message_id=log.message_id,
+                    message=log.full if log.expanded else log.short,
+                    keyboard=inline_keyboard(log.message_id, log.expanded),
+                )
+            except Exception as exc:  # noqa: BLE001 - лог уже удалён игроком; бой идёт дальше
+                if getattr(exc, "code", None) == 9 and tries < FLOOD_TRIES:
+                    tries += 1
+                    delay = FLOOD_PAUSE
+                    continue
+                logger.warning("Короткий лог: не удалось повесить кнопку на {} у {}: {}", log.message_id, peer, exc)
+            _queue[peer].pop(0)
+            delay, tries = ATTACH_DELAY, 0
+    finally:
+        _workers.discard(peer)
+        if not _queue.get(peer):
+            _queue.pop(peer, None)
 
 
 async def toggle_inline(api, peer_id: int, message_id: int, in_battle: bool) -> str | None:
@@ -220,9 +247,9 @@ async def toggle_inline(api, peer_id: int, message_id: int, in_battle: bool) -> 
             message=log.full if log.expanded else log.short,
             keyboard=inline_keyboard(message_id, log.expanded),
         )
-    except Exception:  # noqa: BLE001 - сообщение удалено
+    except Exception as exc:  # noqa: BLE001 - сообщение удалено
         log.expanded = not log.expanded
-        return NOTHING_TEXT
+        return BUSY_TEXT if getattr(exc, "code", None) == 9 else NOTHING_TEXT
     return None
 
 
