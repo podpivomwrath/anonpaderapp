@@ -674,7 +674,7 @@ def register_routes(app: web.Application) -> None:
 
 # Нарезка (2026-10-22): этот блок живёт в bot.miniapp_presets_api.
 # Старые адреса (miniapp_api.X в других модулях и тестах) работают через ссылку.
-from bot.miniapp_presets_api import (  # noqa: E402,F401
+from bot.miniapp_presets_api import (
     _in_battle,
     handle_get_presets,
     handle_post_preset_buy_slot,
@@ -685,7 +685,7 @@ from bot.miniapp_presets_api import (  # noqa: E402,F401
 
 # Нарезка (2026-10-22): этот блок живёт в bot.miniapp_inventory_api.
 # Старые адреса (miniapp_api.X в других модулях и тестах) работают через ссылку.
-from bot.miniapp_inventory_api import (  # noqa: E402,F401
+from bot.miniapp_inventory_api import (
     _ELIXIR_CATEGORY_TITLES,
     _FISH_GLOW,
     _ORE_GLOW,

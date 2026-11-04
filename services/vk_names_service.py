@@ -35,7 +35,7 @@ async def refresh(db: AsyncSession, api, now: datetime | None = None) -> int:
         return 0
     try:
         found = await api.users.get(user_ids=[u.vk_id for u in users])
-    except Exception as exc:  # noqa: BLE001 - фоновая задача, повторим в следующий раз
+    except Exception as exc:
         logger.warning("Имена VK не подтянулись: {}", exc)
         return 0
     by_id = {p.id: p for p in found or []}

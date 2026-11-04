@@ -5,7 +5,8 @@ CombatantState/CombatSessionState — рабочие объекты tick_engine 
 
 from dataclasses import dataclass, field
 from enum import StrEnum
-from typing import TYPE_CHECKING, Callable
+from typing import TYPE_CHECKING
+from collections.abc import Callable
 
 from pydantic import BaseModel, Field
 

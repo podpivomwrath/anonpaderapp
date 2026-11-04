@@ -1214,7 +1214,7 @@ async def _tell_others(battle, cid: int, text: str) -> None:
 
 # Нарезка (2026-10-22): этот блок живёт в bot.handlers.raid_results.
 # Старые адреса (raid_combat.X в других модулях и тестах) работают через ссылку.
-from bot.handlers.raid_results import (  # noqa: E402,F401
+from bot.handlers.raid_results import (
     PENDING_REWARD_LINE,
     RIFT_RAISED_HP_PCT,
     SAFE_EXIT_LINE,

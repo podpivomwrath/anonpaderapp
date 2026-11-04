@@ -475,7 +475,7 @@ async def notify_travel_started(
         resp = await _bot_api.messages.send(
             peer_id=peer_id, message=text, random_id=0, keyboard=kb.mount_travel_keyboard()
         )
-    except Exception:  # noqa: BLE001 - сеть/VK могут бросить что угодно
+    except Exception:
         # Поездка на этот момент УЖЕ записана в БД, и падение отправки не
         # должно её отменять или ронять HTTP-запрос с карты. Но и молчать
         # нельзя: именно так и выглядела жалоба «с карты не приходит ничего»,
@@ -516,7 +516,7 @@ async def send_progress(peer_id: int, travel) -> None:
             keyboard=kb.mount_travel_keyboard(),
         )
         _travel_message[peer_id] = int(resp)
-    except Exception:  # noqa: BLE001
+    except Exception:
         logger.exception("Не удалось отправить сообщение пути ({})", peer_id)
 
 
@@ -530,7 +530,7 @@ async def close_progress(peer_id: int, text: str) -> bool:
         return False
     try:
         await _bot_api.messages.edit(peer_id=peer_id, message_id=msg_id, message=text)
-    except Exception:  # noqa: BLE001
+    except Exception:
         logger.debug("Не удалось закрыть сообщение пути для {}", peer_id)
         return False
     return True

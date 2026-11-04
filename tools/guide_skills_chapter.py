@@ -19,14 +19,14 @@ from loguru import logger
 
 logger.remove()
 
-from game.classes.base import REGISTRY  # noqa: E402
-from game.combat import balance_config as bc  # noqa: E402
-from game.combat.base_skills import skills_for_class  # noqa: E402
-from game.combat.subclass_skills import SUBCLASS_SKILL_DEFS  # noqa: E402
-from game.economy import buff_descriptions as bd  # noqa: E402
-from game.world import encounters  # noqa: E402
-from game.world import world_config as wc  # noqa: E402
-from tools import gen_handbook as gh  # noqa: E402
+from game.classes.base import REGISTRY
+from game.combat import balance_config as bc
+from game.combat.base_skills import skills_for_class
+from game.combat.subclass_skills import SUBCLASS_SKILL_DEFS
+from game.economy import buff_descriptions as bd
+from game.world import encounters
+from game.world import world_config as wc
+from tools import gen_handbook as gh
 
 E = html.escape
 

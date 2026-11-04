@@ -54,7 +54,7 @@ def install(api) -> None:
                 _last_out[p] = now
         try:
             return await original(method, data, version)
-        except Exception as exc:  # noqa: BLE001 - смотрим только на код ошибки VK
+        except Exception as exc:
             # Код 10 - «Internal server error, try later» у самого VK. В логах
             # он ронял разбор хода боя: игрок не получал сообщение о ходе
             # (2026-10-19). Один повтор через секунду почти всегда проходит.
@@ -98,7 +98,7 @@ async def _check_later(peer_id: int, from_id: int, started: float) -> None:
                 return
             keyboard = await world_handlers._current_keyboard(db, character, peer_id, datetime.now(timezone.utc))
         await _api.messages.send(peer_id=peer_id, random_id=0, message=STALE_TEXT, keyboard=keyboard)
-    except Exception:  # noqa: BLE001 - страховка не должна ронять ничего
+    except Exception:
         logger.exception("Страховка кнопок: не удалось ответить {}", peer_id)
 
 

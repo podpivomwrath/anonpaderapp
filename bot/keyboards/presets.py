@@ -3,7 +3,7 @@
 from vkbottle import Keyboard, KeyboardButtonColor
 
 from bot.keyboards.layout import add_paired
-from bot.keyboards.world import BTN_PRESETS, add_miniapp_button  # noqa: F401 - ре-экспорт, импортируется другими модулями
+from bot.keyboards.world import BTN_PRESETS, add_miniapp_button
 from models import CharacterBuffPreset
 
 

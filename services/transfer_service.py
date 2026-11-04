@@ -140,7 +140,7 @@ async def _craft_offers(db: AsyncSession, character_id: int, name: str) -> list[
         if spare:
             return [Offer("ring", resists.RING_ID, f"💍 {resists.RING_TITLE}", spare)]
     # Руны (2026-10-31): «/передать руна тугой кошель 5» или просто название.
-    rune_name = name[5:] if name.startswith("руна ") else name
+    rune_name = name.removeprefix("руна ")
     bag = await rune_service.bag(db, character_id)
     for r in rc.RUNES:
         if name_key(r.name) == rune_name and bag.get(r.id):

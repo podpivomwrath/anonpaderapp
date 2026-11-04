@@ -14,7 +14,7 @@ import hashlib
 import hmac
 import time
 from collections import OrderedDict
-from typing import Awaitable, Callable
+from collections.abc import Awaitable, Callable
 from urllib.parse import urlencode
 
 from aiohttp import web

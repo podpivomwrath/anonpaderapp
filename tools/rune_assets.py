@@ -13,7 +13,7 @@ from PIL import Image
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
-from game.economy import runes_config as rc  # noqa: E402
+from game.economy import runes_config as rc
 
 SRC = ROOT / "img"
 OUT = ROOT / "miniapp" / "src" / "assets" / "runes"

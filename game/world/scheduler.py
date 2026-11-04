@@ -6,7 +6,7 @@
 """
 
 from datetime import datetime, timedelta, timezone
-from typing import Awaitable, Callable
+from collections.abc import Awaitable, Callable
 
 from apscheduler.jobstores.base import JobLookupError
 from apscheduler.schedulers.asyncio import AsyncIOScheduler

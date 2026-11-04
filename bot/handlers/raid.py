@@ -192,7 +192,7 @@ async def cancel_ready(message: Message) -> None:
                 peer_id=peer, random_id=0, message=rt.LOBBY_DISSOLVED_TEXT,
                 keyboard=movement_keyboard(character.pos_x, character.pos_y, peer, has_mount=mounts.get(cid, False)),
             )
-        except Exception:  # noqa: BLE001 - закрыл личку; сбор уже распущен
+        except Exception:
             logger.warning("Raid lobby: не удалось сообщить о роспуске {}", peer)
     if snapshot is None:
         if dissolved:

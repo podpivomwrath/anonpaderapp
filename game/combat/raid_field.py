@@ -299,8 +299,7 @@ class SummonerStage:
         summoner = session.combatants[self.summoner_id]
         # Отравитель может дожать HP уже после фазы применения - пол там не
         # действует. Призыватель всё равно не умирает: он встаёт генералом.
-        if summoner.current_hp < summoner.hp_floor:
-            summoner.current_hp = summoner.hp_floor
+        summoner.current_hp = max(summoner.current_hp, summoner.hp_floor)
         if self.summoner_id in result.deaths:
             result.deaths.remove(self.summoner_id)
             death_line = f"☠ {summoner.name} погибает"

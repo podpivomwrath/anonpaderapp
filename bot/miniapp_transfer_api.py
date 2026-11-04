@@ -115,7 +115,7 @@ async def handle_post_transfer(request: web.Request) -> web.Response:
     if chat._bot_api is not None:
         try:
             await chat._bot_api.messages.send(peer_id=recipient_vk, random_id=0, message=note)
-        except Exception:  # noqa: BLE001 - получатель мог закрыть сообщения; передача уже состоялась
+        except Exception:
             logger.warning("Передача по нику: не удалось уведомить получателя {}", recipient_vk)
     return web.json_response({"done": f"📦 Передано игроку {recipient_name}: {what}."})
 

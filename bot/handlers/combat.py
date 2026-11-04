@@ -10,7 +10,7 @@ import time
 
 from loguru import logger
 
-from vkbottle import BaseStateGroup  # noqa: F401  (совместимость импортов)
+from vkbottle import BaseStateGroup
 from vkbottle.bot import BotLabeler, Message
 
 from bot import ash_handful_state, dailies_texts, editable_message, group_texts, raid_key_texts, short_log

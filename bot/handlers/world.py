@@ -1073,7 +1073,7 @@ async def send_plain_notice(peer_id: int, text: str) -> bool:
         return False
     try:
         await _bot_api.messages.send(peer_id=peer_id, random_id=0, message=text)
-    except Exception:  # noqa: BLE001 - уведомление вторично, действие уже совершено
+    except Exception:
         logger.warning("Не удалось отправить уведомление игроку {}", peer_id)
         return False
     return True
@@ -1113,7 +1113,7 @@ async def broadcast_service_notice(text: str) -> int:
                     peer_id=peer_id, message=text, random_id=0, keyboard=keyboard,
                 )
                 sent += 1
-            except Exception:  # noqa: BLE001 - один недоступный не рвёт рассылку
+            except Exception:
                 logger.warning("Не удалось доставить служебное сообщение игроку {}", peer_id)
             # VK ограничивает скорость отправки сообществу; пауза дешевле, чем
             # ловить 429 на середине рассылки.
@@ -1179,7 +1179,7 @@ def _in_mine_digging(character) -> bool:
 # Шаг 1 нарезки (2026-10-21): /застрял и force_unstick живут в
 # bot/handlers/stuck.py. Старые адреса (world_handlers.force_unstick в
 # админке и тестах) работают через эту ссылку.
-from bot.handlers.stuck import (  # noqa: F401
+from bot.handlers.stuck import (
     STUCK_BATTLE_LINE,
     STUCK_LINE,
     force_unstick,
@@ -1190,7 +1190,7 @@ from bot.handlers.stuck import (  # noqa: F401
 # Шаг 4 нарезки (2026-10-21): исследование живёт в bot/handlers/explore.py.
 # Старые адреса (world_handlers.handle_explore_done в main, ready_hint_peers
 # в группе и отдыхе, тесты) работают через эту ссылку.
-from bot.handlers.explore import (  # noqa: E402,F401
+from bot.handlers.explore import (
     ASH_BURNED_LINE,
     QUEUE_READY_HINT,
     SONG_READ_SCENE,

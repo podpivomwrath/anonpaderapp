@@ -20,7 +20,7 @@ from loguru import logger
 
 logger.remove()
 
-import game.classes  # noqa: F401  - регистрация подклассов
+import game.classes
 from game.classes.base import REGISTRY
 from game.combat import balance_config as bc
 from game.combat.base_skills import skills_for_class

@@ -2,7 +2,7 @@
 определения и боевые умения в реестрах."""
 
 from game.classes.base import REGISTRY, Role, SubclassDef
-from game.classes import (  # noqa: F401  — регистрация side-effect'ом
+from game.classes import (
     blood_knight,
     dark_mystic,
     elementalist,

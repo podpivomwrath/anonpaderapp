@@ -134,7 +134,7 @@ async def _notify_orderers(notes: list[tuple[int, str]]) -> None:
         if peers.get(cid):
             try:
                 await pvp._bot_api.messages.send(peer_id=peers[cid], message=text, random_id=0)
-            except Exception:  # noqa: BLE001 - заказчик закрыл диалог с ботом
+            except Exception:
                 pass
 
 

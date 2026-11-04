@@ -164,7 +164,7 @@ async def clear_redis_combat_keys(redis_url: str | None) -> int:
         async for key in redis.scan_iter(match="combat:session:*:actions"):
             await redis.delete(key)
             cleared += 1
-    except Exception:  # noqa: BLE001 - Redis не критичен для сброса
+    except Exception:
         logger.warning("Не удалось очистить Redis-ключи боя при сбросе состояний")
     finally:
         await redis.aclose()

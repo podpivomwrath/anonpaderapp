@@ -252,7 +252,7 @@ async def _warn_bystanders(character: Character, rift, members: list[Character])
     for peer in peers.values():
         try:
             await _bot_api.messages.send(peer_id=peer, message=text, random_id=0)
-        except Exception:  # noqa: BLE001 - закрыл диалог с ботом
+        except Exception:
             pass
 
 

@@ -1442,7 +1442,7 @@ async def _tell_others(battle, cid: int, text: str) -> None:
 
 # Нарезка (2026-10-22): этот блок живёт в bot.handlers.pvp_results.
 # Старые адреса (pvp.X в других модулях и тестах) работают через ссылку.
-from bot.handlers.pvp_results import (  # noqa: E402,F401
+from bot.handlers.pvp_results import (
     _finish_duel,
     _notify_orderers,
     _render_mass,
@@ -1454,7 +1454,7 @@ from bot.handlers.pvp_results import (  # noqa: E402,F401
 
 # Нарезка (2026-10-22): этот блок живёт в bot.handlers.pvp_scene.
 # Старые адреса (pvp.X в других модулях и тестах) работают через ссылку.
-from bot.handlers.pvp_scene import (  # noqa: E402,F401
+from bot.handlers.pvp_scene import (
     GROUPMATE_NO_PVP_TEXT,
     GUILDMATE_IN_GROUP_TEXT,
     GUILDMATE_NO_PVP_TEXT,

@@ -55,7 +55,7 @@ def _frames():
 
         parent = greenlet.getcurrent().parent
         frame = parent.gr_frame if parent is not None else None
-    except Exception:  # noqa: BLE001
+    except Exception:
         frame = None
     while frame is not None:
         yield frame

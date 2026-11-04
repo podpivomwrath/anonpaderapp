@@ -74,9 +74,7 @@ def _fight(players, stage, rng) -> dict:
                 continue
             target = boss if boss.alive else pick_target(p, session)
             action = choose_action(p, session, target)
-            if action.type in (ActionType.ATTACK, ActionType.SKILL) and action.target_id is None:
-                action = action.model_copy(update={"target_id": target.id})
-            elif action.type == ActionType.ATTACK:
+            if action.type in (ActionType.ATTACK, ActionType.SKILL) and action.target_id is None or action.type == ActionType.ATTACK:
                 action = action.model_copy(update={"target_id": target.id})
             actions[p.id] = action
         result = resolve_tick(session, actions, rng)

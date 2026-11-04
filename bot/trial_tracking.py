@@ -71,7 +71,7 @@ async def settle(session_id: int, won: bool) -> dict[int, list[str]]:
                 if buffs:
                     opened[cid] = buffs
             await db.commit()
-    except Exception:  # noqa: BLE001 - испытания не должны ронять бой или переход этапа
+    except Exception:
         logger.exception("Испытания: отчёт боя {} не записан", session_id)
         return {}
     return opened

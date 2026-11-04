@@ -27,7 +27,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-import text_slop  # noqa: E402
+import text_slop
 
 #: Пауза между сообщениями: лимит VK на рассылку от сообщества.
 PAUSE_SECONDS = 0.1

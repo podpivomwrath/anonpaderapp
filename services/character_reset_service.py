@@ -22,7 +22,7 @@ from dataclasses import dataclass, field
 from sqlalchemy import delete, func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
-import models  # noqa: F401  (регистрирует все таблицы в Base.metadata)
+import models
 from game.economy import guild_config as gc
 from models import Base, Character, GuildMember, Inventory, Item, User, Wallet
 from services import admin_service

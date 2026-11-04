@@ -121,7 +121,7 @@ async def toggle(api, peer_id: int) -> bool:
             message=last.full if last.expanded else last.short,
             keyboard=with_toggle(last.keyboard, expanded=last.expanded),
         )
-    except Exception:  # noqa: BLE001 - сообщение старше суток или удалено
+    except Exception:
         logger.warning("Короткий лог: не удалось править сообщение {} у {}", last.message_id, peer_id)
         last.expanded = not last.expanded
         return False

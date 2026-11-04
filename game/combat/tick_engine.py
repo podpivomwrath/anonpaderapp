@@ -15,7 +15,8 @@ import json
 import random
 from uuid import uuid4
 from datetime import datetime, timedelta, timezone
-from typing import Awaitable, Callable, Protocol
+from typing import Protocol
+from collections.abc import Awaitable, Callable
 
 from apscheduler.jobstores.base import JobLookupError
 from apscheduler.schedulers.asyncio import AsyncIOScheduler

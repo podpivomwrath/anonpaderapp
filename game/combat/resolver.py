@@ -15,7 +15,7 @@
 import random
 from dataclasses import dataclass, field
 
-import game.classes  # noqa: F401  — регистрация умений подклассов
+import game.classes
 import game.combat.base_skills as base_skills  # регистрация базовых навыков + метаданные
 import game.combat.subclass_skills as subclass_skills  # регистрация навыков подклассов + метаданные
 from game.combat import balance_config as bc

@@ -29,7 +29,7 @@ async def _send(peer_id: int, text: str) -> None:
         return
     try:
         await house._bot_api.messages.send(peer_id=peer_id, message=text, random_id=0)
-    except Exception:  # noqa: BLE001 - бафф уже получен, строка в чат - только отчёт
+    except Exception:
         logger.warning("Бафф: не удалось написать в чат {}", peer_id)
 
 

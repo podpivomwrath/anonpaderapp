@@ -20,7 +20,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from loguru import logger  # noqa: E402
+from loguru import logger
 
 logger.remove()
 
@@ -66,7 +66,7 @@ async def main() -> int:
             body = json.loads(response.body) if response.body else {}
             if response.status >= 500 or (response.status >= 400 and name == "персонаж"):
                 failed.append(f"{name}: HTTP {response.status} {str(body)[:120]}")
-        except Exception:  # noqa: BLE001
+        except Exception:
             failed.append(f"{name}: {traceback.format_exc(limit=3)}")
 
     async with factory() as db:
@@ -77,7 +77,7 @@ async def main() -> int:
             else:
                 await world_handlers._current_keyboard(db, character, SMOKE_VK_ID, datetime.now(timezone.utc))
                 await admin_service.player_card(db, character.id)
-        except Exception:  # noqa: BLE001
+        except Exception:
             failed.append(f"клавиатура/карточка: {traceback.format_exc(limit=3)}")
         finally:
             await db.rollback()

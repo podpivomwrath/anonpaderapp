@@ -410,7 +410,7 @@ async def _settle_trials(session_id: int, battle: raid_combat.RaidBattle, won: b
             await raid_combat._bot_api.messages.send(
                 peer_id=p.peer_id, message=trial_tracking.opened_text(buffs), random_id=0,
             )
-        except Exception:  # noqa: BLE001 - баффы уже открыты, весть вторична
+        except Exception:
             pass
 
 

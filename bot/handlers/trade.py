@@ -89,7 +89,7 @@ async def order_job() -> None:
     for peer_id in peers.values():
         try:
             await _bot_api.messages.send(peer_id=peer_id, message=text, random_id=0)
-        except Exception:  # noqa: BLE001 - один недоступный не рвёт рассылку
+        except Exception:
             # Игрок запретил сообщения сообществу - не ошибка бота, без
             # трассировки (как у мирового босса): иначе засоряет счёт ошибок.
             logger.warning("Торговля: весть о заказе не доставлена {}", peer_id)

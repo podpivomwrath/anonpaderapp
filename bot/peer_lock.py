@@ -52,7 +52,7 @@ def install(view) -> None:
             logger.info("Очередь игрока {} занята дольше {} сек - нажатие отклонено", peer, WAIT_SECONDS)
             try:
                 await ctx_api.messages.send(peer_id=peer, message=BUSY_TEXT, random_id=0)
-            except Exception:  # noqa: BLE001 - ответ «подожди» не должен ронять ничего
+            except Exception:
                 logger.exception("Не удалось ответить «подожди» {}", peer)
             return None
         try:

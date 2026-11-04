@@ -22,8 +22,8 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 sys.stdout.reconfigure(encoding="utf-8")
 
-from tools.sim_balance import REGIONS, make_fighter, run_tick_fight  # noqa: E402
-from game.world import encounters  # noqa: E402
+from tools.sim_balance import REGIONS, make_fighter, run_tick_fight
+from game.world import encounters
 
 LEVELS = (3, 6, 10, 14, 17, 21, 25, 29)
 CLASSES = ("warrior", "rogue", "mage")

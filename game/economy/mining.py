@@ -12,7 +12,7 @@ import random
 from game.content_loader import MineDef, OreDef, load_mines, load_ore_defs
 from game.economy import mining_config as mc
 from game.economy import prerelease_config
-from game.economy.fishing import ring_tier  # noqa: F401 - общее правило колец
+from game.economy.fishing import ring_tier
 
 _ore_defs: dict[str, OreDef] | None = None
 _mines_by_coords: dict[tuple[int, int], MineDef] | None = None

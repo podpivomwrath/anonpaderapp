@@ -80,7 +80,7 @@ async def notify_target(target_id: int, kills: int) -> None:
                 "Вне боя можно откупиться на «Доске» за двойную цену оставшихся убийств - тогда узнаешь, кто заказал."
             ),
         )
-    except Exception:  # noqa: BLE001 - цель закрыла диалог с ботом
+    except Exception:
         logger.warning("Заказы: не удалось известить цель {}", target_id)
 
 
@@ -104,7 +104,7 @@ async def notify_bought(bought: contract_service.Buyout, target_name: str) -> No
             continue
         try:
             await _bot_api.messages.send(peer_id=peer, random_id=0, message=text)
-        except Exception:  # noqa: BLE001 - закрыл диалог с ботом
+        except Exception:
             pass
 
 
@@ -128,5 +128,5 @@ async def expire_job() -> None:
                 peer_id=peer, random_id=0,
                 message="📜 Заказов на тебя больше нет - мирные клетки и АФК снова защищают.",
             )
-        except Exception:  # noqa: BLE001
+        except Exception:
             pass

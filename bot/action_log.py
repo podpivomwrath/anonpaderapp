@@ -40,7 +40,7 @@ async def record(message, accepted: bool) -> None:
         await _redis.lpush(key, json.dumps(entry(message, accepted), ensure_ascii=False))
         await _redis.ltrim(key, 0, KEEP - 1)
         await _redis.expire(key, TTL_SECONDS)
-    except Exception:  # noqa: BLE001 - журнал не должен ронять обработку сообщения
+    except Exception:
         logger.exception("Журнал действий: не записалось {}", message.peer_id)
 
 
@@ -49,6 +49,6 @@ async def recent(peer_id: int) -> list[dict]:
         return []
     try:
         rows = await _redis.lrange(_key(peer_id), 0, KEEP - 1)
-    except Exception:  # noqa: BLE001
+    except Exception:
         return []
     return [json.loads(r) for r in rows]

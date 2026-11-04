@@ -23,8 +23,8 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 sys.stdout.reconfigure(encoding="utf-8")
 
-from tools import sim_balance as sb  # noqa: E402
-from game.classes.base import REGISTRY  # noqa: E402
+from tools import sim_balance as sb
+from game.classes.base import REGISTRY
 
 LEVEL = 50
 DUEL = {"dd": (0.35, 0.70), "support": (0.35, 0.70), "tank": (0.05, 0.35), "healer": (0.05, 0.35)}

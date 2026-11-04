@@ -24,7 +24,7 @@ async def _send(notices) -> None:
             continue
         try:
             await house._bot_api.messages.send(peer_id=peer, message=n.text, random_id=0)
-        except Exception:  # noqa: BLE001 - сделка уже прошла, строка в чат - только отчёт
+        except Exception:
             logger.warning("Рынок: не удалось написать {}", peer)
 
 

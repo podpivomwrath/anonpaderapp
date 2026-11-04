@@ -98,7 +98,7 @@ async def announce(boss_pk: int) -> None:
                 peer_id=peer_id, message=text, random_id=0, attachment=attachment,
             )
             delivered += 1
-        except Exception:  # noqa: BLE001 - один недоступный не рвёт рассылку
+        except Exception:
             # Рассылка идёт и тем, кто давно не заходил: кто-то запретил
             # сообщения сообществу. Это не ошибка бота - без трассировки.
             logger.warning("Мировой босс: объявление не доставлено {}", peer_id)

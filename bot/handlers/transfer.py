@@ -138,7 +138,7 @@ def recipient_name_visible(sender_guild: int | None, recipient_guild: int | None
     return sender_guild is not None and sender_guild == recipient_guild and peer_id == from_id
 
 
-def _whom(pending: "Pending") -> str:
+def _whom(pending: Pending) -> str:
     return f"игроку {pending.recipient_name}" if pending.recipient_name else "игроку из пересланного сообщения"
 
 
@@ -391,7 +391,7 @@ async def transfer_confirm(message: Message) -> None:
             message=(f"📦 {sender_name} передаёт тебе: {what}.{tax_line}" if pending.reveal_sender
                      else f"📦 Тебе передали: {what}.{tax_line}"),
         )
-    except Exception:  # noqa: BLE001 - получатель мог запретить сообщения; передача уже состоялась
+    except Exception:
         logger.warning("Передача: не удалось уведомить получателя {}", pending.recipient_peer)
 
 
@@ -460,7 +460,7 @@ async def _confirm_batch(message: Message, pending: Pending) -> None:
             message=(f"📦 {sender_name} передаёт тебе:\n{what}" if pending.reveal_sender
                      else f"📦 Тебе передали:\n{what}"),
         )
-    except Exception:  # noqa: BLE001 - получатель мог запретить сообщения; передача уже состоялась
+    except Exception:
         logger.warning("Передача: не удалось уведомить получателя {}", pending.recipient_peer)
 
 

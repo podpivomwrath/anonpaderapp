@@ -20,7 +20,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-CYR = re.compile(r"[а-яё]", re.I)
+CYR = re.compile(r"[а-яё]", re.IGNORECASE)
 
 
 @dataclass(frozen=True)
@@ -32,7 +32,7 @@ class Rule:
 
 
 def _r(expr: str) -> re.Pattern:
-    return re.compile(expr, re.I)
+    return re.compile(expr, re.IGNORECASE)
 
 
 RULES = (
@@ -51,7 +51,7 @@ RULES = (
 )
 
 #: Короткая «ударная» фраза в конце абзаца: 1-3 слова и точка.
-PUNCH = re.compile(r"(?:^|[.!?]\s+)((?:[А-ЯЁ][^\s.!?]*)(?:\s+[^\s.!?]+){0,2})\.\s*$", re.M)
+PUNCH = re.compile(r"(?:^|[.!?]\s+)((?:[А-ЯЁ][^\s.!?]*)(?:\s+[^\s.!?]+){0,2})\.\s*$", re.MULTILINE)
 
 
 def _literals(path: Path) -> list[tuple[int, str]]:

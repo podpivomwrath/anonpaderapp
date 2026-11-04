@@ -110,7 +110,7 @@ def sickle_cuts(sickle_tier: int, herb_tier: int) -> bool:
 def effect_line(tool_id: str, tier: int, pages: int = 0) -> str:
     """Что даёт инструмент - строка для мини-аппа. pages - страницы альманаха:
     прибавка к 10 подсказкам видна в скобках (2026-10-29, владелец)."""
-    pct = lambda x: f"{round(x * 100)}%"  # noqa: E731
+    pct = lambda x: f"{round(x * 100)}%"
     # Формулировки переписаны 2026-10-23 (владелец: «очень непонятно»).
     if tool_id == "sickle":
         return f"Сам срезает траву до {tier} тира на клетке, куда ты заходишь"

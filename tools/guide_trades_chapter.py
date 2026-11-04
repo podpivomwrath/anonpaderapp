@@ -19,13 +19,13 @@ from loguru import logger
 
 logger.remove()
 
-from bot.onboarding_texts import REGION_TITLES  # noqa: E402
-from game.content_loader import load_fish_defs, load_lakes, load_mines  # noqa: E402
-from game.economy import fishing, mining  # noqa: E402
-from game.economy import fishing_config as fc  # noqa: E402
-from game.economy import mining_config as mc  # noqa: E402
-from game.economy import trade_config as tc  # noqa: E402
-from game.world import world_config as wc  # noqa: E402
+from bot.onboarding_texts import REGION_TITLES
+from game.content_loader import load_fish_defs, load_lakes, load_mines
+from game.economy import fishing, mining
+from game.economy import fishing_config as fc
+from game.economy import mining_config as mc
+from game.economy import trade_config as tc
+from game.world import world_config as wc
 
 E = html.escape
 RING = {1: "I", 2: "II", 3: "III", 4: "IV", 5: "V"}

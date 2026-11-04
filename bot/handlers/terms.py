@@ -50,7 +50,7 @@ async def _docs_for(peer_id: int) -> str | None:
             continue
         try:
             parts.append(await uploader.upload(str(path), peer_id=peer_id, title=f"{title}.pdf"))
-        except Exception:  # noqa: BLE001 - без файлов окно всё равно работает: ссылки в тексте
+        except Exception:
             logger.warning("Соглашение: не загрузился {} для {}", doc_id, peer_id)
     joined = ",".join(parts)
     # Неполный набор не запоминаем - в следующий показ окна догрузим.
@@ -73,7 +73,7 @@ async def _send_docs(peer_id: int) -> None:
             )
         else:
             _docs_started.discard(peer_id)
-    except Exception:  # noqa: BLE001 - фоновая отправка, окно уже у игрока
+    except Exception:
         _docs_started.discard(peer_id)
         logger.exception("Соглашение: не отправились документы {}", peer_id)
 

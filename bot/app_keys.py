@@ -1,7 +1,7 @@
 """Общие aiohttp AppKey — вынесены отдельно, чтобы webhook.py и miniapp-модули
 могли ссылаться на них без цикличных импортов друг друга."""
 
-from typing import Awaitable, Callable
+from collections.abc import Awaitable, Callable
 
 from aiohttp import web
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker

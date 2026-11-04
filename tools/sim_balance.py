@@ -42,7 +42,7 @@ from loguru import logger
 
 logger.remove()
 
-import game.classes  # noqa: F401  - регистрация подклассов
+import game.classes
 from game.classes.base import REGISTRY
 from game.combat import balance_config as bc
 from game.combat.duel_engine import DuelEngine
@@ -631,7 +631,7 @@ def scorecard(n: int, rng: random.Random, level: int = 50) -> None:
         print(f"{REGISTRY[sub].title:18} {ROLE_RU[REGISTRY[sub].natural_role.value]:8} "
               f"{easy['winrate']:>7.0%} {solo['winrate']:>7.0%} {duel[(sub, 'x')]:>7.0%} "
               f"{d_score:>+9.0%} {pvp_team:>9.0%} {shares.get(sub, 0):>11.0%}")
-    print("")
+    print()
     print(f"Зеркальный масс PvP (опора): {mirror:.0%}")
 
 
@@ -687,7 +687,7 @@ def main() -> None:
     base_win, _, base_score = team_winrate_pve([FILLER] * 3, level, mixed, 6, n, rng)
     print(f"Опорная команда из трёх ДД: винрейт {base_win:.0%}, КПД {base_score:.0%}")
     print(f"Строка «{REGISTRY[FILLER].title}» - замена ДД на такого же ДД, то есть шум.")
-    print("")
+    print()
     for sub in subs:
         d_win, d_score = group_contribution(sub, level, mixed, 6, n, rng)
         print(f"   {REGISTRY[sub].title:18} {ROLE_RU[REGISTRY[sub].natural_role.value]:8} "
@@ -698,7 +698,7 @@ def main() -> None:
     mirror = mass_pvp([FILLER] * 3, [FILLER] * 3, level, mixed, n, rng)
     print(f"Зеркальный бой ДД против таких же ДД: {mirror:.0%} побед "
           "(остальное - ничьи по лимиту ходов). Это опора.")
-    print("")
+    print()
     for sub in subs:
         winrate, delta = pvp_contribution(sub, level, mixed, n, rng)
         print(f"   {REGISTRY[sub].title:18} {ROLE_RU[REGISTRY[sub].natural_role.value]:8} "
@@ -709,7 +709,7 @@ def main() -> None:
           "он выигрывает или проигрывает при любом раскладе.")
     for sub in subs:
         diff = pick_difficulty(sub, level, rng, max(n // 3, 12))
-        print("")
+        print()
         print(f"{REGISTRY[sub].title} (сложность «{diff}»)")
         rows = []
         for b in buffs_of(sub):

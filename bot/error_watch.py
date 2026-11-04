@@ -58,5 +58,5 @@ async def alert_job() -> None:
     lines += [f"· {row['count']}× {row['text']}" for row in s["top"][:3]]
     try:
         await world_handlers.send_plain_notice(admin, "\n".join(lines))
-    except Exception:  # noqa: BLE001
+    except Exception:
         logger.warning("Сводка ошибок: весть администратору не ушла")

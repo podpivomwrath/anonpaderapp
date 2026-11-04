@@ -31,4 +31,4 @@ class User(Base):
     characters: Mapped[list["Character"]] = relationship(back_populates="user")
 
 
-from models.character import Character  # noqa: E402  (разрешение forward-ссылки)
+from models.character import Character
