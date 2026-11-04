@@ -13,8 +13,8 @@ after_tick(session, result, rng) -> StageTick, reward_ids.
 import random
 
 from game.combat import balance_config as bc
-from game.combat import formulas, shared_rules
-from game.combat.raid_field import StageTick, _kill, _players, _strike
+from game.combat import formulas
+from game.combat.raid_field import StageTick, _kill, _players, _strike, stage_hurt
 from game.combat.resolver import TickResult
 from game.combat.session import CombatantState, CombatSessionState, build_combatant
 from game.economy import rift_config as rc
@@ -150,15 +150,10 @@ class MatriarchStage(_BossStage):
                 for player in _players(session):
                     before = player.current_hp
                     raw = max(1, round(player.max_hp * rc.SHARD_BLAST))
-                    # Щиты (Оберег, Второе сердце, свиток) гасят взрыв, как
-                    # любой удар: раньше он бил мимо них (2026-10-17).
-                    blast = shared_rules.absorb_by_shields(player, raw, [])
-                    player.current_hp -= blast
-                    if player.current_hp <= 0:
-                        player.current_hp = 0
-                        out.deaths.append(player.id)
-                    else:
-                        shared_rules.rune_guard(player, out.lines)  # «Запас дыхания» (2026-11-03)
+                    # Через общий урон механик (2026-11-05, аудит): щиты гасят
+                    # взрыв, а «Последний вздох» и руны спасают от него, как от
+                    # любого удара - раньше взрыв убивал мимо них.
+                    blast = stage_hurt(player, raw, out)
                     # Кому сколько: раньше строка была без чисел, и погибший
                     # от взрыва не понимал, от чего умер (2026-10-13).
                     shielded = f", щит поглотил {raw - blast}" if raw > blast else ""
