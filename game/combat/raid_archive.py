@@ -10,7 +10,7 @@
   сильнейший удар по себе и бьёт им случайного игрока. Работает всегда,
   независимо от каталога.
 - Ластик: за ход берёт ластик; следующим ходом стирает с группы щиты,
-  усиления и эффекты эликсиров.
+  усиления и эффекты эликсиров, а с себя - яды, горение и прочие дебаффы.
 - Последняя глава: ниже четверти HP каждому каждый ход выпадает страница -
   сила, слабость, щит или немота (все навыки на ход в откате).
 
@@ -43,6 +43,11 @@ _ERASABLE = {
     EffectKind.BLOOD_REFLECT, EffectKind.FLAT_DAMAGE_BONUS, EffectKind.ELEMENTAL_FLOW,
     EffectKind.ASHEN_FEVER,
 }
+#: Что Ластик стирает с самого Архивариуса (2026-11-04, владелец): дебаффы
+#: игроков - яды и горение, уязвимость, ослабление, метки, иней.
+_SELF_CLEANSE = {
+    EffectKind.DOT, EffectKind.VULNERABILITY, EffectKind.WEAKEN, EffectKind.MARK, EffectKind.CHILLED,
+}
 
 PAGES = ("power", "weak", "shield", "silence")
 _PAGE_WORD = {"power": "сила", "weak": "слабость", "shield": "щит", "silence": "немота"}
@@ -63,7 +68,7 @@ class ArchivistAI:
         #: Ластик поднят - стираем в начале своего действия, ДО удара
         #: (2026-10-18, баг-репорт: он бил в щит, а стирал уже после).
         self.erase_now = False
-        self.erased: int | None = None
+        self.erased: tuple[int, int] | None = None
 
     def __call__(self, boss: CombatantState, session: CombatSessionState, rng: random.Random) -> list[PendingHit]:
         self.turn += 1
@@ -144,7 +149,7 @@ class ArchiveStage:
         elif self.ticks % ac.ERASER_EVERY == ac.ERASER_OFFSET:
             self.ai.erase_now = True
             out.lines.append("⚠️ Архивариус берёт ластик.")
-            self._hint("eraser", "В следующий ход он первым делом, до удара, сотрёт с вас щиты и усиления.", out)
+            self._hint("eraser", "В следующий ход он первым делом, до удара, сотрёт с вас щиты и усиления, а с себя - яды и проклятия.", out)
 
         if boss.current_hp <= boss.max_hp * ac.LAST_CHAPTER_HP:
             self._last_chapter(session, boss, rng, out)
@@ -234,11 +239,14 @@ class ArchiveStage:
         self._erase_line(_erase_effects(session), out)
 
     @staticmethod
-    def _erase_line(erased: int, out: StageTick) -> None:
-        out.lines.append(
-            f"🧽 Ластик проходит по вам: стёрто усилений - {erased}." if erased
-            else "🧽 Ластик проходит впустую - стирать было нечего."
-        )
+    def _erase_line(erased: tuple[int, int], out: StageTick) -> None:
+        group, own = erased
+        if group:
+            out.lines.append(f"🧽 Ластик проходит по вам: стёрто усилений - {group}.")
+        if own:
+            out.lines.append(f"🧽 Тем же ластиком он стирает с себя яды и проклятия - {own}.")
+        if not group and not own:
+            out.lines.append("🧽 Ластик проходит впустую - стирать было нечего.")
 
     # --- Последняя глава ---
 
@@ -271,13 +279,23 @@ def _dot_skill_names() -> set[str]:
 _DOT_SKILL_NAMES = _dot_skill_names()
 
 
-def _erase_effects(session) -> int:
+def _erase_effects(session) -> tuple[int, int]:
+    """(сколько стёрто с группы, сколько дебаффов игроков снято с Архивариуса)."""
     erased = 0
     for player in _players(session):
         before = len(player.effects)
         player.effects = [e for e in player.effects if e.kind not in _ERASABLE]
         erased += before - len(player.effects)
-    return erased
+    player_ids = {c.id for c in session.combatants.values() if c.kind == "character"}  # и павших
+    own = 0
+    for boss in session.combatants.values():
+        if boss.side != 1 or not boss.alive:
+            continue
+        before = len(boss.effects)
+        boss.effects = [e for e in boss.effects
+                        if not (e.kind in _SELF_CLEANSE and e.source_id in player_ids)]
+        own += before - len(boss.effects)
+    return erased, own
 
 
 def _skills_of(player: CombatantState) -> list[str]:

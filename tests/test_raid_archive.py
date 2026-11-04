@@ -330,6 +330,21 @@ def test_eraser_strips_buffs_and_shields() -> None:
     assert EffectKind.WEAKEN in kinds  # ослабления он не трогает
 
 
+def test_eraser_also_cleanses_the_boss() -> None:
+    """2026-11-04, владелец: Ластик снимает с Архивариуса яды и дебаффы игроков,
+    свои эффекты босса остаются."""
+    state, stage, boss = _fight()
+    boss.apply_effect(EffectKind.DOT, 12, 4, 1)
+    boss.apply_effect(EffectKind.VULNERABILITY, 0.3, 3, 2)
+    boss.apply_effect(EffectKind.DAMAGE_BUFF, 0.2, 3, boss.id)
+    stage.eraser_up = True
+    out = stage.after_tick(state, _tick(state, {}), random.Random(1))
+    kinds = {e.kind for e in boss.effects}
+    assert EffectKind.DOT not in kinds and EffectKind.VULNERABILITY not in kinds
+    assert EffectKind.DAMAGE_BUFF in kinds
+    assert any("стирает с себя" in line for line in out.lines)
+
+
 def test_eraser_wipes_shield_before_the_boss_hits() -> None:
     """2026-10-18, баг-репорт: Архивариус бил в щит и только потом стирал его."""
     state, stage, boss = _fight(players=1)
