@@ -180,7 +180,7 @@ def offensive_skill(skill_id: str) -> Callable[[SkillHandler], SkillHandler]:
     return wrap
 
 
-# --- Расчёт удара (общий для tick_engine и duel_engine) ---
+# --- Расчёт удара ---
 
 
 def outgoing_multiplier(actor: CombatantState, target: CombatantState) -> float:

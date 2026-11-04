@@ -15,7 +15,7 @@
   * PvP 1x1    - круговой турнир на настоящем дуэльном движке.
   * МАСС PvP   - бои 3x3 на тиковом движке, тот же вклад, что и в масс PvE.
 
-Бои идут через реальные движки (resolve_tick и DuelEngine), никаких
+Бои идут через реальный движок (resolve_tick, дуэль - как в игре), никаких
 упрощённых формул: если движок и контент разойдутся, симулятор это покажет.
 
 Ограничение, которое важно помнить при чтении цифр: качество результата упирается
@@ -27,7 +27,6 @@
 from __future__ import annotations
 
 import argparse
-import asyncio
 import itertools
 import random
 import statistics
@@ -45,7 +44,6 @@ logger.remove()
 import game.classes
 from game.classes.base import REGISTRY
 from game.combat import balance_config as bc
-from game.combat.duel_engine import DuelEngine
 from game.combat.resolver import resolve_tick
 from game.combat.session import (
     ActionType,
@@ -351,27 +349,25 @@ def run_tick_fight(
     return stats
 
 
-#: Один цикл событий на весь прогон. asyncio.run() на КАЖДЫЙ ход дуэли создаёт
-#: и рвёт цикл заново - на десятках тысяч ходов это дороже самого боя.
-_LOOP = asyncio.new_event_loop()
-
-
 def run_duel(a: CombatantState, b: CombatantState, rng: random.Random) -> int | None:
-    """Настоящий дуэльный движок. Возвращает id победителя либо None (ничья)."""
-    engine = DuelEngine(rng=rng, max_turns=bc.PVP_MAX_TURNS)  # как в игре: ходов каждому
-    engine.start_duel(1, a, b)
-    state = engine.duels[1]
-    session_view = state.as_session_state()
-    while not state.finished:
-        actor = state.combatants[state.current_actor_id]
-        target = state.opponent_of(actor.id)
-        if not actor.alive or not target.alive:
-            break
-        action = choose_action(actor, session_view, target)
-        result = _LOOP.run_until_complete(engine._resolve_turn(state, action))
+    """Дуэль как в игре (с 2026-10-29): тиковый движок в режиме PvP, лимит
+    ходов bc.PVP_MAX_TURNS и затухание лечения и щитов к концу боя. Возвращает
+    id победителя либо None (ничья)."""
+    from game.combat import shared_rules
+
+    session = CombatSessionState(session_id=1, mode=CombatMode.PVP_GROUP)
+    session.add(a)
+    session.add(b)
+    for _ in range(bc.PVP_MAX_TURNS):
+        session.tick_number += 1
+        shared_rules.set_recovery(session, bc.PVP_MAX_TURNS)
+        actions = {c.id: choose_action(c, session, b if c is a else a) for c in (a, b) if c.alive}
+        result = resolve_tick(session, actions, rng)
         if result.finished:
-            return None if result.draw else result.winner_id
-    return None
+            if result.draw:
+                return None
+            return a.id if result.winner_side == a.side else b.id
+    return None  # лимит ходов - ничья
 
 
 # ----------------------------------------------------------------------------

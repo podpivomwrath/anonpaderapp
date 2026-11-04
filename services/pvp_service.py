@@ -1,6 +1,6 @@
 """Открытое PvP на карте (патч 22): кто на клетке, награды/штрафы, статистика,
 лог боёв, топ. Живое состояние самих боёв (дуэли/массовые) — в памяти
-bot/handlers/pvp.py + game/combat/duel_engine.py + game/combat/tick_engine.py;
+bot/handlers/pvp.py + game/combat/tick_engine.py;
 здесь — только то, что трогает БД (персонажи, лог, рейтинг).
 """
 

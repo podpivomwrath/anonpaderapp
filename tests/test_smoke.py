@@ -5,7 +5,7 @@ def test_imports() -> None:
     import main  # noqa: F401
     import models  # noqa: F401
     from bot import webhook  # noqa: F401
-    from game.combat import duel_engine, formulas, resolver, session, tick_engine  # noqa: F401
+    from game.combat import formulas, resolver, session, tick_engine  # noqa: F401
     from game.economy import exchange  # noqa: F401
 
 

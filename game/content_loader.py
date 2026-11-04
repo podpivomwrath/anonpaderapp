@@ -1,6 +1,7 @@
 """Загрузка и Pydantic-валидация игрового контента из content/*.json."""
 
 import json
+from functools import lru_cache
 from pathlib import Path
 
 from pydantic import BaseModel, Field, model_validator
@@ -736,6 +737,9 @@ def load_npc_texts(npc_id: str, content_dir: Path = CONTENT_DIR) -> dict:
         return json.load(f)
 
 
+#: Контент на диске во время работы не меняется: читаем один раз (2026-11-05,
+#: аудит - resolve_active_modifiers перечитывал три JSON на каждый расчёт боя).
+@lru_cache(maxsize=4)
 def load_content(content_dir: Path = CONTENT_DIR) -> GameContent:
     mobs = [MobDef(**raw) for raw in _load_json(content_dir / "mobs.json")]
     items = [ItemDef(**raw) for raw in _load_json(content_dir / "items.json")]

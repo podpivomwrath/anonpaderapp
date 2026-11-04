@@ -94,7 +94,7 @@ def test_no_developer_notes_reach_the_player() -> None:
     """
     import ast
 
-    for name in ("game/combat/resolver.py", "game/combat/duel_engine.py"):
+    for name in ("game/combat/resolver.py",):
         tree = ast.parse((ROOT / name).read_text(encoding="utf-8"))
         literals = [
             node.value for node in ast.walk(tree)

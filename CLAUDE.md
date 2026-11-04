@@ -53,9 +53,9 @@ python tools/broadcast.py - [--hours 24] [--photo N] --send`. Скрипт са�
   золота и ресурсов - добавь новый ключ в `admin_service.WALLET_REASONS`, старый
   оставь для истории.
 - **Урон механики рейда** (не удар резолвера) - только `raid_field.stage_hurt`
-  (щиты, «Последний вздох», гибель); правило для обоих движков боя -
-  `game/combat/shared_rules.py`. Сверки: `tests/test_hp_writes.py`,
-  `tests/test_duel_parity.py`.
+  (щиты, «Последний вздох», гибель); общие правила боя -
+  `game/combat/shared_rules.py`. Движок боя один - тиковый (дуэль тоже
+  `PVP_GROUP`), второго не заводить. Сверка: `tests/test_hp_writes.py`.
 - **Что держится в памяти** - `bot/memory_state.py`: новое хранилище впиши туда
   с ответом «кто снимает» (сверка `tests/test_memory_state.py`).
 - **Ввод словами** (не кнопкой) - строка в `bot/button_gate.TYPED_INPUTS` и

@@ -8,7 +8,6 @@ from bot.keyboards.pvp import pvp_combat_keyboard
 from bot.keyboards.raid import raid_combat_keyboard
 from bot.keyboards.world import combat_keyboard
 from game.combat import balance_config as bc
-from game.combat.duel_engine import DuelEngine
 from game.combat.resolver import resolve_tick
 from game.combat.session import ActionType, CombatMode, CombatSessionState, DeclaredAction
 from tests.conftest import NoCritRng, combatant
@@ -48,27 +47,6 @@ def test_defend_deals_no_damage_and_wears_off() -> None:
     resolve_tick(state, {1: DEFEND}, NoCritRng())
     assert b.current_hp == b.max_hp
     assert a.defend_reduction == 0.0  # снялась после тика
-
-
-async def test_defend_protects_through_opponent_reply_in_duel() -> None:
-    engine = DuelEngine(rng=NoCritRng())
-    engine.start()
-    try:
-        a1, b1 = combatant(1, side=0), combatant(2, side=1)
-        engine.start_duel(10, a1, b1)
-        await engine.act(10, 1, ATTACK(2))
-        await engine.act(10, 2, ATTACK(1))
-        plain = a1.max_hp - a1.current_hp
-
-        a2, b2 = combatant(3, side=0), combatant(4, side=1)
-        engine.start_duel(20, a2, b2)
-        await engine.act(20, 3, DEFEND)
-        assert b2.current_hp == b2.max_hp
-        await engine.act(20, 4, ATTACK(3))
-        defended = a2.max_hp - a2.current_hp
-        assert 0 < defended < plain
-    finally:
-        engine.shutdown()
 
 
 def _buttons(keyboard_json: str) -> list[dict]:

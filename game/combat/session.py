@@ -1,6 +1,6 @@
 """Runtime-состояние боя (в памяти движка; БД хранит только персистентный снимок).
 
-CombatantState/CombatSessionState — рабочие объекты tick_engine и duel_engine.
+CombatantState/CombatSessionState — рабочие объекты tick_engine.
 """
 
 from dataclasses import dataclass, field
@@ -20,7 +20,7 @@ if TYPE_CHECKING:
 class CombatMode(StrEnum):
     PVE = "pve"              # соло/группа против мобов: без таймера, ждём всех живых игроков
     PVP_GROUP = "pvp_group"  # групповой PvP: таймер 1 мин + досрочный резолв
-    DUEL = "duel"            # 1×1, последовательные ходы (duel_engine)
+    DUEL = "duel"            # старый последовательный 1×1; с 2026-10-29 дуэль идёт как PVP_GROUP
 
 
 class ActionType(StrEnum):

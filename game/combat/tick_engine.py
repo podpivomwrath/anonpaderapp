@@ -135,7 +135,7 @@ class TickEngine:
 
     def start_session(self, state: CombatSessionState) -> None:
         if state.mode not in (CombatMode.PVE, CombatMode.PVP_GROUP):
-            raise ValueError("Тиковый движок обслуживает pve и pvp_group; дуэль - duel_engine")
+            raise ValueError("Тиковый движок обслуживает pve и pvp_group (дуэль - тоже pvp_group)")
         # «Тяжёлый взгляд» - сразу при создании боя (владелец, 2026-10-31): на
         # стартовом экране у моба уже срезанное здоровье.
         shared_rules.rune_gaze(state)
