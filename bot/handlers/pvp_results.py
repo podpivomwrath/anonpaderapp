@@ -252,7 +252,7 @@ async def on_mass_tick_resolved(session_id: int, tick: int, result: TickResult) 
         own = battle_log.class_line(session.combatants, cid) if session is not None else None
         if own:
             personal_text = f"{personal_text}\n{own}"
-        await short_log.send(pvp._bot_api, participant.peer_id, short_text, personal_text, keyboard, battle=battle)
+        await short_log.send(pvp._bot_api, participant.peer_id, short_text, personal_text, keyboard)
 
 
 async def on_mass_battle_finished(session_id: int, result: TickResult) -> None:

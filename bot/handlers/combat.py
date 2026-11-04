@@ -505,7 +505,6 @@ async def on_tick_resolved(session_id: int, tick: int, result: TickResult) -> No
     keyboard = empty_keyboard() if result.finished else _combat_kb(state, session_id)
     await short_log.send(
         _bot_api, session_id, battle_log.render_short(state, result), _render(state, result), keyboard,
-        battle=state,
     )
 
 

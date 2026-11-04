@@ -767,7 +767,7 @@ async def _broadcast_board(
         # Личное, а не общее: патч 71 по ошибке заменил здесь personal на text,
         # и с тех пор опыт, дроп, ключ, испытание и строка цели до игрока
         # не доходили вовсе.
-        await short_log.send(_bot_api, p.peer_id, short_personal, personal, keyboard, battle=battle)
+        await short_log.send(_bot_api, p.peer_id, short_personal, personal, keyboard)
 
 
 # --- Действия боя (атака/навык) ---
