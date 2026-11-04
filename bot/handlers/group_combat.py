@@ -392,7 +392,7 @@ async def _broadcast_board(
         own = battle_log.class_line(state.combatants, cid) if state is not None else None
         if own:
             personal = f"{personal}\n{own}"
-        await short_log.send(_bot_api, p.peer_id, short_personal or personal, personal, keyboard)
+        await short_log.send(_bot_api, p.peer_id, short_personal or personal, personal, keyboard, battle=battle)
         if notice:
             # Добыча и опыт - отдельным сообщением после хода (2026-10-13):
             # лог боя, затем лут, затем сводка клетки. Раньше лут стоял над

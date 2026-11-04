@@ -78,3 +78,44 @@ async def test_send_short_then_expand_and_hide() -> None:
     await short_log.send(api, 42, "коротко", "полностью", combat_keyboard("mage", {}))
     assert api.sent[-1]["message"] == "полностью" and short_log.BTN_OPEN not in api.sent[-1]["keyboard"]
     assert not await short_log.toggle(api, 42)
+
+
+class _CountingApi(_Api):
+    def __init__(self) -> None:
+        super().__init__()
+        self.next_id = 100
+
+    async def send(self, **kw):
+        self.sent.append(kw)
+        self.next_id += 1
+        return self.next_id
+
+
+async def test_every_past_log_of_the_battle_gets_its_own_button() -> None:
+    """2026-11-05, владелец: любой ход боя сворачивается и разворачивается.
+    Прошлый лог получает кнопку под сообщением, когда пришёл следующий ход;
+    после боя кнопка отвечает, что бой окончен, и снимается."""
+    api = _CountingApi()
+    battle = type("Battle", (), {})()
+    short_log.set_short(42, True)
+    try:
+        for n in (1, 2, 3):
+            await short_log.send(api, 42, f"коротко {n}", f"полностью {n}", combat_keyboard("mage", {}), battle=battle)
+        # Ход 1 и ход 2 - с кнопкой под сообщением, ход 3 - с кнопкой внизу.
+        assert [e["message_id"] for e in api.edited] == [101, 102]
+        assert all(json.loads(e["keyboard"])["inline"] for e in api.edited)
+        assert short_log.BTN_INLINE_OPEN in api.edited[0]["keyboard"]
+        # Развернуть первый ход в любой момент боя.
+        assert await short_log.toggle_inline(api, 42, 101, in_battle=True) is None
+        assert api.edited[-1]["message"] == "полностью 1" and short_log.BTN_INLINE_HIDE in api.edited[-1]["keyboard"]
+        assert await short_log.toggle_inline(api, 42, 101, in_battle=True) is None
+        assert api.edited[-1]["message"] == "коротко 1"
+        # Новый бой - список заново: кнопки прошлого боя уже ничего не находят.
+        await short_log.send(api, 42, "новый бой", "новый бой полностью", combat_keyboard("mage", {}),
+                             battle=type("Battle", (), {})())
+        assert await short_log.toggle_inline(api, 42, 101, in_battle=True) == short_log.NOTHING_TEXT
+        # Бой кончился - кнопка отвечает и снимается.
+        assert await short_log.toggle_inline(api, 42, 104, in_battle=False) == short_log.ENDED_TEXT
+        assert json.loads(api.edited[-1]["keyboard"])["buttons"] == []
+    finally:
+        short_log.set_short(42, False)

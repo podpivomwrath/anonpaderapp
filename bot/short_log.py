@@ -6,13 +6,17 @@
 кнопка «📜 Сводка»: бот правит последний лог в полный, кнопка становится
 «📜 Скрыть» и сворачивает его обратно.
 
-Кнопка - в нижней клавиатуре, а не под сообщением: у VK к сообщению крепится
-одна клавиатура, а лог несёт боевую (КД навыков, арена), и она должна
-обновляться каждый ход (решение владельца).
+У VK к сообщению крепится одна клавиатура, а лог текущего хода несёт боевую
+(КД навыков, арена) - поэтому его кнопка в нижней клавиатуре. Когда приходит
+следующий ход, прошлый лог получает свою кнопку под сообщением (callback,
+нажатие ничего не пишет в чат): так любой ход боя сворачивается и
+разворачивается в любой момент (2026-11-05, владелец; проверено вживую - нижняя
+клавиатура при этой правке не сбрасывается).
 
 Настройка - в ui_flags персонажа (ключ short_log), здесь копия в памяти по
-vk_id, как у bot/no_images.py. Последний лог каждого игрока - тоже в памяти:
-после перезапуска кнопка просто ничего не найдёт и ответит об этом.
+vk_id, как у bot/no_images.py. Логи боя - тоже в памяти и только на один бой:
+начался новый бой или бой кончился - кнопки старых логов отвечают, что бой
+уже окончен, и снимаются.
 """
 
 import json
@@ -25,7 +29,12 @@ from vkbottle import KeyboardButtonColor
 BTN_OPEN = "📜 Сводка"
 BTN_HIDE = "📜 Скрыть"
 PAYLOAD_TYPE = "log_toggle"
+#: Кнопка под прошлым логом: {"type": CALLBACK_TYPE, "m": id сообщения}.
+CALLBACK_TYPE = "log_cb"
+BTN_INLINE_OPEN = "📜 Подробнее"
+BTN_INLINE_HIDE = "📜 Свернуть"
 NOTHING_TEXT = "Лога этого хода уже нет: сводка доступна для последнего хода боя."
+ENDED_TEXT = "Бой окончен - этот лог уже не разворачивается."
 
 _short: set[int] = set()
 
@@ -39,7 +48,45 @@ class LastLog:
     expanded: bool = False
 
 
-_last: dict[int, LastLog] = {}
+@dataclass
+class BattleLogs:
+    #: Чей бой: ключ объекта боя (battle_key) - новый бой начинает список заново.
+    key: int | None
+    logs: list[LastLog]
+
+
+_battles: dict[int, BattleLogs] = {}
+_next_key = 0
+
+
+def battle_key(battle) -> int | None:
+    """Свой номер у каждого объекта боя: id сессии соло-боя повторяется у
+    одного игрока из боя в бой, а объект состояния - новый."""
+    global _next_key
+    if battle is None:
+        return None
+    key = getattr(battle, "_log_key", None)
+    if key is None:
+        _next_key += 1
+        key = _next_key
+        try:
+            battle._log_key = key
+        except AttributeError:
+            return None
+    return key
+
+
+def _last_of(peer_id: int) -> LastLog | None:
+    entry = _battles.get(int(peer_id))
+    return entry.logs[-1] if entry and entry.logs else None
+
+
+def inline_keyboard(message_id: int, expanded: bool) -> str:
+    return json.dumps({"inline": True, "buttons": [[{
+        "action": {"type": "callback", "label": BTN_INLINE_HIDE if expanded else BTN_INLINE_OPEN,
+                   "payload": json.dumps({"type": CALLBACK_TYPE, "m": message_id})},
+        "color": KeyboardButtonColor.SECONDARY.value,
+    }]]}, ensure_ascii=False)
 
 
 async def load(session_factory) -> int:
@@ -60,7 +107,7 @@ def set_short(vk_id: int, on: bool) -> None:
         _short.add(int(vk_id))
     else:
         _short.discard(int(vk_id))
-        _last.pop(int(vk_id), None)
+        _battles.pop(int(vk_id), None)
 
 
 def is_short(vk_id: int) -> bool:
@@ -94,24 +141,74 @@ def with_toggle(keyboard: str | None, expanded: bool = False) -> str | None:
     return json.dumps(data, ensure_ascii=False)
 
 
-async def send(api, peer_id: int, short: str, full: str, keyboard: str | None = None) -> None:
-    """Лог хода: короткий или полный - по настройке игрока."""
-    if not is_short(peer_id):
-        _last.pop(int(peer_id), None)
-        await api.messages.send(peer_id=peer_id, message=full, random_id=0, keyboard=keyboard)
+async def send(api, peer_id: int, short: str, full: str, keyboard: str | None = None, battle=None) -> None:
+    """Лог хода: короткий или полный - по настройке игрока. battle - объект
+    боя (состояние соло-боя, групповой бой, PvP, рейд): по нему логи одного
+    боя отличаются от прошлого."""
+    peer = int(peer_id)
+    if not is_short(peer):
+        _battles.pop(peer, None)
+        await api.messages.send(peer_id=peer, message=full, random_id=0, keyboard=keyboard)
         return
+    key = battle_key(battle)
+    entry = _battles.get(peer)
+    if entry is None or entry.key != key:
+        entry = _battles[peer] = BattleLogs(key, [])
     kb = with_toggle(keyboard)
-    message_id = await api.messages.send(peer_id=peer_id, message=short, random_id=0, keyboard=kb)
+    message_id = await api.messages.send(peer_id=peer, message=short, random_id=0, keyboard=kb)
+    previous = entry.logs[-1] if entry.logs else None
     if isinstance(message_id, int) and message_id > 0:
-        _last[int(peer_id)] = LastLog(message_id, short, full, keyboard)
-    else:
-        _last.pop(int(peer_id), None)
+        entry.logs.append(LastLog(message_id, short, full, keyboard))
+    # Прошлый лог - кнопкой под сообщением. Правим после отправки нового: его
+    # боевая клавиатура уже внизу и правкой не сбрасывается.
+    if previous is not None:
+        try:
+            await api.messages.edit(
+                peer_id=peer, message_id=previous.message_id,
+                message=previous.full if previous.expanded else previous.short,
+                keyboard=inline_keyboard(previous.message_id, previous.expanded),
+            )
+        except Exception:  # noqa: BLE001 - лог уже удалён игроком; бой идёт дальше
+            logger.warning("Короткий лог: не удалось повесить кнопку на {} у {}", previous.message_id, peer)
+
+
+async def toggle_inline(api, peer_id: int, message_id: int, in_battle: bool) -> str | None:
+    """Кнопка под прошлым логом. None - развернули или свернули; иначе текст
+    для всплывающей подсказки (бой окончен, лога нет), а кнопка снимается."""
+    peer = int(peer_id)
+    entry = _battles.get(peer)
+    log = next((x for x in entry.logs if x.message_id == message_id), None) if entry else None
+    if log is None or not in_battle:
+        if entry is not None and not in_battle:
+            _battles.pop(peer, None)
+        if log is not None:
+            # Кнопку снимаем, текст оставляем каким был.
+            try:
+                await api.messages.edit(
+                    peer_id=peer, message_id=message_id,
+                    message=log.full if log.expanded else log.short,
+                    keyboard=json.dumps({"inline": True, "buttons": []}),
+                )
+            except Exception:  # noqa: BLE001 - снять кнопку не вышло - не страшно
+                logger.warning("Короткий лог: не удалось снять кнопку {} у {}", message_id, peer)
+        return ENDED_TEXT if not in_battle else NOTHING_TEXT
+    log.expanded = not log.expanded
+    try:
+        await api.messages.edit(
+            peer_id=peer, message_id=message_id,
+            message=log.full if log.expanded else log.short,
+            keyboard=inline_keyboard(message_id, log.expanded),
+        )
+    except Exception:  # noqa: BLE001 - сообщение удалено
+        log.expanded = not log.expanded
+        return NOTHING_TEXT
+    return None
 
 
 async def toggle(api, peer_id: int) -> bool:
     """Нажатие «📜 Сводка» / «📜 Скрыть»: правит последний лог. False -
     править нечего (бот перезапускался или лог уже полный по настройке)."""
-    last = _last.get(int(peer_id))
+    last = _last_of(peer_id)
     if last is None:
         return False
     last.expanded = not last.expanded
