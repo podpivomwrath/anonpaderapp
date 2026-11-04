@@ -19,6 +19,7 @@ vk_id, как у bot/no_images.py. Логи боя - тоже в памяти и
 уже окончен, и снимаются.
 """
 
+import asyncio
 import json
 from dataclasses import dataclass
 
@@ -35,6 +36,8 @@ BTN_INLINE_OPEN = "📜 Подробнее"
 BTN_INLINE_HIDE = "📜 Свернуть"
 NOTHING_TEXT = "Лога этого хода уже нет: сводка доступна для последнего хода боя."
 ENDED_TEXT = "Бой окончен - этот лог уже не разворачивается."
+#: Через сколько секунд после нового лога вешать кнопку на прошлый (0 - сразу, в тестах).
+ATTACH_DELAY = 1.2
 
 _short: set[int] = set()
 
@@ -162,14 +165,32 @@ async def send(api, peer_id: int, short: str, full: str, keyboard: str | None = 
     # Прошлый лог - кнопкой под сообщением. Правим после отправки нового: его
     # боевая клавиатура уже внизу и правкой не сбрасывается.
     if previous is not None:
+        if ATTACH_DELAY:
+            from bot import background
+
+            background.spawn(_attach(api, peer, previous), name="short_log_attach")
+        else:
+            await _attach(api, peer, previous)
+
+
+async def _attach(api, peer: int, log: LastLog) -> None:
+    """Повесить кнопку на прошлый лог. Не сразу: правка в ту же секунду, что и
+    новый лог, упиралась в ограничение частоты VK (ошибка 9) - кнопки не
+    появлялись (2026-11-05, репорт). При 9 - ещё одна попытка."""
+    for attempt in range(2):
+        await asyncio.sleep(ATTACH_DELAY * (attempt + 1))
         try:
             await api.messages.edit(
-                peer_id=peer, message_id=previous.message_id,
-                message=previous.full if previous.expanded else previous.short,
-                keyboard=inline_keyboard(previous.message_id, previous.expanded),
+                peer_id=peer, message_id=log.message_id,
+                message=log.full if log.expanded else log.short,
+                keyboard=inline_keyboard(log.message_id, log.expanded),
             )
+            return
         except Exception as exc:  # noqa: BLE001 - лог уже удалён игроком; бой идёт дальше
-            logger.warning("Короткий лог: не удалось повесить кнопку на {} у {}: {}", previous.message_id, peer, exc)
+            if getattr(exc, "code", None) == 9 and attempt == 0:
+                continue
+            logger.warning("Короткий лог: не удалось повесить кнопку на {} у {}: {}", log.message_id, peer, exc)
+            return
 
 
 async def toggle_inline(api, peer_id: int, message_id: int, in_battle: bool) -> str | None:

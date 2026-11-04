@@ -91,10 +91,11 @@ class _CountingApi(_Api):
         return self.next_id
 
 
-async def test_every_past_log_of_the_battle_gets_its_own_button() -> None:
+async def test_every_past_log_of_the_battle_gets_its_own_button(monkeypatch) -> None:
     """2026-11-05, владелец: любой ход боя сворачивается и разворачивается.
     Прошлый лог получает кнопку под сообщением, когда пришёл следующий ход;
     после боя кнопка отвечает, что бой окончен, и снимается."""
+    monkeypatch.setattr(short_log, "ATTACH_DELAY", 0)
     api = _CountingApi()
     battle = type("Battle", (), {})()
     short_log.set_short(42, True)
