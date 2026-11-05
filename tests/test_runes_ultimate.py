@@ -189,3 +189,38 @@ def test_prop_fits_every_blood_knight_heal_skill() -> None:
 
     for skill_id in ("blood_knight_lifesteal_strike", "blood_knight_harvest", "blood_knight_crimson_feast"):
         assert "heal_shield" in runes.skill_tags(SUBCLASS_SKILL_DEFS[skill_id]), skill_id
+
+
+def test_viscous_fits_poisoner_blade_and_dart() -> None:
+    """2026-11-05: «Тягучесть» не вставлялась в Ядовитый клинок (яд) и
+    Дурманящий дротик (ослабление), хотя оба вешают эффект на несколько ходов."""
+    from game.combat.subclass_skills import SUBCLASS_SKILL_DEFS
+    from game.economy import runes
+
+    for skill_id in ("poisoner_venom", "poisoner_disrupt"):
+        assert "duration" in runes.skill_tags(SUBCLASS_SKILL_DEFS[skill_id]), skill_id
+
+
+def test_viscous_really_extends_venom_and_dart() -> None:
+    """Руна в деле: яд клинка и ослабление дротика держатся на ход дольше."""
+    import game.classes.poisoner  # noqa: F401 - регистрирует навыки
+    from game.combat.session import ActionType, DeclaredAction, EffectKind
+    from game.combat.skills import OFFENSIVE_SKILLS
+
+    for skill_id, kind in (("poisoner_venom", EffectKind.DOT), ("poisoner_disrupt", EffectKind.WEAKEN)):
+        turns = {}
+        for rune in (0.0, 1.0):
+            actor = combatant(1, 0, subclass_id="poisoner")
+            enemy = combatant(2, 1)
+            enemy.stats.will = 0
+            if rune:
+                actor.buff_modifiers[f"rune:viscous@{skill_id}"] = rune
+            session = CombatSessionState(session_id=1, mode=CombatMode.PVE, combatants={1: actor, 2: enemy})
+            ctx = SkillContext(session=session, actor=actor,
+                               action=DeclaredAction(type=ActionType.SKILL, skill_id=skill_id, target_id=2),
+                               rng=NoCritRng())
+            shared_rules.run_skill(OFFENSIVE_SKILLS[skill_id], ctx, skill_id)
+            effect = next((e for e in enemy.effects if e.kind == kind and e.source_id == 1), None)
+            assert effect is not None, (skill_id, rune)
+            turns[rune] = effect.remaining_ticks
+        assert turns[1.0] == turns[0.0] + 1, (skill_id, turns)

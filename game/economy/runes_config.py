@@ -211,7 +211,9 @@ MANUAL_TAGS: dict[str, set[str]] = {
     # Токсичный выброс убран 2026-11-02 (владелец): он сам ничего не вешает,
     # а считается от яда - «Едкость» в клинке его и так усиливает.
     "dot": {"poisoner_venom", "elementalist_fire"},
+    # Клинок (яд) и дротик (ослабление) - тоже эффект на несколько ходов (2026-11-05, владелец).
     "duration": {"warrior_warcry", "rogue_smoke", "mage_blood_seal", "guardian_block", "guardian_unbreakable",
+                 "poisoner_venom", "poisoner_disrupt",
                  "blood_knight_blood_seal", "shadow_blade_shadow_dance", "poisoner_decay", "elementalist_fire",
                  "dark_mystic_ward"},
     # Навыки, что сами лечат или вешают щит. Глухая оборона и Несокрушимый -
