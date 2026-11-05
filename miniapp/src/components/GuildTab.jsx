@@ -303,6 +303,12 @@ function Overview({ state, run, busy }) {
                 Возрождаться у часовни, а не в городе
               </label>
             )}
+            {me.chapel_on_map && me.respawn_at_chapel && (me.chapels || []).length > 1 && (
+              <select className="guild-input" value={me.chapel_choice ?? ''} disabled={busy}
+                onChange={(e) => run('respawn_pref', { cell_id: Number(e.target.value) }, 'Часовня выбрана.')}>
+                {me.chapels.map((c) => <option key={c.cell_id} value={c.cell_id}>Часовня {c.title}</option>)}
+              </select>
+            )}
           </Div>
         )}
       </Group>

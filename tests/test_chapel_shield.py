@@ -17,7 +17,7 @@ async def test_chapel_respawn_gives_shield_bound_to_the_cell(monkeypatch, db_ses
         async def __aenter__(self): return db_session
         async def __aexit__(self, *args): pass
 
-    async def chapel_cell(db, guild_id): return SimpleNamespace(x=7, y=8)
+    async def chapel_cell(db, guild_id, character=None): return SimpleNamespace(x=7, y=8)
     async def field_keyboard(peer): return None
     sent = []
 

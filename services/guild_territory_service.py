@@ -578,7 +578,8 @@ def respawn_multiplier(character) -> float:
     return max(0.3, 1.0 - cut)
 
 
-async def chapel_cell(db: AsyncSession, guild_id: int) -> GuildCell | None:
+async def chapel_cells(db: AsyncSession, guild_id: int) -> list[tuple[GuildCell, int]]:
+    """Все часовни гильдии на карте с уровнем, сильнейшая первой."""
     rows = (
         await db.execute(
             select(GuildCell, GuildBuilding.level).join(GuildBuilding, GuildBuilding.cell_id == GuildCell.id)
@@ -586,10 +587,19 @@ async def chapel_cell(db: AsyncSession, guild_id: int) -> GuildCell | None:
                 GuildCell.guild_id == guild_id, GuildCell.status == "held",
                 GuildBuilding.building == gc.B_CHAPEL, GuildBuilding.level > 0,
             )
-            .order_by(GuildBuilding.level.desc())
+            .order_by(GuildBuilding.level.desc(), GuildCell.id)
         )
-    ).first()
-    return rows[0] if rows else None
+    ).all()
+    return [(cell, level) for cell, level in rows]
+
+
+async def chapel_cell(db: AsyncSession, guild_id: int, character: Character | None = None) -> GuildCell | None:
+    """Где возрождаться. Игрок выбрал часовню (ui_flags.chapel_cell, репорт 301,
+    2026-11-05: при двух часовнях выбор был случайным) - она, пока стоит;
+    иначе самая прокачанная."""
+    cells = await chapel_cells(db, guild_id)
+    chosen = (character.ui_flags or {}).get("chapel_cell") if character is not None else None
+    return next((cell for cell, _ in cells if cell.id == chosen), cells[0][0] if cells else None)
 
 
 # --- Аура тотема и бонусы к характеристикам ---------------------------------------

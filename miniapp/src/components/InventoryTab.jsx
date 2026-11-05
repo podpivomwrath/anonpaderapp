@@ -4,7 +4,7 @@ import {
   Button, Group, Placeholder,
 } from '@vkontakte/vkui';
 import {
-  IN_VK, disassembleItem, eatFood, getInventory, openChest, openChests, transferByNick,
+  IN_VK, disassembleItem, eatFood, equipItem, getInventory, openChest, openChests, transferByNick,
 } from '../api.js';
 import { itemIcon } from '../itemIcons.js';
 import ChestRoulette from './ChestRoulette.jsx';
@@ -172,22 +172,33 @@ function detailRows(entry) {
   ];
 }
 
-// Разница с надетым в том же слоте: «💪 +3 · 🧠 -2».
+// Сравнение с надетым в том же слоте - ровной таблицей (репорт 307,
+// 2026-11-05: плашки только с разницей прыгали): все пять характеристик
+// всегда на своих местах, значение вещи и в скобках разница с надетой.
+const COMPARE_KEYS = ['str', 'agi', 'int', 'vit', 'wil'];
+const COMPARE_TITLES = { str: 'Сила', agi: 'Ловк.', int: 'Инт.', vit: 'Вын.', wil: 'Воля' };
+
 function CompareLine({ item, worn }) {
-  const keys = ['str', 'agi', 'int', 'vit', 'wil'];
-  const diff = keys
-    .map((k) => [k, (item.base_stats?.[k] || 0) - (worn?.base_stats?.[k] || 0)])
-    .filter(([, d]) => d !== 0);
   return (
     <div className="item-compare">
       <span className="item-compare__label">{worn ? `против «${worn.name}»` : 'слот пуст'}</span>
+      <div className="stat-compare">
+        {COMPARE_KEYS.map((k) => {
+          const value = item.base_stats?.[k] || 0;
+          const d = value - (worn?.base_stats?.[k] || 0);
+          return (
+            <div key={k} className="stat-compare__cell">
+              <span className="stat-compare__name">{STAT_ICONS[k]} {COMPARE_TITLES[k]}</span>
+              <b className="stat-compare__value">{value}</b>
+              <span className={d > 0 ? 'stat-compare__delta stat-compare__delta--up'
+                : d < 0 ? 'stat-compare__delta stat-compare__delta--down' : 'stat-compare__delta'}>
+                {d > 0 ? `+${d}` : d === 0 ? '=' : d}
+              </span>
+            </div>
+          );
+        })}
+      </div>
       <span className="item-compare__chips">
-        {diff.length === 0 && <span className="gear-chip gear-chip--same">=</span>}
-        {diff.map(([k, d]) => (
-          <span key={k} className={d > 0 ? 'gear-chip gear-chip--up' : 'gear-chip gear-chip--down'}>
-            {STAT_ICONS[k]} {d > 0 ? `+${d}` : d}
-          </span>
-        ))}
         {item.resist_chip && (
           <span className="gear-chip gear-chip--resist" title={item.resist}>
             {item.resist_chip.emoji} +{item.resist_chip.pct}%
@@ -544,6 +555,23 @@ export default function InventoryTab({ onOpenTab }) {
     try { localStorage.setItem(VIEW_KEY, next); } catch { /* вид только до перезагрузки */ }
   };
 
+  // Надеть из сумки (репорт 307): вне боя, как и в «Герое».
+  const [wearing, setWearing] = useState(false);
+  async function handleEquip(item) {
+    if (wearing) return;
+    setWearing(true);
+    setErrorMsg(null);
+    try {
+      await equipItem(item.id);
+      apply(await getInventory());
+      setDetail(null);
+    } catch (err) {
+      setErrorMsg(err?.message?.includes(' ') ? err.message : 'Не удалось надеть.');
+    } finally {
+      setWearing(false);
+    }
+  }
+
   // Еда (2026-10-21): только вне боя - сервер откажет, если бой идёт.
   async function handleEat(entry) {
     if (eating) return;
@@ -755,11 +783,15 @@ export default function InventoryTab({ onOpenTab }) {
     const { kind, data } = entry;
     const out = [];
     if (kind === 'gear') {
-      out.push(
-        <button key="hero" type="button" className="pill-btn" onClick={() => onOpenTab?.('character')}>
-          🧍 Надеть в «Герое»
-        </button>,
-      );
+      // Надеть прямо отсюда (репорт 307); вещь выше уровня - кнопки нет.
+      if (!data.equipped && !data.need_level) {
+        out.push(
+          <button key="wear" type="button" className="pill-btn pill-btn--main" disabled={wearing}
+            onClick={() => handleEquip(data)}>
+            🧍 Надеть
+          </button>,
+        );
+      }
       if (data.craftable) {
         out.push(
           <button key="craft" type="button" className="pill-btn"

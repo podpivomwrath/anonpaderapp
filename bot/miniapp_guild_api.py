@@ -335,6 +335,7 @@ async def _state(db, character: Character) -> dict:
     if on_gate and guild_territory_service.home_city(character) is not None:
         gates.append({"cell_id": "city", "title": f"🏙 {REGION_TITLES.get(character.region, 'Город')}"})
     effects = await guild_service.guild_effects(db, guild)
+    chapels = await guild_territory_service.chapel_cells(db, guild.id)
     return {
         "in_guild": True,
         "guild": {
@@ -357,7 +358,12 @@ async def _state(db, character: Character) -> dict:
             "fights_off": bool((character.ui_flags or {}).get("guild_fights_off")),
             # Возродиться можно только у часовни на базе на карте - у Двора
             # клетки нет (2026-10-17): без такой базы галочку не показываем.
-            "chapel_on_map": await guild_territory_service.chapel_cell(db, guild.id) is not None,
+            "chapel_on_map": bool(chapels),
+            # Часовен на карте несколько - игрок выбирает, у какой встать (репорт 301).
+            "chapels": [{"cell_id": cell.id, "title": f"({cell.x}; {cell.y}), {level} ур."} for cell, level in chapels],
+            "chapel_choice": next((cell.id for cell, _ in chapels
+                                   if cell.id == (character.ui_flags or {}).get("chapel_cell")),
+                                  chapels[0][0].id if chapels else None),
             "prayer": {
                 "active": guild_territory_service.prayer_active(character),
                 "stat": character.prayer_stat, "until": _iso(character.prayer_until),
@@ -634,7 +640,16 @@ async def _act(db, character: Character, vk_user_id: int, body: dict) -> list:
             notes.append(("char", character.id, note))
     elif action == "respawn_pref":
         await guild_service.require_member(db, character)
-        character.respawn_at_chapel = bool(body.get("on"))
+        if "on" in body:
+            character.respawn_at_chapel = bool(body.get("on"))
+        if body.get("cell_id") is not None:
+            cells = {cell.id for cell, _ in await guild_territory_service.chapel_cells(db, character.guild_id)}
+            cell_id = _int(body, "cell_id")
+            if cell_id not in cells:
+                raise GuildError("Такой часовни у гильдии нет.")
+            flags = dict(character.ui_flags or {})
+            flags["chapel_cell"] = cell_id
+            character.ui_flags = flags  # новый dict: JSON-поле не следит за изменением на месте
     elif action == "alerts_pref":
         # Весть о чужих (башня, дозор форта) - личный выключатель.
         await guild_service.require_member(db, character)

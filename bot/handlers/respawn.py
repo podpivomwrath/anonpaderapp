@@ -201,7 +201,7 @@ async def scan() -> None:
                     to_revive.append((vk_id, None))
                     continue
                 if character.respawn_at_chapel and character.guild_id is not None:
-                    chapel = await guild_territory_service.chapel_cell(db, character.guild_id)
+                    chapel = await guild_territory_service.chapel_cell(db, character.guild_id, character)
                     if chapel is not None:
                         character.pos_x, character.pos_y = chapel.x, chapel.y
                         # Часовня стоит в поле: без щита у неё добивали бы

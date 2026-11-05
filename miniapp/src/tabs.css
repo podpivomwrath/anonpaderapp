@@ -2627,3 +2627,40 @@ body.lite .shop-showcase::after { animation: none; display: none; }
   background: rgba(255, 255, 255, 0.10);
   vertical-align: middle;
 }
+
+/* Сравнение вещи с надетой - ровная таблица (репорт 307). */
+.stat-compare {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 4px;
+  margin: 6px 0;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+.stat-compare__cell {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding: 4px 0;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.05);
+}
+.stat-compare__name {
+  font-size: 11px;
+  opacity: 0.7;
+}
+.stat-compare__value {
+  font-size: 15px;
+}
+.stat-compare__delta {
+  font-size: 12px;
+  opacity: 0.6;
+}
+.stat-compare__delta--up {
+  color: #6fd27b;
+  opacity: 1;
+}
+.stat-compare__delta--down {
+  color: #ff8a80;
+  opacity: 1;
+}
