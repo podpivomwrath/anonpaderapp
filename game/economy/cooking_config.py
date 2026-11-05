@@ -47,7 +47,7 @@ DISHES_BY_ID = {d.dish_id: d for d in DISHES}
 BUFF_TITLES = {
     "max_hp_bonus": "здоровья",
     "xp_bonus": "опыта с мобов",
-    "damage_bonus": "урона",
+    "damage_bonus": "всего урона",
     "incoming_damage_reduction": "защиты",
     "relic_bonus": "к шансу дополнительной реликвии с моба",
 }

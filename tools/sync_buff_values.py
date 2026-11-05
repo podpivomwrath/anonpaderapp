@@ -38,7 +38,7 @@ MAPPING: dict[tuple[str, str], str] = {
     ("guardian_vital_block", "heal_on_block_pct_max_hp"): "GUARDIAN_HEAL_ON_BLOCK",
     ("guardian_counterattack", "counterattack_mult"): "GUARDIAN_COUNTERATTACK_MULT",
     ("guardian_retribution", "counterstrike_mult"): "GUARDIAN_COUNTERSTRIKE_MULT",
-    ("guardian_heavy_hand", "damage_bonus"): "GUARDIAN_HEAVY_HAND_BONUS",
+    ("guardian_heavy_hand", "direct_damage_bonus"): "GUARDIAN_HEAVY_HAND_BONUS",
     ("blood_knight_shared_thirst", "shared_heal_pct"): "BLOOD_KNIGHT_SHARED_THIRST_ALLY_HEAL_PCT",
     ("blood_knight_shared_feast", "group_damage_bonus"): "BLOOD_KNIGHT_SHARED_FEAST_GROUP_DAMAGE_BONUS",
     ("shadow_blade_deadly_precision", "crit_chance_bonus"): "SHADOW_BLADE_DEADLY_PRECISION_CRIT",

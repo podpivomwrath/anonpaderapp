@@ -213,7 +213,9 @@ async def test_effect_spent_on_entering_fight_and_works_through_last_one(db_sess
     fights = se.content().effects["ash_blessing"].fights
     for n in range(fights):
         mods = await ses.solo_modifiers(db_session, me, {"damage_bonus": 0.05})
-        assert mods["damage_bonus"] == pytest.approx(0.15), f"бой {n + 1}: эффект должен работать"
+        # «Удары тяжелее» - прямой урон (2026-11-05), еда на весь урон рядом не трогается.
+        assert mods["direct_damage_bonus"] == pytest.approx(0.10), f"бой {n + 1}: эффект должен работать"
+        assert mods["damage_bonus"] == pytest.approx(0.05)
         await ses.start_fight_effects(db_session, me.id)
         left = dict(await ses.active_effects(db_session, me.id)).get("ash_blessing", 0)
         assert left == fights - n - 1  # статус уже без этого боя

@@ -44,8 +44,8 @@ def poison_tick_damage(effect: Effect, source: CombatantState | None,
         # владелец: у дотов Элементалиста не было своих усилений).
         multiplier += source.buff_modifiers.get("dot_damage_bonus", 0.0)
         multiplier += source.buff_modifiers.get("poison_damage_per_stack", 0.0) * effect.stacks
-        # Общий бонус урона (еда, пресет) - и к ДоТу (2026-10-29, баг-репорт:
-        # блюдо на урон не усиливало яд, а у Отравителя он почти весь урон).
+        # «Весь урон» (еда) - и к ДоТу (2026-10-29, баг-репорт: блюдо на урон
+        # не усиливало яд). Прямой урон (пассивки, дары) сюда не идёт (2026-11-05).
         multiplier += source.buff_modifiers.get("damage_bonus", 0.0)
         multiplier *= stat_model.ACTIVE.effect_power(source.stats)
     if target is not None:

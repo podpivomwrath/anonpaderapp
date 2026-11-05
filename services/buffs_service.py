@@ -20,7 +20,7 @@ from models import Character
 FOOD_SHORT = {
     "max_hp_bonus": "здоровье",
     "xp_bonus": "опыт",
-    "damage_bonus": "урон",
+    "damage_bonus": "весь урон",
     "incoming_damage_reduction": "защита",
     "relic_bonus": "реликвии",
     "crit_chance_bonus": "крит",

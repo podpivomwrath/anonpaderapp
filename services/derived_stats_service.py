@@ -37,7 +37,7 @@ class DerivedStats:
 #: Баффы пресета и еды, которые работают в бою всегда (без условий «на низком
 #: здоровье», «в группе», «после уворота») - их видно в сводке (2026-10-24).
 SHOWN_MODS = (
-    "damage_bonus", "reckless_damage_bonus", "crit_chance_bonus", "dodge_bonus",
+    "damage_bonus", "direct_damage_bonus", "reckless_damage_bonus", "crit_chance_bonus", "dodge_bonus",
     "incoming_damage_reduction", "max_hp_bonus", "resist_crit", "accuracy", "resist_dot",
 )
 
@@ -74,7 +74,8 @@ def compute(
     primary_value = stat_model.damage_stat_value(s, primary_stat, character.subclass)
     m = shown_mods(mods)
     hp_mult = (1 + m.get("max_hp_bonus", 0.0)) if mods is not None else _food_hp_mult(character)
-    dmg_mult = (1 + m.get("damage_bonus", 0.0)) * (1 + m.get("reckless_damage_bonus", 0.0))
+    dmg_mult = ((1 + m.get("damage_bonus", 0.0)) * (1 + m.get("direct_damage_bonus", 0.0))
+                * (1 + m.get("reckless_damage_bonus", 0.0)))
     stat_dodge = model.dodge(s, False) + stat_model.subclass_dodge_bonus(character.subclass)
     ability_dodge = model.dodge(s, True) + stat_model.subclass_dodge_bonus(character.subclass)
     extra = m.get("dodge_bonus", 0.0)

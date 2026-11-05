@@ -29,7 +29,7 @@ def test_offer_is_three_distinct_new_gifts() -> None:
 
 def test_gift_mods_add_up() -> None:
     mods = gifts_mod.mods([{"id": "whetstone"}, {"id": "vow_silence"}, {"id": "bad_blood"}])
-    assert round(mods["damage_bonus"], 2) == 0.45
+    assert round(mods["direct_damage_bonus"], 2) == 0.45
     assert mods["max_hp_bonus"] == -0.15
 
 

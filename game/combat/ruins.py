@@ -83,10 +83,10 @@ class _RuinsStage:
         if gifts_mod.has(self.gifts, "stone_skin"):
             self._bump(session, "incoming_damage_reduction", 0.5, until_tick=2)
         if gifts_mod.has(self.gifts, "blood_debt"):
-            self._bump(session, "damage_bonus", min(0.30, 0.02 * int(self.ctx.get("kills", 0))))
+            self._bump(session, "direct_damage_bonus", min(0.30, 0.02 * int(self.ctx.get("kills", 0))))
         if gifts_mod.has(self.gifts, "miner_pick"):
             big = self.room in (rules.ELITE, rules.BOSS)
-            self._bump(session, "damage_bonus", 0.30 if big else -0.15)
+            self._bump(session, "direct_damage_bonus", 0.30 if big else -0.15)
         if gifts_mod.has(self.gifts, "foreign_name"):
             for p in _players(session):
                 p.current_hp = max(1, p.current_hp - round(p.max_hp * 0.10))

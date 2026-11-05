@@ -207,8 +207,8 @@ def test_calibrated_guardian_buff_values_in_content() -> None:
     assert buffs["guardian_counterattack"].stat_modifiers["counterstrike_mult"] == bc.GUARDIAN_COUNTERATTACK_MULT
     assert buffs["guardian_retribution"].stat_modifiers["retribution_damage_per_10pct"] == bc.GUARDIAN_RETRIBUTION_PER_10PCT
     assert buffs["guardian_vital_block"].stat_modifiers["heal_on_block_pct_max_hp"] == 0.08
-    assert buffs["guardian_heavy_hand"].stat_modifiers["damage_bonus"] == 0.10
-    assert buffs["blood_knight_blood_rage"].stat_modifiers["damage_bonus"] == 0.05
+    assert buffs["guardian_heavy_hand"].stat_modifiers["direct_damage_bonus"] == 0.10
+    assert buffs["blood_knight_blood_rage"].stat_modifiers["direct_damage_bonus"] == 0.05
 
 
 # --- Элементалист: «Экономия»/«Перегрузка»/«Стихийный поток» (патч 46, ч.1) ---

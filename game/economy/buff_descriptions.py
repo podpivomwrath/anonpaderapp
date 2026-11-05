@@ -81,7 +81,7 @@ def _describe_guardian_vital_block(b: BuffDef) -> str:
 
 
 def _describe_guardian_heavy_hand(b: BuffDef) -> str:
-    return f"Весь твой урон (обычная атака и навыки) больше на {_pct(bc.GUARDIAN_HEAVY_HAND_BONUS)}."
+    return f"Прямой урон (обычная атака и навыки) больше на {_pct(bc.GUARDIAN_HEAVY_HAND_BONUS)}."
 
 
 # --- Страж, микробаффы патча 56 ---
@@ -158,7 +158,7 @@ def _describe_guardian_retribution(b: BuffDef) -> str:
 
 
 def _describe_blood_knight_blood_rage(b: BuffDef) -> str:
-    return f"Весь твой урон (обычная атака и навыки) больше на {_pct(bc.BLOOD_KNIGHT_RAGE_DAMAGE_BONUS)}."
+    return f"Прямой урон (обычная атака и навыки) больше на {_pct(bc.BLOOD_KNIGHT_RAGE_DAMAGE_BONUS)}."
 
 
 def _describe_blood_knight_thirst(b: BuffDef) -> str:
@@ -760,12 +760,14 @@ def _describe_path(buff: BuffDef) -> str:
             continue
         text = {
             "incoming_damage_reduction": f"Весь входящий урон меньше на {_pct(value)}.",
-            "damage_bonus": f"Весь твой урон больше на {_pct(value)}.",
+            "damage_bonus": f"Весь урон (прямой и периодический) больше на {_pct(value)}.",
+            "direct_damage_bonus": f"Прямой урон (обычная атака и навыки) больше на {_pct(value)}.",
+            "dot_damage_bonus": f"Периодический урон (яд, горение) больше на {_pct(value)}.",
             "crit_chance_bonus": f"Шанс крита выше на {_points(value)}.",
             "dodge_bonus": f"Шанс уклониться выше на {_points(value)}.",
             "crit_damage_taken_reduction": f"Вражеские криты бьют по тебе на {_pct(value)} слабее.",
-            "solo_damage_bonus": f"Урон больше на {_pct(value)}, когда дерёшься без союзников.",
-            "execute_damage_bonus": f"Урон больше на {_pct(value)} по цели, у которой меньше {_pct(bc.PATH_EXECUTE_HP)} здоровья.",
+            "solo_damage_bonus": f"Прямой урон больше на {_pct(value)}, когда дерёшься без союзников.",
+            "execute_damage_bonus": f"Прямой урон больше на {_pct(value)} по цели, у которой меньше {_pct(bc.PATH_EXECUTE_HP)} здоровья.",
             "third_stab_chance": f"«Двойной укол»: шанс {_pct(value)} ударить третий раз.",
             "no_cooldown_chance": f"Шанс {_pct(value)}, что навык не уйдёт на перезарядку.",
             "low_hp_damage_reduction": (

@@ -85,13 +85,13 @@ W, R, M = "warrior", "rogue", "mage"
 RUNES: list[RuneDef] = [
     # --- Руны героя ---------------------------------------------------------------
     RuneDef("ash_skin", HERO, "Пепельная кожа", 0.04, "+{v} к здоровью", pvp="half"),
-    RuneDef("doorstep_rush", HERO, "Рывок с порога", 0.12, "+{v} урона в первые 2 хода боя", pvp="half"),
+    RuneDef("doorstep_rush", HERO, "Рывок с порога", 0.12, "+{v} прямого урона в первые 2 хода боя", pvp="half"),
     RuneDef("spare_breath", HERO, "Запас дыхания", 0.10,
             "раз за бой, когда здоровья меньше 30%, лечит {v} от максимума", pvp="half", rarity="rare"),
     # 2026-11-02 (владелец): стат работает только в PvP - вдвое слабее, но в
     # PvP в полную силу, без «вполсилы» (было 0.08 и pvp="half").
     RuneDef("stubborn_brow", HERO, "Упрямый лоб", 0.04, "+{v} к сопротивлению контролю"),
-    RuneDef("bitter_blood", HERO, "Горькая кровь", 0.12, "урон от ядов, горения и кровотечений меньше на {v}",
+    RuneDef("bitter_blood", HERO, "Горькая кровь", 0.12, "периодический урон по тебе меньше на {v}",
             pvp="half"),
     # Сопротивления (2026-11-02, владелец): 7% в базе, в PvP в полную
     # силу - они и нужны против игроков. Яд режет «Горькая кровь» выше.
@@ -125,11 +125,11 @@ RUNES: list[RuneDef] = [
             pvp="half", curve="tight", rarity="epic"),
 
     # --- Руны экипировки ----------------------------------------------------------
-    RuneDef("hammer_down", GEAR, "Молот по лежачему", 0.15, "+{v} урона по оглушённым", pvp="half",
+    RuneDef("hammer_down", GEAR, "Молот по лежачему", 0.15, "+{v} прямого урона по оглушённым", pvp="half",
             classes=(W,), place="weapon"),
-    RuneDef("red_thirst", GEAR, "Красная жажда", 0.03, "{v} урона возвращается здоровьем", pvp="half",
+    RuneDef("red_thirst", GEAR, "Красная жажда", 0.03, "{v} прямого урона возвращается здоровьем", pvp="half",
             classes=(W,), place="weapon"),
-    RuneDef("spite", GEAR, "Злоба", 0.02, "+{v} урона за каждый полученный удар, до пяти раз", pvp="half",
+    RuneDef("spite", GEAR, "Злоба", 0.02, "+{v} прямого урона за каждый полученный удар, до пяти раз", pvp="half",
             classes=(W,), place="weapon"),
     RuneDef("thorn_plate", GEAR, "Колючая броня", 0.08, "{v} полученного урона уходит обратно врагу",
             pvp="half", classes=(W,), place="armor"),
@@ -137,7 +137,7 @@ RUNES: list[RuneDef] = [
             pvp="half", classes=(W,), place="armor", curve="tight", rarity="rare"),
     RuneDef("thin_sting", GEAR, "Тонкое жало", 0.12, "+{v} к урону крита", pvp="half",
             classes=(R,), place="weapon"),
-    RuneDef("last_cut", GEAR, "Последний надрез", 0.12, "+{v} урона по целям ниже 30% здоровья", pvp="half",
+    RuneDef("last_cut", GEAR, "Последний надрез", 0.12, "+{v} прямого урона по целям ниже 30% здоровья", pvp="half",
             classes=(R,), place="weapon"),
     RuneDef("riposte", GEAR, "Ответный выпад", 0.20,
             "увернулся - удары в следующем ходу сильнее на {v}; несколько уворотов подряд не складываются",
@@ -146,9 +146,9 @@ RUNES: list[RuneDef] = [
             pvp="half", classes=(R,), place="weapon", curve="tight", rarity="rare"),
     RuneDef("light_step", GEAR, "Лёгкий шаг", 0.03, "+{v} к уклонению", pvp="half",
             classes=(R,), place="armor", curve="tight", rarity="rare"),
-    RuneDef("echo", GEAR, "Отзвук", 0.08, "+{v} урона по целям под ослаблением, уязвимостью, ядом или горением",
+    RuneDef("echo", GEAR, "Отзвук", 0.08, "+{v} прямого урона по целям под ослаблением, уязвимостью, ядом или горением",
             pvp="half", classes=(M,), place="weapon"),
-    RuneDef("heat_frost", GEAR, "Жар и иней", 0.10, "горение и урон по замороженным сильнее на {v}", pvp="half",
+    RuneDef("heat_frost", GEAR, "Жар и иней", 0.10, "горение и прямой урон по замороженным сильнее на {v}", pvp="half",
             classes=(M,), place="weapon"),
     RuneDef("surplus", GEAR, "Излишек", 0.20, "{v} лечения сверх максимума становится щитом", pvp="half",
             classes=(M,), place="armor"),
@@ -163,7 +163,7 @@ RUNES: list[RuneDef] = [
     RuneDef("second_wind", GEAR, "Свежие силы", 0.25,
             "раз за бой, когда здоровья меньше {v}, перезарядки всех навыков сбрасываются",
             pvp="half", place="armor", rarity="epic"),
-    RuneDef("for_ours", GEAR, "За своих", 0.15, "+{v} урона за каждого павшего союзника, до трёх",
+    RuneDef("for_ours", GEAR, "За своих", 0.15, "+{v} прямого урона за каждого павшего союзника, до трёх",
             pvp="half", place="weapon", rarity="epic"),
     RuneDef("heavy_swing", GEAR, "Счёт до четырёх", 1.00, "каждый четвёртый удар сильнее на {v}",
             pvp="half", place="weapon", curve="very_tight", rarity="mythic"),
@@ -180,7 +180,7 @@ RUNES: list[RuneDef] = [
     RuneDef("ricochet", SKILL, "Отскок", 0.12, "в групповом бою шанс {v} задеть вторую цель обычным ударом с силой 40% (без эффектов навыка)",
             pvp="none", tag="damage"),
     RuneDef("grip", SKILL, "Хватка", 0.15, "+{v} к пробитию сопротивления контролю", pvp="half", tag="control"),
-    RuneDef("acrid", SKILL, "Едкость", 0.15, "урон за ход от навыка сильнее на {v}", pvp="half", tag="dot"),
+    RuneDef("acrid", SKILL, "Едкость", 0.15, "периодический урон навыка сильнее на {v}", pvp="half", tag="dot"),
     RuneDef("viscous", SKILL, "Тягучесть", 0.25, "шанс {v}, что эффект навыка продержится на ход дольше",
             pvp="half", tag="duration", curve="tight", rarity="epic"),
     RuneDef("short_swing", SKILL, "Короткий взмах", 0.20, "шанс {v}, что перезарядка навыка на ход короче",

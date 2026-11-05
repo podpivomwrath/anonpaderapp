@@ -132,7 +132,8 @@ export function computeDerived({ level, baseClass, subclass = null, stats, gearB
 
   const hpMult = (subclass ? 1 : (BASE_CLASS_HP_MULT[baseClass] ?? 1));
   const buffHpMult = 1 + (m.max_hp_bonus ?? 0);
-  const dmgMult = (1 + (m.damage_bonus ?? 0)) * (1 + (m.reckless_damage_bonus ?? 0));
+  const dmgMult = (1 + (m.damage_bonus ?? 0)) * (1 + (m.direct_damage_bonus ?? 0))
+    * (1 + (m.reckless_damage_bonus ?? 0));
   const critBonus = subclass ? 0 : (BASE_CLASS_CRIT_BONUS[baseClass] ?? 0);
   const maxHp = roundHalfToEven(
     roundHalfToEven((HP_BASE + HP_PER_LEVEL * level + HP_PER_VIT * vit + HP_PER_TIER * tierMult) * hpMult) * buffHpMult,

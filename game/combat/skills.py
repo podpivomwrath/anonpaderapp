@@ -193,7 +193,9 @@ def outgoing_multiplier(actor: CombatantState, target: CombatantState) -> float:
     Пепельная лихорадка (патч 16 — эскалирующий бонус, value обновляется по ходам)."""
     mult = 1.0 - min(actor.effect_total(EffectKind.WEAKEN), 0.9)
     mult *= 1.0 + actor.effect_total(EffectKind.DAMAGE_BUFF)  # Боевой клич +20%
-    mult *= 1.0 + actor.buff_modifiers.get("damage_bonus", 0.0)
+    mult *= 1.0 + actor.buff_modifiers.get("damage_bonus", 0.0)  # весь урон: и удары, и урон за ход
+    # Прямой урон - только атака и навыки, яд и горение его не видят (2026-11-05).
+    mult *= 1.0 + actor.buff_modifiers.get("direct_damage_bonus", 0.0)
     # Право мести (Кровавое клеймо): только по тому, кто убил тебя.
     if actor.buff_modifiers.get("revenge_vs") == target.id:
         mult *= 1.0 + actor.buff_modifiers.get("revenge_bonus", 0.0)
