@@ -216,6 +216,39 @@ def effect_icons(c) -> str:
     return (shield + (" " + "".join(out) if out else "")) if shield else (" " + "".join(out) if out else "")
 
 
+def target_line(target, viewer_id: int, result: TickResult | None = None) -> str:
+    """«🎯 Цель: Волк (32% HP) · 💢32% ☠️×2 · твой урон 1380» (2026-11-05,
+    репорты 305-306): что висит на цели сейчас - уязвимость и ослабление
+    числом, яд и горение только свои, - и сколько ты снял с неё за ход."""
+    from game.combat.session import BURN_TAG
+
+    hp_pct = round(100 * target.current_hp / target.max_hp) if target.max_hp else 0
+    marks = []
+    vuln = sum(e.value for e in target.effects_of(EffectKind.VULNERABILITY) if e.remaining_ticks > 0 and e.value > 0)
+    if vuln:
+        marks.append(f"💢{round(vuln * 100)}%")
+    weak = sum(e.value for e in target.effects_of(EffectKind.WEAKEN) if e.remaining_ticks > 0)
+    if weak:
+        marks.append(f"🥀{round(weak * 100)}%")
+    mine = [e for e in target.effects_of(EffectKind.DOT) if e.remaining_ticks > 0 and e.source_id == viewer_id]
+    if any(getattr(e, "tag", None) == BURN_TAG for e in mine):
+        marks.append("🔥")
+    poison = sum(e.stacks for e in mine if getattr(e, "tag", None) != BURN_TAG)
+    if poison:
+        marks.append(f"☠️×{poison} твой" if poison > 1 else "☠️ твой")
+    if any(e.kind == EffectKind.FREEZE and e.remaining_ticks > 0 for e in target.effects):
+        marks.append("❄️")
+    line = f"🎯 Цель: {target.name} ({hp_pct}% HP)"
+    if marks:
+        line += " · " + " ".join(marks)
+    if result is not None:
+        dealt = sum(max(h.hp_before - h.hp_after, 0) for h in result.hit_renders
+                    if not h.missed and h.source_id == viewer_id and h.target_id == target.id)
+        if dealt:
+            line += f" · твой урон {dealt}"
+    return line
+
+
 def _hp_changes(result: TickResult) -> dict[int, tuple[int, int]]:
     """Сколько бойцу за ход сняли и сколько вылечили: (урон, лечение)."""
     out: dict[int, list[int]] = {}

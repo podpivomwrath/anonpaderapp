@@ -7,10 +7,12 @@
 
 import asyncio
 import random
+import re
 
 from loguru import logger
 from vkbottle import Keyboard, KeyboardButtonColor, Text
 from vkbottle.bot import BotLabeler, Message
+from vkbottle.dispatch.rules.base import FuncRule
 
 from bot import info_reply
 from bot.activity import activity_action, blocked_reason
@@ -281,6 +283,103 @@ async def guild_command(message: Message) -> None:
         lines.append(f"🗿 {guild_boss_service.boss_title(boss)} призван: {boss.hp}/{boss.max_hp}. Команда «/страж».")
     lines.append("Управление - в мини-аппе, раздел «Гильдия».")
     await info_reply.answer(message, "\n".join(lines))
+
+
+# --- Часовня и врата словами (2026-11-05, репорты 311 и 312) ---------------------------
+
+#: «/часовня сила», «/часовня с», «/часовня 1» - какую характеристику просить.
+PRAYER_ALIASES = {
+    "str": ("сила", "с", "1", "str"),
+    "agi": ("ловкость", "л", "2", "agi"),
+    "int": ("интеллект", "и", "3", "int"),
+    "vit": ("выносливость", "вынка", "в", "4", "vit"),
+    "wil": ("воля", "о", "5", "wil"),
+}
+STAT_WORDS = {"str": "Сила", "agi": "Ловкость", "int": "Интеллект", "vit": "Выносливость", "wil": "Воля"}
+_PRAYER_RE = re.compile(r"^\s*/(часовня|молитва|pray)\b\s*(.*)$", re.IGNORECASE)
+_GATES_RE = re.compile(r"^\s*/(портал|врата|gates)\b\s*(.*)$", re.IGNORECASE)
+
+
+def prayer_stat(word: str) -> str | None:
+    word = word.strip().lower().replace("ё", "е")
+    return next((stat for stat, names in PRAYER_ALIASES.items() if word in names), None)
+
+
+@labeler.message(FuncRule(lambda m: bool(_PRAYER_RE.match(m.text or ""))))
+async def prayer_command(message: Message) -> None:
+    word = _PRAYER_RE.match(message.text or "").group(2)
+    async with get_session_factory()() as db:
+        character = await onboarding_service.get_character(db, message.from_id)
+        if character is None or character.creation_state is not None:
+            return
+        stat = prayer_stat(word) if word.strip() else None
+        if stat is None:
+            cost = guild_territory_service.prayer_cost(character)
+            await info_reply.answer(message, (
+                f"⛪ Молитва в часовне гильдии: +{round(gc.PRAYER_STAT_BONUS * 100)}% к одной характеристике "
+                f"на {gc.PRAYER_MINUTES} мин., {cost} золота.\n"
+                "Напиши: /часовня сила (или с, 1), ловкость (л, 2), интеллект (и, 3), выносливость (в, 4), воля (о, 5)."
+            ))
+            return
+        try:
+            await guild_territory_service.pray(db, character, stat)
+        except guild_service.GuildError as exc:
+            await db.rollback()
+            await message.answer(f"⛪ {exc}")
+            return
+        await db.commit()
+        from bot import buff_notice
+
+        note = buff_notice.line(character, "prayer", "услышана")
+    await message.answer(note or f"⛪ Молитва услышана: {STAT_WORDS[stat]}.")
+
+
+@labeler.message(FuncRule(lambda m: bool(_GATES_RE.match(m.text or ""))))
+@activity_action
+async def gates_command(message: Message) -> None:
+    from bot.handlers import mounts
+    from bot.handlers import world as world_handlers  # избегаем цикла импортов
+
+    rest = _GATES_RE.match(message.text or "").group(2).strip()
+    async with get_session_factory()() as db:
+        character = await onboarding_service.get_character(db, message.from_id)
+        if character is None or character.creation_state is not None:
+            return
+        guild = await guild_service.guild_of(db, character)
+        gates = await guild_territory_service.gate_targets(db, guild.id) if guild is not None else []
+        listing = "\n".join(f"· ({c.x}; {c.y})" for c in gates)
+        if not rest:
+            if not gates:
+                await info_reply.answer(message, "🌀 У гильдии нет врат: их ставят на базе гильдии.")
+                return
+            await info_reply.answer(message, (
+                f"🌀 Врата гильдии:\n{listing}\n"
+                "Перейти: /портал X Y, в родной город с базы - /портал город."
+            ))
+            return
+        if rest.lower() in ("город", "city"):
+            target = "city"
+        else:
+            coords = mounts.parse_coords(rest)
+            cell = next((c for c in gates if coords and (c.x, c.y) == coords), None)
+            if cell is None:
+                await message.answer("🌀 Там нет врат гильдии." + (f" Врата есть на:\n{listing}" if gates else ""))
+                return
+            target = cell.id
+        reason = await blocked_reason(db, character, message.peer_id)
+        if reason:
+            await message.answer(reason)
+            return
+        try:
+            x, y = await guild_territory_service.travel_gates(db, character, target)
+        except guild_service.GuildError as exc:
+            await db.rollback()
+            await message.answer(f"🌀 {exc}")
+            return
+        await db.commit()
+        text, attachment, keyboard = await world_handlers.location_summary_parts(db, character, message.peer_id)
+    await message.answer(f"🌀 Врата переносят тебя на ({x}; {y}).\n\n{text}",
+                         attachment=attachment, keyboard=keyboard)
 
 
 # --- Страж цитадели --------------------------------------------------------------------

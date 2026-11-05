@@ -410,6 +410,8 @@ export const upgradeCraft = (itemId, ceiling) =>
 // --- Гильдии ---
 
 export const getGuild = () => request('/guild');
+// Журнал гильдии постранично (2026-11-05): записи старше before.
+export const getGuildLog = (before) => request(`/guild/log?before=${before}`);
 
 export const getGuildTree = () => request('/guild/tree');
 

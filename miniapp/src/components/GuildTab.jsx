@@ -3,7 +3,7 @@ import {
   Button, Div, Group, Header, Placeholder, SimpleCell, TabsItem,
 } from '@vkontakte/vkui';
 import Tabs from './ScrollTabs.jsx';
-import { getGuild, guildAction } from '../api.js';
+import { getGuild, getGuildLog, guildAction } from '../api.js';
 import GuildTree from './GuildTree.jsx';
 import ItemIcon from './ItemIcon.jsx';
 import { itemSubtitle } from './InventoryTab.jsx';
@@ -212,6 +212,23 @@ function NoGuild({ state, run, busy }) {
 function Overview({ state, run, busy }) {
   const { guild, me, boss } = state;
   const [stat, setStat] = useState('str');
+  // Журнал целиком (репорт 308): старые записи - по «Показать ещё».
+  const [older, setOlder] = useState([]);
+  const [moreLog, setMoreLog] = useState(state.log.length >= 40);
+  const [logBusy, setLogBusy] = useState(false);
+  const logRows = [...state.log, ...older.filter((row) => !state.log.some((r) => r.id === row.id))];
+  async function loadOlder() {
+    const last = logRows[logRows.length - 1];
+    if (!last) return;
+    setLogBusy(true);
+    try {
+      const res = await getGuildLog(last.id);
+      setOlder((prev) => [...prev, ...res.log]);
+      setMoreLog(res.more);
+    } finally {
+      setLogBusy(false);
+    }
+  }
   const [bossLevel, setBossLevel] = useState(1);
   const perms = me.perms;
   const bossPick = (boss.difficulties || []).find((d) => d.level === bossLevel);
@@ -351,9 +368,12 @@ function Overview({ state, run, busy }) {
 
       <Group header={<Header>Журнал</Header>}>
         <Div className="guild-log">
-          {state.log.map((row, i) => (
-            <p key={i} className="guild-log__row"><span className="guild-log__at">{when(row.at)}</span> {row.text}</p>
+          {logRows.map((row, i) => (
+            <p key={row.id ?? i} className="guild-log__row"><span className="guild-log__at">{when(row.at)}</span> {row.text}</p>
           ))}
+          {moreLog && (
+            <Button size="s" mode="secondary" disabled={logBusy} onClick={loadOlder}>Показать ещё</Button>
+          )}
         </Div>
       </Group>
 
@@ -646,7 +666,7 @@ function Treasury({ state, run, busy }) {
                 const key = `mygoods:${o.kind}:${o.ref}:${o.grade}`;
                 const count = amount(key, o.count);
                 return (
-                  <SimpleCell key={key} multiline subtitle={o.label} after={(
+                  <SimpleCell key={key} multiline subtitle={o.detail || o.label} after={(
                     <span className="guild-row guild-row--tight">
                       {o.kind !== 'fish' && <NumberInput value={count} onChange={(v) => setAmount(key, v)} placeholder="шт" />}
                       <Button size="s" disabled={busy || (o.kind !== 'fish' && !Number(count))}
@@ -658,6 +678,7 @@ function Treasury({ state, run, busy }) {
                     </span>
                   )}>
                     {o.emoji} {o.name}
+                    {o.grade_name && <span className="grade-badge">{o.grade_name}</span>}
                   </SimpleCell>
                 );
               })}
@@ -754,7 +775,7 @@ function Treasury({ state, run, busy }) {
                 const key = `whgoods:${o.kind}:${o.ref}:${o.grade}`;
                 const count = amount(key, o.count);
                 return (
-                  <SimpleCell key={key} multiline subtitle={o.label} after={canGive && (
+                  <SimpleCell key={key} multiline subtitle={o.detail || o.label} after={canGive && (
                     <span className="guild-row guild-row--tight">
                       {o.kind !== 'fish' && <NumberInput value={count} onChange={(v) => setAmount(key, v)} placeholder="шт" />}
                       <Button size="s" mode="secondary" disabled={busy || (o.kind !== 'fish' && !Number(count))}
@@ -766,6 +787,7 @@ function Treasury({ state, run, busy }) {
                     </span>
                   )}>
                     {o.emoji} {o.name}
+                    {o.grade_name && <span className="grade-badge">{o.grade_name}</span>}
                   </SimpleCell>
                 );
               })}
@@ -1077,6 +1099,11 @@ export default function GuildTab() {
 
   const run = useCallback(async (action, params = {}, okText = null) => {
     setBusy(true);
+    // Нажатая кнопка остаётся на том же месте экрана (репорт 310): плашка
+    // итога сверху и опустевшие папки склада сдвигали страницу под пальцем.
+    const anchor = document.activeElement;
+    const anchorTop = anchor?.getBoundingClientRect?.().top;
+    const scrollY = window.scrollY;
     try {
       const data = await guildAction(action, params);
       setState(data);
@@ -1085,6 +1112,13 @@ export default function GuildTab() {
       setNotice({ ok: false, text: err.message === 'bad_response' ? 'Сервер не ответил.' : err.message });
     } finally {
       setBusy(false);
+      requestAnimationFrame(() => {
+        if (anchor && anchor.isConnected && anchorTop != null) {
+          window.scrollBy(0, anchor.getBoundingClientRect().top - anchorTop);
+        } else {
+          window.scrollTo(0, scrollY);
+        }
+      });
     }
   }, []);
 

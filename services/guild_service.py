@@ -128,15 +128,14 @@ async def log(
     db.add(GuildLog(guild_id=guild_id, kind=kind, text=text[:300], character_id=character_id))
 
 
-async def recent_log(db: AsyncSession, guild_id: int, limit: int = 40) -> list[GuildLog]:
-    return list(
-        (
-            await db.scalars(
-                select(GuildLog).where(GuildLog.guild_id == guild_id)
-                .order_by(GuildLog.created_at.desc(), GuildLog.id.desc()).limit(limit)
-            )
-        ).all()
-    )
+async def recent_log(db: AsyncSession, guild_id: int, limit: int = 40,
+                     before_id: int | None = None) -> list[GuildLog]:
+    """Свежие записи журнала; before_id - страница старше этой записи
+    («Показать ещё» в мини-аппе, 2026-11-05: журнал хранится целиком)."""
+    query = select(GuildLog).where(GuildLog.guild_id == guild_id)
+    if before_id is not None:
+        query = query.where(GuildLog.id < before_id)
+    return list((await db.scalars(query.order_by(GuildLog.id.desc()).limit(limit))).all())
 
 
 def rank_at_least(member: GuildMember | None, rank: str) -> bool:

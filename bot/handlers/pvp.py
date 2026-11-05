@@ -1156,7 +1156,7 @@ def _resolve_chosen_target(battle_id: int, battle: Battle, cid: int) -> int | No
     return fallback
 
 
-def _target_line(battle_id: int, battle: Battle, cid: int) -> str:
+def _target_line(battle_id: int, battle: Battle, cid: int, result=None) -> str:
     """Патч 38: «🎯 Цель: Мирэль (41% HP)» — показывается каждому участнику
     массового боя в его личную копию боевого сообщения."""
     combatants = _live_state(battle_id, battle)
@@ -1164,8 +1164,7 @@ def _target_line(battle_id: int, battle: Battle, cid: int) -> str:
     target = combatants.get(target_id) if target_id is not None else None
     if target is None or not target.alive:
         return ""
-    hp_pct = round(100 * target.current_hp / target.max_hp) if target.max_hp else 0
-    return f"🎯 Цель: {target.name} ({hp_pct}% HP)"
+    return battle_log.target_line(target, cid, result)
 
 
 def _battle_board_text(battle_id: int, battle: Battle, lines: list[str]) -> str:

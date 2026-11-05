@@ -365,9 +365,37 @@ async def coord_input(message: Message) -> None:
     await _travel_to(message, *coords)
 
 
-async def _travel_to(message: Message, to_x: int, to_y: int) -> None:
+#: «/маунт 12 -20», «/mount 12:-20» - сразу в путь (репорт 304, 2026-11-05:
+#: с телефона без карты кнопки «Маунт» и потом координаты - лишний шаг).
+_MOUNT_CMD_RE = re.compile(r"^\s*/(маунт|mount)\b\s*(.*)$", re.IGNORECASE)
+
+
+@labeler.message(FuncRule(lambda m: bool(_MOUNT_CMD_RE.match(m.text or ""))))
+async def mount_command(message: Message) -> None:
+    rest = _MOUNT_CMD_RE.match(message.text or "").group(2).strip()
+    if not rest:
+        await open_mounts(message)
+        return
+    coords = parse_coords(rest)
+    if coords is None:
+        await message.answer("Не понял координаты. Формат: /маунт X Y (например /маунт 12 -20).")
+        return
+    async with get_session_factory()() as db:
+        character = await onboarding_svc.get_character(db, message.from_id)
+        if character is None or character.creation_state is not None:
+            return
+        owned = await mount_service.owned_mounts(db, character.id)
+        if not owned:
+            await message.answer("У тебя пока нет маунтов.")
+            return
+        mount = _chosen(owned, (character.ui_flags or {}).get("mount"))
+    await _travel_to(message, *coords, mount_id=mount.mount_id)
+
+
+async def _travel_to(message: Message, to_x: int, to_y: int, mount_id: str | None = None) -> None:
     peer_id = message.peer_id
-    mount_id = (message.state_peer.payload.get("mount_id") if message.state_peer else None)
+    if mount_id is None:
+        mount_id = (message.state_peer.payload.get("mount_id") if message.state_peer else None)
     if mount_id is None:
         await _dispenser.delete(peer_id)
         return

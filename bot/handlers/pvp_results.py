@@ -245,7 +245,7 @@ async def on_mass_tick_resolved(session_id: int, tick: int, result: TickResult) 
         if notice:
             personal_text = f"{notice}\n\n{personal_text}"
             short_text = f"{notice}\n\n{short_text}"
-        target_line = pvp._target_line(session_id, battle, cid)
+        target_line = pvp._target_line(session_id, battle, cid, result)
         if target_line:
             personal_text = f"{personal_text}\n{target_line}"
             short_text = f"{short_text}\n{target_line}"

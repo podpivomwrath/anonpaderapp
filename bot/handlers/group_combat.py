@@ -348,7 +348,7 @@ def _resolve_chosen_target(battle_id: int, battle: GroupBattle, cid: int) -> int
     return fallback
 
 
-def _target_line(battle_id: int, battle: GroupBattle, cid: int) -> str:
+def _target_line(battle_id: int, battle: GroupBattle, cid: int, result=None) -> str:
     # Цель пала - сразу следующая, и её видно (2026-10-17: строка пропадала
     # до следующего нажатия, и игрок не знал, кого бьёт).
     _resolve_chosen_target(battle_id, battle, cid)
@@ -357,8 +357,7 @@ def _target_line(battle_id: int, battle: GroupBattle, cid: int) -> str:
     target = combatants.get(target_id) if target_id is not None else None
     if target is None or not target.alive:
         return ""
-    hp_pct = round(100 * target.current_hp / target.max_hp) if target.max_hp else 0
-    return f"🎯 Цель: {target.name} ({hp_pct}% HP)"
+    return battle_log.target_line(target, cid, result)
 
 
 def _render_board(state: CombatSessionState, result: TickResult | None = None) -> str:
@@ -385,7 +384,7 @@ async def _broadcast_board(
         personal = text
         short_personal = short
         notice = notices.get(cid)
-        target_line = _target_line(battle_id, battle, cid)
+        target_line = _target_line(battle_id, battle, cid, result)
         if target_line and combatant is not None and combatant.alive:
             personal = f"{personal}\n{target_line}"
             short_personal = f"{short_personal}\n{target_line}"

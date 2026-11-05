@@ -22,6 +22,8 @@ from services.db import get_session_factory
 TYPED_INPUTS: dict[str, str] = {
     "arena.code_input": "CodeInput: игрок вводит код",
     "fallback.fallback": "последний: на набранный текст молчит",
+    "guild.gates_command": "команда «/портал X Y» - со слешем, фильтр её пропускает",
+    "guild.prayer_command": "команда «/часовня сила» - со слешем, фильтр её пропускает",
     "group_events.on_pot_stake": "_pot_scene_of: ставка в Котле",
     "promo.try_activate_promo": "код промо существует в базе",
     "pvp.join_via_text": "_pending_join_prompt, пока тот бой идёт",

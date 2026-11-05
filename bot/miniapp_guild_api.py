@@ -99,7 +99,27 @@ def _goods_line(line) -> dict:
         "name": line.name, "emoji": line.emoji, "grade_name": line.grade_name,
         "kind_title": guild_stock_service.KIND_TITLES[line.kind],
         "label": _with_effect(line),
+        # Подпись строки склада без названия (оно в заголовке): количество и
+        # бафф еды (репорт 309).
+        "detail": _detail(line),
     }
+
+
+def _detail(line) -> str:
+    amount = fishing_kg(line.count) if line.kind == "fish" else f"×{line.count}"
+    if line.kind != "food":
+        return amount
+    from game.economy import cooking
+    from game.economy import cooking_config as cc
+
+    dish = cc.DISHES_BY_ID.get(line.ref)
+    return f"{amount} · {cooking.buff_text(dish, line.grade)}" if dish is not None else amount
+
+
+def fishing_kg(grams: int) -> str:
+    from game.economy import fishing
+
+    return fishing.format_kg(grams)
 
 
 def _with_effect(line) -> str:
@@ -427,7 +447,8 @@ async def _state(db, character: Character) -> dict:
             ],
         },
         "log": [
-            {"text": row.text, "at": _iso(row.created_at)} for row in await guild_service.recent_log(db, guild.id)
+            {"id": row.id, "text": row.text, "at": _iso(row.created_at)}
+            for row in await guild_service.recent_log(db, guild.id)
         ],
         "config": {
             "ranks": gc.RANK_TITLES, "siege_hours": list(gc.SIEGE_HOURS_ALLOWED),
@@ -682,6 +703,31 @@ async def _deliver(db, notes: list, vk_user_id: int) -> None:
             logger.exception("Гильдии: не доставлено уведомление {}", note)
 
 
+async def handle_get_log(request: web.Request) -> web.Response:
+    """Журнал гильдии постранично: ?before=<id записи> - записи старше неё."""
+    vk_user_id = request[VK_USER_ID_KEY]
+    try:
+        before = int(request.query.get("before", ""))
+    except ValueError:
+        return _error("bad_request", 400)
+    async with request.app[SESSION_FACTORY_KEY]() as db:
+        character = await onboarding_svc.get_character(db, vk_user_id)
+        if character is None:
+            return _error("character_not_found", 404)
+        guild = await guild_service.guild_of(db, character)
+        if guild is None:
+            return _error("not_in_guild", 403)
+        rows = await guild_service.recent_log(db, guild.id, limit=LOG_PAGE, before_id=before)
+    return web.json_response({
+        "log": [{"id": row.id, "text": row.text, "at": _iso(row.created_at)} for row in rows],
+        "more": len(rows) == LOG_PAGE,
+    })
+
+
+#: Записей журнала за одно «Показать ещё».
+LOG_PAGE = 100
+
+
 async def handle_get(request: web.Request) -> web.Response:
     vk_user_id = request[VK_USER_ID_KEY]
     async with request.app[SESSION_FACTORY_KEY]() as db:
@@ -735,6 +781,7 @@ async def handle_post(request: web.Request) -> web.Response:
 
 def register_routes(app: web.Application) -> None:
     app.router.add_get("/api/miniapp/guild", handle_get)
+    app.router.add_get("/api/miniapp/guild/log", handle_get_log)
     app.router.add_get("/api/miniapp/guild/tree", handle_get_tree)
     app.router.add_post("/api/miniapp/guild/action", handle_post)
 
