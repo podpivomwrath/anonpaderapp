@@ -34,7 +34,8 @@ def _hit_line(hit: RenderedHit, source_name: str, target_name: str, mode: str) -
         # выглядел так, будто нажатие не сработало.
         mark = f" 🎯 Метка добычи ×{hit.marked}" if hit.marked else ""
         return f"{source_name} → {word} по {target_name} - промах, {target_name} уклоняется{mark}"
-    crit = " (крит!)" if hit.crit else ""
+    crit = (" (крит!)" if hit.crit else "") + (
+        f" ({combat_flavor.RIPOSTE_MARK})" if getattr(hit, "riposte", False) else "")
     # Блок срезает удары каждый ход стойки, но в логе это было видно только
     # в ход «Глухой обороны» - игроки решили, что блок срабатывает раз (2026-10-17).
     block = f" (🛡 блок срезал {hit.blocked})" if getattr(hit, "blocked", 0) > 0 else ""

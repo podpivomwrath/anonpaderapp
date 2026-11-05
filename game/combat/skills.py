@@ -52,6 +52,8 @@ class PendingHit:
     reflect_pct: float = 0.0
     #: Каким навыком нанесён (руны навыков: «Кровяная кромка»).
     skill_id: str | None = None
+    #: Руна «Ответный выпад» усилила удар (2026-11-05: отметка в логе).
+    riposte: bool = False
 
 
 @dataclass
@@ -237,7 +239,7 @@ def rune_outgoing(actor: CombatantState, target: CombatantState) -> float:
         mult *= 1.0 + mods.get("rune:heat_frost", 0.0)  # «Жар и иней»: по замороженным
     if target.max_hp > 0 and target.current_hp < target.max_hp * 0.3:
         mult *= 1.0 + mods.get("rune:last_cut", 0.0)
-    if actor.dodged_last_tick:
+    if riposte_active(actor):
         mult *= 1.0 + mods.get("rune:riposte", 0.0)
     if any(target.has_effect(kind) for kind in _DEBUFFS):
         mult *= 1.0 + mods.get("rune:echo", 0.0)
@@ -443,7 +445,14 @@ def compute_hit(
         crit=crit,
         label=label,
         skill_id=getattr(actor, "current_skill", None),
+        riposte=riposte_active(actor),
     )
+
+
+def riposte_active(actor: CombatantState) -> bool:
+    """«Ответный выпад»: прошлый ход боец увернулся - удары этого хода
+    сильнее. Увороты не копятся: прибавка одна, на один ход."""
+    return bool(actor.dodged_last_tick) and actor.buff_modifiers.get("rune:riposte", 0.0) > 0
 
 
 @offensive_skill("attack")

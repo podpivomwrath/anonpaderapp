@@ -28,6 +28,10 @@ def is_basic_attack_label(label: str) -> bool:
     return label in _VERB_LABELS
 
 
+#: Отметка удара, усиленного руной «Ответный выпад» (2026-11-05).
+RIPOSTE_MARK = "⚔️ ответный выпад"
+
+
 def render_hit(
     source_name: str,
     target_name: str,
@@ -43,6 +47,7 @@ def render_hit(
     mode: str = display.MODE_PVP,
     shielded: int = 0,
     blocked: int = 0,
+    riposte: bool = False,
 ) -> str:
     """`[Имя] использует [Навык] на [Цель] — X урона. (Цель: A% → B%)`.
     shielded - сколько из удара съел щит: тогда X - полный удар и суффикс
@@ -57,7 +62,7 @@ def render_hit(
         return f"{target_name} уклоняется от {what} {source_name}."
     pct_before = display.hp_text(hp_before, max_hp, mode)
     pct_after = display.hp_text(hp_after, max_hp, mode)
-    crit_suffix = " (крит!)" if crit else ""
+    crit_suffix = (" (крит!)" if crit else "") + (f" ({RIPOSTE_MARK})" if riposte else "")
     shield_suffix = f" (щит поглотил {shielded})" if shielded > 0 else ""
     if blocked > 0:  # блок стойки (Глухая оборона) - виден в каждом ударе, не только в ход навыка
         shield_suffix += f" (🛡 блок срезал {blocked})"

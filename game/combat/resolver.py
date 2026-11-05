@@ -167,6 +167,8 @@ class RenderedHit:
     absorbed: int = 0
     #: стаков Метки добычи после уворота (см. PendingHit.marked)
     marked: int = 0
+    #: удар усилен руной «Ответный выпад» (см. PendingHit.riposte)
+    riposte: bool = False
     #: сколько срезал блок (Глухая оборона и пр.) - пишется в строке удара
     blocked: int = 0
     #: сколько съел щит - тоже в строке удара (2026-10-29: в логе хода щит
@@ -682,7 +684,7 @@ def resolve_tick(
                     source.name, target.name,
                     label=hit.label, amount=applied, crit=hit.crit, missed=hit.missed, is_dot=hit.is_dot,
                     hp_before=h_before, hp_after=h_after, max_hp=target.max_hp, mode=mode,
-                    shielded=shielded_by_hit.get(id(hit), 0),
+                    shielded=shielded_by_hit.get(id(hit), 0), riposte=hit.riposte,
                 )
             )
             result.hit_renders.append(
@@ -693,7 +695,7 @@ def resolve_tick(
                     hp_before=h_before, hp_after=h_after, max_hp=target.max_hp,
                     absorbed=hit.blocked + max(hit.amount - applied, 0),
                     marked=hit.marked, blocked=hit.blocked,
-                    shielded=shielded_by_hit.get(id(hit), 0),
+                    shielded=shielded_by_hit.get(id(hit), 0), riposte=hit.riposte,
                 )
             )
         for heal in heals:
