@@ -312,8 +312,11 @@ def take_gift(run: RuinRun, gift_id: str) -> None:
     offer = run.offer or {}
     if gift_id not in offer.get("ids", []):
         raise RuinsError("Этот дар уже не предлагают.")
-    gifts = [g for g in run.gifts or [] if g["id"] != offer.get("drop")]
-    gifts.append({"id": gift_id})
+    # Дар - до конца этажа floor + GIFT_FLOORS - 1 (2026-11-06). Уже взятый
+    # не дублируется, а продлевается.
+    until = (run.floor or 1) + rc.GIFT_FLOORS - 1
+    gifts = [g for g in run.gifts or [] if g["id"] not in (offer.get("drop"), gift_id)]
+    gifts.append({"id": gift_id, "until": until})
     run.gifts = gifts
     run.offer = None
     touch(run)
@@ -576,7 +579,16 @@ async def next_floor(db: AsyncSession, run: RuinRun, rng: random.Random) -> None
     run.phase = WALK
     run.pending = None
     run.offer = None
-    run.gifts = [g for g in run.gifts or [] if not g.get("floor")]
+    # Проклятия кладовой - на этаж, дары - до своего этажа (до 2026-11-06 срока
+    # не было: такие дары считаются взятыми на том этаже, откуда уходят).
+    kept = []
+    for g in run.gifts or []:
+        if g.get("floor"):
+            continue
+        until = g.get("until", run.floor - 1 + rc.GIFT_FLOORS)
+        if until >= run.floor:
+            kept.append({**g, "until": until})
+    run.gifts = kept
     run.extra = {**{k: v for k, v in (run.extra or {}).items() if k != "boss_down"}, "prayer": []}
     for m in await members(db, run.id):
         m.consumables_used = 0

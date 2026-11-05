@@ -343,7 +343,9 @@ async def test_every_unique_boss_fight_runs_to_the_end(monkeypatch) -> None:
             info = {c.name: c.current_hp for c in st.combatants.values()} if st else None
             raid_combat.release_ruins_battle(battle_id)
             pytest.fail(f"этаж {floor}: бой не кончился {info} {results}")
-    assert results == ["won"] * 7, results
+    # Проверяем, что бой с каждым боссом заканчивается, а не исход: с кривой
+    # уровней исследования (2026-11-05) тестовый игрок иногда проигрывает.
+    assert len(results) == 7 and set(results) <= {"won", "wipe"}, results
 
 
 async def test_no_group_invites_inside_ruins(db_session, make_character) -> None:
@@ -373,3 +375,30 @@ def test_rune_die_chance_unique_vs_elite() -> None:
     """2026-11-05: руны с элитного хозяина (этажи не кратные 5) - 25%,
     с уникальных боссов - по-прежнему 50%."""
     assert [rc.rune_die_chance(f) for f in (1, 4, 5, 9, 10, 31, 35)] == [0.25, 0.25, 0.5, 0.25, 0.5, 0.25, 0.5]
+
+
+async def test_gifts_last_three_floors_and_refresh(db_session, make_character) -> None:
+    """2026-11-06, владелец: со всеми дарами подношение ничего не давало.
+    Дар - на 3 этажа, считая тот, где взят; уже взятый снова предлагается,
+    когда новых не осталось, и выбор продлевает срок."""
+    from game import ruins_gifts as gifts_mod
+
+    (a,) = await _party(make_character, 1)
+    run = await ruins_service.start(db_session, a, [a], random.Random(1))
+    run.offer = {"ids": ["whetstone"], "until": "2099-01-01T00:00:00+00:00"}
+    ruins_service.take_gift(run, "whetstone")
+    assert run.gifts == [{"id": "whetstone", "until": 1 + rc.GIFT_FLOORS - 1}]
+    for floor in range(2, rc.GIFT_FLOORS + 1):
+        run.phase = ruins_service.CLEARED
+        await ruins_service.next_floor(db_session, run, random.Random(floor))
+        assert gifts_mod.has(run.gifts, "whetstone"), floor
+    run.phase = ruins_service.CLEARED
+    await ruins_service.next_floor(db_session, run, random.Random(9))
+    assert not gifts_mod.has(run.gifts, "whetstone"), "после третьего этажа дар уходит"
+
+    everything = [g.id for g in gifts_mod.GIFTS]
+    assert gifts_mod.offer(random.Random(1), everything), "все взяты - предлагаются уже взятые"
+    run.gifts = [{"id": "whetstone", "until": run.floor}]
+    run.offer = {"ids": ["whetstone"], "until": "2099-01-01T00:00:00+00:00"}
+    ruins_service.take_gift(run, "whetstone")
+    assert run.gifts == [{"id": "whetstone", "until": run.floor + rc.GIFT_FLOORS - 1}], "продлён, не задвоен"

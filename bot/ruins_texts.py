@@ -147,7 +147,7 @@ def offer_text(ids: list[str], leader: bool, leader_name: str) -> str:
 
     lines = ["🎁 Дары на выбор:"] + [f"{i}. {ruins_gifts.line(g)}" for i, g in enumerate(ids, 1)]
     lines.append(f"Выбери кнопкой за {rc.GIFT_SECONDS} с, иначе дар выпадет случайный." if leader
-                 else f"Выбирает {leader_name}. Дар - на всю группу до конца забега.")
+                 else f"Выбирает {leader_name}. Дар - на всю группу на {rc.GIFT_FLOORS} этажа.")
     return "\n".join(lines)
 
 
@@ -156,7 +156,8 @@ def gift_taken(gift_id: str, by: str | None) -> str:
 
     gift = ruins_gifts.BY_ID[gift_id]
     who = f"{by} берёт дар" if by else "Время вышло, выпал дар"
-    return f"🎁 {who} {ruins_gifts.TIER_MARK[gift.tier]}«{gift.name}»: {gift.text}."
+    return (f"🎁 {who} {ruins_gifts.TIER_MARK[gift.tier]}«{gift.name}» на {rc.GIFT_FLOORS} этажа: "
+            f"{gift.text}.")
 
 
 def gifts_block(gifts: list[dict]) -> str | None:
@@ -164,7 +165,9 @@ def gifts_block(gifts: list[dict]) -> str | None:
 
     if not gifts:
         return None
-    rows = [ruins_gifts.line(g["id"]) + (" (до конца этажа)" if g.get("floor") else "") for g in gifts]
+    rows = [ruins_gifts.line(g["id"]) + (" (до конца этажа)" if g.get("floor")
+                                         else f" (до {g['until']} этажа)" if g.get("until") else "")
+            for g in gifts]
     return "🎁 Дары группы:\n" + "\n".join(rows)
 
 

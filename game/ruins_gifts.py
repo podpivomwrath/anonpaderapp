@@ -49,7 +49,7 @@ GIFTS: tuple[Gift, ...] = (
     Gift("greedy_palm", "Жадная ладонь", "ближайший хозяин этажа даёт ещё одну попытку выбить руну"),
     Gift("usurer_mark", "Метка ростовщика", "с каждой элиты реликвий больше"),
     # --- проклятые: сильные, с платой
-    Gift("vow_silence", "Обет молчания", "+35% прямого урона, но зелья пить нельзя до конца забега", CURSED,
+    Gift("vow_silence", "Обет молчания", "+35% прямого урона, но пока дар действует, зелья пить нельзя", CURSED,
          mods={"direct_damage_bonus": 0.35}),
     Gift("heavy_bag", "Тяжёлый мешок", "каждый хозяин этажа даёт две лишние попытки выбить руну, но противники на 15% крепче", CURSED),
     Gift("foreign_name", "Чужое имя", "шанс 25%, что навык не уйдёт в перезарядку, но каждый бой начинается с -10% здоровья", CURSED,
@@ -66,8 +66,9 @@ OFFER_SIZE = 3
 
 def offer(rng: random.Random, owned: list[str], tiers: tuple[str, ...] = (COMMON, RARE, CURSED),
           size: int = OFFER_SIZE) -> list[str]:
-    """Три разных дара, которых у группы ещё нет."""
-    pool = [g for g in GIFTS if g.id not in owned and g.tier in tiers]
+    """Три разных дара, которых у группы ещё нет. Если таких не осталось -
+    из уже взятых: повторный выбор продлевает срок (дары на GIFT_FLOORS этажей)."""
+    pool = [g for g in GIFTS if g.id not in owned and g.tier in tiers] or [g for g in GIFTS if g.tier in tiers]
     picked: list[str] = []
     while pool and len(picked) < size:
         gift = rng.choices(pool, weights=[TIER_WEIGHT[g.tier] for g in pool])[0]
