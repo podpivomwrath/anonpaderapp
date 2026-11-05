@@ -8,9 +8,10 @@
 
 #: Клетка входа - Подножный забой (content/mining/mines.json, monolith_face).
 ENTRY_CELL = (-1, 0)
-#: Закрытая проверка (2026-11-05): пока False, руины (сообщение у забоя,
+#: Закрытая проверка (2026-11-05): при False руины (сообщение у забоя,
 #: вход, задание наставника) видят только администратор и TESTER_VK_IDS.
-OPEN = False
+#: Открыты всем 2026-11-05, вместе с вороном 60-м (tools/ruins_raven.py).
+OPEN = True
 TESTER_VK_IDS: frozenset[int] = frozenset()
 MIN_LEVEL = 60
 MAX_PARTY = 5

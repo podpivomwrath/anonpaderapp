@@ -105,6 +105,31 @@ async def _levelup_later(peer_id: int, header: str) -> None:
         )
     except Exception:
         logger.exception("Весть о новом уровне не ушла {}", peer_id)
+    await _ruins_raven(peer_id)
+
+
+async def _ruins_raven(peer_id: int) -> None:
+    """60 уровень: ворон приносит письмо наставника о новом поручении (руины
+    культа, 2026-11-05). Один раз - флаг ruins_raven; запись отдельной
+    короткой транзакцией уже после коммита того, кто начислил опыт."""
+    from bot import ruins_texts
+    from services import ruins_service, story_service
+
+    try:
+        async with get_session_factory()() as db:
+            character = await _read_character(db, peer_id)
+            if character is None or not story_service.ruins_raven_due(character):
+                return
+            if not ruins_service.open_for(peer_id):
+                return
+            await db.refresh(character, with_for_update=True)
+            if not story_service.ruins_raven_due(character):
+                return
+            story_service.mark_ruins_raven(character)
+            await db.commit()
+        await _bot_api.messages.send(peer_id=peer_id, message=ruins_texts.RAVEN_LETTER, random_id=0)
+    except Exception:
+        logger.exception("Ворон с письмом не долетел {}", peer_id)
 
 
 async def _read_character(db, peer_id: int) -> Character | None:

@@ -407,6 +407,18 @@ def mark_ruins_intro(character: Character) -> None:
     character.ui_flags = flags  # новый dict: JSON-поле не следит за изменением на месте
 
 
+def ruins_raven_due(character: Character) -> bool:
+    """Ворон с письмом о руинах: 60 уровень, письма ещё не было и вводное
+    задание наставник ещё не дал (2026-11-05)."""
+    return ruins_intro_due(character) and not (character.ui_flags or {}).get("ruins_raven")
+
+
+def mark_ruins_raven(character: Character) -> None:
+    flags = dict(character.ui_flags or {})
+    flags["ruins_raven"] = True
+    character.ui_flags = flags
+
+
 async def mentor_badge_active(db: AsyncSession, character: Character) -> bool:
     """Пометка [🧙 Наставник ❗] (патч 21) — есть что взять или что сдать."""
     if ruins_intro_due(character):

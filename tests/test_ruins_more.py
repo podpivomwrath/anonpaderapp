@@ -313,3 +313,20 @@ def test_every_scene_has_a_photo() -> None:
             *(f"{m}_элита" for m in rc.MOB_PHOTO_KEYS)}
     assert need == set(rc.PHOTOS)
     assert all(v.isdigit() for v in rc.PHOTOS.values())
+
+
+def test_raven_letter_once_before_mentor_intro() -> None:
+    """Ворон с письмом (2026-11-05): с 60 уровня, один раз и только пока
+    наставник ещё не дал задание о руинах."""
+    from types import SimpleNamespace
+
+    from services import story_service
+
+    hero = SimpleNamespace(level=59, ui_flags={})
+    assert not story_service.ruins_raven_due(hero)
+    hero.level = 60
+    assert story_service.ruins_raven_due(hero)
+    story_service.mark_ruins_raven(hero)
+    assert not story_service.ruins_raven_due(hero)
+    took = SimpleNamespace(level=60, ui_flags={"ruins_intro": True})
+    assert not story_service.ruins_raven_due(took)
