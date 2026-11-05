@@ -115,7 +115,8 @@ RUNES: list[RuneDef] = [
     RuneDef("clean_still", HERO, "Чистая перегонка", 0.10, "эликсиры сильнее на {v}", pvp="half"),
     RuneDef("full_belly", HERO, "Сытый живот", 0.20, "еда держится дольше на {v}"),
     RuneDef("calluses", HERO, "Мозоли", 0.06, "+{v} к опыту ремёсел"),
-    RuneDef("monolith_mark", HERO, "Метка Монолита", 0.05, "+{v} к опыту героя", rarity="epic", curve="tight"),
+    # 2026-11-05: была эпической - на 60 уровне опыт не нужен, теперь обычная.
+    RuneDef("monolith_mark", HERO, "Метка Монолита", 0.05, "+{v} к опыту героя", curve="tight"),
     RuneDef("loose_tongue", HERO, "Язык без костей", 0.05, "обоз привозит больше золота на {v}", rarity="epic",
             curve="tight"),
 
