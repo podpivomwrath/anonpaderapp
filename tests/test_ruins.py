@@ -126,6 +126,55 @@ async def test_next_floor_resets_potions(db_session, make_character) -> None:
     assert run.floor == 2 and run.phase == ruins_service.WALK and m.consumables_used == 0 and m.hp == 100
 
 
+async def test_walk_after_boss_and_back_to_stairs(db_session, make_character) -> None:
+    """2026-11-05: после хозяина группа может уйти из его зала, подраться
+    в оставшихся комнатах и вернуться: лестницы - только в зале хозяина."""
+    (a,) = await _party(make_character, 1)
+    run = await ruins_service.start(db_session, a, [a], random.Random(1))
+    boss = run.layout["boss"]
+    run.pos = boss
+    await ruins_service.room_won(db_session, run, {a.id: 100}, {a.id: 0}, random.Random(1))
+    assert run.phase == ruins_service.CLEARED
+
+    direction, target = next(iter(rules.exits(run.layout, boss).items()))
+    assert ruins_service.propose(run, a.id, direction, 1) == target
+    run.cleared = [c for c in run.cleared if c != target]
+    run.layout = {**run.layout, "rooms": {**run.layout["rooms"], str(target): rules.FIGHT}}
+    ruins_service.move(run, target)
+    assert run.phase == ruins_service.FIGHT and ruins_service.boss_down(run)
+    try:
+        await ruins_service.next_floor(db_session, run, random.Random(2))
+        raise AssertionError("глубже - только из зала хозяина")
+    except ruins_service.RuinsError:
+        pass
+    await ruins_service.room_won(db_session, run, {a.id: 90}, {a.id: 0}, random.Random(3))
+    assert run.phase == ruins_service.WALK and ruins_service.boss_down(run)
+
+    back = next(d for d, j in rules.exits(run.layout, target).items() if j == boss)
+    ruins_service.propose(run, a.id, back, 1)
+    ruins_service.move(run, boss)
+    assert run.phase == ruins_service.CLEARED
+    await ruins_service.next_floor(db_session, run, random.Random(4))
+    assert run.floor == 2 and run.phase == ruins_service.WALK and not ruins_service.boss_down(run)
+
+
+async def test_recover_after_boss_keeps_stairs(db_session, make_character) -> None:
+    """Перезапуск посреди боя после хозяина: группа у входа в комнату, флаг
+    «хозяин убит» цел; если вернула в зал хозяина - снова выбор."""
+    (a,) = await _party(make_character, 1)
+    run = await ruins_service.start(db_session, a, [a], random.Random(1))
+    boss = run.layout["boss"]
+    run.pos = boss
+    await ruins_service.room_won(db_session, run, {a.id: 100}, {a.id: 0}, random.Random(1))
+    target = next(iter(rules.exits(run.layout, boss).values()))
+    run.cleared = [c for c in run.cleared if c != target]
+    run.layout = {**run.layout, "rooms": {**run.layout["rooms"], str(target): rules.FIGHT}}
+    ruins_service.move(run, target)
+    assert run.phase == ruins_service.FIGHT
+    await ruins_service.recover(db_session)
+    assert run.pos == boss and run.phase == ruins_service.CLEARED
+
+
 async def test_wipe_burns_bags(db_session, make_character) -> None:
     a, b = await _party(make_character)
     run = await ruins_service.start(db_session, a, [a, b], random.Random(1))

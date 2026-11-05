@@ -30,6 +30,7 @@ TYPED_INPUTS: dict[str, str] = {
     "raid_archive.on_answer": "ArchiveAnswer: этап загадок",
     "rift.cancel": "кнопка «Отмена» (метка есть), FuncRule только сужает",
     "ruins.kick_command": "команда «/кик ник» - со слешем, фильтр её пропускает",
+    "ruins.entry_command": "команда «/руины» - со слешем, фильтр её пропускает",
     "scene_events.riddle_answer": "RiddleAnswer: загадка ждёт ответа",
     "scene_events.stake_answer": "StakeAnswer: кости ждут ставку",
     "stats_window.typed_alloc": "окно характеристик открыто: «сила 10»",

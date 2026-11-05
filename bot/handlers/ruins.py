@@ -111,18 +111,17 @@ def _room_keyboard(run, cid: int) -> str:
             for gift_id in run.offer.get("ids", []):
                 rows.append([(ruins_gifts.title(gift_id)[:40], {"type": "ruins_gift", "g": gift_id},
                               KeyboardButtonColor.POSITIVE)])
-    elif run.phase == ruins_service.CLEARED:
-        if leader:
-            rows.append([(texts.BTN_DEEPER, {"type": "ruins_deeper"}, KeyboardButtonColor.NEGATIVE),
-                         (texts.BTN_UP, {"type": "ruins_up"}, KeyboardButtonColor.POSITIVE)])
-    elif run.phase == ruins_service.WALK:
+    elif run.phase in (ruins_service.WALK, ruins_service.CLEARED):
         if run.pending:
             if cid not in run.pending.get("ok", []):
                 rows.append([(texts.BTN_GO, {"type": "ruins_go"}, KeyboardButtonColor.POSITIVE)])
         elif leader:
             choice_rows = []
             kind = rules.room_kind(run.layout, run.pos)
-            if ruins_service.room_open(run):
+            if run.phase == ruins_service.CLEARED:
+                choice_rows = [[(texts.BTN_DEEPER, {"type": "ruins_deeper"}, KeyboardButtonColor.NEGATIVE),
+                                (texts.BTN_UP, {"type": "ruins_up"}, KeyboardButtonColor.POSITIVE)]]
+            elif ruins_service.room_open(run):
                 if kind == rules.WELL:
                     owned = ruins_gifts.ids(run.gifts)[-4:]
                     buttons = [(f"🔁 {ruins_gifts.BY_ID[g].name}"[:40], {"type": "ruins_room", "c": f"drop:{g}"},
@@ -210,6 +209,39 @@ async def maybe_send_here_button(peer_id: int, character) -> None:
     await _send(peer_id, texts.HERE_TEXT, keyboard=_enter_keyboard(), attachment=_pic("вход"))
 
 
+async def _offer_again(peer_id: int) -> None:
+    """После выхода или изгнания - кнопка спуска сразу, не дожидаясь, пока
+    игрок уйдёт с клетки и вернётся."""
+    from bot import craft_button_state as cbs
+
+    cbs.mark_sent(peer_id, cbs.RUINS, *rc.ENTRY_CELL)
+    await _send(peer_id, texts.AGAIN_TEXT, keyboard=_enter_keyboard())
+
+
+_ENTRY_RE = re.compile(r"^\s*/(?:руины|ruins)\s*$", re.IGNORECASE)
+
+
+@labeler.message(FuncRule(lambda m: bool(_ENTRY_RE.match(m.text or "")) and m.payload is None))
+async def entry_command(message: Message) -> None:
+    """«/руины»: на клетке забоя - кнопка спуска, внутри - вид комнаты."""
+    if is_inside(message.peer_id):
+        await _show_self(message)
+        return
+    if not ruins_service.open_for(message.from_id):
+        return
+    async with get_session_factory()() as db:
+        character = await onboarding_svc.get_character(db, message.from_id)
+        await db.rollback()
+    if character is None or character.creation_state is not None:
+        return
+    if (character.pos_x, character.pos_y) != rc.ENTRY_CELL:
+        await message.answer(texts.NOT_HERE_TEXT)
+    elif character.level < rc.MIN_LEVEL:
+        await message.answer(texts.LOCKED_TEXT)
+    else:
+        await message.answer(texts.HERE_TEXT, keyboard=_enter_keyboard(), attachment=_pic("вход"))
+
+
 # --- Вид комнаты ------------------------------------------------------------------
 
 
@@ -233,9 +265,9 @@ def _view_text(run, cid: int, leader_name: str, head: str | None = None) -> str:
         lines.append(texts.offer_text(run.offer.get("ids", []), leader, leader_name))
         return "\n".join(lines)
     if run.phase == ruins_service.CLEARED:
+        # Зал хозяина: выбор, а ходить можно и дальше (2026-11-05).
         lines.append(texts.LEADER_CHOICE if leader else texts.WAIT_CHOICE)
-        return "\n".join(lines)
-    if kind == rules.START:
+    elif kind == rules.START:
         lines.append(texts.ROOM_TEXT[rules.START])
     elif ruins_service.room_open(run):
         if kind == rules.EVENT:
@@ -247,6 +279,8 @@ def _view_text(run, cid: int, leader_name: str, head: str | None = None) -> str:
         lines.append("Решай, что делать, или иди дальше." if leader else f"Решает {leader_name}.")
     elif run.pos in (run.cleared or []):
         lines.append(texts.CLEARED_ROOM)
+    if run.phase != ruins_service.CLEARED and ruins_service.boss_down(run):
+        lines.append(texts.STAIRS_IN_BOSS_ROOM)
     lines.append(texts.exits_line(ruins_service.exits_now(run), _seen(run)))
     if run.pending:
         if leader:
@@ -450,7 +484,8 @@ async def _do_move(run_id: int, target: int, note: str | None = None) -> None:
     trap_line = photo = None
     async with get_session_factory()() as db:
         run = await ruins_service.lock(db, run_id)
-        if run is None or run.status != ruins_service.ACTIVE or run.phase != ruins_service.WALK:
+        if run is None or run.status != ruins_service.ACTIVE or run.phase not in (ruins_service.WALK,
+                                                                                   ruins_service.CLEARED):
             return
         if run.pending and run.pending.get("to") != target:
             return
@@ -737,6 +772,7 @@ async def up(message: Message) -> None:
         await _send(peer, f"{texts.EXIT_TEXT} Глубже всего - этаж {floor}.\n{texts.exit_bag_line(paid[cid])}",
                     attachment=_pic("выход"))
         await _send_location_summary(cid, peer)
+        await _offer_again(peer)
     logger.info("Руины {}: выход с этажа {}", run.id, floor)
 
 
@@ -883,6 +919,7 @@ async def _finish_vote(run_id: int) -> None:
         _inside.pop(target_peer, None)
         await _send(target_peer, texts.KICKED_TEXT)
         await _send_location_summary(target_id, target_peer)
+        await _offer_again(target_peer)
     head = texts.kicked_others(target_name)
     if new_leader is not None:
         head += "\n" + texts.new_leader(new_leader.name)

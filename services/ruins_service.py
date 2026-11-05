@@ -165,7 +165,7 @@ def exits_now(run: RuinRun) -> dict[str, int]:
 def propose(run: RuinRun, leader_id: int, direction: str, party: int, now: datetime | None = None) -> int:
     """Лидер выбрал направление. Вернёт комнату. Соло - шаг сразу (pending
     не ставится, вызывающий делает move)."""
-    if run.phase != WALK:
+    if run.phase not in (WALK, CLEARED):
         raise RuinsError("Сейчас не до шагов.")
     if run.leader_id != leader_id:
         raise RuinsError("Куда идти, решает лидер.")
@@ -206,6 +206,8 @@ def pending_due(run: RuinRun, now: datetime | None = None) -> bool:
 
 def move(run: RuinRun, target: int) -> str:
     """Группа перешла в комнату. Вернёт её тип; с боем - фаза fight."""
+    if boss_down(run) and not (run.extra or {}).get("boss_down"):
+        run.extra = {**(run.extra or {}), "boss_down": True}  # забеги до 2026-11-05: флага не было
     run.pending = None
     run.prev_pos = run.pos
     run.pos = target
@@ -215,8 +217,17 @@ def move(run: RuinRun, target: int) -> str:
     if kind in rules.COMBAT_ROOMS and target not in (run.cleared or []):
         run.phase = FIGHT
         run.extra = {**(run.extra or {}), "fight": {"kind": kind}}
+    else:
+        # После хозяина группа может пройтись по этажу (2026-11-05); лестницы
+        # вниз и наверх - в его зале: вернулись туда - снова выбор.
+        run.phase = CLEARED if boss_down(run) and target == run.layout.get("boss") else WALK
     touch(run)
     return kind
+
+
+def boss_down(run: RuinRun) -> bool:
+    """Хозяин этажа повержен (группа могла уйти из его зала)."""
+    return run.phase == CLEARED or bool((run.extra or {}).get("boss_down"))
 
 
 def room_open(run: RuinRun) -> bool:
@@ -539,6 +550,8 @@ async def room_won(db: AsyncSession, run: RuinRun, hp: dict[int, int], used: dic
     if boss and gifts_mod.has(run.gifts, "greedy_palm"):
         run.gifts = [g for g in run.gifts if g["id"] != "greedy_palm"]
     run.phase = CLEARED if boss else WALK
+    if boss:
+        run.extra = {**run.extra, "boss_down": True}
     after = fight.get("after") or {}
     if not boss and (kind == rules.ELITE or after.get("offer")):
         start_offer(run, tuple(after.get("offer") or ruins_rooms.GOOD), rng)
@@ -563,7 +576,7 @@ async def next_floor(db: AsyncSession, run: RuinRun, rng: random.Random) -> None
     run.pending = None
     run.offer = None
     run.gifts = [g for g in run.gifts or [] if not g.get("floor")]
-    run.extra = {**(run.extra or {}), "prayer": []}
+    run.extra = {**{k: v for k, v in (run.extra or {}).items() if k != "boss_down"}, "prayer": []}
     for m in await members(db, run.id):
         m.consumables_used = 0
     touch(run)
@@ -667,7 +680,7 @@ async def recover(db: AsyncSession) -> list[RuinRun]:
                     m.hp_before = None
             if run.prev_pos is not None:
                 run.pos = run.prev_pos
-            run.phase = WALK
+            run.phase = CLEARED if boss_down(run) and run.pos == run.layout.get("boss") else WALK
         run.pending = None
         run.vote = None
         if run.extra and run.extra.get("fight"):
