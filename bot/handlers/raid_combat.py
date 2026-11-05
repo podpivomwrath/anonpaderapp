@@ -620,7 +620,7 @@ async def start_raid(
 
 
 async def start_ruins_room(run_id: int, stage, member_inputs: list[MemberCombatInput], hp: dict[int, int],
-                           used: dict[int, int], opening: str) -> int:
+                           used: dict[int, int], opening: str, attachment: str | None = None) -> int:
     """Руины: бой одной комнаты тем же путём, что этапы рейда. Итог боя -
     bot/handlers/ruins.py (on_room_won / on_wipe) через raid_results."""
     global _next_battle_id
@@ -644,7 +644,7 @@ async def start_ruins_room(run_id: int, stage, member_inputs: list[MemberCombatI
     state = _start_stage_session(battle_id, battle)
     _engine.start_session(state)
     for p in participants.values():
-        await _bot_api.messages.send(peer_id=p.peer_id, message=opening, random_id=0)
+        await _bot_api.messages.send(peer_id=p.peer_id, message=opening, random_id=0, attachment=attachment)
     await _broadcast_board(battle_id, battle, None, boss_lines=_take_opening_lines(battle))
     return battle_id
 

@@ -24,6 +24,7 @@ from bot.activity import activity_action, blocked_reason
 from bot.battle_keyboard import in_any_battle
 from bot.dispatch_rules import is_info_command
 from bot.keyboards.world import add_miniapp_button
+from bot.vk_media import photo_attachment
 from game import ruins as rules
 from game.combat.ruins import RoomStage
 from game.economy import ruins_config as rc
@@ -55,6 +56,36 @@ async def _send(peer_id: int, text: str, keyboard: str | None = None, **kw) -> N
         await _bot_api.messages.send(peer_id=peer_id, message=text, random_id=0, keyboard=keyboard, **kw)
     except Exception:
         logger.exception("Руины: не доставлено {}", peer_id)
+
+
+def _pic(key: str | None) -> str | None:
+    """Вложение-картинка руин по ключу ruins_config.PHOTOS (нет номера - None)."""
+    photo_id = rc.photo(key)
+    return photo_attachment(photo_id) if photo_id else None
+
+
+def _fight_photo(stage, kind: str, layout: dict) -> str | None:
+    """Ключ картинки боя: босс зала, мимик, засада или мобы этажа."""
+    from game.combat.ruins import BossRoom
+
+    if isinstance(stage, BossRoom):
+        return rc.BOSS_PHOTO_KEYS.get(stage.bosses[0].key) if stage.bosses else None
+    if kind == rules.TREASURE:
+        return rc.ROOM_PHOTO_KEYS["mimic"]
+    if kind == rules.AMBUSH:
+        return rc.ROOM_PHOTO_KEYS[rules.AMBUSH]
+    mob = rc.MOB_PHOTO_KEYS[int(layout.get("mobs", 0)) % len(rc.MOB_PHOTO_KEYS)]
+    return f"{mob}_элита" if kind in (rules.ELITE, rules.BOSS) else mob
+
+
+def _room_photo(run) -> str | None:
+    """Ключ картинки особой комнаты, пока в ней есть выбор."""
+    if not ruins_service.room_open(run):
+        return None
+    kind = rules.room_kind(run.layout, run.pos)
+    if kind == rules.EVENT:
+        return rc.EVENT_PHOTO_KEYS.get(rules.event_of(run.layout, run.pos) or "")
+    return rc.ROOM_PHOTO_KEYS.get(kind)
 
 
 async def _peers(db, character_ids: list[int]) -> dict[int, int]:
@@ -170,7 +201,7 @@ async def maybe_send_here_button(peer_id: int, character) -> None:
     if character.level < rc.MIN_LEVEL:
         await _send(peer_id, texts.LOCKED_TEXT)
         return
-    await _send(peer_id, texts.HERE_TEXT, keyboard=_enter_keyboard())
+    await _send(peer_id, texts.HERE_TEXT, keyboard=_enter_keyboard(), attachment=_pic("вход"))
 
 
 # --- Вид комнаты ------------------------------------------------------------------
@@ -223,9 +254,10 @@ def _view_text(run, cid: int, leader_name: str, head: str | None = None) -> str:
     return "\n".join(lines)
 
 
-async def _broadcast_view(run_id: int, head: str | dict[int, str] | None = None) -> None:
+async def _broadcast_view(run_id: int, head: str | dict[int, str] | None = None,
+                          photo: str | None = None) -> None:
     """Всем в забеге - где группа и что можно нажать. head - строка сверху
-    (общая или своя каждому)."""
+    (общая или своя каждому), photo - ключ картинки (ruins_config.PHOTOS)."""
     async with get_session_factory()() as db:
         run = await db.get(RuinRun, run_id)
         if run is None or run.status != ruins_service.ACTIVE:
@@ -237,7 +269,8 @@ async def _broadcast_view(run_id: int, head: str | dict[int, str] | None = None)
         leader_name = leader.name if leader else "лидер"
     for cid, peer in peers.items():
         top = head.get(cid) if isinstance(head, dict) else head
-        await _send(peer, _view_text(run, cid, leader_name, top), keyboard=_room_keyboard(run, cid))
+        await _send(peer, _view_text(run, cid, leader_name, top), keyboard=_room_keyboard(run, cid),
+                    attachment=_pic(photo))
 
 
 # --- Вход -------------------------------------------------------------------------
@@ -291,7 +324,7 @@ async def enter(message: Message) -> None:
     for peer in behind_peers.values():
         await _send(peer, "Группа спустилась в руины без тебя: ты стоял не у забоя.")
     logger.info("Руины {}: спуск, {} человек", run_id, len(going))
-    await _broadcast_view(run_id, texts.PROLOGUE)
+    await _broadcast_view(run_id, texts.PROLOGUE, photo="пролог")
 
 
 def _busy_elsewhere(peer_id: int | None, character) -> bool:
@@ -408,7 +441,7 @@ async def go(message: Message) -> None:
 async def _do_move(run_id: int, target: int, note: str | None = None) -> None:
     """Группа переходит в комнату target. С боем - бой сразу, с ловушкой -
     ловушка сразу."""
-    trap_line = None
+    trap_line = photo = None
     async with get_session_factory()() as db:
         run = await ruins_service.lock(db, run_id)
         if run is None or run.status != ruins_service.ACTIVE or run.phase != ruins_service.WALK:
@@ -423,12 +456,15 @@ async def _do_move(run_id: int, target: int, note: str | None = None) -> None:
             dodged = await ruins_service.trap(db, run, _rng)
             names = {c: (await db.get(Character, c)).name for c in dodged}
             trap_line = texts.trap_text(dodged, names)
+            photo = rc.ROOM_PHOTO_KEYS[rules.TRAP]
+        else:
+            photo = _room_photo(run)
         await db.commit()
     if fight:
         await _start_fight(run_id, note)
     else:
         head = "\n\n".join(x for x in (note, trap_line) if x) or None
-        await _broadcast_view(run_id, head)
+        await _broadcast_view(run_id, head, photo)
 
 
 async def _start_fight(run_id: int, note: str | None = None) -> None:
@@ -465,7 +501,8 @@ async def _start_fight(run_id: int, note: str | None = None) -> None:
     if note:
         opening = f"{note}\n\n{opening}"
     try:
-        await raid_combat.start_ruins_room(run_id, stage, inputs, hp, start, opening)
+        await raid_combat.start_ruins_room(run_id, stage, inputs, hp, start, opening,
+                                           attachment=_pic(_fight_photo(stage, kind, layout)))
     except Exception:
         logger.exception("Руины {}: бой не начался", run_id)
         async with get_session_factory()() as db:
@@ -516,7 +553,7 @@ async def on_room_won(session_id: int, battle) -> None:
         if got.get("chests"):
             lines.append(texts.chests_line(got["chests"]))
         heads[cid] = "\n".join(lines) or None
-    await _broadcast_view(run_id, heads)
+    await _broadcast_view(run_id, heads, "спуск" if boss else None)
 
 
 async def on_wipe(session_id: int, battle, text: str | None = None) -> None:
@@ -542,7 +579,7 @@ async def on_wipe(session_id: int, battle, text: str | None = None) -> None:
     body = f"{text}\n\n{texts.WIPE_TEXT}" if text else texts.WIPE_TEXT
     for cid, peer in peers.items():
         _inside.pop(peer, None)
-        await _send(peer, body)
+        await _send(peer, body, attachment=_pic("гибель"))
         if cid in deaths:
             defeat, respawn_at = deaths[cid]
             await respawn_handlers.register_death(peer, respawn_at, defeat.xp_lost, defeat.relics_lost,
@@ -691,7 +728,8 @@ async def up(message: Message) -> None:
     for cid, peer in peers.items():
         _inside.pop(peer, None)
         pvp_shield.grant(cid, pvp_shield.RUINS, cell=rc.ENTRY_CELL)
-        await _send(peer, f"{texts.EXIT_TEXT} Глубже всего - этаж {floor}.\n{texts.exit_bag_line(paid[cid])}")
+        await _send(peer, f"{texts.EXIT_TEXT} Глубже всего - этаж {floor}.\n{texts.exit_bag_line(paid[cid])}",
+                    attachment=_pic("выход"))
         await _send_location_summary(cid, peer)
     logger.info("Руины {}: выход с этажа {}", run.id, floor)
 

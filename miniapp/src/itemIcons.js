@@ -45,10 +45,9 @@ const ICONS = {
   'chest:dim': new URL('./assets/items/chest_dim.webp', import.meta.url).href,
   'chest:dusty': new URL('./assets/items/chest_dusty.webp', import.meta.url).href,
   'chest:ore': new URL('./assets/items/chest_ore.webp', import.meta.url).href,
+  'chest:rune': new URL('./assets/items/chest_rune.webp', import.meta.url).href,
   'chest:searing': new URL('./assets/items/chest_searing.webp', import.meta.url).href,
   'chest:supply': new URL('./assets/items/chest_supply.webp', import.meta.url).href,
-  // Ларец рун (2026-11-05): своей картинки пока нет - пылающий ларец.
-  'chest:rune': new URL('./assets/items/chest_searing.webp', import.meta.url).href,
   'chest:tear': new URL('./assets/items/chest_tear.webp', import.meta.url).href,
   'class:mage': new URL('./assets/items/class_mage.webp', import.meta.url).href,
   'class:rogue': new URL('./assets/items/class_rogue.webp', import.meta.url).href,

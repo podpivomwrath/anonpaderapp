@@ -282,3 +282,27 @@ async def test_elixir_service_grant_adds_without_charging_gold(db_session, make_
     assert counts["heal_small"] == 3
     wallet = await wallet_service.get_wallet(db_session, character.id)
     assert wallet.farm_currency == 0
+
+
+@pytest.mark.parametrize("level, chests", [(60, 1), (59, 0)])
+async def test_rune_chest_for_all_dailies_only_at_60(db_session, make_character, level, chests) -> None:
+    """2026-11-05: ларец рун - когда закрыта ПОСЛЕДНЯЯ ежедневка дня, и только
+    на 60 уровне. За первую из двух - ещё нет."""
+    from services import lootbox_service
+
+    character = await make_character(level=level)
+    hunt = await _add_quest(db_session, character, "hunt")
+    other = await _add_quest(db_session, character, "explorer")
+    hunt.progress = dc.scaled_target(daily_service.quest_def("hunt").base_target, level) - 1
+    await db_session.flush()
+    await daily_service.record_battle(db_session, character, _report(won=True, mob_level=level))
+    assert hunt.completed and not other.completed
+    assert not await lootbox_service.closed_chests(db_session, character.id, lootbox_service.RUNE)
+
+    other.progress = dc.scaled_target(daily_service.quest_def("explorer").base_target, level) - 1
+    await db_session.flush()
+    result = await daily_service.record_exploration(db_session, character)
+    assert other.completed
+    got = await lootbox_service.closed_chests(db_session, character.id, lootbox_service.RUNE)
+    assert len(got) == chests
+    assert ("Ларец рун" in (result.streak_notice or "")) == bool(chests)

@@ -317,9 +317,25 @@ async def _finish(
                 f"🔥 Серия ежедневок: {_days(character.daily_streak)}!\n"
                 f"Получено: {', '.join(reward_lines)}"
             )
+    if character.level == dc.RUNE_CHEST_LEVEL and await _all_done_today(db, character, today):
+        # 2026-11-05: ларец рун за все ежедневки дня на 60 уровне. Строки дня
+        # под блокировкой (_active_dailies), поэтому «закрыл последнюю» видит
+        # ровно один запрос - второй ларец за день не выйдет.
+        await lootbox_service.grant_chest(db, character, character.daily_streak, lootbox_service.RUNE)
+        notice_parts.append("🔮 Все задания дня выполнены - Ларец рун в сумке.")
     await db.flush()
     notice = "\n\n".join(notice_parts) if notice_parts else None
     return DailyProgressResult(completed=completions, streak_notice=notice)
+
+
+async def _all_done_today(db: AsyncSession, character: Character, today: date) -> bool:
+    """Все ежедневки дня закрыты (и они вообще были)."""
+    await db.flush()
+    rows = (await db.scalars(
+        select(CharacterDaily.completed).where(CharacterDaily.character_id == character.id,
+                                               CharacterDaily.date == today)
+    )).all()
+    return bool(rows) and all(rows)
 
 
 async def _with_guild(

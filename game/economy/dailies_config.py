@@ -47,6 +47,10 @@ def daily_reward(level: int) -> tuple[int, int]:
     return xp, gold
 
 
+#: Ларец рун за ВСЕ ежедневки дня - только на этом уровне (2026-11-05,
+#: решение владельца: «только на 60»).
+RUNE_CHEST_LEVEL = 60
+
 # --- Рубежи стрика ежедневок (патч 23, п.4) ---
 # Каждый рубеж: gold/gems — фикс. числа; elixirs_random_combat — N случайных
 # БОЕВЫХ (category=="combat") эликсиров по 2 шт. каждого; title — id титула

@@ -170,6 +170,7 @@ EXTRA_FILES = {
     # Добыча кровавого разлома (tools/blood_rift_loot_prompts.md)
     "chest:ore": "ларец_руды.png",
     "chest:supply": "ларец_расходников.png",
+    "chest:rune": "ларец_рун.png",  # tools/ruins_art_prompts.md
     "elixir:scroll_healing": "свиток_лечения.png",
     "elixir:scroll_ward": "свиток_оберега.png",
     "elixir:scroll_vulnerability": "свиток_уязвимости.png",

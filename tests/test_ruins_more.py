@@ -292,3 +292,24 @@ def test_prayer_saves_once() -> None:
     state.combatants[1].current_hp = 0
     stage.after_tick(state, TickResult(deaths=[1]), random.Random(1))
     assert state.combatants[1].current_hp == 0, "второй раз за этаж - нет"
+
+
+def test_every_scene_has_a_photo() -> None:
+    """Картинки руин (2026-11-05): у каждой комнаты, сценки, босса и вида мобов
+    есть номер фото, лишних номеров нет."""
+    from game import ruins as rules
+    from game import ruins_rooms
+    from game.combat import ruins as combat_ruins
+    from game.economy import ruins_config as rc
+
+    bosses = {cls.key for cls in combat_ruins.RuinBoss.__subclasses__()}
+    assert bosses == set(rc.BOSS_PHOTO_KEYS)
+    assert set(ruins_rooms.EVENTS) == set(rc.EVENT_PHOTO_KEYS)
+    rooms = set(rules.CHOICE_ROOMS) - {rules.EVENT} | {rules.TRAP, rules.AMBUSH}
+    assert rooms | {"mimic"} == set(rc.ROOM_PHOTO_KEYS)
+    assert len(rc.MOB_PHOTO_KEYS) == len(rc.MOB_KINDS)
+    need = {"вход", "пролог", "спуск", "выход", "гибель", *rc.ROOM_PHOTO_KEYS.values(),
+            *rc.EVENT_PHOTO_KEYS.values(), *rc.BOSS_PHOTO_KEYS.values(), *rc.MOB_PHOTO_KEYS,
+            *(f"{m}_элита" for m in rc.MOB_PHOTO_KEYS)}
+    assert need == set(rc.PHOTOS)
+    assert all(v.isdigit() for v in rc.PHOTOS.values())
