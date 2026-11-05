@@ -115,9 +115,15 @@ FLASK_HEAL = 0.08           # Фляга послушника - после бо�
 BANDAGE_HEAL = 0.25         # Тряпьё на бинты - после хозяина этажа
 GIFT_SECONDS = 60           # на выбор дара
 #: Руны с босса этажа: кубик на каждые 10 этажей (1-10 - 1, 11-20 - 2...),
-#: каждый с этим шансом.
+#: каждый с этим шансом. С уникальных боссов (этажи кратные 5) - 50%, с
+#: элитного хозяина остальных этажей - 25% (2026-11-05, решение владельца).
 RUNE_DIE_CHANCE = 0.5
+RUNE_DIE_CHANCE_ELITE = 0.25
 FLOORS_PER_RUNE_DIE = 10
+
+
+def rune_die_chance(floor: int) -> float:
+    return RUNE_DIE_CHANCE if floor % 5 == 0 else RUNE_DIE_CHANCE_ELITE
 
 
 def rune_dice(floor: int) -> int:

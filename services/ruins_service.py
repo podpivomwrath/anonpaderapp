@@ -524,7 +524,7 @@ async def room_won(db: AsyncSession, run: RuinRun, hp: dict[int, int], used: dic
             if boss:
                 bag = m.bag or {}
                 dice = rc.rune_dice(run.floor) + dice_bonus
-                for _ in range(sum(1 for _ in range(dice) if rng.random() < rc.RUNE_DIE_CHANCE)):
+                for _ in range(sum(1 for _ in range(dice) if rng.random() < rc.rune_die_chance(run.floor))):
                     rune_id = rune_service.roll_rune(rng)
                     bag = _add(bag, "runes", rune_id, 1)
                     got["runes"].append(rune_id)

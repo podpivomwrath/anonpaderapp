@@ -367,3 +367,9 @@ async def test_no_group_invites_inside_ruins(db_session, make_character) -> None
     except group_service.GroupError as exc:
         assert "руин" in str(exc)
     assert await group_service.get_membership(db_session, inside.id) is None
+
+
+def test_rune_die_chance_unique_vs_elite() -> None:
+    """2026-11-05: руны с элитного хозяина (этажи не кратные 5) - 25%,
+    с уникальных боссов - по-прежнему 50%."""
+    assert [rc.rune_die_chance(f) for f in (1, 4, 5, 9, 10, 31, 35)] == [0.25, 0.25, 0.5, 0.25, 0.5, 0.25, 0.5]
