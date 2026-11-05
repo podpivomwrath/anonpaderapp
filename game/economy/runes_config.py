@@ -216,6 +216,9 @@ MANUAL_TAGS: dict[str, set[str]] = {
                  "dark_mystic_ward"},
     # Навыки, что сами лечат или вешают щит. Глухая оборона и Несокрушимый -
     # нет: их лечение идёт от блока, «Подпорка» там ничего бы не дала.
-    "heal_shield": {"dark_mystic_ward", "blood_knight_lifesteal_strike", "dark_mystic_blood_pact",
-                    "dark_mystic_drain", "dark_mystic_circle"},
+    # Жатва и Багровый пир лечат так же, как Кровопуск (долей урона) - были
+    # забыты (2026-11-05, владелец).
+    "heal_shield": {"dark_mystic_ward", "blood_knight_lifesteal_strike", "blood_knight_harvest",
+                    "blood_knight_crimson_feast", "dark_mystic_blood_pact", "dark_mystic_drain",
+                    "dark_mystic_circle"},
 }

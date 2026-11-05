@@ -179,3 +179,13 @@ def test_event_runes_leave_a_log_line() -> None:
         assert any(word in x for x in ctx.lines), rune
     assert "Каменная воля" in combat_flavor.control_resisted_line("Страж", "stone_will")
     assert combat_flavor.control_resisted_line("Страж") == "Страж сопротивляется контролю."
+
+
+def test_prop_fits_every_blood_knight_heal_skill() -> None:
+    """2026-11-05, владелец: «Подпорка» не вставлялась в Жатву и Багровый
+    пир, хотя они лечат так же, как Кровопуск."""
+    from game.combat.subclass_skills import SUBCLASS_SKILL_DEFS
+    from game.economy import runes
+
+    for skill_id in ("blood_knight_lifesteal_strike", "blood_knight_harvest", "blood_knight_crimson_feast"):
+        assert "heal_shield" in runes.skill_tags(SUBCLASS_SKILL_DEFS[skill_id]), skill_id
