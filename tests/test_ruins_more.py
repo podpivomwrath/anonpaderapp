@@ -423,3 +423,27 @@ def test_no_waiting_message_without_allies(monkeypatch) -> None:
     assert not raid_combat._others_pending(-999, duo, 1)
     with_dead = SimpleNamespace(participants={1: object(), 3: object()})
     assert not raid_combat._others_pending(-999, with_dead, 1)
+
+
+def test_ruins_mobs_use_the_exploration_level_curve() -> None:
+    """2026-11-05, владелец: разница уровней в руинах - точно как в
+    исследовании (LVL_DIFF_FIELD_*), но «Тяжёлый взгляд» мобов руин не режет."""
+    from game.combat import formulas, shared_rules
+
+    for floor, room in ((1, rules.FIGHT), (7, rules.ELITE), (5, rules.BOSS)):
+        stage, state = _boss_room(floor) if room == rules.BOSS else (None, None)
+        if stage is None:
+            layout = rules.generate(random.Random(0), floor)
+            state = CombatSessionState(session_id=1, mode=CombatMode.PVE, is_raid=True)
+            state.add(_player(1))
+            stage = rcombat.build_stage(22_000_000, layout, room, 1, {}, random.Random(0))
+            stage.setup(state)
+        mobs = [c for c in state.combatants.values() if c.kind == "mob"]
+        assert mobs and all(m.field_curve and not m.field_mob for m in mobs), (floor, room)
+        mob = mobs[0]
+        assert formulas.level_diff_modifiers(mob.level, 60, mob.field_curve) == \
+            formulas.level_diff_modifiers(mob.level, 60, True)
+        hp = mob.max_hp
+        state.combatants[1].buff_modifiers["rune:heavy_gaze"] = 0.06
+        shared_rules.rune_gaze(state)
+        assert mob.max_hp == hp

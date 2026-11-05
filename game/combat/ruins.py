@@ -56,8 +56,11 @@ class _RuinsStage:
         return 1.15 if gifts_mod.has(self.gifts, "heavy_bag") else 1.0
 
     def _mob(self, name: str, hp: float, dmg: float, primary: str | None = None, label: str | None = None):
-        return build_mob(self._new_id(), name, self.level, rc.MOB_RING, hp * self._toughness(), dmg,
-                         primary or self.primary, label or self.label)
+        mob = build_mob(self._new_id(), name, self.level, rc.MOB_RING, hp * self._toughness(), dmg,
+                        primary or self.primary, label or self.label)
+        # Разница уровней - как у мобов исследования (2026-11-05, владелец).
+        mob.steep_level_curve = True
+        return mob
 
     def _add(self, session: CombatSessionState, mob: CombatantState, reward: bool = True) -> CombatantState:
         if reward:
