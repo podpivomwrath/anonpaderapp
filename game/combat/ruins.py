@@ -361,11 +361,21 @@ class Herald(RuinBoss):
         if not self.alive(session):
             return
         if self.banned is not None:
+            from game.combat.skills import DEFENSIVE_SKILLS
+
+            # Только тот, кто УДАРИЛ врага объявленным: защитные навыки,
+            # «Защититься», зелья и промахи мимо не в счёт (2026-11-06, баг:
+            # Глашатай бил в ответ на Глухую оборону).
+            struck = {h.source_id for h in result.hit_renders
+                      if not h.is_tick and h.source_side != h.target_side}
             for cid, action in result.actions.items():
                 c = session.combatants.get(cid)
-                if action.type == self.banned and c is not None and c.alive:
-                    stage_hurt(c, round(c.max_hp * rc.HERALD_HIT), out)
-                    out.lines.append(f"📯 {c.name} ударил запретным - удар вернулся")
+                if c is None or not c.alive or action.type != self.banned or cid not in struck:
+                    continue
+                if action.type == ActionType.SKILL and action.skill_id in DEFENSIVE_SKILLS:
+                    continue
+                hurt = stage_hurt(c, round(c.max_hp * rc.HERALD_HIT), out)
+                out.lines.append(f"📯 {c.name} ударил запретным - Глашатай возвращает удар: {hurt} урона")
         self.banned = rng.choice(list(self.KINDS))
         out.lines.append(f"📯 Глашатай: «Следующий {self.KINDS[self.banned]} вернётся тому, кто ударит!»")
 

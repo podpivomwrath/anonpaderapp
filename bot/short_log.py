@@ -121,8 +121,21 @@ async def toggle(api, peer_id: int) -> bool:
             message=last.full if last.expanded else last.short,
             keyboard=with_toggle(last.keyboard, expanded=last.expanded),
         )
-    except Exception:
-        logger.warning("Короткий лог: не удалось править сообщение {} у {}", last.message_id, peer_id)
+    except Exception as exc:
+        # Чаще всего - лимит частоты правок VK (код 9): в рейдах и руинах бот
+        # правит сообщения постоянно. Игрок видел «лога уже нет», хотя лог в
+        # памяти был (2026-11-06). Тогда полный лог - новым сообщением.
+        logger.warning("Короткий лог: не удалось править сообщение {} у {}: {}", last.message_id, peer_id, exc)
         last.expanded = not last.expanded
-        return False
+        if last.expanded:
+            return True  # свернуть не вышло - не беда, лог и так развёрнут
+        try:
+            message_id = await api.messages.send(peer_id=peer_id, message=last.full, random_id=0,
+                                                 keyboard=with_toggle(last.keyboard, expanded=True))
+        except Exception:
+            logger.warning("Короткий лог: и новым сообщением не ушёл у {}", peer_id)
+            return False
+        _last.pop(int(peer_id), None)
+        if isinstance(message_id, int) and message_id > 0:
+            _last[int(peer_id)] = LastLog(message_id, last.short, last.full, last.keyboard, expanded=True)
     return True

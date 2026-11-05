@@ -88,3 +88,23 @@ def test_short_render_counts_shield_turned_into_health() -> None:
     state, hero, _wolf = _session()
     result = TickResult(shield_heals=[(1, 1, 73)])
     assert "(+73)" in battle_log.render_short(state, result)
+
+
+async def test_expand_falls_back_to_new_message_when_edit_refused() -> None:
+    """2026-11-06: VK отказывал в правке (лимит частоты, код 9), и «Сводка»
+    отвечала «лога уже нет», хотя лог был. Теперь полный лог - новым сообщением."""
+
+    class _Refusing(_Api):
+        async def edit(self, **kw):
+            raise RuntimeError("Flood control")
+
+    api = _Refusing()
+    short_log.set_short(777, True)
+    try:
+        kb = combat_keyboard("mage", {})
+        await short_log.send(api, 777, "коротко", "полностью", kb)
+        assert await short_log.toggle(api, 777)
+        assert api.sent[-1]["message"] == "полностью"
+        assert short_log.BTN_HIDE in api.sent[-1]["keyboard"]
+    finally:
+        short_log.set_short(777, False)

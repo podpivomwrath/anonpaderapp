@@ -263,13 +263,30 @@ def test_candles_heal_boss_and_go_out_with_her() -> None:
 
 
 def test_herald_reflects_banned_strike() -> None:
+    """Возвращает только удар по врагу объявленным видом. 2026-11-06, баг:
+    бил и за Глухую оборону - защитный навык тоже считался «навыком»."""
+    from game.combat.session import ActionType
+
     stage, state = _boss_room(20)
     herald = stage.bosses[0]
-    stage._enemy_tick(state, TickResult(), random.Random(1))
-    banned = herald.banned
+    boss_id = herald.boss_id
+
+    def strike(cid):
+        return RenderedHit(cid, boss_id, 0, 1, "бьёт", 100, False, False, False, 9000, 8900, 9000)
+
+    for banned, action in ((ActionType.ATTACK, DeclaredAction(type=ActionType.ATTACK)),
+                           (ActionType.SKILL, DeclaredAction(type=ActionType.SKILL, skill_id="warrior_stagger"))):
+        herald.banned = banned
+        before = state.combatants[1].current_hp
+        res = TickResult(actions={1: action}, hit_renders=[strike(1)])
+        stage._enemy_tick(state, res, random.Random(1))
+        assert state.combatants[1].current_hp < before, banned
+        state.combatants[1].current_hp = state.combatants[1].max_hp
+    herald.banned = ActionType.SKILL
     before = state.combatants[1].current_hp
-    stage._enemy_tick(state, TickResult(actions={1: DeclaredAction(type=banned)}), random.Random(1))
-    assert state.combatants[1].current_hp < before
+    guard = DeclaredAction(type=ActionType.SKILL, skill_id="guardian_block")
+    stage._enemy_tick(state, TickResult(actions={1: guard}), random.Random(1))
+    assert state.combatants[1].current_hp == before, "защитный навык без удара - не в счёт"
 
 
 def test_brothers_rage_when_uneven() -> None:
