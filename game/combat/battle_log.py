@@ -259,6 +259,12 @@ def _hp_changes(result: TickResult) -> dict[int, tuple[int, int]]:
             out.setdefault(h.target_id, [0, 0])[0] += max(h.hp_before - h.hp_after, 0)
     for h in result.heal_renders:
         out.setdefault(h.target_id, [0, 0])[1] += max(h.hp_after - h.hp_before, 0)
+    # Остаток щита, обращённый в здоровье (Оберег, Второе сердце), - мимо
+    # heal_renders. Без него короткий лог прятал это лечение: полоска росла,
+    # а в «+» его не было (2026-11-05, Пётр Филиппов).
+    for _source, target_id, amount in getattr(result, "shield_heals", []) or []:
+        if amount > 0:
+            out.setdefault(target_id, [0, 0])[1] += amount
     return {cid: (lost, healed) for cid, (lost, healed) in out.items()}
 
 

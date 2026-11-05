@@ -78,3 +78,13 @@ async def test_send_short_then_expand_and_hide() -> None:
     await short_log.send(api, 42, "коротко", "полностью", combat_keyboard("mage", {}))
     assert api.sent[-1]["message"] == "полностью" and short_log.BTN_OPEN not in api.sent[-1]["keyboard"]
     assert not await short_log.toggle(api, 42)
+
+
+def test_short_render_counts_shield_turned_into_health() -> None:
+    """2026-11-05 (Пётр Филиппов): Оберег истёк и вылечил, а в коротком
+    логе «+» этого не показывал - лечение от щита шло мимо heal_renders."""
+    from game.combat.resolver import TickResult
+
+    state, hero, _wolf = _session()
+    result = TickResult(shield_heals=[(1, 1, 73)])
+    assert "(+73)" in battle_log.render_short(state, result)
