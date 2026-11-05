@@ -447,3 +447,18 @@ def test_ruins_mobs_use_the_exploration_level_curve() -> None:
         state.combatants[1].buff_modifiers["rune:heavy_gaze"] = 0.06
         shared_rules.rune_gaze(state)
         assert mob.max_hp == hp
+
+
+def test_candle_wax_boosts_burn_and_poison() -> None:
+    """2026-11-05, владелец: бонус к урону ядом - бонус ко всему урону за ход,
+    горение Элементалиста тоже."""
+    from game import ruins_gifts
+    from game.combat import shared_rules
+    from game.combat.session import BURN_TAG, Effect, EffectKind
+
+    src, tgt = _player(1), _player(2)
+    src.buff_modifiers.update(ruins_gifts.mods([{"id": "candle_wax"}]))
+    for tag in (BURN_TAG, None):
+        effect = Effect(kind=EffectKind.DOT, value=100, remaining_ticks=3, source_id=1, stacks=1, tag=tag)
+        plain = shared_rules.poison_tick_damage(effect, _player(3), tgt)
+        assert shared_rules.poison_tick_damage(effect, src, tgt) == round(plain * 1.25), tag
