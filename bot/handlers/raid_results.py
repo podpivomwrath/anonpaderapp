@@ -189,6 +189,7 @@ async def on_raid_tick_resolved(session_id: int, tick: int, result: TickResult) 
             held = (
                 "📖 Каталог сковал тебя: следующий ход ты пропускаешь." if battle.is_archive
                 else "⛓ Тебя держат: следующий ход ты пропускаешь." if battle.is_rift
+                else _ruins_held(battle) if battle.is_ruins
                 else "🦴 Руки держат крепко: следующий ход ты пропускаешь."
             )
             notices[cid] = f"{notices[cid]}\n{held}" if notices.get(cid) else held
@@ -618,6 +619,14 @@ async def _send_location_summary(character_id: int, peer_id: int) -> None:
         )
     except Exception:
         logger.exception("Рейд: не удалось отправить сводку локации {}", peer_id)
+
+
+def _ruins_held(battle) -> str:
+    """Руины: пропуск хода - это завал Привратника (2026-11-05: раньше
+    приходило «Руки держат крепко» из рейда, игрок решал, что ход не прошёл)."""
+    if len(battle.participants) == 1:
+        return "🪨 Тебя засыпало: следующий ход пропускаешь, потом выберешься сам."
+    return "🪨 Тебя засыпало: ход пропускаешь, пока тебя не откопают («⛏ Разгрести»)."
 
 
 #: Павшие в пройденном разломе поднимаются с этой долей здоровья (2026-10-16).

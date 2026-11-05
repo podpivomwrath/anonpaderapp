@@ -247,8 +247,8 @@ class Gatekeeper(RuinBoss):
             if free and (len(alive) == 1 or len(free) > 1):
                 victim = rng.choice(free)
                 self.buried[victim.id] = self.room.ticks
-                stage_hurt(victim, round(victim.max_hp * rc.GATE_HIT), out)
-                out.lines.append(f"🪨 Свод рушится на {victim.name} - его засыпало")
+                hurt = stage_hurt(victim, round(victim.max_hp * rc.GATE_HIT), out)
+                out.lines.append(f"🪨 Свод рушится на {victim.name} - {hurt} урона, его засыпало")
         out.frozen.extend(cid for cid in self.buried if cid not in out.frozen)
 
     def extra_buttons(self, session, cid) -> list[tuple[str, dict]]:

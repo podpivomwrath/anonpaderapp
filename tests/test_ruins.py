@@ -344,3 +344,26 @@ async def test_every_unique_boss_fight_runs_to_the_end(monkeypatch) -> None:
             raid_combat.release_ruins_battle(battle_id)
             pytest.fail(f"этаж {floor}: бой не кончился {info} {results}")
     assert results == ["won"] * 7, results
+
+
+async def test_no_group_invites_inside_ruins(db_session, make_character) -> None:
+    """2026-11-05: Гостус принял приглашение Есты посреди своего забега,
+    группа у входа не могла спуститься. Из руин и в руины не зовут, а
+    приглашение, принятое уже внутри, не срабатывает."""
+    from services import group_service
+
+    inside, outside, other = await _party(make_character, 3)
+    pending = await group_service.send_invite(db_session, outside, inside)
+    await ruins_service.start(db_session, inside, [inside], random.Random(1))
+    for inviter, target in ((outside, inside), (inside, other)):
+        try:
+            await group_service.send_invite(db_session, inviter, target)
+            raise AssertionError("приглашение прошло")
+        except group_service.GroupError as exc:
+            assert "руин" in str(exc)
+    try:
+        await group_service.accept_invite(db_session, pending.id, inside.id)
+        raise AssertionError("вступил из руин")
+    except group_service.GroupError as exc:
+        assert "руин" in str(exc)
+    assert await group_service.get_membership(db_session, inside.id) is None

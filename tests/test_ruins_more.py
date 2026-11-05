@@ -224,6 +224,21 @@ def test_gatekeeper_buries_and_dig_frees() -> None:
     assert buried not in gate.buried
 
 
+def test_gatekeeper_solo_skips_one_turn_per_burial() -> None:
+    """2026-11-05 (Дедушка_Ау): одиночку засыпало, а выбирался он только
+    после второго пропуска - и сразу под новый завал, ходил 1 раз из 3.
+    Теперь: засыпало - один пропущенный ход - свободен."""
+    stage, state = _boss_room(5, party=1)
+    frozen_ticks = []
+    for tick in range(1, 4 * rc.GATE_EVERY + 1):
+        stage.ticks = tick
+        out = stage._enemy_tick(state, TickResult(), random.Random(1))
+        state.combatants[1].current_hp = state.combatants[1].max_hp  # не дать погибнуть
+        if 1 in out.frozen:
+            frozen_ticks.append(tick + 1)  # пропускается следующий ход
+    assert frozen_ticks == [t + 1 for t in range(rc.GATE_EVERY, 4 * rc.GATE_EVERY + 1, rc.GATE_EVERY)]
+
+
 def test_counter_collects_debt() -> None:
     stage, state = _boss_room(10)
     boss_id = stage.bosses[0].boss_id

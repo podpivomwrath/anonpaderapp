@@ -99,6 +99,14 @@ async def _active_invite_to(db: AsyncSession, to_character_id: int) -> GroupInvi
 async def send_invite(db: AsyncSession, inviter: Character, target: Character) -> GroupInvite:
     if target.id == inviter.id:
         raise GroupError("Нельзя пригласить самого себя.")
+    # Руины (2026-11-05): Гостус принял приглашение посреди своего забега -
+    # группа у входа ждала, не понимая, почему спуск не пускает.
+    from services import ruins_service
+
+    if await ruins_service.membership(db, inviter.id) is not None:
+        raise GroupError("Из руин в группу не зовут - сначала поднимись наверх.")
+    if await ruins_service.membership(db, target.id) is not None:
+        raise GroupError("Этот игрок сейчас в руинах - позови, когда поднимется.")
 
     inviter_membership = await get_membership(db, inviter.id)
     current_levels = [inviter.level]
@@ -168,6 +176,12 @@ async def accept_invite(db: AsyncSession, invite_id: int, character_id: int) -> 
         invite.status = "declined"
         await db.flush()
         raise GroupError("Ты уже в другой группе.")
+    from services import ruins_service
+
+    if await ruins_service.membership(db, character_id) is not None:
+        invite.status = "declined"
+        await db.flush()
+        raise GroupError("Ты в руинах - сначала поднимись наверх, потом вступай в группу.")
 
     newly_created = False
     if invite.group_id is None:
