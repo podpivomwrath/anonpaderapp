@@ -32,6 +32,9 @@ class DerivedStats:
     crit_resist: float = 0.0
     accuracy: float = 0.0
     dot_resist: float = 0.0
+    #: Прибавка периодического урона от Воли (2026-11-06); у Отравителя 0 -
+    #: его Воля в poison_power.
+    dot_power: float = 0.0
 
 
 #: Баффы пресета и еды, которые работают в бою всегда (без условий «на низком
@@ -99,6 +102,7 @@ def compute(
         poison_power=round(
             poison_tick_damage_per_stack(will, agility) * bc.POISONER_MAX_STACKS, 1
         ),
+        dot_power=model.dot_power(s, character.subclass) - 1,
         crit_resist=model.crit_resist(s) + m.get("resist_crit", 0.0),
         accuracy=m.get("accuracy", 0.0),
         # Как в бою (shared_rules.rune_dot_mult): не больше 90%.

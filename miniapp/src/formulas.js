@@ -53,6 +53,9 @@ const SUPPORT_K = 125;
 // причём Воля весит больше, хотя основной стат подкласса - Ловкость.
 const POISON_PER_WIL = 0.7125;
 const POISON_PER_AGI = 0.4875;
+// Воля качает периодический урон всем, кроме Отравителя (2026-11-06,
+// balance_config.DOT_POWER_PER_WIL): у него Воля уже в силе яда.
+const DOT_POWER_PER_WIL = 0.006;
 const POISON_MAX_STACKS = 3;
 
 // Уворот - от Воли (2026-10-24, было от Ловкости).
@@ -149,6 +152,7 @@ export function computeDerived({ level, baseClass, subclass = null, stats, gearB
   const supportPower = hyper(wil, SUPPORT_CAP, SUPPORT_K);
   // урон за ход при полном числе стаков: делится на стаки и тут же
   // умножается обратно, но так формула читается так же, как в движке
+  const dotPower = subclass === 'poisoner' ? 0 : DOT_POWER_PER_WIL * wil;
   const poisonPower =
     ((POISON_PER_WIL * wil + POISON_PER_AGI * agi) / POISON_MAX_STACKS) * POISON_MAX_STACKS;
   // Прибавка подкласса - к обоим уворотам целиком, как в бою (skills.compute_hit).
@@ -166,6 +170,6 @@ export function computeDerived({ level, baseClass, subclass = null, stats, gearB
 
   return {
     maxHp, damage, critChance, mitigation, controlResist, supportPower,
-    dodgeChance, abilityDodgeChance, poisonPower, critResist, accuracy, dotResist,
+    dodgeChance, abilityDodgeChance, poisonPower, critResist, accuracy, dotResist, dotPower,
   };
 }

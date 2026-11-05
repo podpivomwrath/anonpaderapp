@@ -277,6 +277,7 @@ def test_freeze_skips_action() -> None:
 def test_dot_ticks_damage() -> None:
     rng = NoCritRng()
     a = combatant(1, side=0)
+    a.stats.will = 0  # Воля качает урон за ход (2026-11-06)
     b = combatant(2, side=1)
     b.effects.append(Effect(kind=EffectKind.DOT, value=25, remaining_ticks=2, source_id=1))
     state = make_session(CombatMode.PVP_GROUP, a, b)

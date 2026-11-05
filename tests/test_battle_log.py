@@ -105,6 +105,7 @@ def test_miss_line_format() -> None:
 
 def test_dot_line_appears_in_target_side_section() -> None:
     a = combatant(1, side=0, name="Гостус")
+    a.stats.will = 0  # Воля качает урон за ход (2026-11-06) - тут проверяем только раздел лога
     b = combatant(2, side=1, name="Кандальный", kind="mob")
     b.effects.append(Effect(kind=EffectKind.DOT, value=10, remaining_ticks=2, source_id=1))
     state = make_session(CombatMode.PVE, a, b)

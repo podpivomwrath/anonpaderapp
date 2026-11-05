@@ -145,6 +145,7 @@ def test_poison_scales_with_stats() -> None:
 
     per_stack = (bc.POISONER_POISON_WIL_COEF * 100
                  + bc.POISONER_POISON_AGI_COEF * 50) / bc.POISONER_MAX_STACKS
+    # Отравителю Воля - только в базе яда, без множителя (2026-11-06).
     assert hp_before_dot - enemy.current_hp == round(per_stack)
 
 

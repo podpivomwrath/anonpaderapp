@@ -169,6 +169,7 @@ def _character_payload(
             "crit_resist": derived.crit_resist,
             "accuracy": derived.accuracy,
             "dot_resist": derived.dot_resist,
+            "dot_power": derived.dot_power,
         },
     }
 

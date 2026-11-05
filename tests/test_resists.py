@@ -85,6 +85,7 @@ def test_accuracy_cuts_dodge_and_floors_at_zero() -> None:
 
 def test_dot_resist_with_floor() -> None:
     src, tgt = combatant(1, 0), combatant(2, 1)
+    src.stats.will = 0  # без прибавки Воли (2026-11-06): проверяем только стойкость
     effect = Effect(kind=EffectKind.DOT, value=100, remaining_ticks=3, source_id=1, stacks=1)
     base = shared_rules.poison_tick_damage(effect, src, tgt)
     tgt.buff_modifiers["resist_dot"] = 0.27

@@ -125,6 +125,16 @@ const DERIVED_DEFS = [
     format: (v) => (v + EPS).toFixed(1),
     hint: () => 'Урон яда за ход при 3 зарядах: 0,95 за каждое очко Воли и 0,65 за каждое очко Ловкости.',
   },
+  {
+    key: 'dot_power',
+    clientKey: 'dotPower',
+    label: '🔥 Периодический урон',
+    format: (v) => `+${(v * 100 + EPS).toFixed(1)}%`,
+    // У Отравителя Воля уже в «Силе яда» - строка ему не нужна.
+    notFor: 'poisoner',
+    hint: () => 'Прибавка к периодическому урону (яд, горение) от Воли: +0,6% за каждое очко. '
+      + 'У Отравителя Воля вместо этого входит в силу яда.',
+  },
 ];
 
 const DODGE_HINT = 'От Воли: 100 очков - 13%, 250 - 22%, выше 45% не бывает. Это шанс целиком избежать '
@@ -303,7 +313,7 @@ export default function StatsTab({ character, onCharacterUpdate }) {
 
       <Group header={<Header>Предпросмотр</Header>}>
         <Caption level="1" className="stat-row__hint">Числа - как в бою: с вещами, активным пресетом и едой.</Caption>
-        {DERIVED_DEFS.filter((row) => !row.onlyFor || row.onlyFor === character.subclass).map((row) => {
+        {DERIVED_DEFS.filter((row) => (!row.onlyFor || row.onlyFor === character.subclass) && row.notFor !== character.subclass).map((row) => {
           const before = character.derived[row.key];
           const after = previewDerived[row.clientKey];
           const changed = totalPending > 0 && row.format(before) !== row.format(after);

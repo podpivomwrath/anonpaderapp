@@ -181,6 +181,7 @@ def test_vulnerability_boosts_poison_ticks() -> None:
     """2026-10-25, жалоба: уязвимость Отравителя не работала - его урон почти
     весь ядом, а яд уязвимость не видел."""
     poisoner, enemy, poison, _state = _setup()
+    poisoner.stats.will = 0  # без прибавки Воли (2026-11-06): проверяем только уязвимость
     plain = shared_rules.poison_tick_damage(poison, poisoner, enemy)
     enemy.apply_effect(EffectKind.VULNERABILITY, 0.34, 3, poisoner.id)
     assert shared_rules.poison_tick_damage(poison, poisoner, enemy) == round(poison.value * poison.stacks * 1.34)

@@ -10,6 +10,7 @@ from tests.conftest import NoCritRng, combatant
 
 def _tick(mods: dict) -> int:
     src, tgt = combatant(1, 0), combatant(2, 1)
+    src.stats.will = 0  # прибавка Воли - отдельный тест
     src.buff_modifiers.update(mods)
     burn = Effect(kind=EffectKind.DOT, value=100, remaining_ticks=3, source_id=1, stacks=1, tag=BURN_TAG)
     return shared_rules.poison_tick_damage(burn, src, tgt)
@@ -48,3 +49,20 @@ def test_gifts_and_passives_are_direct_food_is_all() -> None:
         assert "direct_damage_bonus" in BY_ID[gid].mods
     assert BY_ID["candle_wax"].mods == {"dot_damage_bonus": 0.25}
     assert any("damage_bonus" in d.buff for d in cooking_config.DISHES)
+
+
+def test_will_boosts_every_dot() -> None:
+    """2026-11-06, владелец: Воля качает периодический урон всем - и горение
+    Элементалиста. Отравителю - нет: его Воля уже в силе яда, яд не трогаем."""
+    from game.combat import balance_config as bc
+
+    src, tgt = combatant(1, 0), combatant(2, 1)
+    for will in (0, 100):
+        src.stats.will = will
+        for tag in (BURN_TAG, None):
+            effect = Effect(kind=EffectKind.DOT, value=100, remaining_ticks=3, source_id=1, stacks=1, tag=tag)
+            assert shared_rules.poison_tick_damage(effect, src, tgt) == round(100 * (1 + bc.DOT_POWER_PER_WIL * will))
+    poisoner = combatant(3, 0, subclass_id="poisoner")
+    poisoner.stats.will = 100
+    effect = Effect(kind=EffectKind.DOT, value=100, remaining_ticks=3, source_id=3, stacks=1)
+    assert shared_rules.poison_tick_damage(effect, poisoner, tgt) == 100, "у Отравителя без двойного учёта"
