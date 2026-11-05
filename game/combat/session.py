@@ -253,6 +253,15 @@ class CombatantState:
     rune_breath_used: bool = False
     rune_saved: bool = False
     rune_gaze_done: bool = False
+    # Ультимативные руны (2026-11-05): «Свежие силы» и «Каменная воля» - раз
+    # за бой; «За своих» - павшие союзники; «Счёт до четырёх» - счёт ударов;
+    # «Ещё раз» - навык во второй раз вполсилы; «Последнее слово» - отыграно.
+    rune_wind_used: bool = False
+    rune_will_used: bool = False
+    allies_fallen: int = 0
+    hits_made: int = 0
+    rune_half: bool = False
+    rune_last_word_done: bool = False
     # Сила входящего лечения и новых щитов в этот ход: в PvP падает от 1.0 в
     # первый ход до 0 в последний (2026-10-29, владелец). Ставит движок при
     # открытии хода - эликсиры пьются в окне хода, до резолва.

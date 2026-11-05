@@ -54,6 +54,8 @@ class PendingHit:
     skill_id: str | None = None
     #: Руна «Ответный выпад» усилила удар (2026-11-05: отметка в логе).
     riposte: bool = False
+    #: Руна «Счёт до четырёх»: четвёртый удар (2026-11-05, отметка в логе).
+    heavy: bool = False
 
 
 @dataclass
@@ -248,6 +250,8 @@ def rune_outgoing(actor: CombatantState, target: CombatantState) -> float:
         mult *= 1.0 + mods.get(f"rune:press@{skill_id}", 0.0)
     # «Злоба»: за каждый полученный удар, до пяти.
     mult *= 1.0 + mods.get("rune:spite", 0.0) * min(getattr(actor, "hits_taken", 0), 5)
+    # «За своих» (2026-11-05): за каждого павшего союзника, до трёх.
+    mult *= 1.0 + mods.get("rune:for_ours", 0.0) * min(getattr(actor, "allies_fallen", 0), 3)
     return mult
 
 
@@ -406,6 +410,17 @@ def compute_hit(
         # трогает, только входящий по себе.
         base *= 1.0 - target.buff_modifiers.get("crit_damage_taken_reduction", 0.0)
     base *= outgoing_multiplier(actor, target)
+    # Ультимативные руны (2026-11-05): «Ещё раз» - второй прогон навыка
+    # вполсилы; «Счёт до четырёх» - каждый четвёртый удар (промахи не в счёт).
+    if getattr(actor, "rune_half", False):
+        base *= 0.5
+    heavy = False
+    swing = actor.buff_modifiers.get("rune:heavy_swing", 0.0)
+    if swing > 0:
+        actor.hits_made = getattr(actor, "hits_made", 0) + 1
+        if actor.hits_made % 4 == 0:
+            base *= 1.0 + swing
+            heavy = True
     # Руна «Литая кираса» (2026-10-31): уязвимость на цели слабее.
     base *= 1.0 + target.effect_total(EffectKind.VULNERABILITY) * max(
         1.0 - target.buff_modifiers.get("rune:cast_cuirass", 0.0), 0.0)
@@ -446,6 +461,7 @@ def compute_hit(
         label=label,
         skill_id=getattr(actor, "current_skill", None),
         riposte=riposte_active(actor),
+        heavy=heavy,
     )
 
 

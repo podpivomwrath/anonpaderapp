@@ -3,7 +3,7 @@
 Готовые файлы клади в `img/` под указанными именами - подключу. Нет файла -
 в мини-аппе остаётся эмодзи, так что делать можно частями.
 
-Всего: 49 иконок рун, 3 пустых гнезда, замок, рунный круг под ногами героя и
+Всего: 56 иконок рун (7 ультимативных добавлены 2026-11-05), 3 пустых гнезда, замок, рунный круг под ногами героя и
 шапка раздела.
 
 ## Как устроены иконки
@@ -87,6 +87,7 @@ square 1:1 composition, crisp readable silhouette at small size
 | `руна_мозоли.png` | Мозоли | a hammer and an awl crossed |
 | `руна_метка_монолита.png` | Метка Монолита | a tall narrow standing stone with a handprint on it |
 | `руна_язык_без_костей.png` | Язык без костей | a set of balance scales with a coin on one pan |
+| `руна_каменная_воля.png` | Каменная воля | a standing stone with a broken chain slipping off it |
 
 ## Руны экипировки (багрянец, осколок в скобе)
 
@@ -109,6 +110,10 @@ square 1:1 composition, crisp readable silhouette at small size
 | `руна_свежая_броня.png` | Свежая броня | a breastplate with short rays shining around it |
 | `руна_литая_кираса.png` | Литая кираса | a solid cuirass with a round seal stamped on its chest |
 | `руна_не_сегодня.png` | Не сегодня | an hourglass with a crack across it and the sand stopped |
+| `руна_свежие_силы.png` | Свежие силы | two curved gusts of wind circling around a heart |
+| `руна_за_своих.png` | За своих | three spears planted in the ground, one of them broken |
+| `руна_счёт_до_четырёх.png` | Счёт до четырёх | a war hammer raised high with four notches on the handle |
+| `руна_последнее_слово.png` | Последнее слово | a falling warrior's open hand releasing a burst of light |
 
 ## Руны навыков (голубой лёд, сланцевый диск)
 
@@ -123,6 +128,8 @@ square 1:1 composition, crisp readable silhouette at small size
 | `руна_тягучесть.png` | Тягучесть | a long stretched drop pulled into a thread |
 | `руна_короткий_взмах.png` | Короткий взмах | a short sharp arc next to a half-empty hourglass |
 | `руна_подпорка.png` | Подпорка | a stone pillar propping up a cracked shield |
+| `руна_ещё_раз.png` | Ещё раз | two identical arrows, the second one fainter, flying side by side |
+| `руна_без_передышки.png` | Без передышки | a sickle cutting through a closed loop of an hourglass |
 
 ## Гнёзда слотов
 

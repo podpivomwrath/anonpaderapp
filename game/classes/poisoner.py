@@ -77,9 +77,12 @@ def venom(ctx: SkillContext) -> None:
         target.effects.append(existing)
     # Руна «Гнилая рана» (2026-10-31): яд с шансом держится на ход дольше.
     wound = actor.buff_modifiers.get("rune:rotten_wound", 0.0)
-    if wound and ctx.rng.random() < wound:
+    rotten = bool(wound) and ctx.rng.random() < wound
+    if rotten:
         existing.remaining_ticks += 1
     ctx.lines.append(f"{target.name} под действием яда ({actor.name}) ☠")
+    if rotten:
+        ctx.lines.append(f"🪨 Гнилая рана: яд на {target.name} продержится на ход дольше")
 
     # Патч 56, «Ядовитое облако»: раз в N ходов тот же удар разносит по стаку
     # яда на ВСЕХ противников. Нет-оп в дуэли: там противник всего один.
@@ -143,7 +146,7 @@ def disrupt(ctx: SkillContext) -> None:
             # В PvP сопротивление сбою не выдаём (2026-10-29, баг-репорт):
             # сбой и так срабатывает с шансом, пусть сорвалось молча.
             if not pvp:
-                ctx.lines.append(combat_flavor.control_resisted_line(target.name))
+                ctx.lines.append(combat_flavor.control_resisted_line(target.name, res.reason))
         else:
             # Патч 56, «Паралитик»: удачный сбой роняет сопротивление контролю
             # цели на 1 ход (тот же эффект, что «Тепловой шок» Элементалиста).

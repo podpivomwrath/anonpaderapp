@@ -117,8 +117,12 @@ RUNES: list[RuneDef] = [
     RuneDef("calluses", HERO, "Мозоли", 0.06, "+{v} к опыту ремёсел"),
     # 2026-11-05: была эпической - на 60 уровне опыт не нужен, теперь обычная.
     RuneDef("monolith_mark", HERO, "Метка Монолита", 0.05, "+{v} к опыту героя", curve="tight"),
-    RuneDef("loose_tongue", HERO, "Язык без костей", 0.05, "обоз привозит больше золота на {v}", rarity="epic",
+    # 2026-11-05: была эпической - вниз вместе с «Меткой Монолита».
+    RuneDef("loose_tongue", HERO, "Язык без костей", 0.05, "обоз привозит больше золота на {v}",
             curve="tight"),
+    # Ультимативные (2026-11-05, владелец: для высоких тиров).
+    RuneDef("stone_will", HERO, "Каменная воля", 0.50, "шанс {v} стряхнуть первый контроль в бою",
+            pvp="half", curve="tight", rarity="epic"),
 
     # --- Руны экипировки ----------------------------------------------------------
     RuneDef("hammer_down", GEAR, "Молот по лежачему", 0.15, "+{v} урона по оглушённым", pvp="half",
@@ -155,6 +159,17 @@ RUNES: list[RuneDef] = [
     RuneDef("cast_cuirass", GEAR, "Литая кираса", 0.25, "уязвимость на тебе слабее на {v}", place="armor"),
     RuneDef("not_today", GEAR, "Не сегодня", 0.05, "шанс {v} пережить смертельный удар, раз за бой",
             pvp="half", place="armor", curve="very_tight", rarity="mythic"),
+    # Ультимативные (2026-11-05).
+    RuneDef("second_wind", GEAR, "Свежие силы", 0.25,
+            "раз за бой, когда здоровья меньше {v}, перезарядки всех навыков сбрасываются",
+            pvp="half", place="armor", rarity="epic"),
+    RuneDef("for_ours", GEAR, "За своих", 0.15, "+{v} урона за каждого павшего союзника, до трёх",
+            pvp="half", place="weapon", rarity="epic"),
+    RuneDef("heavy_swing", GEAR, "Счёт до четырёх", 1.00, "каждый четвёртый удар сильнее на {v}",
+            pvp="half", place="weapon", curve="very_tight", rarity="mythic"),
+    RuneDef("last_word", GEAR, "Последнее слово", 0.30,
+            "при гибели бьёт всех врагов на {v} своего максимума здоровья",
+            pvp="half", place="armor", curve="tight", rarity="mythic"),
 
     # --- Руны навыков -------------------------------------------------------------
     RuneDef("cold_count", SKILL, "Холодный счёт", 0.08, "шанс {v}, что навык не уйдёт в перезарядку",
@@ -172,6 +187,11 @@ RUNES: list[RuneDef] = [
             pvp="half", tag="long_cd", curve="very_tight", rarity="mythic"),
     RuneDef("prop", SKILL, "Подпорка", 0.15, "лечение и щиты навыка сильнее на {v}", pvp="half",
             tag="heal_shield"),
+    # Ультимативные (2026-11-05). В PvP не действуют.
+    RuneDef("once_more", SKILL, "Ещё раз", 0.10, "шанс {v}, что навык сработает второй раз вполсилы",
+            pvp="none", tag="damage", curve="very_tight", rarity="mythic"),
+    RuneDef("no_rest", SKILL, "Без передышки", 0.50, "шанс {v}, что добивание этим навыком сбросит его перезарядку",
+            pvp="none", tag="damage", curve="tight", rarity="mythic"),
 ]
 
 BY_ID: dict[str, RuneDef] = {r.id: r for r in RUNES}

@@ -109,7 +109,7 @@ def _make_handler(skill: SubclassSkillDef):
                 elif res.immune:
                     ctx.lines.append(combat_flavor.control_blocked_line(target.name, res.reason))
                 elif res.resisted:
-                    ctx.lines.append(combat_flavor.control_resisted_line(target.name))
+                    ctx.lines.append(combat_flavor.control_resisted_line(target.name, res.reason))
                 else:
                     # Патч 52, баг 1: «теряет ход» больше НЕ печатается здесь —
                     # единственное место теперь резолвер (game/combat/resolver.py,

@@ -357,12 +357,81 @@ def rune_guard(combatant: CombatantState, lines: list[str], rng=None) -> None:
             combatant.current_hp = 1
             lines.append(f"🪨 Не сегодня: {combatant.name} остаётся на ногах с 1 HP")
         return
+    wind = _rune(combatant, "rune:second_wind")
+    if wind and not getattr(combatant, "rune_wind_used", False) and combatant.current_hp < combatant.max_hp * wind:
+        # «Свежие силы» (2026-11-05): раз за бой все перезарядки - в ноль.
+        combatant.rune_wind_used = True
+        if any(v > 0 for v in combatant.cooldowns.values()):
+            combatant.cooldowns = {k: 0 for k in combatant.cooldowns}
+            lines.append(f"🪨 Свежие силы: у {combatant.name} снова готовы все навыки")
     heal = _rune(combatant, "rune:spare_breath")
     if heal and not getattr(combatant, "rune_breath_used", False) and combatant.current_hp < combatant.max_hp * 0.3:
         combatant.rune_breath_used = True
         amount = recovered(combatant, max(round(combatant.max_hp * heal), 1))
         combatant.current_hp = min(combatant.current_hp + amount, combatant.max_hp)
         lines.append(f"🪨 Запас дыхания: {combatant.name} +{amount} HP")
+
+
+def rune_will(target: CombatantState, rng) -> bool:
+    """«Каменная воля» (2026-11-05): первый контроль в бою - шанс стряхнуть.
+    Попытка одна: прошёл первый контроль - дальше руна молчит."""
+    chance = _rune(target, "rune:stone_will")
+    if not chance or getattr(target, "rune_will_used", False):
+        return False
+    target.rune_will_used = True
+    return rng.random() < chance
+
+
+def rune_last_word(session: CombatSessionState, alive_before: set[int], lines: list[str]) -> None:
+    """«Последнее слово» (2026-11-05): павший в этот ход бьёт всех живых
+    врагов на долю своего максимума здоровья. Через щиты, раз за бой; от его
+    удара павшие словом не отвечают - цепочки нет."""
+    fallen = [c for cid, c in session.combatants.items()
+              if cid in alive_before and not c.alive and not getattr(c, "rune_last_word_done", False)]
+    for dead in fallen:
+        share = _rune(dead, "rune:last_word")
+        if share <= 0:
+            continue
+        dead.rune_last_word_done = True
+        amount = max(round(dead.max_hp * share), 1)
+        enemies = [c for c in session.combatants.values() if c.side != dead.side and c.alive]
+        if not enemies:
+            continue
+        lines.append(f"🪨 Последнее слово: {dead.name} падает и бьёт всех врагов на {amount}")
+        # Павшие от слова в список выше не попали - их слово уже не прозвучит.
+        for enemy in enemies:
+            dealt = absorb_by_shields(enemy, cap_incoming(enemy, amount), [])
+            enemy.current_hp = max(enemy.current_hp - dealt, enemy.hp_floor, 0)
+            rune_guard(enemy, lines)
+
+
+def rune_after_deaths(session: CombatSessionState, deaths: list[int], hits: list, lines: list[str], rng) -> None:
+    """После смертей хода (2026-11-05): «За своих» - живым союзникам павшего
+    +1 к счёту; «Без передышки» - добил навыком, шанс сбросить его перезарядку."""
+    if not deaths:
+        return
+    for cid in deaths:
+        dead = session.combatants[cid]
+        if dead.kind != "character":
+            continue
+        for ally in session.combatants.values():
+            if ally.side == dead.side and ally.alive and ally.id != cid:
+                ally.allies_fallen = getattr(ally, "allies_fallen", 0) + 1
+    done: set[tuple[int, str]] = set()
+    for hit in hits:
+        skill_id = getattr(hit, "skill_id", None)
+        if not skill_id or hit.target_id not in deaths or hit.missed:
+            continue
+        source = session.combatants.get(hit.source_id)
+        if source is None or not source.alive or (source.id, skill_id) in done:
+            continue
+        chance = _rune(source, f"rune:no_rest@{skill_id}")
+        if not chance or source.cooldowns.get(skill_id, 0) <= 0:
+            continue
+        done.add((source.id, skill_id))
+        if rng.random() < chance:
+            source.cooldowns[skill_id] = 0
+            lines.append(f"🪨 Без передышки: «{skill_id_name(skill_id)}» у {source.name} снова готов")
 
 
 def rune_on_hit(source: CombatantState | None, target: CombatantState, hit, heals: list) -> float:
@@ -459,11 +528,35 @@ def run_skill(handler, ctx, skill_id: str | None) -> None:
         handler(ctx)
     finally:
         actor.current_skill = None
-    rune_cooldown(actor, skill_id, cd_before, ctx.rng)
+    rune_cooldown(actor, skill_id, cd_before, ctx.rng, ctx.lines)
     rune_after_skill(actor, skill_id, before, combatants, ctx, heals_from)
+    rune_once_more(handler, ctx, skill_id)
 
 
-def rune_cooldown(actor: CombatantState, skill_id: str | None, cd_before: int, rng) -> None:
+def rune_once_more(handler, ctx, skill_id: str | None) -> None:
+    """«Ещё раз» (2026-11-05): шанс, что навык сработает второй раз вполсилы
+    (compute_hit режет урон по actor.rune_half). Перезарядка и цена навыка
+    здоровьем - от первого раза: второй прогон бесплатный."""
+    actor = ctx.actor
+    chance = _rune(actor, f"rune:once_more@{skill_id}") if skill_id else 0.0
+    if not chance or ctx.rng.random() >= chance:
+        return
+    if not any(c.alive and c.side != actor.side for c in ctx.session.combatants.values()):
+        return
+    cooldowns, hp = dict(actor.cooldowns), actor.current_hp
+    ctx.lines.append(f"🪨 Ещё раз: «{skill_id_name(skill_id)}» у {actor.name} срабатывает снова, вполсилы")
+    actor.current_skill, actor.rune_half = skill_id, True
+    try:
+        handler(ctx)
+    finally:
+        actor.current_skill, actor.rune_half = None, False
+    actor.cooldowns = cooldowns
+    if actor.current_hp < hp:
+        actor.current_hp = hp
+
+
+def rune_cooldown(actor: CombatantState, skill_id: str | None, cd_before: int, rng,
+                  lines: list[str] | None = None) -> None:
     """«Холодный счёт» и «Короткий взмах» - здесь, а не в set_cooldown:
     навыки подклассов ставят перезарядку напрямую, мимо него."""
     if not skill_id:
@@ -474,10 +567,14 @@ def rune_cooldown(actor: CombatantState, skill_id: str | None, cd_before: int, r
     cold = _rune(actor, f"rune:cold_count@{skill_id}")
     if cold and rng.random() < cold:
         actor.cooldowns[skill_id] = cd_before
+        if lines is not None:
+            lines.append(f"🪨 Холодный счёт: «{skill_id_name(skill_id)}» у {actor.name} без перезарядки")
         return
     swing = _rune(actor, f"rune:short_swing@{skill_id}")
     if swing and cd > 1 and rng.random() < swing:
         actor.cooldowns[skill_id] = cd - 1
+        if lines is not None:
+            lines.append(f"🪨 Короткий взмах: перезарядка «{skill_id_name(skill_id)}» у {actor.name} на ход короче")
 
 
 def skill_snapshot(actor: CombatantState, combatants) -> dict:

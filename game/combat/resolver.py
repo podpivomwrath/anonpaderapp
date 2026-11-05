@@ -169,6 +169,8 @@ class RenderedHit:
     marked: int = 0
     #: удар усилен руной «Ответный выпад» (см. PendingHit.riposte)
     riposte: bool = False
+    #: удар «Тяжёлого замаха» (см. PendingHit.heavy)
+    heavy: bool = False
     #: сколько срезал блок (Глухая оборона и пр.) - пишется в строке удара
     blocked: int = 0
     #: сколько съел щит - тоже в строке удара (2026-10-29: в логе хода щит
@@ -684,7 +686,7 @@ def resolve_tick(
                     source.name, target.name,
                     label=hit.label, amount=applied, crit=hit.crit, missed=hit.missed, is_dot=hit.is_dot,
                     hp_before=h_before, hp_after=h_after, max_hp=target.max_hp, mode=mode,
-                    shielded=shielded_by_hit.get(id(hit), 0), riposte=hit.riposte,
+                    shielded=shielded_by_hit.get(id(hit), 0), riposte=hit.riposte, heavy=hit.heavy,
                 )
             )
             result.hit_renders.append(
@@ -695,7 +697,7 @@ def resolve_tick(
                     hp_before=h_before, hp_after=h_after, max_hp=target.max_hp,
                     absorbed=hit.blocked + max(hit.amount - applied, 0),
                     marked=hit.marked, blocked=hit.blocked,
-                    shielded=shielded_by_hit.get(id(hit), 0), riposte=hit.riposte,
+                    shielded=shielded_by_hit.get(id(hit), 0), riposte=hit.riposte, heavy=hit.heavy,
                 )
             )
         for heal in heals:
@@ -822,8 +824,10 @@ def resolve_tick(
     shared_rules.poison_end_effects(session, result.lines, alive_before)
 
     # --- Смерти и исход ---
+    shared_rules.rune_last_word(session, alive_before, result.lines)  # руна (2026-11-05)
     result.deaths = [cid for cid in alive_before if not session.combatants[cid].alive]
     shared_rules.inspiration_on_deaths(session, result.lines, result.deaths)
+    shared_rules.rune_after_deaths(session, result.deaths, result.hits, result.lines, rng)  # руны (2026-11-05)
 
     for cid in result.deaths:
         result.lines.append(f"☠ {session.combatants[cid].name} погибает")

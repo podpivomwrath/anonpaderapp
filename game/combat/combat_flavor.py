@@ -30,6 +30,8 @@ def is_basic_attack_label(label: str) -> bool:
 
 #: Отметка удара, усиленного руной «Ответный выпад» (2026-11-05).
 RIPOSTE_MARK = "⚔️ ответный выпад"
+#: Отметка удара «Счёта до четырёх» (2026-11-05).
+HEAVY_MARK = "💥 счёт до четырёх"
 
 
 def render_hit(
@@ -48,6 +50,7 @@ def render_hit(
     shielded: int = 0,
     blocked: int = 0,
     riposte: bool = False,
+    heavy: bool = False,
 ) -> str:
     """`[Имя] использует [Навык] на [Цель] — X урона. (Цель: A% → B%)`.
     shielded - сколько из удара съел щит: тогда X - полный удар и суффикс
@@ -62,7 +65,8 @@ def render_hit(
         return f"{target_name} уклоняется от {what} {source_name}."
     pct_before = display.hp_text(hp_before, max_hp, mode)
     pct_after = display.hp_text(hp_after, max_hp, mode)
-    crit_suffix = (" (крит!)" if crit else "") + (f" ({RIPOSTE_MARK})" if riposte else "")
+    crit_suffix = ((" (крит!)" if crit else "") + (f" ({RIPOSTE_MARK})" if riposte else "")
+                   + (f" ({HEAVY_MARK})" if heavy else ""))
     shield_suffix = f" (щит поглотил {shielded})" if shielded > 0 else ""
     if blocked > 0:  # блок стойки (Глухая оборона) - виден в каждом ударе, не только в ход навыка
         shield_suffix += f" (🛡 блок срезал {blocked})"
@@ -81,7 +85,9 @@ def self_buff_line(actor_name: str, skill_name: str, what: str, value: float, tu
     return f"{actor_name} → {skill_name}: {what} +{round(value * 100)}% на {plural.count(turns, 'ход', 'хода', 'ходов')}"
 
 
-def control_resisted_line(target_name: str) -> str:
+def control_resisted_line(target_name: str, reason: str | None = None) -> str:
+    if reason == "stone_will":  # руна (2026-11-05)
+        return f"🪨 Каменная воля: {target_name} стряхивает контроль."
     return f"{target_name} сопротивляется контролю."
 
 

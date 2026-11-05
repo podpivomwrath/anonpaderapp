@@ -90,6 +90,11 @@ def try_apply_control(
     resist = min(resist + target.buff_modifiers.get("rune:stubborn_brow", 0.0), bc.CONTROL_RESIST_CAP)
     if rng.random() < resist:
         return ControlResult(applied=False, resisted=True)
+    # Руна «Каменная воля» (2026-11-05): первый прошедший резист контроль в бою.
+    from game.combat import shared_rules
+
+    if shared_rules.rune_will(target, rng):
+        return ControlResult(applied=False, resisted=True, reason="stone_will")
 
     # PvE: контроль всегда проходит полной длительностью, DR не трогаем
     if not pvp:
