@@ -84,7 +84,7 @@ def goods() -> dict[str, Good]:
         tool = craft_gear_config.TOOLS[tool_id]
         out[f"craft:{tool_id}"] = Good(f"craft:{tool_id}", "craft", tool.title, tool.emoji, f"gear:{tool_id}")
     # Шансы пепельного - от серии того, кто открывает: все ларцы одинаковые.
-    for kind in (lootbox_service.ASHEN, lootbox_service.ORE, lootbox_service.SUPPLY):
+    for kind in (lootbox_service.ASHEN, lootbox_service.ORE, lootbox_service.SUPPLY, lootbox_service.RUNE):
         info = lootbox_service.CHEST_KINDS[kind]
         out[f"chest:{kind}"] = Good(f"chest:{kind}", "chest", info.name, "🗃️", info.icon)
     from game.economy import runes_config as rc

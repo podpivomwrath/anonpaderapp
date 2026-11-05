@@ -669,6 +669,7 @@ class LootboxRewardPart(BaseModel):
     trophy_id: str | None = None
     elixir_id: str | None = None
     ore_id: str | None = None  # type=ore: ларец руды кровавого разлома
+    rarity: str | None = None  # type=rune: ларец рун руин культа (2026-11-05)
     min: int = 0
     max: int = 0
 

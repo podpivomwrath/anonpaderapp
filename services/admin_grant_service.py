@@ -164,6 +164,7 @@ def catalog() -> list[dict]:
             _entry("chest", f"🗃️ {lootbox_service.CHEST_NAME}"),
             _entry("chest:ore", f"⛏ {lootbox_service.CHEST_KINDS['ore'].name}"),
             _entry("chest:supply", f"🧪 {lootbox_service.CHEST_KINDS['supply'].name}"),
+            _entry("chest:rune", f"🔮 {lootbox_service.CHEST_KINDS['rune'].name}"),
         ]},
         {"id": "relics", "title": "💀 Реликвии", "entries": [
             _entry(f"trophy:{t.id}", f"{t.emoji} {t.name}") for t in trophy_service.trophy_defs_ordered()

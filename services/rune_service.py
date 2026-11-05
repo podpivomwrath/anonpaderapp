@@ -320,6 +320,28 @@ def roll_rune(rng: random.Random) -> str:
     return rng.choices(pool, weights=[rc.RARITY_WEIGHTS[r.rarity] for r in pool])[0].id
 
 
+#: Перевес рун своего класса в ларце рун (2026-11-05, решение владельца:
+#: под класс открывшего, но не только - дубли нужны рынку).
+OWN_CLASS_WEIGHT = 3
+
+
+def roll_rune_of_rarity(rng: random.Random, rarity: str, base_class: str | None = None) -> str:
+    """Руна заданной редкости: вид по весам, руны своего класса чаще."""
+    pool = [r for r in rc.RUNES if r.ready and r.rarity == rarity] or [r for r in rc.RUNES if r.ready]
+    weights = [
+        rc.KIND_WEIGHTS[r.kind] * (OWN_CLASS_WEIGHT if base_class and base_class in r.classes else 1)
+        for r in pool
+    ]
+    return rng.choices(pool, weights=weights)[0].id
+
+
+def rune_title(rune_id: str) -> str:
+    rune_def = rc.BY_ID.get(rune_id)
+    if rune_def is None:
+        return rune_id
+    return f"{KIND_EMOJI[rune_def.kind]} {rune_def.name}"
+
+
 async def maybe_drop(db: AsyncSession, character: Character, rng: random.Random,
                      chance: float = rc.MOB_DROP_CHANCE) -> str | None:
     """Бросок на руну за победу. Возвращает id выпавшей руны."""

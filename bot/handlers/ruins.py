@@ -70,9 +70,17 @@ async def _peers(db, character_ids: list[int]) -> dict[int, int]:
 
 
 def _room_keyboard(run, cid: int) -> str:
+    """Клавиатура вне боя. Не больше 5 рядов (память vk-keyboard-limits)."""
+    from game import ruins_gifts, ruins_rooms
+
     rows: list[list[tuple[str, dict, KeyboardButtonColor]]] = []
     leader = run.leader_id == cid
-    if run.phase == ruins_service.CLEARED:
+    if run.offer:
+        if leader:
+            for gift_id in run.offer.get("ids", []):
+                rows.append([(ruins_gifts.title(gift_id)[:40], {"type": "ruins_gift", "g": gift_id},
+                              KeyboardButtonColor.POSITIVE)])
+    elif run.phase == ruins_service.CLEARED:
         if leader:
             rows.append([(texts.BTN_DEEPER, {"type": "ruins_deeper"}, KeyboardButtonColor.NEGATIVE),
                          (texts.BTN_UP, {"type": "ruins_up"}, KeyboardButtonColor.POSITIVE)])
@@ -81,25 +89,56 @@ def _room_keyboard(run, cid: int) -> str:
             if cid not in run.pending.get("ok", []):
                 rows.append([(texts.BTN_GO, {"type": "ruins_go"}, KeyboardButtonColor.POSITIVE)])
         elif leader:
-            exits = rules.exits(run.layout, run.pos)
-            for line in (("up",), ("left", "right"), ("down",)):
-                row = [(texts.ARROWS[d], {"type": "ruins_step", "d": d}, KeyboardButtonColor.PRIMARY)
-                       for d in line if d in exits]
-                if row:
-                    rows.append(row)
+            choice_rows = []
+            kind = rules.room_kind(run.layout, run.pos)
+            if ruins_service.room_open(run):
+                if kind == rules.WELL:
+                    owned = ruins_gifts.ids(run.gifts)[-4:]
+                    buttons = [(f"🔁 {ruins_gifts.BY_ID[g].name}"[:40], {"type": "ruins_room", "c": f"drop:{g}"},
+                                KeyboardButtonColor.PRIMARY) for g in owned]
+                    choice_rows = [buttons[i:i + 2] for i in range(0, len(buttons), 2)]
+                    choice_rows.append([(texts.CHOICE_LABEL["leave"], {"type": "ruins_room", "c": "leave"},
+                                         KeyboardButtonColor.SECONDARY)])
+                else:
+                    options = ruins_rooms.choices(kind, rules.event_of(run.layout, run.pos))
+                    choice_rows = [[(texts.CHOICE_LABEL.get(c, c), {"type": "ruins_room", "c": c},
+                                     KeyboardButtonColor.POSITIVE if i == 0 else KeyboardButtonColor.SECONDARY)
+                                    for i, c in enumerate(options)]]
+            rows += choice_rows
+            exits = ruins_service.exits_now(run)
+            arrow = [(texts.ARROWS[d], {"type": "ruins_step", "d": d}, KeyboardButtonColor.PRIMARY)
+                     for d in ("left", "up", "down", "right") if d in exits]
+            if choice_rows:
+                rows.append(arrow)  # с выбором комнаты стрелки - одним рядом
+            else:
+                for line in (("up",), ("left", "right"), ("down",)):
+                    row = [b for b in arrow if b[1]["d"] in line]
+                    if row:
+                        rows.append(row)
     if run.vote and cid != run.vote.get("target") and cid not in run.vote.get("yes", []) + run.vote.get("no", []):
         rows.append([(texts.BTN_VOTE_YES, {"type": "ruins_vote", "v": 1}, KeyboardButtonColor.NEGATIVE),
                      (texts.BTN_VOTE_NO, {"type": "ruins_vote", "v": 0}, KeyboardButtonColor.SECONDARY)])
-    rows.append([(texts.BTN_BAG, {"type": "ruins_bag"}, KeyboardButtonColor.SECONDARY),
-                 (texts.BTN_PARTY, {"type": "ruins_party"}, KeyboardButtonColor.SECONDARY)])
     kb = Keyboard(one_time=False)
-    for i, row in enumerate(rows):
-        if i:
-            kb.row()
+    for row in [r for r in rows if r][:4]:
         for label, payload, color in row:
             kb.add(Text(label, payload=payload), color=color)
-    add_miniapp_button(kb)
+        kb.row()
+    kb.add(Text(texts.BTN_BAG, payload={"type": "ruins_bag"}), color=KeyboardButtonColor.SECONDARY)
+    kb.add(Text(texts.BTN_PARTY, payload={"type": "ruins_party"}), color=KeyboardButtonColor.SECONDARY)
+    _miniapp_link(kb)
     return kb.get_json()
+
+
+def _miniapp_link(kb: Keyboard) -> None:
+    """Мини-апп - в том же ряду, что мешок: еда едится оттуда."""
+    from vkbottle import OpenLink
+
+    from bot.keyboards.world import BTN_CHARACTER
+    from config import get_settings
+
+    url = get_settings().vk_miniapp_url
+    if url:
+        kb.add(OpenLink(url, BTN_CHARACTER))
 
 
 def keyboard_for(peer_id: int) -> str | None:
@@ -152,22 +191,34 @@ def _view_text(run, cid: int, leader_name: str, head: str | None = None) -> str:
     lines = [head] if head else []
     lines.append(texts.floor_line(run.floor))
     kind = rules.room_kind(run.layout, run.pos)
+    leader = run.leader_id == cid
+    if run.offer:
+        lines.append(texts.offer_text(run.offer.get("ids", []), leader, leader_name))
+        return "\n".join(lines)
     if run.phase == ruins_service.CLEARED:
-        lines.append(texts.LEADER_CHOICE if run.leader_id == cid else texts.WAIT_CHOICE)
+        lines.append(texts.LEADER_CHOICE if leader else texts.WAIT_CHOICE)
         return "\n".join(lines)
     if kind == rules.START:
         lines.append(texts.ROOM_TEXT[rules.START])
+    elif ruins_service.room_open(run):
+        if kind == rules.EVENT:
+            lines.append(texts.EVENT_TEXT.get(rules.event_of(run.layout, run.pos) or "", "❓"))
+        else:
+            lines.append(texts.SPECIAL_TEXT.get(kind, ""))
+        if kind == rules.WELL and not run.gifts:
+            lines.append("Бросить в колодец нечего: даров у группы нет.")
+        lines.append("Решай, что делать, или иди дальше." if leader else f"Решает {leader_name}.")
     elif run.pos in (run.cleared or []):
         lines.append(texts.CLEARED_ROOM)
-    lines.append(texts.exits_line(rules.exits(run.layout, run.pos), _seen(run)))
+    lines.append(texts.exits_line(ruins_service.exits_now(run), _seen(run)))
     if run.pending:
-        if run.leader_id == cid:
+        if leader:
             lines.append(texts.leader_wait_text(run.pending["dir"]))
         elif cid in run.pending.get("ok", []):
             lines.append("Ты готов идти. Ждём остальных.")
         else:
             lines.append(texts.pending_text(leader_name, run.pending["dir"]))
-    elif run.leader_id != cid:
+    elif not leader:
         lines.append(f"Ведёт {leader_name}.")
     return "\n".join(lines)
 
@@ -355,7 +406,9 @@ async def go(message: Message) -> None:
 
 
 async def _do_move(run_id: int, target: int, note: str | None = None) -> None:
-    """Группа переходит в комнату target. С боем - бой сразу."""
+    """Группа переходит в комнату target. С боем - бой сразу, с ловушкой -
+    ловушка сразу."""
+    trap_line = None
     async with get_session_factory()() as db:
         run = await ruins_service.lock(db, run_id)
         if run is None or run.status != ruins_service.ACTIVE or run.phase != ruins_service.WALK:
@@ -366,16 +419,25 @@ async def _do_move(run_id: int, target: int, note: str | None = None) -> None:
         fight = run.phase == ruins_service.FIGHT
         if fight:
             await ruins_service.snapshot_hp(db, run)
+        elif kind == rules.TRAP and target not in (run.cleared or []):
+            dodged = await ruins_service.trap(db, run, _rng)
+            names = {c: (await db.get(Character, c)).name for c in dodged}
+            trap_line = texts.trap_text(dodged, names)
         await db.commit()
     if fight:
-        await _start_fight(run_id, kind, note)
+        await _start_fight(run_id, note)
     else:
-        await _broadcast_view(run_id, note)
+        head = "\n\n".join(x for x in (note, trap_line) if x) or None
+        await _broadcast_view(run_id, head)
 
 
-async def _start_fight(run_id: int, kind: str, note: str | None = None) -> None:
+async def _start_fight(run_id: int, note: str | None = None) -> None:
+    from dataclasses import replace
+
     from bot.handlers import group_combat as group_combat_handlers
     from bot.handlers import raid_combat
+    from game import ruins_gifts
+    from game.combat.ruins import BossRoom, build_stage
 
     async with get_session_factory()() as db:
         run = await db.get(RuinRun, run_id)
@@ -383,22 +445,32 @@ async def _start_fight(run_id: int, kind: str, note: str | None = None) -> None:
         characters = [c for c in [await db.get(Character, m.character_id) for m in members] if c is not None]
         inputs = await group_combat_handlers.build_member_inputs(db, characters)
         await db.commit()
+        kind = ruins_service.fight_kind(run)
         hp = {m.character_id: (0 if m.dead else m.hp) for m in members}
-        used = {m.character_id: m.consumables_used for m in members}
+        start = {m.character_id: ruins_service.battle_potions_start(run, m.consumables_used) for m in members}
+        floor_used = {m.character_id: m.consumables_used for m in members}
         layout = dict(run.layout)
-    stage = RoomStage(22_000_000, layout, kind, len(inputs))
-    opening = texts.opening_text(kind, layout, len(inputs))
+        gifts = list(run.gifts or [])
+        extra = dict(run.extra or {})
+    mods = ruins_gifts.mods(gifts)
+    if mods:
+        inputs = [replace(m, buff_modifiers={**m.buff_modifiers,
+                                             **{k: m.buff_modifiers.get(k, 0.0) + v for k, v in mods.items()}})
+                  for m in inputs]
+    ctx = {"gifts": gifts, "kills": extra.get("kills", 0), "prayer_used": extra.get("prayer") or [],
+           "start": start, "floor_used": floor_used}
+    stage = build_stage(22_000_000, layout, kind, len(inputs), ctx, _rng)
+    opening = (texts.boss_opening(stage.names) if isinstance(stage, BossRoom)
+               else texts.opening_text(kind, layout, len(inputs)))
     if note:
         opening = f"{note}\n\n{opening}"
     try:
-        await raid_combat.start_ruins_room(run_id, stage, inputs, hp, used, opening)
+        await raid_combat.start_ruins_room(run_id, stage, inputs, hp, start, opening)
     except Exception:
         logger.exception("Руины {}: бой не начался", run_id)
         async with get_session_factory()() as db:
-            run = await ruins_service.lock(db, run_id)
-            if run is not None:
-                await ruins_service.recover(db)
-                await db.commit()
+            await ruins_service.recover(db)
+            await db.commit()
         await _broadcast_view(run_id, texts.RESTART_TEXT)
 
 
@@ -407,15 +479,31 @@ async def _start_fight(run_id: int, kind: str, note: str | None = None) -> None:
 
 async def on_room_won(session_id: int, battle) -> None:
     from bot.handlers import raid_combat
+    from game.combat.ruins import BossRoom
 
+    stage = battle.ruin_stage
     combatants = raid_combat.release_ruins_battle(session_id)
-    hp = {cid: (c.current_hp if c.alive else 0) for cid, c in combatants.items() if cid in battle.participants}
-    used = {cid: getattr(c, "consumables_used", 0) for cid, c in combatants.items() if cid in battle.participants}
+    ctx = getattr(stage, "ctx", {}) or {}
+    start, floor_used = ctx.get("start", {}), ctx.get("floor_used", {})
+    hp, used, top = {}, {}, {}
+    for cid in battle.participants:
+        c = combatants.get(cid)
+        if c is None:
+            continue
+        hp[cid] = c.current_hp if c.alive else 0
+        top[cid] = c.max_hp
+        spent = max(0, getattr(c, "consumables_used", 0) - start.get(cid, 0))
+        used[cid] = floor_used.get(cid, 0) + spent
+    reward = set(getattr(stage, "reward_ids", set()))
+    kills = sum(1 for i in reward if combatants.get(i) is not None and not combatants[i].alive)
+    bosses = len(stage.bosses) if isinstance(stage, BossRoom) else 0
     async with get_session_factory()() as db:
         run = await ruins_service.lock(db, battle.ruin_run_id)
         if run is None or run.status != ruins_service.ACTIVE:
             return
-        found = await ruins_service.room_won(db, run, hp, used, _rng)
+        found = await ruins_service.room_won(db, run, hp, used, _rng, kills=kills,
+                                             prayer_used=list(getattr(stage, "prayer_used", []) or []),
+                                             top_hp=top, bosses=bosses)
         boss = run.phase == ruins_service.CLEARED
         await db.commit()
         run_id = run.id
@@ -425,6 +513,8 @@ async def on_room_won(session_id: int, battle) -> None:
         line = texts.found_line(got)
         if line:
             lines.append(line)
+        if got.get("chests"):
+            lines.append(texts.chests_line(got["chests"]))
         heads[cid] = "\n".join(lines) or None
     await _broadcast_view(run_id, heads)
 
@@ -458,6 +548,107 @@ async def on_wipe(session_id: int, battle, text: str | None = None) -> None:
             await respawn_handlers.register_death(peer, respawn_at, defeat.xp_lost, defeat.relics_lost,
                                                   defeat.fish_lost)
     logger.info("Руины {}: группа погибла", battle.ruin_run_id)
+
+
+# --- Особые комнаты и дары ----------------------------------------------------------
+
+
+@labeler.message(payload_contains={"type": "ruins_room"})
+async def room_choice(message: Message) -> None:
+    choice = str((message.get_payload_json() or {}).get("c", ""))
+    async with get_session_factory()() as db:
+        ctx = await _member_context(db, message.peer_id)
+        if ctx is None:
+            return
+        run, _member, character = ctx
+        try:
+            result = await ruins_service.choose(db, run, character.id, choice, _rng)
+        except ruins_service.RuinsError as exc:
+            await db.rollback()
+            await message.answer(str(exc), keyboard=_room_keyboard(run, character.id))
+            return
+        if result["fight"]:
+            await ruins_service.snapshot_hp(db, run)
+        await db.commit()
+        run_id = run.id
+    lines = [texts.OUTCOME.get(k, "") for k in result["lines"] if texts.OUTCOME.get(k)]
+    if result.get("curse"):
+        lines.append(texts.curse_line(result["curse"]))
+    head = "\n".join(lines) or None
+    if result["fight"]:
+        await _start_fight(run_id, head)
+        return
+    if result["loot"]:
+        heads = {}
+        for cid, drop in result["loot"].items():
+            got = texts.trophies_line(drop) if drop else ""
+            heads[cid] = "\n".join(x for x in (head, f"🎒 В мешок: {got}" if got else "") if x) or None
+        await _broadcast_view(run_id, heads)
+        return
+    await _broadcast_view(run_id, head)
+
+
+@labeler.message(payload_contains={"type": "ruins_gift"})
+async def gift_pick(message: Message) -> None:
+    gift_id = str((message.get_payload_json() or {}).get("g", ""))
+    async with get_session_factory()() as db:
+        ctx = await _member_context(db, message.peer_id)
+        if ctx is None:
+            return
+        run, _member, character = ctx
+        if run.leader_id != character.id or not run.offer:
+            await db.rollback()
+            await _show_self(message)
+            return
+        try:
+            ruins_service.take_gift(run, gift_id)
+        except ruins_service.RuinsError as exc:
+            await db.rollback()
+            await message.answer(str(exc))
+            return
+        await db.commit()
+        run_id = run.id
+    await _broadcast_view(run_id, texts.gift_taken(gift_id, character.name))
+
+
+async def _expire_offer(run_id: int) -> None:
+    async with get_session_factory()() as db:
+        run = await ruins_service.lock(db, run_id)
+        if run is None or not ruins_service.offer_due(run):
+            return
+        gift_id = _rng.choice(run.offer["ids"])
+        ruins_service.take_gift(run, gift_id)
+        await db.commit()
+    await _broadcast_view(run_id, texts.gift_taken(gift_id, None))
+
+
+@labeler.message(payload_contains={"type": "ruins_act"})
+async def boss_act(message: Message) -> None:
+    """Особое действие в бою с боссом руин («Разгрести»): занимает ход."""
+    from bot.battle_keyboard import answer_battle_gone
+    from bot.handlers import raid_combat
+    from game.combat.session import ActionType, DeclaredAction
+
+    action_name = str((message.get_payload_json() or {}).get("a", ""))
+    battle_id = raid_combat._peer_battle.get(message.peer_id)
+    battle = raid_combat._battles.get(battle_id) if battle_id is not None else None
+    if battle is None or not battle.is_ruins:
+        await answer_battle_gone(message)
+        return
+    state = raid_combat._engine.sessions.get(battle_id)
+    cid = raid_combat._character_id_for_peer(battle, message.peer_id)
+    stage = battle.field_stage
+    if state is None or cid is None or stage is None:
+        return
+    if cid in raid_combat._declared_this_tick.get(battle_id, set()):
+        return
+    note = stage.act(state, cid, action_name)
+    if note is None:
+        await message.answer("Сейчас это не нужно.")
+        return
+    await raid_combat._raid_action(
+        message, DeclaredAction(type=ActionType.SKIP, payload={"note": note, action_name: True}),
+    )
 
 
 # --- После хозяина этажа --------------------------------------------------------------
@@ -515,7 +706,10 @@ async def bag(message: Message) -> None:
         if ctx is None:
             return
         run, member, character = ctx
-        text = texts.bag_text(member.bag or {}, run.floor, member.consumables_used)
+        text = texts.bag_text(member.bag or {}, run.floor, member.consumables_used, ruins_service.floor_potions(run))
+        gifts = texts.gifts_block(run.gifts or [])
+        if gifts:
+            text = f"{text}\n\n{gifts}"
         keyboard = _room_keyboard(run, character.id) if run.phase != ruins_service.FIGHT else None
         await db.rollback()
     await message.answer(text, keyboard=keyboard)
@@ -662,6 +856,9 @@ async def tick_job() -> None:
             runs = await ruins_service.active_runs(db)
             due_moves = [(r.id, r.pending["to"]) for r in runs if ruins_service.pending_due(r)]
             due_votes = [r.id for r in runs if r.vote and _vote_due(r.vote)]
+            due_offers = [r.id for r in runs if ruins_service.offer_due(r)]
+        for run_id in due_offers:
+            await _expire_offer(run_id)
         for run_id, target in due_moves:
             await _do_move(run_id, target, texts.MOVE_TIMEOUT_NOTE)
         for run_id in due_votes:

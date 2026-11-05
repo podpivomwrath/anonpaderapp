@@ -18,8 +18,27 @@ from collections import deque
 from game.economy import ruins_config as rc
 
 START, FIGHT, ELITE, BOSS = "start", "fight", "elite", "boss"
+AMBUSH = "ambush"            # бой без зелий
+SPRING = "spring"            # источник: лечение или дар
+ALTAR = "altar"              # кровь за дар
+EVENT = "event"              # сценка с выбором
+TRAP = "trap"                # проверка ловкости, срабатывает сама
+CRYPT = "crypt"              # поднять павших за здоровье живых
+WELL = "well"                # сменить дар
+CAVEIN = "cavein"            # обвал: пролезть с уроном или обойти боем
+PRISONER = "prisoner"        # пленник: бой с охраной за дар
+STOREROOM = "storeroom"      # кладовая: реликвии + проклятие на этаж
+CHAPEL = "chapel"            # молельня: реликвии из мешка за редкий дар
+TREASURE = "treasure"        # тайник: реликвии, иногда мимик
 #: Комнаты с боем - вошёл, бой начинается сразу.
-COMBAT_ROOMS = (FIGHT, ELITE, BOSS)
+COMBAT_ROOMS = (FIGHT, ELITE, BOSS, AMBUSH)
+#: Комнаты, где лидер выбирает, что делать (кнопки), - до выбора одна.
+CHOICE_ROOMS = (SPRING, ALTAR, EVENT, CRYPT, WELL, CAVEIN, PRISONER, STOREROOM, CHAPEL, TREASURE)
+#: Вес типа комнаты на этаже (вход и босс - отдельно).
+ROOM_WEIGHTS: dict[str, int] = {
+    FIGHT: 34, ELITE: 15, AMBUSH: 6, SPRING: 6, ALTAR: 4, EVENT: 8, TRAP: 6, CRYPT: 3, WELL: 3,
+    CAVEIN: 4, PRISONER: 4, STOREROOM: 3, CHAPEL: 3, TREASURE: 6,
+}
 
 DIRS: dict[str, tuple[int, int]] = {"up": (-1, 0), "down": (1, 0), "left": (0, -1), "right": (0, 1)}
 
@@ -82,9 +101,17 @@ def generate(rng: random.Random, floor: int) -> dict:
         elif i == boss:
             kind = BOSS
         else:
-            kind = ELITE if rng.random() < rc.ELITE_SHARE else FIGHT
+            kind = rng.choices(list(ROOM_WEIGHTS), weights=list(ROOM_WEIGHTS.values()))[0]
         rooms[str(i)] = kind
-    return {"rooms": rooms, "start": start, "boss": boss, "mobs": rng.randrange(len(rc.MOB_KINDS)), "floor": floor}
+    from game import ruins_rooms  # цикл импортов
+
+    events = {k: ruins_rooms.event_for(rng) for k, v in rooms.items() if v == EVENT}
+    return {"rooms": rooms, "start": start, "boss": boss, "mobs": rng.randrange(len(rc.MOB_KINDS)), "floor": floor,
+            "events": events}
+
+
+def event_of(layout: dict, i: int) -> str | None:
+    return (layout.get("events") or {}).get(str(i))
 
 
 def room_kind(layout: dict, i: int) -> str:

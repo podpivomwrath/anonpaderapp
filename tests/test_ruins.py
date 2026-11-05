@@ -95,6 +95,7 @@ async def test_walk_fight_bag_and_exit(db_session, make_character) -> None:
 
     # Зачистка комнаты босса: b пал - встаёт с 1 HP, в мешках трофеи и руны.
     run.pos = run.layout["boss"]
+    run.extra = {}  # телепорт в зал хозяина: прошлый бой не в счёт
     run.floor = 30  # 3 кубика
     found = await ruins_service.room_won(db_session, run, {a.id: 500, b.id: 0}, {a.id: 2, b.id: 0},
                                          random.Random(0))
@@ -238,3 +239,59 @@ async def test_room_fight_keeps_hp_and_reports_back(monkeypatch) -> None:
     finally:
         engine.shutdown() if hasattr(engine, "shutdown") else None
         raid_combat.release_ruins_battle(-1)
+
+
+async def test_every_unique_boss_fight_runs_to_the_end(monkeypatch) -> None:
+    """Каждый уникальный босс и сочетание (этаж 35) - через настоящий движок,
+    без падений механик; сильная группа доходит до победы."""
+    import asyncio
+
+    import pytest
+
+    from bot.handlers import raid_combat
+    from bot.handlers import ruins as ruins_handlers
+    from game.combat.ruins import build_stage
+    from game.combat.tick_engine import InMemoryActionStore, TickEngine
+
+    api = _Api()
+    engine = TickEngine(
+        InMemoryActionStore(),
+        on_tick_resolved=raid_combat.on_raid_tick_resolved,
+        on_battle_finished=raid_combat.on_raid_battle_finished,
+    )
+    engine.start()
+    raid_combat.setup(engine, api)
+    results: list = []
+
+    async def fake_won(session_id, battle):
+        raid_combat.release_ruins_battle(session_id)
+        results.append("won")
+
+    async def fake_wipe(session_id, battle, text=None):
+        raid_combat.release_ruins_battle(session_id)
+        results.append("wipe")
+
+    monkeypatch.setattr(ruins_handlers, "on_room_won", fake_won)
+    monkeypatch.setattr(ruins_handlers, "on_wipe", fake_wipe)
+    for floor in (5, 10, 15, 20, 25, 30, 35):
+        layout = rules.generate(random.Random(floor), floor)
+        members = [_member(1), _member(2)]
+        stage = build_stage(22_000_000, layout, rules.BOSS, 2, {}, random.Random(floor))
+        battle_id = await raid_combat.start_ruins_room(-60 - floor, stage, members, {1: 10**9, 2: 10**9},
+                                                       {1: 0, 2: 0}, "бой")
+        for _ in range(400):
+            if battle_id not in raid_combat._battles:
+                break
+            for cid in (1, 2):
+                if battle_id not in raid_combat._battles:
+                    break
+                await raid_combat.raid_attack(_Msg(100 + cid, {"type": "raid_attack"}))
+            # засыпанные пропускают ход фоновой задачей - дать ей отработать
+            for _ in range(3):
+                await asyncio.sleep(0)
+        if battle_id in raid_combat._battles:
+            st = engine.sessions.get(battle_id)
+            info = {c.name: c.current_hp for c in st.combatants.values()} if st else None
+            raid_combat.release_ruins_battle(battle_id)
+            pytest.fail(f"этаж {floor}: бой не кончился {info} {results}")
+    assert results == ["won"] * 7, results

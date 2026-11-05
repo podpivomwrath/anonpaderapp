@@ -275,6 +275,11 @@ def _combat_keyboard(battle: RaidBattle, p: Participant, combatant) -> str:
         extra.append((mt.BTN_CARRY, {"type": "raid_carry"}))
     elif isinstance(stage, raid_mill.MillerStage) and stage.bread_open:
         extra.append((mt.BTN_BREAD, {"type": "raid_bread"}))
+    elif battle.is_ruins and stage is not None and _engine is not None:
+        # Руины: особые действия боссов («Разгрести» у Привратника).
+        state = _engine.sessions.get(_peer_battle.get(p.peer_id))
+        if state is not None:
+            extra += stage.extra_buttons(state, p.character_id)
     grid = _arena_grid(battle, stage, p.character_id) if isinstance(stage, trail_combat.NamelessStage) else None
     return kb.raid_combat_keyboard(p.base_class, combatant.cooldowns, subclass_id=p.subclass_id, extra=extra,
                                    grid=grid)

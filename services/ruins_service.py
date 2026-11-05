@@ -14,6 +14,8 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from game import ruins as rules
+from game import ruins_gifts as gifts_mod
+from game import ruins_rooms
 from game.economy import loot
 from game.economy import loot_config as lc
 from game.economy import ruins_config as rc
@@ -152,8 +154,12 @@ async def start(db: AsyncSession, leader: Character, characters: list[Character]
 # --- Ходьба -------------------------------------------------------------------
 
 
-def step_target(run: RuinRun, direction: str) -> int | None:
-    return rules.exits(run.layout, run.pos).get(direction)
+def exits_now(run: RuinRun) -> dict[str, int]:
+    """Куда можно шагнуть сейчас. Обвал не пройден - только назад."""
+    out = rules.exits(run.layout, run.pos)
+    if rules.room_kind(run.layout, run.pos) == rules.CAVEIN and run.pos not in (run.cleared or []):
+        out = {d: j for d, j in out.items() if j == run.prev_pos}
+    return out
 
 
 def propose(run: RuinRun, leader_id: int, direction: str, party: int, now: datetime | None = None) -> int:
@@ -165,13 +171,15 @@ def propose(run: RuinRun, leader_id: int, direction: str, party: int, now: datet
         raise RuinsError("Куда идти, решает лидер.")
     if run.pending:
         raise RuinsError("Группа ещё не двинулась на прошлый шаг.")
-    target = step_target(run, direction)
+    if run.offer:
+        raise RuinsError("Сначала выбери дар.")
+    target = exits_now(run).get(direction)
     if target is None:
-        raise RuinsError("Там глухая стена.")
+        raise RuinsError("Туда не пройти.")
     if party > 1:
         now = now or _now()
-        run.pending = {"dir": direction, "to": target, "until": (now + timedelta(seconds=rc.MOVE_CONFIRM_SECONDS)).isoformat(),
-                       "ok": [leader_id]}
+        run.pending = {"dir": direction, "to": target,
+                       "until": (now + timedelta(seconds=rc.MOVE_CONFIRM_SECONDS)).isoformat(), "ok": [leader_id]}
     touch(run, now)
     return target
 
@@ -206,14 +214,243 @@ def move(run: RuinRun, target: int) -> str:
     kind = rules.room_kind(run.layout, target)
     if kind in rules.COMBAT_ROOMS and target not in (run.cleared or []):
         run.phase = FIGHT
+        run.extra = {**(run.extra or {}), "fight": {"kind": kind}}
     touch(run)
     return kind
+
+
+def room_open(run: RuinRun) -> bool:
+    """В комнате ещё есть что выбрать (особая комната до выбора)."""
+    return rules.room_kind(run.layout, run.pos) in rules.CHOICE_ROOMS and run.pos not in (run.cleared or [])
+
+
+def _mark_cleared(run: RuinRun) -> None:
+    if run.pos not in (run.cleared or []):
+        run.cleared = [*(run.cleared or []), run.pos]
 
 
 async def snapshot_hp(db: AsyncSession, run: RuinRun) -> None:
     """Перед боем: здоровье на входе - его вернёт перезапуск посреди боя."""
     for m in await members(db, run.id):
         m.hp_before = m.hp
+
+
+# --- Здоровье вне боя ---------------------------------------------------------
+
+
+async def max_hp(db: AsyncSession, character_id: int, gifts: list | None) -> int:
+    """Максимум здоровья с дарами группы (Толстая шкура, Дурная кровь)."""
+    character = await db.get(Character, character_id)
+    if character is None:
+        return 1
+    _, top = await world_hp(db, character)
+    bonus = gifts_mod.mods(gifts).get("max_hp_bonus", 0.0)
+    return max(1, round(top * (1 + bonus)))
+
+
+async def heal_alive(db: AsyncSession, run: RuinRun, share: float) -> None:
+    for m in await members(db, run.id):
+        if not m.dead:
+            top = await max_hp(db, m.character_id, run.gifts)
+            m.hp = min(top, m.hp + round(top * share))
+
+
+async def hurt_alive(db: AsyncSession, run: RuinRun, share: float, only: set[int] | None = None) -> None:
+    """Урон вне боя не убивает: до 1 HP."""
+    for m in await members(db, run.id):
+        if not m.dead and (only is None or m.character_id in only):
+            top = await max_hp(db, m.character_id, run.gifts)
+            m.hp = max(1, m.hp - round(top * share))
+
+
+def floor_potions(run: RuinRun) -> int:
+    """Зелий на этаж с дарами."""
+    return rc.CONSUMABLES_PER_FLOOR + (1 if gifts_mod.has(run.gifts, "spare_vial") else 0)
+
+
+def battle_potions_start(run: RuinRun, used_on_floor: int) -> int:
+    """Сколько зелий «уже выпито» на старте боя: в бою лимит обычный (5),
+    на этаже - floor_potions; Обет молчания и засада закрывают зелья."""
+    from game.combat import consumable_limit
+
+    kind = ((run.extra or {}).get("fight") or {}).get("kind")
+    if gifts_mod.has(run.gifts, "vow_silence") or kind == rules.AMBUSH:
+        return consumable_limit.LIMIT
+    left = max(floor_potions(run) - used_on_floor, 0)
+    return consumable_limit.LIMIT - min(consumable_limit.LIMIT, left)
+
+
+# --- Дары ---------------------------------------------------------------------
+
+
+def start_offer(run: RuinRun, tiers: tuple[str, ...], rng: random.Random, now: datetime | None = None,
+                drop: str | None = None) -> list[str]:
+    """Лидеру - три дара на выбор. Пусто - даров не осталось."""
+    owned = [g for g in gifts_mod.ids(run.gifts) if g != drop]
+    ids = gifts_mod.offer(rng, owned, tiers)
+    if not ids:
+        return []
+    until = (now or _now()) + timedelta(seconds=rc.GIFT_SECONDS)
+    run.offer = {"ids": ids, "until": until.isoformat(), "drop": drop}
+    touch(run, now)
+    return ids
+
+
+def take_gift(run: RuinRun, gift_id: str) -> None:
+    """Дар выбран: колодец снимает старый, новый - в список."""
+    offer = run.offer or {}
+    if gift_id not in offer.get("ids", []):
+        raise RuinsError("Этот дар уже не предлагают.")
+    gifts = [g for g in run.gifts or [] if g["id"] != offer.get("drop")]
+    gifts.append({"id": gift_id})
+    run.gifts = gifts
+    run.offer = None
+    touch(run)
+
+
+def offer_due(run: RuinRun, now: datetime | None = None) -> bool:
+    return bool(run.offer) and datetime.fromisoformat(run.offer["until"]) <= (now or _now())
+
+
+def _curse_floor(run: RuinRun, rng: random.Random) -> str | None:
+    pool = [g.id for g in gifts_mod.GIFTS if g.tier == gifts_mod.CURSED and g.id not in gifts_mod.ids(run.gifts)]
+    if not pool:
+        return None
+    gift_id = rng.choice(pool)
+    run.gifts = [*(run.gifts or []), {"id": gift_id, "floor": True}]
+    return gift_id
+
+
+# --- Особые комнаты -----------------------------------------------------------
+
+
+def _roll_loot(rng: random.Random, rolls: int) -> dict[str, int]:
+    return loot.roll_drop(rng, lc.ROLLS_BY_RING[rc.MOB_RING] * rolls)
+
+
+def _bag_trophies(member: RuinMember, drop: dict[str, int]) -> None:
+    bag = member.bag or {}
+    for trophy_id, count in drop.items():
+        bag = _add(bag, "trophies", trophy_id, count)
+    member.bag = bag
+
+
+def _take_trophies(member: RuinMember, count: int) -> bool:
+    """Снять из мешка count реликвий, сначала дешёвые. False - не хватает."""
+    from services import trophy_service
+
+    bag = {k: dict(v) for k, v in (member.bag or {}).items()}
+    trophies = bag.get("trophies") or {}
+    if sum(trophies.values()) < count:
+        return False
+    for tdef in trophy_service.trophy_defs_ordered():
+        while count and trophies.get(tdef.id):
+            trophies[tdef.id] -= 1
+            count -= 1
+            if not trophies[tdef.id]:
+                trophies.pop(tdef.id)
+    bag["trophies"] = trophies
+    member.bag = bag
+    return True
+
+
+async def trap(db: AsyncSession, run: RuinRun, rng: random.Random) -> dict[int, bool]:
+    """Ловушка срабатывает сама при входе: каждый живой - бросок ловкости.
+    Вернёт {id: увернулся}."""
+    from services import item_service
+
+    out = {}
+    hit: set[int] = set()
+    for m in await members(db, run.id):
+        if m.dead:
+            continue
+        stats = await db.scalar(select(CharacterStats).where(CharacterStats.character_id == m.character_id))
+        agi = (stats.agility if stats else 0) + (await item_service.compute_gear_bonus(db, m.character_id)).get("agi", 0)
+        dodged = rng.random() < ruins_rooms.dodge_chance(agi)
+        out[m.character_id] = dodged
+        if not dodged:
+            hit.add(m.character_id)
+    await hurt_alive(db, run, rc.TRAP_HIT, only=hit)
+    _mark_cleared(run)
+    touch(run)
+    await db.flush()
+    return out
+
+
+async def choose(db: AsyncSession, run: RuinRun, leader_id: int, choice: str, rng: random.Random) -> dict:
+    """Лидер выбрал, что делать в особой комнате. Вернёт {"lines": [ключи],
+    "fight": тип или None, "offer": [дары], "loot": {id: добыча}, "curse"}."""
+    if run.leader_id != leader_id:
+        raise RuinsError("Решает лидер.")
+    if run.phase != WALK or run.pending or run.offer:
+        raise RuinsError("Сейчас не до этого.")
+    kind = rules.room_kind(run.layout, run.pos)
+    if not room_open(run):
+        raise RuinsError("Здесь уже всё сделано.")
+    result: dict = {"lines": [], "fight": None, "offer": [], "loot": {}}
+    members_now = await members(db, run.id)
+    event = rules.event_of(run.layout, run.pos)
+    if kind == rules.WELL:
+        if choice == "leave":
+            result["lines"].append("leave")
+        elif choice.startswith("drop:") and gifts_mod.has(run.gifts, choice[5:]):
+            result["offer"] = start_offer(run, ruins_rooms.ANY, rng, drop=choice[5:])
+            result["lines"].append("well")
+        else:
+            raise RuinsError("Сначала выбери, какой дар бросить в колодец.")
+        _mark_cleared(run)
+        touch(run)
+        await db.flush()
+        return result
+    if choice not in ruins_rooms.choices(kind, event):
+        raise RuinsError("Так здесь нельзя.")
+    if kind == rules.CRYPT and choice == "raise" and not any(m.dead for m in members_now):
+        raise RuinsError("Поднимать некого: все на ногах.")
+    if kind == rules.CHAPEL and choice == "pray":
+        poor = [m for m in members_now if not m.dead
+                and sum(((m.bag or {}).get("trophies") or {}).values()) < rc.CHAPEL_PRICE]
+        if poor:
+            raise RuinsError(f"Не у всех в мешке есть {rc.CHAPEL_PRICE} реликвии.")
+    effects = ruins_rooms.outcome(kind, choice, rng, event)
+    if not effects:
+        result["lines"].append("leave")
+    for e in effects:
+        if "line" in e:
+            result["lines"].append(e["line"])
+        if "hurt" in e:
+            await hurt_alive(db, run, e["hurt"])
+        if "heal" in e:
+            await heal_alive(db, run, e["heal"])
+        if "raise" in e:
+            for m in members_now:
+                if m.dead:
+                    m.dead = False
+                    m.hp = max(1, round(await max_hp(db, m.character_id, run.gifts) * e["raise"]))
+        if "pay" in e:
+            for m in members_now:
+                if not m.dead:
+                    _take_trophies(m, e["pay"])
+        if "loot" in e:
+            for m in members_now:
+                if not m.dead:
+                    drop = _roll_loot(rng, e["loot"])
+                    _bag_trophies(m, drop)
+                    result["loot"][m.character_id] = drop
+        if "curse" in e:
+            cursed = _curse_floor(run, rng)
+            if cursed:
+                result["curse"] = cursed
+        if "offer" in e:
+            result["offer"] = start_offer(run, tuple(e["offer"]), rng)
+        if "fight" in e:
+            result["fight"] = e["fight"]
+            run.extra = {**(run.extra or {}), "fight": {"kind": e["fight"], "after": e.get("after")}}
+            run.phase = FIGHT
+    if not result["fight"]:
+        _mark_cleared(run)
+    touch(run)
+    await db.flush()
+    return result
 
 
 # --- Итоги боя ----------------------------------------------------------------
@@ -226,13 +463,38 @@ def _add(bag: dict, section: str, key: str, count: int) -> dict:
     return bag
 
 
+def _firsts(character: Character) -> list[int]:
+    return list((character.ui_flags or {}).get("ruins_firsts") or [])
+
+
+def fight_kind(run: RuinRun) -> str:
+    """Тип текущего боя: из выбора в комнате или сама комната."""
+    return ((run.extra or {}).get("fight") or {}).get("kind") or rules.room_kind(run.layout, run.pos)
+
+
 async def room_won(db: AsyncSession, run: RuinRun, hp: dict[int, int], used: dict[int, int],
-                   rng: random.Random) -> dict[int, dict]:
-    """Комната зачищена. hp - здоровье после боя (0 - пал), used - зелий за
-    этаж. Живые кладут в мешок трофеи; за босса - кубики рун и подъём павших.
-    Вернёт находки: {id: {"trophies": {...}, "runes": [...]}}."""
-    kind = rules.room_kind(run.layout, run.pos)
-    run.cleared = [*(run.cleared or []), run.pos]
+                   rng: random.Random, *, kills: int = 0, prayer_used: list[int] | None = None,
+                   top_hp: dict[int, int] | None = None, bosses: int = 0) -> dict[int, dict]:
+    """Комната зачищена. hp - здоровье после боя (0 - пал), used - зелий
+    выпито на этаже, top_hp - максимум здоровья в бою, bosses - сколько
+    уникальных боссов было в зале. Живые кладут в мешок трофеи; за хозяина -
+    кубики рун и подъём павших; за первого уникального - ларцы рун сразу.
+    Вернёт находки: {id: {"trophies", "runes", "raised", "chests"}}."""
+    from services import lootbox_service, rune_service
+
+    fight = (run.extra or {}).get("fight") or {}
+    kind = fight.get("kind") or rules.room_kind(run.layout, run.pos)
+    boss = kind == rules.BOSS
+    _mark_cleared(run)
+    extra = dict(run.extra or {})
+    extra["kills"] = int(extra.get("kills", 0)) + kills
+    extra["prayer"] = list(prayer_used if prayer_used is not None else extra.get("prayer") or [])
+    extra.pop("fight", None)
+    run.extra = extra
+    top_hp = top_hp or {}
+    rolls = rc.ROOM_LOOT.get(kind, 1) + (1 if kind == rules.ELITE and gifts_mod.has(run.gifts, "usurer_mark") else 0)
+    dice_bonus = (1 if gifts_mod.has(run.gifts, "greedy_palm") else 0) + (2 if gifts_mod.has(run.gifts, "heavy_bag") else 0)
+    first_floor = boss and run.floor % 5 == 0
     found: dict[int, dict] = {}
     for m in await members(db, run.id):
         if m.character_id in hp:
@@ -241,34 +503,53 @@ async def room_won(db: AsyncSession, run: RuinRun, hp: dict[int, int], used: dic
         if m.character_id in used:
             m.consumables_used = used[m.character_id]
         m.hp_before = None
+        top = top_hp.get(m.character_id) or await max_hp(db, m.character_id, run.gifts)
         got: dict = {"trophies": {}, "runes": []}
         if not m.dead:
-            drop = loot.roll_drop(rng, lc.ROLLS_BY_RING[rc.MOB_RING] * rc.ROOM_LOOT.get(kind, 1))
-            bag = m.bag or {}
-            for trophy_id, count in drop.items():
-                bag = _add(bag, "trophies", trophy_id, count)
+            drop = _roll_loot(rng, rolls)
+            _bag_trophies(m, drop)
             got["trophies"] = drop
-            if kind == rules.BOSS:
-                from services import rune_service
-
-                for _ in range(rules.roll_rune_dice(rng, run.floor)):
+            if boss:
+                bag = m.bag or {}
+                dice = rc.rune_dice(run.floor) + dice_bonus
+                for _ in range(sum(1 for _ in range(dice) if rng.random() < rc.RUNE_DIE_CHANCE)):
                     rune_id = rune_service.roll_rune(rng)
                     bag = _add(bag, "runes", rune_id, 1)
                     got["runes"].append(rune_id)
-            m.bag = bag
-        if kind == rules.BOSS and m.dead:
+                m.bag = bag
+            if gifts_mod.has(run.gifts, "novice_flask"):
+                m.hp = min(top, m.hp + round(top * rc.FLASK_HEAL))
+        if boss and m.dead:
             m.dead = False
             m.hp = rc.RAISE_HP
             got["raised"] = True
+        if boss and gifts_mod.has(run.gifts, "bandage"):
+            m.hp = min(top, m.hp + round(top * rc.BANDAGE_HEAL))
+        if first_floor:
+            character = await db.get(Character, m.character_id)
+            if character is not None and run.floor not in _firsts(character):
+                flags = dict(character.ui_flags or {})
+                flags["ruins_firsts"] = [*_firsts(character), run.floor]
+                character.ui_flags = flags
+                chests = rc.FIRST_KILL_CHESTS * max(1, bosses)
+                for _ in range(chests):
+                    await lootbox_service.grant_chest(db, character, character.daily_streak, lootbox_service.RUNE)
+                got["chests"] = chests
         found[m.character_id] = got
-    run.phase = CLEARED if kind == rules.BOSS else WALK
+    if boss and gifts_mod.has(run.gifts, "greedy_palm"):
+        run.gifts = [g for g in run.gifts if g["id"] != "greedy_palm"]
+    run.phase = CLEARED if boss else WALK
+    after = fight.get("after") or {}
+    if not boss and (kind == rules.ELITE or after.get("offer")):
+        start_offer(run, tuple(after.get("offer") or ruins_rooms.GOOD), rng)
     touch(run)
     await db.flush()
     return found
 
 
 async def next_floor(db: AsyncSession, run: RuinRun, rng: random.Random) -> None:
-    """Лидер повёл глубже: новый этаж, лимит зелий заново."""
+    """Лидер повёл глубже: новый этаж, лимит зелий заново, проклятие
+    кладовой и «Чужая молитва» - заново."""
     if run.phase != CLEARED:
         raise RuinsError("Глубже - только после хозяина этажа.")
     run.floor += 1
@@ -280,6 +561,9 @@ async def next_floor(db: AsyncSession, run: RuinRun, rng: random.Random) -> None
     run.cleared = [run.pos]
     run.phase = WALK
     run.pending = None
+    run.offer = None
+    run.gifts = [g for g in run.gifts or [] if not g.get("floor")]
+    run.extra = {**(run.extra or {}), "prayer": []}
     for m in await members(db, run.id):
         m.consumables_used = 0
     touch(run)
@@ -386,6 +670,8 @@ async def recover(db: AsyncSession) -> list[RuinRun]:
             run.phase = WALK
         run.pending = None
         run.vote = None
+        if run.extra and run.extra.get("fight"):
+            run.extra = {k: v for k, v in run.extra.items() if k != "fight"}
     await db.flush()
     return runs
 

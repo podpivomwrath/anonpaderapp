@@ -28,7 +28,7 @@ from game.economy import mining
 from models import Character, CharacterLootbox
 from services import elixir_service, mining_service, raid_key_service, trophy_service, wallet_service
 
-ASHEN, ORE, SUPPLY = "ashen", "ore", "supply"
+ASHEN, ORE, SUPPLY, RUNE = "ashen", "ore", "supply", "rune"
 
 
 @dataclass(frozen=True)
@@ -53,6 +53,10 @@ CHEST_KINDS: dict[str, ChestKind] = {
                       "Из кровавого разлома и в награду лучшим поставщикам фракции: 1-3 зелья, "
                       "а с самой редкой карточки - свиток, "
                       "которого больше нигде не достать."),
+    # Руины культа (2026-11-05): 2 ларца за первое убийство уникального босса.
+    RUNE: ChestKind("rune_chest", "Ларец рун", "chest:rune",
+                    "Из руин культа - за первую победу над хозяином пятого, десятого и далее этажа. "
+                    "От двух обычных рун до мифической с двумя эпическими."),
 }
 
 _grades: dict[str, list[LootboxGradeDef]] = {}
@@ -142,6 +146,15 @@ async def _apply_part(db: AsyncSession, character: Character, part: LootboxRewar
         tdef = trophy_service.trophy_def(part.trophy_id)
         name = f"{tdef.emoji} {tdef.name}" if tdef is not None else part.trophy_id
         return f"{name} ×{amount}"
+    if part.type == "rune":
+        from services import rune_service
+
+        names = []
+        for _ in range(rng.randint(part.min, part.max)):
+            rune_id = rune_service.roll_rune_of_rarity(rng, part.rarity or "common", character.base_class)
+            await rune_service.grant(db, character.id, rune_id, 1, reason="rune_chest")
+            names.append(rune_service.rune_title(rune_id))
+        return ", ".join(names)
     raise ValueError(f"unknown lootbox reward type: {part.type}")
 
 
@@ -290,6 +303,10 @@ def _part_preview(part: LootboxRewardPart) -> str:
     if part.type == "ore":
         ore = mining.ore_def(part.ore_id)
         return f"{ore.name if ore else part.ore_id} ×{span}"
+    if part.type == "rune":
+        from game.economy import runes_config
+
+        return f"{runes_config.RARITY_TITLES.get(part.rarity or 'common', '')} руна ×{span}".capitalize()
     return part.type
 
 

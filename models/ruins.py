@@ -37,6 +37,13 @@ class RuinRun(Base):
     #: голосование за изгнание: {"target", "until", "yes": [...], "no": [...]}
     vote: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     deepest: Mapped[int] = mapped_column(Integer, default=1)
+    #: дары культа группы: [{"id", "floor": True - только на этот этаж}]
+    gifts: Mapped[list] = mapped_column(JSON, default=list)
+    #: дары на выбор лидеру: {"ids": [...], "until", "drop": снятый дар колодца}
+    offer: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    #: прочее состояние: kills, prayer (спасённые молитвой на этаже),
+    #: fight ({"kind", "after"} - бой из выбора в комнате)
+    extra: Mapped[dict] = mapped_column(JSON, default=dict)
     started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     last_action_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)

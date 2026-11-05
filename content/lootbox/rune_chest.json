@@ -1,0 +1,100 @@
+[
+  {
+    "id": "dusty",
+    "emoji": "⚪",
+    "name": "Две обычные",
+    "chance": 0.45,
+    "options": [
+      [
+        {
+          "type": "rune",
+          "rarity": "common",
+          "min": 2,
+          "max": 2
+        }
+      ]
+    ]
+  },
+  {
+    "id": "dim",
+    "emoji": "🔵",
+    "name": "Три обычные",
+    "chance": 0.27,
+    "options": [
+      [
+        {
+          "type": "rune",
+          "rarity": "common",
+          "min": 3,
+          "max": 3
+        }
+      ]
+    ]
+  },
+  {
+    "id": "crimson",
+    "emoji": "🟣",
+    "name": "Редкая и две обычные",
+    "chance": 0.18,
+    "options": [
+      [
+        {
+          "type": "rune",
+          "rarity": "rare",
+          "min": 1,
+          "max": 1
+        },
+        {
+          "type": "rune",
+          "rarity": "common",
+          "min": 2,
+          "max": 2
+        }
+      ]
+    ]
+  },
+  {
+    "id": "searing",
+    "emoji": "🟠",
+    "name": "Эпическая и две редкие",
+    "chance": 0.08,
+    "options": [
+      [
+        {
+          "type": "rune",
+          "rarity": "epic",
+          "min": 1,
+          "max": 1
+        },
+        {
+          "type": "rune",
+          "rarity": "rare",
+          "min": 2,
+          "max": 2
+        }
+      ]
+    ]
+  },
+  {
+    "id": "tear",
+    "emoji": "🟡",
+    "name": "Мифическая и две эпические",
+    "chance": 0.02,
+    "options": [
+      [
+        {
+          "type": "rune",
+          "rarity": "mythic",
+          "min": 1,
+          "max": 1
+        },
+        {
+          "type": "rune",
+          "rarity": "epic",
+          "min": 2,
+          "max": 2
+        }
+      ]
+    ]
+  }
+]
