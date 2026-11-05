@@ -175,7 +175,7 @@ async def on_raid_tick_resolved(session_id: int, tick: int, result: TickResult) 
     # генерал) или когда поле закрыло этап само (призыватель взял алебарду).
     stage_won = field_cleared or (result.finished and result.winner_side == 0)
     notices: dict[int, str] = {}
-    if stage_won:
+    if stage_won and not battle.is_ruins:  # в руинах награда - мешок (bot/handlers/ruins.py)
         alive_char_ids = [
             cid for cid, c in raid_combat._live_state(session_id, battle).items()
             if c.side == 0 and c.alive and cid in battle.participants
@@ -208,10 +208,14 @@ async def on_raid_tick_resolved(session_id: int, tick: int, result: TickResult) 
         # гибнет. Не навык из списка, а сценарный конец: раньше одиночка мог
         # тянуть этап сотнями ходов на зельях (решение владельца 2026-10-02).
         raid_combat._engine.abort_session(session_id)
-        ultimate = (
-            rfc.RIFT_TYPES[battle.rift_kind].ultimate_text if battle.is_rift
-            else rc.RAID_ULTIMATE_TEXT[battle.raid_id]
-        )
+        if battle.is_ruins:
+            from bot import ruins_texts
+
+            ultimate = ruins_texts.ULTIMATE_TEXT
+        elif battle.is_rift:
+            ultimate = rfc.RIFT_TYPES[battle.rift_kind].ultimate_text
+        else:
+            ultimate = rc.RAID_ULTIMATE_TEXT[battle.raid_id]
         await raid_combat._finish_wipe(session_id, battle, ultimate)
         return
     if frozen_ids:
@@ -344,7 +348,7 @@ async def _auto_skip(battle_id: int, character_ids: list[int]) -> None:
 
 def _field_after_tick(battle: raid_combat.RaidBattle, state: CombatSessionState, result: TickResult):
     stage = battle.field_stage
-    if getattr(stage, "rift", False):
+    if getattr(stage, "rift", False) or getattr(stage, "ruins", False):
         return stage.after_tick(state, result, battle.rng)
     if isinstance(stage, (raid_archive.ArchiveStage, raid_mill.CargoStage, raid_mill.MillerStage,
                           trail_combat.NamelessStage)):
@@ -418,6 +422,11 @@ async def _advance_or_finish(session_id: int, battle: raid_combat.RaidBattle) ->
     """Этап зачищен (сторона игроков победила). stage<3 — пауза 5-10 сек +
     переход к следующему этапу; stage==3 — рейд пройден целиком."""
     await _settle_trials(session_id, battle, won=True)
+    if battle.is_ruins:
+        from bot.handlers import ruins  # цикл импортов
+
+        await ruins.on_room_won(session_id, battle)
+        return
     stage_cleared = battle.stage
     if stage_cleared >= battle.final_stage:
         await _finish_victory(session_id, battle)
@@ -579,6 +588,11 @@ async def _finish_victory(session_id: int, battle: raid_combat.RaidBattle) -> No
 
 
 async def _finish_wipe(session_id: int, battle: raid_combat.RaidBattle, text: str | None = None) -> None:
+    if battle.is_ruins:
+        from bot.handlers import ruins  # цикл импортов
+
+        await ruins.on_wipe(session_id, battle, text)
+        return
     texts = raid_combat._texts(battle)
     await _cleanup_and_return(session_id, battle, text or texts.RAID_DEFEAT_TEXT, defeated=True)
 

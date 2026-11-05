@@ -62,6 +62,7 @@ from models.transfer import CourierDelivery, TransferLog
 from models.trophy import CharacterTrophy
 from models.user import User
 from models.rift import Rift, RiftMeter, RiftRun
+from models.ruins import RuinMember, RuinRun
 from models.voyage import CharacterVoyage
 from models.world_boss import WorldBoss, WorldBossContribution, WorldBossMeter
 
@@ -153,6 +154,8 @@ __all__ = [
     "Region",
     "ResourceLog",
     "Rift",
+    "RuinMember",
+    "RuinRun",
     "RiftMeter",
     "RiftRun",
     "TradeCart",

@@ -19,6 +19,7 @@ from game.world import grid
 DRAW = "после ничьей"
 RIFT = "после разлома"
 RAID = "после рейда"
+RUINS = "после руин"
 CHAPEL = "после возрождения"
 
 # character_id -> (до какого time.time(), причина, клетка, где выдан)

@@ -25,6 +25,7 @@ STATES: dict[str, str] = {
     "traveling_on_foot": "Сначала дождись прибытия.",
     "riding": "Сначала дождись окончания поездки.",
     "voyage": "Ты в долгом пути. Вернуться можно кнопкой «⚓ Вернуться».",
+    "ruins": "Ты в руинах. Сначала поднимись наверх.",
 }
 
 #: Как каждое состояние кончается - чтобы ни одно не держало игрока вечно.
@@ -43,6 +44,9 @@ ENDS_BY: dict[str, str] = {
     "riding": "unstick",
     # Долгий путь кончается сам по времени или кнопкой «⚓ Вернуться».
     "voyage": "timer",
+    # Руины кончаются выходом после хозяина этажа, гибелью группы, изгнанием
+    # или сами - через сутки без действий (ruins_service.abandon_due).
+    "ruins": "timer",
 }
 
 
@@ -101,6 +105,10 @@ async def busy(
     # мини-аппа - чат держит путь своим фильтром, а карта его не знала).
     if voyage_handlers.is_away(peer_id):
         checks.append(hit("voyage"))
+    from bot.handlers import ruins as ruins_handlers
+
+    if ruins_handlers.is_inside(peer_id):
+        checks.append(hit("ruins"))
     found = next((c for c in checks if c is not None), None)
     if found is not None or "riding" in skip:
         return found

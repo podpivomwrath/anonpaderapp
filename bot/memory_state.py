@@ -88,6 +88,7 @@ STATE: dict[str, str] = {
     "bot.handlers.respawn._death_xp": "возрождение",
     "bot.handlers.respawn._pvp_death_pending": "возрождение",
     "bot.handlers.rift._waiting": "вход группы, отмена, уход от разлома",
+    "bot.handlers.ruins._inside": "выход наверх, гибель группы, изгнание, брошенный забег; при старте - из базы",
     "bot.handlers.scene_events._pending": "ответ на сцену, уход с клетки, истечение",
     "bot.handlers.stats_window._pending": "«Готово» или закрытие окна статов",
     "bot.handlers.stats_window._window_header": "«Готово» или закрытие окна статов",

@@ -455,6 +455,18 @@ async def run() -> None:
         id="rift_tick", max_instances=1, coalesce=True,
     )
 
+    # Руины культа (2026-11-05): забег в базе; кто внутри - снова в памяти,
+    # оборванный бой отыгрывается заново. Шаги без подтверждения, голосования
+    # и брошенные забеги - раз в 3 секунды.
+    from bot.handlers import ruins as ruins_handlers
+
+    ruins_handlers.setup(bot.api)
+    await ruins_handlers.recover_on_start()
+    respawn_scheduler.add_job(
+        ruins_handlers.tick_job, "interval", seconds=3,
+        id="ruins_tick", max_instances=1, coalesce=True,
+    )
+
     # Гильдии: стройка, закладки, осады и Страж - раз в 30 секунд; шахты -
     # раз в 5 минут; сезон и снимок владений - раз в сутки ночью.
     guild_handlers.setup(bot.api)

@@ -163,6 +163,18 @@ class RaidBattle:
     #: клетка, куда участники возвращаются после боя (у рейдов - Монолит)
     home: tuple[int, int] = rc.MONOLITH_COORDS
 
+    # --- Руины культа (bot/handlers/ruins.py): бой одной комнаты ---
+    ruin_run_id: int | None = None
+    #: готовый этап комнаты (game/combat/ruins.RoomStage)
+    ruin_stage: object | None = None
+    #: здоровье на входе (0 - пал раньше) и зелья, выпитые на этаже
+    ruin_hp: dict = field(default_factory=dict)
+    ruin_used: dict = field(default_factory=dict)
+
+    @property
+    def is_ruins(self) -> bool:
+        return self.ruin_run_id is not None
+
     @property
     def is_rift(self) -> bool:
         return self.rift_id is not None
@@ -324,8 +336,16 @@ def _start_stage_session(battle_id: int, battle: RaidBattle) -> CombatSessionSta
     battle.stage_ticks = 0
     state = CombatSessionState(session_id=battle_id, mode=CombatMode.PVE, is_raid=True)
     _build_player_combatants(state, battle.member_inputs)
+    if battle.is_ruins:
+        # Руины не лечат между комнатами: здоровье - с прошлого боя, зелья -
+        # общий счёт этажа (решение владельца 2026-11-05).
+        for cid, hp in battle.ruin_hp.items():
+            c = state.combatants.get(cid)
+            if c is not None:
+                c.current_hp = max(0, min(int(hp), c.max_hp))
+                c.consumables_used = int(battle.ruin_used.get(cid, 0))
 
-    if battle.is_field or battle.is_archive or battle.is_rift or battle.is_mill or battle.is_trail:
+    if battle.is_field or battle.is_archive or battle.is_rift or battle.is_mill or battle.is_trail or battle.is_ruins:
         _build_field_stage(battle, state)
     elif battle.stage == 1:
         mobs = raid_bosses.build_stage1_mobs(start_id=20_000_000)
@@ -362,7 +382,9 @@ def _build_field_stage(battle: RaidBattle, state: CombatSessionState) -> None:
     """Этап «Безмогильного поля». id противников - свой диапазон на этап,
     как у театра: объекты и скелеты нумеруются дальше от него. У архива
     боевой только третий этап - Архивариус."""
-    if battle.is_rift:
+    if battle.is_ruins:
+        stage = battle.ruin_stage
+    elif battle.is_rift:
         stage = rift_combat.build_stage(
             battle.rift_kind, battle.stage, 21_000_000 + battle.stage * 100_000, battle.rift_level, battle.rift_ring,
             blood=getattr(battle, "rift_blood", False),
@@ -590,6 +612,58 @@ async def start_raid(
             attachment=_stage_attachment(battle), random_id=0,
         )
     await _broadcast_board(battle_id, battle, None, boss_lines=_take_opening_lines(battle))
+
+
+async def start_ruins_room(run_id: int, stage, member_inputs: list[MemberCombatInput], hp: dict[int, int],
+                           used: dict[int, int], opening: str) -> int:
+    """Руины: бой одной комнаты тем же путём, что этапы рейда. Итог боя -
+    bot/handlers/ruins.py (on_room_won / on_wipe) через raid_results."""
+    global _next_battle_id
+    battle_id = _next_battle_id
+    _next_battle_id -= 1
+    participants = {
+        m.character.id: Participant(
+            character_id=m.character.id, peer_id=m.peer_id, name=m.character.name,
+            base_class=m.character.base_class, subclass_id=m.character.subclass,
+        )
+        for m in member_inputs
+    }
+    battle = RaidBattle(group_id=None, participants=participants, member_inputs=member_inputs,
+                        rng=random.Random(), raid_id="ruins")
+    battle.ruin_run_id, battle.ruin_stage = run_id, stage
+    battle.ruin_hp, battle.ruin_used = dict(hp), dict(used)
+    _battles[battle_id] = battle
+    for cid, p in participants.items():
+        _peer_battle[p.peer_id] = battle_id
+        _character_in_raid.add(cid)
+    state = _start_stage_session(battle_id, battle)
+    _engine.start_session(state)
+    for p in participants.values():
+        await _bot_api.messages.send(peer_id=p.peer_id, message=opening, random_id=0)
+    await _broadcast_board(battle_id, battle, None, boss_lines=_take_opening_lines(battle))
+    return battle_id
+
+
+def release_ruins_battle(battle_id: int) -> dict:
+    """Бой комнаты кончился: снять его из памяти, ничего не двигая. Вернёт
+    бойцов последнего хода (здоровье, зелья)."""
+    battle = _battles.pop(battle_id, None)
+    if battle is None:
+        return {}
+    combatants = dict(battle.last_combatants)
+    state = _engine.sessions.get(battle_id)
+    if state is not None:
+        combatants = dict(state.combatants)
+    from bot import trial_tracking
+
+    trial_tracking.drop(battle_id)
+    _declared_this_tick.pop(battle_id, None)
+    _declared_actions.pop(battle_id, None)
+    for p in list(battle.participants.values()):
+        _peer_battle.pop(p.peer_id, None)
+        _chosen_target.pop(p.character_id, None)
+        _character_in_raid.discard(p.character_id)
+    return combatants
 
 
 async def begin_combat_stage(

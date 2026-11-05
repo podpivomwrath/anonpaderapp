@@ -491,6 +491,7 @@ WALLET_REASONS = {
     "pk_service.settle": "Кровавое клеймо", "preset_service.buy_preset_slot": "Слот пресета",
     "preset_service.save_preset": "Новый пресет", "promo_service._apply_reward": "Промокод",
     "raid_combat._rift_gold": "Разлом", "raid_results._rift_gold": "Разлом",
+    "ruins_service.pay_out": "Руины культа: мешок",
     "respec_service.full_class_reset": "Смена класса",
     "respec_service.reset_subclass": "Сброс подкласса", "respec_service.reset_stats": "Сброс характеристик",
     "scene_event_service.grant_gold": "Событие", "scene_event_service.pay": "Событие: плата",

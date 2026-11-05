@@ -21,6 +21,7 @@ _last_cell: dict[tuple[int, str], tuple[int, int]] = {}
 LAKE = "lake"
 MINE = "mine"
 MONOLITH = "monolith"  # 2026-10-18: кнопка Монолита - тоже раз на вход
+RUINS = "ruins"  # 2026-11-05: вход в руины культа у Подножного забоя
 
 
 def should_send(peer_id: int, kind: str, x: int, y: int) -> bool:

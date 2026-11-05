@@ -354,11 +354,20 @@ async def test_mentor_badge_travel_combat_states(db_session, character_at) -> No
     assert await story_service.mentor_badge_active(db_session, character) is True  # сдача
 
 
-async def test_mentor_badge_false_after_region_completed(db_session, make_character) -> None:
+async def test_mentor_badge_false_after_region_completed(db_session, make_character, monkeypatch) -> None:
+    from game.economy import ruins_config
+
+    monkeypatch.setattr(ruins_config, "OPEN", True)
     character = await make_character(region="ridge", level=60)
     await _set_progress(db_session, character, "ridge_5_2", act=5, status="active")
     stats = await db_session.get(CharacterStats, character.id)
     await story_service.visit_mentor(db_session, character, stats)  # резолвит и завершает линию
+    # 60-й ещё не слышал о руинах культа - наставнику есть что сказать.
+    assert await story_service.mentor_badge_active(db_session, character) is True
+    monkeypatch.setattr(ruins_config, "OPEN", False)  # закрытая проверка: обычному игроку не видно
+    assert await story_service.mentor_badge_active(db_session, character) is False
+    monkeypatch.setattr(ruins_config, "OPEN", True)
+    story_service.mark_ruins_intro(character)
     assert await story_service.mentor_badge_active(db_session, character) is False
 
 

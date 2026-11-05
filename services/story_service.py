@@ -394,8 +394,26 @@ async def advance_past_subclass_gate(
     return reward_text  # текст сцены уже был показан игроку раньше (assign_text)
 
 
+def ruins_intro_due(character: Character) -> bool:
+    """Вводное задание о руинах культа (2026-11-05): с 60 уровня, один раз."""
+    from game.economy import ruins_config
+
+    return character.level >= ruins_config.MIN_LEVEL and not (character.ui_flags or {}).get("ruins_intro")
+
+
+def mark_ruins_intro(character: Character) -> None:
+    flags = dict(character.ui_flags or {})
+    flags["ruins_intro"] = True
+    character.ui_flags = flags  # новый dict: JSON-поле не следит за изменением на месте
+
+
 async def mentor_badge_active(db: AsyncSession, character: Character) -> bool:
     """Пометка [🧙 Наставник ❗] (патч 21) — есть что взять или что сдать."""
+    if ruins_intro_due(character):
+        from services import ruins_service
+
+        if await ruins_service.open_for_character(db, character):
+            return True
     quest = await current_quest_def(db, character)
     if quest is None:
         return False  # линия региона пройдена целиком

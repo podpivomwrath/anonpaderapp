@@ -47,6 +47,7 @@ from bot.handlers.explore import labeler as explore_labeler
 from bot.handlers.world_boss import labeler as world_boss_labeler
 from bot.handlers.voyage import labeler as voyage_labeler
 from bot.handlers.rift import labeler as rift_labeler
+from bot.handlers.ruins import labeler as ruins_labeler
 from bot.handlers.terms import labeler as terms_labeler
 from bot.handlers.turbo_ishak import labeler as turbo_ishak_labeler
 
@@ -57,10 +58,11 @@ LABELERS = [
     # Долгий путь (AFK): пока игрок в пути, его сообщения перехватываются
     # раньше всех - кроме онбординга (он ловит только FSM создания).
     # Разломы: ожидание у входа перехватывает всё, кроме боя и /напасть.
+    # Руины культа: внутри, вне боя - то же самое (bot/handlers/ruins.py).
     # Соглашение (2026-10-15): кнопка «Принимаю» - раньше всех.
     # Короткий боевой лог (2026-10-22): «📜 Сводка» - раньше боевых
     # обработчиков, которые молчат на чужие кнопки в ходе.
-    terms_labeler, onboarding_labeler, combat_log_labeler, voyage_labeler, rift_labeler, raid_archive_labeler, raid_procession_labeler, raid_trail_labeler, scene_events_labeler, group_events_labeler, turbo_ishak_labeler, world_labeler, explore_labeler, rest_labeler, stuck_labeler, combat_labeler, group_combat_labeler, pvp_labeler, arena_labeler, house_labeler, herbs_labeler, appraiser_labeler, market_labeler,
+    terms_labeler, onboarding_labeler, combat_log_labeler, voyage_labeler, rift_labeler, ruins_labeler, raid_archive_labeler, raid_procession_labeler, raid_trail_labeler, scene_events_labeler, group_events_labeler, turbo_ishak_labeler, world_labeler, explore_labeler, rest_labeler, stuck_labeler, combat_labeler, group_combat_labeler, pvp_labeler, arena_labeler, house_labeler, herbs_labeler, appraiser_labeler, market_labeler,
     inventory_labeler, list_keeper_labeler, presets_labeler, elixir_shop_labeler,
     dailies_labeler, mounts_labeler, stats_window_labeler, moderation_labeler, basic_labeler,
     # Патч 53: рейд — до fallback/promo, как и остальные боевые/меню лейблеры.

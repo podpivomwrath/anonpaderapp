@@ -335,6 +335,10 @@ async def send_cell_buttons(peer_id: int, character) -> None:
     await turbo_handlers.maybe_send_here_button(peer_id, character)
 
     await rift_handlers.maybe_send_here_button(peer_id, character)
+    # Руины культа (2026-11-05): вход - в дальнем конце Подножного забоя.
+    from bot.handlers import ruins as ruins_handlers
+
+    await ruins_handlers.maybe_send_here_button(peer_id, character)
     from bot.handlers import herbs as herb_handlers
 
     await herb_handlers.notify(peer_id, character)
@@ -870,6 +874,17 @@ async def talk_to_mentor(message: Message) -> None:
             return
 
         if progress.status == "completed":
+            # Руины культа (2026-11-05): на 60 уровне наставник один раз
+            # рассказывает о завале в Подножном забое - вводное задание.
+            from services import ruins_service
+
+            if story_service.ruins_intro_due(character) and ruins_service.open_for(message.from_id):
+                story_service.mark_ruins_intro(character)
+                await db.commit()
+                from bot import ruins_texts
+
+                await message.answer(ruins_texts.MENTOR_INTRO)
+                return
             # патч 18: квест 1.1 закрыт — дальше сюжет ведёт story_service
             stats = await _get_stats(db, character.id)
             story_result = await story_service.visit_mentor(db, character, stats)

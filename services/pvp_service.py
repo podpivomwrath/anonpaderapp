@@ -13,7 +13,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from game.classes.base import REGISTRY
 from game.economy import pvp_config as pc
 from models import Character, PvpBattle, CharacterVoyage
-from services import death_service, title_service
+from services import death_service, ruins_service, title_service
 
 BASE_CLASS_TITLES = {"warrior": "Воин", "rogue": "Разбойник", "mage": "Маг"}
 
@@ -58,6 +58,8 @@ async def others_at(db: AsyncSession, character: Character) -> list[Character]:
                 Character.id.not_in(
                     select(CharacterVoyage.character_id).where(CharacterVoyage.status == "away")
                 ),
+                # Спустившиеся в руины культа стоят на клетке забоя, но их тут нет.
+                Character.id.not_in(ruins_service.inside_query()),
             # Постоянный порядок: без него номера в «Осмотреться» менялись
             # местами от раза к разу (2026-10-15).
             ).order_by(Character.id)
