@@ -369,3 +369,21 @@ def test_room_keyboard_passes_vk_limits(monkeypatch) -> None:
                         assert len(row) <= 2
                     assert len(row) <= 5
     assert seen_link
+
+
+def test_no_model_reads_right_after_rollback() -> None:
+    """2026-11-05: «Пожертвовать» без реликвий ломало игру - отказ собирал
+    клавиатуру из забега ПОСЛЕ db.rollback(), поля были просрочены, и чтение
+    шло в базу вне сессии (greenlet_spawn). Игрок видел «кнопка устарела»."""
+    import re
+    from pathlib import Path
+
+    lines = Path("bot/handlers/ruins.py").read_text(encoding="utf-8").splitlines()
+    for i, line in enumerate(lines):
+        if "await db.rollback()" not in line:
+            continue
+        indent = len(line) - len(line.lstrip())
+        for nxt in lines[i + 1:i + 4]:
+            if nxt.strip() and len(nxt) - len(nxt.lstrip()) < indent:
+                break
+            assert not re.search(r"\b(run|character|member)\.", nxt), f"строка {i + 1}: {nxt.strip()}"

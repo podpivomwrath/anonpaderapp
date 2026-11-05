@@ -231,12 +231,13 @@ async def entry_command(message: Message) -> None:
         return
     async with get_session_factory()() as db:
         character = await onboarding_svc.get_character(db, message.from_id)
-        await db.rollback()
-    if character is None or character.creation_state is not None:
-        return
-    if (character.pos_x, character.pos_y) != rc.ENTRY_CELL:
+        if character is None or character.creation_state is not None:
+            return
+        cell, level = (character.pos_x, character.pos_y), character.level
+        await db.commit()  # get_character пишет last_active_at
+    if cell != rc.ENTRY_CELL:
         await message.answer(texts.NOT_HERE_TEXT)
-    elif character.level < rc.MIN_LEVEL:
+    elif level < rc.MIN_LEVEL:
         await message.answer(texts.LOCKED_TEXT)
     else:
         await message.answer(texts.HERE_TEXT, keyboard=_enter_keyboard(), attachment=_pic("вход"))
@@ -444,8 +445,11 @@ async def step(message: Message) -> None:
         try:
             target = ruins_service.propose(run, character.id, direction, party)
         except ruins_service.RuinsError as exc:
+            # Клавиатура - ДО отката: после него поля забега просрочены, и
+            # чтение лезло в базу вне сессии (greenlet_spawn, 2026-11-05).
+            keyboard = _room_keyboard(run, character.id)
             await db.rollback()
-            await message.answer(str(exc), keyboard=_room_keyboard(run, character.id))
+            await message.answer(str(exc), keyboard=keyboard)
             return
         await db.commit()
         run_id = run.id
@@ -642,8 +646,11 @@ async def room_choice(message: Message) -> None:
         try:
             result = await ruins_service.choose(db, run, character.id, choice, _rng)
         except ruins_service.RuinsError as exc:
+            # Клавиатура - ДО отката: после него поля забега просрочены, и
+            # чтение лезло в базу вне сессии (greenlet_spawn, 2026-11-05).
+            keyboard = _room_keyboard(run, character.id)
             await db.rollback()
-            await message.answer(str(exc), keyboard=_room_keyboard(run, character.id))
+            await message.answer(str(exc), keyboard=keyboard)
             return
         if result["fight"]:
             await ruins_service.snapshot_hp(db, run)
@@ -740,8 +747,9 @@ async def deeper(message: Message) -> None:
             return
         run, _member, character = ctx
         if run.leader_id != character.id or run.phase != ruins_service.CLEARED:
+            head = texts.WAIT_CHOICE if run.phase == ruins_service.CLEARED else None
             await db.rollback()
-            await _show_self(message, texts.WAIT_CHOICE if run.phase == ruins_service.CLEARED else None)
+            await _show_self(message, head)
             return
         await ruins_service.next_floor(db, run, _rng)
         await db.commit()
@@ -759,8 +767,9 @@ async def up(message: Message) -> None:
             return
         run, _member, character = ctx
         if run.leader_id != character.id or run.phase != ruins_service.CLEARED:
+            head = texts.WAIT_CHOICE if run.phase == ruins_service.CLEARED else None
             await db.rollback()
-            await _show_self(message, texts.WAIT_CHOICE if run.phase == ruins_service.CLEARED else None)
+            await _show_self(message, head)
             return
         paid = await ruins_service.exit_run(db, run)
         await db.commit()

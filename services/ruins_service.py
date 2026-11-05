@@ -421,7 +421,8 @@ async def choose(db: AsyncSession, run: RuinRun, leader_id: int, choice: str, rn
         poor = [m for m in members_now if not m.dead
                 and sum(((m.bag or {}).get("trophies") or {}).values()) < rc.CHAPEL_PRICE]
         if poor:
-            raise RuinsError(f"Не у всех в мешке есть {rc.CHAPEL_PRICE} реликвии.")
+            raise RuinsError(f"Чаша берёт только найденное здесь, внизу: нужно по {rc.CHAPEL_PRICE} реликвии "
+                             "в мешке руин у каждого живого. Реликвии из сумки не в счёт.")
     effects = ruins_rooms.outcome(kind, choice, rng, event)
     if not effects:
         result["lines"].append("leave")
