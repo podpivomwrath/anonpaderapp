@@ -28,7 +28,7 @@ CRIT, DODGE, DOT = "crit", "dodge", "dot"
 KINDS = (CRIT, DODGE, DOT)
 #: Ключ в buff_modifiers.
 KEYS = {CRIT: "resist_crit", DODGE: "accuracy", DOT: "resist_dot"}
-TITLES = {CRIT: "стойкость к крит-урону", DODGE: "меткость", DOT: "стойкость к ядам"}
+TITLES = {CRIT: "стойкость к крит-урону", DODGE: "меткость", DOT: "стойкость к периодическому урону"}
 EMOJI = {CRIT: "🪨", DODGE: "🎯", DOT: "🧪"}
 
 #: Кованая вещь: столько при 120% эффективности, ниже - пропорционально.
