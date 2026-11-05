@@ -330,3 +330,42 @@ def test_raven_letter_once_before_mentor_intro() -> None:
     assert not story_service.ruins_raven_due(hero)
     took = SimpleNamespace(level=60, ui_flags={"ruins_intro": True})
     assert not story_service.ruins_raven_due(took)
+
+
+def test_room_keyboard_passes_vk_limits(monkeypatch) -> None:
+    """2026-11-05: ссылка на мини-апп стояла третьей в ряду с мешком и
+    группой - VK (ошибка 911) отклонял каждое сообщение руин. Ряд со ссылкой -
+    не больше 2 кнопок, рядов не больше 5, в каждом состоянии комнаты."""
+    import json
+    import random
+    from types import SimpleNamespace
+
+    from bot.handlers import ruins as handler
+    from config import get_settings
+    from game import ruins as rules
+    from services import ruins_service
+
+    monkeypatch.setattr(get_settings(), "vk_miniapp_url", "https://vk.com/app1")
+    seen_link = False
+    for seed in range(40):
+        layout = rules.generate(random.Random(seed), 1)
+        for pos in rules.rooms_of(layout):
+            for leader, pending, phase, offer, vote, gifts in (
+                (1, None, ruins_service.WALK, None, None, []),
+                (2, None, ruins_service.WALK, None, None, []),
+                (1, {"dir": "up", "to": pos, "ok": []}, ruins_service.WALK, None, None, []),
+                (1, None, ruins_service.CLEARED, None, {"target": 3, "yes": [], "no": []}, []),
+                (1, None, ruins_service.WALK, {"ids": ["rusty_nail", "stone_skin", "blood_debt"]}, None, []),
+                (1, None, ruins_service.WALK, None, {"target": 3, "yes": [], "no": []},
+                 [{"id": g} for g in ("rusty_nail", "stone_skin", "blood_debt", "miner_pick")]),
+            ):
+                run = SimpleNamespace(leader_id=leader, offer=offer, phase=phase, pending=pending, layout=layout,
+                                      pos=pos, prev_pos=None, cleared=[], visited=[pos], gifts=gifts, vote=vote, extra={})
+                rows = json.loads(handler._room_keyboard(run, 1))["buttons"]
+                assert len(rows) <= 5
+                for row in rows:
+                    if any(b["action"]["type"] == "open_link" for b in row):
+                        seen_link = True
+                        assert len(row) <= 2
+                    assert len(row) <= 5
+    assert seen_link

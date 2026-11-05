@@ -149,19 +149,24 @@ def _room_keyboard(run, cid: int) -> str:
     if run.vote and cid != run.vote.get("target") and cid not in run.vote.get("yes", []) + run.vote.get("no", []):
         rows.append([(texts.BTN_VOTE_YES, {"type": "ruins_vote", "v": 1}, KeyboardButtonColor.NEGATIVE),
                      (texts.BTN_VOTE_NO, {"type": "ruins_vote", "v": 0}, KeyboardButtonColor.SECONDARY)])
+    rows = [r for r in rows if r][:4]
     kb = Keyboard(one_time=False)
-    for row in [r for r in rows if r][:4]:
+    for row in rows:
         for label, payload, color in row:
             kb.add(Text(label, payload=payload), color=color)
         kb.row()
     kb.add(Text(texts.BTN_BAG, payload={"type": "ruins_bag"}), color=KeyboardButtonColor.SECONDARY)
     kb.add(Text(texts.BTN_PARTY, payload={"type": "ruins_party"}), color=KeyboardButtonColor.SECONDARY)
-    _miniapp_link(kb)
+    if len(rows) <= 3:
+        _miniapp_link(kb)
     return kb.get_json()
 
 
 def _miniapp_link(kb: Keyboard) -> None:
-    """Мини-апп - в том же ряду, что мешок: еда едится оттуда."""
+    """Мини-апп (еда едится оттуда) - своим рядом: VK пускает кнопку-ссылку
+    только в ряд из двух кнопок, а с мешком и группой их было три - и VK
+    отклонял каждое сообщение руин (2026-11-05, застряла Еста). Рядов всего
+    не больше 5, поэтому при 4 рядах выбора ссылку не ставим."""
     from vkbottle import OpenLink
 
     from bot.keyboards.world import BTN_CHARACTER
@@ -169,6 +174,7 @@ def _miniapp_link(kb: Keyboard) -> None:
 
     url = get_settings().vk_miniapp_url
     if url:
+        kb.row()
         kb.add(OpenLink(url, BTN_CHARACTER))
 
 
