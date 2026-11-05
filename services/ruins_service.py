@@ -106,7 +106,7 @@ def touch(run: RuinRun, now: datetime | None = None) -> None:
 
 def entry_refusal(characters: list[Character]) -> str | None:
     if len(characters) > rc.MAX_PARTY:
-        return f"В руины спускаются не больше {rc.MAX_PARTY} человек, а вас {len(characters)}."
+        return f"В руины спускаются до {rc.MAX_PARTY} человек, в группе {len(characters)}."
     low = [c.name for c in characters if c.level < rc.MIN_LEVEL]
     if low:
         return f"В руины пускают с {rc.MIN_LEVEL} уровня. Не дорос: {', '.join(low)}."
@@ -166,11 +166,11 @@ def propose(run: RuinRun, leader_id: int, direction: str, party: int, now: datet
     """Лидер выбрал направление. Вернёт комнату. Соло - шаг сразу (pending
     не ставится, вызывающий делает move)."""
     if run.phase not in (WALK, CLEARED):
-        raise RuinsError("Сейчас не до шагов.")
+        raise RuinsError("Сейчас идти нельзя - сначала закончите бой.")
     if run.leader_id != leader_id:
         raise RuinsError("Куда идти, решает лидер.")
     if run.pending:
-        raise RuinsError("Группа ещё не двинулась на прошлый шаг.")
+        raise RuinsError("Группа ещё не пошла по прошлому шагу - ждём подтверждений.")
     if run.offer:
         raise RuinsError("Сначала выбери дар.")
     target = exits_now(run).get(direction)
@@ -414,7 +414,7 @@ async def choose(db: AsyncSession, run: RuinRun, leader_id: int, choice: str, rn
         await db.flush()
         return result
     if choice not in ruins_rooms.choices(kind, event):
-        raise RuinsError("Так здесь нельзя.")
+        raise RuinsError("Эта кнопка здесь не работает.")
     if kind == rules.CRYPT and choice == "raise" and not any(m.dead for m in members_now):
         raise RuinsError("Поднимать некого: все на ногах.")
     if kind == rules.CHAPEL and choice == "pray":

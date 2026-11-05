@@ -355,7 +355,7 @@ class Herald(RuinBoss):
         self.banned: ActionType | None = None
 
     def opening(self) -> list[str]:
-        return ["📯 Глашатай заранее кричит, какой удар отразит на следующем ходу. Смотрите в лог."]
+        return ["📯 Глашатай каждый ход кричит, какой удар отразит на следующем. Его слова - в логе хода."]
 
     def tick(self, session, result, rng, out) -> None:
         if not self.alive(session):

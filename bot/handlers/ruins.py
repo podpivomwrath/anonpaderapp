@@ -277,7 +277,7 @@ def _view_text(run, cid: int, leader_name: str, head: str | None = None) -> str:
             lines.append(texts.SPECIAL_TEXT.get(kind, ""))
         if kind == rules.WELL and not run.gifts:
             lines.append("Бросить в колодец нечего: даров у группы нет.")
-        lines.append("Решай, что делать, или иди дальше." if leader else f"Решает {leader_name}.")
+        lines.append("Выбери действие кнопкой или иди дальше." if leader else f"Решает {leader_name}.")
     elif run.pos in (run.cleared or []):
         lines.append(texts.CLEARED_ROOM)
     if run.phase != ruins_service.CLEARED and ruins_service.boss_down(run):
@@ -729,7 +729,7 @@ async def boss_act(message: Message) -> None:
         return
     note = stage.act(state, cid, action_name)
     if note is None:
-        await message.answer("Сейчас это не нужно.")
+        await message.answer("Сейчас никого не засыпало.")
         return
     await raid_combat._raid_action(
         message, DeclaredAction(type=ActionType.SKIP, payload={"note": note, action_name: True}),
@@ -778,7 +778,7 @@ async def up(message: Message) -> None:
     for cid, peer in peers.items():
         _inside.pop(peer, None)
         pvp_shield.grant(cid, pvp_shield.RUINS, cell=rc.ENTRY_CELL)
-        await _send(peer, f"{texts.EXIT_TEXT} Глубже всего - этаж {floor}.\n{texts.exit_bag_line(paid[cid])}",
+        await _send(peer, f"{texts.EXIT_TEXT} Самый глубокий этаж: {floor}.\n{texts.exit_bag_line(paid[cid])}",
                     attachment=_pic("выход"))
         await _send_location_summary(cid, peer)
         await _offer_again(peer)
