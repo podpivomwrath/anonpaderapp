@@ -402,3 +402,24 @@ def test_no_model_reads_right_after_rollback() -> None:
             if nxt.strip() and len(nxt) - len(nxt.lstrip()) < indent:
                 break
             assert not re.search(r"\b(run|character|member)\.", nxt), f"строка {i + 1}: {nxt.strip()}"
+
+
+def test_no_waiting_message_without_allies(monkeypatch) -> None:
+    """2026-11-05 (Пётр Филиппов): одиночке в руинах пришло «Ожидание
+    остальных». Сообщение - только если есть живой союзник без хода."""
+    from types import SimpleNamespace
+
+    from bot.handlers import raid_combat
+
+    alive = SimpleNamespace(alive=True)
+    dead = SimpleNamespace(alive=False)
+    solo = SimpleNamespace(participants={1: object()})
+    monkeypatch.setattr(raid_combat, "_live_state", lambda bid, b: {1: alive, 2: alive, 3: dead})
+    monkeypatch.setitem(raid_combat._declared_this_tick, -999, {1})
+    assert not raid_combat._others_pending(-999, solo, 1)
+    duo = SimpleNamespace(participants={1: object(), 2: object()})
+    assert raid_combat._others_pending(-999, duo, 1)
+    raid_combat._declared_this_tick[-999].add(2)
+    assert not raid_combat._others_pending(-999, duo, 1)
+    with_dead = SimpleNamespace(participants={1: object(), 3: object()})
+    assert not raid_combat._others_pending(-999, with_dead, 1)

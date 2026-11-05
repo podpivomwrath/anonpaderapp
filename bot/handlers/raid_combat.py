@@ -933,13 +933,25 @@ async def _raid_action(message: Message, action: DeclaredAction) -> None:
         _declared_this_tick.get(battle_id, set()).discard(cid)
         _declared_actions.get(battle_id, {}).pop(cid, None)
         return
-    if cid in _declared_this_tick.get(battle_id, set()):
+    if cid in _declared_this_tick.get(battle_id, set()) and _others_pending(battle_id, battle, cid):
         p = battle.participants.get(cid)
         if p is not None:
             await _bot_api.messages.send(
                 peer_id=p.peer_id, message="✅ Действие принято. Ожидание остальных...",
                 random_id=0, keyboard=kb.raid_waiting_keyboard(),
             )
+
+
+def _others_pending(battle_id: int, battle: RaidBattle, cid: int) -> bool:
+    """Есть живой союзник, который ещё не походил. Иначе «ожидание
+    остальных» врёт: одиночка в руинах получал его, пока ход ещё
+    разбирался (2026-11-05, Пётр Филиппов)."""
+    declared = _declared_this_tick.get(battle_id, set())
+    live = _live_state(battle_id, battle)
+    return any(
+        other != cid and other not in declared and (c := live.get(other)) is not None and c.alive
+        for other in battle.participants
+    )
 
 
 @labeler.message(payload_contains={"type": "raid_carry"})
