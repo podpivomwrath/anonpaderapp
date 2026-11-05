@@ -107,6 +107,12 @@ def _goods_line(line) -> dict:
 
 def _detail(line) -> str:
     amount = fishing_kg(line.count) if line.kind == "fish" else f"×{line.count}"
+    if line.kind == "rune":  # что делает руна (2026-11-05)
+        from game.economy import runes
+        from game.economy import runes_config as rc
+
+        rune_def = rc.BY_ID.get(line.ref)
+        return f"{amount} · {runes.describe(rune_def)}" if rune_def is not None else amount
     if line.kind != "food":
         return amount
     from game.economy import cooking

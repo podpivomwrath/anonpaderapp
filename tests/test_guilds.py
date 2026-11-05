@@ -846,6 +846,24 @@ async def test_warehouse_goods_herbs_fish_food_elixirs(db_session, make_characte
         await guild_stock_service.deposit(db_session, leader, "trophy", "x", "", 1)
 
 
+async def test_warehouse_runes_take_no_space(db_session, make_character) -> None:
+    """2026-11-05, владелец: руны - на склад гильдии без ограничения по месту."""
+    from services import guild_stock_service, rune_service
+
+    guild, leader = await _found(db_session, make_character)
+    cap = (await guild_service.capacity(db_session, guild)).ore
+    await rune_service.grant(db_session, leader.id, "riposte", cap + 50)
+    await guild_stock_service.deposit(db_session, leader, "rune", "riposte", "", cap + 40)
+    assert await guild_stock_service.goods_units(db_session, guild.id) == 0
+    mine = {x.ref: x.count for x in await guild_stock_service.mine(db_session, leader.id) if x.kind == "rune"}
+    assert mine == {"riposte": 10}
+    with pytest.raises(GuildError):
+        await guild_stock_service.deposit(db_session, leader, "rune", "riposte", "", 11)
+    receiver, line = await guild_stock_service.withdraw(db_session, leader, "rune", "riposte", "", 5)
+    assert line.name == "Ответный выпад" and line.grade_name
+    assert (await rune_service.bag(db_session, leader.id))["riposte"] == 15
+
+
 async def test_same_guild_rejoin_waits_a_week(db_session, make_character) -> None:
     """2026-10-31: в другую гильдию - через сутки, в ту же - через неделю."""
     from datetime import timedelta

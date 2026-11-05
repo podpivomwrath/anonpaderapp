@@ -5,6 +5,9 @@
 Сдать может любой участник, выдать - глава и казначеи (как руду). Место -
 своё, того же размера, что у руды, по счёту «штук»: рыба - килограммами с округлением
 вверх. Ремесленные инструменты привязаны - на склад не идут.
+
+Руны (2026-11-05, владелец) - тем же складом, но места не занимают: их можно
+сдавать сколько угодно. Сдаются только руны из сумки, вставленные - нет.
 """
 
 from dataclasses import dataclass
@@ -13,18 +16,32 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from game.economy import cooking, fishing, herbalism
-from models import Character, CharacterConsumable, CharacterFish, CharacterFood, CharacterHerb, GuildStock
+from models import (
+    Character,
+    CharacterConsumable,
+    CharacterFish,
+    CharacterFood,
+    CharacterHerb,
+    CharacterRune,
+    GuildStock,
+)
 from services import guild_service
 from services.guild_service import GuildError
 
-KINDS = ("herb", "fish", "food", "elixir")
+KINDS = ("herb", "fish", "food", "elixir", "rune")
+#: Виды, которые место на складе не занимают.
+UNLIMITED = ("rune",)
 #: Место под припасы - своё, того же размера, что под руду (capacity().ore).
 
-KIND_TITLES = {"herb": "🌿 Травы", "fish": "🐟 Рыба", "food": "🍲 Еда", "elixir": "🧪 Зелья и расходники"}
+KIND_TITLES = {"herb": "🌿 Травы", "fish": "🐟 Рыба", "food": "🍲 Еда", "elixir": "🧪 Зелья и расходники",
+               "rune": "🔮 Руны"}
 
 
 def _units(kind: str, count: int) -> int:
-    """Сколько места занимает: рыба - килограммы вверх, остальное - штуки."""
+    """Сколько места занимает: рыба - килограммы вверх, руны - нисколько,
+    остальное - штуки."""
+    if kind in UNLIMITED:
+        return 0
     return -(-count // 1000) if kind == "fish" else count
 
 
@@ -64,6 +81,13 @@ def describe(kind: str, ref: str, grade: str, count: int) -> Line:
         d = cooking.dish_def(ref)
         return Line(kind, ref, grade, count, d.name if d else ref, d.emoji if d else "🍲",
                     f"рыба {fishing.grade_name(grade)}")
+    if kind == "rune":
+        from game.economy import runes_config as rc
+        from services.rune_service import KIND_EMOJI
+
+        r = rc.BY_ID.get(ref)
+        return Line(kind, ref, grade, count, r.name if r else ref, KIND_EMOJI.get(r.kind, "🔮") if r else "🔮",
+                    rc.RARITY_TITLES.get(r.rarity, "") if r else "")
     from services import elixir_service
 
     e = elixir_service.elixir_def(ref)
@@ -85,6 +109,9 @@ async def mine(db: AsyncSession, character_id: int) -> list[Line]:
     for r in (await db.scalars(select(CharacterConsumable).where(
             CharacterConsumable.character_id == character_id, CharacterConsumable.count > 0))).all():
         out.append(describe("elixir", r.elixir_id, "", r.count))
+    for r in (await db.scalars(select(CharacterRune).where(
+            CharacterRune.character_id == character_id, CharacterRune.count > 0))).all():
+        out.append(describe("rune", r.rune_id, "", r.count))
     return out
 
 
@@ -95,6 +122,7 @@ async def _own_row(db: AsyncSession, character_id: int, kind: str, ref: str, gra
         "fish": (CharacterFish, CharacterFish.fish_id, "total_grams"),
         "food": (CharacterFood, CharacterFood.dish_id, "count"),
         "elixir": (CharacterConsumable, CharacterConsumable.elixir_id, "count"),
+        "rune": (CharacterRune, CharacterRune.rune_id, "count"),
     }[kind]
     query = select(model).where(model.character_id == character_id, ref_col == ref)
     if kind in ("fish", "food"):
@@ -112,6 +140,8 @@ async def _give_to(db: AsyncSession, character_id: int, kind: str, ref: str, gra
             row = CharacterFish(character_id=character_id, fish_id=ref, grade=grade, total_grams=0)
         elif kind == "food":
             row = CharacterFood(character_id=character_id, dish_id=ref, grade=grade, count=0)
+        elif kind == "rune":
+            row = CharacterRune(character_id=character_id, rune_id=ref, count=0)
         else:
             row = CharacterConsumable(character_id=character_id, elixir_id=ref, count=0)
         db.add(row)
@@ -140,9 +170,10 @@ async def deposit(db: AsyncSession, character: Character, kind: str, ref: str, g
     row, field = await _own_row(db, character.id, kind, ref, grade)
     if row is None or getattr(row, field) < count:
         raise GuildError("Столько у тебя нет.")
-    cap = await guild_service.capacity(db, guild)
-    if await goods_units(db, guild.id) + _units(kind, count) > cap.ore:
-        raise GuildError(f"Склад полон: припасов помещается {cap.ore}.")
+    if kind not in UNLIMITED:
+        cap = await guild_service.capacity(db, guild)
+        if await goods_units(db, guild.id) + _units(kind, count) > cap.ore:
+            raise GuildError(f"Склад полон: припасов помещается {cap.ore}.")
     setattr(row, field, getattr(row, field) - count)
     stored = await _stock_row(db, guild.id, kind, ref, grade)
     if stored is None:

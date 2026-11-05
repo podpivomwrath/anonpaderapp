@@ -603,7 +603,7 @@ function Treasury({ state, run, busy }) {
         </div>
         <div className="milestone milestone--flat">
           <span className="milestone__head">
-            <span>🧺 Припасы (рыба - по кг)</span>
+            <span>🧺 Припасы (рыба - по кг, руны места не занимают)</span>
             <span>{warehouse.goods_total || 0}/{warehouse.capacity.ore}</span>
           </span>
           <Bar value={warehouse.goods_total || 0} max={warehouse.capacity.ore} tone="blue" thin />
@@ -665,7 +665,7 @@ function Treasury({ state, run, busy }) {
           ))}
         </Group>
         <Group header={<Header>Сдать припасы</Header>}>
-          {(warehouse.my_goods || []).length === 0 && <Div style={{ opacity: 0.8 }}>Трав, рыбы, еды и зелий у тебя нет.</Div>}
+          {(warehouse.my_goods || []).length === 0 && <Div style={{ opacity: 0.8 }}>Трав, рыбы, еды, зелий и рун в сумке у тебя нет.</Div>}
           {groupGoods(warehouse.my_goods || []).map((g) => (
             <Folder key={g.id} title={g.title} count={g.rows.length}>
               {g.rows.map((o) => {

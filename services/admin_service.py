@@ -485,6 +485,8 @@ WALLET_REASONS = {
     "guild_quest_service.record": "Задание гильдии", "guild_service.create": "Основание гильдии",
     "guild_service.deposit": "Вклад в казну гильдии", "guild_service.disband": "Роспуск гильдии",
     "guild_service.withdraw": "Выдача из казны гильдии", "guild_territory_service.pray": "Гильдия: молитва",
+    "guild_stock_service.deposit": "Сдача на склад гильдии", "guild_stock_service.withdraw": "Выдача со склада гильдии",
+    "guild_stock_service._give_to": "Выдача со склада гильдии",
     "guild_tree_service.reset": "Сброс древа гильдии", "item_service.sell_item": "Продажа снаряжения",
     "lootbox_service._apply_part": "Ларец", "miniapp_guild_api._act": "Гильдия",
     "mining_service.sell_ore": "Продажа руды", "mining_service.finish_dig": "Самоцвет в свете лампы", "payment_service.apply_status": "Покупка самоцветов (донат)",
