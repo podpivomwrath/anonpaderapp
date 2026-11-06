@@ -57,7 +57,7 @@ function TopRow({ e }) {
         {/* Имя, титул и Мощь переносятся внутри своей колонки: на
             телефоне в одну строку они наезжали на достижение справа. */}
         <span className="top-who">
-          <span className="top-name">{e.premium && '💠 '}{e.name}</span>
+          <span className="top-name">{e.badge ? `${e.badge} ` : e.premium && '💠 '}{e.name}</span>
           {/* Титул - цветом своего тира, как в шапке профиля. */}
           {e.title && (
             <span className={`top-title title-tier title-tier--${e.title_tier || 'common'}`}>«{e.title}»</span>

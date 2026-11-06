@@ -735,6 +735,10 @@ function PlayerCard({ card, onRefresh }) {
           label="💠 Метка Хранителя"
           value={card.premium_until ? `до ${new Date(card.premium_until).toLocaleString('ru')}${card.is_premium ? '' : ' (истекла)'}` : 'нет'}
         />
+        <StatRow
+          label="🌑 Клеймо Хранителя"
+          value={card.brand_until ? `до ${new Date(card.brand_until).toLocaleString('ru')}${card.is_brand ? '' : ' (сошло)'}` : 'нет'}
+        />
       </Fold>
 
       <Fold title={<>Прогресс</>}>

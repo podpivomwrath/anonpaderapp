@@ -289,6 +289,13 @@ def trophies_line(drop: dict[str, int]) -> str:
     return ", ".join(parts)
 
 
+def salvage_line(kept: dict[str, int]) -> str:
+    """Клеймо Хранителя: что носитель унёс из мешка, когда группа легла."""
+    from game.economy import brand_config as brc
+
+    return f"{brc.BRAND_BADGE} Клеймо вытащило тебя с частью мешка: {trophies_line(kept)}."
+
+
 def found_line(found: dict) -> str | None:
     """Что упало в мешок за комнату."""
     lines = []
@@ -300,6 +307,10 @@ def found_line(found: dict) -> str | None:
         lines.append("🎒 Руны в мешок: " + ", ".join(rune_name(r) for r in runes))
     if found.get("raised"):
         lines.append(RAISED_LINE)
+    if found.get("ring"):
+        from services import rune_service
+
+        lines.append(rune_service.ring_line(found["ring"]) + " Мимо мешка - уже твоё.")
     return "\n".join(lines) or None
 
 

@@ -148,7 +148,7 @@ async def handle_get(request: web.Request) -> web.Response:
             },
             "wanted": wanted,
             "rating": [
-                {"rank": e.rank, "name": e.name, "value": e.value, "premium": e.premium,
+                {"rank": e.rank, "name": e.name, "value": e.value, "premium": e.premium, "badge": e.badge,
                  "base_class": e.base_class, "subclass": e.subclass,
                  "title": e.title, "title_tier": e.title_tier,
                  "crown_frame": frames.get(e.character_id),

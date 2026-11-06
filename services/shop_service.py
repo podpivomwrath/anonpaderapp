@@ -11,7 +11,9 @@ from datetime import datetime, timedelta, timezone
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from game.economy import dailies_config as dc
+from game.economy import brand_config as brc
 from game.economy import gem_goods_config as ggc
+from game.economy import market_config as mc
 from game.economy import premium_config as pc
 from game.economy import raid_key_config as rkc
 from game.world import world_config as wc
@@ -30,12 +32,63 @@ def _premium_perks() -> list[str]:
         f"+{round((pc.PREMIUM_XP_MULTIPLIER - 1) * 100)}% опыта персонажа из всех источников (ремёсла - без прибавки)",
         f"{round(pc.PREMIUM_RARITY_UPGRADE_CHANCE * 100)}% шанс поднять редкость выпавшей вещи на ступень",
         f"ежедневных заданий {dc.DAILY_QUEST_COUNT_PREMIUM} вместо {dc.DAILY_QUEST_COUNT}",
-        f"Ключей Монолита до {rkc.RAID_KEY_CAP_PREMIUM} вместо {rkc.RAID_KEY_CAP}",
-        f"+{pc.PRESET_SLOT_BONUS} слот пресета",
         f"отдых {round(pc.REST_SECONDS_MIN)}-{round(pc.REST_SECONDS_MAX)} с вместо "
         f"{round(wc.REST_SECONDS_MIN)}-{round(wc.REST_SECONDS_MAX)}",
+        f"заявок на рынке до {mc.MAX_ORDERS_PREMIUM} вместо {mc.MAX_ORDERS}",
         f"{pc.PREMIUM_BADGE} у ника",
     ]
+
+
+# --- Клеймо Хранителя (2026-11-06): премиум для 60 уровня --------------------
+
+BRAND_ID = "keeper_brand"
+
+
+def _brand_perks() -> list[str]:
+    return [
+        f"руны падают на {round((brc.RUNE_DROP_MULT - 1) * 100)}% чаще - в исследовании и с хозяев этажей руин",
+        f"группа легла в руинах - уносишь {round(brc.WIPE_KEEP_SHARE * 100)}% реликвий из мешка",
+        f"ключей Монолита до {rkc.RAID_KEY_CAP_PREMIUM} вместо {rkc.RAID_KEY_CAP}",
+        "весть об открытом разломе твоего уровня - с клеткой",
+        f"+{brc.CART_EXTRA_CRATES} ящик в кузов каждой повозки",
+        "в долгом путешествии опыт ремесла выпадает вдвое чаще",
+        f"+{pc.PRESET_SLOT_BONUS} слот пресета",
+        f"{brc.BRAND_BADGE} у ника и рамка героя",
+    ]
+
+
+def brand_item(character: Character) -> dict:
+    until = character.brand_until
+    active = premium_service.is_brand(character)
+    return {
+        "id": BRAND_ID,
+        "title": brc.BRAND_NAME,
+        "emoji": brc.BRAND_BADGE,
+        "kind": "days",
+        "min": brc.SHOP_MIN_DAYS,
+        "max": brc.SHOP_MAX_DAYS,
+        "prices": {d: brc.shop_price(d) for d in range(brc.SHOP_MIN_DAYS, brc.SHOP_MAX_DAYS + 1)},
+        "perks": _brand_perks(),
+        "note": (f"С {brc.MIN_LEVEL} уровня. Действует вместе с Меткой Хранителя. Без силовых преимуществ: "
+                 "характеристики, урон и здоровье не меняются. Срок складывается с оставшимся."),
+        "active_until": until.isoformat() if active and until is not None else None,
+    }
+
+
+async def buy_brand(db: AsyncSession, character: Character, days: int) -> datetime:
+    """Списать самоцветы и продлить Клеймо. Только с 60 уровня."""
+    if character.level < brc.MIN_LEVEL:
+        raise ShopError(f"{brc.BRAND_NAME} - с {brc.MIN_LEVEL} уровня.")
+    if not isinstance(days, int) or isinstance(days, bool) or not brc.SHOP_MIN_DAYS <= days <= brc.SHOP_MAX_DAYS:
+        raise ShopError(f"Срок - от {brc.SHOP_MIN_DAYS} до {brc.SHOP_MAX_DAYS} дней.")
+    price = brc.shop_price(days)
+    try:
+        await wallet_service.charge(db, character.id, "donate", price)
+    except wallet_service.NotEnoughCurrency:
+        raise ShopError(f"Не хватает самоцветов: нужно 💎{price}.") from None
+    premium_service.extend_brand(character, days, datetime.now(timezone.utc))
+    await db.flush()
+    return character.brand_until
 
 
 def catalog(character: Character, gems: int, firm_name: str | None = None) -> dict:
@@ -54,7 +107,7 @@ def catalog(character: Character, gems: int, firm_name: str | None = None) -> di
             "perks": _premium_perks(),
             "note": "Без силовых преимуществ: характеристики, урон и здоровье не меняются. Срок складывается с оставшимся.",
             "active_until": until.isoformat() if active and until is not None else None,
-        }, elixir_pack_item(), tincture_item(character), pocket_item(character), faction_item(character),
+        }, brand_item(character), elixir_pack_item(), tincture_item(character), pocket_item(character), faction_item(character),
             courier_item(character), donka_item(character), *house_items(character),
             *rename_items(character, firm_name)],
     }

@@ -289,6 +289,15 @@ class Character(Base):
     premium_warn_sent: Mapped[bool] = mapped_column(Boolean, default=False)
     premium_expire_notified: Mapped[bool] = mapped_column(Boolean, default=False)
 
+    # Клеймо Хранителя (2026-11-06) - премиум для 60 уровня, отдельно от Метки.
+    # Проверка - premium_service.is_brand, не сравнивать сроки по коду.
+    brand_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    brand_warn_sent: Mapped[bool] = mapped_column(Boolean, default=False, server_default=false())
+    brand_expire_notified: Mapped[bool] = mapped_column(Boolean, default=False, server_default=false())
+    # Ключи Монолита до 4 и слот пресета ушли с Метки на Клеймо: Метка, активная
+    # в день переноса, держит их до этого срока (premium_service.big_key_cap).
+    legacy_perks_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
     user: Mapped["User"] = relationship(back_populates="characters")
     stats: Mapped["CharacterStats"] = relationship(
         back_populates="character", uselist=False, cascade="all, delete-orphan"

@@ -16,7 +16,8 @@ def current_cap(character: Character) -> int:
     """Потолок накопления ключей. Вынесено из maybe_grant: с патчем 58
     ключ может прийти и с рыбалки (со дна), и правило капа не должно
     существовать в двух местах."""
-    return rc.RAID_KEY_CAP_PREMIUM if premium_service.is_premium(character) else rc.RAID_KEY_CAP
+    # С 2026-11-06 - Клеймо Хранителя (и Метки, активные в день переноса).
+    return rc.RAID_KEY_CAP_PREMIUM if premium_service.big_key_cap(character) else rc.RAID_KEY_CAP
 
 
 async def maybe_grant(db: AsyncSession, character: Character, rng: random.Random) -> bool:

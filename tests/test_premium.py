@@ -185,7 +185,7 @@ def test_maybe_upgrade_rarity_caps_at_legendary() -> None:
 
 async def test_raid_key_cap_is_higher_for_premium(make_character, db_session) -> None:
     character = await make_character()
-    character.premium_until = datetime.now(timezone.utc) + timedelta(days=1)
+    character.brand_until = datetime.now(timezone.utc) + timedelta(days=1)
     character.raid_keys = rc.RAID_KEY_CAP  # 2 — обычный кап уже достигнут
     dropped = await raid_key_service.maybe_grant(db_session, character, FixedRng(0.0))
     assert dropped is True
@@ -194,7 +194,7 @@ async def test_raid_key_cap_is_higher_for_premium(make_character, db_session) ->
 
 async def test_raid_key_cap_stops_at_premium_cap(make_character, db_session) -> None:
     character = await make_character()
-    character.premium_until = datetime.now(timezone.utc) + timedelta(days=1)
+    character.brand_until = datetime.now(timezone.utc) + timedelta(days=1)
     character.raid_keys = rc.RAID_KEY_CAP_PREMIUM
     dropped = await raid_key_service.maybe_grant(db_session, character, FixedRng(0.0))
     assert dropped is False
@@ -224,7 +224,7 @@ async def test_effective_preset_slots_bonus_for_premium(make_character) -> None:
     character = await make_character()
     character.preset_slots = 1
     no_bonus = preset_service.effective_preset_slots(character)
-    character.premium_until = datetime.now(timezone.utc) + timedelta(days=1)
+    character.brand_until = datetime.now(timezone.utc) + timedelta(days=1)
     with_bonus = preset_service.effective_preset_slots(character)
     assert no_bonus == 1
     assert with_bonus == 2
@@ -250,7 +250,7 @@ async def test_second_preset_requires_premium_bonus_slot(make_character, db_sess
     with pytest.raises(PresetValidationError):
         await save_preset(db_session, character, "ДД", second_set, catalog)
 
-    character.premium_until = datetime.now(timezone.utc) + timedelta(days=1)
+    character.brand_until = datetime.now(timezone.utc) + timedelta(days=1)
     second = await save_preset(db_session, character, "ДД", second_set, catalog)
     assert second.buff_ids == second_set
 
@@ -266,7 +266,7 @@ async def test_preset_switch_blocked_when_beyond_effective_slots_after_expiry(ma
     second_set = ["guardian_heavy_hand", "guardian_reflection", "guardian_provoker_mark"]
 
     character = await make_character(farm=bc.PRESET_CHANGE_COST_FARM * 2, subclass="guardian")
-    character.premium_until = datetime.now(timezone.utc) + timedelta(days=1)
+    character.brand_until = datetime.now(timezone.utc) + timedelta(days=1)
     for buff_id in set(first_set) | set(second_set):
         db_session.add(CharacterUnlockedBuff(character_id=character.id, buff_id=buff_id))
     await db_session.flush()
@@ -274,7 +274,7 @@ async def test_preset_switch_blocked_when_beyond_effective_slots_after_expiry(ma
     first = await save_preset(db_session, character, "Танк", first_set, catalog)
     second = await save_preset(db_session, character, "ДД", second_set, catalog)  # за счёт бонусного слота
 
-    character.premium_until = None  # премиум истёк — второй пресет не удалён, но недоступен для переключения
+    character.brand_until = None  # премиум истёк — второй пресет не удалён, но недоступен для переключения
     with pytest.raises(PresetValidationError):
         await switch_active_preset(db_session, character, second.id)
 

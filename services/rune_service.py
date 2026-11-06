@@ -355,22 +355,30 @@ async def maybe_drop(db: AsyncSession, character: Character, rng: random.Random,
 KIND_EMOJI = {rc.HERO: "🟠", rc.GEAR: "🔴", rc.SKILL: "🔵"}
 
 
+def ring_line(ring: str) -> str:
+    """Строка о найденном Перстне Несгоревшего: worn - надет сам, bag - в сумке."""
+    from game.economy import resists
+
+    if ring == "worn":
+        return (f"💍 Среди добычи - кольцо: «{resists.RING_TITLE}». Оно уже на пальце, "
+                "смотри во вкладке «Герой».")
+    return (f"💍 Среди добычи - кольцо: «{resists.RING_TITLE}». Палец занят, оно в сумке: "
+            "поменять кольца можно во вкладке «Герой», лишнее - передать или продать на рынке.")
+
+
 async def drop_line(db: AsyncSession, character: Character, rng: random.Random) -> str | None:
     """Строка в итог победы, если выпала руна. Тот же бросок победы - и
     Перстень Несгоревшего (2026-11-02): строка только у нашедшего."""
-    from game.economy import resists
-    from services import resist_service
+    from game.economy import brand_config as brc
+    from services import premium_service, resist_service
 
     lines = []
-    rune_id = await maybe_drop(db, character, rng)
+    chance = rc.MOB_DROP_CHANCE * (brc.RUNE_DROP_MULT if premium_service.is_brand(character) else 1.0)
+    rune_id = await maybe_drop(db, character, rng, chance)
     if rune_id is not None:
         rune_def = rc.BY_ID[rune_id]
         lines.append(f"{KIND_EMOJI[rune_def.kind]} Выпала {rc.KIND_ONE[rune_def.kind].lower()}: «{rune_def.name}»")
     ring = await resist_service.maybe_drop_ring(db, character, rng)
-    if ring == "worn":
-        lines.append(f"💍 Среди добычи - кольцо: «{resists.RING_TITLE}». Оно уже на пальце, "
-                     "смотри во вкладке «Герой».")
-    elif ring == "bag":
-        lines.append(f"💍 Среди добычи - кольцо: «{resists.RING_TITLE}». Палец занят, оно в сумке: "
-                     "поменять кольца можно во вкладке «Герой», лишнее - передать или продать на рынке.")
+    if ring is not None:
+        lines.append(ring_line(ring))
     return "\n".join(lines) or None

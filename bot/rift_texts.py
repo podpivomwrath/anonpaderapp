@@ -3,6 +3,7 @@
 отдаёт то же самое для одного типа разлома."""
 
 from bot.vk_media import photo_attachment
+from game import plural
 from game.economy import rift_config as rc
 from models import Rift
 
@@ -60,6 +61,15 @@ class RiftTexts:
         if stage == len(self.t.stages):
             return _photo(rc.RIFT_IMAGES[self.kind]["boss"])
         return None
+
+
+def brand_notice(rift: Rift, minutes: int) -> str:
+    """Клеймо Хранителя: весть об открытом разломе твоего уровня."""
+    from game.economy import brand_config as brc
+
+    lo, hi = rc.BANDS[rift.ring]
+    return (f"{brc.BRAND_BADGE} Открылся разлом твоего уровня: {title(rift.kind)} ({lo}-{hi}), "
+            f"клетка ({rift.x}; {rift.y}). Закроется через {plural.count(minutes, 'минуту', 'минуты', 'минут')}.")
 
 
 def here_text(rift: Rift, minutes: int) -> str:

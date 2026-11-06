@@ -91,7 +91,7 @@ def _order(order, level: int, now: datetime) -> dict:
     }
 
 
-def _cart(cart, level: int, ore_have: dict, prices: dict, now: datetime) -> dict:
+def _cart(cart, level: int, ore_have: dict, prices: dict, now: datetime, character=None) -> dict:
     parts = []
     for part in tc.PARTS:
         lvl = getattr(cart, part.id)
@@ -108,7 +108,7 @@ def _cart(cart, level: int, ore_have: dict, prices: dict, now: datetime) -> dict
     info = {
         "slot": cart.slot, "city": cart.city, "city_title": REGION_TITLES[cart.city],
         "status": cart.status, "parts": parts,
-        "capacity": trade_service.capacity(cart), "crates": trade_service.crates(cart),
+        "capacity": trade_service.capacity(cart, character), "crates": trade_service.crates(cart),
         "cargo": [{**_good(tc.GOODS_BY_ID[g]), "count": n} for g, n in (cart.cargo or {}).items()],
         "durability": cart.durability, "max_durability": trade_service.max_durability(cart),
         "repair_cost": trade_service.repair_cost(cart),
@@ -207,7 +207,7 @@ async def _state(db, character) -> dict:
     }
     prices = await trade_service.pressures(db, now)
     ore_have = await _ore_have(db, character.id)
-    state["carts"] = [_cart(c, firm.trade_level, ore_have, prices, now) for c in carts]
+    state["carts"] = [_cart(c, firm.trade_level, ore_have, prices, now, character) for c in carts]
     state["trips"] = [
         {
             "id": t.id, "slot": t.slot, "from_title": REGION_TITLES[t.from_city], "to_title": REGION_TITLES[t.to_city],

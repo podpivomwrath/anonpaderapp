@@ -231,7 +231,12 @@ async def craft_xp(db: AsyncSession, character: Character, rng: random.Random) -
     """Шанс опыта случайного ремесла за час похода: отдельная строка под
     вестью часа («что было в пути» и опыт в скобках) или None. С опытом -
     и добыча этого ремесла по уровню игрока (2026-10-29, владелец)."""
-    if rng.random() >= vc.CRAFT_XP_CHANCE:
+    from game.economy import brand_config as brc
+    from services import premium_service
+
+    # Клеймо Хранителя: ремесло в часе похода - вдвое чаще.
+    chance = vc.CRAFT_XP_CHANCE * (brc.VOYAGE_CRAFT_CHANCE_MULT if premium_service.is_brand(character) else 1.0)
+    if rng.random() >= chance:
         return None
     open_crafts = [c for c, (lvl, _xp, _t, _n) in CRAFTS.items() if _xp_to_next(c, getattr(character, lvl)) > 0]
     if not open_crafts:

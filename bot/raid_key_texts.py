@@ -8,7 +8,7 @@ RAID_KEY_FLAVOR = (
 )
 def raid_key_status(count: int, cap: int, premium_cap: int | None) -> str:
     """/ключ (2026-11-03, владелец: «сколько из скольких»). premium_cap - лимит
-    с Меткой Хранителя, если её нет; None - метка уже есть."""
+    с Клеймом Хранителя, если его нет; None - уже есть."""
     lines = [f"{RAID_KEY_NAME}: {count} из {cap}."]
     if count >= cap:
         lines.append("Больше не выпадет, пока не потратишь хотя бы один.")
@@ -16,7 +16,7 @@ def raid_key_status(count: int, cap: int, premium_cap: int | None) -> str:
         lines.append("Изредка падает с мобов, событий, ларцов и рыбалки.")
     lines.append("Ключ тратит лидер группы, когда открывает рейд.")
     if premium_cap is not None:
-        lines.append(f"С Меткой Хранителя ключей копится до {premium_cap}.")
+        lines.append(f"С Клеймом Хранителя (с 60 уровня) ключей копится до {premium_cap}.")
     return "\n".join(lines)
 
 

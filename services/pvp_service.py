@@ -13,7 +13,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from game.classes.base import REGISTRY
 from game.economy import pvp_config as pc
 from models import Character, PvpBattle, CharacterVoyage
-from services import death_service, ruins_service, title_service
+from services import death_service, premium_service, ruins_service, title_service
 
 BASE_CLASS_TITLES = {"warrior": "Воин", "rogue": "Разбойник", "mage": "Маг"}
 
@@ -140,6 +140,7 @@ class LeaderboardEntry:
     losses: int
     title: str | None = None
     premium: bool = False  # патч 50: Метка Хранителя — бейдж 💠 в топе
+    badge: str = ""  # 2026-11-06: «🌑» Клеймо, «💠» Метка или пусто
     pts: int = 1000
 
 
@@ -154,7 +155,7 @@ async def leaderboard(db: AsyncSession, limit: int = 10) -> list[LeaderboardEntr
         await db.execute(
             select(
                 Character.name, Character.pvp_wins, Character.pvp_losses,
-                Character.active_title_id, Character.premium_until, Character.pts,
+                Character.active_title_id, Character.premium_until, Character.pts, Character.brand_until,
             )
             .where(Character.creation_state.is_(None), (Character.pvp_wins + Character.pvp_losses) > 0)
             .order_by(Character.pts.desc(), Character.pvp_wins.desc(), Character.id.asc())
@@ -166,8 +167,9 @@ async def leaderboard(db: AsyncSession, limit: int = 10) -> list[LeaderboardEntr
             rank=i, name=name, wins=wins, losses=losses,
             title=title_service.name_of(title_id) if title_id else None,
             premium=premium_until is not None and premium_until > now, pts=pts,
+            badge=premium_service.badge_of(brand_until, premium_until, now).strip(),
         )
-        for i, (name, wins, losses, title_id, premium_until, pts) in enumerate(rows, start=1)
+        for i, (name, wins, losses, title_id, premium_until, pts, brand_until) in enumerate(rows, start=1)
     ]
 
 

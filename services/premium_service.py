@@ -20,9 +20,22 @@ def is_premium(character: Character, now: datetime | None = None) -> bool:
 
 
 def badge(character: Character, now: datetime | None = None) -> str:
-    """"💠 " перед ником, иначе пустая строка — единая точка для всех мест
-    отображения (Осмотреться, топ PvP, профиль, карточка админки)."""
-    return f"{pc.PREMIUM_BADGE} " if is_premium(character, now) else ""
+    """"🌑 " (Клеймо) или "💠 " (Метка) перед ником, иначе пустая строка —
+    единая точка для всех мест отображения (Осмотреться, топ PvP, профиль,
+    карточка админки). Оба сразу - видно старшее, Клеймо."""
+    return badge_of(getattr(character, "brand_until", None), character.premium_until, now)
+
+
+def badge_of(brand_until: datetime | None, premium_until: datetime | None, now: datetime | None = None) -> str:
+    """То же по голым срокам - для топов, где строки читаются колонками."""
+    from game.economy import brand_config as bc
+
+    now = now or datetime.now(timezone.utc)
+    if brand_until is not None and brand_until > now:
+        return f"{bc.BRAND_BADGE} "
+    if premium_until is not None and premium_until > now:
+        return f"{pc.PREMIUM_BADGE} "
+    return ""
 
 
 def extend(character: Character, days: int, now: datetime | None = None) -> None:
@@ -39,12 +52,18 @@ def extend(character: Character, days: int, now: datetime | None = None) -> None
 def check_expiry_notice(character: Character, now: datetime | None = None) -> str | None:
     """Вызывается из services/onboarding_service.py::get_character (та же
     точка входа "на следующее действие игрока", что и ежедневный ролловер) —
-    идемпотентно (за счёт premium_warn_sent/premium_expire_notified) отдаёт
-    ОДНУ строку уведомления, если пора, иначе None. Мутирует character —
+    идемпотентно (за счёт premium_warn_sent/premium_expire_notified и тех же
+    флагов Клейма) отдаёт строку уведомления (Метка и Клеймо - через перевод
+    строки), если пора, иначе None. Мутирует character —
     вызывающий обязан сохранить изменение в БД (обычная db.flush()/commit())."""
+    now = now or datetime.now(timezone.utc)
+    lines = [line for line in (_premium_notice(character, now), _brand_notice(character, now)) if line]
+    return "\n".join(lines) or None
+
+
+def _premium_notice(character: Character, now: datetime) -> str | None:
     if character.premium_until is None:
         return None
-    now = now or datetime.now(timezone.utc)
     if character.premium_until > now:
         remaining = character.premium_until - now
         if not character.premium_warn_sent and remaining <= timedelta(days=pc.EXPIRY_WARNING_DAYS):
@@ -54,4 +73,50 @@ def check_expiry_notice(character: Character, now: datetime | None = None) -> st
     if not character.premium_expire_notified:
         character.premium_expire_notified = True
         return pc.EXPIRED_TEXT
+    return None
+
+
+# --- Клеймо Хранителя (2026-11-06) -------------------------------------------
+
+
+def is_brand(character: Character, now: datetime | None = None) -> bool:
+    """Клеймо Хранителя активно. Единая проверка, как is_premium."""
+    until = getattr(character, "brand_until", None)
+    if until is None:
+        return False
+    return until > (now or datetime.now(timezone.utc))
+
+
+def big_key_cap(character: Character, now: datetime | None = None) -> bool:
+    """Ключей Монолита до 4 и лишний слот пресета: Клеймо - или Метка,
+    активная в день переноса этих бонусов, до конца её срока."""
+    if is_brand(character, now):
+        return True
+    legacy = getattr(character, "legacy_perks_until", None)
+    return legacy is not None and legacy > (now or datetime.now(timezone.utc)) and is_premium(character, now)
+
+
+def extend_brand(character: Character, days: int, now: datetime | None = None) -> None:
+    """Продление Клейма - срок складывается с оставшимся, как у Метки."""
+    now = now or datetime.now(timezone.utc)
+    base = character.brand_until if is_brand(character, now) else now
+    character.brand_until = base + timedelta(days=days)
+    character.brand_warn_sent = False
+    character.brand_expire_notified = False
+
+
+def _brand_notice(character: Character, now: datetime) -> str | None:
+    from game.economy import brand_config as bc
+
+    until = getattr(character, "brand_until", None)
+    if until is None:
+        return None
+    if until > now:
+        if not character.brand_warn_sent and until - now <= timedelta(days=bc.EXPIRY_WARNING_DAYS):
+            character.brand_warn_sent = True
+            return bc.EXPIRY_WARNING_TEXT
+        return None
+    if not character.brand_expire_notified:
+        character.brand_expire_notified = True
+        return bc.EXPIRED_TEXT
     return None

@@ -128,7 +128,7 @@ function Rating({ data }) {
                 <ClassIcon subclass={e.subclass} baseClass={e.base_class} crown={e.crown_frame || null} size={40} />
                 <span className="top-who">
                   {/* Значок - место в прошлом сезоне PvP (2026-10-30). */}
-                  <span className="top-name">{e.premium && '💠 '}{e.season_medal && `${e.season_medal} `}{e.name}</span>
+                  <span className="top-name">{e.badge ? `${e.badge} ` : e.premium && '💠 '}{e.season_medal && `${e.season_medal} `}{e.name}</span>
                   {e.title && <span className={`top-title title-tier title-tier--${e.title_tier || 'common'}`}>«{e.title}»</span>}
                 </span>
               </span>

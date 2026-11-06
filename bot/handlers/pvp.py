@@ -79,7 +79,6 @@ from game.combat import consumable_limit
 from game.economy import elixir_config as ec
 from game.economy import prerelease_config
 from game.economy import fishing as game_fishing
-from game.economy import premium_config as pc
 from game.world import grid
 from models import Character, CharacterStats
 from services import pk_service, pts_service, pvp_shield, subclass_service, trial_service
@@ -462,7 +461,7 @@ async def leaderboard_command(message: Message) -> None:
 
     lines = ["🏆 ЛУЧШИЕ ИЗ МЕЧЕНЫХ", ""]
     for entry in entries:
-        badge = pc.PREMIUM_BADGE + " " if entry.premium else ""
+        badge = f"{entry.badge} " if entry.badge else ""
         name = f"{badge}{entry.name} «{entry.title}»" if entry.title else f"{badge}{entry.name}"
         lines.append(
             f"{entry.rank}. {name} - {entry.pts} PTS · {pts_service.rank_name(entry.pts)}"

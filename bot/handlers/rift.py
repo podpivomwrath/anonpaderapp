@@ -154,6 +154,25 @@ async def _peers(db, character_ids: list[int]) -> dict[int, int]:
     return peers
 
 
+async def notify_brand(rift_id: int) -> None:
+    """Клеймо Хранителя (2026-11-06): весть об открытом разломе твоего уровня
+    с клеткой. Остальные находят разломы сами, как раньше."""
+    try:
+        async with get_session_factory()() as db:
+            from models import Rift
+
+            rift = await db.get(Rift, rift_id)
+            if rift is None:
+                return
+            peers = await rift_service.brand_watchers(db, rift)
+            text = texts.brand_notice(rift, rift_service.minutes_left(rift))
+    except Exception:
+        logger.exception("Разлом {}: весть носителям Клейма не собрана", rift_id)
+        return
+    for peer in peers:
+        await _send(peer, text)
+
+
 # --- Клетка разлома -----------------------------------------------------------
 
 

@@ -509,7 +509,8 @@ async def room_won(db: AsyncSession, run: RuinRun, hp: dict[int, int], used: dic
     уникальных боссов было в зале. Живые кладут в мешок трофеи; за хозяина -
     кубики рун и подъём павших; за первого уникального - ларцы рун сразу.
     Вернёт находки: {id: {"trophies", "runes", "raised", "chests"}}."""
-    from services import lootbox_service, rune_service
+    from game.economy import brand_config as brc
+    from services import lootbox_service, premium_service, resist_service, rune_service
 
     fight = (run.extra or {}).get("fight") or {}
     kind = fight.get("kind") or rules.room_kind(run.layout, run.pos)
@@ -538,10 +539,22 @@ async def room_won(db: AsyncSession, run: RuinRun, hp: dict[int, int], used: dic
             drop = _roll_loot(rng, rolls)
             _bag_trophies(m, drop)
             got["trophies"] = drop
+            character = await db.get(Character, m.character_id)
+            # Перстень Несгоревшего (2026-11-06, владелец): как с мобов
+            # исследования - бросок за каждого убитого, сразу игроку, мимо мешка.
+            if character is not None:
+                for _ in range(kills):
+                    ring = await resist_service.maybe_drop_ring(db, character, rng)
+                    if ring is not None:
+                        got["ring"] = ring
+                        break
             if boss:
                 bag = m.bag or {}
                 dice = rc.rune_dice(run.floor) + dice_bonus
-                for _ in range(sum(1 for _ in range(dice) if rng.random() < rc.rune_die_chance(run.floor))):
+                # Клеймо Хранителя: кубик рун выпадает чаще.
+                die = rc.rune_die_chance(run.floor) * (
+                    brc.RUNE_DROP_MULT if character is not None and premium_service.is_brand(character) else 1.0)
+                for _ in range(sum(1 for _ in range(dice) if rng.random() < die)):
                     rune_id = rune_service.roll_rune(rng)
                     bag = _add(bag, "runes", rune_id, 1)
                     got["runes"].append(rune_id)
@@ -657,6 +670,36 @@ def _close(run: RuinRun, outcome: str) -> None:
     run.finished_at = _now()
     run.pending = None
     run.vote = None
+
+
+async def brand_salvage(db: AsyncSession, run: RuinRun, rng: random.Random) -> dict[int, dict[str, int]]:
+    """Группа легла: что из мешка уносит носитель Клейма Хранителя - долю
+    реликвий (руны сгорают). Ничего не выдаёт - выдача после штрафа смерти,
+    чтобы штраф не съел спасённое. Звать до wipe(): он чистит мешки."""
+    from game.economy import brand_config as brc
+    from services import premium_service
+
+    out: dict[int, dict[str, int]] = {}
+    for m in await members(db, run.id):
+        character = await db.get(Character, m.character_id)
+        if character is None or not premium_service.is_brand(character):
+            continue
+        kept = {}
+        for trophy_id, count in ((m.bag or {}).get("trophies") or {}).items():
+            share = count * brc.WIPE_KEEP_SHARE
+            n = int(share) + (1 if rng.random() < share - int(share) else 0)
+            if n > 0:
+                kept[trophy_id] = n
+        if kept:
+            out[m.character_id] = kept
+    return out
+
+
+async def grant_salvage(db: AsyncSession, character_id: int, kept: dict[str, int]) -> None:
+    from services import trophy_service
+
+    for trophy_id, count in kept.items():
+        await trophy_service.grant_specific(db, character_id, trophy_id, count)
 
 
 async def wipe(db: AsyncSession, run: RuinRun) -> list[int]:

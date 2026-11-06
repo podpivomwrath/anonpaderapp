@@ -1160,7 +1160,7 @@ async def raid_key_command(message: Message) -> None:
         character = await onboarding_svc.get_character(db, message.from_id)
         if character is None or character.creation_state is not None:
             return
-        premium = premium_service.is_premium(character)
+        premium = premium_service.big_key_cap(character)
         text = raid_key_texts.raid_key_status(
             character.raid_keys, raid_key_service.current_cap(character),
             None if premium else raid_key_config.RAID_KEY_CAP_PREMIUM,

@@ -173,8 +173,13 @@ def part_value(cart: TradeCart, part_id: str):
     return part.values[min(getattr(cart, part_id), len(part.values)) - 1]
 
 
-def capacity(cart: TradeCart) -> int:
-    return part_value(cart, "body")
+def capacity(cart: TradeCart, character: Character | None = None) -> int:
+    """Ящиков в кузове. С Клеймом Хранителя владельца - на ящик больше."""
+    from game.economy import brand_config as brc
+    from services import premium_service
+
+    extra = brc.CART_EXTRA_CRATES if character is not None and premium_service.is_brand(character) else 0
+    return part_value(cart, "body") + extra
 
 
 def crates(cart: TradeCart) -> int:
@@ -426,8 +431,8 @@ async def dispatch(
             )
         order.append((good, count))
     total_crates = sum(n for _, n in order)
-    if total_crates > capacity(cart):
-        raise TradeError(f"В кузов влезет {capacity(cart)} ящ.")
+    if total_crates > capacity(cart, character):
+        raise TradeError(f"В кузов влезет {capacity(cart, character)} ящ.")
 
     cargo: dict[str, int] = {}
     paid: dict[str, int] = {}

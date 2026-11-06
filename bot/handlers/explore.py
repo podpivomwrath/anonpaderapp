@@ -405,12 +405,16 @@ async def handle_explore_done(peer_id: int) -> None:
         # активность всего сервера.
         new_boss = await world_boss_service.record_exploration(db, world._rng)
         # Разломы: тот же счётчик активности, но без объявления.
-        await rift_service.record_exploration(db, world._rng)
+        new_rift = await rift_service.record_exploration(db, world._rng)
         daily_progress = await daily_service.record_exploration(db, character)
         guild_outcome = await guild_territory_service.on_exploration(db, character)
         await db.commit()
         if new_boss is not None:
             world_boss_handlers.on_spawned(new_boss.id)
+        if new_rift is not None:
+            from bot.handlers import rift as rift_handlers
+
+            await rift_handlers.notify_brand(new_rift.id)
         await guild_handlers.after_exploration(peer_id, character, guild_outcome)
         gear_bonus = await item_service.compute_gear_bonus(db, character.id)
         buff_modifiers = await scene_event_service.solo_modifiers(

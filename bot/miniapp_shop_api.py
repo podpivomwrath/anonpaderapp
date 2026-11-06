@@ -41,7 +41,7 @@ async def handle_get(request: web.Request) -> web.Response:
 #: молча падает в bad_request (так было с Домом 2026-10-21); следит
 #: tests/test_shop_rename.py::test_every_catalog_item_is_buyable.
 BUYABLE = (
-    shop_service.PREMIUM_ID, shop_service.RENAME_ID, shop_service.FIRM_RENAME_ID,
+    shop_service.PREMIUM_ID, shop_service.BRAND_ID, shop_service.RENAME_ID, shop_service.FIRM_RENAME_ID,
     shop_service.ELIXIR_PACK_ID, shop_service.TINCTURE_ID, shop_service.POCKET_ID,
     shop_service.FACTION_ID, shop_service.COURIER_ID, shop_service.HOUSE_ID, shop_service.DONKA_ID,
 )
@@ -72,6 +72,9 @@ async def handle_post(request: web.Request) -> web.Response:
         try:
             if item == shop_service.PREMIUM_ID:
                 until = await shop_service.buy_premium(db, character, body.get("days"))
+                done = {"item": item, "days": body.get("days"), "until": until.isoformat()}
+            elif item == shop_service.BRAND_ID:
+                until = await shop_service.buy_brand(db, character, body.get("days"))
                 done = {"item": item, "days": body.get("days"), "until": until.isoformat()}
             elif item == shop_service.ELIXIR_PACK_ID:
                 done = {"item": item, "contents": await shop_service.buy_elixir_pack(db, character, body.get("qty"))}

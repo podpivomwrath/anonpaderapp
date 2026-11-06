@@ -68,6 +68,8 @@ class BoardEntry:
     #: Тир титула (цвет в мини-аппе), см. title_service.TITLE_TIERS.
     title_tier: str | None = None
     premium: bool = False
+    #: Значок у ника: «🌑» (Клеймо Хранителя), «💠» (Метка) или пусто.
+    badge: str = ""
     #: Нужны мини-аппу (значок класса в строке) и crown_service (кто первый).
     #: Раньше строка топа несла только имя, и опознать по ней персонажа было
     #: нечем - имена уникальны лишь по индексу, а правило топа не должно
@@ -292,4 +294,22 @@ async def board(db: AsyncSession, board_id: str, limit: int = 10) -> list[BoardE
     loader = _LOADERS.get(board_id)
     if loader is None:
         raise ValueError(f"неизвестный топ: {board_id}")
-    return await loader(db, limit)
+    entries = await loader(db, limit)
+    await _apply_badges(db, entries)
+    return entries
+
+
+async def _apply_badges(db: AsyncSession, entries: list[BoardEntry]) -> None:
+    """Значок у ника (2026-11-06): Клеймо старше Метки. Один запрос на весь топ."""
+    from game.economy import brand_config as brc
+    from game.economy import premium_config as pc
+
+    ids = [e.character_id for e in entries if e.character_id is not None]
+    branded: set[int] = set()
+    if ids:
+        now = datetime.now(timezone.utc)
+        branded = set((await db.scalars(
+            select(Character.id).where(Character.id.in_(ids), Character.brand_until > now)
+        )).all())
+    for e in entries:
+        e.badge = brc.BRAND_BADGE if e.character_id in branded else pc.PREMIUM_BADGE if e.premium else ""

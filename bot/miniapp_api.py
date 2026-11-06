@@ -77,8 +77,13 @@ def _character_payload(
 ) -> dict:
     stats = character.stats
     derived = derived_stats_service.compute(character, stats, gear_bonus, mods)
+    from services import premium_service
+
     return {
         "name": character.name,
+        # Значок у ника (🌑 Клеймо или 💠 Метка) и рамка героя с Клеймом.
+        "badge": premium_service.badge(character).strip(),
+        "brand": premium_service.is_brand(character),
         "is_admin": is_admin,
         "title": daily_service.title_name(character),
         # Тир - цвет титула в шапке; titles - открытые титулы для подменю.
@@ -471,7 +476,7 @@ async def handle_get_leaderboard(request: web.Request) -> web.Response:
         def row(e):
             return {
                 "rank": e.rank, "name": e.name, "value": e.value,
-                "title": e.title, "title_tier": e.title_tier, "premium": e.premium,
+                "title": e.title, "title_tier": e.title_tier, "premium": e.premium, "badge": e.badge,
                 # Значок класса в строке. Подкласс есть не у всех (до 30
                 # уровня его нет вовсе), поэтому клиенту отдаются оба, а
                 # он показывает подкласс, если тот выбран.

@@ -567,6 +567,7 @@ export default function Hub() {
         )}
         <div className="hub-banner__text">
         <p className="hub-banner__name">
+          {character.badge && <span className="hub-banner__badge">{character.badge} </span>}
           {character.name}
           {/* Титул - кнопка, когда есть из чего выбирать (как эмблема венца).
               Без активного титула, но с открытыми - тусклая подсказка, иначе

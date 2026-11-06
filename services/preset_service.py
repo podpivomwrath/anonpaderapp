@@ -97,7 +97,8 @@ def effective_preset_slots(character: Character) -> int:
     просто не учитывается, когда премиум истёк (пресеты сверх купленного
     лимита остаются сохранёнными, но недоступными для сохранения/переключения,
     см. save_preset/switch_active_preset)."""
-    bonus = pc.PRESET_SLOT_BONUS if premium_service.is_premium(character) else 0
+    # С 2026-11-06 - Клеймо Хранителя (и Метки, активные в день переноса).
+    bonus = pc.PRESET_SLOT_BONUS if premium_service.big_key_cap(character) else 0
     return character.preset_slots + bonus
 
 

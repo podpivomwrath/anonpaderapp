@@ -225,6 +225,18 @@ async def record_exploration(db: AsyncSession, rng: random.Random, now: datetime
     return await spawn(db, rng, now)
 
 
+async def brand_watchers(db: AsyncSession, rift: Rift, now: datetime | None = None) -> list[int]:
+    """vk_id носителей Клейма Хранителя, кому разлом по уровню: им весть."""
+    from models import User
+
+    now = now or _now()
+    rows = (await db.execute(
+        select(Character.level, User.vk_id).join(User, User.id == Character.user_id)
+        .where(Character.brand_until > now)
+    )).all()
+    return [vk_id for level, vk_id in rows if vk_id is not None and level_fits(level, rift)]
+
+
 # --- Вход ---------------------------------------------------------------------
 
 

@@ -12,7 +12,6 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from game.combat import balance_config as bc
-from game.economy import raid_key_config as rc
 from models import Character, CharacterStats, PromoActivation, PromoCode
 from services import (
     admin_service,
@@ -214,7 +213,9 @@ async def _apply_reward(
         amount = int(reward.get("amount", 0))
         if amount <= 0:
             return None, None
-        cap = rc.RAID_KEY_CAP_PREMIUM if premium_service.is_premium(character) else rc.RAID_KEY_CAP
+        from services import raid_key_service
+
+        cap = raid_key_service.current_cap(character)
         room = max(cap - character.raid_keys, 0)
         granted = min(amount, room)
         if granted > 0:

@@ -663,6 +663,7 @@ async def on_wipe(session_id: int, battle, text: str | None = None) -> None:
         run = await ruins_service.lock(db, battle.ruin_run_id)
         if run is None or run.status != ruins_service.ACTIVE:
             return
+        salvage = await ruins_service.brand_salvage(db, run, _rng)
         ids = await ruins_service.wipe(db, run)
         for cid in ids:
             character = await db.get(Character, cid)
@@ -670,12 +671,16 @@ async def on_wipe(session_id: int, battle, text: str | None = None) -> None:
                 continue
             defeat = await encounter_service.resolve_defeat(db, character)
             deaths[cid] = (defeat, character.respawn_at)
+            # Клеймо Хранителя: доля реликвий - уже после штрафа смерти.
+            if cid in salvage:
+                await ruins_service.grant_salvage(db, cid, salvage[cid])
         await db.commit()
         peers = await _peers(db, ids)
     body = f"{text}\n\n{texts.WIPE_TEXT}" if text else texts.WIPE_TEXT
     for cid, peer in peers.items():
         _inside.pop(peer, None)
-        await _send(peer, body, attachment=_pic("гибель"))
+        own = f"{body}\n{texts.salvage_line(salvage[cid])}" if cid in salvage else body
+        await _send(peer, own, attachment=_pic("гибель"))
         if cid in deaths:
             defeat, respawn_at = deaths[cid]
             await respawn_handlers.register_death(peer, respawn_at, defeat.xp_lost, defeat.relics_lost,
