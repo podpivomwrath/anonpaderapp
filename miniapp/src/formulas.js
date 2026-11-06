@@ -148,7 +148,10 @@ export function computeDerived({ level, baseClass, subclass = null, stats, gearB
     hyper(agi, CRIT_CAP, CRIT_K) + critBonus + (SUBCLASS_CRIT[subclass] ?? 0) + (m.crit_chance_bonus ?? 0), 1,
   );
   const mitigation = 1 - (1 - hyper(vit, MITIGATION_CAP, MITIGATION_K)) * (1 - (m.incoming_damage_reduction ?? 0));
-  const controlResist = hyper(wil, CONTROL_RESIST_CAP, CONTROL_RESIST_K);
+  // руна «Упрямый лоб» - сверху, общий потолок (как control.py)
+  const controlResist = Math.min(
+    hyper(wil, CONTROL_RESIST_CAP, CONTROL_RESIST_K) + (m['rune:stubborn_brow'] ?? 0), CONTROL_RESIST_CAP,
+  );
   const supportPower = hyper(wil, SUPPORT_CAP, SUPPORT_K);
   // урон за ход при полном числе стаков: делится на стаки и тут же
   // умножается обратно, но так формула читается так же, как в движке
@@ -157,7 +160,8 @@ export function computeDerived({ level, baseClass, subclass = null, stats, gearB
     ((POISON_PER_WIL * wil + POISON_PER_AGI * agi) / POISON_MAX_STACKS) * POISON_MAX_STACKS;
   // Прибавка подкласса - к обоим уворотам целиком, как в бою (skills.compute_hit).
   const subclassDodge = SUBCLASS_DODGE[subclass] ?? 0;
-  const extraDodge = m.dodge_bonus ?? 0;
+  // руна «Лёгкий шаг» - к баффу уворота, как в бою
+  const extraDodge = (m.dodge_bonus ?? 0) + (m['rune:light_step'] ?? 0);
   const dodgeChance = Math.min(hyper(wil, DODGE_CAP, DODGE_K) + subclassDodge + extraDodge, DODGE_HARD_CAP);
   const abilityDodgeChance = Math.min(
     hyper(wil, DODGE_CAP, DODGE_K) * ABILITY_DODGE_RATIO + subclassDodge + extraDodge * EFFECT_ABILITY_DODGE_RATIO,

@@ -278,3 +278,24 @@ def test_derived_stats_show_resists() -> None:
     d = compute(Ch(), St(), mods={"resist_crit": 0.07, "accuracy": 0.1, "resist_dot": 2.0})
     assert d.crit_resist == pytest.approx(0.075 + 0.07)
     assert d.accuracy == pytest.approx(0.1) and d.dot_resist == pytest.approx(0.9)
+
+
+def test_always_on_runes_show_in_stats() -> None:
+    """Репорт 2026-11-06: «Лёгкий шаг» (+3% уворота) работал в бою, но не
+    был виден в статах; так же «Упрямый лоб». Профиль считает их как бой."""
+    from game.combat import balance_config as bc
+    from services.derived_stats_service import compute, shown_mods
+
+    class Ch:
+        level, base_class, subclass = 60, "warrior", "guardian"
+
+    class St:
+        strength, agility, intellect, vitality, will = 10, 10, 10, 200, 10
+
+    base = compute(Ch(), St(), mods={})
+    mods = {"rune:light_step": 0.03, "rune:stubborn_brow": 0.04}
+    d = compute(Ch(), St(), mods=mods)
+    assert d.dodge_chance == pytest.approx(base.dodge_chance + 0.03)
+    assert d.ability_dodge_chance == pytest.approx(base.ability_dodge_chance + 0.03 * bc.EFFECT_ABILITY_DODGE_RATIO)
+    assert d.control_resist == pytest.approx(base.control_resist + 0.04)
+    assert set(mods) <= set(shown_mods(mods)), "мини-апп получает руны в derived_mods"

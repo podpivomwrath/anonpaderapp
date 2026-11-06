@@ -38,7 +38,8 @@ MODS = (
     None,
     {"damage_bonus": 0.12, "reckless_damage_bonus": 0.06, "crit_chance_bonus": 0.1, "dodge_bonus": 0.08,
      "incoming_damage_reduction": 0.12, "max_hp_bonus": 0.16,
-     "resist_crit": 0.07, "accuracy": 0.17, "resist_dot": 0.27},
+     "resist_crit": 0.07, "accuracy": 0.17, "resist_dot": 0.27,
+     "rune:light_step": 0.03, "rune:stubborn_brow": 0.04},
 )
 
 SCRIPT = """

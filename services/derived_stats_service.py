@@ -42,6 +42,9 @@ class DerivedStats:
 SHOWN_MODS = (
     "damage_bonus", "direct_damage_bonus", "reckless_damage_bonus", "crit_chance_bonus", "dodge_bonus",
     "incoming_damage_reduction", "max_hp_bonus", "resist_crit", "accuracy", "resist_dot",
+    # Руны с постоянным эффектом, которые бой читает своим ключом (2026-11-06,
+    # репорт: «Лёгкий шаг» не видно в статах).
+    "rune:light_step", "rune:stubborn_brow",
 )
 
 
@@ -81,7 +84,8 @@ def compute(
                 * (1 + m.get("reckless_damage_bonus", 0.0)))
     stat_dodge = model.dodge(s, False) + stat_model.subclass_dodge_bonus(character.subclass)
     ability_dodge = model.dodge(s, True) + stat_model.subclass_dodge_bonus(character.subclass)
-    extra = m.get("dodge_bonus", 0.0)
+    # Как в бою (skills.compute_hit): руна «Лёгкий шаг» - к баффу уворота.
+    extra = m.get("dodge_bonus", 0.0) + m.get("rune:light_step", 0.0)
 
     return DerivedStats(
         max_hp=round(round(formulas.hp(character.level, vitality, tier_mult)
@@ -94,7 +98,8 @@ def compute(
                         + m.get("crit_chance_bonus", 0.0), 1.0),
         # Снижение от Выносливости и от баффа - множителями, как в бою.
         mitigation=1 - (1 - model.mitigation(s)) * (1 - m.get("incoming_damage_reduction", 0.0)),
-        control_resist=model.control_resist(will),
+        # Как в бою (control.py): «Упрямый лоб» сверху, общий потолок.
+        control_resist=min(model.control_resist(will) + m.get("rune:stubborn_brow", 0.0), bc.CONTROL_RESIST_CAP),
         support_power=model.support_power(s),
         # Бафф уворота от навыков - вдвое слабее (EFFECT_ABILITY_DODGE_RATIO), как в бою; общий потолок.
         dodge_chance=min(stat_dodge + extra, bc.DODGE_HARD_CAP),
