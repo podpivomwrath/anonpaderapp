@@ -25,6 +25,7 @@ export const RUNE_ICONS = {
   calluses: new URL('./assets/runes/calluses.webp', import.meta.url).href,
   monolith_mark: new URL('./assets/runes/monolith_mark.webp', import.meta.url).href,
   loose_tongue: new URL('./assets/runes/loose_tongue.webp', import.meta.url).href,
+  stone_will: new URL('./assets/runes/stone_will.webp', import.meta.url).href,
   hammer_down: new URL('./assets/runes/hammer_down.webp', import.meta.url).href,
   red_thirst: new URL('./assets/runes/red_thirst.webp', import.meta.url).href,
   spite: new URL('./assets/runes/spite.webp', import.meta.url).href,
@@ -42,6 +43,10 @@ export const RUNE_ICONS = {
   fresh_armor: new URL('./assets/runes/fresh_armor.webp', import.meta.url).href,
   cast_cuirass: new URL('./assets/runes/cast_cuirass.webp', import.meta.url).href,
   not_today: new URL('./assets/runes/not_today.webp', import.meta.url).href,
+  second_wind: new URL('./assets/runes/second_wind.webp', import.meta.url).href,
+  for_ours: new URL('./assets/runes/for_ours.webp', import.meta.url).href,
+  heavy_swing: new URL('./assets/runes/heavy_swing.webp', import.meta.url).href,
+  last_word: new URL('./assets/runes/last_word.webp', import.meta.url).href,
   cold_count: new URL('./assets/runes/cold_count.webp', import.meta.url).href,
   press: new URL('./assets/runes/press.webp', import.meta.url).href,
   blood_edge: new URL('./assets/runes/blood_edge.webp', import.meta.url).href,
@@ -51,6 +56,8 @@ export const RUNE_ICONS = {
   viscous: new URL('./assets/runes/viscous.webp', import.meta.url).href,
   short_swing: new URL('./assets/runes/short_swing.webp', import.meta.url).href,
   prop: new URL('./assets/runes/prop.webp', import.meta.url).href,
+  once_more: new URL('./assets/runes/once_more.webp', import.meta.url).href,
+  no_rest: new URL('./assets/runes/no_rest.webp', import.meta.url).href,
 };
 
 export const RUNE_ART = {
