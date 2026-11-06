@@ -529,3 +529,19 @@ def test_party_over_three_makes_enemies_tougher() -> None:
     hp_ratio = b5.max_hp / b3.max_hp
     expected = (1 + rc.UNIQUE_HP_PER_PLAYER * 4) / (1 + rc.UNIQUE_HP_PER_PLAYER * 2)
     assert abs(hp_ratio - expected) < 0.05, "здоровье уникального босса - только своей формулой, без двойного"
+
+
+def test_start_fight_keeps_its_note() -> None:
+    """Репорт 2026-11-06: строка засады дважды в одном сообщении - причина
+    закрытых зелий собиралась через `note :=` и затирала подпись боя."""
+    import ast
+    import inspect
+    import textwrap
+
+    from bot.handlers import ruins as ruins_handlers
+
+    tree = ast.parse(textwrap.dedent(inspect.getsource(ruins_handlers._start_fight)))
+    rebinds = [n for n in ast.walk(tree)
+               if isinstance(n, ast.NamedExpr) and n.target.id == "note"
+               or isinstance(n, ast.Assign) and any(getattr(t, "id", None) == "note" for t in n.targets)]
+    assert not rebinds, "note - подпись боя, её не перезаписывать"
