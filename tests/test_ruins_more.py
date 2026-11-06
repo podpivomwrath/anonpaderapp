@@ -158,7 +158,7 @@ async def test_closed_potions_name_the_real_reason(db_session, make_character) -
 
     run, _ = await _run_in(db_session, make_character, rules.AMBUSH)
     note = ruins_service.potions_closed_text(run, 0)
-    assert note and "Засада" in note
+    assert note and "ЗАСАДА" in note and "‼️" in note
     run.extra = {}
     assert ruins_service.potions_closed_text(run, 2) is None, "зелья есть - причины нет"
     assert "этаж" in ruins_service.potions_closed_text(run, 5)

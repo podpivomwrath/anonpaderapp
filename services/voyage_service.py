@@ -239,7 +239,12 @@ async def craft_xp(db: AsyncSession, character: Character, rng: random.Random) -
     craft = rng.choice(open_crafts)
     level_field, xp_field, title, name = CRAFTS[craft]
     before = getattr(character, level_field)
-    amount = max(1, round(_xp_to_next(craft, before) * vc.CRAFT_XP_SHARE))
+    from game.economy import runes
+
+    base = max(1, round(_xp_to_next(craft, before) * vc.CRAFT_XP_SHARE))
+    # Руна «Мозоли» - на все ремёсла (2026-11-06: рыбалка и горное дело в
+    # походе шли без неё). Травы, алхимия и кулинария берут её в grant_xp.
+    amount = runes.craft_xp(character, base)
     if craft in ("fishing", "mining"):
         from game.economy import fishing, mining
 
@@ -254,7 +259,7 @@ async def craft_xp(db: AsyncSession, character: Character, rng: random.Random) -
         from services import herb_service
 
         {"herbalism": herb_service.grant_xp, "alchemy": alchemy.grant_xp, "cooking": cooking.grant_xp}[craft](
-            character, amount)
+            character, base)
     after = getattr(character, level_field)
     reward = f"+{amount} опыта {title}" + (f", {name} {after} ур." if after > before else "")
     found = await _craft_drop(db, character, craft, before, rng)

@@ -296,7 +296,7 @@ def potions_closed_text(run: RuinRun, used_on_floor: int) -> str | None:
     обычный лимит боя скажет о себе сам."""
     kind = ((run.extra or {}).get("fight") or {}).get("kind")
     if kind == rules.AMBUSH:
-        return "🗡 Засада: в этом бою до зелий не дотянуться. В следующем бою снова можно."
+        return "‼️ ЗАСАДА: в этом бою до зелий не дотянуться ‼️\nВ следующем бою снова можно."
     if gifts_mod.has(run.gifts, "vow_silence"):
         return "🤐 Обет молчания: пока дар действует, зелья пить нельзя."
     if used_on_floor >= floor_potions(run):

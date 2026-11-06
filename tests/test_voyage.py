@@ -147,3 +147,20 @@ async def test_craft_xp_in_voyage_hour(db_session, make_character, monkeypatch) 
     assert ore and fish  # добыча ремесла дошла до сумки
     monkeypatch.setattr(voyage_service.vc, "CRAFT_XP_CHANCE", 0.0)
     assert await voyage_service.craft_xp(db_session, c, random.Random(1)) is None
+
+
+async def test_calluses_rune_in_voyage_for_every_craft(db_session, make_character, monkeypatch) -> None:
+    """Руна «Мозоли» в походе - на все ремёсла: рыбалка и горное дело шли
+    без неё (2026-11-06). Травы, алхимия, кулинария - без двойного бонуса."""
+    from game.economy import runes
+
+    monkeypatch.setattr(voyage_service.vc, "CRAFT_XP_CHANCE", 1.0)
+    all_crafts = dict(voyage_service.CRAFTS)
+    for craft, (level_field, xp_field, _t, _n) in all_crafts.items():
+        monkeypatch.setattr(voyage_service, "CRAFTS", {craft: all_crafts[craft]})
+        c = await make_character(level=30)
+        setattr(c, level_field, 1)
+        c.rune_effects = {"rune:calluses": 0.5}
+        base = max(1, round(voyage_service._xp_to_next(craft, 1) * voyage_service.vc.CRAFT_XP_SHARE))
+        await voyage_service.craft_xp(db_session, c, random.Random(3))
+        assert getattr(c, xp_field) == runes.craft_xp(c, base) or getattr(c, level_field) > 1, craft
