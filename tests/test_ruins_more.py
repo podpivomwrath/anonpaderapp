@@ -481,3 +481,28 @@ def test_candle_wax_boosts_burn_and_poison() -> None:
         effect = Effect(kind=EffectKind.DOT, value=100, remaining_ticks=3, source_id=1, stacks=1, tag=tag)
         plain = shared_rules.poison_tick_damage(effect, _player(3), tgt)
         assert shared_rules.poison_tick_damage(effect, src, tgt) == round(plain * 1.25), tag
+
+
+def test_party_over_three_makes_enemies_tougher() -> None:
+    """2026-11-06, владелец: мобов от трёх игроков всегда 5, поэтому за 4-го
+    и 5-го - здоровье и урон противников. Уникальным боссам - только урон:
+    здоровье у них и так растёт с группой."""
+    from game.combat.session import CombatMode, CombatSessionState
+
+    def mobs(room: str, party: int, floor: int = 1):
+        layout = rules.generate(random.Random(0), floor)
+        state = CombatSessionState(session_id=1, mode=CombatMode.PVE, is_raid=True)
+        for i in range(1, party + 1):
+            state.add(_player(i))
+        stage = rcombat.build_stage(22_000_000, layout, room, party, {}, random.Random(0))
+        stage.setup(state)
+        return [c for c in state.combatants.values() if c.kind == "mob"]
+
+    base, four, five = (mobs(rules.FIGHT, n)[0] for n in (3, 4, 5))
+    assert len(mobs(rules.FIGHT, 5)) == len(mobs(rules.FIGHT, 3))
+    assert four.max_hp > base.max_hp and five.max_hp > four.max_hp
+    assert sum(base.stats.__dict__.values()) < sum(five.stats.__dict__.values())
+    b3, b5 = mobs(rules.BOSS, 3, floor=5)[0], mobs(rules.BOSS, 5, floor=5)[0]
+    hp_ratio = b5.max_hp / b3.max_hp
+    expected = (1 + rc.UNIQUE_HP_PER_PLAYER * 4) / (1 + rc.UNIQUE_HP_PER_PLAYER * 2)
+    assert abs(hp_ratio - expected) < 0.05, "здоровье уникального босса - только своей формулой, без двойного"

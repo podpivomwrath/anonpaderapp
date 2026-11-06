@@ -55,7 +55,13 @@ class _RuinsStage:
     def _toughness(self) -> float:
         return 1.15 if gifts_mod.has(self.gifts, "heavy_bag") else 1.0
 
-    def _mob(self, name: str, hp: float, dmg: float, primary: str | None = None, label: str | None = None):
+    def _mob(self, name: str, hp: float, dmg: float, primary: str | None = None, label: str | None = None,
+             party_hp: bool = True):
+        """party_hp=False - здоровье уже посчитано под группу (уникальные боссы)."""
+        extra = rc.party_extra(self.party)
+        if party_hp:
+            hp *= 1 + rc.PARTY_HP_PER_EXTRA * extra
+        dmg *= 1 + rc.PARTY_DMG_PER_EXTRA * extra
         mob = build_mob(self._new_id(), name, self.level, rc.MOB_RING, hp * self._toughness(), dmg,
                         primary or self.primary, label or self.label)
         # Разница уровней - как у мобов исследования (2026-11-05, владелец).
@@ -189,7 +195,7 @@ class RuinBoss:
         party = self.room.party
         hp = rc.UNIQUE_HP * self.hp * (1 + rc.UNIQUE_HP_PER_PLAYER * (party - 1))
         boss = self.room._add(session, self.room._mob(self.name, hp, rc.UNIQUE_DMG * self.dmg, self.primary,
-                                                     self.label))
+                                                     self.label, party_hp=False))
         self.boss_id = boss.id
         return self.opening()
 
@@ -313,7 +319,7 @@ class Candlewoman(RuinBoss):
 
     def _candle(self, session) -> None:
         hp = rc.CANDLE_HP * (1 + rc.UNIQUE_HP_PER_PLAYER * (self.room.party - 1))
-        mob = self.room._mob("Свеча", hp, 0.0)
+        mob = self.room._mob("Свеча", hp, 0.0, party_hp=False)
         mob.scripted_hit = _idle
         self.room._add(session, mob, reward=False)
         self.candles.append(mob.id)
@@ -397,7 +403,7 @@ class Brothers(RuinBoss):
         party = self.room.party
         hp = rc.UNIQUE_HP * self.hp * (1 + rc.UNIQUE_HP_PER_PLAYER * (party - 1))
         second = self.room._add(session, self.room._mob("Младший копатель", hp, rc.UNIQUE_DMG * self.dmg,
-                                                        "str", "бьёт киркой"))
+                                                        "str", "бьёт киркой", party_hp=False))
         self.second_id = second.id
         return lines
 
