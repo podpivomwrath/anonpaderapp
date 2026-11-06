@@ -501,7 +501,7 @@ WALLET_REASONS = {
     "scene_event_service.grant_gold": "Событие", "scene_event_service.pay": "Событие: плата",
     "scene_events._dice": "Кости в событии", "shop_service._charge": "Магазин",
     "shop_service.buy_elixir_pack": "Набор зелий", "shop_service.buy_house": "Дом",
-    "shop_service.buy_premium": "Метка Хранителя", "shop_service.buy_brand": "Клеймо Хранителя", "story_service._grant": "Сюжет",
+    "shop_service.buy_premium": "Метка Хранителя", "shop_service.buy_brand": "Клеймо Хранителя", "shop_service.buy_pair": "Метка и Клеймо", "story_service._grant": "Сюжет",
     "subclass_service.pay_unlock": "Выбор подкласса", "trade_service.arrive": "Торговля: продажа груза",
     "trade_service.buy_cart": "Торговля: повозка", "trade_service.buy_firm": "Торговля: фирма",
     "trade_service.dispatch": "Торговля: закупка груза", "trade_service.repair": "Торговля: ремонт",

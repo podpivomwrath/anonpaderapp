@@ -109,7 +109,10 @@ function BuySheet({ item, gems, onClose, onBought }) {
         <div className="shop-sheet__slider">
           <div className="shop-sheet__days">
             <b>{days} {daysWord(days)}</b>
-            <span>💎 {money(price)}</span>
+            <span>
+              {item.full_prices && <s className="shop-sheet__old">💎 {money(item.full_prices[days])}</s>}
+              {' '}💎 {money(price)}
+            </span>
           </div>
           <input
             type="range"
@@ -496,7 +499,7 @@ export default function ShopTab({ onWallet, onBought }) {
 
   const item = open ? data.items.find((i) => i.id === open) : null;
   // Витрины - Метка и Клеймо Хранителя (2026-11-06): обе большими карточками.
-  const SHOWCASE = ['premium', 'keeper_brand'];
+  const SHOWCASE = ['keeper_pair', 'premium', 'keeper_brand'];
   const showcases = data.items.filter((i) => SHOWCASE.includes(i.id));
   const rest = data.items.filter((i) => !SHOWCASE.includes(i.id));
 
@@ -513,6 +516,7 @@ export default function ShopTab({ onWallet, onBought }) {
             className={`shop-showcase shop-showcase--${featured.id}`}
             onClick={() => setOpen(featured.id)}
           >
+            {featured.promo && <span className="shop-showcase__ribbon">{featured.promo}</span>}
             <span className="shop-showcase__art"><ShopIcon id={featured.id} emoji={featured.emoji} /></span>
             <span className="shop-showcase__text">
               <b className="shop-showcase__title">{featured.title}</b>
@@ -523,9 +527,14 @@ export default function ShopTab({ onWallet, onBought }) {
                 {featured.active_until
                   ? `${featured.id === 'keeper_brand' ? 'активно' : 'активна'} до ${untilText(featured.active_until)}`
                   : featured.kind === 'days' ? `от 💎 ${money(featured.prices[featured.min])}` : `💎 ${money(featured.price)}`}
+                {featured.full_prices && (
+                  <s className="shop-showcase__old"> 💎 {money(featured.full_prices[featured.min])}</s>
+                )}
               </span>
             </span>
-            {longSaving(featured) >= 10 && <span className="shop-card__deal">до −{longSaving(featured)}%</span>}
+            {featured.discount
+              ? <span className="shop-card__deal shop-card__deal--promo">−{featured.discount}%</span>
+              : longSaving(featured) >= 10 && <span className="shop-card__deal">до −{longSaving(featured)}%</span>}
           </button>
           ))}
         </Group>

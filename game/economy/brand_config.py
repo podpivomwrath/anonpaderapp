@@ -37,6 +37,22 @@ EXPIRY_WARNING_TEXT = f"{BRAND_BADGE} {BRAND_NAME} побледнеет завт
 EXPIRED_TEXT = f"{BRAND_BADGE} {BRAND_NAME} сошло. Хранитель вычеркнул пометку на полях."
 
 
+#: Набор «Метка и Клеймо» (2026-11-06): обе на один срок, скидка от суммы
+#: цен по отдельности. Акция без срока - всегда первой в магазине.
+PAIR_DISCOUNT = 0.20
+
+
+def pair_full_price(days: int) -> int:
+    from game.economy import premium_config as pc
+
+    return pc.shop_price(days) + shop_price(days)
+
+
+def pair_price(days: int) -> int:
+    """Метка + Клеймо на days дней со скидкой, округлено до 5."""
+    return round(pair_full_price(days) * (1 - PAIR_DISCOUNT) / 5) * 5
+
+
 def shop_price(days: int) -> int:
     """Цена Клейма на days дней: цена Метки ×1,5, округлено до 5."""
     from game.economy import premium_config as pc

@@ -75,6 +75,53 @@ def brand_item(character: Character) -> dict:
     }
 
 
+# --- Набор «Метка и Клеймо» (2026-11-06): обе на срок со скидкой -------------
+
+PAIR_ID = "keeper_pair"
+
+
+def pair_item(character: Character) -> dict:
+    days = range(brc.SHOP_MIN_DAYS, brc.SHOP_MAX_DAYS + 1)
+    return {
+        "id": PAIR_ID,
+        "title": "Метка и Клеймо",
+        "emoji": f"{pc.PREMIUM_BADGE}{brc.BRAND_BADGE}",
+        "kind": "days",
+        "min": brc.SHOP_MIN_DAYS,
+        "max": brc.SHOP_MAX_DAYS,
+        "prices": {d: brc.pair_price(d) for d in days},
+        "full_prices": {d: brc.pair_full_price(d) for d in days},
+        "discount": round(brc.PAIR_DISCOUNT * 100),
+        "promo": "Лучшая цена",
+        "perks": [
+            f"{pc.PREMIUM_BADGE} {pc.PREMIUM_NAME} и {brc.BRAND_BADGE} {brc.BRAND_NAME} на один срок",
+            f"на {round(brc.PAIR_DISCOUNT * 100)}% дешевле, чем по отдельности",
+            *_premium_perks()[:-1],
+            *_brand_perks(),
+        ],
+        "note": (f"С {brc.MIN_LEVEL} уровня. Срок прибавляется к оставшемуся у каждой. Без силовых "
+                 "преимуществ: характеристики, урон и здоровье не меняются."),
+    }
+
+
+async def buy_pair(db: AsyncSession, character: Character, days: int) -> datetime:
+    """Метка и Клеймо на days дней со скидкой. Вернёт срок Клейма."""
+    if character.level < brc.MIN_LEVEL:
+        raise ShopError(f"Набор с {brc.BRAND_NAME} - с {brc.MIN_LEVEL} уровня.")
+    if not isinstance(days, int) or isinstance(days, bool) or not brc.SHOP_MIN_DAYS <= days <= brc.SHOP_MAX_DAYS:
+        raise ShopError(f"Срок - от {brc.SHOP_MIN_DAYS} до {brc.SHOP_MAX_DAYS} дней.")
+    price = brc.pair_price(days)
+    try:
+        await wallet_service.charge(db, character.id, "donate", price)
+    except wallet_service.NotEnoughCurrency:
+        raise ShopError(f"Не хватает самоцветов: нужно 💎{price}.") from None
+    now = datetime.now(timezone.utc)
+    premium_service.extend(character, days, now)
+    premium_service.extend_brand(character, days, now)
+    await db.flush()
+    return character.brand_until
+
+
 async def buy_brand(db: AsyncSession, character: Character, days: int) -> datetime:
     """Списать самоцветы и продлить Клеймо. Только с 60 уровня."""
     if character.level < brc.MIN_LEVEL:
@@ -96,7 +143,7 @@ def catalog(character: Character, gems: int, firm_name: str | None = None) -> di
     active = premium_service.is_premium(character)
     return {
         "gems": gems,
-        "items": [{
+        "items": [pair_item(character), {
             "id": PREMIUM_ID,
             "title": pc.PREMIUM_NAME,
             "emoji": pc.PREMIUM_BADGE,

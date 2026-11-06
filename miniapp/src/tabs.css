@@ -1707,6 +1707,55 @@ body.lite .cart-road__ox { animation: none; }
 
 .shop-showcase:active { transform: scale(0.98); }
 
+/* Набор «Метка и Клеймо» - акция без срока: золото и обе гаммы, лента сверху. */
+.shop-showcase--keeper_pair {
+  padding-top: 28px;
+  border: 1.5px solid rgba(240, 200, 110, 0.85);
+  background:
+    radial-gradient(90% 120% at 0% 50%, rgba(110, 150, 230, 0.28), transparent 60%),
+    radial-gradient(90% 120% at 100% 50%, rgba(130, 90, 210, 0.3), transparent 60%),
+    radial-gradient(circle at 50% 0%, rgba(240, 200, 110, 0.25), transparent 55%),
+    rgba(16, 13, 18, 0.94);
+  box-shadow: 0 0 18px rgba(240, 200, 110, 0.22);
+}
+
+.shop-showcase--keeper_pair .shop-showcase__art {
+  background: radial-gradient(circle, rgba(240, 200, 110, 0.32), transparent 70%);
+}
+
+.shop-showcase--keeper_pair .shop-card__emoji { font-size: 36px; letter-spacing: -4px; }
+.shop-showcase--keeper_pair .shop-showcase__price { color: #ffe3a3; }
+
+.shop-showcase__ribbon {
+  position: absolute;
+  top: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 3px 14px;
+  border-radius: 0 0 10px 10px;
+  background: linear-gradient(90deg, #e9b85a, #f7d98e, #e9b85a);
+  color: #2a1d08;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.shop-showcase__old,
+.shop-sheet__old {
+  margin-left: 6px;
+  font-weight: 400;
+  opacity: 0.5;
+}
+
+.shop-sheet__old { margin: 0 4px 0 0; }
+
+.shop-card__deal--promo {
+  font-size: 14px;
+  padding: 3px 10px;
+}
+
 /* Клеймо Хранителя - тёмная пара Метки: холодный фиолет вместо синевы. */
 .shop-showcase--keeper_brand {
   border-color: rgba(160, 130, 220, 0.5);

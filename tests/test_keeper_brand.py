@@ -186,3 +186,23 @@ async def test_rift_notice_goes_to_brand_holders_of_its_band(make_character, db_
     from bot import rift_texts
 
     assert "(1; 1)" in rift_texts.brand_notice(high, 30)
+
+
+def test_pair_is_first_and_cheaper() -> None:
+    import inspect
+
+    assert '"items": [pair_item(character),' in inspect.getsource(shop_service.catalog), "набор - первым"
+    first = shop_service.pair_item(_char())
+    assert first["id"] == shop_service.PAIR_ID and first["promo"]
+    for d in (1, 7, 30):
+        assert first["prices"][d] < first["full_prices"][d] == pc.shop_price(d) + brc.shop_price(d)
+    assert first["prices"][30] == 1600
+
+
+async def test_buy_pair_extends_both(make_character, db_session) -> None:
+    young = await make_character(level=59, donate=10_000)
+    with pytest.raises(shop_service.ShopError):
+        await shop_service.buy_pair(db_session, young, 7)
+    c = await make_character(level=60, donate=10_000)
+    await shop_service.buy_pair(db_session, c, 7)
+    assert premium_service.is_premium(c) and premium_service.is_brand(c)
