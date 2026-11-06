@@ -1707,6 +1707,21 @@ body.lite .cart-road__ox { animation: none; }
 
 .shop-showcase:active { transform: scale(0.98); }
 
+/* Клеймо Хранителя - тёмная пара Метки: холодный фиолет вместо синевы. */
+.shop-showcase--keeper_brand {
+  border-color: rgba(160, 130, 220, 0.5);
+  background:
+    radial-gradient(110% 130% at 0% 50%, rgba(120, 80, 200, 0.32), transparent 60%),
+    radial-gradient(circle at 100% 0%, rgba(90, 60, 150, 0.28), transparent 50%),
+    rgba(12, 10, 18, 0.92);
+}
+
+.shop-showcase--keeper_brand .shop-showcase__art {
+  background: radial-gradient(circle, rgba(130, 90, 210, 0.38), transparent 70%);
+}
+
+.shop-showcase--keeper_brand .shop-showcase__price { color: #d2c2ff; }
+
 .shop-showcase__art {
   display: grid;
   place-items: center;

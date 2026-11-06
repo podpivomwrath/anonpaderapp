@@ -97,7 +97,7 @@ function BuySheet({ item, gems, onClose, onBought }) {
           <div>
             <b className="shop-sheet__title">{item.title}</b>
             {item.active_until && (
-              <p className="shop-sheet__active">Активна до {untilText(item.active_until)} - новый срок прибавится сверху</p>
+              <p className="shop-sheet__active">{item.id === 'keeper_brand' ? 'Активно' : 'Активна'} до {untilText(item.active_until)} - новый срок прибавится сверху</p>
             )}
           </div>
         </div>
@@ -495,15 +495,24 @@ export default function ShopTab({ onWallet, onBought }) {
   }
 
   const item = open ? data.items.find((i) => i.id === open) : null;
-  const [featured, ...rest] = data.items;
+  // Витрины - Метка и Клеймо Хранителя (2026-11-06): обе большими карточками.
+  const SHOWCASE = ['premium', 'keeper_brand'];
+  const showcases = data.items.filter((i) => SHOWCASE.includes(i.id));
+  const rest = data.items.filter((i) => !SHOWCASE.includes(i.id));
 
   return (
     <>
       <SectionHead kind="shop" icon="💎" value={money(data.gems)} label="Пепельных самоцветов" />
       {notice && <Div><p className="shop-notice">{notice}</p></Div>}
-      {featured && (
+      {showcases.length > 0 && (
         <Group>
-          <button type="button" className="shop-showcase" onClick={() => setOpen(featured.id)}>
+          {showcases.map((featured) => (
+          <button
+            type="button"
+            key={featured.id}
+            className={`shop-showcase shop-showcase--${featured.id}`}
+            onClick={() => setOpen(featured.id)}
+          >
             <span className="shop-showcase__art"><ShopIcon id={featured.id} emoji={featured.emoji} /></span>
             <span className="shop-showcase__text">
               <b className="shop-showcase__title">{featured.title}</b>
@@ -512,12 +521,13 @@ export default function ShopTab({ onWallet, onBought }) {
               ))}
               <span className="shop-showcase__price">
                 {featured.active_until
-                  ? `активна до ${untilText(featured.active_until)}`
+                  ? `${featured.id === 'keeper_brand' ? 'активно' : 'активна'} до ${untilText(featured.active_until)}`
                   : featured.kind === 'days' ? `от 💎 ${money(featured.prices[featured.min])}` : `💎 ${money(featured.price)}`}
               </span>
             </span>
             {longSaving(featured) >= 10 && <span className="shop-card__deal">до −{longSaving(featured)}%</span>}
           </button>
+          ))}
         </Group>
       )}
       <Group header={<Header>Товары</Header>}>
