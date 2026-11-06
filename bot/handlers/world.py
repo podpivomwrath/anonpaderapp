@@ -744,6 +744,7 @@ async def _move(message: Message, direction: tuple[int, int] | None) -> None:
             await raid_service.leave_lobby_if_present(db, character.id)
         travel_seconds = movement_service.start_travel(character, dx, dy, now)
         guild_handlers.forget_tithe(message.peer_id)
+        craft_button_state.forget(message.peer_id)  # прибытие - новый вход на клетку
         await db.commit()
         # Ушёл с клетки - событие с выбором на ней закрыто: иначе его кнопки
         # всплывали бы потом в любой команде (2026-10-15).

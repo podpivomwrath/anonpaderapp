@@ -467,6 +467,11 @@ async def start_travel_and_notify(
     from bot import ash_handful_state
 
     ash_handful_state.clear(peer_id)
+    # Промежуточные клетки кнопок не показывают - иначе отметки с прошлого
+    # визита глушили бы кнопки на месте прибытия (руины, 2026-11-06).
+    from bot import craft_button_state
+
+    craft_button_state.forget(peer_id)
     seconds = mount_service.total_travel_seconds(mount_id, len(path), character)
     await db.commit()
     await notify_travel_started(

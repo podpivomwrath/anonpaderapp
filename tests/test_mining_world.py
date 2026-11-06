@@ -254,3 +254,26 @@ async def test_stuck_command_drops_the_pick_and_returns_ore(db_session, characte
     assert await world_handlers.force_unstick(db_session, character, 515151) is False
     assert not mining_service.is_digging(character) and character.screen is None
     assert (await db_session.get(MineVein, mine.id)).ore_count == 3
+
+
+def test_any_trip_start_forgets_shown_buttons() -> None:
+    """Маунт проезжает клетки без кнопок: отметка с прошлого визита глушила
+    кнопку спуска в руины при возвращении верхом (2026-11-06). Старт любого
+    пути сбрасывает все отметки игрока, чужие не трогает."""
+    st.mark_sent(901, st.RUINS, -1, 0)
+    st.mark_sent(901, st.MINE, -1, 0)
+    st.mark_sent(902, st.RUINS, -1, 0)
+    st.forget(901)
+    assert st.should_send(901, st.RUINS, -1, 0)
+    assert st.should_send(901, st.MINE, -1, 0)
+    assert not st.should_send(902, st.RUINS, -1, 0)
+    st.forget(902)
+
+
+def test_trip_starts_call_forget() -> None:
+    import inspect
+
+    from bot.handlers import mounts, world
+
+    assert "craft_button_state.forget(" in inspect.getsource(world._move)
+    assert "craft_button_state.forget(" in inspect.getsource(mounts.start_travel_and_notify)
