@@ -589,6 +589,8 @@ async def on_room_won(session_id: int, battle) -> None:
         boss = run.phase == ruins_service.CLEARED
         await db.commit()
         run_id = run.id
+        floor = run.floor
+    dailies = await _record_dailies(hp, top, floor)
     heads = {}
     for cid, got in found.items():
         lines = [texts.BOSS_DOWN] if boss else []
@@ -599,6 +601,52 @@ async def on_room_won(session_id: int, battle) -> None:
             lines.append(texts.chests_line(got["chests"]))
         heads[cid] = "\n".join(lines) or None
     await _broadcast_view(run_id, heads, "спуск" if boss else None)
+    await _send_dailies(dailies)
+
+
+async def _record_dailies(hp: dict[int, int], top: dict[int, int], floor: int) -> dict[int, object]:
+    """Победа в комнате - выигранный бой для ежедневок, как групповой бой с
+    мобами клетки (2026-11-06, репорт 323: «мобы своего уровня» не шли). Своя
+    сессия - уже после коммита забега, блокировку забега не держим."""
+    from game.combat.battle_report import BattleReport
+    from services import daily_service
+
+    out: dict[int, object] = {}
+    try:
+        async with get_session_factory()() as db:
+            for cid, left in hp.items():
+                if left <= 0:
+                    continue
+                character = await db.get(Character, cid)
+                if character is None:
+                    continue
+                report = BattleReport(won=True, mob_level=rc.mob_level(floor), max_hp=top.get(cid, 0),
+                                      hp_min_pct=1.0, only_skills=False, only_basic_attack=False)
+                out[cid] = await daily_service.record_battle(db, character, report)
+            await db.commit()
+    except Exception:
+        logger.exception("Руины: ежедневки после комнаты не записаны")
+        return {}
+    return out
+
+
+async def _send_dailies(dailies: dict[int, object]) -> None:
+    from bot import dailies_texts
+    from bot.handlers import stats_window
+
+    if not dailies:
+        return
+    async with get_session_factory()() as db:
+        peers = await _peers(db, list(dailies))
+    for cid, daily in dailies.items():
+        peer = peers.get(cid)
+        if peer is None:
+            continue
+        notice = dailies_texts.progress_notice(daily)
+        if notice:
+            await _send(peer, notice)
+        for c in getattr(daily, "completed", []):
+            await stats_window.notify_levelup(peer, c.levels_gained, c.new_level)
 
 
 async def on_wipe(session_id: int, battle, text: str | None = None) -> None:

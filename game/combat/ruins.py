@@ -294,8 +294,9 @@ class Counter(RuinBoss):
         self.marks[top] = self.marks.get(top, 0) + 1
         if self.marks[top] >= rc.COUNTER_MARKS:
             self.marks[top] = 0
-            stage_hurt(c, round(c.max_hp * rc.COUNTER_HIT), out)
-            out.lines.append(f"📒 Счетовод взыскивает долг с {c.name}")
+            hurt = stage_hurt(c, round(c.max_hp * rc.COUNTER_HIT), out)
+            # Сколько отнял - в логе (2026-11-06, репорт 322: урон не было видно).
+            out.lines.append(f"📒 Счетовод взыскивает долг с {c.name}: {hurt} урона")
         else:
             out.lines.append(f"📒 Долг {c.name}: {self.marks[top]} из {rc.COUNTER_MARKS}")
 

@@ -21,6 +21,10 @@ FOOD_SHORT = {
     "max_hp_bonus": "здоровье",
     "xp_bonus": "опыт",
     "damage_bonus": "весь урон",
+    # Репорт 324 (2026-11-06): после разделения урона в плашке события был
+    # виден сырой ключ «direct_damage_bonus».
+    "direct_damage_bonus": "прямой урон",
+    "dot_damage_bonus": "периодический урон",
     "incoming_damage_reduction": "защита",
     "relic_bonus": "реликвии",
     "crit_chance_bonus": "крит",

@@ -402,3 +402,35 @@ async def test_gifts_last_three_floors_and_refresh(db_session, make_character) -
     run.offer = {"ids": ["whetstone"], "until": "2099-01-01T00:00:00+00:00"}
     ruins_service.take_gift(run, "whetstone")
     assert run.gifts == [{"id": "whetstone", "until": run.floor + rc.GIFT_FLOORS - 1}], "продлён, не задвоен"
+
+
+async def test_room_win_counts_for_dailies(db_session, make_character, monkeypatch) -> None:
+    """2026-11-06, репорт 323: мобы руин не шли в ежедневку «мобы своего
+    уровня». Победа в комнате - выигранный бой с мобом уровня этажа."""
+    from contextlib import asynccontextmanager
+
+    from bot.handlers import ruins as handler
+    from models import CharacterDaily
+    from services import daily_service
+
+    hero = await make_character(level=60)
+    db_session.add(CharacterDaily(character_id=hero.id, quest_id="deeper_ash", progress=0, completed=False,
+                                  date=daily_service.today_msk()))
+    dead = await make_character(level=60)
+    await db_session.flush()
+
+    @asynccontextmanager
+    async def _same():
+        yield db_session
+
+    async def _no_commit():
+        await db_session.flush()
+
+    monkeypatch.setattr(handler, "get_session_factory", lambda: _same)
+    monkeypatch.setattr(db_session, "commit", _no_commit)
+    got = await handler._record_dailies({hero.id: 500, dead.id: 0}, {hero.id: 1000}, floor=1)
+    assert set(got) == {hero.id}, "павший в бою ежедневку не двигает"
+    row = (await db_session.execute(
+        __import__("sqlalchemy").select(CharacterDaily).where(CharacterDaily.character_id == hero.id)
+    )).scalar_one()
+    assert row.progress == 1

@@ -66,3 +66,14 @@ def test_will_boosts_every_dot() -> None:
     poisoner.stats.will = 100
     effect = Effect(kind=EffectKind.DOT, value=100, remaining_ticks=3, source_id=3, stacks=1)
     assert shared_rules.poison_tick_damage(effect, poisoner, tgt) == 100, "у Отравителя без двойного учёта"
+
+
+def test_every_event_modifier_has_a_label() -> None:
+    """Репорт 324 (2026-11-06): в плашке события был виден сырой ключ
+    «direct_damage_bonus». У каждого модификатора событий - подпись."""
+    from game.world import scene_events
+    from services.buffs_service import FOOD_SHORT
+
+    keys = {k for e in scene_events.content().effects.values() for k in e.modifiers}
+    assert keys <= set(FOOD_SHORT), sorted(keys - set(FOOD_SHORT))
+    assert {"damage_bonus", "direct_damage_bonus", "dot_damage_bonus"} <= set(FOOD_SHORT)

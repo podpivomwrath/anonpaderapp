@@ -245,8 +245,10 @@ def test_counter_collects_debt() -> None:
     before = state.combatants[1].current_hp
     for _ in range(rc.COUNTER_MARKS):
         res = TickResult(hit_renders=[RenderedHit(1, boss_id, 0, 1, "бьёт", 500, False, False, False, 9000, 8500, 9000)])
-        stage._enemy_tick(state, res, random.Random(1))
+        out = stage._enemy_tick(state, res, random.Random(1))
     assert state.combatants[1].current_hp < before
+    # Репорт 322 (2026-11-06): сколько взыскал - в логе.
+    assert any("взыскивает долг" in x and x.rstrip().endswith("урона") for x in out.lines), out.lines
 
 
 def test_candles_heal_boss_and_go_out_with_her() -> None:
