@@ -127,7 +127,7 @@ RUNES: list[RuneDef] = [
     # --- Руны экипировки ----------------------------------------------------------
     RuneDef("hammer_down", GEAR, "Молот по лежачему", 0.15, "+{v} прямого урона по оглушённым", pvp="half",
             classes=(W,), place="weapon"),
-    RuneDef("red_thirst", GEAR, "Красная жажда", 0.03, "{v} прямого урона возвращается здоровьем", pvp="half",
+    RuneDef("red_thirst", GEAR, "Красная жажда", 0.03, "+{v} вампиризма от прямого урона", pvp="half",
             classes=(W,), place="weapon"),
     RuneDef("spite", GEAR, "Злоба", 0.02, "+{v} прямого урона за каждый полученный удар, до пяти раз", pvp="half",
             classes=(W,), place="weapon"),
@@ -152,7 +152,7 @@ RUNES: list[RuneDef] = [
             classes=(M,), place="weapon"),
     RuneDef("surplus", GEAR, "Излишек", 0.20, "{v} лечения сверх максимума становится щитом", pvp="half",
             classes=(M,), place="armor"),
-    RuneDef("reverse_prayer", GEAR, "Обратная молитва", 0.15, "{v} твоего лечения бьёт врага", pvp="half",
+    RuneDef("reverse_prayer", GEAR, "Обратная молитва", 0.15, "{v} лечения и вампиризма твоих навыков бьёт врага", pvp="half",
             classes=(M,), place="weapon", rarity="rare"),
     RuneDef("fresh_armor", GEAR, "Свежая броня", 0.15, "входящий урон в первые 3 хода меньше на {v}",
             pvp="half", place="armor"),
@@ -175,7 +175,7 @@ RUNES: list[RuneDef] = [
     RuneDef("cold_count", SKILL, "Холодный счёт", 0.08, "шанс {v}, что навык не уйдёт в перезарядку",
             pvp="half", curve="tight", rarity="rare"),
     RuneDef("press", SKILL, "Нажим", 0.10, "навык бьёт сильнее на {v}", pvp="half"),
-    RuneDef("blood_edge", SKILL, "Кровяная кромка", 0.05, "{v} урона навыка возвращается здоровьем",
+    RuneDef("blood_edge", SKILL, "Кровяная кромка", 0.05, "+{v} вампиризма от урона навыка",
             pvp="half", tag="damage"),
     RuneDef("ricochet", SKILL, "Отскок", 0.12, "в групповом бою шанс {v} задеть вторую цель обычным ударом с силой 40% (без эффектов навыка)",
             pvp="none", tag="damage"),
@@ -185,7 +185,7 @@ RUNES: list[RuneDef] = [
             pvp="half", tag="duration", curve="tight", rarity="epic"),
     RuneDef("short_swing", SKILL, "Короткий взмах", 0.20, "шанс {v}, что перезарядка навыка на ход короче",
             pvp="half", tag="long_cd", curve="very_tight", rarity="mythic"),
-    RuneDef("prop", SKILL, "Подпорка", 0.15, "лечение и щиты навыка сильнее на {v}", pvp="half",
+    RuneDef("prop", SKILL, "Подпорка", 0.15, "лечение, щиты и вампиризм навыка сильнее на {v}", pvp="half",
             tag="heal_shield"),
     # Ультимативные (2026-11-05). В PvP не действуют.
     RuneDef("once_more", SKILL, "Ещё раз", 0.10, "шанс {v}, что навык сработает второй раз вполсилы",
@@ -202,7 +202,7 @@ BY_ID: dict[str, RuneDef] = {r.id: r for r in RUNES}
 SKILL_TAG_TITLES = {
     "damage": "навыки с уроном", "control": "навыки контроля", "dot": "навыки с уроном за ход",
     "duration": "навыки с эффектом на несколько ходов", "long_cd": "навыки с перезарядкой от 4 ходов",
-    "heal_shield": "лечение и щиты",
+    "heal_shield": "лечение, щиты и вампиризм",
 }
 MANUAL_TAGS: dict[str, set[str]] = {
     "control": {"warrior_stagger", "mage_ice_bonds", "guardian_stonegrip", "elementalist_ice",

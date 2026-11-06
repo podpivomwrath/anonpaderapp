@@ -88,17 +88,17 @@ def skill_mechanics() -> dict[str, str]:
             f"{turns(_s('guardian_unbreakable').effect_duration).capitalize()} ни один удар не может снять "
             f"с тебя больше {pct(_s('guardian_unbreakable').effect_value)} максимального здоровья за раз.",
         "blood_knight_lifesteal_strike":
-            f"Ты восстанавливаешь здоровье: {pct(_s('blood_knight_lifesteal_strike').effect_value)} "
-            "от нанесённого урона.",
+            f"Вампиризм {pct(_s('blood_knight_lifesteal_strike').effect_value)}: здоровье возвращается "
+            "долей нанесённого урона.",
         "blood_knight_harvest":
-            f"Если у тебя меньше половины здоровья, восстанавливаешь "
-            f"{pct(_s('blood_knight_harvest').effect_value)} от нанесённого урона.",
+            f"Если у тебя меньше половины здоровья - вампиризм "
+            f"{pct(_s('blood_knight_harvest').effect_value)}.",
         "blood_knight_blood_seal":
-            f"Помечает цель на {turns(_s('blood_knight_blood_seal').effect_duration)}: лечение от урона "
+            f"Помечает цель на {turns(_s('blood_knight_blood_seal').effect_duration)}: вампиризм от ударов "
             f"по ней в {num(bc.BLOOD_KNIGHT_BLOOD_SEAL_MULT)} раза больше.",
         "blood_knight_crimson_feast":
-            f"Забирает у тебя {pct(bc.BLOOD_KNIGHT_CRIMSON_FEAST_HP_COST)} текущего здоровья, а потом "
-            f"лечит на {pct(_s('blood_knight_crimson_feast').effect_value)} от нанесённого урона.",
+            f"Забирает у тебя {pct(bc.BLOOD_KNIGHT_CRIMSON_FEAST_HP_COST)} текущего здоровья, "
+            f"вампиризм {pct(_s('blood_knight_crimson_feast').effect_value)}.",
         "shadow_blade_marked_strike":
             f"Вешает на цель заряд Метки добычи (всего не больше {bc.SHADOW_BLADE_MARK_MAX_STACKS}). "
             "Заряды тратит Жатва меток.",
@@ -152,7 +152,7 @@ def skill_mechanics() -> dict[str, str]:
             "вместо здоровья. Чем больше Воля, тем крепче щит. Что осталось от щита в конце - "
             "превращается в лечение.",
         "dark_mystic_drain":
-            f"Восстанавливает тебе {pct(_s('dark_mystic_drain').effect_value)} от нанесённого урона. "
+            f"Вампиризм {pct(_s('dark_mystic_drain').effect_value)}. "
             f"Если цель оглушена или заморожена (или была в прошлый ход), урон в "
             f"{num(bc.DARK_MYSTIC_DRAIN_CONTROLLED_MULT)} раза больше.",
         "dark_mystic_circle":

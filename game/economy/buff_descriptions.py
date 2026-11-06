@@ -163,16 +163,15 @@ def _describe_blood_knight_blood_rage(b: BuffDef) -> str:
 
 def _describe_blood_knight_thirst(b: BuffDef) -> str:
     return (
-        f"Пока у тебя меньше 50% здоровья, навыки, которые лечат тебя от нанесённого урона (Кровопуск, Жатва, Багровый пир), лечат "
-        f"больше: к их доле прибавляется {_points(bc.BLOOD_KNIGHT_THIRST_LOW_HP_LIFESTEAL_BONUS)} "
-        "(например, было 20% от урона - станет 28%)."
+        f"Пока у тебя меньше 50% здоровья, вампиризм Кровопуска, Жатвы и Багрового пира выше на "
+        f"{_points(bc.BLOOD_KNIGHT_THIRST_LOW_HP_LIFESTEAL_BONUS)} (например, было 20% - станет 28%)."
     )
 
 
 def _describe_blood_knight_vein_rupture(b: BuffDef) -> str:
     return (
-        f"Если навык, который лечит от нанесённого урона (Кровопуск, Жатва, Багровый пир), бьёт критически, лечение больше: к доле прибавляется "
-        f"{_points(bc.BLOOD_KNIGHT_VEIN_RUPTURE_CRIT_LIFESTEAL_BONUS)} (было 20% от урона - станет 28%)."
+        f"Если Кровопуск, Жатва или Багровый пир бьёт критически, вампиризм этого удара выше на "
+        f"{_points(bc.BLOOD_KNIGHT_VEIN_RUPTURE_CRIT_LIFESTEAL_BONUS)} (было 20% - станет 28%)."
     )
 
 
@@ -182,8 +181,8 @@ def _describe_blood_knight_recklessness(b: BuffDef) -> str:
 
 def _describe_blood_knight_insatiable(b: BuffDef) -> str:
     return (
-        f"Навыки, которые лечат тебя от нанесённого урона (Кровопуск, Жатва, Багровый пир), всегда лечат больше: к доле прибавляется "
-        f"{_points(bc.BLOOD_KNIGHT_INSATIABLE_LIFESTEAL_BONUS)} (было 20% от урона - станет 25%)."
+        f"Вампиризм Кровопуска, Жатвы и Багрового пира всегда выше на "
+        f"{_points(bc.BLOOD_KNIGHT_INSATIABLE_LIFESTEAL_BONUS)} (было 20% - станет 25%)."
     )
 
 
@@ -192,7 +191,7 @@ def _describe_blood_knight_eternal_hunger(b: BuffDef) -> str:
 
     share = SUBCLASS_SKILL_DEFS["blood_knight_harvest"].effect_value
     return (
-        f"Жатва лечит тебя на {_pct(share)} нанесённого урона, пока у тебя меньше "
+        f"Вампиризм Жатвы ({_pct(share)}) работает, пока у тебя меньше "
         f"{_pct(bc.BLOOD_KNIGHT_ETERNAL_HUNGER_HP_THRESHOLD)} здоровья, а не {_pct(bc.BLOOD_KNIGHT_HARVEST_HP_THRESHOLD)}."
     )
 
@@ -215,13 +214,13 @@ def _describe_blood_knight_pain_resistant(b: BuffDef) -> str:
 def _describe_blood_knight_feast(b: BuffDef) -> str:
     base = _crimson_feast_base_ratio()
     total = base + bc.BLOOD_KNIGHT_FEAST_CRIMSON_HEAL_BONUS
-    return f"Багровый пир лечит тебя на {_pct(total)} нанесённого урона вместо {_pct(base)}."
+    return f"Вампиризм Багрового пира - {_pct(total)} вместо {_pct(base)}."
 
 
 def _describe_blood_knight_shared_thirst(b: BuffDef) -> str:
     return (
-        f"Когда ты лечишься от нанесённого урона (Кровопуск, Жатва, Багровый пир), {_pct(bc.BLOOD_KNIGHT_SHARED_THIRST_ALLY_HEAL_PCT)} "
-        f"этого лечения получает союзник с самым низким здоровьем. {_ALLIES_ONLY}"
+        f"{_pct(bc.BLOOD_KNIGHT_SHARED_THIRST_ALLY_HEAL_PCT)} того, что ты восстановил вампиризмом (Кровопуск, "
+        f"Жатва, Багровый пир), получает и союзник с самым низким здоровьем. {_ALLIES_ONLY}"
     )
 
 
