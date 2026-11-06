@@ -39,7 +39,7 @@ def _premium_perks() -> list[str]:
     ]
 
 
-# --- Клеймо Хранителя (2026-11-06): премиум для 60 уровня --------------------
+# --- Клеймо Хранителя (2026-11-06): премиум под высокие уровни ---------------
 
 BRAND_ID = "keeper_brand"
 
@@ -69,7 +69,7 @@ def brand_item(character: Character) -> dict:
         "max": brc.SHOP_MAX_DAYS,
         "prices": {d: brc.shop_price(d) for d in range(brc.SHOP_MIN_DAYS, brc.SHOP_MAX_DAYS + 1)},
         "perks": _brand_perks(),
-        "note": (f"С {brc.MIN_LEVEL} уровня. Действует вместе с Меткой Хранителя. Без силовых преимуществ: "
+        "note": ("Действует вместе с Меткой Хранителя. Без силовых преимуществ: "
                  "характеристики, урон и здоровье не меняются. Срок складывается с оставшимся."),
         "active_until": until.isoformat() if active and until is not None else None,
     }
@@ -99,15 +99,13 @@ def pair_item(character: Character) -> dict:
             *_premium_perks()[:-1],
             *_brand_perks(),
         ],
-        "note": (f"С {brc.MIN_LEVEL} уровня. Срок прибавляется к оставшемуся у каждой. Без силовых "
+        "note": ("Срок прибавляется к оставшемуся у каждой. Без силовых "
                  "преимуществ: характеристики, урон и здоровье не меняются."),
     }
 
 
 async def buy_pair(db: AsyncSession, character: Character, days: int) -> datetime:
     """Метка и Клеймо на days дней со скидкой. Вернёт срок Клейма."""
-    if character.level < brc.MIN_LEVEL:
-        raise ShopError(f"Набор с {brc.BRAND_NAME} - с {brc.MIN_LEVEL} уровня.")
     if not isinstance(days, int) or isinstance(days, bool) or not brc.SHOP_MIN_DAYS <= days <= brc.SHOP_MAX_DAYS:
         raise ShopError(f"Срок - от {brc.SHOP_MIN_DAYS} до {brc.SHOP_MAX_DAYS} дней.")
     price = brc.pair_price(days)
@@ -123,9 +121,7 @@ async def buy_pair(db: AsyncSession, character: Character, days: int) -> datetim
 
 
 async def buy_brand(db: AsyncSession, character: Character, days: int) -> datetime:
-    """Списать самоцветы и продлить Клеймо. Только с 60 уровня."""
-    if character.level < brc.MIN_LEVEL:
-        raise ShopError(f"{brc.BRAND_NAME} - с {brc.MIN_LEVEL} уровня.")
+    """Списать самоцветы и продлить Клеймо."""
     if not isinstance(days, int) or isinstance(days, bool) or not brc.SHOP_MIN_DAYS <= days <= brc.SHOP_MAX_DAYS:
         raise ShopError(f"Срок - от {brc.SHOP_MIN_DAYS} до {brc.SHOP_MAX_DAYS} дней.")
     price = brc.shop_price(days)

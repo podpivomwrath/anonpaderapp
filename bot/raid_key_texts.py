@@ -16,7 +16,7 @@ def raid_key_status(count: int, cap: int, premium_cap: int | None) -> str:
         lines.append("Изредка падает с мобов, событий, ларцов и рыбалки.")
     lines.append("Ключ тратит лидер группы, когда открывает рейд.")
     if premium_cap is not None:
-        lines.append(f"С Клеймом Хранителя (с 60 уровня) ключей копится до {premium_cap}.")
+        lines.append(f"С Клеймом Хранителя ключей копится до {premium_cap}.")
     return "\n".join(lines)
 
 

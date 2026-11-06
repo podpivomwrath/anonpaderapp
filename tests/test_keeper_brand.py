@@ -66,11 +66,11 @@ def test_shop_item_price_and_perks() -> None:
     assert not any("Ключей Монолита" in p or "слот пресета" in p for p in perks), "ушли на Клеймо"
 
 
-async def test_buy_brand_needs_level_60(make_character, db_session) -> None:
-    young = await make_character(level=59, donate=10_000)
+async def test_buy_brand_on_any_level(make_character, db_session) -> None:
+    poor = await make_character(level=60, donate=10)
     with pytest.raises(shop_service.ShopError):
-        await shop_service.buy_brand(db_session, young, 7)
-    old = await make_character(level=60, donate=10_000)
+        await shop_service.buy_brand(db_session, poor, 7)
+    old = await make_character(level=5, donate=10_000)
     until = await shop_service.buy_brand(db_session, old, 7)
     assert premium_service.is_brand(old) and until > datetime.now(timezone.utc) + 6 * DAY
 
@@ -200,9 +200,6 @@ def test_pair_is_first_and_cheaper() -> None:
 
 
 async def test_buy_pair_extends_both(make_character, db_session) -> None:
-    young = await make_character(level=59, donate=10_000)
-    with pytest.raises(shop_service.ShopError):
-        await shop_service.buy_pair(db_session, young, 7)
-    c = await make_character(level=60, donate=10_000)
+    c = await make_character(level=5, donate=10_000)
     await shop_service.buy_pair(db_session, c, 7)
     assert premium_service.is_premium(c) and premium_service.is_brand(c)
