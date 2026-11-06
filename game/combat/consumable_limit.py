@@ -33,11 +33,18 @@ def left(combatant) -> int:
     return max(LIMIT - getattr(combatant, "consumables_used", 0), 0)
 
 
+def exhausted_text(combatant) -> str:
+    """Почему зелий больше нет. Руины закрывают их по своим причинам
+    (засада, Обет молчания, лимит этажа) - тогда своя строка, а не «лимит 5
+    за бой» (2026-11-06, репорт: в засаде игрок искал у себя проклятие)."""
+    return getattr(combatant, "potions_closed_text", None) or EXHAUSTED_TEXT
+
+
 def items_header(combatant) -> str:
     """Шапка окна «🎒 Что использовать?» со счётчиком на этот бой."""
     n = left(combatant)
     if n <= 0:
-        return f"🎒 Что использовать?\n{EXHAUSTED_TEXT}"
+        return f"🎒 Что использовать?\n{exhausted_text(combatant)}"
     text = f"🎒 Что использовать?\nОсталось зелий: {n} из {LIMIT}"
     if heal_taken(combatant):
         text += "\n" + HEAL_TAKEN_TEXT

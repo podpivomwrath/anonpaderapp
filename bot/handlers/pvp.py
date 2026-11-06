@@ -1378,7 +1378,7 @@ async def pvp_use_item(message: Message) -> None:
         await message.answer("Скован - не до зелий сейчас. ❄️", keyboard=battle_kb)
         return
     if consumable_limit.left(combatant) <= 0:
-        await message.answer(consumable_limit.EXHAUSTED_TEXT, keyboard=battle_kb)
+        await message.answer(consumable_limit.exhausted_text(combatant), keyboard=battle_kb)
         return
     if elixir.category == "heal" and consumable_limit.heal_taken(combatant):
         await message.answer(consumable_limit.HEAL_TAKEN_TEXT, keyboard=battle_kb)

@@ -291,6 +291,20 @@ def battle_potions_start(run: RuinRun, used_on_floor: int) -> int:
     return consumable_limit.LIMIT - min(consumable_limit.LIMIT, left)
 
 
+def potions_closed_text(run: RuinRun, used_on_floor: int) -> str | None:
+    """Своя причина, если руины закрыли зелья на этот бой. Иначе None:
+    обычный лимит боя скажет о себе сам."""
+    kind = ((run.extra or {}).get("fight") or {}).get("kind")
+    if kind == rules.AMBUSH:
+        return "🗡 Засада: в этом бою до зелий не дотянуться. В следующем бою снова можно."
+    if gifts_mod.has(run.gifts, "vow_silence"):
+        return "🤐 Обет молчания: пока дар действует, зелья пить нельзя."
+    if used_on_floor >= floor_potions(run):
+        n = floor_potions(run)
+        return f"🧪 Зелья на этаж кончились: {n} из {n}. На следующем этаже счёт заново."
+    return None
+
+
 # --- Дары ---------------------------------------------------------------------
 
 

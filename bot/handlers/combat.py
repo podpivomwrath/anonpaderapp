@@ -885,7 +885,7 @@ async def use_combat_item(message: Message) -> None:
         await message.answer("Скован - не до зелий сейчас. ❄️", keyboard=_combat_kb(state, peer_id))
         return
     if consumable_limit.left(player) <= 0:
-        await message.answer(consumable_limit.EXHAUSTED_TEXT, keyboard=_combat_kb(state, peer_id))
+        await message.answer(consumable_limit.exhausted_text(player), keyboard=_combat_kb(state, peer_id))
         return
     if elixir.category == "heal" and consumable_limit.heal_taken(player):
         await message.answer(consumable_limit.HEAL_TAKEN_TEXT, keyboard=_combat_kb(state, peer_id))

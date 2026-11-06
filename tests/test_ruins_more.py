@@ -151,6 +151,29 @@ async def test_potions_vow_ambush_spare(db_session, make_character) -> None:
     assert ruins_service.battle_potions_start(run, 0) == 5
 
 
+async def test_closed_potions_name_the_real_reason(db_session, make_character) -> None:
+    """Репорт 2026-11-06: в засаде сумка писала «лимит 5 за бой исчерпан»,
+    и игрок искал у себя проклятие. Причина - своя строка в окне зелий."""
+    from game.combat import consumable_limit
+
+    run, _ = await _run_in(db_session, make_character, rules.AMBUSH)
+    note = ruins_service.potions_closed_text(run, 0)
+    assert note and "Засада" in note
+    run.extra = {}
+    assert ruins_service.potions_closed_text(run, 2) is None, "зелья есть - причины нет"
+    assert "этаж" in ruins_service.potions_closed_text(run, 5)
+    run.gifts = [{"id": "vow_silence"}]
+    assert "Обет" in ruins_service.potions_closed_text(run, 0)
+
+    class _C:
+        consumables_used = consumable_limit.LIMIT
+        potions_closed_text = note
+
+    assert note in consumable_limit.items_header(_C())
+    _C.potions_closed_text = None
+    assert consumable_limit.EXHAUSTED_TEXT in consumable_limit.items_header(_C())
+
+
 # --- Первая победа над уникальным - ларцы рун --------------------------------------
 
 
