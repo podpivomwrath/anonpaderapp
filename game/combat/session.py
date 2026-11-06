@@ -467,6 +467,9 @@ class CombatSessionState:
     is_raid: bool = False  # влияет на точность % в логе (п.11)
     #: своё окно хода вместо общего (финал Мельника: жернова ускоряются)
     turn_seconds: float | None = None
+    #: групповой PvE без таймера хода: соло в руинах ждёт игрока, как бой с
+    #: тварью (2026-11-06, владелец)
+    untimed: bool = False
 
     def add(self, combatant: CombatantState) -> None:
         self.combatants[combatant.id] = combatant

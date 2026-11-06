@@ -181,7 +181,7 @@ class TickEngine:
         window = None
         if state.mode == CombatMode.PVP_GROUP:
             window = self.pvp_window_seconds
-        elif state.mode == CombatMode.PVE and state.is_raid:
+        elif state.mode == CombatMode.PVE and state.is_raid and not state.untimed:
             window = state.turn_seconds or self.group_pve_window_seconds
         if window is not None:
             resolve_at = datetime.now(timezone.utc) + timedelta(seconds=window)

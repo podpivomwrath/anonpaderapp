@@ -434,3 +434,42 @@ async def test_room_win_counts_for_dailies(db_session, make_character, monkeypat
         __import__("sqlalchemy").select(CharacterDaily).where(CharacterDaily.character_id == hero.id)
     )).scalar_one()
     assert row.progress == 1
+
+
+async def test_solo_room_fight_has_no_turn_timer(monkeypatch) -> None:
+    """2026-11-06, владелец: в соло бой руин ждёт игрока без таймера хода, как
+    бой с тварью. В группе таймер остаётся. Руины не держат выкатку."""
+    from bot import restart_safety
+    from bot.handlers import raid_combat
+    from game.combat.tick_engine import InMemoryActionStore, TickEngine
+
+    engine = TickEngine(
+        InMemoryActionStore(),
+        on_tick_resolved=raid_combat.on_raid_tick_resolved,
+        on_battle_finished=raid_combat.on_raid_battle_finished,
+    )
+    engine.start()
+    raid_combat.setup(engine, _Api())
+    layout = rules.generate(random.Random(2), 1)
+    try:
+        solo = await raid_combat.start_ruins_room(
+            -71, RoomStage(22_000_000, layout, rules.FIGHT, 1), [_member(1)], {1: 10**9}, {1: 0}, "бой")
+        assert engine.sessions[solo].untimed
+        assert engine.scheduler.get_job(engine._job_id(solo)) is None, "соло - без таймера"
+        group = await raid_combat.start_ruins_room(
+            -72, RoomStage(22_000_000, layout, rules.FIGHT, 2), [_member(2), _member(3)],
+            {2: 10**9, 3: 10**9}, {2: 0, 3: 0}, "бой")
+        assert not engine.sessions[group].untimed
+        assert engine.scheduler.get_job(engine._job_id(group)) is not None, "группа - с таймером"
+        from bot.handlers import group_combat, group_events, pvp
+
+        monkeypatch.setattr(group_combat, "_battles", {})
+        monkeypatch.setattr(pvp, "_battles", {})
+        monkeypatch.setattr(group_events, "_scenes", {})
+        assert restart_safety.busy_battles() == 0, "бои руин выкатку не держат"
+    finally:
+        for bid in list(raid_combat._battles):
+            if raid_combat._battles[bid].is_ruins:
+                raid_combat.release_ruins_battle(bid)
+                engine.abort_session(bid)
+        engine.shutdown() if hasattr(engine, "shutdown") else None

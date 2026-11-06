@@ -65,10 +65,13 @@ async def restore_solo_battles(redis) -> int:
 
 
 def busy_battles() -> int:
-    """Идущие бои, которые перезапуск оборвал бы: всё, кроме соло с тварью."""
+    """Идущие бои, которые перезапуск оборвал бы: всё, кроме соло с тварью и
+    руин. Руины выкатку не держат (2026-11-06, владелец): бой комнаты после
+    рестарта откатывается, группа - в комнате, откуда вошла (ruins_service.recover)."""
     from bot.handlers import group_combat, group_events, pvp, raid_combat
 
-    return (len(group_combat._battles) + len(raid_combat._battles)
+    raids = sum(1 for b in raid_combat._battles.values() if not b.is_ruins)
+    return (len(group_combat._battles) + raids
             + len(pvp._battles) + len(group_events._scenes))
 
 
