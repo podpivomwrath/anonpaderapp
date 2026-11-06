@@ -1108,22 +1108,24 @@ body.lite .sparks {
 .rune-socket--locked .rune-socket__bg { filter: grayscale(0.4) brightness(0.8); }
 .rune-socket__rune { position: absolute; inset: 12px; display: grid; place-items: center; }
 .rune-socket__rune .rune-icon { border-radius: 50%; }
-.rune-socket__price, .rune-socket__label {
-  position: absolute;
-  left: 50%;
-  bottom: -14px;
-  transform: translateX(-50%);
-  white-space: nowrap;
-  font-size: 10px;
-  opacity: 0.85;
+/* Гнездо и подписи под ним: место и название руны (2026-11-06). */
+.rune-cell { display: flex; flex-direction: column; align-items: center; gap: 2px; width: 100%; min-width: 0; }
+.rune-cell__label { font-size: 10px; opacity: 0.75; white-space: nowrap; }
+.rune-cell__name {
+  max-width: 84px;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.15;
+  text-align: center;
+  overflow-wrap: anywhere;
 }
-.rune-grid--gear .rune-socket, .rune-grid .rune-socket { margin-bottom: 12px; }
 .rune-skills { display: flex; flex-direction: column; gap: 8px; }
 .rune-skill { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 6px 10px;
   border-radius: 12px; background: var(--card); border: 1px solid var(--card-line); }
 .rune-skill__name { min-width: 0; font-size: 14px; }
 .rune-skill__slots { display: flex; gap: 8px; }
-.rune-skill__slots .rune-socket { width: 52px; height: 52px; margin-bottom: 12px; }
+.rune-skill__slots .rune-socket { width: 52px; height: 52px; }
+.rune-skill__slots .rune-cell { width: 68px; }
 .rune-skill__slots .rune-socket__rune { inset: 9px; }
 .rune-skill__slots .rune-socket__rune .rune-icon { width: 34px; height: 34px; }
 .rune-bag__title { margin: 6px 0 0; font-family: var(--serif); font-size: 16px; }

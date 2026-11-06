@@ -35,17 +35,22 @@ export function RuneIcon({ rune, size = 48 }) {
   return <img className={`rune-icon rune-icon--${rar}`} src={url} alt="" width={size} height={size} draggable="false" />;
 }
 
+// Под гнездом - подпись места и название вставленной руны (2026-11-06,
+// предложение игрока: картинки мелкие и похожи, без приближения не отличить).
 function Socket({ kind, socket, onPick, label }) {
   const art = RUNE_ART[socket.open ? SOCKET_ART[kind] : 'socket_lock'];
   return (
-    <button type="button" className={`rune-socket${socket.open ? '' : ' rune-socket--locked'}`} onClick={() => onPick(socket)}
-      aria-label={socket.rune ? socket.rune.name : socket.open ? 'Пустой слот' : 'Закрытый слот'}>
-      <img className="rune-socket__bg" src={art} alt="" draggable="false" />
-      {socket.rune && <span className="rune-socket__rune"><RuneIcon rune={socket.rune} size={40} /></span>}
-      {!socket.open && socket.price && <small className="rune-socket__price">💰 {gold(socket.price)}</small>}
-      {!socket.open && socket.moved && <small className="rune-socket__price">бесплатно</small>}
-      {label && <small className="rune-socket__label">{label}</small>}
-    </button>
+    <div className="rune-cell">
+      <button type="button" className={`rune-socket${socket.open ? '' : ' rune-socket--locked'}`} onClick={() => onPick(socket)}
+        aria-label={socket.rune ? socket.rune.name : socket.open ? 'Пустой слот' : 'Закрытый слот'}>
+        <img className="rune-socket__bg" src={art} alt="" draggable="false" />
+        {socket.rune && <span className="rune-socket__rune"><RuneIcon rune={socket.rune} size={40} /></span>}
+      </button>
+      {label && <small className="rune-cell__label">{label}</small>}
+      {socket.rune && <b className="rune-cell__name">{socket.rune.name}</b>}
+      {!socket.open && socket.price && <small className="rune-cell__label">💰 {gold(socket.price)}</small>}
+      {!socket.open && socket.moved && <small className="rune-cell__label">бесплатно</small>}
+    </div>
   );
 }
 
