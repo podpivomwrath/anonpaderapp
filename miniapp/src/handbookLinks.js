@@ -58,6 +58,11 @@ const TERMS = [
   [`воин${W}`, 'skills', 'Воин'],
   [`разбойник${W}`, 'skills', 'Разбойник'],
   ['маг|мага|магу|магом|маге|маги|магов|магам|магами|магах', 'skills', 'Маг'],
+  // «Страж» - три разных: подкласс, Страж гильдии и городская стража
+  // (глава VII, без ссылки). Четвёртый элемент - в каких главах правило
+  // действует (2026-11-07, владелец: «к каждому случаю свою ссылку»).
+  [`страж${W}`, 'guild', 'Страж гильдии', ['crafts', 'guild', 'commands']],
+  [`страж${W}`, 'skills', 'Страж', ['start', 'path', 'skills']],
 ];
 
 const ROMAN = /^[IVXL]+$/;
@@ -74,11 +79,12 @@ export function buildRules(chapters) {
   const byNo = Object.fromEntries(chapters.map((c, i) => [c.no, i]));
   const rules = TERMS
     .filter(([, ch]) => ch in byId)
-    .map(([stem, ch, sec]) => ({
+    .map(([stem, ch, sec, only]) => ({
       key: `${ch}|${sec || ''}`,
       re: new RegExp(`(?<![а-яёa-z0-9-])(?:${stem})(?![а-яёa-z0-9])`, 'iu'),
       chapter: byId[ch],
       section: sec,
+      only: only ? new Set(only.map((id) => byId[id])) : null,
     }));
   return { rules, byNo, chapterRef: new RegExp(CHAPTER_REF, 'u') };
 }
@@ -97,6 +103,7 @@ export function linkify(text, { rules, byNo, chapterRef }, used, here) {
     if (ref) best = { index: ref.index, length: ref[0].length, ref: ref[0] };
     for (const rule of rules) {
       if (used.has(rule.key)) continue;
+      if (rule.only && !rule.only.has(here.chapter)) continue;
       if (rule.chapter === here.chapter && (rule.section === null || rule.section === here.section)) continue;
       const m = rule.re.exec(rest);
       if (m && (!best || m.index < best.index)) best = { index: m.index, length: m[0].length, rule };

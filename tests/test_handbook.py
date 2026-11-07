@@ -12,7 +12,9 @@ from pathlib import Path
 SRC = Path(__file__).resolve().parent.parent / "miniapp" / "src"
 DATA = json.loads((SRC / "handbook.json").read_text(encoding="utf-8"))
 LINKS = (SRC / "handbookLinks.js").read_text(encoding="utf-8")
-TERM = re.compile(r"\[`[^`]*`, '(\w+)', (null|'[^']*')\]|\['[^']*', '(\w+)', (null|'[^']*')\]")
+# Четвёртый элемент - необязательный список глав, где правило действует.
+TERM = re.compile(r"\[`[^`]*`, '(\w+)', (null|'[^']*')(?:, \[[^\]]*\])?\]"
+                  r"|\['[^']*', '(\w+)', (null|'[^']*')(?:, \[[^\]]*\])?\]")
 
 
 def _headings(blocks):
@@ -39,6 +41,13 @@ def test_link_targets_exist() -> None:
         assert ch in chapters, f"нет главы {ch}"
         if sec != "null":
             assert sec.strip("'") in chapters[ch], f"в главе {ch} нет подраздела {sec}"
+
+
+def test_guard_links_have_their_own_targets() -> None:
+    """«Страж» - подкласс и Страж гильдии, каждый ведёт в свой раздел."""
+    targets = [(m[0] or m[2], m[1] or m[3]) for m in TERM.findall(LINKS)]
+    assert ("guild", "'Страж гильдии'") in targets
+    assert ("skills", "'Страж'") in targets
 
 
 def test_only_bold_markup_in_text() -> None:
