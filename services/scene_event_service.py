@@ -168,6 +168,15 @@ class Applied:
     new_level: int = 1
     group_kick: "group_service.LevelGapKick | None" = None
     daily_completed: list = field(default_factory=list)
+    #: Рубежи стрика и гильдейские задания (DailyProgressResult.streak_notice).
+    #: Раньше терялись: гильдейская ежедневка закрывалась событием молча, а
+    #: золото за неё приходило (2026-11-07, жалоба Котёнка).
+    daily_notices: list[str] = field(default_factory=list)
+
+    def add_progress(self, progress) -> None:
+        self.daily_completed += progress.completed
+        if progress.streak_notice:
+            self.daily_notices.append(progress.streak_notice)
 
 
 async def _add_xp(db, character, stats, units: float, applied: Applied) -> None:
@@ -198,8 +207,7 @@ async def grant_trophies(db, character, units: float, rng: random.Random, applie
         applied.lines.append(line)
     if character.subclass is not None:
         await trial_service.record_trophies(db, character, drop)
-    progress = await daily_service.record_trophies(db, character, drop)
-    applied.daily_completed += progress.completed
+    applied.add_progress(await daily_service.record_trophies(db, character, drop))
 
 
 async def grant_gold(db, character, units: float, applied: Applied) -> int:
@@ -319,8 +327,7 @@ async def apply_result(
 
 async def finish_event(db: AsyncSession, character: Character, applied: Applied) -> None:
     """Событие пройдено до конца - засчитать ежедневку «Любопытный»."""
-    progress = await daily_service.record_event_choice(db, character)
-    applied.daily_completed += progress.completed
+    applied.add_progress(await daily_service.record_event_choice(db, character))
 
 
 # --- Эффекты на N боёв -----------------------------------------------------------

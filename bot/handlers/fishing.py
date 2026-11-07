@@ -529,12 +529,12 @@ async def _donka_bite(db, character, peer_id: int) -> tuple[str, str | None, flo
     result = await fishing_service.strike(db, character, lake, _rng)
     capacity = fishing.bag_capacity_grams(character.fishing_level)
     if result.landed:
-        await guild_quest_service.record(db, character, "fish", 1)
-        kept = await fishing_service.keep_catch(db, character)
+        guild_lines = await guild_quest_service.record(db, character, "fish", 1)
+        kept =await fishing_service.keep_catch(db, character)
         if kept is None or kept.bag_full:
             fishing_service.drop_catch(character)
             fishing_service.clear_cast(character)
-            return ft.DONKA_FULL_TEXT, kb.lake_keyboard(True), None
+            return "\n".join([ft.DONKA_FULL_TEXT, *guild_lines]), kb.lake_keyboard(True), None
         char_xp = await experience_service.grant_activity_xp(
             db, character, "fish", place_level=grid.mob_level_at(character.pos_x, character.pos_y, character.level),
         )
@@ -543,6 +543,8 @@ async def _donka_bite(db, character, peer_id: int) -> tuple[str, str | None, flo
         xp_line = experience_service.activity_xp_line(char_xp) if char_xp else ""
         if xp_line:
             text += "\n" + xp_line
+        if guild_lines:  # гильдейская ежедневка на рыбу - раньше донка её закрывала молча
+            text += "\n" + "\n".join(guild_lines)
         if char_xp is not None and char_xp.levels_gained:
             from bot.handlers import stats_window  # избегаем цикла импортов
 

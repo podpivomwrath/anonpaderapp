@@ -528,6 +528,7 @@ async def _dealer(peer_id, db, character, stats, p: Pending, scene: Scene, actio
         _pending.pop(peer_id, None)
         await pending_activity.forget_scene(peer_id)
         await _send(peer_id, scene.attack_text, waiting_keyboard(), photo_attachment(relic_dealer.FIGHT_IMAGE))
+        await _notify(peer_id, applied)
         from bot.handlers import combat as combat_handlers
 
         await combat_handlers.start_dealer_encounter(peer_id, character, stats, gear_bonus, modifiers, lot)
@@ -673,7 +674,9 @@ async def _notify(peer_id: int, applied) -> None:
         return
     await stats_window.notify_levelup(peer_id, applied.levels_gained, applied.new_level)
     await group_texts.notify_group_kick(_api(), applied.group_kick)
-    notice = dailies_texts.progress_notice_from(applied.daily_completed, None)
+    notice = dailies_texts.progress_notice_from(
+        applied.daily_completed, "\n".join(applied.daily_notices) or None,
+    )
     if notice:
         await _send(peer_id, notice)
     for c in applied.daily_completed:

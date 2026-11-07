@@ -459,6 +459,7 @@ async def _finish_dealer(scene: GroupScene) -> None:
     attack = _rng.random() < relic_dealer.ATTACK_CHANCE
     personal: dict[int, list[str]] = {cid: [] for cid in scene.members}
     notices: dict[int, str] = {}
+    applied_by: dict[int, scene_event_service.Applied] = {}
     lots: dict[int, dict[str, int]] = {}
     fighters: list[int] = []
     async with get_session_factory()() as db:
@@ -478,9 +479,10 @@ async def _finish_dealer(scene: GroupScene) -> None:
                     personal[cid].append(f"💰 Меняла отсчитывает тебе {guild_service.gold_label(character, gold)}.")
                     if progress is not None and (notice := dailies_texts.progress_notice(progress)):
                         notices[cid] = notice
-            await scene_event_service.finish_event(
-                db, character, scene_event_service.Applied(new_level=character.level),
-            )
+            applied = scene_event_service.Applied(new_level=character.level)
+            await scene_event_service.finish_event(db, character, applied)
+            # Ежедневка «Любопытный» и гильдейское задание за событие - раньше молча.
+            applied_by[cid] = applied
             if (character.pos_x, character.pos_y) == scene.cell:
                 fighters.append(cid)
         await db.commit()
@@ -495,6 +497,7 @@ async def _finish_dealer(scene: GroupScene) -> None:
         await _send(m.peer_id, text, waiting_keyboard(), picture)
         if cid in notices:
             await _send(m.peer_id, notices[cid])
+        await scene_event_handlers._notify(m.peer_id, applied_by.get(cid))
 
     if attack and fighters and await _start_dealer_fight(scene, fighters, lots):
         return
