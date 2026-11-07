@@ -622,7 +622,8 @@ def rune_after_skill(actor: CombatantState, skill_id: str | None, before: dict, 
 
             target = min(enemies, key=lambda c: c.current_hp)
             ctx.hits.append(PendingHit(source_id=actor.id, target_id=target.id,
-                                       amount=max(round(healed * prayer), 1), label="обратная молитва"))
+                                       amount=max(round(healed * prayer), 1), label="обратная молитва",
+                                       reactive=True))
     ricochet = mods.get(f"rune:ricochet@{skill_id}", 0.0)
     if ricochet and rng.random() < ricochet:
         hit_ids = {h.target_id for h in ctx.hits if h.source_id == actor.id}

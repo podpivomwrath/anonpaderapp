@@ -374,7 +374,7 @@ class Herald(RuinBoss):
             # «Защититься», зелья и промахи мимо не в счёт (2026-11-06, баг:
             # Глашатай бил в ответ на Глухую оборону).
             struck = {h.source_id for h in result.hit_renders
-                      if not h.is_tick and h.source_side != h.target_side}
+                      if not h.is_tick and not getattr(h, "reactive", False) and h.source_side != h.target_side}
             for cid, action in result.actions.items():
                 c = session.combatants.get(cid)
                 if c is None or not c.alive or action.type != self.banned or cid not in struck:

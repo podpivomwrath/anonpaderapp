@@ -159,7 +159,7 @@ async def on_raid_tick_resolved(session_id: int, tick: int, result: TickResult) 
         if not alive_players_left:
             # Последний ход - всем, до конца захода: иначе погибший от
             # взрыва или фазы босса не видел, от чего умер (2026-10-13).
-            await raid_combat._broadcast_board(session_id, battle, result, boss_lines=extra_lines)
+            await raid_combat._broadcast_board(session_id, battle, result, boss_lines=extra_lines, final=True)
             # Вайп сценарной гибелью — TickEngine об этом не узнает сам
             # (HP обнулён В ОБХОД resolve_tick), поэтому завершаем ЯВНО:
             # abort_session — единственный ПУБЛИЧНЫЙ метод движка для этого
@@ -193,7 +193,8 @@ async def on_raid_tick_resolved(session_id: int, tick: int, result: TickResult) 
                 else "🦴 Руки держат крепко: следующий ход ты пропускаешь."
             )
             notices[cid] = f"{notices[cid]}\n{held}" if notices.get(cid) else held
-    await raid_combat._broadcast_board(session_id, battle, result, notices, boss_lines=extra_lines)
+    await raid_combat._broadcast_board(session_id, battle, result, notices, boss_lines=extra_lines,
+                                       final=field_cleared or result.finished)
 
     if field_cleared:
         # Этап поля закончен не смертью всех противников - движок об этом не

@@ -171,6 +171,8 @@ class RenderedHit:
     riposte: bool = False
     #: удар «Тяжёлого замаха» (см. PendingHit.heavy)
     heavy: bool = False
+    #: ответный удар (см. PendingHit.reactive)
+    reactive: bool = False
     #: сколько срезал блок (Глухая оборона и пр.) - пишется в строке удара
     blocked: int = 0
     #: сколько съел щит - тоже в строке удара (2026-10-29: в логе хода щит
@@ -275,33 +277,35 @@ def _apply_phase(
         shielded_by_hit[id(hit)] = before_shields - amount
         # Страж, «Отражение» (патч 56) - общее с дуэлью правило.
         reflected = shared_rules.block_reflect_amount(target, hit.blocked)
-        if reflected and hit.source_id != target.id:
+        if reflected and hit.source_id != target.id and not hit.reactive:
             attacker = session.combatants.get(hit.source_id)
             if attacker is not None and attacker.alive:
                 reflect_hits.append(
                     PendingHit(
                         source_id=target.id, target_id=attacker.id,
-                        amount=reflected, label="отражает щитом",
+                        amount=reflected, label="отражает щитом", reactive=True,
                     )
                 )
         # Кровь за кровь (патч 16): доля полученного урона возвращается атакующему.
         # Только за удар: яд и горение не возвращаются (2026-10-25, баг).
         reflect_pct = target.effect_total(EffectKind.BLOOD_REFLECT)
-        if reflect_pct > 0 and amount > 0 and hit.source_id != target.id and not hit.is_dot:
+        if reflect_pct > 0 and amount > 0 and hit.source_id != target.id and not hit.is_dot and not hit.reactive:
             attacker = session.combatants.get(hit.source_id)
             if attacker is not None and attacker.alive:
                 reflect_hits.append(
                     PendingHit(
                         source_id=target.id, target_id=attacker.id,
                         amount=max(round(amount * reflect_pct), 1), label=target.reflect_label,
+                        reactive=True,
                     )
                 )
         # Руны (2026-10-31): вампиризм, «Злоба», «Колючая броня» - общее с дуэлью.
         attacker = session.combatants.get(hit.source_id)
         thorns = shared_rules.rune_on_hit(attacker, target, hit, heals)
-        if thorns > 0 and amount > 0 and attacker is not None and attacker.alive and attacker.id != target.id:
+        if (thorns > 0 and amount > 0 and attacker is not None and attacker.alive and attacker.id != target.id
+                and not hit.reactive):
             reflect_hits.append(PendingHit(source_id=target.id, target_id=attacker.id,
-                                           amount=max(round(amount * thorns), 1), label="шипы руны"))
+                                           amount=max(round(amount * thorns), 1), label="шипы руны", reactive=True))
         applied_by_hit[id(hit)] = amount
         damage_taken[hit.target_id] = damage_taken.get(hit.target_id, 0) + amount
     # Ответный урон - тоже через щиты ударившего (2026-10-22, баг: «возврат
@@ -698,6 +702,7 @@ def resolve_tick(
                     absorbed=hit.blocked + max(hit.amount - applied, 0),
                     marked=hit.marked, blocked=hit.blocked,
                     shielded=shielded_by_hit.get(id(hit), 0), riposte=hit.riposte, heavy=hit.heavy,
+                    reactive=hit.reactive,
                 )
             )
         for heal in heals:

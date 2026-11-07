@@ -35,7 +35,7 @@ from bot.keyboards.group_combat import (
     group_waiting_keyboard,
 )
 from bot.keyboards.items import no_keyboard
-from bot.keyboards.world import ASH_OFFER_TEXT, ash_handful_keyboard, movement_keyboard
+from bot.keyboards.world import ASH_OFFER_TEXT, ash_handful_keyboard, empty_keyboard, movement_keyboard
 from game.combat.battle_report import BattleReport
 from game.combat import balance_config as bc
 from game.combat import battle_log, display, elixir_effects
@@ -374,10 +374,14 @@ async def _broadcast_board(
     text = _render_board(state, result) if state is not None else ""
     short = battle_log.render_short(state, result or TickResult()) if state is not None else ""
     notices = notices or {}
+    # Последний ход (пал последний моб или группа) - лог без кнопок боя:
+    # итог с нужной клавиатурой пришлёт конец боя (владелец, 2026-11-07).
+    final = result is not None and result.finished
     for cid, p in list(battle.participants.items()):
         combatant = _live_state(battle_id, battle).get(cid)
         keyboard = (
-            group_combat_keyboard(p.base_class, combatant.cooldowns, subclass_id=p.subclass_id)
+            empty_keyboard() if final
+            else group_combat_keyboard(p.base_class, combatant.cooldowns, subclass_id=p.subclass_id)
             if combatant is not None and combatant.alive
             else group_waiting_keyboard()
         )

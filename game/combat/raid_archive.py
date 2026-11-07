@@ -177,7 +177,7 @@ class ArchiveStage:
             damage = sum(
                 h.amount for h in result.hit_renders
                 if h.source_id == cid and h.target_side == 1 and not h.missed and not h.is_tick
-                and h.label not in _REACTIVE_LABELS
+                and not getattr(h, "reactive", False) and h.label not in _REACTIVE_LABELS
             )
             heal = sum(h.amount for h in result.heal_renders if h.source_id == cid)
             copied = False
@@ -216,7 +216,8 @@ class ArchiveStage:
     def _quote(self, session, result: TickResult, boss: CombatantState, rng, out: StageTick) -> None:
         strongest = max(
             (h for h in result.hit_renders
-             if h.target_id == boss.id and h.source_side == 0 and not h.missed and not h.is_tick),
+             if h.target_id == boss.id and h.source_side == 0 and not h.missed and not h.is_tick
+             and not getattr(h, "reactive", False)),
             key=lambda h: h.amount, default=None,
         )
         players = _players(session)

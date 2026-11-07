@@ -28,7 +28,7 @@ from bot.handlers.group_combat import MemberCombatInput
 from bot.keyboards import raid as kb
 from bot.battle_keyboard import answer_battle_gone
 from bot.keyboards.items import no_keyboard
-from bot.keyboards.world import movement_keyboard
+from bot.keyboards.world import empty_keyboard, movement_keyboard
 from game.combat import balance_config as bc
 from game.combat import battle_log, display, elixir_effects, raid_archive, raid_bosses, raid_field, raid_mill
 from game.combat import raid_trail as trail_combat
@@ -810,9 +810,10 @@ def _render_board(
 
 async def _broadcast_board(
     battle_id: int, battle: RaidBattle, result: TickResult | None, notices: dict[int, str] | None = None,
-    boss_lines: list[str] | None = None,
+    boss_lines: list[str] | None = None, final: bool = False,
 ) -> None:
     """boss_lines - сценарные реплики босса (порядок Вельдов, фазы Хирурга).
+    final - последний ход этапа (враги или группа пали): лог без кнопок боя.
 
     Уходят В ДОСКУ, в раздел противника (battle_log.render_tick ждёт их
     параметром enemy_lines - ради них он и написан): это ДЕЙСТВИЯ врага в
@@ -832,7 +833,8 @@ async def _broadcast_board(
         # Скованный (руки на поле) ход не выбирает - за него уже объявлен
         # пропуск, кнопки боя ему ни к чему.
         keyboard = (
-            _combat_keyboard(battle, p, combatant)
+            empty_keyboard() if final
+            else _combat_keyboard(battle, p, combatant)
             if combatant is not None and combatant.alive and (cid not in skipping or cid in battle.frozen_now)
             else kb.raid_waiting_keyboard()
         )

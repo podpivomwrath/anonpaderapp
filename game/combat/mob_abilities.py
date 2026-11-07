@@ -363,8 +363,8 @@ class MobBrain:
             attacker = session.combatants.get(hit.source_id)
             if attacker is None or not attacker.alive or attacker.side == mob.side:
                 continue
-            if hit.is_dot:
-                continue  # яд - не удар, на него не отвечают
+            if hit.is_dot or hit.reactive:
+                continue  # яд и ответные удары (шипы, молитва) - не удар, на них не отвечают
             if hit.missed:
                 if self.has("counter_on_dodge") and not stunned:
                     self._strike(mob, attacker, rng, turn, self.one("counter_on_dodge").mult,
@@ -377,7 +377,7 @@ class MobBrain:
                     source_id=mob.id, target_id=attacker.id,
                     amount=max(round(hit.amount * self.one("reflect").value), 1),
                     label="возвращает урон",
-                    reflect_of=hit, reflect_pct=self.one("reflect").value,
+                    reflect_of=hit, reflect_pct=self.one("reflect").value, reactive=True,
                 ))
             if self.has("brine_spray"):
                 trait = self.one("brine_spray")
