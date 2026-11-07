@@ -199,3 +199,15 @@ async def test_leadership_passes_to_a_member_with_a_key(db_session, make_charact
     await rs.touch_monolith(db_session, member3, "graveless_field", group_id)
     snap = await rs.leave_lobby_if_present(db_session, leader.id)
     assert snap.leader_character_id == member3.id
+
+
+async def test_lobby_names_who_is_not_ready(db_session, make_character) -> None:
+    """Репорты 334-335: в сборе видно ники неготовых, а не только «Готовы: N/M»."""
+    from bot import raid_texts as rt
+
+    group_id, (leader, member2, member3) = await _make_group(db_session, make_character, size=3)
+    snap = await rs.touch_monolith(db_session, leader, rc.RAID_PUPPET_THEATRE_ID, group_id=group_id)
+    assert sorted(snap.waiting) == sorted([member2.name, member3.name])
+    snap = await rs.touch_monolith(db_session, member2, rc.RAID_PUPPET_THEATRE_ID, group_id=group_id)
+    assert snap.waiting == [member3.name]
+    assert rt.lobby_status_line(2, 3, snap.waiting) == f"Готовы: 2/3\nНе готовы: {member3.name}"

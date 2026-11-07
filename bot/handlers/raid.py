@@ -220,7 +220,7 @@ _primed = False
 
 def _signature(snapshot) -> tuple:
     return (snapshot.leader_character_id, snapshot.denominator,
-            tuple((c.id, ready) for c, ready in snapshot.members))
+            tuple((c.id, ready) for c, ready in snapshot.members), tuple(snapshot.waiting))
 
 
 async def publish_lobby(snapshot) -> None:
@@ -233,7 +233,7 @@ async def publish_lobby(snapshot) -> None:
     # повторно - игрок видел «Готовы: 1/2» дважды.
     _published[snapshot.id] = signature
     leader = next((c for c, _ in snapshot.members if c.id == snapshot.leader_character_id), None)
-    text = rt.lobby_status_line(sum(r for _, r in snapshot.members), snapshot.denominator)
+    text = rt.lobby_status_line(sum(r for _, r in snapshot.members), snapshot.denominator, snapshot.waiting)
     text = f"{rt.raid_title(snapshot.raid_id)}\n{text}"
     if leader:
         text += f"\nЛидер: {leader.name}. Ключ будет списан у лидера."

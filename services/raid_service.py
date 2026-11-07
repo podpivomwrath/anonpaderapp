@@ -8,7 +8,7 @@
 RaidError — игроко-читаемая причина отказа (тот же паттерн, что GroupError/
 PresetValidationError)."""
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 from sqlalchemy import func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -37,6 +37,9 @@ class LobbySnapshot:
     status: str
     members: list[tuple[Character, bool]]  # (персонаж, готов)
     denominator: int  # знакомое "N/M" — размер группы (1, если соло)
+    #: Ники тех, кто ещё не готов: в сборе без готовности или из группы, но
+    #: к Монолиту не подходил (репорты 334-335, 2026-11-07).
+    waiting: list[str] = field(default_factory=list)
 
 
 async def get_membership(db: AsyncSession, character_id: int) -> RaidLobbyMember | None:
@@ -64,10 +67,17 @@ async def get_snapshot(db: AsyncSession, lobby_id: int) -> LobbySnapshot | None:
     ).all()
     members = [(character, member.ready) for member, character in rows]
     denominator = len(members) if lobby.group_id is None else await _group_size(db, lobby.group_id)
+    waiting = [character.name for character, ready in members if not ready]
+    if lobby.group_id is not None:
+        inside = {character.id for character, _ in members}
+        waiting += list(await db.scalars(
+            select(Character.name).join(GroupMember, GroupMember.character_id == Character.id)
+            .where(GroupMember.group_id == lobby.group_id, Character.id.notin_(inside))
+        ))
     return LobbySnapshot(
         id=lobby.id, raid_id=lobby.raid_id, group_id=lobby.group_id,
         leader_character_id=lobby.leader_character_id, status=lobby.status,
-        members=members, denominator=max(denominator, len(members)),
+        members=members, denominator=max(denominator, len(members)), waiting=waiting,
     )
 
 

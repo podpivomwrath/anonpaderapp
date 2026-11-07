@@ -156,6 +156,7 @@ def _snapshot(*, denominator: int = 4, members=(3,)):
         id = 11
         leader_character_id = 3
         raid_id = "puppet_theatre"
+        waiting: list = []
 
     snapshot = _Snapshot()
     snapshot.denominator = denominator

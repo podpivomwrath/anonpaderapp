@@ -174,8 +174,9 @@ RAID_DEFEAT_TEXT = "Занавес идёт вниз раньше времени
 LOBBY_DISSOLVED_TEXT = "Сбор на рейд распущен: готовность сняли все. Выбрать рейд можно заново у Монолита."
 
 
-def lobby_status_line(ready: int, total: int) -> str:
-    return f"Готовы: {ready}/{total}"
+def lobby_status_line(ready: int, total: int, waiting: list[str] | None = None) -> str:
+    line = f"Готовы: {ready}/{total}"
+    return f"{line}\nНе готовы: {', '.join(waiting)}" if waiting else line
 
 
 def group_touch_notice(leader_name: str, raid_id: str = rc.RAID_PUPPET_THEATRE_ID) -> str:
