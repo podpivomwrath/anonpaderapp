@@ -218,20 +218,48 @@ def settle_skill_slots(character: Character) -> bool:
     """Купленные вторые слоты прежних навыков сами переходят на текущие
     навыки без слота, по порядку навыков (2026-11-04, игроки: после смены
     класса слоты приходилось переносить вручную в каждом навыке). Вернулся
-    к прежнему пути - слоты так же переедут обратно. True - что-то перенесли."""
+    к прежнему пути - слоты так же переедут обратно. True - что-то перенесли.
+
+    Обратно - на тот же навык, где слот был (репорт 333: у Тёмного мистика
+    слот с «Круга тьмы» после смены пути и возврата встал на «Кровавый
+    пакт», первый по порядку). Откуда пришёл каждый слот - ui_flags."""
     skill_ids = [s.id for s in skills_of(character)]
     owned = list(character.rune_skill_slots or [])
     missing = [sid for sid in skill_ids if sid not in owned]
+    flags = dict(getattr(character, "ui_flags", None) or {})
+    came_from = dict(flags.get(_SLOT_FROM) or {})
     moved = False
     for i, sid in enumerate(owned):
         if not missing:
             break
         if sid not in skill_ids:
-            owned[i] = missing.pop(0)
+            target = _slot_home(sid, came_from, missing)
+            missing.remove(target)
+            owned[i] = target
+            came_from[target] = sid
             moved = True
     if moved:
         character.rune_skill_slots = owned  # JSON заменяется целиком
+        if hasattr(character, "ui_flags"):
+            flags[_SLOT_FROM] = came_from
+            character.ui_flags = flags
     return moved
+
+
+_SLOT_FROM = "rune_slot_from"
+
+
+def _slot_home(sid: str, came_from: dict[str, str], missing: list[str]) -> str:
+    """Куда вернуть слот с ушедшего навыка sid: навык, откуда он когда-то
+    пришёл, если этот навык снова есть и без слота, иначе первый свободный."""
+    seen = {sid}
+    prev = came_from.get(sid)
+    while prev and prev not in seen:
+        if prev in missing:
+            return prev
+        seen.add(prev)
+        prev = came_from.get(prev)
+    return missing[0]
 
 
 async def buy_skill_slot(db: AsyncSession, character: Character, skill_id: str) -> None:

@@ -150,6 +150,23 @@ def test_bought_skill_slots_follow_the_path_by_themselves() -> None:
     assert sorted(c.rune_skill_slots) == sorted(["warrior_cleave", "warrior_stagger", "warrior_warcry"])
 
 
+def test_bought_skill_slot_returns_to_its_own_skill() -> None:
+    """Репорт 333: слот с последнего навыка подкласса после смены пути и
+    возврата встал на первый навык, а не на свой."""
+    class C:
+        base_class, subclass, subclass_declined = "mage", "dark_mystic", False
+        rune_skill_slots = ["dark_mystic_circle"]
+        ui_flags: dict = {}
+
+    c = C()
+    c.subclass = "elementalist"
+    assert rune_service.settle_skill_slots(c)
+    assert c.rune_skill_slots[0].startswith("elementalist")
+    c.subclass = "dark_mystic"
+    assert rune_service.settle_skill_slots(c)
+    assert c.rune_skill_slots == ["dark_mystic_circle"]
+
+
 async def test_class_change_returns_foreign_gear_rune(db_session, make_character) -> None:
     """Репорт 266: руна чужого класса после смены класса - в сумку, не действует."""
     from models import BaseClass
