@@ -49,6 +49,11 @@ _SELF_CLEANSE = {
     EffectKind.DOT, EffectKind.VULNERABILITY, EffectKind.WEAKEN, EffectKind.MARK, EffectKind.CHILLED,
 }
 
+#: Ответные удары - не урон навыка: шипы, отражение щитом, «Обратная
+#: молитва». Каталог их не копирует (репорт 331: лекарь с молитвой,
+#: повторив лечение, получал свою же молитву в лицо).
+_REACTIVE_LABELS = {"шипы", "шипы руны", "отражает щитом", "обратная молитва"}
+
 PAGES = ("power", "weak", "shield", "silence")
 _PAGE_WORD = {"power": "сила", "weak": "слабость", "shield": "щит", "silence": "немота"}
 
@@ -172,6 +177,7 @@ class ArchiveStage:
             damage = sum(
                 h.amount for h in result.hit_renders
                 if h.source_id == cid and h.target_side == 1 and not h.missed and not h.is_tick
+                and h.label not in _REACTIVE_LABELS
             )
             heal = sum(h.amount for h in result.heal_renders if h.source_id == cid)
             copied = False

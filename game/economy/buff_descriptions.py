@@ -408,9 +408,16 @@ def _describe_poisoner_epidemic(b: BuffDef) -> str:
     return "Если взята и Зараза: перешедший на другого врага яд бьёт в полную силу, а не вполсилы."
 
 
+def _cloud_turns(b: BuffDef) -> str:
+    from game import plural
+
+    turns = int(b.stat_modifiers.get("venom_cloud_interval", bc.POISONER_VENOM_CLOUD_INTERVAL))
+    return plural.count(turns, "ход", "хода", "ходов")
+
+
 def _describe_poisoner_venom_cloud(b: BuffDef) -> str:
     return (
-        f"Каждый {bc.POISONER_VENOM_CLOUD_INTERVAL}-й ход Отравленный клинок отравляет сразу всех врагов, "
+        f"Раз в {_cloud_turns(b)} Отравленный клинок отравляет сразу всех врагов, "
         f"а не одного. {_MANY_ENEMIES}"
     )
 

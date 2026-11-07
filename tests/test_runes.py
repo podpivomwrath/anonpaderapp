@@ -182,3 +182,17 @@ async def test_misfit_skill_rune_returns_to_bag(db_session, make_character) -> N
     effects = await rune_service.recompute(db_session, c)
     assert "rune:acrid@poisoner_toxic_burst" not in effects
     assert (await rune_service._bag_row(db_session, c.id, "acrid")).count == 1
+
+
+def test_calluses_adds_xp_on_small_numbers() -> None:
+    """Репорт 327: round(5 * 1.06) = 5 - «Мозоли» на мелком опыте ничего не давали."""
+    import random
+    from types import SimpleNamespace
+
+    from game.economy import runes
+
+    c = SimpleNamespace(rune_effects={"rune:calluses": 0.06})
+    rng = random.Random(7)
+    total = sum(runes.craft_xp(c, 5, rng) for _ in range(5000))
+    assert 26000 < total < 27000  # в среднем 5.3
+    assert runes.craft_xp(SimpleNamespace(rune_effects={}), 5) == 5

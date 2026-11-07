@@ -178,6 +178,26 @@ def test_venom_cloud_needs_several_enemies() -> None:
     assert other.effect_from(EffectKind.DOT, 1) is None or main.effect_from(EffectKind.DOT, 1) is not None
 
 
+def test_venom_cloud_fires_again_off_multiple_ticks() -> None:
+    """Репорт 330: второе облако не выходило - ждало хода, кратного интервалу."""
+    rng = NoCritRng()
+    poisoner = combatant(1, side=0, subclass_id="poisoner")
+    poisoner.buff_modifiers = {"venom_cloud_interval": 5.0}
+    main = combatant(2, side=1)
+    others = [combatant(3, side=1), combatant(4, side=1)]
+    state = make_session(poisoner, main, *others)
+    clouds = []
+    for tick in (6, 9, 12):  # ни один не кратен 5
+        state.tick_number = tick
+        poisoner.cooldowns.clear()
+        for o in others:
+            o.effects.clear()
+        resolve_tick(state, {1: skill("poisoner_venom", 2)}, rng)
+        if any(o.effect_from(EffectKind.DOT, 1) is not None for o in others):
+            clouds.append(tick)
+    assert clouds == [6, 12]
+
+
 # --- Контроль ---
 
 

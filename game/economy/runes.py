@@ -3,6 +3,8 @@
 Без БД - состояние игрока (сумка, мастерство, слоты) в services/rune_service.py.
 """
 
+import random
+
 from game.economy import runes_config as rc
 
 
@@ -35,10 +37,17 @@ def next_threshold(curve: str, absorbed: int) -> tuple[int, int]:
     return threshold(curve, step + 1), 100 + 10 * (step + 1)
 
 
-def craft_xp(character, xp: int) -> int:
-    """Опыт ремесла с руной «Мозоли» - копия эффектов лежит на персонаже."""
+def craft_xp(character, xp: int, rng=None) -> int:
+    """Опыт ремесла с руной «Мозоли» - копия эффектов лежит на персонаже.
+
+    Дробная часть - шансом (репорт 327): ремёсла дают по 3-8 опыта, и
+    round(5 * 1.06) возвращал те же 5 - руна не давала ничего."""
     bonus = (getattr(character, "rune_effects", None) or {}).get("rune:calluses", 0.0)
-    return round(xp * (1 + bonus)) if bonus and xp > 0 else xp
+    if not bonus or xp <= 0:
+        return xp
+    exact = xp * (1 + bonus)
+    whole = int(exact)
+    return whole + (1 if (rng or random).random() < exact - whole else 0)
 
 
 def rune(rune_id: str) -> rc.RuneDef | None:

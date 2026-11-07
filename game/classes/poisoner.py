@@ -86,9 +86,15 @@ def venom(ctx: SkillContext) -> None:
 
     # Патч 56, «Ядовитое облако»: раз в N ходов тот же удар разносит по стаку
     # яда на ВСЕХ противников. Нет-оп в дуэли: там противник всего один.
+    # Репорт 330 (2026-11-07): раньше облако ждало хода, кратного интервалу,
+    # а клинок с перезарядкой 2 попадал на такой ход редко - второе облако
+    # почти не выходило. Теперь - первый клинок после того, как прошёл интервал.
     interval = int(actor.buff_modifiers.get("venom_cloud_interval", 0))
-    if interval > 0 and ctx.session.tick_number % interval == 0:
+    tick = ctx.session.tick_number
+    if interval > 0 and tick >= getattr(actor, "venom_cloud_at", 0) and tick >= interval:
         others = [e for e in ctx.session.alive_enemies_of(actor) if e.id != target.id]
+        if others:
+            actor.venom_cloud_at = tick + interval
         for other in others:
             existing_other = other.effect_from(EffectKind.DOT, actor.id)
             if existing_other is not None:

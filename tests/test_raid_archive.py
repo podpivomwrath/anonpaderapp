@@ -269,6 +269,29 @@ def test_catalog_turns_repeated_defence_into_his_guard() -> None:
     assert stage._hook(hit, None, 100) == round(100 * (1 - ac.CATALOG_GUARD_REDUCTION))
 
 
+def test_catalog_skips_rune_and_reflect_hits() -> None:
+    """Репорт 331: «Обратная молитва» и шипы - не урон навыка. Повторённое
+    лечение лечит Архивариуса, а не бьёт лекаря его же молитвой."""
+    from game.combat.resolver import RenderedHeal, RenderedHit
+
+    state, stage, boss = _fight()
+    stage.last_skill[1] = "dark_mystic_blood_pact"
+    result = _tick(state, {})
+    result.actions[1] = DeclaredAction(type=ActionType.SKILL, skill_id="dark_mystic_blood_pact")
+    result.heal_renders.append(RenderedHeal(
+        source_id=1, target_id=2, source_side=0, target_side=0, label="пакт",
+        amount=300, hp_before=0, hp_after=0, max_hp=1,
+    ))
+    for label in ("обратная молитва", "шипы руны", "отражает щитом"):
+        result.hit_renders.append(RenderedHit(
+            source_id=1, target_id=boss.id, source_side=0, target_side=1, label=label,
+            amount=400, crit=False, missed=False, is_dot=False, hp_before=0, hp_after=0, max_hp=1,
+        ))
+    hp = state.combatants[1].current_hp
+    stage.after_tick(state, result, random.Random(1))
+    assert state.combatants[1].current_hp == hp
+
+
 def test_catalog_ignores_a_skill_used_for_the_first_time() -> None:
     state, stage, boss = _fight()
     result = _tick(state, {})
