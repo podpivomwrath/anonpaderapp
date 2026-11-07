@@ -545,3 +545,19 @@ def test_start_fight_keeps_its_note() -> None:
                if isinstance(n, ast.NamedExpr) and n.target.id == "note"
                or isinstance(n, ast.Assign) and any(getattr(t, "id", None) == "note" for t in n.targets)]
     assert not rebinds, "note - подпись боя, её не перезаписывать"
+
+
+async def test_leader_sees_who_has_not_pressed_go(db_session, make_character) -> None:
+    """Предложение игрока (2026-11-07): лидер видит ники тех, кто не нажал «Иду»."""
+    from bot.handlers import ruins as handler
+
+    chars = await _solo(make_character, 3)
+    run = await ruins_service.start(db_session, chars[0], chars, random.Random(1))
+    direction = next(iter(ruins_service.exits_now(run)))
+    ruins_service.propose(run, chars[0].id, direction, 3)
+    ruins_service.confirm(run, chars[1].id)
+    waiting = await handler._not_ready(db_session, run, [c.id for c in chars])
+    assert waiting == [chars[2].name]
+    text = handler._view_text(run, chars[0].id, chars[0].name, waiting=waiting)
+    assert chars[2].name in text and chars[1].name not in text
+    assert chars[2].name in handler._view_text(run, chars[1].id, chars[0].name, waiting=waiting)

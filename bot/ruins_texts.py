@@ -245,6 +245,10 @@ def pending_text(leader: str, direction: str) -> str:
             f"через {rc.MOVE_CONFIRM_SECONDS} с группа пойдёт и без тебя.")
 
 
+def not_ready_line(names: list[str]) -> str:
+    return f"Ещё не нажали «{BTN_GO}»: {', '.join(names)}."
+
+
 def leader_wait_text(direction: str) -> str:
     return f"Ведёшь группу {ARROWS[direction]}. У остальных {rc.MOVE_CONFIRM_SECONDS} с, чтобы нажать «{BTN_GO}»."
 

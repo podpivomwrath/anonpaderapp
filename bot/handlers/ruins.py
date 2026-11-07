@@ -257,7 +257,10 @@ def _seen(run) -> dict[int, str]:
     return out
 
 
-def _view_text(run, cid: int, leader_name: str, head: str | None = None) -> str:
+def _view_text(run, cid: int, leader_name: str, head: str | None = None,
+               waiting: list[str] | None = None) -> str:
+    """waiting - ники тех, кто ещё не нажал «Иду»: их видят лидер и уже
+    нажавшие (предложение игрока, 2026-11-07)."""
     lines = [head] if head else []
     lines.append(texts.floor_line(run.floor))
     kind = rules.room_kind(run.layout, run.pos)
@@ -286,8 +289,10 @@ def _view_text(run, cid: int, leader_name: str, head: str | None = None) -> str:
     if run.pending:
         if leader:
             lines.append(texts.leader_wait_text(run.pending["dir"]))
+            if waiting:
+                lines.append(texts.not_ready_line(waiting))
         elif cid in run.pending.get("ok", []):
-            lines.append("Ты готов идти. Ждём остальных.")
+            lines.append(texts.not_ready_line(waiting) if waiting else "Ты готов идти. Ждём остальных.")
         else:
             lines.append(texts.pending_text(leader_name, run.pending["dir"]))
     elif not leader:
@@ -308,9 +313,10 @@ async def _broadcast_view(run_id: int, head: str | dict[int, str] | None = None,
         peers = await _peers(db, [m.character_id for m in members])
         leader = await db.get(Character, run.leader_id)
         leader_name = leader.name if leader else "лидер"
+        waiting = await _not_ready(db, run, [m.character_id for m in members])
     for cid, peer in peers.items():
         top = head.get(cid) if isinstance(head, dict) else head
-        await _send(peer, _view_text(run, cid, leader_name, top), keyboard=_room_keyboard(run, cid),
+        await _send(peer, _view_text(run, cid, leader_name, top, waiting), keyboard=_room_keyboard(run, cid),
                     attachment=_pic(photo))
 
 
@@ -410,6 +416,18 @@ async def _member_context(db, peer_id: int):
     return run, member, character
 
 
+async def _not_ready(db, run, member_ids: list[int]) -> list[str]:
+    """Ники тех, кто ещё не подтвердил шаг лидера."""
+    if not run.pending:
+        return []
+    ok = set(run.pending.get("ok", []))
+    names = []
+    for cid in member_ids:
+        if cid not in ok and (c := await db.get(Character, cid)) is not None:
+            names.append(c.name)
+    return names
+
+
 async def _show_self(message: Message, head: str | None = None) -> None:
     async with get_session_factory()() as db:
         ctx = await _member_context(db, message.peer_id)
@@ -417,7 +435,8 @@ async def _show_self(message: Message, head: str | None = None) -> None:
             return
         run, _member, character = ctx
         leader = await db.get(Character, run.leader_id)
-        text = _view_text(run, character.id, leader.name if leader else "лидер", head)
+        waiting = await _not_ready(db, run, [m.character_id for m in await ruins_service.members(db, run.id)])
+        text = _view_text(run, character.id, leader.name if leader else "лидер", head, waiting)
         keyboard = _room_keyboard(run, character.id)
         await db.rollback()
     await message.answer(text, keyboard=keyboard)
@@ -474,12 +493,23 @@ async def go(message: Message) -> None:
         ids = [m.character_id for m in await ruins_service.members(db, run.id)]
         ready = ruins_service.all_confirmed(run, ids)
         target = run.pending["to"]
+        leader_view = None
+        if not ready and run.leader_id != character.id:
+            leader = await db.get(Character, run.leader_id)
+            leader_view = (
+                (await _peers(db, [run.leader_id])).get(run.leader_id),
+                _view_text(run, run.leader_id, leader.name if leader else "лидер",
+                           waiting=await _not_ready(db, run, ids)),
+                _room_keyboard(run, run.leader_id),
+            )
         await db.commit()
         run_id = run.id
     if ready:
         await _do_move(run_id, target)
     else:
         await _show_self(message)
+        if leader_view is not None and leader_view[0] is not None:
+            await _send(leader_view[0], leader_view[1], keyboard=leader_view[2])  # лидеру - кто ещё не нажал
 
 
 async def _do_move(run_id: int, target: int, note: str | None = None) -> None:
