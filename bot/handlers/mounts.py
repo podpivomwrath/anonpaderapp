@@ -789,14 +789,14 @@ async def scan() -> None:
 
                 # «Странник» и гильдейское задание на клетки: каждая клетка
                 # верхом засчитывается (2026-10-14/15; раньше - одна за поездку).
-                daily_announce.append((peer_id, await daily_service.record_cell_moved(
-                    db, character, step.cells,
-                )))
+                daily_progress = await daily_service.record_cell_moved(db, character, step.cells)
                 from services import trial_service
 
                 # «Одиночка» - тоже каждая клетка верхом (2026-10-29).
+                trial_buffs = []
                 if subclass_service.buff_pool(character) is not None:
-                    await trial_service.record_cell_moved(db, character, step.cells)
+                    trial_buffs = await trial_service.record_cell_moved(db, character, step.cells)
+                daily_announce.append((peer_id, daily_progress, trial_buffs))
             if step.moved:
                 from bot.handlers import guild as guild_handlers  # избегаем цикла импортов
 
@@ -873,8 +873,8 @@ async def scan() -> None:
 
     from bot.handlers import world as world_handlers  # избегаем цикла импортов
 
-    for daily_peer, daily_progress in daily_announce:
-        await world_handlers._announce_daily(daily_peer, daily_progress)
+    for daily_peer, daily_progress, trial_buffs in daily_announce:
+        await world_handlers._announce_daily(daily_peer, daily_progress, trial_buffs)
     for (peer_id, character, stats, farm_currency, donate_currency, quest_line, gear_bonus,
          region, mentor_badge, is_foreign, group_block, has_mount) in arrivals:
         await close_progress(peer_id, f"🏁 Путь окончен: ({character.pos_x}; {character.pos_y}).")

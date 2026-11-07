@@ -16,6 +16,23 @@ def test_applied_keeps_streak_notice() -> None:
     assert applied.daily_notices == ["🏰 Гильдейская ежедневка выполнена"]
 
 
+def test_two_notices_in_one_fight_both_kept() -> None:
+    from services import encounter_service
+
+    assert encounter_service._join_notice("трофеи", "победа") == "трофеи\nпобеда"
+    assert encounter_service._join_notice(None, None) is None
+
+
+def test_ruins_exit_asks_first() -> None:
+    """Выход из руин - только второй кнопкой с номером этажа (2026-11-07)."""
+    import inspect
+
+    from bot.handlers import ruins
+
+    src = inspect.getsource(ruins.up)
+    assert src.index('payload.get("sure") != run.floor') < src.index("exit_run")
+
+
 @pytest.mark.asyncio
 async def test_notify_sends_guild_line(monkeypatch) -> None:
     sent: list[str] = []

@@ -206,7 +206,8 @@ async def grant_trophies(db, character, units: float, rng: random.Random, applie
     if line:
         applied.lines.append(line)
     if character.subclass is not None:
-        await trial_service.record_trophies(db, character, drop)
+        for buff_id in await trial_service.record_trophies(db, character, drop):
+            applied.lines.append(f"📖 Испытание пройдено. Открыт бафф: {trial_service.buff_name(buff_id)}.")
     applied.add_progress(await daily_service.record_trophies(db, character, drop))
 
 

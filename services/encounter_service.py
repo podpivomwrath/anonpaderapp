@@ -46,6 +46,12 @@ class VictoryOutcome:
     group_kick: "group_service.LevelGapKick | None" = None  # патч 51, ч.2 — исключён из группы левелапом
 
 
+def _join_notice(first: str | None, second: str | None) -> str | None:
+    """Трофеи и победа могут закрыть по гильдейскому заданию за один бой -
+    раньше через `or` вторая строка терялась (2026-11-07)."""
+    return "\n".join(filter(None, [first, second])) or None
+
+
 async def _guild_trophy_bonus(
     db: AsyncSession, character: Character, trophies: dict[str, int], rng: random.Random,
 ) -> dict[str, int]:
@@ -149,11 +155,11 @@ async def resolve_victory(
     daily_streak_notice = None
     daily_progress = await daily_service.record_trophies(db, character, trophies)
     daily_completed += daily_progress.completed
-    daily_streak_notice = daily_streak_notice or daily_progress.streak_notice
+    daily_streak_notice = _join_notice(daily_streak_notice, daily_progress.streak_notice)
     if battle_report is not None:
         daily_progress = await daily_service.record_battle(db, character, battle_report)
         daily_completed += daily_progress.completed
-        daily_streak_notice = daily_streak_notice or daily_progress.streak_notice
+        daily_streak_notice = _join_notice(daily_streak_notice, daily_progress.streak_notice)
 
     progress = await quest_service.record_kill(db, character)
     if progress is None:

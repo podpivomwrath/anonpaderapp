@@ -827,6 +827,18 @@ async def up(message: Message) -> None:
             await db.rollback()
             await _show_self(message, head)
             return
+        # Сначала подтверждение: с глубоких этажей выходили случайным нажатием
+        # (2026-11-07). «sure» - номер этажа: кнопка с прошлого этажа не выведет.
+        payload = message.get_payload_json() or {}
+        if payload.get("sure") != run.floor:
+            floor = run.floor
+            await db.rollback()
+            kb = Keyboard(one_time=False)
+            kb.add(Text(texts.BTN_UP_SURE, payload={"type": "ruins_up", "sure": floor}),
+                   color=KeyboardButtonColor.NEGATIVE)
+            kb.add(Text(texts.BTN_UP_STAY, payload={"type": "ruins_stay"}), color=KeyboardButtonColor.SECONDARY)
+            await message.answer(texts.exit_confirm(floor), keyboard=kb.get_json())
+            return
         paid = await ruins_service.exit_run(db, run)
         await db.commit()
         peers = await _peers(db, list(paid))
@@ -839,6 +851,12 @@ async def up(message: Message) -> None:
         await _send_location_summary(cid, peer)
         await _offer_again(peer)
     logger.info("Руины {}: выход с этажа {}", run.id, floor)
+
+
+@labeler.message(payload_contains={"type": "ruins_stay"})
+async def stay(message: Message) -> None:
+    """Передумал выходить - обратно к выбору в зале хозяина."""
+    await _show_self(message)
 
 
 # --- Мешок и группа -----------------------------------------------------------------

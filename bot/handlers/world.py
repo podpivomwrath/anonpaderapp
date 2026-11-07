@@ -486,10 +486,16 @@ async def city_status(db, character) -> str:
     return status_block(character, stats, wallet.farm_currency, wallet.donate_currency, vit)
 
 
-async def _announce_daily(peer_id: int, progress) -> None:
+async def _announce_daily(peer_id: int, progress, trial_buffs: list[str] | None = None) -> None:
     """Ежедневное задание выполнено шагом - сказать об этом и о новом уровне.
     Раньше прогресс задания «пройди N клеток» отбрасывался: награда и
-    уровень приходили молча (2026-10-13, жалоба про Бубылду)."""
+    уровень приходили молча (2026-10-13, жалоба про Бубылду). trial_buffs -
+    баффы, открытые испытанием «пройди N клеток без боя» (тоже были молча
+    до 2026-11-07)."""
+    from bot import trial_tracking
+
+    if trial_buffs:
+        await _bot_api.messages.send(peer_id=peer_id, message=trial_tracking.opened_text(trial_buffs), random_id=0)
     if progress is None:
         return
     notice = dailies_texts.progress_notice(progress)
@@ -537,11 +543,12 @@ async def show_location(message: Message, db, character) -> None:
         return
 
     if movement_service.resolve_arrival(character, now):
+        trial_buffs = []
         if subclass_service.buff_pool(character) is not None:
-            await trial_service.record_cell_moved(db, character)
+            trial_buffs = await trial_service.record_cell_moved(db, character)
         daily_progress = await daily_service.record_cell_moved(db, character)
         await db.commit()
-        await _announce_daily(message.peer_id, daily_progress)
+        await _announce_daily(message.peer_id, daily_progress, trial_buffs)
 
     if movement_service.is_traveling(character, now):
         left = movement_service.remaining_seconds(character, now)
@@ -698,11 +705,12 @@ async def _move(message: Message, direction: tuple[int, int] | None) -> None:
             await message.answer(busy_mod.STATES["fishing"])
             return
         if movement_service.resolve_arrival(character, now):
+            trial_buffs = []
             if subclass_service.buff_pool(character) is not None:
-                await trial_service.record_cell_moved(db, character)
+                trial_buffs = await trial_service.record_cell_moved(db, character)
             daily_progress = await daily_service.record_cell_moved(db, character)
             await db.commit()
-            await _announce_daily(message.peer_id, daily_progress)
+            await _announce_daily(message.peer_id, daily_progress, trial_buffs)
             await show_location(message, db, character)
             return
         if movement_service.is_traveling(character, now):
@@ -789,14 +797,15 @@ async def handle_arrival(peer_id: int) -> None:
             return
         if not movement_service.resolve_arrival(character):
             return  # игрок уже сам разрешил прибытие более ранним действием
+        trial_buffs = []
         if subclass_service.buff_pool(character) is not None:
-            await trial_service.record_cell_moved(db, character)
+            trial_buffs = await trial_service.record_cell_moved(db, character)
         daily_progress = await daily_service.record_cell_moved(db, character)
         await guild_handlers.on_arrival(db, character)
         await group_handlers.notify_arrival(db, character)
         await db.commit()
         await _deliver_daily_notice(peer_id, character)
-        await _announce_daily(peer_id, daily_progress)
+        await _announce_daily(peer_id, daily_progress, trial_buffs)
         region = grid.city_region_at(character.pos_x, character.pos_y)
         if region is not None:
             # Патч 39: прибытие в город — всегда корневой экран (площадь).

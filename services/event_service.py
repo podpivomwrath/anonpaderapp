@@ -80,12 +80,13 @@ async def apply_outcome(
     lines = [outcome.text] if outcome.text else []
     daily_completed = []
     daily_streak_notice = None
+    trial_buffs: list[str] = []  # открытые испытанием баффы - раньше молча (2026-11-07)
 
     if character.subclass is not None and event_id is not None and choice_code is not None:
         # trial_service.EVENT_CHOICE_CODES — узкий словарь ТОЛЬКО для конкретных
         # испытаний подклассов ("Помочь"/"Помолиться"/"Осквернить"); намеренно
         # не покрывает все варианты выбора всех событий.
-        await trial_service.record_event_choice(db, character, event_id, choice_code)
+        trial_buffs += await trial_service.record_event_choice(db, character, event_id, choice_code)
     if event_id is not None:
         # Патч 45, ч.3 (репорт #19): ежедневка «Любопытный» засчитывается по
         # самому ФАКТУ выбора в любом событии — раньше здесь ошибочно стояло
@@ -94,7 +95,7 @@ async def apply_outcome(
         # Вскрыть, Оставить, Коснуться, Отколоть кусок и т.д.) не засчитывались.
         progress = await daily_service.record_event_choice(db, character)
         daily_completed += progress.completed
-        daily_streak_notice = daily_streak_notice or progress.streak_notice
+        daily_streak_notice = "\n".join(filter(None, [daily_streak_notice, progress.streak_notice])) or None
 
     # Патч 45, ч.4: Ключ Монолита падает независимым броском с ЛЮБОГО
     # источника лута, не только там, где outcome.trophy — проверяем всегда.
@@ -113,10 +114,12 @@ async def apply_outcome(
             lines.append(drop_line)
             reward_added = True
         if character.subclass is not None:
-            await trial_service.record_trophies(db, character, drop)
+            trial_buffs += await trial_service.record_trophies(db, character, drop)
         progress = await daily_service.record_trophies(db, character, drop)
         daily_completed += progress.completed
-        daily_streak_notice = daily_streak_notice or progress.streak_notice
+        daily_streak_notice = "\n".join(filter(None, [daily_streak_notice, progress.streak_notice])) or None
+
+    lines += [f"📖 Испытание пройдено. Открыт бафф: {trial_service.buff_name(b)}." for b in trial_buffs]
 
     levels_gained = 0
     new_level = character.level
