@@ -81,7 +81,7 @@ def _character_payload(
 
     return {
         "name": character.name,
-        # Значок у ника (🌑 Клеймо или 💠 Метка) и рамка героя с Клеймом.
+        # Значок у ника (🌑 Клеймо или 💠 Метка).
         "badge": premium_service.badge(character).strip(),
         "brand": premium_service.is_brand(character),
         "is_admin": is_admin,

@@ -624,7 +624,7 @@ export default function HeroTab({ character, onCharacterUpdate }) {
         {page === 1 ? (
           <RunesPage data={runes} onData={setRunes} kind={runeKind} onKind={setRuneKind} />
         ) : craft ? <CraftGear key={craft.id} craft={craft} onUpdate={setGear} /> : (
-        <div className={`hero-stage hero-stage--${path}${character.brand ? ' hero-stage--brand' : ''}`}>
+        <div className={`hero-stage hero-stage--${path}`}>
           <div className="hero-row">
             <div className="hero-col hero-col--left">
               <BuffList buffs={gear?.buffs} />
