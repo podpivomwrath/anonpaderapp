@@ -41,28 +41,51 @@ def line_path(x1: int, y1: int, x2: int, y2: int) -> list[tuple[int, int]]:
     ]
 
 
-#: Штраф безопасного пути за шаг на клетку кольца опаснее цели - за каждое
-#: кольцо сверх. Такой, что любой обход дешевле, чем зайти внутрь.
-SAFE_PATH_PENALTY = 1000
+def _line_offset(x1: int, y1: int, x2: int, y2: int, x: int, y: int) -> int:
+    """Насколько клетка в стороне от прямой старт-цель (x10, целое)."""
+    dx, dy = x2 - x1, y2 - y1
+    norm = math.hypot(dx, dy) or 1.0
+    return round(abs(dx * (y - y1) - dy * (x - x1)) / norm * 10)
 
 
-def safe_path(x1: int, y1: int, x2: int, y2: int) -> list[tuple[int, int]]:
-    """Безопасный путь (2026-10-13): клетки без стартовой и с конечной, по 8
-    направлениям, не заходя в кольца опаснее кольца цели (ближе к центру).
-    Если старт сам в таком кольце - выходит из него кратчайшим путём. Обход
-    дольше прямой; путь всегда находится - внутри мира всё связно."""
+def safe_path(x1: int, y1: int, x2: int, y2: int, by_level: bool = True) -> list[tuple[int, int]]:
+    """Безопасный путь: клетки без стартовой и с конечной, по 8 направлениям.
+
+    by_level (2026-11-08, верхом) - не заходит на клетки, где мобы сильнее,
+    чем на клетке цели: уровень мобов с 2026-10-15 растёт плавно к центру, и
+    правило «не опаснее кольца цели» пускало в кольце II на клетки 30-го
+    уровня по пути к клетке 16-го. by_level=False - старое правило колец
+    (повозки: их нападения считаются по кольцам, а время пути - от длины).
+
+    Если прямая и так не опаснее цели - это и есть безопасный путь (раньше
+    поиск выбирал другую ломаную той же длины, и она ныряла к центру). Иначе
+    по порядку: меньше всего опасности сверх цели (старт внутри - выходит
+    кратчайшим путём), потом короче, потом по клеткам послабее, потом ближе к
+    прямой - чтобы обход шёл ровно, без зигзагов. Путь всегда находится -
+    внутри мира всё связно."""
     import heapq
 
-    limit = ring_tier(x2, y2)
     start, goal = (x1, y1), (x2, y2)
     if start == goal:
         return []
-    best = {start: 0}
+
+    if by_level:
+        def danger(x: int, y: int) -> int:
+            return wc.cell_base_level(monolith_distance(x, y))
+    else:
+        danger = ring_tier
+    limit = danger(x2, y2)
+    straight = line_path(x1, y1, x2, y2)
+    if all(danger(*c) <= limit for c in straight):
+        return straight
+
+    zero = (0, 0, 0, 0)
+    best = {start: zero}
     came: dict[tuple[int, int], tuple[int, int]] = {}
-    queue = [(0, 0, 0, start)]
+    queue = [(zero, 0, start)]
     order = 0
     while queue:
-        cost, _, _, cell = heapq.heappop(queue)
+        cost, _, cell = heapq.heappop(queue)
         if cell == goal:
             break
         if cost > best.get(cell, cost):
@@ -75,14 +98,17 @@ def safe_path(x1: int, y1: int, x2: int, y2: int) -> list[tuple[int, int]]:
                 nxt = (cx + dx, cy + dy)
                 if not in_bounds(*nxt):
                     continue
-                step = 1 + SAFE_PATH_PENALTY * max(0, ring_tier(*nxt) - limit)
-                new = cost + step
-                if new < best.get(nxt, new + 1):
+                d = danger(*nxt)
+                new = (
+                    cost[0] + max(0, d - limit), cost[1] + 1, cost[2] + d,
+                    cost[3] + _line_offset(x1, y1, x2, y2, *nxt),
+                )
+                old = best.get(nxt)
+                if old is None or new < old:
                     best[nxt] = new
                     came[nxt] = cell
                     order += 1
-                    # Тай-брейк - ближе к цели: путь ровнее, без петель.
-                    heapq.heappush(queue, (new, cells_between(*nxt, *goal), order, nxt))
+                    heapq.heappush(queue, (new, order, nxt))
     path = []
     cell = goal
     while cell != start:

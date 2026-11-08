@@ -582,7 +582,7 @@ export default function MapTab({ focus = null }) {
   const routePending = Boolean(routeKey) && !preview;
   const detourNote = safeRoute && preview
     ? (preview.cells > preview.direct_cells ? `обход +${preview.cells - preview.direct_cells} кл.`
-      : preview.detour ? 'обход без потери времени' : 'опасных колец по пути нет')
+      : preview.detour ? 'обход без потери времени' : 'прямая и так безопасна')
     : null;
 
   const confirmSend = async () => {
@@ -931,7 +931,7 @@ export default function MapTab({ focus = null }) {
             >
               {safeRoute ? '✓ 🛡 Безопасный путь' : '🛡 Безопасный путь'}
               <span className="map-safe-toggle__hint">
-                {safeRoute ? `в обход колец опаснее цели${detourNote ? ` - ${detourNote}` : ''}` : 'напрямую, через любые кольца'}
+                {safeRoute ? `мимо мобов сильнее, чем у цели${detourNote ? ` - ${detourNote}` : ''}` : 'напрямую, через любые кольца'}
               </span>
             </button>
           )}

@@ -258,7 +258,7 @@ async def _quick_targets(db, character) -> list[tuple[str, int, int]]:
 
 def _route_line(safe: bool) -> str:
     return (
-        "🛡 Путь: безопасный - в обход колец опаснее цели, дольше."
+        "🛡 Путь: безопасный - мимо клеток, где мобы сильнее, чем у цели. Бывает дольше."
         if safe else "➡️ Путь: прямой - кратчайший, через любые кольца."
     )
 

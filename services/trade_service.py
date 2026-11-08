@@ -333,7 +333,7 @@ async def pressures(db: AsyncSession, now: datetime | None = None) -> dict[tuple
 
 def path(from_city: str, to_city: str, route: str) -> list[tuple[int, int]]:
     a, b = wc.CITY_COORDS[from_city], wc.CITY_COORDS[to_city]
-    return grid.safe_path(*a, *b) if route == "safe" else grid.line_path(*a, *b)
+    return grid.safe_path(*a, *b, by_level=False) if route == "safe" else grid.line_path(*a, *b)
 
 
 def trip_seconds(cart: TradeCart, cells: int, route: str) -> float:
