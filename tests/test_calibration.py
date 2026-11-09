@@ -228,6 +228,26 @@ def test_thrift_full_chance_skips_cooldown() -> None:
     assert not caster.is_on_cooldown("elementalist_fire")
 
 
+def test_no_cooldown_chance_works_for_every_subclass() -> None:
+    """Репорт 342: «Чужое имя» в руинах (шанс 25% без перезарядки) не
+    срабатывал у Кровавого рыцаря - навыки подклассов ставили перезарядку
+    напрямую, мимо set_cooldown. Теперь шанс общий для всех."""
+    from game.combat.subclass_skills import SUBCLASS_SKILL_DEFS
+
+    for skill_id, sub in (("blood_knight_lifesteal_strike", "blood_knight"), ("shadow_blade_marked_strike", "shadow_blade"),
+                          ("poisoner_venom", "poisoner"), ("guardian_block", "guardian"),
+                          ("dark_mystic_blood_pact", "dark_mystic")):
+        assert skill_id in SUBCLASS_SKILL_DEFS, skill_id
+        caster = combatant(1, side=0, subclass_id=sub)
+        caster.buff_modifiers["no_cooldown_chance"] = 1.0
+        enemy = combatant(2, side=1, vitality=500)
+        resolve_tick(make_session(caster, enemy), {1: skill(skill_id, 2)}, NoCritRng())
+        assert not caster.is_on_cooldown(skill_id), skill_id
+        plain = combatant(1, side=0, subclass_id=sub)
+        resolve_tick(make_session(plain, combatant(2, side=1, vitality=500)), {1: skill(skill_id, 2)}, NoCritRng())
+        assert plain.is_on_cooldown(skill_id), skill_id
+
+
 def test_thrift_zero_chance_sets_cooldown_normally() -> None:
     rng = NoCritRng()
     caster = combatant(1, side=0, subclass_id="elementalist")

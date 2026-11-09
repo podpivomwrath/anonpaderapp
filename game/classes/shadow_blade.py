@@ -10,7 +10,7 @@ from game.classes.base import Role, SubclassDef, register
 from game.combat import balance_config as bc
 from game.combat import shared_rules
 from game.combat.session import EffectKind
-from game.combat.skills import SkillContext, compute_hit, offensive_skill
+from game.combat.skills import SkillContext, compute_hit, offensive_skill, set_cooldown
 from game.combat.subclass_skills import SUBCLASS_SKILL_DEFS
 
 SHADOW_BLADE = register(
@@ -35,7 +35,7 @@ def marked_strike(ctx: SkillContext) -> None:
     способ открыть метку без баффов пресета: пассивка только добавляет к ней."""
     skill = SUBCLASS_SKILL_DEFS["shadow_blade_marked_strike"]
     actor = ctx.actor
-    actor.cooldowns[skill.id] = skill.cd
+    set_cooldown(actor, skill.id, skill.cd, ctx.rng)
     target = ctx.resolve_target()
     if target is None:
         return
@@ -51,7 +51,7 @@ def mark_harvest(ctx: SkillContext) -> None:
     """Жатва меток: 120% + 35% за каждый стак Метки, тратит все стаки."""
     skill = SUBCLASS_SKILL_DEFS["shadow_blade_mark_harvest"]
     actor = ctx.actor
-    actor.cooldowns[skill.id] = skill.cd
+    set_cooldown(actor, skill.id, skill.cd, ctx.rng)
     target = ctx.resolve_target()
     if target is None:
         return
@@ -78,7 +78,7 @@ def execute(ctx: SkillContext) -> None:
     """Казнь: 195% урона, гарантированный крит. Если цель ниже 30% HP — урон удваивается."""
     skill = SUBCLASS_SKILL_DEFS["shadow_blade_execute"]
     actor = ctx.actor
-    actor.cooldowns[skill.id] = skill.cd
+    set_cooldown(actor, skill.id, skill.cd, ctx.rng)
     target = ctx.resolve_target()
     if target is None:
         return

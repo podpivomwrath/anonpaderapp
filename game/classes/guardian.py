@@ -17,7 +17,7 @@
 from game.classes.base import Role, SubclassDef, register
 from game.combat import balance_config as bc
 from game.combat.session import CombatMode, EffectKind
-from game.combat.skills import PendingHeal, SkillContext, compute_hit, defensive_skill
+from game.combat.skills import PendingHeal, SkillContext, compute_hit, defensive_skill, set_cooldown
 from game.combat.subclass_skills import SUBCLASS_SKILL_DEFS
 
 GUARDIAN = register(
@@ -44,7 +44,7 @@ def shield_bash(ctx: SkillContext) -> None:
     этот же ход)."""
     skill = SUBCLASS_SKILL_DEFS["guardian_shield_bash"]
     actor = ctx.actor
-    actor.cooldowns[skill.id] = skill.cd
+    set_cooldown(actor, skill.id, skill.cd, ctx.rng)
     target = ctx.resolve_target()
     if target is not None:
         ctx.hits.append(compute_hit(actor, target, ctx.rng, skill.name, skill.multiplier, is_ability=True,
@@ -85,7 +85,7 @@ def block(ctx: SkillContext) -> None:
     шанс ПОЛНОГО блока (Несокрушимость), самоисцеление при блоке (Живительный
     блок), контрудар (Возмездие) — читаются из buff_modifiers как и раньше."""
     actor = ctx.actor
-    actor.cooldowns[_BLOCK.id] = _BLOCK.cd
+    set_cooldown(actor, _BLOCK.id, _BLOCK.cd, ctx.rng)
 
     # Патч 56, «Гарда»: доп. шанс полного блока против ударов по самому Стражу.
     full_block_chance = (
@@ -153,6 +153,6 @@ def block(ctx: SkillContext) -> None:
 def unbreakable(ctx: SkillContext) -> None:
     """Несокрушимый: без урона, 3 хода потолок входящего урона за удар."""
     actor = ctx.actor
-    actor.cooldowns[_UNBREAKABLE.id] = _UNBREAKABLE.cd
+    set_cooldown(actor, _UNBREAKABLE.id, _UNBREAKABLE.cd, ctx.rng)
     actor.apply_effect(EffectKind.DAMAGE_CAP, _UNBREAKABLE.effect_value, _UNBREAKABLE.effect_duration, actor.id)
     ctx.lines.append(f"{actor.name} застывает несокрушимой глыбой")

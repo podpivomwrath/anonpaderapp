@@ -12,7 +12,7 @@ from game.classes.base import Role, SubclassDef, register
 from game.combat import balance_config as bc
 from game.combat import shared_rules, stat_model
 from game.combat.session import WARD_TAG, EffectKind
-from game.combat.skills import PendingHeal, SkillContext, compute_hit, offensive_skill
+from game.combat.skills import PendingHeal, SkillContext, compute_hit, offensive_skill, set_cooldown
 from game.combat.subclass_skills import SUBCLASS_SKILL_DEFS
 
 DARK_MYSTIC = register(
@@ -86,7 +86,7 @@ def blood_pact(ctx: SkillContext) -> None:
     наименьшим HP (себе, если союзника нет)."""
     skill = SUBCLASS_SKILL_DEFS["dark_mystic_blood_pact"]
     actor = ctx.actor
-    actor.cooldowns[skill.id] = skill.cd
+    set_cooldown(actor, skill.id, skill.cd, ctx.rng)
     target = ctx.resolve_target()
     if target is None:
         return
@@ -161,7 +161,7 @@ def ward(ctx: SkillContext) -> None:
     сердце» — патч 16)."""
     skill = SUBCLASS_SKILL_DEFS["dark_mystic_ward"]
     actor = ctx.actor
-    actor.cooldowns[skill.id] = skill.cd
+    set_cooldown(actor, skill.id, skill.cd, ctx.rng)
     # Патч 56: «Оберег крови» и «Стойкий оберег» увеличивают поглощение,
     # второй платит за это лишним ходом перезарядки. «Передача оберега»
     # разрешает накрывать союзника полной величиной.
@@ -177,7 +177,7 @@ def ward(ctx: SkillContext) -> None:
         # гасил три удара из четырёх, и мистик фармил мобов на +7-10.
         * _solo_heal_penalty(ctx)
     )
-    if steadfast > 0:
+    if steadfast > 0 and skill.id in actor.cooldowns:  # без перезарядки - без лишнего хода
         actor.cooldowns[skill.id] = skill.cd + bc.DARK_MYSTIC_STEADFAST_WARD_CD
     ward_target.apply_effect(EffectKind.SHIELD_POOL, absorb, skill.effect_duration, actor.id, tag=WARD_TAG)
     # В PvP щит слабеет к концу боя - в строке то, что повесилось.
@@ -198,7 +198,7 @@ def drain(ctx: SkillContext) -> None:
     """Иссушение: 160% урона, лечит на 50% нанесённого. Цель под контролем — урон +40%."""
     skill = SUBCLASS_SKILL_DEFS["dark_mystic_drain"]
     actor = ctx.actor
-    actor.cooldowns[skill.id] = skill.cd
+    set_cooldown(actor, skill.id, skill.cd, ctx.rng)
     target = ctx.resolve_target()
     if target is None:
         return
@@ -224,7 +224,7 @@ def circle_of_dark(ctx: SkillContext) -> None:
     только себя, со штрафом одиночки."""
     skill = SUBCLASS_SKILL_DEFS["dark_mystic_circle"]
     actor = ctx.actor
-    actor.cooldowns[skill.id] = skill.cd
+    set_cooldown(actor, skill.id, skill.cd, ctx.rng)
     _pay_hp(actor, bc.DARK_MYSTIC_CIRCLE_HP_COST, ctx.lines)
     # Патч 56: навык потратил собственное HP - «Тёмное вознаграждение» усилит
     # следующий Кровавый пакт.

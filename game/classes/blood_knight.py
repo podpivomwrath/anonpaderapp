@@ -16,7 +16,7 @@ from game.classes.base import Role, SubclassDef, register
 from game.combat import balance_config as bc
 from game.combat import shared_rules, stat_model
 from game.combat.session import CombatantState, EffectKind
-from game.combat.skills import PendingHeal, SkillContext, compute_hit, offensive_skill
+from game.combat.skills import PendingHeal, SkillContext, compute_hit, offensive_skill, set_cooldown
 from game.combat.subclass_skills import SUBCLASS_SKILL_DEFS
 
 BLOOD_KNIGHT = register(
@@ -88,7 +88,7 @@ def lifesteal_strike(ctx: SkillContext) -> None:
     частый навык кита, cd2)."""
     skill = SUBCLASS_SKILL_DEFS["blood_knight_lifesteal_strike"]
     actor = ctx.actor
-    actor.cooldowns[skill.id] = skill.cd
+    set_cooldown(actor, skill.id, skill.cd, ctx.rng)
     target = ctx.resolve_target()
     if target is None:
         return
@@ -103,7 +103,7 @@ def harvest(ctx: SkillContext) -> None:
     голод» (2026-10-23) поднимает порог до 60%."""
     skill = SUBCLASS_SKILL_DEFS["blood_knight_harvest"]
     actor = ctx.actor
-    actor.cooldowns[skill.id] = skill.cd
+    set_cooldown(actor, skill.id, skill.cd, ctx.rng)
     target = ctx.resolve_target()
     if target is None:
         return
@@ -120,7 +120,7 @@ def blood_seal(ctx: SkillContext) -> None:
     атаки рыцаря по ней лечат в BLOOD_KNIGHT_BLOOD_SEAL_MULT раз сильнее."""
     skill = SUBCLASS_SKILL_DEFS["blood_knight_blood_seal"]
     actor = ctx.actor
-    actor.cooldowns[skill.id] = skill.cd
+    set_cooldown(actor, skill.id, skill.cd, ctx.rng)
     target = ctx.resolve_target()
     if target is None:
         return
@@ -137,7 +137,7 @@ def crimson_feast(ctx: SkillContext) -> None:
     добавляет к ratio лечения — только у этого навыка (не у всех четырёх)."""
     skill = SUBCLASS_SKILL_DEFS["blood_knight_crimson_feast"]
     actor = ctx.actor
-    actor.cooldowns[skill.id] = skill.cd
+    set_cooldown(actor, skill.id, skill.cd, ctx.rng)
     target = ctx.resolve_target()
     if target is None:
         return

@@ -14,7 +14,7 @@ from game.combat import shared_rules
 from game.combat import combat_flavor, control
 from game.classes.base import Role, SubclassDef, register
 from game.combat.session import CombatMode, Effect, EffectKind
-from game.combat.skills import PendingHit, SkillContext, compute_hit, offensive_skill
+from game.combat.skills import PendingHit, SkillContext, compute_hit, offensive_skill, set_cooldown
 import game.combat.subclass_skills as subclass_skills
 from game.combat.subclass_skills import SUBCLASS_SKILL_DEFS
 
@@ -50,7 +50,7 @@ def venom(ctx: SkillContext) -> None:
     """Отравленный клинок: 120% урона + стак яда (ДоТ) НА ЦЕЛЬ (макс. 3)."""
     skill = SUBCLASS_SKILL_DEFS["poisoner_venom"]
     actor = ctx.actor
-    actor.cooldowns[skill.id] = skill.cd
+    set_cooldown(actor, skill.id, skill.cd, ctx.rng)
     target = ctx.resolve_target()
     if target is None:
         return
@@ -115,7 +115,7 @@ def disrupt(ctx: SkillContext) -> None:
     Ослабление -25% урона цели на 3 хода (безусловно)."""
     skill = SUBCLASS_SKILL_DEFS["poisoner_disrupt"]
     actor = ctx.actor
-    actor.cooldowns[skill.id] = skill.cd
+    set_cooldown(actor, skill.id, skill.cd, ctx.rng)
     target = ctx.resolve_target()
     if target is None:
         return
@@ -177,7 +177,7 @@ def toxic_burst(ctx: SkillContext) -> None:
     """
     skill = SUBCLASS_SKILL_DEFS["poisoner_toxic_burst"]
     actor = ctx.actor
-    actor.cooldowns[skill.id] = skill.cd
+    set_cooldown(actor, skill.id, skill.cd, ctx.rng)
     target = ctx.resolve_target()
     if target is None:
         return
