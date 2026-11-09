@@ -193,6 +193,49 @@ async def unequip(db: AsyncSession, character: Character, kind: str, slot: str) 
     await recompute(db, character)
 
 
+async def layout(db: AsyncSession, character: Character) -> list[dict]:
+    """Вставленные руны - для пресета (репорт 340)."""
+    rows = sorted(await slots(db, character.id), key=lambda r: (r.kind, r.slot))
+    return [{"kind": r.kind, "slot": r.slot, "rune_id": r.rune_id} for r in rows]
+
+
+async def apply_layout(db: AsyncSession, character: Character, saved: list) -> int:
+    """Расставить руны по сохранённой раскладке: лишние - в сумку, нужные -
+    из сумки. Возвращает, сколько рун не нашлось (продана, впитана, слот
+    закрыт, не подходит после смены пути)."""
+    if not at_home(character):
+        raise RuneError("Руны меняют только в родном городе.")
+    want: dict[tuple[str, str], str] = {}
+    for e in saved or []:
+        if isinstance(e, dict) and e.get("kind") in rc.KINDS and isinstance(e.get("slot"), str):
+            want[(e["kind"], e["slot"])] = str(e.get("rune_id"))
+    kept: set[tuple[str, str]] = set()
+    for row in await slots(db, character.id):
+        if want.get((row.kind, row.slot)) == row.rune_id:
+            kept.add((row.kind, row.slot))
+            continue
+        await grant(db, character.id, row.rune_id)
+        await db.delete(row)
+    await db.flush()
+    missing = 0
+    for (kind, slot), rune_id in want.items():
+        if (kind, slot) in kept:
+            continue
+        rune_def = rc.BY_ID.get(rune_id)
+        if rune_def is None or not _slot_open(character, kind, slot) or _fits(character, rune_def, kind, slot):
+            missing += 1
+            continue
+        row = await _bag_row(db, character.id, rune_id)
+        if row is None or row.count < 1:
+            missing += 1
+            continue
+        row.count -= 1
+        db.add(CharacterRuneSlot(character_id=character.id, kind=kind, slot=slot, rune_id=rune_id))
+    await db.flush()
+    await recompute(db, character)
+    return missing
+
+
 async def buy_hero_slot(db: AsyncSession, character: Character) -> int:
     price = runes.hero_slot_price(character.rune_hero_slots)
     if price is None:

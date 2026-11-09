@@ -150,6 +150,11 @@ export function setShortLog(on) {
   return saveUi({ set: { short_log: on } });
 }
 
+// «Без оповещений» (2026-11-09, bot/notices.py): разломы, боссы, вести и т.п.
+export function setNoNotices(on) {
+  return saveUi({ set: { no_notices: on } });
+}
+
 export function glance() {
   return request('/glance', { method: 'POST' });
 }
@@ -240,6 +245,15 @@ export function switchPreset(presetId) {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ preset_id: presetId }),
+  });
+}
+
+// Раскладка рун в пресете (репорт 340): keep=false - забыть.
+export function rememberPresetRunes(presetId, keep = true) {
+  return request('/presets/runes', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ preset_id: presetId, keep }),
   });
 }
 

@@ -86,7 +86,9 @@ def notify_peers(peers: list[int], text: str) -> None:
 async def notify_guild(guild_id: int, text: str, min_rank: str | None = None) -> None:
     async with get_session_factory()() as db:
         peers = await guild_service.peers_of(db, guild_id, min_rank=min_rank)
-    notify_peers(peers, text)
+    from bot import notices
+
+    notify_peers(notices.keep(peers), text)
 
 
 # --- Поле: исследование и прибытие -------------------------------------------------

@@ -77,9 +77,10 @@ async def _payload(db, character) -> dict:
          "slots": [socket(rc.SKILL, f"{s.id}:0"), second_socket(s.id)]}
         for s in rune_service.skills_of(character)
     ]
+    worn = set(taken.values())
     owned = [
-        _rune(r, known.get(r.id, 0), bag.get(r.id, 0))
-        for r in rc.RUNES if bag.get(r.id) or known.get(r.id) or any(v == r.id for v in taken.values())
+        {**_rune(r, known.get(r.id, 0), bag.get(r.id, 0)), "equipped": r.id in worn}
+        for r in rc.RUNES if bag.get(r.id) or known.get(r.id) or r.id in worn
     ]
     wallet = await wallet_service.get_wallet(db, character.id)
     return {

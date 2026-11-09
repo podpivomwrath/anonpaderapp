@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Group, Header, SimpleCell, Switch } from '@vkontakte/vkui';
 import {
-  equipItem, getCharacter, getGear, getInventory, getRunes, getTrophies, ringAction, setGender, setNoImages, setShortLog,
+  equipItem, getCharacter, getGear, getInventory, getRunes, getTrophies, ringAction, setGender, setNoImages, setShortLog, setNoNotices,
   unequipItem,
 } from '../api.js';
 import CraftGear from './CraftGear.jsx';
@@ -235,6 +235,14 @@ function Settings({ character, onCharacterUpdate }) {
       .then(() => onCharacterUpdate((prev) => ({ ...prev, ui: { ...(prev.ui || {}), short_log: next } })))
       .catch(() => setShort(!next));
   };
+  // «Без оповещений» (2026-11-09, репорт 340, bot/notices.py).
+  const [quiet, setQuiet] = useState(Boolean(character.ui?.no_notices));
+  const toggleQuiet = (next) => {
+    setQuiet(next);
+    setNoNotices(next)
+      .then(() => onCharacterUpdate((prev) => ({ ...prev, ui: { ...(prev.ui || {}), no_notices: next } })))
+      .catch(() => setQuiet(!next));
+  };
   return (
     <Group header={<Header>Настройки</Header>}>
       <SimpleCell
@@ -250,6 +258,13 @@ function Settings({ character, onCharacterUpdate }) {
         after={<Switch checked={short} onChange={(e) => toggleShort(e.target.checked)} />}
       >
         Короткий лог боя
+      </SimpleCell>
+      <SimpleCell
+        Component="label" multiline
+        subtitle="Бот не пишет сам: разломы, мировые боссы, Ишак, заказы и прибытие повозок, вести похода, новости гильдии, конец баффов. Ответы на твои действия приходят как раньше."
+        after={<Switch checked={quiet} onChange={(e) => toggleQuiet(e.target.checked)} />}
+      >
+        Отключить оповещения
       </SimpleCell>
     </Group>
   );

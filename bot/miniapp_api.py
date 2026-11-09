@@ -380,7 +380,9 @@ UI_FLAGS = {"intro": int, "tour": int, "sound": bool, "safe_route": bool, "fish_
             # «Убрать картинки в игре» (2026-10-22): bot/no_images.py.
             "no_images": bool,
             # Короткий боевой лог (2026-10-22): bot/short_log.py.
-            "short_log": bool}
+            "short_log": bool,
+            # «Без оповещений» (2026-11-09): bot/notices.py.
+            "no_notices": bool}
 UI_HINTS_MAX = 32
 
 
@@ -418,6 +420,10 @@ async def handle_post_ui(request: web.Request) -> web.Response:
             from bot import no_images
 
             no_images.set_muted(request[VK_USER_ID_KEY], bool(flags["no_images"]))
+        if "no_notices" in flags:
+            from bot import notices
+
+            notices.set_quiet(request[VK_USER_ID_KEY], bool(flags["no_notices"]))
         if "short_log" in flags:
             from bot import short_log
 
@@ -674,6 +680,7 @@ def register_routes(app: web.Application) -> None:
     app.router.add_post("/api/miniapp/presets", handle_post_presets)
     app.router.add_post("/api/miniapp/presets/switch", handle_post_preset_switch)
     app.router.add_post("/api/miniapp/presets/buy_slot", handle_post_preset_buy_slot)
+    app.router.add_post("/api/miniapp/presets/runes", handle_post_preset_runes)
     app.router.add_get("/api/miniapp/leaderboard", handle_get_leaderboard)
     app.router.add_get("/api/miniapp/dailies", handle_get_dailies)
 
@@ -684,6 +691,7 @@ from bot.miniapp_presets_api import (
     _in_battle,
     handle_get_presets,
     handle_post_preset_buy_slot,
+    handle_post_preset_runes,
     handle_post_preset_switch,
     handle_post_presets,
 )

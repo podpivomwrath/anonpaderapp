@@ -169,7 +169,9 @@ async def notify_brand(rift_id: int) -> None:
     except Exception:
         logger.exception("Разлом {}: весть носителям Клейма не собрана", rift_id)
         return
-    for peer in peers:
+    from bot import notices
+
+    for peer in notices.keep(peers):
         await _send(peer, text)
 
 

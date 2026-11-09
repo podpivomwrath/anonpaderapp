@@ -117,8 +117,10 @@ async def _news(catcher_peer: int, player: str) -> None:
     async with get_session_factory()() as db:
         recipients = await svc.news_recipients(db)
         await db.rollback()
+    from bot import notices
+
     text = texts.CAUGHT_NEWS.format(player=player)
-    for peer_id in recipients:
+    for peer_id in notices.keep(recipients):
         if peer_id == catcher_peer:
             continue
         await _send(peer_id, text)
@@ -131,7 +133,9 @@ async def _spawn_news() -> None:
         recipients = await svc.news_recipients(db, hours=tc.SPAWN_NEWS_ACTIVE_HOURS)
         await db.rollback()
     logger.info("Турбоишак: оповещаю о выходе {}", len(recipients))
-    for peer_id in recipients:
+    from bot import notices
+
+    for peer_id in notices.keep(recipients):
         await _send(peer_id, texts.SPAWN_NEWS, attachment=_photo(tc.HERE_IMAGE))
         await asyncio.sleep(0.05)  # лимит сообщений сообщества
 

@@ -18,7 +18,7 @@ from vkbottle.dispatch.rules.base import FuncRule
 
 from bot.activity import activity_action
 from bot.keyboards import world as kb
-from bot import text_match
+from bot import notices as notice_mute, text_match
 from game.economy import voyage_config as vc
 from models import User
 from bot.dispatch_rules import is_info_command
@@ -259,10 +259,11 @@ async def tick_job() -> None:
                 _away.discard(peer_id)
                 await _send_home(peer_id, notice.text)
             else:
-                await _bot_api.messages.send(
-                    peer_id=peer_id, message=notice.text, random_id=0, keyboard=kb.voyage_keyboard(),
-                    attachment=_photo(notice.image),
-                )
+                if not notice_mute.quiet(peer_id):  # часовые вести - оповещение, итог похода - нет
+                    await _bot_api.messages.send(
+                        peer_id=peer_id, message=notice.text, random_id=0, keyboard=kb.voyage_keyboard(),
+                        attachment=_photo(notice.image),
+                    )
                 if notice.levels:
                     await stats_window.notify_levelup(peer_id, notice.levels, notice.new_level)
         except Exception:

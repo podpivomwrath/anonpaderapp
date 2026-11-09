@@ -43,7 +43,11 @@ async def tick_job() -> None:
         logger.exception("Баффы: проверка окончания не прошла")
         return
     _since = now
+    from bot import notices
+
     for peer, text in sends:
+        if notices.quiet(peer):
+            continue
         try:
             await _bot_api.messages.send(peer_id=peer, random_id=0, message=text)
         except Exception:

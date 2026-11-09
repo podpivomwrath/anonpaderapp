@@ -598,7 +598,9 @@ async def next_floor(db: AsyncSession, run: RuinRun, rng: random.Random) -> None
         raise RuinsError("Глубже - только после хозяина этажа.")
     run.floor += 1
     run.deepest = max(run.deepest or 1, run.floor)
-    run.layout = rules.generate(rng, run.floor)
+    used = rules.once_rooms(run.layout or {"rooms": {}}, (run.extra or {}).get("once_rooms", []))
+    run.extra = {**(run.extra or {}), "once_rooms": used}
+    run.layout = rules.generate(rng, run.floor, used)
     run.pos = run.layout["start"]
     run.prev_pos = None
     run.visited = [run.pos]

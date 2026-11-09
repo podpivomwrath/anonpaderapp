@@ -92,7 +92,9 @@ async def announce(boss_pk: int) -> None:
     text = texts.announce_text(boss)
     attachment = _attachment(boss)
     delivered = 0
-    for peer_id in recipients:
+    from bot import notices
+
+    for peer_id in notices.keep(recipients):
         try:
             await _bot_api.messages.send(
                 peer_id=peer_id, message=text, random_id=0, attachment=attachment,

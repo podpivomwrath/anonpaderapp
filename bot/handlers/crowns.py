@@ -13,6 +13,7 @@ services/crown_service.py; сервис сообщений не шлёт и пр
 from loguru import logger
 from sqlalchemy import select
 
+from bot import notices
 from game.economy import crown_config as cc
 from models import Character, User
 from services import crown_service, leaderboard_service
@@ -67,7 +68,7 @@ async def recompute_and_notify() -> None:
 
     for loss in displaced:
         peer_id = peers.get(loss.character_id)
-        if peer_id is None:
+        if peer_id is None or notices.quiet(peer_id):
             continue
         try:
             await _bot_api.messages.send(

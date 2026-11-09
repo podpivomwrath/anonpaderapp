@@ -88,11 +88,13 @@ async def switch_preset_button(message: Message) -> None:
         if character is None or character.creation_state is not None:
             return
         try:
-            await preset_service.switch_active_preset(db, character, preset_id)
+            _preset, note = await preset_service.switch_with_runes(db, character, preset_id)
         except PresetValidationError:
             return
         await db.commit()
         presets = await preset_service.presets_of(db, character)
+    if note:
+        await message.answer(note)
 
     await editable_message.send_or_edit(
         _bot_api, _NS, peer_id, _list_text(presets), presets_list_keyboard(presets)
@@ -121,12 +123,14 @@ async def switch_preset_command(message: Message, n: int) -> None:
 
         target = presets[n - 1]
         try:
-            await preset_service.switch_active_preset(db, character, target.id)
+            _preset, note = await preset_service.switch_with_runes(db, character, target.id)
         except PresetValidationError:
             await message.answer(f"Пресет {n} пуст. Собери его в разделе «Персонаж».")
             return
         await db.commit()
         catalog = load_content().buffs
         text = _summary_text(n, target, catalog)
+        if note:
+            text += "\n" + note
 
     await message.answer(text)

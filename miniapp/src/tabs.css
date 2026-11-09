@@ -1988,6 +1988,7 @@ body.lite .shop-showcase::after { animation: none; display: none; }
 }
 
 .preset-card__chips { display: flex; flex-wrap: wrap; gap: 4px; }
+.preset-card__runes { opacity: 0.75; }
 .preset-card__actions { display: flex; flex-wrap: wrap; gap: 6px; }
 .preset-card__plus { font-size: 14px; }
 

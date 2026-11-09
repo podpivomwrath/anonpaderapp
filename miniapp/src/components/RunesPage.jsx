@@ -183,7 +183,9 @@ export default function RunesPage({ data, onData, kind, onKind }) {
 
   if (!data) return <p className="hero-error">Загружаем руны...</p>;
   const open = openSocket;
-  const bag = data.runes.filter((r) => r.kind === kind);
+  // Надетые - первыми, с подписью (репорт 340): в общей куче их было не найти.
+  const bag = data.runes.filter((r) => r.kind === kind)
+    .sort((x, y) => Number(Boolean(y.equipped)) - Number(Boolean(x.equipped)));
   const skillOf = (slot) => data.skills.find((s) => slot.startsWith(`${s.id}:`));
 
   return (
@@ -229,7 +231,7 @@ export default function RunesPage({ data, onData, kind, onKind }) {
           <button key={r.id} type="button" className="rune-bag__item" onClick={() => setOpenRune(r.id)}>
             <RuneIcon rune={r} size={40} />
             <span className="rune-bag__main">
-              <b>{r.name}</b>
+              <b>{r.name}{r.equipped && <span className="rune-bag__worn">экипировано</span>}</b>
               <small>{r.efficiency}% · в сумке {r.count}</small>
               <Bar value={r.absorbed} max={r.next} thin />
             </span>

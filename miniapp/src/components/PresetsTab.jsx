@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Group, Header, Div, Text, Placeholder, Button, Input } from '@vkontakte/vkui';
-import { getPresets, savePreset, switchPreset, buyPresetSlot } from '../api.js';
+import { getPresets, savePreset, switchPreset, buyPresetSlot, rememberPresetRunes } from '../api.js';
 import Skeleton from './Skeleton.jsx';
 import { SectionHead } from './ui.jsx';
 
@@ -22,6 +22,13 @@ function BuffChip({ buff }) {
   return <span className={`buff-chip buff-chip--${tone(buff)}`}>{buff?.name || '?'}</span>;
 }
 
+// Склонялка рядом (как в CraftGear.jsx): 1 руна, 2 руны, 5 рун.
+function runesWord(n) {
+  const d = n % 10;
+  if (d === 1 && n % 100 !== 11) return 'руна';
+  return d >= 2 && d <= 4 && (n % 100 < 12 || n % 100 > 14) ? 'руны' : 'рун';
+}
+
 function saveErrorText(err) {
   const code = err?.message;
   if (!code) return 'Не удалось сохранить пресет.';
@@ -37,6 +44,7 @@ export default function PresetsTab({ character }) {
   const [editBuffs, setEditBuffs] = useState([]);
   const [busy, setBusy] = useState(false);
   const [errorMsg, setErrorMsg] = useState(null);
+  const [note, setNote] = useState(null);
 
   function load() {
     setStatus('loading');
@@ -103,8 +111,25 @@ export default function PresetsTab({ character }) {
   async function handleSwitch(presetId) {
     setBusy(true);
     setErrorMsg(null);
+    setNote(null);
     try {
-      await switchPreset(presetId);
+      const res = await switchPreset(presetId);
+      setNote(res?.note || null);
+      load();
+    } catch (err) {
+      setErrorMsg(saveErrorText(err));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function handleRunes(presetId, keep) {
+    setBusy(true);
+    setErrorMsg(null);
+    setNote(null);
+    try {
+      await rememberPresetRunes(presetId, keep);
+      setNote(keep ? '🔮 Руны запомнены: при переключении на этот пресет в родном городе встанут сами.' : null);
       load();
     } catch (err) {
       setErrorMsg(saveErrorText(err));
@@ -196,6 +221,11 @@ export default function PresetsTab({ character }) {
                 <span className="preset-card__chips">
                   {preset.buff_ids.map((id) => <BuffChip key={id} buff={data.buffs.find((x) => x.id === id)} />)}
                 </span>
+                {preset.runes !== null && preset.runes !== undefined && (
+                  <small className="preset-card__runes">
+                    🔮 {preset.runes ? `Запомнено: ${preset.runes} ${runesWord(preset.runes)}` : 'Запомнено: без рун'}
+                  </small>
+                )}
                 <span className="preset-card__actions">
                   {!preset.is_active && (
                     <button type="button" className="pill-btn pill-btn--main" disabled={busy} onClick={() => handleSwitch(preset.id)}>
@@ -205,6 +235,14 @@ export default function PresetsTab({ character }) {
                   <button type="button" className="pill-btn" disabled={busy} onClick={() => startEdit(preset)}>
                     ✎ Изменить
                   </button>
+                  <button type="button" className="pill-btn" disabled={busy} onClick={() => handleRunes(preset.id, true)}>
+                    🔮 Запомнить руны
+                  </button>
+                  {preset.runes !== null && preset.runes !== undefined && (
+                    <button type="button" className="pill-btn" disabled={busy} onClick={() => handleRunes(preset.id, false)}>
+                      Забыть руны
+                    </button>
+                  )}
                 </span>
               </div>
             </div>
@@ -225,6 +263,11 @@ export default function PresetsTab({ character }) {
         </Div>
       )}
 
+      {note && (
+        <Div>
+          <Text>{note}</Text>
+        </Div>
+      )}
       {errorMsg && (
         <Div>
           <Text style={{ color: '#c81e3a' }}>{errorMsg}</Text>

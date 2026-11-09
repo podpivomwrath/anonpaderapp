@@ -338,6 +338,12 @@ async def run() -> None:
     muted = await no_images.load(get_session_factory())
     if muted:
         logger.info("Без картинок: {} игроков", muted)
+    from bot import notices
+
+    # 2026-11-09: кто выключил оповещения - разломы, боссы, вести и т.п. не шлём
+    quiet_count = await notices.load(get_session_factory())
+    if quiet_count:
+        logger.info("Без оповещений: {} игроков", quiet_count)
     from bot import short_log
 
     # 2026-10-22: короткий боевой лог по выбору игрока

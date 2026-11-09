@@ -305,6 +305,9 @@ async def handle_post_action(request: web.Request) -> web.Response:
                     from bot import short_log
 
                     short_log.set_short(reset_peer_id, False)
+                    from bot import notices
+
+                    notices.set_quiet(reset_peer_id, False)
             elif action == "ban":
                 reason = body.get("reason")
                 if not isinstance(reason, str) or not reason.strip():

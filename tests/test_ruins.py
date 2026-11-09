@@ -26,6 +26,19 @@ def test_floor_is_connected_and_boss_is_farthest() -> None:
             assert set(rules.exits(layout, i).values()) <= set(rooms)
 
 
+def test_prisoner_once_per_run() -> None:
+    """Репорт 339: пленник-забойщик - не больше одного за заход."""
+    for seed in range(300):
+        rng = random.Random(seed)
+        used: list[str] = []
+        seen = 0
+        for floor in range(1, 8):
+            layout = rules.generate(rng, floor, used)
+            seen += list(rules.rooms_of(layout).values()).count(rules.PRISONER)
+            used = rules.once_rooms(layout, used)
+        assert seen <= 1
+
+
 def test_numbers() -> None:
     assert [rc.mob_level(f) for f in (1, 5, 6, 10, 11)] == [61, 61, 62, 62, 63]
     assert [rc.mob_count(n) for n in (1, 2, 3, 4, 5)] == [2, 3, 5, 5, 5]

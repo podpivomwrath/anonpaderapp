@@ -267,6 +267,47 @@ async def _preset_and_food(db: AsyncSession, character: Character) -> dict[str, 
     return merged
 
 
+async def own_preset(db: AsyncSession, character: Character, preset_id: int) -> CharacterBuffPreset:
+    preset = next((p for p in await presets_of(db, character) if p.id == preset_id), None)
+    if preset is None:
+        raise PresetValidationError("Пресет не найден")
+    return preset
+
+
+async def remember_runes(db: AsyncSession, character: Character, preset_id: int, keep: bool = True) -> CharacterBuffPreset:
+    """Запомнить в пресете руны, что вставлены сейчас (keep=False - забыть)."""
+    from services import rune_service
+
+    preset = await own_preset(db, character, preset_id)
+    preset.runes = await rune_service.layout(db, character) if keep else None
+    await db.flush()
+    return preset
+
+
+async def apply_preset_runes(db: AsyncSession, character: Character, preset: CharacterBuffPreset) -> str | None:
+    """Руны пресета - на место. Строка для игрока или None, если пресет руны
+    не трогает."""
+    from game import plural
+    from services import rune_service
+
+    if preset.runes is None:
+        return None
+    if not rune_service.at_home(character):
+        return "🔮 Руны остались прежние: их меняют только в родном городе."
+    missing = await rune_service.apply_layout(db, character, preset.runes)
+    if missing:
+        return f"🔮 Руны пресета на месте, кроме {plural.count(missing, 'руны', 'рун', 'рун')}: их нет в сумке."
+    return "🔮 Руны пресета на месте."
+
+
+async def switch_with_runes(
+    db: AsyncSession, character: Character, preset_id: int
+) -> tuple[CharacterBuffPreset, str | None]:
+    """Переключить пресет и расставить его руны (репорт 340)."""
+    preset = await switch_active_preset(db, character, preset_id)
+    return preset, await apply_preset_runes(db, character, preset)
+
+
 async def switch_active_preset(
     db: AsyncSession, character: Character, preset_id: int
 ) -> CharacterBuffPreset:

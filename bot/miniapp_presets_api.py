@@ -55,7 +55,9 @@ async def handle_get_presets(request: web.Request) -> web.Response:
                 "preset_slots": character.preset_slots,
                 "next_slot_cost": next_cost,
                 "presets": [
-                    {"id": p.id, "name": p.name, "buff_ids": p.buff_ids, "is_active": p.is_active}
+                    {"id": p.id, "name": p.name, "buff_ids": p.buff_ids, "is_active": p.is_active,
+                     # None - пресет руны не трогает, иначе сколько рун запомнено
+                     "runes": None if p.runes is None else len(p.runes)}
                     for p in presets
                 ],
                 # Правило состава приходит с сервера: клиент его пересказывал
@@ -134,11 +136,35 @@ async def handle_post_preset_switch(request: web.Request) -> web.Response:
         if character is None:
             return web.json_response({"error": "character_not_found"}, status=404)
         try:
-            await preset_service.switch_active_preset(session, character, preset_id)
+            _preset, note = await preset_service.switch_with_runes(session, character, preset_id)
         except PresetValidationError as exc:
             return web.json_response({"error": str(exc)}, status=400)
         await session.commit()
-        return web.json_response({"ok": True})
+        return web.json_response({"ok": True, "note": note})
+
+
+async def handle_post_preset_runes(request: web.Request) -> web.Response:
+    """Запомнить в пресете вставленные сейчас руны или забыть (репорт 340)."""
+    vk_user_id = request[VK_USER_ID_KEY]
+    try:
+        body = await request.json()
+    except Exception:
+        return web.json_response({"error": "bad_request"}, status=400)
+    preset_id = body.get("preset_id") if isinstance(body, dict) else None
+    keep = body.get("keep", True) if isinstance(body, dict) else True
+    if not isinstance(preset_id, int) or not isinstance(keep, bool):
+        return web.json_response({"error": "bad_request"}, status=400)
+    session_factory = request.app[SESSION_FACTORY_KEY]
+    async with session_factory() as session:
+        character = await miniapp_api._load_character(session, vk_user_id)
+        if character is None:
+            return web.json_response({"error": "character_not_found"}, status=404)
+        try:
+            preset = await preset_service.remember_runes(session, character, preset_id, keep)
+        except PresetValidationError as exc:
+            return web.json_response({"error": str(exc)}, status=400)
+        await session.commit()
+        return web.json_response({"runes": None if preset.runes is None else len(preset.runes)})
 
 
 async def handle_post_preset_buy_slot(request: web.Request) -> web.Response:

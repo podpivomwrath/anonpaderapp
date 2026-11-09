@@ -213,3 +213,34 @@ def test_calluses_adds_xp_on_small_numbers() -> None:
     total = sum(runes.craft_xp(c, 5, rng) for _ in range(5000))
     assert 26000 < total < 27000  # в среднем 5.3
     assert runes.craft_xp(SimpleNamespace(rune_effects={}), 5) == 5
+
+
+async def test_preset_remembers_and_restores_runes(db_session, make_character) -> None:
+    """Репорт 340: пресет запоминает раскладку рун и ставит её при
+    переключении в родном городе; руны, которых нет, пропускает."""
+    from models import CharacterBuffPreset
+    from services import preset_service
+
+    c = await make_character(level=10)
+    _home(c)
+    a, b, gone = [r.id for r in rc.RUNES if r.kind == rc.HERO][:3]
+    for rid in (a, b, gone):
+        await rune_service.grant(db_session, c.id, rid)
+    await rune_service.equip(db_session, c, rc.HERO, "0", a)
+    await rune_service.equip(db_session, c, rc.HERO, "1", gone)
+    preset = CharacterBuffPreset(character_id=c.id, name="1", buff_ids=[], runes=None)
+    db_session.add(preset)
+    await db_session.flush()
+    preset.runes = await rune_service.layout(db_session, c)
+    # Переставил: руна a снята, в слот 0 - b, руна gone продана.
+    await rune_service.unequip(db_session, c, rc.HERO, "1")
+    await rune_service.take(db_session, c.id, gone)
+    await rune_service.equip(db_session, c, rc.HERO, "0", b)
+    note = await preset_service.apply_preset_runes(db_session, c, preset)
+    assert "кроме 1 руны" in note
+    placed = {(r.slot, r.rune_id) for r in await rune_service.slots(db_session, c.id)}
+    assert placed == {("0", a)}
+    bag = await rune_service.bag(db_session, c.id)
+    assert bag.get(b) == 1 and a not in bag
+    c.pos_x += 1
+    assert "родном городе" in await preset_service.apply_preset_runes(db_session, c, preset)

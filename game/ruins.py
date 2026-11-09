@@ -40,6 +40,10 @@ ROOM_WEIGHTS: dict[str, int] = {
     CAVEIN: 4, PRISONER: 4, STOREROOM: 3, CHAPEL: 3, TREASURE: 6,
 }
 
+#: Комнаты, которые встречаются раз за заход (репорт 339: пленник-забойщик -
+#: один человек, а попадался по два раза на этаже).
+ONCE_PER_RUN = (PRISONER,)
+
 DIRS: dict[str, tuple[int, int]] = {"up": (-1, 0), "down": (1, 0), "left": (0, -1), "right": (0, 1)}
 
 
@@ -83,8 +87,9 @@ def distances(rooms: set[int], start: int) -> dict[int, int]:
     return dist
 
 
-def generate(rng: random.Random, floor: int) -> dict:
-    """Новый этаж: 5-10 комнат, связных; босс - дальше всех от входа."""
+def generate(rng: random.Random, floor: int, used: tuple[str, ...] | list[str] = ()) -> dict:
+    """Новый этаж: 5-10 комнат, связных; босс - дальше всех от входа.
+    used - комнаты из ONCE_PER_RUN, что уже были в этом заходе."""
     size = rng.randint(rc.ROOMS_MIN, rc.ROOMS_MAX)
     start = rng.randrange(rc.GRID * rc.GRID)
     taken = {start}
@@ -95,19 +100,29 @@ def generate(rng: random.Random, floor: int) -> dict:
     far = max(dist.values())
     boss = rng.choice(sorted(i for i, d in dist.items() if d == far))
     rooms: dict[str, str] = {}
+    banned = set(used)
     for i in sorted(taken):
         if i == start:
             kind = START
         elif i == boss:
             kind = BOSS
         else:
-            kind = rng.choices(list(ROOM_WEIGHTS), weights=list(ROOM_WEIGHTS.values()))[0]
+            kinds = [k for k in ROOM_WEIGHTS if k not in banned]
+            kind = rng.choices(kinds, weights=[ROOM_WEIGHTS[k] for k in kinds])[0]
+            if kind in ONCE_PER_RUN:
+                banned.add(kind)
         rooms[str(i)] = kind
     from game import ruins_rooms  # цикл импортов
 
     events = {k: ruins_rooms.event_for(rng) for k, v in rooms.items() if v == EVENT}
     return {"rooms": rooms, "start": start, "boss": boss, "mobs": rng.randrange(len(rc.MOB_KINDS)), "floor": floor,
             "events": events}
+
+
+def once_rooms(layout: dict, used: tuple[str, ...] | list[str] = ()) -> list[str]:
+    """used плюс комнаты ONCE_PER_RUN этого этажа - для следующего generate."""
+    here = set(rooms_of(layout).values())
+    return sorted(set(used) | {k for k in ONCE_PER_RUN if k in here})
 
 
 def event_of(layout: dict, i: int) -> str | None:

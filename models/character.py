@@ -336,6 +336,9 @@ class CharacterBuffPreset(Base):
     name: Mapped[str] = mapped_column(String(64))
     buff_ids: Mapped[list] = mapped_column(JSON, default=list)  # JSON-массив id баффов
     is_active: Mapped[bool] = mapped_column(Boolean, default=False)
+    #: Раскладка рун (2026-11-09, репорт 340): [{"kind", "slot", "rune_id"}],
+    #: None - пресет руны не трогает. Ставится при переключении в родном городе.
+    runes: Mapped[list | None] = mapped_column(JSON, nullable=True)
 
     character: Mapped["Character"] = relationship(back_populates="buff_presets")
 

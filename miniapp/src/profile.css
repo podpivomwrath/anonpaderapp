@@ -1145,6 +1145,7 @@ body.lite .sparks {
 .rune-bag__main, .rune-option__main { display: flex; flex-direction: column; gap: 3px; min-width: 0; flex: 1; }
 .rune-bag__main b, .rune-option__main b { font-size: 13px; }
 .rune-bag__main small, .rune-option__main small { font-size: 11px; opacity: 0.75; }
+.rune-bag__worn { margin-left: 6px; font-size: 10px; font-weight: 600; padding: 1px 6px; border-radius: 8px; background: var(--accent-soft, rgba(127,127,127,0.18)); white-space: nowrap; }
 .rune-option { width: 100%; }
 .rune-option__count { opacity: 0.7; }
 .rune-options { display: flex; flex-direction: column; gap: 6px; }
