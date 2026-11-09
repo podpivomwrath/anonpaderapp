@@ -31,6 +31,24 @@ function damageSource(c) {
   return PRIMARY_HINT[c.base_class] || 'основная характеристика';
 }
 
+// Порог урона (stat_model.primary_value): у Тёмного мистика он считается не
+// от Воли, а от смеси 0,6 Воли + 0,4 Интеллекта (репорт про Илью Лута,
+// 2026-11-09: подсказка сравнивала порог с полной Волей и пугала урезанием).
+const PRIMARY_KEY = { warrior: 'str', mage: 'int', rogue: 'agi' };
+
+function damageCapLine(c, st) {
+  const cap = Math.round((30 + 2 * c.level) * (c.base_class === 'rogue' ? 4 / 3 : 1));
+  const mystic = c.subclass === 'dark_mystic';
+  const value = Math.round(mystic ? 0.6 * (st?.wil || 0) + 0.4 * (st?.int || 0) : (st?.[PRIMARY_KEY[c.base_class]] || 0));
+  const what = mystic
+    ? `В урон идёт 0,6 Воли и 0,4 Интеллекта с вещами, у вас это ${value}.`
+    : `В урон идёт основная характеристика с вещами, у вас ${value}.`;
+  const tail = value > cap
+    ? ` Сверх порога каждое очко считается примерно на треть: в урон сейчас идут ${cap} полностью и ещё ${value - cap} на треть.`
+    : ' Сверх порога каждое очко будет считаться примерно на треть, а пока всё идёт полностью.';
+  return `${what} Полностью считается до порога 30 + 2 за уровень${c.base_class === 'rogue' ? ', у Ловкости он на треть выше' : ''}: у вас ${cap}.${tail}`;
+}
+
 const DERIVED_DEFS = [
   {
     key: 'max_hp', clientKey: 'maxHp', label: 'Макс. HP', format: (v) => Math.round(v),
@@ -39,10 +57,9 @@ const DERIVED_DEFS = [
   },
   {
     key: 'damage', clientKey: 'damage', label: '⚔️ Урон', format: (v) => (v + EPS).toFixed(1),
-    hint: (c) => `Сила обычной атаки: база ранга уровня + ${damageSource(c)}. `
-      + `Основная характеристика с вещами считается полностью до порога 30 + 2 за уровень, у Ловкости - на треть выше `
-      + `(у вас сейчас: ${Math.round((30 + 2 * c.level) * (c.base_class === 'rogue' ? 4 / 3 : 1))}), `
-      + 'каждое очко сверх - на треть. Навыки бьют на свой процент от этого числа, крит - в 1,5 раза сильнее.',
+    hint: (c, _d, st) => `Сила обычной атаки: база ранга уровня + ${damageSource(c)}. `
+      + damageCapLine(c, st)
+      + ' Навыки бьют на свой процент от этого числа, крит - в 1,5 раза сильнее.',
   },
   {
     key: 'crit_chance',
@@ -322,7 +339,7 @@ export default function StatsTab({ character, onCharacterUpdate }) {
               key={row.key} label={row.label} open={openHint === row.key}
               onToggle={() => setOpenHint(openHint === row.key ? null : row.key)}
               value={changed ? `${row.format(before)} → ${row.format(after)}` : row.format(before)}
-              changed={changed} hint={row.hint(character, previewDerived)}
+              changed={changed} hint={row.hint(character, previewDerived, withGear(previewStats))}
             />
           );
         })}
