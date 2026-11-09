@@ -228,6 +228,9 @@ class CombatantState:
     # в buff_modifiers (см. game/combat/skills.py::set_cooldown).
     overload_turn_counter: int = 0
     overload_ready: bool = False
+    # Навык не ушёл на перезарядку: "chance" (шанс из баффов и даров) или
+    # "overload" - set_cooldown ставит, shared_rules.run_skill пишет строку в лог.
+    cd_free: str | None = None
     # Стихийный поток: последние (до 3) применённые элементальные умения подряд
     recent_elements: list[str] = field(default_factory=list)
     # Схождение стихий (2026-11-03): какие стихии применены с прошлого

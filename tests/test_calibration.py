@@ -241,8 +241,10 @@ def test_no_cooldown_chance_works_for_every_subclass() -> None:
         caster = combatant(1, side=0, subclass_id=sub)
         caster.buff_modifiers["no_cooldown_chance"] = 1.0
         enemy = combatant(2, side=1, vitality=500)
-        resolve_tick(make_session(caster, enemy), {1: skill(skill_id, 2)}, NoCritRng())
+        result = resolve_tick(make_session(caster, enemy), {1: skill(skill_id, 2)}, NoCritRng())
         assert not caster.is_on_cooldown(skill_id), skill_id
+        # Репорт 343: срабатывание видно в логе, а не только по панели.
+        assert any("🌀 Без перезарядки" in line for line in result.lines), skill_id
         plain = combatant(1, side=0, subclass_id=sub)
         resolve_tick(make_session(plain, combatant(2, side=1, vitality=500)), {1: skill(skill_id, 2)}, NoCritRng())
         assert plain.is_on_cooldown(skill_id), skill_id

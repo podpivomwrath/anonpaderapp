@@ -120,9 +120,11 @@ def set_cooldown(actor: CombatantState, skill_id: str, cd: int, rng: random.Rand
     ключей — поведение не отличается от прямого actor.cooldowns[skill_id] = cd."""
     chance = actor.buff_modifiers.get("no_cooldown_chance", 0.0)
     if chance > 0 and rng.random() < chance:
+        actor.cd_free = "chance"
         return
     if actor.overload_ready:
         actor.overload_ready = False
+        actor.cd_free = "overload"
         return
     actor.cooldowns[skill_id] = cd
 

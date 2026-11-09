@@ -528,13 +528,25 @@ def run_skill(handler, ctx, skill_id: str | None) -> None:
     heals_from = len(ctx.heals)
     cd_before = actor.cooldowns.get(skill_id, 0) if skill_id else 0
     actor.current_skill = skill_id
+    actor.cd_free = None
     try:
         handler(ctx)
     finally:
         actor.current_skill = None
+    cd_free_line(actor, skill_id, ctx.lines)
     rune_cooldown(actor, skill_id, cd_before, ctx.rng, ctx.lines)
     rune_after_skill(actor, skill_id, before, combatants, ctx, heals_from)
     rune_once_more(handler, ctx, skill_id)
+
+
+def cd_free_line(actor: CombatantState, skill_id: str | None, lines: list[str]) -> None:
+    """Навык не ушёл на перезарядку (шанс из баффов и даров, «Перегрузка») -
+    строка в лог, иначе видно только по панели (репорт 343)."""
+    why, actor.cd_free = actor.cd_free, None
+    if not why or not skill_id:
+        return
+    head = "⚡ Перегрузка" if why == "overload" else "🌀 Без перезарядки"
+    lines.append(f"{head}: «{skill_id_name(skill_id)}» у {actor.name} снова готов")
 
 
 def rune_once_more(handler, ctx, skill_id: str | None) -> None:
