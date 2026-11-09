@@ -47,7 +47,7 @@ async def test_hourly_events_rewards_and_end(db_session, character_at) -> None:
     assert voyage.status == "away" and voyage_service.total_hours(voyage) == 8
     assert await voyage_service.tick(db_session, random.Random(1), now=NOW + timedelta(minutes=30)) == []
     notices = await voyage_service.tick(db_session, random.Random(1), now=NOW + timedelta(minutes=61))
-    assert len(notices) == 1 and notices[0].text.startswith("⛵ Час 1 из 8.")
+    assert len(notices) == 1 and notices[0].text.startswith("⛵ Час 1 из 8")
     # бот лежал - все пропущенные часы догоняются, и поход кончается сам
     notices = await voyage_service.tick(db_session, random.Random(2), now=NOW + timedelta(hours=9))
     assert [n.finished for n in notices] == [False] * 7 + [True]
@@ -104,9 +104,10 @@ async def test_hour_shows_reward_in_brackets_and_summary_lists_everything(db_ses
     monkeypatch.setattr(voyage_service, "_roll_event", lambda v, rng: next(events))
     monkeypatch.setattr(voyage_service.vc, "CRAFT_XP_CHANCE", 0.0)  # ремесла - отдельный тест
     notices = await voyage_service.tick(db_session, random.Random(1), now=NOW + timedelta(hours=3, minutes=1))
-    assert "Остов корабля. (🔵 Сгусток скверны ×2)" in notices[0].text
-    assert notices[1].text.endswith("(🎁 Пепельный ларец)")
-    assert "золота)" in notices[2].text
+    # Обычный час - сухая строка без сценки (2026-11-09, репорт 340).
+    assert notices[0].text == "⛵ Час 1 из 8: 🔵 Сгусток скверны ×2."
+    assert "Сундук." in notices[1].text and notices[1].text.endswith("(🎁 Пепельный ларец)")
+    assert "Соль" not in notices[2].text and notices[2].text.endswith("золота.")
     text = await voyage_service.come_back(db_session, c)
     assert "📊 Итог похода - событий: 3" in text and "💰 Золото: +" in text
     assert "🔵 Сгусток скверны ×2" in text and "🎁 Пепельный ларец" in text

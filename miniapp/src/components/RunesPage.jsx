@@ -183,7 +183,7 @@ export default function RunesPage({ data, onData, kind, onKind }) {
 
   if (!data) return <p className="hero-error">Загружаем руны...</p>;
   const open = openSocket;
-  // Надетые - первыми, с подписью (репорт 340): в общей куче их было не найти.
+  // Надетые - первыми и в зелёной рамке (репорт 340): в общей куче их было не найти.
   const bag = data.runes.filter((r) => r.kind === kind)
     .sort((x, y) => Number(Boolean(y.equipped)) - Number(Boolean(x.equipped)));
   const skillOf = (slot) => data.skills.find((s) => slot.startsWith(`${s.id}:`));
@@ -228,10 +228,10 @@ export default function RunesPage({ data, onData, kind, onKind }) {
       {bag.length === 0 && <p className="rune-hint">Руны падают с мобов. Их можно купить и продать на рынке.</p>}
       <div className="rune-bag">
         {bag.map((r) => (
-          <button key={r.id} type="button" className="rune-bag__item" onClick={() => setOpenRune(r.id)}>
+          <button key={r.id} type="button" className={`rune-bag__item${r.equipped ? ' rune-bag__item--worn' : ''}`} onClick={() => setOpenRune(r.id)}>
             <RuneIcon rune={r} size={40} />
             <span className="rune-bag__main">
-              <b>{r.name}{r.equipped && <span className="rune-bag__worn">экипировано</span>}</b>
+              <b>{r.name}</b>
               <small>{r.efficiency}% · в сумке {r.count}</small>
               <Bar value={r.absorbed} max={r.next} thin />
             </span>

@@ -380,9 +380,15 @@ async def tick(db: AsyncSession, rng: random.Random | None = None, now: datetime
             voyage.trip_xp += xp
             voyage.trip_gold += gold
             trip = vc.VOYAGES[voyage.region]
-            body = f"{trip.emoji} Час {voyage.hours_done} из {hours}. {vc.TIER_TITLES[tier]}{text}"
-            if lines:
-                body += f" ({', '.join(lines)})"
+            head = f"{trip.emoji} Час {voyage.hours_done} из {hours}"
+            if tier in vc.SCENE_TIERS:
+                body = f"{head}. {vc.TIER_TITLES[tier]}{text}"
+                if lines:
+                    body += f" ({', '.join(lines)})"
+            else:
+                # Обычный час - сухая строка (2026-11-09, репорт 340): вести
+                # приходят каждый час, сценка в каждой читалась как робот.
+                body = f"{head}: {', '.join(lines) if lines else 'без находок'}."
             if craft_line:
                 body += f"\n{craft_line}"
             image = vc.LEGENDARY_IMAGES.get((voyage.region, index), "") if tier == "legendary" else ""
