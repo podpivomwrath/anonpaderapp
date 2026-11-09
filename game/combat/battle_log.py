@@ -244,10 +244,18 @@ def target_line(target, viewer_id: int, result: TickResult | None = None) -> str
     if marks:
         line += " · " + " ".join(marks)
     if result is not None:
-        dealt = sum(max(h.hp_before - h.hp_after, 0) for h in result.hit_renders
-                    if not h.missed and h.source_id == viewer_id and h.target_id == target.id)
-        if dealt:
+        mine_hits = [h for h in result.hit_renders
+                     if not h.missed and h.source_id == viewer_id and h.target_id != viewer_id]
+        dealt = sum(max(h.hp_before - h.hp_after, 0) for h in mine_hits if h.target_id == target.id)
+        # Цель пала - строка уже про следующую, и урон по павшей пропадал
+        # (репорт 344): весь урон за ход, если он больше, чем по этой цели.
+        total = sum(max(h.hp_before - h.hp_after, 0) for h in mine_hits)
+        if dealt and total > dealt:
+            line += f" · ваш урон {dealt}, всего за ход {total}"
+        elif dealt:
             line += f" · ваш урон {dealt}"
+        elif total:
+            line += f" · ваш урон за ход {total}"
     return line
 
 

@@ -627,6 +627,26 @@ def test_target_line_formats_name_and_hp_percent() -> None:
     assert pvp_handlers._target_line(-15, battle, 1) == "🎯 Цель: Мирэль (41% HP)"
 
 
+def test_target_line_counts_damage_to_fallen_target() -> None:
+    """Репорт 344: цель пала - строка уже про следующую, и урон по павшей
+    пропадал. Теперь - весь урон за ход; удар по себе (цена навыка) не в счёт."""
+    from types import SimpleNamespace
+
+    from game.combat import battle_log
+
+    nxt = combatant(3, side=1, name="Волк")
+
+    def hit(target, before, after, source=1):
+        return SimpleNamespace(source_id=source, target_id=target, hp_before=before, hp_after=after, missed=False)
+
+    killed = SimpleNamespace(hit_renders=[hit(2, 300, 0), hit(1, 500, 450)])
+    assert battle_log.target_line(nxt, 1, killed).endswith("· ваш урон за ход 300")
+    spill = SimpleNamespace(hit_renders=[hit(2, 300, 0), hit(3, nxt.max_hp, nxt.max_hp - 40)])
+    assert battle_log.target_line(nxt, 1, spill).endswith("· ваш урон 40, всего за ход 340")
+    plain = SimpleNamespace(hit_renders=[hit(3, nxt.max_hp, nxt.max_hp - 40), hit(3, 10, 0, source=9)])
+    assert battle_log.target_line(nxt, 1, plain).endswith("· ваш урон 40")
+
+
 def test_target_line_empty_without_a_target() -> None:
     battle = _make_battle("mass", (0, 0))
     session = CombatSessionState(session_id=-16, mode=CombatMode.PVP_GROUP)
