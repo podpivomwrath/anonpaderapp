@@ -68,7 +68,7 @@ def _death_text(respawn_at: datetime, now: datetime, xp_lost: int = 0) -> str:
 
 
 TINCTURE_SAVED_LINE = "🫗 Настойка пепла ещё действует: опыт не потерян."
-POCKET_SAVED_LINE = "🎒 Секретный карман цел: что было в нём, осталось при тебе."
+POCKET_SAVED_LINE = "🎒 Секретный карман цел: что было в нём, осталось при вас."
 
 
 async def _gem_goods_lines(peer_id: int, now: datetime, pvp: bool) -> list[str]:
@@ -136,8 +136,8 @@ async def register_death(
 
 
 CHAPEL_RESPAWN_TEXT = (
-    "⛪ Ты приходишь в себя у часовни своей гильдии. Колокол ещё гудит.\n"
-    "🛡 Две минуты на тебя не нападут, пока не уйдёшь с этой клетки."
+    "⛪ Вы приходите в себя у часовни своей гильдии. Колокол ещё гудит.\n"
+    "🛡 Две минуты на вас не нападут, пока не уйдёте с этой клетки."
 )
 
 

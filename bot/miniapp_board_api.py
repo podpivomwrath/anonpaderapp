@@ -247,7 +247,7 @@ async def handle_post_contracts(request: web.Request) -> web.Response:
                     raise contract_service.ContractError("Откупиться можно только вне боя.")
                 bought = await contract_service.buyout(db, character, body.get("id"))
                 who = f"Заказчик - {bought.orderer_name}." if bought.orderer_name else "Заказчика уже нет в игре."
-                done = f"💸 Ты откупился за 💎{bought.cost}, заказ снят. {who}"
+                done = f"💸 Вы откупились за 💎{bought.cost}, заказ снят. {who}"
             else:
                 contract = await contract_service.take(db, character, body.get("id"))
                 target = await db.get(Character, contract.target_id)

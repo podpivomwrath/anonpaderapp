@@ -86,7 +86,7 @@ def rune_about(rune_id: str, absorbed: int = 0) -> dict:
         lines.append("Пока не действует - подключим в ближайших обновлениях.")
     effect = "При 100%: " + runes.describe(r, 0)
     if absorbed:
-        effect += f". У тебя {runes.efficiency(r.curve, absorbed) * 100:.0f}%: " + runes.describe(r, absorbed)
+        effect += f". У вас {runes.efficiency(r.curve, absorbed) * 100:.0f}%: " + runes.describe(r, absorbed)
     return {"description": " ".join(lines), "effect": effect + "."}
 
 

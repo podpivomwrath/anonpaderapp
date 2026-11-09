@@ -40,7 +40,7 @@ function StoryTab({ story, onShowOnMap }) {
         <div className={`quest-card${quest.ready ? ' quest-card--ready' : ''}`}>
           <b className="quest-card__title">{quest.title}</b>
           <p className="quest-card__text">{quest.text}</p>
-          {quest.ready && <p className="quest-card__ready">Цель достигнута - вернись к наставнику.</p>}
+          {quest.ready && <p className="quest-card__ready">Цель достигнута - вернитесь к наставнику.</p>}
           {quest.target && !quest.ready && (
             <button type="button" className="pill-btn" onClick={() => onShowOnMap(quest.target)}>
               📍 {quest.target.label} ({quest.target.x}; {quest.target.y})

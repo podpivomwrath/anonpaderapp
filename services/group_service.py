@@ -104,9 +104,9 @@ async def send_invite(db: AsyncSession, inviter: Character, target: Character) -
     from services import ruins_service
 
     if await ruins_service.membership(db, inviter.id) is not None:
-        raise GroupError("Из руин в группу не зовут - сначала поднимись наверх.")
+        raise GroupError("Из руин в группу не зовут - сначала поднимитесь наверх.")
     if await ruins_service.membership(db, target.id) is not None:
-        raise GroupError("Этот игрок сейчас в руинах - позови, когда поднимется.")
+        raise GroupError("Этот игрок сейчас в руинах - позовите, когда поднимется.")
 
     inviter_membership = await get_membership(db, inviter.id)
     current_levels = [inviter.level]
@@ -175,13 +175,13 @@ async def accept_invite(db: AsyncSession, invite_id: int, character_id: int) -> 
     if await get_membership(db, character_id) is not None:
         invite.status = "declined"
         await db.flush()
-        raise GroupError("Ты уже в другой группе.")
+        raise GroupError("Вы уже в другой группе.")
     from services import ruins_service
 
     if await ruins_service.membership(db, character_id) is not None:
         invite.status = "declined"
         await db.flush()
-        raise GroupError("Ты в руинах - сначала поднимись наверх, потом вступай в группу.")
+        raise GroupError("Вы в руинах - сначала поднимитесь наверх, потом вступайте в группу.")
 
     newly_created = False
     if invite.group_id is None:
@@ -307,7 +307,7 @@ async def _remove_member(db: AsyncSession, group: Group, character_id: int, was_
 async def leave_group(db: AsyncSession, character_id: int) -> LeaveResult:
     membership = await get_membership(db, character_id)
     if membership is None:
-        raise GroupError("Ты не в группе.")
+        raise GroupError("Вы не в группе.")
     group = await db.get(Group, membership.group_id)
     was_leader = group.leader_character_id == character_id
     await db.delete(membership)
@@ -324,19 +324,19 @@ async def leave_group(db: AsyncSession, character_id: int) -> LeaveResult:
 async def kick_member(db: AsyncSession, leader: Character, target_character_id: int) -> LeaveResult:
     membership = await get_membership(db, leader.id)
     if membership is None:
-        raise GroupError("Ты не в группе.")
+        raise GroupError("Вы не в группе.")
     group = await db.get(Group, membership.group_id)
     if group.leader_character_id != leader.id:
         raise GroupError("Исключать может только лидер.")
     if target_character_id == leader.id:
-        raise GroupError("Нельзя исключить самого себя - используй /выйти.")
+        raise GroupError("Нельзя исключить самого себя - используйте /выйти.")
     target_membership = await db.scalar(
         select(GroupMember).where(
             GroupMember.group_id == group.id, GroupMember.character_id == target_character_id,
         )
     )
     if target_membership is None:
-        raise GroupError("Этого игрока нет в твоей группе.")
+        raise GroupError("Этого игрока нет в вашей группе.")
     await db.delete(target_membership)
     await db.flush()
     from services import raid_service  # см. комментарий в leave_group

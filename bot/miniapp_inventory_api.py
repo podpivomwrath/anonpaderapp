@@ -682,6 +682,6 @@ async def handle_post_disassemble(request: web.Request) -> web.Response:
         dust = await item_service.disassemble_unique(session, character, item_id)
         if dust is None:
             await session.rollback()
-            return web.json_response({"error": "Эту вещь разобрать нельзя: надетую сначала сними."}, status=400)
+            return web.json_response({"error": "Эту вещь разобрать нельзя: надетую сначала снимите."}, status=400)
         await session.commit()
         return web.json_response(await _full_inventory(session, character.id))

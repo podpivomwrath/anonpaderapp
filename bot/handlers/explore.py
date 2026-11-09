@@ -94,7 +94,7 @@ async def explore(message: Message) -> None:
             await message.answer("☠ Сначала очнись.")
             return
         if in_any_battle(peer_id):
-            await message.answer("⚔️ Ты уже в бою.")
+            await message.answer("⚔️ Вы уже в бою.")
             return
         if world._in_mine_digging(character):
             await message.answer(
@@ -102,10 +102,10 @@ async def explore(message: Message) -> None:
             )
             return
         if explore_rest.exploring(peer_id):
-            await message.answer("🔍 Ты уже осматриваешься...")
+            await message.answer("🔍 Вы уже осматриваетесь...")
             return
         if explore_rest.resting(peer_id):
-            await message.answer("🛏️ Ты отдыхаешь. Дай себе минуту.")
+            await message.answer("🛏️ Вы отдыхаете. Дайте себе минуту.")
             return
         if movement_service.is_traveling(character, now):
             left = movement_service.remaining_seconds(character, now)
@@ -134,7 +134,7 @@ async def explore(message: Message) -> None:
             if len(cohort) > 1:
                 if group_combat_handlers.is_group_fighting(snapshot.id) or \
                         group_event_handlers.has_group_event(snapshot.id):
-                    await message.answer("Твоя группа уже в деле. Дождись, пока они закончат.")
+                    await message.answer("Ваша группа уже в деле. Дождитесь, пока они закончат.")
                     return
                 cohort_ids = {m.id for m in cohort}
                 queue = group_explore_service.start_or_join(
@@ -257,7 +257,7 @@ async def explore(message: Message) -> None:
     delay = world._rng.uniform(wc.EXPLORE_SECONDS_MIN, wc.EXPLORE_SECONDS_MAX)
     await explore_rest.start(explore_rest.EXPLORE, peer_id, delay)
     # Кнопки убираем до появления моба.
-    text = "🔍 Ты осматриваешься вокруг..."
+    text = "🔍 Вы осматриваетесь вокруг..."
     if ash_burned:
         text = f"{ASH_BURNED_LINE}\n\n{text}"
     if fragment is not None:
@@ -266,7 +266,7 @@ async def explore(message: Message) -> None:
     world._explore_scheduler.schedule(peer_id, delay)
 
 
-QUEUE_READY_HINT = "👥 Все, кто остался на клетке, готовы - нажми «🔍 Исследовать», чтобы начать."
+QUEUE_READY_HINT = "👥 Все, кто остался на клетке, готовы - нажмите «🔍 Исследовать», чтобы начать."
 
 
 async def ready_hint_peers(db, character_ids: set[int]) -> list[int]:
@@ -298,7 +298,7 @@ async def group_explore_cancel(message: Message) -> None:
         hint_peers = await ready_hint_peers(db, ready)
         has_mount = await mount_service.has_any_mount(db, character.id)
     await message.answer(
-        "Ты вышел из очереди исследования. Передумаешь - нажми «🔍 Исследовать» снова.",
+        "Вы вышли из очереди исследования. Передумаете - нажмите «🔍 Исследовать» снова.",
         keyboard=kb.movement_keyboard(character.pos_x, character.pos_y, peer_id, has_mount=has_mount),
     )
     await send_ready_hint(hint_peers)
@@ -665,10 +665,10 @@ async def event_choice(message: Message) -> None:
 
 
 SONG_READ_SCENE = (
-    "Ты читаешь Песнь целиком, от первой строки до последней. Целиком её не читали много лет.\n\n"
+    "Вы читаете Песнь целиком, от первой строки до последней. Целиком её не читали много лет.\n\n"
     "Пепел вокруг алтаря поднимается столбом, густеет, и на месте золы встаёт конь из пепла "
     "и багрового света. Он не дышит, бьёт копытом и ждёт седока.\n\n"
-    "Хранитель Списков вписал тебе звание."
+    "Хранитель Списков вписал вам звание."
 )
 
 

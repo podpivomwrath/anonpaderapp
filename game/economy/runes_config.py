@@ -91,11 +91,11 @@ RUNES: list[RuneDef] = [
     # 2026-11-02 (владелец): стат работает только в PvP - вдвое слабее, но в
     # PvP в полную силу, без «вполсилы» (было 0.08 и pvp="half").
     RuneDef("stubborn_brow", HERO, "Упрямый лоб", 0.04, "+{v} к сопротивлению контролю"),
-    RuneDef("bitter_blood", HERO, "Горькая кровь", 0.12, "периодический урон по тебе меньше на {v}",
+    RuneDef("bitter_blood", HERO, "Горькая кровь", 0.12, "периодический урон по вам меньше на {v}",
             pvp="half"),
     # Сопротивления (2026-11-02, владелец): 7% в базе, в PvP в полную
     # силу - они и нужны против игроков. Яд режет «Горькая кровь» выше.
-    RuneDef("tempered", HERO, "Закалка", 0.07, "крит-урон по тебе ниже на {v}"),
+    RuneDef("tempered", HERO, "Закалка", 0.07, "крит-урон по вам ниже на {v}"),
     RuneDef("true_eye", HERO, "Верный глаз", 0.07, "уворот цели ниже на {v}"),
     RuneDef("heavy_gaze", HERO, "Тяжёлый взгляд", 0.06, "у мобов клетки на {v} меньше здоровья", pvp="none"),
     RuneDef("grabby_fingers", HERO, "Цепкие пальцы", 0.10, "+{v} к шансу, что с моба выпадет предмет экипировки", pvp="none"),
@@ -152,11 +152,11 @@ RUNES: list[RuneDef] = [
             classes=(M,), place="weapon"),
     RuneDef("surplus", GEAR, "Излишек", 0.20, "{v} лечения сверх максимума становится щитом", pvp="half",
             classes=(M,), place="armor"),
-    RuneDef("reverse_prayer", GEAR, "Обратная молитва", 0.15, "{v} лечения и вампиризма твоих навыков бьёт врага", pvp="half",
+    RuneDef("reverse_prayer", GEAR, "Обратная молитва", 0.15, "{v} лечения и вампиризма ваших навыков бьёт врага", pvp="half",
             classes=(M,), place="weapon", rarity="rare"),
     RuneDef("fresh_armor", GEAR, "Свежая броня", 0.15, "входящий урон в первые 3 хода меньше на {v}",
             pvp="half", place="armor"),
-    RuneDef("cast_cuirass", GEAR, "Литая кираса", 0.25, "уязвимость на тебе слабее на {v}", place="armor"),
+    RuneDef("cast_cuirass", GEAR, "Литая кираса", 0.25, "уязвимость на вас слабее на {v}", place="armor"),
     RuneDef("not_today", GEAR, "Не сегодня", 0.05, "шанс {v} пережить смертельный удар, раз за бой",
             pvp="half", place="armor", curve="very_tight", rarity="mythic"),
     # Ультимативные (2026-11-05).

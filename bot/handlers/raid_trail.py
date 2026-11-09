@@ -354,7 +354,7 @@ async def where_all(message: Message) -> None:
     for other, n in sorted(run.numbers.items(), key=lambda kv: kv[1]):
         where = _place_name(run, run.lab.pos[other])
         mark = " (без имени)" if run.lab.is_frozen(other, now) else ""
-        me = " - ты" if other == cid else ""
+        me = " - вы" if other == cid else ""
         lines.append(f"{n}. {run.names[other]}{me}: {where}{mark}")
     await _send(message.peer_id, "\n".join(lines) + f"\n\n{_status(run)}", map_keyboard(run, cid))
 

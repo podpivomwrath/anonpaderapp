@@ -5,7 +5,7 @@ from bot.handlers import pvp
 
 def test_peaceful_scene_alone() -> None:
     text = pvp._peaceful_scene_text([])
-    assert "Ты один" in text and "мирное" in text
+    assert "Вы один" in text and "мирное" in text
 
 
 async def test_peaceful_scene_lists_players_without_numbers(make_character) -> None:

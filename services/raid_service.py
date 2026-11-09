@@ -20,7 +20,7 @@ from models import Character, Group, GroupMember, RaidLobby, RaidLobbyMember, Ra
 #: Начать сбор (стать лидером) без ключа нельзя: ключ списывается у лидера.
 NO_KEY_TO_LEAD = (
     "Начать сбор может только тот, у кого есть Ключ Монолита: его списывают у лидера. "
-    "У тебя ключа нет - пусть рейд первым выберет тот, у кого он есть."
+    "У вас ключа нет - пусть рейд первым выберет тот, у кого он есть."
 )
 
 
@@ -101,7 +101,7 @@ async def touch_monolith(
     if membership is not None:
         lobby = await lock_lobby(db, membership.lobby_id)
         if lobby is None or lobby.status != "waiting" or lobby.raid_id != raid_id or lobby.group_id != group_id:
-            raise RaidError("Ты уже в очереди на другой рейд.")
+            raise RaidError("Вы уже в очереди на другой рейд.")
         membership.ready = True
         await db.flush()
         return await get_snapshot(db, lobby.id)
@@ -119,7 +119,7 @@ async def touch_monolith(
         db.add(lobby)
         await db.flush()
     elif lobby.raid_id != raid_id:
-        raise RaidError("Твоя группа уже выбрала другой рейд - сначала разберитесь с ним.")
+        raise RaidError("Ваша группа уже выбрала другой рейд - сначала разберитесь с ним.")
 
     db.add(RaidLobbyMember(lobby_id=lobby.id, character_id=character.id, ready=True))
     await db.flush()

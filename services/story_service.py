@@ -29,7 +29,7 @@ from services import experience_service, group_service, quest_service, subclass_
 _lines: dict[str, StoryLineDef] = {}
 
 FALLBACK_NO_QUESTS_TEXT = (
-    "📜 Никто не ждёт от тебя ничего. Пепельные Земли не дают поручений - "
+    "📜 Никто не ждёт от вас ничего. Пепельные Земли не дают поручений - "
     "здесь каждый идёт своей дорогой."
 )
 
@@ -46,7 +46,7 @@ def compass_direction(px: int, py: int, tx: int, ty: int) -> str:
     строго на севере - это «север», а не «северо-восток»."""
     dx, dy = tx - px, ty - py
     if dx == 0 and dy == 0:
-        return "ты уже на месте"
+        return "вы уже на месте"
     sector = round(math.degrees(math.atan2(dy, dx)) / 45) % 8
     steps = [(1, 0), (1, 1), (0, 1), (-1, 1), (-1, 0), (-1, -1), (0, -1), (1, -1)]
     return f"на {_DIR_WORDS[steps[sector]]}"
@@ -355,7 +355,7 @@ async def namesake_hint(db: AsyncSession, character: Character, mob_name: str) -
     return (
         # Без рода: среди врагов есть и «Головня», и «Мать Углей».
         f"📜 Это лишь тёзка: «{quest.named_enemy.name}» из задания ждёт у "
-        f"({quest.target_x}; {quest.target_y}): исследуй местность там."
+        f"({quest.target_x}; {quest.target_y}): исследуйте местность там."
     )
 
 
@@ -494,20 +494,20 @@ async def quest_reminder_text(db: AsyncSession, character: Character, mentor_nam
     if quest.kind == "first_quest":
         peek = await quest_service.peek_progress(db, character)
         if peek is None or peek.status is None:
-            return f"У тебя нет активного задания. {mentor_name} ждёт тебя в городе."
+            return f"У вас нет активного задания. {mentor_name} ждёт вас в городе."
         if peek.status == "ready":
-            return f"📜 {peek.title}: цель достигнута - возвращайся к {mentor_name}."
+            return f"📜 {peek.title}: цель достигнута - возвращайтесь к {mentor_name}."
         return f"📜 {peek.title}: {peek.progress_label} {peek.progress}/{peek.target_count}."
 
     if quest.kind == "travel_combat":
         row = await get_progress(db, character)
         if row.status == "ready":
-            return f"📜 {quest.title}: цель достигнута - возвращайся к {mentor_name}."
+            return f"📜 {quest.title}: цель достигнута - возвращайтесь к {mentor_name}."
         return _format_assign(quest, character)
 
     if quest.kind == "subclass_gate":
         if not subclass_service.path_chosen(character):
             return format_text(quest.assign_text, character)
-        return f"У тебя нет активного задания. {mentor_name} ждёт тебя в городе."
+        return f"У вас нет активного задания. {mentor_name} ждёт вас в городе."
 
     return format_text(quest.assign_text, character)  # city_scene

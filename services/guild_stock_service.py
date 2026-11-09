@@ -169,7 +169,7 @@ async def deposit(db: AsyncSession, character: Character, kind: str, ref: str, g
     grade = grade or ""
     row, field = await _own_row(db, character.id, kind, ref, grade)
     if row is None or getattr(row, field) < count:
-        raise GuildError("Столько у тебя нет.")
+        raise GuildError("Столько у вас нет.")
     if kind not in UNLIMITED:
         cap = await guild_service.capacity(db, guild)
         if await goods_units(db, guild.id) + _units(kind, count) > cap.ore:

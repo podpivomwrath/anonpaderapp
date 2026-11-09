@@ -151,7 +151,7 @@ class ActivationOutcome:
 
 
 STATUS_TEXTS = {
-    "already_used": "Ты уже воспользовался этим кодом.",
+    "already_used": "Вы уже воспользовались этим кодом.",
     "limit_reached": "Этот код больше не действует.",
     "expired": "Этот код истёк.",
 }

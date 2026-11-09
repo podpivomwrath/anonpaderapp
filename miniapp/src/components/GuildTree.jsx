@@ -98,7 +98,7 @@ export default function GuildTree({ onChanged }) {
   /** Почему узел сейчас не взять - или null, если можно. */
   const lack = (n) => {
     if (!tree.can_edit) return 'Брать узлы могут глава и казначеи.';
-    if (!n.available) return 'Сначала возьми соседний узел - древо растёт от уже взятых.';
+    if (!n.available) return 'Сначала возьмите соседний узел - древо растёт от уже взятых.';
     if (tree.points_available < n.points) return `Не хватает очков древа: нужно ${n.points}. Очки дают уровни гильдии.`;
     if (tree.treasury_gold < n.gold) return `В казне не хватает золота: нужно ${money(n.gold)}.`;
     return null;

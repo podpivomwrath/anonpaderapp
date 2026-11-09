@@ -126,7 +126,7 @@ async def set_almanac_herbs(db: AsyncSession, character: Character, herb_ids: li
     if herb_ids is not None:
         chosen = set(herb_ids)
         if not chosen <= visible:
-            raise GearError("Эту траву ты пока не различаешь.")
+            raise GearError("Эту траву вы пока не различаете.")
         herb_ids = None if chosen == visible else [h.id for h in ordered if h.id in chosen]
     row.herb_ids = None if herb_ids is None else ",".join(herb_ids)
     row.herb_tier = None
@@ -258,7 +258,7 @@ async def make(db: AsyncSession, character: Character, tool_id: str, tier: int) 
     row = await _row(db, character.id, tool_id)
     stackable = tool.source in ("charges", "stock")
     if row is not None and not stackable and row.tier >= tier:
-        raise GearError("У тебя уже есть такой или лучше.")
+        raise GearError("У вас уже есть такой или лучше.")
 
     needs = recipe(tool, tier)
     ore_tier = 1 if tool.source == "stock" else tier

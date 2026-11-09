@@ -222,7 +222,7 @@ class MobBrain:
         if self.has("first_turn_weaken") and self.turns == 1:
             trait = self.one("first_turn_weaken")
             target.apply_effect(EffectKind.WEAKEN, trait.value, trait.duration, mob.id, decays=False)
-            turn.lines.append(f"{mob.name}: {title.lower()} - ты медлишь")
+            turn.lines.append(f"{mob.name}: {title.lower()} - вы медлите")
         return turn
 
     # --- части хода -----------------------------------------------------------
@@ -315,10 +315,10 @@ class MobBrain:
             turn.lines.append(f"{mob.name}: {self.ability.title.lower()} - {per_tick} урона за ход")
         elif kind == EffectKind.WEAKEN:
             target.apply_effect(kind, trait.value, trait.duration, mob.id, decays=False)
-            turn.lines.append(f"{mob.name} ослабляет тебя на {trait.value:.0%}")
+            turn.lines.append(f"{mob.name} ослабляет вас на {trait.value:.0%}")
         else:
             target.apply_effect(kind, trait.value, trait.duration, mob.id, decays=False)
-            turn.lines.append(f"{mob.name}: ты получаешь на {trait.value:.0%} больше урона")
+            turn.lines.append(f"{mob.name}: вы получаете на {trait.value:.0%} больше урона")
 
     def _self_upkeep(
         self, mob: CombatantState, target: CombatantState | None,

@@ -280,7 +280,7 @@ def _view_text(run, cid: int, leader_name: str, head: str | None = None,
             lines.append(texts.SPECIAL_TEXT.get(kind, ""))
         if kind == rules.WELL and not run.gifts:
             lines.append("Бросить в колодец нечего: даров у группы нет.")
-        lines.append("Выбери действие кнопкой или иди дальше." if leader else f"Решает {leader_name}.")
+        lines.append("Выберите действие кнопкой или идите дальше." if leader else f"Решает {leader_name}.")
     elif run.pos in (run.cleared or []):
         lines.append(texts.CLEARED_ROOM)
     if run.phase != ruins_service.CLEARED and ruins_service.boss_down(run):
@@ -292,7 +292,7 @@ def _view_text(run, cid: int, leader_name: str, head: str | None = None,
             if waiting:
                 lines.append(texts.not_ready_line(waiting))
         elif cid in run.pending.get("ok", []):
-            lines.append(texts.not_ready_line(waiting) if waiting else "Ты готов идти. Ждём остальных.")
+            lines.append(texts.not_ready_line(waiting) if waiting else "Вы готовы идти. Ждём остальных.")
         else:
             lines.append(texts.pending_text(leader_name, run.pending["dir"]))
     elif not leader:
@@ -353,7 +353,7 @@ async def enter(message: Message) -> None:
             if reason is None and _busy_elsewhere(peer, member):
                 reason = "занят"
             if reason:
-                who = "Тебе" if member.id == character.id else member.name
+                who = "Вам" if member.id == character.id else member.name
                 await message.answer(f"Спуск невозможен - {who}: {reason}")
                 return
         try:
@@ -369,7 +369,7 @@ async def enter(message: Message) -> None:
         _inside[peer] = run_id
         pvp_shield.drop(cid)
     for peer in behind_peers.values():
-        await _send(peer, "Группа спустилась в руины без тебя: ты стоял не у забоя.")
+        await _send(peer, "Группа спустилась в руины без вас: вы стояли не у забоя.")
     logger.info("Руины {}: спуск, {} человек", run_id, len(going))
     await _broadcast_view(run_id, texts.PROLOGUE, photo="пролог")
 

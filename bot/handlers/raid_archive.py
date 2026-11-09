@@ -236,10 +236,10 @@ async def _start_riddles(run: ArchiveRun) -> None:
         for pos in sorted(run.riddles[cid]):
             a = run.phrase.assignments[pos - 1]
             parts.append(f"❓ «{a.question}»\nОтвет - слово №{pos} из {run.phrase.size}.")
-        parts.append("Ответ напиши сообщением.")
+        parts.append("Ответ напишите сообщением.")
         if cid == run.leader_id:
             parts.append(
-                f"👑 Ты лидер. Когда соберёте слова, введи строку двери целиком:\n{run.phrase.masked()}"
+                f"👑 Вы лидер. Когда соберёте слова, введите строку двери целиком:\n{run.phrase.masked()}"
             )
         parts.append(_left(run))
         await _send(peer, "\n\n".join(parts), raid_kb.raid_waiting_keyboard(), at.stage_attachment(2))
@@ -281,13 +281,13 @@ async def on_answer(message: Message) -> None:
         assignment = run.phrase.assignments[pos - 1]
         if archive_riddles.answer_is(text, assignment):
             run.solved_words.add(pos)
-            tail = "" if cid == run.leader_id else " Передай его лидеру."
+            tail = "" if cid == run.leader_id else " Передайте его лидеру."
             await message.answer(f"✅ Верно. Слово №{pos}: «{assignment.word}».{tail}")
             return
     if mine:
         await message.answer(f"❌ Не то. {_left(run)}")
     elif cid == run.leader_id:
-        await message.answer("Строку двери вводи целиком, все слова сразу.")
+        await message.answer("Строку двери вводите целиком, все слова сразу.")
 
 
 async def _phrase_attempt(run: ArchiveRun, text: str) -> None:

@@ -23,7 +23,7 @@ labeler.vbml_ignore_case = True  # команды без учёта регист
 _NS = "presets"
 _bot_api = None
 
-NO_SUBCLASS_TEXT = "Твоя Метка ещё не обрела форму - пресеты недоступны."
+NO_SUBCLASS_TEXT = "Ваша Метка ещё не обрела форму - пресеты недоступны."
 IN_COMBAT_TEXT = "Не сейчас. Кровь занята другим."
 
 
@@ -36,7 +36,7 @@ def setup(bot_api) -> None:
 
 def _list_text(presets: list[CharacterBuffPreset]) -> str:
     if not presets:
-        return "⚔️ Пресетов пока нет. Собери первый в разделе «Персонаж» мини-аппа."
+        return "⚔️ Пресетов пока нет. Соберите первый в разделе «Персонаж» мини-аппа."
     lines = ["⚔️ Пресеты:", ""]
     for idx, preset in enumerate(presets, start=1):
         mark = "✅" if preset.is_active else "▫️"
@@ -118,14 +118,14 @@ async def switch_preset_command(message: Message, n: int) -> None:
 
         presets = await preset_service.presets_of(db, character)
         if n < 1 or n > len(presets):
-            await message.answer(f"Пресет {n} пуст. Собери его в разделе «Персонаж».")
+            await message.answer(f"Пресет {n} пуст. Соберите его в разделе «Персонаж».")
             return
 
         target = presets[n - 1]
         try:
             _preset, note = await preset_service.switch_with_runes(db, character, target.id)
         except PresetValidationError:
-            await message.answer(f"Пресет {n} пуст. Собери его в разделе «Персонаж».")
+            await message.answer(f"Пресет {n} пуст. Соберите его в разделе «Персонаж».")
             return
         await db.commit()
         catalog = load_content().buffs

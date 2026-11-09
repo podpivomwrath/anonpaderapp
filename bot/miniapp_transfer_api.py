@@ -73,9 +73,9 @@ async def handle_post_transfer(request: web.Request) -> web.Response:
         name, number = transfer_service.parse(command[len(COMMAND):].strip())
         lookup = await transfer_service.find(db, sender.id, name, number)
         if not lookup.offers:
-            return _bad(lookup.refusal or "Этого у тебя уже нет.")
+            return _bad(lookup.refusal or "Этого у вас уже нет.")
         if len(lookup.offers) > 1:
-            return _bad("Под это название подходит несколько вещей - передай из карточки нужной.")
+            return _bad("Под это название подходит несколько вещей - передайте из карточки нужной.")
         offer = lookup.offers[0]
         # У экипировки число в команде - номер вещи, у стаков - количество.
         amount, refusal = chat._resolve_qty(offer, qty if offer.stackable else None)
@@ -110,8 +110,8 @@ async def handle_post_transfer(request: web.Request) -> web.Response:
 
     if courier:
         # Получатель узнает, когда курьер заберёт посылку (bot/handlers/courier.py).
-        return web.json_response({"done": f"{cc.EMOJI} Курьер выбежал из твоего города за посылкой для {recipient_name}: {what}."})
-    note = f"📦 {sender_name} передаёт тебе: {what}." if reveal else f"📦 Тебе передали: {what}."
+        return web.json_response({"done": f"{cc.EMOJI} Курьер выбежал из вашего города за посылкой для {recipient_name}: {what}."})
+    note = f"📦 {sender_name} передаёт вам: {what}." if reveal else f"📦 Вам передали: {what}."
     if chat._bot_api is not None:
         try:
             await chat._bot_api.messages.send(peer_id=recipient_vk, random_id=0, message=note)

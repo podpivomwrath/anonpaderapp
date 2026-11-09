@@ -435,7 +435,7 @@ export default function Hub() {
       action={<Button size="l" loading={termsBusy} onClick={accept}>✅ Принимаю</Button>}
     >
       <b>📜 Прежде чем продолжить</b>
-      <p>Нажимая «Принимаю», ты подтверждаешь, что тебе исполнилось 18 лет, и принимаешь условия игры:</p>
+      <p>Нажимая «Принимаю», вы подтверждаете, что вам исполнилось 18 лет, и принимаете условия игры:</p>
       {(terms.docs || []).map((d) => (
         <p key={d.url}><a href={d.url} target="_blank" rel="noopener noreferrer">{d.title}</a></p>
       ))}
@@ -490,7 +490,7 @@ export default function Hub() {
             </Button>
           }
         >
-          Не удалось открыть хаб персонажа. Проверь, что мини-апп открыт из ВКонтакте.
+          Не удалось открыть хаб персонажа. Проверьте, что мини-апп открыт из ВКонтакте.
         </Placeholder>
       </Panel>
     );

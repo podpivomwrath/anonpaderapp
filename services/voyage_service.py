@@ -77,7 +77,7 @@ async def buy(db: AsyncSession, character: Character) -> CharacterVoyage:
     if character.level < vc.VOYAGE_MIN_LEVEL:
         raise VoyageError(f"В долгий путь отпускают с {vc.VOYAGE_MIN_LEVEL} уровня.")
     if await get(db, character.id) is not None:
-        raise VoyageError(f"{trip.gear} у тебя уже есть.")
+        raise VoyageError(f"{trip.gear} у вас уже есть.")
     try:
         await wallet_service.charge(db, character.id, "farm", vc.VOYAGE_PRICE)
     except wallet_service.NotEnoughCurrency:
@@ -99,7 +99,7 @@ async def upgrade(db: AsyncSession, character: Character, part_id) -> CharacterV
     if voyage is None:
         raise VoyageError("Сначала нужно снаряжение.")
     if voyage.status == "away":
-        raise VoyageError("Ты в пути.")
+        raise VoyageError("Вы в пути.")
     cost = upgrade_cost(voyage, part_id)
     if cost is None:
         raise VoyageError("Улучшено до предела.")
@@ -120,13 +120,13 @@ async def start(db: AsyncSession, character: Character, now: datetime | None = N
     if voyage is None:
         raise VoyageError("Сначала нужно снаряжение.")
     if voyage.status == "away":
-        raise VoyageError("Ты уже в пути.")
+        raise VoyageError("Вы уже в пути.")
     from services import death_service, mount_service, movement_service
 
     if death_service.is_dead(character, now):
         raise VoyageError("☠ Сначала очнись.")
     if movement_service.is_traveling(character, now) or await mount_service.active_travel(db, character.id):
-        raise VoyageError("Ты в дороге.")
+        raise VoyageError("Вы в дороге.")
     hours = part_value(voyage, "endurance")
     voyage.status = "away"
     voyage.region = character.region
@@ -428,7 +428,7 @@ async def come_back(db: AsyncSession, character: Character) -> str:
     """Вернуться раньше времени. Награды за прошедшие часы уже начислены."""
     voyage = await get(db, character.id, lock=True)
     if voyage is None or voyage.status != "away":
-        raise VoyageError("Ты не в пути.")
+        raise VoyageError("Вы не в пути.")
     text = _finish(voyage, early=True)
     await db.flush()
     return text

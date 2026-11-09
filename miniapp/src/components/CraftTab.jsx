@@ -205,7 +205,7 @@ function Forge({ data, busy, run, strike }) {
             </ForgeSlot>
           </div>
           <p className="craft-hint">
-            Выбери некованый предмет с рейд-босса и руду. Тир руды задаёт стартовую эффективность (80-100%),
+            Выберите некованый предмет с рейд-босса и руду. Тир руды задаёт стартовую эффективность (80-100%),
             градация - точность: чем она выше, тем больше очков уходит в главные характеристики варианта.
           </p>
         </Div>
@@ -235,7 +235,7 @@ function Forge({ data, busy, run, strike }) {
               </p>
             </>
           ) : (
-            <p className="craft-hint">Выбери, во что ковать: танк, урон или поддержка.</p>
+            <p className="craft-hint">Выберите, во что ковать: танк, урон или поддержка.</p>
           )}
         </Div>
       </Group>
@@ -261,7 +261,7 @@ function Forge({ data, busy, run, strike }) {
           <Button size="l" stretched mode="primary"
             disabled={busy || !item || !oreRow || !chosen || oreRow.count < cost}
             onClick={() => setConfirming(true)}>
-            {!item ? 'Выбери предмет' : !oreRow ? 'Выбери руду' : !chosen ? 'Выбери результат'
+            {!item ? 'Выберите предмет' : !oreRow ? 'Выберите руду' : !chosen ? 'Выберите результат'
               : oreRow.count < cost ? `Не хватает руды: ${oreRow.count} из ${cost}` : 'Создать'}
           </Button>
         )}
@@ -292,7 +292,7 @@ function Forge({ data, busy, run, strike }) {
           <p className="craft-hint forge-sheet__hint">
             Тир руды - стартовая эффективность. Градация - точность характеристик: обычная оставляет шансы как есть,
             редкая, эпическая и легендарная всё сильнее сдвигают очки в главные характеристики.
-            {chosen ? '' : ' Выбери вариант ковки - и здесь будет видно, как градация меняет главную характеристику.'}
+            {chosen ? '' : ' Выберите вариант ковки - и здесь будет видно, как градация меняет главную характеристику.'}
           </p>
           {groups.length === 0 && <p className="craft-hint">Подходящей руды нет: в ковку идёт руда первых трёх тиров.</p>}
           {groups.map((group) => group.grades.map((row) => {
@@ -307,7 +307,7 @@ function Forge({ data, busy, run, strike }) {
                   <small>
                     старт {row.craft_efficiency}%
                     {topChance(row.grade) ? ` · ${STAT_TITLES[topChance(row.grade).stat] || topChance(row.grade).stat} ${topChance(row.grade).pct}%` : ''}
-                    {' · '}у тебя {row.count}{enough ? '' : ` - не хватает, нужно ${cost}`}
+                    {' · '}у вас {row.count}{enough ? '' : ` - не хватает, нужно ${cost}`}
                   </small>
                 </span>
               </button>
@@ -342,7 +342,7 @@ function ToolForge({ data, busy, run, need, itemName }) {
             <ForgeSlot label="Руда" filled={!!group} onClick={() => { setOpen(true); setConfirming(false); }}>
               <ItemIcon icon={group ? `ore:${group.id}` : null} rarity={group?.grades[group.grades.length - 1]?.grade} alt={group?.name} />
               <span className="forge-slot__name">{group?.name}</span>
-              {group && <span className="forge-slot__sub">у тебя {group.total}</span>}
+              {group && <span className="forge-slot__sub">у вас {group.total}</span>}
             </ForgeSlot>
             <span className="forge-plus">=</span>
             <ForgeSlot label="Инструмент" filled={!!group} onClick={() => { setOpen(true); setConfirming(false); }}>
@@ -353,12 +353,12 @@ function ToolForge({ data, busy, run, need, itemName }) {
           {group ? (
             <p className="craft-hint">
               Получится инструмент, который качает до {group.tool_ceiling}%. Уйдёт {group.tool_cost} шт.
-              {pick ? ` (${pick.grade_name.toLowerCase()})` : ''}, у тебя {group.total}.
+              {pick ? ` (${pick.grade_name.toLowerCase()})` : ''}, у вас {group.total}.
               {weak(group) ? ` Для «${itemName}» он слабоват - нужен потолок от ${need}%.` : ''}
             </p>
           ) : (
             <p className="craft-hint">
-              Положи руду - инструмент куётся из неё. Тир руды задаёт потолок: чем дороже руда, тем выше
+              Положите руду - инструмент куётся из неё. Тир руды задаёт потолок: чем дороже руда, тем выше
               ступень он закроет.{need !== null ? ` Для «${itemName}» нужен потолок от ${need}%.` : ''}
             </p>
           )}
@@ -377,7 +377,7 @@ function ToolForge({ data, busy, run, need, itemName }) {
             </div>
           ) : (
             <Button size="l" stretched mode="secondary" disabled={busy || !group || !pick} onClick={() => setConfirming(true)}>
-              {!group ? 'Выбери руду'
+              {!group ? 'Выберите руду'
                 : !pick ? `Не хватает руды: нужно ${group.tool_cost} одной градации, есть ${Math.max(0, ...group.grades.map((row) => row.count))}`
                   : 'Выковать инструмент'}
             </Button>
@@ -406,7 +406,7 @@ function ToolForge({ data, busy, run, need, itemName }) {
                 <span className="crown-sheet__text">
                   <b>{g.name} → до {g.tool_ceiling}%</b>
                   <small>
-                    нужно {g.tool_cost} одной градации · у тебя {best}
+                    нужно {g.tool_cost} одной градации · у вас {best}
                     {g.total > best ? ` (всего ${g.total}, градации не смешиваются)` : ''}
                     {enough ? '' : ' - не хватает'}
                     {weak(g) ? ' · слабоват для этой вещи' : ''}
@@ -435,9 +435,9 @@ function Upgrade({ data, busy, run, strike }) {
   const reset = () => setConfirming(false);
 
   let blocker = null;
-  if (!item) blocker = 'Выбери предмет';
+  if (!item) blocker = 'Выберите предмет';
   else if (need === null) blocker = 'Уже потолок';
-  else if (!tool) blocker = 'Выбери инструмент';
+  else if (!tool) blocker = 'Выберите инструмент';
   else if (!fits(tool)) blocker = `Нужен инструмент до ${need}%`;
 
   return (
@@ -454,7 +454,7 @@ function Upgrade({ data, busy, run, strike }) {
             <ForgeSlot label="Инструмент" filled={!!tool} onClick={() => { setPicker('tool'); reset(); }}>
               <ItemIcon icon={tool ? `tool:${tool.ceiling}` : null} alt="Инструмент" />
               <span className="forge-slot__name">{tool ? `До ${tool.ceiling}%` : ''}</span>
-              {tool && <span className="forge-slot__sub">у тебя ×{tool.count}</span>}
+              {tool && <span className="forge-slot__sub">у вас ×{tool.count}</span>}
             </ForgeSlot>
           </div>
           <p className="craft-hint">
@@ -466,7 +466,7 @@ function Upgrade({ data, busy, run, strike }) {
 
       <Group header={<Header>Что получится</Header>}>
         <Div>
-          {!item && <p className="craft-hint">Выбери выкованную вещь - здесь будет видно, как вырастут характеристики.</p>}
+          {!item && <p className="craft-hint">Выберите выкованную вещь - здесь будет видно, как вырастут характеристики.</p>}
           {item && need === null && <p className="craft-hint">«{item.name}» уже на {item.efficiency}% - это потолок.</p>}
           {item && data.efficiency && <EffLadder eff={data.efficiency} now={item.efficiency} next={need} />}
           {item && need !== null && (
@@ -535,7 +535,7 @@ function Upgrade({ data, busy, run, strike }) {
           <p className="craft-hint forge-sheet__hint">
             {need !== null
               ? `Нужен потолок от ${need}%. Инструмент слабее не подойдёт, сильнее - подойдёт, но жалко.`
-              : 'Сначала выбери предмет - будет видно, какой инструмент подходит.'}
+              : 'Сначала выберите предмет - будет видно, какой инструмент подходит.'}
           </p>
           {data.tools.length === 0 && <p className="craft-hint">Инструментов нет - выкуй ниже из руды.</p>}
           {data.tools.map((t) => (
@@ -545,7 +545,7 @@ function Upgrade({ data, busy, run, strike }) {
               <ItemIcon icon={`tool:${t.ceiling}`} alt="Инструмент" />
               <span className="crown-sheet__text">
                 <b>Инструмент до {t.ceiling}%</b>
-                <small>у тебя ×{t.count}{need !== null && !fits(t) ? ` - слабее нужного (${need}%)` : ''}</small>
+                <small>у вас ×{t.count}{need !== null && !fits(t) ? ` - слабее нужного (${need}%)` : ''}</small>
               </span>
             </button>
           ))}

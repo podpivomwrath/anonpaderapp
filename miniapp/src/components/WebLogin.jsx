@@ -68,8 +68,8 @@ export async function completeWebLogin() {
 }
 
 const ERRORS = {
-  state_mismatch: 'Вход прервался. Попробуй ещё раз.',
-  login_failed: 'VK не подтвердил вход. Попробуй ещё раз.',
+  state_mismatch: 'Вход прервался. Попробуйте ещё раз.',
+  login_failed: 'VK не подтвердил вход. Попробуйте ещё раз.',
   web_login_disabled: 'Вход на сайте ещё не включён.',
 };
 

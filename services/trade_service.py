@@ -71,7 +71,7 @@ async def _check_name(db: AsyncSession, name: str) -> str:
     if not _NAME_RE.match(name):
         raise TradeError("В названии - только буквы, цифры, пробел и дефис.")
     if onboarding_service.contains_banned_word(name):
-        raise TradeError("Такое название не пройдёт - выбери другое.")
+        raise TradeError("Такое название не пройдёт - выберите другое.")
     if await db.scalar(select(TradeFirm.character_id).where(TradeFirm.name_key == name.lower())) is not None:
         raise TradeError("Фирма с таким названием уже есть.")
     return name
@@ -90,7 +90,7 @@ async def buy_firm(db: AsyncSession, character: Character, name=None) -> TradeFi
         raise TradeError(f"Торговать можно с {tc.TRADE_MIN_LEVEL} уровня.")
     home = _home(character)
     if await get_firm(db, character.id) is not None:
-        raise TradeError("Фирма у тебя уже есть.")
+        raise TradeError("Фирма у вас уже есть.")
     name = await _check_name(db, name) if name is not None else None
     try:
         await wallet_service.charge(db, character.id, "farm", tc.FIRM_PRICE)
@@ -123,7 +123,7 @@ async def name_firm(db: AsyncSession, character: Character, name) -> TradeFirm:
 async def require_firm(db: AsyncSession, character: Character, lock: bool = False) -> TradeFirm:
     firm = await get_firm(db, character.id, lock=lock)
     if firm is None:
-        raise TradeError("Сначала открой торговую фирму.")
+        raise TradeError("Сначала откройте торговую фирму.")
     if not firm.name:
         raise TradeError("Сначала дай фирме название.")
     return firm
@@ -411,9 +411,9 @@ async def dispatch(
     if to_city == cart.city:
         raise TradeError("Повозка уже в этом городе.")
     if route not in tc.ROUTES:
-        raise TradeError("Выбери путь.")
+        raise TradeError("Выберите путь.")
     if cart.durability <= 0:
-        raise TradeError("Обшивка выбита - сначала почини повозку.")
+        raise TradeError("Обшивка выбита - сначала почините повозку.")
     if not isinstance(goods, dict):
         raise TradeError("Неверный заказ.")
     order: list[tuple[tc.Good, int]] = []

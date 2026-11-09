@@ -92,7 +92,7 @@ def effects_of(guild: Guild) -> dict[str, float]:
 async def plant_banner(db: AsyncSession, actor: Character, x: int, y: int) -> GuildCell:
     guild, _member = await guild_service.require_treasurer(db, actor)
     if (actor.pos_x, actor.pos_y) != (x, y):
-        raise GuildError("Знамя ставят на месте: встань на эту клетку.")
+        raise GuildError("Знамя ставят на месте: встаньте на эту клетку.")
     reason = claim_reason(x, y)
     if reason:
         raise GuildError(reason)
@@ -203,7 +203,7 @@ async def abandon(db: AsyncSession, actor: Character, cell_id: int) -> GuildCell
     guild, _member = await guild_service.require_treasurer(db, actor)
     cell = await db.get(GuildCell, cell_id)
     if cell is None or cell.guild_id != guild.id:
-        raise GuildError("Это не земля твоей гильдии.")
+        raise GuildError("Это не земля вашей гильдии.")
     if await active_siege_on(db, cell.x, cell.y) is not None:
         raise GuildError("Под осадой землю не бросают.")
     await guild_service.log(db, guild.id, "abandon", f"{actor.name} оставляет клетку ({cell.x}; {cell.y}).", actor.id)
@@ -250,7 +250,7 @@ def quote(guild: Guild, building: str, level: int) -> BuildQuote:
 async def _held_cell(db: AsyncSession, guild: Guild, cell_id: int) -> GuildCell:
     cell = await db.get(GuildCell, cell_id)
     if cell is None or cell.guild_id != guild.id or cell.status != "held":
-        raise GuildError("Это не база твоей гильдии.")
+        raise GuildError("Это не база вашей гильдии.")
     return cell
 
 

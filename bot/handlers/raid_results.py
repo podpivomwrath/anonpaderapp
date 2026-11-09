@@ -187,10 +187,10 @@ async def on_raid_tick_resolved(session_id: int, tick: int, result: TickResult) 
         battle.frozen_now = set(frozen_ids)
         for cid in frozen_ids:
             held = (
-                "📖 Каталог сковал тебя: следующий ход ты пропускаешь." if battle.is_archive
-                else "⛓ Тебя держат: следующий ход ты пропускаешь." if battle.is_rift
+                "📖 Каталог сковал вас: следующий ход вы пропускаете." if battle.is_archive
+                else "⛓ Вас держат: следующий ход вы пропускаете." if battle.is_rift
                 else _ruins_held(battle) if battle.is_ruins
-                else "🦴 Руки держат крепко: следующий ход ты пропускаешь."
+                else "🦴 Руки держат крепко: следующий ход вы пропускаете."
             )
             notices[cid] = f"{notices[cid]}\n{held}" if notices.get(cid) else held
     await raid_combat._broadcast_board(session_id, battle, result, notices, boss_lines=extra_lines,
@@ -503,7 +503,7 @@ async def _grant_stage_clear_bonus(battle: raid_combat.RaidBattle) -> None:
         try:
             await raid_combat._bot_api.messages.send(
                 peer_id=peer_id,
-                message=f"🔴 Тебе достаётся {scalpel.name}.",
+                message=f"🔴 Вам достаётся {scalpel.name}.",
                 random_id=0,
             )
         except Exception:
@@ -626,8 +626,8 @@ def _ruins_held(battle) -> str:
     """Руины: пропуск хода - это завал Привратника (2026-11-05: раньше
     приходило «Руки держат крепко» из рейда, игрок решал, что ход не прошёл)."""
     if len(battle.participants) == 1:
-        return "🪨 Тебя засыпало: следующий ход пропускаешь, потом выберешься сам."
-    return "🪨 Тебя засыпало: ход пропускаешь, пока тебя не откопают («⛏ Разгрести»)."
+        return "🪨 Вас засыпало: следующий ход пропускаете, потом выберетесь сами."
+    return "🪨 Вас засыпало: ход пропускаете, пока вас не откопают («⛏ Разгрести»)."
 
 
 #: Павшие в пройденном разломе поднимаются с этой долей здоровья (2026-10-16).
@@ -714,7 +714,7 @@ async def _cleanup_and_return(session_id: int, battle: raid_combat.RaidBattle, t
     for cid, p in list(battle.participants.items()):
         if cid in has_mount_by_cid:
             raised_line = (
-                f"\n\n🩸 Ты пал в {'разломе' if battle.is_rift else 'рейде'}, но группа его прошла и подняла тебя: "
+                f"\n\n🩸 Вы пали в {'разломе' if battle.is_rift else 'рейде'}, но группа его прошла и подняла вас: "
                 f"{round(RIFT_RAISED_HP_PCT * 100)}% здоровья, опыт не потерян."
                 if cid in raised else ""
             )
@@ -796,4 +796,4 @@ def _syringe_tick(battle, surgeon, result, extra_lines: list[str]) -> None:
     extra_lines.append(rt.SURGEON_SYRINGE_INJECT[drawn].format(turns=turns))
 
 
-SAFE_EXIT_LINE = f"\n\n🛡 {bc.PVP_SAFE_SECONDS // 60} мин. на тебя нельзя нападать, пока не ушёл с этой клетки. Нападёшь сам - защита пропадёт."
+SAFE_EXIT_LINE = f"\n\n🛡 {bc.PVP_SAFE_SECONDS // 60} мин. на вас нельзя нападать, пока не ушли с этой клетки. Нападёте сами - защита пропадёт."

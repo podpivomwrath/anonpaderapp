@@ -55,11 +55,11 @@ async def contracts_command(message: Message) -> None:
             for contract, target in rows
         ]
         if await contract_service.is_target(db, character.id, now):
-            lines.append("📜 На тебя есть заказ: вне городов охотники видят тебя на карте.")
+            lines.append("📜 На вас есть заказ: вне городов охотники видят вас на карте.")
     if not lines:
         await info_reply.answer(message, "📜 Взятых заказов нет. Заказы - на «Доске» в мини-аппе, вкладка «Заказы».")
         return
-    await info_reply.answer(message, "📜 Твои заказы:\n\n" + "\n".join(lines))
+    await info_reply.answer(message, "📜 Ваши заказы:\n\n" + "\n".join(lines))
 
 
 async def notify_target(target_id: int, kills: int) -> None:
@@ -74,10 +74,10 @@ async def notify_target(target_id: int, kills: int) -> None:
         await _bot_api.messages.send(
             peer_id=peer, random_id=0,
             message=(
-                f"📜 На тебя оформлен заказ: убийств - {kills}. Пока он действует (до 20 ч), охотники, "
-                "взявшие его, видят тебя на карте, а озёра и АФК от них не спасают. На руднике "
-                "не тронут, пока ты внутри штольни. Спасение - города, Монолит и клетка мирового босса. "
-                "Вне боя можно откупиться на «Доске» за двойную цену оставшихся убийств - тогда узнаешь, кто заказал."
+                f"📜 На вас оформлен заказ: убийств - {kills}. Пока он действует (до 20 ч), охотники, "
+                "взявшие его, видят вас на карте, а озёра и АФК от них не спасают. На руднике "
+                "не тронут, пока вы внутри штольни. Спасение - города, Монолит и клетка мирового босса. "
+                "Вне боя можно откупиться на «Доске» за двойную цену оставшихся убийств - тогда узнаете, кто заказал."
             ),
         )
     except Exception:
@@ -93,7 +93,7 @@ async def notify_bought(bought: contract_service.Buyout, target_name: str) -> No
     notes = []
     if bought.contract.orderer_id:
         notes.append((bought.contract.orderer_id, (
-            f"📜 {target_name} откупился от твоего заказа и узнал, что заказчик - ты. Остаток заказа сгорел, "
+            f"📜 {target_name} откупился от вашего заказа и узнал, что заказчик - вы. Остаток заказа сгорел, "
             f"снова заказать {target_name} можно через {cc.BUYOUT_REORDER_HOURS} ч."
         )))
     notes += [(cid, f"📜 {target_name} откупился - заказ на него снят.") for cid in bought.taker_ids]
@@ -126,7 +126,7 @@ async def expire_job() -> None:
         try:
             await _bot_api.messages.send(
                 peer_id=peer, random_id=0,
-                message="📜 Заказов на тебя больше нет - мирные клетки и АФК снова защищают.",
+                message="📜 Заказов на вас больше нет - мирные клетки и АФК снова защищают.",
             )
         except Exception:
             pass

@@ -329,7 +329,7 @@ async def leave_mine(message: Message) -> None:
         keyboard = await world._current_keyboard(db, character, message.peer_id, datetime.now(timezone.utc))
         await db.commit()
     _cancel_finish(message.peer_id)
-    await message.answer("Ты поднимаешься наверх.", keyboard=keyboard)
+    await message.answer("Вы поднимаетесь наверх.", keyboard=keyboard)
 
 
 @labeler.message(payload_contains={"type": "dig_vein"})
@@ -377,7 +377,7 @@ async def ring_list_command(message: Message, match: tuple) -> None:
     rings = sorted({m.tier for m in mining_rules.all_mines()})
     if ring not in rings:
         await message.answer(
-            "Напиши номер кольца: " + ", ".join(f"/руда{r}" for r in rings)
+            "Напишите номер кольца: " + ", ".join(f"/руда{r}" for r in rings)
             + ". Первое - внешнее (1-15 ур.), дальше ближе к Монолиту."
         )
         return

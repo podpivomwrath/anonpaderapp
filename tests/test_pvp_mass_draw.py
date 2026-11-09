@@ -47,6 +47,6 @@ async def test_fallen_in_a_mass_draw_are_told_they_died(db_session, make_charact
     pvp_handlers._battles[-901] = battle
     await pvp_handlers.on_mass_battle_finished(-901, SimpleNamespace(draw=True, draw_reason="turn_limit"))
     texts = dict(api.messages.sent)
-    assert "Тебя одолели" in texts[9000 + fallen.id]
+    assert "Вас одолели" in texts[9000 + fallen.id]
     assert "Расходитесь, пока целы" not in texts[9000 + fallen.id]
     assert "павшие" in texts[9000 + alive_a.id]

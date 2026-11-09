@@ -55,7 +55,7 @@ async def _render_list(db, character, page: int = 1) -> tuple[str, list[tuple[It
     страницы (патч 109: раньше текст показывал всё разом)."""
     items = await item_service.get_inventory(db, character.id)
     if not items:
-        return "🎒 Твоя сумка пока пуста.", items
+        return "🎒 Ваша сумка пока пуста.", items
     page, total_pages = inventory_page_bounds(len(items), page)
     start = (page - 1) * INVENTORY_PAGE_SIZE
     lines = []

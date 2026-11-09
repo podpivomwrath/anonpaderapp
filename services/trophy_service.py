@@ -239,7 +239,7 @@ def lost_line(lost: dict[str, int]) -> str:
     for trophy_id, n in lost.items():
         d = trophy_def(trophy_id)
         parts.append(f"{d.emoji} {d.name} ×{n}" if d else f"{trophy_id} ×{n}")
-    return "🔥 Реликвии при тебе рассыпались в пепел: " + ", ".join(parts) + "."
+    return "🔥 Реликвии при вас рассыпались в пепел: " + ", ".join(parts) + "."
 
 
 async def split_among(
@@ -303,7 +303,7 @@ DROP_SOURCE_PREFIXES: dict[str, str] = {
     "ash_handful": "В пепле находится",
     "dead_box": "В шкатулке лежит",
     "monolith_shard": "Среди осколков лежит",
-    "wounded_wanderer": "Он вкладывает тебе в ладонь",
+    "wounded_wanderer": "Он вкладывает вам в ладонь",
     "ash_altar": "Среди подношений",
     "world_boss": "Добыча",
     "event": "Добыча",             # патч 110: события со сценами
@@ -325,5 +325,5 @@ def format_drop_line(drop: dict[str, int], source: str = "mob") -> str | None:
             continue
         suffix = f" ×{amount}" if amount > 1 else ""
         parts.append(f"{trophy_def.emoji} {trophy_def.name}{suffix}")
-    prefix = DROP_SOURCE_PREFIXES.get(source, "Ты находишь")
+    prefix = DROP_SOURCE_PREFIXES.get(source, "Вы находите")
     return f"{prefix}: " + ", ".join(parts) + "."

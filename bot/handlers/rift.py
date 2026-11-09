@@ -191,7 +191,7 @@ async def maybe_send_here_button(peer_id: int, character) -> None:
     text = texts.here_text(rift, rift_service.minutes_left(rift))
     if not rift_service.level_fits(character.level, rift):
         lo, hi = rift_service.band(rift)
-        await _send(peer_id, f"{text}\n\n🔒 Тебе не по уровню: разлом для {lo}-{hi}.")
+        await _send(peer_id, f"{text}\n\n🔒 Вам не по уровню: разлом для {lo}-{hi}.")
         return
     await _send(peer_id, text, keyboard=_enter_keyboard(rift.id),
                 attachment=texts.RiftTexts(rift.kind).prologue_attachment())
@@ -232,7 +232,7 @@ async def enter(message: Message) -> None:
             if reason is None and _busy_elsewhere(peer, member):
                 reason = "занят"
             if reason:
-                who = "Тебе" if member.id == character.id else member.name
+                who = "Вам" if member.id == character.id else member.name
                 await message.answer(f"Вход невозможен - {who}: {reason}")
                 return
         try:

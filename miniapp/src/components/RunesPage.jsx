@@ -103,7 +103,7 @@ function RuneSheet({ rune, busy, onAbsorb, onClose }) {
       <p className="rune-sheet__have">В сумке: {rune.count}</p>
       {max > 0 && (
         <div className="rune-absorb">
-          <p className="rune-absorb__hint">Впитанная копия исчезает и навсегда поднимает твоё мастерство этой руны.</p>
+          <p className="rune-absorb__hint">Впитанная копия исчезает и навсегда поднимает ваше мастерство этой руны.</p>
           <div className="rune-absorb__row">
             <input type="range" min={1} max={max} value={Math.min(count, max)} onChange={(e) => setCount(Number(e.target.value))} />
             <b>{Math.min(count, max)}</b>
@@ -128,12 +128,12 @@ function SocketSheet({ kind, socket, data, skill, busy, onEquip, onUnequip, onBu
           </>
         ) : socket.price ? (
           <>
-            <p>Открыть слот за 💰 {gold(socket.price)}? У тебя 💰 {gold(data.gold)}.</p>
+            <p>Открыть слот за 💰 {gold(socket.price)}? У вас 💰 {gold(data.gold)}.</p>
             <button type="button" className="pill-btn" disabled={busy || data.gold < socket.price} onClick={onBuy}>
               Открыть за {gold(socket.price)}
             </button>
           </>
-        ) : <p>Сначала открой предыдущий слот.</p>}
+        ) : <p>Сначала откройте предыдущий слот.</p>}
       </Sheet>
     );
   }
@@ -224,7 +224,7 @@ export default function RunesPage({ data, onData, kind, onKind }) {
       )}
       {error && <p className="hero-error">{error}</p>}
 
-      <h3 className="rune-bag__title">Твои руны</h3>
+      <h3 className="rune-bag__title">Ваши руны</h3>
       {bag.length === 0 && <p className="rune-hint">Руны падают с мобов. Их можно купить и продать на рынке.</p>}
       <div className="rune-bag">
         {bag.map((r) => (

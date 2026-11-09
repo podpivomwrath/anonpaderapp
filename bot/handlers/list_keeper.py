@@ -80,7 +80,7 @@ def path_attachment(subclass_id: str) -> str | None:
 STATE_OFFER = "subclass_offer"
 STATE_PATH_SELECT = "subclass_path_select"
 #: Повторный выбор пути после смены класса/подкласса (временно бесплатно).
-FREE_REPICK_LINE = "Ты уже платил за путь. После смены класса новый выбирается без платы."
+FREE_REPICK_LINE = "Вы уже платили за путь. После смены класса новый выбирается без платы."
 STATE_PATH_CONFIRM = "subclass_path_confirm"
 # Отказ от подкласса (2026-10-20): подтверждение живёт в памяти, после
 # рестарта игрок вернётся на прежний шаг (предложение или выбор пути).
@@ -302,7 +302,7 @@ async def decline_confirm(message: Message) -> None:
         text += f"\n\n{story_reward_text}"
     await message.answer(text, keyboard=tavern_keyboard(character))
     if story_reward_text:
-        await message.answer(f"📜 {mentor_name(character.region)} ждёт тебя в городе.")
+        await message.answer(f"📜 {mentor_name(character.region)} ждёт вас в городе.")
 
 
 @labeler.message(state=SubclassSelectState.DECLINE_CONFIRM)
@@ -404,7 +404,7 @@ async def path_confirm(message: Message) -> None:
     if story_reward_text:
         # патч 21, п.1: сюжет продвинулся (акт 4 открыт) — игрок сейчас у
         # Хранителя, не у наставника, поэтому пингуем сами
-        await message.answer(f"📜 {mentor_name(character.region)} ждёт тебя в городе.")
+        await message.answer(f"📜 {mentor_name(character.region)} ждёт вас в городе.")
     await _send_trials(peer_id, character)
 
 

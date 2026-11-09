@@ -500,7 +500,7 @@ def _note_receiver(notes: list, actor, receiver, what: str) -> None:
     """Выдача из казны или со склада другому - получателю весть в чат
     (2026-10-21): «Ник выдает тебе ...». Себе - без вести."""
     if receiver is not None and receiver.id != actor.id:
-        notes.append(("char", receiver.id, f"🏰 {actor.name} выдаёт тебе {what}."))
+        notes.append(("char", receiver.id, f"🏰 {actor.name} выдаёт вам {what}."))
 
 
 async def _vk_ids(db, characters: list[Character]) -> dict[int, int]:
@@ -543,7 +543,7 @@ async def _act(db, character: Character, vk_user_id: int, body: dict) -> list:
     elif action == "invite":
         target = await guild_service.invite(db, character, _str(body, "name"))
         guild = await guild_service.guild_of(db, character)
-        notes.append(("char", target.id, f"📨 Тебя зовут в гильдию [{guild.tag}] {guild.name}. Ответить можно в мини-аппе."))
+        notes.append(("char", target.id, f"📨 Вас зовут в гильдию [{guild.tag}] {guild.name}. Ответить можно в мини-аппе."))
     elif action == "accept_invite":
         guild = await guild_service.accept_invite(db, character, _int(body, "guild_id"))
         notes.append(("guild", guild.id, f"🏰 {character.name} вступает в гильдию."))
@@ -552,19 +552,19 @@ async def _act(db, character: Character, vk_user_id: int, body: dict) -> list:
     elif action == "accept_application":
         target = await guild_service.accept_application(db, character, _int(body, "character_id"))
         guild = await guild_service.guild_of(db, character)
-        notes.append(("char", target.id, f"🏰 Тебя приняли в гильдию [{guild.tag}] {guild.name}!"))
+        notes.append(("char", target.id, f"🏰 Вас приняли в гильдию [{guild.tag}] {guild.name}!"))
     elif action == "decline_application":
         await guild_service.decline_application(db, character, _int(body, "character_id"))
     elif action == "leave":
         await guild_service.leave(db, character)
     elif action == "kick":
         target = await guild_service.kick(db, character, _int(body, "character_id"))
-        notes.append(("char", target.id, "🏰 Тебя исключили из гильдии."))
+        notes.append(("char", target.id, "🏰 Вас исключили из гильдии."))
     elif action == "rank":
         await guild_service.set_rank(db, character, _int(body, "character_id"), _str(body, "rank"))
     elif action == "transfer":
         target = await guild_service.transfer_leadership(db, character, _int(body, "character_id"))
-        notes.append(("char", target.id, "🏰 Ты теперь глава гильдии."))
+        notes.append(("char", target.id, "🏰 Вы теперь глава гильдии."))
     elif action == "disband":
         former = await guild_service.disband(db, character)
         for cid in former:
@@ -717,7 +717,7 @@ async def _deliver(db, notes: list, vk_user_id: int) -> None:
                 character = await onboarding_svc.get_character(db, vk_user_id)
                 text, attachment, keyboard = await world_handlers.location_summary_parts(db, character, vk_user_id)
                 await guild_handlers.send(
-                    vk_user_id, f"🌀 Врата переносят тебя на ({note[1]}; {note[2]}).\n\n{text}",
+                    vk_user_id, f"🌀 Врата переносят вас на ({note[1]}; {note[2]}).\n\n{text}",
                     attachment=attachment, keyboard=keyboard,
                 )
         except Exception:

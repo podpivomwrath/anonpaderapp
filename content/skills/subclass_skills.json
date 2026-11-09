@@ -4,18 +4,18 @@
   "guardian_shield_bash": {
     "id": "guardian_shield_bash", "name": "Удар щитом", "subclass_id": "guardian",
     "multiplier": 1.6, "cd": 2, "effect": "custom",
-    "flavor": "Кромка щита входит в лицо. Теперь он смотрит только на тебя."
+    "flavor": "Кромка щита входит в лицо. Теперь он смотрит только на вас."
   },
   "guardian_block": {
     "id": "guardian_block", "name": "Глухая оборона", "subclass_id": "guardian",
     "multiplier": 0, "cd": 4, "effect": "custom",
     "effect_value": 0.35, "effect_duration": 2,
-    "flavor": "Ты уходишь за щит, и мир сужается до полосы света над кромкой."
+    "flavor": "Вы уходите за щит, и мир сужается до полосы света над кромкой."
   },
   "guardian_stonegrip": {
     "id": "guardian_stonegrip", "name": "Каменная хватка", "subclass_id": "guardian",
     "multiplier": 1.5, "cd": 4, "effect": "stun",
-    "flavor": "Ты перехватываешь его и держишь. Просто держишь."
+    "flavor": "Вы перехватываете его и держите. Просто держите."
   },
   "guardian_unbreakable": {
     "id": "guardian_unbreakable", "name": "Несокрушимый", "subclass_id": "guardian",
@@ -34,19 +34,19 @@
     "id": "blood_knight_harvest", "name": "Жатва", "subclass_id": "blood_knight",
     "multiplier": 1.57, "cd": 3, "effect": "custom",
     "effect_value": 0.27,
-    "flavor": "Чем меньше в тебе крови, тем жаднее клинок."
+    "flavor": "Чем меньше в вас крови, тем жаднее клинок."
   },
   "blood_knight_blood_seal": {
     "id": "blood_knight_blood_seal", "name": "Кровавая печать", "subclass_id": "blood_knight",
     "multiplier": 1.0, "cd": 4, "effect": "custom",
     "effect_duration": 3,
-    "flavor": "Знак вспыхивает на его коже. Теперь он - твой источник."
+    "flavor": "Знак вспыхивает на его коже. Теперь он - ваш источник."
   },
   "blood_knight_crimson_feast": {
     "id": "blood_knight_crimson_feast", "name": "Багровый пир", "subclass_id": "blood_knight",
     "multiplier": 2.1, "cd": 5, "effect": "custom",
     "effect_value": 0.32,
-    "flavor": "Ты платишь своей кровью вперёд - и забираешь с процентами."
+    "flavor": "Вы платите своей кровью вперёд - и забираете с процентами."
   },
 
   "shadow_blade_marked_strike": {
@@ -64,12 +64,12 @@
     "id": "shadow_blade_shadow_dance", "name": "Танец в тени", "subclass_id": "shadow_blade",
     "multiplier": 1.0, "cd": 4, "effect": "self_dodge_buff",
     "effect_value": 0.4, "effect_duration": 2,
-    "flavor": "Ты перестаёшь быть там, где был. Ненадолго, но этого хватает."
+    "flavor": "Вы перестаёте быть там, где были. Ненадолго, но этого хватает."
   },
   "shadow_blade_execute": {
     "id": "shadow_blade_execute", "name": "Казнь", "subclass_id": "shadow_blade",
     "multiplier": 1.95, "cd": 5, "effect": "custom",
-    "flavor": "Ты не бьёшь. Ты завершаешь."
+    "flavor": "Вы не бьёте. Вы завершаете."
   },
 
   "poisoner_venom": {
@@ -124,7 +124,7 @@
     "id": "dark_mystic_blood_pact", "name": "Кровавый пакт", "subclass_id": "dark_mystic",
     "multiplier": 1.1, "cd": 2, "effect": "custom",
     "effect_value": 0.7,
-    "flavor": "Его кровь становится чужой силой. Ты лишь проводник."
+    "flavor": "Его кровь становится чужой силой. Вы лишь проводник."
   },
   "dark_mystic_ward": {
     "id": "dark_mystic_ward", "name": "Оберег", "subclass_id": "dark_mystic",
@@ -136,12 +136,12 @@
     "id": "dark_mystic_drain", "name": "Иссушение", "subclass_id": "dark_mystic",
     "multiplier": 1.6, "cd": 3, "effect": "custom",
     "effect_value": 0.5,
-    "flavor": "Ты тянешь из него то, что он ещё считал своим."
+    "flavor": "Вы тянете из него то, что он ещё считал своим."
   },
   "dark_mystic_circle": {
     "id": "dark_mystic_circle", "name": "Круг тьмы", "subclass_id": "dark_mystic",
     "multiplier": 0, "cd": 6, "effect": "custom",
     "effect_value": 0.6,
-    "flavor": "Ты платишь собой - и платёж расходится кругами."
+    "flavor": "Вы платите собой - и платёж расходится кругами."
   }
 }

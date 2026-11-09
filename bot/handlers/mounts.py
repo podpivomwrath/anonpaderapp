@@ -135,8 +135,8 @@ _MOUNT_TEXTS = {
     "pvp": "Сначала разберись с открытым боем.",
     "battle": "В бою не до маунта.",
     "busy": "Сначала закончи то, что начал.",
-    "traveling_on_foot": "🚶 Ты уже в пути пешком.",
-    "riding": "🐎 Ты уже в пути на маунте.",
+    "traveling_on_foot": "🚶 Вы уже в пути пешком.",
+    "riding": "🐎 Вы уже в пути на маунте.",
 }
 
 
@@ -170,7 +170,7 @@ async def open_mounts(message: Message) -> None:
             return
         owned = await mount_service.owned_mounts(db, character.id)
         if not owned:
-            await message.answer("У тебя пока нет маунтов.")
+            await message.answer("У вас пока нет маунтов.")
             return
         # Маунтов больше одного (2026-10-19) - кнопки остальных под сообщением;
         # выбранный запоминается (ui_flags.mount). Маунты - небольшой
@@ -190,7 +190,7 @@ def _chosen(owned: list, mount_id: str | None):
 def _ready_text(mount, character, safe: bool) -> str:
     return (
         f"{mount.emoji} {mount.name} готов в путь.\n"
-        f"Ты в ({character.pos_x}; {character.pos_y}). Куда направиться? Пришли координаты в формате X:Y "
+        f"Вы в ({character.pos_x}; {character.pos_y}). Куда направиться? Пришлите координаты в формате X:Y "
         f"(не дальше {wc.WORLD_RADIUS} клеток от Монолита, например 12:-20).\n\n"
         f"{_route_line(safe)}"
     )
@@ -207,7 +207,7 @@ async def choose_mount(message: Message) -> None:
         await db.commit()
     current_id = message.state_peer.payload.get("mount_id") if message.state_peer else None
     current = next((m for m in owned if m.mount_id == current_id), None)
-    await message.answer("На ком поедешь?", keyboard=_mounts_keyboard(owned, current))
+    await message.answer("На ком поедете?", keyboard=_mounts_keyboard(owned, current))
 
 
 @labeler.message(payload_contains={"type": "mount_pick"}, state=MountCoordState.COORD_INPUT)
@@ -328,7 +328,7 @@ async def route_toggle(message: Message) -> None:
         owned = await mount_service.owned_mounts(db, character.id)
     current_id = message.state_peer.payload.get("mount_id") if message.state_peer else None
     current = next((m for m in owned if m.mount_id == current_id), None)
-    await message.answer(f"{_route_line(safe)} Пришли координаты.",
+    await message.answer(f"{_route_line(safe)} Пришлите координаты.",
                          keyboard=_route_keyboard(safe, targets, owned if current else None, current))
 
 
@@ -386,7 +386,7 @@ async def mount_command(message: Message) -> None:
             return
         owned = await mount_service.owned_mounts(db, character.id)
         if not owned:
-            await message.answer("У тебя пока нет маунтов.")
+            await message.answer("У вас пока нет маунтов.")
             return
         mount = _chosen(owned, (character.ui_flags or {}).get("mount"))
     await _travel_to(message, *coords, mount_id=mount.mount_id)
@@ -413,11 +413,11 @@ async def _travel_to(message: Message, to_x: int, to_y: int, mount_id: str | Non
         if not grid.in_bounds(to_x, to_y):
             await message.answer(
                 f"Эти координаты за краем мира: он кончается в {wc.WORLD_RADIUS} клетках от Монолита. "
-                "Попробуй ещё раз."
+                "Попробуйте ещё раз."
             )
             return
         if (to_x, to_y) == (character.pos_x, character.pos_y):
-            await message.answer("Ты уже здесь. Назови другую клетку.")
+            await message.answer("Вы уже здесь. Назовите другую клетку.")
             return
         from services import pk_service
 
@@ -604,7 +604,7 @@ async def _recover_stranded(peer_id: int) -> None:
         travel = await mount_service.active_travel(db, character.id)
         if travel is not None and travel.status == "traveling":
             await _bot_api.messages.send(
-                peer_id=peer_id, message="🐎 Ты и так в пути.", random_id=0,
+                peer_id=peer_id, message="🐎 Вы и так в пути.", random_id=0,
                 keyboard=kb.mount_travel_keyboard(),
             )
             return
@@ -612,7 +612,7 @@ async def _recover_stranded(peer_id: int) -> None:
         pos = (character.pos_x, character.pos_y)
     await _bot_api.messages.send(
         peer_id=peer_id,
-        message="Путь прерван - продолжать нечего. Ты остаёшься на месте.",
+        message="Путь прерван - продолжать нечего. Вы остаётесь на месте.",
         random_id=0,
         keyboard=kb.movement_keyboard(*pos, peer_id, has_mount=has_mount),
     )
@@ -657,13 +657,13 @@ async def stop_and_notify(peer_id: int, travel_id: int | None = None) -> str | N
             return "Персонаж не найден."
         travel = await mount_service.active_travel(db, character.id)
         if travel is None or (travel_id is not None and travel.id != travel_id):
-            return "Ты сейчас не в пути."
+            return "Вы сейчас не в пути."
         if not await mount_service.stop_travel(db, travel, character, after_ambush=after_ambush):
             return "Сейчас не остановиться."
         await db.commit()
     _pending_continue.pop(peer_id, None)
     await close_progress(peer_id, f"⏹ Остановка на ({character.pos_x}; {character.pos_y}).")
-    await send_cell_screen(peer_id, "⏹ Ты сходишь с пути.")
+    await send_cell_screen(peer_id, "⏹ Вы сходите с пути.")
     return None
 
 
@@ -864,7 +864,7 @@ async def scan() -> None:
     for peer_id, character, stats, gear_bonus, buff_modifiers, travel_id, encounter in ambush_starts:
         # Одно сообщение о нападении (2026-10-29, владелец): правим отсчёт пути,
         # а если его нет - пишем новым. Дальше - карточка моба.
-        ambush_text = f"⚠ В пути на ({character.pos_x}; {character.pos_y}) на тебя нападают."
+        ambush_text = f"⚠ В пути на ({character.pos_x}; {character.pos_y}) на вас нападают."
         if not await close_progress(peer_id, ambush_text):
             await _bot_api.messages.send(peer_id=peer_id, message=ambush_text, random_id=0)
         await combat_handlers.start_mount_ambush_encounter(
@@ -881,7 +881,7 @@ async def scan() -> None:
         if region is not None:
             text = (
                 foreign_city_entry_text(REGION_TITLES[region]) if is_foreign
-                else f"🐎 Ты прибываешь к воротам: {REGION_TITLES[region]}"
+                else f"🐎 Вы прибываете к воротам: {REGION_TITLES[region]}"
             )
             from bot.world_summary import status_block
 
@@ -896,7 +896,7 @@ async def scan() -> None:
             )
             continue
         vit_bonus = gear_bonus.get("vit", 0)
-        text = "🐎 Ты прибываешь на место.\n\n" + location_summary(
+        text = "🐎 Вы прибываете на место.\n\n" + location_summary(
             character, stats, _rng, farm_currency, vit_bonus, quest_line, donate_currency, group_block,
         )
         await _bot_api.messages.send(

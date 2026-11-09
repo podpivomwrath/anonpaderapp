@@ -54,7 +54,7 @@ def status_text(boss, my_damage: int, cooldown: int, can_attack: bool) -> str:
         lines.append(f"Этот босс для уровня до {world_boss.max_attacker_level(boss.ring)}.")
         return "\n".join(lines)
     if my_damage:
-        lines.append(f"Твой урон: {my_damage}.")
+        lines.append(f"Ваш урон: {my_damage}.")
     if cooldown:
         lines.append(f"Следующий заход через {cooldown} мин.")
     return "\n".join(lines)
@@ -74,7 +74,7 @@ def intro_text(boss) -> str:
     """Одна строка: заход повторяется каждый час, а описание босса игрок уже
     прочёл в объявлении."""
     return (
-        f"Босс не отвечает на удары. У тебя {wbc.ATTEMPT_TURNS} ходов, "
+        f"Босс не отвечает на удары. У вас {wbc.ATTEMPT_TURNS} ходов, "
         f"у него {boss.hp}/{boss.max_hp} здоровья."
     )
 
@@ -133,7 +133,7 @@ def end_text(boss, got, total_damage: int) -> str:
             f"здоровья - разыграна такая же часть награды."
         )
     share = _pct(got.damage, total_damage)
-    lines = [head, f"Твой урон: {got.damage} ({share}% от всех)."]
+    lines = [head, f"Ваш урон: {got.damage} ({share}% от всех)."]
     rewards = reward_lines(got)
-    lines += rewards if rewards else ["В этот раз тебе ничего не выпало."]
+    lines += rewards if rewards else ["В этот раз вам ничего не выпало."]
     return "\n".join(lines)

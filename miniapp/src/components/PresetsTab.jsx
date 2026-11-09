@@ -7,8 +7,8 @@ import { SectionHead } from './ui.jsx';
 // Коды ошибок сервера, у которых нет человеческого текста на той стороне.
 const ERROR_TEXTS = {
   not_enough_gold: 'Не хватило золота.',
-  no_subclass: 'Сначала выбери подкласс.',
-  bad_request: 'Не удалось сохранить: проверь название и состав.',
+  no_subclass: 'Сначала выберите подкласс.',
+  bad_request: 'Не удалось сохранить: проверьте название и состав.',
 };
 
 // Цвет бафа по категории (2026-10-22): урон, оборона, лечение и прочее
@@ -61,7 +61,7 @@ export default function PresetsTab({ character }) {
   if (!character.subclass && !character.buff_pool) {
     return (
       <Placeholder icon={<div style={{ fontSize: 48 }}>⚔️</div>}>
-        Твоя Метка ещё не обрела форму. Возвращайся, когда кровь потребует имени.
+        Ваша Метка ещё не обрела форму. Возвращайтесь, когда кровь потребует имени.
       </Placeholder>
     );
   }

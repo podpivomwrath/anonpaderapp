@@ -221,11 +221,11 @@ async def set_name(db: AsyncSession, character: Character, raw) -> str:
 
     row = await _turbo_row(db, character.id)
     if row is None:
-        raise TurboError("Турбоишака у тебя нет.")
+        raise TurboError("Турбоишака у вас нет.")
     name = ti.clean_name(raw)
     error = ti.name_error(name)
     if error is None and onboarding_service.contains_banned_word(name):
-        error = "Такое имя не пройдёт - выбери другое."
+        error = "Такое имя не пройдёт - выберите другое."
     if error is not None:
         raise TurboError(error)
     row.nickname = name

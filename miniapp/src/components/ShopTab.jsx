@@ -133,7 +133,7 @@ function BuySheet({ item, gems, onClose, onBought }) {
         </div>
 
         {error && <p className="shop-sheet__error">{error}</p>}
-        {!enough && <p className="shop-sheet__error">Не хватает самоцветов: у тебя 💎 {money(gems)}.</p>}
+        {!enough && <p className="shop-sheet__error">Не хватает самоцветов: у вас 💎 {money(gems)}.</p>}
         <div className="shop-sheet__actions">
           {confirming ? (
             <>
@@ -214,7 +214,7 @@ function BundleSheet({ item, gems, onClose, onBought }) {
         {item.available === false && <p className="shop-sheet__error">{item.unavailable}</p>}
         {error && <p className="shop-sheet__error">{error}</p>}
         {!enough && item.available !== false && (
-          <p className="shop-sheet__error">Не хватает самоцветов: у тебя 💎 {money(gems)}.</p>
+          <p className="shop-sheet__error">Не хватает самоцветов: у вас 💎 {money(gems)}.</p>
         )}
         <div className="shop-sheet__actions">
           {confirming ? (
@@ -291,7 +291,7 @@ function FactionSheet({ item, gems, onClose, onBought }) {
           </div>
         )}
         {error && <p className="shop-sheet__error">{error}</p>}
-        {!enough && <p className="shop-sheet__error">Не хватает самоцветов: у тебя 💎 {money(gems)}.</p>}
+        {!enough && <p className="shop-sheet__error">Не хватает самоцветов: у вас 💎 {money(gems)}.</p>}
         <div className="shop-sheet__actions">
           {confirming ? (
             <>
@@ -361,7 +361,7 @@ function RenameSheet({ item, gems, onClose, onBought }) {
           </>
         )}
         {error && <p className="shop-sheet__error">{error}</p>}
-        {!enough && <p className="shop-sheet__error">Не хватает самоцветов: у тебя 💎 {money(gems)}.</p>}
+        {!enough && <p className="shop-sheet__error">Не хватает самоцветов: у вас 💎 {money(gems)}.</p>}
         <div className="shop-sheet__actions">
           {confirming ? (
             <>
@@ -425,7 +425,7 @@ function GemPacks() {
     <Group header={<Header>💎 Самоцветы</Header>}>
       <Div>
         <p className="craft-hint">1 самоцвет = 1 ₽. Оплата через ЮKassa, самоцветы приходят сразу после оплаты.</p>
-        <p className="shop-notice">На релизе игры все самоцветы, купленные за рубли, будут начислены на твой аккаунт.</p>
+        <p className="shop-notice">На релизе игры все самоцветы, купленные за рубли, будут начислены на ваш аккаунт.</p>
         {returned && <p className="shop-notice">Оплата обрабатывается - как только ЮKassa её подтвердит, бот напишет в сообщения.</p>}
         {!data.enabled && <p className="craft-hint">Покупка за рубли скоро откроется.</p>}
         {error && <p style={{ color: 'var(--vkui--color_text_negative)' }}>{error}</p>}
@@ -454,7 +454,7 @@ function GemPacks() {
       </div>
       {data.history.length > 0 && (
         <Div>
-          <p className="craft-hint"><b>Твои покупки</b></p>
+          <p className="craft-hint"><b>Ваши покупки</b></p>
           {data.history.map((h, i) => (
             <p key={i} className="craft-hint">
               {new Date(h.at).toLocaleString('ru-RU', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
@@ -470,8 +470,8 @@ function GemPacks() {
 function bundleNotice(item, done) {
   if (done.contents) return `${item.emoji} ${item.title} в сумке: ${done.contents.join(', ')}.`;
   if (done.until) return `${item.emoji} ${item.title} действует до ${untilText(done.until)}.`;
-  if (item.id === 'house') return '🏠 Дом твой: кнопка «Дом» теперь на площади родного города.';
-  if (item.id === 'ash_donka') return '🪝 Донка твоя: у озера появится кнопка «Поставить донку».';
+  if (item.id === 'house') return '🏠 Дом ваш: кнопка «Дом» теперь на площади родного города.';
+  if (item.id === 'ash_donka') return '🪝 Донка ваша: у озера появится кнопка «Поставить донку».';
   return `${item.emoji} ${item.title} - готово.`;
 }
 
@@ -597,8 +597,8 @@ export default function ShopTab({ onWallet, onBought }) {
             setCelebrate(item);
             onWallet?.({ donate_currency: res.gems });
             setNotice(res.done.pending
-              ? `${item.emoji} Переезд в ${res.done.title} оплачен. Ты в бою - переедешь, когда он закончится.`
-              : `${item.emoji} Переезд готов, твой город теперь - ${res.done.title}. Бот прислал площадь в сообщения.`);
+              ? `${item.emoji} Переезд в ${res.done.title} оплачен. Вы в бою - переедете, когда он закончится.`
+              : `${item.emoji} Переезд готов, ваш город теперь - ${res.done.title}. Бот прислал площадь в сообщения.`);
             onBought?.();
           }}
         />

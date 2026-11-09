@@ -60,7 +60,7 @@ async def create(db: AsyncSession, orderer: Character, target_name, kills, price
     wait = await reorder_wait_hours(db, orderer.id, target.id, now)
     if wait > 0:
         raise ContractError(
-            f"{target.name} откупился от твоего заказа. Снова заказать его можно через {max(1, round(wait))} ч."
+            f"{target.name} откупился от вашего заказа. Снова заказать его можно через {max(1, round(wait))} ч."
         )
     total = kills * price
     try:
@@ -83,16 +83,16 @@ async def take(db: AsyncSession, hunter: Character, contract_id, now: datetime |
     if contract is None or contract.status != "active" or _aware(contract.expires_at) <= now or contract.kills_left <= 0:
         raise ContractError("Этот заказ уже закрыт.")
     if contract.target_id == hunter.id:
-        raise ContractError("Это заказ на тебя.")
+        raise ContractError("Это заказ на вас.")
     if contract.orderer_id == hunter.id:
         raise ContractError("Свой заказ взять нельзя.")
     # Согильдийцев не заказывают у своих (2026-10-16, решение владельца).
     if hunter.guild_id is not None:
         target = await db.get(Character, contract.target_id)
         if target is not None and target.guild_id == hunter.guild_id:
-            raise ContractError("Это твой согильдиец - заказ на него взять нельзя.")
+            raise ContractError("Это ваш согильдиец - заказ на него взять нельзя.")
     if await db.get(ContractTaker, (contract.id, hunter.id)) is not None:
-        raise ContractError("Ты уже взял этот заказ.")
+        raise ContractError("Вы уже взяли этот заказ.")
     db.add(ContractTaker(contract_id=contract.id, character_id=hunter.id, taken_at=now))
     await db.flush()
     return contract
@@ -239,13 +239,13 @@ async def on_kill(
         if contract.orderer_id:
             out.orderer_notes.append((
                 contract.orderer_id,
-                f"📜 Твой заказ на {victim.name}: убийство выполнено, осталось {contract.kills_left} из {contract.kills_total}.",
+                f"📜 Ваш заказ на {victim.name}: убийство выполнено, осталось {contract.kills_left} из {contract.kills_total}.",
             ))
-        out.victim_lines.append(f"📜 Тебя убили по заказу. Осталось убийств по нему: {contract.kills_left}.")
+        out.victim_lines.append(f"📜 Вас убили по заказу. Осталось убийств по нему: {contract.kills_left}.")
     await db.flush()
     if out.victim_lines and not await is_target(db, victim.id, now):
         out.finished_for_target = True
-        out.victim_lines.append("Заказов на тебя больше нет - мирные клетки и АФК снова защищают.")
+        out.victim_lines.append("Заказов на вас больше нет - мирные клетки и АФК снова защищают.")
     return out
 
 

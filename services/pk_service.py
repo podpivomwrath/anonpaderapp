@@ -108,7 +108,7 @@ def city_banned(character: Character) -> bool:
 
 
 CITY_BAN_TEXT = (
-    "🛡 Стража не пускает тебя в город: у тебя 20 или больше меток клейма. "
+    "🛡 Стража не пускает вас в город: у вас 20 или больше меток клейма. "
     "Каждая метка исчезает сама через 5 часов - когда их станет меньше 20, пустят."
 )
 
@@ -122,9 +122,9 @@ def revenge_bonus(attacker: Character, target_id: int, now: datetime | None = No
 
 def consequences(n: int) -> str:
     """Чем грозит клеймо на n метках - одной строкой."""
-    parts = ["все видят 🩸 рядом с твоим именем"]
+    parts = ["все видят 🩸 рядом с вашим именем"]
     if n >= pc.COSTLY_DEATH_FROM:
-        parts.append("при смерти теряешь в 1,5 раза больше опыта (даже в PvP), и твои трофеи заберёт любой победитель")
+        parts.append("при смерти теряете в 1,5 раза больше опыта (даже в PvP), и ваши трофеи заберёт любой победитель")
     if n >= pc.CITY_PENALTY_FROM:
         parts.append("зелья в лавке в 1,5 раза дороже, скупщик платит за реликвии в 2 раза меньше")
     if n >= pc.CITY_BAN_FROM:
@@ -188,7 +188,7 @@ async def on_pvp_kill(
     victim.revenge_target_id = killer.id
     victim.revenge_until = now + timedelta(hours=pc.REVENGE_HOURS)
     out.victim_lines.append(
-        f"🩸 {killer.name} убил тебя, хотя он сильнее на {pc.LEVEL_GAP}+ уровней, и получил метку клейма. "
-        f"Право мести: следующие {pc.REVENGE_HOURS} ч твой урон по {killer.name} на {round(pc.REVENGE_BONUS * 100)}% больше."
+        f"🩸 {killer.name} убил вас, хотя он сильнее на {pc.LEVEL_GAP}+ уровней, и получил метку клейма. "
+        f"Право мести: следующие {pc.REVENGE_HOURS} ч ваш урон по {killer.name} на {round(pc.REVENGE_BONUS * 100)}% больше."
     )
     return out

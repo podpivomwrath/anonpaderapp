@@ -105,11 +105,11 @@ def week_award_text(award) -> str:
 
     chests = ", ".join(f"{_CHEST_NAMES[k]} ×{n}" for k, n in award.chests.items())
     text = (
-        f"🏆 Итоги недели: ты {_PLACE[award.place]} поставщик фракции {REGION_TITLES[award.city]}. "
+        f"🏆 Итоги недели: вы {_PLACE[award.place]} поставщик фракции {REGION_TITLES[award.city]}. "
         f"Награда: {chests}."
     )
     if award.place == 1:
-        text += " Всю эту неделю тебе идёт доля налога с переводов игрокам твоей фракции."
+        text += " Всю эту неделю вам идёт доля налога с переводов игрокам вашей фракции."
     return text
 
 
@@ -146,7 +146,7 @@ def payout_text(payout) -> str:
     if payout.gems:
         parts.append(plural.gems(payout.gems))
     return (
-        f"🏆 Доля первого поставщика за сутки: {' и '.join(parts)} - из налога с переводов игрокам твоей фракции."
+        f"🏆 Доля первого поставщика за сутки: {' и '.join(parts)} - из налога с переводов игрокам вашей фракции."
     )
 
 

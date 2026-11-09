@@ -101,12 +101,12 @@ async def _back_to_movement(message: Message, text: str) -> None:
 
 @labeler.message(text=[rt.BTN_RAID_BACK])
 async def raid_list_back_button(message: Message) -> None:
-    await _back_to_movement(message, "Ты отступаешь от Монолита.")
+    await _back_to_movement(message, "Вы отступаете от Монолита.")
 
 
 @labeler.message(payload_contains={"type": "raid_list_back"})
 async def raid_list_back_payload(message: Message) -> None:
-    await _back_to_movement(message, "Ты отступаешь от Монолита.")
+    await _back_to_movement(message, "Вы отступаете от Монолита.")
 
 
 @labeler.message(payload_contains={"type": "raid_pick"})
@@ -125,10 +125,10 @@ async def pick_raid(message: Message) -> None:
             await message.answer(reason)
             return
         if grid.monolith_distance(character.pos_x, character.pos_y) != 0:
-            await message.answer("Ты уже не у Монолита.")
+            await message.answer("Вы уже не у Монолита.")
             return
         if raid_combat_handlers.has_active_raid(character.id):
-            await message.answer("Ты уже в рейде.")
+            await message.answer("Вы уже в рейде.")
             return
         group_snapshot = await group_service.get_group_snapshot(db, character.id)
         group_id = group_snapshot.id if group_snapshot is not None else None

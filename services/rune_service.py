@@ -142,7 +142,7 @@ def _fits(character: Character, rune_def: rc.RuneDef, kind: str, slot: str) -> s
     place = slot.partition(":")[0]
     if kind == rc.GEAR and not runes.fits_gear(rune_def, place, character.base_class):
         if rune_def.classes and character.base_class not in rune_def.classes:
-            return "Эта руна не для твоего класса."
+            return "Эта руна не для вашего класса."
         return "Оружейная руна - только в оружие." if rune_def.place == "weapon" else "Эта руна - в доспех."
     if kind == rc.SKILL:
         skill = next(s for s in skills_of(character) if s.id == place)
@@ -432,7 +432,7 @@ def ring_line(ring: str) -> str:
 
     if ring == "worn":
         return (f"💍 Среди добычи - кольцо: «{resists.RING_TITLE}». Оно уже на пальце, "
-                "смотри во вкладке «Герой».")
+                "смотрите во вкладке «Герой».")
     return (f"💍 Среди добычи - кольцо: «{resists.RING_TITLE}». Палец занят, оно в сумке: "
             "поменять кольца можно во вкладке «Герой», лишнее - передать или продать на рынке.")
 

@@ -39,7 +39,7 @@ REST_SECONDS_MAX = 6.0
 # premium_expire_notified, сбрасываются при каждом продлении.
 EXPIRY_WARNING_DAYS = 1
 EXPIRY_WARNING_TEXT = f"{PREMIUM_BADGE} {PREMIUM_NAME} потускнеет завтра."
-EXPIRED_TEXT = f"{PREMIUM_BADGE} {PREMIUM_NAME} погасла. Хранитель снова смотрит на тебя как на всех."
+EXPIRED_TEXT = f"{PREMIUM_BADGE} {PREMIUM_NAME} погасла. Хранитель снова смотрит на вас как на всех."
 
 # Допустимые длительности активации промокодом (Часть 2) — дни.
 ALLOWED_DURATIONS_DAYS = (3, 7, 30)

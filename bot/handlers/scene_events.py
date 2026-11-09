@@ -199,7 +199,7 @@ async def _render(db, character, stats, p: Pending, peer_id: int, rebuild: bool 
         # И при пересборке экрана: раньше возвращалась одна кнопка «Не знаю»,
         # а вопрос пропадал (2026-10-29, баг-репорт).
         if p.riddle is not None:
-            text += f"\n\n«{p.riddle.q}»\n\nОтвет напиши сообщением."
+            text += f"\n\n«{p.riddle.q}»\n\nОтвет напишите сообщением."
 
     elif scene.type == "dice":
         # Одна партия в три шага, на каждом - «Отменить»: валюта -> сумма
@@ -210,7 +210,7 @@ async def _render(db, character, stats, p: Pending, peer_id: int, rebuild: bool 
         elif p.stake is None:
             wallet = await wallet_service.get_wallet(db, character.id)
             have = wallet.donate_currency if p.currency == "gems" else wallet.farm_currency
-            text = f"Сколько ставишь? Напиши сумму сообщением.\n\n{_money(p.currency, have)} у тебя."
+            text = f"Сколько ставите? Напишите сумму сообщением.\n\n{_money(p.currency, have)} у вас."
             if not rebuild:
                 p.deadline = time.monotonic() + RIDDLE_SECONDS
                 p.task = asyncio.create_task(_expire(peer_id, p.token, p.scene_id, RIDDLE_SECONDS, "cancel"))
@@ -483,7 +483,7 @@ async def _dice(peer_id, db, character, stats, p: Pending, scene: Scene, action:
     except wallet_service.NotEnoughCurrency:
         p.stake = None
         text, keyboard = await _render(db, character, stats, p, peer_id)
-        await _send(peer_id, "Столько у тебя уже нет.\n\n" + text, keyboard)
+        await _send(peer_id, "Столько у вас уже нет.\n\n" + text, keyboard)
         return
     won, mine, theirs = se.roll_dice(_rng, scene.win_chance)
     if won:
@@ -494,7 +494,7 @@ async def _dice(peer_id, db, character, stats, p: Pending, scene: Scene, action:
         await wallet_service.deposit(db, character.id, wallet_column, p.stake)
     net = guild_service.after_tax(character, p.stake) if p.currency == "gold" else p.stake
     line = (
-        f"🎲 Ты: {mine[0]} и {mine[1]}, он: {theirs[0]} и {theirs[1]}.\n"
+        f"🎲 Вы: {mine[0]} и {mine[1]}, он: {theirs[0]} и {theirs[1]}.\n"
         + (f"{scene.win_text} +{_money(p.currency, p.stake)}"
            + (f" (после налога гильдии +{net})" if net != p.stake else "")
            if won
@@ -654,7 +654,7 @@ async def stake_answer(message: Message) -> None:
             if amount is None:
                 note = "Нужна сумма числом, например 250."
             elif amount > have:
-                note = f"У тебя только {_money(p.currency, have)}."
+                note = f"У вас только {_money(p.currency, have)}."
             else:
                 p.stake, note = amount, None
             text, keyboard = await _render(db, character, stats, p, peer_id)

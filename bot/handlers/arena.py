@@ -81,10 +81,10 @@ def _arena_text() -> str:
         f"ничего не теряет, {elixirs}, все выходят с полным здоровьем.\n\n"
         "🎲 Случайный бой - сразиться с первым, кто тоже ищет бой.\n"
         "⏳ Ждать соперника - получить код и ждать, пока его введут.\n"
-        "👥 Комната на бой - код для нескольких игроков, стороны выбирают сами, начинаешь ты.\n"
+        "👥 Комната на бой - код для нескольких игроков, стороны выбирают сами, начинаете вы.\n"
         "🔎 Найти по коду - ввести код соперника или комнаты.\n"
         f"🗿 Манекен - {arena_dummy.TURNS} ходов по цели на {arena_dummy.HP} здоровья, "
-        "он не бьёт. Босс не поддаётся контролю, как в рейде, моб - обычный, твоего уровня."
+        "он не бьёт. Босс не поддаётся контролю, как в рейде, моб - обычный, вашего уровня."
     )
 
 
@@ -212,7 +212,7 @@ async def random_fight(message: Message) -> None:
     if character is None:
         return
     if is_waiting(peer_id):
-        await message.answer("Ты уже ждёшь соперника.", keyboard=arena_kb.arena_waiting_keyboard())
+        await message.answer("Вы уже ждёте соперника.", keyboard=arena_kb.arena_waiting_keyboard())
         return
     async with get_session_factory()() as db:
         me = await _ready(db, character.id, peer_id)
@@ -247,14 +247,14 @@ async def host_fight(message: Message) -> None:
     code = _code_of(peer_id)
     if code is None:
         if is_waiting(peer_id):
-            await message.answer("Ты уже ждёшь соперника.", keyboard=arena_kb.arena_waiting_keyboard())
+            await message.answer("Вы уже ждёте соперника.", keyboard=arena_kb.arena_waiting_keyboard())
             return
         while code is None or code in _codes:
             code = "".join(_rng.choice("0123456789") for _ in range(CODE_DIGITS))
         _codes[code] = (character.id, peer_id)
     await message.answer(
-        f"⏳ Твой код: {code}\n\nПередай его сопернику: он нажимает «Найти по коду» на арене и вводит код. "
-        "Пока не отменишь, код ждёт.",
+        f"⏳ Ваш код: {code}\n\nПередайте его сопернику: он нажимает «Найти по коду» на арене и вводит код. "
+        "Пока не отмените, код ждёт.",
         keyboard=arena_kb.arena_waiting_keyboard(),
     )
 
@@ -265,10 +265,10 @@ async def find_fight(message: Message) -> None:
     if await _arena_character(message) is None:
         return
     if is_waiting(peer_id) and peer_id not in _entering:
-        await message.answer("Ты уже ждёшь соперника.", keyboard=arena_kb.arena_waiting_keyboard())
+        await message.answer("Вы уже ждёте соперника.", keyboard=arena_kb.arena_waiting_keyboard())
         return
     _entering.add(peer_id)
-    await message.answer("🔎 Введи код соперника или комнаты.", keyboard=arena_kb.arena_waiting_keyboard())
+    await message.answer("🔎 Введите код соперника или комнаты.", keyboard=arena_kb.arena_waiting_keyboard())
 
 
 class CodeInput(ABCRule[Message]):
@@ -293,10 +293,10 @@ async def code_input(message: Message) -> None:
         return
     host = _codes.get(code)
     if host is None:
-        await message.answer("Такого кода нет. Проверь цифры или отмени.", keyboard=arena_kb.arena_waiting_keyboard())
+        await message.answer("Такого кода нет. Проверьте цифры или отмените.", keyboard=arena_kb.arena_waiting_keyboard())
         return
     if host[1] == peer_id:
-        await message.answer("Это твой собственный код.", keyboard=arena_kb.arena_waiting_keyboard())
+        await message.answer("Это ваш собственный код.", keyboard=arena_kb.arena_waiting_keyboard())
         return
     _codes.pop(code, None)  # до ожидания: код не достанется двоим
     async with get_session_factory()() as db:
@@ -341,7 +341,7 @@ async def on_arena_finished(battle, winner_id: int | None, draw: bool = False) -
             text = f"🏆 Победа на арене над {loser.name}!"
         else:
             text = f"🏟 Поражение на арене: {winner.name} сильнее в этот раз."
-        text += " Ничего не потеряно - бой тренировочный.\n\nВыбирай следующий бой или возвращайся в таверну."
+        text += " Ничего не потеряно - бой тренировочный.\n\nВыбирайте следующий бой или возвращайтесь в таверну."
         await _bot_api.messages.send(peer_id=p.peer_id, message=text, random_id=0, keyboard=arena_kb.arena_keyboard())
 
 
@@ -370,7 +370,7 @@ def _room_text(room: Room) -> str:
         names = [name for _, name, s in room.members.values() if s == side]
         sides.append(f"{title}: {', '.join(names) if names else 'пусто'}")
     head = f"👥 Комната {room.code}, хозяин - {host[1] if host else '?'}. Игроков {len(room.members)} из {ROOM_MAX}."
-    return f"{head}\n" + "\n".join(sides) + "\n\nКод передай тем, кого зовёшь: «Найти по коду» на арене. Бой начинает хозяин."
+    return f"{head}\n" + "\n".join(sides) + "\n\nКод передайте тем, кого зовёте: «Найти по коду» на арене. Бой начинает хозяин."
 
 
 async def _tell_room(room: Room, text: str, skip: int | None = None) -> None:
@@ -413,7 +413,7 @@ async def create_room(message: Message) -> None:
     if character is None:
         return
     if is_waiting(peer_id):
-        await message.answer("Ты уже ждёшь боя.", keyboard=keyboard_for(peer_id))
+        await message.answer("Вы уже ждёте боя.", keyboard=keyboard_for(peer_id))
         return
     code = None
     while code is None or code in _codes or code in _rooms:
@@ -439,7 +439,7 @@ async def _join_room(message: Message, character, room: Room) -> None:
     side = 1 if count[1] < count[0] else 0
     room.members[peer_id] = (character.id, character.name, side)
     _room_of[peer_id] = room.code
-    note = " Бой уже идёт - войдёшь в следующий." if room.fighting else ""
+    note = " Бой уже идёт - войдёте в следующий." if room.fighting else ""
     await _tell_room(room, f"{character.name} входит в комнату.{note}\n\n{_room_text(room)}")
 
 
@@ -464,7 +464,7 @@ async def leave_room(message: Message) -> None:
     if _room_for(peer_id) is None or await _arena_character(message) is None:
         return
     await _leave_and_tell(peer_id)
-    await message.answer("Ты больше не в комнате.", keyboard=arena_kb.arena_keyboard())
+    await message.answer("Вы больше не в комнате.", keyboard=arena_kb.arena_keyboard())
 
 
 @labeler.message(text=[arena_kb.BTN_ROOM_START])
@@ -540,7 +540,7 @@ async def start_dummy(message: Message) -> None:
     if character is None:
         return
     if is_waiting(peer_id):
-        await message.answer("Сначала выйди из ожидания или комнаты.", keyboard=keyboard_for(peer_id))
+        await message.answer("Сначала выйдите из ожидания или комнаты.", keyboard=keyboard_for(peer_id))
         return
     kind = _DUMMY_KIND[message.text.strip()] if message.text.strip() in _DUMMY_KIND else arena_dummy.MOB
     async with get_session_factory()() as db:

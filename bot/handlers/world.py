@@ -93,7 +93,7 @@ from services.db import get_session_factory
 
 # Поездка верхом идёт по клеткам сама (bot/handlers/mounts.py::scan): пеший
 # шаг, исследование или отдых посреди неё увели бы персонажа с пути.
-MOUNT_BUSY_TEXT = "🐎 Ты в пути верхом - маунт несёт тебя к цели. Оглядеться можно: «👁 Осмотреться»."
+MOUNT_BUSY_TEXT = "🐎 Вы в пути верхом - маунт несёт вас к цели. Оглядеться можно: «👁 Осмотреться»."
 
 
 labeler = BotLabeler()
@@ -364,7 +364,7 @@ async def _check_still_dead(db, character, now: datetime) -> bool:
     return death_service.is_dead(character, now)
 
 
-STORY_NEAR_HINT = "📜 Цель задания здесь. Исследуй местность - первый же бой выведет на неё."
+STORY_NEAR_HINT = "📜 Цель задания здесь. Исследуйте местность - первый же бой выведет на неё."
 
 
 def _story_enemy(quest, character, participant_id: int):
@@ -436,7 +436,7 @@ async def _maybe_trigger_story(peer_id: int, db, character, stats) -> bool:
     # патч 21, п.1: игрок не в разговоре с наставником — пингуем сами
     await _bot_api.messages.send(
         peer_id=peer_id,
-        message=f"📜 {mentor_name(character.region)} ждёт тебя в городе.",
+        message=f"📜 {mentor_name(character.region)} ждёт вас в городе.",
         random_id=0,
     )
     return True
@@ -539,7 +539,7 @@ async def show_location(message: Message, db, character) -> None:
 
     if await _check_still_dead(db, character, now):
         minutes_left = (character.respawn_at - now).total_seconds() / 60
-        await message.answer(f"☠ Ты ещё не очнулся. Осталось ~{minutes_left:.1f} мин.")
+        await message.answer(f"☠ Вы ещё не очнулись. Осталось ~{minutes_left:.1f} мин.")
         return
 
     if movement_service.resolve_arrival(character, now):
@@ -556,7 +556,7 @@ async def show_location(message: Message, db, character) -> None:
         return
 
     if in_any_battle(message.peer_id):
-        await message.answer("⚔️ Ты в бою - реши его исход.")
+        await message.answer("⚔️ Вы в бою - решите его исход.")
         return
 
     region = grid.city_region_at(character.pos_x, character.pos_y)
@@ -600,12 +600,12 @@ async def gate_exit(message: Message) -> None:
         if region is None:
             has_mount = await mount_service.has_any_mount(db, character.id)
             await message.answer(
-                "Ты уже за городом.",
+                "Вы уже за городом.",
                 keyboard=kb.movement_keyboard(character.pos_x, character.pos_y, message.peer_id, has_mount=has_mount),
             )
             return
         await message.answer(
-            "Куда направишься?",
+            "Куда направитесь?",
             keyboard=kb.gate_direction_keyboard(character.pos_x, character.pos_y),
         )
 
@@ -646,7 +646,7 @@ async def gate_exit_direction(message: Message) -> None:
         await db.commit()
         await _deliver_daily_notice(message.peer_id, character)
         # ux-patch-10 п.1: сводка локации — всегда отдельное сообщение
-        await message.answer("Ты выходишь за ворота.", keyboard=kb.waiting_keyboard())
+        await message.answer("Вы выходите за ворота.", keyboard=kb.waiting_keyboard())
         await message.answer(
             _map_text(character, stats, farm_currency, gear_bonus, quest_line, donate_currency, group_block),
             attachment=location_attachment(character),
@@ -692,10 +692,10 @@ async def _move(message: Message, direction: tuple[int, int] | None) -> None:
             )
             return
         if explore_rest.exploring(message.peer_id):
-            await message.answer("🔍 Ты осматриваешься - подожди.")
+            await message.answer("🔍 Вы осматриваетесь - подождите.")
             return
         if explore_rest.resting(message.peer_id):
-            await message.answer("🛏️ Ты отдыхаешь. Дай себе минуту.")
+            await message.answer("🛏️ Вы отдыхаете. Дайте себе минуту.")
             return
         # Снасть в воде держит на клетке (2026-10-23, баг-репорт).
         casting = fishing_service.is_casting(character) and not fishing_service.cast_is_stale(character, now)
@@ -764,7 +764,7 @@ async def _move(message: Message, direction: tuple[int, int] | None) -> None:
         _travel_scheduler.schedule(message.peer_id, travel_seconds)
 
 
-WALK_CANCEL_TEXT = "Ты передумываешь и возвращаешься."
+WALK_CANCEL_TEXT = "Вы передумываете и возвращаетесь."
 
 
 @labeler.message(payload_contains=kb.WALK_CANCEL_PAYLOAD)

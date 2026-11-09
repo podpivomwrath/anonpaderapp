@@ -38,7 +38,7 @@ NAMESPACE = "transfer"
 MAX_BATCH = 10
 
 USAGE_TEXT = (
-    "Чтобы передать, перешли сообщение получателя с подписью:\n"
+    "Чтобы передать, перешлите сообщение получателя с подписью:\n"
     "/передать <что> <сколько>\n"
     "Например: /передать золото 500, /передать Малое исцеление 3, /передать Скальпель Хирурга.\n"
     "Несколько сразу - через запятую: /передать Горькая полынь 2, Малое исцеление 3.\n"
@@ -156,20 +156,20 @@ def _resolve_qty(offer: transfer_service.Offer, qty: int | None) -> tuple[int | 
         return 1, None  # экипировка - всегда одна штука, даже если написали число
     if qty is None:
         if offer.kind in ("gold", "gems"):
-            return None, "Укажи сколько: например, «/передать золото 500»."
+            return None, "Укажите сколько: например, «/передать золото 500»."
         qty = 1
     if qty <= 0:
         return None, "Количество должно быть больше нуля."
     if offer.kind in ("gold", "gems") and qty < fc.TRANSFER_MIN:
         return None, f"Валюту передают от {fc.TRANSFER_MIN}."
     if qty > offer.available:
-        return None, f"У тебя только {offer.available}."
+        return None, f"У вас только {offer.available}."
     return qty, None
 
 
 #: Вещь на расстояние, а курьера нет (2026-10-19). Не отказ, а подсказка.
 NO_COURIER_TEXT = (
-    "Получатель не на твоей клетке. Вещи, зелья и руду из рук в руки передают "
+    "Получатель не на вашей клетке. Вещи, зелья и руду из рук в руки передают "
     "только рядом, а на любое расстояние их носит курьер - он есть в магазине."
 )
 
@@ -190,7 +190,7 @@ async def _ask_confirm(peer_id: int, pending: Pending) -> None:
     pending.qty = qty
     if _by_courier(pending, offer):
         text = (f"{cc.EMOJI} Курьер отнесёт {offer.label}{_qty_text(offer, qty)} {_whom(pending)}. "
-                "Он выйдет из твоего города, заберёт посылку у тебя и побежит к получателю.\nЭто не отменить.")
+                "Он выйдет из вашего города, заберёт посылку у вас и побежит к получателю.\nЭто не отменить.")
         await editable_message.send_or_edit(_bot_api, NAMESPACE, peer_id, text, _confirm_keyboard(pending.token))
         return
     text = f"📦 Передать {offer.label}{_qty_text(offer, qty)} {_whom(pending)}?\nЭто не отменить."
@@ -258,7 +258,7 @@ async def transfer_command(message: Message, match: tuple) -> None:
         await db.commit()
 
     if not lookup.offers:
-        await message.answer(lookup.refusal or f"У тебя нет «{name}».")
+        await message.answer(lookup.refusal or f"У вас нет «{name}».")
         return
     pending = Pending(
         token=uuid.uuid4().hex[:10], recipient_id=recipient.id,
@@ -293,7 +293,7 @@ async def _resolve_batch(db, sender_id: int, parts: list[str]):
         name, qty = transfer_service.parse(part)
         lookup = await transfer_service.find(db, sender_id, name, qty)
         if not lookup.offers:
-            return [], lookup.refusal or f"У тебя нет «{name}»."
+            return [], lookup.refusal or f"У вас нет «{name}»."
         if len(lookup.offers) > 1:
             variants = ", ".join(o.label for o in lookup.offers[:MAX_CHOICES])
             return [], f"«{name}» - уточни, какой именно: {variants}."
@@ -388,8 +388,8 @@ async def transfer_confirm(message: Message) -> None:
     try:
         await _bot_api.messages.send(
             peer_id=pending.recipient_peer, random_id=0,
-            message=(f"📦 {sender_name} передаёт тебе: {what}.{tax_line}" if pending.reveal_sender
-                     else f"📦 Тебе передали: {what}.{tax_line}"),
+            message=(f"📦 {sender_name} передаёт вам: {what}.{tax_line}" if pending.reveal_sender
+                     else f"📦 Вам передали: {what}.{tax_line}"),
         )
     except Exception:
         logger.warning("Передача: не удалось уведомить получателя {}", pending.recipient_peer)
@@ -444,7 +444,7 @@ async def _confirm_batch(message: Message, pending: Pending) -> None:
             line += f" (дошло {amount - fc.transfer_tax(amount)})"
         lines.append(line)
     if far:
-        courier = f"{cc.EMOJI} Курьер выбежал из твоего города за посылкой:\n" + "\n".join(_batch_lines(far))
+        courier = f"{cc.EMOJI} Курьер выбежал из вашего города за посылкой:\n" + "\n".join(_batch_lines(far))
         text = courier + ("\n\n📦 Сразу передано:\n" + "\n".join(lines) if lines else "")
         await editable_message.send_or_edit(_bot_api, NAMESPACE, peer_id, text, await _keyboard_for(peer_id))
         if not lines:
@@ -457,8 +457,8 @@ async def _confirm_batch(message: Message, pending: Pending) -> None:
     try:
         await _bot_api.messages.send(
             peer_id=pending.recipient_peer, random_id=0,
-            message=(f"📦 {sender_name} передаёт тебе:\n{what}" if pending.reveal_sender
-                     else f"📦 Тебе передали:\n{what}"),
+            message=(f"📦 {sender_name} передаёт вам:\n{what}" if pending.reveal_sender
+                     else f"📦 Вам передали:\n{what}"),
         )
     except Exception:
         logger.warning("Передача: не удалось уведомить получателя {}", pending.recipient_peer)
@@ -482,6 +482,6 @@ async def _send_by_courier(db, peer_id: int, sender, recipient, pending: Pending
     await db.commit()
     await editable_message.send_or_edit(
         _bot_api, NAMESPACE, peer_id,
-        f"{cc.EMOJI} Курьер выбежал из твоего города за посылкой: {offer.label}{_qty_text(offer, qty)}.",
+        f"{cc.EMOJI} Курьер выбежал из вашего города за посылкой: {offer.label}{_qty_text(offer, qty)}.",
         await _keyboard_for(peer_id),
     )

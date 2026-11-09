@@ -232,11 +232,11 @@ async def on_pot_stake(message: Message) -> None:
         await message.answer(f"Старуха качает головой: больше {cap} золота в котёл не берёт.")
         return
     if amount > wallet.farm_currency:
-        await message.answer(f"У тебя столько нет - в кошельке {wallet.farm_currency} золота.")
+        await message.answer(f"У вас столько нет - в кошельке {wallet.farm_currency} золота.")
         return
     scene.pot_stakes[cid] = amount
     done = len(scene.pot_stakes)
-    text = f"Ставка: {amount} золота." if amount else "Ты не ставишь."
+    text = f"Ставка: {amount} золота." if amount else "Вы не ставите."
     # Котёл бросает только по окончании отсчёта (2026-10-15): раньше бросал,
     # как только вписали все, и передумать было уже нельзя.
     await message.answer(
@@ -261,7 +261,7 @@ async def _finish_pot(scene: GroupScene) -> None:
             try:
                 await wallet_service.charge(db, cid, "farm", amount)
             except wallet_service.NotEnoughCurrency:
-                personal[cid].append("Денег на ставку уже нет - котёл тебя не взял.")
+                personal[cid].append("Денег на ставку уже нет - котёл вас не взял.")
                 continue
             stakers[cid] = amount
         summary: list[str] = []
@@ -307,7 +307,7 @@ async def on_choice(message: Message) -> None:
     if value not in options:
         return
     if cid in scene.choices:
-        await message.answer("Ты уже выбрал. Ждём остальных.", keyboard=waiting_keyboard())
+        await message.answer("Вы уже выбрали. Ждём остальных.", keyboard=waiting_keyboard())
         return
     scene.choices[cid] = value
     deciders = scene.deciders()
@@ -381,7 +381,7 @@ async def _finish(scene: GroupScene) -> bool:
                 wallet = await wallet_service.get_wallet(db, cid)
                 if wallet.farm_currency < scene_event_service.gold_amount(loaded[cid][0], stake.gold):
                     choices[cid] = ge.NO_STAKE
-                    personal[cid].append("Денег на эту ставку уже нет - котёл тебя не взял.")
+                    personal[cid].append("Денег на эту ставку уже нет - котёл вас не взял.")
 
         outcome = ge.resolve(event, names, choices, _rng, scene.leader_id, scene.victim_id, scene.state)
 
@@ -476,7 +476,7 @@ async def _finish_dealer(scene: GroupScene) -> None:
                     lots[cid] = await relic_dealer_service.lot(db, character, choice)
                 else:
                     gold, progress = await relic_dealer_service.sell(db, character, choice)
-                    personal[cid].append(f"💰 Меняла отсчитывает тебе {guild_service.gold_label(character, gold)}.")
+                    personal[cid].append(f"💰 Меняла отсчитывает вам {guild_service.gold_label(character, gold)}.")
                     if progress is not None and (notice := dailies_texts.progress_notice(progress)):
                         notices[cid] = notice
             applied = scene_event_service.Applied(new_level=character.level)

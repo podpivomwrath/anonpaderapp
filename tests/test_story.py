@@ -312,7 +312,7 @@ async def test_quest_reminder_ready_travel_combat(db_session, make_character) ->
         (0, 0, -5, -5, "на юго-запад"),
         (0, 0, 1, 10, "на север"),
         (0, 0, 10, -2, "на восток"),
-        (3, 3, 3, 3, "ты уже на месте"),
+        (3, 3, 3, 3, "вы уже на месте"),
     ],
 )
 def test_compass_direction(px, py, tx, ty, expected) -> None:

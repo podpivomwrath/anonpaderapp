@@ -172,7 +172,7 @@ def is_transferable(item: Item, equipped: bool) -> str | None:
     if item.bound or item.craft_spec is not None:
         return "Скованная экипировка привязана к хозяину - её не передать."
     if equipped:
-        return "Надетое не передать - сначала сними."
+        return "Надетое не передать - сначала снимите."
     return None
 
 
@@ -310,34 +310,34 @@ async def take(db: AsyncSession, sender_id: int, offer: Offer, amount: int) -> i
         try:
             await wallet_service.charge(db, sender_id, currency, amount)
         except wallet_service.NotEnoughCurrency:
-            raise TransferFailed("Столько у тебя нет.") from None
+            raise TransferFailed("Столько у вас нет.") from None
     elif offer.kind == "elixir":
         if not await _take_stack(db, CharacterConsumable, {"character_id": sender_id, "elixir_id": offer.ref}, amount):
-            raise TransferFailed("Столько у тебя нет.")
+            raise TransferFailed("Столько у вас нет.")
     elif offer.kind == "ore":
         ore_id, grade = offer.ref.split(":", 1)
         key = {"character_id": sender_id, "ore_id": ore_id, "grade": grade}
         if not await _take_stack(db, CharacterOre, key, amount):
-            raise TransferFailed("Столько у тебя нет.")
+            raise TransferFailed("Столько у вас нет.")
     elif offer.kind == "rune":
         from models import CharacterRune
 
         if not await _take_stack(db, CharacterRune, {"character_id": sender_id, "rune_id": offer.ref}, amount):
-            raise TransferFailed("Столько у тебя нет.")
+            raise TransferFailed("Столько у вас нет.")
     elif offer.kind == "ring":
         from models import CharacterCraftGear
 
         # Надетый в сумке не лежит - передаются только лишние.
         if not await _take_stack(db, CharacterCraftGear, {"character_id": sender_id, "tool_id": offer.ref}, amount):
-            raise TransferFailed("Столько ненадетых перстней у тебя нет.")
+            raise TransferFailed("Столько ненадетых перстней у вас нет.")
     elif offer.kind == "herb":
         if not await _take_stack(db, CharacterHerb, {"character_id": sender_id, "herb_id": offer.ref}, amount):
-            raise TransferFailed("Столько у тебя нет.")
+            raise TransferFailed("Столько у вас нет.")
     elif offer.kind == "food":
         dish_id, grade = offer.ref.split(":", 1)
         key = {"character_id": sender_id, "dish_id": dish_id, "grade": grade}
         if not await _take_stack(db, CharacterFood, key, amount):
-            raise TransferFailed("Столько у тебя нет.")
+            raise TransferFailed("Столько у вас нет.")
     elif offer.kind == "fish":
         fish_id, grade, grams = offer.ref.split(":", 2)
         taken = await db.execute(
@@ -348,7 +348,7 @@ async def take(db: AsyncSession, sender_id: int, offer: Offer, amount: int) -> i
             .execution_options(synchronize_session="fetch")
         )
         if not taken.rowcount:
-            raise TransferFailed("Этой рыбы у тебя уже нет.")
+            raise TransferFailed("Этой рыбы у вас уже нет.")
         _log_stack(db, CharacterFish, {"character_id": sender_id, "fish_id": fish_id, "grade": grade}, -int(grams))
     elif offer.kind == "item":
         item = await db.get(Item, int(offer.ref), with_for_update=True)
@@ -362,7 +362,7 @@ async def take(db: AsyncSession, sender_id: int, offer: Offer, amount: int) -> i
             ).execution_options(synchronize_session="fetch")
         )
         if not moved.rowcount:
-            raise TransferFailed("Этой вещи у тебя уже нет - или она надета.")
+            raise TransferFailed("Этой вещи у вас уже нет - или она надета.")
         from services import resource_log
 
         resource_log.add(db, sender_id, "item", offer.ref, -1)

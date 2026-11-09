@@ -346,7 +346,7 @@ async def handle_post_action(request: web.Request) -> web.Response:
             if reset_peer_id is not None:
                 await world_handlers.send_plain_notice(
                     reset_peer_id,
-                    "🔄 Твой персонаж обнулён администратором. Напиши любое сообщение - начнёшь заново.",
+                    "🔄 Ваш персонаж обнулён администратором. Напишите любое сообщение - начнёте заново.",
                 )
             return web.json_response({"reset": True, **reset_info})
         card = await admin_service.player_card(db, character_id)

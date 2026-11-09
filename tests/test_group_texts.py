@@ -47,4 +47,4 @@ def test_level_gap_kick_line_mentions_name() -> None:
 
 
 def test_level_gap_kick_self_line_is_stable_text() -> None:
-    assert "исключён" in group_texts.level_gap_kick_self_line()
+    assert "исключены" in group_texts.level_gap_kick_self_line()

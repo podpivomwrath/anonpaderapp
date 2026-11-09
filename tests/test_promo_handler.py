@@ -62,7 +62,7 @@ def test_render_success_no_rewards() -> None:
 
 def test_render_already_used() -> None:
     outcome = promo_service.ActivationOutcome(status="already_used")
-    assert _render(outcome) == "Ты уже воспользовался этим кодом."
+    assert _render(outcome) == "Вы уже воспользовались этим кодом."
 
 
 def test_render_limit_reached() -> None:

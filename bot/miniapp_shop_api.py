@@ -116,7 +116,7 @@ async def handle_post(request: web.Request) -> web.Response:
         except IntegrityError:
             # Имя заняли в ту же секунду - уникальность держит база.
             await db.rollback()
-            return _error("Это имя только что заняли - выбери другое.", 409)
+            return _error("Это имя только что заняли - выберите другое.", 409)
         state = await _catalog(db, character)
         await db.commit()
     if item == shop_service.FIRM_RENAME_ID:
@@ -140,7 +140,7 @@ async def faction_blocker(peer_id: int, character) -> str | None:
     if in_any_battle(peer_id) or raid_combat.has_active_raid(character.id):
         return "Сначала закончи бой."
     if rift.is_waiting(peer_id):
-        return "Ты ждёшь разлом - сначала выйди из очереди."
+        return "Вы ждёте разлом - сначала выйдите из очереди."
     if scene_events.has_pending(peer_id):
         return "Сначала закончи событие."
     return None
@@ -199,7 +199,7 @@ async def after_faction_move(peer_id: int, region: str, voyage_text: str | None)
 
 
 FACTION_MOVE_TEXT = (
-    "🏳 Писарь у ворот вписывает тебя в книгу жителей, даже не подняв головы. "
+    "🏳 Писарь у ворот вписывает вас в книгу жителей, даже не подняв головы. "
     "Новый дом - {city}."
 )
 
@@ -262,7 +262,7 @@ async def handle_post_payment(request: web.Request) -> web.Response:
             from loguru import logger
 
             logger.exception("YooKassa: не удалось создать платёж")
-            return _error("Платёжный сервис не ответил. Попробуй ещё раз.", 502)
+            return _error("Платёжный сервис не ответил. Попробуйте ещё раз.", 502)
         await db.commit()
     return web.json_response({"url": url})
 

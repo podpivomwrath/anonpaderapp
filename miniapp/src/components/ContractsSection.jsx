@@ -75,7 +75,7 @@ function OrderForm({ data, busy, act }) {
             onChange={(e) => { setPrice(e.target.value); setConfirming(false); }} />
         </div>
         <p className="craft-hint">
-          Итого 💎{money(total)} (у тебя 💎{money(data.gems)}), списываются сразу. Заказ висит {rules.hours} ч,
+          Итого 💎{money(total)} (у вас 💎{money(data.gems)}), списываются сразу. Заказ висит {rules.hours} ч,
           невыполненный остаток сгорает. Цель - с {rules.target_min_level} уровня. Цели придёт весть, что на неё
           заказ; кто заказал, она узнает, только если откупится.
         </p>
@@ -144,7 +144,7 @@ export default function ContractsSection() {
       )}
       <SectionHead
         kind="board" icon="🎯" value={data.contracts.length} label="открытых заказов"
-        aside={<>💎 {money(data.gems)}<br /><small>у тебя</small></>}
+        aside={<>💎 {money(data.gems)}<br /><small>у вас</small></>}
       />
       <Group header={<Header>🎯 Открытые заказы</Header>}>
         {data.contracts.length === 0 && <Empty icon="🎯">Сейчас заказов нет.</Empty>}
@@ -164,8 +164,8 @@ export default function ContractsSection() {
               </div>
               <span className="contract-card__side">
                 <b className="contract-card__price">💎{money(c.price)}</b>
-                {c.on_me ? <><small>на тебя</small><BuyoutButton c={c} gems={data.gems} busy={busy} act={act} /></>
-                  : c.mine ? <small>твой заказ</small>
+                {c.on_me ? <><small>на вас</small><BuyoutButton c={c} gems={data.gems} busy={busy} act={act} /></>
+                  : c.mine ? <small>ваш заказ</small>
                     : c.taken ? <small>взят</small>
                       : c.guildmate ? <small>согильдиец</small>
                         : <button type="button" className="pill-btn pill-btn--main" disabled={busy} onClick={() => act('take', { id: c.id })}>Взять</button>}

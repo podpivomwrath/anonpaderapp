@@ -68,7 +68,7 @@ def brand_notice(rift: Rift, minutes: int) -> str:
     from game.economy import brand_config as brc
 
     lo, hi = rc.BANDS[rift.ring]
-    return (f"{brc.BRAND_BADGE} Открылся разлом твоего уровня: {title(rift.kind)} ({lo}-{hi}), "
+    return (f"{brc.BRAND_BADGE} Открылся разлом вашего уровня: {title(rift.kind)} ({lo}-{hi}), "
             f"клетка ({rift.x}; {rift.y}). Закроется через {plural.count(minutes, 'минуту', 'минуты', 'минут')}.")
 
 
@@ -103,7 +103,7 @@ def wait_text(rift: Rift) -> str:
 
 WAITING_REMINDER = f"⏳ Вы ждёте у входа в разлом. Отменить - «{BTN_CANCEL}»."
 CANCELLED_TEXT = "Вход в разлом отменён."
-SHIELD_DROPPED = "🛡 Защита от нападения снята: ты встал к разлому."
+SHIELD_DROPPED = "🛡 Защита от нападения снята: вы встали к разлому."
 
 
 def rival_text(rift: Rift, names: list[str]) -> str:
@@ -111,11 +111,11 @@ def rival_text(rift: Rift, names: list[str]) -> str:
     баг-репорт: разлом занимали, пока хозяева клетки стояли в АФК)."""
     who = ", ".join(names)
     return (
-        f"🌀 К разлому на твоей клетке ({title(rift.kind)}) встают: {who}. "
+        f"🌀 К разлому на вашей клетке ({title(rift.kind)}) встают: {who}. "
         f"Через {rc.ENTRY_WAIT_SECONDS} сек. войдут, если им никто не помешает."
     )
 LOST_TEXT = "Вход в разлом сорван: у входа никого не осталось."
-LEFT_OUT_TEXT = "🌀 Группа встала к разлому без тебя: тебя не было рядом. Догнать их внутри уже не выйдет."
+LEFT_OUT_TEXT = "🌀 Группа встала к разлому без вас: вас не было рядом. Догнать их внутри уже не выйдет."
 
 
 def left_behind_text(names: str) -> str:

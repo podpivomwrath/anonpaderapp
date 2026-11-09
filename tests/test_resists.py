@@ -99,9 +99,9 @@ def test_item_value_and_lines() -> None:
     assert resists.item_value(80) == pytest.approx(0.10 * 80 / 120)
     assert resists.item_value(None) == pytest.approx(0.10 * 100 / 120)
     item = Item(name="x", slot="weapon", craft_resist="crit", craft_efficiency=120)
-    assert resist_service.item_line(item) == "крит-урон по тебе ниже на 10%"
+    assert resist_service.item_line(item) == "крит-урон по вам ниже на 10%"
     item.craft_resist, item.craft_efficiency = "dot", 90
-    assert resist_service.item_line(item) == "яд и горение по тебе слабее на 7.5%"
+    assert resist_service.item_line(item) == "яд и горение по вам слабее на 7.5%"
     item.craft_resist = None
     assert resist_service.item_line(item) is None
 

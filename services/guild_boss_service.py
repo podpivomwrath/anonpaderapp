@@ -159,8 +159,8 @@ async def start_attempt(db: AsyncSession, character: Character, boss_pk: int) ->
         return AttemptCheck(False, "Это страж чужой гильдии.")
     if not can_reach(boss, character):
         if boss.court:
-            return AttemptCheck(False, "Страж Двора отвечает только в городе - зайди в любой город.")
-        return AttemptCheck(False, "Страж стоит в цитадели - иди туда или в любой город.")
+            return AttemptCheck(False, "Страж Двора отвечает только в городе - зайдите в любой город.")
+        return AttemptCheck(False, "Страж стоит в цитадели - идите туда или в любой город.")
     minutes = await cooldown_minutes(db, boss, character.id)
     if minutes:
         return AttemptCheck(False, f"Следующий заход через {minutes} мин.", minutes)

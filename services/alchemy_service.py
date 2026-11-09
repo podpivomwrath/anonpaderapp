@@ -51,7 +51,7 @@ async def start(db: AsyncSession, character: Character, elixir_id: str, now: dat
     """Списать травы и золото и поставить варку."""
     recipe = ac.RECIPES_BY_ID.get(elixir_id)
     if recipe is None or recipe.level > character.alchemy_level:
-        raise AlchemyError("Этот рецепт тебе пока не знаком.")
+        raise AlchemyError("Этот рецепт вам пока не знаком.")
     if is_working(character):
         raise AlchemyError("Стол занят: сначала закончи то, что уже на огне.")
     gold = alchemy.gold_cost(recipe, character.alchemy_level)

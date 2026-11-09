@@ -57,7 +57,7 @@ def validate_preset(
             and unlocked_buff_ids is not None
             and buff_id not in unlocked_buff_ids
         ):
-            raise PresetValidationError(f"Бафф {buff_id} ещё не открыт - пройди испытание")
+            raise PresetValidationError(f"Бафф {buff_id} ещё не открыт - пройдите испытание")
 
 
 def preset_subclass(preset: CharacterBuffPreset) -> str | None:
@@ -137,7 +137,7 @@ async def save_preset(
         existing_count = len(await presets_of(db, character))
         if existing_count >= effective_preset_slots(character):
             raise PresetValidationError(
-                "Нет свободных слотов пресетов - купи ещё один в разделе «Персонаж»"
+                "Нет свободных слотов пресетов - купите ещё один в разделе «Персонаж»"
             )
 
     # Создание нового пресета платное, пересбор уже созданного - бесплатно
@@ -185,7 +185,7 @@ def preset_rule_hint(catalog_labels: dict[str, str] | None = None) -> str:
     следующее изменение правил снова не разошлось с экраном.
     """
     return (
-        f"Выбери от {bc.PRESET_MIN_BUFFS} до {bc.PRESET_MAX_BUFFS} баффов - любых "
+        f"Выберите от {bc.PRESET_MIN_BUFFS} до {bc.PRESET_MAX_BUFFS} баффов - любых "
         "из своего пула."
     )
 
@@ -325,7 +325,7 @@ async def switch_active_preset(
     slot_index = presets.index(target)
     if slot_index >= effective_preset_slots(character):
         raise PresetValidationError(
-            "Этот пресет вне доступных слотов - продли Метку Хранителя или купи слот"
+            "Этот пресет вне доступных слотов - продлите Метку Хранителя или купите слот"
         )
     for preset in presets:
         preset.is_active = preset.id == preset_id

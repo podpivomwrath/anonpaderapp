@@ -182,7 +182,7 @@ export default function CraftGear({ craft, onUpdate }) {
       {/* Шапка с картинкой ремесла - assets/sections/gear_<ремесло>.webp. */}
       <SectionHead
         kind={`gear_${craft.id}`} icon={craft.emoji} value={`${craft.level} уровень`}
-        label="Инструменты не ломаются и остаются с тобой"
+        label="Инструменты не ломаются и остаются с вами"
       />
       <div className="gear-page__tools">
         {craft.tools.map((t) => (

@@ -68,10 +68,10 @@ def describe(kind: str, value: float) -> str:
     pct = round(value * 100, 1)
     num = f"{pct:g}"
     if kind == CRIT:
-        return f"крит-урон по тебе ниже на {num}%"
+        return f"крит-урон по вам ниже на {num}%"
     if kind == DODGE:
         return f"уворот цели ниже на {num}%"
-    return f"яд и горение по тебе слабее на {num}%"
+    return f"яд и горение по вам слабее на {num}%"
 
 
 def capped(total: float) -> float:

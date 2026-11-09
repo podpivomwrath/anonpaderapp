@@ -24,7 +24,7 @@ const FRAMES = [
   { text: 'Однажды он треснул. С неба посыпался пепел - и сыплется до сих пор.', crack: true },
   { text: 'Выжившие ушли к краям мира: в горы Кряжа, к соляным Пристаням, в огонь Предела, под кроны Пущ. А в пепле зашевелилось то, чему не следовало просыпаться.' },
   { text: 'Но пепел оставил и метку. На тех, кого коснулся, - и кто не сгорел.' },
-  { text: 'Ты - Меченый. Монолит зовёт.', final: true },
+  { text: 'Вы - Меченый. Монолит зовёт.', final: true },
 ];
 
 const WORD_MS = 140;     // шаг появления слов
@@ -99,7 +99,7 @@ export default function IntroScene({ onDone }) {
         <AshLayer density={4} />
         <button type="button" className="intro__start" onClick={begin}>
           <span className="intro__sigil" aria-hidden="true" />
-          <span className="intro__start-text">Коснись, чтобы начать</span>
+          <span className="intro__start-text">Коснитесь, чтобы начать</span>
         </button>
         <button type="button" className="intro__skip" onClick={() => setStage('sound')}>Пропустить</button>
       </div>

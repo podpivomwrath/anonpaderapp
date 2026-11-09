@@ -63,7 +63,7 @@ export default function TrialsTab() {
   if (!data.subclass) {
     return (
       <Group>
-        <Empty icon="📖">Твоя Метка ещё не обрела форму. Возвращайся, когда кровь потребует имени.</Empty>
+        <Empty icon="📖">Ваша Метка ещё не обрела форму. Возвращайтесь, когда кровь потребует имени.</Empty>
       </Group>
     );
   }

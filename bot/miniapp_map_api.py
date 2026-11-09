@@ -298,7 +298,7 @@ async def handle_post_stop_travel(request: web.Request) -> web.Response:
         travel = await mount_service.active_travel(db, character.id)
         travel_id = travel.id if travel is not None else None
     if travel_id is None:
-        return web.json_response({"error": "Ты сейчас не в пути."}, status=409)
+        return web.json_response({"error": "Вы сейчас не в пути."}, status=409)
     reason = await mounts_handlers.stop_and_notify(vk_user_id, travel_id)
     if reason is not None:
         return web.json_response({"error": reason}, status=409)

@@ -112,7 +112,7 @@ RECOVERY_INTRO = (
 
 
 #: Цель заказа в штольне (2026-10-29, владелец).
-SHAFT_NO_PVP_TEXT = "Цель в штольне. В узком забое не подраться - жди, пока выйдет наверх."
+SHAFT_NO_PVP_TEXT = "Цель в штольне. В узком забое не подраться - ждите, пока выйдет наверх."
 
 
 def _in_shaft(character) -> bool:
@@ -207,7 +207,7 @@ def _grant_draw_shield(battle: "Battle", survivors) -> list[int]:
     return shielded
 
 
-DRAW_SHIELD_LINE = f"🛡 Ничья: на тебя нельзя нападать {bc.PVP_DRAW_SHIELD_SECONDS // 60} мин., пока не ушёл с этой клетки."
+DRAW_SHIELD_LINE = f"🛡 Ничья: на вас нельзя нападать {bc.PVP_DRAW_SHIELD_SECONDS // 60} мин., пока не ушли с этой клетки."
 # peer_id -> battle_id, ждём выбора стороны (текстом "1"/"2") для этого боя
 _pending_join_prompt: dict[int, int] = {}
 #: Последнее «Осмотреться»: peer -> (клетка, id игроков, id боёв) в том
@@ -376,7 +376,7 @@ def _format_transfer_line(moved: dict[str, int]) -> str | None:
         parts.append(f"{trophy_def.emoji} {trophy_def.name}{suffix}")
     if not parts:
         return None
-    return "Забираешь трофеи: " + ", ".join(parts) + "."
+    return "Забираете трофеи: " + ", ".join(parts) + "."
 
 
 @labeler.message(text=[kb.BTN_LOOK_AROUND])
@@ -385,7 +385,7 @@ async def look_around(message: Message) -> None:
     if in_any_battle(peer_id):
         # Кнопка со старой клавиатуры посреди боя: раньше молчали, и нажатие
         # уходило в пустоту. Отвечаем и возвращаем кнопки боя.
-        await message.answer("⚔️ Ты в бою - оглядеться некогда.", keyboard=active_battle_keyboard(peer_id))
+        await message.answer("⚔️ Вы в бою - оглядеться некогда.", keyboard=active_battle_keyboard(peer_id))
         return
     async with get_session_factory()() as db:
         character = await onboarding_svc.get_character(db, message.from_id)
@@ -437,8 +437,8 @@ def _peaceful_scene_text(solo: list[Character], tags: dict[int, str] | None = No
     """busy - кто чем занят (бой с мобами, рыбалка, забой): видно и на
     мирной клетке (2026-10-29, баг-репорт)."""
     if not solo and not battles:
-        return "👁 Ты оглядываешься.\n\nТы один. Место мирное - здесь не нападают."
-    lines = ["👁 Ты оглядываешься. Место мирное - здесь не нападают.", ""]
+        return "👁 Вы оглядываетесь.\n\nВы один. Место мирное - здесь не нападают."
+    lines = ["👁 Вы оглядываетесь. Место мирное - здесь не нападают.", ""]
     if solo:
         lines.append("Рядом:")
         lines += [f"• {_class_line(c, tags)}{(busy or {}).get(c.id, '')}" for c in solo]
@@ -470,11 +470,11 @@ async def leaderboard_command(message: Message) -> None:
     if (character.pvp_wins or 0) + (character.pvp_losses or 0) == 0:
         # Без боёв в таблице не стоят - и место не выдумываем (2026-10-15).
         lines.append("-")
-        lines.append(f"Тебя пока нет в рейтинге: попадёшь после первого PvP-боя. У тебя {character.pts} PTS.")
+        lines.append(f"Вас пока нет в рейтинге: попадёте после первого PvP-боя. У вас {character.pts} PTS.")
     elif rank > len(entries):
         lines.append("-")
         lines.append(
-            f"Ты: {rank} место - {character.pts} PTS · {pts_service.rank_name(character.pts)}"
+            f"Вы: {rank} место - {character.pts} PTS · {pts_service.rank_name(character.pts)}"
             f" · {character.pvp_wins} / {character.pvp_losses}"
         )
     await info_reply.answer(message, "\n".join(lines))
@@ -488,7 +488,7 @@ async def leaderboard_command(message: Message) -> None:
 async def attack_command(message: Message, target: str) -> None:
     peer_id = message.peer_id
     if in_any_battle(peer_id):
-        await message.answer("Ты уже дерёшься.")
+        await message.answer("Вы уже деретесь.")
         return
     async with get_session_factory()() as db:
         character = await onboarding_svc.get_character(db, message.from_id)
@@ -589,7 +589,7 @@ async def attack_command(message: Message, target: str) -> None:
                 return
             _pending_join_prompt[peer_id] = battle_id
             await message.answer(
-                f"{_battle_roster_text(battle_id, battle)}\n\nК кому присоединиться? Напиши 1 или 2.",
+                f"{_battle_roster_text(battle_id, battle)}\n\nК кому присоединиться? Напишите 1 или 2.",
                 keyboard=join_side_keyboard(battle_id),
             )
             return
@@ -650,12 +650,12 @@ async def _start_forced_duel_impl(
     if dropped is not None:
         await db.commit()
     if dropped:
-        await _bot_api.messages.send(peer_id=victim_peer_id, message=f"⚔️ На тебя напали! {dropped}", random_id=0)
+        await _bot_api.messages.send(peer_id=victim_peer_id, message=f"⚔️ На вас напали! {dropped}", random_id=0)
 
     if combat_handlers.has_active_encounter(victim_peer_id):
         await combat_handlers.interrupt_for_pvp(victim_peer_id)
         await _bot_api.messages.send(
-            peer_id=victim_peer_id, message="⚔️ На тебя напали! Бой с тварью прерван.", random_id=0,
+            peer_id=victim_peer_id, message="⚔️ На вас напали! Бой с тварью прерван.", random_id=0,
         )
     if group_combat.has_active_group_battle(victim_peer_id):
         # Группа, что дралась с мобами вместе с жертвой, целиком встаёт на её
@@ -679,7 +679,7 @@ async def _start_forced_duel_impl(
             await _start_group_ambush(db, attacker, attacker_peer_id, victim, defenders)
             return
         await _bot_api.messages.send(
-            peer_id=victim_peer_id, message="⚔️ На тебя напали! Бой группы с мобами прерван.", random_id=0,
+            peer_id=victim_peer_id, message="⚔️ На вас напали! Бой группы с мобами прерван.", random_id=0,
         )
 
     from bot.handlers import group as group_handlers  # избегаем цикла импортов
@@ -860,7 +860,7 @@ async def _handle_join_choice(message: Message, battle_id, side) -> None:
         return
     _pending_join_prompt.pop(peer_id, None)
     if in_any_battle(peer_id):
-        await message.answer("Ты уже дерёшься.")
+        await message.answer("Вы уже деретесь.")
         return
     battle = _battles.get(battle_id)
     if battle is None:
@@ -879,7 +879,7 @@ async def _handle_join_choice(message: Message, battle_id, side) -> None:
             await message.answer("☠ Сначала очнись.")
             return
         if (character.pos_x, character.pos_y) != battle.location:
-            await message.answer("Ты уже не на той клетке.")
+            await message.answer("Вы уже не на той клетке.")
             return
         # Против согруппника не вступают: его сторона - и твоя.
         mate_side = await _groupmate_side(db, character, battle)
@@ -916,7 +916,7 @@ async def _handle_join_choice(message: Message, battle_id, side) -> None:
     # бил с первого хода, а в логе его появления не было.
     await _tell_others(battle, participant.character_id,
                        f"⚔️ {participant.name} вступает в бой на стороне {side}.")
-    text = f"⚔️ Ты вступаешь в бой на стороне {side}!"
+    text = f"⚔️ Вы вступаете в бой на стороне {side}!"
     if target_line:
         text += f"\n{target_line}"
     await message.answer(
@@ -1333,7 +1333,7 @@ async def pvp_open_items(message: Message) -> None:
     visible = consumable_limit.visible_stock(combatant, stock, limit_reached)
     text = consumable_limit.items_header(combatant)
     if limit_reached and any(d.category != "heal" for d, _ in stock):
-        text += "\n\nБольше твоё тело не выдержит за один бой - боевые эликсиры недоступны."
+        text += "\n\nБольше ваше тело не выдержит за один бой - боевые эликсиры недоступны."
     # Открытие окна - всегда новым сообщением внизу: иначе правилось бы
     # окно из прошлого боя, давно уехавшее вверх, и нажатие казалось мёртвым.
     page = page_of(message)
@@ -1383,7 +1383,7 @@ async def pvp_use_item(message: Message) -> None:
         await message.answer(consumable_limit.HEAL_TAKEN_TEXT, keyboard=battle_kb)
         return
     if elixir.category != "heal" and combatant.combat_elixirs_used >= ec.ELIXIR_PER_BATTLE_LIMIT:
-        await message.answer("Больше твоё тело не выдержит за один бой.", keyboard=battle_kb)
+        await message.answer("Больше ваше тело не выдержит за один бой.", keyboard=battle_kb)
         return
 
     if free:
@@ -1419,7 +1419,7 @@ async def pvp_use_item(message: Message) -> None:
             await _tell_others(battle, cid, elixir_effects.elixir_seen(participant.name, elixir))
     if elixir.category == "scroll":
         await _tell_others(battle, cid, f"{participant.name}: {line}")
-    text = f"{line} Твой ход.\n\n{_battle_board_text(battle_id, battle, [])}"
+    text = f"{line} Ваш ход.\n\n{_battle_board_text(battle_id, battle, [])}"
     await _bot_api.messages.send(
         peer_id=peer_id, message=text, random_id=0,
         keyboard=pvp_combat_keyboard(participant.base_class, combatant.cooldowns, subclass_id=combatant.subclass_id),

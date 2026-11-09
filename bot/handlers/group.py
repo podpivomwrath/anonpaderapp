@@ -29,7 +29,7 @@ labeler.vbml_ignore_case = True  # команды без учёта регист
 _bot_api = None
 
 USAGE_TEXT = (
-    "Чтобы пригласить в группу: напиши «/пригласить Никнейм» или перешли "
+    "Чтобы пригласить в группу: напишите «/пригласить Никнейм» или перешлите "
     "сообщение игрока боту с подписью «/пригласить»."
 )
 NOT_FOUND_TEXT = "Игрок с таким ником не найден."
@@ -62,7 +62,7 @@ async def _send_invite(message: Message, nickname: str) -> None:
     if target_peer_id is not None:
         await _bot_api.messages.send(
             peer_id=target_peer_id,
-            message=f"👥 {inviter_name} приглашает тебя в группу.",
+            message=f"👥 {inviter_name} приглашает вас в группу.",
             random_id=0,
             keyboard=group_invite_keyboard(invite.id),
         )
@@ -103,12 +103,12 @@ async def invite_by_forward(message: Message) -> None:
 
     # Ник не показываем, пока игрок не согласится (2026-10-17): пересылка не
     # должна выдавать, какой персонаж у этого человека.
-    await message.answer("👥 Приглашение отправлено. У игрока есть 1 минута на ответ - ник увидишь, когда он согласится.")
+    await message.answer("👥 Приглашение отправлено. У игрока есть 1 минута на ответ - ник увидите, когда он согласится.")
     await _bot_api.messages.send(
         peer_id=from_vk_id,
         # И приглашённому ник пригласившего - только после согласия
         # (2026-10-19): пересылку делает знакомый по VK, ник выдал бы его.
-        message="👥 Тебя зовут в группу. Кто зовёт - увидишь, если согласишься.",
+        message="👥 Вас зовут в группу. Кто зовёт - увидите, если согласитесь.",
         random_id=0,
         keyboard=group_invite_keyboard(invite.id),
     )
@@ -136,7 +136,7 @@ async def invite_accept(message: Message) -> None:
         leader_peer_id = await onboarding_svc.vk_id_for_character(db, leader.id)
         joined_name = character.name
 
-    await message.answer(f"👥 Ты вступил в группу.\n\n{group_block}")
+    await message.answer(f"👥 Вы вступили в группу.\n\n{group_block}")
     if leader_peer_id is not None and leader_peer_id != peer_id:
         await _bot_api.messages.send(
             peer_id=leader_peer_id,
@@ -171,7 +171,7 @@ async def leave_prompt(message: Message) -> None:
         if character is None or character.creation_state is not None:
             return
         if await gs.get_membership(db, character.id) is None:
-            await message.answer("Ты не в группе.")
+            await message.answer("Вы не в группе.")
             return
     await message.answer("Точно выйти из группы?", keyboard=leave_confirm_keyboard())
 
@@ -203,13 +203,13 @@ async def leave_confirm(message: Message) -> None:
             new_leader = await db.get(Character, result.new_leader_character_id)
             new_leader_name = new_leader.name if new_leader is not None else None
 
-    await message.answer("Ты вышел из группы.")
+    await message.answer("Вы вышли из группы.")
     for vk_id in remaining_peer_ids:
         if result.dissolved:
             # Группа распадается, когда остаётся один. Сказать об этом надо:
             # иначе последний участник видит «группа» на экране и не понимает,
             # почему она больше ничего не умеет.
-            text = f"👥 {left_name} покинул группу. Группа распалась - ты остался один."
+            text = f"👥 {left_name} покинул группу. Группа распалась - вы остались один."
         else:
             text = f"👥 {left_name} покинул группу."
             if new_leader_name is not None:
@@ -270,7 +270,7 @@ async def kick_by_name(message: Message, name: str) -> None:
     if target_peer_id is not None:
         try:
             await _bot_api.messages.send(
-                peer_id=target_peer_id, message="👥 Тебя исключили из группы.", random_id=0,
+                peer_id=target_peer_id, message="👥 Вас исключили из группы.", random_id=0,
             )
         except Exception:
             pass
@@ -327,7 +327,7 @@ async def notify_arrival(db, character) -> None:
             continue
         here.append(m)
     peers = await _member_peers(db, here)
-    _send_later(peers, f"👥 {character.name} теперь на твоей клетке ({character.pos_x}; {character.pos_y}).")
+    _send_later(peers, f"👥 {character.name} теперь на вашей клетке ({character.pos_x}; {character.pos_y}).")
 
 
 async def notify_attacked(db, victim, attacker) -> None:
@@ -339,5 +339,5 @@ async def notify_attacked(db, victim, attacker) -> None:
     peers = await _member_peers(db, others)
     _send_later(
         peers,
-        f"⚔️ На {victim.name} из твоей группы напал {attacker.name} - клетка ({victim.pos_x}; {victim.pos_y}).",
+        f"⚔️ На {victim.name} из вашей группы напал {attacker.name} - клетка ({victim.pos_x}; {victim.pos_y}).",
     )

@@ -61,7 +61,7 @@ async def add_manual(
     """Донат, принятый мимо ЮKassa: имя, сумма в рублях, по желанию vk_id и заметка."""
     donor = donor.strip() if isinstance(donor, str) else ""
     if not 1 <= len(donor) <= 160:
-        raise DonationError("Укажи, кто задонатил.")
+        raise DonationError("Укажите, кто задонатил.")
     if not isinstance(amount, int) or isinstance(amount, bool) or not 1 <= amount <= 10_000_000:
         raise DonationError("Сумма - целое число рублей больше нуля.")
     if vk_id is not None and (not isinstance(vk_id, int) or isinstance(vk_id, bool) or vk_id <= 0):

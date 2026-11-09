@@ -271,7 +271,7 @@ def test_format_drop_line_dead_box_source() -> None:
 
 def test_format_drop_line_wounded_wanderer_source() -> None:
     line = trophy_service.format_drop_line({"ash_dust": 1}, source="wounded_wanderer")
-    assert line.startswith("Он вкладывает тебе в ладонь:")
+    assert line.startswith("Он вкладывает вам в ладонь:")
 
 
 def test_format_drop_line_ash_altar_source() -> None:
@@ -286,5 +286,5 @@ def test_format_drop_line_monolith_shard_source() -> None:
 
 def test_format_drop_line_unknown_source_falls_back_neutral() -> None:
     line = trophy_service.format_drop_line({"ash_dust": 1}, source="something_new")
-    assert line.startswith("Ты находишь:")
+    assert line.startswith("Вы находите:")
     assert "твари" not in line

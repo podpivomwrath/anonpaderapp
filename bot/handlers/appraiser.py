@@ -421,7 +421,7 @@ async def sell_rarity(message: Message) -> None:
 
     if warnings:
         text = (
-            f"⚠️ Среди них есть снаряжение лучше того, что на тебе:\n{_warning_lines(warnings)}\n\n"
+            f"⚠️ Среди них есть снаряжение лучше того, что на вас:\n{_warning_lines(warnings)}\n\n"
             "Продать всё равно?"
         )
         kb = sell_confirm_keyboard({"type": "sell_rarity_confirm", "rarity": rarity_id})
@@ -455,7 +455,7 @@ async def sell_all_gear(message: Message) -> None:
 
     if warnings:
         text = (
-            f"⚠️ Среди них есть снаряжение лучше того, что на тебе:\n{_warning_lines(warnings)}\n\n"
+            f"⚠️ Среди них есть снаряжение лучше того, что на вас:\n{_warning_lines(warnings)}\n\n"
             "Продать всё равно?"
         )
         kb = sell_confirm_keyboard({"type": "sell_all_gear_confirm"})

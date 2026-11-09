@@ -24,7 +24,7 @@ from services.db import get_session_factory
 labeler = BotLabeler()
 labeler.vbml_ignore_case = True  # команды без учёта регистра
 
-STUCK_LINE = "Ты встряхиваешься и приходишь в себя."
+STUCK_LINE = "Вы встряхиваетесь и приходите в себя."
 STUCK_BATTLE_LINE = "Бой продолжается - кнопки обновлены."
 
 

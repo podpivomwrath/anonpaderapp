@@ -159,7 +159,7 @@ def class_line(combatants, owner_id: int) -> str | None:
             parts.append("📣 Провокация: " + ", ".join(taunted))
     elif sub == "dark_mystic":
         for c in allies:
-            who = "ты" if c.id == owner_id else c.name
+            who = "вы" if c.id == owner_id else c.name
             shields = [e for e in mine(c, EffectKind.SHIELD_POOL) if getattr(e, "tag", None) != SECOND_HEART_TAG]
             # Оберег и Отголосок - разные щиты (2026-10-17), показываем порознь.
             for title, group in (
@@ -237,7 +237,7 @@ def target_line(target, viewer_id: int, result: TickResult | None = None) -> str
         marks.append("🔥")
     poison = sum(e.stacks for e in mine if getattr(e, "tag", None) != BURN_TAG)
     if poison:
-        marks.append(f"☠️×{poison} твой" if poison > 1 else "☠️ твой")
+        marks.append(f"☠️×{poison} ваш" if poison > 1 else "☠️ ваш")
     if any(e.kind == EffectKind.FREEZE and e.remaining_ticks > 0 for e in target.effects):
         marks.append("❄️")
     line = f"🎯 Цель: {target.name} ({hp_pct}% HP)"
@@ -247,7 +247,7 @@ def target_line(target, viewer_id: int, result: TickResult | None = None) -> str
         dealt = sum(max(h.hp_before - h.hp_after, 0) for h in result.hit_renders
                     if not h.missed and h.source_id == viewer_id and h.target_id == target.id)
         if dealt:
-            line += f" · твой урон {dealt}"
+            line += f" · ваш урон {dealt}"
     return line
 
 

@@ -95,9 +95,9 @@ async def tick_job() -> None:
             continue
         if kind == "picked":
             await _send(sender_peer, f"{cc.EMOJI} Курьер забрал посылку ({what}) и побежал к получателю.")
-            await _send(recipient_peer, f"{cc.EMOJI} К тебе бежит курьер с посылкой{from_whom}: {what}.")
+            await _send(recipient_peer, f"{cc.EMOJI} К вам бежит курьер с посылкой{from_whom}: {what}.")
         elif kind == "delivered":
-            await _send(recipient_peer, f"📦 Курьер отдаёт тебе посылку{from_whom}: {what}.")
+            await _send(recipient_peer, f"📦 Курьер отдаёт вам посылку{from_whom}: {what}.")
             await _send(sender_peer, f"{cc.EMOJI} Курьер доставил посылку ({what}) и пошёл домой.")
         elif kind == "returned":
             await _send(sender_peer, f"{cc.EMOJI} Получателя больше нет в игре. Курьер вернул посылку: {what}.")

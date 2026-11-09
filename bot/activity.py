@@ -21,7 +21,7 @@ def transition(peer_ids):
     owner = _owner.get() or object()
     peers = set(peer_ids)
     if any(p in _owners and _owners[p] is not owner for p in peers):
-        raise ActivityBusy("Действие ещё выполняется. Подожди немного.")
+        raise ActivityBusy("Действие ещё выполняется. Подождите немного.")
     added = peers - _owners.keys()
     for peer in added:
         _owners[peer] = owner

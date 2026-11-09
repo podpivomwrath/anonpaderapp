@@ -60,7 +60,7 @@ function AboutSheet({ good, onClose, onTrade }) {
     <Sheet title={good.name} icon={good.emoji} onClose={onClose} className="market-sheet">
       <div className="market-about__head">
         <Icon icon={good.icon} emoji={good.emoji} size={56} />
-        {info?.have > 0 && <small className="market-muted">у тебя {info.have}</small>}
+        {info?.have > 0 && <small className="market-muted">у вас {info.have}</small>}
       </div>
       {info ? <About about={info.about} /> : <p className="market-muted">Загрузка…</p>}
       <Button size="l" stretched onClick={onTrade}>Торговать</Button>
@@ -121,7 +121,7 @@ function GoodSheet({ good, rules, gold, onClose, act, busy }) {
       <div className="market-switch">
         <button type="button" className={side === 'buy' ? 'is-on' : ''} onClick={() => setSide('buy')}>Купить</button>
         <button type="button" className={side === 'sell' ? 'is-on' : ''} onClick={() => setSide('sell')}>
-          Продать{have ? ` (у тебя ${have})` : ''}
+          Продать{have ? ` (у вас ${have})` : ''}
         </button>
       </div>
       <div className="market-form">
@@ -131,7 +131,7 @@ function GoodSheet({ good, rules, gold, onClose, act, busy }) {
       <p className="craft-hint">
         {side === 'buy'
           ? `Спишется ${money(total)} + ${money(fee)} за заявку. Найдётся дешевле - разница вернётся сразу.`
-          : `Получишь ${money(net)} (минус ${rules.sale_fee_pct}%), за заявку - ${money(fee)}.`}
+          : `Получите ${money(net)} (минус ${rules.sale_fee_pct}%), за заявку - ${money(fee)}.`}
         {' '}Заявка висит {rules.hours} ч.
         {tooSmall && ` Заявка - от ${rules.min_gold} золота.`}
       </p>
@@ -140,9 +140,9 @@ function GoodSheet({ good, rules, gold, onClose, act, busy }) {
         onClick={() => act(side, { good: good.key, qty, price }, onClose)}
       >
         {/* Причина на самой кнопке (2026-10-29, баг-репорт: серая кнопка без объяснений). */}
-        {!qty || !price ? 'Укажи количество и цену'
+        {!qty || !price ? 'Укажите количество и цену'
           : tooSmall ? `Заявка - от ${money(rules.min_gold)} золота`
-            : cant ? (side === 'sell' ? 'Столько у тебя нет' : 'Не хватает золота')
+            : cant ? (side === 'sell' ? 'Столько у вас нет' : 'Не хватает золота')
               : side === 'buy' ? `Купить ×${qty} по ${money(price)}` : `Продать ×${qty} по ${money(price)}`}
       </Button>
     </Sheet>
@@ -153,7 +153,7 @@ function summaryLine(sell, buy, have) {
   return [
     sell ? `продают от ${money(sell)}` : 'не продают',
     buy ? `покупают до ${money(buy)}` : 'не покупают',
-    have ? `у тебя ${have}` : null,
+    have ? `у вас ${have}` : null,
   ].filter(Boolean).join(' · ');
 }
 
@@ -276,7 +276,7 @@ function Showcase({ data, act, busy }) {
                 <Stats stats={o.item.stats} />
               </span>
               {o.mine
-                ? <small className="market-muted">твой лот</small>
+                ? <small className="market-muted">ваш лот</small>
                 : (
                   <Button size="s" disabled={busy || data.gold < o.price} onClick={() => act('buy_item', { order_id: o.id })}>
                     {money(o.price)}
@@ -395,7 +395,7 @@ export default function MarketTab({ onWallet }) {
         buy_item: 'Куплено - забери в городе.',
         cancel: 'Заявка снята.',
         claim: `Забрано: ${(done.lines || []).join(', ')}.`,
-        courier: `Курьер побежал к тебе: ${(done.lines || []).join(', ')}.`,
+        courier: `Курьер побежал к вам: ${(done.lines || []).join(', ')}.`,
       }[action];
       setNotice({ ok: true, text });
       after?.();

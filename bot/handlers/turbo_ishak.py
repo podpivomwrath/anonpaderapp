@@ -167,7 +167,7 @@ async def name_reply(message: Message) -> None:
             await svc.set_name(db, character, message.text)
         except svc.TurboError as exc:
             await db.rollback()
-            await message.answer(f"{exc} Попробуй ещё раз.", keyboard=skip_name_keyboard())
+            await message.answer(f"{exc} Попробуйте ещё раз.", keyboard=skip_name_keyboard())
             return
         owned = {m.mount_id: m.name for m in await mount_service.owned_mounts(db, character.id)}
         await db.commit()

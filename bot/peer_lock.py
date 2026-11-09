@@ -20,7 +20,7 @@ import asyncio
 from loguru import logger
 
 WAIT_SECONDS = 10.0
-BUSY_TEXT = "⏳ Предыдущее действие ещё выполняется - подожди немного."
+BUSY_TEXT = "⏳ Предыдущее действие ещё выполняется - подождите немного."
 
 _locks: dict[int, asyncio.Lock] = {}
 

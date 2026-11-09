@@ -36,9 +36,9 @@ def lost_crown_text(board: str, successor_name: str | None) -> str:
     else:
         who = f"Первого в топе «{board_title}» больше нет."
     return (
-        f"Венец «{title}» больше не твой.\n\n"
+        f"Венец «{title}» больше не ваш.\n\n"
         f"{who}\n\n"
-        f"Рамка снята, {effect} больше не действует. Вернёшь место - вернётся и венец."
+        f"Рамка снята, {effect} больше не действует. Вернёте место - вернётся и венец."
     )
 
 

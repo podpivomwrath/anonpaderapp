@@ -148,7 +148,7 @@ export default function CraftsTab({ character }) {
 
   const catalogRow = (h) => (
     <SimpleCell key={h.id} before={glyph(h, h.known)}
-      subtitle={h.known ? 'Различаешь' : `Откроется на ${h.level} уровне`}
+      subtitle={h.known ? 'Различаете' : `Откроется на ${h.level} уровне`}
       style={h.known ? undefined : { opacity: 0.55 }}>
       {h.known ? h.name : '???'}
     </SimpleCell>
@@ -231,7 +231,7 @@ export default function CraftsTab({ character }) {
           <CraftHead icon="🌿" level={herbal.level} max={herbal.max_level} xp={herbal.xp} xpNext={herbal.xp_to_next}
             next={nextLocked(herbal.catalog)} />
           <Caption level="1" style={{ padding: '0 16px 12px', opacity: 0.7 }}>
-            Трава вырастает на случайных клетках, пока игроки исследуют мир, и ждет сутки. Зайдешь на клетку
+            Трава вырастает на случайных клетках, пока игроки исследуют мир, и ждет сутки. Зайдете на клетку
             с травой - в чате появится кнопка «Собрать». Кто первый сорвал, того и трава. Каждые 10 уровней
             открывают новые травы и дают +10% к шансу сорвать два пучка
             {herbal.double_pct ? ` (сейчас ${herbal.double_pct}%)` : ''}.

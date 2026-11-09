@@ -44,7 +44,7 @@ function buildFrames(r) {
   if (me.place) {
     frames.push({
       img: 2,
-      text: `Ты на ${me.place} месте. Титул «${me.title}» твой на весь новый сезон, на счёт пришло 💎 ${money(me.gems)}.`,
+      text: `Вы на ${me.place} месте. Титул «${me.title}» ваш на весь новый сезон, на счёт пришло 💎 ${money(me.gems)}.`,
       crown: true,
     });
   }

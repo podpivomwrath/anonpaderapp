@@ -37,7 +37,7 @@ labeler = BotLabeler()
 labeler.vbml_ignore_case = True  # команды без учёта регистра
 
 HOUSE_TEXT = "🏠 Дом\n\nТвои стены в городе. У окна печь, в углу стол с ретортами и склянками."
-BUSY_TEXT = "🏠 Работа на огне. Дождись ее или брось - тогда все, что пошло в дело, пропадет."
+BUSY_TEXT = "🏠 Работа на огне. Дождитесь ее или бросьте - тогда все, что пошло в дело, пропадет."
 
 #: Картинки в альбоме группы (tools/crafts_art_prompts.md, 2026-10-21).
 HOUSE_PHOTO, OVEN_PHOTO, TABLE_PHOTO = "457239277", "457239278", "457239279"
@@ -101,7 +101,7 @@ MASTER_DONE_TEXT = (
     "Камень шипит в котле, тварь растворяется без следа, пыль ложится на поверхность "
     "и гаснет. Когда пар уходит, на дне лежит перстень, а рядом - флакон с тёмным отваром.\n\n"
     "💍 Перстень Мастера - на пальце: всё, что добывают и делают ремёсла, теперь приходит вдвое.\n"
-    "🧪 Эликсир Мастера - в сумке, в еде: выпей, когда будешь готов.\n"
+    "🧪 Эликсир Мастера - в сумке, в еде: выпейте, когда будете готовы.\n"
     "👑 Новый титул: Мастер всех ремёсел."
 )
 
@@ -184,7 +184,7 @@ def brewing_text(character: Character) -> str:
     d = elixir_service.elixir_def(recipe.elixir_id) if recipe else None
     name = d.name if d else "зелье"
     return (f"⚗️ На огне {name}. Готово через {alchemy_service.seconds_left(character)} сек.\n"
-            "Выйти из дома до конца варки нельзя. Бросишь - травы и золото пропадут.")
+            "Выйти из дома до конца варки нельзя. Бросите - травы и золото пропадут.")
 
 
 def brewed_text(result: alchemy_service.Brewed, character: Character | None = None) -> str:
@@ -245,7 +245,7 @@ def cooking_text(character: Character) -> str:
     found = cooking_service.cooking_now(character)
     name = cooking.dish_def(found[0].dish_id).name if found else "блюдо"
     return (f"🔥 В печи {name}. Готово через {alchemy_service.seconds_left(character)} сек.\n"
-            "Выйти из дома до конца готовки нельзя. Бросишь - рыба, трава и золото пропадут.")
+            "Выйти из дома до конца готовки нельзя. Бросите - рыба, трава и золото пропадут.")
 
 
 def cooked_text(result: cooking_service.Cooked, character: Character | None = None) -> str:
@@ -535,7 +535,7 @@ async def eat_command(message: Message, name: str | None = None) -> None:
             await message.answer("🍲 Такого блюда в сумке нет. Посмотреть, что есть: /съесть")
             return
         if len(names) > 1:
-            await message.answer("🍲 Подходит несколько блюд: " + ", ".join(sorted(names)) + ". Напиши название точнее.")
+            await message.answer("🍲 Подходит несколько блюд: " + ", ".join(sorted(names)) + ". Напишите название точнее.")
             return
         d, dish, grade, _n = found[0]  # лучшая градация рыбы - первой
         before = cooking_service.active(character)

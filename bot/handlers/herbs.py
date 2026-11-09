@@ -131,7 +131,7 @@ def picked_text(result, character=None) -> str:
     if result.level_after > result.level_before:
         text += f"\n🌿 Травничество: {result.level_after} уровень."
     if result.unlocked:
-        text += "\nТеперь ты различаешь новые травы: " + ", ".join(h.name for h in result.unlocked) + "."
+        text += "\nТеперь вы различаете новые травы: " + ", ".join(h.name for h in result.unlocked) + "."
     if character is not None:
         from game.combat import display
         from game.economy import herbalism
@@ -145,7 +145,7 @@ def picked_text(result, character=None) -> str:
 
 REFUSALS = {
     "gone": "🌿 Пусто: траву уже сорвали.",
-    "elsewhere": "🌿 Ты уже ушел с той клетки.",
+    "elsewhere": "🌿 Вы уже ушли с той клетки.",
     "unseen": "🌿 Пусто: траву уже сорвали.",
 }
 

@@ -38,15 +38,15 @@ function Wanted({ data }) {
     <>
       <SectionHead
         kind="board" icon="🩸" value={wanted.length} label="клеймёных убийц сейчас"
-        aside={me.marks > 0 ? <>🩸 {me.marks}<br /><small>твоё клеймо</small></> : null}
+        aside={me.marks > 0 ? <>🩸 {me.marks}<br /><small>ваше клеймо</small></> : null}
       />
       {(me.marks > 0 || me.revenge) && (
-        <Group header={<Header>Ты</Header>}>
+        <Group header={<Header>Вы</Header>}>
           <Div>
             {me.marks > 0 && (
               <>
                 <p className="guild-line">🩸 Клеймо: <b>{me.marks}</b></p>
-                <p className="craft-hint">Следующая метка сойдёт через {minutes(me.next_decay_min)}. Пока клеймо на тебе: {me.consequences}</p>
+                <p className="craft-hint">Следующая метка сойдёт через {minutes(me.next_decay_min)}. Пока клеймо на вас: {me.consequences}</p>
               </>
             )}
             {me.revenge && (
@@ -83,13 +83,13 @@ function Wanted({ data }) {
         <details className="board-rules">
           <summary>Как работает Кровавое клеймо</summary>
           <div className="craft-hint">
-          <p><b>Когда даётся метка.</b> Ты убил в PvP игрока, у которого уровень меньше твоего на {rules.level_gap} или больше. Пример: тебе 30 уровень, убил игрока 25 уровня или ниже - метка. Убил 26 уровня - метки нет.</p>
-          <p><b>Сколько держится.</b> Каждая метка исчезает сама через {rules.decay_hours} ч, играешь ты или нет. 3 метки исчезнут через {rules.decay_hours * 3} ч.</p>
+          <p><b>Когда даётся метка.</b> Вы убили в PvP игрока, у которого уровень меньше вашего на {rules.level_gap} или больше. Пример: вам 30 уровень, убили игрока 25 уровня или ниже - метка. Убили 26 уровня - метки нет.</p>
+          <p><b>Сколько держится.</b> Каждая метка исчезает сама через {rules.decay_hours} ч, играете вы или нет. 3 метки исчезнут через {rules.decay_hours * 3} ч.</p>
           <p><b>Что грозит</b> (всё складывается):</p>
           <p>• 1+ метка - 🩸 рядом с именем, видят все.</p>
-          <p>• {rules.costly_from}+ - при смерти теряешь в 1,5 раза больше опыта, даже в PvP. Твои трофеи заберёт любой победитель, даже тот, кто старше тебя на 11+ уровней (обычно таким трофеи не достаются).</p>
+          <p>• {rules.costly_from}+ - при смерти теряете в 1,5 раза больше опыта, даже в PvP. Ваши трофеи заберёт любой победитель, даже тот, кто старше вас на 11+ уровней (обычно таким трофеи не достаются).</p>
           <p>• {rules.city_penalty_from}+ - зелья в лавке в 1,5 раза дороже, скупщик платит за реликвии в 2 раза меньше.</p>
-          <p>• {rules.city_ban_from}+ - в город не пускают, после смерти появляешься у ворот.</p>
+          <p>• {rules.city_ban_from}+ - в город не пускают, после смерти появляетесь у ворот.</p>
           <p><b>Тому, кого убили:</b> {rules.revenge_hours} ч его урон по убийце на {rules.revenge_pct}% больше.</p>
           <p><b>Охота на клеймёных:</b> за убийство игрока с клеймом метку не дают, даже если он намного слабее. PTS за него начисляются при любой разнице уровней.</p>
           </div>
@@ -106,7 +106,7 @@ function Rating({ data }) {
       {/* Своё место видно всегда, даже за пределами двадцатки (2026-10-15). */}
       <SectionHead
         kind="board" icon="🏅" value={me.place ? `#${me.place}` : '-'}
-        label={me.place ? `место из ${me.rated_total} · ${me.rank}` : `ты в рейтинге после первого PvP-боя · ${me.rank}`}
+        label={me.place ? `место из ${me.rated_total} · ${me.rank}` : `вы в рейтинге после первого PvP-боя · ${me.rank}`}
         aside={<>{money(me.pts)}<br /><small>PTS</small></>}
       />
       <Group header={<Header>Рейтинг PvP · сезон {data.season.name}</Header>}>
@@ -191,7 +191,7 @@ function Season({ data }) {
           })}
         </ol>
         <p className="craft-hint season-note">
-          Сезон длится календарный месяц. В начале нового сезона рейтинг каждого сжимается к {money(season.start)}: остаётся {season.keep_pct}% того, на сколько ты был выше или ниже.
+          Сезон длится календарный месяц. В начале нового сезона рейтинг каждого сжимается к {money(season.start)}: остаётся {season.keep_pct}% того, на сколько вы были выше или ниже.
         </p>
       </Group>
     </>

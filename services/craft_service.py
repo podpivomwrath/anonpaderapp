@@ -128,10 +128,10 @@ async def _owned_item(db: AsyncSession, character_id: int, item_id: int) -> Item
         )
     )
     if row is None:
-        raise CraftError("Этого предмета у тебя нет.")
+        raise CraftError("Этого предмета у вас нет.")
     item = await db.get(Item, item_id)
     if item is None:
-        raise CraftError("Этого предмета у тебя нет.")
+        raise CraftError("Этого предмета у вас нет.")
     return item
 
 
@@ -289,7 +289,7 @@ async def _spend_tool(db: AsyncSession, character_id: int, ceiling: int) -> None
         .values(count=CharacterCraftTool.count - 1)
     )
     if not result.rowcount:
-        raise CraftError("Такого инструмента у тебя нет.")
+        raise CraftError("Такого инструмента у вас нет.")
 
 
 @dataclass

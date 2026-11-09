@@ -221,7 +221,7 @@ _declared_this_tick: dict[int, set[int]] = {}
 #: после объявления переобъявляет удар по новой цели (2026-10-31, репорт 271:
 #: «бил жернова, ударило мельника» - цель вшивалась в момент нажатия).
 _declared_actions: dict[int, dict[int, DeclaredAction]] = {}
-HELD_TEXT = "Ты скован и этот ход пропускаешь. Кнопки заработают на следующем."
+HELD_TEXT = "Вы скованы и этот ход пропускаете. Кнопки заработают на следующем."
 _chosen_target: dict[int, int] = {}
 _character_in_raid: set[int] = set()
 
@@ -1199,7 +1199,7 @@ async def raid_open_items(message: Message) -> None:
     visible = consumable_limit.visible_stock(combatant, stock, limit_reached)
     text = consumable_limit.items_header(combatant)
     if limit_reached and any(d.category != "heal" for d, _ in stock):
-        text += "\n\nБольше твоё тело не выдержит за один бой - боевые эликсиры недоступны."
+        text += "\n\nБольше ваше тело не выдержит за один бой - боевые эликсиры недоступны."
     # Открытие окна - всегда новым сообщением внизу: иначе правилось бы
     # окно из прошлого боя, давно уехавшее вверх, и нажатие казалось мёртвым.
     page = page_of(message)
@@ -1244,7 +1244,7 @@ async def raid_use_item(message: Message) -> None:
         await message.answer(consumable_limit.HEAL_TAKEN_TEXT, keyboard=battle_kb)
         return
     if elixir.category != "heal" and combatant.combat_elixirs_used >= ec.ELIXIR_PER_BATTLE_LIMIT:
-        await message.answer("Больше твоё тело не выдержит за один бой.", keyboard=battle_kb)
+        await message.answer("Больше ваше тело не выдержит за один бой.", keyboard=battle_kb)
         return
 
     # Метательная склянка (2026-10-23): спросить, пить самому или на группу.
@@ -1293,7 +1293,7 @@ async def raid_use_item(message: Message) -> None:
             await _tell_others(battle, cid, elixir_effects.elixir_seen(p.name, elixir))
     if elixir.category == "scroll":
         await _tell_others(battle, cid, f"{p.name}: {line}")
-    text = f"{line} Твой ход.\n\n{_render_board(_engine.sessions.get(battle_id))}"
+    text = f"{line} Ваш ход.\n\n{_render_board(_engine.sessions.get(battle_id))}"
     await _bot_api.messages.send(
         peer_id=peer_id, message=text, random_id=0,
         keyboard=_combat_keyboard(battle, p, combatant),

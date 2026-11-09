@@ -150,7 +150,7 @@ def can_manage_treasury(member: GuildMember | None) -> bool:
 async def _require_member(db: AsyncSession, character: Character) -> tuple[Guild, GuildMember]:
     member = await membership(db, character.id)
     if member is None:
-        raise GuildError("Ты не состоишь в гильдии.")
+        raise GuildError("Вы не состоите в гильдии.")
     guild = await db.get(Guild, member.guild_id)
     return guild, member
 
@@ -278,7 +278,7 @@ def pvp_ties(character, now: datetime | None = None) -> set[int]:
 
 def _check_free(character: Character, guild_id: int | None = None) -> None:
     if character.guild_id is not None:
-        raise GuildError("Ты уже в гильдии.")
+        raise GuildError("Вы уже в гильдии.")
     if character.level < gc.JOIN_MIN_LEVEL:
         raise GuildError(f"В гильдии вступают с {gc.JOIN_MIN_LEVEL} уровня.")
     wait = rejoin_wait_hours(character, guild_id=guild_id)
@@ -394,7 +394,7 @@ async def apply(db: AsyncSession, character: Character, guild_id: int) -> Guild:
     refused = await _live_invite(db, guild.id, character.id, REFUSED)
     if refused is not None:
         left = max(1, -(-int((aware(refused.expires_at) - now_utc()).total_seconds()) // 60))
-        raise GuildError(f"Гильдия отказала тебе. Снова подать заявку в неё можно через {left} мин.")
+        raise GuildError(f"Гильдия отказала вам. Снова подать заявку в неё можно через {left} мин.")
     await _upsert_invite(db, guild.id, character.id, "apply", character.id)
     return guild
 
@@ -497,7 +497,7 @@ async def leave(db: AsyncSession, character: Character) -> Guild | None:
     guild, member = await _require_member(db, character)
     if member.rank == gc.RANK_LEADER:
         if await member_count(db, guild.id) > 1:
-            raise GuildError("Глава не может просто уйти: сначала передай главенство.")
+            raise GuildError("Глава не может просто уйти: сначала передайте главенство.")
         await disband(db, character)
         return None
     await _remove_member(db, member, character)
@@ -521,9 +521,9 @@ async def kick(db: AsyncSession, actor: Character, character_id: int) -> Charact
     guild, member = await _require_member(db, actor)
     target_member = await membership(db, character_id)
     if target_member is None or target_member.guild_id != guild.id:
-        raise GuildError("Он не в твоей гильдии.")
+        raise GuildError("Он не в вашей гильдии.")
     if not _can_kick(member, target_member):
-        raise GuildError("Исключить его ты не можешь.")
+        raise GuildError("Исключить его вы не можете.")
     target = await db.get(Character, character_id)
     await _remove_member(db, target_member, target)
     await log(db, guild.id, "kick", f"{actor.name} исключает {target.name}.", actor.id)
@@ -560,9 +560,9 @@ async def set_rank(db: AsyncSession, actor: Character, character_id: int, rank: 
     guild, member = await _require_member(db, actor)
     target_member = await membership(db, character_id)
     if target_member is None or target_member.guild_id != guild.id:
-        raise GuildError("Он не в твоей гильдии.")
+        raise GuildError("Он не в вашей гильдии.")
     if not _can_set_rank(member, target_member, rank):
-        raise GuildError("Такое звание ты дать не можешь.")
+        raise GuildError("Такое звание вы дать не можете.")
     target_member.rank = rank
     target = await db.get(Character, character_id)
     await log(db, guild.id, "rank", f"{target.name} теперь {gc.RANK_TITLES[rank].lower()}.", actor.id)
@@ -575,7 +575,7 @@ async def transfer_leadership(db: AsyncSession, actor: Character, character_id: 
         raise GuildError("Передать главенство может только глава.")
     target_member = await membership(db, character_id)
     if target_member is None or target_member.guild_id != guild.id or target_member.id == member.id:
-        raise GuildError("Он не в твоей гильдии.")
+        raise GuildError("Он не в вашей гильдии.")
     target_member.rank = gc.RANK_LEADER
     member.rank = gc.RANK_TREASURER
     target = await db.get(Character, character_id)
@@ -652,7 +652,7 @@ async def deposit(db: AsyncSession, character: Character, currency: str, amount:
     try:
         await wallet_service.charge(db, character.id, wallet_currency, amount)
     except wallet_service.NotEnoughCurrency:
-        raise GuildError("Столько у тебя нет.") from None
+        raise GuildError("Столько у вас нет.") from None
     if currency == "gold":
         await treasury_add(db, guild.id, gold=amount)
     else:
@@ -816,7 +816,7 @@ async def deposit_ore(
         ).with_for_update()
     )
     if row is None or row.count < count:
-        raise GuildError("Столько руды у тебя нет.")
+        raise GuildError("Столько руды у вас нет.")
     row.count -= count
     await add_guild_ore(db, guild.id, ore_id, grade, count)
     from game.economy import mining
@@ -859,11 +859,11 @@ async def deposit_item(db: AsyncSession, character: Character, item_id: int) -> 
     )
     item = await db.get(Item, item_id)
     if entry is None or item is None:
-        raise GuildError("Такой вещи у тебя нет.")
+        raise GuildError("Такой вещи у вас нет.")
     if entry.equipped:
-        raise GuildError("Сначала сними вещь.")
+        raise GuildError("Сначала снимите вещь.")
     if item.bound:
-        raise GuildError("Эта вещь привязана к тебе.")
+        raise GuildError("Эта вещь привязана к вам.")
     cap = await capacity(db, guild)
     if await item_count(db, guild.id) >= cap.items:
         raise GuildError(f"Склад полон: вещей помещается {cap.items}.")

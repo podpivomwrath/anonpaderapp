@@ -210,13 +210,13 @@ async def come_back(message: Message) -> None:
             text = None
         await db.commit()
     _away.discard(peer_id)
-    await _send_home(peer_id, text or "Ты дома.")
+    await _send_home(peer_id, text or "Вы дома.")
 
 
 @labeler.message(AWAY_BLOCK)
 async def while_away(message: Message) -> None:
     """Пока в пути, ничего другого: напоминание и клавиатура пути."""
-    await message.answer("Ты в долгом пути. Вернуться можно кнопкой «⚓ Вернуться».", keyboard=kb.voyage_keyboard())
+    await message.answer("Вы в долгом пути. Вернуться можно кнопкой «⚓ Вернуться».", keyboard=kb.voyage_keyboard())
 
 
 async def _send_home(peer_id: int, header: str) -> None:

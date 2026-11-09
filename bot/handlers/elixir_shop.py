@@ -49,7 +49,7 @@ def _catalog_text(counts: dict[str, int], mult: float = 1.0, note: str = "") -> 
     lines = [shop_intro()] + ([note] if note else [])
     for elixir in elixir_service.shop_elixirs():
         owned = counts.get(elixir.id, 0)
-        owned_suffix = f" (у тебя: {owned})" if owned else ""
+        owned_suffix = f" (у вас: {owned})" if owned else ""
         price = round(elixir_service.price(elixir.id) * mult)
         lines.append(f"{elixir.emoji} {elixir.name} - {price} зол.{owned_suffix}\n{elixir.description}")
     return "\n\n".join(lines)

@@ -62,8 +62,8 @@ def _crimson_feast_base_ratio() -> float:
 
 def _describe_guardian_bulwark(b: BuffDef) -> str:
     return (
-        f"Когда применяешь Глухую оборону, с шансом {_pct(bc.GUARDIAN_BULWARK_FULL_BLOCK_CHANCE)} в этот ход "
-        "ты полностью блокируешь весь урон по себе (полный блок)."
+        f"Когда применяете Глухую оборону, с шансом {_pct(bc.GUARDIAN_BULWARK_FULL_BLOCK_CHANCE)} в этот ход "
+        "вы полностью блокируете весь урон по себе (полный блок)."
     )
 
 
@@ -75,7 +75,7 @@ def _describe_guardian_unyielding(b: BuffDef) -> str:
 
 def _describe_guardian_vital_block(b: BuffDef) -> str:
     return (
-        f"Каждый раз, когда применяешь Глухую оборону, восстанавливаешь {_pct(bc.GUARDIAN_HEAL_ON_BLOCK)} "
+        f"Каждый раз, когда применяете Глухую оборону, восстанавливаете {_pct(bc.GUARDIAN_HEAL_ON_BLOCK)} "
         "своего максимального здоровья."
     )
 
@@ -88,34 +88,34 @@ def _describe_guardian_heavy_hand(b: BuffDef) -> str:
 
 
 def _describe_guardian_sturdy_armor(b: BuffDef) -> str:
-    return f"Весь урон по тебе меньше на {_pct(bc.GUARDIAN_STURDY_ARMOR_REDUCTION)}."
+    return f"Весь урон по вам меньше на {_pct(bc.GUARDIAN_STURDY_ARMOR_REDUCTION)}."
 
 
 def _describe_guardian_reflection(b: BuffDef) -> str:
     return (
-        f"Пока ты в Глухой обороне, {_pct(bc.GUARDIAN_REFLECTION_PCT)} урона, который она с тебя срезала, "
+        f"Пока вы в Глухой обороне, {_pct(bc.GUARDIAN_REFLECTION_PCT)} урона, который она с вас срезала, "
         "получает тот, кто ударил."
     )
 
 
 def _describe_guardian_resilience(b: BuffDef) -> str:
     return (
-        f"Пока у тебя меньше {_pct(bc.GUARDIAN_RESILIENCE_HP_THRESHOLD)} здоровья, урон по тебе "
+        f"Пока у вас меньше {_pct(bc.GUARDIAN_RESILIENCE_HP_THRESHOLD)} здоровья, урон по вам "
         f"меньше ещё на {_pct(bc.GUARDIAN_RESILIENCE_REDUCTION)}."
     )
 
 
 def _describe_guardian_command(b: BuffDef) -> str:
     return (
-        f"Мобы бьют тебя на {_pct(bc.GUARDIAN_COMMAND_AGGRO_BONUS)} чаще, чем твоих союзников, - "
-        "так ты прикрываешь группу. Против игроков не работает."
+        f"Мобы бьют вас на {_pct(bc.GUARDIAN_COMMAND_AGGRO_BONUS)} чаще, чем ваших союзников, - "
+        "так вы прикрываете группу. Против игроков не работает."
     )
 
 
 def _describe_guardian_provoker_mark(b: BuffDef) -> str:
     total = bc.PROVOKE_PVP_DAMAGE_REDUCTION + bc.GUARDIAN_PROVOKER_MARK_BONUS
     return (
-        f"В бою с игроками: пока действует твоя Провокация, спровоцированный противник, бьющий не тебя, "
+        f"В бою с игроками: пока действует ваша Провокация, спровоцированный противник, бьющий не вас, "
         f"наносит на {_pct(total)} меньше урона (без этого баффа - на {_pct(bc.PROVOKE_PVP_DAMAGE_REDUCTION)})."
     )
 
@@ -130,8 +130,8 @@ def _describe_guardian_guard(b: BuffDef) -> str:
 
 def _describe_guardian_allys_shield(b: BuffDef) -> str:
     return (
-        f"Когда ты в Глухой обороне, союзник с самым низким здоровьем тоже получает её защиту - "
-        f"{_pct(bc.GUARDIAN_ALLYS_SHIELD_SHARE)} от твоей. {_ALLIES_ONLY}"
+        f"Когда вы в Глухой обороне, союзник с самым низким здоровьем тоже получает её защиту - "
+        f"{_pct(bc.GUARDIAN_ALLYS_SHIELD_SHARE)} от вашей. {_ALLIES_ONLY}"
     )
 
 
@@ -144,15 +144,15 @@ def _describe_guardian_wall(b: BuffDef) -> str:
 
 def _describe_guardian_counterattack(b: BuffDef) -> str:
     return (
-        "Когда Глухая оборона срабатывает полным блоком, ты сразу бьёшь случайного врага: "
-        f"{_pct(bc.GUARDIAN_COUNTERATTACK_MULT)} от твоей обычной атаки."
+        "Когда Глухая оборона срабатывает полным блоком, вы сразу бьёте случайного врага: "
+        f"{_pct(bc.GUARDIAN_COUNTERATTACK_MULT)} от вашей обычной атаки."
     )
 
 
 def _describe_guardian_retribution(b: BuffDef) -> str:
     return (
-        f"Чем больше урона срезала твоя Глухая оборона за последние {_turns(bc.GUARDIAN_RETRIBUTION_WINDOW_TURNS)}, "
-        f"тем сильнее ты бьёшь: за каждые срезанные 10% твоего максимального здоровья урон "
+        f"Чем больше урона срезала ваша Глухая оборона за последние {_turns(bc.GUARDIAN_RETRIBUTION_WINDOW_TURNS)}, "
+        f"тем сильнее вы бьёте: за каждые срезанные 10% вашего максимального здоровья урон "
         f"+{_pct(bc.GUARDIAN_RETRIBUTION_PER_10PCT)}, но не больше +{_pct(bc.GUARDIAN_RETRIBUTION_CAP)}."
     )
 
@@ -163,7 +163,7 @@ def _describe_blood_knight_blood_rage(b: BuffDef) -> str:
 
 def _describe_blood_knight_thirst(b: BuffDef) -> str:
     return (
-        f"Пока у тебя меньше 50% здоровья, вампиризм Кровопуска, Жатвы и Багрового пира выше на "
+        f"Пока у вас меньше 50% здоровья, вампиризм Кровопуска, Жатвы и Багрового пира выше на "
         f"{_points(bc.BLOOD_KNIGHT_THIRST_LOW_HP_LIFESTEAL_BONUS)} (например, было 20% - станет 28%)."
     )
 
@@ -176,7 +176,7 @@ def _describe_blood_knight_vein_rupture(b: BuffDef) -> str:
 
 
 def _describe_blood_knight_recklessness(b: BuffDef) -> str:
-    return f"Весь твой урон (обычная атака и навыки) больше на {_pct(bc.BLOOD_KNIGHT_RECKLESSNESS_DAMAGE_BONUS)}."
+    return f"Весь ваш урон (обычная атака и навыки) больше на {_pct(bc.BLOOD_KNIGHT_RECKLESSNESS_DAMAGE_BONUS)}."
 
 
 def _describe_blood_knight_insatiable(b: BuffDef) -> str:
@@ -191,24 +191,24 @@ def _describe_blood_knight_eternal_hunger(b: BuffDef) -> str:
 
     share = SUBCLASS_SKILL_DEFS["blood_knight_harvest"].effect_value
     return (
-        f"Вампиризм Жатвы ({_pct(share)}) работает, пока у тебя меньше "
+        f"Вампиризм Жатвы ({_pct(share)}) работает, пока у вас меньше "
         f"{_pct(bc.BLOOD_KNIGHT_ETERNAL_HUNGER_HP_THRESHOLD)} здоровья, а не {_pct(bc.BLOOD_KNIGHT_HARVEST_HP_THRESHOLD)}."
     )
 
 
 def _describe_blood_knight_second_wind(b: BuffDef) -> str:
     return (
-        f"Пока у тебя меньше {_pct(bc.BLOOD_KNIGHT_SECOND_WIND_HP_THRESHOLD)} здоровья, урон по тебе "
+        f"Пока у вас меньше {_pct(bc.BLOOD_KNIGHT_SECOND_WIND_HP_THRESHOLD)} здоровья, урон по вам "
         f"меньше на {_pct(bc.BLOOD_KNIGHT_SECOND_WIND_DAMAGE_REDUCTION)}."
     )
 
 
 def _describe_blood_knight_blood_armor(b: BuffDef) -> str:
-    return f"Весь урон по тебе меньше на {_pct(bc.BLOOD_KNIGHT_BLOOD_ARMOR_DAMAGE_REDUCTION)}, всегда."
+    return f"Весь урон по вам меньше на {_pct(bc.BLOOD_KNIGHT_BLOOD_ARMOR_DAMAGE_REDUCTION)}, всегда."
 
 
 def _describe_blood_knight_pain_resistant(b: BuffDef) -> str:
-    return f"Критические удары по тебе наносят на {_pct(bc.BLOOD_KNIGHT_PAIN_RESISTANT_CRIT_REDUCTION)} меньше урона."
+    return f"Критические удары по вам наносят на {_pct(bc.BLOOD_KNIGHT_PAIN_RESISTANT_CRIT_REDUCTION)} меньше урона."
 
 
 def _describe_blood_knight_feast(b: BuffDef) -> str:
@@ -219,7 +219,7 @@ def _describe_blood_knight_feast(b: BuffDef) -> str:
 
 def _describe_blood_knight_shared_thirst(b: BuffDef) -> str:
     return (
-        f"{_pct(bc.BLOOD_KNIGHT_SHARED_THIRST_ALLY_HEAL_PCT)} того, что ты восстановил вампиризмом (Кровопуск, "
+        f"{_pct(bc.BLOOD_KNIGHT_SHARED_THIRST_ALLY_HEAL_PCT)} того, что вы восстановили вампиризмом (Кровопуск, "
         f"Жатва, Багровый пир), получает и союзник с самым низким здоровьем. {_ALLIES_ONLY}"
     )
 
@@ -228,12 +228,12 @@ def _describe_blood_knight_blood_pact(b: BuffDef) -> str:
     base = bc.BLOOD_KNIGHT_CRIMSON_FEAST_HP_COST
     reduced = base * (1.0 - bc.BLOOD_KNIGHT_BLOOD_PACT_COST_REDUCTION)
     return (
-        f"Багровый пир забирает у тебя {_pct(reduced)} текущего здоровья вместо {_pct(base)}."
+        f"Багровый пир забирает у вас {_pct(reduced)} текущего здоровья вместо {_pct(base)}."
     )
 
 
 def _describe_blood_knight_shared_feast(b: BuffDef) -> str:
-    return f"Весь твой урон (обычная атака и навыки) больше на {_pct(bc.BLOOD_KNIGHT_SHARED_FEAST_GROUP_DAMAGE_BONUS)}."
+    return f"Весь ваш урон (обычная атака и навыки) больше на {_pct(bc.BLOOD_KNIGHT_SHARED_FEAST_GROUP_DAMAGE_BONUS)}."
 
 
 def _describe_poisoner_lingering_poison(b: BuffDef) -> str:
@@ -263,7 +263,7 @@ def _poisoner_base_disrupt_chance() -> float:
 def _describe_shadow_blade_deadly_precision(b: BuffDef) -> str:
     return (
         f"Шанс критического удара +{_points(bc.SHADOW_BLADE_DEADLY_PRECISION_CRIT)} "
-        "(прибавляется к твоему: было 20% - станет 32%)."
+        "(прибавляется к вашему: было 20% - станет 32%)."
     )
 
 
@@ -276,7 +276,7 @@ def _describe_shadow_blade_carve(b: BuffDef) -> str:
 
 def _describe_shadow_blade_bloodlust(b: BuffDef) -> str:
     return (
-        "После твоего критического удара следующий удар (обычная атака или навык) тоже будет критическим. "
+        "После вашего критического удара следующий удар (обычная атака или навык) тоже будет критическим. "
         "Казнь всегда бьёт критически - она тоже его включает. "
         f"Срабатывает не чаще раза в {_turns(bc.SHADOW_BLADE_BLOODLUST_COOLDOWN)}."
     )
@@ -292,51 +292,51 @@ def _describe_shadow_blade_mark_of_prey_plus(b: BuffDef) -> str:
 def _describe_shadow_blade_shadow(b: BuffDef) -> str:
     return (
         f"Шанс уклониться от удара +{_points(bc.SHADOW_BLADE_SHADOW_DODGE)} "
-        "(прибавляется к твоему: было 30% - станет 38%)."
+        "(прибавляется к вашему: было 30% - станет 38%)."
     )
 
 
 def _describe_shadow_blade_slip_away(b: BuffDef) -> str:
     return (
-        f"После того как ты уклонился (от удара или навыка), шанс уклониться от следующего удара "
+        f"После того как вы уклонились (от удара или навыка), шанс уклониться от следующего удара "
         f"+{_points(bc.SHADOW_BLADE_SLIP_AWAY)}."
     )
 
 
 def _describe_shadow_blade_blade_dancer(b: BuffDef) -> str:
     return (
-        f"Когда ты уклоняешься (от удара или навыка), Метки добычи, которые уже висят на врагах, снова держатся "
+        f"Когда вы уклоняетесь (от удара или навыка), Метки добычи, которые уже висят на врагах, снова держатся "
         f"{_turns(bc.SHADOW_BLADE_MARK_DURATION)}."
     )
 
 
 def _describe_shadow_blade_blade_hunger(b: BuffDef) -> str:
-    return "Когда ты уклоняешься (от удара или навыка), тот, кто промахнулся, получает заряд Метки добычи."
+    return "Когда вы уклоняетесь (от удара или навыка), тот, кто промахнулся, получает заряд Метки добычи."
 
 
 def _describe_shadow_blade_hunters_solitude(b: BuffDef) -> str:
     return (
-        f"Пока ты дерёшься один, без союзников, весь твой урон больше на {_pct(bc.SHADOW_BLADE_SOLO_DAMAGE)}."
+        f"Пока вы деретесь один, без союзников, весь ваш урон больше на {_pct(bc.SHADOW_BLADE_SOLO_DAMAGE)}."
     )
 
 
 def _describe_shadow_blade_second_chance(b: BuffDef) -> str:
     return (
-        f"Каждый {bc.SHADOW_BLADE_SECOND_CHANCE_INTERVAL}-й ход боя первый удар по тебе "
+        f"Каждый {bc.SHADOW_BLADE_SECOND_CHANCE_INTERVAL}-й ход боя первый удар по вам "
         "гарантированно промахивается."
     )
 
 
 def _describe_shadow_blade_mark_passed_on(b: BuffDef) -> str:
     return (
-        f"Союзники чаще бьют критически по цели с твоей Меткой добычи: их шанс +{_points(bc.SHADOW_BLADE_ALLY_CRIT_ON_MARK)}. "
+        f"Союзники чаще бьют критически по цели с вашей Меткой добычи: их шанс +{_points(bc.SHADOW_BLADE_ALLY_CRIT_ON_MARK)}. "
         f"{_ALLIES_ONLY}"
     )
 
 
 def _describe_shadow_blade_inspiration(b: BuffDef) -> str:
     return (
-        f"Когда цель с твоей Меткой погибает, союзники восстанавливают {_pct(bc.SHADOW_BLADE_INSPIRATION_HEAL)} "
+        f"Когда цель с вашей Меткой погибает, союзники восстанавливают {_pct(bc.SHADOW_BLADE_INSPIRATION_HEAL)} "
         f"максимального здоровья и {_turns(bc.SHADOW_BLADE_INSPIRATION_TURNS)} бьют на "
         f"{_pct(bc.SHADOW_BLADE_INSPIRATION_DAMAGE)} сильнее. {_ALLIES_ONLY}"
     )
@@ -344,7 +344,7 @@ def _describe_shadow_blade_inspiration(b: BuffDef) -> str:
 
 def _describe_shadow_blade_hunting_mark(b: BuffDef) -> str:
     return (
-        f"Союзники видят в сводке боя, на ком висит твоя Метка добычи и сколько у неё зарядов. {_ALLIES_ONLY}"
+        f"Союзники видят в сводке боя, на ком висит ваша Метка добычи и сколько у неё зарядов. {_ALLIES_ONLY}"
     )
 
 
@@ -353,7 +353,7 @@ def _describe_poisoner_toxic_blood(b: BuffDef) -> str:
     total = base + bc.POISONER_TOXIC_BLOOD_VULN_BONUS
     return (
         f"Разложение делает цель уязвимее сильнее: урон по ней больше на {_pct(total)} вместо {_pct(base)}. "
-        f"Кроме того, все остальные враги, которых ты отравил, тоже становятся уязвимее - на "
+        f"Кроме того, все остальные враги, которых вы отравили, тоже становятся уязвимее - на "
         f"{_pct(bc.POISONER_TOXIC_BLOOD_SPREAD_PCT)} от этой силы."
     )
 
@@ -362,7 +362,7 @@ def _describe_poisoner_desiccation(b: BuffDef) -> str:
     total = bc.POISONER_DISRUPT_WEAKEN + bc.POISONER_DESICCATION_WEAKEN_BONUS
     return (
         f"Дурманящий дротик ослабляет цель сильнее: она бьёт на {_pct(total)} слабее вместо "
-        f"{_pct(bc.POISONER_DISRUPT_WEAKEN)}. Кроме того, все остальные враги, которых ты отравил, "
+        f"{_pct(bc.POISONER_DISRUPT_WEAKEN)}. Кроме того, все остальные враги, которых вы отравили, "
         f"тоже ослабевают - на {_pct(bc.POISONER_DESICCATION_SPREAD_PCT)} от этой силы."
     )
 
@@ -376,7 +376,7 @@ def _describe_poisoner_double_dose(b: BuffDef) -> str:
 
 def _describe_poisoner_corroding_toxin(b: BuffDef) -> str:
     return (
-        f"Твой яд наносит на {_pct(bc.POISONER_CORRODING_TOXIN_BONUS)} больше урона. "
+        f"Ваш яд наносит на {_pct(bc.POISONER_CORRODING_TOXIN_BONUS)} больше урона. "
         "Токсический выброс тоже: он взрывает яд по этому урону."
     )
 
@@ -475,7 +475,7 @@ def _describe_elementalist_overload(b: BuffDef) -> str:
 
 def _describe_elementalist_elemental_flow(b: BuffDef) -> str:
     return (
-        "Примени три разных стихийных навыка подряд (огонь, лёд, молния) - следующее действие нанесёт "
+        "Примените три разных стихийных навыка подряд (огонь, лёд, молния) - следующее действие нанесёт "
         f"на {_pct(bc.ELEMENTALIST_ELEMENTAL_FLOW_BONUS)} больше урона."
     )
 
@@ -570,14 +570,14 @@ def _describe_dark_mystic_dark_resonance(b: BuffDef) -> str:
 
 def _describe_dark_mystic_blood_pact_plus(b: BuffDef) -> str:
     return (
-        f"Навыки, которые забирают твоё здоровье (Круг тьмы и доплата Самоотречения за Кровавый пакт), "
+        f"Навыки, которые забирают ваше здоровье (Круг тьмы и доплата Самоотречения за Кровавый пакт), "
         f"забирают на {_pct(bc.DARK_MYSTIC_HP_COST_REDUCTION)} меньше."
     )
 
 
 def _describe_dark_mystic_self_denial(b: BuffDef) -> str:
     return (
-        f"Пока у тебя больше {_pct(bc.DARK_MYSTIC_SELF_DENIAL_MIN_HP)} здоровья, Кровавый пакт забирает у тебя "
+        f"Пока у вас больше {_pct(bc.DARK_MYSTIC_SELF_DENIAL_MIN_HP)} здоровья, Кровавый пакт забирает у вас "
         f"ещё {_pct(bc.DARK_MYSTIC_SELF_DENIAL_EXTRA_HP)} максимального здоровья, но бьёт и лечит на "
         f"{_pct(bc.DARK_MYSTIC_SELF_DENIAL_BONUS)} сильнее."
     )
@@ -585,7 +585,7 @@ def _describe_dark_mystic_self_denial(b: BuffDef) -> str:
 
 def _describe_dark_mystic_dark_reward(b: BuffDef) -> str:
     return (
-        "После навыка, который забрал твоё здоровье (Круг тьмы или Кровавый пакт с доплатой Самоотречения), "
+        "После навыка, который забрал ваше здоровье (Круг тьмы или Кровавый пакт с доплатой Самоотречения), "
         "следующий Кровавый пакт бьёт и лечит на "
         f"{_pct(bc.DARK_MYSTIC_DARK_REWARD_BONUS)} сильнее."
     )
@@ -593,7 +593,7 @@ def _describe_dark_mystic_dark_reward(b: BuffDef) -> str:
 
 def _describe_dark_mystic_edge(b: BuffDef) -> str:
     return (
-        f"Пока у тебя меньше {_pct(bc.DARK_MYSTIC_EDGE_HP_THRESHOLD)} здоровья, Кровавый пакт и Круг тьмы "
+        f"Пока у вас меньше {_pct(bc.DARK_MYSTIC_EDGE_HP_THRESHOLD)} здоровья, Кровавый пакт и Круг тьмы "
         f"бьют и лечат на {_pct(bc.DARK_MYSTIC_EDGE_BONUS)} сильнее."
     )
 
@@ -604,7 +604,7 @@ def _describe_dark_mystic_blood_ward(b: BuffDef) -> str:
 
 def _describe_dark_mystic_ward_passed_on(b: BuffDef) -> str:
     return (
-        "Оберег ставит такой же щит, как тебе, ещё и союзнику с самым низким здоровьем. "
+        "Оберег ставит такой же щит, как вам, ещё и союзнику с самым низким здоровьем. "
         f"{_ALLIES_ONLY}"
     )
 
@@ -771,8 +771,8 @@ def _describe_path(buff: BuffDef) -> str:
             "dot_damage_bonus": f"Периодический урон (яд, горение) больше на {_pct(value)}.",
             "crit_chance_bonus": f"Шанс крита выше на {_points(value)}.",
             "dodge_bonus": f"Шанс уклониться выше на {_points(value)}.",
-            "crit_damage_taken_reduction": f"Вражеские криты бьют по тебе на {_pct(value)} слабее.",
-            "solo_damage_bonus": f"Прямой урон больше на {_pct(value)}, когда дерёшься без союзников.",
+            "crit_damage_taken_reduction": f"Вражеские криты бьют по вам на {_pct(value)} слабее.",
+            "solo_damage_bonus": f"Прямой урон больше на {_pct(value)}, когда деретесь без союзников.",
             "execute_damage_bonus": f"Прямой урон больше на {_pct(value)} по цели, у которой меньше {_pct(bc.PATH_EXECUTE_HP)} здоровья.",
             "third_stab_chance": f"«Двойной укол»: шанс {_pct(value)} ударить третий раз.",
             "no_cooldown_chance": f"Шанс {_pct(value)}, что навык не уйдёт на перезарядку.",

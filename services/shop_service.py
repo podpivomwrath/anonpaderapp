@@ -47,9 +47,9 @@ BRAND_ID = "keeper_brand"
 def _brand_perks() -> list[str]:
     return [
         f"руны падают на {round((brc.RUNE_DROP_MULT - 1) * 100)}% чаще - в исследовании и с хозяев этажей руин",
-        f"группа легла в руинах - уносишь {round(brc.WIPE_KEEP_SHARE * 100)}% реликвий из мешка",
+        f"группа легла в руинах - уносите {round(brc.WIPE_KEEP_SHARE * 100)}% реликвий из мешка",
         f"ключей Монолита до {rkc.RAID_KEY_CAP_PREMIUM} вместо {rkc.RAID_KEY_CAP}",
-        "весть об открытом разломе твоего уровня - с клеткой",
+        "весть об открытом разломе вашего уровня - с клеткой",
         f"+{brc.CART_EXTRA_CRATES} ящик в кузов каждой повозки",
         "в долгом путешествии опыт ремесла выпадает вдвое чаще",
         f"+{pc.PRESET_SLOT_BONUS} слот пресета",
@@ -247,7 +247,7 @@ def rename_items(character: Character, firm_name: str | None) -> list[dict]:
         {
             "id": FIRM_RENAME_ID, "title": "Смена названия фирмы", "emoji": "🏛", "kind": "rename",
             "price": FIRM_RENAME_PRICE, "current": firm_name, "available": firm_name is not None,
-            "unavailable": "Сначала открой торговую фирму и дай ей название.",
+            "unavailable": "Сначала откройте торговую фирму и дайте ей название.",
             "min_len": tc.FIRM_NAME_MIN, "max_len": tc.FIRM_NAME_MAX,
             "rules": f"{tc.FIRM_NAME_MIN}-{tc.FIRM_NAME_MAX} символов: буквы, цифры, пробел и дефис. "
                      "Название должно быть свободно.",
@@ -257,7 +257,7 @@ def rename_items(character: Character, firm_name: str | None) -> list[dict]:
 
 _NICK_ERRORS = {
     "invalid": "Ник - 3-16 символов: русские или латинские буквы, цифры и _.",
-    "banned": "Такой ник не пройдёт - выбери другой.",
+    "banned": "Такой ник не пройдёт - выберите другой.",
     "taken": "Этот ник уже занят или слишком похож на чужой.",
     "mixed": "Ник - либо русскими буквами, либо латинскими, не вперемешку.",
     "sticks": "Не больше двух l, I и 1 подряд: на экране их не отличить.",
@@ -276,7 +276,7 @@ async def rename_character(db: AsyncSession, character: Character, new_name) -> 
 
     name = new_name.strip() if isinstance(new_name, str) else ""
     if name == character.name:
-        raise ShopError("Это и так твой ник.")
+        raise ShopError("Это и так ваш ник.")
     error = onboarding_service.validate_nickname_format(name)
     if error is None and onboarding_service.contains_banned_word(name):
         error = "banned"
@@ -301,7 +301,7 @@ async def rename_firm(db: AsyncSession, character: Character, new_name) -> str:
 
     firm = await trade_service.get_firm(db, character.id, lock=True)
     if firm is None or not firm.name:
-        raise ShopError("Сначала открой торговую фирму и дай ей название.")
+        raise ShopError("Сначала откройте торговую фирму и дайте ей название.")
     if isinstance(new_name, str) and trade_service.clean_name(new_name) == firm.name:
         raise ShopError("У фирмы уже такое название.")
     try:
@@ -337,10 +337,10 @@ def tincture_item(character: Character) -> dict:
         "price": ggc.TINCTURE_PRICE, "max_qty": MAX_QTY,
         "perks": [
             f"{ggc.TINCTURE_HOURS} часа после покупки смерть не отнимает опыт",
-            "Действует и в PvP, если на тебе клеймо",
+            "Действует и в PvP, если на вас клеймо",
             f"Каждая настойка добавляет {ggc.TINCTURE_HOURS} часа к оставшемуся времени",
         ],
-        "note": "Пьётся сразу при покупке. Таймер идёт и когда ты не в игре.",
+        "note": "Пьётся сразу при покупке. Таймер идёт и когда вы не в игре.",
         "active_until": character.ash_tincture_until.isoformat() if active else None,
     }
 
@@ -367,7 +367,7 @@ def pocket_item(character: Character) -> dict:
         "id": POCKET_ID, "title": "Секретный карман", "emoji": "🎒", "kind": "bundle",
         "price": ggc.POCKET_PRICE,
         "perks": [
-            "При смерти половина реликвий остаётся у тебя",
+            "При смерти половина реликвий остаётся у вас",
             "Работает и в PvP: победитель забирает только вторую половину",
             "Покупается один раз и навсегда",
         ],
@@ -408,12 +408,12 @@ def faction_item(character: Character) -> dict:
         "options": [{"id": c, "title": REGION_TITLES[c]} for c in fc.CITIES if c != character.region],
         "perks": [
             "Сразу переносит на площадь нового города",
-            "Долгий путь прерывается: награда за прошедшие часы остаётся, снаряжение переезжает с тобой",
+            "Долгий путь прерывается: награда за прошедшие часы остаётся, снаряжение переезжает с вами",
             "Поездка, исследование и рыбалка отменяются",
             "Сюжет нового города открывается на том же акте",
             "Новые обозы фирмы выходят из нового города, товар в пути и на складе остаётся",
         ],
-        "note": f"Менять фракцию можно раз в {ggc.FACTION_COOLDOWN_DAYS} дней. Купишь в бою - переезд случится, "
+        "note": f"Менять фракцию можно раз в {ggc.FACTION_COOLDOWN_DAYS} дней. Купите в бою - переезд случится, "
                 "когда бой закончится.",
         "available": ready is None and character.pending_faction is None,
         "available_at": ready.isoformat() if ready is not None else None,
@@ -434,11 +434,11 @@ async def change_faction(
 
     now = now or datetime.now(timezone.utc)
     if region not in fc.CITIES:
-        raise ShopError("Выбери город.")
+        raise ShopError("Выберите город.")
     if character.pending_faction is not None:
         raise ShopError("Переезд уже оплачен - он случится после боя.")
     if region == character.region:
-        raise ShopError("Ты и так живёшь в этом городе.")
+        raise ShopError("Вы и так живёте в этом городе.")
     if faction_available_at(character) is not None:
         raise ShopError(f"Фракцию меняют не чаще раза в {ggc.FACTION_COOLDOWN_DAYS} дней.")
     await _charge(db, character, ggc.FACTION_PRICE)
@@ -520,16 +520,16 @@ def courier_item(character: Character) -> dict:
     return {
         "id": COURIER_ID, "title": "Курьер", "emoji": cc.EMOJI, "kind": "bundle", "price": cc.PRICE,
         "perks": [
-            "Носит вещи, зелья и руду тому, кто далеко от тебя",
-            "Выходит из твоего города, забирает посылку у тебя и бежит к получателю",
+            "Носит вещи, зелья и руду тому, кто далеко от вас",
+            "Выходит из вашего города, забирает посылку у вас и бежит к получателю",
             "Получатель сменил клетку - курьер поворачивает за ним прямо в дороге",
             "Получатель в бою или рейде - курьер ждёт рядом и отдаёт посылку после боя",
             "Покупается один раз и навсегда",
         ],
-        "note": "Рядом с тобой и золото с самоцветами передаются и без курьера, как раньше. "
+        "note": "Рядом с вами и золото с самоцветами передаются и без курьера, как раньше. "
                 "Одна посылка за раз: следующую он возьмёт, когда отдаст эту.",
         "available": not character.has_courier,
-        "unavailable": "Курьер у тебя уже есть.",
+        "unavailable": "Курьер у вас уже есть.",
     }
 
 
@@ -547,14 +547,14 @@ def house_items(character: Character) -> list[dict]:
         "id": HOUSE_ID, "title": "Дом", "emoji": hc.EMOJI, "kind": "bundle", "price": hc.PRICE,
         "perks": [
             "Свой дом в родном городе, кнопка «Дом» на площади",
-            "Алхимический стол: сам варишь зелья из лавки из собранных трав, выходит дешевле",
+            "Алхимический стол: сами варите зелья из лавки из собранных трав, выходит дешевле",
             "Печь: блюда из рыбы и трав с баффом от 30 минут (с уровнем кулинарии дольше), он переживает смерть",
-            "Переезжаешь в другой город - дом переезжает с тобой",
+            "Переезжаете в другой город - дом переезжает с вами",
             "Покупается один раз и навсегда",
         ],
         "note": "Травы собирать можно и без дома, а варить зелья и готовить еду - только дома.",
         "available": not character.has_house,
-        "unavailable": "Дом у тебя уже есть.",
+        "unavailable": "Дом у вас уже есть.",
     }]
 
 
@@ -564,7 +564,7 @@ async def buy_house(db: AsyncSession, character: Character) -> None:
     if not hc.ON_SALE:
         raise ShopError("Дом пока не продаётся.")
     if character.has_house:
-        raise ShopError("Дом у тебя уже есть.")
+        raise ShopError("Дом у вас уже есть.")
     try:
         await wallet_service.charge(db, character.id, "donate", hc.PRICE)
     except wallet_service.NotEnoughCurrency:
@@ -592,23 +592,23 @@ def donka_item(character: Character) -> dict:
     return {
         "id": DONKA_ID, "title": "Пепельная донка", "emoji": "🪝", "kind": "bundle", "price": DONKA_PRICE,
         "perks": [
-            "Ставишь у озера - снасть забрасывается и подсекает сама",
+            "Ставите у озера - снасть забрасывается и подсекает сама",
             "Рыба сразу идёт в садок, удочка и леска работают как обычно",
-            "Ловит вчетверо медленнее, чем руками, и только пока ты у воды",
+            "Ловит вчетверо медленнее, чем руками, и только пока вы у воды",
             f"Одна постановка - {ggc.DONKA_MINUTES} минут, потом донку сматывают; поставить снова можно сразу",
             "Опыт за рыбу с донки идёт как за пойманную руками",
             "Покупается один раз и навсегда",
         ],
         "note": "У воды появится выбор: рыбачить самому или поставить донку. "
-                "Час идёт с постановки, даже если ты не в игре.",
+                "Час идёт с постановки, даже если вы не в игре.",
         "available": not character.has_donka,
-        "unavailable": "Донка у тебя уже есть.",
+        "unavailable": "Донка у вас уже есть.",
     }
 
 
 async def buy_donka(db: AsyncSession, character: Character) -> None:
     if character.has_donka:
-        raise ShopError("Донка у тебя уже есть.")
+        raise ShopError("Донка у вас уже есть.")
     await _charge(db, character, DONKA_PRICE)
     character.has_donka = True
     await db.flush()

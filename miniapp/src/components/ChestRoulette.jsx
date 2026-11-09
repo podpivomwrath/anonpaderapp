@@ -192,7 +192,7 @@ export default function ChestRoulette({ strip, winIndex, result, onClose, left =
             </>
           ) : (
             <span className="roulette__hint">
-              {phase === 'shake' ? 'Ларец рвётся из рук... (нажми, чтобы вскрыть)' : 'Крышка поддаётся...'}
+              {phase === 'shake' ? 'Ларец рвётся из рук... (нажмите, чтобы вскрыть)' : 'Крышка поддаётся...'}
             </span>
           )}
         </div>

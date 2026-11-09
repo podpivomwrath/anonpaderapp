@@ -377,7 +377,7 @@ async def test_resolve_target_battle_number_after_solo_players(db_session, chara
 def test_format_transfer_line_orders_expensive_first() -> None:
     line = pvp_handlers._format_transfer_line({"ash_dust": 2, "blood_shard": 1})
     assert line is not None
-    assert line.startswith("Забираешь трофеи:")
+    assert line.startswith("Забираете трофеи:")
     assert "Кровяной осколок" in line and "Пепельная крошка" in line
 
 

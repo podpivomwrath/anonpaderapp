@@ -69,7 +69,7 @@ def test_shield_lines_name_their_source() -> None:
     absorb_by_shields(owner, 30, lines)
     assert "Оберег" in lines[0] and "Второе сердце" not in lines[0]
     line = battle_log.class_line(state.combatants, owner.id)
-    assert "Оберег: ты - 70" in line
+    assert "Оберег: вы - 70" in line
 
 
 def test_last_breath_turns_shown_to_any_class() -> None:

@@ -244,7 +244,7 @@ async def _validate(db: AsyncSession, character: Character, qty: int, price: int
     if qty * price < mc.MIN_ORDER_GOLD:
         raise MarketError(f"Заявка - от {mc.MIN_ORDER_GOLD} золота (цена × количество).")
     if await open_count(db, character.id) >= limit_for(character):
-        raise MarketError(f"Открытых заявок не больше {limit_for(character)}. Сними или дождись старых.")
+        raise MarketError(f"Открытых заявок не больше {limit_for(character)}. Снимите или дождитесь старых.")
 
 
 def _new_order(character_id: int, side: str, key: str, qty: int, price: int, now: datetime) -> MarketOrder:
@@ -267,7 +267,7 @@ async def place_sell(db: AsyncSession, character: Character, key: str, qty: int,
     await _validate(db, character, qty, price)
     await _fee(db, character.id, qty * price)
     if not await _take(db, character.id, key, qty):
-        raise MarketError("Столько у тебя нет.")
+        raise MarketError("Столько у вас нет.")
     await _lock_good(db, key)
     order = _new_order(character.id, SELL, key, qty, price, now)
     db.add(order)
@@ -367,7 +367,7 @@ async def list_item(db: AsyncSession, character: Character, item_id: int, price:
         Inventory.item_id == item_id, Inventory.character_id == character.id, Inventory.equipped.is_(False),
     ).execution_options(synchronize_session="fetch"))
     if not moved.rowcount:
-        raise MarketError("Этой вещи у тебя уже нет.")
+        raise MarketError("Этой вещи у вас уже нет.")
     from services import resource_log
 
     resource_log.add(db, character.id, "item", str(item_id), -1)
@@ -383,7 +383,7 @@ async def buy_item(db: AsyncSession, character: Character, order_id: int, now: d
     if order is None or order.status != OPEN or not order.good.startswith("item:"):
         raise MarketError("Эту вещь уже купили или сняли с витрины.")
     if order.character_id == character.id:
-        raise MarketError("Это твой же лот.")
+        raise MarketError("Это ваш же лот.")
     await _charge(db, character.id, order.price, "market.buy_item")
     net = await _pay_seller(db, order.character_id, order.price)
     await _trade(db, order.good, order.price, 1, character.id, order.character_id, now)
@@ -472,9 +472,9 @@ async def send_courier(db: AsyncSession, character: Character) -> list[str]:
     from services import courier_service
 
     if not character.has_courier:
-        raise MarketError("Курьера у тебя нет. Его покупают в Магазине.")
+        raise MarketError("Курьера у вас нет. Его покупают в Магазине.")
     if await courier_service.active_of(db, character.id) is not None:
-        raise MarketError("Курьер ещё бегает с прошлой посылкой. Дождись, пока он её отдаст.")
+        raise MarketError("Курьер ещё бегает с прошлой посылкой. Дождитесь, пока он её отдаст.")
     rows = (await db.scalars(
         select(MarketInbox).where(MarketInbox.character_id == character.id).with_for_update()
     )).all()

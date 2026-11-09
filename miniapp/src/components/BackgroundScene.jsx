@@ -143,7 +143,7 @@ export default function BackgroundScene() {
         />
         {woke && (
           <div className="scene__whisper" style={{ left: glow.x - glow.width, top: glow.y }}>
-            Трещина затихает<br />под твоим взглядом.<br />Титул «Внимательный».
+            Трещина затихает<br />под вашим взглядом.<br />Титул «Внимательный».
           </div>
         )}
       </div>

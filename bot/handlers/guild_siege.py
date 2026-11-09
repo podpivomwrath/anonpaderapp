@@ -89,7 +89,7 @@ async def start(siege_id: int) -> None:
             await db.commit()
         return
     others = (
-        f"🏰 Осада ({x}; {y}) началась. Успеешь дойти - вступай через «Осмотреться» на клетке."
+        f"🏰 Осада ({x}; {y}) началась. Успеете дойти - вступайте через «Осмотреться» на клетке."
     )
     present = {peer for _c, peer in attackers + defenders}
     async with get_session_factory()() as db:
@@ -130,7 +130,7 @@ async def on_siege_battle_finished(battle, result, dead_ids: list[int], survivor
             await guild_handlers.send(participant.peer_id, text, keyboard=keyboard)
         else:
             await guild_handlers.send(
-                participant.peer_id, f"☠ Ты пал под стенами.\n\n{text}", keyboard=kb.waiting_keyboard(),
+                participant.peer_id, f"☠ Вы пали под стенами.\n\n{text}", keyboard=kb.waiting_keyboard(),
             )
     present = {p.peer_id for p in battle.participants.values()}
     async with get_session_factory()() as db:

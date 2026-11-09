@@ -172,7 +172,7 @@ def propose(run: RuinRun, leader_id: int, direction: str, party: int, now: datet
     if run.pending:
         raise RuinsError("Группа ещё не пошла по прошлому шагу - ждём подтверждений.")
     if run.offer:
-        raise RuinsError("Сначала выбери дар.")
+        raise RuinsError("Сначала выберите дар.")
     target = exits_now(run).get(direction)
     if target is None:
         raise RuinsError("Туда не пройти.")
@@ -425,7 +425,7 @@ async def choose(db: AsyncSession, run: RuinRun, leader_id: int, choice: str, rn
             result["offer"] = start_offer(run, ruins_rooms.ANY, rng, drop=choice[5:])
             result["lines"].append("well")
         else:
-            raise RuinsError("Сначала выбери, какой дар бросить в колодец.")
+            raise RuinsError("Сначала выберите, какой дар бросить в колодец.")
         _mark_cleared(run)
         touch(run)
         await db.flush()

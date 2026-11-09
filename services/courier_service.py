@@ -44,7 +44,7 @@ def _aware(dt: datetime) -> datetime:
 
 async def buy(db: AsyncSession, character: Character) -> None:
     if character.has_courier:
-        raise CourierError("Курьер у тебя уже есть.")
+        raise CourierError("Курьер у вас уже есть.")
     try:
         await wallet_service.charge(db, character.id, "donate", cc.PRICE)
     except wallet_service.NotEnoughCurrency:
@@ -81,11 +81,11 @@ async def send(
     """Отдать посылку курьеру: списать у отправителя и выпустить курьера.
     CourierError / transfer_service.TransferFailed - ничего не списано."""
     if not sender.has_courier:
-        raise CourierError("Курьера у тебя нет.")
+        raise CourierError("Курьера у вас нет.")
     if offer.kind not in transfer_service.NEEDS_NEAR:
         raise CourierError("Это передаётся и без курьера.")
     if await active_of(db, sender.id) is not None:
-        raise CourierError("Курьер ещё бегает с прошлой посылкой. Дождись, пока он её отдаст.")
+        raise CourierError("Курьер ещё бегает с прошлой посылкой. Дождитесь, пока он её отдаст.")
     amount = await transfer_service.take(db, sender.id, offer, amount)
     x, y = start_cell(sender)
     delivery = CourierDelivery(
@@ -108,9 +108,9 @@ async def send_batch(
     """Пачка в одной посылке (2026-10-21): списать всё сразу и выпустить
     курьера. Не хватило чего-то одного - не списано ничего (откат у вызывающего)."""
     if not sender.has_courier:
-        raise CourierError("Курьера у тебя нет.")
+        raise CourierError("Курьера у вас нет.")
     if await active_of(db, sender.id) is not None:
-        raise CourierError("Курьер ещё бегает с прошлой посылкой. Дождись, пока он её отдаст.")
+        raise CourierError("Курьер ещё бегает с прошлой посылкой. Дождитесь, пока он её отдаст.")
     parts, labels = [], []
     for offer, amount in batch:
         if offer.kind in transfer_service.NEEDS_NEAR:
@@ -142,9 +142,9 @@ async def send_market(
     списан вызывающим (market_service.send_courier). Курьер берёт посылку в
     родном городе и бежит сразу к игроку: отправитель и получатель - он сам."""
     if not character.has_courier:
-        raise CourierError("Курьера у тебя нет. Его покупают в Магазине.")
+        raise CourierError("Курьера у вас нет. Его покупают в Магазине.")
     if await active_of(db, character.id) is not None:
-        raise CourierError("Курьер ещё бегает с прошлой посылкой. Дождись, пока он её отдаст.")
+        raise CourierError("Курьер ещё бегает с прошлой посылкой. Дождитесь, пока он её отдаст.")
     x, y = start_cell(character)
     delivery = CourierDelivery(
         sender_id=character.id, recipient_id=character.id, kind=BATCH,

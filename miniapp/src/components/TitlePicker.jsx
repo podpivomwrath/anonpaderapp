@@ -65,7 +65,7 @@ export default function TitlePicker({ titles, onChange, onClose }) {
           {!current && <span className="crown-sheet__mark">✓</span>}
         </button>
 
-        {failed && <p className="crown-sheet__error">Не вышло. Попробуй ещё раз.</p>}
+        {failed && <p className="crown-sheet__error">Не вышло. Попробуйте ещё раз.</p>}
       </div>
     </>
   );

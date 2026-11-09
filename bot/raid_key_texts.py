@@ -11,7 +11,7 @@ def raid_key_status(count: int, cap: int, premium_cap: int | None) -> str:
     с Клеймом Хранителя, если его нет; None - уже есть."""
     lines = [f"{RAID_KEY_NAME}: {count} из {cap}."]
     if count >= cap:
-        lines.append("Больше не выпадет, пока не потратишь хотя бы один.")
+        lines.append("Больше не выпадет, пока не потратите хотя бы один.")
     else:
         lines.append("Изредка падает с мобов, событий, ларцов и рыбалки.")
     lines.append("Ключ тратит лидер группы, когда открывает рейд.")

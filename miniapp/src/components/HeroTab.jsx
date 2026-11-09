@@ -201,7 +201,7 @@ function TrophyShelf({ trophies }) {
       {relic && (
         <p className="relic-caption">
           {relic.name}
-          {relic.won ? ` · побед: ${relic.wins} · у тебя: ${relic.owned}` : ' - ещё не добыто'}
+          {relic.won ? ` · побед: ${relic.wins} · у вас: ${relic.owned}` : ' - ещё не добыто'}
         </p>
       )}
       <div className="trophy-tiles">
@@ -261,7 +261,7 @@ function Settings({ character, onCharacterUpdate }) {
       </SimpleCell>
       <SimpleCell
         Component="label" multiline
-        subtitle="Бот не пишет сам: разломы, мировые боссы, Ишак, заказы и прибытие повозок, вести похода, новости гильдии, конец баффов. Ответы на твои действия приходят как раньше."
+        subtitle="Бот перестанет присылать то, о чём вы не просили: открытые разломы, мировых боссов, турбоишака, заказы и прибытие повозок, вести похода, новости гильдии и окончание баффов. Ответы на ваши действия будут приходить как обычно."
         after={<Switch checked={quiet} onChange={(e) => toggleQuiet(e.target.checked)} />}
       >
         Отключить оповещения
@@ -437,7 +437,7 @@ export function GenderChoice({ character, onPick, busy }) {
   return (
     <Group>
       <div className="gender-choice">
-        <p className="gender-choice__title">Выбери облик</p>
+        <p className="gender-choice__title">Выберите облик</p>
         <div className="gender-choice__row">
           {[['m', 'Мужской'], ['f', 'Женский']].map(([g, label]) => (
             <button
@@ -472,7 +472,7 @@ export function GenderGate({ character, onCharacterUpdate }) {
     }
   }
   return (
-    <div className="gender-gate" role="dialog" aria-label="Выбери облик">
+    <div className="gender-gate" role="dialog" aria-label="Выберите облик">
       <div className="gender-gate__card">
         <GenderChoice character={character} onPick={pick} busy={busy} />
       </div>

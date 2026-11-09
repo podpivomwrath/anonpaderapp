@@ -53,7 +53,7 @@ async def rest(message: Message) -> None:
             await message.answer("☠ Сначала очнись.")
             return
         if in_any_battle(peer_id):
-            await message.answer("В бою не отдохнёшь.")
+            await message.answer("В бою не отдохнёте.")
             return
         if world._in_mine_digging(character):
             await message.answer(
@@ -61,7 +61,7 @@ async def rest(message: Message) -> None:
             )
             return
         if explore_rest.resting(peer_id):
-            await message.answer("🛏️ Ты уже отдыхаешь.")
+            await message.answer("🛏️ Вы уже отдыхаете.")
             return
         if explore_rest.exploring(peer_id) or movement_service.is_traveling(character, now):
             await message.answer("Сначала закончи то, что начал.")
@@ -94,7 +94,7 @@ async def rest(message: Message) -> None:
     # отдых — кнопки убираем на время (чистка шума)
     await message.answer(flavor.rest_start(), keyboard=kb.waiting_keyboard())
     if hint_peers:
-        await message.answer("Ты вышел из очереди группового исследования.")
+        await message.answer("Вы вышли из очереди группового исследования.")
         await world.send_ready_hint(hint_peers)
     world._rest_scheduler.schedule(peer_id, delay)
 

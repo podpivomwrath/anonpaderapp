@@ -128,7 +128,7 @@ async def start(
 ) -> tuple[cc.Dish, int]:
     dish = cc.DISHES_BY_ID.get(dish_id)
     if dish is None or dish.level > character.cooking_level:
-        raise CookingError("Этот рецепт тебе пока не знаком.")
+        raise CookingError("Этот рецепт вам пока не знаком.")
     if character.house_work is not None:
         raise CookingError("Печь занята: сначала закончи то, что уже на огне.")
     fish = fishing.fish_def(fish_id)
@@ -261,13 +261,13 @@ async def eat(db: AsyncSession, character: Character, dish_id: str, grade: str, 
     cap = now + timedelta(minutes=cc.FOOD_STACK_MAX_MINUTES)
     same = active(character, now) is not None and (character.food_dish, character.food_grade) == (dish_id, grade)
     if same and _aware(character.food_until) >= cap - timedelta(minutes=1):
-        raise CookingError(f"Ты сыт: дольше {cc.FOOD_STACK_MAX_MINUTES // 60} ч одно блюдо не держится.")
+        raise CookingError(f"Вы сыты: дольше {cc.FOOD_STACK_MAX_MINUTES // 60} ч одно блюдо не держится.")
     row = await db.scalar(select(CharacterFood).where(
         CharacterFood.character_id == character.id, CharacterFood.dish_id == dish_id, CharacterFood.grade == grade,
     ).with_for_update().execution_options(populate_existing=True))
     dish = cc.DISHES_BY_ID.get(dish_id)
     if row is None or row.count < 1 or dish is None:
-        raise CookingError("Этого блюда у тебя нет.")
+        raise CookingError("Этого блюда у вас нет.")
     row.count -= 1
     # Пряности: заряд уходит на каждую съеденную порцию, пока они есть.
     from game.economy import craft_gear

@@ -14,7 +14,7 @@ from game.economy import mining_config as mc
 #: Вторая дверь в рудник — как «Озеро» и «Монолит». Кнопка приходит только при
 #: ВХОДЕ на клетку, поэтому тому, кто уже стоит на руднике, нужна команда.
 MINE_COMMAND = "/рудник"
-MINE_HINT_LINE = f"⛏ Напиши «{MINE_COMMAND}», чтобы спуститься в выработку."
+MINE_HINT_LINE = f"⛏ Напишите «{MINE_COMMAND}», чтобы спуститься в выработку."
 
 BTN_MINE = "⛏ В выработку"
 BTN_DIG = "⛏ Добыть"
@@ -66,7 +66,7 @@ def dig_time_line(mine: MineDef, mining_level: int, speed: float = 1.0) -> str:
         return f"⏳ Кусок займёт {span}."
     need = mc.MINE_REQUIRED_LEVEL[mine.tier]
     ore_note = (
-        " Руда глубже твоего уровня отсюда не пойдёт."
+        " Руда глубже вашего уровня отсюда не пойдёт."
         if mining.unlocked_tier(mining_level) < mine.tier else ""
     )
     return f"⚠️ Не по уровню (нужен {need}): кусок займёт {span}.{ore_note}"
@@ -81,28 +81,28 @@ def level_line(character) -> str:
 
 
 def dig_started_text(seconds: float) -> str:
-    return f"Ты берёшься за кирку. Работы примерно на {mining.format_duration(seconds)}."
+    return f"Вы берётесь за кирку. Работы примерно на {mining.format_duration(seconds)}."
 
 
 def dig_progress_text(seconds: float) -> str:
-    return f"⛏ Копаешь. Осталось примерно {mining.format_duration(seconds)}."
+    return f"⛏ Копаете. Осталось примерно {mining.format_duration(seconds)}."
 
 
 EMPTY_MINE_TEXT = (
-    "Жила выбрана подчистую. Порода нарастает сама - возвращайся позже."
+    "Жила выбрана подчистую. Порода нарастает сама - возвращайтесь позже."
 )
 NOT_AT_MINE_TEXT = "Здесь нечего копать."
-ALREADY_DIGGING_TEXT = "Ты уже копаешь."
+ALREADY_DIGGING_TEXT = "Вы уже копаете."
 NOT_DIGGING_TEXT = "Сначала возьмись за кирку."
 LEAVE_WHILE_DIGGING_TEXT = "Не бросив кирку, наверх не подняться."
-ABANDONED_TEXT = "Ты бросаешь забой. Начатая порода остаётся в жиле."
+ABANDONED_TEXT = "Вы бросаете забой. Начатая порода остаётся в жиле."
 
 
 def busy_text(seconds: float) -> str:
     """Отказ во время добычи. Раньше это была глухая фраза «ты занят»; теперь
     любая нажатая кнопка заодно отвечает, сколько осталось — иначе узнать это
     было негде, кроме как ждать."""
-    return f"⛏ Ты в забое. Осталось примерно {mining.format_duration(seconds)}."
+    return f"⛏ Вы в забое. Осталось примерно {mining.format_duration(seconds)}."
 
 
 def dig_result_text(result, character=None) -> str:

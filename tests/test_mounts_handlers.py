@@ -67,4 +67,4 @@ async def test_second_continue_while_riding_does_not_strand(monkeypatch) -> None
     monkeypatch.setattr(mounts.onboarding_svc, "get_character", _char)
     monkeypatch.setattr(mounts.mount_service, "active_travel", _travel)
     await mounts._recover_stranded(123)
-    assert sent == ["🐎 Ты и так в пути."]
+    assert sent == ["🐎 Вы и так в пути."]

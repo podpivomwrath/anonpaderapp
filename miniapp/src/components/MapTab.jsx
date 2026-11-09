@@ -34,17 +34,17 @@ const ERROR_MESSAGES = {
   in_pvp: 'Сначала разберись с открытым боем.',
   in_combat: 'В бою не до маунта.',
   busy: 'Сначала закончи то, что начал.',
-  mining: 'Ты в забое - сначала закончи или брось добычу.',
-  fishing: 'Снасть в воде - сначала дождись поклёвки или отмени заброс.',
+  mining: 'Вы в забое - сначала закончите или бросьте добычу.',
+  fishing: 'Снасть в воде - сначала дождитесь поклёвки или отмените заброс.',
   in_event: 'Сначала закончи событие в чате - потом в седло.',
-  house_work: 'Идет варка в доме - дождись ее или брось.',
-  traveling_on_foot: 'Ты уже в пути пешком.',
-  voyage: 'Ты в долгом пути. Вернуться можно кнопкой «⚓ Вернуться» в чате.',
-  ruins: 'Ты в руинах культа. Сначала поднимись наверх.',
-  already_on_mount: 'Ты уже в пути на маунте.',
+  house_work: 'Идет варка в доме - дождитесь ее или бросьте.',
+  traveling_on_foot: 'Вы уже в пути пешком.',
+  voyage: 'Вы в долгом пути. Вернуться можно кнопкой «⚓ Вернуться» в чате.',
+  ruins: 'Вы в руинах культа. Сначала поднимитесь наверх.',
+  already_on_mount: 'Вы уже в пути на маунте.',
   out_of_bounds: 'Это за краем мира.',
-  already_there: 'Ты уже здесь.',
-  mount_not_owned: 'Этого маунта у тебя нет.',
+  already_there: 'Вы уже здесь.',
+  mount_not_owned: 'Этого маунта у вас нет.',
   bad_request: 'Что-то пошло не так.',
 };
 
@@ -112,7 +112,7 @@ function readSimple() {
 // focus - клетка, которую показать при открытии (цель задания из «Заданий»).
 // Легенда значков карты (2026-10-22): открывается кнопкой «?» у карты.
 const LEGEND = [
-  ['🟡', 'Ты'],
+  ['🟡', 'Вы'],
   ['🏛', 'Город'],
   ['⛏', 'Рудник (бледный - жила пуста)'],
   ['🎣', 'Озеро'],
@@ -122,9 +122,9 @@ const LEGEND = [
   ['🏰', 'База гильдии (🏯 цитадель, 🚩 закладка знамени)'],
   ['🫏', 'Турбоишак'],
   ['🎯', 'Цель заказа на убийство'],
-  ['🐂', 'Твоя повозка в пути'],
+  ['🐂', 'Ваша повозка в пути'],
   ['🏃', 'Курьер'],
-  ['⚑', 'Куда едешь'],
+  ['⚑', 'Куда едете'],
 ];
 
 function MapLegend({ onClose }) {
@@ -673,7 +673,7 @@ export default function MapTab({ focus = null }) {
     }),
     // Повозки торговой фирмы в пути - там, где они сейчас (стоящие ждут в городах).
     ...(mapState.carts || []).filter((c) => c.traveling)
-      .map((c) => [c.x, c.y, 'map-pin--cart', '🐂', `Твоя повозка №${c.num} в пути`, 0.9]),
+      .map((c) => [c.x, c.y, 'map-pin--cart', '🐂', `Ваша повозка №${c.num} в пути`, 0.9]),
     ...(mapState.rifts || []).map((r) => [
       r.x, r.y,
       r.blood ? 'map-pin--rift map-pin--rift-blood' : `map-pin--rift${r.state !== 'free' ? ' map-pin--rift-busy' : ''}`,
@@ -681,7 +681,7 @@ export default function MapTab({ focus = null }) {
       `${r.blood ? 'Кровавый разлом: ' : ''}${r.name} · ${r.min_level}-${r.max_level} ур.`, 1.2,
     ]),
     ...(travelTarget ? [[travelTarget.to_x, travelTarget.to_y, 'map-pin--route', '⚑', 'Цель пути', 1]] : []),
-    ...(playerPin ? [[playerPin.x, playerPin.y, 'map-pin--player', '', 'Ты здесь', 1.1]] : []),
+    ...(playerPin ? [[playerPin.x, playerPin.y, 'map-pin--player', '', 'Вы здесь', 1.1]] : []),
   ];
 
   /** Метка в точке (sx, sy); size - её размер в пикселях. */
@@ -880,7 +880,7 @@ export default function MapTab({ focus = null }) {
             <>
               <p className="map-card__line">
                 {cellRift.blood ? '🩸 Кровавый разлом' : '🌀 Разлом'}: {cellRift.emoji} {cellRift.name} · {cellRift.min_level}-{cellRift.max_level} ур.
-                {levels.level < cellRift.min_level || levels.level > cellRift.max_level ? ' (тебе не по уровню)' : ''}
+                {levels.level < cellRift.min_level || levels.level > cellRift.max_level ? ' (вам не по уровню)' : ''}
               </p>
               <p className="map-card__line">
                 До {cellRift.max_size} игроков · {RIFT_STATE[cellRift.state] || ''}
@@ -893,17 +893,17 @@ export default function MapTab({ focus = null }) {
           {info.isCity && <p className="map-card__line">Город · без PvP · торговля, лавки, долгий путь из родного.</p>}
           {info.boss && <p className="map-card__line">💀 {info.boss.name} · ур. {info.boss.level} · {info.boss.hp_percent}%</p>}
           {mapState.turbo && !mapState.turbo.running && mapState.turbo.x === info.x && mapState.turbo.y === info.y && (
-            <p className="map-card__line">🫏 Турбоишак здесь. Зайди на клетку и нажми «Подойти» - он долго не стоит.</p>
+            <p className="map-card__line">🫏 Турбоишак здесь. Зайдите на клетку и нажмите «Подойти» - он долго не стоит.</p>
           )}
           {(() => {
             const g = guildCells.find((c) => c.x === info.x && c.y === info.y);
             if (!g) return null;
             const what = g.status === 'claiming' ? 'закладывают знамя' : (g.mine ? 'рудник гильдии' : 'земля гильдии');
-            return <p className="map-card__line">🏰 [{g.tag}] · {what}{g.own ? ' (твоя гильдия)' : ''}</p>;
+            return <p className="map-card__line">🏰 [{g.tag}] · {what}{g.own ? ' (ваша гильдия)' : ''}</p>;
           })()}
           <div className="map-card__badges">
             {info.isCity && <span className="map-card__badge">Город</span>}
-            {info.isPlayer && <span className="map-card__badge">Ты здесь</span>}
+            {info.isPlayer && <span className="map-card__badge">Вы здесь</span>}
             {info.isQuestTarget && <span className="map-card__badge">Цель квеста{info.questLabel ? `: ${info.questLabel}` : ''}</span>}
           </div>
 
@@ -918,7 +918,7 @@ export default function MapTab({ focus = null }) {
           )}
           {!sendFlow && !canSendMount && (
             <p className="map-card__hint">
-              {mapState.mounts.length === 0 ? 'У тебя пока нет маунтов.' : isTraveling ? 'Ты уже в пути.' : 'Сейчас недоступно.'}
+              {mapState.mounts.length === 0 ? 'У вас пока нет маунтов.' : isTraveling ? 'Вы уже в пути.' : 'Сейчас недоступно.'}
             </p>
           )}
 
@@ -986,7 +986,7 @@ const RIFT_STATE = { free: 'свободен', waiting: 'у входа ждёт 
 
 /** «(у тебя N)», если уровня профессии не хватает. */
 function levelNote(have, need) {
-  return have != null && have < need ? ` (у тебя ${have})` : '';
+  return have != null && have < need ? ` (у вас ${have})` : '';
 }
 
 function MapTooltipContent({ info, mineOre, rift }) {

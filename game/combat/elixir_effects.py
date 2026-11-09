@@ -25,7 +25,7 @@ def drink_heal(actor: CombatantState, elixir_id: str) -> str:
     actor.current_hp = min(actor.max_hp, before + amount)
     healed = actor.current_hp - before
     if healed <= 0:
-        return "🧪 Зелье выпито, но ты и так цел."
+        return "🧪 Зелье выпито, но вы и так целы."
     return f"🧪 Зелье лечит: +{healed} HP ({actor.current_hp}/{actor.max_hp})."
 
 
@@ -101,7 +101,7 @@ def _apply_elixir(actor: CombatantState, elixir_id: str, combatants=None) -> str
             EffectKind.ASHEN_FEVER, ec.ASHEN_FEVER_DAMAGE_BONUS_STEP,
             ec.ASHEN_FEVER_DURATION, actor.id,
         )
-        return "🔥 Кровь вскипает пеплом. Удары станут злее - но жгут и тебя самого."
+        return "🔥 Кровь вскипает пеплом. Удары станут злее - но жгут и вас самих."
 
     if elixir_id == "last_breath":
         actor.apply_effect(EffectKind.LAST_BREATH, 1.0, ec.LAST_BREATH_DURATION, actor.id)
@@ -130,7 +130,7 @@ def _apply_elixir(actor: CombatantState, elixir_id: str, combatants=None) -> str
         shield_amount = round(sum(
             e.value for e in actor.effects_of(EffectKind.SHIELD_POOL) if getattr(e, "tag", None) == SECOND_HEART_TAG
         ))
-        return f"🛡️ Второе сердце укрывает тебя щитом ({shield_amount} поглощения)."
+        return f"🛡️ Второе сердце укрывает вас щитом ({shield_amount} поглощения)."
 
     if elixir_id == "ashen_haze":
         # Эликсир пьётся ДО хода, поэтому эффект для резолвера уже «старый»
@@ -139,7 +139,7 @@ def _apply_elixir(actor: CombatantState, elixir_id: str, combatants=None) -> str
         actor.apply_effect(
             EffectKind.DODGE, ec.ASHEN_HAZE_DODGE_CHANCE, ec.ASHEN_HAZE_DURATION, actor.id,
         )
-        return "🌫️ Морок укрывает тебя пеплом - удары будут находить лишь его."
+        return "🌫️ Морок укрывает вас пеплом - удары будут находить лишь его."
 
     if elixir_id == "shard_blood":
         bonus = round(actor.level * ec.SHARD_BLOOD_DAMAGE_PER_LEVEL)

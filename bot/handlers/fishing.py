@@ -582,7 +582,7 @@ async def leave_lake(message: Message) -> None:
         # Открытое событие на клетке - его кнопки, а не карта (2026-10-24).
         keyboard = await _root_keyboard(db, character, message.peer_id)
         await db.commit()
-    await message.answer("Ты отходишь от воды.", keyboard=keyboard)
+    await message.answer("Вы отходите от воды.", keyboard=keyboard)
 
 
 async def _root_keyboard(db, character, peer_id: int) -> str:
@@ -601,7 +601,7 @@ async def ring_list_command(message: Message, match: tuple) -> None:
     rings = sorted({lake.tier for lake in fishing_rules.all_lakes()})
     if ring not in rings:
         await message.answer(
-            "Напиши номер кольца: " + ", ".join(f"/рыба{r}" for r in rings)
+            "Напишите номер кольца: " + ", ".join(f"/рыба{r}" for r in rings)
             + ". Первое - внешнее (1-15 ур.), дальше ближе к Монолиту."
         )
         return

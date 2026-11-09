@@ -39,7 +39,7 @@ async def test_take_rules(db_session, make_character):
     target = await make_character(level=20)
     hunter = await make_character(level=20)
     c = await cs.create(db_session, orderer, target.name, 5, 100, now=NOW)
-    with pytest.raises(cs.ContractError, match="на тебя"):
+    with pytest.raises(cs.ContractError, match="на вас"):
         await cs.take(db_session, target, c.id, now=NOW)
     with pytest.raises(cs.ContractError, match="Свой"):
         await cs.take(db_session, orderer, c.id, now=NOW)

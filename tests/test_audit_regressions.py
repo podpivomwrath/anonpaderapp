@@ -240,4 +240,4 @@ async def test_group_victory_raises_fallen_member(monkeypatch, db_session, make_
     monkeypatch.setattr(gc.ash_service, "roll_appears", lambda rng: False)
     await gc.on_group_battle_finished(battle_id, SimpleNamespace())
     assert not death_service.is_dead(b)
-    assert any(m["peer_id"] == 602 and "подняла тебя" in m["message"] for m in sent)
+    assert any(m["peer_id"] == 602 and "подняла вас" in m["message"] for m in sent)

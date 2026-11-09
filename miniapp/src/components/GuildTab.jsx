@@ -176,10 +176,10 @@ function NoGuild({ state, run, busy }) {
           {state.invites.map((inv) => (
             <SimpleCell
               key={`${inv.guild_id}:${inv.kind}`}
-              subtitle={inv.kind === 'invite' ? `${inv.level} ур. · зовут тебя` : 'Твоя заявка ждёт ответа'}
+              subtitle={inv.kind === 'invite' ? `${inv.level} ур. · зовут вас` : 'Ваша заявка ждёт ответа'}
               after={inv.kind === 'invite' && (
                 <span className="guild-confirm">
-                  <Button size="s" disabled={busy} onClick={() => run('accept_invite', { guild_id: inv.guild_id }, 'Ты в гильдии!')}>Вступить</Button>
+                  <Button size="s" disabled={busy} onClick={() => run('accept_invite', { guild_id: inv.guild_id }, 'Вы в гильдии!')}>Вступить</Button>
                   <Button size="s" mode="tertiary" disabled={busy} onClick={() => run('decline_invite', { guild_id: inv.guild_id })}>✕</Button>
                 </span>
               )}
@@ -193,7 +193,7 @@ function NoGuild({ state, run, busy }) {
       <Group header={<Header>Основать гильдию</Header>}>
         <Div className="guild-form">
           <p className="craft-hint">
-            Стоит 💎 {state.found_cost} самоцветов, с {state.found_min_level} уровня. У тебя 💎 {money(state.gems)}.
+            Стоит 💎 {state.found_cost} самоцветов, с {state.found_min_level} уровня. У вас 💎 {money(state.gems)}.
           </p>
           <input className="guild-input" placeholder="Название" maxLength={24} value={name} onChange={(e) => setName(e.target.value)} />
           <input className="guild-input" placeholder="Тег (2-4 знака)" maxLength={4} value={tag} onChange={(e) => setTag(e.target.value.toUpperCase())} />
@@ -240,7 +240,7 @@ function Overview({ state, run, busy }) {
           <div className="guild-hero__text">
             <b className="guild-hero__name">{guild.name}</b>
             <small className="guild-hero__sub">
-              {guild.level} уровень · ты - {me.rank_title.toLowerCase()}
+              {guild.level} уровень · вы - {me.rank_title.toLowerCase()}
               {guild.season_wins ? ` · побед в сезонах: ${guild.season_wins}` : ''}
             </small>
             <span className="guild-hero__fame">
@@ -252,7 +252,7 @@ function Overview({ state, run, busy }) {
         <div className="tile-grid guild-tiles">
           <div className="tile"><span className="tile__icon">👥</span><b className="tile__value">{guild.members}/{guild.cap}</b><small className="tile__label">участников</small></div>
           <div className="tile"><span className="tile__icon">💰</span><b className="tile__value">{money(guild.treasury_gold)}</b><small className="tile__label">казна · 💎 {money(guild.treasury_gems)}</small></div>
-          <div className="tile"><span className="tile__icon">⭐</span><b className="tile__value">{money(me.contribution_week)}</b><small className="tile__label">твой вклад</small></div>
+          <div className="tile"><span className="tile__icon">⭐</span><b className="tile__value">{money(me.contribution_week)}</b><small className="tile__label">ваш вклад</small></div>
           {state.season.place && (
             <div className="tile"><span className="tile__icon">👑</span><b className="tile__value">{state.season.place}</b><small className="tile__label">место в сезоне</small></div>
           )}
@@ -323,7 +323,7 @@ function Overview({ state, run, busy }) {
               </p>
               <Bar value={boss.hp} max={boss.max_hp} tone="red" />
               <p className="craft-hint">
-                {boss.court ? 'Бить - в чате, из любого города: напиши «/страж».' : 'Бить - в чате, на клетке цитадели или из любого города: напиши «/страж».'}
+                {boss.court ? 'Бить - в чате, из любого города: напишите «/страж».' : 'Бить - в чате, на клетке цитадели или из любого города: напишите «/страж».'}
               </p>
             </>
           ) : (
@@ -386,7 +386,7 @@ function Overview({ state, run, busy }) {
       <Div className="guild-danger">
         {perms.leader
           ? <Confirm onConfirm={() => run('disband', {}, 'Гильдия распущена.')} disabled={busy}>Распустить гильдию</Confirm>
-          : <Confirm onConfirm={() => run('leave', {}, 'Ты покинул гильдию.')} disabled={busy}>Покинуть гильдию</Confirm>}
+          : <Confirm onConfirm={() => run('leave', {}, 'Вы покинули гильдию.')} disabled={busy}>Покинуть гильдию</Confirm>}
       </Div>
     </>
   );
@@ -443,7 +443,7 @@ function Members({ state, run, busy }) {
               </span>
               <span className="member-card__week">
                 <b>{money(m.week)}</b>
-                <small>{m.id === me.id ? 'ты' : 'за неделю'}</small>
+                <small>{m.id === me.id ? 'вы' : 'за неделю'}</small>
               </span>
             </button>
             {open === m.id && m.id !== me.id && (m.controls?.ranks.length > 0 || m.controls?.kick || me.perms.leader) && (
@@ -513,7 +513,7 @@ function Quests({ state }) {
         <div className="card-list">{quests.dailies.map((q) => <QuestRow key={q.metric} q={q} />)}</div>
       </Group>
       <Group header={<Header>Общие - на неделю</Header>}>
-        <div className="card-list">{quests.weekly.map((q) => <QuestRow key={q.metric} q={q} extra={`твой вклад ${money(q.mine)}`} />)}</div>
+        <div className="card-list">{quests.weekly.map((q) => <QuestRow key={q.metric} q={q} extra={`ваш вклад ${money(q.mine)}`} />)}</div>
       </Group>
     </>
   );
@@ -627,7 +627,7 @@ function Treasury({ state, run, busy }) {
         <Group header={<Header>Внести в казну</Header>}>
           <Div>
             <p className="craft-hint">
-              У тебя: 💰 {money(me.gold)} · 💎 {money(me.gems)}. Взнос - от {state.config.deposit_min_gold} золота
+              У вас: 💰 {money(me.gold)} · 💎 {money(me.gems)}. Взнос - от {state.config.deposit_min_gold} золота
               или от {state.config.deposit_min_gems} самоцветов, виден в журнале.
             </p>
             <div className="guild-row">
@@ -641,14 +641,14 @@ function Treasury({ state, run, busy }) {
           </Div>
         </Group>
         <Group header={<Header>Сдать руду</Header>}>
-          {warehouse.my_ore.length === 0 && <Div style={{ opacity: 0.8 }}>У тебя нет руды.</Div>}
+          {warehouse.my_ore.length === 0 && <Div style={{ opacity: 0.8 }}>У вас нет руды.</Div>}
           {groupOre(warehouse.my_ore).map((g) => (
             <Folder key={g.id} title={g.title} count={g.total}>
               {g.rows.map((o) => {
                 const key = `my:${o.ore_id}:${o.grade}`;
                 const count = amount(key, o.count);
                 return (
-                  <SimpleCell key={key} subtitle={`у тебя ${o.count}`} after={(
+                  <SimpleCell key={key} subtitle={`у вас ${o.count}`} after={(
                     <span className="guild-row guild-row--tight">
                       <NumberInput value={count} onChange={(v) => setAmount(key, v)} placeholder="шт" />
                       <Button size="s" disabled={busy || !Number(count)}
@@ -665,7 +665,7 @@ function Treasury({ state, run, busy }) {
           ))}
         </Group>
         <Group header={<Header>Сдать припасы</Header>}>
-          {(warehouse.my_goods || []).length === 0 && <Div style={{ opacity: 0.8 }}>Трав, рыбы, еды, зелий и рун в сумке у тебя нет.</Div>}
+          {(warehouse.my_goods || []).length === 0 && <Div style={{ opacity: 0.8 }}>Трав, рыбы, еды, зелий и рун в сумке у вас нет.</Div>}
           {groupGoods(warehouse.my_goods || []).map((g) => (
             <Folder key={g.id} title={g.title} count={g.rows.length}>
               {g.rows.map((o) => {
@@ -826,7 +826,7 @@ function Here({ state, run, busy }) {
   const { here, me } = state;
   if (!here || here.x == null) return null;
   return (
-    <Group header={<Header>📍 Ты на ({here.x}; {here.y})</Header>}>
+    <Group header={<Header>📍 Вы на ({here.x}; {here.y})</Header>}>
       <Div className="guild-form">
         {here.banner && (here.banner.reason ? (
           <p className="craft-hint">{here.banner.reason}</p>
@@ -848,7 +848,7 @@ function Here({ state, run, busy }) {
           </>
         ))}
         {here.owner && (
-          <p className="guild-line">🏰 Земля [{here.owner.tag}] {here.owner.name}{here.owner.own ? ' - твоя гильдия' : ''}</p>
+          <p className="guild-line">🏰 Земля [{here.owner.tag}] {here.owner.name}{here.owner.own ? ' - ваша гильдия' : ''}</p>
         )}
         {here.siege && here.siege.peaceful && (
           <p className="craft-hint">🕊 Мирное кольцо - эту землю не осаждают.</p>
@@ -876,7 +876,7 @@ function Here({ state, run, busy }) {
           <p className="guild-line">🌀 Врата ведут:</p>
           {state.gates.map((g) => (
             <Button key={g.cell_id} size="s" mode="secondary" disabled={busy}
-              onClick={() => run('gates', { cell_id: g.cell_id }, 'Ты прошёл через врата.')}>
+              onClick={() => run('gates', { cell_id: g.cell_id }, 'Вы прошли через врата.')}>
               {g.title || `(${g.x}; ${g.y})`}
             </Button>
           ))}
@@ -908,7 +908,7 @@ function Cell({ cell, state, run, busy }) {
           `${cell.base_title} · кольцо ${cell.ring}${cell.peaceful ? ' 🕊 мирная' : ''}`,
           `построек ${cell.used_slots}/${cell.slots}`,
           cell.shield_until && new Date(cell.shield_until) > new Date() ? `🛡 ${timeLeft(cell.shield_until)}` : null,
-          cell.here ? 'ты здесь' : null,
+          cell.here ? 'вы здесь' : null,
         ].filter(Boolean).join(' · ')}>
         {cell.base_tier === 'citadel' ? '🏯' : '🏰'} ({cell.x}; {cell.y}){cell.mine ? ` · ⛏ ${cell.mine}` : ''}
       </SimpleCell>

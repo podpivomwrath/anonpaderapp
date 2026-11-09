@@ -86,7 +86,7 @@ async def declare(db: AsyncSession, actor: Character, cell_id: int) -> GuildSieg
     if cell is None or cell.status != "held":
         raise GuildError("Осаждать можно только чужую базу.")
     if cell.guild_id == guild.id:
-        raise GuildError("Это твоя земля.")
+        raise GuildError("Это ваша земля.")
     if guild_territory_service.is_peaceful(cell.x, cell.y):
         raise GuildError(f"Земля {gc.PEACEFUL_RING_TIER}-го кольца мирная - её не осаждают.")
     now = now_utc()

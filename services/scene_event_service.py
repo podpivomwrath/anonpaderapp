@@ -490,7 +490,7 @@ async def summary_lines(db: AsyncSession, character: Character) -> list[str]:
             if trail_def is not None:
                 lines.append(f"{trail_def.emoji} {trail_def.cold_text}")
         elif (trail.x, trail.y) == (character.pos_x, character.pos_y):
-            lines.append(f"{trail_def.emoji} {trail_def.title}: след обрывается здесь - исследуй.")
+            lines.append(f"{trail_def.emoji} {trail_def.title}: след обрывается здесь - исследуйте.")
         else:
             left = max(1, round((_aware(trail.expires_at) - _now()).total_seconds() / 60))
             direction = story_service.compass_direction(character.pos_x, character.pos_y, trail.x, trail.y)

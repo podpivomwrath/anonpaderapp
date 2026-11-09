@@ -632,7 +632,7 @@ async def group_open_items(message: Message) -> None:
     visible = consumable_limit.visible_stock(combatant, stock, limit_reached)
     text = consumable_limit.items_header(combatant)
     if limit_reached and any(d.category != "heal" for d, _ in stock):
-        text += "\n\nБольше твоё тело не выдержит за один бой - боевые эликсиры недоступны."
+        text += "\n\nБольше ваше тело не выдержит за один бой - боевые эликсиры недоступны."
     # Открытие окна - всегда новым сообщением внизу: иначе правилось бы
     # окно из прошлого боя, давно уехавшее вверх, и нажатие казалось мёртвым.
     page = page_of(message)
@@ -676,7 +676,7 @@ async def group_use_item(message: Message) -> None:
         await message.answer(consumable_limit.HEAL_TAKEN_TEXT, keyboard=battle_kb)
         return
     if elixir.category != "heal" and combatant.combat_elixirs_used >= ec.ELIXIR_PER_BATTLE_LIMIT:
-        await message.answer("Больше твоё тело не выдержит за один бой.", keyboard=battle_kb)
+        await message.answer("Больше ваше тело не выдержит за один бой.", keyboard=battle_kb)
         return
 
     # Метательная склянка (2026-10-23): спросить, пить самому или на группу.
@@ -725,7 +725,7 @@ async def group_use_item(message: Message) -> None:
             await _tell_others(battle, cid, elixir_effects.elixir_seen(p.name, elixir))
     if elixir.category == "scroll":
         await _tell_others(battle, cid, f"{p.name}: {line}")
-    text = f"{line} Твой ход.\n\n{_render_board(_engine.sessions.get(battle_id))}"
+    text = f"{line} Ваш ход.\n\n{_render_board(_engine.sessions.get(battle_id))}"
     await _bot_api.messages.send(
         peer_id=peer_id, message=text, random_id=0,
         keyboard=group_combat_keyboard(p.base_class, combatant.cooldowns, subclass_id=p.subclass_id),
@@ -837,7 +837,7 @@ async def _story_kill(db, battle: GroupBattle) -> dict[int, str]:
         if quest is None or quest.id != battle.story_quest_id:
             continue
         await story_service.mark_ready(db, character, battle.story_quest_id)
-        lines[cid] = f"📜 Цель задания выполнена. {mentor_name(character.region)} ждёт тебя в городе."
+        lines[cid] = f"📜 Цель задания выполнена. {mentor_name(character.region)} ждёт вас в городе."
     return lines
 
 
@@ -927,7 +927,7 @@ async def on_group_battle_finished(session_id: int, result: TickResult) -> None:
             if cid in raised_ids:
                 await _bot_api.messages.send(
                     peer_id=p.peer_id, random_id=0,
-                    message=f"🩸 Ты пал в бою, но группа победила и подняла тебя: "
+                    message=f"🩸 Вы пали в бою, но группа победила и подняла вас: "
                             f"{round(RAISED_HP_PCT * 100)}% здоровья, опыт не потерян.",
                 )
             daily = battle_dailies.get(cid)
@@ -1086,5 +1086,5 @@ async def _send_location_summary(character_id: int, peer_id: int, fallback_keybo
         # Сводка не собралась - кнопки движения всё равно нужны.
         logger.exception("Групповой бой: не удалось отправить сводку локации {}", peer_id)
         await _bot_api.messages.send(
-            peer_id=peer_id, message="Осматриваешься после боя.", random_id=0, keyboard=fallback_keyboard,
+            peer_id=peer_id, message="Осматриваетесь после боя.", random_id=0, keyboard=fallback_keyboard,
         )

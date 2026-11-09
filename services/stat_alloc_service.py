@@ -76,7 +76,7 @@ def render_window(header: str, unspent: int, char_stats: dict[str, int], pending
         suffix = f" (+{add})" if add else ""
         lines.append(f"{emoji} {name}: {value}{suffix}")
     if remaining > 0:
-        lines += ["", "Можно и числом: напиши «сила 10» или «воля 5 ловкость 3»."]
+        lines += ["", "Можно и числом: напишите «сила 10» или «воля 5 ловкость 3»."]
     return "\n".join(lines)
 
 

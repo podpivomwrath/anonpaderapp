@@ -14,7 +14,7 @@ from services.db import get_session_factory
 labeler = BotLabeler()
 labeler.vbml_ignore_case = True
 
-EMPTY_TEXT = "🏪 На рынке у тебя ничего нет. Торговать - в мини-аппе, раздел «Рынок»."
+EMPTY_TEXT = "🏪 На рынке у вас ничего нет. Торговать - в мини-аппе, раздел «Рынок»."
 
 
 @labeler.message(text=["/рынок", "/market"])

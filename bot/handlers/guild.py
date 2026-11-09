@@ -263,7 +263,7 @@ async def guild_command(message: Message) -> None:
         guild = await guild_service.guild_of(db, character)
         if guild is None:
             await info_reply.answer(
-                message, "🏰 Ты не в гильдии. Вступить или основать свою можно в мини-аппе: раздел «Гильдия»."
+                message, "🏰 Вы не в гильдии. Вступить или основать свою можно в мини-аппе: раздел «Гильдия»."
             )
             return
         member = await guild_service.membership(db, character.id)
@@ -274,7 +274,7 @@ async def guild_command(message: Message) -> None:
     lines = [
         f"🏰 [{guild.tag}] {guild.name} - {guild.level} ур.",
         f"Слава: {guild.fame}/{gc.fame_to_next(guild.level)}. Участников: {count}/{gc.member_cap(guild.level)}.",
-        f"Ты - {gc.RANK_TITLES[member.rank].lower()}.",
+        f"Вы - {gc.RANK_TITLES[member.rank].lower()}.",
         f"Земли: клеток {counts['cells']}, рудников {counts['mines']}.",
     ]
     for siege in sieges:
@@ -320,7 +320,7 @@ async def prayer_command(message: Message) -> None:
             await info_reply.answer(message, (
                 f"⛪ Молитва в часовне гильдии: +{round(gc.PRAYER_STAT_BONUS * 100)}% к одной характеристике "
                 f"на {gc.PRAYER_MINUTES} мин., {cost} золота.\n"
-                "Напиши: /часовня сила (или с, 1), ловкость (л, 2), интеллект (и, 3), выносливость (в, 4), воля (о, 5)."
+                "Напишите: /часовня сила (или с, 1), ловкость (л, 2), интеллект (и, 3), выносливость (в, 4), воля (о, 5)."
             ))
             return
         try:
@@ -380,7 +380,7 @@ async def gates_command(message: Message) -> None:
             return
         await db.commit()
         text, attachment, keyboard = await world_handlers.location_summary_parts(db, character, message.peer_id)
-    await message.answer(f"🌀 Врата переносят тебя на ({x}; {y}).\n\n{text}",
+    await message.answer(f"🌀 Врата переносят вас на ({x}; {y}).\n\n{text}",
                          attachment=attachment, keyboard=keyboard)
 
 
@@ -455,7 +455,7 @@ async def boss_attack(message: Message) -> None:
     combatant = guild_boss_service.build_combatant(combat_handlers.MOB_ID, boss_hp, max_hp)
     encounter = encounters.Encounter(
         combatant=combatant,
-        flavor=f"Каменный страж не отвечает на удары. У тебя {gc.BOSS_ATTEMPT_TURNS} ходов, у него {boss_hp}/{max_hp}.",
+        flavor=f"Каменный страж не отвечает на удары. У вас {gc.BOSS_ATTEMPT_TURNS} ходов, у него {boss_hp}/{max_hp}.",
     )
     _fighter[peer_id] = character.id
     _known_hp[peer_id] = boss_hp

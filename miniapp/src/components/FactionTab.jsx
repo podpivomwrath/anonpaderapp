@@ -254,7 +254,7 @@ function CartCard({ cart, gold, busy, act, onDispatch }) {
             {cart.durability > 0 ? (
               <Button size="m" disabled={busy} onClick={() => onDispatch(cart)}>Отправить</Button>
             ) : (
-              <span className="craft-hint">Обшивка выбита - почини.</span>
+              <span className="craft-hint">Обшивка выбита - почините.</span>
             )}
             {cart.repair_cost > 0 && (
               <Button size="m" mode="secondary" disabled={busy || gold < cart.repair_cost}
@@ -332,8 +332,8 @@ function Trade({ data, busy, act }) {
           <div className="trade-intro">
             <ItemIcon icon="trade:cart" size={64} />
             <p className="guild-line">
-              Открой фирму, и её повозки будут возить товар между городами сами: закупаешь товар там, где его
-              делают, выбираешь город и путь, а по прибытии повозка продаёт груз. Ты в это время свободен.
+              Откройте фирму, и её повозки будут возить товар между городами сами: закупаете товар там, где его
+              делают, выбираете город и путь, а по прибытии повозка продаёт груз. Вы в это время свободны.
             </p>
           </div>
           {data.level < data.min_level ? (
@@ -353,11 +353,11 @@ function Trade({ data, busy, act }) {
 
   if (!firm.name) {
     return (
-      <Group header={<Header>{firm.migrated ? '🏛 Твоя повозка стала фирмой' : '🏛 Название фирмы'}</Header>}>
+      <Group header={<Header>{firm.migrated ? '🏛 Ваша повозка стала фирмой' : '🏛 Название фирмы'}</Header>}>
         <Div>
           {firm.migrated && (
             <p className="guild-line">
-              Торговля теперь идёт удалённо: повозки ездят сами, а ты отправляешь их из этой вкладки. Улучшения и
+              Торговля теперь идёт удалённо: повозки ездят сами, а вы отправляете их из этой вкладки. Улучшения и
               уровень торговли сохранились, груз возмещён золотом.
             </p>
           )}
@@ -395,7 +395,7 @@ function Trade({ data, busy, act }) {
             </span>
             <UiBar value={firm.today_points} max={firm.daily_cap} tone="blue" thin />
           </div>
-          <p className="craft-hint">У тебя 💰 {money(data.gold)}</p>
+          <p className="craft-hint">У вас 💰 {money(data.gold)}</p>
           <label className="guild-check">
             <input type="checkbox" checked={firm.notify_arrival} disabled={busy}
               onChange={(e) => act('notify', { arrival: e.target.checked })} />
@@ -500,7 +500,7 @@ function CitySummary({ city }) {
         </div>
       ))}
       <p className="craft-hint">
-        Цены без надбавки за твой уровень торговли. Ближний рынок платит ×1,45 к базовой цене товара, дальний
+        Цены без надбавки за ваш уровень торговли. Ближний рынок платит ×1,45 к базовой цене товара, дальний
         ×1,95. Каждый проданный ящик опускает цену на 1,2%, каждый купленный у производителя поднимает (до ±45%);
         со временем цена возвращается.
       </p>
@@ -542,7 +542,7 @@ function Factions({ data }) {
         return (
           <Group key={f.city} className={home ? 'faction-home' : undefined} header={(
             <button type="button" className="city-head" onClick={() => setOpen(open === f.city ? null : f.city)}>
-              <Header>{f.title}{home ? ' · твой город' : ''}</Header>
+              <Header>{f.title}{home ? ' · ваш город' : ''}</Header>
               <span className="city-head__hint">{open === f.city ? 'свернуть ▲' : 'товары и торговцы ▼'}</span>
             </button>
           )}>

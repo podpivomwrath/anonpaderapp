@@ -110,7 +110,7 @@ def location_summary(
     shield_left, shield_why = pvp_shield.left(getattr(character, "id", None))
     # На мирной клетке и так не нападают - строка о щите там лишняя.
     if shield_left and not grid.pvp_forbidden(x, y):
-        monolith_block += f"🛡 Защита {shield_why}: на тебя не нападут ещё {shield_left} сек.\n"
+        monolith_block += f"🛡 Защита {shield_why}: на вас не нападут ещё {shield_left} сек.\n"
     # Патч 58: озеро — как Монолит: кнопка приходит только при ВХОДЕ на
     # клетку, поэтому у воды обязана быть вторая дверь командой словом.
     # Патч 59: рудник — то же, что озеро. Запас руды показывается ДО спуска:

@@ -79,7 +79,7 @@ async def _finish_duel(battle: pvp.Battle, winner_cid: int, loser_cid: int) -> N
         winner_has_mount = await mount_service.has_any_mount(db, winner.id)
         await db.commit()
 
-    win_text = f"🏆 Ты побеждаешь {loser_p.name}!"
+    win_text = f"🏆 Вы побеждаете {loser_p.name}!"
     if no_reward:
         win_text += f"\n\n{NOTHING_TO_TAKE}"
     else:
@@ -103,7 +103,7 @@ async def _finish_duel(battle: pvp.Battle, winner_cid: int, loser_cid: int) -> N
     )
     for c in daily_progress.completed:
         await stats_window.notify_levelup(winner_p.peer_id, c.levels_gained, c.new_level)
-    lose_text = f"☠ Тебя побеждает {winner_p.name}. Ты уходишь во тьму."
+    lose_text = f"☠ Вас побеждает {winner_p.name}. Вы уходите во тьму."
     if pk.victim_lines:
         lose_text += "\n\n" + "\n".join(pk.victim_lines)
     if payout.victim_lines:
@@ -412,7 +412,7 @@ async def on_mass_battle_finished(session_id: int, result: TickResult) -> None:
             # ему же приходило «Ничья. Списки остались нетронутыми»).
             await pvp._bot_api.messages.send(
                 peer_id=participant.peer_id, random_id=0, keyboard=kb.waiting_keyboard(),
-                message="☠ Тебя одолели в бою. Остальные разошлись вничью, но для тебя бой кончился раньше."
+                message="☠ Вас одолели в бою. Остальные разошлись вничью, но для вас бой кончился раньше."
                 + ("\n\n" + "\n".join(pk_lines[cid]) if pk_lines.get(cid) else ""),
             )
         elif result.draw:
@@ -427,7 +427,7 @@ async def on_mass_battle_finished(session_id: int, result: TickResult) -> None:
                 text += f"\n\n{pvp.DRAW_SHIELD_LINE}"
             await pvp._bot_api.messages.send(peer_id=participant.peer_id, random_id=0, keyboard=keyboard, message=text)
         elif cid in survivor_ids:
-            text = "🏆 Бой окончен - твоя сторона побеждает!"
+            text = "🏆 Бой окончен - ваша сторона побеждает!"
             lines = transfer_lines.get(cid, [])
             if lines:
                 text += "\n\n" + "\n".join(lines)
@@ -454,7 +454,7 @@ async def on_mass_battle_finished(session_id: int, result: TickResult) -> None:
         elif cid in dead_ids:
             await pvp._bot_api.messages.send(
                 peer_id=participant.peer_id,
-                message="☠ Тебя одолели в бою. Ты уходишь во тьму."
+                message="☠ Вас одолели в бою. Вы уходите во тьму."
                 + (f"\n\n{pts_lines[cid]}" if pts_lines.get(cid) else "")
                 + ("\n\n" + "\n".join(pk_lines[cid]) if pk_lines.get(cid) else ""),
                 random_id=0, keyboard=kb.waiting_keyboard(),
@@ -470,10 +470,10 @@ def season_result_text(result) -> str:
     from services import title_service
 
     return (
-        f"🏆 Сезон PvP {result.season} окончен: ты на {result.place} месте, "
+        f"🏆 Сезон PvP {result.season} окончен: вы на {result.place} месте, "
         f"{result.pts} PTS за {plural.count(result.fights, 'бой', 'боя', 'боёв')}.\n"
-        f"Титул «{title_service.name_of(result.title_id)}» твой на весь новый сезон, "
-        f"на счёт пришло 💎 {result.gems}. Чтобы оставить титул, войди в пятёрку снова."
+        f"Титул «{title_service.name_of(result.title_id)}» ваш на весь новый сезон, "
+        f"на счёт пришло 💎 {result.gems}. Чтобы оставить титул, войдите в пятёрку снова."
     )
 
 

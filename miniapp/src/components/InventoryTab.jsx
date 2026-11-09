@@ -309,7 +309,7 @@ export function NickTransfer({ command, qty = null, onDone }) {
         <div className="break-confirm">
           <span className="break-confirm__text">
             {preview.courier ? 'Курьер отнесёт' : 'Передать'} {preview.what} игроку {preview.to}?
-            {preview.courier ? ' Он заберёт посылку у тебя и побежит к получателю.' : ''} Это не отменить.
+            {preview.courier ? ' Он заберёт посылку у вас и побежит к получателю.' : ''} Это не отменить.
           </span>
           <button type="button" className="pill-btn pill-btn--main" disabled={busy} onClick={() => run(true)}>
             Да, передать
@@ -819,7 +819,7 @@ export default function InventoryTab({ onOpenTab }) {
       if (data.disassemble) {
         out.push(breaking === data.id ? (
           <span key="break" className="break-confirm">
-            <span className="break-confirm__text">Разобрать «{data.name}» навсегда? Получишь ✨ 1 звёздной пыли.</span>
+            <span className="break-confirm__text">Разобрать «{data.name}» навсегда? Получите ✨ 1 звёздной пыли.</span>
             <button type="button" className="pill-btn pill-btn--danger" onClick={() => handleDisassemble(data)}>
               Да, разобрать
             </button>

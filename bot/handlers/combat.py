@@ -583,7 +583,7 @@ async def on_battle_finished(session_id: int, result: TickResult) -> None:
             if relic_deal is not None:
                 from game.world import relic_dealer
 
-                event_lines.append("💰 Меняла рассыпается в труху. Реликвии при тебе - продать их можно в городе.")
+                event_lines.append("💰 Меняла рассыпается в труху. Реликвии при вас - продать их можно в городе.")
                 from services import relic_dealer_service
 
                 won = await scene_event_service.apply_result(db, character, stats, relic_dealer.win_result(), _rng)
@@ -712,7 +712,7 @@ async def on_battle_finished(session_id: int, result: TickResult) -> None:
             # патч 21, п.1: игрок не в разговоре с наставником — пингуем сами
             await _bot_api.messages.send(
                 peer_id=peer_id,
-                message=f"📜 {mentor_name(character.region)} ждёт тебя в городе.",
+                message=f"📜 {mentor_name(character.region)} ждёт вас в городе.",
                 random_id=0,
             )
 
@@ -855,7 +855,7 @@ async def use_item(message: Message) -> None:
     visible = consumable_limit.visible_stock(player, stock, limit_reached)
     text = consumable_limit.items_header(player)
     if limit_reached and any(d.category != "heal" for d, _ in stock):
-        text += "\n\nБольше твоё тело не выдержит за один бой - боевые эликсиры недоступны."
+        text += "\n\nБольше ваше тело не выдержит за один бой - боевые эликсиры недоступны."
     # Открытие окна - всегда новым сообщением внизу: иначе правилось бы
     # окно из прошлого боя, давно уехавшее вверх, и нажатие казалось мёртвым.
     page = page_of(message)
@@ -891,7 +891,7 @@ async def use_combat_item(message: Message) -> None:
         await message.answer(consumable_limit.HEAL_TAKEN_TEXT, keyboard=_combat_kb(state, peer_id))
         return
     if elixir.category != "heal" and player.combat_elixirs_used >= ec.ELIXIR_PER_BATTLE_LIMIT:
-        await message.answer("Больше твоё тело не выдержит за один бой.", keyboard=_combat_kb(state, peer_id))
+        await message.answer("Больше ваше тело не выдержит за один бой.", keyboard=_combat_kb(state, peer_id))
         return
 
     async with get_session_factory()() as db:
@@ -922,7 +922,7 @@ async def use_combat_item(message: Message) -> None:
         line = elixir_effects.apply_combat_elixir(player, elixir_id, state.combatants)
         player.combat_elixirs_used += 1
     await _bot_api.messages.send(
-        peer_id=peer_id, message=f"{line} Твой ход.\n\n{_render(state)}", random_id=0,
+        peer_id=peer_id, message=f"{line} Ваш ход.\n\n{_render(state)}", random_id=0,
         keyboard=_combat_kb(state, peer_id),
     )
 
@@ -965,7 +965,7 @@ async def _release_encounter(peer_id: int) -> str | None:
             return None
         stopped = await mount_service.stop_travel(db, travel, character, after_ambush=True)
         await db.commit()
-    return f"Поездка прервана - ты остаёшься на ({character.pos_x}; {character.pos_y})." if stopped else None
+    return f"Поездка прервана - вы остаётесь на ({character.pos_x}; {character.pos_y})." if stopped else None
 
 
 async def interrupt_for_pvp(peer_id: int) -> None:
@@ -1000,11 +1000,11 @@ async def flee(message: Message) -> None:
         if is_arena_dummy(peer_id):
             ask = "🏃 Закончить с манекеном? Урон за эти ходы покажу."
         elif peer_id in _world_boss:
-            ask = "🏃 Точно уйти от босса? Нанесённый урон засчитан, но бой для тебя закончится."
+            ask = "🏃 Точно уйти от босса? Нанесённый урон засчитан, но бой для вас закончится."
         else:
             ask = (f"🏃 Точно бежать? Шанс уйти: {round(chance * 100)}%. "
                    f"Не выйдет - ход пропадёт.")
-        ask += "\nНажми «🏃 Побег» ещё раз, чтобы подтвердить."
+        ask += "\nНажмите «🏃 Побег» ещё раз, чтобы подтвердить."
         keyboard = _combat_kb(state, peer_id) if state is not None else None
         await message.answer(ask, keyboard=keyboard)
         return
@@ -1022,16 +1022,16 @@ async def flee(message: Message) -> None:
         await _persist_hp(peer_id, hp)
         await _flee_breaks_streaks(peer_id)
         pos_x, pos_y, has_mount = await _get_position(peer_id)
-        text = "🏃 Ты срываешься прочь - и темнота глотает твой след."
+        text = "🏃 Вы срываетесь прочь - и темнота глотает ваш след."
         if travel_line:
             text += f"\n{travel_line}"
         await message.answer(text, keyboard=movement_keyboard(pos_x, pos_y, peer_id, has_mount=has_mount))
         return
     # Патч 30, баг 2: бой продолжается — без клавиатуры игрок теряет кнопки
     # до того, как declare_action(SKIP) ниже вызовет резолв следующего хода.
-    stronger = " Оно сильнее тебя - от такого не уходят легко." if chance < FLEE_SUCCESS_CHANCE else ""
+    stronger = " Оно сильнее вас - от такого не уходят легко." if chance < FLEE_SUCCESS_CHANCE else ""
     await message.answer(
-        f"🏃 Уйти не вышло - оно снова между тобой и спасением.{stronger}",
+        f"🏃 Уйти не вышло - оно снова между вами и спасением.{stronger}",
         keyboard=_combat_kb(_engine.sessions[peer_id], peer_id),
     )
     try:

@@ -126,7 +126,7 @@ def _scene_text(solo: list[Character], battles: list[tuple[int, pvp.Battle]], ta
                 busy: dict[int, str] | None = None) -> str:
     if not solo and not battles:
         return ALONE_ON_CELL
-    lines = ["👁 Ты оглядываешься.", "", "Здесь есть кто-то ещё:"]
+    lines = ["👁 Вы оглядываетесь.", "", "Здесь есть кто-то ещё:"]
     idx = 1
     for c in solo:
         lines.append(f"{idx}. {_class_line(c, tags)}{(busy or {}).get(c.id, '')}")
@@ -201,7 +201,7 @@ async def _resolve_target(db, character: Character, target: str, peer_id: int | 
     return None, None
 
 
-GROUPMATE_NO_PVP_TEXT = "Это твой согруппник - на своих не нападают."
+GROUPMATE_NO_PVP_TEXT = "Это ваш согруппник - на своих не нападают."
 
 
 async def _same_group(db, character, other_id: int) -> bool:
@@ -216,10 +216,10 @@ async def _same_group(db, character, other_id: int) -> bool:
 #: Открытого PvP между согильдийцами нет (2026-10-31, владелец: набивка PTS
 #: на своих). Подраться со своими - только на арене таверны.
 GUILDMATE_NO_PVP_TEXT = (
-    "Это твой согильдиец, нынешний или ушедший меньше двух суток назад. "
+    "Это ваш согильдиец, нынешний или ушедший меньше двух суток назад. "
     "Со своими дерутся только на арене в таверне."
 )
-GUILDMATE_IN_GROUP_TEXT = "В группе, на которую нападаешь, твой согильдиец. Со своими дерутся только на арене в таверне."
+GUILDMATE_IN_GROUP_TEXT = "В группе, на которую нападаете, ваш согильдиец. Со своими дерутся только на арене в таверне."
 GUILDMATES_BOTH_SIDES_TEXT = "Согильдийцы бьются на обеих сторонах - вступить можно только против своих, а это нельзя."
 
 
