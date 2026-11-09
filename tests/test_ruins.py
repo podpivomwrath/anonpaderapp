@@ -449,6 +449,39 @@ async def test_room_win_counts_for_dailies(db_session, make_character, monkeypat
     assert row.progress == 1
 
 
+async def test_ruins_relics_count_for_collect_dailies(db_session, make_character, monkeypatch) -> None:
+    """2026-11-09: реликвии из комнат руин не шли в ежедневку на сбор реликвий.
+    Засчитываются при выпадении в мешок - и после боя, и в особой комнате."""
+    from contextlib import asynccontextmanager
+
+    import sqlalchemy
+
+    from bot.handlers import ruins as handler
+    from models import CharacterDaily
+    from services import daily_service
+
+    hero = await make_character(level=60)
+    db_session.add(CharacterDaily(character_id=hero.id, quest_id="collector", progress=0, completed=False,
+                                  date=daily_service.today_msk(), target=100))
+    await db_session.flush()
+
+    @asynccontextmanager
+    async def _same():
+        yield db_session
+
+    async def _no_commit():
+        await db_session.flush()
+
+    monkeypatch.setattr(handler, "get_session_factory", lambda: _same)
+    monkeypatch.setattr(db_session, "commit", _no_commit)
+    await handler._record_dailies({hero.id: 500}, {hero.id: 1000}, floor=1, drops={hero.id: {"ash_dust": 3}})
+    await handler._record_trophy_dailies({hero.id: {"ash_dust": 2}})
+    row = (await db_session.execute(
+        sqlalchemy.select(CharacterDaily).where(CharacterDaily.character_id == hero.id)
+    )).scalar_one()
+    assert row.progress == 5
+
+
 async def test_solo_room_fight_has_no_turn_timer(monkeypatch) -> None:
     """2026-11-06, владелец: в соло бой руин ждёт игрока без таймера хода, как
     бой с тварью. В группе таймер остаётся. Руины не держат выкатку."""

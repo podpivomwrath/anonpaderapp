@@ -623,7 +623,7 @@ async def on_room_won(session_id: int, battle) -> None:
         await db.commit()
         run_id = run.id
         floor = run.floor
-    dailies = await _record_dailies(hp, top, floor)
+    dailies = await _record_dailies(hp, top, floor, {cid: got.get("trophies") or {} for cid, got in found.items()})
     heads = {}
     for cid, got in found.items():
         lines = [texts.BOSS_DOWN] if boss else []
@@ -637,13 +637,41 @@ async def on_room_won(session_id: int, battle) -> None:
     await _send_dailies(dailies)
 
 
-async def _record_dailies(hp: dict[int, int], top: dict[int, int], floor: int) -> dict[int, object]:
+def _merge_daily(a, b):
+    """Два итога ежедневок одного игрока - в один уведомлением."""
+    if a is None:
+        return b
+    a.completed = list(a.completed) + list(b.completed)
+    notes = [n for n in (a.streak_notice, b.streak_notice) if n]
+    a.streak_notice = "\n".join(notes) or None
+    return a
+
+
+async def _relic_progress(db, character: Character, drop: dict[str, int]):
+    """Реликвии в мешок - в ежедневки на сбор реликвий и в испытания класса
+    («Соберите 10 Кровяных осколков»), как с мобов в мире (2026-11-09)."""
+    from bot import trial_tracking
+    from services import daily_service, trial_service
+
+    result = await daily_service.record_trophies(db, character, drop)
+    opened = await trial_service.record_trophies(db, character, drop)
+    if opened:
+        result = _merge_daily(result, daily_service.DailyProgressResult(
+            streak_notice=trial_tracking.opened_text(opened)))
+    return result
+
+
+async def _record_dailies(hp: dict[int, int], top: dict[int, int], floor: int,
+                          drops: dict[int, dict] | None = None) -> dict[int, object]:
     """Победа в комнате - выигранный бой для ежедневок, как групповой бой с
     мобами клетки (2026-11-06, репорт 323: «мобы своего уровня» не шли). Своя
-    сессия - уже после коммита забега, блокировку забега не держим."""
+    сессия - уже после коммита забега, блокировку забега не держим.
+    Реликвии в мешок идут в задания на сбор реликвий сразу при выпадении, как
+    с мобов в мире (2026-11-09: не засчитывались)."""
     from game.combat.battle_report import BattleReport
     from services import daily_service
 
+    drops = drops or {}
     out: dict[int, object] = {}
     try:
         async with get_session_factory()() as db:
@@ -656,6 +684,8 @@ async def _record_dailies(hp: dict[int, int], top: dict[int, int], floor: int) -
                 report = BattleReport(won=True, mob_level=rc.mob_level(floor), max_hp=top.get(cid, 0),
                                       hp_min_pct=1.0, only_skills=False, only_basic_attack=False)
                 out[cid] = await daily_service.record_battle(db, character, report)
+                if drops.get(cid):
+                    out[cid] = _merge_daily(out[cid], await _relic_progress(db, character, drops[cid]))
             await db.commit()
     except Exception:
         logger.exception("Руины: ежедневки после комнаты не записаны")
@@ -755,8 +785,25 @@ async def room_choice(message: Message) -> None:
             got = texts.trophies_line(drop) if drop else ""
             heads[cid] = "\n".join(x for x in (head, f"🎒 В мешок: {got}" if got else "") if x) or None
         await _broadcast_view(run_id, heads)
+        await _send_dailies(await _record_trophy_dailies(result["loot"]))
         return
     await _broadcast_view(run_id, head)
+
+
+async def _record_trophy_dailies(drops: dict[int, dict]) -> dict[int, object]:
+    """Реликвии из особой комнаты - в задания на сбор реликвий."""
+    out: dict[int, object] = {}
+    try:
+        async with get_session_factory()() as db:
+            for cid, drop in drops.items():
+                character = await db.get(Character, cid) if drop else None
+                if character is not None:
+                    out[cid] = await _relic_progress(db, character, drop)
+            await db.commit()
+    except Exception:
+        logger.exception("Руины: реликвии комнаты не записаны в ежедневки")
+        return {}
+    return out
 
 
 @labeler.message(payload_contains={"type": "ruins_gift"})
