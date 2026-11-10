@@ -13,7 +13,7 @@ from game.combat import balance_config as bc
 from game.content_loader import BuffDef
 from game.economy import premium_config as pc
 from models import Character, CharacterBuffPreset
-from services import premium_service, subclass_service, trial_service
+from services import premium_service, subclass_service
 from services.wallet_service import charge
 
 
@@ -75,12 +75,13 @@ def preset_subclass(preset: CharacterBuffPreset) -> str | None:
 
 
 def belongs(preset: CharacterBuffPreset, subclass: str | None) -> bool:
-    owner = preset_subclass(preset)
-    return subclass is not None and (owner is None or owner == subclass)
+    """С рунами-навыками (2026-11-10) пресет - раскладка рун, общая для
+    персонажа: у любого пути, и до выбора подкласса тоже."""
+    return True
 
 
 async def presets_of(db: AsyncSession, character: Character) -> list[CharacterBuffPreset]:
-    """Пресеты текущего подкласса, по порядку создания."""
+    """Пресеты персонажа (раскладки рун), по порядку создания."""
     rows = (
         await db.scalars(
             select(CharacterBuffPreset)
@@ -129,8 +130,8 @@ async def save_preset(
     """Создание нового пресета - платно, изменение состава уже созданного -
     бесплатно (2026-10-16).
     Новый пресет нельзя создать сверх купленных слотов (патч 14, ч.3)."""
-    unlocked = await trial_service.unlocked_buff_ids(db, character.id)
-    validate_preset(buff_ids, subclass_service.buff_pool(character), catalog, unlocked)
+    # Руны-навыки (2026-11-10): микробаффов нет, пресет - имя и раскладка рун.
+    buff_ids = []
 
     if preset_id is None:
         # Слоты - на подкласс: пресеты прежних подклассов места не занимают.
@@ -155,6 +156,10 @@ async def save_preset(
         preset = CharacterBuffPreset(
             character_id=character.id, name=name, buff_ids=buff_ids
         )
+        # Новый пресет сразу запоминает руны, что стоят сейчас.
+        from services import rune_service
+
+        preset.runes = await rune_service.layout(db, character)
         db.add(preset)
     await db.flush()
     return preset

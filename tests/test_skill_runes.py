@@ -300,3 +300,11 @@ def test_ability_runes_drop_with_their_share() -> None:
     kinds = [rc.BY_ID[rune_service.roll_rune(rng)].kind for _ in range(3000)]
     share = kinds.count(rc.ABILITY) / len(kinds)
     assert 0.15 < share < 0.25
+
+
+async def test_starter_runes_are_given_once_and_equipped(db_session, make_character) -> None:
+    character = await make_character(base_class="mage")
+    given = await rune_service.grant_starter(db_session, character)
+    assert given == list(skill_catalog.STARTER_SKILLS["mage"])
+    assert skill_catalog.skill_ids_of(character.rune_effects) == given
+    assert await rune_service.grant_starter(db_session, character) == []

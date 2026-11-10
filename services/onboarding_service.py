@@ -202,6 +202,10 @@ async def apply_class(db: AsyncSession, character: Character, base_class: str) -
     stats.intellect = start["INT"]
     stats.vitality = start["VIT"]
     stats.will = start["WIL"]
+    # Руны-навыки (2026-11-10): три стартовые руны класса сразу в слотах.
+    from services import rune_service
+
+    await rune_service.grant_starter(db, character)
     await set_state(db, character, STATE_REGION_SELECT)
 
 

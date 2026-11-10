@@ -104,9 +104,32 @@ async def _apply_delta(
     row.progress = min(row.progress + delta, target)
     if row.progress >= target:
         row.completed = True
-        await _unlock_buff(db, character_id, trial.buff_id)
+        # Руны-навыки (2026-11-10): микробаффов больше нет - испытание даёт
+        # руну навыка, в ступенях которого живёт этот бафф, или огранку.
+        from services import rune_service
+
+        await rune_service.grant(db, character_id, reward_rune(trial.buff_id), 1, reason="trial")
         return trial.buff_id
     return None
+
+
+#: Огранка за испытание, чей бафф не живёт ни в одной ступени навыка.
+_FACET_BY_CATEGORY = {"damage": "press", "defense": "prop", "control_utility": "grip", "group_support": "prop"}
+
+
+def reward_rune(buff_id: str) -> str:
+    """Руна за испытание: руна-навык, в ступенях которого есть ключи этого
+    микробаффа, иначе огранка по категории баффа."""
+    from game.content_loader import load_content
+    from game.economy import ability_config
+
+    buff = load_content().buffs.get(buff_id)
+    keys = set(buff.stat_modifiers) if buff else set()
+    for ability in ability_config.ABILITIES:
+        steps = [ability.one, ability.two, *ability.fork, ability.four]
+        if keys and any(keys & set(step.mods) for step in steps):
+            return ability.id
+    return _FACET_BY_CATEGORY.get(buff.category if buff else "", "press")
 
 
 async def _reset(db: AsyncSession, character_id: int, trial: ClassTrialDef) -> None:
@@ -289,8 +312,12 @@ EVENT_CHOICE_CODES = {
 
 
 def opened_line(buff_id: str) -> str:
-    """Строка игроку: испытание пройдено, бафф открыт. Одна на всю игру."""
-    return f"📖 Испытание пройдено. Открыт бафф: {buff_name(buff_id)}."
+    """Строка игроку: испытание пройдено, руна в сумке. Одна на всю игру."""
+    from game.economy import runes_config as rc
+
+    rune = rc.BY_ID.get(reward_rune(buff_id))
+    what = f"{rc.KIND_ONE[rune.kind].lower()} «{rune.name}»" if rune else "руна"
+    return f"📖 Испытание пройдено: {what} уже в сумке."
 
 
 def opened_text(buff_ids) -> str:

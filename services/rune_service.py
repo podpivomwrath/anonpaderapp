@@ -278,6 +278,29 @@ async def apply_layout(db: AsyncSession, character: Character, saved: list) -> i
     return missing
 
 
+async def grant_starter(db: AsyncSession, character: Character) -> list[str]:
+    """Три стартовые руны-навыка класса от Хранителя Списков (2026-11-10):
+    выдаются и сразу встают в пустые слоты навыков - без условия «дома»,
+    это выбор класса, а не перестановка. Обычные руны: их можно продать и
+    передать (твины запрещены, абуза нет - владелец). Возвращает id навыков."""
+    from game.combat import skill_catalog
+
+    starter = skill_catalog.STARTER_SKILLS.get(character.base_class or "", ())
+    if any(r.kind == rc.ABILITY for r in await slots(db, character.id)):
+        return []  # уже выдавали (возврат к выбору класса при создании)
+    free = [str(i) for i in range(rc.ABILITY_SLOTS)]
+    given = []
+    for sid in starter:
+        await grant(db, character.id, sid, 1, reason="starter")
+        if free:
+            await take(db, character.id, sid, 1)
+            db.add(CharacterRuneSlot(character_id=character.id, kind=rc.ABILITY, slot=free.pop(0), rune_id=sid))
+        given.append(sid)
+    await db.flush()
+    await recompute(db, character)
+    return given
+
+
 async def buy_hero_slot(db: AsyncSession, character: Character) -> int:
     price = runes.hero_slot_price(character.rune_hero_slots)
     if price is None:
