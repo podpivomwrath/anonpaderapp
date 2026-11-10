@@ -42,7 +42,9 @@ def marked_strike(ctx: SkillContext) -> None:
     ctx.hits.append(compute_hit(actor, target, ctx.rng, skill.name, skill.multiplier, is_ability=True))
 
     # Длительность обновляется до полной, не суммируется (патч 52, баг 1).
-    shared_rules.add_mark(actor, target, bc.SHADOW_BLADE_MARKED_STRIKE_STACKS)
+    # Пробуждение руны-навыка (2026-11-10): заряд сверху.
+    extra = round(actor.buff_modifiers.get("marked_strike_stacks", 0.0))
+    shared_rules.add_mark(actor, target, bc.SHADOW_BLADE_MARKED_STRIKE_STACKS + extra)
     ctx.lines.append(f"{target.name} помечен добычей ({actor.name}) 🎯")
 
 
@@ -70,7 +72,11 @@ def mark_harvest(ctx: SkillContext) -> None:
                     crit_multiplier=crit_multiplier)
     )
     if mark is not None:
-        target.effects.remove(mark)
+        # Ступень руны-навыка «тратит только половину зарядов» (2026-11-10).
+        if actor.buff_modifiers.get("harvest_keep_half", 0.0) > 0 and mark.stacks >= 2:
+            mark.stacks //= 2
+        else:
+            target.effects.remove(mark)
 
 
 @offensive_skill("shadow_blade_execute")
@@ -82,7 +88,9 @@ def execute(ctx: SkillContext) -> None:
     target = ctx.resolve_target()
     if target is None:
         return
-    low_hp = target.current_hp < target.max_hp * bc.SHADOW_BLADE_EXECUTE_HP_THRESHOLD
+    # Ступень руны-навыка (2026-11-10): порог добивания выше.
+    threshold = max(bc.SHADOW_BLADE_EXECUTE_HP_THRESHOLD, actor.buff_modifiers.get("execute_threshold", 0.0))
+    low_hp = target.current_hp < target.max_hp * threshold
     hit = compute_hit(actor, target, ctx.rng, skill.name, skill.multiplier, force_crit=True, is_ability=True)
     if low_hp:
         hit.amount = round(hit.amount * bc.SHADOW_BLADE_EXECUTE_LOW_HP_MULT)

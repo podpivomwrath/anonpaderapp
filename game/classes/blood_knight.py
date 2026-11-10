@@ -52,8 +52,10 @@ def _lifesteal_heal(ctx: SkillContext, hit, ratio: float) -> None:
     самому раненому живому союзнику (нет-оп в бою 1×1 — союзников не бывает)."""
     actor = ctx.actor
     target = ctx.session.combatants.get(hit.target_id)
-    if target is not None and target.effect_from(EffectKind.BLOOD_SEAL, actor.id) is not None:
-        ratio *= bc.BLOOD_KNIGHT_BLOOD_SEAL_MULT
+    seal = target.effect_from(EffectKind.BLOOD_SEAL, actor.id) if target is not None else None
+    if seal is not None:
+        # Сила печати - в самом эффекте: ступень руны-навыка её поднимает (2026-11-10).
+        ratio *= max(seal.value, bc.BLOOD_KNIGHT_BLOOD_SEAL_MULT)
     if hit.crit:
         ratio += actor.buff_modifiers.get("crit_lifesteal_bonus", 0.0)
     if actor.current_hp < actor.max_hp * 0.5:
@@ -112,6 +114,9 @@ def harvest(ctx: SkillContext) -> None:
     threshold = max(bc.BLOOD_KNIGHT_HARVEST_HP_THRESHOLD, actor.buff_modifiers.get("harvest_hp_threshold", 0.0))
     if actor.current_hp < actor.max_hp * threshold:
         _lifesteal_heal(ctx, hit, skill.effect_value)
+    elif actor.buff_modifiers.get("harvest_floor_ratio", 0.0) > 0:
+        # Ступень руны-навыка (2026-11-10): выше порога Жатва тоже лечит, слабее.
+        _lifesteal_heal(ctx, hit, actor.buff_modifiers["harvest_floor_ratio"])
 
 
 @offensive_skill("blood_knight_blood_seal")
@@ -125,7 +130,8 @@ def blood_seal(ctx: SkillContext) -> None:
     if target is None:
         return
     ctx.hits.append(compute_hit(actor, target, ctx.rng, skill.name, skill.multiplier, is_ability=True))
-    target.apply_effect(EffectKind.BLOOD_SEAL, 1.0, skill.effect_duration, actor.id)
+    target.apply_effect(EffectKind.BLOOD_SEAL, bc.BLOOD_KNIGHT_BLOOD_SEAL_MULT + skill.effect_value,
+                        skill.effect_duration, actor.id)
     ctx.lines.append(f"{target.name} отмечен Кровавой печатью 🩸")
 
 

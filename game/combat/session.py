@@ -482,6 +482,10 @@ class CombatSessionState:
     mode: CombatMode
     combatants: dict[int, CombatantState] = field(default_factory=dict)
     tick_number: int = 0
+    #: Действия этого хода {id бойца: DeclaredAction} - на время разрешения
+    #: хода (2026-11-10): «Немота» и «Дурманящий дротик» с пробуждением
+    #: отправляют сорванный навык цели на перезарядку.
+    turn_actions: dict = field(default_factory=dict)
     is_raid: bool = False  # влияет на точность % в логе (п.11)
     #: своё окно хода вместо общего (финал Мельника: жернова ускоряются)
     turn_seconds: float | None = None

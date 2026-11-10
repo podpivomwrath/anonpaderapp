@@ -23,6 +23,7 @@ from game.combat import combat_flavor, control, display, formulas, shared_rules
 from game.combat.session import (
     BURN_TAG,
     ECHO_TAG,
+    WARD_TAG,
     ActionType,
     CombatantState,
     CombatMode,
@@ -32,6 +33,7 @@ from game.combat.session import (
     shield_name,
 )
 from game.combat.skills import (
+    DEAF_SHIELD_LABEL,
     DEFENSIVE_SKILLS,
     OFFENSIVE_SKILLS,
     PendingHeal,
@@ -437,6 +439,7 @@ def resolve_tick(
     for cid in session.expected_declarers():
         action = actions.get(cid) or DeclaredAction(type=ActionType.SKIP)
         normalized[cid] = _own_skill_or_attack(session.combatants[cid], action)
+    session.turn_actions = normalized
 
     ctx = SkillContext(
         session=session,
@@ -627,6 +630,18 @@ def resolve_tick(
             elif target.kind == "mob" and source.kind == "character":
                 _, taken_mult = formulas.level_diff_modifiers(target.level, source.level, target.field_curve)
                 hit.amount = max(round(hit.amount * taken_mult), 1)
+    # Пробуждение «Дымовой завесы» (2026-11-10): увернувшийся отвечает ударом.
+    for hit in list(ctx.hits):
+        if not hit.missed or hit.reactive or hit.is_dot or hit.label == DEAF_SHIELD_LABEL:
+            continue
+        dodger = session.combatants.get(hit.target_id)
+        attacker = session.combatants.get(hit.source_id)
+        mult = dodger.buff_modifiers.get("dodge_counter_mult", 0.0) if dodger is not None else 0.0
+        if mult > 0 and attacker is not None and attacker.alive and dodger.alive and attacker.side != dodger.side:
+            counter = compute_hit(dodger, attacker, rng, label="отвечает", multiplier=mult, is_ability=True,
+                                  dodge_marks=False)
+            counter.reactive = True
+            ctx.hits.append(counter)
     # Отражение моба - доля урона, который удар нанёс на самом деле (см. PendingHit.reflect_of).
     for hit in ctx.hits:
         if hit.reflect_of is not None:
@@ -782,14 +797,20 @@ def resolve_tick(
         # Щит (Второе сердце, Оберег; патч 16) не пробит за отведённые ходы - остаток лечит
         for effect in combatant.effects_of(EffectKind.SHIELD_POOL):
             if effect.remaining_ticks <= 0 and effect.value > 0 and combatant.alive:
-                if getattr(effect, "tag", None) == ECHO_TAG:
+                tag = getattr(effect, "tag", None) or ""
+                if tag == ECHO_TAG or tag.startswith("step:"):
                     # Щит из перелечивания не лечит снова (2026-10-18): иначе
-                    # лечение -> щит -> лечение ходили по кругу.
+                    # лечение -> щит -> лечение ходили по кругу. Щиты ступеней
+                    # рун-навыков (2026-11-10) - тоже просто сгорают.
                     effect.value = 0
                     continue
                 # Без затухания PvP: щит уже срезан, когда его вешали, второй
                 # срез на остатке - двойной (баг 241, 2026-10-30).
                 heal = round(effect.value)
+                if tag == WARD_TAG:
+                    # Пробуждение Оберега: остаток лечит сильнее.
+                    owner = session.combatants.get(effect.source_id)
+                    heal = round(heal * (1 + (owner.buff_modifiers.get("ward_heal_mult", 0.0) if owner else 0.0)))
                 before_hp = combatant.current_hp
                 combatant.current_hp = min(combatant.current_hp + heal, combatant.max_hp)
                 if combatant.current_hp == before_hp:

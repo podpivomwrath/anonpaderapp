@@ -92,6 +92,11 @@ def _make_handler(skill: BaseSkillDef):
         elif skill.effect == "self_damage_buff":
             actor.apply_effect(EffectKind.DAMAGE_BUFF, value, duration, actor.id)
             ctx.lines.append(combat_flavor.self_buff_line(actor.name, skill.name, "урон", value, duration))
+            # Ступень руны-навыка (2026-11-10): союзники получают долю усиления.
+            share = actor.buff_modifiers.get("warcry_share", 0.0)
+            if share > 0:
+                for ally in ctx.session.alive_allies_of(actor):
+                    ally.apply_effect(EffectKind.DAMAGE_BUFF, value * share, duration, actor.id)
         elif skill.effect == "self_dodge_buff":
             actor.apply_effect(EffectKind.DODGE, value, duration, actor.id)
             ctx.lines.append(combat_flavor.self_buff_line(actor.name, skill.name, "уклонение", value, duration))

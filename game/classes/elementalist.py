@@ -111,7 +111,11 @@ def convergence(ctx: SkillContext) -> None:
     # Две разные стихии с прошлого Схождения, в любом порядке (2026-11-03,
     # отзыв игроков: цепочка огонь-лёд не складывалась, лёд на боссах не
     # проходит) - и прибавка, и крит, без условий на цели.
-    primed = len(set(getattr(actor, "convergence_elements", None) or [])) >= 2
+    # Ступени руны-навыка (2026-11-10): convergence_need 1 - хватает одной
+    # стихии, 2 и больше (пробуждение) - всегда в полную силу.
+    need = actor.buff_modifiers.get("convergence_need", 0.0)
+    seen = len(set(getattr(actor, "convergence_elements", None) or []))
+    primed = need >= 2 or seen >= (1 if need >= 1 else 2)
     actor.convergence_elements = []
     if primed or target.has_burning():
         multiplier *= 1.0 + skill.effect_value

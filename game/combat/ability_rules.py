@@ -179,3 +179,19 @@ def shield_power(actor) -> float:
 def ally_heal_power(actor) -> float:
     """Пассивка Тёмного мистика: лечение и щиты на союзников сильнее."""
     return (getattr(actor, "buff_modifiers", None) or {}).get("ally_heal_power", 0.0)
+
+
+def lock_declared_skill(session, target, lines: list[str], who: str) -> None:
+    """Навык, который цель объявила в этот ход и не смогла применить, уходит
+    на полную перезарядку («Немота», пробуждение «Дурманящего дротика»)."""
+    from game.combat import skill_catalog
+    from game.combat.session import ActionType
+
+    action = (getattr(session, "turn_actions", None) or {}).get(target.id)
+    if action is None or action.type != ActionType.SKILL or not action.skill_id:
+        return
+    skill = skill_catalog.skill_def(action.skill_id)
+    if skill is None:
+        return
+    target.cooldowns[skill.id] = max(target.cooldowns.get(skill.id, 0), skill.cd)
+    lines.append(f"🟣 {who}: «{skill.name}» у {target.name} уходит на перезарядку")

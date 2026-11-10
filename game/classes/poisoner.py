@@ -156,6 +156,8 @@ def disrupt(ctx: SkillContext) -> None:
             if not pvp:
                 ctx.lines.append(combat_flavor.control_resisted_line(target.name, res.reason))
         else:
+            if actor.buff_modifiers.get("disrupt_full_cd", 0.0) > 0:
+                ability_rules.lock_declared_skill(ctx.session, target, ctx.lines, "Дурманящий дротик")
             # Патч 56, «Паралитик»: удачный сбой роняет сопротивление контролю
             # цели на 1 ход (тот же эффект, что «Тепловой шок» Элементалиста).
             paralytic = actor.buff_modifiers.get("paralytic_resist_down", 0.0)
@@ -203,4 +205,9 @@ def toxic_burst(ctx: SkillContext) -> None:
             source_id=actor.id, target_id=target.id, is_dot=True, label="яд вспыхивает напоследок",
             amount=max(round(tick_damage * burst_pct), 1),
         ))
-    target.effects.remove(poison)  # весь яд, как и сказано в описании
+    keep = actor.buff_modifiers.get("burst_keep_low", 0.0)
+    if keep > 0 and target.current_hp < target.max_hp * 0.3 and ctx.rng.random() < keep:
+        # Пробуждение руны-навыка (2026-11-10): по добиваемой цели яд остаётся.
+        ctx.lines.append(f"🟣 Яд на {target.name} не выгорает")
+    else:
+        target.effects.remove(poison)  # весь яд, как и сказано в описании
