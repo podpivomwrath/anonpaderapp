@@ -121,6 +121,7 @@ def _rows(raw: str) -> list[list[dict]]:
         ("инвентарь руды", kb.ore_keyboard()),
         ("кнопка входа", kb.approach_mine_keyboard()),
         ("кнопка жилы", kb.event_vein_keyboard("ore_vein")),
+        ("подтверждение броска кирки", kb.abandon_confirm_keyboard()),
     ],
 )
 def test_keyboards_fit_vk_limits(name: str, raw: str) -> None:
@@ -147,6 +148,20 @@ def test_mine_screens_always_have_a_way_out() -> None:
         assert mt.BTN_LEAVE_MINE in labels
     digging = [b["action"]["label"] for row in _rows(kb.digging_keyboard()) for b in row]
     assert mt.BTN_ABANDON in digging
+
+
+def test_abandon_asks_first_and_confirm_has_both_ways() -> None:
+    """2026-11-10, владелец: «Бросить кирку» задевали случайно. Кнопка только
+    спрашивает, бросает - «Да, бросить»; «Копать дальше» возвращает к добыче."""
+    import inspect
+
+    from bot.handlers import mining as handlers
+
+    assert "cancel_dig" not in inspect.getsource(handlers.abandon_ask)
+    assert "cancel_dig" in inspect.getsource(handlers.abandon)
+    labels = [b["action"]["label"] for row in _rows(kb.abandon_confirm_keyboard()) for b in row]
+    assert mt.BTN_ABANDON_YES in labels and mt.BTN_KEEP_DIGGING in labels
+    assert mt.BTN_ABANDON not in labels
 
 
 def test_entry_buttons_are_inline() -> None:

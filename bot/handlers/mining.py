@@ -273,13 +273,47 @@ async def dig(message: Message) -> None:
 
 @labeler.message(text=[mt.BTN_ABANDON])
 @activity_action
+async def abandon_ask(message: Message) -> None:
+    """«Бросить кирку» - сначала спросить (2026-11-10, владелец: мисклики)."""
+    async with get_session_factory()() as db:
+        character = await onboarding_svc.get_character(db, message.from_id)
+        if character is None or character.screen != "mine":
+            return
+    if not mining_service.is_digging(character):
+        await message.answer(mt.NOT_DIGGING_TEXT)
+        return
+    await message.answer(mt.ABANDON_ASK_TEXT, keyboard=kb.abandon_confirm_keyboard())
+
+
+@labeler.message(text=[mt.BTN_KEEP_DIGGING])
+@activity_action
+async def keep_digging(message: Message) -> None:
+    async with get_session_factory()() as db:
+        character = await onboarding_svc.get_character(db, message.from_id)
+        if character is None or character.screen != "mine":
+            return
+        if not mining_service.is_digging(character):
+            mine = mining_service.mine_at(character)
+            left = await mining_service.ore_in_mine(db, mine.id) if mine else 0
+            await message.answer(mt.NOT_DIGGING_TEXT, keyboard=kb.mine_keyboard(left > 0))
+            return
+    await message.answer(
+        mt.dig_progress_text(mining_service.remaining_seconds(character)), keyboard=kb.digging_keyboard(),
+    )
+
+
+@labeler.message(text=[mt.BTN_ABANDON_YES])
+@activity_action
 async def abandon(message: Message) -> None:
     async with get_session_factory()() as db:
         character = await onboarding_svc.get_character(db, message.from_id)
         if character is None or character.screen != "mine":
             return
         if not mining_service.is_digging(character):
-            await message.answer(mt.NOT_DIGGING_TEXT)
+            # Добыча кончилась, пока висело подтверждение - вернуть экран рудника.
+            mine = mining_service.mine_at(character)
+            left = await mining_service.ore_in_mine(db, mine.id) if mine else 0
+            await message.answer(mt.NOT_DIGGING_TEXT, keyboard=kb.mine_keyboard(left > 0))
             return
         await mining_service.cancel_dig(db, character)
         mine = mining_service.mine_at(character)

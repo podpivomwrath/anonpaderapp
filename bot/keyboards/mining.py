@@ -11,8 +11,10 @@ from bot.keyboards.world import add_miniapp_button
 
 from bot.mining_texts import (
     BTN_ABANDON,
+    BTN_ABANDON_YES,
     BTN_DIG,
     BTN_DIG_VEIN,
+    BTN_KEEP_DIGGING,
     BTN_LEAVE_MINE,
     BTN_MINE,
     BTN_ORE,
@@ -45,6 +47,16 @@ def digging_keyboard() -> str:
     """
     kb = Keyboard(one_time=False)
     kb.add(Text(BTN_ABANDON), color=KeyboardButtonColor.NEGATIVE)
+    add_miniapp_button(kb)
+    return kb.get_json()
+
+
+def abandon_confirm_keyboard() -> str:
+    """Подтверждение «Бросить кирку»: случайное нажатие не должно сбрасывать
+    добычу. Добыча при этом идёт дальше - таймер не останавливается."""
+    kb = Keyboard(one_time=False)
+    kb.add(Text(BTN_KEEP_DIGGING), color=KeyboardButtonColor.POSITIVE)
+    kb.add(Text(BTN_ABANDON_YES), color=KeyboardButtonColor.NEGATIVE)
     add_miniapp_button(kb)
     return kb.get_json()
 
