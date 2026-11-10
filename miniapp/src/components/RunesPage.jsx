@@ -35,14 +35,17 @@ const gold = (n) => n.toLocaleString('ru-RU');
 
 export function RuneIcon({ rune, size = 48 }) {
   const url = rune && RUNE_ICONS[rune.id];
+  const rar = rune?.rarity;
   if (!url) {
     // Картинки рун-навыков ещё нет - первая буква названия на камне.
     if (rune?.kind === 'ability') {
-      return <span className={`rune-icon rune-icon--empty rune-icon--letter rune-icon--${rune.rarity}`} style={{ width: size, height: size }}>{rune.name[0]}</span>;
+      const letter = rune.name.slice(0, 1);
+      const cls = `rune-icon rune-icon--empty rune-icon--letter rune-icon--${rar}`;
+      return <span className={cls} style={{ width: size, height: size }}>{letter}</span>;
     }
     return <span className="rune-icon rune-icon--empty" style={{ width: size, height: size }} />;
   }
-  return <img className={`rune-icon rune-icon--${rune.rarity}`} src={url} alt="" width={size} height={size} draggable="false" />;
+  return <img className={`rune-icon rune-icon--${rar}`} src={url} alt="" width={size} height={size} draggable="false" />;
 }
 
 // Под гнездом - подпись места и название вставленной руны (2026-11-06,

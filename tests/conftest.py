@@ -157,3 +157,15 @@ def _any_skill_allowed(request, monkeypatch):
     from game.combat import skill_catalog
 
     monkeypatch.setattr(skill_catalog, "has_skill", lambda mods, skill_id: bool(skill_id))
+
+
+def kb_fighter(*skill_ids: str, cooldowns: dict | None = None):
+    """Боец для тестов клавиатур боя (руны-навыки, 2026-11-10): навыки -
+    вставленные руны. По умолчанию - три стартовые руны воина."""
+    from types import SimpleNamespace
+
+    from game.combat import skill_catalog
+
+    ids = skill_ids or skill_catalog.STARTER_SKILLS["warrior"]
+    return SimpleNamespace(cooldowns=dict(cooldowns or {}),
+                           buff_modifiers={skill_catalog.ability_key(s): i + 1 for i, s in enumerate(ids)})

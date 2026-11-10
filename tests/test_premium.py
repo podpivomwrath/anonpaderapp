@@ -252,7 +252,7 @@ async def test_second_preset_requires_premium_bonus_slot(make_character, db_sess
 
     character.brand_until = datetime.now(timezone.utc) + timedelta(days=1)
     second = await save_preset(db_session, character, "ДД", second_set, catalog)
-    assert second.buff_ids == second_set
+    assert second.name == "ДД"
 
 
 async def test_preset_switch_blocked_when_beyond_effective_slots_after_expiry(make_character, db_session) -> None:

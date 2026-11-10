@@ -32,16 +32,6 @@ def attack(target_id: int) -> DeclaredAction:
 # --- Контент ---
 
 
-def test_all_skills_registered() -> None:
-    from game.combat.skills import OFFENSIVE_SKILLS
-
-    assert set(base_skills.BASE_SKILLS_BY_CLASS) == {"warrior", "rogue", "mage"}
-    for _cls, skills in base_skills.BASE_SKILLS_BY_CLASS.items():
-        assert len(skills) == 3
-        for s in skills:
-            assert s.id in OFFENSIVE_SKILLS
-
-
 # --- Множители урона ---
 
 
@@ -188,7 +178,7 @@ def test_pvp_control_log_names_target_not_creature() -> None:
     a.primary_stat = "int"
     b = combatant(2, side=1, name="Валгар", will=0)  # will=0 — резист/DR не мешают
     state = make_session(a, b)
-    result = resolve_tick(state, {1: skill("mage_ice_bonds", 2)}, rng)
+    result = resolve_tick(state, {1: skill("elementalist_ice", 2)}, rng)
 
     assert "Валгар теряет ход ❄️" in result.lines
     for banned in ("Тварь", "тварь"):
@@ -286,7 +276,7 @@ def test_blood_seal_vulnerability() -> None:
     mage.primary_stat = "int"
     enemy = combatant(2, side=1, vitality=500, will=0)
     state = make_session(mage, enemy)
-    resolve_tick(state, {1: skill("mage_blood_seal", 2)}, rng)
+    resolve_tick(state, {1: skill("poisoner_decay", 2)}, rng)
     assert enemy.has_effect(EffectKind.VULNERABILITY)
 
 

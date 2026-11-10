@@ -38,4 +38,4 @@ def test_guardian_skills_registered() -> None:
     assert "attack" in OFFENSIVE_SKILLS
     for skill in ("guardian_shield_bash", "guardian_block", "guardian_unbreakable"):
         assert skill in DEFENSIVE_SKILLS
-    assert "guardian_stonegrip" in OFFENSIVE_SKILLS
+    assert "warrior_stagger" in OFFENSIVE_SKILLS

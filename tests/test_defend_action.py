@@ -1,5 +1,6 @@
 """«Защититься» (2026-10-19): добровольный пропуск хода за -10% входящего урона."""
 
+from tests.conftest import kb_fighter
 import json
 
 from bot.keyboards import combat_modes
@@ -55,10 +56,10 @@ def _buttons(keyboard_json: str) -> list[dict]:
 
 def test_every_combat_keyboard_has_defend_with_own_payload() -> None:
     keyboards = {
-        combat_modes.SOLO_PVE: combat_keyboard("warrior", {}, "blood_knight"),
-        combat_modes.PVP: pvp_combat_keyboard("warrior", {}, True, "blood_knight"),
-        combat_modes.GROUP_PVE: group_combat_keyboard("warrior", {}, "blood_knight"),
-        combat_modes.RAID: raid_combat_keyboard("warrior", {}, "blood_knight"),
+        combat_modes.SOLO_PVE: combat_keyboard(kb_fighter()),
+        combat_modes.PVP: pvp_combat_keyboard(kb_fighter(), show_target=True),
+        combat_modes.GROUP_PVE: group_combat_keyboard(kb_fighter()),
+        combat_modes.RAID: raid_combat_keyboard(kb_fighter()),
     }
     payloads = set()
     for mode, kb in keyboards.items():

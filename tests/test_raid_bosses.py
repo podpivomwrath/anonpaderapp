@@ -39,7 +39,8 @@ def make_session(*combatants) -> CombatSessionState:
 
 # --- Построение участников ---
 
-
+
+
 
 def _hp(base: int) -> int:
     """Бойцы рейда крепче на RAID_FIGHTER_HP_MULT (2026-10-24)."""
@@ -270,7 +271,7 @@ def test_surgeon_is_never_controlled():
     boss = rb.build_surgeon(id=1)
     assert boss.control_immune_always is True
     player = make_player(2)
-    result = _control_tick(boss, player, "mage_ice_bonds")
+    result = _control_tick(boss, player, "elementalist_ice")
     # FREEZE потребляется в тот же ход (см. game/combat/control.py), поэтому
     # факт наложения проверяем по control_landed_by, а не по остаточному эффекту.
     assert player.id not in result.control_landed_by
@@ -280,7 +281,7 @@ def test_control_attempt_on_surgeon_is_recorded_even_though_it_fails():
     """Окно прерывания живёт именно на этом: попытка засчитана, эффекта нет."""
     boss = rb.build_surgeon(id=1)
     player = make_player(2)
-    result = _control_tick(boss, player, "mage_ice_bonds")
+    result = _control_tick(boss, player, "elementalist_ice")
     assert result.control_attempts_on.get(boss.id) == {player.id}
     assert not result.control_landed_by  # ничего не легло - сбивается навык, не Хирург
 
@@ -290,7 +291,7 @@ def test_ordinary_boss_still_yields_to_control():
     veld = rb.build_veld_mobs(start_id=1)[rc.VELD_OSWALD]
     assert veld.control_immune_always is False
     player = make_player(50)
-    result = _control_tick(veld, player, "mage_ice_bonds")
+    result = _control_tick(veld, player, "elementalist_ice")
     assert result.control_landed_by == {player.id}
 
 
@@ -301,7 +302,7 @@ def test_control_attempts_do_not_leak_between_ticks():
     boss = rb.build_surgeon(id=1)
     player = make_player(2)
     session = make_session(boss, player)
-    attack = {player.id: DeclaredAction(type=ActionType.SKILL, skill_id="mage_ice_bonds", target_id=boss.id)}
+    attack = {player.id: DeclaredAction(type=ActionType.SKILL, skill_id="elementalist_ice", target_id=boss.id)}
     resolver.resolve_tick(session, attack, NoResistRng())
     quiet = resolver.resolve_tick(session, {}, NoResistRng())
     assert boss.id not in quiet.control_attempts_on

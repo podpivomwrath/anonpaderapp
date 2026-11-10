@@ -1,5 +1,6 @@
 """Рейд «Тропа Безымянного» (2026-10-20): лабиринт и бой на арене 3×3."""
 
+from tests.conftest import kb_fighter
 import json
 import random
 from collections import deque
@@ -283,7 +284,7 @@ def test_arena_keyboard_fits_vk() -> None:
     stage.marks = {4}
     battle = SimpleNamespace(participants={1: None, 2: None})
     grid = raid_combat._arena_grid(battle, stage, 1)
-    raw = raid_kb.raid_combat_keyboard("mage", {}, subclass_id="elementalist", grid=grid)
+    raw = raid_kb.raid_combat_keyboard(kb_fighter(), grid=grid)
     rows = _rows(raw)
     assert len(rows) <= 10 and all(len(r) <= 5 for r in rows)
     assert rows[1][1]["color"] == "negative"  # союзник на отпечатке - красным

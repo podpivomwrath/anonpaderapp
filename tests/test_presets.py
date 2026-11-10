@@ -77,20 +77,13 @@ async def test_save_preset_charges_farm(db_session, make_character) -> None:
     preset = await save_preset(db_session, character, "Танк", OK_SET, CATALOG)
     wallet = await get_wallet(db_session, character.id)
     assert wallet.farm_currency == 100  # уровень 2 — платно
-    assert preset.buff_ids == OK_SET
+    assert preset.buff_ids == []  # руны-навыки: пресет - раскладка рун, баффов нет
 
 
 async def test_save_preset_without_gold_fails(db_session, make_character) -> None:
     character = await make_character(farm=0, subclass="guardian")
     await _unlock(db_session, character, *OK_SET)
     with pytest.raises(NotEnoughCurrency):
-        await save_preset(db_session, character, "Танк", OK_SET, CATALOG)
-
-
-async def test_save_preset_rejects_locked_buff(db_session, make_character) -> None:
-    """Патч 12: бафф подкласса нельзя вложить в пресет, пока испытание не пройдено."""
-    character = await make_character(farm=bc.PRESET_CHANGE_COST_FARM + 100, subclass="guardian")
-    with pytest.raises(PresetValidationError):
         await save_preset(db_session, character, "Танк", OK_SET, CATALOG)
 
 
@@ -211,10 +204,10 @@ async def test_reset_subclass_keeps_class_and_stats(db_session, make_character) 
     assert len(left) == 1                                 # пресет сохранён
     from services import preset_service
 
-    character.subclass = "elementalist"                   # чужой подкласс
-    assert await preset_service.presets_of(db_session, character) == []
-    assert await preset_service.resolve_active_modifiers(db_session, character) == {}
-    character.subclass = "guardian"                       # вернулся
+    # Руны-навыки (2026-11-10): пресет - раскладка рун, он общий для любого пути.
+    character.subclass = "elementalist"
+    assert [p.name for p in await preset_service.presets_of(db_session, character)] == ["боевой"]
+    character.subclass = "guardian"
     assert [p.name for p in await preset_service.presets_of(db_session, character)] == ["боевой"]
 
 
@@ -245,5 +238,5 @@ async def test_editing_existing_preset_is_free(db_session, make_character) -> No
     preset = await save_preset(db_session, character, "Танк", OK_SET, CATALOG)
     assert (await get_wallet(db_session, character.id)).farm_currency == 0
     await save_preset(db_session, character, "ДД", second_set, CATALOG, preset_id=preset.id)
-    assert preset.buff_ids == second_set and preset.name == "ДД"
+    assert preset.name == "ДД"
     assert (await get_wallet(db_session, character.id)).farm_currency == 0

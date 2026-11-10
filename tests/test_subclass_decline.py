@@ -27,30 +27,6 @@ def test_every_base_class_has_a_full_pool() -> None:
         assert all(b.implemented for b in pool)
 
 
-async def test_decline_opens_base_pool_behind_trials(db_session, make_character) -> None:
-    character = await make_character(level=30, farm=10_000)
-    assert subclass_service.buff_pool(character) is None
-    subclass_service.decline(character)
-    assert not subclass_service.can_offer(character)
-    assert subclass_service.path_chosen(character)
-    assert subclass_service.buff_pool(character) == "warrior_path"
-
-    # Баффы пути открываются испытаниями, как у подклассов (2026-10-20).
-    states = await trial_service.get_trial_states(db_session, character)
-    assert {s_.trial.buff_id for s_ in states} == {b.id for b in CATALOG.values() if b.subclass == "warrior_path"}
-    with pytest.raises(PresetValidationError):
-        await preset_service.save_preset(db_session, character, "Путь", WARRIOR_SET, CATALOG)
-    for buff_id in WARRIOR_SET:
-        db_session.add(CharacterUnlockedBuff(character_id=character.id, buff_id=buff_id))
-    await db_session.flush()
-    preset = await preset_service.save_preset(db_session, character, "Путь", WARRIOR_SET, CATALOG)
-    await preset_service.switch_active_preset(db_session, character, preset.id)
-    mods = await preset_service.resolve_active_modifiers(db_session, character)
-    assert mods["incoming_damage_reduction"] == pytest.approx(CATALOG["warrior_path_hardened"].stat_modifiers["incoming_damage_reduction"])
-    power = await power_service.power_of(db_session, character)
-    assert power.subclass_bonus > 0 and power.buffs == 3
-
-
 def test_foreign_path_buffs_rejected() -> None:
     opened = set(WARRIOR_SET)
     with pytest.raises(PresetValidationError):

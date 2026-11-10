@@ -297,22 +297,15 @@ async def test_trials_lists_full_pool_with_progress(client, session_factory) -> 
     assert len(data["trials"]) == 14
     bulwark = next(t for t in data["trials"] if t["id"] == "guardian_bulwark")
     assert bulwark["unlocked"] is True
-    assert bulwark["buff_name"] == "Несокрушимость"
+    # Руны-навыки (2026-11-10): испытание даёт руну - здесь руну Глухой обороны,
+    # в ступенях которой живёт Несокрушимость.
+    assert bulwark["reward_id"] == "guardian_block"
+    assert bulwark["reward_name"] == "Глухая оборона"
+    assert bulwark["reward_text"]
     other = next(t for t in data["trials"] if t["id"] == "guardian_command")
     assert other["unlocked"] is False
     assert other["progress"] == 0
     assert other["target"] == 25
-
-    # Патч 48: описание/категория/статус реализации микробаффа.
-    assert bulwark["implemented"] is True
-    assert bulwark["category"] == "Оборона"
-    assert f"{round(bc.GUARDIAN_BULWARK_FULL_BLOCK_CHANCE * 100)}%" in bulwark["description"]
-    # Патч 56: у Стража заглушек не осталось, все 14 реализованы.
-    assert other["implemented"] is True
-    assert other["description"] != ""
-
-
-# --- GET /api/miniapp/inventory + POST /api/miniapp/equip (патч 14, ч.2.1) ---
 
 
 async def _grant_item(session_factory, character_id: int, **overrides) -> int:
@@ -412,43 +405,14 @@ async def _unlock_buffs(session_factory, character_id: int, *buff_ids: str) -> N
         await session.commit()
 
 
-async def test_presets_empty_without_subclass(client, session_factory) -> None:
+async def test_presets_are_rune_layouts_for_everyone(client, session_factory) -> None:
+    """Руны-навыки (2026-11-10): пресет - имя и раскладка рун, баффов нет;
+    пресеты есть и до выбора подкласса."""
     await _make_character(session_factory, vk_id=500)
     resp = await client.get("/api/miniapp/presets", params=_signed_query(500))
     assert resp.status == 200
     data = await resp.json()
-    assert data == {
-        "subclass": None, "preset_slots": 1, "next_slot_cost": None,
-        "presets": [], "buffs": [], "rule_hint": "",
-    }
-
-
-async def test_presets_lists_slots_and_subclass_catalog(client, session_factory) -> None:
-    character = await _make_character(session_factory, vk_id=501, subclass="guardian")
-    await _unlock_buffs(session_factory, character.id, "guardian_bulwark")
-    resp = await client.get("/api/miniapp/presets", params=_signed_query(501))
-    assert resp.status == 200
-    data = await resp.json()
-    assert data["subclass"] == "guardian"
-    assert data["preset_slots"] == 1
-    assert data["next_slot_cost"] == 5000  # PRESET_SLOT_COSTS[1]
-    assert data["presets"] == []
-    assert len(data["buffs"]) == 14  # весь пул подкласса, не только открытые
-    bulwark = next(b for b in data["buffs"] if b["id"] == "guardian_bulwark")
-    assert bulwark["unlocked"] is True
-    other = next(b for b in data["buffs"] if b["id"] == "guardian_command")
-    assert other["unlocked"] is False
-
-    # Правило состава приходит с сервера: клиент пересказывал его своими
-    # словами и врал. Ограничение по категориям снято - в тексте остаются
-    # только границы размера.
-    assert str(bc.PRESET_MIN_BUFFS) in data["rule_hint"]
-    assert str(bc.PRESET_MAX_BUFFS) in data["rule_hint"]
-
-    # Описание и ярлык категории тоже с сервера - без описания пресет
-    # собирался вслепую, по одним названиям.
-    assert bulwark["category_label"] == buff_descriptions.category_label(bulwark["category"])
-    assert bulwark["description"]
+    assert data == {"preset_slots": 1, "next_slot_cost": 5000, "presets": []}
 
 
 async def test_save_preset_creates_and_charges_gold(client, session_factory) -> None:

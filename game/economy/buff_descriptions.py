@@ -744,13 +744,13 @@ def describe(buff: BuffDef) -> str:
 def _describe_path(buff: BuffDef) -> str:
     """Баффы пути без подкласса (2026-10-20): описание по ключам модификаторов,
     числа навыков - из content/skills/base_skills.json."""
-    from game.combat.base_skills import BASE_SKILL_DEFS
+    from game.combat import skill_catalog
 
     mods = buff.stat_modifiers
     parts: list[str] = []
     for key, value in mods.items():
         kind, _, skill_id = key.partition(":")
-        skill = BASE_SKILL_DEFS.get(skill_id)
+        skill = skill_catalog.skill_def(skill_id) if skill_id else None
         if skill is not None:
             name = f"«{skill.name}»"
             if kind == "skill_bonus":

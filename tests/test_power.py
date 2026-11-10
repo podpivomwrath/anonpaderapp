@@ -1,6 +1,6 @@
 """Патч 111: Мощь - статы + вещи, надбавки за подкласс и микробаффы."""
 
-from models import CharacterBuffPreset, Inventory, Item
+from models import Inventory, Item
 from services import power_service
 from services import leaderboard_service
 
@@ -32,11 +32,14 @@ async def test_counts_stats_and_equipped_gear(db_session, make_character) -> Non
     assert power.total == base + 30
 
 
-async def test_subclass_and_active_buffs_add_percent(db_session, make_character) -> None:
+async def test_subclass_and_skill_steps_add_percent(db_session, make_character) -> None:
+    """Руны-навыки (2026-11-10): вместо баффов пресета - ступени вставленных
+    рун-навыков, каждая ступень +3%, как прежний бафф."""
     me = await make_character()
     before = (await power_service.power_of(db_session, me)).total
     me.subclass = "guardian"
-    db_session.add(CharacterBuffPreset(character_id=me.id, name="П", buff_ids=["a", "b", "c", "d"], is_active=True))
+    me.rune_effects = {"ability:warrior_cleave": 1, "step:warrior_cleave": 3, "ability:guardian_block": 2,
+                       "step:guardian_block": 1}
     await db_session.flush()
     power = await power_service.power_of(db_session, me)
     assert power.buffs == 4

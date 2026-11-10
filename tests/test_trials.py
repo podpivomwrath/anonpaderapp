@@ -330,7 +330,7 @@ async def test_record_relics_counts_daily_and_trial_with_one_notice(db_session, 
     await daily_service.record_relics(db_session, character, {"blood_shard": 4})
     assert await _progress(db_session, character, "poisoner_toxicology") == 4
     result = await daily_service.record_relics(db_session, character, {"blood_shard": 6})
-    assert "Открыт бафф" in (result.streak_notice or "")
+    assert "Испытание пройдено" in (result.streak_notice or "")
     row = (await db_session.execute(
         __import__("sqlalchemy").select(CharacterDaily).where(CharacterDaily.character_id == character.id)
     )).scalar_one()

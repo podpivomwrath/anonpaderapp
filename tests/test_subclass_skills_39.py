@@ -257,10 +257,11 @@ def test_ice_frosts_control_immune_boss_and_convergence_crits() -> None:
 
 def test_other_stuns_do_not_frost_a_boss() -> None:
     """Иней - только от Ледяных оков: прочие оглушения по боссу как раньше."""
-    from game.combat.subclass_skills import SUBCLASS_SKILL_DEFS
+    # Руны-навыки (2026-11-10): Каменная хватка слита с Оглушающим натиском.
+    from game.combat.base_skills import BASE_SKILL_DEFS
 
-    stun = next(s for s in SUBCLASS_SKILL_DEFS.values() if s.effect == "stun" and s.id != "elementalist_ice")
-    actor = combatant(1, side=0, subclass_id=stun.subclass_id)
+    stun = BASE_SKILL_DEFS["warrior_stagger"]
+    actor = combatant(1, side=0)
     boss = combatant(2, side=1, vitality=500)
     boss.control_immune_always = True
     state = make_session(actor, boss)

@@ -77,7 +77,12 @@ def rune_about(rune_id: str, absorbed: int = 0) -> dict:
         who = ", ".join(classes[c] for c in r.classes) if r.classes else "любого класса"
         lines.append(f"Вставляется в {'оружие' if r.place == 'weapon' else 'доспех'}, для {who}.")
     if r.kind == rc.SKILL:
-        lines.append(f"Вставляется в {rc.SKILL_TAG_TITLES[r.tag] if r.tag else 'любой навык'}.")
+        lines.append(f"Огранка: вставляется в {rc.SKILL_TAG_TITLES[r.tag] if r.tag else 'любой навык'}.")
+    if r.kind == rc.ABILITY:
+        from game.economy import ability_config
+
+        lines.append(ability_config.BY_ID[r.id].summary)
+        lines.append("Вставьте в слот навыка - и навык появится в бою.")
     first, second = runes.threshold(r.curve, 1), runes.threshold(r.curve, 2)
     lines.append(f"Мастерство: 110% - {first} копий, 120% - {second}.")
     lines.append({"full": "В PvP в полную силу.", "half": "В PvP вполсилы.",

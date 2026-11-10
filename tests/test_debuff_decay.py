@@ -11,7 +11,7 @@ from game.combat.session import ActionType, CombatMode, CombatSessionState, Decl
 from tests.conftest import NoCritRng, combatant
 
 KEEP = 1 - bc.DEBUFF_DECAY_PER_TURN
-SEAL = 0.35
+SEAL = 0.30  # Разложение (вобрало Стихийную печать, 2026-11-10)
 
 
 def end_turn(c) -> None:
@@ -74,7 +74,7 @@ def test_resolver_decays_from_next_turn():
     state.add(player)
     state.add(enemy)
     skip = DeclaredAction(type=ActionType.SKIP)
-    seal = DeclaredAction(type=ActionType.SKILL, skill_id="mage_blood_seal", target_id=2)
+    seal = DeclaredAction(type=ActionType.SKILL, skill_id="poisoner_decay", target_id=2)
     resolve_tick(state, {1: seal, 2: skip}, NoCritRng())
     assert enemy.effect_total(EffectKind.VULNERABILITY) == pytest.approx(SEAL)
     resolve_tick(state, {1: skip, 2: skip}, NoCritRng())

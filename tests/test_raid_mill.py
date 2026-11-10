@@ -1,5 +1,6 @@
 """Рейд «Жернова Паломников»: шествие, обоз, Мельник и сквозной заход."""
 
+from tests.conftest import kb_fighter
 import json
 import random
 from types import SimpleNamespace
@@ -302,6 +303,8 @@ def test_broken_chain_does_no_harm() -> None:
 
 def test_excommunication_puts_one_subclass_on_cooldown_for_a_turn() -> None:
     stage, state, (a, b) = _miller()
+    for c in (a, b):  # навыки - руны (2026-11-10): без них отлучать нечего
+        c.buff_modifiers.update(kb_fighter().buff_modifiers)
     stage._excommunicate(state, random.Random(1), StageTick())
     assert a.cooldowns and all(v == 1 for v in a.cooldowns.values())
 
@@ -339,7 +342,7 @@ def test_raid_is_listed_and_rewards_greaves() -> None:
 
 
 def test_raid_keyboard_with_stage_button_fits_vk() -> None:
-    kb = json.loads(raid_kb.raid_combat_keyboard("warrior", {}, "blood_knight", extra=[(mt.BTN_CARRY, {"type": "raid_carry"})]))
+    kb = json.loads(raid_kb.raid_combat_keyboard(kb_fighter(), extra=[(mt.BTN_CARRY, {"type": "raid_carry"})]))
     rows = kb["buttons"]
     assert rows[0][0]["action"]["label"] == mt.BTN_CARRY
     assert len(rows) <= 10 and all(len(r) <= 2 for r in rows)

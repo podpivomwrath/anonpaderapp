@@ -90,7 +90,7 @@ def goods() -> dict[str, Good]:
     from game.economy import runes_config as rc
 
     # Руны (2026-10-31): продаются как выпали, мастерство остаётся у игрока.
-    kind_emoji = {rc.HERO: "🟠", rc.GEAR: "🔴", rc.SKILL: "🔵"}
+    kind_emoji = {rc.HERO: "🟠", rc.GEAR: "🔴", rc.SKILL: "🔵", rc.ABILITY: "🟣"}
     for r in rc.RUNES:
         out[f"rune:{r.id}"] = Good(f"rune:{r.id}", "rune", r.name, kind_emoji[r.kind], f"rune:{r.id}",
                                     base=rc.KIND_TITLES[r.kind], variant=r.name)

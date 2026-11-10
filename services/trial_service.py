@@ -109,6 +109,7 @@ async def _apply_delta(
         from services import rune_service
 
         await rune_service.grant(db, character_id, reward_rune(trial.buff_id), 1, reason="trial")
+        await _unlock_buff(db, character_id, trial.buff_id)  # запись о пройденном - для истории и админки
         return trial.buff_id
     return None
 

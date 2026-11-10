@@ -11,6 +11,7 @@
 разбор ВСЕХ `text=`-правил в bot/handlers/ на предмет пересечений.
 """
 
+from tests.conftest import kb_fighter
 import ast
 import collections
 import importlib
@@ -89,10 +90,10 @@ def test_raid_has_no_escape_and_solo_pve_does() -> None:
 
 def test_every_combat_keyboard_contains_its_declared_actions() -> None:
     keyboards = {
-        combat_modes.SOLO_PVE: combat_keyboard("warrior", {}),
-        combat_modes.PVP: pvp_combat_keyboard("warrior", {}, show_target=True),
-        combat_modes.GROUP_PVE: group_combat_keyboard("warrior", {}),
-        combat_modes.RAID: raid_combat_keyboard("warrior", {}),
+        combat_modes.SOLO_PVE: combat_keyboard(kb_fighter()),
+        combat_modes.PVP: pvp_combat_keyboard(kb_fighter(), show_target=True),
+        combat_modes.GROUP_PVE: group_combat_keyboard(kb_fighter()),
+        combat_modes.RAID: raid_combat_keyboard(kb_fighter()),
     }
     for mode, keyboard in keyboards.items():
         labels = _labels(keyboard)
@@ -101,14 +102,14 @@ def test_every_combat_keyboard_contains_its_declared_actions() -> None:
 
 
 def test_raid_keyboard_has_no_escape_button() -> None:
-    labels = _labels(raid_combat_keyboard("warrior", {}))
+    labels = _labels(raid_combat_keyboard(kb_fighter()))
     assert combat_modes.SOLO_PVE.escape not in labels
 
 
 def test_raid_buttons_carry_unique_payloads() -> None:
     """Второй рубеж: даже если подписи когда-нибудь сойдутся, рейдовые кнопки
     разводятся по payload (обработчики рейда слушают именно его)."""
-    types = _payload_types(raid_combat_keyboard("warrior", {}))
+    types = _payload_types(raid_combat_keyboard(kb_fighter()))
     assert {"raid_attack", "raid_open_target", "raid_open_items", combat_modes.RAID.skill_payload} <= types
 
 
@@ -200,10 +201,10 @@ def test_every_combat_action_button_has_a_handler() -> None:
     text_owners = _text_rule_owners()
     payload_types = _payload_rule_types()
     keyboards = {
-        combat_modes.SOLO_PVE: combat_keyboard("warrior", {}),
-        combat_modes.PVP: pvp_combat_keyboard("warrior", {}, show_target=True),
-        combat_modes.GROUP_PVE: group_combat_keyboard("warrior", {}),
-        combat_modes.RAID: raid_combat_keyboard("warrior", {}),
+        combat_modes.SOLO_PVE: combat_keyboard(kb_fighter()),
+        combat_modes.PVP: pvp_combat_keyboard(kb_fighter(), show_target=True),
+        combat_modes.GROUP_PVE: group_combat_keyboard(kb_fighter()),
+        combat_modes.RAID: raid_combat_keyboard(kb_fighter()),
     }
     for mode, keyboard in keyboards.items():
         action_labels = set(mode.action_labels)

@@ -100,8 +100,8 @@
   {"id": "mage_path_last_stand", "name": "Последний рубеж", "subclass": "mage_path", "category": "defense", "description": "", "stat_modifiers": {"low_hp_damage_reduction": 0.18, "low_hp_damage_reduction_threshold": 0.3}, "duration_ticks": 1, "implemented": true},
   {"id": "mage_path_clear_mind", "name": "Ясный ум", "subclass": "mage_path", "category": "damage", "description": "", "stat_modifiers": {"crit_chance_bonus": 0.08}, "duration_ticks": 1, "implemented": true},
   {"id": "mage_path_thrift", "name": "Экономия сил", "subclass": "mage_path", "category": "control_utility", "description": "", "stat_modifiers": {"no_cooldown_chance": 0.12}, "duration_ticks": 1, "implemented": true},
-  {"id": "mage_path_sharp_shards", "name": "Острые осколки", "subclass": "mage_path", "category": "damage", "description": "", "stat_modifiers": {"skill_bonus:mage_shard_volley": 0.2}, "duration_ticks": 1, "implemented": true},
-  {"id": "mage_path_hard_ice", "name": "Крепкий лёд", "subclass": "mage_path", "category": "control_utility", "description": "", "stat_modifiers": {"skill_cd:mage_ice_bonds": 1}, "duration_ticks": 1, "implemented": true},
-  {"id": "mage_path_deep_seal", "name": "Глубокая печать", "subclass": "mage_path", "category": "damage", "description": "", "stat_modifiers": {"skill_value:mage_blood_seal": 0.1}, "duration_ticks": 1, "implemented": true},
-  {"id": "mage_path_long_seal", "name": "Долгая печать", "subclass": "mage_path", "category": "damage", "description": "", "stat_modifiers": {"skill_duration:mage_blood_seal": 1}, "duration_ticks": 1, "implemented": true}
+  {"id": "mage_path_sharp_shards", "name": "Острые осколки", "subclass": "mage_path", "category": "damage", "description": "", "stat_modifiers": {"skill_bonus:elementalist_fire": 0.2}, "duration_ticks": 1, "implemented": true},
+  {"id": "mage_path_hard_ice", "name": "Крепкий лёд", "subclass": "mage_path", "category": "control_utility", "description": "", "stat_modifiers": {"skill_cd:elementalist_ice": 1}, "duration_ticks": 1, "implemented": true},
+  {"id": "mage_path_deep_seal", "name": "Глубокая печать", "subclass": "mage_path", "category": "damage", "description": "", "stat_modifiers": {"skill_value:poisoner_decay": 0.1}, "duration_ticks": 1, "implemented": true},
+  {"id": "mage_path_long_seal", "name": "Долгая печать", "subclass": "mage_path", "category": "damage", "description": "", "stat_modifiers": {"skill_duration:poisoner_decay": 1}, "duration_ticks": 1, "implemented": true}
 ]
