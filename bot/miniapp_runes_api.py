@@ -1,7 +1,8 @@
 """Руны в мини-аппе (2026-10-31): /api/miniapp/runes.
 
-Страница «Руны» на вкладке «Герой»: три подвкладки (героя, экипировки,
-навыков), все слоты сразу, закрытые - под замком с ценой. Руны героя ещё и
+Страница «Руны» на вкладке «Герой»: подвкладки (навыки, героя, экипировки),
+все слоты сразу, закрытые - под замком с ценой. Руны-навыки (2026-11-10): три
+слота, в каждом гнёзда огранок и ступени навыка. Руны героя ещё и
 кругом под ногами силуэта. Логика - services/rune_service.py.
 """
 
@@ -9,6 +10,8 @@ from aiohttp import web
 
 from bot.app_keys import SESSION_FACTORY_KEY
 from bot.miniapp_auth import VK_USER_ID_KEY
+from game.combat import skill_catalog
+from game.economy import ability_config as ac
 from game.economy import runes
 from game.economy import runes_config as rc
 from services import rune_service, wallet_service
@@ -40,6 +43,38 @@ def _rune(rune_def: rc.RuneDef, absorbed: int, count: int = 0) -> dict:
     }
 
 
+def _ability_info(skill_id: str, absorbed: int, fork: int | None) -> dict:
+    """Ступени руны-навыка: что даёт каждая, сколько копий до неё, что открыто."""
+    ability = ac.BY_ID[skill_id]
+    need = ac.step_thresholds(ability.curve)
+    step = ac.step_of(skill_id, absorbed)
+    steps = [
+        {"n": 1, "text": ability.one.text, "need": need[0], "done": step >= 1},
+        {"n": 2, "text": ability.two.text + " Открывает второе гнездо огранки.", "need": need[1], "done": step >= 2},
+        {"n": 3, "need": need[2], "done": step >= 3, "fork": [ability.fork[0].text, ability.fork[1].text],
+         "chosen": fork if fork in (1, 2) else None},
+        {"n": 4, "text": ability.four.text, "need": need[3], "done": step >= 4,
+         "pvp_note": "В PvP - вполсилы."},
+    ]
+    return {"summary": ability.summary, "step": step, "steps": steps}
+
+
+def _ability_slot(index: int, taken: dict, known: dict, character, socket) -> dict:
+    out = socket(rc.ABILITY, str(index))
+    rune_id = taken.get((rc.ABILITY, str(index)))
+    if not rune_id or rune_id not in ac.BY_ID:
+        out["facets"] = []
+        return out
+    absorbed = known.get(rune_id, 0)
+    info = _ability_info(rune_id, absorbed, (character.skill_forks or {}).get(rune_id))
+    skill = skill_catalog.skill_def(rune_id)
+    out.update(info)
+    out["skill"] = {"id": rune_id, "name": skill.name, "cd": skill.cd, "tags": sorted(runes.skill_tags(skill))}
+    out["facets"] = [socket(rc.SKILL, f"{rune_id}:0"),
+                     {**socket(rc.SKILL, f"{rune_id}:1", info["step"] >= 2), "need_step": 2}]
+    return out
+
+
 async def _payload(db, character) -> dict:
     bag = await rune_service.bag(db, character.id)
     known = await rune_service.mastery(db, character.id)
@@ -61,22 +96,7 @@ async def _payload(db, character) -> dict:
          "slots": [socket(rc.GEAR, f"{place}:{i}") for i in range(rc.GEAR_SLOTS_PER_PLACE)]}
         for place in rc.GEAR_PLACES
     ]
-    second = set(character.rune_skill_slots or [])
-    spare = rune_service.spare_skill_slots(character)
-
-    def second_socket(skill_id: str) -> dict:
-        if skill_id in second:
-            return socket(rc.SKILL, f"{skill_id}:1")
-        # Купленный слот от прежних навыков переносится бесплатно.
-        out = socket(rc.SKILL, f"{skill_id}:1", False, None if spare else rc.SKILL_SLOT_PRICE)
-        out["moved"] = bool(spare)
-        return out
-
-    skills = [
-        {"id": s.id, "name": s.name, "tags": sorted(runes.skill_tags(s)),
-         "slots": [socket(rc.SKILL, f"{s.id}:0"), second_socket(s.id)]}
-        for s in rune_service.skills_of(character)
-    ]
+    abilities = [_ability_slot(i, taken, known, character, socket) for i in range(rc.ABILITY_SLOTS)]
     worn = set(taken.values())
     owned = [
         {**_rune(r, known.get(r.id, 0), bag.get(r.id, 0)), "equipped": r.id in worn}
@@ -86,8 +106,8 @@ async def _payload(db, character) -> dict:
     return {
         "home": rune_service.at_home(character), "gold": wallet.farm_currency,
         "base_class": character.base_class,
-        "hero": hero, "gear": gear, "skills": skills, "runes": owned,
-        "titles": rc.KIND_TITLES, "skill_slot_price": rc.SKILL_SLOT_PRICE, "spare_skill_slots": spare,
+        "hero": hero, "gear": gear, "abilities": abilities, "runes": owned,
+        "titles": rc.KIND_TITLES,
     }
 
 
@@ -96,13 +116,9 @@ async def handle_get(request: web.Request) -> web.Response:
         character = await onboarding_svc.get_character(db, request[VK_USER_ID_KEY])
         if character is None:
             return _error("character_not_found", 404)
-        # Сменил путь - руны из слотов прежних навыков возвращаются в сумку,
-        # а купленные вторые слоты сами переходят на новые навыки.
-        changed = rune_service.settle_skill_slots(character)
+        # Огранки снятых навыков (и руны экипировки чужого класса) - в сумку.
         if await rune_service.release_lost_runes(db, character):
             await rune_service.recompute(db, character)
-            changed = True
-        if changed:
             await db.commit()
         return web.json_response(await _payload(db, character))
 
@@ -132,8 +148,11 @@ async def handle_post(request: web.Request) -> web.Response:
                 await rune_service.absorb(db, character, str(body.get("rune")), count)
             elif action == "buy_hero":
                 await rune_service.buy_hero_slot(db, character)
-            elif action == "buy_skill":
-                await rune_service.buy_skill_slot(db, character, str(body.get("skill")))
+            elif action == "fork":
+                fork = body.get("fork")
+                if not isinstance(fork, int):
+                    return _error("bad_request")
+                await rune_service.choose_fork(db, character, str(body.get("skill")), fork)
             else:
                 return _error("bad_request")
         except rune_service.RuneError as exc:

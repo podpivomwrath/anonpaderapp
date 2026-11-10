@@ -275,6 +275,10 @@ class Character(Base):
     rune_hero_slots: Mapped[int] = mapped_column(default=4, server_default="4")
     rune_skill_slots: Mapped[list] = mapped_column(JSON, default=list, server_default="[]")
     rune_effects: Mapped[dict] = mapped_column(JSON, default=dict, server_default="{}")
+    #: Руны-навыки (2026-11-10): выбор развилки ступени III, {id навыка: 1 (а) | 2 (б)}.
+    #: Меняется бесплатно, только дома. rune_skill_slots с этого дня не используется:
+    #: второе гнездо огранки открывает ступень II навыка, а не покупка.
+    skill_forks: Mapped[dict] = mapped_column(JSON, default=dict, server_default="{}")
     # Когда последний раз ушёл из гильдии - защита от прыжков.
     guild_left_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     # Из какой гильдии ушёл (2026-10-31): возврат туда и бывшие свои в PvP.

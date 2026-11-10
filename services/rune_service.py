@@ -2,7 +2,7 @@
 
 Решения владельца (память runes-plan): руна - обычный предмет, мастерство -
 личное, копия впитывается без следа; вставлять и снимать руны бесплатно, но
-только в родном городе; слоты героя и вторые слоты навыков - за золото.
+только в родном городе; слоты героя - за золото; второе гнездо огранки открывает ступень II навыка.
 
 Сумма эффектов вставленных рун лежит копией на персонаже (rune_effects), как
 guild_perks: её читают места без сессии БД (опыт, лут, отдых...). Её надо
@@ -46,9 +46,10 @@ async def slots(db: AsyncSession, character_id: int) -> list[CharacterRuneSlot]:
 
 
 def skills_of(character: Character) -> list:
-    from game.combat.base_skills import skills_for_character
+    """Вставленные руны-навыки - это и есть навыки героя (2026-11-10)."""
+    from game.combat import skill_catalog
 
-    return list(skills_for_character(character.base_class, character.subclass))
+    return skill_catalog.skills_of(character.rune_effects)
 
 
 def at_home(character: Character) -> bool:
@@ -120,18 +121,34 @@ async def absorb(db: AsyncSession, character: Character, rune_id: str, count: in
 
 # --- Слоты -----------------------------------------------------------------------
 
-def _slot_open(character: Character, kind: str, slot: str) -> bool:
+def _equipped(character: Character) -> tuple[list[str], dict[str, int]]:
+    """Вставленные руны-навыки по порядку слотов и их ступени - из копии
+    эффектов на персонаже (её обновляет recompute)."""
+    from game.combat import skill_catalog
+
+    effects = character.rune_effects or {}
+    ids = skill_catalog.skill_ids_of(effects)
+    return ids, {sid: int(effects.get(f"step:{sid}", 0)) for sid in ids}
+
+
+def _slot_open(character: Character, kind: str, slot: str,
+               state: tuple[list[str], dict[str, int]] | None = None) -> bool:
     if kind == rc.HERO:
         return slot.isdigit() and int(slot) < character.rune_hero_slots
+    if kind == rc.ABILITY:
+        return slot.isdigit() and int(slot) < rc.ABILITY_SLOTS
     place, _, index = slot.partition(":")
     if not index.isdigit():
         return False
     if kind == rc.GEAR:
         return place in rc.GEAR_PLACES and int(index) < rc.GEAR_SLOTS_PER_PLACE
     if kind == rc.SKILL:
-        if place not in {s.id for s in skills_of(character)}:
+        # Гнёзда огранок - внутри вставленной руны-навыка; второе открывает
+        # ступень II этого навыка (2026-11-10, вместо покупки за золото).
+        ids, steps = state or _equipped(character)
+        if place not in ids:
             return False
-        return int(index) == 0 or (int(index) == 1 and place in (character.rune_skill_slots or []))
+        return int(index) == 0 or (int(index) == 1 and steps.get(place, 0) >= 2)
     return False
 
 
@@ -145,9 +162,13 @@ def _fits(character: Character, rune_def: rc.RuneDef, kind: str, slot: str) -> s
             return "Эта руна не для вашего класса."
         return "Оружейная руна - только в оружие." if rune_def.place == "weapon" else "Эта руна - в доспех."
     if kind == rc.SKILL:
-        skill = next(s for s in skills_of(character) if s.id == place)
-        if not runes.fits_skill(rune_def, skill):
-            return f"Эта руна - только в {rc.SKILL_TAG_TITLES[rune_def.tag]}."
+        from game.combat import skill_catalog
+
+        skill = skill_catalog.skill_def(place)
+        if skill is None or not runes.fits_skill(rune_def, skill):
+            return f"Эта огранка - только в {rc.SKILL_TAG_TITLES[rune_def.tag]}."
+    if kind == rc.ABILITY and not rune_def.ready:
+        return "Этот навык пока не готов."
     return None
 
 
@@ -167,9 +188,10 @@ async def equip(db: AsyncSession, character: Character, kind: str, slot: str, ru
     for row in taken:
         if row.kind != kind or row.slot == slot or row.rune_id != rune_id:
             continue
-        # Одна руна вида - на героя одна, в экипировке одна, в навыке одна.
+        # Одна руна вида - на героя одна, в экипировке одна, навык - в одном
+        # слоте, огранка - одна на навык.
         if kind != rc.SKILL or row.slot.partition(":")[0] == place:
-            raise RuneError("Такая руна уже вставлена.")
+            raise RuneError("Такой навык уже вставлен." if kind == rc.ABILITY else "Такая руна уже вставлена.")
     await take(db, character.id, rune_id)
     current = next((r for r in taken if r.kind == kind and r.slot == slot), None)
     if current is not None:
@@ -193,6 +215,22 @@ async def unequip(db: AsyncSession, character: Character, kind: str, slot: str) 
     await recompute(db, character)
 
 
+async def choose_fork(db: AsyncSession, character: Character, skill_id: str, fork: int) -> None:
+    """Развилка ступени III: 1 - а, 2 - б. Бесплатно, только дома."""
+    from game.economy import ability_config as ac
+
+    if fork not in (1, 2) or skill_id not in ac.BY_ID:
+        raise RuneError("Нет такой развилки.")
+    if not at_home(character):
+        raise RuneError("Развилку меняют только в родном городе.")
+    known = await mastery(db, character.id)
+    if ac.step_of(skill_id, known.get(skill_id, 0)) < 3:
+        raise RuneError("Развилка открывается на третьей ступени.")
+    character.skill_forks = {**(character.skill_forks or {}), skill_id: fork}  # JSON - целиком
+    await db.flush()
+    await recompute(db, character)
+
+
 async def layout(db: AsyncSession, character: Character) -> list[dict]:
     """Вставленные руны - для пресета (репорт 340)."""
     rows = sorted(await slots(db, character.id), key=lambda r: (r.kind, r.slot))
@@ -202,7 +240,8 @@ async def layout(db: AsyncSession, character: Character) -> list[dict]:
 async def apply_layout(db: AsyncSession, character: Character, saved: list) -> int:
     """Расставить руны по сохранённой раскладке: лишние - в сумку, нужные -
     из сумки. Возвращает, сколько рун не нашлось (продана, впитана, слот
-    закрыт, не подходит после смены пути)."""
+    закрыт, не подходит). Руны-навыки ставятся первыми: от них зависят гнёзда
+    огранок."""
     if not at_home(character):
         raise RuneError("Руны меняют только в родном городе.")
     want: dict[tuple[str, str], str] = {}
@@ -218,9 +257,12 @@ async def apply_layout(db: AsyncSession, character: Character, saved: list) -> i
         await db.delete(row)
     await db.flush()
     missing = 0
-    for (kind, slot), rune_id in want.items():
+    order = sorted(want.items(), key=lambda item: item[0][0] != rc.ABILITY)
+    for (kind, slot), rune_id in order:
         if (kind, slot) in kept:
             continue
+        if kind == rc.SKILL:
+            await recompute(db, character)  # навыки уже стоят - гнёзда огранок открыты
         rune_def = rc.BY_ID.get(rune_id)
         if rune_def is None or not _slot_open(character, kind, slot) or _fits(character, rune_def, kind, slot):
             missing += 1
@@ -231,7 +273,7 @@ async def apply_layout(db: AsyncSession, character: Character, saved: list) -> i
             continue
         row.count -= 1
         db.add(CharacterRuneSlot(character_id=character.id, kind=kind, slot=slot, rune_id=rune_id))
-    await db.flush()
+        await db.flush()
     await recompute(db, character)
     return missing
 
@@ -249,102 +291,28 @@ async def buy_hero_slot(db: AsyncSession, character: Character) -> int:
     return character.rune_hero_slots
 
 
-def spare_skill_slots(character: Character) -> int:
-    """Купленные вторые слоты у навыков, которых у героя больше нет (подкласс
-    заменил навыки класса, сброс пути). Владелец, 2026-10-31: 1 покупка = 1
-    доп. слот - такой слот переносится на любой текущий навык бесплатно."""
-    skill_ids = {s.id for s in skills_of(character)}
-    return sum(1 for sid in character.rune_skill_slots or [] if sid not in skill_ids)
-
-
-def settle_skill_slots(character: Character) -> bool:
-    """Купленные вторые слоты прежних навыков сами переходят на текущие
-    навыки без слота, по порядку навыков (2026-11-04, игроки: после смены
-    класса слоты приходилось переносить вручную в каждом навыке). Вернулся
-    к прежнему пути - слоты так же переедут обратно. True - что-то перенесли.
-
-    Обратно - на тот же навык, где слот был (репорт 333: у Тёмного мистика
-    слот с «Круга тьмы» после смены пути и возврата встал на «Кровавый
-    пакт», первый по порядку). Откуда пришёл каждый слот - ui_flags."""
-    skill_ids = [s.id for s in skills_of(character)]
-    owned = list(character.rune_skill_slots or [])
-    missing = [sid for sid in skill_ids if sid not in owned]
-    flags = dict(getattr(character, "ui_flags", None) or {})
-    came_from = dict(flags.get(_SLOT_FROM) or {})
-    moved = False
-    for i, sid in enumerate(owned):
-        if not missing:
-            break
-        if sid not in skill_ids:
-            target = _slot_home(sid, came_from, missing)
-            missing.remove(target)
-            owned[i] = target
-            came_from[target] = sid
-            moved = True
-    if moved:
-        character.rune_skill_slots = owned  # JSON заменяется целиком
-        if hasattr(character, "ui_flags"):
-            flags[_SLOT_FROM] = came_from
-            character.ui_flags = flags
-    return moved
-
-
-_SLOT_FROM = "rune_slot_from"
-
-
-def _slot_home(sid: str, came_from: dict[str, str], missing: list[str]) -> str:
-    """Куда вернуть слот с ушедшего навыка sid: навык, откуда он когда-то
-    пришёл, если этот навык снова есть и без слота, иначе первый свободный."""
-    seen = {sid}
-    prev = came_from.get(sid)
-    while prev and prev not in seen:
-        if prev in missing:
-            return prev
-        seen.add(prev)
-        prev = came_from.get(prev)
-    return missing[0]
-
-
-async def buy_skill_slot(db: AsyncSession, character: Character, skill_id: str) -> None:
-    skill_ids = {s.id for s in skills_of(character)}
-    if skill_id not in skill_ids:
-        raise RuneError("Нет такого навыка.")
-    owned = list(character.rune_skill_slots or [])
-    if skill_id in owned:
-        raise RuneError("Второй слот уже открыт.")
-    spare = next((i for i, sid in enumerate(owned) if sid not in skill_ids), None)
-    if spare is not None:
-        owned[spare] = skill_id  # перенос купленного слота, без платы
-        character.rune_skill_slots = owned  # JSON заменяется целиком
-        await db.flush()
-        return
-    try:
-        await wallet_service.charge(db, character.id, "farm", rc.SKILL_SLOT_PRICE)
-    except wallet_service.NotEnoughCurrency:
-        raise RuneError(f"Нужно {rc.SKILL_SLOT_PRICE:,} золота.".replace(",", " ")) from None
-    character.rune_skill_slots = owned + [skill_id]
-    await db.flush()
-
-
-def _lost(character: Character, row: CharacterRuneSlot, skill_ids: set[str]) -> bool:
-    """Руна, которой после смены класса или пути здесь не место, или руна
-    навыка, которую этот навык больше не принимает (правка тегов)."""
+def _lost(character: Character, row: CharacterRuneSlot, state: tuple[list[str], dict[str, int]]) -> bool:
+    """Руна, которой здесь больше не место: огранка навыка, который сняли
+    (или второе гнездо без ступени II, или огранка не подходит после правки
+    меток), руна экипировки чужого класса."""
     rune_def = rc.BY_ID.get(row.rune_id)
     if row.kind == rc.SKILL:
-        place = row.slot.partition(":")[0]
-        if place not in skill_ids:
+        if not _slot_open(character, rc.SKILL, row.slot, state):
             return True
-        skill = next(s for s in skills_of(character) if s.id == place)
-        return rune_def is not None and not runes.fits_skill(rune_def, skill)
+        from game.combat import skill_catalog
+
+        skill = skill_catalog.skill_def(row.slot.partition(":")[0])
+        return rune_def is not None and (skill is None or not runes.fits_skill(rune_def, skill))
     return (row.kind == rc.GEAR and rune_def is not None
             and bool(rune_def.classes) and character.base_class not in rune_def.classes)
 
 
 async def release_lost_runes(db: AsyncSession, character: Character) -> bool:
-    """Руны из слотов навыков, которых у героя больше нет, и руны экипировки
-    чужого класса (репорт 266) - обратно в сумку."""
-    skill_ids = {s.id for s in skills_of(character)}
-    lost = [r for r in await slots(db, character.id) if _lost(character, r, skill_ids)]
+    """Огранки снятых навыков и руны экипировки чужого класса (репорт 266) -
+    обратно в сумку."""
+    known = await mastery(db, character.id)
+    state = _state_from_rows(await slots(db, character.id), known)
+    lost = [r for r in await slots(db, character.id) if _lost(character, r, state)]
     for row in lost:
         await grant(db, character.id, row.rune_id)
         await db.delete(row)
@@ -353,22 +321,51 @@ async def release_lost_runes(db: AsyncSession, character: Character) -> bool:
     return bool(lost)
 
 
+def _state_from_rows(rows, known: dict[str, int]) -> tuple[list[str], dict[str, int]]:
+    """Вставленные навыки и их ступени - по строкам слотов, не по копии."""
+    from game.combat import skill_catalog
+    from game.economy import ability_config as ac
+
+    ability_rows = sorted(
+        (r for r in rows if r.kind == rc.ABILITY and r.slot.isdigit() and int(r.slot) < rc.ABILITY_SLOTS
+         and r.rune_id in skill_catalog.ALL_SKILL_DEFS),
+        key=lambda r: int(r.slot),
+    )
+    ids = [r.rune_id for r in ability_rows]
+    return ids, {sid: ac.step_of(sid, known.get(sid, 0)) for sid in ids}
+
+
 async def recompute(db: AsyncSession, character: Character) -> dict[str, float]:
-    """Пересчитать копию эффектов на персонаже. Руны навыков, которых больше
-    нет (сменил путь), возвращаются в сумку."""
+    """Пересчитать копию эффектов на персонаже. Огранки снятых навыков
+    возвращаются в сумку. Руна-навык кладёт в копию: "ability:<id>" (слот +
+    1), "rune:<id>" (сила от мастерства), "step:<id>" (ступень), "fork:<id>"
+    (развилка, со ступени III)."""
     await release_lost_runes(db, character)
     known = await mastery(db, character.id)
-    skill_ids = {s.id for s in skills_of(character)}
+    rows = await slots(db, character.id)
+    state = _state_from_rows(rows, known)
+    ids, steps = state
+    forks = character.skill_forks or {}
     effects: dict[str, float] = {}
-    for row in await slots(db, character.id):
+    for row in rows:
         rune_def = rc.BY_ID.get(row.rune_id)
-        if rune_def is None or not _slot_open(character, row.kind, row.slot):
+        if rune_def is None or not _slot_open(character, row.kind, row.slot, state):
             continue
-        skill_id = None
-        if row.kind == rc.SKILL:
-            skill_id = row.slot.partition(":")[0]
-            if skill_id not in skill_ids:
+        if row.kind == rc.ABILITY:
+            sid = row.rune_id
+            if sid not in ids:
                 continue
+            effects[f"ability:{sid}"] = int(row.slot) + 1
+            power = round(runes.value(rune_def, known.get(sid, 0)) - 1.0, 6)
+            if power > 0:
+                effects[runes.effect_key(sid)] = power
+            if steps.get(sid):
+                effects[f"step:{sid}"] = steps[sid]
+            fork = forks.get(sid)
+            if steps.get(sid, 0) >= 3 and fork in (1, 2):
+                effects[f"fork:{sid}"] = fork
+            continue
+        skill_id = row.slot.partition(":")[0] if row.kind == rc.SKILL else None
         if row.kind == rc.GEAR and rune_def.classes and character.base_class not in rune_def.classes:
             continue
         key = runes.effect_key(row.rune_id, skill_id)
@@ -423,7 +420,7 @@ async def maybe_drop(db: AsyncSession, character: Character, rng: random.Random,
     return rune_id
 
 
-KIND_EMOJI = {rc.HERO: "🟠", rc.GEAR: "🔴", rc.SKILL: "🔵"}
+KIND_EMOJI = {rc.HERO: "🟠", rc.GEAR: "🔴", rc.SKILL: "🔵", rc.ABILITY: "🟣"}
 
 
 def ring_line(ring: str) -> str:
