@@ -234,9 +234,26 @@ def set_recovery(session: CombatSessionState, max_turns: int | None) -> None:
 
 
 def recovered(target: CombatantState, amount: int) -> int:
-    """Входящее лечение после затухания в PvP (вне PvP множитель 1)."""
+    """Входящее лечение после затухания в PvP (вне PvP множитель 1) и
+    «Горькой раны» (2026-11-10: EffectKind.HEAL_REDUCTION)."""
     mult = getattr(target, "recovery_mult", 1.0)
+    reduction = target.heal_reduction() if hasattr(target, "heal_reduction") else 0.0
+    mult *= 1.0 - reduction
     return amount if mult >= 1.0 else round(amount * mult)
+
+
+def bitter_backlash(target: CombatantState, healed: int) -> int:
+    """Пробуждение «Горькой раны»: доля лечения цели бьёт её саму. Доля -
+    в метке эффекта "bitter:<доля>"."""
+    if healed <= 0:
+        return 0
+    for effect in target.effects_of(EffectKind.HEAL_REDUCTION):
+        tag = getattr(effect, "tag", None) or ""
+        if effect.remaining_ticks > 0 and tag.startswith("bitter:"):
+            share = float(tag.split(":", 1)[1] or 0)
+            if share > 0:
+                return max(round(healed * share), 1)
+    return 0
 
 
 def begin_turn_flags(session: CombatSessionState, turn_number: int) -> None:

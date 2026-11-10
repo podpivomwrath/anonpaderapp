@@ -332,8 +332,7 @@ BY_ID: dict[str, AbilityDef] = {a.id: a for a in ABILITIES}
 
 #: Навыки, у которых ещё нет обработчика в бою: их руны не выпадают
 #: (runes_config.RuneDef.ready). Пустеет по мере реализации.
-PENDING: set[str] = {"cleanse_water", "bitter_wound", "shatter", "mute", "counter_strike", "strip_veil",
-                     "breather", "cover_ally", "close_ranks", "reckoning"}
+PENDING: set[str] = set()
 
 
 def mods_for(skill_id: str, step: int, fork: int = 0) -> dict[str, float]:

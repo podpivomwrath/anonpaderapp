@@ -44,6 +44,7 @@ def try_apply_control(
     pvp: bool,
     duration_bonus: int = 0,
     chance_bonus: float = 0.0,
+    kind: EffectKind = EffectKind.FREEZE,
 ) -> ControlResult:
     """duration_bonus/chance_bonus (патч 47) — микробаффы «Оцепенение»/«Глубокая
     заморозка» Элементалиста; 0 для всех остальных источников контроля."""
@@ -98,8 +99,9 @@ def try_apply_control(
 
     # PvE: контроль всегда проходит полной длительностью, DR не трогаем
     if not pvp:
-        target.apply_effect(EffectKind.FREEZE, 1.0, base_duration, source_id)
-        _mark_chilled(target, source_id)
+        target.apply_effect(kind, 1.0, base_duration, source_id)
+        if kind == EffectKind.FREEZE:
+            _mark_chilled(target, source_id)
         return ControlResult(applied=True)
 
     # PvP: DR по «будущему» стрику — этот контроль вызовет пропуск в текущем ходу,
@@ -111,8 +113,10 @@ def try_apply_control(
         duration = max(1, round(base_duration * bc.CC_STREAK_REDUCE_FACTOR))
         reduced = True
 
-    target.apply_effect(EffectKind.FREEZE, 1.0, duration, source_id)
-    _mark_chilled(target, source_id)
+    # kind - заморозка или «Немота» (2026-11-10): защита от цепочки контроля общая.
+    target.apply_effect(kind, 1.0, duration, source_id)
+    if kind == EffectKind.FREEZE:
+        _mark_chilled(target, source_id)
     target.control_hits += 1
     target.control_hits_reset_in = bc.CC_HITS_RESET_TURNS
 

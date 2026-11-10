@@ -10,5 +10,6 @@ from game.classes import (
     poisoner,
     shadow_blade,
 )
+from game.combat import rune_skills  # noqa: F401 - новые навыки рун (2026-11-10)
 
 __all__ = ["REGISTRY", "Role", "SubclassDef"]

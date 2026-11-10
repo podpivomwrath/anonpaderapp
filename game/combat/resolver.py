@@ -274,9 +274,15 @@ def _apply_phase(
         )
         # Сколько съел щит, пишется в строке удара (render_hit, shielded) -
         # отдельные строки щитов больше не нужны.
+        # Руны-навыки (2026-11-10): «Прикрыть собой» - часть урона уходит
+        # прикрывающему ещё до щитов прикрытого.
+        amount = _cover_redirect(session, hit, target, amount, damage_taken, reflect_hits)
         before_shields = amount
         amount = shared_rules.absorb_by_shields(target, amount, [], pierce=pierce)
         shielded_by_hit[id(hit)] = before_shields - amount
+        # Счётчик полученного урона - для «Расплаты».
+        target.taken_total = getattr(target, "taken_total", 0) + amount
+        target.shield_taken_total = getattr(target, "shield_taken_total", 0) + before_shields - amount
         # Страж, «Отражение» (патч 56) - общее с дуэлью правило.
         reflected = shared_rules.block_reflect_amount(target, hit.blocked)
         if reflected and hit.source_id != target.id and not hit.reactive:
@@ -291,7 +297,10 @@ def _apply_phase(
         # Кровь за кровь (патч 16): доля полученного урона возвращается атакующему.
         # Только за удар: яд и горение не возвращаются (2026-10-25, баг).
         reflect_pct = target.effect_total(EffectKind.BLOOD_REFLECT)
-        if reflect_pct > 0 and amount > 0 and hit.source_id != target.id and not hit.is_dot and not hit.reactive:
+        # Пробуждение «Ответного удара» (2026-11-10) возвращает и яды.
+        dots_too = target.buff_modifiers.get("counter_all", 0.0) > 0
+        if (reflect_pct > 0 and amount > 0 and hit.source_id != target.id and (dots_too or not hit.is_dot)
+                and not hit.reactive):
             attacker = session.combatants.get(hit.source_id)
             if attacker is not None and attacker.alive:
                 reflect_hits.append(
@@ -327,6 +336,12 @@ def _apply_phase(
         # месте - лог и вклад видят то, что дошло.
         heal.amount = shared_rules.recovered(session.combatants[heal.target_id], heal.amount)
         heal_taken[heal.target_id] = heal_taken.get(heal.target_id, 0) + heal.amount
+        # Пробуждение «Горькой раны» (2026-11-10): лечение бьёт саму цель.
+        backlash = shared_rules.bitter_backlash(session.combatants[heal.target_id], heal.amount)
+        if backlash:
+            damage_taken[heal.target_id] = damage_taken.get(heal.target_id, 0) + backlash
+            ctx.lines.append(f"🩹 Горькая рана: лечение обжигает {session.combatants[heal.target_id].name} "
+                             f"на {backlash}")
 
     # Патч 56, «Отголосок» Тёмного мистика: лечение сверх максимума HP не
     # пропадает, а становится щитом следующему по низкому HP союзнику.
@@ -382,15 +397,40 @@ def _display_mode(session: CombatSessionState) -> str:
     return display.MODE_PVE_NUM if session.mode == CombatMode.PVE else display.MODE_PVP
 
 
+def _cover_redirect(session, hit, target, amount: int, damage_taken: dict, out: list) -> int:
+    """«Прикрыть собой» (2026-11-10): доля урона по прикрытому уходит тому,
+    кто прикрывает (отдельным ударом - через его щиты). Возвращает, сколько
+    остаётся прикрытому."""
+    if amount <= 0 or hit.reactive:
+        return amount
+    cover = next((e for e in target.effects_of(EffectKind.COVERED) if e.remaining_ticks > 0), None)
+    if cover is None:
+        return amount
+    guard = session.combatants.get(cover.source_id)
+    if guard is None or not guard.alive or guard.id == target.id:
+        return amount
+    moved = round(amount * cover.value)
+    if moved <= 0:
+        return amount
+    taken = round(moved * (1 - guard.buff_modifiers.get("cover_reduce", 0.0)))
+    if guard.buff_modifiers.get("cover_no_death", 0.0) > 0:
+        taken = min(taken, max(guard.current_hp - damage_taken.get(guard.id, 0) - 1, 0))
+    if taken > 0:
+        out.append(PendingHit(source_id=hit.source_id, target_id=guard.id, amount=taken,
+                              label="бьёт прикрывшего", reactive=True))
+    return amount - moved
+
+
 def _own_skill_or_attack(actor, action: DeclaredAction) -> DeclaredAction:
     """Навык персонажа - только из его рун-навыков (2026-11-10). Старая
     кнопка или подставной payload с чужим навыком - обычная атака по той же
-    цели, ход не пропадает. Мобов и прочих не персонажей не трогаем."""
+    цели, ход не пропадает. Под «Немотой» навыки тоже становятся атакой.
+    Мобов и прочих не персонажей не трогаем."""
     if action.type != ActionType.SKILL or getattr(actor, "kind", None) != "character":
         return action
     from game.combat import skill_catalog
 
-    if skill_catalog.has_skill(actor.buff_modifiers, action.skill_id):
+    if skill_catalog.has_skill(actor.buff_modifiers, action.skill_id) and not actor.has_effect(EffectKind.SILENCE):
         return action
     return DeclaredAction(type=ActionType.ATTACK, target_id=action.target_id)
 
@@ -580,7 +620,8 @@ def resolve_tick(
                 target = taunter
         if target is None:
             target = _choose_mob_target(session, mob, rng)
-        if mob.mob_brain is not None:
+        if mob.mob_brain is not None and not mob.has_effect(EffectKind.SILENCE):
+            # Под «Немотой» (2026-11-10) моб без способности - просто кусает.
             # Патч 103: способность моба. Сюда попадает только моб, который
             # этот ход переживёт (проверка выше), поэтому ни одна ответная
             # механика не срабатывает от добивающего удара.
@@ -694,6 +735,10 @@ def resolve_tick(
         log_phases.append((hits + reflects, heals))
     ctx.hits = [h for hits, _ in log_phases for h in hits]
     ctx.heals = [h for _, heals in log_phases for h in heals]
+    # Пробуждение «Сомкнуть ряды» (2026-11-10): раз за бой - само.
+    from game.combat import rune_skills
+
+    rune_skills.close_ranks_auto(session, ctx.lines)
 
     # --- Строки лога: единый краткий формат везде — PvE, PvP, рейды (патч 43,
     # ч.1) — образность убрана из пошагового лога, режим влияет только на
@@ -738,9 +783,7 @@ def resolve_tick(
             source = session.combatants[heal.source_id]
             target = session.combatants[heal.target_id]
             h_before = running_hp[target.id]
-            # Горькая рана (2026-11-10): лечение цели слабее.
-            amount = round(heal.amount * (1.0 - target.heal_reduction()))
-            h_after = min(h_before + amount, target.max_hp)
+            h_after = min(h_before + heal.amount, target.max_hp)
             # В лог идёт ФАКТИЧЕСКИ восполненное, а не запрошенное. Лечение поверх
             # полного HP не восполняет ничего, и строка «восполнено 1 HP
             # (100.0% -> 100.0%)» сама себе противоречила. Ноль не печатаем вовсе:
