@@ -16,7 +16,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from models import Character, CharacterStats
-from services import item_service, preset_service, subclass_service
+from services import item_service, subclass_service
 
 #: Надбавка за выбранный подкласс (30+ уровень).
 SUBCLASS_BONUS = 0.10
@@ -54,12 +54,11 @@ async def power_of(db: AsyncSession, character: Character) -> Power:
         item_service.item_power(item) for item in equipped.values()
         if item is not None
     )
-    buffs = 0
     # Путь без подкласса считается как подкласс (2026-10-20, владелец).
     chosen = subclass_service.path_chosen(character)
-    if chosen:
-        preset = await preset_service.get_active_preset(db, character.id)
-        buffs = len(preset.buff_ids) if preset is not None else 0
+    # Руны-навыки (2026-11-10): вместо баффов пресета - ступени вставленных
+    # рун-навыков, каждая ступень как прежний бафф.
+    buffs = sum(int(v) for k, v in (character.rune_effects or {}).items() if k.startswith("step:"))
     return compute(stats_sum, gear_sum, chosen, buffs)
 
 

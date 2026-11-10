@@ -21,7 +21,6 @@ from services import naming, ring_slot_service, subclass_service, transfer_servi
 from bot.onboarding_texts import REGION_TITLES
 from config import Settings
 from game.content_loader import load_content
-from game.economy import buff_descriptions
 from models import BaseClass, Character, User
 from services import (
     daily_service,
@@ -98,6 +97,8 @@ def _character_payload(
         # Пул пресетов: подкласс или базовый класс после отказа (2026-10-20).
         "buff_pool": subclass_service.buff_pool(character),
         "subclass_declined": subclass_service.declined(character),
+        # Руны-навыки (2026-11-10): пассивка подкласса или пути - вкладка «Герой».
+        "passive": _passive_payload(subclass_service.buff_pool(character)),
         # Венец топ-1 (патч 91). Держать можно сразу несколько досок, но
         # рамка в шапке одна: берём первую в порядке BOARDS, иначе она
         # менялась бы от показа к показу вслед за порядком выдачи из базы.
@@ -287,31 +288,46 @@ async def handle_get_trials(request: web.Request) -> web.Response:
         if subclass_service.buff_pool(character) is None:
             return web.json_response({"subclass": None, "trials": []})
         states = await trial_service.get_trial_states(session, character)
-        catalog = load_content().buffs
         return web.json_response(
             {
                 "subclass": subclass_service.buff_pool(character),
                 "trials": [
                     {
                         "id": s.trial.id,
-                        "buff_id": s.trial.buff_id,
-                        "buff_name": s.buff_name,
                         "unlocked": s.unlocked,
                         "progress": s.progress,
                         "target": s.target,
                         "text": s.trial.text,
-                        # Патч 48: описание микробаффа для раскрывающейся панели —
-                        # генерируется из тех же значений, что читает бой (сухие
-                        # цифры, без лора); implemented=false → фронт показывает
-                        # "в разработке" вместо описания.
-                        "category": buff_descriptions.category_label(catalog[s.trial.buff_id].category),
-                        "implemented": catalog[s.trial.buff_id].implemented,
-                        "description": buff_descriptions.describe(catalog[s.trial.buff_id]),
+                        # Руны-навыки (2026-11-10): награда испытания - руна.
+                        **_trial_reward(s.trial.buff_id),
                     }
                     for s in states
                 ],
             }
         )
+
+
+def _passive_payload(pool: str | None) -> dict | None:
+    from game.economy import passives_config
+
+    passive = passives_config.passive_of(pool)
+    return {"title": passive.title, "lines": list(passive.lines)} if passive else None
+
+
+def _trial_reward(buff_id: str) -> dict:
+    from game.economy import runes
+    from game.economy import runes_config as rc
+
+    rune = rc.BY_ID.get(trial_service.reward_rune(buff_id))
+    if rune is None:
+        return {"reward_name": "руна", "reward_kind": None, "reward_text": ""}
+    text = runes.describe(rune)
+    if rune.kind == rc.ABILITY:
+        from game.economy import ability_config
+
+        text = ability_config.BY_ID[rune.id].summary
+    return {"reward_name": rune.name, "reward_kind": rc.KIND_ONE[rune.kind], "reward_text": text,
+            "reward_id": rune.id}
 
 
 async def handle_post_crown_frame(request: web.Request) -> web.Response:

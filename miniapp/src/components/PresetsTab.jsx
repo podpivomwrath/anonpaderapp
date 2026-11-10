@@ -7,20 +7,12 @@ import { SectionHead } from './ui.jsx';
 // Коды ошибок сервера, у которых нет человеческого текста на той стороне.
 const ERROR_TEXTS = {
   not_enough_gold: 'Не хватило золота.',
-  no_subclass: 'Сначала выберите подкласс.',
-  bad_request: 'Не удалось сохранить: проверьте название и состав.',
+  bad_request: 'Не удалось сохранить: проверьте название.',
 };
 
-// Цвет бафа по категории (2026-10-22): урон, оборона, лечение и прочее
-// различаются с первого взгляда. Класс CSS, а не текст на экране.
-const CATEGORY_TONE = {
-  damage: 'red', defense: 'blue', healing: 'green', control_utility: 'violet', group_support: 'gold',
-};
-const tone = (b) => CATEGORY_TONE[b?.category] || 'gray';
-
-function BuffChip({ buff }) {
-  return <span className={`buff-chip buff-chip--${tone(buff)}`}>{buff?.name || '?'}</span>;
-}
+// Руны-навыки (2026-11-10): микробаффов больше нет - пресет это имя и
+// запомненная раскладка рун (навыки, огранки, руны героя и экипировки).
+// Переключение в родном городе расставляет руны само.
 
 // Склонялка рядом (как в CraftGear.jsx): 1 руна, 2 руны, 5 рун.
 function runesWord(n) {
@@ -41,7 +33,6 @@ export default function PresetsTab({ character }) {
   const [status, setStatus] = useState('loading'); // loading | ready | error
   const [editingId, setEditingId] = useState(undefined); // undefined - не редактируем; null - новый; число - существующий
   const [editName, setEditName] = useState('');
-  const [editBuffs, setEditBuffs] = useState([]);
   const [busy, setBusy] = useState(false);
   const [errorMsg, setErrorMsg] = useState(null);
   const [note, setNote] = useState(null);
@@ -58,14 +49,6 @@ export default function PresetsTab({ character }) {
 
   useEffect(load, []);
 
-  if (!character.subclass && !character.buff_pool) {
-    return (
-      <Placeholder icon={<div style={{ fontSize: 48 }}>⚔️</div>}>
-        Ваша Метка ещё не обрела форму. Возвращайтесь, когда кровь потребует имени.
-      </Placeholder>
-    );
-  }
-
   if (status === 'loading') {
     return (
       <Skeleton />
@@ -79,7 +62,6 @@ export default function PresetsTab({ character }) {
   function startEdit(preset) {
     setEditingId(preset ? preset.id : null);
     setEditName(preset ? preset.name : '');
-    setEditBuffs(preset ? [...preset.buff_ids] : []);
     setErrorMsg(null);
   }
 
@@ -88,15 +70,11 @@ export default function PresetsTab({ character }) {
     setErrorMsg(null);
   }
 
-  function toggleBuff(buffId) {
-    setEditBuffs((prev) => (prev.includes(buffId) ? prev.filter((id) => id !== buffId) : [...prev, buffId]));
-  }
-
   async function handleSave() {
     setBusy(true);
     setErrorMsg(null);
     try {
-      await savePreset(editName.trim(), editBuffs, editingId ?? undefined);
+      await savePreset(editName.trim(), [], editingId ?? undefined);
       setEditingId(undefined);
       load();
     } catch (err) {
@@ -157,27 +135,11 @@ export default function PresetsTab({ character }) {
         <Div>
           <Input placeholder="Название" value={editName} onChange={(e) => setEditName(e.target.value)} />
         </Div>
-        <Div style={{ fontSize: 13, opacity: 0.7 }}>{data.rule_hint}</Div>
-        <div className="buff-pick">
-          {data.buffs.map((b) => {
-            const on = editBuffs.includes(b.id);
-            return (
-              <button
-                type="button" key={b.id} disabled={!b.unlocked} aria-pressed={on}
-                className={`buff-tile buff-tile--${tone(b)}${on ? ' buff-tile--on' : ''}`}
-                onClick={() => toggleBuff(b.id)}
-              >
-                <span className="buff-tile__head">
-                  <b>{b.unlocked ? '' : '🔒 '}{b.name}</b>
-                  <span className="buff-tile__check" aria-hidden="true">{on ? '✓' : ''}</span>
-                </span>
-                <small className="buff-tile__cat">{b.category_label}</small>
-                {/* без описания пресет собирался вслепую, по одним названиям */}
-                {b.description && <small className="buff-tile__desc">{b.description}</small>}
-              </button>
-            );
-          })}
-        </div>
+        <Div style={{ fontSize: 13, opacity: 0.7 }}>
+          {editingId === null
+            ? 'Новый пресет сразу запомнит руны, что стоят у вас сейчас.'
+            : 'Здесь меняется название. Чтобы пресет запомнил нынешние руны, нажмите «Запомнить руны».'}
+        </Div>
         {errorMsg && (
           <Div>
             <Text style={{ color: '#c81e3a' }}>{errorMsg}</Text>
@@ -218,9 +180,6 @@ export default function PresetsTab({ character }) {
                   {preset.name}
                   {preset.is_active && <span className="preset-card__badge">активен</span>}
                 </b>
-                <span className="preset-card__chips">
-                  {preset.buff_ids.map((id) => <BuffChip key={id} buff={data.buffs.find((x) => x.id === id)} />)}
-                </span>
                 {preset.runes !== null && preset.runes !== undefined && (
                   <small className="preset-card__runes">
                     🔮 {preset.runes ? `Запомнено: ${preset.runes} ${runesWord(preset.runes)}` : 'Запомнено: без рун'}
@@ -233,7 +192,7 @@ export default function PresetsTab({ character }) {
                     </button>
                   )}
                   <button type="button" className="pill-btn" disabled={busy} onClick={() => startEdit(preset)}>
-                    ✎ Изменить
+                    ✎ Название
                   </button>
                   <button type="button" className="pill-btn" disabled={busy} onClick={() => handleRunes(preset.id, true)}>
                     🔮 Запомнить руны
@@ -249,7 +208,7 @@ export default function PresetsTab({ character }) {
           ) : (
             <button type="button" className="preset-card preset-card--empty" key={`empty-${idx}`} disabled={busy} onClick={() => startEdit(null)}>
               <span className="preset-card__num">{idx + 1}</span>
-              <span className="preset-card__plus">+ Собрать пресет</span>
+              <span className="preset-card__plus">+ Запомнить раскладку</span>
             </button>
           )))}
         </div>

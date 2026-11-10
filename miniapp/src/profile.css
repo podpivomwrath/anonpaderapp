@@ -1119,15 +1119,39 @@ body.lite .sparks {
   text-align: center;
   overflow-wrap: anywhere;
 }
-.rune-skills { display: flex; flex-direction: column; gap: 8px; }
-.rune-skill { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 6px 10px;
+/* Руны-навыки (2026-11-10): три слота навыков, в каждом - гнёзда огранок. */
+.rune-abilities { display: flex; flex-direction: column; gap: 8px; }
+.rune-passive { display: flex; flex-direction: column; gap: 2px; padding: 8px 10px; border-radius: 12px;
+  border: 1px dashed var(--card-line); }
+.rune-passive small { opacity: 0.8; font-size: 13px; line-height: 1.35; }
+.rune-ability { display: flex; flex-direction: column; gap: 8px; padding: 8px 10px;
   border-radius: 12px; background: var(--card); border: 1px solid var(--card-line); }
-.rune-skill__name { min-width: 0; font-size: 14px; }
-.rune-skill__slots { display: flex; gap: 8px; }
-.rune-skill__slots .rune-socket { width: 52px; height: 52px; }
-.rune-skill__slots .rune-cell { width: 68px; }
-.rune-skill__slots .rune-socket__rune { inset: 9px; }
-.rune-skill__slots .rune-socket__rune .rune-icon { width: 34px; height: 34px; }
+.rune-ability__main { display: flex; align-items: flex-start; gap: 10px; }
+.rune-ability__info { display: flex; flex-direction: column; gap: 4px; min-width: 0; flex: 1; }
+.rune-ability__info p { margin: 0; font-size: 13px; line-height: 1.35; }
+.rune-ability__info small { opacity: 0.7; }
+.rune-ability__info .pill-btn { align-self: flex-start; }
+.rune-ability__facets { display: flex; gap: 8px; padding-left: 4px; border-top: 1px solid var(--card-line); padding-top: 6px; }
+.rune-ability__facets .rune-socket { width: 52px; height: 52px; }
+.rune-ability__facets .rune-cell { width: 68px; }
+.rune-ability__facets .rune-socket__rune { inset: 9px; }
+.rune-ability__facets .rune-socket__rune .rune-icon { width: 34px; height: 34px; }
+.pill-btn--small { padding: 4px 12px; font-size: 13px; }
+.rune-icon--letter { display: inline-flex; align-items: center; justify-content: center; border-radius: 10px;
+  font-family: var(--serif); font-weight: 700; color: #cbbcf0; background: rgba(120, 96, 180, 0.22); }
+.rune-steps { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.rune-step { padding: 8px 10px; border-radius: 10px; border: 1px solid var(--card-line); opacity: 0.75; }
+.rune-step--done { opacity: 1; border-color: rgba(150, 120, 220, 0.6); background: rgba(120, 96, 180, 0.1); }
+.rune-step__head { display: flex; justify-content: space-between; gap: 8px; align-items: baseline; }
+.rune-step__head small { opacity: 0.7; white-space: nowrap; }
+.rune-step p { margin: 4px 0 0; font-size: 13px; line-height: 1.35; }
+.rune-step > small { display: block; margin-top: 4px; opacity: 0.7; font-size: 12px; }
+.rune-fork { display: flex; flex-direction: column; gap: 6px; margin-top: 6px; }
+.rune-fork > small { opacity: 0.7; font-size: 12px; }
+.rune-fork__opt { text-align: left; padding: 6px 8px; border-radius: 8px; border: 1px solid var(--card-line);
+  background: transparent; color: inherit; font: inherit; font-size: 13px; line-height: 1.35; }
+.rune-fork__opt--chosen { border-color: #3f9a52; background: rgba(63, 154, 82, 0.14); }
+.rune-fork__opt:disabled { cursor: default; }
 .rune-bag__title { margin: 6px 0 0; font-family: var(--serif); font-size: 16px; }
 .rune-bag { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; }
 .rune-bag__item, .rune-option {

@@ -552,7 +552,7 @@ export function getRunes() {
 }
 
 // action: equip {kind, slot, rune} | unequip {kind, slot} | absorb {rune, count}
-// | buy_hero | buy_skill {skill}
+// | buy_hero | fork {skill, fork: 1|2} (руны-навыки, 2026-11-10)
 export function runeAction(action, params = {}) {
   return request('/runes', {
     method: 'POST',

@@ -40,6 +40,9 @@ def _rune(rune_def: rc.RuneDef, absorbed: int, count: int = 0) -> dict:
         "tag": rc.SKILL_TAG_TITLES.get(rune_def.tag) if rune_def.tag else None, "tag_id": rune_def.tag or None,
         "absorbed": absorbed, "efficiency": round(runes.efficiency(rune_def.curve, absorbed) * 100, 1),
         "next": nxt, "next_pct": nxt_pct,
+        # Руна-навык (2026-11-10): что делает навык и на какой он ступени.
+        "summary": ac.BY_ID[rune_def.id].summary if rune_def.kind == rc.ABILITY else None,
+        "step": ac.step_of(rune_def.id, absorbed) if rune_def.kind == rc.ABILITY else None,
     }
 
 
@@ -75,6 +78,15 @@ def _ability_slot(index: int, taken: dict, known: dict, character, socket) -> di
     return out
 
 
+def _passive(character) -> dict | None:
+    """Пассивка подкласса или пути: она подсказывает, какие навыки брать."""
+    from game.economy import passives_config
+    from services import subclass_service
+
+    passive = passives_config.passive_of(subclass_service.buff_pool(character))
+    return {"title": passive.title, "lines": list(passive.lines)} if passive else None
+
+
 async def _payload(db, character) -> dict:
     bag = await rune_service.bag(db, character.id)
     known = await rune_service.mastery(db, character.id)
@@ -107,6 +119,7 @@ async def _payload(db, character) -> dict:
         "home": rune_service.at_home(character), "gold": wallet.farm_currency,
         "base_class": character.base_class,
         "hero": hero, "gear": gear, "abilities": abilities, "runes": owned,
+        "passive": _passive(character),
         "titles": rc.KIND_TITLES,
     }
 

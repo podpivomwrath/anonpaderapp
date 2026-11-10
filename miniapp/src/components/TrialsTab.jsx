@@ -5,7 +5,8 @@ import Skeleton from './Skeleton.jsx';
 import { Bar, Empty, SectionHead } from './ui.jsx';
 
 // Испытания подкласса (2026-10-22): карточки с полоской прогресса, нажатие
-// раскрывает эффект бафа. Открытые - отдельной сеткой ниже.
+// раскрывает награду. С рунами-навыками (2026-11-10) награда - руна: руна-навык
+// или огранка, она приходит в сумку. Пройденные - отдельной сеткой ниже.
 
 function TrialCard({ t, open, onToggle }) {
   return (
@@ -13,9 +14,9 @@ function TrialCard({ t, open, onToggle }) {
       <button type="button" className="trial-card__row" onClick={onToggle} aria-expanded={open}>
         <span className="trial-card__seal" aria-hidden="true">{t.unlocked ? '✦' : '🔒'}</span>
         <span className="trial-card__text">
-          <b className="trial-card__name">{t.buff_name}{!t.implemented && ' ⚙️'}</b>
+          <b className="trial-card__name">{t.reward_name}</b>
           {!t.unlocked && <small className="trial-card__task">{t.text}</small>}
-          {t.unlocked && <small className="trial-card__task">{t.category}</small>}
+          {t.unlocked && <small className="trial-card__task">{t.reward_kind} - получена</small>}
           {!t.unlocked && (
             <span className="daily-card__progress">
               <Bar value={t.progress} max={t.target} tone="blue" thin />
@@ -28,10 +29,8 @@ function TrialCard({ t, open, onToggle }) {
       <div className={open ? 'fold fold--open' : 'fold'} aria-hidden={!open}>
         <div className="fold__inner">
           <div className="trial-card__detail">
-            {t.implemented
-              ? (t.description && <p>{t.description}</p>)
-              : <p className="trial-card__wip">⚙️ В разработке - эффект пока не действует в бою.</p>}
-            {!t.unlocked && <small>Категория: {t.category}</small>}
+            {t.reward_text && <p>{t.reward_text}</p>}
+            <small>Награда: {t.reward_kind ? t.reward_kind.toLowerCase() : 'руна'} «{t.reward_name}» - в сумку.</small>
           </div>
         </div>
       </div>

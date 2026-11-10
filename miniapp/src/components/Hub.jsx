@@ -84,7 +84,7 @@ function powerHint(parts) {
   if (!parts) return 'Мощь';
   const bonuses = [];
   if (parts.subclass_pct) bonuses.push(`подкласс +${parts.subclass_pct}%`);
-  if (parts.buffs) bonuses.push(`микробаффы ${parts.buffs} × ${parts.buff_pct}%`);
+  if (parts.buffs) bonuses.push(`ступени навыков ${parts.buffs} × ${parts.buff_pct}%`);
   return `Характеристики ${parts.stats} + вещи ${parts.gear}` + (bonuses.length ? `, ${bonuses.join(', ')}` : '');
 }
 

@@ -505,7 +505,7 @@ export default function HeroTab({ character, onCharacterUpdate }) {
   const [page, setPage] = useState(0);
   const [gear, setGear] = useState(null);
   const [runes, setRunes] = useState(null);
-  const [runeKind, setRuneKind] = useState('hero');
+  const [runeKind, setRuneKind] = useState('ability');
   const [choosing, setChoosing] = useState(false);
   // Облик могли выбрать на экране выбора при входе (GenderGate) - подхватить.
   useEffect(() => {
