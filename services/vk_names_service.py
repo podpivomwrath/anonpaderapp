@@ -49,8 +49,3 @@ async def refresh(db: AsyncSession, api, now: datetime | None = None) -> int:
     return len(users)
 
 
-def full_name(user: User | None) -> str | None:
-    if user is None:
-        return None
-    name = " ".join(p for p in (user.vk_first_name, user.vk_last_name) if p)
-    return name or None

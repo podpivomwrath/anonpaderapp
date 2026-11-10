@@ -41,13 +41,6 @@ def spec_weights(source_id: str | None, spec: str) -> dict[str, float]:
     return cc.SPEC_WEIGHTS[spec]
 
 
-def output_name(source_id: str, spec: str) -> str | None:
-    recipe = recipe_for(source_id)
-    if recipe is None or spec not in recipe.outputs:
-        return None
-    return recipe.outputs[spec].name
-
-
 # --- Веса ----------------------------------------------------------------------
 
 

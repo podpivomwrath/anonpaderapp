@@ -47,20 +47,6 @@ class InMemoryExchangeState:
         return self._net_sold
 
 
-class RedisExchangeState:
-    KEY = "exchange:net_donate_sold"
-
-    def __init__(self, redis) -> None:  # redis.asyncio.Redis
-        self._redis = redis
-
-    async def get_net_sold(self) -> int:
-        value = await self._redis.get(self.KEY)
-        return int(value) if value is not None else 0
-
-    async def add_net_sold(self, delta: int) -> int:
-        return int(await self._redis.incrby(self.KEY, delta))
-
-
 @dataclass
 class ExchangeQuote:
     buy_price: int    # золота за следующий лот при покупке

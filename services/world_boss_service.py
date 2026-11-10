@@ -309,6 +309,9 @@ class Granted:
     elixirs: dict[str, int] = field(default_factory=dict)
     group_kick: object | None = None
     almanac: str | None = None
+    #: Ежедневки и испытание на сбор реликвий (2026-11-10): раньше реликвии
+    #: с босса в задания не шли.
+    daily_notice: str | None = None
 
 
 def pool_share(boss: WorldBoss) -> float:
@@ -354,6 +357,12 @@ async def distribute(db: AsyncSession, boss: WorldBoss, rng: random.Random) -> l
         for elixir_id, amount in share.elixirs.items():
             await elixir_service.grant(db, character_id, elixir_id, amount)
         got.trophies = dict(share.trophies)
+        if share.trophies:
+            from bot import dailies_texts
+            from services import daily_service
+
+            got.daily_notice = dailies_texts.progress_notice(
+                await daily_service.record_relics(db, character, dict(share.trophies)))
         got.elixirs = dict(share.elixirs)
         if boss.status == KILLED:
             # Альманах травника (2026-10-23): босс - тоже моб, один бросок.

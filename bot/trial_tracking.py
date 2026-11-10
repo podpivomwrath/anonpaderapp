@@ -80,4 +80,4 @@ async def settle(session_id: int, won: bool) -> dict[int, list[str]]:
 def opened_text(buff_ids: list[str]) -> str:
     from services import trial_service
 
-    return "\n".join(f"📖 Испытание пройдено. Открыт бафф: {trial_service.buff_name(b)}." for b in buff_ids)
+    return trial_service.opened_text(buff_ids)

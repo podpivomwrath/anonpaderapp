@@ -38,10 +38,6 @@ def set_muted(vk_id: int, on: bool) -> None:
         _muted.discard(int(vk_id))
 
 
-def is_muted(vk_id: int) -> bool:
-    return int(vk_id) in _muted
-
-
 def peers_of(data: dict) -> list[int]:
     """Кому уходит сообщение. vkbottle шлёт по-разному: api.messages.send -
     peer_id числом, message.answer - peer_ids СПИСКОМ ([id]), рассылки -

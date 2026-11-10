@@ -207,7 +207,6 @@ async def handle_post_action(request: web.Request) -> web.Response:
         return web.json_response({"error": "bad_request"}, status=400)
 
     action = body.get("action")
-    settings: Settings = request.app[SETTINGS_KEY]
     # В журнал - тот, кто нажал: админ или модератор.
     admin_vk_id = request[VK_USER_ID_KEY]
 
@@ -625,7 +624,6 @@ async def handle_post_promo_codes(request: web.Request) -> web.Response:
         except ValueError:
             return web.json_response({"error": "bad_request"}, status=400)
 
-    settings: Settings = request.app[SETTINGS_KEY]
     session_factory = request.app[SESSION_FACTORY_KEY]
     async with session_factory() as db:
         try:
@@ -647,7 +645,6 @@ async def handle_delete_promo_code(request: web.Request) -> web.Response:
         promo_id = int(request.match_info["id"])
     except ValueError:
         return web.json_response({"error": "bad_request"}, status=400)
-    settings: Settings = request.app[SETTINGS_KEY]
     session_factory = request.app[SESSION_FACTORY_KEY]
     async with session_factory() as db:
         deleted = await promo_service.delete_code(db, request[VK_USER_ID_KEY], promo_id)

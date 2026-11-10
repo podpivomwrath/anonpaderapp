@@ -1,6 +1,8 @@
 import { useMemo, useState } from 'react';
 import { Group, Header, Button, Div, Text, Caption } from '@vkontakte/vkui';
-import { computeDerived } from '../formulas.js';
+import {
+  computeDerived, damageStatValue, primaryThreshold, PRIMARY_STAT_BY_CLASS,
+} from '../formulas.js';
 import { submitStats } from '../api.js';
 import StatRadar from './StatRadar.jsx';
 
@@ -32,14 +34,13 @@ function damageSource(c) {
 }
 
 // Порог урона (stat_model.primary_value): у Тёмного мистика он считается не
-// от Воли, а от смеси 0,6 Воли + 0,4 Интеллекта (репорт про Илью Лута,
-// 2026-11-09: подсказка сравнивала порог с полной Волей и пугала урезанием).
-const PRIMARY_KEY = { warrior: 'str', mage: 'int', rogue: 'agi' };
-
+// от Воли, а от смеси Воли и Интеллекта (2026-11-09, Илья Лут: подсказка
+// сравнивала порог с полной Волей и пугала урезанием). Числа - из formulas.js.
 function damageCapLine(c, st) {
-  const cap = Math.round((30 + 2 * c.level) * (c.base_class === 'rogue' ? 4 / 3 : 1));
+  const stat = PRIMARY_STAT_BY_CLASS[c.base_class];
+  const cap = Math.round(primaryThreshold(c.level, stat));
   const mystic = c.subclass === 'dark_mystic';
-  const value = Math.round(mystic ? 0.6 * (st?.wil || 0) + 0.4 * (st?.int || 0) : (st?.[PRIMARY_KEY[c.base_class]] || 0));
+  const value = Math.round(damageStatValue(c.subclass, stat, st));
   const what = mystic
     ? `В урон идёт 0,6 Воли и 0,4 Интеллекта с вещами, у вас это ${value}.`
     : `В урон идёт основная характеристика с вещами, у вас ${value}.`;

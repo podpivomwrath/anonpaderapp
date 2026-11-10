@@ -347,5 +347,3 @@ def total_effects(allocated: set[str]) -> dict[str, float]:
     return {k: round(v, 3) for k, v in total.items()}
 
 
-def points_total() -> int:
-    return sum(POINTS[n.kind] for n in build().values())

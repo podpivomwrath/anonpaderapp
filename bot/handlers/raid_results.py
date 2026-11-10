@@ -312,7 +312,7 @@ async def _grant_stage_reward(battle: raid_combat.RaidBattle, reward: StageRewar
                 lines.append(group_texts.level_gap_kick_self_line())
             character = next((c for c in characters if c.id == r.character_id), None)
             if character is not None and r.trophies:
-                daily_progress = await daily_service.record_trophies(db, character, r.trophies)
+                daily_progress = await daily_service.record_relics(db, character, r.trophies)
                 daily_notice = dailies_texts.progress_notice(daily_progress)
                 if daily_notice:
                     lines.append(daily_notice)
@@ -333,7 +333,7 @@ async def _grant_stage_reward(battle: raid_combat.RaidBattle, reward: StageRewar
                 if character is None or subclass_service.buff_pool(character) is None:
                     continue
                 for buff_id in await trial_service.record_level_kill(db, character, trial_level):
-                    opened = f"📖 Испытание пройдено. Открыт бафф: {trial_service.buff_name(buff_id)}."
+                    opened = trial_service.opened_line(buff_id)
                     notices[cid] = f"{notices[cid]}\n{opened}" if notices.get(cid) else opened
         await db.commit()
     return notices

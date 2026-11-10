@@ -92,7 +92,7 @@ async def _finish_duel(battle: pvp.Battle, winner_cid: int, loser_cid: int) -> N
     if daily_notice:
         win_text += f"\n\n{daily_notice}"
     for buff_id in trial_buffs:
-        win_text += f"\n\n📖 Испытание пройдено. Открыт бафф: {trial_service.buff_name(buff_id)}."
+        win_text += f"\n\n{trial_service.opened_line(buff_id)}"
     if pk.killer_lines:
         win_text += "\n\n" + "\n".join(pk.killer_lines)
     if payout.hunter_lines.get(winner_cid):
@@ -388,7 +388,7 @@ async def on_mass_battle_finished(session_id: int, result: TickResult) -> None:
             )
             if top > me.level:
                 trial_lines[cid] = [
-                    f"📖 Испытание пройдено. Открыт бафф: {trial_service.buff_name(b)}."
+                    trial_service.opened_line(b)
                     for b in await trial_service.record_level_kill(db, me, top)
                 ]
         await pvp_service.log_battle(db, "mass", list(battle.participants), winner_ids)

@@ -316,6 +316,27 @@ async def test_collect_trophy_count(db_session, make_character) -> None:
     assert "poisoner_toxicology" in unlocked
 
 
+async def test_record_relics_counts_daily_and_trial_with_one_notice(db_session, make_character) -> None:
+    """2026-11-10: реликвии из горстки пепла, со дна, с мирового босса, из
+    групп, рейдов и руин не шли в испытание на сбор. Одна точка входа -
+    daily_service.record_relics, открытый бафф - в том же уведомлении."""
+    from models import CharacterDaily
+    from services import daily_service
+
+    character = await make_character(subclass="poisoner")
+    db_session.add(CharacterDaily(character_id=character.id, quest_id="collector", progress=0, completed=False,
+                                  date=daily_service.today_msk(), target=100))
+    await db_session.flush()
+    await daily_service.record_relics(db_session, character, {"blood_shard": 4})
+    assert await _progress(db_session, character, "poisoner_toxicology") == 4
+    result = await daily_service.record_relics(db_session, character, {"blood_shard": 6})
+    assert "Открыт бафф" in (result.streak_notice or "")
+    row = (await db_session.execute(
+        __import__("sqlalchemy").select(CharacterDaily).where(CharacterDaily.character_id == character.id)
+    )).scalar_one()
+    assert row.progress == 10
+
+
 async def test_win_count_dropped_below_hp(db_session, make_character) -> None:
     character = await make_character(subclass="blood_knight")
     await trial_service.record_battle(db_session, character, _report(hp_min_pct=0.8))
@@ -373,20 +394,6 @@ async def test_get_trial_states_empty_without_subclass(db_session, make_characte
     character = await make_character()
     assert await trial_service.get_trial_states(db_session, character) == []
     assert await trial_service.record_battle(db_session, character, _report()) == []
-
-
-async def test_group_win_counts_location_trial(db_session, make_character):
-    """2026-10-15: «Дойди до Кострищ культа и победи там» засчитывается и
-    победой группы (раньше группа испытания не двигала - жалоба Archon)."""
-    from services import trial_service
-
-    c = await make_character(level=32)
-    c.subclass = "dark_mystic"
-    c.pos_x, c.pos_y = -8, -9  # Кострища культа
-    unlocked = await trial_service.record_group_win(db_session, c)
-    assert "dark_mystic_echo" in unlocked
-    c.pos_x, c.pos_y = 0, 28  # не Кострища - ничего
-    assert "dark_mystic_echo" not in await trial_service.record_group_win(db_session, c)
 
 
 async def test_never_below_hp_resets_when_broken(db_session, make_character) -> None:

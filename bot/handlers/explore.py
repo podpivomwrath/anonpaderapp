@@ -342,12 +342,17 @@ async def collect_ash_handful(message: Message) -> None:
         text += f"\n{raid_key_texts.raid_key_drop_line()}"
     if result.group_kick is not None and result.group_kick.kicked_character_id == character.id:
         text += f"\n\n{group_texts.level_gap_kick_self_line()}"
+    daily_notice = dailies_texts.progress_notice(result.daily) if result.daily is not None else None
+    if daily_notice:
+        text += f"\n\n{daily_notice}"
     # Сводку локации заново не шлём: игрок на той же клетке, она только что
     # была выше (2026-10-13). Клавиатура карты остаётся рабочей.
     await message.answer(
         text, keyboard=kb.movement_keyboard(character.pos_x, character.pos_y, peer_id, has_mount=has_mount),
     )
     await stats_window.notify_levelup(peer_id, result.levels_gained, result.new_level)
+    for c in (result.daily.completed if result.daily is not None else []):
+        await stats_window.notify_levelup(peer_id, c.levels_gained, c.new_level)
     await group_texts.notify_group_kick(world._bot_api, result.group_kick)
 
 

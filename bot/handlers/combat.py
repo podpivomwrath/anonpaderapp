@@ -697,7 +697,7 @@ async def on_battle_finished(session_id: int, result: TickResult) -> None:
             # патч 12: испытание завершено — микробафф открыт навсегда
             await _bot_api.messages.send(
                 peer_id=peer_id,
-                message=f"📖 Испытание пройдено. Открыт бафф: {trial_service.buff_name(buff_id)}.",
+                message=trial_service.opened_line(buff_id),
                 random_id=0,
             )
 

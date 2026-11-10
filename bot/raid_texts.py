@@ -196,15 +196,6 @@ def group_touch_notice(leader_name: str, raid_id: str = rc.RAID_PUPPET_THEATRE_I
     )
 
 
-def raid_key_missing_line() -> str:
-    return NO_KEY_TEXT
-
-
-def stage_loot_line(stage: int) -> str:
-    mult = {1: rc.STAGE1_LOOT_MULT, 2: rc.STAGE2_LOOT_MULT, 3: rc.STAGE3_LOOT_MULT}[stage]
-    return f"×{mult} к трофеям и опыту за этот этап."
-
-
 def contribution_table(rows) -> str:
     """Патч 69: общие итоги захода - ОДИН И ТОТ ЖЕ текст всем участникам.
 

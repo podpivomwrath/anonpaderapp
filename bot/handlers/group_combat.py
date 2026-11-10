@@ -790,7 +790,7 @@ async def on_group_tick_resolved(session_id: int, tick: int, result: TickResult)
                         lines.append(group_texts.level_gap_kick_self_line())
                     character = next((c for c in characters if c.id == r.character_id), None)
                     if character is not None and r.trophies:
-                        daily_progress = await daily_service.record_trophies(db, character, r.trophies)
+                        daily_progress = await daily_service.record_relics(db, character, r.trophies)
                         daily_notice = dailies_texts.progress_notice(daily_progress)
                         if daily_notice:
                             lines.append(daily_notice)
@@ -922,7 +922,7 @@ async def on_group_battle_finished(session_id: int, result: TickResult) -> None:
             for buff_id in trial_buffs.get(cid, []):
                 await _bot_api.messages.send(
                     peer_id=p.peer_id, random_id=0,
-                    message=f"📖 Испытание пройдено. Открыт бафф: {trial_service.buff_name(buff_id)}.",
+                    message=trial_service.opened_line(buff_id),
                 )
             if cid in raised_ids:
                 await _bot_api.messages.send(

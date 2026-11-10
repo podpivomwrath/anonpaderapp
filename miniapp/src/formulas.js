@@ -78,14 +78,27 @@ const hyper = (x, cap, k) => (x > 0 ? (cap * x) / (x + k) : 0);
 // Порог Ловкости выше в 2/1.5 раза - одинаковый по урону с Силой и Интеллектом.
 const PRIMARY_SOFT_STAT_MULT = { agi: 4 / 3 };
 
+/** Порог, до которого основная характеристика идёт в урон полностью. */
+export function primaryThreshold(level, stat = 'str') {
+  return (PRIMARY_SOFT_BASE + PRIMARY_SOFT_PER_LEVEL * level) * (PRIMARY_SOFT_STAT_MULT[stat] ?? 1);
+}
+
 export function primaryEffective(value, level, stat = 'str') {
-  const threshold = (PRIMARY_SOFT_BASE + PRIMARY_SOFT_PER_LEVEL * level) * (PRIMARY_SOFT_STAT_MULT[stat] ?? 1);
+  const threshold = primaryThreshold(level, stat);
   return value <= threshold ? value : threshold + (value - threshold) * PRIMARY_OVER;
 }
 
 export const PRIMARY_STAT_BY_CLASS = { warrior: 'str', rogue: 'agi', mage: 'int' };
 const DARK_MYSTIC_DAMAGE_WILL_SHARE = 0.6;
 const DARK_MYSTIC_DAMAGE_INT_SHARE = 0.4;
+
+/** Сколько очков идёт в урон до порога (stats - уже с вещами), как
+ * stat_model.damage_stat_value: у Тёмного мистика - смесь Воли и Интеллекта. */
+export function damageStatValue(subclass, primaryStat, stats) {
+  return subclass === 'dark_mystic'
+    ? DARK_MYSTIC_DAMAGE_WILL_SHARE * stats.wil + DARK_MYSTIC_DAMAGE_INT_SHARE * stats.int
+    : (stats[primaryStat] ?? 0);
+}
 
 /**
  * Округление «половина к чётному» - то же, что делает round() в Python.
@@ -128,9 +141,7 @@ export function computeDerived({ level, baseClass, subclass = null, stats, gearB
   const wil = stats.wil + (gearBonus.wil ?? 0);
   // Тёмный мистик бьёт от Воли, Интеллект вторичный (2026-10-29), как в
   // stat_model.damage_stat_value.
-  const primaryValue = subclass === 'dark_mystic'
-    ? DARK_MYSTIC_DAMAGE_WILL_SHARE * wil + DARK_MYSTIC_DAMAGE_INT_SHARE * int_
-    : ({ str, agi, int: int_ }[primaryStat] ?? 0);
+  const primaryValue = damageStatValue(subclass, primaryStat, { str, agi, int: int_, wil });
   const kDmg = K_DMG[primaryStat];
 
   const hpMult = (subclass ? 1 : (BASE_CLASS_HP_MULT[baseClass] ?? 1));

@@ -1,7 +1,7 @@
 """Тексты уведомлений ежедневных заданий и наград за вход (патч 23)."""
 
 from services import elixir_service, title_service
-from services.daily_service import DailiesOverview, DailyProgressResult, LoginCycleState
+from services.daily_service import DailiesOverview, DailyProgressResult
 from services.daily_service import _days
 
 
@@ -89,14 +89,3 @@ def dailies_overview_text(overview: DailiesOverview) -> str:
     return "\n".join(lines)
 
 
-def login_overview_text(state: LoginCycleState) -> str:
-    lines = ["📅 Награда за вход", "", f"Серия входов: {_days(state.login_streak)}"]
-    lines.append(f"День цикла: {state.cycle_day}/{state.cycle_length}")
-    if state.today_reward is not None:
-        status = "уже получена сегодня" if state.claimed_today else "будет выдана автоматически"
-        lines.append(f"Награда дня: {reward_preview(state.today_reward)} ({status})")
-    next_day = state.cycle_day % state.cycle_length + 1
-    next_reward = state.rewards.get(next_day)
-    if next_reward is not None:
-        lines.append(f"Завтра (день {next_day}): {reward_preview(next_reward)}")
-    return "\n".join(lines)

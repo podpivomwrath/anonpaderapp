@@ -388,7 +388,13 @@ async def _resolve_junk(db, character) -> tuple[str, str]:
             f"{trophy_service.trophy_def(tid).emoji} {trophy_service.trophy_def(tid).name} x{n}"
             for tid, n in drop.items()
         )
-        return (f"📦 Отсыревший ящик. Внутри: {names}", kb.lake_keyboard())
+        # Реликвии со дна - тоже в задания на сбор (2026-11-10).
+        from bot import dailies_texts
+        from services import daily_service
+
+        notice = dailies_texts.progress_notice(await daily_service.record_relics(db, character, drop))
+        text = f"📦 Отсыревший ящик. Внутри: {names}" + (f"\n\n{notice}" if notice else "")
+        return (text, kb.lake_keyboard())
 
     junk_id = _rng.choice(list(fc.JUNK_ITEMS))
     _emoji, _name, price = fc.JUNK_ITEMS[junk_id]

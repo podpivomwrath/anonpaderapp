@@ -59,14 +59,6 @@ async def test_herbalists_level_counts_only_active_herbalists(db_session, charac
     assert await herb_service.herbalists_level(db_session, NOW) == 11
 
 
-async def test_regrow_rerolls_existing_patches(db_session, character_at) -> None:
-    patch = await _plant(db_session, 5, 20)
-    patch.herb_id = next(h.id for h in herbalism.herb_defs_ordered() if h.tier == 5)
-    await db_session.flush()
-    assert await herb_service.regrow_all(db_session, random.Random(3), NOW) == 1
-    assert herbalism.herb_def(patch.herb_id).tier <= 2  # травников нет - уровень 1
-
-
 def test_xp_curve_and_cap() -> None:
     assert herbalism.xp_to_next(1) == 41 and herbalism.xp_to_next(hc.MAX_LEVEL) == 0
     # 2026-10-21, «ещё медленнее»: до 50-го ~19 000 опыта (было 5 390).

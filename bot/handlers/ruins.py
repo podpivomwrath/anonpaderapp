@@ -647,20 +647,6 @@ def _merge_daily(a, b):
     return a
 
 
-async def _relic_progress(db, character: Character, drop: dict[str, int]):
-    """Реликвии в мешок - в ежедневки на сбор реликвий и в испытания класса
-    («Соберите 10 Кровяных осколков»), как с мобов в мире (2026-11-09)."""
-    from bot import trial_tracking
-    from services import daily_service, trial_service
-
-    result = await daily_service.record_trophies(db, character, drop)
-    opened = await trial_service.record_trophies(db, character, drop)
-    if opened:
-        result = _merge_daily(result, daily_service.DailyProgressResult(
-            streak_notice=trial_tracking.opened_text(opened)))
-    return result
-
-
 async def _record_dailies(hp: dict[int, int], top: dict[int, int], floor: int,
                           drops: dict[int, dict] | None = None) -> dict[int, object]:
     """Победа в комнате - выигранный бой для ежедневок, как групповой бой с
@@ -685,7 +671,7 @@ async def _record_dailies(hp: dict[int, int], top: dict[int, int], floor: int,
                                       hp_min_pct=1.0, only_skills=False, only_basic_attack=False)
                 out[cid] = await daily_service.record_battle(db, character, report)
                 if drops.get(cid):
-                    out[cid] = _merge_daily(out[cid], await _relic_progress(db, character, drops[cid]))
+                    out[cid] = _merge_daily(out[cid], await daily_service.record_relics(db, character, drops[cid]))
             await db.commit()
     except Exception:
         logger.exception("Руины: ежедневки после комнаты не записаны")
@@ -792,13 +778,15 @@ async def room_choice(message: Message) -> None:
 
 async def _record_trophy_dailies(drops: dict[int, dict]) -> dict[int, object]:
     """Реликвии из особой комнаты - в задания на сбор реликвий."""
+    from services import daily_service
+
     out: dict[int, object] = {}
     try:
         async with get_session_factory()() as db:
             for cid, drop in drops.items():
                 character = await db.get(Character, cid) if drop else None
                 if character is not None:
-                    out[cid] = await _relic_progress(db, character, drop)
+                    out[cid] = await daily_service.record_relics(db, character, drop)
             await db.commit()
     except Exception:
         logger.exception("Руины: реликвии комнаты не записаны в ежедневки")

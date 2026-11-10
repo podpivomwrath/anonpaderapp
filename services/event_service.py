@@ -119,7 +119,7 @@ async def apply_outcome(
         daily_completed += progress.completed
         daily_streak_notice = "\n".join(filter(None, [daily_streak_notice, progress.streak_notice])) or None
 
-    lines += [f"📖 Испытание пройдено. Открыт бафф: {trial_service.buff_name(b)}." for b in trial_buffs]
+    lines += [trial_service.opened_line(b) for b in trial_buffs]
 
     levels_gained = 0
     new_level = character.level

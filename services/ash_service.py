@@ -28,6 +28,7 @@ class AshCollectResult:
     raid_key_dropped: bool = False  # патч 45, ч.4 — Ключ Монолита
     xp_premium_applied: bool = False  # патч 51, ч.1
     group_kick: "group_service.LevelGapKick | None" = None  # патч 51, ч.2
+    daily: object = None  # ежедневки и испытание на сбор реликвий (2026-11-10)
 
 
 async def collect(
@@ -40,6 +41,9 @@ async def collect(
     if levelup.levels_gained > 0:
         group_kick = await group_service.enforce_level_gap(db, character)
     trophies = await trophy_service.grant_from_event(db, character, rng)  # 1 бросок
+    from services import daily_service  # избегаем цикла импортов
+
+    daily = await daily_service.record_relics(db, character, trophies)
     item = None
     if rng.random() < ac.ASH_ITEM_CHANCE:
         item = await item_service.grant_random_item(db, character, character.level, rng)
@@ -48,5 +52,5 @@ async def collect(
         xp=levelup.xp_awarded, trophies=trophies, item=item,
         levels_gained=levelup.levels_gained, new_level=levelup.new_level,
         raid_key_dropped=raid_key_dropped, xp_premium_applied=levelup.premium_applied,
-        group_kick=group_kick,
+        group_kick=group_kick, daily=daily,
     )

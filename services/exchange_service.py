@@ -117,20 +117,6 @@ async def my_orders(db: AsyncSession, character_id: int, limit: int = 15) -> lis
     )
 
 
-async def recent_orders(db: AsyncSession, limit: int = 40) -> list[ExchangeOrder]:
-    return list(
-        (
-            await db.scalars(
-                select(ExchangeOrder).order_by(ExchangeOrder.created_at.desc(), ExchangeOrder.id.desc()).limit(limit)
-            )
-        ).all()
-    )
-
-
-def is_buy(order: ExchangeOrder) -> bool:
-    return order.direction == OrderDirection.BUY
-
-
 # --- График: курс на закрытие дня ----------------------------------------------
 
 _TZ = ZoneInfo("Europe/Moscow")

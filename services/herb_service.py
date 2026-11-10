@@ -8,7 +8,7 @@ import random
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 
-from sqlalchemy import delete, func, select
+from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from game.content_loader import HerbDef
@@ -65,19 +65,6 @@ async def herbalists_level(db: AsyncSession, now: datetime | None = None) -> flo
         if levels:
             return sum(levels) / len(levels)
     return 1.0
-
-
-async def regrow_all(db: AsyncSession, rng: random.Random, now: datetime | None = None) -> int:
-    """Перерастить всю траву на карте под нынешних травников: клетки и
-    время остаются, вид травы выбирается заново (2026-10-22, разово после
-    смены правила)."""
-    now = now or _now()
-    level = await herbalists_level(db, now)
-    patches = list(await db.scalars(select(HerbPatch).where(HerbPatch.spawned_at >= _fresh_since(now))))
-    for patch in patches:
-        patch.herb_id = herbalism.roll_herb(rng, level).id
-    await db.flush()
-    return len(patches)
 
 
 async def visible_here(db: AsyncSession, character: Character, now: datetime | None = None) -> tuple[HerbPatch, HerbDef] | None:
@@ -229,8 +216,3 @@ async def get_bag(db: AsyncSession, character_id: int) -> list[tuple[HerbDef, in
     return [(h, counts[h.id]) for h in herbalism.herb_defs_ordered() if counts.get(h.id)]
 
 
-async def alive_count(db: AsyncSession, now: datetime | None = None) -> int:
-    now = now or _now()
-    return await db.scalar(select(func.count()).select_from(HerbPatch).where(
-        HerbPatch.spawned_at >= _fresh_since(now)
-    )) or 0

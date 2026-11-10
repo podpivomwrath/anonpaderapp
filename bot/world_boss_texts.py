@@ -117,6 +117,8 @@ def reward_lines(got) -> list[str]:
         lines.append("🎒 " + ", ".join(elixirs) + ".")
     if getattr(got, "almanac", None):
         lines.append(got.almanac)
+    if getattr(got, "daily_notice", None):
+        lines.append(got.daily_notice)
     return lines
 
 

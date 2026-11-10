@@ -43,11 +43,6 @@ def buff_pool(character) -> str | None:
     return None
 
 
-def is_path_pool(pool: str | None) -> bool:
-    """Пул базового класса: открыт сразу, без испытаний."""
-    return bool(pool) and pool.endswith(PATH_SUFFIX)
-
-
 def decline(character: Character) -> None:
     """Отказ от подкласса - бесплатно и навсегда (снимает только смена класса)."""
     character.subclass_declined = True

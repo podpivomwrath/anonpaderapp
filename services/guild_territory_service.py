@@ -10,7 +10,7 @@ import random
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 
-from sqlalchemy import delete, func, select
+from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from game.economy import guild_config as gc
@@ -747,5 +747,3 @@ async def territory_counts(db: AsyncSession, guild_id: int) -> dict[str, int]:
     }
 
 
-async def held_count(db: AsyncSession) -> int:
-    return await db.scalar(select(func.count()).select_from(GuildCell).where(GuildCell.status == "held")) or 0

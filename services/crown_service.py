@@ -214,14 +214,3 @@ async def recompute(db: AsyncSession) -> list[Displaced]:
     return displaced
 
 
-async def holders(db: AsyncSession) -> dict[str, int]:
-    """Доска -> id держателя. Для показа венцов там, где персонажа под рукой
-    нет (чужие профили, строки топа)."""
-    rows = (
-        await db.scalars(select(Character).where(Character.creation_state.is_(None)))
-    ).all()
-    found: dict[str, int] = {}
-    for character in rows:
-        for board in _crowns(character):
-            found[board] = character.id
-    return found

@@ -421,6 +421,27 @@ async def record_trophies(
     return await _with_guild(db, character, "trophies", sum(trophies.values()), result)
 
 
+async def record_relics(
+    db: AsyncSession, character: Character, trophies: dict[str, int],
+) -> DailyProgressResult:
+    """Реликвии, найденные игроком: ежедневки и гильдейское задание на сбор
+    (record_trophies) плюс испытание класса на сбор («10 Кровяных осколков»).
+    Открытый бафф - строкой в streak_notice, чтобы уведомление было одно.
+    Для мест, которые сами не ведут испытания (горстка пепла, дно озера,
+    мировой босс, групповые бои, рейды, руины) - 2026-11-10: реликвии оттуда
+    в задания не шли. Соло-бой и события ведут испытания сами."""
+    from services import subclass_service, trial_service  # избегаем цикла импортов
+
+    result = await record_trophies(db, character, trophies)
+    if not trophies or subclass_service.buff_pool(character) is None:
+        return result
+    opened = await trial_service.record_trophies(db, character, trophies)
+    if opened:
+        text = trial_service.opened_text(opened)
+        result.streak_notice = "\n".join(x for x in (result.streak_notice, text) if x)
+    return result
+
+
 async def record_cell_moved(
     db: AsyncSession, character: Character, cells: int = 1, guild_cells: int | None = None,
 ) -> DailyProgressResult:

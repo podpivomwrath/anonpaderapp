@@ -236,26 +236,6 @@ async def record_battle(db: AsyncSession, character: Character, report: BattleRe
     return unlocked
 
 
-async def record_group_win(db: AsyncSession, character: Character) -> list[str]:
-    """Победа в групповом PvE-бою (2026-10-15): раньше группа не двигала
-    испытания вовсе, и «дойди до места и победи там» не засчитывалось
-    тем, кто ходит группой. Засчитываем только испытания места - у
-    остальных условия про криты, серии и навыки считаются по соло-бою."""
-    from game.world import location_types
-
-    if character.pos_x is None or character.pos_y is None:
-        return []
-    loc = location_types.location_type_at(character.pos_x, character.pos_y)
-    unlocked: list[str] = []
-    for trial in await _active_trials(db, character):
-        if trial.condition_type != "reach_location_win":
-            continue
-        buff = await _apply_delta(db, character.id, trial, int(loc.id == trial.params.get("location_type")))
-        if buff:
-            unlocked.append(buff)
-    return unlocked
-
-
 async def record_defeat(db: AsyncSession, character: Character) -> None:
     """Поражение сбрасывает стрики «подряд» — не только бой без отдыха.
     Побег из боя - тоже поражение для серий (2026-10-25)."""
@@ -306,6 +286,15 @@ EVENT_CHOICE_CODES = {
     "Помолиться": "pray",
     "Осквернить": "desecrate",
 }
+
+
+def opened_line(buff_id: str) -> str:
+    """Строка игроку: испытание пройдено, бафф открыт. Одна на всю игру."""
+    return f"📖 Испытание пройдено. Открыт бафф: {buff_name(buff_id)}."
+
+
+def opened_text(buff_ids) -> str:
+    return "\n".join(opened_line(b) for b in buff_ids)
 
 
 def buff_name(buff_id: str) -> str:

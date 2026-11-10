@@ -137,6 +137,3 @@ def mob_kind(layout: dict) -> tuple[str, str, str, str]:
     return rc.MOB_KINDS[layout.get("mobs", 0) % len(rc.MOB_KINDS)]
 
 
-def roll_rune_dice(rng: random.Random, floor: int) -> int:
-    """Сколько рун выпало с босса этажа одному игроку."""
-    return sum(1 for _ in range(rc.rune_dice(floor)) if rng.random() < rc.rune_die_chance(floor))

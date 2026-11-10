@@ -60,11 +60,6 @@ def _banned_words() -> tuple[str, ...]:
     return tuple(words)
 
 
-def reload_banned_words() -> None:
-    """Сбросить кэш (файл пополняется без правки кода)."""
-    _banned_words.cache_clear()
-
-
 async def get_or_create_user(db: AsyncSession, vk_id: int) -> User:
     user = await db.scalar(select(User).where(User.vk_id == vk_id))
     if user is None:
