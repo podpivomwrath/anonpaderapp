@@ -11,7 +11,7 @@
 
 from game.combat import balance_config as bc
 from game.combat import shared_rules
-from game.combat import combat_flavor, control
+from game.combat import ability_rules, combat_flavor, control
 from game.classes.base import Role, SubclassDef, register
 from game.combat.session import CombatMode, Effect, EffectKind
 from game.combat.skills import PendingHit, SkillContext, compute_hit, offensive_skill, set_cooldown
@@ -144,7 +144,9 @@ def disrupt(ctx: SkillContext) -> None:
         pvp = ctx.session.mode != CombatMode.PVE
         res = control.try_apply_control(
             target, base_duration=bc.CONTROL_BASE_DURATION_TICKS, source_id=actor.id, rng=ctx.rng, pvp=pvp,
-            chance_bonus=actor.buff_modifiers.get(f"rune:grip@{skill.id}", 0.0),
+            chance_bonus=actor.buff_modifiers.get(f"rune:grip@{skill.id}", 0.0)
+            + ability_rules.mod(actor, "skill_ctrl_pierce", skill.id),
+            duration_bonus=ability_rules.ctrl_mobs_bonus(actor, skill.id, target),
         )
         if res.immune:
             ctx.lines.append(combat_flavor.control_blocked_line(target.name, res.reason))
@@ -191,6 +193,7 @@ def toxic_burst(ctx: SkillContext) -> None:
     # Руна «Нажим» (2026-11-02, жалоба игрока): выброс бьёт мимо compute_hit,
     # где руна считается для остальных навыков, - без этой строки она молчала.
     amount = round(amount * (1 + actor.buff_modifiers.get(f"rune:press@{skill.id}", 0.0)))
+    amount = round(amount * (1 + actor.buff_modifiers.get(f"rune:{skill.id}", 0.0)))  # сила руны-навыка
     ctx.hits.append(PendingHit(source_id=actor.id, target_id=target.id, amount=amount, label="взрывает ядом", is_dot=True))
     # «Токсичный всплеск» (2026-10-23, владелец): выброс - тоже конец яда,
     # он вспыхивает напоследок, как при истечении (shared_rules.poison_end_effects).

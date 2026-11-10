@@ -60,7 +60,7 @@ from bot.pvp_texts import (
 )
 from game.combat import balance_config as bc
 from game.combat import battle_log, display, elixir_effects
-from game.combat.base_skills import BASE_SKILL_DEFS
+from game.combat import skill_catalog
 from game.combat.resolver import TickResult
 from game.combat.session import (
     ActionType,
@@ -73,7 +73,6 @@ from game.combat.session import (
     build_combatant,
 )
 from game.combat.skills import DEFENSIVE_SKILLS
-from game.combat.subclass_skills import SUBCLASS_SKILL_DEFS
 from game.combat.tick_engine import TickEngine
 from game.combat import consumable_limit
 from game.economy import elixir_config as ec
@@ -288,7 +287,7 @@ def rebuild_keyboard(peer_id: int) -> str | None:
         return pvp_waiting_keyboard()
     if participant.character_id in _declared_this_tick.get(battle_id, set()):
         return pvp_waiting_keyboard()
-    return pvp_combat_keyboard(participant.base_class, combatant.cooldowns, subclass_id=combatant.subclass_id, show_target=True)
+    return pvp_combat_keyboard(combatant, show_target=True)
 
 
 def _new_battle_id() -> int:
@@ -751,9 +750,7 @@ async def start_arena_room(db, roster: list[tuple[Character, int, int]], code: s
         combatant = state.combatants[p.character_id]
         await _bot_api.messages.send(
             peer_id=p.peer_id, message=board, random_id=0,
-            keyboard=pvp_combat_keyboard(
-                p.base_class, combatant.cooldowns, subclass_id=combatant.subclass_id, show_target=True,
-            ),
+            keyboard=pvp_combat_keyboard(combatant, show_target=True),
         )
 
 
@@ -784,9 +781,7 @@ async def _launch_duel(
         combatant = state.combatants[p.character_id]
         await _bot_api.messages.send(
             peer_id=p.peer_id, message=f"{intro}\n\n{_render_mass(state, [])}", random_id=0,
-            keyboard=pvp_combat_keyboard(
-                p.base_class, combatant.cooldowns, subclass_id=combatant.subclass_id, show_target=True,
-            ),
+            keyboard=pvp_combat_keyboard(combatant, show_target=True),
         )
 
 
@@ -824,9 +819,7 @@ async def _start_group_ambush(db, attacker: Character, attacker_peer_id: int, vi
         combatant = state.combatants[p.character_id]
         await _bot_api.messages.send(
             peer_id=p.peer_id, message=board, random_id=0,
-            keyboard=pvp_combat_keyboard(
-                p.base_class, combatant.cooldowns, subclass_id=combatant.subclass_id, show_target=True,
-            ),
+            keyboard=pvp_combat_keyboard(combatant, show_target=True),
         )
 
 
@@ -920,9 +913,7 @@ async def _handle_join_choice(message: Message, battle_id, side) -> None:
     if target_line:
         text += f"\n{target_line}"
     await message.answer(
-        text, keyboard=pvp_combat_keyboard(
-            participant.base_class, {}, show_target=True, subclass_id=combatant.subclass_id,
-        ),
+        text, keyboard=pvp_combat_keyboard(combatant, fresh=True, show_target=True),
     )
 
 
@@ -988,9 +979,7 @@ async def start_siege_battle(
         combatant = state.combatants[p.character_id]
         await _bot_api.messages.send(
             peer_id=p.peer_id, message=board, random_id=0, attachment=photo_attachment(SIEGE_PHOTO_ID),
-            keyboard=pvp_combat_keyboard(
-                p.base_class, combatant.cooldowns, subclass_id=combatant.subclass_id, show_target=True,
-            ),
+            keyboard=pvp_combat_keyboard(combatant, show_target=True),
         )
     return battle_id
 
@@ -1034,7 +1023,7 @@ async def pvp_defend(message: Message) -> None:
 async def pvp_skill(message: Message) -> None:
     payload = message.get_payload_json() or {}
     skill_id = payload.get("id")
-    if skill_id not in BASE_SKILL_DEFS and skill_id not in SUBCLASS_SKILL_DEFS:
+    if skill_id not in skill_catalog.ALL_SKILL_DEFS:
         return
     peer_id = message.peer_id
     battle_id = _peer_battle.get(peer_id)
@@ -1053,7 +1042,7 @@ async def pvp_skill(message: Message) -> None:
         # Патч 30, баг 2: бой активен — без клавиатуры игрок теряет кнопки.
         participant = battle.participants.get(cid)
         keyboard = (
-            pvp_combat_keyboard(participant.base_class, combatant.cooldowns, subclass_id=combatant.subclass_id, show_target=battle.battle_type == "mass")
+            pvp_combat_keyboard(combatant, show_target=battle.battle_type == "mass")
             if participant else None
         )
         await message.answer(f"⏳ Навык ещё не готов (КД {cd}).", keyboard=keyboard)
@@ -1249,7 +1238,7 @@ async def pvp_pick_target(message: Message) -> None:
     board = f"🎯 Цель: {target.name}.\n\n{_battle_board_text(battle_id, battle, [])}"
     await _bot_api.messages.send(
         peer_id=peer_id, message=board, random_id=0,
-        keyboard=pvp_combat_keyboard(participant.base_class, me.cooldowns, subclass_id=me.subclass_id, show_target=True),
+        keyboard=pvp_combat_keyboard(me, show_target=True),
     )
 
 
@@ -1273,10 +1262,7 @@ async def pvp_target_back(message: Message) -> None:
     await editable_message.send_or_edit(_bot_api, "pvp_target", peer_id, "Возврат в бой.", no_keyboard())
     await _bot_api.messages.send(
         peer_id=peer_id, message=_battle_board_text(battle_id, battle, []), random_id=0,
-        keyboard=pvp_combat_keyboard(
-            participant.base_class, combatant.cooldowns, show_target=battle.battle_type == "mass",
-            subclass_id=combatant.subclass_id,
-        ),
+        keyboard=pvp_combat_keyboard(combatant, show_target=battle.battle_type == "mass"),
     )
 
 
@@ -1305,7 +1291,7 @@ async def pvp_open_items(message: Message) -> None:
     participant = battle.participants.get(cid)
     if combatant is None or participant is None:
         return
-    battle_kb = pvp_combat_keyboard(participant.base_class, combatant.cooldowns, subclass_id=combatant.subclass_id, show_target=battle.battle_type == "mass")
+    battle_kb = pvp_combat_keyboard(combatant, show_target=battle.battle_type == "mass")
     free = battle.arena and prerelease_config.arena_free_elixirs()
     if battle.arena and not free:
         # Арена - бой без потерь: тратить эликсиры здесь нельзя.
@@ -1367,7 +1353,7 @@ async def pvp_use_item(message: Message) -> None:
     participant = battle.participants.get(cid)
     if combatant is None or participant is None:
         return
-    battle_kb = pvp_combat_keyboard(participant.base_class, combatant.cooldowns, subclass_id=combatant.subclass_id, show_target=battle.battle_type == "mass")
+    battle_kb = pvp_combat_keyboard(combatant, show_target=battle.battle_type == "mass")
     free = battle.arena and prerelease_config.arena_free_elixirs()
     if battle.arena and not free:
         # Арена - бой без потерь: тратить эликсиры здесь нельзя.
@@ -1422,7 +1408,7 @@ async def pvp_use_item(message: Message) -> None:
     text = f"{line} Ваш ход.\n\n{_battle_board_text(battle_id, battle, [])}"
     await _bot_api.messages.send(
         peer_id=peer_id, message=text, random_id=0,
-        keyboard=pvp_combat_keyboard(participant.base_class, combatant.cooldowns, subclass_id=combatant.subclass_id),
+        keyboard=pvp_combat_keyboard(combatant),
     )
 
 

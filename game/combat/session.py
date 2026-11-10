@@ -65,6 +65,11 @@ class EffectKind(StrEnum):
     # нерфа контроля в PvP развалилась совсем. Метка живёт своим окном и
     # разводит «как долго цель стоит» и «успеешь ли ты добить по холоду».
     CHILLED = "chilled"
+    # --- Руны-навыки (2026-11-10) ---
+    # Горькая рана и ступени: входящее лечение и новые щиты слабее на value.
+    HEAL_REDUCTION = "heal_reduction"
+    # Немота: цель не может применять навыки (только удар, защита, предмет).
+    SILENCE = "silence"
 
 
 class DeclaredAction(BaseModel):
@@ -349,6 +354,9 @@ class CombatantState:
             # Затухание щитов в PvP. Отголосок не режем второй раз: он из
             # лечения, которое уже срезано.
             value = round(value * getattr(self, "recovery_mult", 1.0))
+        if kind == EffectKind.SHIELD_POOL:
+            # Горькая рана (2026-11-10): новые щиты на цель слабее.
+            value = round(value * (1.0 - self.heal_reduction()))
         for effect in self.effects:
             # Щиты с разными метками не сливаются: мистик со своим Оберегом
             # выпил «Второе сердце» - это два щита, а не один перезаписанный.
@@ -395,6 +403,11 @@ class CombatantState:
             for effect in old:
                 effect.value *= keep
             fatigue[kind] = fatigue.get(kind, 1.0) * keep
+
+    def heal_reduction(self) -> float:
+        """Насколько слабее входящее лечение и новые щиты (Горькая рана)."""
+        return min(max((e.value for e in self.effects
+                        if e.kind == EffectKind.HEAL_REDUCTION and e.remaining_ticks > 0), default=0.0), 0.9)
 
     def is_on_cooldown(self, skill_id: str) -> bool:
         return self.cooldowns.get(skill_id, 0) > 0

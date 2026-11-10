@@ -127,3 +127,21 @@ RAID = CombatModeUi(
 )
 
 ALL_MODES: tuple[CombatModeUi, ...] = (SOLO_PVE, PVP, GROUP_PVE, RAID)
+
+
+def skill_items(combatant, payload_type: str, fresh: bool = False) -> list:
+    """Кнопки навыков бойца (руны-навыки, 2026-11-10): навыки - те, что
+    вставлены в слоты рун (ключи "ability:" в buff_modifiers), а не навыки
+    класса. Навык на перезарядке - с остатком, но нажимается: обработчик
+    ответит «не готов» без траты хода. fresh - бой только начался."""
+    from vkbottle import KeyboardButtonColor
+    from game.combat import skill_catalog
+
+    cooldowns = {} if fresh else (getattr(combatant, "cooldowns", None) or {})
+    items = []
+    for skill in skill_catalog.skills_of(getattr(combatant, "buff_modifiers", None)):
+        cd = cooldowns.get(skill.id, 0)
+        label = skill.name if cd <= 0 else f"{skill.name} (КД {cd})"
+        color = KeyboardButtonColor.PRIMARY if cd <= 0 else KeyboardButtonColor.SECONDARY
+        items.append((label, color, {"type": payload_type, "id": skill.id}))
+    return items

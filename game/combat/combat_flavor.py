@@ -125,10 +125,9 @@ def unimplemented_skill_line(actor_name: str, skill_id: str | None) -> str:
     разработчика. Если страховка всё же сработает, пусть выглядит как часть
     игры, а не как утечка из исходников.
     """
-    from game.combat.base_skills import BASE_SKILL_DEFS
-    from game.combat.subclass_skills import SUBCLASS_SKILL_DEFS
+    from game.combat import skill_catalog
 
-    definition = BASE_SKILL_DEFS.get(skill_id) or SUBCLASS_SKILL_DEFS.get(skill_id)
+    definition = skill_catalog.skill_def(skill_id)
     name = definition.name if definition is not None else "приём"
     return f"{actor_name} пытается применить «{name}», но ничего не выходит."
 

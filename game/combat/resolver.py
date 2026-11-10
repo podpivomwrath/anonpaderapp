@@ -380,6 +380,19 @@ def _display_mode(session: CombatSessionState) -> str:
     return display.MODE_PVE_NUM if session.mode == CombatMode.PVE else display.MODE_PVP
 
 
+def _own_skill_or_attack(actor, action: DeclaredAction) -> DeclaredAction:
+    """Навык персонажа - только из его рун-навыков (2026-11-10). Старая
+    кнопка или подставной payload с чужим навыком - обычная атака по той же
+    цели, ход не пропадает. Мобов и прочих не персонажей не трогаем."""
+    if action.type != ActionType.SKILL or getattr(actor, "kind", None) != "character":
+        return action
+    from game.combat import skill_catalog
+
+    if skill_catalog.has_skill(actor.buff_modifiers, action.skill_id):
+        return action
+    return DeclaredAction(type=ActionType.ATTACK, target_id=action.target_id)
+
+
 def _run_offensive(ctx: SkillContext, cid: int, action: DeclaredAction, session, result) -> None:
     ctx.actor = session.combatants[cid]
     ctx.action = action
@@ -422,7 +435,8 @@ def resolve_tick(
 
     normalized: dict[int, DeclaredAction] = {}
     for cid in session.expected_declarers():
-        normalized[cid] = actions.get(cid) or DeclaredAction(type=ActionType.SKIP)
+        action = actions.get(cid) or DeclaredAction(type=ActionType.SKIP)
+        normalized[cid] = _own_skill_or_attack(session.combatants[cid], action)
 
     ctx = SkillContext(
         session=session,
@@ -709,7 +723,9 @@ def resolve_tick(
             source = session.combatants[heal.source_id]
             target = session.combatants[heal.target_id]
             h_before = running_hp[target.id]
-            h_after = min(h_before + heal.amount, target.max_hp)
+            # Горькая рана (2026-11-10): лечение цели слабее.
+            amount = round(heal.amount * (1.0 - target.heal_reduction()))
+            h_after = min(h_before + amount, target.max_hp)
             # В лог идёт ФАКТИЧЕСКИ восполненное, а не запрошенное. Лечение поверх
             # полного HP не восполняет ничего, и строка «восполнено 1 HP
             # (100.0% -> 100.0%)» сама себе противоречила. Ноль не печатаем вовсе:

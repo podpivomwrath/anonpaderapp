@@ -122,6 +122,11 @@ def set_cooldown(actor: CombatantState, skill_id: str, cd: int, rng: random.Rand
     if chance > 0 and rng.random() < chance:
         actor.cd_free = "chance"
         return
+    from game.combat import ability_rules
+
+    if ability_rules.skip_cooldown(actor, skill_id):  # ступень «ниже 30% - без перезарядки»
+        actor.cd_free = "chance"
+        return
     if actor.overload_ready:
         actor.overload_ready = False
         actor.cd_free = "overload"
@@ -238,9 +243,11 @@ def rune_outgoing(actor: CombatantState, target: CombatantState) -> float:
     """Руны на исходящий урон (2026-10-31). Ключи «rune:...» кладёт
     preset_service.resolve_active_modifiers, в PvP уже ослабленные."""
     mods = actor.buff_modifiers
+    skill_id = getattr(actor, "current_skill", None)
+    step = 1.0 + skill_step_bonus(actor, target, skill_id) if skill_id else 1.0
     if not any(key.startswith("rune:") for key in mods):
-        return 1.0
-    mult = 1.0
+        return step
+    mult = step
     if getattr(actor, "turns_done", 0) < 2:
         mult *= 1.0 + mods.get("rune:doorstep_rush", 0.0)
     if target.has_effect(EffectKind.FREEZE) or target.has_effect(EffectKind.CHILLED):
@@ -252,14 +259,33 @@ def rune_outgoing(actor: CombatantState, target: CombatantState) -> float:
         mult *= 1.0 + mods.get("rune:riposte", 0.0)
     if any(target.has_effect(kind) for kind in _DEBUFFS):
         mult *= 1.0 + mods.get("rune:echo", 0.0)
-    skill_id = getattr(actor, "current_skill", None)
     if skill_id:
         mult *= 1.0 + mods.get(f"rune:press@{skill_id}", 0.0)
+        # Руна-навык (2026-11-10): сила от мастерства.
+        mult *= 1.0 + mods.get(f"rune:{skill_id}", 0.0)
     # «Злоба»: за каждый полученный удар, до пяти.
     mult *= 1.0 + mods.get("rune:spite", 0.0) * min(getattr(actor, "hits_taken", 0), 5)
     # «За своих» (2026-11-05): за каждого павшего союзника, до трёх.
     mult *= 1.0 + mods.get("rune:for_ours", 0.0) * min(getattr(actor, "allies_fallen", 0), 3)
     return mult
+
+
+def skill_step_bonus(actor: CombatantState, target: CombatantState, skill_id: str) -> float:
+    """Ступени руны-навыка на урон (ability_config): по цели ниже 30%
+    здоровья, выше 70%, под контролем, и пока у вас самих меньше 30%."""
+    mods = actor.buff_modifiers
+    bonus = 0.0
+    if target.max_hp > 0:
+        share = target.current_hp / target.max_hp
+        if share < 0.3:
+            bonus += mods.get(f"skill_execute:{skill_id}", 0.0)
+        if share > 0.7:
+            bonus += mods.get(f"skill_fresh:{skill_id}", 0.0)
+    if target.has_effect(EffectKind.FREEZE):
+        bonus += mods.get(f"skill_vs_ctrl:{skill_id}", 0.0)
+    if actor.max_hp > 0 and actor.current_hp < actor.max_hp * 0.3:
+        bonus += mods.get(f"skill_desperate:{skill_id}", 0.0)
+    return bonus
 
 
 def retribution_bonus(actor: CombatantState) -> float:
@@ -395,6 +421,8 @@ def compute_hit(
     crit_chance = stat_model.ACTIVE.crit_chance(actor.stats)
     crit_chance += stat_model.subclass_crit_bonus(actor.subclass_id)
     crit_chance += actor.buff_modifiers.get("crit_chance_bonus", 0.0)
+    if getattr(actor, "current_skill", None):
+        crit_chance += actor.buff_modifiers.get(f"skill_crit:{actor.current_skill}", 0.0)  # ступень руны-навыка
     crit_chance += formulas.class_crit_bonus(actor.base_class, actor.subclass_id)  # пассивка разбойника до подкласса
     if target.has_effect(EffectKind.MARK):
         for mark in target.effects_of(EffectKind.MARK):

@@ -20,7 +20,6 @@ bot/handlers/raid_combat.py.
 
 import random
 
-from game.combat import balance_config as bc
 from game.combat import base_skills, subclass_skills
 from game.combat.raid_bosses import _boss_combatant
 from game.combat.raid_field import StageTick, _players, _target_of, stage_hurt
@@ -32,7 +31,7 @@ from game.economy import raid_archive_config as ac
 BOSS_NAME = "Безликий Архивариус"
 
 #: Самоуворот: повторишь - он сам начнёт уворачиваться.
-_DODGE_SKILLS = {"rogue_smoke", "shadow_blade_shadow_dance"}
+_DODGE_SKILLS = {"rogue_smoke"}
 #: Самоусиление урона: повторишь - он ударит сильнее.
 _BUFF_SKILLS = {"warrior_warcry"}
 
@@ -63,7 +62,9 @@ def _is_control(skill_id: str) -> bool:
 
 
 def _skill_name(skill_id: str) -> str:
-    skill = base_skills.BASE_SKILL_DEFS.get(skill_id) or subclass_skills.SUBCLASS_SKILL_DEFS.get(skill_id)
+    from game.combat import skill_catalog
+
+    skill = skill_catalog.skill_def(skill_id)
     return skill.name if skill else skill_id
 
 
@@ -306,9 +307,7 @@ def _erase_effects(session) -> tuple[int, int]:
 
 
 def _skills_of(player: CombatantState) -> list[str]:
-    base_class = next(
-        (cls for cls, stat in bc.PRIMARY_STAT_BY_CLASS.items() if stat == player.primary_stat), None,
-    )
-    if base_class is None:
-        return []
-    return [s.id for s in base_skills.skills_for_character(base_class, player.subclass_id)]
+    """Навыки игрока - его руны-навыки (2026-11-10), не навыки класса."""
+    from game.combat import skill_catalog
+
+    return skill_catalog.skill_ids_of(player.buff_modifiers)

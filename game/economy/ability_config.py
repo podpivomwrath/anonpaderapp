@@ -371,3 +371,41 @@ def step_of(skill_id: str, absorbed: int) -> int:
     if ability is None:
         return 0
     return sum(1 for t in step_thresholds(ability.curve) if absorbed >= t)
+
+
+#: Интервалы и перезарядки («раз в N ходов»): выгоднее меньшее число.
+LOWER_IS_BETTER = ("_interval", "_cooldown")
+
+
+def combat_modifiers(effects: dict[str, float], pool: str | None, pvp: bool = False) -> dict[str, float]:
+    """Модификаторы бойца от рун-навыков и пассивки подкласса.
+
+    effects - копия эффектов рун на персонаже (rune_service.recompute):
+    "ability:<id>", "step:<id>", "fork:<id>". Ступени навыка складываются с
+    пассивкой: пассивка задумана тянуть к своим навыкам. Интервалы - меньший.
+    Пробуждение (ступень IV) в PvP - вполсилы (решение 2026-11-10)."""
+    from game.combat import skill_catalog
+    from game.economy import passives_config
+
+    out: dict[str, float] = {}
+
+    def add(mods: dict[str, float], mult: float = 1.0) -> None:
+        for key, value in mods.items():
+            value *= mult
+            if key.endswith(LOWER_IS_BETTER):
+                out[key] = min(out[key], value) if key in out else value
+            else:
+                out[key] = out.get(key, 0.0) + value
+
+    passive = passives_config.passive_of(pool)
+    if passive is not None:
+        add(passive.mods)
+    for sid in skill_catalog.skill_ids_of(effects):
+        step = int(effects.get(f"step:{sid}", 0))
+        fork = int(effects.get(f"fork:{sid}", 0))
+        add(mods_for(sid, min(step, 3), fork))
+        if step >= 4:
+            ability = BY_ID[sid]
+            # интервалы вполсилы не делим - они не «сила»
+            add(ability.four.mods, 0.5 if pvp else 1.0)
+    return out

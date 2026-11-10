@@ -235,7 +235,7 @@ async def on_mass_tick_resolved(session_id: int, tick: int, result: TickResult) 
     for cid, participant in list(battle.participants.items()):
         combatant = battle.last_combatants.get(cid)
         keyboard = (
-            pvp_combat_keyboard(participant.base_class, combatant.cooldowns, subclass_id=combatant.subclass_id, show_target=True)
+            pvp_combat_keyboard(combatant, show_target=True)
             if combatant is not None and combatant.alive
             else pvp_waiting_keyboard()
         )

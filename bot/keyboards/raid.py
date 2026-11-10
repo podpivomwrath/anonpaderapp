@@ -12,7 +12,6 @@ from bot.keyboards.world import add_miniapp_button
 from bot.keyboards import combat_modes
 from bot.keyboards.layout import add_paired
 from bot.raid_texts import BTN_RAID_BACK, BTN_RAID_CANCEL_READY, BTN_TOUCH_MONOLITH, RAID_TITLES
-from game.combat.base_skills import skills_for_character
 
 _TARGET_ROW_WIDTH = 5
 _RAID = combat_modes.RAID
@@ -53,7 +52,7 @@ def raid_lobby_keyboard(ready: bool = True, raid_id: str = "puppet_theatre") -> 
 
 
 def raid_combat_keyboard(
-    base_class: str, cooldowns: dict[str, int], subclass_id: str | None = None,
+    combatant, fresh: bool = False,
     extra: list[tuple[str, dict]] | None = None,
     grid: list[list[tuple[str, dict, str]]] | None = None,
 ) -> str:
@@ -82,11 +81,7 @@ def raid_combat_keyboard(
         # зависит от подписи вовсе (второй рубеж, см. combat_modes).
         (_RAID.attack, KeyboardButtonColor.POSITIVE, {"type": "raid_attack"})
     ]
-    for skill in skills_for_character(base_class, subclass_id):
-        cd = cooldowns.get(skill.id, 0)
-        label = skill.name if cd <= 0 else f"{skill.name} (КД {cd})"
-        color = KeyboardButtonColor.PRIMARY if cd <= 0 else KeyboardButtonColor.SECONDARY
-        items.append((label, color, {"type": _RAID.skill_payload, "id": skill.id}))
+    items += combat_modes.skill_items(combatant, _RAID.skill_payload, fresh)
     items.append((combat_modes.DEFEND_LABEL, KeyboardButtonColor.SECONDARY, {"type": combat_modes.RAID.defend_payload}))
     items.append((_RAID.target, KeyboardButtonColor.SECONDARY, {"type": "raid_open_target"}))
     items.append((_RAID.item, KeyboardButtonColor.SECONDARY, {"type": "raid_open_items"}))

@@ -190,6 +190,8 @@ _ICONS: tuple[tuple[EffectKind, str], ...] = (
     (EffectKind.BLOOD_REFLECT, "🪞"),
     (EffectKind.CONTROL_IMMUNE, "✨"),
     (EffectKind.LAST_BREATH, "💀"),
+    (EffectKind.HEAL_REDUCTION, "🩹"),
+    (EffectKind.SILENCE, "🤐"),
 )
 
 

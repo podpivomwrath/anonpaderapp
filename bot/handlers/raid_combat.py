@@ -283,8 +283,7 @@ def _combat_keyboard(battle: RaidBattle, p: Participant, combatant) -> str:
         if state is not None:
             extra += stage.extra_buttons(state, p.character_id)
     grid = _arena_grid(battle, stage, p.character_id) if isinstance(stage, trail_combat.NamelessStage) else None
-    return kb.raid_combat_keyboard(p.base_class, combatant.cooldowns, subclass_id=p.subclass_id, extra=extra,
-                                   grid=grid)
+    return kb.raid_combat_keyboard(combatant, extra=extra, grid=grid)
 
 
 def _arena_grid(battle: RaidBattle, stage, cid: int) -> list[list[tuple[str, dict, str]]]:

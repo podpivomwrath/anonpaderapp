@@ -155,8 +155,7 @@ def rebuild_keyboard(peer_id: int) -> str | None:
     c = state.combatants.get(cid) if state else None
     if c is None or not c.alive or cid in _declared_this_tick.get(battle_id, set()):
         return group_waiting_keyboard()
-    p = battle.participants[cid]
-    return group_combat_keyboard(p.base_class, c.cooldowns, subclass_id=p.subclass_id)
+    return group_combat_keyboard(c)
 
 
 async def build_member_inputs(db, members: list[Character]) -> list[MemberCombatInput]:
@@ -381,7 +380,7 @@ async def _broadcast_board(
         combatant = _live_state(battle_id, battle).get(cid)
         keyboard = (
             empty_keyboard() if final
-            else group_combat_keyboard(p.base_class, combatant.cooldowns, subclass_id=p.subclass_id)
+            else group_combat_keyboard(combatant)
             if combatant is not None and combatant.alive
             else group_waiting_keyboard()
         )
@@ -432,7 +431,7 @@ async def group_skill(message: Message) -> None:
     if combatant is not None and combatant.is_on_cooldown(skill_id):
         cd = combatant.cooldowns.get(skill_id, 0)
         p = battle.participants.get(cid)
-        keyboard = group_combat_keyboard(p.base_class, combatant.cooldowns, subclass_id=p.subclass_id) if p else None
+        keyboard = group_combat_keyboard(combatant) if p else None
         await message.answer(f"⏳ Навык ещё не готов (КД {cd}).", keyboard=keyboard)
         return
     await _group_action(message, DeclaredAction(type=ActionType.SKILL, skill_id=skill_id))
@@ -566,7 +565,7 @@ async def group_pick_target(message: Message) -> None:
     board = f"🎯 Цель: {target.name}.\n\n{_render_board(_engine.sessions.get(battle_id))}"
     await _bot_api.messages.send(
         peer_id=peer_id, message=board, random_id=0,
-        keyboard=group_combat_keyboard(p.base_class, me.cooldowns, subclass_id=p.subclass_id),
+        keyboard=group_combat_keyboard(me),
     )
 
 
@@ -589,7 +588,7 @@ async def group_target_back(message: Message) -> None:
     await editable_message.send_or_edit(_bot_api, "group_pve_target", peer_id, "Возврат в бой.", no_keyboard())
     await _bot_api.messages.send(
         peer_id=peer_id, message=_render_board(_engine.sessions.get(battle_id)), random_id=0,
-        keyboard=group_combat_keyboard(p.base_class, combatant.cooldowns, subclass_id=p.subclass_id),
+        keyboard=group_combat_keyboard(combatant),
     )
 
 
@@ -613,7 +612,7 @@ async def group_open_items(message: Message) -> None:
     p = battle.participants.get(cid)
     if combatant is None or p is None:
         return
-    battle_kb = group_combat_keyboard(p.base_class, combatant.cooldowns, subclass_id=p.subclass_id)
+    battle_kb = group_combat_keyboard(combatant)
     if combatant.has_effect(EffectKind.FREEZE):
         await message.answer("Скован - не до зелий сейчас. ❄️", keyboard=battle_kb)
         return
@@ -665,7 +664,7 @@ async def group_use_item(message: Message) -> None:
     p = battle.participants.get(cid)
     if combatant is None or p is None:
         return
-    battle_kb = group_combat_keyboard(p.base_class, combatant.cooldowns, subclass_id=p.subclass_id)
+    battle_kb = group_combat_keyboard(combatant)
     if combatant.has_effect(EffectKind.FREEZE):
         await message.answer("Скован - не до зелий сейчас. ❄️", keyboard=battle_kb)
         return
@@ -728,7 +727,7 @@ async def group_use_item(message: Message) -> None:
     text = f"{line} Ваш ход.\n\n{_render_board(_engine.sessions.get(battle_id))}"
     await _bot_api.messages.send(
         peer_id=peer_id, message=text, random_id=0,
-        keyboard=group_combat_keyboard(p.base_class, combatant.cooldowns, subclass_id=p.subclass_id),
+        keyboard=group_combat_keyboard(combatant),
     )
 
 

@@ -144,3 +144,16 @@ def combatant(
         primary_stat="str",
         subclass_id=subclass_id,
     )
+
+
+@pytest.fixture(autouse=True)
+def _any_skill_allowed(request, monkeypatch):
+    """Руны-навыки (2026-11-10): в игре персонаж применяет только навыки
+    вставленных рун (resolver._own_skill_or_attack). Тесты механик навыков
+    не раскладывают руны - им разрешён любой навык. Тест самой проверки
+    помечается @pytest.mark.real_abilities."""
+    if request.node.get_closest_marker("real_abilities"):
+        return
+    from game.combat import skill_catalog
+
+    monkeypatch.setattr(skill_catalog, "has_skill", lambda mods, skill_id: bool(skill_id))

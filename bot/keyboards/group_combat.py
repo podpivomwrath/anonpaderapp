@@ -11,7 +11,6 @@ from vkbottle import Keyboard, KeyboardButtonColor, Text
 
 from bot.keyboards import combat_modes
 from bot.keyboards.layout import add_paired
-from game.combat.base_skills import skills_for_character
 
 _TARGET_ROW_WIDTH = 5
 
@@ -22,9 +21,7 @@ BTN_GROUP_ITEM = combat_modes.GROUP_PVE.item
 BTN_GROUP_TARGET = combat_modes.GROUP_PVE.target
 
 
-def group_combat_keyboard(
-    base_class: str, cooldowns: dict[str, int], subclass_id: str | None = None,
-) -> str:
+def group_combat_keyboard(combatant, fresh: bool = False) -> str:
     """Как pvp_combat_keyboard, но без побега (сбежать из группового боя
     нельзя, как и из массового PvP) и ВСЕГДА с выбором цели (мобов, как
     правило, несколько — по числу участников)."""
@@ -32,11 +29,7 @@ def group_combat_keyboard(
     items: list[tuple[str, KeyboardButtonColor, dict | None]] = [
         (BTN_GROUP_ATTACK, KeyboardButtonColor.POSITIVE, None)
     ]
-    for skill in skills_for_character(base_class, subclass_id):
-        cd = cooldowns.get(skill.id, 0)
-        label = skill.name if cd <= 0 else f"{skill.name} (КД {cd})"
-        color = KeyboardButtonColor.PRIMARY if cd <= 0 else KeyboardButtonColor.SECONDARY
-        items.append((label, color, {"type": "group_pve_skill", "id": skill.id}))
+    items += combat_modes.skill_items(combatant, "group_pve_skill", fresh)
     items.append((combat_modes.DEFEND_LABEL, KeyboardButtonColor.SECONDARY, {"type": combat_modes.GROUP_PVE.defend_payload}))
     items.append((BTN_GROUP_TARGET, KeyboardButtonColor.SECONDARY, None))
     items.append((BTN_GROUP_ITEM, KeyboardButtonColor.SECONDARY, None))

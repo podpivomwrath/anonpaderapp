@@ -82,6 +82,10 @@ def _make_handler(base_skill: SubclassSkillDef):
                 duration_bonus = int(actor.buff_modifiers.get("freeze_duration_bonus", 0))
                 chance_bonus = actor.buff_modifiers.get("control_chance_bonus", 0.0)
                 chance_bonus += actor.buff_modifiers.get(f"rune:grip@{skill.id}", 0.0)  # руна (2026-10-31)
+                from game.combat import ability_rules
+
+                chance_bonus += ability_rules.mod(actor, "skill_ctrl_pierce", skill.id)
+                duration_bonus += ability_rules.ctrl_mobs_bonus(actor, skill.id, target)
                 res = control.try_apply_control(
                     target, base_duration=bc.CONTROL_BASE_DURATION_TICKS, source_id=actor.id, rng=ctx.rng, pvp=pvp,
                     duration_bonus=duration_bonus, chance_bonus=chance_bonus,

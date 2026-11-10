@@ -15,7 +15,6 @@ from vkbottle import Keyboard, KeyboardButtonColor, Text
 from bot.keyboards import combat_modes
 from bot.keyboards.layout import add_paired
 from bot.keyboards.world import add_miniapp_button
-from game.combat.base_skills import skills_for_character
 from game.content_loader import ElixirDef
 
 # Патч 41: сколько целей помещается в один ряд инлайн-клавиатуры выбора цели
@@ -48,10 +47,7 @@ def join_side_keyboard(session_id: int) -> str:
     return kb.get_json()
 
 
-def pvp_combat_keyboard(
-    base_class: str, cooldowns: dict[str, int], show_target: bool = False,
-    subclass_id: str | None = None,
-) -> str:
+def pvp_combat_keyboard(combatant, fresh: bool = False, show_target: bool = False) -> str:
     """Как combat_keyboard (PvE), но БЕЗ побега (патч 22 — бой навязан,
     сбежать из уже идущей встречи нельзя). Патч 30: предметы ДОБАВЛЕНЫ —
     раньше их не было вовсе, хотя патч 16 (зелья/эликсиры) не делал для
@@ -65,11 +61,7 @@ def pvp_combat_keyboard(
     items: list[tuple[str, KeyboardButtonColor, dict | None]] = [
         (BTN_PVP_ATTACK, KeyboardButtonColor.POSITIVE, None)
     ]
-    for skill in skills_for_character(base_class, subclass_id):
-        cd = cooldowns.get(skill.id, 0)
-        label = skill.name if cd <= 0 else f"{skill.name} (КД {cd})"
-        color = KeyboardButtonColor.PRIMARY if cd <= 0 else KeyboardButtonColor.SECONDARY
-        items.append((label, color, {"type": "pvp_skill", "id": skill.id}))
+    items += combat_modes.skill_items(combatant, "pvp_skill", fresh)
     items.append((combat_modes.DEFEND_LABEL, KeyboardButtonColor.SECONDARY, {"type": combat_modes.PVP.defend_payload}))
     if show_target:
         items.append((BTN_PVP_TARGET, KeyboardButtonColor.SECONDARY, None))

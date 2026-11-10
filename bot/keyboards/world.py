@@ -15,7 +15,6 @@ from bot.onboarding_texts import REGION_TITLES
 from bot import text_match
 from config import get_settings
 from game.combat import balance_config as bc
-from game.combat.base_skills import skills_for_character
 from game.content_loader import ExplorationEventDef
 from game.world import grid
 
@@ -392,7 +391,7 @@ def event_choice_keyboard(event: ExplorationEventDef, song_extra: bool = False) 
     return kb.get_json()
 
 
-def combat_keyboard(base_class: str, cooldowns: dict[str, int], subclass_id: str | None = None) -> str:
+def combat_keyboard(combatant, fresh: bool = False) -> str:
     """Боевая клавиатура: Атака + навыки класса/подкласса (с КД-счётчиком) + Предмет + Побег.
     Навык на КД показывается с остатком, но остаётся нажимаемым — обработчик ответит
     «не готов» без траты хода. subclass_id (патч 39, ч.3) — после выбора подкласса
@@ -405,11 +404,7 @@ def combat_keyboard(base_class: str, cooldowns: dict[str, int], subclass_id: str
     items: list[tuple[str, KeyboardButtonColor, dict | None]] = [
         (BTN_ATTACK, KeyboardButtonColor.POSITIVE, None)
     ]
-    for skill in skills_for_character(base_class, subclass_id):
-        cd = cooldowns.get(skill.id, 0)
-        label = skill.name if cd <= 0 else f"{skill.name} (КД {cd})"
-        color = KeyboardButtonColor.PRIMARY if cd <= 0 else KeyboardButtonColor.SECONDARY
-        items.append((label, color, {"type": "skill", "id": skill.id}))
+    items += combat_modes.skill_items(combatant, "skill", fresh)
     items.append((combat_modes.DEFEND_LABEL, KeyboardButtonColor.SECONDARY, {"type": combat_modes.SOLO_PVE.defend_payload}))
     items.append((BTN_ITEM, KeyboardButtonColor.SECONDARY, None))
     items.append((BTN_FLEE, KeyboardButtonColor.NEGATIVE, None))

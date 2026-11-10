@@ -9,7 +9,7 @@
 """
 
 from game.combat import balance_config as bc
-from game.combat import combat_flavor, control
+from game.combat import ability_rules, combat_flavor, control
 from game.combat.session import CombatMode, EffectKind
 from game.combat.skills import SkillContext, compute_hit, offensive_skill, set_cooldown
 from game.content_loader import BaseSkillDef, load_base_skills
@@ -68,7 +68,9 @@ def _make_handler(skill: BaseSkillDef):
                 pvp = ctx.session.mode != CombatMode.PVE
                 res = control.try_apply_control(
                     target, base_duration=bc.CONTROL_BASE_DURATION_TICKS, source_id=actor.id, rng=ctx.rng, pvp=pvp,
-                    chance_bonus=actor.buff_modifiers.get(f"rune:grip@{skill.id}", 0.0),
+                    chance_bonus=actor.buff_modifiers.get(f"rune:grip@{skill.id}", 0.0)
+                    + ability_rules.mod(actor, "skill_ctrl_pierce", skill.id),
+                    duration_bonus=ability_rules.ctrl_mobs_bonus(actor, skill.id, target),
                 )
                 # Единый краткий текст независимо от режима (патч 43, ч.1).
                 if res.immune:

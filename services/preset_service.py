@@ -234,6 +234,16 @@ async def resolve_active_modifiers(db: AsyncSession, character: Character, pvp: 
 
     runes = rune_service.combat_modifiers(character, pvp)
     merged.update(runes)
+    # Руны-навыки (2026-11-10): ступени вставленных навыков и пассивка
+    # подкласса. Складываются с едой и прочим, интервалы - меньший.
+    from game.economy import ability_config
+
+    for key, value in ability_config.combat_modifiers(
+            runes, subclass_service.buff_pool(character), pvp).items():
+        if key.endswith(ability_config.LOWER_IS_BETTER) and key in merged:
+            merged[key] = min(merged[key], value)
+        else:
+            merged[key] = merged.get(key, 0.0) + value
     # Сопротивления (2026-11-02): руны, кованые вещи, Перстень Несгоревшего.
     from services import resist_service
 
@@ -247,24 +257,13 @@ async def resolve_active_modifiers(db: AsyncSession, character: Character, pvp: 
 
 
 async def _preset_and_food(db: AsyncSession, character: Character) -> dict[str, float]:
-    """Шорткат: активный пресет персонажа → смерженные stat_modifiers
-    (патч 14, ч.3). Пусто, если подкласс не выбран или пресет не активирован.
-    2026-10-21: сюда же - боевая часть баффа от еды (урон, защита, здоровье),
-    так она попадает во все бои, что строятся от пресета."""
+    """Боевая часть баффа от еды (урон, защита, здоровье). Микробаффы
+    пресетов с 2026-11-10 не действуют: они переехали в ступени рун-навыков
+    и пассивки подклассов (game/economy/ability_config.py, passives_config.py).
+    Пресет теперь - запомненная раскладка рун."""
     from services import cooking_service
 
-    food = cooking_service.combat_modifiers(character)
-    if subclass_service.buff_pool(character) is None:
-        return dict(food)
-    active = await get_active_preset(db, character.id)
-    if active is None:
-        return dict(food)
-    from game.content_loader import load_content
-
-    merged = resolve_buff_modifiers(active.buff_ids, load_content().buffs)
-    for key, value in food.items():
-        merged[key] = merged.get(key, 0.0) + value
-    return merged
+    return dict(cooking_service.combat_modifiers(character))
 
 
 async def own_preset(db: AsyncSession, character: Character, preset_id: int) -> CharacterBuffPreset:

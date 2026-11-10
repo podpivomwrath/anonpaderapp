@@ -421,7 +421,7 @@ def rune_after_deaths(session: CombatSessionState, deaths: list[int], hits: list
         for ally in session.combatants.values():
             if ally.side == dead.side and ally.alive and ally.id != cid:
                 ally.allies_fallen = getattr(ally, "allies_fallen", 0) + 1
-    done: set[tuple[int, str]] = set()
+    done: set[tuple] = set()
     for hit in hits:
         skill_id = getattr(hit, "skill_id", None)
         if not skill_id or hit.target_id not in deaths or hit.missed:
@@ -429,7 +429,15 @@ def rune_after_deaths(session: CombatSessionState, deaths: list[int], hits: list
         source = session.combatants.get(hit.source_id)
         if source is None or not source.alive or (source.id, skill_id) in done:
             continue
-        chance = _rune(source, f"rune:no_rest@{skill_id}")
+        from game.combat import ability_rules
+
+        heal_kill = ability_rules.heal_on_kill(source, skill_id)
+        if heal_kill and (source.id, skill_id, "heal") not in done and source.max_hp > 0:
+            done.add((source.id, skill_id, "heal"))
+            gain = round(source.max_hp * heal_kill)
+            source.current_hp = min(source.max_hp, source.current_hp + gain)
+            lines.append(f"🟣 «{skill_id_name(skill_id)}» добил: {source.name} лечится на {gain}")
+        chance = _rune(source, f"rune:no_rest@{skill_id}") + ability_rules.reset_kill_chance(source, skill_id)
         if not chance or source.cooldowns.get(skill_id, 0) <= 0:
             continue
         done.add((source.id, skill_id))
@@ -452,6 +460,9 @@ def rune_on_hit(source: CombatantState | None, target: CombatantState, hit, heal
         skill_id = getattr(hit, "skill_id", None)
         if skill_id:
             ratio += _rune(source, f"rune:blood_edge@{skill_id}")
+            from game.combat import ability_rules
+
+            ratio += ability_rules.lifesteal(source, skill_id)  # ступень руны-навыка
         if ratio > 0:
             heals.append(PendingHeal(source_id=source.id, target_id=source.id, amount=round(hit.amount * ratio),
                                      label="пьёт кровь", of_hit=hit, ratio=ratio))
@@ -466,6 +477,8 @@ def rune_dot_mult(effect: Effect, source: CombatantState | None, target: Combata
     if source is not None:
         burn = getattr(effect, "tag", None) == BURN_TAG
         mult += _rune(source, "rune:acrid@" + ("elementalist_fire" if burn else "poisoner_venom"))
+        # Руна-навык (2026-11-10): сила навыка, что повесил яд или горение.
+        mult += _rune(source, "rune:" + ("elementalist_fire" if burn else "poisoner_venom"))
         if burn:
             mult += _rune(source, "rune:heat_frost")
     if target is not None:
@@ -526,6 +539,7 @@ def run_skill(handler, ctx, skill_id: str | None) -> None:
     combatants = list(ctx.session.combatants.values())
     before = skill_snapshot(actor, combatants)
     heals_from = len(ctx.heals)
+    hits_from = len(ctx.hits)
     cd_before = actor.cooldowns.get(skill_id, 0) if skill_id else 0
     actor.current_skill = skill_id
     actor.cd_free = None
@@ -536,6 +550,9 @@ def run_skill(handler, ctx, skill_id: str | None) -> None:
     cd_free_line(actor, skill_id, ctx.lines)
     rune_cooldown(actor, skill_id, cd_before, ctx.rng, ctx.lines)
     rune_after_skill(actor, skill_id, before, combatants, ctx, heals_from)
+    from game.combat import ability_rules
+
+    ability_rules.after_skill(actor, skill_id, ctx, hits_from)  # ступени руны-навыка (2026-11-10)
     rune_once_more(handler, ctx, skill_id)
 
 
@@ -555,6 +572,10 @@ def rune_once_more(handler, ctx, skill_id: str | None) -> None:
     здоровьем - от первого раза: второй прогон бесплатный."""
     actor = ctx.actor
     chance = _rune(actor, f"rune:once_more@{skill_id}") if skill_id else 0.0
+    if skill_id:
+        from game.combat import ability_rules
+
+        chance += ability_rules.twice_chance(actor, skill_id)  # ступень руны-навыка
     if not chance or ctx.rng.random() >= chance:
         return
     if not any(c.alive and c.side != actor.side for c in ctx.session.combatants.values()):
@@ -593,6 +614,29 @@ def rune_cooldown(actor: CombatantState, skill_id: str | None, cd_before: int, r
             lines.append(f"🪨 Короткий взмах: перезарядка «{skill_id_name(skill_id)}» у {actor.name} на ход короче")
 
 
+def _passive_recovery(actor: CombatantState, fresh: list, combatants, ctx, heals_from: int) -> None:
+    """Пассивки подклассов (2026-11-10): щиты от навыков Стража крепче,
+    лечение и щиты Тёмного мистика на союзников сильнее."""
+    from game.combat import ability_rules
+
+    shield = ability_rules.shield_power(actor)
+    ally = ability_rules.ally_heal_power(actor)
+    if not (shield or ally):
+        return
+    owner = {id(e): c for c in combatants for e in c.effects}
+    for e in fresh:
+        if e.kind != EffectKind.SHIELD_POOL:
+            continue
+        holder = owner.get(id(e))
+        mult = 1.0 + shield + (ally if holder is not None and holder.id != actor.id else 0.0)
+        e.value = round(e.value * mult)
+    if ally:
+        for h in ctx.heals[heals_from:]:
+            if h.source_id == actor.id and h.target_id != actor.id:
+                h.amount = round(h.amount * (1 + ally))
+                h.ratio *= 1 + ally
+
+
 def skill_snapshot(actor: CombatantState, combatants) -> dict:
     """Что висело от бойца до навыка: для рун «Тягучесть» и «Подпорка»."""
     return {id(e): (e.remaining_ticks, e.value) for c in combatants for e in c.effects if e.source_id == actor.id}
@@ -605,17 +649,19 @@ def rune_after_skill(actor: CombatantState, skill_id: str | None, before: dict, 
     if not skill_id:
         return
     mods = actor.buff_modifiers
+    fresh = [e for c in combatants for e in c.effects
+             if e.source_id == actor.id and (id(e) not in before or e.remaining_ticks > before[id(e)][0])]
+    _passive_recovery(actor, fresh, combatants, ctx, heals_from)
     if not any(key.startswith("rune:") for key in mods):
         return
     rng = ctx.rng
-    fresh = [e for c in combatants for e in c.effects
-             if e.source_id == actor.id and (id(e) not in before or e.remaining_ticks > before[id(e)][0])]
     viscous = mods.get(f"rune:viscous@{skill_id}", 0.0)
     if viscous and fresh and rng.random() < viscous:
         for e in fresh:
             e.remaining_ticks += 1
         ctx.lines.append(f"🪨 Тягучесть: эффект «{skill_id_name(skill_id)}» продержится на ход дольше")
-    prop = mods.get(f"rune:prop@{skill_id}", 0.0)
+    # «Подпорка» и сила руны-навыка от мастерства (2026-11-10) - на лечение и щиты.
+    prop = mods.get(f"rune:prop@{skill_id}", 0.0) + mods.get(f"rune:{skill_id}", 0.0)
     new_heals = [h for h in ctx.heals[heals_from:] if h.source_id == actor.id]
     if prop:
         for e in fresh:
@@ -648,11 +694,7 @@ def rune_after_skill(actor: CombatantState, skill_id: str | None, before: dict, 
 
 
 def skill_id_name(skill_id: str) -> str:
-    from game.combat.base_skills import BASE_SKILL_DEFS
+    from game.combat import skill_catalog
 
-    skill = BASE_SKILL_DEFS.get(skill_id)
-    if skill is None:
-        from game.combat.subclass_skills import SUBCLASS_SKILL_DEFS
-
-        skill = SUBCLASS_SKILL_DEFS.get(skill_id)
+    skill = skill_catalog.skill_def(skill_id)
     return skill.name if skill is not None else skill_id
