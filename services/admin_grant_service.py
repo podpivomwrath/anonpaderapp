@@ -138,9 +138,11 @@ def catalog() -> list[dict]:
         for t in gearc.TOOLS.values()
     ]
     from game.economy import runes_config as runec
+    from services import rune_service
 
     runes_entries = [
-        _entry(f"rune:{r.id}", f"{'🟠' if r.kind == runec.HERO else '🔴' if r.kind == runec.GEAR else '🔵'} {r.name}"
+        _entry(f"rune:{r.id}", f"{rune_service.KIND_EMOJI[r.kind]} {r.name}"
+               + (" (руна-навык)" if r.kind == runec.ABILITY else "")
                + ("" if r.ready else " (пока не действует)"))
         for r in runec.RUNES
     ]

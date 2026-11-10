@@ -9,8 +9,8 @@ from game.combat import balance_config as bc
 from game.combat.base_skills import BASE_SKILL_DEFS
 from game.combat.resolver import resolve_tick
 from game.content_loader import load_content
-from models import BaseClass, CharacterUnlockedBuff
-from services import power_service, preset_service, subclass_service, trial_service
+from models import BaseClass
+from services import preset_service, subclass_service
 from services.preset_service import PresetValidationError
 from services.respec_service import full_class_reset
 from tests.conftest import NoCritRng, combatant

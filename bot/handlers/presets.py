@@ -36,7 +36,7 @@ def setup(bot_api) -> None:
 
 def _list_text(presets: list[CharacterBuffPreset]) -> str:
     if not presets:
-        return "⚔️ Пресетов пока нет. Соберите первый в разделе «Персонаж» мини-аппа."
+        return "⚔️ Пресетов пока нет. Запомните раскладку рун в разделе «Персонаж» мини-аппа."
     lines = ["⚔️ Пресеты:", ""]
     for idx, preset in enumerate(presets, start=1):
         mark = "✅" if preset.is_active else "▫️"
@@ -45,11 +45,8 @@ def _list_text(presets: list[CharacterBuffPreset]) -> str:
 
 
 def _summary_text(index: int, preset: CharacterBuffPreset, catalog: dict) -> str:
-    lines = [f"✨ Активен пресет {index}: «{preset.name}»"]
-    for buff_id in preset.buff_ids:
-        buff = catalog.get(buff_id)
-        lines.append(f"· {buff.name if buff else buff_id}")
-    return "\n".join(lines)
+    # Руны-навыки (2026-11-10): пресет - раскладка рун, баффов в нём нет.
+    return f"✨ Активен пресет {index}: «{preset.name}»"
 
 
 @labeler.message(text=[BTN_PRESETS])
@@ -118,14 +115,14 @@ async def switch_preset_command(message: Message, n: int) -> None:
 
         presets = await preset_service.presets_of(db, character)
         if n < 1 or n > len(presets):
-            await message.answer(f"Пресет {n} пуст. Соберите его в разделе «Персонаж».")
+            await message.answer(f"Пресет {n} пуст. Запомните в него руны в разделе «Персонаж».")
             return
 
         target = presets[n - 1]
         try:
             _preset, note = await preset_service.switch_with_runes(db, character, target.id)
         except PresetValidationError:
-            await message.answer(f"Пресет {n} пуст. Соберите его в разделе «Персонаж».")
+            await message.answer(f"Пресет {n} пуст. Запомните в него руны в разделе «Персонаж».")
             return
         await db.commit()
         catalog = load_content().buffs

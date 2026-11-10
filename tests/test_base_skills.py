@@ -2,7 +2,6 @@
 
 import random
 
-from game.combat import base_skills
 from game.combat.resolver import resolve_tick
 from game.combat.session import (
     ActionType,

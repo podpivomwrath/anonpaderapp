@@ -550,7 +550,7 @@ async def remake_apply(message: Message) -> None:
                 return
             await respec_service.reset_subclass(db, character)
             reply = ("- Путь стёрт. - Хранитель закрывает страницу. - "
-                     "Приходи, когда решишь заново. Пресеты пришлось убрать.")
+                     "Приходи, когда решишь заново.")
         elif action == BTN_REMAKE_STATS:
             await respec_service.reset_stats(db, character)
             reply = ("- Готово. - Хранитель откладывает перо. - "

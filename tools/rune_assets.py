@@ -1,7 +1,8 @@
 """Картинки рун для мини-аппа (2026-10-31): python tools/rune_assets.py
 
 Берёт из img/ файлы по именам из tools/runes_art_prompts.md (иконка руны -
-«руна_<название>.png»), ужимает в webp и пишет miniapp/src/runeIcons.js.
+«руна_<название>.png») и tools/skill_runes_art_prompts.md (руна-навык -
+«навык_<название>.png»), ужимает в webp и пишет miniapp/src/runeIcons.js.
 Оригиналы в git не идут, как у остальных иконок (tools/icon_assets.py).
 """
 
@@ -26,6 +27,9 @@ EXTRA = {
     "гнездо_руна_навык.png": ("socket_skill", 128),
     "гнездо_замок.png": ("socket_lock", 128),
     "рунный_круг.png": ("circle", 900),
+    # Руны-навыки (2026-11-10, tools/skill_runes_art_prompts.md).
+    "гнездо_навык.png": ("socket_ability", 128),
+    "пробуждение.png": ("awakened", 96),
 }
 
 #: Шапка раздела - к остальным шапкам (ui.jsx берёт их по имени файла).
@@ -33,7 +37,9 @@ BANNER = ("шапка_руны.png", ROOT / "miniapp" / "src" / "assets" / "sect
 
 
 def file_for(rune: rc.RuneDef) -> str:
-    return "руна_" + rune.name.lower().replace(" ", "_") + ".png"
+    """Иконка руны: «руна_<название>.png», у рун-навыков - «навык_<название>.png»."""
+    prefix = "навык_" if rune.kind == rc.ABILITY else "руна_"
+    return prefix + rune.name.lower().replace(" ", "_") + ".png"
 
 
 def save(src: Path, name: str, width: int) -> None:

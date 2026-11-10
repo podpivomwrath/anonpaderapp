@@ -20,7 +20,6 @@ from game.economy import crafting
 from services import naming, ring_slot_service, subclass_service, transfer_service
 from bot.onboarding_texts import REGION_TITLES
 from config import Settings
-from game.content_loader import load_content
 from models import BaseClass, Character, User
 from services import (
     daily_service,

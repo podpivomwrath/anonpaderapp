@@ -15,8 +15,6 @@ from urllib.parse import urlencode
 
 import pytest
 
-from game.combat import balance_config as bc
-from game.economy import buff_descriptions
 from aiohttp.test_utils import TestClient, TestServer
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 

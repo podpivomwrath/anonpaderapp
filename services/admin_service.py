@@ -677,6 +677,12 @@ async def _rune_rows(db: AsyncSession, character: Character) -> list[dict]:
             continue
         eff = round(runes.efficiency(r.curve, known.get(r.id, 0)) * 100, 1)
         value = f"×{bag.get(r.id, 0)}, {eff}% ({known.get(r.id, 0)} впит.)" + (", вставлена" if r.id in worn else "")
+        if r.kind == rc.ABILITY:
+            from game.economy import ability_config
+
+            step = ability_config.step_of(r.id, known.get(r.id, 0))
+            fork = (character.skill_forks or {}).get(r.id)
+            value += f", ступень {step}" + (f" ({'а' if fork == 1 else 'б'})" if step >= 3 and fork else "")
         out.append({"name": f"{rune_service.KIND_EMOJI[r.kind]} {r.name}", "value": value})
     return out
 

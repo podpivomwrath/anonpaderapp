@@ -3,7 +3,6 @@
 
 import json
 
-from bot.keyboards import combat_modes
 
 from bot.keyboards.pvp import (
     BTN_PVP_ATTACK,
