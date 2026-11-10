@@ -1,5 +1,5 @@
 {
-  "_comment": "Базовые навыки классов (combat-patch-2): 3 на класс, доступны с 1 уровня, без маны, баланс через КД в ходах боя. Урон = базовый урон Атаки × multiplier. Тексты дословно. effect: null|stun|self_damage_buff|double_hit|guaranteed_crit|self_dodge_buff|target_vuln.",
+  "_comment": "Руны-навыки (2026-11-10): навыки больше не принадлежат классу - это руны. Здесь навыки с дженерик-обработчиком game/combat/base_skills.py; группа по классу - только для стартовых рун и старых инструментов. Мага нет: его три навыка слиты (Осколочный залп -> Рассекающий удар, Ледяные оковы -> elementalist_ice, Стихийная печать -> Разложение).",
   "warrior": [
     {
       "id": "warrior_cleave",
@@ -12,7 +12,7 @@
     {
       "id": "warrior_stagger",
       "name": "Оглушающий натиск",
-      "multiplier": 1.2,
+      "multiplier": 1.35,
       "cd": 4,
       "effect": "stun",
       "flavor": "Удар щитом или навершием - чтобы враг на миг забыл, где он."
@@ -48,40 +48,13 @@
     {
       "id": "rogue_smoke",
       "name": "Дымовая завеса",
-      "multiplier": 0.8,
-      "cd": 5,
+      "multiplier": 1.0,
+      "cd": 4,
       "effect": "self_dodge_buff",
       "effect_value": 0.4,
       "effect_duration": 2,
       "flavor": "Горсть жгучего праха в воздух - и вас уже не достать."
     }
   ],
-  "mage": [
-    {
-      "id": "mage_shard_volley",
-      "name": "Осколочный залп",
-      "multiplier": 1.45,
-      "cd": 2,
-      "effect": null,
-      "flavor": "Крошево Монолита срывается с ладони роем багровых игл."
-    },
-    {
-      "id": "mage_ice_bonds",
-      "name": "Ледяные оковы",
-      "multiplier": 1.0,
-      "cd": 4,
-      "effect": "stun",
-      "flavor": "Кровь врага на миг вспоминает, что она - вода."
-    },
-    {
-      "id": "mage_blood_seal",
-      "name": "Стихийная печать",
-      "multiplier": 0.9,
-      "cd": 4,
-      "effect": "target_vuln",
-      "effect_value": 0.35,
-      "effect_duration": 2,
-      "flavor": "Знак, вспыхивающий на коже жертвы. Метка для всего, что бьёт."
-    }
-  ]
+  "mage": []
 }

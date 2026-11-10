@@ -55,8 +55,11 @@ def _apply_vulnerability(target, skill: SubclassSkillDef, value: float, source_i
     ))
 
 
-def _make_handler(skill: SubclassSkillDef):
+def _make_handler(base_skill: SubclassSkillDef):
     def handler(ctx: SkillContext) -> None:
+        from game.combat.skill_catalog import tuned  # цикл: каталог импортирует этот модуль
+
+        skill = tuned(ctx, base_skill.id)  # ступени руны двигают числа (2026-11-10)
         actor = ctx.actor
         set_cooldown(actor, skill.id, skill.cd, ctx.rng)
         register_element_use(actor, skill.id)

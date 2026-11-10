@@ -17,7 +17,7 @@ from game.combat import balance_config as bc
 from game.combat import shared_rules, stat_model
 from game.combat.session import CombatantState, EffectKind
 from game.combat.skills import PendingHeal, SkillContext, compute_hit, offensive_skill, set_cooldown
-from game.combat.subclass_skills import SUBCLASS_SKILL_DEFS
+from game.combat.skill_catalog import tuned
 
 BLOOD_KNIGHT = register(
     SubclassDef(
@@ -86,7 +86,7 @@ def _lifesteal_heal(ctx: SkillContext, hit, ratio: float) -> None:
 def lifesteal_strike(ctx: SkillContext) -> None:
     """Кровопуск: 138% урона, лечит на 20% нанесённого (капается — самый
     частый навык кита, cd2)."""
-    skill = SUBCLASS_SKILL_DEFS["blood_knight_lifesteal_strike"]
+    skill = tuned(ctx, "blood_knight_lifesteal_strike")
     actor = ctx.actor
     set_cooldown(actor, skill.id, skill.cd, ctx.rng)
     target = ctx.resolve_target()
@@ -101,7 +101,7 @@ def lifesteal_strike(ctx: SkillContext) -> None:
 def harvest(ctx: SkillContext) -> None:
     """Жатва: если HP актёра ниже 50% — лечит на 27% нанесённого. «Вечный
     голод» (2026-10-23) поднимает порог до 60%."""
-    skill = SUBCLASS_SKILL_DEFS["blood_knight_harvest"]
+    skill = tuned(ctx, "blood_knight_harvest")
     actor = ctx.actor
     set_cooldown(actor, skill.id, skill.cd, ctx.rng)
     target = ctx.resolve_target()
@@ -118,7 +118,7 @@ def harvest(ctx: SkillContext) -> None:
 def blood_seal(ctx: SkillContext) -> None:
     """Кровавая печать: 85% урона, метит цель на 3 хода — все последующие
     атаки рыцаря по ней лечат в BLOOD_KNIGHT_BLOOD_SEAL_MULT раз сильнее."""
-    skill = SUBCLASS_SKILL_DEFS["blood_knight_blood_seal"]
+    skill = tuned(ctx, "blood_knight_blood_seal")
     actor = ctx.actor
     set_cooldown(actor, skill.id, skill.cd, ctx.rng)
     target = ctx.resolve_target()
@@ -135,7 +135,7 @@ def crimson_feast(ctx: SkillContext) -> None:
 
     Патч 47, ч.2: «Кровавый пакт» снижает себестоимость HP, «Пиршество»
     добавляет к ratio лечения — только у этого навыка (не у всех четырёх)."""
-    skill = SUBCLASS_SKILL_DEFS["blood_knight_crimson_feast"]
+    skill = tuned(ctx, "blood_knight_crimson_feast")
     actor = ctx.actor
     set_cooldown(actor, skill.id, skill.cd, ctx.rng)
     target = ctx.resolve_target()

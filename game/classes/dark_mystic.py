@@ -13,7 +13,7 @@ from game.combat import balance_config as bc
 from game.combat import shared_rules, stat_model
 from game.combat.session import WARD_TAG, EffectKind
 from game.combat.skills import PendingHeal, SkillContext, compute_hit, offensive_skill, set_cooldown
-from game.combat.subclass_skills import SUBCLASS_SKILL_DEFS
+from game.combat.skill_catalog import tuned
 
 DARK_MYSTIC = register(
     SubclassDef(
@@ -84,7 +84,7 @@ def _edge_multiplier(actor) -> float:
 def blood_pact(ctx: SkillContext) -> None:
     """Кровавый пакт: 110% урона цели, 70% нанесённого — лечением союзнику с
     наименьшим HP (себе, если союзника нет)."""
-    skill = SUBCLASS_SKILL_DEFS["dark_mystic_blood_pact"]
+    skill = tuned(ctx, "dark_mystic_blood_pact")
     actor = ctx.actor
     set_cooldown(actor, skill.id, skill.cd, ctx.rng)
     target = ctx.resolve_target()
@@ -159,7 +159,7 @@ def ward(ctx: SkillContext) -> None:
     """Оберег: без урона, щит себе или союзнику (масштаб от Воли), 3 хода,
     остаток по истечении превращается в лечение (resolver.py, как «Второе
     сердце» — патч 16)."""
-    skill = SUBCLASS_SKILL_DEFS["dark_mystic_ward"]
+    skill = tuned(ctx, "dark_mystic_ward")
     actor = ctx.actor
     set_cooldown(actor, skill.id, skill.cd, ctx.rng)
     # Патч 56: «Оберег крови» и «Стойкий оберег» увеличивают поглощение,
@@ -196,7 +196,7 @@ def ward(ctx: SkillContext) -> None:
 @offensive_skill("dark_mystic_drain")
 def drain(ctx: SkillContext) -> None:
     """Иссушение: 160% урона, лечит на 50% нанесённого. Цель под контролем — урон +40%."""
-    skill = SUBCLASS_SKILL_DEFS["dark_mystic_drain"]
+    skill = tuned(ctx, "dark_mystic_drain")
     actor = ctx.actor
     set_cooldown(actor, skill.id, skill.cd, ctx.rng)
     target = ctx.resolve_target()
@@ -222,7 +222,7 @@ def circle_of_dark(ctx: SkillContext) -> None:
     """Круг тьмы: тратит 20% текущего HP, лечит всю группу вместе с мистиком -
     каждого на долю ЕГО здоровья от силы поддержки (Воля). Вне группы лечит
     только себя, со штрафом одиночки."""
-    skill = SUBCLASS_SKILL_DEFS["dark_mystic_circle"]
+    skill = tuned(ctx, "dark_mystic_circle")
     actor = ctx.actor
     set_cooldown(actor, skill.id, skill.cd, ctx.rng)
     _pay_hp(actor, bc.DARK_MYSTIC_CIRCLE_HP_COST, ctx.lines)

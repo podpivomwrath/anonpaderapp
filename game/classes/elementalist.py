@@ -18,7 +18,7 @@ from game.combat.skills import (
     register_element_use,
     set_cooldown,
 )
-from game.combat.subclass_skills import SUBCLASS_SKILL_DEFS
+from game.combat.skill_catalog import tuned
 
 ELEMENTALIST = register(
     SubclassDef(
@@ -40,7 +40,7 @@ ELEMENTALIST = register(
 def fire_whip(ctx: SkillContext) -> None:
     """Огненная плеть: 130% урона + Горение (ДоТ на 3 хода, магнитуда —
     доля от урона этого удара)."""
-    skill = SUBCLASS_SKILL_DEFS["elementalist_fire"]
+    skill = tuned(ctx, "elementalist_fire")
     actor = ctx.actor
     set_cooldown(actor, skill.id, skill.cd, ctx.rng)
     register_element_use(actor, skill.id)
@@ -75,7 +75,7 @@ def fire_whip(ctx: SkillContext) -> None:
 @offensive_skill("elementalist_lightning")
 def chain_lightning(ctx: SkillContext) -> None:
     """Цепь молний: 115% урона основной цели, 60% от этого — ещё двум противникам."""
-    skill = SUBCLASS_SKILL_DEFS["elementalist_lightning"]
+    skill = tuned(ctx, "elementalist_lightning")
     actor = ctx.actor
     set_cooldown(actor, skill.id, skill.cd, ctx.rng)
     register_element_use(actor, skill.id)
@@ -101,7 +101,7 @@ def convergence(ctx: SkillContext) -> None:
     стихии (огонь, лёд, молния в любом порядке) - +effect_value к урону и
     гарантированный крит. Без них: цель горит (от любого игрока) - прибавка,
     заморожена или только вышла из контроля - крит."""
-    skill = SUBCLASS_SKILL_DEFS["elementalist_convergence"]
+    skill = tuned(ctx, "elementalist_convergence")
     actor = ctx.actor
     set_cooldown(actor, skill.id, skill.cd, ctx.rng)
     target = ctx.resolve_target()

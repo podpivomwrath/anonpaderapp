@@ -18,7 +18,7 @@ from game.classes.base import Role, SubclassDef, register
 from game.combat import balance_config as bc
 from game.combat.session import CombatMode, EffectKind
 from game.combat.skills import PendingHeal, SkillContext, compute_hit, defensive_skill, set_cooldown
-from game.combat.subclass_skills import SUBCLASS_SKILL_DEFS
+from game.combat.skill_catalog import tuned
 
 GUARDIAN = register(
     SubclassDef(
@@ -28,13 +28,9 @@ GUARDIAN = register(
         primary_stat="str",
         natural_role=Role.TANK,
         flexible_roles=(Role.SUPPORT,),
-        skills=("attack", "guardian_shield_bash", "guardian_block", "guardian_stonegrip", "guardian_unbreakable"),
+        skills=("attack", "guardian_shield_bash", "guardian_block", "guardian_unbreakable"),
     )
 )
-
-_BLOCK = SUBCLASS_SKILL_DEFS["guardian_block"]
-_UNBREAKABLE = SUBCLASS_SKILL_DEFS["guardian_unbreakable"]
-
 
 @defensive_skill("guardian_shield_bash")
 def shield_bash(ctx: SkillContext) -> None:
@@ -42,7 +38,7 @@ def shield_bash(ctx: SkillContext) -> None:
     PvP — дебаф урона ударенного противника по остальным целям). ЗАЩИТНЫЙ навык (не
     зависит от фазы атаки моба — провокация должна успеть подействовать в
     этот же ход)."""
-    skill = SUBCLASS_SKILL_DEFS["guardian_shield_bash"]
+    skill = tuned(ctx, "guardian_shield_bash")
     actor = ctx.actor
     set_cooldown(actor, skill.id, skill.cd, ctx.rng)
     target = ctx.resolve_target()
@@ -85,6 +81,7 @@ def block(ctx: SkillContext) -> None:
     шанс ПОЛНОГО блока (Несокрушимость), самоисцеление при блоке (Живительный
     блок), контрудар (Возмездие) — читаются из buff_modifiers как и раньше."""
     actor = ctx.actor
+    _BLOCK = tuned(ctx, "guardian_block")
     set_cooldown(actor, _BLOCK.id, _BLOCK.cd, ctx.rng)
 
     # Патч 56, «Гарда»: доп. шанс полного блока против ударов по самому Стражу.
@@ -153,6 +150,7 @@ def block(ctx: SkillContext) -> None:
 def unbreakable(ctx: SkillContext) -> None:
     """Несокрушимый: без урона, 3 хода потолок входящего урона за удар."""
     actor = ctx.actor
+    _UNBREAKABLE = tuned(ctx, "guardian_unbreakable")
     set_cooldown(actor, _UNBREAKABLE.id, _UNBREAKABLE.cd, ctx.rng)
     actor.apply_effect(EffectKind.DAMAGE_CAP, _UNBREAKABLE.effect_value, _UNBREAKABLE.effect_duration, actor.id)
     ctx.lines.append(f"{actor.name} застывает несокрушимой глыбой")

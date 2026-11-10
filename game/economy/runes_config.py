@@ -1,7 +1,9 @@
 """Руны (2026-10-31, решения владельца - память runes-plan): каталог и числа.
 
-Три вида: руны героя (общие, до 12 слотов), руны экипировки (уклон в класс,
-слот у места снаряжения), руны навыков (по типу навыка, 2 слота на навык).
+Четыре вида: руны героя (общие, до 12 слотов), руны экипировки (уклон в
+класс, слот у места снаряжения), руны-навыки (2026-11-10: руна = навык, 3
+слота, game/economy/ability_config.py) и огранки - бывшие руны навыков,
+гнёзда внутри руны-навыка (второе - со ступени II этого навыка).
 
 Руна - обычный предмет, продаётся и передаётся как выпала. Прокачивается не
 руна, а личное мастерство игрока по виду руны: лишние копии «впитываются».
@@ -11,10 +13,11 @@
 
 from dataclasses import dataclass, field
 
-HERO, GEAR, SKILL = "hero", "gear", "skill"
-KINDS = (HERO, GEAR, SKILL)
-KIND_TITLES = {HERO: "Руны героя", GEAR: "Руны экипировки", SKILL: "Руны навыков"}
-KIND_ONE = {HERO: "Руна героя", GEAR: "Руна экипировки", SKILL: "Руна навыка"}
+#: SKILL - огранки (бывшие «руны навыков», id вида прежний), ABILITY - руны-навыки.
+HERO, GEAR, SKILL, ABILITY = "hero", "gear", "skill", "ability"
+KINDS = (HERO, GEAR, SKILL, ABILITY)
+KIND_TITLES = {HERO: "Руны героя", GEAR: "Руны экипировки", SKILL: "Огранки", ABILITY: "Руны-навыки"}
+KIND_ONE = {HERO: "Руна героя", GEAR: "Руна экипировки", SKILL: "Огранка", ABILITY: "Руна-навык"}
 
 #: Кривые прогрессии: (копий до 110%, множитель последующих порогов).
 #: Порог ступени k (100 + 10k %): k=1 - N0, дальше M * (k-1)^2. Тугие -
@@ -40,8 +43,11 @@ HERO_SLOTS_MAX = 12
 #: недостижим, около 20 млрд.
 HERO_SLOT_PRICES = [35_000, 100_000, 300_000, 900_000,
                     6_000_000, 60_000_000, 1_000_000_000, 20_000_000_000]
+#: Гнёзд огранок в руне-навыке: второе открывает ступень II навыка (2026-11-10,
+#: вместо покупки за золото).
 SKILL_SLOTS_MAX = 2
-SKILL_SLOT_PRICE = 60_000
+#: Слотов рун-навыков.
+ABILITY_SLOTS = 3
 #: Пока нет заточки - по одному слоту на место снаряжения.
 GEAR_PLACES = ("weapon", "helmet", "armor", "legs", "boots")
 GEAR_SLOTS_PER_PLACE = 1
@@ -53,7 +59,9 @@ ARMOR_PLACES = ("helmet", "armor", "legs", "boots")
 #: в новом контенте.
 MOB_DROP_CHANCE = 0.01
 #: Доля руны каждого вида в розыгрыше.
-KIND_WEIGHTS = {HERO: 50, GEAR: 30, SKILL: 20}
+#: 2026-11-10: руны-навыки - 20% (доля «рун навыков» не тронута, владелец),
+#: прочие три вида делят остальное в прежней пропорции 50:30:20.
+KIND_WEIGHTS = {HERO: 40, GEAR: 24, SKILL: 16, ABILITY: 20}
 
 
 @dataclass(frozen=True)
@@ -194,6 +202,27 @@ RUNES: list[RuneDef] = [
             pvp="none", tag="damage", curve="tight", rarity="mythic"),
 ]
 
+
+
+def _ability_runes() -> list[RuneDef]:
+    """Руна-навык на каждый навык из ability_config: id руны = id навыка.
+    value 1.0 - эффективность и есть сила навыка (110% = навык на 10%
+    сильнее). В PvP в полную силу: вполсилы там только пробуждение."""
+    from game.content_loader import load_base_skills, load_rune_skills, load_subclass_skills
+    from game.economy import ability_config as ac
+
+    names = {s.id: s.name for skills in load_base_skills().values() for s in skills}
+    names.update({s.id: s.name for skills in load_subclass_skills().values() for s in skills})
+    names.update({s.id: s.name for s in load_rune_skills()})
+    return [
+        RuneDef(a.id, ABILITY, names[a.id], 1.0, "сила навыка {v}", rarity=a.rarity, curve=a.curve,
+                ready=a.id not in ac.PENDING, emoji="🟣")
+        for a in ac.ABILITIES
+    ]
+
+
+RUNES += _ability_runes()
+
 BY_ID: dict[str, RuneDef] = {r.id: r for r in RUNES}
 
 #: Навыки по типам для рун навыков. damage - любой навык с уроном
@@ -203,24 +232,4 @@ SKILL_TAG_TITLES = {
     "damage": "навыки с уроном", "control": "навыки контроля", "dot": "навыки с уроном за ход",
     "duration": "навыки с эффектом на несколько ходов", "long_cd": "навыки с перезарядкой от 4 ходов",
     "heal_shield": "лечение, щиты и вампиризм",
-}
-MANUAL_TAGS: dict[str, set[str]] = {
-    "control": {"warrior_stagger", "mage_ice_bonds", "guardian_stonegrip", "elementalist_ice",
-                "poisoner_disrupt"},
-    # Только навыки, что вешают яд или горение: в них «Едкость» работает.
-    # Токсичный выброс убран 2026-11-02 (владелец): он сам ничего не вешает,
-    # а считается от яда - «Едкость» в клинке его и так усиливает.
-    "dot": {"poisoner_venom", "elementalist_fire"},
-    # Клинок (яд) и дротик (ослабление) - тоже эффект на несколько ходов (2026-11-05, владелец).
-    "duration": {"warrior_warcry", "rogue_smoke", "mage_blood_seal", "guardian_block", "guardian_unbreakable",
-                 "poisoner_venom", "poisoner_disrupt",
-                 "blood_knight_blood_seal", "shadow_blade_shadow_dance", "poisoner_decay", "elementalist_fire",
-                 "dark_mystic_ward"},
-    # Навыки, что сами лечат или вешают щит. Глухая оборона и Несокрушимый -
-    # нет: их лечение идёт от блока, «Подпорка» там ничего бы не дала.
-    # Жатва и Багровый пир лечат так же, как Кровопуск (долей урона) - были
-    # забыты (2026-11-05, владелец).
-    "heal_shield": {"dark_mystic_ward", "blood_knight_lifesteal_strike", "blood_knight_harvest",
-                    "blood_knight_crimson_feast", "dark_mystic_blood_pact", "dark_mystic_drain",
-                    "dark_mystic_circle"},
 }

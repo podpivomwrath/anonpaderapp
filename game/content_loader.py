@@ -200,6 +200,14 @@ def load_subclass_skills(content_dir: Path = CONTENT_DIR) -> dict[str, list[Subc
     return by_subclass
 
 
+def load_rune_skills(content_dir: Path = CONTENT_DIR) -> list[SubclassSkillDef]:
+    """Навыки, которых не было у классов (руны-навыки, 2026-11-10):
+    content/skills/rune_skills.json, формат subclass_skills.json."""
+    with (content_dir / "skills" / "rune_skills.json").open(encoding="utf-8") as f:
+        raw = json.load(f)
+    return [SubclassSkillDef(**s) for k, s in raw.items() if not k.startswith("_")]
+
+
 class TrophyDef(BaseModel):
     """Градация трофея (content/trophies.json, патч 9) — стакающийся ресурс,
     не отдельные предметы."""

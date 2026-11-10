@@ -1,0 +1,64 @@
+{
+  "_comment": "Руны-навыки (2026-11-10): навыки, которых не было ни у одного класса. Обработчики - game/combat/rune_skills.py. Формат тот же, что subclass_skills.json; subclass_id пустой - навык общий. effect_value/effect_duration - базовые числа, их двигают ступени (game/economy/ability_config.py).",
+
+  "cleanse_water": {
+    "id": "cleanse_water", "name": "Чистая вода", "subclass_id": "",
+    "multiplier": 0, "cd": 4, "effect": "custom",
+    "effect_value": 1, "effect_duration": 1,
+    "flavor": "Вода из фляги смывает с раны яд и копоть. Пока она не высохла, сбить вас с ног труднее."
+  },
+  "bitter_wound": {
+    "id": "bitter_wound", "name": "Горькая рана", "subclass_id": "",
+    "multiplier": 1.1, "cd": 3, "effect": "custom",
+    "effect_value": 0.5, "effect_duration": 3,
+    "flavor": "Порез, который плохо затягивается: лекари над ним только разводят руками."
+  },
+  "shatter": {
+    "id": "shatter", "name": "Раскол", "subclass_id": "",
+    "multiplier": 1.2, "cd": 3, "effect": "custom",
+    "effect_value": 0.5, "effect_duration": 0,
+    "flavor": "Удар по щиту, а не по человеку. Щит раскалывается, человек остаётся без него."
+  },
+  "mute": {
+    "id": "mute", "name": "Немота", "subclass_id": "",
+    "multiplier": 0.8, "cd": 5, "effect": "custom",
+    "effect_value": 0, "effect_duration": 1,
+    "flavor": "Удар под горло. Ход-другой противнику не до заклинаний и хитрых приёмов."
+  },
+  "counter_strike": {
+    "id": "counter_strike", "name": "Ответный удар", "subclass_id": "",
+    "multiplier": 0, "cd": 4, "effect": "custom",
+    "effect_value": 0.6, "effect_duration": 2,
+    "flavor": "Вы перестаёте уворачиваться и ждёте удара, чтобы сразу ответить."
+  },
+  "strip_veil": {
+    "id": "strip_veil", "name": "Сорвать покров", "subclass_id": "",
+    "multiplier": 1.0, "cd": 4, "effect": "custom",
+    "effect_value": 1, "effect_duration": 0,
+    "flavor": "Вы сбиваете с противника всё, на что он рассчитывал: защиту, задор или удачу."
+  },
+  "breather": {
+    "id": "breather", "name": "Передышка", "subclass_id": "",
+    "multiplier": 0, "cd": 5, "effect": "custom",
+    "effect_value": 0.05, "effect_duration": 1,
+    "flavor": "Пара вдохов посреди драки. Руки сами вспоминают, что умеют."
+  },
+  "cover_ally": {
+    "id": "cover_ally", "name": "Прикрыть собой", "subclass_id": "",
+    "multiplier": 0, "cd": 5, "effect": "custom",
+    "effect_value": 0.3, "effect_duration": 2,
+    "flavor": "Вы встаёте перед союзником, и часть того, что летит в него, достаётся вам."
+  },
+  "close_ranks": {
+    "id": "close_ranks", "name": "Сомкнуть ряды", "subclass_id": "",
+    "multiplier": 0, "cd": 7, "effect": "custom",
+    "effect_value": 0.15, "effect_duration": 2,
+    "flavor": "Когда кто-то из своих начинает падать, остальные встают к нему плечом к плечу."
+  },
+  "reckoning": {
+    "id": "reckoning", "name": "Расплата", "subclass_id": "",
+    "multiplier": 0, "cd": 6, "effect": "custom",
+    "effect_value": 0.4, "effect_duration": 0,
+    "flavor": "Всё, что вам досталось за этот бой, вы возвращаете одним ударом."
+  }
+}

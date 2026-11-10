@@ -16,7 +16,7 @@ from game.classes.base import Role, SubclassDef, register
 from game.combat.session import CombatMode, Effect, EffectKind
 from game.combat.skills import PendingHit, SkillContext, compute_hit, offensive_skill, set_cooldown
 import game.combat.subclass_skills as subclass_skills
-from game.combat.subclass_skills import SUBCLASS_SKILL_DEFS
+from game.combat.skill_catalog import tuned
 
 POISONER = register(
     SubclassDef(
@@ -48,7 +48,7 @@ def poison_tick_damage_per_stack(will: int, agility: int) -> float:
 @offensive_skill("poisoner_venom")
 def venom(ctx: SkillContext) -> None:
     """Отравленный клинок: 120% урона + стак яда (ДоТ) НА ЦЕЛЬ (макс. 3)."""
-    skill = SUBCLASS_SKILL_DEFS["poisoner_venom"]
+    skill = tuned(ctx, "poisoner_venom")
     actor = ctx.actor
     set_cooldown(actor, skill.id, skill.cd, ctx.rng)
     target = ctx.resolve_target()
@@ -113,7 +113,7 @@ def venom(ctx: SkillContext) -> None:
 def disrupt(ctx: SkillContext) -> None:
     """Дурманящий дротик: 95% урона, 60% шанс сбить действие цели В ЭТОТ ход,
     Ослабление -25% урона цели на 3 хода (безусловно)."""
-    skill = SUBCLASS_SKILL_DEFS["poisoner_disrupt"]
+    skill = tuned(ctx, "poisoner_disrupt")
     actor = ctx.actor
     set_cooldown(actor, skill.id, skill.cd, ctx.rng)
     target = ctx.resolve_target()
@@ -175,7 +175,7 @@ def toxic_burst(ctx: SkillContext) -> None:
     значением эффекта: это то, что яд реально снимает за ход, вместе с
     «Разъедающим токсином» и «Некрозом».
     """
-    skill = SUBCLASS_SKILL_DEFS["poisoner_toxic_burst"]
+    skill = tuned(ctx, "poisoner_toxic_burst")
     actor = ctx.actor
     set_cooldown(actor, skill.id, skill.cd, ctx.rng)
     target = ctx.resolve_target()

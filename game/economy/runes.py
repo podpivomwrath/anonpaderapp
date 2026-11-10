@@ -66,7 +66,10 @@ def describe(rune_def: rc.RuneDef, absorbed: int = 0) -> str:
 
 def skill_tags(skill) -> set[str]:
     """Типы навыка для рун навыков. skill - BaseSkillDef/SubclassSkillDef."""
-    tags = {tag for tag, ids in rc.MANUAL_TAGS.items() if skill.id in ids}
+    from game.economy import ability_config as ac
+
+    ability = ac.BY_ID.get(skill.id)
+    tags = set(ability.tags) if ability else set()
     if (getattr(skill, "multiplier", 0) or 0) > 0:
         tags.add("damage")
     if (getattr(skill, "cd", 0) or 0) >= 4:

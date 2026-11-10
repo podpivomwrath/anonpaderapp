@@ -11,7 +11,7 @@ from game.combat import balance_config as bc
 from game.combat import shared_rules
 from game.combat.session import EffectKind
 from game.combat.skills import SkillContext, compute_hit, offensive_skill, set_cooldown
-from game.combat.subclass_skills import SUBCLASS_SKILL_DEFS
+from game.combat.skill_catalog import tuned
 
 SHADOW_BLADE = register(
     SubclassDef(
@@ -23,7 +23,7 @@ SHADOW_BLADE = register(
         flexible_roles=(Role.TANK,),
         skills=(
             "attack", "shadow_blade_marked_strike", "shadow_blade_mark_harvest",
-            "shadow_blade_shadow_dance", "shadow_blade_execute",
+            "shadow_blade_execute",
         ),
     )
 )
@@ -33,7 +33,7 @@ SHADOW_BLADE = register(
 def marked_strike(ctx: SkillContext) -> None:
     """Скользящий рез: 145% урона, +2 стака Метки добычи (макс. 5). Единственный
     способ открыть метку без баффов пресета: пассивка только добавляет к ней."""
-    skill = SUBCLASS_SKILL_DEFS["shadow_blade_marked_strike"]
+    skill = tuned(ctx, "shadow_blade_marked_strike")
     actor = ctx.actor
     set_cooldown(actor, skill.id, skill.cd, ctx.rng)
     target = ctx.resolve_target()
@@ -49,7 +49,7 @@ def marked_strike(ctx: SkillContext) -> None:
 @offensive_skill("shadow_blade_mark_harvest")
 def mark_harvest(ctx: SkillContext) -> None:
     """Жатва меток: 120% + 35% за каждый стак Метки, тратит все стаки."""
-    skill = SUBCLASS_SKILL_DEFS["shadow_blade_mark_harvest"]
+    skill = tuned(ctx, "shadow_blade_mark_harvest")
     actor = ctx.actor
     set_cooldown(actor, skill.id, skill.cd, ctx.rng)
     target = ctx.resolve_target()
@@ -76,7 +76,7 @@ def mark_harvest(ctx: SkillContext) -> None:
 @offensive_skill("shadow_blade_execute")
 def execute(ctx: SkillContext) -> None:
     """Казнь: 195% урона, гарантированный крит. Если цель ниже 30% HP — урон удваивается."""
-    skill = SUBCLASS_SKILL_DEFS["shadow_blade_execute"]
+    skill = tuned(ctx, "shadow_blade_execute")
     actor = ctx.actor
     set_cooldown(actor, skill.id, skill.cd, ctx.rng)
     target = ctx.resolve_target()

@@ -12,11 +12,6 @@
     "effect_value": 0.35, "effect_duration": 2,
     "flavor": "Вы уходите за щит, и мир сужается до полосы света над кромкой."
   },
-  "guardian_stonegrip": {
-    "id": "guardian_stonegrip", "name": "Каменная хватка", "subclass_id": "guardian",
-    "multiplier": 1.5, "cd": 4, "effect": "stun",
-    "flavor": "Вы перехватываете его и держите. Просто держите."
-  },
   "guardian_unbreakable": {
     "id": "guardian_unbreakable", "name": "Несокрушимый", "subclass_id": "guardian",
     "multiplier": 0, "cd": 6, "effect": "custom",
@@ -60,12 +55,6 @@
     "effect_value": 0.35,
     "flavor": "Все порезы вспоминают о себе разом."
   },
-  "shadow_blade_shadow_dance": {
-    "id": "shadow_blade_shadow_dance", "name": "Танец в тени", "subclass_id": "shadow_blade",
-    "multiplier": 1.0, "cd": 4, "effect": "self_dodge_buff",
-    "effect_value": 0.4, "effect_duration": 2,
-    "flavor": "Вы перестаёте быть там, где были. Ненадолго, но этого хватает."
-  },
   "shadow_blade_execute": {
     "id": "shadow_blade_execute", "name": "Казнь", "subclass_id": "shadow_blade",
     "multiplier": 1.95, "cd": 5, "effect": "custom",
@@ -80,7 +69,7 @@
   "poisoner_decay": {
     "id": "poisoner_decay", "name": "Разложение", "subclass_id": "poisoner",
     "multiplier": 0.9, "cd": 3, "effect": "target_vuln",
-    "effect_value": 0.26, "effect_duration": 3,
+    "effect_value": 0.30, "effect_duration": 3,
     "flavor": "Плоть перестаёт держать удар. Она больше не считает это своей обязанностью."
   },
   "poisoner_disrupt": {
@@ -104,7 +93,7 @@
   },
   "elementalist_ice": {
     "id": "elementalist_ice", "name": "Ледяные оковы", "subclass_id": "elementalist",
-    "multiplier": 1.05, "cd": 6, "effect": "stun",
+    "multiplier": 1.05, "cd": 5, "effect": "stun",
     "flavor": "Кровь врага на миг вспоминает, что она - вода."
   },
   "elementalist_lightning": {
