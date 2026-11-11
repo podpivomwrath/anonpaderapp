@@ -476,6 +476,7 @@ WALLET_REASONS = {
     "pts_service.season_close": "Награда сезона PvP",
     "rune_service.buy_hero_slot": "Слот руны героя",
     "rune_service.buy_skill_slot": "Второй слот руны навыка",
+    "migrate_skill_runes.refund": "Возврат за второй слот навыка (руны-навыки)",
     "alchemy_service.start": "Варка зелья", "cooking_service.start": "Готовка в печи",
     "contract_service.create": "Заказ на голову", "contract_service.buyout": "Откуп от заказа", "contract_service.rules_refund": "Возврат заказа: новые правила", "contract_service.on_kill": "Награда за заказ",
     "courier_service.buy": "Курьер (магазин)", "daily_service._apply_delta": "Ежедневное задание",

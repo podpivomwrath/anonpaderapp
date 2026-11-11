@@ -387,3 +387,70 @@ def test_new_facets_squint_and_finisher() -> None:
     from game.combat.skills import skill_step_bonus
 
     assert skill_step_bonus(me, low, "warrior_cleave") == pytest.approx(0.25)
+
+
+# --- Перевод живых персонажей (2026-11-11, без вайпа) ------------------------------
+
+
+async def test_migration_turns_old_skills_into_runes(db_session, make_character) -> None:
+    import sys
+
+    sys.path.insert(0, "tools")
+    import migrate_skill_runes as mig
+    from sqlalchemy import select
+
+    from models import Wallet
+    from models.character import CharacterBuffPreset
+    from models.subclass_trial import CharacterUnlockedBuff
+
+    character = await make_character(level=40, subclass="guardian")
+    character.rune_skill_slots = ["guardian_block"]
+    db_session.add_all([
+        # огранка на слитом навыке - навык встаёт в слот первым, огранка едет с ним
+        rc_slot(character.id, "guardian_stonegrip:0", "cold_count"),
+        rc_slot(character.id, "guardian_block:1", "press"),
+        CharacterUnlockedBuff(character_id=character.id, buff_id="guardian_guard"),
+        CharacterBuffPreset(character_id=character.id, name="П", buff_ids=[], is_active=True,
+                            runes=[{"kind": "hero", "slot": "0", "rune_id": "ash_skin"},
+                                   {"kind": "skill", "slot": "guardian_stonegrip:0", "rune_id": "cold_count"}]),
+    ])
+    await db_session.flush()
+    report = await mig.migrate_one(db_session, character, apply=True)
+    assert report["equip"] == ["guardian_shield_bash", "guardian_block", "warrior_stagger"]
+    assert report["spare"] == ["guardian_unbreakable"]
+    assert skill_catalog.skill_ids_of(character.rune_effects) == report["equip"]
+    bag = await rune_service.bag(db_session, character.id)
+    assert bag["guardian_unbreakable"] == 1 and bag["press"] == 1
+    assert bag[trial_reward("guardian_guard")] >= 1
+    slots = {(r.kind, r.slot): r.rune_id for r in await rune_service.slots(db_session, character.id)}
+    assert slots[(rc.SKILL, "warrior_stagger:0")] == "cold_count"
+    wallet = await db_session.scalar(select(Wallet).where(Wallet.character_id == character.id))
+    assert wallet.farm_currency == mig.OLD_SLOT_PRICE and character.rune_skill_slots == []
+    preset = await db_session.scalar(select(CharacterBuffPreset).where(CharacterBuffPreset.character_id == character.id))
+    assert {"kind": rc.SKILL, "slot": "warrior_stagger:0", "rune_id": "cold_count"} in preset.runes
+    assert [e["rune_id"] for e in preset.runes if e["kind"] == rc.ABILITY] == report["equip"]
+    # повторный запуск ничего не делает
+    assert await mig.migrate_one(db_session, character, apply=True) is None
+
+
+async def test_old_preset_layout_keeps_skills(db_session, make_character) -> None:
+    """Раскладка пресета без рун-навыков (сохранена до переделки) не снимает навыки."""
+    character = await make_character(base_class="mage")
+    _home(character)
+    await rune_service.grant_starter(db_session, character)
+    await rune_service.grant(db_session, character.id, "ash_skin", 1)
+    missing = await rune_service.apply_layout(db_session, character, [{"kind": "hero", "slot": "0", "rune_id": "ash_skin"}])
+    assert missing == 0
+    assert skill_catalog.skill_ids_of(character.rune_effects) == list(skill_catalog.STARTER_SKILLS["mage"])
+
+
+def rc_slot(character_id: int, slot: str, rune_id: str):
+    from models import CharacterRuneSlot
+
+    return CharacterRuneSlot(character_id=character_id, kind=rc.SKILL, slot=slot, rune_id=rune_id)
+
+
+def trial_reward(buff_id: str) -> str:
+    from services import trial_service
+
+    return trial_service.reward_rune(buff_id)

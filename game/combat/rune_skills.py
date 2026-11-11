@@ -158,7 +158,7 @@ def counter_strike(ctx: SkillContext) -> None:
     actor = ctx.actor
     set_cooldown(actor, skill.id, skill.cd, ctx.rng)
     actor.apply_effect(EffectKind.BLOOD_REFLECT, skill.effect_value, skill.effect_duration, actor.id)
-    actor.reflect_label = "отвечает ударом"
+    actor.reflect_label = skill.name  # «Боец использует Ответный удар на ...»
     ctx.lines.append(f"🔁 {actor.name} ждёт удара, чтобы ответить")
 
 
@@ -282,8 +282,10 @@ def reckoning(ctx: SkillContext) -> None:
     if actor.buff_modifiers.get("reckoning_shields", 0.0) > 0:
         taken += getattr(actor, "shield_taken_total", 0)
     if not hit.missed:
+        # не слабее обычного удара (2026-11-11): в начале боя счётчик пуст, и
+        # удар на 1 урона с перезарядкой 6 выглядел как поломка
         cap = round(hit.amount * (3 + actor.buff_modifiers.get("reckoning_cap", 0.0)))
-        hit.amount = max(min(round(taken * skill.effect_value), cap), 1)
+        hit.amount = max(min(round(taken * skill.effect_value), cap), hit.amount, 1)
     ctx.hits.append(hit)
     keep = actor.buff_modifiers.get("reckoning_keep", 0.0)
     actor.taken_total = round(getattr(actor, "taken_total", 0) * keep)

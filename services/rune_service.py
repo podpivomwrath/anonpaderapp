@@ -248,8 +248,14 @@ async def apply_layout(db: AsyncSession, character: Character, saved: list) -> i
     for e in saved or []:
         if isinstance(e, dict) and e.get("kind") in rc.KINDS and isinstance(e.get("slot"), str):
             want[(e["kind"], e["slot"])] = str(e.get("rune_id"))
+    # Раскладка, сохранённая до рун-навыков (без единого навыка), навыки и их
+    # огранки не трогает: иначе пресет снял бы с героя все навыки.
+    legacy = not any(kind == rc.ABILITY for kind, _ in want)
     kept: set[tuple[str, str]] = set()
     for row in await slots(db, character.id):
+        if legacy and row.kind in (rc.ABILITY, rc.SKILL):
+            kept.add((row.kind, row.slot))
+            continue
         if want.get((row.kind, row.slot)) == row.rune_id:
             kept.add((row.kind, row.slot))
             continue
@@ -259,7 +265,7 @@ async def apply_layout(db: AsyncSession, character: Character, saved: list) -> i
     missing = 0
     order = sorted(want.items(), key=lambda item: item[0][0] != rc.ABILITY)
     for (kind, slot), rune_id in order:
-        if (kind, slot) in kept:
+        if (kind, slot) in kept or (legacy and kind == rc.SKILL):
             continue
         if kind == rc.SKILL:
             await recompute(db, character)  # навыки уже стоят - гнёзда огранок открыты
