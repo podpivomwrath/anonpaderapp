@@ -74,7 +74,6 @@ class RuneDef:
     rarity: str = "common"
     curve: str = "normal"
     pvp: str = "full"
-    #: Руны экипировки и навыков: базовые классы, которым подходит (пусто - всем).
     #: Руны экипировки: "weapon" или "armor".
     place: str = ""
     #: Руны навыков: тег навыка (SKILL_TAGS), пусто - любой навык.
@@ -139,7 +138,7 @@ RUNES: list[RuneDef] = [
     RuneDef("thin_sting", GEAR, "Тонкое жало", 0.12, "+{v} к урону крита", pvp="half", place="weapon"),
     RuneDef("last_cut", GEAR, "Последний надрез", 0.12, "+{v} прямого урона по целям ниже 30% здоровья", pvp="half", place="weapon"),
     RuneDef("riposte", GEAR, "Ответный выпад", 0.20,
-            "увернулся - удары в следующем ходу сильнее на {v}; несколько уворотов подряд не складываются",
+            "после вашего уворота удары следующего хода сильнее на {v}; несколько уворотов подряд не складываются",
             pvp="half", place="weapon"),
     RuneDef("rotten_wound", GEAR, "Гнилая рана", 0.20, "шанс {v}, что яд продержится на ход дольше",
             pvp="half", place="weapon", curve="tight", rarity="rare"),
@@ -163,7 +162,7 @@ RUNES: list[RuneDef] = [
     RuneDef("heavy_swing", GEAR, "Счёт до четырёх", 1.00, "каждый четвёртый удар сильнее на {v}",
             pvp="half", place="weapon", curve="very_tight", rarity="mythic"),
     RuneDef("last_word", GEAR, "Последнее слово", 0.30,
-            "при гибели бьёт всех врагов на {v} своего максимума здоровья",
+            "при вашей гибели все враги получают урон в {v} вашего максимума здоровья",
             pvp="half", place="armor", curve="tight", rarity="mythic"),
 
     # --- Руны навыков -------------------------------------------------------------
