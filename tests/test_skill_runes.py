@@ -467,3 +467,37 @@ def trial_reward(buff_id: str) -> str:
     from services import trial_service
 
     return trial_service.reward_rune(buff_id)
+
+
+# --- Карточка: лечение и щиты на ваших характеристиках (2026-11-11) -----------------
+
+
+def _card_fighter(subclass="dark_mystic", base="mage", will=72):
+    from game.combat.session import Stats, build_combatant
+
+    stats = Stats(strength=30, agility=30, intellect=30, vitality=60, will=will)
+    return build_combatant(id=1, side=0, kind="character", name="Герой", level=40, stats=stats,
+                           primary_stat="int", subclass_id=subclass,
+                           buff_modifiers=ac.combat_modifiers({}, subclass), base_class=base)
+
+
+def test_circle_card_says_source_and_amounts() -> None:
+    """Владелец: у «Круга тьмы» не было видно, от чего и на сколько он лечит."""
+    from bot import miniapp_runes_api as api
+
+    hero = {"str": 30, "agi": 30, "int": 30, "vit": 60, "wil": 72}
+    text = api._effect_text("dark_mystic_circle", _card_fighter(), hero, 0, None)
+    assert "от Воли (у вас 72)" in text and "в одиночку" in text and "союзнику" in text
+    weak = api._effect_text("dark_mystic_circle", _card_fighter(will=30), {**hero, "wil": 30}, 0, None)
+    num = lambda t: int(t.split("в одиночку ")[1].split(",")[0])  # noqa: E731
+    assert num(text) > num(weak)  # больше Воли - больше лечения
+
+
+def test_every_healing_or_shielding_skill_shows_numbers() -> None:
+    from bot import miniapp_runes_api as api
+
+    hero = {"str": 30, "agi": 30, "int": 30, "vit": 60, "wil": 72}
+    fighter = _card_fighter()
+    for sid in ac.RECOVERY_SKILLS:
+        text = api._effect_text(sid, fighter, hero, 0, None)
+        assert text and any(ch.isdigit() for ch in text), sid

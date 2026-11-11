@@ -107,7 +107,8 @@ def _scaling_info(skill_id: str, absorbed: int, character, hero: dict[str, int])
     return {"scaling": parts, "damage": round(unit * tuned.multiplier)}
 
 
-def _ability_slot(index: int, taken: dict, known: dict, character, socket, hero: dict | None = None) -> dict:
+def _ability_slot(index: int, taken: dict, known: dict, character, socket, hero: dict | None = None,
+                  fighter=None) -> dict:
     out = socket(rc.ABILITY, str(index))
     rune_id = taken.get((rc.ABILITY, str(index)))
     if not rune_id or rune_id not in ac.BY_ID:
@@ -118,10 +119,106 @@ def _ability_slot(index: int, taken: dict, known: dict, character, socket, hero:
     skill = skill_catalog.skill_def(rune_id)
     out.update(info)
     out.update(_scaling_info(rune_id, absorbed, character, hero or {}))
+    out["effect"] = _effect_text(rune_id, fighter, hero or {}, absorbed,
+                                 (character.skill_forks or {}).get(rune_id))
     out["skill"] = {"id": rune_id, "name": skill.name, "cd": skill.cd, "tags": sorted(runes.skill_tags(skill))}
     out["facets"] = [socket(rc.SKILL, f"{rune_id}:0"),
                      {**socket(rc.SKILL, f"{rune_id}:1", info["step"] >= 2), "need_step": 2}]
     return out
+
+
+async def _hero_fighter(db, character, hero: dict[str, int]):
+    """Боец героя для прикидки навыков: характеристики с вещами и модификаторы
+    вне PvP - как перед боем с тварью."""
+    from game.combat import balance_config as bc
+    from game.combat.session import Stats, build_combatant
+    from services import preset_service
+
+    if not character.base_class:
+        return None
+    stats = Stats(strength=hero["str"], agility=hero["agi"], intellect=hero["int"],
+                  vitality=hero["vit"], will=hero["wil"])
+    return build_combatant(
+        id=1, side=0, kind="character", name=character.name, level=character.level or 1, stats=stats,
+        primary_stat=bc.PRIMARY_STAT_BY_CLASS[character.base_class], subclass_id=character.subclass,
+        buff_modifiers=dict(await preset_service.resolve_active_modifiers(db, character)),
+        base_class=character.base_class,
+    )
+
+
+def _source_title(skill_id: str, hero: dict[str, int]) -> str:
+    src = ac.recovery_from(skill_id)
+    if src == "dmg":
+        return "от нанесённого урона"
+    if src == "hp":
+        return "от вашего здоровья"
+    return f"от {ac.STAT_TITLES[src]} (у вас {hero.get(src, 0)})"
+
+
+def _amounts(solo: int, me: int, ally: int) -> str:
+    """«в одиночку 192, в группе вам 320, союзнику 400»."""
+    group = []
+    if ally and me == ally:
+        group.append(f"каждому {ally}")
+    else:
+        if me:
+            group.append(f"вам {me}")
+        if ally:
+            group.append(f"союзнику {ally}")
+    if not group or group == [f"вам {solo}"]:
+        return str(solo)
+    parts = [f"в одиночку {solo}"] if solo else []
+    parts.append("в группе " + ", ".join(group))
+    return ", ".join(parts)
+
+
+def _effect_text(skill_id: str, fighter, hero: dict[str, int], absorbed: int, fork: int | None) -> str | None:
+    """Лечение, щит и цена навыка на ваших характеристиках (2026-11-11,
+    владелец: у «Круга тьмы» не было видно, от чего и на сколько он лечит).
+    Числа - из пробного прогона настоящего обработчика (skill_preview)."""
+    import copy
+
+    from game.combat import skill_preview
+
+    if fighter is None:
+        return None
+    me = copy.deepcopy(fighter)
+    # Руна из сумки: её мастерство и ступени - как если бы она стояла в слоте.
+    rune_def = rc.BY_ID[skill_id]
+    step = ac.step_of(skill_id, absorbed)
+    effects = {f"ability:{skill_id}": 1, f"step:{skill_id}": step}
+    if step >= 3 and fork in (1, 2):
+        effects[f"fork:{skill_id}"] = fork
+    me.buff_modifiers.update(ac.combat_modifiers(effects, None))
+    power = runes.value(rune_def, absorbed) - 1.0
+    if power > 0:
+        me.buff_modifiers[f"rune:{skill_id}"] = power
+    try:
+        p = skill_preview.preview(me, skill_id)
+    except Exception:  # noqa: BLE001 - подсказка не должна ронять весь раздел «Руны»
+        from loguru import logger
+
+        logger.exception(f"прикидка навыка {skill_id} не посчиталась")
+        return None
+    src = _source_title(skill_id, hero)
+    out = []
+    if p.heal_solo or p.heal_self or p.heal_ally:
+        out.append(f"Лечение {src}: {_amounts(p.heal_solo, p.heal_self, p.heal_ally)}.")
+    if p.shield_solo or p.shield_self or p.shield_ally:
+        out.append(f"Щит {src}: {_amounts(p.shield_solo, p.shield_self, p.shield_ally)}.")
+    if p.cost:
+        out.append(f"Цена с полного здоровья: {p.cost}.")
+    skill = skill_catalog.tuned(me, skill_id)
+    if skill_id == "guardian_unbreakable":
+        out.append(f"Удар по вам снимет не больше {round(me.max_hp * skill.effect_value)} здоровья.")
+    if skill_id == "guardian_block" and p.block_heal:
+        out.append(f"Каждый удар по вам в стойке лечит на {p.block_heal}.")
+    if skill_id == "reckoning" and p.hit:
+        cap = 3 + me.buff_modifiers.get("reckoning_cap", 0.0)
+        out.append(f"Сейчас удар от {p.hit} до {round(p.hit * cap)}, без брони и крита.")
+    if skill_id == "poisoner_toxic_burst":
+        out.append("Урон зависит от яда на цели: без яда удар пустой.")
+    return " ".join(out) or None
 
 
 def _passive(character) -> dict | None:
@@ -155,10 +252,14 @@ async def _payload(db, character) -> dict:
         for place in rc.GEAR_PLACES
     ]
     hero_stats = await _hero_stats(db, character)
-    abilities = [_ability_slot(i, taken, known, character, socket, hero_stats) for i in range(rc.ABILITY_SLOTS)]
+    fighter = await _hero_fighter(db, character, hero_stats)
+    abilities = [_ability_slot(i, taken, known, character, socket, hero_stats, fighter)
+                 for i in range(rc.ABILITY_SLOTS)]
     worn = set(taken.values())
     owned = [
-        {**_rune(r, known.get(r.id, 0), bag.get(r.id, 0)), "equipped": r.id in worn}
+        {**_rune(r, known.get(r.id, 0), bag.get(r.id, 0)), "equipped": r.id in worn,
+         "effect": (_effect_text(r.id, fighter, hero_stats, known.get(r.id, 0),
+                                 (character.skill_forks or {}).get(r.id)) if r.kind == rc.ABILITY else None)}
         for r in rc.RUNES if bag.get(r.id) or known.get(r.id) or r.id in worn
     ]
     wallet = await wallet_service.get_wallet(db, character.id)

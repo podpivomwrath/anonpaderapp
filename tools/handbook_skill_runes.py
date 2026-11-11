@@ -34,6 +34,14 @@ CLASS_TITLES = {"warrior": "Воин", "rogue": "Разбойник", "mage": "�
 RARITY = {ac.COMMON: "обычная", ac.RARE: "редкая", ac.EPIC: "эпическая", ac.MYTHIC: "мифическая"}
 STEP = {1: "I", 2: "II", 3: "III", 4: "IV"}
 
+#: От чего лечение и щиты навыка (ability_config.RECOVERY_FROM).
+RECOVERY_NOTE = {
+    "wil": "Лечение и щиты - от Воли.",
+    "vit": "Щит - от Выносливости.",
+    "hp": "Лечение - доля вашего здоровья.",
+    "dmg": "Лечение - доля нанесённого удара.",
+}
+
 #: Группы навыков в справочнике - как в документе дизайна.
 GROUPS = [
     ("Удары", ["warrior_cleave", "rogue_double_stab", "rogue_shadow_dash", "shadow_blade_marked_strike",
@@ -66,6 +74,8 @@ def skill_details(sid: str) -> dict:
     if scale:
         head += " Бьёт от характеристик: " + " и ".join(
             f"{round(coef * 100)}% {ac.STAT_TITLES[stat]}" for stat, coef in scale.items()) + "."
+    if sid in ac.RECOVERY_SKILLS:
+        head += " " + RECOVERY_NOTE[ac.recovery_from(sid)]
     steps = [
         f"<b>Ступень I</b> ({copies(need[0])}) - {ability.one.text}",
         f"<b>Ступень II</b> ({copies(need[1])}) - {ability.two.text} Открывает второе гнездо огранки.",

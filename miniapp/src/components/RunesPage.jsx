@@ -96,6 +96,7 @@ function RuneInfo({ rune }) {
     <div className="rune-info">
       {rune.summary && <p className="rune-info__text">{rune.summary}</p>}
       {rune.scaling_text && <p className="rune-info__text">Бьёт от характеристик: {rune.scaling_text}.</p>}
+      {rune.effect && <p className="rune-info__text">{rune.effect}</p>}
       <p className="rune-info__text">{rune.kind === 'ability' ? `Сила навыка ${rune.efficiency}%.` : rune.text}</p>
       <small className="rune-info__meta">
         {rune.rarity_title}{rune.kind === 'ability' ? '' : `, ${PVP[rune.pvp]}`}
@@ -203,7 +204,7 @@ function SocketSheet({ kind, socket, data, ability, busy, onEquip, onUnequip, on
         {options.map((r) => (
           <button key={r.id} type="button" className="rune-option" disabled={busy || !data.home} onClick={() => onEquip(r.id)}>
             <RuneIcon rune={r} size={36} />
-            <span className="rune-option__main"><b>{r.name}</b><small>{r.summary || r.text}{r.scaling_text ? ` ${r.scaling_text}.` : ''}</small></span>
+            <span className="rune-option__main"><b>{r.name}</b><small>{r.summary || r.text}{r.scaling_text ? ` ${r.scaling_text}.` : ''}{r.effect ? ` ${r.effect}` : ''}</small></span>
             <small className="rune-option__count">×{r.count}</small>
           </button>
         ))}
@@ -229,6 +230,8 @@ function AbilityCard({ ability, index, onPick, onSteps }) {
                 {ability.damage ? ` → урон ${ability.damage}` : ''}
               </small>
             )}
+            {/* Лечение, щит и цена на ваших характеристиках (2026-11-11). */}
+            {ability.effect && <small className="rune-ability__scale">{ability.effect}</small>}
             <button type="button" className="pill-btn pill-btn--small" onClick={() => onSteps(ability)}>
               {/* Пробуждение видит только сам игрок - значок на его же карточке. */}
               {ability.step === 4 && RUNE_ART.awakened && <img className="rune-awakened" src={RUNE_ART.awakened} alt="" />}

@@ -230,7 +230,7 @@ ABILITIES: list[AbilityDef] = [
       ("Промахнувшийся по вам получает заряд Метки добычи.", {"mark_on_dodge": 1.0}),
       ("Каждый 8-й ход первый удар по вам промахивается.", {"second_chance_interval": 8.0}),
       ("Уклонившись, вы отвечаете ударом на 50%.", {"dodge_counter_mult": 0.5})),
-    A("guardian_block", RARE, (DURATION,), "Входящий урон -35% на 2 хода и лечение за срезанное.",
+    A("guardian_block", RARE, (DURATION,), "Входящий урон -35% на 2 хода, каждый удар в стойку лечит вас на 3% здоровья.",
       ("При применении лечит 8% здоровья.", {"heal_on_block_pct_max_hp": 0.08}),
       ("Шанс 30% полностью заблокировать удар.", {"full_block_chance": 0.30}),
       ("25% срезанного урона получает ударивший.", {"block_reflect_pct": 0.25}),
@@ -252,13 +252,13 @@ ABILITIES: list[AbilityDef] = [
        {"self_denial": 1.0}),
       ("Каждый 5-й ход пакт лечит ещё и всю группу на 40% от основного лечения.",
        {"circle_interval": 5.0, "circle_pct": 0.4})),
-    A("dark_mystic_ward", RARE, (DURATION, HEAL), "Щит себе или союзнику на 3 хода, остаток - лечением.",
+    A("dark_mystic_ward", RARE, (DURATION, HEAL), "Щит от вашей Воли самому раненому своему на 3 хода, остаток - лечением.",
       ("Щит больше на 18%.", {"ward_shield_bonus": 0.18}),
       ("Такой же щит - ещё и самому раненому союзнику.", {"ward_transfer": 1.0}),
       ("Щит больше ещё на 20%, перезарядка 5 ходов.", {"ward_absorb_bonus": 0.20}),
       ("Снимает с цели один плохой эффект.", {"skill_cleanse@": 1}),
       ("Остаток щита превращается в лечение вдвое сильнее.", {"ward_heal_mult": 1.0})),
-    A("dark_mystic_circle", EPIC, (HEAL, LONG_CD), "Тратит 20% текущего здоровья, лечит всю свою сторону.",
+    A("dark_mystic_circle", EPIC, (HEAL, LONG_CD), "Тратит 20% текущего здоровья и лечит всю свою сторону от вашей Воли, каждого на долю его здоровья. В одиночку лечит только вас.",
       ("Тратит на 20% меньше здоровья.", {"hp_cost_reduction": 0.2}),
       ("Лечит на 15% сильнее.", {"skill_value@": 0.09}),
       ("Пока у вас меньше 25% здоровья, лечит на 30% сильнее.", {"edge_bonus": 0.3}),
@@ -301,7 +301,7 @@ ABILITIES: list[AbilityDef] = [
       ("+15% к шансу крита этим ударом.", {"skill_crit@": 0.15}),
       ("Цель ослаблена на 15% на 2 хода.", {"skill_weaken@": 0.15}),
       ("Снимает всё полезное.", {"skill_value@": 8})),
-    A("breather", EPIC, (LONG_CD,), "Перезарядка остальных ваших навыков на ход короче; вы лечитесь на 5%.",
+    A("breather", EPIC, (LONG_CD,), "Перезарядка остальных ваших навыков на ход короче; вы лечитесь на 5% здоровья.",
       ("Лечит на 8%.", {"skill_value@": 0.03}),
       ("Перезарядка 4 хода.", {"skill_cd@": 1}),
       ("Перезарядка остальных на 2 хода короче, но без лечения.", {"breather_turns": 1.0}),
@@ -432,6 +432,23 @@ SCALING_SHARES: dict[str, dict[str, float]] = {
 #: Выносливость - как Сила.
 STAT_K = {"str": 2.0, "agi": 1.5, "int": 2.0, "wil": 2.0, "vit": 2.0}
 STAT_TITLES = {"str": "Силы", "agi": "Ловкости", "int": "Интеллекта", "wil": "Воли", "vit": "Выносливости"}
+
+#: От чего лечат и ставят щиты навыки (2026-11-11, для карточки и путеводителя):
+#: характеристика, «dmg» - доля нанесённого удара, «hp» - доля вашего здоровья.
+#: Чего нет здесь - лечит и ставит щиты от Воли.
+RECOVERY_FROM: dict[str, str] = {
+    "cover_ally": "vit", "close_ranks": "vit", "breather": "hp", "guardian_block": "hp",
+    "blood_knight_lifesteal_strike": "dmg", "blood_knight_harvest": "dmg", "blood_knight_crimson_feast": "dmg",
+    "blood_knight_blood_seal": "dmg", "dark_mystic_drain": "dmg", "dark_mystic_blood_pact": "dmg",
+}
+#: Навыки, которые сами лечат или ставят щиты (для путеводителя).
+RECOVERY_SKILLS = ("breather", "close_ranks", "cover_ally", "dark_mystic_circle", "dark_mystic_ward",
+                   "guardian_block", "blood_knight_lifesteal_strike", "blood_knight_harvest",
+                   "blood_knight_crimson_feast", "dark_mystic_drain", "dark_mystic_blood_pact")
+
+
+def recovery_from(skill_id: str) -> str:
+    return RECOVERY_FROM.get(skill_id, "wil")
 
 
 def scaling(skill_id: str, multiplier: float, power: float = 0.0) -> dict[str, float]:
