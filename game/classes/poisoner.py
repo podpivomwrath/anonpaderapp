@@ -63,7 +63,7 @@ def venom(ctx: SkillContext) -> None:
     per_stack = poison_tick_damage_per_stack(actor.stats.will, actor.stats.agility)
     # Патч 47: «Затяжной яд» — +duration_bonus ходов к длительности; 0 без баффа.
     duration = bc.POISONER_POISON_DURATION_TICKS + int(actor.buff_modifiers.get("poison_duration_bonus", 0))
-    existing = target.effect_from(EffectKind.DOT, actor.id)
+    existing = target.poison_from(actor.id)
     if existing is not None:
         existing.stacks = min(existing.stacks + 1, bc.POISONER_MAX_STACKS)
         existing.value = per_stack
@@ -96,7 +96,7 @@ def venom(ctx: SkillContext) -> None:
         if others:
             actor.venom_cloud_at = tick + interval
         for other in others:
-            existing_other = other.effect_from(EffectKind.DOT, actor.id)
+            existing_other = other.poison_from(actor.id)
             if existing_other is not None:
                 existing_other.stacks = min(existing_other.stacks + 1, bc.POISONER_MAX_STACKS)
                 existing_other.remaining_ticks = max(existing_other.remaining_ticks, duration)
@@ -135,7 +135,7 @@ def disrupt(ctx: SkillContext) -> None:
     if weaken_bonus > 0:
         spread = weaken * bc.POISONER_DESICCATION_SPREAD_PCT
         for enemy in ctx.session.alive_enemies_of(actor):
-            if enemy.id != target.id and enemy.effect_from(EffectKind.DOT, actor.id) is not None:
+            if enemy.id != target.id and enemy.poison_from(actor.id) is not None:
                 enemy.apply_effect(EffectKind.WEAKEN, spread, 3, actor.id)
 
     # Патч 56: «Галлюциноген» поднимает шанс сбоя действия (0.60 -> 0.75).
@@ -185,7 +185,7 @@ def toxic_burst(ctx: SkillContext) -> None:
     target = ctx.resolve_target()
     if target is None:
         return
-    poison = target.effect_from(EffectKind.DOT, actor.id)
+    poison = target.poison_from(actor.id)
     if poison is None:
         ctx.lines.append(f"{actor.name} бьёт впустую - на {target.name} нет яда")
         return

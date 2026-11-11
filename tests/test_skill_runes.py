@@ -525,3 +525,18 @@ async def test_class_change_keeps_all_runes_and_gives_nothing(db_session, make_c
     assert await rune_service.layout(db_session, character) == before_slots
     assert await rune_service.bag(db_session, character.id) == before_bag
     assert skill_catalog.skill_ids_of(character.rune_effects) == list(skill_catalog.STARTER_SKILLS["warrior"])
+
+
+@pytest.mark.real_abilities
+def test_fire_does_not_erase_own_poison() -> None:
+    """Репорт игрока 2026-11-11: яд, затем огонь - яд пропадал. Яд и горение
+    одного бойца - разные эффекты; «Токсический выброс» берёт именно яд."""
+    me, foe = combatant(1, side=0, agility=72, intellect=72), combatant(2, side=1, vitality=5000)
+    _equip(me, "poisoner_venom", "elementalist_fire", "poisoner_toxic_burst")
+    s = _session(me, foe, mode=CombatMode.PVE)
+    resolve_tick(s, {1: _skill("poisoner_venom", 2)}, NoCritRng())
+    r = resolve_tick(s, {1: _skill("elementalist_fire", 2)}, NoCritRng())
+    assert foe.poison_from(1) is not None and foe.burn_from(1) is not None
+    assert any("«яд»" in line for line in r.lines)  # яд тикнул в ход огня
+    resolve_tick(s, {1: _skill("poisoner_toxic_burst", 2)}, NoCritRng())
+    assert foe.poison_from(1) is None and foe.burn_from(1) is not None  # взорван яд, огонь горит

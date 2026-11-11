@@ -229,8 +229,12 @@ class ArchiveStage:
         source = session.combatants[strongest.source_id].name
         names = ", ".join(t.name for t in targets)
         out.lines.append(f"📖 Цитата: удар {source} → {names} - {strongest.amount} урона")
-        dot = (boss.effect_from(EffectKind.DOT, strongest.source_id)
-               if strongest.label in _DOT_SKILL_NAMES else None)
+        dot = None
+        if strongest.label in _DOT_SKILL_NAMES:  # огонь - горение, клинок - яд
+            from game.combat import skill_catalog
+
+            fire = strongest.label == skill_catalog.ALL_SKILL_DEFS["elementalist_fire"].name
+            dot = (boss.burn_from if fire else boss.poison_from)(strongest.source_id)
         for target in targets:
             stage_hurt(target, strongest.amount, out)
             # Цитата повторяет навык целиком: Отравленный клинок отравляет, Огненная

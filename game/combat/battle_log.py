@@ -109,7 +109,6 @@ def class_line(combatants, owner_id: int) -> str | None:
     owner = combatants.get(owner_id)
     if owner is None or not owner.alive:
         return None
-    sub = owner.subclass_id
     enemies = [c for c in combatants.values() if c.alive and c.side != owner.side]
     allies = [c for c in combatants.values() if c.alive and c.side == owner.side]
 
@@ -123,52 +122,48 @@ def class_line(combatants, owner_id: int) -> str | None:
     breath = owner.effects_of(EffectKind.LAST_BREATH)
     if breath:
         parts.append(f"💀 Последний вздох ({_turns(max(e.remaining_ticks for e in breath))})")
-    if sub == "shadow_blade":
-        for c in enemies:
-            stacks = sum(e.stacks for e in mine(c, EffectKind.MARK))
-            if stacks:
-                parts.append(f"🎯 Метка добычи: {c.name} ×{stacks}")
-    elif sub == "poisoner":
-        for c in enemies:
-            poison = mine(c, EffectKind.DOT, burn=False)
-            if poison:
-                stacks = sum(e.stacks for e in poison)
-                parts.append(f"☠ Яд: {c.name} ×{stacks} ({_turns(max(e.remaining_ticks for e in poison))})")
-    elif sub == "elementalist":
-        for c in enemies:
-            burn = mine(c, EffectKind.DOT, burn=True)
-            if burn:
-                parts.append(f"🔥 Горит: {c.name} ({_turns(max(e.remaining_ticks for e in burn))})")
-            frozen = mine(c, EffectKind.FREEZE)
-            if frozen:
-                parts.append(f"❄ Скован: {c.name} ({_turns(max(e.remaining_ticks for e in frozen))})")
-    elif sub == "blood_knight":
-        for c in enemies:
-            seal = mine(c, EffectKind.BLOOD_SEAL)
-            if seal:
-                parts.append(f"🩸 Кровавая печать: {c.name} ({_turns(max(e.remaining_ticks for e in seal))})")
-    elif sub == "guardian":
-        stance = owner.effects_of(EffectKind.BLOCK_STANCE)
-        if stance:
-            parts.append(f"🛡 Глухая оборона ({_turns(max(e.remaining_ticks for e in stance))})")
-        cap = owner.effects_of(EffectKind.DAMAGE_CAP)
-        if cap:
-            parts.append(f"🪨 Несокрушимый ({_turns(max(e.remaining_ticks for e in cap))})")
-        taunted = [c.name for c in enemies if getattr(c, "taunted_by", None) == owner_id]
-        if taunted:
-            parts.append("📣 Провокация: " + ", ".join(taunted))
-    elif sub == "dark_mystic":
-        for c in allies:
-            who = "вы" if c.id == owner_id else c.name
-            shields = [e for e in mine(c, EffectKind.SHIELD_POOL) if getattr(e, "tag", None) != SECOND_HEART_TAG]
-            # Оберег и Отголосок - разные щиты (2026-10-17), показываем порознь.
-            for title, group in (
-                ("Оберег", [e for e in shields if getattr(e, "tag", None) != ECHO_TAG]),
-                ("Отголосок", [e for e in shields if getattr(e, "tag", None) == ECHO_TAG]),
-            ):
-                left = round(sum(e.value for e in group))
-                if group and left > 0:
-                    parts.append(f"🛡 {title}: {who} - {left} ({_turns(max(e.remaining_ticks for e in group))})")
+    # С рунами-навыками (2026-11-11) яд, горение, метки и щиты вешает кто
+    # угодно: показываем то, что висит, а не по подклассу.
+    for c in enemies:
+        stacks = sum(e.stacks for e in mine(c, EffectKind.MARK))
+        if stacks:
+            parts.append(f"🎯 Метка добычи: {c.name} ×{stacks}")
+    for c in enemies:
+        poison = mine(c, EffectKind.DOT, burn=False)
+        if poison:
+            stacks = sum(e.stacks for e in poison)
+            parts.append(f"☠ Яд: {c.name} ×{stacks} ({_turns(max(e.remaining_ticks for e in poison))})")
+    for c in enemies:
+        burn = mine(c, EffectKind.DOT, burn=True)
+        if burn:
+            parts.append(f"🔥 Горит: {c.name} ({_turns(max(e.remaining_ticks for e in burn))})")
+        frozen = mine(c, EffectKind.FREEZE)
+        if frozen:
+            parts.append(f"❄ Скован: {c.name} ({_turns(max(e.remaining_ticks for e in frozen))})")
+    for c in enemies:
+        seal = mine(c, EffectKind.BLOOD_SEAL)
+        if seal:
+            parts.append(f"🩸 Кровавая печать: {c.name} ({_turns(max(e.remaining_ticks for e in seal))})")
+    stance = owner.effects_of(EffectKind.BLOCK_STANCE)
+    if stance:
+        parts.append(f"🛡 Глухая оборона ({_turns(max(e.remaining_ticks for e in stance))})")
+    cap = owner.effects_of(EffectKind.DAMAGE_CAP)
+    if cap:
+        parts.append(f"🪨 Несокрушимый ({_turns(max(e.remaining_ticks for e in cap))})")
+    taunted = [c.name for c in enemies if getattr(c, "taunted_by", None) == owner_id]
+    if taunted:
+        parts.append("📣 Провокация: " + ", ".join(taunted))
+    for c in allies:
+        who = "вы" if c.id == owner_id else c.name
+        shields = [e for e in mine(c, EffectKind.SHIELD_POOL) if getattr(e, "tag", None) != SECOND_HEART_TAG]
+        # Оберег и Отголосок - разные щиты (2026-10-17), показываем порознь.
+        for title, group in (
+            ("Оберег", [e for e in shields if getattr(e, "tag", None) != ECHO_TAG]),
+            ("Отголосок", [e for e in shields if getattr(e, "tag", None) == ECHO_TAG]),
+        ):
+            left = round(sum(e.value for e in group))
+            if group and left > 0:
+                parts.append(f"🛡 {title}: {who} - {left} ({_turns(max(e.remaining_ticks for e in group))})")
     return "\n".join(parts) if parts else None
 
 

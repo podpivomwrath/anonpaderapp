@@ -341,6 +341,16 @@ class CombatantState:
     def effect_from(self, kind: EffectKind, source_id: int) -> Effect | None:
         return next((e for e in self.effects if e.kind == kind and e.source_id == source_id), None)
 
+    def poison_from(self, source_id: int) -> Effect | None:
+        """Яд этого бойца (урон за ход без метки горения). Горение и яд одного
+        бойца живут раздельно (2026-11-11), effect_from(DOT) мог вернуть огонь."""
+        return next((e for e in self.effects if e.kind == EffectKind.DOT and e.source_id == source_id
+                     and getattr(e, "tag", None) != BURN_TAG), None)
+
+    def burn_from(self, source_id: int) -> Effect | None:
+        return next((e for e in self.effects if e.kind == EffectKind.DOT and e.source_id == source_id
+                     and getattr(e, "tag", None) == BURN_TAG), None)
+
     def has_burning(self) -> bool:
         """Горит ли цель (Горение от любого источника)."""
         # getattr: соло-бои переживают перезапуск pickle-снимком, и эффект из
@@ -369,6 +379,10 @@ class CombatantState:
             # Щиты с разными метками не сливаются: мистик со своим Оберегом
             # выпил «Второе сердце» - это два щита, а не один перезаписанный.
             if kind == EffectKind.SHIELD_POOL and getattr(effect, "tag", None) != tag:
+                continue
+            # Яд и горение одного бойца - разные эффекты (2026-11-11): с рунами-
+            # навыками их вешает один игрок, и огонь перезаписывал яд.
+            if kind == EffectKind.DOT and effect.kind == kind and getattr(effect, "tag", None) != tag:
                 continue
             if effect.kind == kind and effect.source_id == source_id:
                 # Горение (2026-10-18): слабое перекинувшееся пламя не гасит
@@ -500,6 +514,9 @@ class CombatSessionState:
     #: групповой PvE без таймера хода: соло в руинах ждёт игрока, как бой с
     #: тварью (2026-11-06, владелец)
     untimed: bool = False
+    #: не объявивший действие бьёт обычной атакой, а не пропускает ход
+    #: (руины в группе, 2026-11-11)
+    idle_attack: bool = False
 
     def add(self, combatant: CombatantState) -> None:
         self.combatants[combatant.id] = combatant

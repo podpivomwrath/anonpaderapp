@@ -154,7 +154,7 @@ def _make_handler(base_skill: SubclassSkillDef):
                 if vuln_bonus > 0:
                     spread = vulnerability * bc.POISONER_TOXIC_BLOOD_SPREAD_PCT
                     for other in ctx.session.alive_enemies_of(actor):
-                        if other.id != target.id and other.effect_from(EffectKind.DOT, actor.id):
+                        if other.id != target.id and other.poison_from(actor.id):
                             _apply_vulnerability(other, skill, spread, actor.id)
 
     return handler
