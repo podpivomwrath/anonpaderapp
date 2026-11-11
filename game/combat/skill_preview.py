@@ -48,6 +48,7 @@ class Preview:
     cost: int = 0           # здоровья заплачено (в одиночку, с полного)
     hit: int = 0            # удар навыка по манекену без брони (в одиночку)
     block_heal: int = 0     # «Глухая оборона»: лечение за каждый удар в стойку
+    shield_low: int = 0     # щит, когда герой почти при смерти (15% здоровья, в одиночку)
     lines: list[str] = field(default_factory=list)
 
 
@@ -103,6 +104,14 @@ def preview(hero, skill_id: str) -> Preview:
     full.current_hp = full.max_hp  # цена здоровьем и удар - с полного
     _heals, _shields, out.cost, out.hit = _run(full, [], skill_id)
     out.block_heal = round(full.max_hp * full.effect_total(EffectKind.BLOCK_HEAL))
+
+    # «Сомкнуть ряды» (репорт 350): щит почти вдвое крепче, если кто-то из
+    # своих ниже порога, - карточке нужны оба числа.
+    low = copy.deepcopy(hero)
+    low.id, low.side, low.cooldowns = 1, 0, {}
+    low.current_hp = round(low.max_hp * 0.15)
+    _heals, shields, _cost, _hit = _run(low, [], skill_id)
+    out.shield_low = shields.get(1, 0)
 
     solo = copy.deepcopy(hero)
     solo.id, solo.side, solo.cooldowns = 1, 0, {}

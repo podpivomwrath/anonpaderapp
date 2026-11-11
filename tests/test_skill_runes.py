@@ -493,6 +493,26 @@ def test_circle_card_says_source_and_amounts() -> None:
     assert num(text) > num(weak)  # больше Воли - больше лечения
 
 
+@pytest.mark.real_abilities
+def test_close_ranks_card_matches_the_fight() -> None:
+    """Репорт 350 (Еста): карточка показывала в группе усиленный щит, а в бою
+    без раненых своих вешался обычный, почти вдвое слабее."""
+    from bot import miniapp_runes_api as api
+    from game.combat import rune_skills
+
+    hero = {"str": 30, "agi": 30, "int": 30, "vit": 60, "wil": 72}
+    text = api._effect_text("close_ranks", _card_fighter(), hero, 0, None)
+    assert "меньше 30% здоровья" in text, text
+    weak = int(text.split("каждому своему ")[1].split(",")[0])
+    strong = int(text.split("здоровья - ")[1].rstrip("."))
+    assert strong > weak
+
+    me, friend, foe = _card_fighter(), combatant(2, side=0), combatant(3, side=1)
+    lines: list[str] = []
+    rune_skills.close_ranks_shields(_session(me, friend, foe), me, 0.15, 2, lines)
+    assert f"щит {weak} каждому" in lines[0], (lines, text)
+
+
 def test_every_healing_or_shielding_skill_shows_numbers() -> None:
     from bot import miniapp_runes_api as api
 

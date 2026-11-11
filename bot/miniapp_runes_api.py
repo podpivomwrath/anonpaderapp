@@ -204,7 +204,15 @@ def _effect_text(skill_id: str, fighter, hero: dict[str, int], absorbed: int, fo
     out = []
     if p.heal_solo or p.heal_self or p.heal_ally:
         out.append(f"Лечение {src}: {_amounts(p.heal_solo, p.heal_self, p.heal_ally)}.")
-    if p.shield_solo or p.shield_self or p.shield_ally:
+    if skill_id == "close_ranks" and p.shield_solo:
+        # Репорт 350: в группе карточка показывала усиленный щит (союзник в
+        # прогоне - на пороге), а в бою без раненых вешался обычный.
+        from game.combat import rune_skills
+
+        threshold = rune_skills.CLOSE_RANKS_THRESHOLD + me.buff_modifiers.get("close_ranks_threshold", 0.0)
+        out.append(f"Щит {src}: каждому своему {p.shield_solo}, а если у вас или союзника меньше "
+                   f"{round(threshold * 100)}% здоровья - {p.shield_low}.")
+    elif p.shield_solo or p.shield_self or p.shield_ally:
         out.append(f"Щит {src}: {_amounts(p.shield_solo, p.shield_self, p.shield_ally)}.")
     if p.cost:
         out.append(f"Цена с полного здоровья: {p.cost}.")
