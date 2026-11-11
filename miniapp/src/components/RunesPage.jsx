@@ -232,6 +232,8 @@ function AbilityCard({ ability, index, onPick, onSteps }) {
               </small>
             )}
             <button type="button" className="pill-btn pill-btn--small" onClick={() => onSteps(ability)}>
+              {/* Пробуждение видит только сам игрок - значок на его же карточке. */}
+              {ability.step === 4 && RUNE_ART.awakened && <img className="rune-awakened" src={RUNE_ART.awakened} alt="" />}
               {ability.step ? `Ступень ${STEP_NAMES[ability.step]}` : 'Ступени'}
             </button>
           </div>

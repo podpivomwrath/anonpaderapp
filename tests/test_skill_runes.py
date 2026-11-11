@@ -375,3 +375,15 @@ def test_card_shows_stat_percent_and_damage() -> None:
     assert strong["scaling"] == [{"stat": "str", "title": "Силы", "pct": 330, "have": 72}]
     assert strong["damage"] > weak["damage"]
     assert api._scaling_text(rc.BY_ID["dark_mystic_drain"], 0) == "192% Воли и 128% Интеллекта"
+
+
+def test_new_facets_squint_and_finisher() -> None:
+    """Огранки «Прищур» (крит навыком) и «Добивание» (по раненой цели)."""
+    assert rc.BY_ID["squint"].kind == rc.SKILL and rc.BY_ID["finisher"].kind == rc.SKILL
+    low = combatant(2, side=1, vitality=500)
+    low.current_hp = low.max_hp // 5
+    me = combatant(1, side=0)
+    me.buff_modifiers["rune:finisher@warrior_cleave"] = 0.25
+    from game.combat.skills import skill_step_bonus
+
+    assert skill_step_bonus(me, low, "warrior_cleave") == pytest.approx(0.25)

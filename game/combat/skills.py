@@ -305,6 +305,7 @@ def skill_step_bonus(actor: CombatantState, target: CombatantState, skill_id: st
         share = target.current_hp / target.max_hp
         if share < 0.3:
             bonus += mods.get(f"skill_execute:{skill_id}", 0.0)
+            bonus += mods.get(f"rune:finisher@{skill_id}", 0.0)  # огранка «Добивание»
         if share > 0.7:
             bonus += mods.get(f"skill_fresh:{skill_id}", 0.0)
     if target.has_effect(EffectKind.FREEZE):
@@ -452,6 +453,7 @@ def compute_hit(
     crit_chance += actor.buff_modifiers.get("crit_chance_bonus", 0.0)
     if getattr(actor, "current_skill", None):
         crit_chance += actor.buff_modifiers.get(f"skill_crit:{actor.current_skill}", 0.0)  # ступень руны-навыка
+        crit_chance += actor.buff_modifiers.get(f"rune:squint@{actor.current_skill}", 0.0)  # огранка «Прищур»
     crit_chance += formulas.class_crit_bonus(actor.base_class, actor.subclass_id)  # пассивка разбойника до подкласса
     if target.has_effect(EffectKind.MARK):
         for mark in target.effects_of(EffectKind.MARK):

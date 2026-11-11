@@ -198,6 +198,11 @@ RUNES: list[RuneDef] = [
             pvp="none", tag="damage", curve="very_tight", rarity="mythic"),
     RuneDef("no_rest", SKILL, "Без передышки", 0.50, "шанс {v}, что добивание этим навыком сбросит его перезарядку",
             pvp="none", tag="damage", curve="tight", rarity="mythic"),
+    # Огранки из бывших микробаффов (2026-11-11): крит и добивание навыком.
+    RuneDef("squint", SKILL, "Прищур", 0.12, "+{v} к шансу крита этим навыком", pvp="half", tag="damage",
+            rarity="rare"),
+    RuneDef("finisher", SKILL, "Добивание", 0.25, "+{v} урона навыка по цели, у которой меньше 30% здоровья",
+            pvp="half", tag="damage", rarity="rare"),
 ]
 
 

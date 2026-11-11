@@ -1140,6 +1140,7 @@ body.lite .sparks {
 .rune-ability__facets .rune-socket__rune { inset: 9px; }
 .rune-ability__facets .rune-socket__rune .rune-icon { width: 34px; height: 34px; }
 .pill-btn--small { padding: 4px 12px; font-size: 13px; }
+.rune-awakened { width: 16px; height: 16px; margin-right: 4px; vertical-align: -3px; }
 .rune-icon.rune-icon--letter { display: flex; align-items: center; justify-content: center; border-radius: 10px;
   font-size: 20px; line-height: 1;
   font-family: var(--serif); font-weight: 700; color: #cbbcf0; background: rgba(120, 96, 180, 0.22); }

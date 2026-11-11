@@ -152,7 +152,7 @@ def skills_chapter_blocks() -> list[dict]:
     facets = [r for r in rc.RUNES if r.kind == rc.SKILL]
     blocks.append({"t": "h3", "text": "Огранки"})
     blocks.append({"t": "ul", "items": [
-        f"<b>{r.name}</b> - {r.text.replace('{v}', str(round(r.value * 100)) + '%')}"
+        f"<b>{r.name}</b>: {r.text.replace('{v}', str(round(r.value * 100)) + '%')}"
         + (f" (только в {rc.SKILL_TAG_TITLES[r.tag]})" if r.tag else "")
         for r in facets
     ]})
