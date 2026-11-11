@@ -51,21 +51,21 @@ def test_gifts_and_passives_are_direct_food_is_all() -> None:
     assert any("damage_bonus" in d.buff for d in cooking_config.DISHES)
 
 
-def test_will_boosts_every_dot() -> None:
-    """2026-11-06, владелец: Воля качает периодический урон всем - и горение
-    Элементалиста. Отравителю - нет: его Воля уже в силе яда, яд не трогаем."""
+def test_will_boosts_burn_but_not_poison() -> None:
+    """2026-11-06, владелец: Воля качает периодический урон - горение и прочее.
+    Яду - нет ни у кого (2026-11-11, жалоба Есты): Воля уже в силе яда, и у
+    не-Отравителя с рунами-навыками она шла в яд дважды."""
     from game.combat import balance_config as bc
 
-    src, tgt = combatant(1, 0), combatant(2, 1)
-    for will in (0, 100):
-        src.stats.will = will
-        for tag in (BURN_TAG, None):
-            effect = Effect(kind=EffectKind.DOT, value=100, remaining_ticks=3, source_id=1, stacks=1, tag=tag)
-            assert shared_rules.poison_tick_damage(effect, src, tgt) == round(100 * (1 + bc.DOT_POWER_PER_WIL * will))
-    poisoner = combatant(3, 0, subclass_id="poisoner")
-    poisoner.stats.will = 100
-    effect = Effect(kind=EffectKind.DOT, value=100, remaining_ticks=3, source_id=3, stacks=1)
-    assert shared_rules.poison_tick_damage(effect, poisoner, tgt) == 100, "у Отравителя без двойного учёта"
+    tgt = combatant(2, 1)
+    for sub in (None, "poisoner", "elementalist"):
+        src = combatant(1, 0, subclass_id=sub)
+        for will in (0, 100):
+            src.stats.will = will
+            burn = Effect(kind=EffectKind.DOT, value=100, remaining_ticks=3, source_id=1, stacks=1, tag=BURN_TAG)
+            assert shared_rules.poison_tick_damage(burn, src, tgt) == round(100 * (1 + bc.DOT_POWER_PER_WIL * will))
+            poison = Effect(kind=EffectKind.DOT, value=100, remaining_ticks=3, source_id=1, stacks=1)
+            assert shared_rules.poison_tick_damage(poison, src, tgt) == 100, sub
 
 
 def test_every_event_modifier_has_a_label() -> None:

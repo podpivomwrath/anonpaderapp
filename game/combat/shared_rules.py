@@ -48,7 +48,11 @@ def poison_tick_damage(effect: Effect, source: CombatantState | None,
         # не усиливало яд). Прямой урон (пассивки, дары) сюда не идёт (2026-11-05).
         multiplier += source.buff_modifiers.get("damage_bonus", 0.0)
         multiplier *= stat_model.ACTIVE.effect_power(source.stats)
-        multiplier *= stat_model.ACTIVE.dot_power(source.stats, source.subclass_id)  # Воля (2026-11-06)
+        # Воля (2026-11-06) - горению и прочему; яду игрока нет: Воля уже в
+        # силе его яда (2026-11-11, у не-Отравителей шла дважды).
+        players_poison = source.kind == "character" and getattr(effect, "tag", None) != BURN_TAG
+        if not players_poison:
+            multiplier *= stat_model.ACTIVE.dot_power(source.stats)
     if target is not None:
         # Руна «Литая кираса» ослабляет уязвимость и для яда, как для ударов.
         multiplier *= 1.0 + target.effect_total(EffectKind.VULNERABILITY) * max(

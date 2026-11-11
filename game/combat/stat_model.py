@@ -58,13 +58,14 @@ class StatModel:
         """Множитель яда, горения и вампиризма. Сейчас статы на них не влияют."""
         return 1.0
 
-    def dot_power(self, s, subclass_id: str | None = None) -> float:
+    def dot_power(self, s) -> float:
         """Множитель периодического урона от Воли (2026-11-06): +0.6% за очко.
-        Отравителю - 1.0: у него Воля уже в силе яда (POISONER_POISON_WIL_COEF)."""
+        К яду «Отравленного клинка» не идёт - Воля уже в силе яда
+        (POISONER_POISON_WIL_COEF); это решает shared_rules.poison_tick_damage.
+        До 2026-11-11 исключение было по подклассу: с рунами-навыками яд носят
+        все, и у не-Отравителя Воля шла в яд дважды (яд втрое сильнее)."""
         from game.combat import balance_config as bc
 
-        if subclass_id == "poisoner":
-            return 1.0
         return 1.0 + bc.DOT_POWER_PER_WIL * s.will
 
 
