@@ -86,11 +86,14 @@ def test_rot_weakens_healing_and_enrage_after_ten_turns() -> None:
     for _ in range(9):
         stage.after_tick(state, TickResult(), random.Random(1))
     assert foe.buff_modifiers["damage_bonus"] == pytest.approx(base)
-    out = stage.after_tick(state, TickResult(), random.Random(1))  # 10-й ход
-    assert foe.buff_modifiers["damage_bonus"] == pytest.approx(base + rc.ENRAGE_PER_TURN)
+    out = stage.after_tick(state, TickResult(), random.Random(1))  # 10-й ход: +10%
+    assert foe.buff_modifiers["damage_bonus"] == pytest.approx(base + rc.ENRAGE_STEP)
     assert any("Ярость руин" in line for line in out.lines)
-    stage.after_tick(state, TickResult(), random.Random(1))
-    assert foe.buff_modifiers["damage_bonus"] == pytest.approx(base + 2 * rc.ENRAGE_PER_TURN)
+    for _ in range(9):  # до 19-го - без прибавки
+        stage.after_tick(state, TickResult(), random.Random(1))
+    assert foe.buff_modifiers["damage_bonus"] == pytest.approx(base + rc.ENRAGE_STEP)
+    stage.after_tick(state, TickResult(), random.Random(1))  # 20-й: ещё +10%
+    assert foe.buff_modifiers["damage_bonus"] == pytest.approx(base + 2 * rc.ENRAGE_STEP)
 
 
 def _stage(room: str, party: int) -> CombatSessionState:
@@ -399,6 +402,12 @@ async def test_every_unique_boss_fight_runs_to_the_end(monkeypatch) -> None:
             # засыпанные пропускают ход фоновой задачей - дать ей отработать
             for _ in range(3):
                 await asyncio.sleep(0)
+        # Бой мог уже кончиться в движке, а обработчик ещё снимает его
+        # фоновой задачей - дать ей доработать (тест плавал на 35 этаже).
+        for _ in range(50):
+            if battle_id not in raid_combat._battles:
+                break
+            await asyncio.sleep(0.01)
         if battle_id in raid_combat._battles:
             st = engine.sessions.get(battle_id)
             info = {c.name: c.current_hp for c in st.combatants.values()} if st else None

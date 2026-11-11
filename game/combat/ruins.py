@@ -141,16 +141,16 @@ class _RuinsStage:
         return [f"🕸 Порча руин: лечение и щиты слабее на {round(rot * 100)}%"]
 
     def _enrage(self, session: CombatSessionState, out: StageTick) -> None:
-        """Ярость руин (2026-11-11, владелец): с 10-го хода противники каждый
-        ход бьют сильнее - затянутый бой становится опасным."""
-        if self.ticks < rc.ENRAGE_FROM:
+        """Ярость руин (2026-11-11, владелец): каждые 10 ходов противники бьют
+        сильнее ещё на 10% - затянутый бой становится опасным."""
+        if self.ticks < rc.ENRAGE_EVERY or self.ticks % rc.ENRAGE_EVERY:
             return
-        bonus = rc.ENRAGE_PER_TURN * (self.ticks - rc.ENRAGE_FROM + 1)
+        bonus = rc.ENRAGE_STEP * (self.ticks // rc.ENRAGE_EVERY)
         foes = [c for c in session.combatants.values() if c.side == 1 and c.alive]
         if not foes:
             return
         for c in foes:
-            c.buff_modifiers["damage_bonus"] = c.buff_modifiers.get("damage_bonus", 0.0) + rc.ENRAGE_PER_TURN
+            c.buff_modifiers["damage_bonus"] = c.buff_modifiers.get("damage_bonus", 0.0) + rc.ENRAGE_STEP
         out.lines.append(f"🔥 Ярость руин: враги бьют сильнее на {round(bonus * 100)}%")
 
     def _setup_enemies(self, session: CombatSessionState) -> list[str]:
