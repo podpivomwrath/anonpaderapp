@@ -14,7 +14,7 @@ class CharacterRune(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True)
     character_id: Mapped[int] = mapped_column(ForeignKey("characters.id", ondelete="CASCADE"), index=True)
-    rune_id: Mapped[str] = mapped_column(String(24))
+    rune_id: Mapped[str] = mapped_column(String(64))
     count: Mapped[int] = mapped_column(BigInteger, default=0)
 
 
@@ -27,7 +27,7 @@ class CharacterRuneMastery(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True)
     character_id: Mapped[int] = mapped_column(ForeignKey("characters.id", ondelete="CASCADE"), index=True)
-    rune_id: Mapped[str] = mapped_column(String(24))
+    rune_id: Mapped[str] = mapped_column(String(64))
     absorbed: Mapped[int] = mapped_column(BigInteger, default=0)
 
 
@@ -42,4 +42,4 @@ class CharacterRuneSlot(Base):
     character_id: Mapped[int] = mapped_column(ForeignKey("characters.id", ondelete="CASCADE"), index=True)
     kind: Mapped[str] = mapped_column(String(8))
     slot: Mapped[str] = mapped_column(String(48))
-    rune_id: Mapped[str] = mapped_column(String(24))
+    rune_id: Mapped[str] = mapped_column(String(64))

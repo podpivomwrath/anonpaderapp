@@ -52,6 +52,19 @@ def test_every_skill_is_a_rune_with_a_handler_and_steps() -> None:
         assert all(s.text for s in ability.fork), sid
 
 
+def test_rune_ids_and_socket_keys_fit_db_columns() -> None:
+    """SQLite в тестах длину строк не проверяет, Postgres - проверяет: на
+    выкатке 2026-11-11 «blood_knight_lifesteal_strike» не влез в String(24)."""
+    from models import CharacterRune, CharacterRuneMastery, CharacterRuneSlot
+
+    longest = max(len(r.id) for r in rc.RUNES)
+    for model in (CharacterRune, CharacterRuneMastery, CharacterRuneSlot):
+        assert longest <= model.__table__.c.rune_id.type.length, model
+    socket = max(len(f"{sid}:1") for sid in skill_catalog.ALL_SKILL_DEFS)
+    assert socket <= CharacterRuneSlot.__table__.c.slot.type.length
+    assert max(len(k) for k in rc.KINDS) <= CharacterRuneSlot.__table__.c.kind.type.length
+
+
 def test_merged_duplicates_are_gone() -> None:
     for sid in ("mage_shard_volley", "mage_ice_bonds", "mage_blood_seal", "guardian_stonegrip",
                 "shadow_blade_shadow_dance"):
