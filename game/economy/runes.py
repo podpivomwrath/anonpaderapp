@@ -72,6 +72,8 @@ def skill_tags(skill) -> set[str]:
     tags = set(ability.tags) if ability else set()
     if (getattr(skill, "multiplier", 0) or 0) > 0:
         tags.add("damage")
+    if "damage" in tags or skill.id in rc.STRIKE_EXTRA:
+        tags.add("strike")
     if (getattr(skill, "cd", 0) or 0) >= 4:
         tags.add("long_cd")
     return tags

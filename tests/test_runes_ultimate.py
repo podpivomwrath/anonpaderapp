@@ -191,6 +191,20 @@ def test_prop_fits_every_blood_knight_heal_skill() -> None:
         assert "heal_shield" in runes.skill_tags(SUBCLASS_SKILL_DEFS[skill_id]), skill_id
 
 
+def test_press_only_fits_skills_that_hit() -> None:
+    """2026-11-12, владелец: «Нажим» вставлялся в Оберег, где урона нет и
+    руна ничего не давала. Взрыв яда бьёт мимо обычного удара, но Нажим
+    усиливает его сам (poisoner.py) - ему можно."""
+    from game.combat import skill_catalog
+    from game.economy import runes
+
+    press = rc.BY_ID["press"]
+    for skill_id in ("dark_mystic_ward", "guardian_block", "cleanse_water", "counter_strike", "breather"):
+        assert not runes.fits_skill(press, skill_catalog.skill_def(skill_id)), skill_id
+    for skill_id in ("poisoner_toxic_burst", "warrior_cleave", "dark_mystic_drain", "reckoning"):
+        assert runes.fits_skill(press, skill_catalog.skill_def(skill_id)), skill_id
+
+
 def test_viscous_fits_poisoner_blade_and_dart() -> None:
     """2026-11-05: «Тягучесть» не вставлялась в Ядовитый клинок (яд) и
     Дурманящий дротик (ослабление), хотя оба вешают эффект на несколько ходов."""
