@@ -1196,3 +1196,5 @@ body.lite .sparks {
 .rune-absorb__hint { margin: 0; font-size: 12px; opacity: 0.75; }
 .rune-absorb__row { display: flex; align-items: center; gap: 10px; }
 .rune-absorb__row input { flex: 1; min-width: 0; }
+.rune-absorb__confirm { display: flex; flex-direction: column; gap: 8px; }
+.rune-absorb__buttons { display: flex; flex-wrap: wrap; gap: 8px; }

@@ -112,7 +112,10 @@ function RuneInfo({ rune }) {
 
 function RuneSheet({ rune, busy, onAbsorb, onClose }) {
   const [count, setCount] = useState(1);
+  // Подтверждение (2026-11-11, владелец): впитывали мисскликом вместо вставки.
+  const [confirming, setConfirming] = useState(false);
   const max = rune.count;
+  const n = Math.min(count, max);
   return (
     <Sheet title={rune.name} icon={<RuneIcon rune={rune} size={28} />} onClose={onClose}>
       <RuneInfo rune={rune} />
@@ -121,12 +124,30 @@ function RuneSheet({ rune, busy, onAbsorb, onClose }) {
         <div className="rune-absorb">
           <p className="rune-absorb__hint">Впитанная копия исчезает и навсегда поднимает ваше мастерство этой руны.</p>
           <div className="rune-absorb__row">
-            <input type="range" min={1} max={max} value={Math.min(count, max)} onChange={(e) => setCount(Number(e.target.value))} />
-            <b>{Math.min(count, max)}</b>
+            <input type="range" min={1} max={max} value={n}
+              onChange={(e) => { setCount(Number(e.target.value)); setConfirming(false); }} />
+            <b>{n}</b>
           </div>
-          <button type="button" className="pill-btn" disabled={busy} onClick={() => onAbsorb(rune.id, Math.min(count, max))}>
-            Впитать {Math.min(count, max)} {copiesWord(Math.min(count, max))}
-          </button>
+          {confirming ? (
+            <div className="rune-absorb__confirm">
+              <p className="rune-absorb__hint">
+                Впитать {n} {copiesWord(n)} «{rune.name}»? Из сумки они исчезнут насовсем, вставить их в слот будет нельзя.
+              </p>
+              <div className="rune-absorb__buttons">
+                <button type="button" className="pill-btn pill-btn--danger" disabled={busy}
+                  onClick={() => { setConfirming(false); onAbsorb(rune.id, n); }}>
+                  Да, впитать
+                </button>
+                <button type="button" className="pill-btn" disabled={busy} onClick={() => setConfirming(false)}>
+                  Отмена
+                </button>
+              </div>
+            </div>
+          ) : (
+            <button type="button" className="pill-btn" disabled={busy} onClick={() => setConfirming(true)}>
+              Впитать {n} {copiesWord(n)}
+            </button>
+          )}
         </div>
       )}
     </Sheet>
