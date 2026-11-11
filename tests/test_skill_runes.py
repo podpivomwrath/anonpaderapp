@@ -501,3 +501,27 @@ def test_every_healing_or_shielding_skill_shows_numbers() -> None:
     for sid in ac.RECOVERY_SKILLS:
         text = api._effect_text(sid, fighter, hero, 0, None)
         assert text and any(ch.isdigit() for ch in text), sid
+
+
+async def test_class_change_keeps_all_runes_and_gives_nothing(db_session, make_character) -> None:
+    """Владелец (2026-11-11): при смене класса и подкласса новые руны не
+    выдаются, старые не заменяются - всё остаётся как было."""
+    from models import BaseClass
+    from services import respec_service
+
+    character = await make_character(level=40, base_class="warrior", subclass="guardian")
+    _home(character)
+    await rune_service.grant_starter(db_session, character)
+    await rune_service.grant(db_session, character.id, "press", 1)
+    await rune_service.grant(db_session, character.id, "hammer_down", 1)
+    await rune_service.equip(db_session, character, rc.SKILL, "warrior_cleave:0", "press")
+    await rune_service.equip(db_session, character, rc.GEAR, "weapon:0", "hammer_down")
+    before_slots = await rune_service.layout(db_session, character)
+    before_bag = await rune_service.bag(db_session, character.id)
+
+    await respec_service.reset_subclass(db_session, character)
+    await respec_service.full_class_reset(db_session, character, BaseClass("mage"))
+
+    assert await rune_service.layout(db_session, character) == before_slots
+    assert await rune_service.bag(db_session, character.id) == before_bag
+    assert skill_catalog.skill_ids_of(character.rune_effects) == list(skill_catalog.STARTER_SKILLS["warrior"])
