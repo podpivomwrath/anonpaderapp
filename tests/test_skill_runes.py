@@ -295,11 +295,15 @@ async def test_same_skill_cannot_take_two_slots(db_session, make_character) -> N
         await rune_service.equip(db_session, character, rc.ABILITY, "1", "warrior_cleave")
 
 
-def test_ability_runes_drop_with_their_share() -> None:
+def test_runes_drop_from_one_pool_weighted_by_rarity_only() -> None:
+    """2026-11-11, владелец: долей видов нет - полный рандом по всем рунам."""
     rng = random.Random(1)
-    kinds = [rc.BY_ID[rune_service.roll_rune(rng)].kind for _ in range(3000)]
-    share = kinds.count(rc.ABILITY) / len(kinds)
-    assert 0.15 < share < 0.25
+    rolled = [rc.BY_ID[rune_service.roll_rune(rng)] for _ in range(20000)]
+    ready = [r for r in rc.RUNES if r.ready]
+    weight = {r.id: rc.RARITY_WEIGHTS[r.rarity] for r in ready}
+    share = sum(weight[r.id] for r in ready if r.kind == rc.ABILITY) / sum(weight.values())
+    got = sum(1 for r in rolled if r.kind == rc.ABILITY) / len(rolled)
+    assert abs(got - share) < 0.02
 
 
 async def test_starter_runes_are_given_once_and_equipped(db_session, make_character) -> None:

@@ -401,13 +401,10 @@ async def recompute(db: AsyncSession, character: Character) -> dict[str, float]:
 # --- Выпадение -------------------------------------------------------------------
 
 def roll_rune(rng: random.Random) -> str:
-    """Какая руна выпала: вид по весам, затем руна по редкости. Только руны,
-    чей эффект уже работает."""
-    kinds = list(rc.KIND_WEIGHTS)
-    kind = rng.choices(kinds, weights=[rc.KIND_WEIGHTS[k] for k in kinds])[0]
-    pool = [r for r in rc.RUNES if r.kind == kind and r.ready]
-    if not pool:
-        pool = [r for r in rc.RUNES if r.ready]
+    """Какая руна выпала: из всех рун разом, вес - только редкость (2026-11-11,
+    владелец: доли видов убраны, «полный рандом»). Только руны, чей эффект
+    уже работает."""
+    pool = [r for r in rc.RUNES if r.ready]
     return rng.choices(pool, weights=[rc.RARITY_WEIGHTS[r.rarity] for r in pool])[0].id
 
 
@@ -417,12 +414,9 @@ OWN_CLASS_WEIGHT = 3
 
 
 def roll_rune_of_rarity(rng: random.Random, rarity: str, base_class: str | None = None) -> str:
-    """Руна заданной редкости: вид по весам, руны своего класса чаще."""
+    """Руна заданной редкости: любая, руны экипировки своего класса чаще."""
     pool = [r for r in rc.RUNES if r.ready and r.rarity == rarity] or [r for r in rc.RUNES if r.ready]
-    weights = [
-        rc.KIND_WEIGHTS[r.kind] * (OWN_CLASS_WEIGHT if base_class and base_class in r.classes else 1)
-        for r in pool
-    ]
+    weights = [OWN_CLASS_WEIGHT if base_class and base_class in r.classes else 1 for r in pool]
     return rng.choices(pool, weights=weights)[0].id
 
 
