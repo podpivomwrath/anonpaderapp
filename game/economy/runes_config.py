@@ -75,7 +75,6 @@ class RuneDef:
     curve: str = "normal"
     pvp: str = "full"
     #: Руны экипировки и навыков: базовые классы, которым подходит (пусто - всем).
-    classes: tuple[str, ...] = ()
     #: Руны экипировки: "weapon" или "armor".
     place: str = ""
     #: Руны навыков: тег навыка (SKILL_TAGS), пусто - любой навык.
@@ -86,7 +85,6 @@ class RuneDef:
     extra: dict = field(default_factory=dict)
 
 
-W, R, M = "warrior", "rogue", "mage"
 
 RUNES: list[RuneDef] = [
     # --- Руны героя ---------------------------------------------------------------
@@ -131,35 +129,26 @@ RUNES: list[RuneDef] = [
             pvp="half", curve="tight", rarity="epic"),
 
     # --- Руны экипировки ----------------------------------------------------------
-    RuneDef("hammer_down", GEAR, "Молот по лежачему", 0.15, "+{v} прямого урона по оглушённым", pvp="half",
-            classes=(W,), place="weapon"),
-    RuneDef("red_thirst", GEAR, "Красная жажда", 0.03, "+{v} вампиризма от прямого урона", pvp="half",
-            classes=(W,), place="weapon"),
-    RuneDef("spite", GEAR, "Злоба", 0.02, "+{v} прямого урона за каждый полученный удар, до пяти раз", pvp="half",
-            classes=(W,), place="weapon"),
+    RuneDef("hammer_down", GEAR, "Молот по лежачему", 0.15, "+{v} прямого урона по оглушённым", pvp="half", place="weapon"),
+    RuneDef("red_thirst", GEAR, "Красная жажда", 0.03, "+{v} вампиризма от прямого урона", pvp="half", place="weapon"),
+    RuneDef("spite", GEAR, "Злоба", 0.02, "+{v} прямого урона за каждый полученный удар, до пяти раз", pvp="half", place="weapon"),
     RuneDef("thorn_plate", GEAR, "Колючая броня", 0.08, "{v} полученного урона уходит обратно врагу",
-            pvp="half", classes=(W,), place="armor"),
+            pvp="half", place="armor"),
     RuneDef("deaf_shield", GEAR, "Глухой щит", 0.06, "шанс {v} полностью блокировать обычную атаку",
-            pvp="half", classes=(W,), place="armor", curve="tight", rarity="rare"),
-    RuneDef("thin_sting", GEAR, "Тонкое жало", 0.12, "+{v} к урону крита", pvp="half",
-            classes=(R,), place="weapon"),
-    RuneDef("last_cut", GEAR, "Последний надрез", 0.12, "+{v} прямого урона по целям ниже 30% здоровья", pvp="half",
-            classes=(R,), place="weapon"),
+            pvp="half", place="armor", curve="tight", rarity="rare"),
+    RuneDef("thin_sting", GEAR, "Тонкое жало", 0.12, "+{v} к урону крита", pvp="half", place="weapon"),
+    RuneDef("last_cut", GEAR, "Последний надрез", 0.12, "+{v} прямого урона по целям ниже 30% здоровья", pvp="half", place="weapon"),
     RuneDef("riposte", GEAR, "Ответный выпад", 0.20,
             "увернулся - удары в следующем ходу сильнее на {v}; несколько уворотов подряд не складываются",
-            pvp="half", classes=(R,), place="weapon"),
+            pvp="half", place="weapon"),
     RuneDef("rotten_wound", GEAR, "Гнилая рана", 0.20, "шанс {v}, что яд продержится на ход дольше",
-            pvp="half", classes=(R,), place="weapon", curve="tight", rarity="rare"),
-    RuneDef("light_step", GEAR, "Лёгкий шаг", 0.03, "+{v} к уклонению", pvp="half",
-            classes=(R,), place="armor", curve="tight", rarity="rare"),
+            pvp="half", place="weapon", curve="tight", rarity="rare"),
+    RuneDef("light_step", GEAR, "Лёгкий шаг", 0.03, "+{v} к уклонению", pvp="half", place="armor", curve="tight", rarity="rare"),
     RuneDef("echo", GEAR, "Отзвук", 0.08, "+{v} прямого урона по целям под ослаблением, уязвимостью, ядом или горением",
-            pvp="half", classes=(M,), place="weapon"),
-    RuneDef("heat_frost", GEAR, "Жар и иней", 0.10, "горение и прямой урон по замороженным сильнее на {v}", pvp="half",
-            classes=(M,), place="weapon"),
-    RuneDef("surplus", GEAR, "Излишек", 0.20, "{v} лечения сверх максимума становится щитом", pvp="half",
-            classes=(M,), place="armor"),
-    RuneDef("reverse_prayer", GEAR, "Обратная молитва", 0.15, "{v} лечения и вампиризма ваших навыков бьёт врага", pvp="half",
-            classes=(M,), place="weapon", rarity="rare"),
+            pvp="half", place="weapon"),
+    RuneDef("heat_frost", GEAR, "Жар и иней", 0.10, "горение и прямой урон по замороженным сильнее на {v}", pvp="half", place="weapon"),
+    RuneDef("surplus", GEAR, "Излишек", 0.20, "{v} лечения сверх максимума становится щитом", pvp="half", place="armor"),
+    RuneDef("reverse_prayer", GEAR, "Обратная молитва", 0.15, "{v} лечения и вампиризма ваших навыков бьёт врага", pvp="half", place="weapon", rarity="rare"),
     RuneDef("fresh_armor", GEAR, "Свежая броня", 0.15, "входящий урон в первые 3 хода меньше на {v}",
             pvp="half", place="armor"),
     RuneDef("cast_cuirass", GEAR, "Литая кираса", 0.25, "уязвимость на вас слабее на {v}", place="armor"),

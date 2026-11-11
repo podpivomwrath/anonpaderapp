@@ -157,9 +157,7 @@ def _fits(character: Character, rune_def: rc.RuneDef, kind: str, slot: str) -> s
     if rune_def.kind != kind:
         return f"Это {rc.KIND_ONE[rune_def.kind].lower()}."
     place = slot.partition(":")[0]
-    if kind == rc.GEAR and not runes.fits_gear(rune_def, place, character.base_class):
-        if rune_def.classes and character.base_class not in rune_def.classes:
-            return "Эта руна не для вашего класса."
+    if kind == rc.GEAR and not runes.fits_gear(rune_def, place):
         return "Оружейная руна - только в оружие." if rune_def.place == "weapon" else "Эта руна - в доспех."
     if kind == rc.SKILL:
         from game.combat import skill_catalog
@@ -323,7 +321,7 @@ async def buy_hero_slot(db: AsyncSession, character: Character) -> int:
 def _lost(character: Character, row: CharacterRuneSlot, state: tuple[list[str], dict[str, int]]) -> bool:
     """Руна, которой здесь больше не место: огранка навыка, который сняли
     (или второе гнездо без ступени II, или огранка не подходит после правки
-    меток), руна экипировки чужого класса."""
+    меток)."""
     rune_def = rc.BY_ID.get(row.rune_id)
     if row.kind == rc.SKILL:
         if not _slot_open(character, rc.SKILL, row.slot, state):
@@ -332,12 +330,11 @@ def _lost(character: Character, row: CharacterRuneSlot, state: tuple[list[str], 
 
         skill = skill_catalog.skill_def(row.slot.partition(":")[0])
         return rune_def is not None and (skill is None or not runes.fits_skill(rune_def, skill))
-    return (row.kind == rc.GEAR and rune_def is not None
-            and bool(rune_def.classes) and character.base_class not in rune_def.classes)
+    return False
 
 
 async def release_lost_runes(db: AsyncSession, character: Character) -> bool:
-    """Огранки снятых навыков и руны экипировки чужого класса (репорт 266) -
+    """Огранки снятых навыков (и, до 2026-11-11, руны экипировки чужого класса) -
     обратно в сумку."""
     known = await mastery(db, character.id)
     state = _state_from_rows(await slots(db, character.id), known)
@@ -395,8 +392,6 @@ async def recompute(db: AsyncSession, character: Character) -> dict[str, float]:
                 effects[f"fork:{sid}"] = fork
             continue
         skill_id = row.slot.partition(":")[0] if row.kind == rc.SKILL else None
-        if row.kind == rc.GEAR and rune_def.classes and character.base_class not in rune_def.classes:
-            continue
         key = runes.effect_key(row.rune_id, skill_id)
         effects[key] = round(runes.value(rune_def, known.get(row.rune_id, 0)), 6)
     character.rune_effects = effects
@@ -414,16 +409,11 @@ def roll_rune(rng: random.Random) -> str:
     return rng.choices(pool, weights=[rc.RARITY_WEIGHTS[r.rarity] for r in pool])[0].id
 
 
-#: Перевес рун своего класса в ларце рун (2026-11-05, решение владельца:
-#: под класс открывшего, но не только - дубли нужны рынку).
-OWN_CLASS_WEIGHT = 3
-
-
-def roll_rune_of_rarity(rng: random.Random, rarity: str, base_class: str | None = None) -> str:
-    """Руна заданной редкости: любая, руны экипировки своего класса чаще."""
+def roll_rune_of_rarity(rng: random.Random, rarity: str) -> str:
+    """Руна заданной редкости, любая (2026-11-11: перевес рун своего класса
+    ушёл вместе с привязкой рун экипировки к классу)."""
     pool = [r for r in rc.RUNES if r.ready and r.rarity == rarity] or [r for r in rc.RUNES if r.ready]
-    weights = [OWN_CLASS_WEIGHT if base_class and base_class in r.classes else 1 for r in pool]
-    return rng.choices(pool, weights=weights)[0].id
+    return rng.choice(pool).id
 
 
 def rune_title(rune_id: str) -> str:

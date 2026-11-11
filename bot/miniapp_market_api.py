@@ -72,10 +72,8 @@ def rune_about(rune_id: str, absorbed: int = 0) -> dict:
     if r is None:
         return {"description": None, "effect": None}
     lines = [f"{rc.KIND_ONE[r.kind]}, {rc.RARITY_TITLES[r.rarity]}."]
-    classes = {"warrior": "воина", "rogue": "разбойника", "mage": "мага"}
     if r.kind == rc.GEAR:
-        who = ", ".join(classes[c] for c in r.classes) if r.classes else "любого класса"
-        lines.append(f"Вставляется в {'оружие' if r.place == 'weapon' else 'доспех'}, для {who}.")
+        lines.append(f"Вставляется в {'оружие' if r.place == 'weapon' else 'доспех'}, любому классу.")
     if r.kind == rc.SKILL:
         lines.append(f"Огранка: вставляется в {rc.SKILL_TAG_TITLES[r.tag] if r.tag else 'любой навык'}.")
     if r.kind == rc.ABILITY:

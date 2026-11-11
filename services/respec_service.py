@@ -65,7 +65,7 @@ async def full_class_reset(
 
 async def _release_runes(db: AsyncSession, character: Character) -> None:
     """Сменились класс или навыки - руны не к месту в сумку, эффекты заново
-    (репорт 266: руна чужого класса оставалась в слоте)."""
+    (репорт 266)."""
     from services import rune_service
 
     await rune_service.recompute(db, character)

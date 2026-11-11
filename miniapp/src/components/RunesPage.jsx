@@ -71,7 +71,6 @@ function fits(rune, kind, slot, data, ability) {
   if (rune.kind !== kind || rune.count < 1) return false;
   if (kind === 'gear') {
     const place = slot.split(':')[0];
-    if (rune.classes.length && !rune.classes.includes(data.base_class)) return false;
     return rune.place === 'weapon' ? place === 'weapon' : place !== 'weapon';
   }
   if (kind === 'skill') return !rune.tag_id || ability?.skill?.tags.includes(rune.tag_id);
@@ -98,7 +97,6 @@ function RuneInfo({ rune }) {
       {rune.summary && <p className="rune-info__text">{rune.summary}</p>}
       {rune.scaling_text && <p className="rune-info__text">Бьёт от характеристик: {rune.scaling_text}.</p>}
       <p className="rune-info__text">{rune.kind === 'ability' ? `Сила навыка ${rune.efficiency}%.` : rune.text}</p>
-      {rune.class_note && <p className="rune-info__text">{rune.class_note}</p>}
       <small className="rune-info__meta">
         {rune.rarity_title}{rune.kind === 'ability' ? '' : `, ${PVP[rune.pvp]}`}
         {rune.tag ? `, только в ${rune.tag}` : ''}

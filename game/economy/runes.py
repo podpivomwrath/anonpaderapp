@@ -81,10 +81,10 @@ def fits_skill(rune_def: rc.RuneDef, skill) -> bool:
     return rune_def.kind == rc.SKILL and (not rune_def.tag or rune_def.tag in skill_tags(skill))
 
 
-def fits_gear(rune_def: rc.RuneDef, place: str, base_class: str | None) -> bool:
+def fits_gear(rune_def: rc.RuneDef, place: str) -> bool:
+    """Руна экипировки встаёт любому классу (2026-11-11): навыки общие -
+    и руны под них тоже."""
     if rune_def.kind != rc.GEAR:
-        return False
-    if rune_def.classes and base_class not in rune_def.classes:
         return False
     if rune_def.place == "weapon":
         return place == "weapon"

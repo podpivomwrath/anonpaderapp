@@ -17,9 +17,6 @@ from game.economy import runes_config as rc
 from services import rune_service, wallet_service
 from services import onboarding_service as onboarding_svc
 
-#: Подпись классовой руны в описании (2026-10-31, владелец).
-CLASS_TITLES = {"warrior": "воин", "rogue": "разбойник", "mage": "маг"}
-
 PLACE_TITLES = {"weapon": "Оружие", "helmet": "Шлем", "armor": "Доспех", "legs": "Штаны", "boots": "Сапоги"}
 
 
@@ -45,9 +42,7 @@ def _rune(rune_def: rc.RuneDef, absorbed: int, count: int = 0) -> dict:
         "rarity_title": rc.RARITY_TITLES[rune_def.rarity], "count": count,
         "text": runes.describe(rune_def, absorbed), "base_text": runes.describe(rune_def, 0),
         "pvp": rune_def.pvp, "ready": rune_def.ready,
-        "classes": list(rune_def.classes), "place": rune_def.place,
-        "class_note": (f"Для класса {', '.join(CLASS_TITLES[c] for c in rune_def.classes)}"
-                       if rune_def.classes else None),
+        "place": rune_def.place,
         "tag": rc.SKILL_TAG_TITLES.get(rune_def.tag) if rune_def.tag else None, "tag_id": rune_def.tag or None,
         "absorbed": absorbed, "efficiency": round(runes.efficiency(rune_def.curve, absorbed) * 100, 1),
         "next": nxt, "next_pct": nxt_pct,
@@ -181,7 +176,7 @@ async def handle_get(request: web.Request) -> web.Response:
         character = await onboarding_svc.get_character(db, request[VK_USER_ID_KEY])
         if character is None:
             return _error("character_not_found", 404)
-        # Огранки снятых навыков (и руны экипировки чужого класса) - в сумку.
+        # Огранки снятых навыков - в сумку.
         if await rune_service.release_lost_runes(db, character):
             await rune_service.recompute(db, character)
             await db.commit()

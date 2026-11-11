@@ -151,7 +151,7 @@ async def _apply_part(db: AsyncSession, character: Character, part: LootboxRewar
 
         names = []
         for _ in range(rng.randint(part.min, part.max)):
-            rune_id = rune_service.roll_rune_of_rarity(rng, part.rarity or "common", character.base_class)
+            rune_id = rune_service.roll_rune_of_rarity(rng, part.rarity or "common")
             await rune_service.grant(db, character.id, rune_id, 1, reason="rune_chest")
             names.append(rune_service.rune_title(rune_id))
         return ", ".join(names)

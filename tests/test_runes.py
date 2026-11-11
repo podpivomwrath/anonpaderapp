@@ -83,21 +83,23 @@ async def test_buy_hero_slot_charges_gold(db_session, make_character) -> None:
         await rune_service.buy_hero_slot(db_session, c)
 
 
-async def test_gear_rune_class_and_place(db_session, make_character) -> None:
+async def test_gear_rune_any_class_but_its_place(db_session, make_character) -> None:
+    """2026-11-11, владелец: руны экипировки - любому классу, место (оружие
+    или доспех) осталось."""
     c = await make_character(level=10, base_class="warrior")
     _home(c)
     await rune_service.grant(db_session, c.id, "thin_sting")
     await rune_service.grant(db_session, c.id, "hammer_down")
-    with pytest.raises(rune_service.RuneError):
-        await rune_service.equip(db_session, c, rc.GEAR, "weapon:0", "thin_sting")  # руна разбойника
+    await rune_service.equip(db_session, c, rc.GEAR, "weapon:0", "thin_sting")  # бывшая руна разбойника
+    assert rune_service.effect(c, "thin_sting") > 0
     with pytest.raises(rune_service.RuneError):
         await rune_service.equip(db_session, c, rc.GEAR, "helmet:0", "hammer_down")  # оружейная
     await rune_service.equip(db_session, c, rc.GEAR, "weapon:0", "hammer_down")
     assert rune_service.effect(c, "hammer_down") == pytest.approx(0.15)
 
 
-async def test_class_change_returns_foreign_gear_rune(db_session, make_character) -> None:
-    """Репорт 266: руна чужого класса после смены класса - в сумку, не действует."""
+async def test_class_change_keeps_gear_rune(db_session, make_character) -> None:
+    """Руна экипировки без класса (2026-11-11): после смены класса стоит и действует."""
     from models import BaseClass
     from services import respec_service
 
@@ -106,8 +108,8 @@ async def test_class_change_returns_foreign_gear_rune(db_session, make_character
     await rune_service.grant(db_session, c.id, "hammer_down")
     await rune_service.equip(db_session, c, rc.GEAR, "weapon:0", "hammer_down")
     await respec_service.full_class_reset(db_session, c, BaseClass("mage"))
-    assert rune_service.effect(c, "hammer_down") == 0
-    assert (await rune_service.bag(db_session, c.id)).get("hammer_down") == 1
+    assert rune_service.effect(c, "hammer_down") == pytest.approx(0.15)
+    assert not (await rune_service.bag(db_session, c.id)).get("hammer_down")
 
 
 def test_drop_rolls_only_ready_runes() -> None:
