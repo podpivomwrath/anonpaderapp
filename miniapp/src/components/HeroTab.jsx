@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Group, Header, SimpleCell, Switch } from '@vkontakte/vkui';
 import {
-  equipItem, getCharacter, getGear, getInventory, getRunes, getTrophies, ringAction, setGender, setNoImages, setShortLog, setNoNotices,
+  equipItem, getCharacter, getGear, getInventory, getRunes, getTrophies, ringAction, setGender, setNoImages, setShortLog, setNoNotices, setSignalsOff,
   unequipItem,
 } from '../api.js';
 import CraftGear from './CraftGear.jsx';
@@ -243,6 +243,18 @@ function Settings({ character, onCharacterUpdate }) {
       .then(() => onCharacterUpdate((prev) => ({ ...prev, ui: { ...(prev.ui || {}), no_notices: next } })))
       .catch(() => setQuiet(!next));
   };
+  // Сигналы союзникам в групповом бою (2026-11-11, bot/battle_signals.py):
+  // флаги - «выключено», галочка - «включено».
+  const [sigOut, setSigOut] = useState(!character.ui?.signals_out_off);
+  const [sigIn, setSigIn] = useState(!character.ui?.signals_in_off);
+  const toggleSignal = (which, on) => {
+    const key = which === 'out' ? 'signals_out_off' : 'signals_in_off';
+    const set = which === 'out' ? setSigOut : setSigIn;
+    set(on);
+    setSignalsOff(which, !on)
+      .then(() => onCharacterUpdate((prev) => ({ ...prev, ui: { ...(prev.ui || {}), [key]: !on } })))
+      .catch(() => set(!on));
+  };
   return (
     <Group header={<Header>Настройки</Header>}>
       <SimpleCell
@@ -265,6 +277,20 @@ function Settings({ character, onCharacterUpdate }) {
         after={<Switch checked={quiet} onChange={(e) => toggleQuiet(e.target.checked)} />}
       >
         Отключить оповещения
+      </SimpleCell>
+      <SimpleCell
+        Component="label" multiline
+        subtitle="В групповом бою после выбора действия появится кнопка «📢 Показать союзникам»: союзники увидят, что вы готовите."
+        after={<Switch checked={sigOut} onChange={(e) => toggleSignal('out', e.target.checked)} />}
+      >
+        Показывать союзникам мои действия
+      </SimpleCell>
+      <SimpleCell
+        Component="label" multiline
+        subtitle="Бот будет присылать, что готовят союзники по групповому бою, если они нажали «📢 Показать союзникам»."
+        after={<Switch checked={sigIn} onChange={(e) => toggleSignal('in', e.target.checked)} />}
+      >
+        Получать действия союзников
       </SimpleCell>
     </Group>
   );

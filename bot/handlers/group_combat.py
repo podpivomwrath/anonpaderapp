@@ -492,9 +492,12 @@ async def _group_action(message: Message, action: DeclaredAction) -> None:
     if cid in _declared_this_tick.get(battle_id, set()):
         p = battle.participants.get(cid)
         if p is not None:
+            from bot import battle_signals
+
             await _bot_api.messages.send(
                 peer_id=p.peer_id, message="✅ Действие принято. Ожидание остальных...",
-                random_id=0, keyboard=group_waiting_keyboard(),
+                random_id=0, keyboard=battle_signals.waiting_keyboard(
+                    _engine, battle_id, battle, cid, action, group_waiting_keyboard()),
             )
 
 

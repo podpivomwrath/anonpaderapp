@@ -155,6 +155,11 @@ export function setNoNotices(on) {
   return saveUi({ set: { no_notices: on } });
 }
 
+// Сигналы союзникам в групповом бою (2026-11-11, bot/battle_signals.py).
+export function setSignalsOff(which, off) {
+  return saveUi({ set: { [which === 'out' ? 'signals_out_off' : 'signals_in_off']: off } });
+}
+
 export function glance() {
   return request('/glance', { method: 'POST' });
 }

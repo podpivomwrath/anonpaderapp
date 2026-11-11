@@ -945,9 +945,12 @@ async def _raid_action(message: Message, action: DeclaredAction) -> None:
     if cid in _declared_this_tick.get(battle_id, set()) and _others_pending(battle_id, battle, cid):
         p = battle.participants.get(cid)
         if p is not None:
+            from bot import battle_signals
+
             await _bot_api.messages.send(
                 peer_id=p.peer_id, message="✅ Действие принято. Ожидание остальных...",
-                random_id=0, keyboard=kb.raid_waiting_keyboard(),
+                random_id=0, keyboard=battle_signals.waiting_keyboard(
+                    _engine, battle_id, battle, cid, action, kb.raid_waiting_keyboard()),
             )
 
 

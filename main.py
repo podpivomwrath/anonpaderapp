@@ -350,6 +350,12 @@ async def run() -> None:
     short_count = await short_log.load(get_session_factory())
     if short_count:
         logger.info("Короткий лог боя: {} игроков", short_count)
+    from bot import battle_signals
+
+    # 2026-11-11: кто выключил сигналы союзникам в групповом бою
+    signals_off = await battle_signals.load(get_session_factory())
+    if signals_off:
+        logger.info("Сигналы боя выключены: {} игроков", signals_off)
     resumed = await world_handlers.resume_after_restart()
     # Рыбалка и добыча: их состояние в базе, таймеры - в памяти (2026-10-12).
     resumed["fishing"] = await fishing_handlers.resume_after_restart()

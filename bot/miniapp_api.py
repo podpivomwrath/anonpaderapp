@@ -397,7 +397,9 @@ UI_FLAGS = {"intro": int, "tour": int, "sound": bool, "safe_route": bool, "fish_
             # Короткий боевой лог (2026-10-22): bot/short_log.py.
             "short_log": bool,
             # «Без оповещений» (2026-11-09): bot/notices.py.
-            "no_notices": bool}
+            "no_notices": bool,
+            # Сигналы союзникам в групповом бою (2026-11-11): bot/battle_signals.py.
+            "signals_out_off": bool, "signals_in_off": bool}
 UI_HINTS_MAX = 32
 
 
@@ -439,6 +441,10 @@ async def handle_post_ui(request: web.Request) -> web.Response:
             from bot import notices
 
             notices.set_quiet(request[VK_USER_ID_KEY], bool(flags["no_notices"]))
+        if "signals_out_off" in flags or "signals_in_off" in flags:
+            from bot import battle_signals
+
+            battle_signals.set_flags(request[VK_USER_ID_KEY], flags)
         if "short_log" in flags:
             from bot import short_log
 

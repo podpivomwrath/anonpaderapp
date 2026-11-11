@@ -1092,11 +1092,14 @@ async def _pvp_action(message: Message, action: DeclaredAction) -> None:
     if cid in _declared_this_tick.get(battle_id, set()):
         participant = battle.participants.get(cid)
         if participant is not None:
+            from bot import battle_signals
+
             await _bot_api.messages.send(
                 peer_id=participant.peer_id,
                 message="✅ Действие принято. Ожидание остальных...",
                 random_id=0,
-                keyboard=pvp_waiting_keyboard(),
+                keyboard=battle_signals.waiting_keyboard(
+                    _mass_engine, battle_id, battle, cid, action, pvp_waiting_keyboard()),
             )
 
 
