@@ -139,15 +139,6 @@ def test_duel_overheal_becomes_own_shield() -> None:
     assert healer.effect_total(EffectKind.SHIELD_POOL) == round(healer.max_hp * bc.DARK_MYSTIC_ECHO_CAP_PCT)
 
 
-def test_deaf_shield_blocks_only_basic_attacks() -> None:
-    a, t = combatant(1, 0), combatant(2, 1)
-    t.buff_modifiers["rune:deaf_shield"] = 0.06
-    blocked = compute_hit(a, t, AlwaysRng(), ignore_dodge=True)
-    assert blocked.missed and blocked.amount == 0
-    skill_hit = compute_hit(a, t, NoCritRng(), is_ability=True)
-    assert not skill_hit.missed and skill_hit.amount > 0
-
-
 def test_pvp_scaling_keeps_full_and_drops_pve_only() -> None:
     scaled = runes.pvp_scaled({"rune:press@warrior_cleave": 0.10, "rune:ricochet@warrior_cleave": 0.12,
                                "rune:cast_cuirass": 0.25}, pvp=True)

@@ -30,7 +30,6 @@ export const RUNE_ICONS = {
   red_thirst: new URL('./assets/runes/red_thirst.webp', import.meta.url).href,
   spite: new URL('./assets/runes/spite.webp', import.meta.url).href,
   thorn_plate: new URL('./assets/runes/thorn_plate.webp', import.meta.url).href,
-  deaf_shield: new URL('./assets/runes/deaf_shield.webp', import.meta.url).href,
   thin_sting: new URL('./assets/runes/thin_sting.webp', import.meta.url).href,
   last_cut: new URL('./assets/runes/last_cut.webp', import.meta.url).href,
   riposte: new URL('./assets/runes/riposte.webp', import.meta.url).href,

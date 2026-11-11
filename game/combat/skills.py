@@ -242,7 +242,6 @@ def outgoing_multiplier(actor: CombatantState, target: CombatantState) -> float:
 
 
 _DEBUFFS = (EffectKind.VULNERABILITY, EffectKind.WEAKEN, EffectKind.DOT)
-DEAF_SHIELD_LABEL = "глухой щит"
 
 
 def rune_outgoing(actor: CombatantState, target: CombatantState) -> float:
@@ -408,11 +407,6 @@ def compute_hit(
     dodges = (not ignore_dodge and second_chance) or (
         total_dodge > 0 and rng.random() < total_dodge
     )
-    # Руна «Глухой щит» (2026-10-31): обычную атаку - целиком в щит. Не
-    # уворот: «Ответный выпад», метки и прочее за уворот не срабатывают.
-    shield = target.buff_modifiers.get("rune:deaf_shield", 0.0)
-    if not dodges and not is_ability and shield > 0 and rng.random() < shield:
-        return PendingHit(source_id=actor.id, target_id=target.id, amount=0, label=DEAF_SHIELD_LABEL, missed=True)
     if dodges:
         target.second_chance_active = False
         target.dodged_this_tick = True

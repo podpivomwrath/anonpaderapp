@@ -33,7 +33,6 @@ from game.combat.session import (
     shield_name,
 )
 from game.combat.skills import (
-    DEAF_SHIELD_LABEL,
     DEFENSIVE_SKILLS,
     OFFENSIVE_SKILLS,
     PendingHeal,
@@ -673,7 +672,7 @@ def resolve_tick(
                 hit.amount = max(round(hit.amount * taken_mult), 1)
     # Пробуждение «Дымовой завесы» (2026-11-10): увернувшийся отвечает ударом.
     for hit in list(ctx.hits):
-        if not hit.missed or hit.reactive or hit.is_dot or hit.label == DEAF_SHIELD_LABEL:
+        if not hit.missed or hit.reactive or hit.is_dot:
             continue
         dodger = session.combatants.get(hit.target_id)
         attacker = session.combatants.get(hit.source_id)

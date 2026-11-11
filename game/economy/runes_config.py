@@ -134,8 +134,8 @@ RUNES: list[RuneDef] = [
     RuneDef("spite", GEAR, "Злоба", 0.02, "+{v} прямого урона за каждый полученный удар, до пяти раз", pvp="half", place="weapon"),
     RuneDef("thorn_plate", GEAR, "Колючая броня", 0.08, "{v} полученного урона уходит обратно врагу",
             pvp="half", place="armor"),
-    RuneDef("deaf_shield", GEAR, "Глухой щит", 0.06, "шанс {v} полностью блокировать обычную атаку",
-            pvp="half", place="armor", curve="tight", rarity="rare"),
+    # «Глухой щит» (шанс заблокировать обычную атаку) слит с «Лёгким шагом»
+    # 2026-11-11: блок заменён уклонением (владелец), миграция 0110.
     RuneDef("thin_sting", GEAR, "Тонкое жало", 0.12, "+{v} к урону крита", pvp="half", place="weapon"),
     RuneDef("last_cut", GEAR, "Последний надрез", 0.12, "+{v} прямого урона по целям ниже 30% здоровья", pvp="half", place="weapon"),
     RuneDef("riposte", GEAR, "Ответный выпад", 0.20,
