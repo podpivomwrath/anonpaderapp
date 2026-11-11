@@ -96,6 +96,7 @@ function RuneInfo({ rune }) {
   return (
     <div className="rune-info">
       {rune.summary && <p className="rune-info__text">{rune.summary}</p>}
+      {rune.scaling_text && <p className="rune-info__text">Бьёт от характеристик: {rune.scaling_text}.</p>}
       <p className="rune-info__text">{rune.kind === 'ability' ? `Сила навыка ${rune.efficiency}%.` : rune.text}</p>
       {rune.class_note && <p className="rune-info__text">{rune.class_note}</p>}
       <small className="rune-info__meta">
@@ -204,7 +205,7 @@ function SocketSheet({ kind, socket, data, ability, busy, onEquip, onUnequip, on
         {options.map((r) => (
           <button key={r.id} type="button" className="rune-option" disabled={busy || !data.home} onClick={() => onEquip(r.id)}>
             <RuneIcon rune={r} size={36} />
-            <span className="rune-option__main"><b>{r.name}</b><small>{r.summary || r.text}</small></span>
+            <span className="rune-option__main"><b>{r.name}</b><small>{r.summary || r.text}{r.scaling_text ? ` ${r.scaling_text}.` : ''}</small></span>
             <small className="rune-option__count">×{r.count}</small>
           </button>
         ))}
@@ -223,6 +224,13 @@ function AbilityCard({ ability, index, onPick, onSteps }) {
           <div className="rune-ability__info">
             <small>перезарядка {ability.skill.cd} · сила {ability.rune.efficiency}%</small>
             <p>{ability.summary}</p>
+            {ability.scaling?.length > 0 && (
+              // От каких характеристик бьёт навык (2026-11-11, владелец): так виден билд.
+              <small className="rune-ability__scale">
+                {ability.scaling.map((x) => `${x.pct}% ${x.title} (у вас ${x.have})`).join(' и ')}
+                {ability.damage ? ` → урон ${ability.damage}` : ''}
+              </small>
+            )}
             <button type="button" className="pill-btn pill-btn--small" onClick={() => onSteps(ability)}>
               {ability.step ? `Ступень ${STEP_NAMES[ability.step]}` : 'Ступени'}
             </button>

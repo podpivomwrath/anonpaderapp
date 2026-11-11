@@ -312,3 +312,66 @@ async def test_starter_runes_are_given_once_and_equipped(db_session, make_charac
     assert given == list(skill_catalog.STARTER_SKILLS["mage"])
     assert skill_catalog.skill_ids_of(character.rune_effects) == given
     assert await rune_service.grant_starter(db_session, character) == []
+
+
+# --- Масштаб от характеристик (2026-11-11) ------------------------------------------
+
+
+def _fighter(**stats):
+    from game.combat.session import Stats, build_combatant
+
+    s = Stats()
+    for key, value in stats.items():
+        setattr(s, key, value)
+    return build_combatant(id=1, side=0, kind="character", name="Боец", level=40, stats=s, primary_stat="str")
+
+
+def test_home_class_hits_as_before() -> None:
+    """Проценты подобраны так, что «родной» класс бьёт как раньше."""
+    from game.combat import formulas, stat_model
+    from game.combat.skills import skill_damage_unit
+
+    warrior = _fighter(strength=90, intellect=10)
+    old = formulas.damage(warrior.tier_mult, stat_model.ACTIVE.primary_value(90, 40, True, "str"), 2.0)
+    assert skill_damage_unit(warrior, "warrior_cleave") == pytest.approx(old)
+
+
+def test_skill_hits_from_its_own_stats() -> None:
+    """Воин с Огненной плетью бьёт от Интеллекта, а не от Силы."""
+    from game.combat.skills import skill_damage_unit
+
+    strong, clever = _fighter(strength=90, intellect=10), _fighter(strength=10, intellect=90)
+    assert skill_damage_unit(strong, "warrior_cleave") > skill_damage_unit(clever, "warrior_cleave")
+    assert skill_damage_unit(clever, "elementalist_fire") > skill_damage_unit(strong, "elementalist_fire")
+    assert skill_damage_unit(strong, "attack") is None  # обычная атака - как прежде
+
+
+def test_mastery_grows_the_stat_percent() -> None:
+    from game.combat.skills import skill_damage_unit
+
+    me = _fighter(strength=90)
+    plain = skill_damage_unit(me, "warrior_cleave")
+    me.buff_modifiers["rune:warrior_cleave"] = 0.1
+    assert skill_damage_unit(me, "warrior_cleave") > plain
+    assert ac.scaling("warrior_cleave", 1.65, 0.1)["str"] == pytest.approx(3.63)
+
+
+def test_every_damage_skill_has_its_stats() -> None:
+    for sid, skill in skill_catalog.ALL_SKILL_DEFS.items():
+        if skill.multiplier > 0:
+            assert sid in ac.SCALING_SHARES, sid
+            assert sum(ac.SCALING_SHARES[sid].values()) == pytest.approx(1.0), sid
+
+
+def test_card_shows_stat_percent_and_damage() -> None:
+    """Карточка навыка в мини-аппе: «330% Силы (у вас 72) -> урон N»."""
+    from types import SimpleNamespace
+
+    from bot import miniapp_runes_api as api
+
+    hero = SimpleNamespace(rune_effects={}, level=40, subclass=None, subclass_declined=False, base_class="warrior")
+    weak = api._scaling_info("warrior_cleave", 0, hero, {"str": 20})
+    strong = api._scaling_info("warrior_cleave", 0, hero, {"str": 72})
+    assert strong["scaling"] == [{"stat": "str", "title": "Силы", "pct": 330, "have": 72}]
+    assert strong["damage"] > weak["damage"]
+    assert api._scaling_text(rc.BY_ID["dark_mystic_drain"], 0) == "192% Воли и 128% Интеллекта"

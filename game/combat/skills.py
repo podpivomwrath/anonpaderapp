@@ -261,13 +261,39 @@ def rune_outgoing(actor: CombatantState, target: CombatantState) -> float:
         mult *= 1.0 + mods.get("rune:echo", 0.0)
     if skill_id:
         mult *= 1.0 + mods.get(f"rune:press@{skill_id}", 0.0)
-        # Руна-навык (2026-11-10): сила от мастерства.
-        mult *= 1.0 + mods.get(f"rune:{skill_id}", 0.0)
+        # Руна-навык (2026-11-10): сила от мастерства. У навыков со своими
+        # характеристиками она уже в процентах (skill_damage_unit, 2026-11-11).
+        from game.economy import ability_config
+
+        if skill_id not in ability_config.SCALING_SHARES:
+            mult *= 1.0 + mods.get(f"rune:{skill_id}", 0.0)
     # «Злоба»: за каждый полученный удар, до пяти.
     mult *= 1.0 + mods.get("rune:spite", 0.0) * min(getattr(actor, "hits_taken", 0), 5)
     # «За своих» (2026-11-05): за каждого павшего союзника, до трёх.
     mult *= 1.0 + mods.get("rune:for_ours", 0.0) * min(getattr(actor, "allies_fallen", 0), 3)
     return mult
+
+
+def skill_damage_unit(actor: CombatantState, skill_id: str | None) -> float | None:
+    """Урон навыка «на 100%» (до множителя навыка) от СВОИХ характеристик
+    навыка (2026-11-11, владелец): база оружия по уровню + каждая
+    характеристика из ability_config.SCALING_SHARES со своим порогом, всё
+    это - с силой руны от мастерства. None - не навык персонажа или навык без
+    своих характеристик: тогда урон, как у обычной атаки."""
+    if not skill_id or getattr(actor, "kind", None) != "character":
+        return None
+    from game.economy import ability_config
+
+    shares = ability_config.SCALING_SHARES.get(skill_id)
+    if not shares:
+        return None
+    power = (actor.buff_modifiers or {}).get(f"rune:{skill_id}", 0.0)
+    stat_part = sum(
+        share * ability_config.STAT_K[stat]
+        * stat_model.ACTIVE.primary_value(actor.stats.by_key(stat), actor.level, True, stat)
+        for stat, share in shares.items()
+    )
+    return formulas.weapon_base(actor.tier_mult) + stat_part * (1 + power)
 
 
 def skill_step_bonus(actor: CombatantState, target: CombatantState, skill_id: str) -> float:
@@ -406,15 +432,18 @@ def compute_hit(
             source_id=actor.id, target_id=target.id, amount=0, label=label, missed=True, marked=marked,
         )
 
-    base = formulas.damage(
-        actor.tier_mult,
-        stat_model.ACTIVE.primary_value(
-            stat_model.damage_stat_value(
-                actor.stats, actor.primary_stat, actor.subclass_id if actor.kind == "character" else None,
-            ),
-            actor.level, actor.kind == "character", actor.primary_stat),
-        formulas.k_dmg_for(actor.primary_stat),
-    ) * multiplier
+    unit = skill_damage_unit(actor, getattr(actor, "current_skill", None))
+    if unit is None:
+        unit = formulas.damage(
+            actor.tier_mult,
+            stat_model.ACTIVE.primary_value(
+                stat_model.damage_stat_value(
+                    actor.stats, actor.primary_stat, actor.subclass_id if actor.kind == "character" else None,
+                ),
+                actor.level, actor.kind == "character", actor.primary_stat),
+            formulas.k_dmg_for(actor.primary_stat),
+        )
+    base = unit * multiplier
     # Патч 56, Клинок теней: «Смертельная точность» (+шанс крита), «Передача
     # метки» (союзники чаще критуют по помеченной цели), «Жажда крови»
     # (следующий удар после крита критует гарантированно).

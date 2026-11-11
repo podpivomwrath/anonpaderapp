@@ -62,6 +62,10 @@ def skill_details(sid: str) -> dict:
     ability = ac.BY_ID[sid]
     need = ac.step_thresholds(ability.curve)
     head = (f"{RARITY[ability.rarity].capitalize()} руна, перезарядка {skill.cd}. {ability.summary}")
+    scale = ac.scaling(sid, skill.multiplier)
+    if scale:
+        head += " Бьёт от характеристик: " + " и ".join(
+            f"{round(coef * 100)}% {ac.STAT_TITLES[stat]}" for stat, coef in scale.items()) + "."
     steps = [
         f"<b>Ступень I</b> ({copies(need[0])}) - {ability.one.text}",
         f"<b>Ступень II</b> ({copies(need[1])}) - {ability.two.text} Открывает второе гнездо огранки.",
@@ -132,8 +136,11 @@ def skills_chapter_blocks() -> list[dict]:
         blocks.append({"t": "h4", "text": passive.title})
         blocks.append({"t": "ul", "items": list(passive.lines)})
     blocks.append({"t": "h3", "text": "Руны-навыки"})
-    blocks.append({"t": "p", "text": "Урон навыка - доля от обычной атаки. Числа ниже - для 100% мастерства, "
-                                     "каждая впитанная копия немного их поднимает."})
+    blocks.append({"t": "p", "text": "Навык бьёт от своих характеристик, а не от основной характеристики класса: "
+                                     "«330% Силы» - каждое очко Силы даёт 3,3 урона, к этому прибавляется база "
+                                     "по уровню. Полностью считается до 30 + 2 за уровень очков каждой "
+                                     "характеристики, дальше - на треть. Числа ниже - для 100% мастерства, "
+                                     "каждая впитанная копия поднимает проценты."})
     listed = set()
     for title, ids in GROUPS:
         blocks.append({"t": "h4", "text": title})

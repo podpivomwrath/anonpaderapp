@@ -107,8 +107,12 @@ def after_skill(actor, skill_id: str | None, ctx, hits_from: int) -> None:
     if splash and hit_ids:
         others = [c for c in session.alive_enemies_of(actor) if c.id not in hit_ids]
         if others:
-            ctx.hits.append(compute_hit(actor, rng.choice(others), rng, label="задевает", multiplier=splash,
-                                        is_ability=True))
+            actor.current_skill = skill_id  # бьёт от характеристик навыка (2026-11-11)
+            try:
+                ctx.hits.append(compute_hit(actor, rng.choice(others), rng, label="задевает", multiplier=splash,
+                                            is_ability=True))
+            finally:
+                actor.current_skill = None
 
     shield = mod(actor, "skill_shield", skill_id)
     if shield and actor.max_hp > 0:

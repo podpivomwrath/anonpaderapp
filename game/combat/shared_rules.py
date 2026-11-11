@@ -494,8 +494,10 @@ def rune_dot_mult(effect: Effect, source: CombatantState | None, target: Combata
     if source is not None:
         burn = getattr(effect, "tag", None) == BURN_TAG
         mult += _rune(source, "rune:acrid@" + ("elementalist_fire" if burn else "poisoner_venom"))
-        # Руна-навык (2026-11-10): сила навыка, что повесил яд или горение.
-        mult += _rune(source, "rune:" + ("elementalist_fire" if burn else "poisoner_venom"))
+        # Руна-навык (2026-11-10): сила навыка, что повесил яд. Горение -
+        # доля удара Плети, сила руны в нём уже есть (2026-11-11).
+        if not burn:
+            mult += _rune(source, "rune:poisoner_venom")
         synergy = source.buff_modifiers.get("burn_poison_synergy", 0.0)
         if synergy and target is not None:
             mine = [e for e in target.effects_of(EffectKind.DOT) if e.source_id == source.id]

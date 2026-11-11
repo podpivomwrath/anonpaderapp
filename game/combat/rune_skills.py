@@ -18,9 +18,11 @@ from game.combat.skills import (
 
 #: «Прикрыть собой»: доля урона по прикрытому, что уходит прикрывающему.
 COVER_SHARE = 0.3
-#: «Прикрыть собой»: щит прикрытому - доля здоровья прикрывающего на единицу
-#: силы навыка (0.3 -> 15% здоровья).
-COVER_SHIELD_PER_VALUE = 0.5
+#: Щиты «Прикрыть собой» и «Сомкнуть ряды» - от Выносливости того, кто их
+#: ставит (2026-11-11, владелец), с порогом характеристики. Числа - так, чтобы
+#: при 100 Выносливости щит был прежним (~15% здоровья героя 60 уровня).
+COVER_SHIELD_PER_VIT = 11.5  # на единицу силы навыка: 0.3 x 11.5 = 3.45 щита за очко
+CLOSE_RANKS_SHIELD_PER_VIT = 23.0  # на долю: 0.15 x 23 = 3.45 щита за очко
 #: «Сомкнуть ряды»: порог «кто-то из своих падает» и щит без этого условия.
 CLOSE_RANKS_THRESHOLD = 0.3
 CLOSE_RANKS_WEAK_SHIELD = 0.08
@@ -32,6 +34,13 @@ def _own(ctx: SkillContext) -> list:
 
 def _share(c) -> float:
     return c.current_hp / c.max_hp if c.max_hp else 1.0
+
+
+def _vit(actor) -> float:
+    """Выносливость с порогом характеристики - от неё щиты прикрытия."""
+    from game.combat import stat_model
+
+    return stat_model.ACTIVE.primary_value(actor.stats.vitality, actor.level, True, "vit")
 
 
 def _effects_word(n: int) -> str:
@@ -202,7 +211,7 @@ def cover_ally(ctx: SkillContext) -> None:
     skill = tuned(ctx, "cover_ally")
     actor = ctx.actor
     set_cooldown(actor, skill.id, skill.cd, ctx.rng)
-    shield = round(actor.max_hp * COVER_SHIELD_PER_VALUE * skill.effect_value)
+    shield = round(_vit(actor) * COVER_SHIELD_PER_VIT * skill.effect_value)
     allies = sorted(ctx.session.alive_allies_of(actor), key=_share)
     count = 2 if actor.buff_modifiers.get("cover_two", 0.0) > 0 else 1
     covered = allies[:count]
@@ -225,9 +234,10 @@ def close_ranks_shields(ctx_or_session, actor, value: float, duration: int, line
     threshold = CLOSE_RANKS_THRESHOLD + actor.buff_modifiers.get("close_ranks_threshold", 0.0)
     low = any(_share(c) < threshold for c in own)
     pct = value if low else CLOSE_RANKS_WEAK_SHIELD
+    shield = round(_vit(actor) * CLOSE_RANKS_SHIELD_PER_VIT * pct)
     for c in own:
-        c.apply_effect(EffectKind.SHIELD_POOL, round(c.max_hp * pct), duration, actor.id, tag="step:close_ranks")
-    lines.append(f"🛡 {actor.name}: ряды сомкнуты, щит {round(pct * 100)}% здоровья каждому")
+        c.apply_effect(EffectKind.SHIELD_POOL, shield, duration, actor.id, tag="step:close_ranks")
+    lines.append(f"🛡 {actor.name}: ряды сомкнуты, щит {shield} каждому")
 
 
 @defensive_skill("close_ranks")

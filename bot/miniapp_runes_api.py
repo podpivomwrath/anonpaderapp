@@ -27,6 +27,17 @@ def _error(message: str, status: int = 400) -> web.Response:
     return web.json_response({"error": message}, status=status)
 
 
+def _scaling_text(rune_def: rc.RuneDef, absorbed: int) -> str | None:
+    """«330% Силы» / «192% Воли и 128% Интеллекта» - с мастерством."""
+    if rune_def.kind != rc.ABILITY or rune_def.id not in ac.SCALING_SHARES:
+        return None
+    skill = skill_catalog.skill_def(rune_def.id)
+    power = runes.value(rune_def, absorbed) - 1.0
+    parts = [f"{round(coef * 100)}% {ac.STAT_TITLES[stat]}"
+             for stat, coef in ac.scaling(rune_def.id, skill.multiplier, power).items()]
+    return " и ".join(parts)
+
+
 def _rune(rune_def: rc.RuneDef, absorbed: int, count: int = 0) -> dict:
     nxt, nxt_pct = runes.next_threshold(rune_def.curve, absorbed)
     return {
@@ -42,6 +53,7 @@ def _rune(rune_def: rc.RuneDef, absorbed: int, count: int = 0) -> dict:
         "next": nxt, "next_pct": nxt_pct,
         # Руна-навык (2026-11-10): что делает навык и на какой он ступени.
         "summary": ac.BY_ID[rune_def.id].summary if rune_def.kind == rc.ABILITY else None,
+        "scaling_text": _scaling_text(rune_def, absorbed),
         "step": ac.step_of(rune_def.id, absorbed) if rune_def.kind == rc.ABILITY else None,
     }
 
@@ -62,7 +74,45 @@ def _ability_info(skill_id: str, absorbed: int, fork: int | None) -> dict:
     return {"summary": ability.summary, "step": step, "steps": steps}
 
 
-def _ability_slot(index: int, taken: dict, known: dict, character, socket) -> dict:
+async def _hero_stats(db, character) -> dict[str, int]:
+    """Характеристики героя с вещами - от них бьют навыки."""
+    from sqlalchemy import select
+
+    from models import CharacterStats
+    from services import item_service
+
+    stats = await db.scalar(select(CharacterStats).where(CharacterStats.character_id == character.id))
+    gear = await item_service.compute_gear_bonus(db, character.id)
+    base = {"str": stats.strength, "agi": stats.agility, "int": stats.intellect, "vit": stats.vitality,
+            "wil": stats.will} if stats is not None else dict.fromkeys(("str", "agi", "int", "vit", "wil"), 0)
+    return {k: v + int(gear.get(k, 0)) for k, v in base.items()}
+
+
+def _scaling_info(skill_id: str, absorbed: int, character, hero: dict[str, int]) -> dict:
+    """От каких характеристик бьёт навык (2026-11-11, владелец): проценты с
+    мастерством, ваши значения и прикидка урона - без брони и крита."""
+    from types import SimpleNamespace
+
+    from game.combat import formulas, stat_model
+    from services import subclass_service
+
+    shares = ac.SCALING_SHARES.get(skill_id)
+    if not shares:
+        return {"scaling": [], "damage": None}
+    rune_def = rc.BY_ID[skill_id]
+    power = runes.value(rune_def, absorbed) - 1.0
+    mods = ac.combat_modifiers(character.rune_effects or {}, subclass_service.buff_pool(character))
+    tuned = skill_catalog.tuned(SimpleNamespace(buff_modifiers=mods), skill_id)
+    level = character.level or 1
+    parts, unit = [], formulas.weapon_base(formulas.tier_multiplier(formulas.tier_for_level(level)))
+    for stat, coef in ac.scaling(skill_id, tuned.multiplier, power).items():
+        have = hero.get(stat, 0)
+        parts.append({"stat": stat, "title": ac.STAT_TITLES[stat], "pct": round(coef * 100), "have": have})
+        unit += coef / tuned.multiplier * stat_model.ACTIVE.primary_value(have, level, True, stat)
+    return {"scaling": parts, "damage": round(unit * tuned.multiplier)}
+
+
+def _ability_slot(index: int, taken: dict, known: dict, character, socket, hero: dict | None = None) -> dict:
     out = socket(rc.ABILITY, str(index))
     rune_id = taken.get((rc.ABILITY, str(index)))
     if not rune_id or rune_id not in ac.BY_ID:
@@ -72,6 +122,7 @@ def _ability_slot(index: int, taken: dict, known: dict, character, socket) -> di
     info = _ability_info(rune_id, absorbed, (character.skill_forks or {}).get(rune_id))
     skill = skill_catalog.skill_def(rune_id)
     out.update(info)
+    out.update(_scaling_info(rune_id, absorbed, character, hero or {}))
     out["skill"] = {"id": rune_id, "name": skill.name, "cd": skill.cd, "tags": sorted(runes.skill_tags(skill))}
     out["facets"] = [socket(rc.SKILL, f"{rune_id}:0"),
                      {**socket(rc.SKILL, f"{rune_id}:1", info["step"] >= 2), "need_step": 2}]
@@ -108,7 +159,8 @@ async def _payload(db, character) -> dict:
          "slots": [socket(rc.GEAR, f"{place}:{i}") for i in range(rc.GEAR_SLOTS_PER_PLACE)]}
         for place in rc.GEAR_PLACES
     ]
-    abilities = [_ability_slot(i, taken, known, character, socket) for i in range(rc.ABILITY_SLOTS)]
+    hero_stats = await _hero_stats(db, character)
+    abilities = [_ability_slot(i, taken, known, character, socket, hero_stats) for i in range(rc.ABILITY_SLOTS)]
     worn = set(taken.values())
     owned = [
         {**_rune(r, known.get(r.id, 0), bag.get(r.id, 0)), "equipped": r.id in worn}

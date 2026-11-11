@@ -1132,6 +1132,7 @@ body.lite .sparks {
 .rune-ability__main > .rune-cell { flex: 0 0 84px; width: 84px; }
 .rune-ability__info p { margin: 0; font-size: 13px; line-height: 1.35; }
 .rune-ability__info small { opacity: 0.7; }
+.rune-ability__info .rune-ability__scale { opacity: 1; color: #d8c79a; line-height: 1.35; }
 .rune-ability__info .pill-btn { align-self: flex-start; }
 .rune-ability__facets { display: flex; gap: 8px; padding-left: 4px; border-top: 1px solid var(--card-line); padding-top: 6px; }
 .rune-ability__facets .rune-socket { width: 52px; height: 52px; }

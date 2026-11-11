@@ -307,15 +307,15 @@ ABILITIES: list[AbilityDef] = [
       ("Перезарядка остальных на 2 хода короче, но без лечения.", {"breather_turns": 1.0}),
       ("Ещё и щит 10% здоровья на 2 хода.", {"skill_shield@": 0.10}),
       ("Один навык с самой долгой перезарядкой готов сразу.", {"breather_reset": 1.0})),
-    A("cover_ally", EPIC, (DURATION, HEAL), "Щит самому раненому союзнику на 2 хода; 30% урона по нему приходится на вас. Без союзника - щит себе вполсилы.",
+    A("cover_ally", EPIC, (DURATION, HEAL), "Щит самому раненому союзнику на 2 хода, его сила - от вашей Выносливости; 30% урона по нему приходится на вас. Без союзника - щит себе вполсилы.",
       ("Держится 3 хода.", {"skill_duration@": 1}),
       ("Перенесённый урон по вам на 20% слабее.", {"cover_reduce": 0.20}),
       ("Прикрывает двоих.", {"cover_two": 1.0}),
       ("Щит больше на 30%.", {"skill_value@": 0.30}),
       ("От перенесённого урона вы не погибаете: остаётся 1 здоровье.", {"cover_no_death": 1.0})),
     # --- Мифические ---------------------------------------------------------------
-    A("close_ranks", MYTHIC, (HEAL, LONG_CD), "Если у вас или союзника меньше 30% здоровья, вся ваша сторона получает щит 15% здоровья на 2 хода; иначе - 8%.",
-      ("Щит 18%.", {"skill_value@": 0.03}),
+    A("close_ranks", MYTHIC, (HEAL, LONG_CD), "Щит всей вашей стороне на 2 хода от вашей Выносливости; если у вас или союзника меньше 30% здоровья, щит почти вдвое крепче.",
+      ("Щит крепче на пятую часть.", {"skill_value@": 0.03}),
       ("Порог - 40% здоровья.", {"close_ranks_threshold": 0.10}),
       ("Щит держится 3 хода.", {"skill_duration@": 1}),
       ("Ещё и снимает с каждого по плохому эффекту.", {"skill_cleanse@": 9}),
@@ -408,3 +408,34 @@ def combat_modifiers(effects: dict[str, float], pool: str | None, pvp: bool = Fa
             # интервалы вполсилы не делим - они не «сила»
             add(ability.four.mods, 0.5 if pvp else 1.0)
     return out
+
+
+# --- Масштаб от характеристик (2026-11-11, владелец) ----------------------------
+#: Навык с уроном бьёт от СВОИХ характеристик: доля каждой. Проценты для игрока -
+#: множитель навыка x STAT_K x доля («Рассекающий удар: 330% Силы»): подобраны так,
+#: чтобы «родной» класс навыка бил как раньше. Мастерство руны растит проценты.
+#: Порог (30 + 2 за уровень, дальше на треть) - на каждую характеристику отдельно.
+SCALING_SHARES: dict[str, dict[str, float]] = {
+    "warrior_cleave": {"str": 1}, "rogue_double_stab": {"agi": 1}, "rogue_shadow_dash": {"agi": 1},
+    "shadow_blade_marked_strike": {"agi": 1}, "shadow_blade_mark_harvest": {"agi": 1},
+    "shadow_blade_execute": {"agi": 0.7, "str": 0.3}, "guardian_shield_bash": {"str": 0.6, "vit": 0.4},
+    "blood_knight_lifesteal_strike": {"str": 1}, "blood_knight_harvest": {"str": 1},
+    "blood_knight_blood_seal": {"str": 1}, "blood_knight_crimson_feast": {"str": 0.7, "vit": 0.3},
+    "dark_mystic_drain": {"wil": 0.6, "int": 0.4}, "poisoner_venom": {"agi": 1}, "elementalist_fire": {"int": 1},
+    "elementalist_lightning": {"int": 1}, "elementalist_convergence": {"int": 1}, "warrior_stagger": {"str": 1},
+    "elementalist_ice": {"int": 1}, "poisoner_disrupt": {"agi": 1}, "poisoner_decay": {"agi": 0.5, "wil": 0.5},
+    "warrior_warcry": {"str": 1}, "rogue_smoke": {"agi": 1}, "dark_mystic_blood_pact": {"wil": 0.6, "int": 0.4},
+    "bitter_wound": {"str": 0.5, "agi": 0.5}, "shatter": {"str": 1}, "mute": {"int": 0.5, "wil": 0.5},
+    "strip_veil": {"agi": 1},
+}
+#: Урон за очко характеристики: как у обычной атаки (balance_config.K_DMG), Воля и
+#: Выносливость - как Сила.
+STAT_K = {"str": 2.0, "agi": 1.5, "int": 2.0, "wil": 2.0, "vit": 2.0}
+STAT_TITLES = {"str": "Силы", "agi": "Ловкости", "int": "Интеллекта", "wil": "Воли", "vit": "Выносливости"}
+
+
+def scaling(skill_id: str, multiplier: float, power: float = 0.0) -> dict[str, float]:
+    """Сколько урона даёт очко каждой характеристики (в долях: 3.3 = 330%).
+    power - сила руны от мастерства (0.1 при 110%)."""
+    shares = SCALING_SHARES.get(skill_id) or {}
+    return {stat: multiplier * STAT_K[stat] * share * (1 + power) for stat, share in shares.items()}
