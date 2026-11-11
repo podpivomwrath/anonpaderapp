@@ -134,8 +134,14 @@ def set_cooldown(actor: CombatantState, skill_id: str, cd: int, rng: random.Rand
     actor.cooldowns[skill_id] = cd
 
 
+#: Сколько разных стихий подряд нужно «Стихийному потоку» (2026-11-11: было 3,
+#: но с тремя слотами навыков и перезарядками три подряд почти не набирались).
+FLOW_ELEMENTS = 2
+
+
 def register_element_use(actor: CombatantState, skill_id: str) -> None:
-    """«Стихийный поток» (патч 46, ч.1): 3 разные стихии подряд — следующее
+    """«Стихийный поток» (патч 46, ч.1; с 2026-11-11 - две стихии, не три):
+    2 разные стихии подряд — следующее
     действие усилено на elemental_flow_bonus. Нет-оп без этого ключа в
     buff_modifiers (актёр не слотнул бафф) или для неэлементального умения."""
     element = ELEMENT_SKILL_TAGS.get(skill_id)
@@ -149,8 +155,8 @@ def register_element_use(actor: CombatantState, skill_id: str) -> None:
     bonus = actor.buff_modifiers.get("elemental_flow_bonus", 0.0)
     if bonus <= 0:
         return
-    actor.recent_elements = (actor.recent_elements + [element])[-3:]
-    if len(actor.recent_elements) == 3 and len(set(actor.recent_elements)) == 3:
+    actor.recent_elements = (actor.recent_elements + [element])[-FLOW_ELEMENTS:]
+    if len(actor.recent_elements) == FLOW_ELEMENTS and len(set(actor.recent_elements)) == FLOW_ELEMENTS:
         actor.apply_effect(EffectKind.ELEMENTAL_FLOW, bonus, 1, actor.id)
         actor.recent_elements = []
 

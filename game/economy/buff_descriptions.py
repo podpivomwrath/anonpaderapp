@@ -475,7 +475,7 @@ def _describe_elementalist_overload(b: BuffDef) -> str:
 
 def _describe_elementalist_elemental_flow(b: BuffDef) -> str:
     return (
-        "Примените три разных стихийных навыка подряд (огонь, лёд, молния) - следующее действие нанесёт "
+        "Примените два разных стихийных навыка подряд (огонь, лёд или молния) - следующее действие нанесёт "
         f"на {_pct(bc.ELEMENTALIST_ELEMENTAL_FLOW_BONUS)} больше урона."
     )
 

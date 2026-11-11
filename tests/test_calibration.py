@@ -287,34 +287,42 @@ def test_overload_inactive_without_buff() -> None:
     assert not caster.overload_ready
 
 
-def test_elemental_flow_triggers_on_three_distinct_elements() -> None:
-    rng = NoCritRng()
+def test_elemental_flow_triggers_on_two_distinct_elements() -> None:
+    """2026-11-11, владелец: две разные стихии подряд (было три - с тремя
+    слотами навыков почти не набиралось)."""
+    from game.combat.skills import register_element_use
+
     caster = combatant(1, side=0, subclass_id="elementalist", intellect=100)
     caster.buff_modifiers["elemental_flow_bonus"] = 0.20
-    enemy = combatant(2, side=1, vitality=5000, level=1)
-    state = make_session(caster, enemy)
-
-    resolve_tick(state, {1: skill("elementalist_fire", 2)}, rng)
+    register_element_use(caster, "elementalist_fire")
     assert not caster.has_effect(EffectKind.ELEMENTAL_FLOW)
-    resolve_tick(state, {1: skill("elementalist_ice", 2)}, rng)
-    assert not caster.has_effect(EffectKind.ELEMENTAL_FLOW)
-    resolve_tick(state, {1: skill("elementalist_lightning", 2)}, rng)
+    register_element_use(caster, "elementalist_ice")
     assert caster.has_effect(EffectKind.ELEMENTAL_FLOW)
     assert caster.effect_total(EffectKind.ELEMENTAL_FLOW) == 0.20
     assert caster.recent_elements == []  # цепь потрачена
 
 
-def test_elemental_flow_repeated_element_resets_streak() -> None:
+def test_elemental_flow_same_element_twice_does_not_count() -> None:
+    from game.combat.skills import register_element_use
+
+    caster = combatant(1, side=0, subclass_id="elementalist", intellect=100)
+    caster.buff_modifiers["elemental_flow_bonus"] = 0.20
+    register_element_use(caster, "elementalist_fire")
+    register_element_use(caster, "elementalist_fire")  # повтор - не две разные
+    assert not caster.has_effect(EffectKind.ELEMENTAL_FLOW)
+    register_element_use(caster, "elementalist_lightning")
+    assert caster.has_effect(EffectKind.ELEMENTAL_FLOW)
+
+
+def test_elemental_flow_in_real_fight() -> None:
     rng = NoCritRng()
     caster = combatant(1, side=0, subclass_id="elementalist", intellect=100)
     caster.buff_modifiers["elemental_flow_bonus"] = 0.20
     enemy = combatant(2, side=1, vitality=5000, level=1)
     state = make_session(caster, enemy)
-
     resolve_tick(state, {1: skill("elementalist_fire", 2)}, rng)
-    resolve_tick(state, {1: skill("elementalist_fire", 2)}, rng)  # повтор — не считается
+    assert not caster.has_effect(EffectKind.ELEMENTAL_FLOW)
     resolve_tick(state, {1: skill("elementalist_ice", 2)}, rng)
-    resolve_tick(state, {1: skill("elementalist_lightning", 2)}, rng)
     assert caster.has_effect(EffectKind.ELEMENTAL_FLOW)
 
 
