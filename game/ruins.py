@@ -36,7 +36,8 @@ COMBAT_ROOMS = (FIGHT, ELITE, BOSS, AMBUSH)
 CHOICE_ROOMS = (SPRING, ALTAR, EVENT, CRYPT, WELL, CAVEIN, PRISONER, STOREROOM, CHAPEL, TREASURE)
 #: Вес типа комнаты на этаже (вход и босс - отдельно).
 ROOM_WEIGHTS: dict[str, int] = {
-    FIGHT: 34, ELITE: 15, AMBUSH: 6, SPRING: 6, ALTAR: 4, EVENT: 8, TRAP: 6, CRYPT: 3, WELL: 3,
+    # 2026-11-11: комнат меньше, бои плотнее - элиты чаще (было 34 и 15)
+    FIGHT: 28, ELITE: 21, AMBUSH: 6, SPRING: 6, ALTAR: 4, EVENT: 8, TRAP: 6, CRYPT: 3, WELL: 3,
     CAVEIN: 4, PRISONER: 4, STOREROOM: 3, CHAPEL: 3, TREASURE: 6,
 }
 
@@ -88,9 +89,10 @@ def distances(rooms: set[int], start: int) -> dict[int, int]:
 
 
 def generate(rng: random.Random, floor: int, used: tuple[str, ...] | list[str] = ()) -> dict:
-    """Новый этаж: 5-10 комнат, связных; босс - дальше всех от входа.
-    used - комнаты из ONCE_PER_RUN, что уже были в этом заходе."""
-    size = rng.randint(rc.ROOMS_MIN, rc.ROOMS_MAX)
+    """Новый этаж: комнаты связные (сколько - rc.rooms_range); босс -
+    дальше всех от входа. used - комнаты из ONCE_PER_RUN, что уже были в
+    этом заходе."""
+    size = rng.randint(*rc.rooms_range(floor))
     start = rng.randrange(rc.GRID * rc.GRID)
     taken = {start}
     while len(taken) < size:

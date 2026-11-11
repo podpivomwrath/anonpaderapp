@@ -522,7 +522,7 @@ async def room_won(db: AsyncSession, run: RuinRun, hp: dict[int, int], used: dic
     extra.pop("fight", None)
     run.extra = extra
     top_hp = top_hp or {}
-    rolls = rc.ROOM_LOOT.get(kind, 1) + (1 if kind == rules.ELITE and gifts_mod.has(run.gifts, "usurer_mark") else 0)
+    rolls = rc.room_loot(kind, run.floor) + (1 if kind == rules.ELITE and gifts_mod.has(run.gifts, "usurer_mark") else 0)
     dice_bonus = (1 if gifts_mod.has(run.gifts, "greedy_palm") else 0) + (2 if gifts_mod.has(run.gifts, "heavy_bag") else 0)
     first_floor = boss and run.floor % 5 == 0
     found: dict[int, dict] = {}

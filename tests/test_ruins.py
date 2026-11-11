@@ -3,6 +3,7 @@
 
 import random
 
+import pytest
 from sqlalchemy import select
 
 from game import ruins as rules
@@ -15,9 +16,11 @@ from services import pvp_service, ruins_service
 
 def test_floor_is_connected_and_boss_is_farthest() -> None:
     for seed in range(200):
-        layout = rules.generate(random.Random(seed), 1)
+        floor = 1 + seed % 12  # и разминка 1-5, и обычные этажи
+        layout = rules.generate(random.Random(seed), floor)
         rooms = rules.rooms_of(layout)
-        assert rc.ROOMS_MIN <= len(rooms) <= rc.ROOMS_MAX
+        lo, hi = rc.rooms_range(floor)
+        assert lo <= len(rooms) <= hi
         dist = rules.distances(set(rooms), layout["start"])
         assert set(dist) == set(rooms), "этаж связный"
         assert dist[layout["boss"]] == max(dist.values()), "босс - дальше всех"
@@ -42,7 +45,52 @@ def test_prisoner_once_per_run() -> None:
 def test_numbers() -> None:
     assert [rc.mob_level(f) for f in (1, 5, 6, 10, 11)] == [61, 61, 62, 62, 63]
     assert [rc.mob_count(n) for n in (1, 2, 3, 4, 5)] == [2, 3, 5, 5, 5]
-    assert [rc.rune_dice(f) for f in (1, 10, 11, 50, 51)] == [1, 1, 2, 5, 6]
+    # 2026-11-11: кубик рун - на каждые 5 этажей, этажи тяжелее
+    assert [rc.rune_dice(f) for f in (1, 5, 6, 10, 11, 20)] == [1, 1, 2, 2, 3, 4]
+    assert rc.rooms_range(3) == (3, 4) and rc.rooms_range(6) == (4, 7)
+    assert rc.floor_mult(1) == 1.0 and rc.floor_mult(21) == 2.0
+    assert rc.rot(10) == 0.2 and rc.rot(40) == rc.ROT_MAX
+    assert rc.room_loot("fight", 10) == 1 and rc.room_loot("fight", 11) == 2
+
+
+def test_deeper_floor_mobs_are_tougher() -> None:
+    """Каждый этаж крепче прошлого - и здоровьем, и уроном (2026-11-11)."""
+    base = rules.generate(random.Random(1), 6)
+
+    def first_mob(floor: int):
+        layout = {**base, "floor": floor}
+        state = CombatSessionState(session_id=1, mode=CombatMode.PVE, is_raid=True)
+        RoomStage(22_000_000, layout, rules.FIGHT, 1).setup(state)
+        return next(c for c in state.combatants.values() if c.side == 1)
+
+    low, high = first_mob(6), first_mob(10)  # одна ступень уровня (62)
+    assert high.max_hp / low.max_hp == pytest.approx(rc.floor_mult(10) / rc.floor_mult(6), rel=0.01)
+    assert high.buff_modifiers["damage_bonus"] - low.buff_modifiers["damage_bonus"] == pytest.approx(0.2)
+
+
+def test_rot_weakens_healing_and_enrage_after_ten_turns() -> None:
+    from game.combat import shared_rules
+    from game.combat.resolver import TickResult
+    from tests.conftest import combatant
+
+    layout = {**rules.generate(random.Random(1), 10), "floor": 10}
+    state = CombatSessionState(session_id=1, mode=CombatMode.PVE, is_raid=True)
+    hero = combatant(1, 0)
+    state.add(hero)
+    stage = RoomStage(22_000_000, layout, rules.FIGHT, 1)
+    lines = stage.setup(state)
+    assert any("Порча руин" in line for line in lines)
+    assert shared_rules.recovered(hero, 100) == 80  # этаж 10: -20%
+    foe = next(c for c in state.combatants.values() if c.side == 1)
+    base = foe.buff_modifiers.get("damage_bonus", 0.0)  # рост этажа
+    for _ in range(9):
+        stage.after_tick(state, TickResult(), random.Random(1))
+    assert foe.buff_modifiers["damage_bonus"] == pytest.approx(base)
+    out = stage.after_tick(state, TickResult(), random.Random(1))  # 10-й ход
+    assert foe.buff_modifiers["damage_bonus"] == pytest.approx(base + rc.ENRAGE_PER_TURN)
+    assert any("Ярость руин" in line for line in out.lines)
+    stage.after_tick(state, TickResult(), random.Random(1))
+    assert foe.buff_modifiers["damage_bonus"] == pytest.approx(base + 2 * rc.ENRAGE_PER_TURN)
 
 
 def _stage(room: str, party: int) -> CombatSessionState:
@@ -519,3 +567,20 @@ async def test_solo_room_fight_has_no_turn_timer(monkeypatch) -> None:
                 raid_combat.release_ruins_battle(bid)
                 engine.abort_session(bid)
         engine.shutdown() if hasattr(engine, "shutdown") else None
+
+
+def test_idle_player_attacks_in_group_ruins() -> None:
+    """2026-11-11: в группе руин не успевший за ход бьёт обычной атакой, а не
+    пропускает ход."""
+    from game.combat.resolver import resolve_tick
+    from tests.conftest import NoCritRng, combatant
+
+    me, foe = combatant(1, 0), combatant(2, 1, vitality=500)
+    state = CombatSessionState(session_id=1, mode=CombatMode.PVE, is_raid=True)
+    state.add(me)
+    state.add(foe)
+    state.idle_attack = True
+    before = foe.current_hp
+    result = resolve_tick(state, {}, NoCritRng())
+    assert foe.current_hp < before
+    assert not any("пропускает ход" in line for line in result.lines)

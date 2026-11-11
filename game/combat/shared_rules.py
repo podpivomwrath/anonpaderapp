@@ -192,6 +192,8 @@ def poison_end_effects(
         if victim.alive:
             continue
         for effect in list(victim.effects_of(EffectKind.DOT)):
+            if getattr(effect, "tag", None) == BURN_TAG:
+                continue  # «Эпидемия» перекидывает яд, не огонь
             source = session.combatants.get(effect.source_id)
             if source is None or source.buff_modifiers.get("plague_spread", 0.0) <= 0:
                 continue
@@ -201,7 +203,7 @@ def poison_end_effects(
             full_power = source.buff_modifiers.get("epidemic_full_power", 0.0) > 0
             value = effect.value if full_power else effect.value * 0.5
             new_target = candidates[0]
-            existing = new_target.effect_from(EffectKind.DOT, effect.source_id)
+            existing = new_target.poison_from(effect.source_id)
             if existing is not None:
                 existing.stacks = min(existing.stacks + effect.stacks, bc.POISONER_MAX_STACKS)
                 existing.value = max(existing.value, value)
@@ -234,11 +236,13 @@ def set_recovery(session: CombatSessionState, max_turns: int | None) -> None:
 
 
 def recovered(target: CombatantState, amount: int) -> int:
-    """Входящее лечение после затухания в PvP (вне PvP множитель 1) и
-    «Горькой раны» (2026-11-10: EffectKind.HEAL_REDUCTION)."""
+    """Входящее лечение после затухания в PvP (вне PvP множитель 1),
+    «Горькой раны» (2026-11-10: EffectKind.HEAL_REDUCTION) и «Порчи руин»."""
     mult = getattr(target, "recovery_mult", 1.0)
     reduction = target.heal_reduction() if hasattr(target, "heal_reduction") else 0.0
     mult *= 1.0 - reduction
+    # «Порча руин» (2026-11-11): чем глубже этаж, тем слабее лечение и щиты.
+    mult *= 1.0 - (getattr(target, "buff_modifiers", None) or {}).get("ruins_rot", 0.0)
     return amount if mult >= 1.0 else round(amount * mult)
 
 

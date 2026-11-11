@@ -475,8 +475,9 @@ def resolve_tick(
     shared_rules.begin_turn_flags(session, session.tick_number)
 
     normalized: dict[int, DeclaredAction] = {}
+    idle = ActionType.ATTACK if getattr(session, "idle_attack", False) else ActionType.SKIP
     for cid in session.expected_declarers():
-        action = actions.get(cid) or DeclaredAction(type=ActionType.SKIP)
+        action = actions.get(cid) or DeclaredAction(type=idle)
         normalized[cid] = _own_skill_or_attack(session.combatants[cid], action)
     session.turn_actions = normalized
 

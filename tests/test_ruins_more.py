@@ -1,19 +1,29 @@
+import json
+from datetime import datetime, timedelta, timezone
+
 """Руины культа, этапы 2-4 (2026-11-05): дары, особые комнаты, уникальные
 боссы, ларцы рун."""
 
 import random
 
+import pytest
 from sqlalchemy import select
 
 from game import ruins as rules
 from game import ruins_gifts as gifts_mod
 from game.combat import ruins as rcombat
 from game.combat.resolver import RenderedHit, TickResult
-from game.combat.session import ActionType, CombatMode, CombatSessionState, DeclaredAction, Stats, build_combatant
+from game.combat.session import (
+    ActionType,
+    CombatMode,
+    CombatSessionState,
+    DeclaredAction,
+    Stats,
+    build_combatant,
+)
 from game.economy import ruins_config as rc
 from models import CharacterLootbox, CharacterRune
 from services import lootbox_service, ruins_service
-
 
 # --- Дары ---------------------------------------------------------------------------
 
@@ -318,12 +328,13 @@ def test_brothers_rage_when_uneven() -> None:
     stage, state = _boss_room(25)
     bro = stage.bosses[0]
     a, b = state.combatants[bro.boss_id], state.combatants[bro.second_id]
+    base = a.buff_modifiers.get("damage_bonus", 0)  # рост этажа (2026-11-11)
     b.current_hp = b.max_hp // 3
     stage._enemy_tick(state, TickResult(), random.Random(1))
-    assert a.buff_modifiers.get("damage_bonus", 0) == rc.BROTHERS_RAGE
+    assert a.buff_modifiers.get("damage_bonus", 0) == pytest.approx(base + rc.BROTHERS_RAGE)
     b.current_hp = b.max_hp
     stage._enemy_tick(state, TickResult(), random.Random(1))
-    assert a.buff_modifiers.get("damage_bonus", 0) == 0
+    assert a.buff_modifiers.get("damage_bonus", 0) == pytest.approx(base)
 
 
 def test_abbot_punishes_everyone() -> None:
@@ -547,17 +558,19 @@ def test_start_fight_keeps_its_note() -> None:
     assert not rebinds, "note - подпись боя, её не перезаписывать"
 
 
-async def test_leader_sees_who_has_not_pressed_go(db_session, make_character) -> None:
-    """Предложение игрока (2026-11-07): лидер видит ники тех, кто не нажал «Иду»."""
+async def test_group_follows_leader_unless_someone_stops(db_session, make_character) -> None:
+    """2026-11-11, владелец: лидер выбрал проход - группа идёт за ним через
+    MOVE_CONFIRM_SECONDS сама; «Стой» - любой может остановить."""
+    from bot import ruins_texts as texts
     from bot.handlers import ruins as handler
 
     chars = await _solo(make_character, 3)
     run = await ruins_service.start(db_session, chars[0], chars, random.Random(1))
     direction = next(iter(ruins_service.exits_now(run)))
     ruins_service.propose(run, chars[0].id, direction, 3)
-    ruins_service.confirm(run, chars[1].id)
-    waiting = await handler._not_ready(db_session, run, [c.id for c in chars])
-    assert waiting == [chars[2].name]
-    text = handler._view_text(run, chars[0].id, chars[0].name, waiting=waiting)
-    assert chars[2].name in text and chars[1].name not in text
-    assert chars[2].name in handler._view_text(run, chars[1].id, chars[0].name, waiting=waiting)
+    labels = [b["action"]["label"] for row in json.loads(handler._room_keyboard(run, chars[1].id))["buttons"]
+              for b in row]
+    assert texts.BTN_STOP in labels and texts.BTN_GO in labels
+    assert texts.BTN_STOP in handler._view_text(run, chars[1].id, chars[0].name)
+    later = datetime.now(timezone.utc) + timedelta(seconds=rc.MOVE_CONFIRM_SECONDS + 1)
+    assert ruins_service.pending_due(run, later)  # никто не остановил - пошли

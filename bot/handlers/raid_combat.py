@@ -346,6 +346,12 @@ def _start_stage_session(battle_id: int, battle: RaidBattle) -> CombatSessionSta
         # Соло в руинах - без таймера хода: можно отойти, как в бою с тварью
         # (2026-11-06, владелец). В группе таймер остаётся - один не держит всех.
         state.untimed = len(battle.participants) == 1
+        # В группе ход короче и не пропадает: не успел - бьёт обычной атакой
+        # (2026-11-11, владелец: группа ждала самого медленного).
+        from game.economy import ruins_config
+
+        state.turn_seconds = ruins_config.TURN_SECONDS
+        state.idle_attack = True
         # Руины не лечат между комнатами: здоровье - с прошлого боя, зелья -
         # общий счёт этажа (решение владельца 2026-11-05).
         for cid, hp in battle.ruin_hp.items():

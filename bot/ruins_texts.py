@@ -9,6 +9,7 @@ TITLE = "Древние руины культа"
 
 BTN_ENTER = "🕳 Спуститься в руины"
 BTN_GO = "✅ Иду"
+BTN_STOP = "⛔ Стой"
 BTN_BAG = "🎒 Мешок"
 BTN_PARTY = "👥 Группа"
 BTN_DEEPER = "⬇️ Глубже"
@@ -187,7 +188,7 @@ def curse_line(gift_id: str) -> str:
 CLEARED_ROOM = "Здесь больше ничего нет."
 
 INSIDE_REMINDER = "Вы в руинах: здесь работают только кнопки руин. Куда идти, выбирает лидер."
-MOVE_TIMEOUT_NOTE = "Подтвердили не все - группа пошла и так."
+MOVE_TIMEOUT_NOTE = None
 
 BOSS_DOWN = (
     "👑 Хозяин этажа повержен. В углу зала нашёлся спуск ниже, а за спиной открылась лестница наверх."
@@ -241,16 +242,17 @@ def exits_line(exits: dict[str, int], seen: dict[int, str]) -> str:
 
 
 def pending_text(leader: str, direction: str) -> str:
-    return (f"{leader} ведёт группу {ARROWS[direction]}. Жмите «{BTN_GO}» - "
-            f"через {rc.MOVE_CONFIRM_SECONDS} с группа пойдёт и без вас.")
+    return (f"{leader} ведёт группу {ARROWS[direction]}: через {rc.MOVE_CONFIRM_SECONDS} с идём. "
+            f"Не готовы - жмите «{BTN_STOP}».")
 
 
-def not_ready_line(names: list[str]) -> str:
-    return f"Ещё не нажали «{BTN_GO}»: {', '.join(names)}."
+def stop_text(name: str) -> str:
+    return f"⛔ {name} просит подождать: группа стоит. Лидер выберет проход заново."
 
 
 def leader_wait_text(direction: str) -> str:
-    return f"Вы ведёте группу {ARROWS[direction]}. У остальных {rc.MOVE_CONFIRM_SECONDS} с, чтобы нажать «{BTN_GO}»."
+    return (f"Вы ведёте группу {ARROWS[direction]}: через {rc.MOVE_CONFIRM_SECONDS} с идём, "
+            f"если никто не нажмёт «{BTN_STOP}».")
 
 
 def _crowd(name: str, n: int) -> str:
@@ -357,16 +359,19 @@ def party_text(rows: list[tuple[str, int, int, bool, bool]]) -> str:
 
 
 def exit_bag_line(bag: dict) -> str:
-    runes = sum((bag.get("runes") or {}).values())
-    trophies = sum((bag.get("trophies") or {}).values())
+    """Что выдано из мешка - поимённо (2026-11-11, владелец: по одному числу
+    «3 руны» не понять, какие именно)."""
+    runes = {r: n for r, n in (bag.get("runes") or {}).items() if n}
+    trophies = {t: n for t, n in (bag.get("trophies") or {}).items() if n}
     if not runes and not trophies:
         return "Мешок пустой."
-    parts = []
+    lines = ["🎒 Из мешка - уже в сумке:"]
     if runes:
-        parts.append(plural.count(runes, "руна", "руны", "рун"))
+        names = ", ".join(rune_name(r) + (f" ×{n}" if n > 1 else "") for r, n in runes.items())
+        lines.append(f"🔮 {plural.count(sum(runes.values()), 'руна', 'руны', 'рун')}: {names}")
     if trophies:
-        parts.append(plural.count(trophies, "реликвия", "реликвии", "реликвий"))
-    return "Из мешка: " + ", ".join(parts) + "."
+        lines.append(f"Реликвии: {trophies_line(trophies)}")
+    return "\n".join(lines)
 
 
 def vote_text(starter: str, target: str) -> str:

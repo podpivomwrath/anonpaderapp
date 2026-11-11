@@ -64,6 +64,11 @@ class _RuinsStage:
         dmg *= 1 + rc.PARTY_DMG_PER_EXTRA * extra
         mob = build_mob(self._new_id(), name, self.level, rc.MOB_RING, hp * self._toughness(), dmg,
                         primary or self.primary, label or self.label)
+        # Этаж крепче прошлого (2026-11-11): напрямую здоровье и урон, а не
+        # характеристики - у них есть база, и прирост размывался.
+        grow = rc.floor_mult(self.floor)
+        mob.max_hp = mob.current_hp = round(mob.max_hp * grow)
+        mob.buff_modifiers["damage_bonus"] = mob.buff_modifiers.get("damage_bonus", 0.0) + grow - 1.0
         # Разница уровней - как у мобов исследования (2026-11-05, владелец).
         mob.steep_level_curve = True
         return mob
@@ -123,7 +128,30 @@ class _RuinsStage:
 
     def setup(self, session: CombatSessionState) -> list[str]:
         lines = self._setup_enemies(session)
-        return lines + self._apply_gifts(session)
+        return lines + self._apply_rot(session) + self._apply_gifts(session)
+
+    def _apply_rot(self, session: CombatSessionState) -> list[str]:
+        """«Порча руин» (2026-11-11): лечение, вампиризм и щиты игроков
+        слабее с каждым этажом (shared_rules.recovered)."""
+        rot = rc.rot(self.floor)
+        if rot <= 0:
+            return []
+        for p in _players(session):
+            p.buff_modifiers["ruins_rot"] = rot
+        return [f"🕸 Порча руин: лечение и щиты слабее на {round(rot * 100)}%"]
+
+    def _enrage(self, session: CombatSessionState, out: StageTick) -> None:
+        """Ярость руин (2026-11-11, владелец): с 10-го хода противники каждый
+        ход бьют сильнее - затянутый бой становится опасным."""
+        if self.ticks < rc.ENRAGE_FROM:
+            return
+        bonus = rc.ENRAGE_PER_TURN * (self.ticks - rc.ENRAGE_FROM + 1)
+        foes = [c for c in session.combatants.values() if c.side == 1 and c.alive]
+        if not foes:
+            return
+        for c in foes:
+            c.buff_modifiers["damage_bonus"] = c.buff_modifiers.get("damage_bonus", 0.0) + rc.ENRAGE_PER_TURN
+        out.lines.append(f"🔥 Ярость руин: враги бьют сильнее на {round(bonus * 100)}%")
 
     def _setup_enemies(self, session: CombatSessionState) -> list[str]:
         raise NotImplementedError
@@ -136,6 +164,7 @@ class _RuinsStage:
         self.ticks += 1
         out = self._enemy_tick(session, result, rng)
         self._gift_tick(session, result, out)
+        self._enrage(session, out)
         return out
 
     def _enemy_tick(self, session, result, rng) -> StageTick:
