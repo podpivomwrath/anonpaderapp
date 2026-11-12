@@ -4,6 +4,7 @@ import { IN_VK, buyShop, buyShopFaction, buyShopRename, createPayment, getPaymen
 import Skeleton from './Skeleton.jsx';
 import Sparks from './Sparks.jsx';
 import { SectionHead } from './ui.jsx';
+import { useBackClose } from '../backStack.js';
 
 /**
  * Магазин (2026-10-13): товары за самоцветы квадратными карточками. Нажатие
@@ -63,6 +64,8 @@ function untilText(iso) {
 }
 
 function BuySheet({ item, gems, onClose, onBought }) {
+  // «Назад» телефона закрывает окно (2026-11-12).
+  useBackClose(onClose);
   const [days, setDays] = useState(Math.min(7, item.max));
   const [confirming, setConfirming] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -156,6 +159,8 @@ function BuySheet({ item, gems, onClose, onBought }) {
 // Набор за фиксированную цену (2026-10-19: набор зелий) - список содержимого
 // и покупка в два нажатия.
 function BundleSheet({ item, gems, onClose, onBought }) {
+  // «Назад» телефона закрывает окно (2026-11-12).
+  useBackClose(onClose);
   const [confirming, setConfirming] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
@@ -238,6 +243,8 @@ function BundleSheet({ item, gems, onClose, onBought }) {
 // Смена фракции (2026-10-19): выбрать город и подтвердить. Бот сразу
 // переносит на площадь нового города и пишет об этом в сообщения.
 function FactionSheet({ item, gems, onClose, onBought }) {
+  // «Назад» телефона закрывает окно (2026-11-12).
+  useBackClose(onClose);
   const [region, setRegion] = useState(null);
   const [confirming, setConfirming] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -316,6 +323,8 @@ function FactionSheet({ item, gems, onClose, onBought }) {
 // самоцветы списываются в тот же момент, что и меняется имя. Не подошло
 // (занято, неверные символы) - ничего не списано, ошибка в окне.
 function RenameSheet({ item, gems, onClose, onBought }) {
+  // «Назад» телефона закрывает окно (2026-11-12).
+  useBackClose(onClose);
   const [name, setName] = useState('');
   const [confirming, setConfirming] = useState(false);
   const [busy, setBusy] = useState(false);

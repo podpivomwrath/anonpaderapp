@@ -63,6 +63,8 @@ class QuestPeek:
     target_count: int
     progress: int
     status: str | None = None
+    #: Опыт за сдачу без множителя Метки (2026-11-12: карточка в мини-аппе).
+    xp_reward: int = 0
 
 
 async def peek_progress(db: AsyncSession, character: Character) -> QuestPeek | None:
@@ -75,6 +77,7 @@ async def peek_progress(db: AsyncSession, character: Character) -> QuestPeek | N
         title=quest.title, progress_label=quest.progress_label, target_count=quest.target_count,
         progress=cq.progress if cq is not None else 0,
         status=cq.status if cq is not None else None,
+        xp_reward=quest.xp_reward,
     )
 
 

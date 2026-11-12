@@ -4,6 +4,11 @@ GET - каталог с лучшими ценами, свои товары, св
 витрина и свои вещи для неё. GET ?good=<ключ> - стакан и история цен товара.
 POST {action: sell|buy|list_item|buy_item|cancel|claim|courier, ...} - действие; в ответ
 то же, что GET, плюс done. Логика - services/market_service.py.
+
+Части (2026-11-12): GET ?part=catalog|goods|showcase|mine и POST {part} отдают
+только нужное вкладке - раньше любое открытие рынка собирало всё сразу
+(свои заявки и сделки с подписью каждой строки) и весило около 100 КБ.
+Каталог товаров мини-апп берёт один раз за запуск. Без part - всё, как раньше.
 """
 
 from aiohttp import web
@@ -127,36 +132,59 @@ async def _trades(db, character_id: int, limit: int = 20) -> list[dict]:
 TRADES_FULL = 100
 
 
-async def _state(db, character) -> dict:
-    wallet = await wallet_service.get_wallet(db, character.id)
-    summary = await market_service.summary(db)
-    showcase = []
-    for o in await market_service.showcase(db):
-        item = await db.get(Item, int(o.good.split(":", 1)[1]))
-        if item is not None:
-            showcase.append({**await _order(db, o), "item": _item(item), "mine": o.character_id == character.id})
-    trades = await _trades(db, character.id)
+#: Части ответа для вкладок рынка (см. docstring модуля).
+PARTS = ("catalog", "goods", "showcase", "mine")
+
+
+def _catalog() -> dict:
     return {
-        "gold": wallet.farm_currency,
         "categories": [{"id": c, "title": t} for c, t in mc.CATEGORIES],
-        "goods": [{**_good(g), **summary.get(g.key, {})} for g in mc.goods().values()],
-        "have": await market_service.holdings(db, character.id),
-        "orders": [await _order(db, o) for o in await market_service.my_orders(db, character.id)],
+        "goods": [_good(g) for g in mc.goods().values()],
+    }
+
+
+async def _state(db, character, part: str | None = None) -> dict:
+    if part == "catalog":
+        return _catalog()
+    wallet = await wallet_service.get_wallet(db, character.id)
+    out = {
+        "gold": wallet.farm_currency,
         "inbox": [{"good": r.good, "name": await market_service.label(db, r.good), "qty": r.qty}
                   for r in await market_service.inbox(db, character.id)],
-        "in_city": grid.city_region_at(character.pos_x, character.pos_y) is not None,
-        # Курьер (2026-10-24): есть ли он и свободен ли - для кнопки «Принести курьером».
-        "courier": bool(character.has_courier),
-        "courier_busy": await courier_service.active_of(db, character.id) is not None,
-        "showcase": showcase,
-        "my_items": [_item(i) for i in await market_service.sellable_items(db, character.id)],
-        "trades": trades,
         "rules": {
             "listing_fee_pct": round(mc.LISTING_FEE * 100, 2), "sale_fee_pct": round(mc.SALE_FEE * 100, 2),
             "min_gold": mc.MIN_ORDER_GOLD, "hours": mc.ORDER_HOURS,
             "max_orders": market_service.limit_for(character),
         },
     }
+    if part in (None, "goods"):
+        summary = await market_service.summary(db)
+        out["have"] = await market_service.holdings(db, character.id)
+        if part is None:
+            out.update(_catalog())
+            out["goods"] = [{**g, **summary.get(g["key"], {})} for g in out["goods"]]
+        else:
+            out["prices"] = summary
+    if part in (None, "showcase"):
+        showcase = []
+        for o in await market_service.showcase(db):
+            item = await db.get(Item, int(o.good.split(":", 1)[1]))
+            if item is not None:
+                showcase.append({**await _order(db, o), "item": _item(item), "mine": o.character_id == character.id})
+        out["showcase"] = showcase
+        out["my_items"] = [_item(i) for i in await market_service.sellable_items(db, character.id)]
+    if part in (None, "mine"):
+        out["orders"] = [await _order(db, o) for o in await market_service.my_orders(db, character.id)]
+        out["trades"] = await _trades(db, character.id)
+        out["in_city"] = grid.city_region_at(character.pos_x, character.pos_y) is not None
+        # Курьер (2026-10-24): есть ли он и свободен ли - для кнопки «Принести курьером».
+        out["courier"] = bool(character.has_courier)
+        out["courier_busy"] = await courier_service.active_of(db, character.id) is not None
+    return out
+
+
+def _part(value) -> str | None:
+    return value if value in PARTS else None
 
 
 async def handle_get(request: web.Request) -> web.Response:
@@ -178,7 +206,7 @@ async def handle_get(request: web.Request) -> web.Response:
                 "about": rune_about(key[5:], (await rune_service.mastery(db, character.id)).get(key[5:], 0))
                 if key.startswith("rune:") else _about(key),
             })
-        return web.json_response(await _state(db, character))
+        return web.json_response(await _state(db, character, _part(request.query.get("part"))))
 
 
 def _int(body: dict, name: str) -> int:
@@ -228,7 +256,7 @@ async def handle_post(request: web.Request) -> web.Response:
         except market_service.MarketError as exc:
             await db.rollback()
             return _error(str(exc), 409)
-        state = await _state(db, character)
+        state = await _state(db, character, _part(body.get("part")))
     market_notice.tell(notices)
     state["done"] = done
     return web.json_response(state)

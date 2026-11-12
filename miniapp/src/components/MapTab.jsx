@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Div, Spinner, Placeholder, Button, IconButton } from '@vkontakte/vkui';
 import { getMapRoute, getMapState, saveUi, sendMountFromMap, stopTravel } from '../api.js';
+import { appHidden, onAppVisibility } from '../appVisibility.js';
 import mapBase from '../assets/world-map-drawn-2048.webp';
 import { Sheet } from './ui.jsx';
 import {
@@ -205,10 +206,23 @@ export default function MapTab({ focus = null }) {
 
   useEffect(() => { load(); }, [load]);
 
-  // Живой опрос позиции/пути/босса - не каталога.
+  // Живой опрос позиции/пути/босса - не каталога. 2026-11-12: пока мини-апп
+  // свёрнут, не спрашиваем вовсе (раньше карта дёргала бота раз в 5 секунд и
+  // из фона), а когда ничего не едет - раз в 15 секунд.
+  const fastPoll = useRef(true);
   useEffect(() => {
-    const id = setInterval(load, 5000);
-    return () => clearInterval(id);
+    let timer = 0;
+    const tick = () => {
+      if (!appHidden()) load();
+      timer = setTimeout(tick, fastPoll.current ? 5000 : 15000);
+    };
+    timer = setTimeout(tick, 5000);
+    const off = onAppVisibility((hidden) => {
+      if (hidden) return;
+      clearTimeout(timer);
+      tick();
+    });
+    return () => { clearTimeout(timer); off(); };
   }, [load]);
 
   // Пока едешь верхом, значок ползёт между клетками плавно: раз в 200 мс
@@ -216,6 +230,8 @@ export default function MapTab({ focus = null }) {
   const riding = Boolean(mapState?.mount_travel && !mapState.mount_travel.paused)
     || Boolean(mapState?.turbo?.running)
     || Boolean(mapState?.hunts?.some((h) => h.travel && !h.travel.paused));
+  const moving = riding || Boolean(mapState?.foot_travel) || Boolean(mapState?.hunts?.length);
+  useEffect(() => { fastPoll.current = moving; }, [moving]);
   const [, setFrame] = useState(0);
   useEffect(() => {
     if (!riding) return undefined;

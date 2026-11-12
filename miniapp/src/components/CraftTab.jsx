@@ -8,6 +8,8 @@ import ItemIcon from './ItemIcon.jsx';
 import Skeleton from './Skeleton.jsx';
 import Sparks from './Sparks.jsx';
 import { Empty, SectionHead, Sheet } from './ui.jsx';
+import { useSavedTab } from '../savedTab.js';
+import { useBackClose } from '../backStack.js';
 
 // Патч 72: мастерская. Два подраздела - «Крафт» (сковать/перековать) и
 // «Улучшение» (инструменты и ступени процентов).
@@ -66,6 +68,8 @@ function byOreType(rows) {
 // руду - полоски сразу показывают, куда уйдут очки.
 
 function PickSheet({ title, onClose, children }) {
+  // «Назад» телефона закрывает окно (2026-11-12).
+  useBackClose(onClose);
   return (
     <>
       <div className="nav-scrim" onClick={onClose} aria-hidden="true" />
@@ -558,7 +562,7 @@ function Upgrade({ data, busy, run, strike }) {
 export default function CraftTab() {
   const [data, setData] = useState(null);
   const [status, setStatus] = useState('loading');
-  const [subtab, setSubtab] = useState('craft');
+  const [subtab, setSubtab] = useSavedTab('craft', SUBTABS.map((s) => s.id), 'craft');
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState(null);
   const [result, setResult] = useState(null);

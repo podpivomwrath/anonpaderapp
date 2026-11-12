@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { setTitle } from '../api.js';
+import { useBackClose } from '../backStack.js';
 
 /**
  * Выбор титула. Открывается нажатием на титул в шапке профиля - как выбор
@@ -16,6 +17,8 @@ const TIER_LABELS = {
 };
 
 export default function TitlePicker({ titles, onChange, onClose }) {
+  // «Назад» телефона закрывает окно (2026-11-12).
+  useBackClose(onClose);
   const [busy, setBusy] = useState(false);
   const [failed, setFailed] = useState(false);
   const current = titles.find((t) => t.active)?.id ?? null;

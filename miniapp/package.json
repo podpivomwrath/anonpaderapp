@@ -10,6 +10,8 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@fontsource/cormorant-sc": "5.3.0",
+    "@fontsource/forum": "5.3.0",
     "@vkontakte/vk-bridge": "^3.0.2",
     "@vkontakte/vkui": "^8.3.1",
     "react": "^19.2.7",

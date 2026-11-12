@@ -274,7 +274,8 @@ async def test_trials_empty_without_subclass(client, session_factory) -> None:
     resp = await client.get("/api/miniapp/trials", params=_signed_query(300))
     assert resp.status == 200
     data = await resp.json()
-    assert data == {"subclass": None, "trials": []}
+    assert data["subclass"] is None and data["trials"] == []
+    assert data["unlock_level"] == 30 and data["level"] < 30  # пустой экран говорит, когда откроется
 
 
 async def test_trials_lists_full_pool_with_progress(client, session_factory) -> None:

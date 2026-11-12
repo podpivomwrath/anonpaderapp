@@ -4,6 +4,7 @@ import Tabs from './ScrollTabs.jsx';
 import { getDailies } from '../api.js';
 import Skeleton from './Skeleton.jsx';
 import { Bar, Empty, SectionHead, hm, useCountdown } from './ui.jsx';
+import { useSavedTab } from '../savedTab.js';
 
 // Патч 23: вкладка «Задания» - три раздела (Сюжет/Ежедневные/Вход).
 // 2026-10-22: путь актов, карточки заданий с полоской, календарь входа.
@@ -39,7 +40,15 @@ function StoryTab({ story, onShowOnMap }) {
       {quest ? (
         <div className={`quest-card${quest.ready ? ' quest-card--ready' : ''}`}>
           <b className="quest-card__title">{quest.title}</b>
-          <p className="quest-card__text">{quest.text}</p>
+          {quest.text && <p className="quest-card__text">{quest.text}</p>}
+          {/* Полоска и награда (2026-11-12) - у задания наставника «убей N». */}
+          {quest.target_count > 0 && (
+            <span className="daily-card__progress">
+              <Bar value={quest.progress} max={quest.target_count} tone={quest.ready ? 'green' : 'gold'} />
+              <span className="daily-card__count">{quest.progress}/{quest.target_count}</span>
+            </span>
+          )}
+          {quest.xp_reward > 0 && <p className="quest-card__text">Награда: ✨ {quest.xp_reward} опыта</p>}
           {quest.ready && <p className="quest-card__ready">Цель достигнута - вернитесь к наставнику.</p>}
           {quest.target && !quest.ready && (
             <button type="button" className="pill-btn" onClick={() => onShowOnMap(quest.target)}>
@@ -164,7 +173,7 @@ function DailyQuestsTab({ dailies }) {
     <>
       <SectionHead
         kind="dailies" icon="🔥" value={dailies.daily_streak}
-        label="дней подряд" aside={<>⏳ {hm(left)}<br /><small>до нового дня</small></>}
+        label="дней подряд с заданиями" aside={<>⏳ {hm(left)}<br /><small>до нового дня</small></>}
       />
       <Group header={<Header>🗓️ Ежедневные задания · {done}/{dailies.quests.length}</Header>}>
         <div className="card-list">
@@ -197,7 +206,12 @@ function LoginCycleTab({ login }) {
   return (
     <>
       <SectionHead kind="login" icon="📅" value={login.login_streak} label="дней входа подряд" />
-      <Group header={<Header>Награда за вход · день {login.cycle_day}/{login.cycle_length}</Header>}>
+      {/* Серия входов не обнуляется с кругом наград: «15 дней подряд» рядом с
+          «день 1/14» путало (2026-11-12) - теперь видно, что идёт новый круг. */}
+      <Group header={<Header>
+        Награда за вход · день {login.cycle_day}/{login.cycle_length}
+        {login.login_streak > login.cycle_length ? `, круг ${Math.floor((login.login_streak - 1) / login.cycle_length) + 1}` : ''}
+      </Header>}>
         <div className="login-cal">
           {days.map((day) => (
             <button
@@ -226,7 +240,7 @@ function LoginCycleTab({ login }) {
 }
 
 export default function DailiesTab({ onShowOnMap }) {
-  const [section, setSection] = useState('story');
+  const [section, setSection] = useSavedTab('dailies', SECTIONS.map((s) => s.id), 'story');
   const [data, setData] = useState(null);
   const [status, setStatus] = useState('loading'); // loading | ready | error
 

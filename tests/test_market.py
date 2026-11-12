@@ -189,3 +189,22 @@ async def test_trade_log_goes_up_to_a_hundred(db_session, make_character) -> Non
     assert len(short) == 20 and len(full) == 30
     assert all(t["side"] == "buy" and t["at"] and t["qty"] == 1 for t in full)
     assert (await _trades(db_session, seller.id, TRADES_FULL))[0]["side"] == "sell"
+
+
+async def test_state_parts_carry_only_their_tab(db_session, make_character) -> None:
+    """2026-11-12: вкладка рынка берёт только свою часть ответа, каталог -
+    отдельно и один раз; без part ответ прежний, целиком."""
+    from bot.miniapp_market_api import _state
+
+    seller, buyer = await _pair(make_character, db_session)
+    await mining_service.add_ore(db_session, seller.id, "salt_quartz", "common", 10)
+    await ms.place_sell(db_session, seller, ORE, 5, 120)
+    full = await _state(db_session, seller)
+    assert {"goods", "categories", "orders", "trades", "showcase", "my_items", "inbox"} <= full.keys()
+    catalog = await _state(db_session, seller, "catalog")
+    assert catalog.keys() == {"categories", "goods"} and "sell" not in catalog["goods"][0]
+    goods = await _state(db_session, seller, "goods")
+    assert goods["prices"][ORE]["sell"] == 120 and "orders" not in goods and "goods" not in goods
+    mine = await _state(db_session, seller, "mine")
+    assert len(mine["orders"]) == 1 and "prices" not in mine and "showcase" not in mine
+    assert {"gold", "inbox", "rules"} <= mine.keys()

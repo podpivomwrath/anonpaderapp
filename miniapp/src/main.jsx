@@ -1,6 +1,11 @@
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import '@vkontakte/vkui/dist/vkui.css'
+// Шрифты заголовков - свои, не с Google (2026-11-12): только кириллица и латиница.
+import '@fontsource/forum/cyrillic-400.css'
+import '@fontsource/forum/latin-400.css'
+import '@fontsource/cormorant-sc/cyrillic-600.css'
+import '@fontsource/cormorant-sc/latin-600.css'
 import './index.css'
 import './guild.css'
 import './intro.css'

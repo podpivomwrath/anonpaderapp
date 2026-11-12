@@ -5,10 +5,8 @@ import { getLeaderboard } from '../api.js';
 import ClassIcon from './ClassIcon.jsx';
 import Skeleton from './Skeleton.jsx';
 import { Empty, Podium, SectionHead } from './ui.jsx';
-
-function money(value) {
-  return Number(value ?? 0).toLocaleString('ru-RU');
-}
+import { useSavedTab } from '../savedTab.js';
+import { useBackClose } from '../backStack.js';
 
 // Патч 58: раньше здесь был один топ (PvP). Теперь их четыре, и список вкладок
 // приходит С СЕРВЕРА вместе с данными — клиент не хранит собственную копию
@@ -54,7 +52,7 @@ function TopRow({ e }) {
           crown={e.crown_frame || null}
           size={40}
         />
-        {/* Имя, титул и Мощь переносятся внутри своей колонки: на
+        {/* Имя и титул переносятся внутри своей колонки: на
             телефоне в одну строку они наезжали на достижение справа. */}
         <span className="top-who">
           <span className="top-name">{e.badge ? `${e.badge} ` : e.premium && '💠 '}{e.name}</span>
@@ -62,8 +60,6 @@ function TopRow({ e }) {
           {e.title && (
             <span className={`top-title title-tier title-tier--${e.title_tier || 'common'}`}>«{e.title}»</span>
           )}
-          {/* Патч 111: Мощь - только в боевых топах (сервер шлёт её там). */}
-          {e.power != null && <span className="power-chip" title="Мощь">⚔ {money(e.power)}</span>}
         </span>
       </span>
       <span className="stat-row__value">
@@ -75,12 +71,13 @@ function TopRow({ e }) {
 }
 
 export default function TopsTab() {
-  const [board, setBoard] = useState('pvp');
+  const [board, setBoard] = useSavedTab('tops', DEFAULT_BOARDS.map((b) => b.id), 'pvp');
   const [boards, setBoards] = useState(DEFAULT_BOARDS);
   const [top, setTop] = useState([]);
   const [status, setStatus] = useState('loading'); // loading | ready | error
   const [crown, setCrown] = useState(null);
   const [helpOpen, setHelpOpen] = useState(false);
+  useBackClose(() => setHelpOpen(false), helpOpen);
   const [me, setMe] = useState(null);
   const [total, setTotal] = useState(0);
 

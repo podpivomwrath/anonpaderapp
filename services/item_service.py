@@ -525,8 +525,7 @@ async def compute_gear_bonus(db: AsyncSession, character_id: int) -> dict[str, i
 
     Гильдии: сюда же ложится прибавка гильдии (древо, молитва в часовне,
     аура тотема). Эту функцию зовут ВСЕ бои и все экраны характеристик, и
-    прибавка, добавленная где-то ещё, неизбежно доехала бы не везде. В Мощь
-    (power_service) она не попадает: та считает снаряжение сама."""
+    прибавка, добавленная где-то ещё, неизбежно доехала бы не везде."""
     equipped = await get_equipped(db, character_id)
     bonus = gear_bonus(equipped)
     character = await db.get(Character, character_id)

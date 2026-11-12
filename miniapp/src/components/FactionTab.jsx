@@ -6,6 +6,8 @@ import { itemIcon } from '../itemIcons.js';
 import ItemIcon from './ItemIcon.jsx';
 import Skeleton from './Skeleton.jsx';
 import { Bar as UiBar, SectionHead } from './ui.jsx';
+import { useSavedTab } from '../savedTab.js';
+import { useBackClose } from '../backStack.js';
 
 // Вкладка «Фракция» (2026-10-15): торговая фирма и процветание городов.
 // Цены, пути, шансы и правила считает сервер (services/trade_service.py,
@@ -85,6 +87,8 @@ function sellLadder(base, pressure, bonus, n, market) {
 }
 
 function DispatchSheet({ cart, gold, routeTitles, orders, market, busy, onSend, onClose }) {
+  // «Назад» телефона закрывает окно (2026-11-12).
+  useBackClose(onClose);
   const [dest, setDest] = useState(cart.destinations[0]?.city);
   const [route, setRoute] = useState('safe');
   const [counts, setCounts] = useState({});
@@ -606,7 +610,7 @@ export default function FactionTab({ onWallet }) {
   const [status, setStatus] = useState('loading');
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState(null);
-  const [section, setSection] = useState('trade');
+  const [section, setSection] = useSavedTab('faction', SECTIONS.map((s) => s.id), 'trade');
 
   const load = useCallback(() => {
     getTrade().then((d) => { setData(d); setStatus('ready'); }).catch(() => setStatus('error'));

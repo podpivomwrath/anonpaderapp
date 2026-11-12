@@ -29,6 +29,11 @@
 		# видели исправлений. Файлы сборки с хэшем в имени кэшируются как раньше.
 		@shell not path /assets/*
 		header @shell Cache-Control "no-cache"
+		# 2026-11-12: файлы сборки с хэшем в имени не меняются никогда - телефон
+		# хранит их год и не переспрашивает при каждом открытии (раньше каждая
+		# картинка проверялась заново, а их на экране героя под сотню).
+		@assets path /assets/*
+		header @assets Cache-Control "public, max-age=31536000, immutable"
 		root * /srv/miniapp
 		try_files {path} /index.html
 		file_server

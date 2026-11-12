@@ -5,6 +5,8 @@
  * строку в каждый вызов как есть, ничего не добавляя и не подделывая.
  */
 
+import { onAppVisibility } from './appVisibility.js';
+
 const API_BASE = import.meta.env.VITE_API_BASE_URL || '';
 const SEARCH = new URLSearchParams(window.location.search);
 // Внутри VK в адресе подписанные launch-параметры. Без них это сайт
@@ -68,20 +70,99 @@ function buildUrl(path) {
   return `${API_BASE}/api/miniapp${path}${separator}${launchQuery}`;
 }
 
+// Кэш ответов разделов (2026-11-12). Раньше каждый заход в раздел заново
+// спрашивал сервер: «Персонаж» -> «Инвентарь» -> «Персонаж» дважды тянул
+// инвентарь, снаряжение и руны. Теперь ответ живёт 20 секунд и сбрасывается
+// целиком на любое действие (POST), на кнопку «обновить» и когда игрок
+// возвращается в мини-апп из чата - там могло поменяться что угодно.
+// Опросы (карта, заказы) и админка в кэш не попадают.
+const CACHE_TTL_MS = 20000;
+const CACHED = /^\/(inventory|gear|runes|trophies|presets|trials|dailies|craft|board|leaderboard|shop|payments|guild|guild\/tree|trade|exchange|market)(\?|$)/;
+const cache = new Map(); // path -> {at, data}
+const inflight = new Map(); // path -> Promise: одинаковые запросы одновременно - один поход
+
+export function clearCache() {
+  cache.clear();
+}
+
+onAppVisibility((hidden) => {
+  if (!hidden) cache.clear();
+});
+
+// Связь (2026-11-12): без ограничения по времени запрос на плохой сети
+// висел бесконечно, и раздел крутил загрузку. Теперь чтение ждёт 15 секунд
+// и один раз повторяется, действие ждёт 25 секунд и не повторяется (оно
+// могло дойти). Пропала связь - Hub показывает плашку, вернулась - убирает.
+const READ_TIMEOUT_MS = 15000;
+const WRITE_TIMEOUT_MS = 25000;
+let offline = false;
+
+function setOffline(value) {
+  if (offline === value) return;
+  offline = value;
+  window.dispatchEvent(new CustomEvent(value ? 'net-down' : 'net-up'));
+}
+
+async function fetchOnce(url, init, timeoutMs) {
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), timeoutMs);
+  try {
+    return await fetch(url, { ...init, signal: ctrl.signal });
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 async function request(path, options) {
+  const isRead = !options?.method || options.method === 'GET';
+  if (!isRead) {
+    cache.clear();
+    return send(path, options, false);
+  }
+  const hit = CACHED.test(path) ? cache.get(path) : null;
+  if (hit && Date.now() - hit.at < CACHE_TTL_MS) return hit.data;
+  if (inflight.has(path)) return inflight.get(path);
+  const promise = send(path, options, true)
+    .then((data) => {
+      if (CACHED.test(path)) cache.set(path, { at: Date.now(), data });
+      return data;
+    })
+    .finally(() => inflight.delete(path));
+  inflight.set(path, promise);
+  return promise;
+}
+
+async function send(path, options, isRead) {
   const url = buildUrl(path);
   // ngrok-skip-browser-warning: без него бесплатный ngrok-туннель (альфа-тест,
   // см. README) отдаёт HTML-заглушку вместо JSON на первый запрос из вебвью.
   // Безвредно для любого другого хостинга - заголовок просто игнорируется.
   const token = IN_VK ? null : webToken();
-  const res = await fetch(url, {
+  const init = {
     ...options,
     headers: {
       'ngrok-skip-browser-warning': 'true',
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
       ...(options?.headers || {}),
     },
-  });
+  };
+  let res;
+  try {
+    res = await fetchOnce(url, init, isRead ? READ_TIMEOUT_MS : WRITE_TIMEOUT_MS);
+  } catch (err) {
+    if (!isRead) {
+      setOffline(true);
+      throw new Error('network');
+    }
+    await new Promise((r) => setTimeout(r, 800));
+    try {
+      res = await fetchOnce(url, init, READ_TIMEOUT_MS);
+    } catch {
+      setOffline(true);
+      throw new Error('network', { cause: err });
+    }
+  }
+  setOffline(false);
   const data = await res.json().catch(() => ({ error: 'bad_response' }));
   if (!res.ok) {
     const error = new Error(data.error || `http_${res.status}`);
@@ -577,8 +658,22 @@ export function setAlmanacHerbs(herbIds) {
 }
 
 // Рынок (2026-10-23): заявки на товары, витрина, ящик купленного.
-export function getMarket() {
-  return request('/market');
+// part: goods | showcase | mine - только то, что нужно вкладке (2026-11-12).
+export function getMarket(part) {
+  return request(part ? `/market?part=${part}` : '/market');
+}
+
+// Каталог товаров (названия, значки, разделы) не меняется до выкатки -
+// берём один раз за запуск мини-аппа.
+let marketCatalog = null;
+export function getMarketCatalog() {
+  if (!marketCatalog) {
+    marketCatalog = request('/market?part=catalog').catch((err) => {
+      marketCatalog = null;
+      throw err;
+    });
+  }
+  return marketCatalog;
 }
 
 // Последние 100 моих сделок (репорт 356).

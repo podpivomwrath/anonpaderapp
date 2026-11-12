@@ -7,6 +7,7 @@ import SeasonScene from './SeasonScene.jsx';
 import ContractsSection from './ContractsSection.jsx';
 import Skeleton from './Skeleton.jsx';
 import { Bar, Empty, Podium, SectionHead } from './ui.jsx';
+import { useSavedTab } from '../savedTab.js';
 
 /**
  * «Доска» (2026-10-15): всё PvP в одном месте - розыск (Кровавое клеймо и
@@ -199,7 +200,7 @@ function Season({ data }) {
 }
 
 export default function BoardTab() {
-  const [section, setSection] = useState('wanted');
+  const [section, setSection] = useSavedTab('board', SECTIONS.map((s) => s.id), 'wanted');
   const [data, setData] = useState(null);
   const [status, setStatus] = useState('loading');
   // Итог прошлого сезона - катсцена один раз (2026-10-30).

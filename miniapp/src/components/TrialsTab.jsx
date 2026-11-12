@@ -62,7 +62,11 @@ export default function TrialsTab() {
   if (!data.subclass) {
     return (
       <Group>
-        <Empty icon="📖">Ваша Метка ещё не обрела форму. Возвращайтесь, когда кровь потребует имени.</Empty>
+        <Empty icon="📖">
+          {data.level == null || data.level < (data.unlock_level || 30)
+            ? `Испытания откроются с ${data.unlock_level || 30} уровня, когда вы выберете путь: подкласс или путь без подкласса.`
+            : 'Испытания откроются, когда вы выберете путь: подкласс или путь без подкласса.'}
+        </Empty>
       </Group>
     );
   }

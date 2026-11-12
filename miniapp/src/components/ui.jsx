@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useBackClose } from '../backStack.js';
 
 /**
  * Общие куски разделов (2026-10-22, разделы до уровня «Героя»): шапка
@@ -88,6 +89,8 @@ export function Bar({ value, max, tone = 'gold', thin = false }) {
 
 /** Шторка снизу - одна на все разделы, как окно слота в «Герое». */
 export function Sheet({ title, icon, onClose, className = '', children }) {
+  // «Назад» телефона закрывает окно (2026-11-12).
+  useBackClose(onClose);
   useEffect(() => {
     const onKey = (e) => { if (e.key === 'Escape') onClose(); };
     window.addEventListener('keydown', onKey);

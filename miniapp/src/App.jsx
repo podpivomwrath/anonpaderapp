@@ -1,13 +1,15 @@
-import { useEffect, useState } from 'react';
+import { Suspense, lazy, useEffect, useState } from 'react';
 import bridge from '@vkontakte/vk-bridge';
 import { AppRoot, ConfigProvider, SplitLayout, SplitCol, TabsItem } from '@vkontakte/vkui';
 import Tabs from './components/ScrollTabs.jsx';
 import BackgroundScene from './components/BackgroundScene.jsx';
-import ChestRoulette from './components/ChestRoulette.jsx';
 import Hub from './components/Hub.jsx';
-import IntroScene from './components/IntroScene.jsx';
 import TabHint from './components/TabHint.jsx';
-import Tour from './components/Tour.jsx';
+
+// Только для разработки (#tour, #chest, #intro) - в основной файл не попадают.
+const ChestRoulette = lazy(() => import('./components/ChestRoulette.jsx'));
+const IntroScene = lazy(() => import('./components/IntroScene.jsx'));
+const Tour = lazy(() => import('./components/Tour.jsx'));
 import { ChronicleSection } from './components/DailiesTab.jsx';
 import WebLogin, { completeWebLogin } from './components/WebLogin.jsx';
 import { IN_VK, webToken } from './api.js';
@@ -99,9 +101,11 @@ function App() {
             ))}
           </Tabs>
           </div></div>
+          <Suspense fallback={null}>
           {hints
             ? <TabHint tab="dailies" onClose={() => { window.location.hash = 'hints-done'; }} />
             : <Tour onDone={() => { window.location.hash = 'tour-done'; }} />}
+          </Suspense>
         </AppRoot>
       </ConfigProvider>
     );
@@ -119,12 +123,14 @@ function App() {
     return (
       <ConfigProvider colorScheme={COLOR_SCHEME}>
         <AppRoot>
+          <Suspense fallback={null}>
           <ChestRoulette
             strip={strip}
             winIndex={38}
             result={{ grade, grade_name: names[grade], lines: ['🟣 Кровяной осколок ×3', '💰 420 золота'] }}
             onClose={() => { window.location.hash = 'chest-closed'; }}
           />
+          </Suspense>
         </AppRoot>
       </ConfigProvider>
     );
@@ -134,7 +140,9 @@ function App() {
     return (
       <ConfigProvider colorScheme={COLOR_SCHEME}>
         <AppRoot>
-          <IntroScene onDone={(sound) => { window.location.hash = `done-${sound}`; }} />
+          <Suspense fallback={null}>
+            <IntroScene onDone={(sound) => { window.location.hash = `done-${sound}`; }} />
+          </Suspense>
         </AppRoot>
       </ConfigProvider>
     );

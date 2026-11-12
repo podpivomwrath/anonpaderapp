@@ -165,7 +165,7 @@ async def handle_get(request: web.Request) -> web.Response:
 async def _contracts_state(db, character, now: datetime) -> dict:
     from game.economy import contract_config as cc
     from models import Wallet
-    from services import contract_service, power_service
+    from services import contract_service
 
     contracts = await contract_service.active_contracts(db, now)
     mine_taken = await contract_service.taken_ids(db, character.id)
@@ -183,7 +183,6 @@ async def _contracts_state(db, character, now: datetime) -> dict:
             "id": c.id, "target_id": target.id, "name": target.name, "level": target.level,
             "base_class": target.base_class, "subclass": target.subclass,
             "crown_frame": frames.get(target.id),
-            "power": (await power_service.power_of(db, target)).total,
             "kills_left": c.kills_left, "kills_total": c.kills_total, "price": c.price,
             "buyout": contract_service.buyout_cost(c) if target.id == character.id else None,
             "minutes_left": max(int((expires - now).total_seconds() // 60), 0),

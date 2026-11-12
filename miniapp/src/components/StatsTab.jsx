@@ -154,7 +154,7 @@ const DERIVED_DEFS = [
 ];
 
 const DODGE_HINT = 'От Воли: 100 очков - 13%, 250 - 22%, выше 45% не бывает. Это шанс целиком избежать '
-  + 'обычной атаки; от навыков вы уклоняетесь вчетверо реже (число в скобках). Клинок теней и Отравитель '
+  + 'обычной атаки; от навыков вы уклоняетесь вчетверо реже (второе число). Клинок теней и Отравитель '
   + 'получают ещё +5% от подкласса. Эликсиры и баффы добавляют сверху, общий потолок 80%.';
 
 function DerivedRow({ label, value, changed, hint, open, onToggle }) {
@@ -172,8 +172,10 @@ function DerivedRow({ label, value, changed, hint, open, onToggle }) {
 
 // Патч 34, ч.1: уворот - составная строка (от атак + от способностей вместе),
 // генерическому DERIVED_DEFS не подходит (там один ключ = одно значение).
+// 2026-11-12: короче - «2.5% (от способностей: 0.6%)» не влезало в строку
+// и переносилось кашей.
 function formatDodge(dodge, abilityDodge) {
-  return `${(dodge * 100 + EPS).toFixed(1)}% (от способностей: ${(abilityDodge * 100 + EPS).toFixed(1)}%)`;
+  return `${(dodge * 100 + EPS).toFixed(1)}% · навыки ${(abilityDodge * 100 + EPS).toFixed(1)}%`;
 }
 
 const EMPTY_PENDING = { str: 0, agi: 0, int: 0, vit: 0, wil: 0 };
@@ -273,6 +275,10 @@ export default function StatsTab({ character, onCharacterUpdate }) {
     }
   }
 
+  // Очков нет (2026-11-12): кнопок «− / +» и «Сбросить / Подтвердить» не
+  // показываем - выключенные, они висели на экране без дела.
+  const canSpend = character.unspent_points > 0;
+
   return (
     <>
       <Group header={<Header>Свободных очков: {remaining}</Header>}>
@@ -284,6 +290,7 @@ export default function StatsTab({ character, onCharacterUpdate }) {
             </span>
             <span className="stat-row__label">{stat.label}</span>
             <div className="stat-row__controls">
+              {canSpend && (
               <Button
                 mode="secondary"
                 size="s"
@@ -292,6 +299,7 @@ export default function StatsTab({ character, onCharacterUpdate }) {
               >
                 −
               </Button>
+              )}
               {editing === stat.key ? (
                 <input
                   className="stat-row__input" type="number" inputMode="numeric" min="0"
@@ -317,9 +325,11 @@ export default function StatsTab({ character, onCharacterUpdate }) {
                   ) : null}
                 </span>
               )}
+              {canSpend && (
               <Button mode="secondary" size="s" disabled={remaining <= 0} onClick={() => increment(stat.key)}>
                 +
               </Button>
+              )}
             </div>
           </div>
         ))}
@@ -362,7 +372,7 @@ export default function StatsTab({ character, onCharacterUpdate }) {
         </Div>
       )}
 
-      {confirming ? (
+      {!canSpend ? null : confirming ? (
         <div className="confirm-warning">
           <Text>Вложенные очки нельзя будет перераспределить бесплатно. Продолжить?</Text>
           <div className="confirm-warning__actions">

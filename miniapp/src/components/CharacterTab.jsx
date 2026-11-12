@@ -1,4 +1,3 @@
-import { useState } from 'react';
 import { TabsItem } from '@vkontakte/vkui';
 import Tabs from './ScrollTabs.jsx';
 import StatsTab from './StatsTab.jsx';
@@ -6,6 +5,7 @@ import PresetsTab from './PresetsTab.jsx';
 import TrialsTab from './TrialsTab.jsx';
 import CraftsTab from './CraftsTab.jsx';
 import HeroTab from './HeroTab.jsx';
+import { useSavedTab } from '../savedTab.js';
 
 // Патч 14, ч.1: Характеристики + Пресеты + Испытания объединены в одну
 // вкладку «Персонаж», переключаемые под-табами. Патч 22: + топ PvP.
@@ -25,7 +25,7 @@ const SECTIONS = [
 ];
 
 export default function CharacterTab({ character, onCharacterUpdate }) {
-  const [section, setSection] = useState('hero');
+  const [section, setSection] = useSavedTab('character', SECTIONS.map((s) => s.id), 'hero');
 
   return (
     <>

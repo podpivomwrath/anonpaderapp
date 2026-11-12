@@ -4,14 +4,12 @@ import {
 import bridge from '@vkontakte/vk-bridge';
 import XpEmblem from './XpEmblem.jsx';
 import AshLayer from './AshLayer.jsx';
-import IntroScene from './IntroScene.jsx';
 import NewPlayer from './NewPlayer.jsx';
 import TabHint from './TabHint.jsx';
 import { TAB_HINTS } from './tabHints.js';
-import Tour from './Tour.jsx';
 import { GenderGate } from './HeroTab.jsx';
-import Spotlight from './Spotlight.jsx';
 import { guideSteps } from './guide.js';
+import { pushBack, setDragScreen, useBackClose } from '../backStack.js';
 import { playTab, preloadTab, setSoundEnabled, unlock } from '../sound.js';
 import CountUp from './CountUp.jsx';
 import CrownPicker from './CrownPicker.jsx';
@@ -19,7 +17,7 @@ import TitlePicker from './TitlePicker.jsx';
 import {
   Panel, PanelHeader, PanelHeaderButton, Placeholder, Spinner, Div, Button,
 } from '@vkontakte/vkui';
-import { acceptTerms, getCharacter, saveUi } from '../api.js';
+import { acceptTerms, clearCache, getCharacter, saveUi } from '../api.js';
 import NavIcon from './NavIcon.jsx';
 import CharacterTab from './CharacterTab.jsx';
 import DailiesTab from './DailiesTab.jsx';
@@ -40,6 +38,13 @@ const TopsTab = lazy(() => import('./TopsTab.jsx'));
 const BoardTab = lazy(() => import('./BoardTab.jsx'));
 // Путеводитель (2026-10-23): свой раздел, не в меню - открывается книгой в шапке.
 const HandbookTab = lazy(() => import('./HandbookTab.jsx'));
+// Настройки (2026-11-12): тоже не в меню - шестерёнкой в шапке.
+const SettingsTab = lazy(() => import('./SettingsTab.jsx'));
+// Вступление, тур и полный гайд нужны раз в жизни - отдельными файлами
+// (2026-11-12), основной файл мини-аппа от них легче.
+const IntroScene = lazy(() => import('./IntroScene.jsx'));
+const Tour = lazy(() => import('./Tour.jsx'));
+const Spotlight = lazy(() => import('./Spotlight.jsx'));
 
 // Патч 14, ч.1: было 5 вкладок (Характеристики/Инвентарь/Пресеты/Испытания/
 // Биржа) - Характеристики+Пресеты+Испытания объединены в «Персонаж».
@@ -51,20 +56,26 @@ const HandbookTab = lazy(() => import('./HandbookTab.jsx'));
 // стало больше, чем помещается в ряд на телефоне: седьмая вкладка сжимала
 // подписи до нечитаемых. В вертикальном списке места столько, сколько нужно,
 // и новый раздел не требует переверстки остальных.
+//
+// 2026-11-12 (владелец): под каждым пунктом - что внутри. «Ремесла» у
+// персонажа путали с «Мастерской», а «Фракция» открывалась торговлей.
 const SECTIONS = [
-  { id: 'character', label: 'Персонаж' },
-  { id: 'dailies', label: 'Задания' },
-  { id: 'inventory', label: 'Инвентарь' },
-  { id: 'craft', label: 'Мастерская' },
-  { id: 'map', label: 'Карта' },
-  { id: 'guild', label: 'Гильдия' },
-  { id: 'tops', label: 'Топы' },
-  { id: 'board', label: 'Доска' },
-  { id: 'trade', label: 'Фракция' },
+  { id: 'character', label: 'Персонаж', hint: 'снаряжение, руны, характеристики, уровни ремёсел' },
+  { id: 'dailies', label: 'Задания', hint: 'сюжет, ежедневные, награда за вход' },
+  { id: 'inventory', label: 'Инвентарь', hint: 'вещи, зелья, ларцы' },
+  { id: 'craft', label: 'Мастерская', hint: 'ковка и улучшение вещей' },
+  { id: 'map', label: 'Карта', hint: 'мир, маунты, разломы' },
+  { id: 'guild', label: 'Гильдия', hint: 'состав, казна, земли' },
+  { id: 'tops', label: 'Топы', hint: 'рейтинги игроков' },
+  { id: 'board', label: 'Доска', hint: 'клеймёные убийцы, заказы, сезон PvP' },
+  { id: 'trade', label: 'Фракция', hint: 'торговые повозки и фракции городов' },
   // Рынок (2026-10-23): заявки, витрина и биржа - вкладками внутри.
-  { id: 'market', label: 'Рынок' },
-  { id: 'shop', label: 'Магазин' },
+  { id: 'market', label: 'Рынок', hint: 'заявки, витрина, биржа' },
+  { id: 'shop', label: 'Магазин', hint: 'самоцветы, Метка и Клеймо' },
 ];
+
+// Разделы не из меню: открываются значками в шапке.
+const EXTRA_TABS = ['handbook', 'settings'];
 
 // Раздел, на котором вышли (2026-11-12, жалоба игрока): VK то держит мини-апп
 // в памяти, то открывает заново - и после выхода с карты попадали то на карту,
@@ -75,13 +86,11 @@ const TAB_KEY = 'pines:tab';
 function savedTab() {
   try {
     const id = window.localStorage.getItem(TAB_KEY);
-    return SECTIONS.some((s) => s.id === id) || id === 'handbook' ? id : 'character';
+    return SECTIONS.some((s) => s.id === id) || EXTRA_TABS.includes(id) ? id : 'character';
   } catch {
     return 'character';
   }
 }
-
-const PLAYERS_CHAT_URL ='https://vk.me/join/xuy8wXu8_zoubce24lDXooe6aB_sV1eB3zE=';
 
 const GUILD_MIN_LEVEL = 20;
 
@@ -92,15 +101,6 @@ const INTRO_VERSION = 1;
 /** Лёгкий отклик телефона на смену раздела. Вне ВК - молча ничего. */
 function haptic() {
   bridge.send('VKWebAppTapticImpactOccurred', { style: 'light' }).catch(() => {});
-}
-
-/** Из чего сложилась Мощь - подсказка к числу в шапке. */
-function powerHint(parts) {
-  if (!parts) return 'Мощь';
-  const bonuses = [];
-  if (parts.subclass_pct) bonuses.push(`подкласс +${parts.subclass_pct}%`);
-  if (parts.buffs) bonuses.push(`ступени навыков ${parts.buffs} × ${parts.buff_pct}%`);
-  return `Характеристики ${parts.stats} + вещи ${parts.gear}` + (bonuses.length ? `, ${bonuses.join(', ')}` : '');
 }
 
 /** Числа с разрядами: без них четырёхзначное золото читается как каша. */
@@ -144,6 +144,7 @@ export default function Hub() {
       setMenuClosing(false);
     }, 180);
   }, []);
+  useBackClose(closeMenu, menuOpen && !menuClosing);
   const toggleMenu = () => {
     if (menuOpen && !menuClosing) closeMenu();
     else {
@@ -177,12 +178,31 @@ export default function Hub() {
     if (prev !== id) {
       playTab();
       haptic();
-      const order = [...SECTIONS.map((s) => s.id), 'admin', 'handbook'];
+      const order = [...SECTIONS.map((s) => s.id), 'admin', ...EXTRA_TABS];
       setDirection(order.indexOf(id) < order.indexOf(prev) ? 'back' : 'fwd');
+      // «Назад» телефона возвращает в прошлый раздел (2026-11-12).
+      pushBack(() => {
+        setDirection('back');
+        activeRef.current = prev;
+        setActiveTab(prev);
+      });
     }
     setActiveTab(id);
     closeMenu();
   }, [closeMenu]);
+
+  // Плашка «нет связи» (2026-11-12): запросы теперь ждут не дольше 15 секунд.
+  const [offline, setOffline] = useState(false);
+  useEffect(() => {
+    const down = () => setOffline(true);
+    const up = () => setOffline(false);
+    window.addEventListener('net-down', down);
+    window.addEventListener('net-up', up);
+    return () => {
+      window.removeEventListener('net-down', down);
+      window.removeEventListener('net-up', up);
+    };
+  }, []);
 
   useEffect(() => {
     const onBan = (event) => setBan(event.detail);
@@ -215,6 +235,9 @@ export default function Hub() {
   // Фон живёт вне хаба (BackgroundScene) и должен знать, какой экран открыт.
   useEffect(() => {
     document.body.dataset.view = activeTab;
+    // На карте и в гильдии (древо) палец таскает картинку - свайп «назад»
+    // айфона там не включаем.
+    setDragScreen(activeTab === 'map' || activeTab === 'guild');
     try {
       window.localStorage.setItem(TAB_KEY, activeTab);
     } catch {
@@ -266,6 +289,7 @@ export default function Hub() {
   // вкладку - и она перечитает своё.
   const refresh = useCallback(async () => {
     setRefreshing(true);
+    clearCache();
     try {
       await load({ silent: true });
       setReloadKey((key) => key + 1);
@@ -312,22 +336,30 @@ export default function Hub() {
     persistUi({ hint: tab });
   };
 
-  // Гильдии - с 20 уровня; кто уже в гильдии, видит вкладку всегда.
+  // Гильдии - с 20 уровня; кто уже в гильдии, видит вкладку всегда. До 20
+  // (2026-11-12) пункт в меню есть, но закрыт - с подписью, с какого уровня.
   const guildOpen = character && (character.level >= GUILD_MIN_LEVEL || character.in_guild);
-  const visible = guildOpen ? SECTIONS : SECTIONS.filter((s) => s.id !== 'guild');
   const sections = character?.is_admin
-    ? [...visible, { id: 'admin', label: 'Админ' }]
-    : visible;
+    ? [...SECTIONS, { id: 'admin', label: 'Админ' }]
+    : SECTIONS;
+  const locked = (id) => (id === 'guild' && !guildOpen ? `с ${GUILD_MIN_LEVEL} уровня` : null);
+  // Отметки в меню (2026-11-12): очки характеристик и несделанные задания.
+  const badges = {
+    character: character?.unspent_points > 0 ? `+${character.unspent_points}` : null,
+    dailies: character?.dailies_left > 0 ? String(character.dailies_left) : null,
+  };
   const current = activeTab === 'handbook'
     ? { id: 'handbook', label: 'Путеводитель' }
-    : sections.find((s) => s.id === activeTab) || sections[0];
+    : activeTab === 'settings'
+      ? { id: 'settings', label: 'Настройки' }
+      : sections.find((s) => s.id === activeTab) || sections[0];
 
   // Гайд переключает разделы молча (без звука и вибрации) и заодно
   // засчитывает короткие подсказки этих разделов - он их уже объяснил.
   const guideNavigate = (tab) => {
     const prev = activeRef.current;
     if (prev === tab) return;
-    const order = [...SECTIONS.map((s) => s.id), 'admin'];
+    const order = [...SECTIONS.map((s) => s.id), 'admin', ...EXTRA_TABS];
     setDirection(order.indexOf(tab) < order.indexOf(prev) ? 'back' : 'fwd');
     activeRef.current = tab;
     setActiveTab(tab);
@@ -389,13 +421,6 @@ export default function Hub() {
         <PanelHeaderButton aria-label="Обновить" disabled={refreshing} onClick={refresh}>
           {refreshing ? <Spinner size="s" /> : <NavIcon id="refresh" className="hub-icon" />}
         </PanelHeaderButton>
-        <PanelHeaderButton
-          aria-label={soundOn ? 'Выключить звук' : 'Включить звук'}
-          title={soundOn ? 'Звук включён' : 'Звук выключен'}
-          onClick={toggleSound}
-        >
-          <NavIcon id={soundOn ? 'soundOn' : 'soundOff'} className="hub-icon" />
-        </PanelHeaderButton>
         {/* На узком экране правый угол шапки закрыт кнопками ВК - «?» здесь. */}
         <span className="help-btn help-btn--inline" data-tour="help">
           <PanelHeaderButton aria-label="Гайд по мини-аппу" title="Гайд по мини-аппу" onClick={() => startHelp()}>
@@ -410,13 +435,11 @@ export default function Hub() {
           <NavIcon id="guide" className="hub-icon" />
         </PanelHeaderButton>
         <PanelHeaderButton
-          aria-label="Чат игроков"
-          title="Чат игроков"
-          href={PLAYERS_CHAT_URL}
-          target="_blank"
-          rel="noopener noreferrer"
+          aria-label="Настройки"
+          title="Настройки: звук, сообщения бота, чат игроков"
+          onClick={() => openTab('settings')}
         >
-          <NavIcon id="chat" className="hub-icon" />
+          <NavIcon id="settings" className="hub-icon" />
         </PanelHeaderButton>
         </span>
       </span>
@@ -434,7 +457,7 @@ export default function Hub() {
   }, [load]);
 
   useEffect(() => {
-    if (!SECTIONS.some((s) => s.id === activeTab) && activeTab !== 'handbook'
+    if (!SECTIONS.some((s) => s.id === activeTab) && !EXTRA_TABS.includes(activeTab)
       && !(activeTab === 'admin' && character?.is_admin)) {
       setActiveTab('character');
     }
@@ -530,20 +553,31 @@ export default function Hub() {
         <div className={menuClosing ? 'nav-layer nav-layer--closing' : 'nav-layer'}>
           <div className="nav-scrim" onClick={closeMenu} aria-hidden="true" />
           <nav className="nav-drawer" aria-label="Разделы">
-            {sections.map((section, index) => (
-              <button
-                type="button"
-                key={section.id}
-                style={{ '--i': index }}
-                className={
-                  section.id === activeTab ? 'nav-drawer__item nav-drawer__item--active' : 'nav-drawer__item'
-                }
-                onClick={() => openTab(section.id)}
-              >
-                <NavIcon id={section.id} />
-                <span className="nav-drawer__label">{section.label}</span>
-              </button>
-            ))}
+            {sections.map((section, index) => {
+              const lock = locked(section.id);
+              const badge = badges[section.id];
+              return (
+                <button
+                  type="button"
+                  key={section.id}
+                  style={{ '--i': index }}
+                  disabled={Boolean(lock)}
+                  className={[
+                    'nav-drawer__item',
+                    section.id === activeTab && 'nav-drawer__item--active',
+                    lock && 'nav-drawer__item--locked',
+                  ].filter(Boolean).join(' ')}
+                  onClick={() => openTab(section.id)}
+                >
+                  <NavIcon id={section.id} />
+                  <span className="nav-drawer__label">
+                    {section.label}
+                    {(lock || section.hint) && <small className="nav-drawer__hint">{lock ? `🔒 ${lock}` : section.hint}</small>}
+                  </span>
+                  {badge && !lock && <span className="nav-drawer__badge">{badge}</span>}
+                </button>
+              );
+            })}
           </nav>
         </div>
       )}
@@ -567,8 +601,19 @@ export default function Hub() {
 
       {/* Карта - на всю площадь страницы: карточка персонажа там только
           отнимала бы место у мира. */}
+      {offline && (
+        <p className="net-banner" role="status">Нет связи с сервером. Проверьте интернет - мини-апп повторит запрос сам.</p>
+      )}
+
+      {/* 2026-11-12 (владелец): полная шапка - только на «Персонаже», на
+          остальных разделах узкая строка (имя, золото, самоцветы): она
+          занимала пятую часть экрана в каждом разделе. */}
       {activeTab !== 'map' && (
-      <div className={levelUp ? 'hub-banner hub-banner--levelup' : 'hub-banner'} data-tour="banner">
+      <div
+        className={['hub-banner', levelUp && 'hub-banner--levelup', activeTab !== 'character' && 'hub-banner--slim']
+          .filter(Boolean).join(' ')}
+        data-tour="banner"
+      >
         {/* Пепел за шапкой (2026-10-22). На слабом устройстве - нет. */}
         {!document.body.classList.contains('lite') && (
           <AshLayer className="hub-banner__ash" density={4} ember={0.3} />
@@ -595,6 +640,7 @@ export default function Hub() {
         <p className="hub-banner__name">
           {character.badge && <span className="hub-banner__badge">{character.badge} </span>}
           {character.name}
+          {activeTab !== 'character' ? null : (<>
           {/* Титул - кнопка, когда есть из чего выбирать (как эмблема венца).
               Без активного титула, но с открытыми - тусклая подсказка, иначе
               снятый титул нечем было бы вернуть. */}
@@ -610,11 +656,14 @@ export default function Hub() {
               </button>
             </>
           ) : character.title ? ` «${character.title}»` : ''}
+          </>)}
         </p>
-        <p className="hub-banner__meta">
-          {character.base_class_title}
-          {character.subclass_title ? ` · ${character.subclass_title}` : ''} · {character.region_title}
-        </p>
+        {activeTab === 'character' && (
+          <p className="hub-banner__meta">
+            {character.base_class_title}
+            {character.subclass_title ? ` · ${character.subclass_title}` : ''} · {character.region_title}
+          </p>
+        )}
         {character.farm_currency !== null && (
           <p className="hub-banner__meta">
             {/* Патч 74: разряды и без подписей. Подписи занимали половину
@@ -624,14 +673,6 @@ export default function Hub() {
           </p>
         )}
         </div>
-        {/* Патч 111: Мощь - одно число силы персонажа. Состав - в подсказке:
-            формула на сервере (power_service), здесь только её части. */}
-        {character.power != null && (
-          <div className="hub-banner__power" title={powerHint(character.power_parts)}>
-            <span className="hub-banner__power-label">Мощь</span>
-            <span className="hub-banner__power-value"><CountUp value={character.power} format={money} /></span>
-          </div>
-        )}
       </div>
       )}
 
@@ -677,10 +718,17 @@ export default function Hub() {
         )}
         {activeTab === 'admin' && character.is_admin && <AdminTab />}
         {activeTab === 'handbook' && <HandbookTab />}
+        {activeTab === 'settings' && (
+          <SettingsTab
+            character={character} onCharacterUpdate={setCharacter}
+            soundOn={soundOn} onToggleSound={toggleSound}
+          />
+        )}
         </Suspense>
         </div>
       </div>
 
+      <Suspense fallback={null}>
       {showIntro && <IntroScene onDone={finishIntro} />}
       {showGender && <GenderGate character={character} onCharacterUpdate={setCharacter} />}
       {showTour && <Tour onDone={finishTour} />}
@@ -708,6 +756,7 @@ export default function Hub() {
           label="Гайд по мини-аппу"
         />
       )}
+      </Suspense>
     </Panel>
   );
 }

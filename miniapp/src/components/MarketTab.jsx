@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Button, Div, Group, Header, Placeholder, TabsItem } from '@vkontakte/vkui';
-import { getMarket, getMarketGood, getMarketTrades, marketAction } from '../api.js';
+import { getMarket, getMarketCatalog, getMarketGood, getMarketTrades, marketAction } from '../api.js';
+import { useSavedTab } from '../savedTab.js';
 import ExchangeTab from './ExchangeTab.jsx';
 import ItemIcon from './ItemIcon.jsx';
 import PriceChart from './PriceChart.jsx';
@@ -400,23 +401,48 @@ function Mine({ data, act, busy }) {
   );
 }
 
+// Ответ сервера по частям (2026-11-12): у каждой вкладки своя. Цены товаров
+// приходят отдельно от каталога и накладываются на него здесь.
+const PART_FIELD = { goods: 'goods', showcase: 'showcase', mine: 'orders' };
+
+function merge(prev, d, catalog) {
+  const next = { ...(prev || {}), ...d };
+  if (catalog) {
+    next.categories = catalog.categories;
+    if (d.prices) next.goods = catalog.goods.map((g) => ({ ...g, ...(d.prices[g.key] || {}) }));
+  }
+  delete next.prices;
+  return next;
+}
+
 export default function MarketTab({ onWallet }) {
   const [data, setData] = useState(null);
   const [status, setStatus] = useState('loading');
-  const [section, setSection] = useState('goods');
+  const [section, setSection] = useSavedTab('market', SECTIONS.map((s) => s.id), 'goods');
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState(null);
 
-  const load = useCallback(() => {
-    getMarket().then((d) => { setData(d); setStatus('ready'); }).catch(() => setStatus('error'));
+  const load = useCallback((part) => {
+    setStatus((s) => (s === 'error' ? 'loading' : s));
+    Promise.all([part === 'goods' ? getMarketCatalog() : null, getMarket(part)])
+      .then(([catalog, d]) => {
+        setData((prev) => merge(prev, d, catalog));
+        setStatus('ready');
+      })
+      .catch(() => setStatus('error'));
   }, []);
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+    if (section !== 'exchange') load(section);
+  }, [section, load]);
 
   const act = async (action, params = {}, after) => {
     setBusy(true);
     try {
-      const d = await marketAction(action, params);
-      setData(d);
+      const [catalog, d] = await Promise.all([
+        section === 'goods' ? getMarketCatalog() : null,
+        marketAction(action, { ...params, part: section }),
+      ]);
+      setData((prev) => merge(prev, d, catalog));
       onWallet?.({ farm_currency: d.gold });
       const done = d.done || {};
       const text = {
@@ -445,10 +471,10 @@ export default function MarketTab({ onWallet }) {
       </>
     );
   }
-  if (status === 'loading') return <Skeleton />;
-  if (status === 'error' || !data) {
-    return <Placeholder action={<Button onClick={load}>Ещё раз</Button>}>Не удалось открыть рынок.</Placeholder>;
+  if (status === 'error') {
+    return <Placeholder action={<Button onClick={() => load(section)}>Ещё раз</Button>}>Не удалось открыть рынок.</Placeholder>;
   }
+  if (!data || data[PART_FIELD[section]] === undefined) return <Skeleton />;
 
   return (
     <>

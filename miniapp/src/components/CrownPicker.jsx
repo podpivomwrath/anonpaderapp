@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { setCrownFrame } from '../api.js';
 import { itemIcon } from '../itemIcons.js';
+import { useBackClose } from '../backStack.js';
 
 /**
  * Выбор рамки венца (патч 92).
@@ -16,6 +17,8 @@ import { itemIcon } from '../itemIcons.js';
  * что сейчас не надеты.
  */
 export default function CrownPicker({ menu, current, onChange, onClose }) {
+  // «Назад» телефона закрывает окно (2026-11-12).
+  useBackClose(onClose);
   const [busy, setBusy] = useState(false);
   const [failed, setFailed] = useState(false);
 

@@ -1,8 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Group, Header, SimpleCell, Switch } from '@vkontakte/vkui';
+import { Group, Header } from '@vkontakte/vkui';
 import {
-  equipItem, getCharacter, getGear, getInventory, getRunes, getTrophies, ringAction, setGender, setNoImages, setShortLog, setNoNotices, setSignalsOff,
-  unequipItem,
+  equipItem, getCharacter, getGear, getInventory, getRunes, getTrophies, ringAction, setGender, unequipItem,
 } from '../api.js';
 import CraftGear from './CraftGear.jsx';
 import RunesPage, { RuneRing } from './RunesPage.jsx';
@@ -11,11 +10,14 @@ import { itemIcon } from '../itemIcons.js';
 import ItemIcon from './ItemIcon.jsx';
 import Sparks from './Sparks.jsx';
 import { Sheet } from './ui.jsx';
+import { useBackClose } from '../backStack.js';
 
 // Вкладка «Герой» (2026-10-22): силуэт персонажа, по бокам окна слотов
 // (линии от окна к телу владелец убрал - и так понятно). Нажал окно - снизу список вещей из сумки для
-// этого слота, с разницей к надетой. Под силуэтом - бонус снаряжения и полка
-// трофеев. Окна сперва лежали прямо на теле - владельцу не понравилось.
+// этого слота, с разницей к надетой. Под силуэтом - что дают вещи.
+// 2026-11-12 (владелец): список надетого под силуэтом убран - уровень и
+// статы вещи подписаны прямо под её окном; полки трофеев больше нет,
+// настройки переехали в свой раздел (шестерёнка в шапке).
 
 // Окна: слева оружие (оно у всех 18 силуэтов в руке слева), справа броня
 // сверху вниз. y - высота окна в долях кадра силуэта, на уровне своей части
@@ -34,6 +36,7 @@ const SLOT_TITLES = {
 };
 
 export const STAT_ICONS = { str: '💪', agi: '🏃', int: '🧠', vit: '❤️', wil: '✨' };
+const STAT_NAMES = { str: 'Сила', agi: 'Ловкость', int: 'Интеллект', vit: 'Выносливость', wil: 'Воля' };
 const STAT_ORDER = ['str', 'agi', 'int', 'vit', 'wil'];
 // Значки сопротивлений - те же, что в «Характеристиках».
 const RESIST_CHIPS = [
@@ -91,6 +94,8 @@ function DiffChips({ diff }) {
 const rarityText = (rarity) => `slot-row__name rarity-text--${rarity}`;
 
 function SlotSheet({ slot, items, onClose, onEquip, onUnequip, busyId }) {
+  // «Назад» телефона закрывает окно (2026-11-12).
+  useBackClose(onClose);
   const current = items.find((i) => i.slot === slot && i.equipped) || null;
   const spare = items
     .filter((i) => i.slot === slot && !i.equipped)
@@ -158,52 +163,43 @@ function SlotSheet({ slot, items, onClose, onEquip, onUnequip, busyId }) {
   );
 }
 
-// «Дар первопроходцев» (2026-10-29): все дорелизные бонусы одной карточкой.
+// «Дар первопроходцев» (2026-10-29): все дорелизные бонусы. 2026-11-12
+// (владелец): в профиле одна плашка, сам список - по нажатию.
 function GiftCard({ gift }) {
+  const [open, setOpen] = useState(false);
   if (!gift) return null;
   return (
-    <Group header={<Header>{gift.emoji} {gift.title}</Header>}>
-      <div className="gift-card">
-        <p className="craft-hint">{gift.about}</p>
-        <ul className="gift-card__list">
-          {gift.lines.map((line) => <li key={line}>{line}</li>)}
-        </ul>
-      </div>
-    </Group>
+    <>
+      <button type="button" className="gift-plaque" onClick={() => setOpen(true)}>
+        <span className="gift-plaque__icon" aria-hidden="true">{gift.emoji}</span>
+        <span className="gift-plaque__title">{gift.title}</span>
+        <span className="gift-plaque__more" aria-hidden="true">›</span>
+      </button>
+      {open && (
+        <Sheet title={gift.title} icon={gift.emoji} onClose={() => setOpen(false)}>
+          <div className="gift-card">
+            <p className="craft-hint">{gift.about}</p>
+            <ul className="gift-card__list">
+              {gift.lines.map((line) => <li key={line}>{line}</li>)}
+            </ul>
+          </div>
+        </Sheet>
+      )}
+    </>
   );
 }
 
-function TrophyShelf({ trophies }) {
-  const [picked, setPicked] = useState(null);
+// Счёт персонажа (2026-11-12): полку трофеев владелец убрал, цифры остались.
+function Score({ trophies }) {
   if (!trophies) return null;
   const tiles = [
-    ['⚔️', trophies.mobs_killed.toLocaleString('ru-RU'), 'мобов'],
-    ['🩸', trophies.pvp_wins.toLocaleString('ru-RU'), 'побед PvP'],
+    ['⚔️', trophies.mobs_killed.toLocaleString('ru-RU'), 'мобов убито'],
+    ['🩸', trophies.pvp_wins.toLocaleString('ru-RU'), 'побед в PvP'],
     [trophies.best_fish?.emoji || '🎣', trophies.best_fish?.weight || '-', 'рекорд улова'],
     ['👑', `${trophies.titles_open}/${trophies.titles_total}`, 'титулов'],
   ];
-  const relic = trophies.raids.find((r) => r.raid === picked);
   return (
-    <Group header={<Header>Трофеи</Header>}>
-      <div className="relic-row">
-        {trophies.raids.map((r) => (
-          <button
-            type="button" key={r.raid}
-            className={`relic${r.won ? ' relic--won' : ''}${picked === r.raid ? ' relic--picked' : ''}`}
-            onClick={() => setPicked(picked === r.raid ? null : r.raid)}
-            aria-label={r.name}
-          >
-            {itemIcon(r.icon) ? <img src={itemIcon(r.icon)} alt="" /> : <span>?</span>}
-            {r.owned > 0 && <small className="relic__count">×{r.owned}</small>}
-          </button>
-        ))}
-      </div>
-      {relic && (
-        <p className="relic-caption">
-          {relic.name}
-          {relic.won ? ` · побед: ${relic.wins} · у вас: ${relic.owned}` : ' - ещё не добыто'}
-        </p>
-      )}
+    <Group header={<Header>Счёт</Header>}>
       <div className="trophy-tiles">
         {tiles.map(([icon, value, label]) => (
           <div className="trophy-tile" key={label}>
@@ -217,120 +213,20 @@ function TrophyShelf({ trophies }) {
   );
 }
 
-// «Убрать картинки в игре» (2026-10-22): бот шлёт сообщения без картинок -
-// некоторым так удобнее (bot/no_images.py).
-function Settings({ character, onCharacterUpdate }) {
-  const [off, setOff] = useState(Boolean(character.ui?.no_images));
-  const toggle = (next) => {
-    setOff(next);
-    setNoImages(next)
-      .then(() => onCharacterUpdate((prev) => ({ ...prev, ui: { ...(prev.ui || {}), no_images: next } })))
-      .catch(() => setOff(!next));
-  };
-  // Короткий боевой лог (2026-10-22, bot/short_log.py).
-  const [short, setShort] = useState(Boolean(character.ui?.short_log));
-  const toggleShort = (next) => {
-    setShort(next);
-    setShortLog(next)
-      .then(() => onCharacterUpdate((prev) => ({ ...prev, ui: { ...(prev.ui || {}), short_log: next } })))
-      .catch(() => setShort(!next));
-  };
-  // «Без оповещений» (2026-11-09, репорт 340, bot/notices.py).
-  const [quiet, setQuiet] = useState(Boolean(character.ui?.no_notices));
-  const toggleQuiet = (next) => {
-    setQuiet(next);
-    setNoNotices(next)
-      .then(() => onCharacterUpdate((prev) => ({ ...prev, ui: { ...(prev.ui || {}), no_notices: next } })))
-      .catch(() => setQuiet(!next));
-  };
-  // Сигналы союзникам в групповом бою (2026-11-11, bot/battle_signals.py):
-  // флаги - «выключено», галочка - «включено».
-  const [sigOut, setSigOut] = useState(!character.ui?.signals_out_off);
-  const [sigIn, setSigIn] = useState(!character.ui?.signals_in_off);
-  const toggleSignal = (which, on) => {
-    const key = which === 'out' ? 'signals_out_off' : 'signals_in_off';
-    const set = which === 'out' ? setSigOut : setSigIn;
-    set(on);
-    setSignalsOff(which, !on)
-      .then(() => onCharacterUpdate((prev) => ({ ...prev, ui: { ...(prev.ui || {}), [key]: !on } })))
-      .catch(() => set(!on));
-  };
+// Подпись под окном надетой вещи (2026-11-12): уровень и два главных стата.
+// Раньше то же самое дублировал список под силуэтом (жалоба 2026-10-23:
+// «чтобы понять, что качать, прокликиваю каждую вещь»).
+function SlotCaption({ item }) {
+  const stats = STAT_ORDER.filter((k) => item.base_stats?.[k])
+    .sort((a, b) => item.base_stats[b] - item.base_stats[a]);
   return (
-    <Group header={<Header>Настройки</Header>}>
-      <SimpleCell
-        Component="label" multiline
-        subtitle="Бот будет присылать сообщения без картинок."
-        after={<Switch checked={off} onChange={(e) => toggle(e.target.checked)} />}
-      >
-        Убрать картинки в игре
-      </SimpleCell>
-      <SimpleCell
-        Component="label" multiline
-        subtitle="В бою только здоровье с изменением за ход и значки эффектов. Весь лог хода - кнопкой «📜 Сводка»."
-        after={<Switch checked={short} onChange={(e) => toggleShort(e.target.checked)} />}
-      >
-        Короткий лог боя
-      </SimpleCell>
-      <SimpleCell
-        Component="label" multiline
-        subtitle="Бот перестанет присылать то, о чём вы не просили: открытые разломы, мировых боссов, турбоишака, заказы и прибытие повозок, вести похода, новости гильдии и окончание баффов. Ответы на ваши действия будут приходить как обычно."
-        after={<Switch checked={quiet} onChange={(e) => toggleQuiet(e.target.checked)} />}
-      >
-        Отключить оповещения
-      </SimpleCell>
-      <SimpleCell
-        Component="label" multiline
-        subtitle="В групповом бою после выбора действия появится кнопка «📢 Показать союзникам»: союзники увидят, что вы готовите."
-        after={<Switch checked={sigOut} onChange={(e) => toggleSignal('out', e.target.checked)} />}
-      >
-        Показывать союзникам мои действия
-      </SimpleCell>
-      <SimpleCell
-        Component="label" multiline
-        subtitle="Бот будет присылать, что готовят союзники по групповому бою, если они нажали «📢 Показать союзникам»."
-        after={<Switch checked={sigIn} onChange={(e) => toggleSignal('in', e.target.checked)} />}
-      >
-        Получать действия союзников
-      </SimpleCell>
-    </Group>
-  );
-}
-
-// Надетое списком (2026-10-23, жалоба игрока: «вижу только итог бонусов, чтобы
-// понять, что качать, прокликиваю каждую вещь»): по слоту - вещь, уровень,
-// ковка и её статы. Нажатие открывает слот, как окно у силуэта.
-function WornList({ equipped, onOpen }) {
-  return (
-    <div className="worn-list">
-      {SLOTS.map(({ slot }) => {
-        const item = equipped[slot];
-        const marks = item ? [
-          item.ilvl ? `ур. ${item.ilvl}` : null,
-          item.craft_efficiency ? `⚒ ${item.craft_efficiency}%` : null,
-        ].filter(Boolean) : [];
-        return (
-          <button type="button" key={slot} className="worn-row" onClick={() => onOpen(slot)}>
-            {item
-              ? <ItemIcon icon={item.icon} rarity={item.rarity} alt={item.name} size={36} />
-              : <span className="worn-row__empty"><SlotGlyph slot={slot} /></span>}
-            <span className="worn-row__text">
-              <span className={item ? rarityText(item.rarity) : 'worn-row__none'}>
-                {item ? item.name : `${SLOT_TITLES[slot]}: пусто`}
-              </span>
-              {item && (
-                <span className="worn-row__meta">
-                  {marks.join(' · ')}
-                  {STAT_ORDER.filter((k) => item.base_stats?.[k]).map((k) => (
-                    <span key={k} className="gear-chip">{STAT_ICONS[k]} +{item.base_stats[k]}</span>
-                  ))}
-                  <ResistChip item={item} />
-                </span>
-              )}
-            </span>
-          </button>
-        );
-      })}
-    </div>
+    <span className="gear-slot__caption" aria-hidden="true">
+      {item.ilvl ? <span className="gear-slot__lvl">ур. {item.ilvl}</span> : null}
+      <span className="gear-slot__stats">
+        {stats.slice(0, 2).map((k) => <span key={k}>{STAT_ICONS[k]}{item.base_stats[k]}</span>)}
+        {stats.length > 2 && <span>+{stats.length - 2}</span>}
+      </span>
+    </span>
   );
 }
 
@@ -349,8 +245,9 @@ function fightsText(n) {
 }
 
 // Действующие баффы (2026-10-23): еда, прикормка, молитва, настойка, эффекты
-// событий - коротко, слева от силуэта над оружием. Сервер -
-// services/buffs_service.py, приходит вместе со страницами ремёсел.
+// событий. Сервер - services/buffs_service.py, приходит вместе со страницами
+// ремёсел. 2026-11-12: строкой над силуэтом - слева над оружием плашки
+// заходили на рисунок и обрезали название («Метка падаль...»).
 function BuffList({ buffs }) {
   const [now, setNow] = useState(Date.now());
   useEffect(() => {
@@ -362,7 +259,7 @@ function BuffList({ buffs }) {
     .filter((b) => b.left);
   const [open, setOpen] = useState(false);
   if (!shown.length) return null;
-  // Над оружием место на три плашки; остальное - в списке по нажатию.
+  // В строке три плашки; остальное - в списке по нажатию.
   const more = shown.length > BUFFS_SHOWN ? shown.length - (BUFFS_SHOWN - 1) : 0;
   const row = (b) => (
     <li key={b.id} className={`hero-buff${b.bad ? ' hero-buff--bad' : ''}`}>
@@ -388,6 +285,7 @@ function BuffList({ buffs }) {
 }
 
 const BUFFS_SHOWN = 3;
+const PAGE_KEY = 'pines:sub:hero';
 
 // Слот кольца (2026-11-03, владелец: «слот кольца только один»). Как
 // у вещей: на пальце одно кольцо, остальные в сумке - снять, надеть,
@@ -528,7 +426,15 @@ export default function HeroTab({ character, onCharacterUpdate }) {
   const [gender, setGenderState] = useState(character.gender || null);
   // Страницы: 0 - снаряжение, 1 - руны (2026-10-31), дальше ремёсла
   // (2026-10-23, стрелкой вправо).
-  const [page, setPage] = useState(0);
+  // 2026-11-12: «Снаряжение» или «Руны» - где вышли, там и откроется.
+  const [page, setPageState] = useState(() => {
+    try { return window.localStorage.getItem(PAGE_KEY) === '1' ? 1 : 0; } catch { return 0; }
+  });
+  const setPage = (next) => setPageState((prev) => {
+    const value = typeof next === 'function' ? next(prev) : next;
+    try { window.localStorage.setItem(PAGE_KEY, value === 1 ? '1' : '0'); } catch { /* не запомнится */ }
+    return value;
+  });
   const [gear, setGear] = useState(null);
   const [runes, setRunes] = useState(null);
   const [runeKind, setRuneKind] = useState('ability');
@@ -642,6 +548,7 @@ export default function HeroTab({ character, onCharacterUpdate }) {
           ? <ItemIcon icon={item.icon} rarity={item.rarity} alt="" size={48} />
           : <SlotGlyph slot={slot} />}
         {upgrades[slot] && <span className="gear-slot__up" aria-hidden="true">▲</span>}
+        {item && <SlotCaption item={item} />}
         <Sparks burst={flashes[slot] || 0} />
       </button>
     );
@@ -666,9 +573,9 @@ export default function HeroTab({ character, onCharacterUpdate }) {
           <RunesPage data={runes} onData={setRunes} kind={runeKind} onKind={setRuneKind} />
         ) : craft ? <CraftGear key={craft.id} craft={craft} onUpdate={setGear} /> : (
         <div className={`hero-stage hero-stage--${path}`}>
+          <BuffList buffs={gear?.buffs} />
           <div className="hero-row">
             <div className="hero-col hero-col--left">
-              <BuffList buffs={gear?.buffs} />
               {SLOTS.filter((x) => x.side === 'left').map(slotButton)}
               <RingSlot slot={character.ring_slot} onAction={handleRing} />
             </div>
@@ -680,27 +587,34 @@ export default function HeroTab({ character, onCharacterUpdate }) {
             </div>
           </div>
           <RuneRing data={runes} onOpen={() => { setRuneKind('hero'); setPage(1); }} />
-          {(bonus.length > 0 || resists.length > 0) && (
+          {/* Подписано словами (2026-11-12): одни значки «🏃 +1 ❤️ +1 🪨 1.5%»
+              игроки не понимали. Сопротивления не только от вещей - от
+              Выносливости, рун и перстня тоже, поэтому отдельной строкой. */}
+          {bonus.length > 0 && (
             <div className="hero-bonus">
+              <span className="hero-bonus__label">Вещи дают:</span>
               {bonus.map((k) => (
-                <span key={k} className="gear-chip">{STAT_ICONS[k]} +{character.gear_bonus[k]}</span>
+                <span key={k} className="gear-chip">{STAT_ICONS[k]} {STAT_NAMES[k]} +{character.gear_bonus[k]}</span>
               ))}
+            </div>
+          )}
+          {resists.length > 0 && (
+            <div className="hero-bonus">
+              <span className="hero-bonus__label">Сопротивления:</span>
               {resists.map(([k, emoji, title]) => (
-                <span key={k} className="gear-chip gear-chip--resist" title={title}>
-                  {emoji} {(character.derived[k] * 100).toFixed(1)}%
+                <span key={k} className="gear-chip gear-chip--resist">
+                  {emoji} {title} {(character.derived[k] * 100).toFixed(1)}%
                 </span>
               ))}
             </div>
           )}
           {error && <p className="hero-error">{error}</p>}
-          <WornList equipped={equipped} onOpen={setOpenSlot} />
         </div>
         )}
       </Group>
 
       <GiftCard gift={trophies?.gift} />
-      <TrophyShelf trophies={trophies} />
-      <Settings character={character} onCharacterUpdate={onCharacterUpdate} />
+      <Score trophies={trophies} />
 
       {openSlot && (
         <SlotSheet

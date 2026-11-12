@@ -10,6 +10,7 @@ import { itemSubtitle } from './InventoryTab.jsx';
 import Skeleton from './Skeleton.jsx';
 import ClassIcon from './ClassIcon.jsx';
 import { Bar as UiBar, Empty } from './ui.jsx';
+import { useSavedTab } from '../savedTab.js';
 
 // Гильдии. Всё управление - здесь: состав, казна и склад, земли и стройка,
 // древо, осады. В чате остаётся то, что происходит в поле.
@@ -1092,7 +1093,7 @@ function War({ state, run, busy }) {
 export default function GuildTab() {
   const [state, setState] = useState(null);
   const [status, setStatus] = useState('loading');
-  const [section, setSection] = useState('overview');
+  const [section, setSection] = useSavedTab('guild', SECTIONS.map((s) => s.id), 'overview');
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState(null);
 

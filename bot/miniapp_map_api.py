@@ -9,6 +9,7 @@
 """
 
 import random
+import time
 from datetime import datetime, timezone
 
 from aiohttp import web
@@ -36,6 +37,53 @@ from services import (
 )
 
 _rng = random.Random()
+
+#: Общее для всех игроков на карте (2026-11-12): владения гильдий, разломы,
+#: мировой босс, запас руды. Раньше каждый опрос каждого игрока собирал это
+#: заново - около десятка запросов к базе раз в 5 секунд на игрока. Теперь
+#: снимок живёт SHARED_TTL секунд и один на всех. {"at": monotonic, "data": dict}
+_shared: dict = {}
+SHARED_TTL = 5.0
+
+
+async def _shared_marks(db) -> dict:
+    now = time.monotonic()
+    if _shared and now - _shared["at"] < SHARED_TTL:
+        return _shared["data"]
+    from services import guild_territory_service, rift_service
+
+    guild_cells = [
+        {
+            "x": cell.x, "y": cell.y, "tag": guild.tag, "guild_id": guild.id, "status": cell.status,
+            "base_tier": cell.base_tier, "mine": cell.mine_id is not None,
+        }
+        for cell, guild in await guild_territory_service.all_cells(db)
+    ]
+    rifts = []
+    for r in await rift_service.active_rifts(db):
+        t = rfc.RIFT_TYPES[r.kind]
+        lo, hi = rfc.BANDS[r.ring]
+        rifts.append({
+            "x": r.x, "y": r.y, "name": t.name, "emoji": t.emoji, "hint": t.hint,
+            "min_level": lo, "max_level": hi, "max_size": t.max_size,
+            "minutes_left": rift_service.minutes_left(r), "state": r.state,
+            "blood": rift_service.is_blood(r),
+        })
+    world_boss_mark = None
+    boss = await world_boss_service.active_boss(db)
+    if boss is not None:
+        boss_def = world_boss.boss_def(boss.boss_id)
+        world_boss_mark = {
+            "x": boss.x, "y": boss.y, "ring": boss.ring, "level": boss.level,
+            "name": boss_def.name if boss_def else "Мировой босс",
+            "hp_percent": round(100 * boss.hp / boss.max_hp) if boss.max_hp else 0,
+        }
+    data = {
+        "guild_cells": guild_cells, "rifts": rifts, "world_boss": world_boss_mark,
+        "mine_ore": await mining_service.ore_counts(db),
+    }
+    _shared.update(at=now, data=data)
+    return data
 
 
 async def _load_character(session, vk_user_id: int) -> Character | None:
@@ -158,16 +206,9 @@ async def handle_get_state(request: web.Request) -> web.Response:
         if trail_def is not None and scene_event_service.trail_alive(trail):
             trail_mark = {"x": trail.x, "y": trail.y, "title": trail_def.title, "emoji": trail_def.emoji}
 
-        # Патч 108: живой мировой босс - метка на карте.
-        world_boss_mark = None
-        boss = await world_boss_service.active_boss(db)
-        if boss is not None:
-            boss_def = world_boss.boss_def(boss.boss_id)
-            world_boss_mark = {
-                "x": boss.x, "y": boss.y, "ring": boss.ring, "level": boss.level,
-                "name": boss_def.name if boss_def else "Мировой босс",
-                "hp_percent": round(100 * boss.hp / boss.max_hp) if boss.max_hp else 0,
-            }
+        # Патч 108: мировой босс, владения гильдий, разломы, руда - общий
+        # снимок на всех (_shared_marks).
+        shared = await _shared_marks(db)
 
         # Турбоишак дня (2026-10-19): где бегает сейчас.
         from services import turbo_ishak_service
@@ -190,31 +231,10 @@ async def handle_get_state(request: web.Request) -> web.Response:
         # Курьера на карте нет (2026-10-30, владелец: «он там не нужен»). Он
         # бежит к получателю и ждёт на его клетке - метка выдавала, где игрок.
 
-        # Гильдии: владения и закладки - цветом гильдии на карте.
-        from services import guild_territory_service
-
+        # Гильдии: владения и закладки - цветом гильдии, своя отмечена.
         guild_cells = [
-            {
-                "x": cell.x, "y": cell.y, "tag": guild.tag, "guild_id": guild.id,
-                "own": guild.id == character.guild_id, "status": cell.status,
-                "base_tier": cell.base_tier, "mine": cell.mine_id is not None,
-            }
-            for cell, guild in await guild_territory_service.all_cells(db)
+            {**cell, "own": cell["guild_id"] == character.guild_id} for cell in shared["guild_cells"]
         ]
-
-        # Разломы: видят все. Свободен / ждут у входа / внутри - для окна клетки.
-        from services import rift_service
-
-        rifts = []
-        for r in await rift_service.active_rifts(db):
-            t = rfc.RIFT_TYPES[r.kind]
-            lo, hi = rfc.BANDS[r.ring]
-            rifts.append({
-                "x": r.x, "y": r.y, "name": t.name, "emoji": t.emoji, "hint": t.hint,
-                "min_level": lo, "max_level": hi, "max_size": t.max_size,
-                "minutes_left": rift_service.minutes_left(r), "state": r.state,
-                "blood": rift_service.is_blood(r),
-            })
         # Повозки торговой фирмы игрока: в пути - на клетке, где они сейчас.
         from services import trade_service
 
@@ -238,7 +258,7 @@ async def handle_get_state(request: web.Request) -> web.Response:
             {
                 "pos_x": character.pos_x, "pos_y": character.pos_y,
                 "guild_cells": guild_cells,
-                "rifts": rifts,
+                "rifts": shared["rifts"],
                 # Для окна клетки: хватает ли уровня у озера, рудника, разлома.
                 "levels": {
                     "level": character.level, "fishing": character.fishing_level,
@@ -251,7 +271,7 @@ async def handle_get_state(request: web.Request) -> web.Response:
                 "mount_travel": mount_travel,
                 "safe_route": bool((character.ui_flags or {}).get("safe_route")),
                 "quest_target": quest_target,
-                "world_boss": world_boss_mark,
+                "world_boss": shared["world_boss"],
                 "turbo": turbo_mark,
                 "trail": trail_mark,
                 "mounts": [
@@ -263,7 +283,7 @@ async def handle_get_state(request: web.Request) -> web.Response:
                 ],
                 # Запас руды по рудникам — динамика, поэтому здесь, а не в
                 # статичном каталоге: игрок видит, куда идти, до похода.
-                "mine_ore": await mining_service.ore_counts(db),
+                "mine_ore": shared["mine_ore"],
                 "catalog": _STATIC_CATALOG,
             }
         )

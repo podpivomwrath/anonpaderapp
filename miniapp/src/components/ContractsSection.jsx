@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Button, Div, Group, Header, Placeholder } from '@vkontakte/vkui';
 import { contractAction, getContracts } from '../api.js';
+import { appHidden } from '../appVisibility.js';
 import ClassIcon from './ClassIcon.jsx';
 import Skeleton from './Skeleton.jsx';
 import { Bar, Empty, SectionHead } from './ui.jsx';
@@ -110,6 +111,7 @@ export default function ContractsSection() {
   useEffect(() => {
     if (!tracking) return undefined;
     const id = setInterval(() => {
+      if (appHidden()) return; // свёрнуто - не спрашиваем (2026-11-12)
       getContracts().then(setData).catch(() => {});
     }, 5000);
     return () => clearInterval(id);
@@ -154,7 +156,7 @@ export default function ContractsSection() {
               <ClassIcon subclass={c.subclass} baseClass={c.base_class} crown={c.crown_frame || null} size={48} />
               <div className="contract-card__body">
                 <b className="contract-card__name">{c.name}</b>
-                <small className="contract-card__meta">{c.level} ур. · мощь {money(c.power)} · ещё {left(c.minutes_left)}</small>
+                <small className="contract-card__meta">{c.level} ур. · ещё {left(c.minutes_left)}</small>
                 {c.where && <small className="contract-card__meta">📍 {c.where}</small>}
                 <span className="daily-card__progress">
                   <Bar value={c.kills_total - c.kills_left} max={c.kills_total} tone="red" thin />

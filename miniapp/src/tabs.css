@@ -777,6 +777,33 @@ body.lite .empty-state__icon {
   transition: transform 0.2s var(--spring, ease-out), box-shadow 0.2s ease;
 }
 
+/* Плитка с названием под ней (2026-11-12). Задержки появления - по
+   обёртке: кнопка в ней всегда первая. */
+.bag-slot {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+
+.bag-slot__name {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+  font-size: 10.5px;
+  line-height: 1.2;
+  text-align: center;
+  word-break: break-word;
+}
+
+.bag-slot__name.rarity-text--common { color: rgba(255, 255, 255, 0.72); }
+
+.bag-slot:nth-child(n+2) .bag-cell { animation-delay: 0.02s; }
+.bag-slot:nth-child(n+6) .bag-cell { animation-delay: 0.05s; }
+.bag-slot:nth-child(n+11) .bag-cell { animation-delay: 0.08s; }
+.bag-slot:nth-child(n+16) .bag-cell { animation-delay: 0.11s; }
+
 .bag-cell:nth-child(n+2) { animation-delay: 0.02s; }
 .bag-cell:nth-child(n+6) { animation-delay: 0.05s; }
 .bag-cell:nth-child(n+11) { animation-delay: 0.08s; }

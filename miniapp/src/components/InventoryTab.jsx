@@ -13,6 +13,7 @@ import ItemIcon from './ItemIcon.jsx';
 import Skeleton from './Skeleton.jsx';
 import Sparks from './Sparks.jsx';
 import { Empty, SectionHead } from './ui.jsx';
+import { useBackClose } from '../backStack.js';
 
 // Столько ларцов сервер открывает за одно нажатие (MANY_CHESTS_MAX в miniapp_inventory_api).
 const MANY_CHESTS_MAX = 1000;
@@ -210,6 +211,8 @@ function CompareLine({ item, worn }) {
 }
 
 export function ItemSheet({ entry, onClose, worn, compare = false, actions = null }) {
+  // «Назад» телефона закрывает окно (2026-11-12).
+  useBackClose(onClose);
   const { kind, data } = entry;
   const NOTES = {
     trophy: 'Цена - у скупщика в своём городе, в чужом он платит меньше. Реликвии не передаются.',
@@ -324,6 +327,8 @@ export function NickTransfer({ command, qty = null, onDone }) {
 // --- Сколько передать -------------------------------------------------------
 
 export function QuantitySheet({ entry, onClose, onCopied, onTransferred }) {
+  // «Назад» телефона закрывает окно (2026-11-12).
+  useBackClose(onClose);
   const max = Math.max(1, entry.count);
   const [qty, setQty] = useState(1);
   const [byNick, setByNick] = useState(false);
@@ -468,7 +473,10 @@ function BagCell({ entry, isNew, onOpen }) {
   const count = gear ? null : data.count;
   const rar = data.rarity || 'common';
   const level = gear ? levelMark(data) : null;
+  // Название под плиткой (2026-11-12): зелья одного цвета различались только
+  // по картинке, а числа на плитке были без подписи.
   return (
+    <div className="bag-slot">
     <button
       type="button"
       className={`bag-cell bag-cell--${rar}${data.need_level ? ' bag-cell--locked' : ''}`}
@@ -476,13 +484,15 @@ function BagCell({ entry, isNew, onOpen }) {
       aria-label={data.name}
     >
       <Picture data={data} size={56} />
-      {count > 1 && <span className="bag-cell__count">{count > 999 ? '999+' : count}</span>}
-      {level && <span className="bag-cell__level">{level}</span>}
+      {count > 1 && <span className="bag-cell__count" title="штук">×{count > 999 ? '999+' : count}</span>}
+      {level && <span className="bag-cell__level">{data.craft_efficiency ? level : `ур.${level}`}</span>}
       {gear && !data.need_level && <span className="bag-cell__trend"><Trend trend={entry.trend} /></span>}
       {data.need_level && <span className="bag-cell__lock" aria-hidden="true">🔒{data.need_level}</span>}
       {gear && <span className="bag-cell__stats">{shortStats(data.base_stats)}</span>}
       {isNew && <span className="bag-cell__new" aria-hidden="true" />}
     </button>
+    <span className={`bag-slot__name rarity-text--${rar}`} aria-hidden="true">{data.name}</span>
+    </div>
   );
 }
 

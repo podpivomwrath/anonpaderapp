@@ -104,4 +104,6 @@ STATE: dict[str, str] = {
     "bot.handlers.voyage._away": "возвращение из долгого пути",
     "bot.handlers.world._pending_events": "ответ на событие, уход с клетки",
     "bot.handlers.world._pending_fish_offers": "вместе с _pending_events",
+    # --- мини-апп
+    "bot.miniapp_map_api._shared": "один снимок карты на всех, перезаписывается раз в 5 секунд",
 }

@@ -30,7 +30,6 @@ from services import (
     crown_service,
     leaderboard_service,
     lootbox_service,
-    power_service,
     preset_service,
     quest_service,
     song_service,
@@ -71,7 +70,7 @@ async def _load_character(session: AsyncSession, vk_user_id: int) -> Character |
 
 def _character_payload(
     character: Character, gear_bonus: dict[str, int] | None = None, wallet=None, is_admin: bool = False,
-    power=None, titles: list[dict] | None = None, mods: dict | None = None,
+    titles: list[dict] | None = None, mods: dict | None = None,
 ) -> dict:
     stats = character.stats
     derived = derived_stats_service.compute(character, stats, gear_bonus, mods)
@@ -115,13 +114,6 @@ def _character_payload(
         "gender": character.gender,
         # Гильдии: вкладка видна с 20 уровня - и всегда тому, кто уже в гильдии.
         "in_guild": character.guild_id is not None,
-        # Патч 111: Мощь - одно число силы персонажа (services/power_service.py).
-        "power": power.total if power is not None else None,
-        "power_parts": {
-            "stats": power.stats, "gear": power.gear,
-            "subclass_pct": round(power.subclass_bonus * 100), "buffs": power.buffs,
-            "buff_pct": round(power_service.PER_BUFF_BONUS * 100),
-        } if power is not None else None,
         "farm_currency": wallet.farm_currency if wallet is not None else None,
         "donate_currency": wallet.donate_currency if wallet is not None else None,
         "stats": {
@@ -217,13 +209,15 @@ async def handle_get_character(request: web.Request) -> web.Response:
             )
         gear_bonus = await item_service.compute_gear_bonus(session, character.id)
         wallet = await get_wallet(session, character.id)
-        power = await power_service.power_of(session, character)
         titles = await title_service.menu(session, character)
         mods = await preset_service.resolve_active_modifiers(session, character)
-        payload = _character_payload(character, gear_bonus, wallet, _is_admin(request, vk_user_id), power, titles, mods)
+        payload = _character_payload(character, gear_bonus, wallet, _is_admin(request, vk_user_id), titles, mods)
         # Слот кольца (2026-11-03): один на оба перстня - что на пальце и
         # что в сумке. None - перстней нет, слот пустой.
         payload["ring_slot"] = await ring_slot_service.payload(session, character)
+        # Отметка у «Заданий» в меню (2026-11-12): сколько ежедневных не сделано.
+        overview = await daily_service.get_dailies_overview(session, character)
+        payload["dailies_left"] = sum(1 for q in overview.quests if not q.completed)
         await session.commit()
         return web.json_response(payload)
 
@@ -266,10 +260,9 @@ async def handle_post_stats(request: web.Request) -> web.Response:
 
         gear_bonus = await item_service.compute_gear_bonus(session, character.id)
         wallet = await get_wallet(session, character.id)
-        power = await power_service.power_of(session, character)
         titles = await title_service.menu(session, character)
         mods = await preset_service.resolve_active_modifiers(session, character)
-        payload = _character_payload(character, gear_bonus, wallet, _is_admin(request, vk_user_id), power, titles, mods)
+        payload = _character_payload(character, gear_bonus, wallet, _is_admin(request, vk_user_id), titles, mods)
         payload["ring_slot"] = await ring_slot_service.payload(session, character)
         await session.commit()
         return web.json_response(payload)
@@ -285,7 +278,12 @@ async def handle_get_trials(request: web.Request) -> web.Response:
         if character is None:
             return web.json_response({"error": "character_not_found"}, status=404)
         if subclass_service.buff_pool(character) is None:
-            return web.json_response({"subclass": None, "trials": []})
+            # Пустой экран говорит, когда откроется (2026-11-12): раньше там
+            # была загадка про Метку без уровня.
+            return web.json_response({
+                "subclass": None, "trials": [],
+                "level": character.level, "unlock_level": bc.SUBCLASS_UNLOCK_MIN_LEVEL,
+            })
         states = await trial_service.get_trial_states(session, character)
         return web.json_response(
             {
@@ -491,11 +489,6 @@ async def handle_get_leaderboard(request: web.Request) -> web.Response:
         mine = next((e for e in full if e.character_id == character.id), None)
         shown = entries + ([mine] if mine is not None and mine.rank > 10 else [])
         moved = await top_places.deltas(board_id, {e.character_id: e.rank for e in full if e.character_id})
-        powers = {}
-        if board_id in leaderboard_service.COMBAT_BOARDS:
-            for e in shown:
-                if e.character_id is not None:
-                    powers[e.character_id] = await power_service.power_by_id(session, e.character_id)
         from game.economy import crown_config as cc
 
         frames = await crown_service.frames_by_id(session, [e.character_id for e in shown])
@@ -508,8 +501,6 @@ async def handle_get_leaderboard(request: web.Request) -> web.Response:
                 # уровня его нет вовсе), поэтому клиенту отдаются оба, а
                 # он показывает подкласс, если тот выбран.
                 "base_class": e.base_class, "subclass": e.subclass,
-                # Патч 111: Мощь рядом с ником - только в боевых топах.
-                "power": powers.get(e.character_id),
                 # Рамка венца, которую носит игрок (своя у каждого).
                 "crown_frame": frames.get(e.character_id),
                 "me": e.character_id == character.id,
@@ -569,9 +560,13 @@ async def _story_payload(session: AsyncSession, character: Character) -> dict:
         peek = await quest_service.peek_progress(session, character)
         active_quest = None
         if peek is not None and peek.status != "completed":
+            # 2026-11-12: полоска и награда вместо «Пепельные твари: 0/10» под
+            # заголовком «Пепельные твари» - подпись не повторяет заголовок.
             active_quest = {
                 "title": peek.title,
-                "text": f"{peek.progress_label}: {peek.progress}/{peek.target_count}",
+                "text": None if peek.progress_label == peek.title else peek.progress_label,
+                "progress": min(peek.progress, peek.target_count), "target_count": peek.target_count,
+                "xp_reward": peek.xp_reward,
                 "target": None,
                 "ready": peek.status == "ready",
             }

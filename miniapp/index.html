@@ -3,19 +3,12 @@
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-    <!-- Патч 79: Forum - римская антиква с родной кириллицей, только для
-         заголовков и имени персонажа. Списки остаются системным шрифтом:
-         антиква на 12 пикселях в длинном списке читается плохо, особенно
-         на Android. preconnect - чтобы подмена шрифта не тянулась.
-         Самохост был бы лучше (в вебвью ВК внешний запрос даёт вспышку),
-         но woff2 нужно положить в репозиторий руками. -->
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link
-      href="https://fonts.googleapis.com/css2?family=Cormorant+SC:wght@600&amp;family=Forum&amp;display=swap"
-      rel="stylesheet"
-    />
+    <!-- Патч 79: Forum и Cormorant SC - только заголовки и имя персонажа.
+         2026-11-12: шрифты лежат в сборке (@fontsource, src/main.jsx), а не
+         на Google: из вебвью ВК внешний запрос шёл долго, и заголовки
+         мигали чужим шрифтом. -->
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
-    <title>Монолит — Персонаж</title>
+    <title>Монолит</title>
   </head>
   <body>
     <div id="root"></div>

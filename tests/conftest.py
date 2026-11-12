@@ -23,6 +23,15 @@ def _terms_accepted(request, monkeypatch):
     monkeypatch.setattr(terms_service, "accepted", lambda user: True)
 
 
+@pytest.fixture(autouse=True)
+def _fresh_map_snapshot():
+    """Общий снимок карты (bot/miniapp_map_api._shared) живёт 5 секунд - между
+    тестами с разными базами он переносил бы чужих боссов и разломы."""
+    from bot import miniapp_map_api
+
+    miniapp_map_api._shared.clear()
+
+
 @pytest.fixture
 async def db_session():
     engine = create_async_engine("sqlite+aiosqlite://")

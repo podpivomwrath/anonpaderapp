@@ -88,6 +88,24 @@ button.slot-row:not(:disabled):active,
   position: relative;
 }
 
+/* Вкладки не влезли - тает тот край, за которым есть ещё (2026-11-12):
+   видно, что лента листается. */
+.ink-tabs .vkuiHorizontalScroll__in {
+  --fade-l: #000;
+  --fade-r: #000;
+}
+
+.ink-tabs[class*='ink-tabs--fade-'] .vkuiHorizontalScroll__in {
+  -webkit-mask-image: linear-gradient(90deg, var(--fade-l) 0, #000 28px, #000 calc(100% - 28px), var(--fade-r) 100%);
+  mask-image: linear-gradient(90deg, var(--fade-l) 0, #000 28px, #000 calc(100% - 28px), var(--fade-r) 100%);
+}
+
+.ink-tabs--fade-left .vkuiHorizontalScroll__in,
+.ink-tabs--fade-both .vkuiHorizontalScroll__in { --fade-l: transparent; }
+
+.ink-tabs--fade-right .vkuiHorizontalScroll__in,
+.ink-tabs--fade-both .vkuiHorizontalScroll__in { --fade-r: transparent; }
+
 .ink-tabs .vkuiTabsItem__underline {
   display: none;
 }
@@ -1198,3 +1216,167 @@ body.lite .sparks {
 .rune-absorb__row input { flex: 1; min-width: 0; }
 .rune-absorb__confirm { display: flex; flex-direction: column; gap: 8px; }
 .rune-absorb__buttons { display: flex; flex-wrap: wrap; gap: 8px; }
+
+/* --- «Герой», 2026-11-12 (владелец) --------------------------------------- */
+/* Баффы - строкой над силуэтом: слева над оружием плашки заходили на
+   рисунок и обрезали название. */
+.hero-buffs {
+  position: static;
+  width: 100%;
+  max-height: none;
+  margin: 0 0 8px;
+}
+
+.hero-buffs ul {
+  flex-direction: row;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.hero-buffs .hero-buff {
+  max-width: calc(50% - 4px);
+  font-size: 11.5px;
+}
+
+/* Подпись под окном вещи: уровень и два главных стата. Окно стоит в
+   колонке 54 px - подпись шире и заходит на край кадра, тёмная подложка
+   держит её читаемой поверх рисунка. */
+.gear-slot__caption {
+  position: absolute;
+  top: calc(100% + 3px);
+  left: 50%;
+  translate: -50% 0;
+  display: grid;
+  justify-items: center;
+  gap: 1px;
+  min-width: 100%;
+  padding: 2px 5px;
+  border-radius: 6px;
+  background: rgba(10, 10, 13, 0.78);
+  color: rgba(255, 255, 255, 0.9);
+  font-size: 10px;
+  line-height: 1.2;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+  pointer-events: none;
+}
+
+.gear-slot__lvl {
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.gear-slot__stats {
+  display: inline-flex;
+  gap: 4px;
+}
+
+/* Подписи под нижними окнами не должны упираться в круг рун. */
+.hero-row {
+  padding-bottom: 22px;
+}
+
+.hero-bonus__label {
+  flex-basis: 100%;
+  text-align: center;
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  opacity: 0.6;
+}
+
+/* Дар первопроходцев - одной плашкой, список по нажатию. */
+.gift-plaque {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: calc(100% - 16px);
+  margin: 8px auto;
+  padding: 12px 14px;
+  border: 1px solid rgba(120, 200, 120, 0.25);
+  border-radius: 12px;
+  background: rgba(14, 22, 14, 0.55);
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.gift-plaque__icon { font-size: 18px; }
+.gift-plaque__title { flex: 1; font-weight: 600; }
+.gift-plaque__more { font-size: 20px; opacity: 0.6; }
+
+/* --- Узкая шапка вне «Персонажа» (2026-11-12, владелец) ----------------- */
+/* Эмблема меньше, имя и деньги в одну строку: полная шапка занимала пятую
+   часть экрана в каждом разделе. */
+.hub-banner--slim {
+  padding-top: 8px;
+  padding-bottom: 8px;
+  gap: 8px;
+}
+
+.hub-banner--slim .hub-banner__text {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  column-gap: 12px;
+  row-gap: 2px;
+}
+
+.hub-banner--slim .hub-banner__name {
+  margin: 0;
+  font-size: 18px;
+}
+
+.hub-banner--slim .xp-emblem {
+  zoom: 0.68;
+}
+
+/* --- Меню разделов: подписи, отметки, закрытые пункты ------------------- */
+.nav-drawer__label {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.nav-drawer__hint {
+  font-size: 11.5px;
+  font-weight: 400;
+  line-height: 1.25;
+  opacity: 0.55;
+}
+
+.nav-drawer__item {
+  padding-top: 9px;
+  padding-bottom: 9px;
+}
+
+.nav-drawer__badge {
+  flex: 0 0 auto;
+  min-width: 20px;
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: #c81e3a;
+  color: #fff;
+  font-size: 12px;
+  font-weight: 600;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
+.nav-drawer__item--locked {
+  opacity: 0.5;
+  cursor: default;
+}
+
+/* --- Нет связи (2026-11-12) --------------------------------------------- */
+.net-banner {
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  margin: 0;
+  padding: 8px 16px;
+  background: rgba(120, 20, 30, 0.92);
+  color: #fff;
+  font-size: 13px;
+  text-align: center;
+}
