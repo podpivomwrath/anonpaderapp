@@ -43,6 +43,8 @@ class _RuinsStage:
         self.gifts = self.ctx.get("gifts") or []
         self.name, self.elite_name, self.primary, self.label = rules.mob_kind(layout)
         self.ids: list[int] = []
+        #: рядовые мобы (не элита, не хозяин, не сундук) - с них руна, rc.COMMON_RUNE_CHANCE
+        self.common_ids: list[int] = []
         self.ticks = 0
         #: кого в этом бою спасла «Чужая молитва» - оркестрация пишет в забег
         self.prayer_used: list[int] = list(self.ctx.get("prayer_used") or [])
@@ -198,7 +200,7 @@ class RoomStage(_RuinsStage):
             self._add(session, self._mob("Сундук с зубами", rc.ELITE_HP, rc.ELITE_DMG, "agi", "кусает"))
             count -= 1
         for _ in range(count):
-            self._add(session, self._mob(self.name, rc.MOB_HP, rc.MOB_DMG))
+            self.common_ids.append(self._add(session, self._mob(self.name, rc.MOB_HP, rc.MOB_DMG)).id)
         return []
 
 

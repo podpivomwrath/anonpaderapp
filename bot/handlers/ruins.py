@@ -605,12 +605,13 @@ async def on_room_won(session_id: int, battle) -> None:
         used[cid] = floor_used.get(cid, 0) + spent
     reward = set(getattr(stage, "reward_ids", set()))
     kills = sum(1 for i in reward if combatants.get(i) is not None and not combatants[i].alive)
+    common = sum(1 for i in getattr(stage, "common_ids", []) if combatants.get(i) is not None and not combatants[i].alive)
     bosses = len(stage.bosses) if isinstance(stage, BossRoom) else 0
     async with get_session_factory()() as db:
         run = await ruins_service.lock(db, battle.ruin_run_id)
         if run is None or run.status != ruins_service.ACTIVE:
             return
-        found = await ruins_service.room_won(db, run, hp, used, _rng, kills=kills,
+        found = await ruins_service.room_won(db, run, hp, used, _rng, kills=kills, common_kills=common,
                                              prayer_used=list(getattr(stage, "prayer_used", []) or []),
                                              top_hp=top, bosses=bosses)
         boss = run.phase == ruins_service.CLEARED

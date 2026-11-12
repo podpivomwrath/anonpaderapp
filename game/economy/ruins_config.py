@@ -184,6 +184,11 @@ RUNE_DIE_CHANCE_ELITE = 0.25
 FLOORS_PER_RUNE_DIE = 5
 
 
+#: Руна с каждого убитого рядового моба (не элита, не хозяин, не сундук) -
+#: каждому живому, в мешок (2026-11-12, владелец). Клеймо Хранителя - чаще.
+COMMON_RUNE_CHANCE = 0.03
+
+
 def rune_die_chance(floor: int) -> float:
     return RUNE_DIE_CHANCE if floor % 5 == 0 else RUNE_DIE_CHANCE_ELITE
 

@@ -187,6 +187,40 @@ async def test_walk_fight_bag_and_exit(db_session, make_character) -> None:
     assert sum(t.count for t in trophies) == sum(paid[a.id]["trophies"].values())
 
 
+async def test_room_kills_count_for_quest_and_drop_runes(db_session, make_character, monkeypatch) -> None:
+    """2026-11-12 (владелец): мобы руин не шли в задание «убей N» и счётчик
+    убийств; руна с рядового моба 3% - каждому живому, в мешок."""
+    from services import quest_service
+
+    a, b = await _party(make_character)
+    run = await ruins_service.start(db_session, a, [a, b], random.Random(1))
+    run.pos = next(i for i in rules.rooms_of(run.layout) if i not in (run.layout["start"], run.layout["boss"]))
+    run.extra = {"fight": {"kind": rules.FIGHT}}
+    quest_kills: list[int] = []
+
+    async def _record(db, character):
+        quest_kills.append(character.id)
+
+    monkeypatch.setattr(quest_service, "record_kill", _record)
+    monkeypatch.setattr(rc, "COMMON_RUNE_CHANCE", 1.0)
+    found = await ruins_service.room_won(db_session, run, {a.id: 500, b.id: 0}, {}, random.Random(0),
+                                         kills=3, common_kills=2)
+    assert len(found[a.id]["runes"]) == 2 and not found[b.id]["runes"], "руны - живым, по одной за рядового"
+    ma = next(m for m in await ruins_service.members(db_session, run.id) if m.character_id == a.id)
+    assert sum(ma.bag["runes"].values()) == 2
+    assert quest_kills == [a.id] * 3, "в задание - каждый убитый, павшему нет"
+    assert a.mobs_killed == b.mobs_killed == 2, "счётчик - доля группы, как в мире"
+
+
+def test_only_common_mobs_drop_runes() -> None:
+    for room in (rules.FIGHT, rules.ELITE, rules.BOSS):
+        session = CombatSessionState(session_id=1, mode=CombatMode.PVE, is_raid=True)
+        stage = RoomStage(1000, {"floor": 1, "mobs": 0}, room, 3)
+        stage._setup_enemies(session)
+        assert len(stage.common_ids) == len(stage.ids) - (room != rules.FIGHT)
+        assert set(stage.common_ids) <= set(stage.ids)
+
+
 async def test_next_floor_resets_potions(db_session, make_character) -> None:
     (a,) = await _party(make_character, 1)
     run = await ruins_service.start(db_session, a, [a], random.Random(1))

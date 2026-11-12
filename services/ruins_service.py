@@ -503,14 +503,25 @@ def fight_kind(run: RuinRun) -> str:
 
 async def room_won(db: AsyncSession, run: RuinRun, hp: dict[int, int], used: dict[int, int],
                    rng: random.Random, *, kills: int = 0, prayer_used: list[int] | None = None,
-                   top_hp: dict[int, int] | None = None, bosses: int = 0) -> dict[int, dict]:
+                   top_hp: dict[int, int] | None = None, bosses: int = 0,
+                   common_kills: int = 0) -> dict[int, dict]:
     """Комната зачищена. hp - здоровье после боя (0 - пал), used - зелий
     выпито на этаже, top_hp - максимум здоровья в бою, bosses - сколько
-    уникальных боссов было в зале. Живые кладут в мешок трофеи; за хозяина -
+    уникальных боссов было в зале, kills - убито всего, common_kills - из них
+    рядовых. Живые кладут в мешок трофеи и руны с рядовых; за хозяина -
     кубики рун и подъём павших; за первого уникального - ларцы рун сразу.
+    Убитые идут в задание наставника «убей N» и счётчик убийств, как в
+    групповом бою в мире (2026-11-12: не шли).
     Вернёт находки: {id: {"trophies", "runes", "raised", "chests"}}."""
     from game.economy import brand_config as brc
-    from services import lootbox_service, premium_service, resist_service, rune_service
+    from services import (
+        lootbox_service,
+        premium_service,
+        quest_service,
+        resist_service,
+        rune_service,
+    )
+    from services.group_combat_service import group_kills_share
 
     fight = (run.extra or {}).get("fight") or {}
     kind = fight.get("kind") or rules.room_kind(run.layout, run.pos)
@@ -526,12 +537,18 @@ async def room_won(db: AsyncSession, run: RuinRun, hp: dict[int, int], used: dic
     dice_bonus = (1 if gifts_mod.has(run.gifts, "greedy_palm") else 0) + (2 if gifts_mod.has(run.gifts, "heavy_bag") else 0)
     first_floor = boss and run.floor % 5 == 0
     found: dict[int, dict] = {}
-    for m in await members(db, run.id):
+    party = await members(db, run.id)
+    kills_each = group_kills_share(kills, len(party))
+    for m in party:
         if m.character_id in hp:
             m.hp = hp[m.character_id]
             m.dead = m.hp <= 0
         if m.character_id in used:
             m.consumables_used = used[m.character_id]
+        if kills_each:
+            killer = await db.get(Character, m.character_id)
+            if killer is not None:
+                killer.mobs_killed += kills_each
         m.hp_before = None
         top = top_hp.get(m.character_id) or await max_hp(db, m.character_id, run.gifts)
         got: dict = {"trophies": {}, "runes": []}
@@ -540,6 +557,16 @@ async def room_won(db: AsyncSession, run: RuinRun, hp: dict[int, int], used: dic
             _bag_trophies(m, drop)
             got["trophies"] = drop
             character = await db.get(Character, m.character_id)
+            if character is not None:
+                for _ in range(kills):
+                    await quest_service.record_kill(db, character)
+                # Руна с рядового моба (2026-11-12, владелец) - в мешок, как с хозяина.
+                chance = rc.COMMON_RUNE_CHANCE * (brc.RUNE_DROP_MULT if premium_service.is_brand(character) else 1.0)
+                for _ in range(common_kills):
+                    if rng.random() < chance:
+                        rune_id = rune_service.roll_rune(rng)
+                        m.bag = _add(m.bag or {}, "runes", rune_id, 1)
+                        got["runes"].append(rune_id)
             # Перстень Несгоревшего (2026-11-06, владелец): как с мобов
             # исследования - бросок за каждого убитого, сразу игроку, мимо мешка.
             if character is not None:
