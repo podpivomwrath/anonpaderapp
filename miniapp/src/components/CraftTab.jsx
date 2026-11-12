@@ -143,7 +143,9 @@ function ResultSheet({ result, onClose }) {
       {item && <b className={nameClass}>{item.name}</b>}
       {result.enchant_after !== undefined ? (
         <p className="forge-result__big">
-          {result.enchant_success ? '' : 'Откат: '}+{result.enchant_before} → +{result.enchant_after}
+          {result.enchant_success && `+${result.enchant_before} → +${result.enchant_after}`}
+          {!result.enchant_success && result.enchant_before === result.enchant_after && `Не вышло: осталось +${result.enchant_after}`}
+          {!result.enchant_success && result.enchant_before !== result.enchant_after && `Откат: +${result.enchant_before} → +${result.enchant_after}`}
         </p>
       ) : result.efficiency_after ? (
         <p className="forge-result__big">{result.efficiency_before}% → {result.efficiency_after}%</p>
