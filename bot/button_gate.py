@@ -26,6 +26,7 @@ TYPED_INPUTS: dict[str, str] = {
     "guild.prayer_command": "команда «/часовня сила» - со слешем, фильтр её пропускает",
     "group_events.on_pot_stake": "_pot_scene_of: ставка в Котле",
     "promo.try_activate_promo": "код промо существует в базе",
+    "pets.code_typed": "CodeTyped: прислан ровно код Странной руны (иначе молчим)",
     "pvp.join_via_text": "_pending_join_prompt, пока тот бой идёт",
     "raid_archive.on_answer": "ArchiveAnswer: этап загадок",
     "rift.cancel": "кнопка «Отмена» (метка есть), FuncRule только сужает",
@@ -60,6 +61,11 @@ async def _typed_input_expected(message: Message) -> bool:
     if group_events._pot_scene_of(peer) is not None:
         return True
     if stats_window.typed_alloc_expected(message):
+        return True
+    # Код Странной руны (2026-11-12): пропускается только точный код.
+    from bot.handlers import pets
+
+    if pets.is_code(message.text):
         return True
     for rule in (arena.CodeInput(), raid_archive.ArchiveAnswer(), scene_events.RiddleAnswer(),
                  scene_events.StakeAnswer()):

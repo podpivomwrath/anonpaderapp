@@ -481,6 +481,7 @@ function bundleNotice(item, done) {
   if (done.until) return `${item.emoji} ${item.title} действует до ${untilText(done.until)}.`;
   if (item.id === 'house') return '🏠 Дом ваш: кнопка «Дом» теперь на площади родного города.';
   if (item.id === 'ash_donka') return '🪝 Донка ваша: у озера появится кнопка «Поставить донку».';
+  if (item.id === 'pet_ferret') return '🦡 Хорёк с вами: он уже в слоте питомца в «Герое».';
   return `${item.emoji} ${item.title} - готово.`;
 }
 
@@ -559,7 +560,7 @@ export default function ShopTab({ onWallet, onBought }) {
                 {i.kind === 'days' ? `от 💎 ${money(i.prices[i.min])}` : `💎 ${money(i.price)}`}
               </span>
               {i.active_until && <span className="shop-card__badge">{i.kind === 'days' ? 'активна' : 'действует'}</span>}
-              {['secret_pocket', 'courier', 'house', 'ash_donka'].includes(i.id) && i.available === false && <span className="shop-card__badge">есть</span>}
+              {['secret_pocket', 'courier', 'house', 'ash_donka', 'pet_ferret'].includes(i.id) && i.available === false && <span className="shop-card__badge">есть</span>}
             </button>
           ))}
         </div>

@@ -332,6 +332,9 @@ async def player_card(db: AsyncSession, character_id: int) -> dict | None:
     resist_mods = await resist_service.modifiers(db, character, rune_service.combat_modifiers(character, False))
     elixirs = await elixir_service.get_stock(db, character_id)
     owned_mounts = await mount_service.owned_mounts(db, character_id)
+    from services import pet_service
+
+    owned_pets = await pet_service.owned_ids(db, character_id)
     mount_travel = await mount_service.active_travel(db, character_id)
     active_preset = await preset_service.get_active_preset(db, character_id)
     song_progress = await song_service.get_progress(db, character_id)
@@ -415,6 +418,11 @@ async def player_card(db: AsyncSession, character_id: int) -> dict | None:
             {"mount_id": m.mount_id, "name": m.name, "rarity": m.rarity, "emoji": m.emoji,
              "rarity_title": naming.rarity_title(m.rarity)}
             for m in owned_mounts
+        ],
+        # Питомцы (2026-11-12): кто есть и кто в слоте.
+        "pets": [
+            {"pet_id": pid, "label": pet_service.label(pid), "active": pid == character.pet_id}
+            for pid in owned_pets
         ],
         "story_progress": [
             {"region": row.region, "region_title": naming.region_title(row.region),
@@ -531,7 +539,8 @@ async def wallet_journal(db: AsyncSession, character_id: int) -> list[dict]:
     ]
 
 
-RESOURCE_KINDS = {"ore": "⛏", "fish": "🐟", "herb": "🌿", "food": "🍲", "elixir": "🧪", "trophy": "💀", "item": "⚔️", "dust": "✨"}
+RESOURCE_KINDS = {"ore": "⛏", "fish": "🐟", "herb": "🌿", "food": "🍲", "elixir": "🧪", "trophy": "💀", "item": "⚔️", "dust": "✨",
+                  "pet": "🐾"}
 
 
 async def _resource_label(db: AsyncSession, kind: str, ref: str) -> str:
@@ -563,6 +572,11 @@ async def _resource_label(db: AsyncSession, kind: str, ref: str) -> str:
         return f"{item.name} #{head}" if item else f"вещь #{head}"
     if kind == "dust":
         return "Звёздная пыль"
+    if kind == "pet":
+        from services import pet_service
+
+        d = pet_service.pet_def(head)
+        return f"питомец {d.name}" if d else head
     return ref
 
 

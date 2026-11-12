@@ -50,6 +50,20 @@ def ambush_chance(mount_id: str) -> float:
     return mc.RARITY_AMBUSH_CHANCE.get(rarity, mc.RARITY_AMBUSH_CHANCE["common"])
 
 
+def flies(mount_id: str | None) -> bool:
+    """Летающий маунт: путь только прямой, в полёте игрока нет на клетке."""
+    d = mount_def(mount_id) if mount_id else None
+    return bool(d is not None and d.flies)
+
+
+def flying_query():
+    """id персонажей, что сейчас летят (для «кто на клетке»)."""
+    flyers = [m.id for m in _defs().values() if m.flies]
+    return select(MountTravel.character_id).where(
+        MountTravel.status == "traveling", MountTravel.mount_id.in_(flyers),
+    )
+
+
 def display_name(d: MountDef, nickname: str | None) -> str:
     """«Турбоишак Алексей» - если игрок дал маунту имя."""
     return f"{d.name} {nickname}" if nickname else d.name
@@ -195,6 +209,7 @@ async def start_travel(
     """step_seconds - шаг, если он не от маунта (у повозки - от лошадей).
     safe - безопасный путь в обход колец опаснее цели (дольше прямой)."""
     now = now or datetime.now(timezone.utc)
+    safe = safe and not flies(mount_id)
     path = route(character.pos_x, character.pos_y, to_x, to_y, safe) if safe else None
     cells = len(path) if path is not None else grid.cells_between(character.pos_x, character.pos_y, to_x, to_y)
     if step_seconds is not None:

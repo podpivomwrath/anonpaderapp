@@ -20,6 +20,9 @@ TITLE_NAMES = {
     "pvp_first": "Первый клинок",
     "pvp_crimson": "Багряный клинок",
     "pvp_steel": "Стальной клинок",
+    # Секрет (2026-11-12): разбудил Пепельного дракона (pet_service.claim_dragon).
+    # Один на весь мир. Нигде не объявляется до того, как его получат.
+    "seeker": "Искатель",
 }
 
 
@@ -34,6 +37,7 @@ TITLE_TIERS = {
     "pvp_first": "legendary",
     "pvp_crimson": "epic",
     "pvp_steel": "rare",
+    "seeker": "legendary",
 }
 
 

@@ -196,7 +196,8 @@ async def season_close(db: AsyncSession, now: datetime | None = None) -> list[Pv
     Пятёрка лучших по PTS среди тех, кто провёл SEASON_MIN_FIGHTS боёв:
     титул на следующий сезон и самоцветы. Сезонные титулы прошлых
     победителей снимаются. Пусто - закрывать нечего или уже закрыто."""
-    from services import title_service, wallet_service
+    from game.economy import pet_config
+    from services import pet_service, title_service, wallet_service
 
     key = season_key(now)
     prev = await db.scalar(select(Character.pts_season).where(
@@ -235,6 +236,9 @@ async def season_close(db: AsyncSession, now: datetime | None = None) -> list[Pv
         character.active_title_id = result.title_id
         await wallet_service.deposit(db, character.id, "donate", result.gems, taxable=False,
                                      reason="pts_service.season_close")
+        # Ворон тройке лучших (2026-11-12): навсегда, второй раз не выдаётся.
+        if result.place in pet_config.RAVEN_PLACES:
+            result.raven = await pet_service.grant(db, character, pet_config.RAVEN)
     await db.flush()
     return results
 

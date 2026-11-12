@@ -324,13 +324,29 @@ async def collect_ash_handful(message: Message) -> None:
             ash_handful_state.clear(peer_id)
             await message.answer(ASH_BURNED_LINE)
             return
+        await db.commit()
+    ash_handful_state.clear(peer_id)
+    await dig_ash(peer_id, message.from_id, ASH_FOUND_TEXT, with_keyboard=True)
+
+
+ASH_FOUND_TEXT = "У ног - горстка пепла, слишком плотная для простой золы. В ней блестит."
+
+
+async def dig_ash(peer_id: int, vk_id: int, intro: str, with_keyboard: bool = False) -> None:
+    """Горстка пепла собрана: награда и сообщение. Кнопкой (with_keyboard -
+    клавиатура карты, как раньше) или хорьком (2026-11-12, bot/pet_finds.py):
+    тогда клавиатура остаётся той, что уже стоит, - после группового боя она
+    своя."""
+    async with get_session_factory()() as db:
+        character = await onboarding_svc.get_character(db, vk_id)
+        if character is None or character.creation_state is not None:
+            return
         stats = await world._get_stats(db, character.id)
         result = await ash_service.collect(db, character, stats, world._rng)
-        ash_handful_state.clear(peer_id)
         has_mount = await mount_service.has_any_mount(db, character.id)
         await db.commit()
 
-    text = "У ног - горстка пепла, слишком плотная для простой золы. В ней блестит."
+    text = intro
     xp_line = display.xp_delta_line(result.xp, premium=result.xp_premium_applied)
     if xp_line:  # на 60 уровне опыта нет - и строки нет
         text += "\n\n" + xp_line
@@ -348,9 +364,9 @@ async def collect_ash_handful(message: Message) -> None:
         text += f"\n\n{daily_notice}"
     # Сводку локации заново не шлём: игрок на той же клетке, она только что
     # была выше (2026-10-13). Клавиатура карты остаётся рабочей.
-    await message.answer(
-        text, keyboard=kb.movement_keyboard(character.pos_x, character.pos_y, peer_id, has_mount=has_mount),
-    )
+    keyboard = (kb.movement_keyboard(character.pos_x, character.pos_y, peer_id, has_mount=has_mount)
+                if with_keyboard else None)
+    await world._bot_api.messages.send(peer_id=peer_id, message=text, random_id=0, keyboard=keyboard)
     await stats_window.notify_levelup(peer_id, result.levels_gained, result.new_level)
     for c in (result.daily.completed if result.daily is not None else []):
         await stats_window.notify_levelup(peer_id, c.levels_gained, c.new_level)
@@ -656,15 +672,14 @@ async def event_choice(message: Message) -> None:
     for c in result.daily_completed:
         await stats_window.notify_levelup(peer_id, c.levels_gained, c.new_level)
         await group_texts.notify_group_kick(world._bot_api, c.group_kick)
-    if ash_service.roll_appears(world._rng):
-        ash_handful_state.mark(peer_id, (character.pos_x, character.pos_y))
     await message.answer(
         world._map_text(character, stats, farm_currency, gear_bonus, quest_line, donate_currency, group_block),
         attachment=location_attachment(character),
         keyboard=kb.movement_keyboard(character.pos_x, character.pos_y, peer_id, has_mount=has_mount),
     )
-    if ash_handful_state.is_pending(peer_id):
-        await message.answer(kb.ASH_OFFER_TEXT, keyboard=kb.ash_handful_keyboard())
+    from bot import pet_finds  # цикл импортов
+
+    await pet_finds.after_explore(peer_id, character.id, (character.pos_x, character.pos_y), world._rng)
     from bot.handlers import herbs as herb_handlers  # цикл импортов
 
     await herb_handlers.notify(peer_id, character)

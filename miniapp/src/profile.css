@@ -373,6 +373,8 @@ button.slot-row:not(:disabled):active,
 .gear-slot--epic { --rar: var(--rar-epic); }
 .gear-slot--legendary { --rar: var(--rar-legendary); }
 .gear-slot--unique { --rar: var(--rar-unique); }
+/* Питомец (2026-11-12): свой цвет рамки, без мерцания редкости. */
+.gear-slot--pet.gear-slot--filled { --rar: var(--rar-epic); }
 
 .gear-slot--epic,
 .gear-slot--legendary,

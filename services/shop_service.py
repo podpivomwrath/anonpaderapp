@@ -134,7 +134,7 @@ async def buy_brand(db: AsyncSession, character: Character, days: int) -> dateti
     return character.brand_until
 
 
-def catalog(character: Character, gems: int, firm_name: str | None = None) -> dict:
+def catalog(character: Character, gems: int, firm_name: str | None = None, has_ferret: bool = False) -> dict:
     until = character.premium_until
     active = premium_service.is_premium(character)
     return {
@@ -151,7 +151,7 @@ def catalog(character: Character, gems: int, firm_name: str | None = None) -> di
             "note": "Без силовых преимуществ: характеристики, урон и здоровье не меняются. Срок складывается с оставшимся.",
             "active_until": until.isoformat() if active and until is not None else None,
         }, brand_item(character), elixir_pack_item(), tincture_item(character), pocket_item(character), faction_item(character),
-            courier_item(character), donka_item(character), *house_items(character),
+            courier_item(character), donka_item(character), ferret_item(has_ferret), *house_items(character),
             *rename_items(character, firm_name)],
     }
 
@@ -586,6 +586,42 @@ async def buy_courier(db: AsyncSession, character: Character) -> None:
 
 DONKA_ID = "ash_donka"
 DONKA_PRICE = 500
+
+
+# --- Хорёк-сыщик (питомец, 2026-11-12) ---
+
+FERRET_ID = "pet_ferret"
+
+
+def ferret_item(owned: bool) -> dict:
+    from game.economy import pet_config as pc
+
+    return {
+        "id": FERRET_ID, "title": "Хорёк-сыщик", "emoji": "🦡", "kind": "bundle", "price": pc.FERRET_PRICE,
+        "perks": [
+            "Питомец: встаёт в слот питомца в «Герое»",
+            "Сам раскапывает горстки пепла: кнопку жать не нужно, находка сразу у вас",
+            "Горстка больше не сгорает, если вы нажали «Исследовать» и не подобрали её",
+            "Покупается один раз и навсегда",
+        ],
+        "note": "Без силовых преимуществ: питомцы не дают характеристик. Питомцев можно менять в любой момент.",
+        "available": not owned,
+        "unavailable": "Хорёк уже с вами.",
+    }
+
+
+async def buy_ferret(db: AsyncSession, character: Character) -> None:
+    from game.economy import pet_config as pc
+    from services import pet_service
+
+    if await pet_service.owns(db, character.id, pc.FERRET):
+        raise ShopError("Хорёк уже с вами.")
+    await _charge(db, character, pc.FERRET_PRICE)
+    if not await pet_service.grant(db, character, pc.FERRET):
+        raise ShopError("Хорёк уже с вами.")
+    # Купил - значит, хочет его сразу: в слот, даже если там другой питомец.
+    character.pet_id = pc.FERRET
+    await db.flush()
 
 
 def donka_item(character: Character) -> dict:

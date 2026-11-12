@@ -211,6 +211,8 @@ class Character(Base):
     ring_id: Mapped[str | None] = mapped_column(String(16), nullable=True)
     #: Перстень Несгоревшего (2026-11-02) - второе кольцо, сопротивления.
     resist_ring: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
+    #: Питомец в слоте (2026-11-12, services/pet_service.py); None - слот пуст.
+    pet_id: Mapped[str | None] = mapped_column(String(24), nullable=True)
     perm_stat_pct: Mapped[float] = mapped_column(default=0.0, server_default="0")
     # Состояние добычи. Добыча БЛОКИРУЕТ все действия, пока идёт, и живёт в
     # БД, а не в памяти: она длится минутами (до полутора часов новичку в

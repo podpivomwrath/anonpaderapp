@@ -714,6 +714,9 @@ class MountDef(BaseModel):
     #: Свои числа поверх редкости (Турбоишак: быстрый, но шумный).
     seconds_per_cell: float | None = None
     ambush_chance: float | None = None
+    #: Летит (Пепельный дракон, 2026-11-12): всегда по прямой, в пути его не
+    #: видно с земли - ни тварям, ни игрокам не достать.
+    flies: bool = False
 
 
 def load_mounts(content_dir: Path = CONTENT_DIR) -> dict[str, MountDef]:

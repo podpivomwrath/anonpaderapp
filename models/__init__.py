@@ -44,6 +44,7 @@ from models.lootbox import CharacterLootbox
 from models.mining import CharacterCraftTool, CharacterOre, MineVein, MiningEvent
 from models.payment import GemPayment
 from models.mount import CharacterMount, MountTravel, TurboIshakDay
+from models.pet import AshDragon, CharacterPet
 from models.promo import PromoActivation, PromoCode
 from models.pvp import PvpBattle, PvpSeasonResult
 from models.quest import CharacterQuest, Quest
@@ -68,6 +69,7 @@ from models.world_boss import WorldBoss, WorldBossContribution, WorldBossMeter
 
 __all__ = [
     "AdminAction",
+    "AshDragon",
     "Base",
     "BaseClass",
     "BugReport",
@@ -86,6 +88,7 @@ __all__ = [
     "CharacterLootbox",
     "CharacterMount",
     "CharacterOre",
+    "CharacterPet",
     "CharacterQuest",
     "CharacterRune",
     "CharacterRuneMastery",

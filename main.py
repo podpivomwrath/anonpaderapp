@@ -417,6 +417,25 @@ async def run() -> None:
     buff_expiry.setup(bot.api)
     respawn_scheduler.add_job(buff_expiry.tick_job, "interval", seconds=buff_expiry.TICK_SECONDS,
                              id="buff_expiry", max_instances=1, coalesce=True)
+    # Питомцы (2026-11-12): ворон оглядывается, гончая обновляет клеймёных,
+    # руна раз в час бормочет код.
+    from bot import hound, raven
+    from bot.handlers import pets as pets_handlers
+    from game.economy import pet_config
+
+    raven.setup(bot.api)
+    pets_handlers.setup(bot.api)
+    try:
+        await pets_handlers.load_code()
+    except Exception:
+        logger.exception("Код руны не загрузился - фильтр набранного текста его пока не пропустит")
+    respawn_scheduler.add_job(raven.scan, "interval", seconds=pet_config.RAVEN_SCAN_SECONDS,
+                             id="pet_raven", max_instances=1, coalesce=True)
+    respawn_scheduler.add_job(hound.refresh, "interval", seconds=hound.REFRESH_SECONDS,
+                             id="pet_hound", max_instances=1, coalesce=True,
+                             next_run_time=datetime.now(timezone.utc))
+    respawn_scheduler.add_job(pets_handlers.rune_job, "interval", minutes=pet_config.RUNE_MESSAGE_MINUTES,
+                             id="pet_rune", max_instances=1, coalesce=True)
     # Смена фракции, купленная в бою, - переезд, когда бой кончился.
     from bot import miniapp_shop_api
 

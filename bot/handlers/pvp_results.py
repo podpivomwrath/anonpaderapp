@@ -493,6 +493,11 @@ async def notify_season_results() -> None:
                 continue
             try:
                 await pvp._bot_api.messages.send(peer_id=user.vk_id, random_id=0, message=season_result_text(result))
+                if result.raven:
+                    from bot import pet_texts
+
+                    await pvp._bot_api.messages.send(peer_id=user.vk_id, random_id=0, message=pet_texts.RAVEN_SEASON,
+                                                     attachment=pet_texts.photo("raven"))
             except Exception:
                 logger.warning("Сезон PvP: итог не доставлен {}", user.vk_id)
         await db.commit()

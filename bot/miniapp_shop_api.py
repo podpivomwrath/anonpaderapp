@@ -24,7 +24,12 @@ async def _catalog(db, character) -> dict:
 
     wallet = await wallet_service.get_wallet(db, character.id)
     firm = await trade_service.get_firm(db, character.id)
-    return shop_service.catalog(character, wallet.donate_currency, firm.name if firm is not None else None)
+    from game.economy import pet_config
+    from services import pet_service
+
+    has_ferret = await pet_service.owns(db, character.id, pet_config.FERRET)
+    return shop_service.catalog(character, wallet.donate_currency, firm.name if firm is not None else None,
+                                has_ferret=has_ferret)
 
 
 async def handle_get(request: web.Request) -> web.Response:
@@ -44,6 +49,7 @@ BUYABLE = (
     shop_service.PREMIUM_ID, shop_service.BRAND_ID, shop_service.PAIR_ID, shop_service.RENAME_ID, shop_service.FIRM_RENAME_ID,
     shop_service.ELIXIR_PACK_ID, shop_service.TINCTURE_ID, shop_service.POCKET_ID,
     shop_service.FACTION_ID, shop_service.COURIER_ID, shop_service.HOUSE_ID, shop_service.DONKA_ID,
+    shop_service.FERRET_ID,
 )
 
 
@@ -96,6 +102,9 @@ async def handle_post(request: web.Request) -> web.Response:
             elif item == shop_service.DONKA_ID:
                 await shop_service.buy_donka(db, character)
                 done = {"item": item}
+            elif item == shop_service.FERRET_ID:
+                await shop_service.buy_ferret(db, character)
+                done = {"item": item}
             elif item == shop_service.FACTION_ID:
                 region = body.get("region")
                 voyage_text = await shop_service.change_faction(db, character, region, defer=busy)
@@ -123,12 +132,30 @@ async def handle_post(request: web.Request) -> web.Response:
         done["name"] = next(i for i in state["items"] if i["id"] == item)["current"]
     if moved is not None:
         await after_faction_move(peer_id, *moved)
+    if item == shop_service.FERRET_ID:
+        await _tell_ferret(peer_id)
     if item == shop_service.TINCTURE_ID:
         from bot import buff_notice
 
         buff_notice.tell(peer_id, buff_notice.line(character, "tincture", "выпита"))
     state["done"] = done
     return web.json_response(state)
+
+
+async def _tell_ferret(peer_id: int) -> None:
+    """Хорёк куплен - сцена в чат: мини-апп закроют, а чат останется."""
+    from loguru import logger
+
+    from bot import pet_texts
+    from bot.handlers import world
+
+    if world._bot_api is None:
+        return
+    try:
+        await world._bot_api.messages.send(peer_id=peer_id, message=pet_texts.FERRET_BOUGHT, random_id=0,
+                                           attachment=pet_texts.photo("ferret"))
+    except Exception:
+        logger.warning("Хорёк: сообщение о покупке не доставлено {}", peer_id)
 
 
 async def faction_blocker(peer_id: int, character) -> str | None:

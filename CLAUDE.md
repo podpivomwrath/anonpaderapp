@@ -83,3 +83,9 @@ python tools/broadcast.py - [--hours 24] [--photo N] --send`. Скрипт са�
 - **Новое ремесло или уровень**: шкала опыта под логом (`display.craft_xp_line`),
   карточка в админке, опыт в походах (`voyage_service.CRAFTS`).
 - **Вкладки мини-аппа** - только `components/ScrollTabs.jsx`, не `Tabs` из VKUI.
+- **Новый питомец**: id в `game/economy/pet_config.py` (`ORDER`), тексты в
+  `content/pets/pets.json`, иконка `pet:<id>` (`tools/icon_assets.py`), сцена
+  находки - `bot/pet_texts.py` (`PHOTOS`, `bot/pet_finds.FOUND`). Выдача только
+  через `pet_service.grant`. Статов питомцы не дают - механика в своём модуле
+  (`bot/pet_finds.py`, `bot/raven.py`, `bot/hound.py`, `bot/handlers/pets.py`).
+  Пепельный дракон в мире один: второго не выдавать, код руны нигде не подсказывать.

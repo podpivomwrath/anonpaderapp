@@ -48,4 +48,6 @@ class PvpSeasonResult(Base):
     title_id: Mapped[str] = mapped_column(String(32))
     gems: Mapped[int] = mapped_column(Integer)
     notified: Mapped[bool] = mapped_column(Boolean, default=False)
+    #: Ворон выдан за это место (2026-11-12): у повторного призёра его нет.
+    raven: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())

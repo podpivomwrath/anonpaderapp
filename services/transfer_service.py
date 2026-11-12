@@ -1,7 +1,9 @@
 """Передача предметов и валюты между игроками.
 
 Можно: золото, самоцветы, расходники, руду, экипировку (включая уникальные
-боссовые вещи вроде Скальпеля Хирурга), травы, рыбу и блюда (2026-10-21).
+боссовые вещи вроде Скальпеля Хирурга), травы, рыбу и блюда (2026-10-21),
+Пепельного дракона (2026-11-12: «огромная разменная монета», владелец) - на
+любое расстояние, как валюту: дракон долетит сам.
 Нельзя: скованную экипировку (она привязана при ковке), надетое, служебное
 и трофеи. Рыба передаётся стаком «вид + градация» целиком: у неё вес, а не
 штуки.
@@ -166,6 +168,26 @@ async def _craft_offers(db: AsyncSession, character_id: int, name: str) -> list[
     ]
 
 
+async def _dragon_offer(db: AsyncSession, character_id: int, name: str) -> Lookup | None:
+    """Пепельный дракон: единственный маунт, который передаётся."""
+    from game.economy import pet_config as pc
+    from models import CharacterMount
+    from services import mount_service
+
+    d = mount_service.mount_def(pc.DRAGON_MOUNT_ID)
+    if d is None or name not in (name_key(d.name), "дракон"):
+        return None
+    owned = await db.scalar(select(CharacterMount.id).where(
+        CharacterMount.character_id == character_id, CharacterMount.mount_id == d.id,
+    ))
+    if owned is None:
+        return None
+    travel = await mount_service.active_travel(db, character_id)
+    if travel is not None and travel.mount_id == d.id:
+        return Lookup([], "Вы сейчас летите на драконе - сначала приземлитесь.")
+    return Lookup([Offer("mount", d.id, f"🐉 {d.name}", 1, stackable=False)])
+
+
 def is_transferable(item: Item, equipped: bool) -> str | None:
     """None - можно; иначе причина отказа. Сначала то, что не передать
     никогда, потом «сначала сними»."""
@@ -211,6 +233,10 @@ async def find(db: AsyncSession, character_id: int, name: str, number: int | Non
     craft = await _craft_offers(db, character_id, name)
     if craft:
         return Lookup(craft)
+
+    dragon = await _dragon_offer(db, character_id, name)
+    if dragon is not None:
+        return dragon
 
     matches = [(item, equipped) for item, equipped in await item_service.get_inventory(db, character_id)
                if name_key(item.name) == name]
@@ -350,6 +376,22 @@ async def take(db: AsyncSession, sender_id: int, offer: Offer, amount: int) -> i
         if not taken.rowcount:
             raise TransferFailed("Этой рыбы у вас уже нет.")
         _log_stack(db, CharacterFish, {"character_id": sender_id, "fish_id": fish_id, "grade": grade}, -int(grams))
+    elif offer.kind == "mount":
+        from models import CharacterMount, MountTravel
+
+        flying = await db.scalar(select(MountTravel.id).where(
+            MountTravel.character_id == sender_id, MountTravel.mount_id == offer.ref,
+            MountTravel.status.in_(("traveling", "ambushed")),
+        ))
+        if flying is not None:
+            raise TransferFailed("Вы сейчас летите на драконе - сначала приземлитесь.")
+        moved = await db.execute(
+            delete(CharacterMount).where(
+                CharacterMount.character_id == sender_id, CharacterMount.mount_id == offer.ref,
+            ).execution_options(synchronize_session="fetch")
+        )
+        if not moved.rowcount:
+            raise TransferFailed("Дракона у вас уже нет.")
     elif offer.kind == "item":
         item = await db.get(Item, int(offer.ref), with_for_update=True)
         if item is None or item.bound or item.craft_spec is not None:
@@ -389,6 +431,10 @@ async def give(db: AsyncSession, recipient_id: int, kind: str, ref: str | None, 
         await _credit_stack(db, CharacterOre, {"character_id": recipient_id, "ore_id": ore_id, "grade": grade}, amount)
     elif kind == "item":
         db.add(Inventory(character_id=recipient_id, item_id=int(ref), equipped=False))
+    elif kind == "mount":
+        from models import CharacterMount
+
+        db.add(CharacterMount(character_id=recipient_id, mount_id=ref))
     elif kind == "rune":
         from models import CharacterRune
 

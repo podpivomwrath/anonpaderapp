@@ -863,10 +863,13 @@ function PlayerCard({ card, onRefresh }) {
         </Fold>
       )}
 
-      <Fold title={<>Маунты</>}>
+      <Fold title={<>Маунты и питомцы</>}>
         {card.mounts.length === 0 && <Div style={{ opacity: 0.7 }}>Маунтов нет.</Div>}
         {card.mounts.map((m) => (
           <StatRow key={m.mount_id} label={`${m.emoji} ${m.name}`} value={m.rarity_title || m.rarity} />
+        ))}
+        {(card.pets || []).map((pet) => (
+          <StatRow key={pet.pet_id} label={pet.label} value={pet.active ? 'питомец, в слоте' : 'питомец'} />
         ))}
         {card.mount_travel && (
           <StatRow

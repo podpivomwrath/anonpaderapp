@@ -577,6 +577,29 @@ async def _grant_blood_chests(battle: raid_combat.RaidBattle) -> None:
             logger.exception("Разлом: не доставлены ларцы {}", p.peer_id)
 
 
+async def _grant_pet_drops(battle: raid_combat.RaidBattle) -> None:
+    """Питомцы (2026-11-12): в разломе каждому участнику свой бросок на
+    Призрачную гончую; с босса рейда - один бросок на Странную руну, и она
+    достаётся тому, у кого её ещё нет. Победа общая - павшие тоже в счёт."""
+    from bot import pet_finds
+    from game.economy import pet_config as pc
+    from services import pet_service
+
+    rng = battle.rng
+    if battle.is_rift:
+        for cid, p in list(battle.participants.items()):
+            if rng.random() < pc.HOUND_DROP_CHANCE:
+                await pet_finds.grant_and_tell(raid_combat._bot_api, p.peer_id, cid, pc.HOUND)
+        return
+    if rng.random() >= pc.RUNE_DROP_CHANCE:
+        return
+    async with raid_combat.get_session_factory()() as db:
+        free = [cid for cid in battle.participants if not await pet_service.owns(db, cid, pc.RUNE)]
+    if free:
+        cid = rng.choice(free)
+        await pet_finds.grant_and_tell(raid_combat._bot_api, battle.participants[cid].peer_id, cid, pc.RUNE)
+
+
 async def _finish_victory(session_id: int, battle: raid_combat.RaidBattle) -> None:
     await _grant_pending_rewards(battle)
     if battle.is_rift:
@@ -585,6 +608,10 @@ async def _finish_victory(session_id: int, battle: raid_combat.RaidBattle) -> No
             await _grant_blood_chests(battle)
     else:
         await _grant_stage_clear_bonus(battle)
+    try:
+        await _grant_pet_drops(battle)
+    except Exception:
+        logger.exception("Питомцы: выпадение после победы не сыграло")
     texts = raid_combat._texts(battle)
     await _cleanup_and_return(session_id, battle, texts.EPILOGUE_TEXT, defeated=False)
 

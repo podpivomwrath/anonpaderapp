@@ -13,17 +13,15 @@ from loguru import logger
 from vkbottle import BaseStateGroup
 from vkbottle.bot import BotLabeler, Message
 
-from bot import ash_handful_state, dailies_texts, editable_message, group_texts, raid_key_texts, short_log
+from bot import dailies_texts, editable_message, group_texts, raid_key_texts, short_log
 from bot.handlers import stats_window
 from bot.keyboards import combat_modes
 from bot.keyboards.combat_items import combat_items_keyboard, page_of
 from bot.keyboards.items import no_keyboard
 from bot.keyboards.world import (
-    ASH_OFFER_TEXT,
     BTN_ATTACK,
     BTN_FLEE,
     BTN_ITEM,
-    ash_handful_keyboard,
     combat_keyboard,
     empty_keyboard,
     movement_keyboard,
@@ -57,7 +55,6 @@ from game.world import encounters, grid
 from game.world import flavor as world_flavor
 from game.world.location_types import region_for
 from services import (
-    ash_service,
     elixir_service,
     encounter_service,
     item_service,
@@ -721,8 +718,6 @@ async def on_battle_finished(session_id: int, result: TickResult) -> None:
             await mount_handlers.offer_continue(peer_id, travel_id)
             return
 
-        if ash_service.roll_appears(_rng):
-            ash_handful_state.mark(peer_id, (character.pos_x, character.pos_y))
         await _bot_api.messages.send(
             peer_id=peer_id,
             message=location_summary(
@@ -731,10 +726,10 @@ async def on_battle_finished(session_id: int, result: TickResult) -> None:
             random_id=0, attachment=location_attachment(character),
             keyboard=movement_keyboard(character.pos_x, character.pos_y, peer_id, has_mount=has_mount),
         )
-        if ash_handful_state.is_pending(peer_id):
-            await _bot_api.messages.send(
-                peer_id=peer_id, message=ASH_OFFER_TEXT, random_id=0, keyboard=ash_handful_keyboard(),
-            )
+        # Горстка пепла (с хорьком - сразу находка) и питомцы (2026-11-12).
+        from bot import pet_finds
+
+        await pet_finds.after_explore(peer_id, character.id, (character.pos_x, character.pos_y), _rng, won=True)
         from bot.handlers import herbs as herb_handlers  # цикл импортов
 
         await herb_handlers.notify(peer_id, character)

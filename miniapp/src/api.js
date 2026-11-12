@@ -282,6 +282,15 @@ export function disassembleItem(itemId) {
 
 // Слот кольца (2026-11-03): action 'wear' (ring - id из сумки, надетое
 // уходит в сумку) или 'remove'. Ответ - { ring_slot }.
+// Слот питомца (2026-11-12): взять питомца с собой или оставить дома.
+export function petAction(action, pet = null) {
+  return request('/pet', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ action, pet }),
+  });
+}
+
 export function ringAction(action, ring = null) {
   return request('/ring', {
     method: 'POST',

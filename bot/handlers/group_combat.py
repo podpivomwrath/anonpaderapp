@@ -20,7 +20,7 @@ from vkbottle.bot import BotLabeler, Message
 
 from bot.keyboards import combat_modes
 from bot.keyboards.combat_items import page_of
-from bot import ash_handful_state, dailies_texts, editable_message, group_texts, raid_key_texts, short_log
+from bot import dailies_texts, editable_message, group_texts, raid_key_texts, short_log
 from bot import trial_tracking
 from bot.handlers import respawn as respawn_handlers
 from bot.battle_keyboard import answer_battle_gone
@@ -35,7 +35,7 @@ from bot.keyboards.group_combat import (
     group_waiting_keyboard,
 )
 from bot.keyboards.items import no_keyboard
-from bot.keyboards.world import ASH_OFFER_TEXT, ash_handful_keyboard, empty_keyboard, movement_keyboard
+from bot.keyboards.world import empty_keyboard, movement_keyboard
 from game.combat.battle_report import BattleReport
 from game.combat import balance_config as bc
 from game.combat import battle_log, display, elixir_effects
@@ -55,7 +55,6 @@ from game.combat import consumable_limit
 from game.economy import elixir_config as ec
 from models import Character, CharacterStats
 from services import (
-    ash_service,
     daily_service,
     elixir_service,
     encounter_service,
@@ -943,12 +942,11 @@ async def on_group_battle_finished(session_id: int, result: TickResult) -> None:
             # группового боя её не было вовсе - только строка о победе.
             await _send_location_summary(cid, p.peer_id, keyboard)
             # Горстка пепла - каждому своя (2026-10-13): у одного выпала,
-            # у другого нет, как после соло-победы.
-            if ash_service.roll_appears(_rng):
-                ash_handful_state.mark(p.peer_id, positions.get(cid))
-                await _bot_api.messages.send(
-                    peer_id=p.peer_id, message=ASH_OFFER_TEXT, random_id=0, keyboard=ash_handful_keyboard(),
-                )
+            # у другого нет, как после соло-победы. С хорьком - сразу
+            # находка, и питомцы (2026-11-12, bot/pet_finds.py).
+            from bot import pet_finds
+
+            await pet_finds.after_explore(p.peer_id, cid, positions.get(cid), _rng, won=True)
             await _notify_herb(cid, p.peer_id)
         elif cid in dead_ids and cid in defeats:
             defeat, respawn_at = defeats[cid]

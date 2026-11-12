@@ -663,6 +663,37 @@ async def handle_post_ring(request: web.Request) -> web.Response:
         return web.json_response({"ring_slot": slot})
 
 
+async def handle_post_pet(request: web.Request) -> web.Response:
+    """Слот питомца (2026-11-12): взять питомца в слот (прежний ждёт в
+    «Герое») или убрать. Менять можно где угодно, даже в бою: статов у
+    питомцев нет. Ответ - новое состояние слота."""
+    from services import pet_service
+
+    vk_user_id = request[VK_USER_ID_KEY]
+    try:
+        body = await request.json()
+    except Exception:
+        return web.json_response({"error": "bad_request"}, status=400)
+    if not isinstance(body, dict) or body.get("action") not in ("wear", "remove"):
+        return web.json_response({"error": "bad_request"}, status=400)
+
+    async with request.app[SESSION_FACTORY_KEY]() as session:
+        character = await miniapp_api._load_character(session, vk_user_id)
+        if character is None:
+            return web.json_response({"error": "character_not_found"}, status=404)
+        try:
+            if body["action"] == "wear":
+                await pet_service.wear(session, character, str(body.get("pet")))
+            else:
+                await pet_service.remove(session, character)
+        except pet_service.PetError as exc:
+            await session.rollback()
+            return web.json_response({"error": str(exc)}, status=400)
+        slot = await pet_service.payload(session, character)
+        await session.commit()
+        return web.json_response({"pet_slot": slot})
+
+
 async def handle_post_disassemble(request: web.Request) -> web.Response:
     """Разобрать уникальную вещь в звёздную пыль (2026-10-22). Подтверждение -
     в мини-аппе вторым нажатием; надетую не разобрать."""

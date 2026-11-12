@@ -14,6 +14,7 @@ STATE: dict[str, str] = {
     "bot.activity._owners": "выход из activity.transition (finally)",
     "bot.handlers.guild._watch_seen": "записи старше кулдауна дозора выбрасываются при каждой новой",
     "bot.ash_handful_state._pending": "сбор горстки, новое исследование, уход с клетки",
+    "bot.raven._seen": "отметки старше RAVEN_REPEAT_MINUTES выбрасываются каждым обходом ворона",
     "bot.background._tasks": "готовая задача сама себя снимает (done_callback)",
     "bot.craft_button_state._last_cell": "перезапись при входе на другую клетку; размер - число игроков",
     "bot.editable_message._tracked": "clear() при новом окне и закрытии",

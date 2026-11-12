@@ -28,6 +28,7 @@ from services import (
     lootbox_service,
     mining_service,
     mount_service,
+    pet_service,
     trophy_service,
     wallet_service,
 )
@@ -190,6 +191,9 @@ def catalog() -> list[dict]:
         {"id": "food", "title": "🍲 Еда", "entries": dishes},
         {"id": "purchases", "title": "🏠 Разовые покупки", "entries": purchases},
         {"id": "mounts", "title": "🐎 Маунты", "entries": mounts},
+        {"id": "pets", "title": "🐾 Питомцы", "entries": [
+            _entry(f"pet:{pid}", pet_service.label(pid), "one") for pid in pet_service.defs()
+        ]},
         {"id": "runes", "title": "🪨 Руны", "entries": runes_entries},
     ]
 
@@ -370,9 +374,19 @@ async def grant(
         if getattr(character, rest[0]):
             raise GrantError("Это у игрока уже есть.")
         setattr(character, rest[0], True)
+    elif kind == "pet":
+        if not await pet_service.grant(db, character, rest[0]):
+            raise GrantError("Этот питомец у игрока уже есть.")
     elif kind == "mount":
         if rest[0] == mount_cfg.ADMIN_MOUNT_ID:
             await _require_self(db, admin_vk_id, character)
+        # Дракон в мире один (2026-11-12): выдать можно, только если его ни у кого нет.
+        if mount_service.flies(rest[0]):
+            from services import pet_service as pets
+
+            holder = await pets.dragon_owner(db)
+            if holder is not None:
+                raise GrantError(f"Дракон уже у {holder.name}. Он в мире один.")
         if not await mount_service.grant(db, character, rest[0]):
             raise GrantError("Этот маунт у игрока уже есть.")
     else:

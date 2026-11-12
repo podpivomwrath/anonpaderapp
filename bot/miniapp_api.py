@@ -17,7 +17,7 @@ from bot import dailies_texts, top_places
 from bot.miniapp_auth import VK_USER_ID_KEY
 from game.combat import balance_config as bc
 from game.economy import crafting
-from services import naming, ring_slot_service, subclass_service, transfer_service
+from services import naming, pet_service, ring_slot_service, subclass_service, transfer_service
 from bot.onboarding_texts import REGION_TITLES
 from config import Settings
 from models import BaseClass, Character, User
@@ -215,6 +215,8 @@ async def handle_get_character(request: web.Request) -> web.Response:
         # Слот кольца (2026-11-03): один на оба перстня - что на пальце и
         # что в сумке. None - перстней нет, слот пустой.
         payload["ring_slot"] = await ring_slot_service.payload(session, character)
+        # Слот питомца (2026-11-12): кто с вами и кто ждёт. None - питомцев нет.
+        payload["pet_slot"] = await pet_service.payload(session, character)
         # Отметка у «Заданий» в меню (2026-11-12): сколько ежедневных не сделано.
         overview = await daily_service.get_dailies_overview(session, character)
         payload["dailies_left"] = sum(1 for q in overview.quests if not q.completed)
@@ -264,6 +266,7 @@ async def handle_post_stats(request: web.Request) -> web.Response:
         mods = await preset_service.resolve_active_modifiers(session, character)
         payload = _character_payload(character, gear_bonus, wallet, _is_admin(request, vk_user_id), titles, mods)
         payload["ring_slot"] = await ring_slot_service.payload(session, character)
+        payload["pet_slot"] = await pet_service.payload(session, character)
         await session.commit()
         return web.json_response(payload)
 
@@ -689,6 +692,7 @@ def register_routes(app: web.Application) -> None:
     app.router.add_post("/api/miniapp/unequip", handle_post_unequip)
     app.router.add_post("/api/miniapp/resist-ring", handle_post_resist_ring)
     app.router.add_post("/api/miniapp/ring", handle_post_ring)
+    app.router.add_post("/api/miniapp/pet", handle_post_pet)
     app.router.add_post("/api/miniapp/disassemble", handle_post_disassemble)
     app.router.add_post("/api/miniapp/chest/open", handle_post_chest_open)
     app.router.add_post("/api/miniapp/eat", handle_post_eat)
@@ -739,6 +743,7 @@ from bot.miniapp_inventory_api import (
     handle_post_disassemble,
     handle_post_eat,
     handle_post_equip,
+    handle_post_pet,
     handle_post_resist_ring,
     handle_post_ring,
     handle_post_unequip,

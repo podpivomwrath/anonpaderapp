@@ -195,6 +195,13 @@ EXTRA_FILES = {
     "dish:coal_flounder": "еда_камбала.png",
     "dish:deep_tear_root": "еда_слеза.png",
     "dish:monolith_feast": "еда_пир.png",
+    # Питомцы и дракон (tools/pets_art_prompts.md, 2026-11-12)
+    "pet:ferret": "питомец_хорек.png",
+    "pet:raven": "питомец_ворон.png",
+    "pet:ash_weaver": "питомец_плетельщик.png",
+    "pet:ghost_hound": "питомец_гончая.png",
+    "pet:strange_rune": "питомец_странная_руна.png",
+    "mount:ash_dragon": "маунт_пепельный_дракон.png",
 }
 
 BG_OUT = ROOT / "miniapp" / "src" / "assets"

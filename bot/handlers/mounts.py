@@ -25,7 +25,7 @@ from loguru import logger
 from vkbottle import BaseMiddleware, BaseStateGroup
 from vkbottle.bot import BotLabeler, Message
 
-from bot import group_texts
+from bot import group_texts, pet_texts
 from bot.dispatch_rules import TEXT_ONLY
 from bot.handlers import combat as combat_handlers
 from bot.handlers import pvp as pvp_handlers
@@ -188,11 +188,12 @@ def _chosen(owned: list, mount_id: str | None):
 
 
 def _ready_text(mount, character, safe: bool) -> str:
+    route = pet_texts.DRAGON_ROUTE_LINE if mount_service.flies(mount.mount_id) else _route_line(safe)
     return (
         f"{mount.emoji} {mount.name} готов в путь.\n"
         f"Вы в ({character.pos_x}; {character.pos_y}). Куда направиться? Пришлите координаты в формате X:Y "
         f"(не дальше {wc.WORLD_RADIUS} клеток от Монолита, например 12:-20).\n\n"
-        f"{_route_line(safe)}"
+        f"{route}"
     )
 
 
@@ -286,27 +287,31 @@ def _mounts_keyboard(owned: list, current) -> str:
 
 
 def _route_keyboard(safe: bool, targets: list[tuple[str, int, int]] | None = None,
-                    owned: list | None = None, current=None) -> str:
+                    owned: list | None = None, current=None) -> str | None:
+    """None - кнопок нет (у дракона нет выбора пути, а целей и других
+    маунтов может не быть): пустую клавиатуру VK не принимает."""
     from vkbottle import Keyboard, KeyboardButtonColor, Text
 
-    keyboard = Keyboard(inline=True)
+    buttons = []
     for label, x, y in targets or []:
-        keyboard.add(
-            # Дом - флагом: город сменили, пока кнопка висела в чате, -
-            # ехать в новый (2026-10-31).
-            Text(f"{label} ({x}; {y})", payload={"type": "mount_go", "x": x, "y": y,
-                                                 **({"home": True} if label == HOME_LABEL else {})}),
-            color=KeyboardButtonColor.PRIMARY,
-        )
-        keyboard.row()
-
-    keyboard.add(
-        Text("➡️ Сделать прямым" if safe else "🛡 Сделать безопасным", payload={"type": "mount_route_toggle"}),
-        color=KeyboardButtonColor.SECONDARY,
-    )
+        # Дом - флагом: город сменили, пока кнопка висела в чате, -
+        # ехать в новый (2026-10-31).
+        buttons.append((Text(f"{label} ({x}; {y})", payload={"type": "mount_go", "x": x, "y": y,
+                                                             **({"home": True} if label == HOME_LABEL else {})}),
+                        KeyboardButtonColor.PRIMARY))
+    # Дракон летит по прямой - переключать нечего.
+    if current is None or not mount_service.flies(current.mount_id):
+        buttons.append((Text("➡️ Сделать прямым" if safe else "🛡 Сделать безопасным",
+                             payload={"type": "mount_route_toggle"}), KeyboardButtonColor.SECONDARY))
     if owned and len(owned) > 1:
-        keyboard.row()
-        keyboard.add(Text(BTN_CHOOSE_MOUNT, payload={"type": "mount_choose"}), color=KeyboardButtonColor.SECONDARY)
+        buttons.append((Text(BTN_CHOOSE_MOUNT, payload={"type": "mount_choose"}), KeyboardButtonColor.SECONDARY))
+    if not buttons:
+        return None
+    keyboard = Keyboard(inline=True)
+    for i, (button, color) in enumerate(buttons):
+        if i:
+            keyboard.row()
+        keyboard.add(button, color=color)
     return keyboard.get_json()
 
 
@@ -458,6 +463,7 @@ async def start_travel_and_notify(
 
         fishing_handlers.cancel_bite(peer_id)
         fishing_service.clear_cast(character)
+    safe = safe and not mount_service.flies(mount_id)
     path = mount_service.route(from_x, from_y, to_x, to_y, safe)
     travel = await mount_service.start_travel(db, character, mount_id, to_x, to_y, _rng, now, safe=safe)
     from bot.handlers import guild as guild_handlers
@@ -477,7 +483,7 @@ async def start_travel_and_notify(
     await notify_travel_started(
         peer_id, to_x, to_y, seconds,
         mount_service.trip_ambush_chance(mount_id, from_x, from_y, to_x, to_y, path=path),
-        travel=travel, safe=safe,
+        icon="🐉" if mount_service.flies(mount_id) else "🐎", travel=travel, safe=safe,
     )
     return seconds
 
@@ -500,10 +506,19 @@ async def notify_travel_started(
         await _dispenser.delete(peer_id)
     if _bot_api is None:
         return
+    flying = travel is not None and mount_service.flies(travel.mount_id)
     text = (
         f"{icon} Путь начат{' безопасной дорогой' if safe else ''}: ({to_x}; {to_y}), {_format_seconds(seconds)}.\n"
-        f"Шанс нападения в пути: {round(ambush_chance * 100)}%."
+        + ("В полёте на вас не нападут." if flying else f"Шанс нападения в пути: {round(ambush_chance * 100)}%.")
     )
+    # Картинка полёта - отдельным сообщением: сообщение пути дальше правится,
+    # и вложение в нём не должно пропадать и мешать правке.
+    flight = pet_texts.photo("dragon_flight") if flying else None
+    if flight is not None:
+        try:
+            await _bot_api.messages.send(peer_id=peer_id, random_id=0, attachment=flight)
+        except Exception:
+            logger.warning("Не удалось отправить картинку полёта ({})", peer_id)
     try:
         resp = await _bot_api.messages.send(
             peer_id=peer_id, message=text, random_id=0, keyboard=kb.mount_travel_keyboard()
@@ -526,7 +541,7 @@ def _travel_text(travel, now: datetime) -> str:
     left = mount_service.remaining_seconds(travel, now)
     path = mount_service.path_of(travel)
     x, y = path[travel.cell_index - 1] if travel.cell_index else (travel.from_x, travel.from_y)
-    icon = "🐎"
+    icon = "🐉" if mount_service.flies(travel.mount_id) else "🐎"
     cells = mount_service.cells_left(travel)
     return (
         f"{icon} В пути: ({x}; {y}) → ({travel.to_x}; {travel.to_y}), "

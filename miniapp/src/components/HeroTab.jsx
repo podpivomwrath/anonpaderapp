@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Group, Header } from '@vkontakte/vkui';
 import {
-  equipItem, getCharacter, getGear, getInventory, getRunes, getTrophies, ringAction, setGender, unequipItem,
+  equipItem, getCharacter, getGear, getInventory, getRunes, getTrophies, petAction, ringAction, setGender, unequipItem,
 } from '../api.js';
 import CraftGear from './CraftGear.jsx';
 import RunesPage, { RuneRing } from './RunesPage.jsx';
@@ -357,6 +357,79 @@ function RingSlot({ slot, onAction }) {
   );
 }
 
+// Слот питомца (2026-11-12): один питомец с вами, остальные ждут здесь.
+// Статов питомцы не дают, только своё умение; менять можно когда угодно.
+// slot - {worn, bag} с сервера (pet_service.payload).
+function PetSlot({ slot, onAction }) {
+  const [open, setOpen] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState(null);
+  const worn = slot?.worn || null;
+  const bag = slot?.bag || [];
+  const art = worn ? itemIcon(worn.icon) : null;
+
+  async function act(action, pet = null) {
+    setBusy(true);
+    setError(null);
+    try {
+      await onAction(action, pet);
+      setOpen(false);
+    } catch (err) {
+      setError(err?.message?.includes(' ') ? err.message : 'Не вышло.');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <>
+      <button
+        type="button" data-slot="pet"
+        className={`gear-slot gear-slot--pet${worn ? ' gear-slot--filled' : ''}`}
+        style={{ top: '16%' }}
+        onClick={() => slot && setOpen(true)}
+        aria-label={worn ? `Питомец: ${worn.name}` : 'Питомец'}
+      >
+        {worn && art ? <img src={art} alt="" className="gear-slot__ring" /> : (
+          <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6"
+            aria-hidden="true">
+            <circle cx="6" cy="10" r="2" /><circle cx="10" cy="5.5" r="2" /><circle cx="14" cy="5.5" r="2" />
+            <circle cx="18" cy="10" r="2" /><path d="M8 17c0-3 2-5.5 4-5.5s4 2.5 4 5.5c0 2-2 2.5-4 2.5s-4-.5-4-2.5z" />
+          </svg>
+        )}
+      </button>
+      {open && slot && (
+        <Sheet title={worn ? worn.name : 'Питомец'} icon={worn ? worn.emoji : '🐾'} onClose={() => setOpen(false)}>
+          {worn ? (
+            <>
+              <p className="gear-sheet__effect">{worn.effect}.</p>
+              {worn.flavor && <p className="gear-sheet__flavor">{worn.flavor}</p>}
+              <button type="button" className="pill-btn" disabled={busy} onClick={() => act('remove')}>
+                Оставить дома
+              </button>
+            </>
+          ) : <p className="gear-sheet__flavor">Сейчас с вами никого нет.</p>}
+          {bag.length > 0 && <p className="gear-sheet__flavor">Ждут дома:</p>}
+          {bag.map((pet) => (
+            <div key={pet.id} className="ring-choice">
+              <ItemIcon icon={pet.icon} alt="" size={40} />
+              <div className="ring-choice__text">
+                <b>{pet.emoji} {pet.name}</b>
+                <span>{pet.effect}.</span>
+              </div>
+              <button type="button" className="pill-btn pill-btn--main" disabled={busy} onClick={() => act('wear', pet.id)}>
+                {worn ? 'Взять вместо' : 'Взять с собой'}
+              </button>
+            </div>
+          ))}
+          <p className="gear-sheet__flavor">Питомцы не дают характеристик, у каждого своё умение. Менять можно в любой момент.</p>
+          {error && <p className="hero-error">{error}</p>}
+        </Sheet>
+      )}
+    </>
+  );
+}
+
 export function GenderChoice({ character, onPick, busy }) {
   return (
     <Group>
@@ -476,6 +549,12 @@ export default function HeroTab({ character, onCharacterUpdate }) {
     refreshCharacter();
   }
 
+  // Ошибку показывает шторка питомца.
+  async function handlePet(action, pet) {
+    const res = await petAction(action, pet);
+    onCharacterUpdate((prev) => ({ ...prev, pet_slot: res.pet_slot }));
+  }
+
   async function handleEquip(itemId) {
     const slot = openSlot;
     setBusyId(itemId);
@@ -576,6 +655,7 @@ export default function HeroTab({ character, onCharacterUpdate }) {
           <BuffList buffs={gear?.buffs} />
           <div className="hero-row">
             <div className="hero-col hero-col--left">
+              {character.pet_slot && <PetSlot slot={character.pet_slot} onAction={handlePet} />}
               {SLOTS.filter((x) => x.side === 'left').map(slotButton)}
               <RingSlot slot={character.ring_slot} onAction={handleRing} />
             </div>

@@ -111,6 +111,12 @@ def location_summary(
     # На мирной клетке и так не нападают - строка о щите там лишняя.
     if shield_left and not grid.pvp_forbidden(x, y):
         monolith_block += f"🛡 Защита {shield_why}: на вас не нападут ещё {shield_left} сек.\n"
+    # Призрачная гончая (питомец, 2026-11-12): где ближайший с клеймом.
+    from bot import hound
+
+    hound_line = hound.line_for(character)
+    if hound_line:
+        monolith_block += hound_line + "\n"
     # Патч 58: озеро — как Монолит: кнопка приходит только при ВХОДЕ на
     # клетку, поэтому у воды обязана быть вторая дверь командой словом.
     # Патч 59: рудник — то же, что озеро. Запас руды показывается ДО спуска:
