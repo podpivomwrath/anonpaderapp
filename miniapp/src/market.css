@@ -91,6 +91,31 @@
   font-size: 14px;
 }
 
+/* Журнал сделок (репорт 356): время, что и сумма - по строке на сделку. */
+.market-trade {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: 8px;
+  align-items: baseline;
+  padding: 6px 16px;
+  font-size: 13px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.market-trade__when {
+  color: rgba(255, 255, 255, 0.5);
+  font-variant-numeric: tabular-nums;
+}
+
+.market-trade__what {
+  min-width: 0;
+}
+
+.market-trade__sum {
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
 .market-book {
   display: grid;
   grid-template-columns: 1fr 1fr;

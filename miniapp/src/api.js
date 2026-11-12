@@ -581,6 +581,11 @@ export function getMarket() {
   return request('/market');
 }
 
+// Последние 100 моих сделок (репорт 356).
+export function getMarketTrades() {
+  return request('/market?trades=1');
+}
+
 export function getMarketGood(key) {
   return request(`/market?good=${encodeURIComponent(key)}`);
 }

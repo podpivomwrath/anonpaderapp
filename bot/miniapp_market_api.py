@@ -110,6 +110,23 @@ def _item(item) -> dict:
     }
 
 
+async def _trades(db, character_id: int, limit: int = 20) -> list[dict]:
+    """Мои сделки, новые сверху. limit=TRADES_FULL - кнопка «Последние 100
+    сделок» (репорт 356: покупок не было видно, всё сливалось)."""
+    out = []
+    for t in await market_service.my_trades(db, character_id, limit):
+        out.append({
+            "good": t.good, "name": await market_service.label(db, t.good), "price": t.price, "qty": t.qty,
+            "side": "buy" if t.buyer_id == character_id else "sell",
+            "at": t.created_at.isoformat() if t.created_at else None,
+        })
+    return out
+
+
+#: Сколько сделок показывает «Последние 100 сделок».
+TRADES_FULL = 100
+
+
 async def _state(db, character) -> dict:
     wallet = await wallet_service.get_wallet(db, character.id)
     summary = await market_service.summary(db)
@@ -118,13 +135,7 @@ async def _state(db, character) -> dict:
         item = await db.get(Item, int(o.good.split(":", 1)[1]))
         if item is not None:
             showcase.append({**await _order(db, o), "item": _item(item), "mine": o.character_id == character.id})
-    trades = []
-    for t in await market_service.my_trades(db, character.id):
-        trades.append({
-            "good": t.good, "name": await market_service.label(db, t.good), "price": t.price, "qty": t.qty,
-            "side": "buy" if t.buyer_id == character.id else "sell",
-            "at": t.created_at.isoformat() if t.created_at else None,
-        })
+    trades = await _trades(db, character.id)
     return {
         "gold": wallet.farm_currency,
         "categories": [{"id": c, "title": t} for c, t in mc.CATEGORIES],
@@ -154,6 +165,8 @@ async def handle_get(request: web.Request) -> web.Response:
         if character is None:
             return _error("character_not_found", 404)
         await db.commit()
+        if request.query.get("trades"):
+            return web.json_response({"trades": await _trades(db, character.id, TRADES_FULL)})
         key = request.query.get("good")
         if key:
             if mc.good(key) is None:

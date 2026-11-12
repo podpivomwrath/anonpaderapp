@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Button, Div, Group, Header, Placeholder, TabsItem } from '@vkontakte/vkui';
-import { getMarket, getMarketGood, marketAction } from '../api.js';
+import { getMarket, getMarketGood, getMarketTrades, marketAction } from '../api.js';
 import ExchangeTab from './ExchangeTab.jsx';
 import ItemIcon from './ItemIcon.jsx';
 import PriceChart from './PriceChart.jsx';
@@ -321,7 +321,34 @@ function left(iso) {
   return `${h} ч`;
 }
 
+// «12.11 14:05»: время сделки в журнале (репорт 356).
+function when(iso) {
+  if (!iso) return '';
+  const d = new Date(iso);
+  const p = (n) => String(n).padStart(2, '0');
+  return `${p(d.getDate())}.${p(d.getMonth() + 1)} ${p(d.getHours())}:${p(d.getMinutes())}`;
+}
+
+function TradeLine({ t }) {
+  return (
+    <div className="market-trade">
+      <span className="market-trade__when">{when(t.at)}</span>
+      <span className="market-trade__what">
+        {t.side === 'buy' ? '🛒 Куплено' : '💰 Продано'}: {t.name} ×{t.qty} по {money(t.price)}
+      </span>
+      <span className="market-trade__sum">{t.side === 'buy' ? '-' : '+'}{money(t.price * t.qty)}</span>
+    </div>
+  );
+}
+
 function Mine({ data, act, busy }) {
+  const [full, setFull] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const openFull = () => {
+    setLoading(true);
+    getMarketTrades().then((d) => setFull(d.trades)).catch(() => setFull(null)).finally(() => setLoading(false));
+  };
+  const trades = full ?? data.trades;
   return (
     <>
       <Group header={<Header>📦 Куплено</Header>}>
@@ -356,13 +383,16 @@ function Mine({ data, act, busy }) {
           </div>
         ))}
       </Group>
-      {data.trades.length > 0 && (
-        <Group header={<Header>Сделки</Header>}>
-          {data.trades.map((t, i) => (
-            <Div key={i} className="market-line">
-              {t.side === 'buy' ? '🛒' : '💰'} {t.name} ×{t.qty} по {money(t.price)}
+      {trades.length > 0 && (
+        <Group header={<Header>{full ? `Последние сделки · ${full.length}` : 'Сделки'}</Header>}>
+          {trades.map((t, i) => <TradeLine key={i} t={t} />)}
+          {!full && data.trades.length >= 20 && (
+            <Div>
+              <Button size="m" mode="secondary" stretched loading={loading} onClick={openFull}>
+                Последние 100 сделок
+              </Button>
             </Div>
-          ))}
+          )}
         </Group>
       )}
     </>

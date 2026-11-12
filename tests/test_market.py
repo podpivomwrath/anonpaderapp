@@ -172,3 +172,20 @@ async def test_courier_brings_the_box(db_session, make_character) -> None:
     events = await courier_service.advance(db_session, set(), now=later)
     assert [e.kind for e in events] == ["delivered"]
     assert await _ore(db_session, buyer) == 5
+
+
+async def test_trade_log_goes_up_to_a_hundred(db_session, make_character) -> None:
+    """Репорт 356 (Ёста): видно было только 20 сделок без времени - покупки
+    сливались. Кнопка «Последние 100 сделок» берёт до 100, новые сверху."""
+    from bot.miniapp_market_api import TRADES_FULL, _trades
+
+    seller, buyer = await _pair(make_character, db_session)
+    await mining_service.add_ore(db_session, seller.id, "salt_quartz", "common", 100)
+    await ms.place_sell(db_session, seller, ORE, 120, 100)
+    for _ in range(30):
+        await ms.place_buy(db_session, buyer, ORE, 1, 100)
+    short = await _trades(db_session, buyer.id)
+    full = await _trades(db_session, buyer.id, TRADES_FULL)
+    assert len(short) == 20 and len(full) == 30
+    assert all(t["side"] == "buy" and t["at"] and t["qty"] == 1 for t in full)
+    assert (await _trades(db_session, seller.id, TRADES_FULL))[0]["side"] == "sell"
