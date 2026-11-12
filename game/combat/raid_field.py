@@ -45,18 +45,23 @@ class StageTick:
     frozen: list[int] = field(default_factory=list)
 
 
-def stage_hurt(player: CombatantState, amount: int, out: StageTick, *, through_shields: bool = False) -> int:
+def stage_hurt(
+    player: CombatantState, amount: int, out: StageTick, *, through_shields: bool = False,
+    shield_lines: bool = True,
+) -> int:
     """Урон механики рейда мимо резолвера (2026-10-22: одна функция на все
     рейды). Щиты держат его, как обычный удар; «Последний вздох» спасает, как
     в резолвере; гибель - в out.deaths, движок про такие смерти не знает.
     through_shields - только гибель всей группы, её щитом не закрыть.
+    shield_lines=False - строку «щит поглощает» вызов пишет сам, в своей
+    строке удара (взыскание Счетовода, 2026-11-13).
     Возвращает урон, дошедший до здоровья."""
     from game.combat.shared_rules import absorb_by_shields
 
     if amount <= 0 or not player.alive:
         return 0
     if not through_shields:
-        amount = absorb_by_shields(player, amount, out.lines)
+        amount = absorb_by_shields(player, amount, out.lines if shield_lines else [])
         if amount <= 0:
             return 0
     player.current_hp = max(0, player.current_hp - amount)

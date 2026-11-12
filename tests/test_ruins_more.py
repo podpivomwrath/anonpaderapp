@@ -300,11 +300,16 @@ def test_counter_debt_is_cut_by_block_stance_and_defend() -> None:
     assert counter_hit(me, defend) < round(full * 0.65)
 
     me.apply_effect(EffectKind.BLOCK_HEAL, 0.03, 3, me.id)
+    me.apply_effect(EffectKind.SHIELD_POOL, 300, 3, me.id)
     boss_id = stage.bosses[0].boss_id
     for _ in range(rc.COUNTER_MARKS):
         res = TickResult(hit_renders=[RenderedHit(1, boss_id, 0, 1, "бьёт", 500, False, False, False, 9000, 8500, 9000)])
         out = stage._enemy_tick(state, res, random.Random(1))
     assert any("Глухая оборона гасит удар" in x for x in out.lines), out.lines
+    # Одной строкой, как обычный удар: весь урон, в скобках щит и оборона.
+    debt = next(x for x in out.lines if "взыскивает долг" in x)
+    assert f"- {round(full * 0.65)} урона" in debt and "(щит поглотил" in debt and "оборона срезала" in debt, debt
+    assert not any("поглощает" in x for x in out.lines), out.lines
 
 
 def test_candles_heal_boss_and_go_out_with_her() -> None:

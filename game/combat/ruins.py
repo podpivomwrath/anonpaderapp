@@ -355,10 +355,20 @@ class Counter(RuinBoss):
         self.marks[top] = self.marks.get(top, 0) + 1
         if self.marks[top] >= rc.COUNTER_MARKS:
             self.marks[top] = 0
-            hurt = stage_hurt(c, counter_hit(c, result), out)
-            # Сколько отнял - в логе (2026-11-06, репорт 322: урон не было видно).
-            out.lines.append(f"📒 Счетовод взыскивает долг с {c.name}: {hurt} урона")
-            heal = shared_rules.recovered(c, shared_rules.block_heal_amount(c, hurt)) if c.alive else 0
+            full = round(c.max_hp * rc.COUNTER_HIT)
+            hit = counter_hit(c, result)
+            hurt = stage_hurt(c, hit, out, shield_lines=False)
+            # Одной строкой, как обычный удар (2026-11-13, владелец): весь урон
+            # после срезок, в скобках - щит и оборона. Раньше строка щита
+            # стояла отдельно, а в строке взыскания был только остаток.
+            notes = ""
+            if hit > hurt:
+                notes += f" (щит поглотил {hit - hurt})"
+            if full > hit:
+                notes += f" (🛡 оборона срезала {full - hit})"
+            out.lines.append(f"📒 Счетовод взыскивает долг с {c.name} - {hit} урона{notes}")
+            # Лечит удар по стойке, даже целиком ушедший в щит, - как в резолвере.
+            heal = shared_rules.recovered(c, shared_rules.block_heal_amount(c, hit)) if c.alive else 0
             if heal > 0:
                 c.current_hp = min(c.max_hp, c.current_hp + heal)
                 out.lines.append(f"🧱 Глухая оборона гасит удар: {c.name} +{heal} здоровья")
