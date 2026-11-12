@@ -4,9 +4,19 @@
 вошла, с тем здоровьем, с каким входила (services/ruins_service.recover).
 """
 
-from datetime import datetime
+from datetime import date, datetime
 
-from sqlalchemy import JSON, Boolean, DateTime, ForeignKey, Integer, String, func
+from sqlalchemy import (
+    JSON,
+    Boolean,
+    Date,
+    DateTime,
+    ForeignKey,
+    Integer,
+    String,
+    UniqueConstraint,
+    func,
+)
 from sqlalchemy.orm import Mapped, mapped_column
 
 from models.base import Base
@@ -67,3 +77,38 @@ class RuinMember(Base):
     consumables_used: Mapped[int] = mapped_column(Integer, default=0)
     bag: Mapped[dict] = mapped_column(JSON, default=dict)
     left_reason: Mapped[str | None] = mapped_column(String(12), nullable=True)
+    #: Топ руин (2026-11-13): этаж, хозяина которого игрок убил последним в
+    #: этом забеге, и когда. Изгнанный и погибшие сохраняют пройденное.
+    floors: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+    floors_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True, index=True)
+
+
+class RuinWeek(Base):
+    """Неделя топа руин подведена (понедельник по Москве). Строка ставится
+    до выдачи наград: второй одновременный вызов упрётся в ключ."""
+
+    __tablename__ = "ruin_weeks"
+
+    week_start: Mapped[date] = mapped_column(Date, primary_key=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class RuinWeekResult(Base):
+    """Призовое место недели топа руин: section - solo | group. Титул -
+    только у строки лучшего места игрока (в двух разделах он один)."""
+
+    __tablename__ = "ruin_week_results"
+    __table_args__ = (
+        UniqueConstraint("week_start", "section", "character_id", name="uq_ruin_week_result"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    week_start: Mapped[date] = mapped_column(Date, index=True)
+    section: Mapped[str] = mapped_column(String(8))
+    place: Mapped[int] = mapped_column(Integer)
+    character_id: Mapped[int] = mapped_column(ForeignKey("characters.id", ondelete="CASCADE"), index=True)
+    run_id: Mapped[int] = mapped_column(Integer)
+    floors: Mapped[int] = mapped_column(Integer)
+    chests: Mapped[int] = mapped_column(Integer)
+    title_id: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())

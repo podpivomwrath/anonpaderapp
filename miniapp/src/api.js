@@ -77,7 +77,7 @@ function buildUrl(path) {
 // возвращается в мини-апп из чата - там могло поменяться что угодно.
 // Опросы (карта, заказы) и админка в кэш не попадают.
 const CACHE_TTL_MS = 20000;
-const CACHED = /^\/(inventory|gear|runes|trophies|presets|trials|dailies|craft|board|leaderboard|shop|payments|guild|guild\/tree|trade|exchange|market)(\?|$)/;
+const CACHED = /^\/(inventory|gear|runes|trophies|presets|trials|dailies|craft|board|leaderboard|ruins_top|shop|payments|guild|guild\/tree|trade|exchange|market)(\?|$)/;
 const cache = new Map(); // path -> {at, data}
 const inflight = new Map(); // path -> Promise: одинаковые запросы одновременно - один поход
 
@@ -370,6 +370,11 @@ export function markSeasonSeen() {
 
 export async function getLeaderboard(board) {
   return request(`/leaderboard?board=${encodeURIComponent(board)}`);
+}
+
+// Топ руин (2026-11-13): board - ruins_solo | ruins_group.
+export async function getRuinsTop(board) {
+  return request(`/ruins_top?board=${encodeURIComponent(board)}`);
 }
 
 // Патч 92: какую рамку венца носить. board === null - снять рамку.

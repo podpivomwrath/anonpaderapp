@@ -23,6 +23,10 @@ TITLE_NAMES = {
     # Секрет (2026-11-12): разбудил Пепельного дракона (pet_service.claim_dragon).
     # Один на весь мир. Нигде не объявляется до того, как его получат.
     "seeker": "Искатель",
+    # Топ руин (2026-11-13): держатся неделю, ruins_top_service.close_week.
+    "ruins_first": "Первый в руинах",
+    "ruins_second": "Спустившийся",
+    "ruins_third": "Копатель",
 }
 
 
@@ -38,6 +42,9 @@ TITLE_TIERS = {
     "pvp_crimson": "epic",
     "pvp_steel": "rare",
     "seeker": "legendary",
+    "ruins_first": "legendary",
+    "ruins_second": "epic",
+    "ruins_third": "rare",
 }
 
 
@@ -74,6 +81,9 @@ TITLE_HOW = {
     "relentless": "365 дней серии ежедневных заданий",
     "chronicler": "Собрать Пепельную Песнь целиком",
     "season_lords": "Быть в лучшей гильдии сезона",
+    "ruins_first": "Первое место недели в топе руин",
+    "ruins_second": "Второе место недели в топе руин",
+    "ruins_third": "Третье место недели в топе руин",
 }
 
 

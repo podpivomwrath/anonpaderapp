@@ -32,6 +32,7 @@ from services import (
     lootbox_service,
     preset_service,
     quest_service,
+    ruins_top_service,
     song_service,
     story_service,
     stat_alloc_service,
@@ -515,7 +516,7 @@ async def handle_get_leaderboard(request: web.Request) -> web.Response:
             "boards": [
                 {"id": b, "title": leaderboard_service.BOARD_TITLES[b]}
                 for b in leaderboard_service.BOARDS
-            ],
+            ] + [{"id": b, "title": t} for b, t in ruins_top_service.BOARD_TITLES.items()],
             # Подсказка «?»: за что место и что даёт венец первого места.
             "crown": {
                 "rule": leaderboard_service.BOARD_RULES[board_id],
@@ -530,6 +531,71 @@ async def handle_get_leaderboard(request: web.Request) -> web.Response:
             "top": [row(e) for e in entries],
             "me": row(mine) if mine is not None and mine.rank > 10 else None,
             "total": len(full),
+        })
+
+
+async def handle_get_ruins_top(request: web.Request) -> web.Response:
+    """Топ руин (2026-11-13): ?board=ruins_solo|ruins_group. Строка - забег,
+    участники с флагом best (бледный - место игрока в другой строке выше).
+    Правила - services/ruins_top_service.py."""
+    from datetime import datetime, timezone
+
+    from game.economy import brand_config as brc
+    from game.economy import premium_config as prc
+
+    vk_user_id = request[VK_USER_ID_KEY]
+    section = ruins_top_service.BOARDS.get(request.query.get("board", ""))
+    if section is None:
+        return web.json_response({"error": "unknown_board"}, status=400)
+    session_factory = request.app[SESSION_FACTORY_KEY]
+    async with session_factory() as session:
+        character = await _load_character(session, vk_user_id)
+        if character is None:
+            return web.json_response({"error": "character_not_found"}, status=404)
+        start, rows = await ruins_top_service.week_rows(session, section)
+        best = await ruins_top_service.record(session, section)
+        mine = next(
+            (r for r in rows if any(m.best and m.character_id == character.id for m in r.members)), None,
+        )
+        shown = rows[:10] + ([mine] if mine is not None and mine.rank > 10 else [])
+        ids = {m.character_id for r in [*shown, *([best] if best else [])] for m in r.members}
+        people = {
+            c.id: c for c in (await session.scalars(select(Character).where(Character.id.in_(ids)))).all()
+        } if ids else {}
+        frames = await crown_service.frames_by_id(session, list(ids))
+        now = datetime.now(timezone.utc)
+
+        def who(m):
+            c = people.get(m.character_id)
+            if c is None:
+                return None
+            branded = c.brand_until is not None and c.brand_until > now
+            premium = c.premium_until is not None and c.premium_until > now
+            return {
+                "name": c.name, "best": m.best, "me": c.id == character.id,
+                "base_class": c.base_class, "subclass": c.subclass,
+                "title": title_service.name_of(c.active_title_id) if c.active_title_id else None,
+                "title_tier": title_service.tier_of(c.active_title_id),
+                "badge": brc.BRAND_BADGE if branded else prc.PREMIUM_BADGE if premium else "",
+                "crown_frame": frames.get(c.id),
+            }
+
+        def row(r):
+            return {
+                "rank": r.rank, "value": ruins_top_service.floors_text(r.floors), "size": r.size,
+                "members": [x for x in (who(m) for m in r.members) if x is not None],
+            }
+
+        return web.json_response({
+            "board": request.query.get("board"),
+            "week": ruins_top_service.week_label(start),
+            "rule": ruins_top_service.RULE + (f" {ruins_top_service.GROUP_RULE}" if section == ruins_top_service.GROUP else ""),
+            "prizes": ruins_top_service.prizes_text(),
+            "record": row(best) if best else None,
+            "top": [row(r) for r in rows[:10]],
+            "me": row(mine) if mine is not None and mine.rank > 10 else None,
+            "my_rank": mine.rank if mine is not None else None,
+            "total": len(rows),
         })
 
 
@@ -702,6 +768,7 @@ def register_routes(app: web.Application) -> None:
     app.router.add_post("/api/miniapp/presets/buy_slot", handle_post_preset_buy_slot)
     app.router.add_post("/api/miniapp/presets/runes", handle_post_preset_runes)
     app.router.add_get("/api/miniapp/leaderboard", handle_get_leaderboard)
+    app.router.add_get("/api/miniapp/ruins_top", handle_get_ruins_top)
     app.router.add_get("/api/miniapp/dailies", handle_get_dailies)
 
 

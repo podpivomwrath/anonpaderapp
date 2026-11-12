@@ -1098,6 +1098,31 @@ body.lite .eff-ladder__step--next { animation: none; }
 .top-moved--up { color: var(--up); }
 .top-moved--down { color: var(--down); }
 
+/* Топ руин (2026-11-13): в строке группы - все участники столбиком;
+   бледный - у игрока место выше, в другой строке. */
+.ruins-team {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.ruins-member {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.ruins-member--pale { opacity: 0.45; }
+
+.ruins-record {
+  margin: 0;
+  padding: 4px 16px 10px;
+  font-size: 13px;
+  line-height: 1.4;
+}
+
 /* Своя строка, когда ты ниже десятки, - прилипает к низу экрана. */
 .top-mine {
   position: sticky;

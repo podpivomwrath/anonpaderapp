@@ -592,6 +592,10 @@ async def room_won(db: AsyncSession, run: RuinRun, hp: dict[int, int], used: dic
             m.dead = False
             m.hp = rc.RAISE_HP
             got["raised"] = True
+        if boss:
+            # Топ руин (2026-11-13): этаж пройден всеми, кто в забеге, и павшими тоже.
+            m.floors = run.floor
+            m.floors_at = _now()
         if boss and gifts_mod.has(run.gifts, "bandage"):
             m.hp = min(top, m.hp + round(top * rc.BANDAGE_HEAL))
         if first_floor:

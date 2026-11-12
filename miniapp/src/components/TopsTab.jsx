@@ -4,6 +4,7 @@ import Tabs from './ScrollTabs.jsx';
 import { getLeaderboard } from '../api.js';
 import ClassIcon from './ClassIcon.jsx';
 import Skeleton from './Skeleton.jsx';
+import RuinsBoard from './RuinsBoard.jsx';
 import { Empty, Podium, SectionHead } from './ui.jsx';
 import { useSavedTab } from '../savedTab.js';
 import { useBackClose } from '../backStack.js';
@@ -21,7 +22,12 @@ const DEFAULT_BOARDS = [
   { id: 'fishing', title: '🎣 Рыбалка' },
   { id: 'fish_weight', title: '🐟 Рекорды по рыбе' },
   { id: 'mining', title: '⛏ Горное дело' },
+  { id: 'ruins_solo', title: '🏛 Руины: одиночки' },
+  { id: 'ruins_group', title: '🏛 Руины: группы' },
 ];
+
+// Топ руин живёт своим компонентом: строка там - забег группы, а не игрок.
+const isRuins = (id) => id.startsWith('ruins_');
 
 const EMPTY_HINTS = {
   pvp: 'В этом сезоне ещё никто не дрался в PvP.',
@@ -82,6 +88,7 @@ export default function TopsTab() {
   const [total, setTotal] = useState(0);
 
   useEffect(() => {
+    if (isRuins(board)) return undefined;
     let cancelled = false;
     setStatus('loading');
     getLeaderboard(board)
@@ -116,21 +123,23 @@ export default function TopsTab() {
         ))}
       </Tabs>
 
-      {status === 'loading' && (
+      {isRuins(board) && <RuinsBoard board={board} />}
+
+      {!isRuins(board) && status === 'loading' && (
         <Skeleton />
       )}
 
-      {status === 'error' && (
+      {!isRuins(board) && status === 'error' && (
         <Placeholder icon={<div style={{ fontSize: 48 }}>🕯️</div>}>
           Не удалось загрузить топ.
         </Placeholder>
       )}
 
-      {status === 'ready' && top.length === 0 && (
+      {!isRuins(board) && status === 'ready' && top.length === 0 && (
         <Group><Empty icon="🕯️">{EMPTY_HINTS[board] || 'Пока пусто.'}</Empty></Group>
       )}
 
-      {status === 'ready' && top.length > 0 && (
+      {!isRuins(board) && status === 'ready' && top.length > 0 && (
         <>
           <SectionHead
             kind="tops" icon="🏆"
@@ -169,7 +178,7 @@ export default function TopsTab() {
           )}
         </>
       )}
-      {helpOpen && crown && (
+      {!isRuins(board) && helpOpen && crown && (
         <>
           <div className="nav-scrim" onClick={() => setHelpOpen(false)} aria-hidden="true" />
           <div className="crown-sheet top-help-sheet" role="dialog" aria-label="Венцы">

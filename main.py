@@ -436,6 +436,15 @@ async def run() -> None:
                              next_run_time=datetime.now(timezone.utc))
     respawn_scheduler.add_job(pets_handlers.rune_job, "interval", minutes=pet_config.RUNE_MESSAGE_MINUTES,
                              id="pet_rune", max_instances=1, coalesce=True)
+    # Топ руин (2026-11-13): итог недели в 00:00 понедельника по Москве; при
+    # старте - догнать пропущенный (повторный вызов ничего не делает).
+    from bot import ruins_top
+
+    ruins_top.setup(bot.api)
+    respawn_scheduler.add_job(
+        ruins_top.week_job, "cron", day_of_week="mon", hour=0, minute=0, timezone="Europe/Moscow",
+        id="ruins_week", max_instances=1, coalesce=True, next_run_time=datetime.now(timezone.utc),
+    )
     # Смена фракции, купленная в бою, - переезд, когда бой кончился.
     from bot import miniapp_shop_api
 
