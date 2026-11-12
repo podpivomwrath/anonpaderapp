@@ -47,7 +47,9 @@ def test_numbers() -> None:
     assert [rc.mob_count(n) for n in (1, 2, 3, 4, 5)] == [2, 3, 5, 5, 5]
     # 2026-11-11: кубик рун - на каждые 5 этажей, этажи тяжелее
     assert [rc.rune_dice(f) for f in (1, 5, 6, 10, 11, 20)] == [1, 1, 2, 2, 3, 4]
-    assert rc.rooms_range(3) == (3, 4) and rc.rooms_range(6) == (4, 7)
+    # 2026-11-12: меньше 4 комнат не бывает - в 3 не успевали набрать даров
+    assert rc.rooms_range(3) == (4, 5) and rc.rooms_range(6) == (4, 7)
+    assert min(rc.rooms_range(f)[0] for f in range(1, 30)) == 4
     assert rc.floor_mult(1) == 1.0 and rc.floor_mult(21) == 2.0
     assert rc.rot(10) == 0.2 and rc.rot(40) == rc.ROT_MAX
     assert rc.room_loot("fight", 10) == 1 and rc.room_loot("fight", 11) == 2

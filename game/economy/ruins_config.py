@@ -20,9 +20,11 @@ MAX_PARTY = 5
 
 #: Сколько комнат на этаже, вход и босс включительно. 2026-11-11 (владелец:
 #: руины «душные»): было 5-10, на первых этажах - разминка в 3-4 комнаты.
+#: 2026-11-12 (владелец): минимум 4 - в 3 комнатах не успевали набрать даров,
+#: разминка стала 4-5.
 ROOMS_MIN, ROOMS_MAX = 4, 7
 EARLY_FLOORS = 5
-EARLY_ROOMS_MIN, EARLY_ROOMS_MAX = 3, 4
+EARLY_ROOMS_MIN, EARLY_ROOMS_MAX = 4, 5
 
 
 def rooms_range(floor: int) -> tuple[int, int]:
