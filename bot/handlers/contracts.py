@@ -93,10 +93,10 @@ async def notify_bought(bought: contract_service.Buyout, target_name: str) -> No
     notes = []
     if bought.contract.orderer_id:
         notes.append((bought.contract.orderer_id, (
-            f"📜 {target_name} откупился от вашего заказа и узнал, что заказчик - вы. Остаток заказа сгорел, "
+            f"📜 {target_name} откупается от вашего заказа и узнаёт, что заказчик - вы. Остаток заказа сгорел, "
             f"снова заказать {target_name} можно через {cc.BUYOUT_REORDER_HOURS} ч."
         )))
-    notes += [(cid, f"📜 {target_name} откупился - заказ на него снят.") for cid in bought.taker_ids]
+    notes += [(cid, f"📜 {target_name} откупается - заказ снят.") for cid in bought.taker_ids]
     async with get_session_factory()() as db:
         peers = [(await onboarding_svc.vk_id_for_character(db, cid), text) for cid, text in notes]
     for peer, text in peers:

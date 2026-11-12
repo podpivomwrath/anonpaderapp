@@ -429,8 +429,8 @@ async def expire_due(db: AsyncSession, now: datetime | None = None) -> list[Noti
         await _close(db, order, EXPIRED)
         back = (f"{name} ×{left} - в сумке" if order.side == SELL
                 else f"{money(left * order.price)} золота вернулось")
-        what = "лот" if order.good.startswith("item:") else "заявка"
-        notices.append(Notice(order.character_id, f"⌛ Рынок: {what} снят(а) по сроку - {back}."))
+        gone = "лот снят" if order.good.startswith("item:") else "заявка снята"
+        notices.append(Notice(order.character_id, f"⌛ Рынок: {gone} по сроку - {back}."))
     return notices
 
 

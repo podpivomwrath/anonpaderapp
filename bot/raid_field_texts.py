@@ -70,7 +70,7 @@ UNIQUE_GRANT_TEXT = "🔴 Вам достаётся {name}."
 
 def group_touch_notice(leader_name: str) -> str:
     return (
-        f"{leader_name} открыл путь на Безмогильное поле. Придите к Монолиту "
+        f"{leader_name} открывает путь на Безмогильное поле. Придите к Монолиту "
         f"(0; 0) и прикоснитесь."
     )
 

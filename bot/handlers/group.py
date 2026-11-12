@@ -58,7 +58,7 @@ async def _send_invite(message: Message, nickname: str) -> None:
         target_peer_id = await onboarding_svc.vk_id_for_character(db, target.id)
         inviter_name = inviter.name
 
-    await message.answer(f"👥 Приглашение отправлено игроку {target.name}. У него есть 1 минута на ответ.")
+    await message.answer(f"👥 Приглашение отправлено игроку {target.name}. На ответ - 1 минута.")
     if target_peer_id is not None:
         await _bot_api.messages.send(
             peer_id=target_peer_id,
@@ -140,7 +140,7 @@ async def invite_accept(message: Message) -> None:
     if leader_peer_id is not None and leader_peer_id != peer_id:
         await _bot_api.messages.send(
             peer_id=leader_peer_id,
-            message=f"👥 {joined_name} вступил в группу.\n\n{group_block}",
+            message=f"👥 В группе новый участник: {joined_name}.\n\n{group_block}",
             random_id=0,
         )
 
@@ -209,9 +209,9 @@ async def leave_confirm(message: Message) -> None:
             # Группа распадается, когда остаётся один. Сказать об этом надо:
             # иначе последний участник видит «группа» на экране и не понимает,
             # почему она больше ничего не умеет.
-            text = f"👥 {left_name} покинул группу. Группа распалась - вы остались один."
+            text = f"👥 {left_name} выходит из группы. Группа распалась."
         else:
-            text = f"👥 {left_name} покинул группу."
+            text = f"👥 {left_name} выходит из группы."
             if new_leader_name is not None:
                 text += f" Новый лидер: 👑 {new_leader_name}."
         try:
@@ -339,5 +339,5 @@ async def notify_attacked(db, victim, attacker) -> None:
     peers = await _member_peers(db, others)
     _send_later(
         peers,
-        f"⚔️ На {victim.name} из вашей группы напал {attacker.name} - клетка ({victim.pos_x}; {victim.pos_y}).",
+        f"⚔️ {attacker.name} нападает на {victim.name} из вашей группы - клетка ({victim.pos_x}; {victim.pos_y}).",
     )

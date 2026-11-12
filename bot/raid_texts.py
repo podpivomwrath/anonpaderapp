@@ -191,7 +191,7 @@ def group_touch_notice(leader_name: str, raid_id: str = rc.RAID_PUPPET_THEATRE_I
     if raid_id == tc.RAID_TRAIL_ID:
         return tt.group_touch_notice(leader_name)
     return (
-        f"{leader_name} открыл вход в Кукольный театр. Придите к Монолиту (0; 0) "
+        f"{leader_name} открывает вход в Кукольный театр. Придите к Монолиту (0; 0) "
         f"и прикоснитесь."
     )
 

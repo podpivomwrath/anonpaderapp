@@ -183,7 +183,7 @@ async def on_press(message: Message) -> None:
                 raid_kb.raid_waiting_keyboard())
     for other, peer in run.peers.items():
         if other != cid:
-            await _send(peer, f"✅ {run.names[cid]} открыл свой замок ({solved}/{total}).")
+            await _send(peer, f"✅ {run.names[cid]} открывает свой замок ({solved}/{total}).")
     if solved == total:
         await _finish_puzzles(run)
 

@@ -41,7 +41,7 @@ async def group_summary_block(db: AsyncSession, character_id: int) -> str | None
 def level_gap_kick_line(kick: "group_service.LevelGapKick") -> str:
     """Уведомление ОСТАЛЬНЫМ участникам группы (не самому исключённому —
     для него отдельный текст, см. level_gap_kick_self_line)."""
-    return f"👥 {kick.kicked_name} вышел за пределы разрыва уровней группы и покинул отряд."
+    return f"👥 {kick.kicked_name} выбывает из отряда: разрыв уровней с группой слишком большой."
 
 
 def level_gap_kick_self_line() -> str:

@@ -199,7 +199,7 @@ class MobBrain:
                 # Уворот упрётся в общий потолок движка - неуязвимым моб не
                 # станет, по нему просто трудно попасть один ход.
                 mob.apply_effect(EffectKind.DODGE, trait.value, 1, mob.id)
-                turn.lines.append(f"{mob.name} уходит в камень - по нему трудно попасть")
+                turn.lines.append(f"{mob.name} уходит в камень - попасть трудно")
                 return turn
 
         # Обычный удар - с множителями способности.

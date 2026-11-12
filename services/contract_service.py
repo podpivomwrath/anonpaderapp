@@ -60,7 +60,7 @@ async def create(db: AsyncSession, orderer: Character, target_name, kills, price
     wait = await reorder_wait_hours(db, orderer.id, target.id, now)
     if wait > 0:
         raise ContractError(
-            f"{target.name} откупился от вашего заказа. Снова заказать его можно через {max(1, round(wait))} ч."
+            f"{target.name}: откуп от вашего заказа уже был. Снова заказать можно через {max(1, round(wait))} ч."
         )
     total = kills * price
     try:

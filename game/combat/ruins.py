@@ -281,14 +281,14 @@ class Gatekeeper(RuinBoss):
                 self.buried.pop(cid, None)
             elif len(alive) == 1 and self.room.ticks - self.buried[cid] >= rc.GATE_SOLO_FREE:
                 self.buried.pop(cid, None)
-                out.lines.append(f"⛏ {c.name} сам выбирается из-под камней")
+                out.lines.append(f"⛏ {c.name} выбирается из-под камней")
         if self.room.ticks % rc.GATE_EVERY == 0:
             free = [p for p in alive if p.id not in self.buried]
             if free and (len(alive) == 1 or len(free) > 1):
                 victim = rng.choice(free)
                 self.buried[victim.id] = self.room.ticks
                 hurt = stage_hurt(victim, round(victim.max_hp * rc.GATE_HIT), out)
-                out.lines.append(f"🪨 Свод рушится на {victim.name} - {hurt} урона, его засыпало")
+                out.lines.append(f"🪨 Свод рушится: {victim.name} под завалом, {hurt} урона")
         out.frozen.extend(cid for cid in self.buried if cid not in out.frozen)
 
     def extra_buttons(self, session, cid) -> list[tuple[str, dict]]:
@@ -413,7 +413,7 @@ class Herald(RuinBoss):
                 if action.type == ActionType.SKILL and action.skill_id in DEFENSIVE_SKILLS:
                     continue
                 hurt = stage_hurt(c, round(c.max_hp * rc.HERALD_HIT), out)
-                out.lines.append(f"📯 {c.name} ударил запретным - Глашатай возвращает удар: {hurt} урона")
+                out.lines.append(f"📯 {c.name} бьёт запретным - Глашатай возвращает удар: {hurt} урона")
         self.banned = rng.choice(list(self.KINDS))
         out.lines.append(f"📯 Глашатай: «Следующий {self.KINDS[self.banned]} вернётся тому, кто ударит!»")
 

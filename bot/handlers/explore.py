@@ -140,7 +140,8 @@ async def explore(message: Message) -> None:
                 queue = group_explore_service.start_or_join(
                     snapshot.id, (character.pos_x, character.pos_y), cohort_ids, character.id,
                 )
-                notice = f"👥 {character.name} готов к исследованию ({len(queue.ready)}/{len(queue.cohort)})."
+                # без рода: пол в чате неизвестен, «готов» про игрока-девушку - ошибка
+                notice = f"👥 {character.name} - за исследование. Готовы {len(queue.ready)}/{len(queue.cohort)}."
                 if not group_explore_service.is_ready_to_start(queue):
                     other_peer_ids = []
                     for m in cohort:

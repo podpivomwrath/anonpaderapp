@@ -770,7 +770,7 @@ async def on_group_tick_resolved(session_id: int, tick: int, result: TickResult)
                     p = battle.participants.get(r.character_id)
                     if p is None:
                         continue
-                    lines = [f"💀 {mob_name} повержен(а)!"]
+                    lines = [f"💀 Враг повержен: {mob_name}"]
                     xp_line = display.xp_delta_line(r.xp_gained, premium=r.xp_premium_applied)
                     if xp_line:  # на 60 уровне опыта нет - и строки нет
                         lines.append(xp_line)

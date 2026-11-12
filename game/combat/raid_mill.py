@@ -356,7 +356,7 @@ class MillerStage:
         if action is None or action.type in (ActionType.SKIP, ActionType.DEFEND):
             out.lines.append(f"{player.name} замирает - жёрнов проходит мимо.")
             return
-        out.lines.append(f"⚙️ {player.name} шевельнулся - жернова дробят ему ноги.")
+        out.lines.append(f"⚙️ {player.name} двигается - жернова дробят ноги.")
         _hurt(player, round(player.max_hp * mc.FREEZE_CRUSH_PCT), out)
         if player.alive:
             player.apply_effect(EffectKind.FREEZE, 1.0, 1, self.boss_id)
@@ -410,7 +410,7 @@ class MillerStage:
         self.chain_shields = _shields(victim)
         out.lines.append(
             f"⛓ Цепь жерновов приковывает {victim.name} к Мельнику: половина урона по Мельнику "
-            f"уходит в {victim.name}, половина лечения и щитов на нём - Мельнику."
+            f"уходит в {victim.name}, половина лечения и щитов этой цели - Мельнику."
         )
         self._hint(
             "chain",

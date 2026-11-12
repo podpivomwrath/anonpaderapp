@@ -187,7 +187,7 @@ async def test_buyout_burns_gems_reveals_name_and_blocks_reorder(db_session, mak
     assert c.status == "bought" and not await cs.is_target(db_session, target.id, NOW)
     with pytest.raises(cs.ContractError, match="закрыт"):
         await cs.buyout(db_session, target, c.id, now=NOW)
-    with pytest.raises(cs.ContractError, match="откупился"):
+    with pytest.raises(cs.ContractError, match="откуп от вашего заказа уже был"):
         await cs.create(db_session, orderer, target.name, 5, 10, now=NOW + timedelta(hours=23))
     await cs.create(db_session, stranger, target.name, 5, 10, now=NOW + timedelta(hours=1))  # другим - можно
     await cs.create(db_session, orderer, target.name, 5, 10, now=NOW + timedelta(hours=25))

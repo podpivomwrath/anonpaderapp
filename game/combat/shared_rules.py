@@ -470,14 +470,14 @@ def rune_after_deaths(session: CombatSessionState, deaths: list[int], hits: list
             # через recovered: в PvP и под «Порчей руин» тоже слабее (репорт 352)
             gain = recovered(source, round(source.max_hp * heal_kill))
             source.current_hp = min(source.max_hp, source.current_hp + gain)
-            lines.append(f"🟣 «{skill_id_name(skill_id)}» добил: {source.name} лечится на {gain}")
+            lines.append(f"🟣 Добивание навыком «{skill_id_name(skill_id)}»: {source.name} лечится на {gain}")
         chance = _rune(source, f"rune:no_rest@{skill_id}") + ability_rules.reset_kill_chance(source, skill_id)
         if not chance or source.cooldowns.get(skill_id, 0) <= 0:
             continue
         done.add((source.id, skill_id))
         if rng.random() < chance:
             source.cooldowns[skill_id] = 0
-            lines.append(f"🪨 Без передышки: «{skill_id_name(skill_id)}» у {source.name} снова готов")
+            lines.append(f"🪨 Без передышки: навык «{skill_id_name(skill_id)}» у {source.name} снова готов")
 
 
 def rune_on_hit(source: CombatantState | None, target: CombatantState, hit, heals: list) -> float:
@@ -609,7 +609,7 @@ def cd_free_line(actor: CombatantState, skill_id: str | None, lines: list[str]) 
     if not why or not skill_id:
         return
     head = "⚡ Перегрузка" if why == "overload" else "🌀 Без перезарядки"
-    lines.append(f"{head}: «{skill_id_name(skill_id)}» у {actor.name} снова готов")
+    lines.append(f"{head}: навык «{skill_id_name(skill_id)}» у {actor.name} снова готов")
 
 
 def rune_once_more(handler, ctx, skill_id: str | None) -> None:

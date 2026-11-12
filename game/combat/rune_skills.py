@@ -145,7 +145,7 @@ def mute(ctx: SkillContext) -> None:
     if res.immune or res.resisted:
         ctx.lines.append(f"🤐 {target.name} не поддаётся Немоте")
         return
-    ctx.lines.append(f"🤐 {target.name} онемел: навыки ему сейчас недоступны")
+    ctx.lines.append(f"🤐 Немота: {target.name} пока без навыков")
     if actor.buff_modifiers.get("mute_full_cd", 0.0) > 0:
         ability_rules.lock_declared_skill(ctx.session, target, ctx.lines, "Немота")
 

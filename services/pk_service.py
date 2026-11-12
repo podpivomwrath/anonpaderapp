@@ -188,7 +188,7 @@ async def on_pvp_kill(
     victim.revenge_target_id = killer.id
     victim.revenge_until = now + timedelta(hours=pc.REVENGE_HOURS)
     out.victim_lines.append(
-        f"🩸 {killer.name} убил вас, хотя он сильнее на {pc.LEVEL_GAP}+ уровней, и получил метку клейма. "
+        f"🩸 Вас убивает {killer.name}, сильнее вас на {pc.LEVEL_GAP}+ уровней, - за это метка клейма. "
         f"Право мести: следующие {pc.REVENGE_HOURS} ч ваш урон по {killer.name} на {round(pc.REVENGE_BONUS * 100)}% больше."
     )
     return out

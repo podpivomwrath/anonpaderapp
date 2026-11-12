@@ -170,7 +170,7 @@ async def _resolve(run: ProcessionRun) -> None:
         lines.append("❌ Сбились с шага: " + ", ".join(run.names[c] for c in result.wrong))
     for cid in result.fallen:
         lines.append(
-            f"🩼 {run.names[cid]} падает, колонна ждёт: -{mc.LAG_STEPS_LOST} шага. Хромота с него сошла."
+            f"🩼 {run.names[cid]} падает, колонна ждёт: -{mc.LAG_STEPS_LOST} шага. Хромота прошла."
         )
     if result.new_pattern:
         lines.append("🥁 Барабан меняет ритм.")
