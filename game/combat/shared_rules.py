@@ -239,6 +239,14 @@ def set_recovery(session: CombatSessionState, max_turns: int | None) -> None:
         c.recovery_mult = mult
 
 
+def shield_value(holder: CombatantState, source_id: int, tag: str | None) -> int:
+    """Сколько поглощения в щите этого бойца с этой меткой - для строки боя:
+    после всех усилений и срезов (репорт 351)."""
+    return round(sum(e.value for e in holder.effects
+                     if e.kind == EffectKind.SHIELD_POOL and e.source_id == source_id
+                     and getattr(e, "tag", None) == tag))
+
+
 def recovered(target: CombatantState, amount: int) -> int:
     """Входящее лечение после затухания в PvP (вне PvP множитель 1),
     «Горькой раны» (2026-11-10: EffectKind.HEAL_REDUCTION) и «Порчи руин»."""
@@ -459,7 +467,8 @@ def rune_after_deaths(session: CombatSessionState, deaths: list[int], hits: list
         heal_kill = ability_rules.heal_on_kill(source, skill_id)
         if heal_kill and (source.id, skill_id, "heal") not in done and source.max_hp > 0:
             done.add((source.id, skill_id, "heal"))
-            gain = round(source.max_hp * heal_kill)
+            # через recovered: в PvP и под «Порчей руин» тоже слабее (репорт 352)
+            gain = recovered(source, round(source.max_hp * heal_kill))
             source.current_hp = min(source.max_hp, source.current_hp + gain)
             lines.append(f"🟣 «{skill_id_name(skill_id)}» добил: {source.name} лечится на {gain}")
         chance = _rune(source, f"rune:no_rest@{skill_id}") + ability_rules.reset_kill_chance(source, skill_id)
@@ -576,10 +585,14 @@ def run_skill(handler, ctx, skill_id: str | None) -> None:
     cd_before = actor.cooldowns.get(skill_id, 0) if skill_id else 0
     actor.current_skill = skill_id
     actor.cd_free = None
+    from game.combat import session as session_mod
+
+    session_mod.SHIELD_BOOST = _shield_boost(actor, skill_id)
     try:
         handler(ctx)
     finally:
         actor.current_skill = None
+        session_mod.SHIELD_BOOST = None
     cd_free_line(actor, skill_id, ctx.lines)
     rune_cooldown(actor, skill_id, cd_before, ctx.rng, ctx.lines)
     rune_after_skill(actor, skill_id, before, combatants, ctx, heals_from)
@@ -647,22 +660,34 @@ def rune_cooldown(actor: CombatantState, skill_id: str | None, cd_before: int, r
             lines.append(f"🪨 Короткий взмах: перезарядка «{skill_id_name(skill_id)}» у {actor.name} на ход короче")
 
 
-def _passive_recovery(actor: CombatantState, fresh: list, combatants, ctx, heals_from: int) -> None:
-    """Пассивки подклассов (2026-11-10): щиты от навыков Стража крепче,
-    лечение и щиты Тёмного мистика на союзников сильнее."""
+def _shield_boost(actor: CombatantState, skill_id: str | None):
+    """Усиление щитов навыка в момент, когда щит вешается (session.SHIELD_BOOST):
+    пассивки (щиты Стража крепче, щиты Тёмного мистика на союзников сильнее),
+    «Подпорка» и сила руны-навыка от мастерства."""
     from game.combat import ability_rules
 
     shield = ability_rules.shield_power(actor)
     ally = ability_rules.ally_heal_power(actor)
-    if not (shield or ally):
-        return
-    owner = {id(e): c for c in combatants for e in c.effects}
-    for e in fresh:
-        if e.kind != EffectKind.SHIELD_POOL:
-            continue
-        holder = owner.get(id(e))
-        mult = 1.0 + shield + (ally if holder is not None and holder.id != actor.id else 0.0)
-        e.value = round(e.value * mult)
+    mods = actor.buff_modifiers
+    prop = (mods.get(f"rune:prop@{skill_id}", 0.0) + mods.get(f"rune:{skill_id}", 0.0)) if skill_id else 0.0
+    if not (shield or ally or prop):
+        return None
+
+    def boost(source_id: int, holder, value: float) -> float:
+        if source_id != actor.id:
+            return value
+        mult = 1.0 + shield + (ally if holder.id != actor.id else 0.0)
+        return round(round(value * mult) * (1 + prop))
+
+    return boost
+
+
+def _passive_recovery(actor: CombatantState, ctx, heals_from: int) -> None:
+    """Пассивка Тёмного мистика (2026-11-10): лечение союзников сильнее.
+    Щиты усиливаются, когда вешаются (_shield_boost)."""
+    from game.combat import ability_rules
+
+    ally = ability_rules.ally_heal_power(actor)
     if ally:
         for h in ctx.heals[heals_from:]:
             if h.source_id == actor.id and h.target_id != actor.id:
@@ -684,7 +709,7 @@ def rune_after_skill(actor: CombatantState, skill_id: str | None, before: dict, 
     mods = actor.buff_modifiers
     fresh = [e for c in combatants for e in c.effects
              if e.source_id == actor.id and (id(e) not in before or e.remaining_ticks > before[id(e)][0])]
-    _passive_recovery(actor, fresh, combatants, ctx, heals_from)
+    _passive_recovery(actor, ctx, heals_from)
     if not any(key.startswith("rune:") for key in mods):
         return
     rng = ctx.rng
@@ -693,14 +718,11 @@ def rune_after_skill(actor: CombatantState, skill_id: str | None, before: dict, 
         for e in fresh:
             e.remaining_ticks += 1
         ctx.lines.append(f"🪨 Тягучесть: эффект «{skill_id_name(skill_id)}» продержится на ход дольше")
-    # «Подпорка» и сила руны-навыка от мастерства (2026-11-10) - на лечение и щиты.
+    # «Подпорка» и сила руны-навыка от мастерства (2026-11-10) - на лечение;
+    # щиты - в момент, когда вешаются (_shield_boost).
     prop = mods.get(f"rune:prop@{skill_id}", 0.0) + mods.get(f"rune:{skill_id}", 0.0)
     new_heals = [h for h in ctx.heals[heals_from:] if h.source_id == actor.id]
     if prop:
-        for e in fresh:
-            if e.kind == EffectKind.SHIELD_POOL:
-                # apply_effect перезаписывает щит целиком - усиливаем весь.
-                e.value = round(e.value * (1 + prop))
         for h in new_heals:
             h.amount = round(h.amount * (1 + prop))
             h.ratio *= 1 + prop

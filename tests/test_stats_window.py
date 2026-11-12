@@ -143,3 +143,34 @@ def test_typed_stats_only_while_window_open() -> None:
         assert not stats_window.typed_alloc_expected(SimpleNamespace(payload=None, peer_id=4242, text="привет"))
     finally:
         stats_window._window_header.pop(4242, None)
+
+
+async def test_daily_completion_levelup_is_announced(monkeypatch) -> None:
+    """Репорт 337 (Ники): уровень от ежедневки за травы, скупщика, варку,
+    отдых приходил молча - весть о новом уровне слал только бой."""
+    from types import SimpleNamespace
+
+    from bot.handlers import stats_window
+
+    sent = []
+
+    async def fake(peer_id, levels, new_level):
+        sent.append((peer_id, levels, new_level))
+
+    monkeypatch.setattr(stats_window, "notify_levelup", fake)
+    done = SimpleNamespace(levels_gained=1, new_level=60)
+    await stats_window.notify_daily_levelups(7, SimpleNamespace(completed=[done]))
+    await stats_window.notify_daily_levelups(7, None)
+    assert sent == [(7, 1, 60)]
+
+
+def test_daily_handlers_announce_levelups() -> None:
+    """Каждый обработчик, что показывает строку выполненной ежедневки, шлёт
+    и весть о новом уровне."""
+    from pathlib import Path
+
+    root = Path(__file__).resolve().parent.parent / "bot" / "handlers"
+    for name in ("herbs.py", "appraiser.py", "house.py"):
+        text = (root / name).read_text(encoding="utf-8")
+        assert text.count("dailies_texts.progress_notice(") == text.count("notify_daily_levelups("), name
+    assert "_announce_daily(peer_id, daily_progress)" in (root / "rest.py").read_text(encoding="utf-8")

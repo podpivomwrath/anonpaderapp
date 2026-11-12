@@ -249,6 +249,9 @@ async def sell_trophies(message: Message) -> None:
         daily_notice = dailies_texts.progress_notice(daily_progress)
         if daily_notice:
             await _bot_api.messages.send(peer_id=peer_id, message=daily_notice, random_id=0)
+        from bot.handlers import stats_window  # избегаем цикла импортов
+
+        await stats_window.notify_daily_levelups(peer_id, daily_progress)
 
 
 #: _sell_now: продать то, что слабее надетого (не id редкости).
@@ -355,6 +358,9 @@ async def _sell_now(peer_id: int, from_id: int, rarity_id: str | None) -> None:
         daily_notice = dailies_texts.progress_notice(daily_progress)
         if daily_notice:
             await _bot_api.messages.send(peer_id=peer_id, message=daily_notice, random_id=0)
+        from bot.handlers import stats_window  # избегаем цикла импортов
+
+        await stats_window.notify_daily_levelups(peer_id, daily_progress)
 
 
 @labeler.message(payload_contains={"type": "appraiser_gear"})
@@ -507,6 +513,9 @@ async def sell_gear_item(message: Message) -> None:
         daily_notice = dailies_texts.progress_notice(daily_progress)
         if daily_notice:
             await _bot_api.messages.send(peer_id=peer_id, message=daily_notice, random_id=0)
+        from bot.handlers import stats_window  # избегаем цикла импортов
+
+        await stats_window.notify_daily_levelups(peer_id, daily_progress)
 
 
 async def rebuild(db, character) -> tuple[str, str] | None:
@@ -605,6 +614,9 @@ async def sell_fish(message: Message) -> None:
     notice = dailies_texts.progress_notice(daily_progress)
     if notice:
         await _bot_api.messages.send(peer_id=peer_id, message=notice, random_id=0)
+    from bot.handlers import stats_window  # избегаем цикла импортов
+
+    await stats_window.notify_daily_levelups(peer_id, daily_progress)
 
 
 # --- Руда (2026-10-21) ---------------------------------------------------------
@@ -680,3 +692,6 @@ async def sell_ore(message: Message) -> None:
         notice = dailies_texts.progress_notice(daily_progress)
         if notice:
             await _bot_api.messages.send(peer_id=peer_id, message=notice, random_id=0)
+        from bot.handlers import stats_window  # избегаем цикла импортов
+
+        await stats_window.notify_daily_levelups(peer_id, daily_progress)

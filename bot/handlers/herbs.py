@@ -81,6 +81,9 @@ async def _auto_cut(peer_id: int, character_id: int, patch_id: int) -> None:
     notice = dailies_texts.progress_notice(progress) if progress is not None else None
     if notice:
         await _api().messages.send(peer_id=peer_id, random_id=0, message=notice)
+    from bot.handlers import stats_window  # избегаем цикла импортов
+
+    await stats_window.notify_daily_levelups(peer_id, progress)
 
 
 #: Север - рост y (Кряж на (0;30)).
@@ -173,3 +176,6 @@ async def pick_herb(message: Message) -> None:
     notice = dailies_texts.progress_notice(progress) if progress is not None else None
     if notice:
         await message.answer(notice)
+    from bot.handlers import stats_window  # избегаем цикла импортов
+
+    await stats_window.notify_daily_levelups(message.peer_id, progress)

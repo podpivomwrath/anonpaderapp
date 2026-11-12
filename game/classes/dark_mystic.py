@@ -180,8 +180,8 @@ def ward(ctx: SkillContext) -> None:
     if steadfast > 0 and skill.id in actor.cooldowns:  # без перезарядки - без лишнего хода
         actor.cooldowns[skill.id] = skill.cd + bc.DARK_MYSTIC_STEADFAST_WARD_CD
     ward_target.apply_effect(EffectKind.SHIELD_POOL, absorb, skill.effect_duration, actor.id, tag=WARD_TAG)
-    # В PvP щит слабеет к концу боя - в строке то, что повесилось.
-    ctx.lines.append(f"{actor.name} накрывает {ward_target.name} Оберегом (+{shared_rules.recovered(ward_target, absorb)} поглощения)")
+    # В строке то, что повесилось: с усилениями, затуханием PvP и порчей руин.
+    ctx.lines.append(f"{actor.name} накрывает {ward_target.name} Оберегом (+{shared_rules.shield_value(ward_target, actor.id, WARD_TAG)} поглощения)")
 
     # «Передача оберега»: тем же навыком накрывается и самый израненный союзник,
     # полной величиной. Нужны живые союзники, иначе накрывать некого.
@@ -190,7 +190,7 @@ def ward(ctx: SkillContext) -> None:
         extra = next((c for c in _allies_by_hp(ctx) if c.id != ward_target.id), None)
         if extra is not None:
             extra.apply_effect(EffectKind.SHIELD_POOL, absorb, skill.effect_duration, actor.id, tag=WARD_TAG)
-            ctx.lines.append(f"{actor.name} передаёт Оберег: {extra.name} (+{shared_rules.recovered(extra, absorb)} поглощения)")
+            ctx.lines.append(f"{actor.name} передаёт Оберег: {extra.name} (+{shared_rules.shield_value(extra, actor.id, WARD_TAG)} поглощения)")
 
 
 @offensive_skill("dark_mystic_drain")

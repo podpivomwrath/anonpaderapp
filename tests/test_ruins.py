@@ -81,7 +81,12 @@ def test_rot_weakens_healing_and_enrage_after_ten_turns() -> None:
     lines = stage.setup(state)
     assert any("Порча руин" in line for line in lines)
     assert shared_rules.recovered(hero, 100) == 80  # этаж 10: -20%
-    foe = next(c for c in state.combatants.values() if c.side == 1)
+    # репорт 352: и щит на герое слабее, а не только число в строке боя
+    from game.combat.session import EffectKind
+
+    hero.apply_effect(EffectKind.SHIELD_POOL, 100, 2, hero.id, tag="test")
+    assert hero.effect_total(EffectKind.SHIELD_POOL) == 80
+    foe =next(c for c in state.combatants.values() if c.side == 1)
     base = foe.buff_modifiers.get("damage_bonus", 0.0)  # рост этажа
     for _ in range(9):
         stage.after_tick(state, TickResult(), random.Random(1))

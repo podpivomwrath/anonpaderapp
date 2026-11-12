@@ -116,7 +116,8 @@ async def handle_rest_done(peer_id: int) -> None:
         vitals_service.restore_full(character)
         if subclass_service.buff_pool(character) is not None:
             await trial_service.record_rest(db, character)
-        await daily_service.record_rest(db, character)
+        # Ежедневка на отдых: строка и новый уровень (репорт 337 - приходили молча).
+        daily_progress = await daily_service.record_rest(db, character)
         has_mount = await mount_service.has_any_mount(db, character.id)
         await db.commit()
         region = grid.city_region_at(character.pos_x, character.pos_y)
@@ -132,3 +133,4 @@ async def handle_rest_done(peer_id: int) -> None:
         # При полном здоровье строка «+0 HP · 100% → 100%» - пустая.
         text += "\n" + display.hp_delta_line(hp_before, max_hp, max_hp)
     await world._bot_api.messages.send(peer_id=peer_id, message=text, random_id=0, keyboard=keyboard)
+    await world._announce_daily(peer_id, daily_progress)

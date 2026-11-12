@@ -513,6 +513,33 @@ def test_close_ranks_card_matches_the_fight() -> None:
     assert f"щит {weak} каждому" in lines[0], (lines, text)
 
 
+@pytest.mark.real_abilities
+def test_ward_line_shows_the_shield_with_all_boosts() -> None:
+    """Репорт 351 (Еста): строка боя писала Оберег без пассивки мистика и
+    «Подпорки» - на союзнике висел щит больше написанного."""
+    from game.combat.session import WARD_TAG
+
+    me, friend, foe = _card_fighter(), combatant(2, side=0), combatant(3, side=1)
+    _equip(me, "dark_mystic_ward")
+    me.buff_modifiers["rune:prop@dark_mystic_ward"] = 0.15
+    friend.current_hp = friend.max_hp // 4
+    state = _session(me, friend, foe, mode=CombatMode.PVE)
+    result = resolve_tick(state, {1: _skill("dark_mystic_ward")}, NoCritRng())
+    shield = round(sum(e.value for e in friend.effects if e.kind == EffectKind.SHIELD_POOL and e.tag == WARD_TAG))
+    line = next(line for line in result.lines if "Оберегом" in line)
+    assert f"+{shield} поглощения" in line, (line, shield)
+
+    bare = _card_fighter()
+    bare.buff_modifiers.clear()
+    _equip(bare, "dark_mystic_ward")
+    friend2 = combatant(2, side=0)
+    friend2.current_hp = friend2.max_hp // 4
+    resolve_tick(_session(bare, friend2, combatant(3, side=1), mode=CombatMode.PVE),
+                 {1: _skill("dark_mystic_ward")}, NoCritRng())
+    plain = round(sum(e.value for e in friend2.effects if e.kind == EffectKind.SHIELD_POOL))
+    assert shield == pytest.approx(round(round(plain * 1.25) * 1.15), abs=2)  # пассивка +25%, Подпорка +15%
+
+
 def test_every_healing_or_shielding_skill_shows_numbers() -> None:
     from bot import miniapp_runes_api as api
 

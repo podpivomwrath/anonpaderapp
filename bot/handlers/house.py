@@ -495,6 +495,9 @@ async def tick_job() -> None:
             notice = dailies_texts.progress_notice(progress)
             if notice:
                 await _bot_api.messages.send(peer_id=peer, random_id=0, message=notice)
+            from bot.handlers import stats_window  # избегаем цикла импортов
+
+            await stats_window.notify_daily_levelups(peer, progress)
         except Exception:
             logger.warning("Дом: сообщение о работе не доставлено {}", peer)
 

@@ -64,6 +64,14 @@ async def _send_or_edit(peer_id: int, text: str, keyboard: str | None) -> None:
 LEVELUP_DELAY_SECONDS = 1.5
 
 
+async def notify_daily_levelups(peer_id: int, progress) -> None:
+    """Ежедневка, выполненная действием, дала уровень - та же весть, что от
+    боя (репорт 337: уровень от травы, скупщика, варки, отдыха приходил
+    молча). progress - DailyProgressResult или None."""
+    for c in getattr(progress, "completed", None) or ():
+        await notify_levelup(peer_id, c.levels_gained, c.new_level)
+
+
 async def notify_levelup(peer_id: int, levels_gained: int, new_level: int) -> None:
     """Единая точка входа для ЛЮБОГО источника опыта (патч 14, ч.2.3: килл,
     квест, событие) — если начисление вызвало левелап, открывает/обновляет

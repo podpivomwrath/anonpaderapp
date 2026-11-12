@@ -4,7 +4,7 @@ game/economy/ability_config.py. Регистрируются импортом и
 """
 
 from game import plural
-from game.combat import ability_rules, control
+from game.combat import ability_rules, control, shared_rules
 from game.combat.session import CombatMode, EffectKind
 from game.combat.skill_catalog import tuned
 from game.combat.skills import (
@@ -237,7 +237,13 @@ def close_ranks_shields(ctx_or_session, actor, value: float, duration: int, line
     shield = round(_vit(actor) * CLOSE_RANKS_SHIELD_PER_VIT * pct)
     for c in own:
         c.apply_effect(EffectKind.SHIELD_POOL, shield, duration, actor.id, tag="step:close_ranks")
-    lines.append(f"🛡 {actor.name}: ряды сомкнуты, щит {shield} каждому")
+    # В строке - что повесилось на каждого (репорт 351): усиления и порча
+    # руин у своих могут развести числа.
+    got = {c.name: shared_rules.shield_value(c, actor.id, "step:close_ranks") for c in own}
+    if len(set(got.values())) == 1:
+        lines.append(f"🛡 {actor.name}: ряды сомкнуты, щит {next(iter(got.values()))} каждому")
+    else:
+        lines.append(f"🛡 {actor.name}: ряды сомкнуты, щиты: " + ", ".join(f"{n} {v}" for n, v in got.items()))
 
 
 @defensive_skill("close_ranks")

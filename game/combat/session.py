@@ -126,6 +126,13 @@ def shield_name(effect) -> str:
     return SHIELD_NAMES.get(getattr(effect, "tag", None), "Щит")
 
 
+#: Усиление щитов навыка (пассивка, «Подпорка», мастерство руны) - ставит
+#: shared_rules.run_skill на время навыка: (id источника, на кого, сила) -> сила.
+#: Раньше щит усиливали после навыка, и строка боя писала число без усилений
+#: (репорт 351). Бой синхронный - глобальной хватает.
+SHIELD_BOOST = None
+
+
 @dataclass
 class Effect:
     kind: EffectKind
@@ -368,10 +375,18 @@ class CombatantState:
         if kind in bc.DECAYING_DEBUFFS and value > 0 and decays:
             # getattr: соло-бой из pickle-снимка до появления поля.
             value *= getattr(self, "debuff_fatigue", {}).get(kind.value, 1.0)
+        if kind == EffectKind.SHIELD_POOL and SHIELD_BOOST is not None:
+            value = SHIELD_BOOST(source_id, self, value)
         if kind == EffectKind.SHIELD_POOL and tag != ECHO_TAG:
             # Затухание щитов в PvP. Отголосок не режем второй раз: он из
             # лечения, которое уже срезано.
             value = round(value * getattr(self, "recovery_mult", 1.0))
+            # «Порча руин» (репорт 352): щиты на этаже слабее, как и лечение.
+            # Строка боя (shared_rules.recovered) уже писала срезанное число,
+            # а вешался полный щит.
+            rot = (getattr(self, "buff_modifiers", None) or {}).get("ruins_rot", 0.0)
+            if rot > 0:
+                value = round(value * (1.0 - rot))
         if kind == EffectKind.SHIELD_POOL:
             # Горькая рана (2026-11-10): новые щиты на цель слабее.
             value = round(value * (1.0 - self.heal_reduction()))
