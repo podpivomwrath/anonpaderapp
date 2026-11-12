@@ -55,7 +55,7 @@ def peers_of(data: dict) -> list[int]:
         if p is None:
             continue
         text = str(p).strip()
-        if text.lstrip("-").isdigit():
+        if text.lstrip("-").isdecimal():
             out.append(int(text))
     return out
 

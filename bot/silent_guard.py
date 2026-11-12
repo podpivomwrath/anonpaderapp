@@ -79,7 +79,14 @@ def install(api) -> None:
             if code != 10:
                 if method in ("messages.send", "messages.edit") and code not in EXPECTED_SEND_ERRORS:
                     logger.error("VK {}: ошибка {} для {} - {}", method, code, data.get("peer_id"), exc)
-                elif code == 9:
+                elif code in (900, 901, 902) and method == "messages.send":
+                    from bot import notices
+
+                    notices.mark_unreachable(data.get("peer_id"))
+                elif code == 9 and method == "messages.send":
+                    # Правки (messages.edit) - это отсчёты пути и возрождения:
+                    # следующая правка перекрывает пропущенную. В журнале их
+                    # было 2745 за неделю, настоящие сбои в них тонули.
                     _note_flood(method, data.get("peer_id"))
                 raise
             logger.warning("VK {}: внутренняя ошибка VK (10), повтор", method)
@@ -132,6 +139,9 @@ class SilentGuardMiddleware(BaseMiddleware[Message]):
         # Только личный диалог с игроком: в беседах бот молчит на чужие реплики.
         if event.from_id <= 0 or event.peer_id != event.from_id:
             return
+        from bot import notices
+
+        notices.reachable_again(event.peer_id)
         started = float(getattr(event, "date", 0) or 0) or time.time()
         background.spawn(_check_later(event.peer_id, event.from_id, started))
 

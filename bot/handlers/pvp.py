@@ -529,7 +529,7 @@ async def attack_command(message: Message, target: str) -> None:
         if victim is None and battle_entry is None:
             if await _afk_target_named(db, character, target):
                 await message.answer(AFK_TARGET_TEXT)
-            elif target.isdigit() and _looked_entry(peer_id, character, int(target)) is not None:
+            elif target.isdecimal() and _looked_entry(peer_id, character, int(target)) is not None:
                 await message.answer(TARGET_GONE_TEXT)
             else:
                 await message.answer("Здесь нет такой цели.")

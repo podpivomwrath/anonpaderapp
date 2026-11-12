@@ -15,6 +15,11 @@
 from sqlalchemy import select
 
 _quiet: set[int] = set()
+#: Кому VK не даёт писать (900/901/902: бот в чёрном списке, сообщения
+#: сообществу закрыты). Оповещения им не шлём, пока игрок сам не напишет
+#: боту (2026-11-13: объявления мирового босса упирались в отказ VK 600 раз
+#: за неделю). Отмечает обёртка отправки в bot/silent_guard.py.
+_unreachable: set[int] = set()
 
 
 async def load(session_factory) -> int:
@@ -37,12 +42,28 @@ def set_quiet(vk_id: int, on: bool) -> None:
         _quiet.discard(int(vk_id))
 
 
+def mark_unreachable(vk_id) -> None:
+    try:
+        _unreachable.add(int(vk_id))
+    except (TypeError, ValueError):
+        pass
+
+
+def reachable_again(vk_id) -> None:
+    """Игрок написал боту - значит, писать ему снова можно."""
+    try:
+        _unreachable.discard(int(vk_id))
+    except (TypeError, ValueError):
+        pass
+
+
 def quiet(vk_id) -> bool:
     """True - этому игроку оповещения не слать."""
     try:
-        return int(vk_id) in _quiet
+        vk_id = int(vk_id)
     except (TypeError, ValueError):
         return False
+    return vk_id in _quiet or vk_id in _unreachable
 
 
 def keep(peers):

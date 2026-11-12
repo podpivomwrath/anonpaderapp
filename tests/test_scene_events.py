@@ -113,6 +113,9 @@ def test_stake_is_read_from_free_text() -> None:
     assert parse_stake("ноль") is None
     assert parse_stake("0") is None
     assert parse_stake("9" * 20) is None
+    # Надстрочные цифры - isdigit() их пропускал, а int() падал (журнал 2026-11-12).
+    assert parse_stake("⁵") is None
+    assert parse_stake("1⁵0") == 10
 
 
 def test_dice_scenes_offer_known_currencies() -> None:

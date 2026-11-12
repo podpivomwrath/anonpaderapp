@@ -355,15 +355,30 @@ class Notice:
     image: str = ""
 
 
-async def tick(db: AsyncSession, rng: random.Random | None = None, now: datetime | None = None) -> list[Notice]:
+async def due(db: AsyncSession, now: datetime | None = None) -> list[int]:
+    """Персонажи, у кого подошёл час (без блокировки - её берёт tick)."""
+    now = now or _now()
+    return list((await db.scalars(
+        select(CharacterVoyage.character_id)
+        .where(CharacterVoyage.status == "away", CharacterVoyage.next_event_at <= now)
+    )).all())
+
+
+async def tick(
+    db: AsyncSession, rng: random.Random | None = None, now: datetime | None = None,
+    character_id: int | None = None,
+) -> list[Notice]:
     """Все, у кого подошло время: событие (по одному за каждый прошедший час -
-    после простоя бота догоняются все) и конец похода по запасу хода."""
+    после простоя бота догоняются все) и конец похода по запасу хода.
+    character_id - только этот поход: фоновая задача ведёт каждый своей
+    транзакцией, иначе налог гильдии с нескольких кошельков сразу ловил
+    взаимную блокировку (журнал ошибок 2026-11-12)."""
     rng = rng or random.Random()
     now = now or _now()
-    rows = (await db.scalars(
-        select(CharacterVoyage).where(CharacterVoyage.status == "away", CharacterVoyage.next_event_at <= now)
-        .with_for_update()
-    )).all()
+    query = select(CharacterVoyage).where(CharacterVoyage.status == "away", CharacterVoyage.next_event_at <= now)
+    if character_id is not None:
+        query = query.where(CharacterVoyage.character_id == character_id)
+    rows = (await db.scalars(query.with_for_update(skip_locked=character_id is not None))).all()
     notices: list[Notice] = []
     for voyage in rows:
         character = await db.get(Character, voyage.character_id)

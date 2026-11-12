@@ -543,7 +543,7 @@ async def _dealer(peer_id, db, character, stats, p: Pending, scene: Scene, actio
 
 def parse_stake(text: str) -> int | None:
     """Сумма ставки из сообщения: «250», «1 000», «250 зол» - берём число."""
-    digits = "".join(ch for ch in text if ch.isdigit())
+    digits = "".join(ch for ch in text if ch.isdecimal())
     if not digits or len(digits) > 12:
         return None
     value = int(digits)

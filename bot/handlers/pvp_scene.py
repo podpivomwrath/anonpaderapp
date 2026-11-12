@@ -48,7 +48,7 @@ async def _afk_target_named(db, character: Character, target: str) -> bool:
     нумеруются вовсе) совпадает с игроком на клетке, который сейчас AFK.
     Только чтобы attack_command показал отдельный лорный текст вместо
     общего "нет такой цели" (патч 33, ч.3)."""
-    if target.isdigit():
+    if target.isdecimal():
         return False
     others = await pvp_service.others_at(db, character)
     battles = _battles_at(character.pos_x, character.pos_y)
@@ -169,7 +169,7 @@ async def _resolve_target(db, character: Character, target: str, peer_id: int | 
     """Возвращает (Character, None) — цель-игрок, (None, (battle_id, Battle))
     — идущий бой, (None, None) — цель не найдена."""
     solo, battles = await _scene_at(db, character)
-    looked = _looked_entry(peer_id, character, int(target)) if target.isdigit() else None
+    looked = _looked_entry(peer_id, character, int(target)) if target.isdecimal() else None
     if looked is not None:
         kind, ref = looked
         if kind == "battle":
@@ -180,7 +180,7 @@ async def _resolve_target(db, character: Character, target: str, peer_id: int | 
         # Тот, кого видел, уже сам дерётся с кем-то на этой клетке - номер
         # ведёт в его бой.
         return None, next(((bid, b) for bid, b in battles if ref in b.participants), None)
-    if target.isdigit():
+    if target.isdecimal():
         n = int(target)
         if 1 <= n <= len(solo):
             return solo[n - 1], None

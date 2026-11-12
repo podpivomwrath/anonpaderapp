@@ -34,3 +34,28 @@ async def test_load_reads_ui_flags(db_session, make_character) -> None:
         assert notices.quiet(vk_id)
     finally:
         notices.set_quiet(vk_id, False)
+
+
+async def test_refused_peer_is_skipped_until_they_write() -> None:
+    """Отказ VK (901) - оповещения не шлём, пока игрок сам не напишет (2026-11-13)."""
+    from bot import silent_guard
+
+    class RefusingApi:
+        async def request(self, method, data, version=None):
+            from vkbottle.exception_factory.base_exceptions import VKAPIError
+
+            raise VKAPIError[901](error_msg="Can't send messages for users without permission")
+
+    import pytest
+    from vkbottle.exception_factory.base_exceptions import VKAPIError
+
+    api = RefusingApi()
+    silent_guard.install(api)
+    with pytest.raises(VKAPIError):
+        await api.request("messages.send", {"peer_id": 9901, "message": "x"})
+    try:
+        assert notices.quiet(9901) and notices.keep([9901, 9902]) == [9902]
+        notices.reachable_again(9901)
+        assert not notices.quiet(9901)
+    finally:
+        notices.reachable_again(9901)

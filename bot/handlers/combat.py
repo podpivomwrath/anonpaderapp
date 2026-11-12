@@ -171,11 +171,24 @@ async def restore_solo(peer_id: int, data: dict) -> bool:
             globals()[name][peer_id] = data[name]
     _engine.restore_session(state)
     if _bot_api is not None:
-        await _bot_api.messages.send(
-            peer_id=peer_id, random_id=0,
-            message="⚔️ Бот обновился - бой продолжается с того же хода.\n\n" + _render(state, None),
-            keyboard=_combat_kb(state, peer_id),
-        )
+        try:
+            await _bot_api.messages.send(
+                peer_id=peer_id, random_id=0,
+                message="⚔️ Бот обновился - бой продолжается с того же хода.\n\n" + _render(state, None),
+                keyboard=_combat_kb(state, peer_id),
+            )
+        except Exception as exc:
+            if getattr(exc, "code", None) == 901:
+                # Игрок закрыл сообщения сообществу: доиграть бой он не
+                # сможет, а без этого бой переезжал через каждый рестарт
+                # (журнал ошибок: 45 рестартов подряд у одного игрока).
+                _engine.abort_session(peer_id)
+                for name in _SNAPSHOT_MAPS:
+                    globals()[name].pop(peer_id, None)
+                logger.info("Бой {} не восстановлен: игрок закрыл сообщения", peer_id)
+                return False
+            # Бой уже в памяти; не дошла только доска - это не сбой восстановления.
+            logger.warning("Бой {} восстановлен, доска не доставлена: {}", peer_id, exc)
     return True
 
 

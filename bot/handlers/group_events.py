@@ -223,7 +223,7 @@ async def on_pot_stake(message: Message) -> None:
     if scene is None:
         return
     cid = next(c for c, m in scene.members.items() if m.peer_id == message.peer_id)
-    amount = int("".join(ch for ch in message.text if ch.isdigit()) or 0)
+    amount = int("".join(ch for ch in message.text if ch.isdecimal()) or 0)
     async with get_session_factory()() as db:
         character = await db.get(Character, cid)
         wallet = await wallet_service.get_wallet(db, cid)

@@ -165,3 +165,17 @@ async def test_calluses_rune_in_voyage_for_every_craft(db_session, make_characte
         base = max(1, round(voyage_service._xp_to_next(craft, 1) * voyage_service.vc.CRAFT_XP_SHARE))
         await voyage_service.craft_xp(db_session, c, random.Random(3))
         assert getattr(c, xp_field) == runes.craft_xp(c, base) or getattr(c, level_field) > 1, craft
+
+
+async def test_tick_one_voyage_leaves_others(db_session, character_at) -> None:
+    """Фоновая задача ведёт каждый поход своей транзакцией (2026-11-13)."""
+    a = await traveler(character_at)
+    b = await traveler(character_at, region="woods")
+    for c in (a, b):
+        await voyage_service.buy(db_session, c)
+        await voyage_service.start(db_session, c, now=NOW)
+    later = NOW + timedelta(minutes=61)
+    assert set(await voyage_service.due(db_session, now=later)) == {a.id, b.id}
+    notices = await voyage_service.tick(db_session, random.Random(1), now=later, character_id=a.id)
+    assert [n.character_id for n in notices] == [a.id]
+    assert await voyage_service.due(db_session, now=later) == [b.id]

@@ -234,20 +234,34 @@ async def tick_job() -> None:
         return
     from models import Character
 
+    factory = get_session_factory()
     try:
-        async with get_session_factory()() as db:
-            notices = await voyage_service.tick(db, _rng)
-            peers = {}
-            if notices:
-                ids = {n.character_id for n in notices}
-                peers = dict((await db.execute(
-                    select(Character.id, User.vk_id).join(User, User.id == Character.user_id)
-                    .where(Character.id.in_(ids))
-                )).all())
-            await db.commit()
+        async with factory() as db:
+            due = await voyage_service.due(db)
     except Exception:
         logger.exception("Долгий путь: тик не прошёл")
         return
+    notices = []
+    # Каждый поход - своей транзакцией: сбой или блокировка одного не
+    # откатывает остальных, а налог гильдии не держит чужие кошельки.
+    for character_id in due:
+        try:
+            async with factory() as db:
+                notices += await voyage_service.tick(db, _rng, character_id=character_id)
+                await db.commit()
+        except Exception:
+            logger.exception("Долгий путь: тик не прошёл для {}", character_id)
+    peers = {}
+    if notices:
+        try:
+            async with factory() as db:
+                peers = dict((await db.execute(
+                    select(Character.id, User.vk_id).join(User, User.id == Character.user_id)
+                    .where(Character.id.in_({n.character_id for n in notices}))
+                )).all())
+        except Exception:
+            logger.exception("Долгий путь: не нашлись адресаты вестей")
+            return
     from bot.handlers import stats_window
 
     for notice in notices:
