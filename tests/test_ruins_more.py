@@ -284,6 +284,29 @@ def test_counter_collects_debt() -> None:
     assert any("взыскивает долг" in x and x.rstrip().endswith("урона") for x in out.lines), out.lines
 
 
+def test_counter_debt_is_cut_by_block_stance_and_defend() -> None:
+    """2026-11-13, владелец: взыскание срезают Глухая оборона и «Защититься»,
+    стойка ещё и лечит за удар. Прочие механики рейдов - по-прежнему мимо."""
+    from game.combat.ruins import counter_hit
+    from game.combat.session import EffectKind
+
+    stage, state = _boss_room(10)
+    me = state.combatants[1]
+    full = round(me.max_hp * rc.COUNTER_HIT)
+    assert counter_hit(me) == full
+    me.apply_effect(EffectKind.BLOCK_STANCE, 0.35, 3, me.id)
+    assert counter_hit(me) == round(full * 0.65)
+    defend = TickResult(actions={1: DeclaredAction(type=ActionType.DEFEND)})
+    assert counter_hit(me, defend) < round(full * 0.65)
+
+    me.apply_effect(EffectKind.BLOCK_HEAL, 0.03, 3, me.id)
+    boss_id = stage.bosses[0].boss_id
+    for _ in range(rc.COUNTER_MARKS):
+        res = TickResult(hit_renders=[RenderedHit(1, boss_id, 0, 1, "бьёт", 500, False, False, False, 9000, 8500, 9000)])
+        out = stage._enemy_tick(state, res, random.Random(1))
+    assert any("Глухая оборона гасит удар" in x for x in out.lines), out.lines
+
+
 def test_candles_heal_boss_and_go_out_with_her() -> None:
     stage, state = _boss_room(15)
     witch = stage.bosses[0]

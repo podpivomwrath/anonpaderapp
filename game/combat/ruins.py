@@ -19,6 +19,8 @@ import random
 
 from game import ruins as rules
 from game import ruins_gifts as gifts_mod
+from game.combat import balance_config as bc
+from game.combat import shared_rules
 from game.combat.raid_field import StageTick, _idle, _players, stage_hurt
 from game.combat.resolver import TickResult
 from game.combat.rift import build_mob
@@ -302,6 +304,28 @@ class Gatekeeper(RuinBoss):
         return None
 
 
+def counter_hit(c: CombatantState, result: TickResult | None = None) -> int:
+    """Взыскание Счетовода (2026-11-13, владелец): 60% здоровья, но, в отличие
+    от прочих механик рейдов, его срезают «Глухая оборона», «Защититься»,
+    «Несокрушимый» и снижения входящего урона - те же множители, что у удара
+    в skills.compute_hit, без защиты от характеристик. Взыскание идёт после
+    разбора хода, когда разовые срезки уже сброшены (reset_transient), -
+    «Защититься» берём из действия игрока за этот ход."""
+    from game.combat.session import EffectKind
+
+    amount = c.max_hp * rc.COUNTER_HIT
+    mods = c.buff_modifiers or {}
+    amount *= 1.0 - mods.get("incoming_damage_reduction", 0.0)
+    threshold = mods.get("low_hp_damage_reduction_threshold", bc.BLOOD_KNIGHT_SECOND_WIND_HP_THRESHOLD)
+    if c.current_hp < c.max_hp * threshold:
+        amount *= 1.0 - mods.get("low_hp_damage_reduction", 0.0)
+    action = (getattr(result, "actions", None) or {}).get(c.id)
+    if action is not None and action.type == ActionType.DEFEND:
+        amount *= 1.0 - bc.DEFEND_DAMAGE_REDUCTION
+    amount *= 1.0 - c.effect_total(EffectKind.BLOCK_STANCE)
+    return shared_rules.cap_incoming(c, max(round(amount), 1))
+
+
 class Counter(RuinBoss):
     """Счетовод: кто за ход нанёс больше всех урона, получает метку долга;
     третья метка - взыскание. Урон надо раскладывать по группе."""
@@ -331,9 +355,13 @@ class Counter(RuinBoss):
         self.marks[top] = self.marks.get(top, 0) + 1
         if self.marks[top] >= rc.COUNTER_MARKS:
             self.marks[top] = 0
-            hurt = stage_hurt(c, round(c.max_hp * rc.COUNTER_HIT), out)
+            hurt = stage_hurt(c, counter_hit(c, result), out)
             # Сколько отнял - в логе (2026-11-06, репорт 322: урон не было видно).
             out.lines.append(f"📒 Счетовод взыскивает долг с {c.name}: {hurt} урона")
+            heal = shared_rules.recovered(c, shared_rules.block_heal_amount(c, hurt)) if c.alive else 0
+            if heal > 0:
+                c.current_hp = min(c.max_hp, c.current_hp + heal)
+                out.lines.append(f"🧱 Глухая оборона гасит удар: {c.name} +{heal} здоровья")
         else:
             out.lines.append(f"📒 Долг {c.name}: {self.marks[top]} из {rc.COUNTER_MARKS}")
 
