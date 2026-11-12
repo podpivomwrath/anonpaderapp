@@ -66,7 +66,22 @@ const SECTIONS = [
   { id: 'shop', label: 'Магазин' },
 ];
 
-const PLAYERS_CHAT_URL = 'https://vk.me/join/xuy8wXu8_zoubce24lDXooe6aB_sV1eB3zE=';
+// Раздел, на котором вышли (2026-11-12, жалоба игрока): VK то держит мини-апп
+// в памяти, то открывает заново - и после выхода с карты попадали то на карту,
+// то на персонажа. Раздел помнит браузер (localStorage) - бот и сервер ни при
+// чём. Админку не восстанавливаем: до загрузки персонажа она недоступна.
+const TAB_KEY = 'pines:tab';
+
+function savedTab() {
+  try {
+    const id = window.localStorage.getItem(TAB_KEY);
+    return SECTIONS.some((s) => s.id === id) || id === 'handbook' ? id : 'character';
+  } catch {
+    return 'character';
+  }
+}
+
+const PLAYERS_CHAT_URL ='https://vk.me/join/xuy8wXu8_zoubce24lDXooe6aB_sV1eB3zE=';
 
 const GUILD_MIN_LEVEL = 20;
 
@@ -95,7 +110,7 @@ function money(value) {
 
 
 export default function Hub() {
-  const [activeTab, setActiveTab] = useState('character');
+  const [activeTab, setActiveTab] = useState(savedTab);
   const [menuOpen, setMenuOpen] = useState(false);
   const [crownOpen, setCrownOpen] = useState(false);
   const [titleOpen, setTitleOpen] = useState(false);
@@ -200,6 +215,11 @@ export default function Hub() {
   // Фон живёт вне хаба (BackgroundScene) и должен знать, какой экран открыт.
   useEffect(() => {
     document.body.dataset.view = activeTab;
+    try {
+      window.localStorage.setItem(TAB_KEY, activeTab);
+    } catch {
+      // хранилище закрыто (приватный режим) - откроется «Персонаж», как раньше
+    }
   }, [activeTab]);
 
   // Патч 72: из инвентаря можно прыгнуть сразу в мастерскую - событие вместо
@@ -419,6 +439,12 @@ export default function Hub() {
       setActiveTab('character');
     }
   }, [activeTab, character?.is_admin]);
+
+  // Запомнили «Гильдию», а из гильдии с тех пор вышли (и уровень ниже 20) -
+  // вкладки в меню нет, открываем «Персонажа».
+  useEffect(() => {
+    if (character && !guildOpen && activeTab === 'guild') setActiveTab('character');
+  }, [character, guildOpen, activeTab]);
 
   if (terms) {
     const accept = async () => {
