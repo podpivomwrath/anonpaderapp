@@ -8,9 +8,10 @@ REGION_SELECT → REGION_CONFIRM → DONE. Сцена пробуждения п�
 восстанавливает состояние диспенсера после рестарта. Шаги *_CONFIRM при
 восстановлении откатываются к *_SELECT (выбранная кнопка жила в памяти).
 
-Внутри CLASS_CONFIRM/REGION_CONFIRM два подшага, различаются кнопками:
-описание пути → «Выбрать этот путь» → «— Уверен? Кровь запомнит.» → «Да, это
-мой путь». Отдельное состояние не требуется — тексты кнопок уникальны.
+Внутри CLASS_CONFIRM/REGION_CONFIRM: описание пути → «Выбрать этот путь» -
+и выбор сделан. Второе «Уверен? Кровь запомнит» убрано 2026-11-13
+(владелец); его кнопки «Да» остались рабочими для старых клавиатур и
+ответа на набранный текст.
 """
 
 from vkbottle import BaseMiddleware, BaseStateGroup
@@ -179,12 +180,10 @@ async def class_select_fallback(message: Message) -> None:
 
 @labeler.message(state=CreationState.CLASS_CONFIRM, text=[texts.BTN_CHOOSE_PATH])
 async def class_choose_path(message: Message) -> None:
-    if not (message.state_peer and message.state_peer.payload.get("pending_class")):
-        await _back_to_class_select(message)
-        return
-    await message.answer(
-        KEEPER["class_confirm_question"], keyboard=path_confirm_keyboard()
-    )
+    # Второго «Уверен? Кровь запомнит» больше нет (2026-11-13, владелец):
+    # новички уходили на лишних подтверждениях. Кнопка «Да, это мой путь»
+    # со старой клавиатуры по-прежнему работает (class_confirm).
+    await class_confirm(message)
 
 
 @labeler.message(state=CreationState.CLASS_CONFIRM, text=[texts.BTN_CONFIRM_PATH])
@@ -257,12 +256,8 @@ async def region_select_fallback(message: Message) -> None:
 
 @labeler.message(state=CreationState.REGION_CONFIRM, text=[texts.BTN_GO_REGION])
 async def region_go(message: Message) -> None:
-    if not (message.state_peer and message.state_peer.payload.get("pending_region")):
-        await _back_to_region_select(message)
-        return
-    await message.answer(
-        KEEPER["region_confirm_question"], keyboard=region_confirm_keyboard()
-    )
+    # Без второго «Точно туда?» (2026-11-13, владелец), как и у класса.
+    await region_confirm(message)
 
 
 @labeler.message(state=CreationState.REGION_CONFIRM, text=[texts.BTN_YES, "да"])
