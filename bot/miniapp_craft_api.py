@@ -16,7 +16,7 @@ from aiohttp import web
 from bot.app_keys import SESSION_FACTORY_KEY
 from bot.miniapp_auth import VK_USER_ID_KEY
 from game.economy import craft_config as cc
-from game.economy import crafting, mining
+from game.economy import crafting, enchant_config, mining
 from models import Character, Item
 from services import craft_service, item_service, naming, resist_service
 from services import onboarding_service as onboarding_svc
@@ -69,10 +69,22 @@ def _spec_payload(source_id: str, primary_stat: str = "str") -> list[dict]:
     return result
 
 
+def _enchant_cost(character: Character, item: Item) -> dict | None:
+    if item.craft_spec is None:
+        return None
+    cost = craft_service.enchant_cost(character, item)
+    if cost is None:
+        return None
+    dust, ore_id, amount = cost
+    definition = mining.ore_def(ore_id)
+    return {"dust": dust, "ore_id": ore_id, "ore_name": definition.name if definition else ore_id, "ore": amount}
+
+
 def _item_payload(character: Character, item: Item) -> dict:
     return {
         "id": item.id,
-        "name": item.name,
+        "name": item_service.display_name(item),
+        "enchant": item.enchant_level or 0,
         "slot": item.slot,
         "icon": naming.item_icon_key(item),
         # Редкость нужна интерфейсу для свечения рамки (патч 79).
@@ -90,11 +102,20 @@ def _item_payload(character: Character, item: Item) -> dict:
         ),
         # Статы после следующей ступени - превью улучшения (2026-10-19).
         "next_stats": (
-            crafting.stats_at_efficiency(item.craft_base_stats, crafting.next_efficiency(item.craft_efficiency))
+            crafting.crafted_stats(
+                item.craft_base_stats, crafting.next_efficiency(item.craft_efficiency), item.enchant_level or 0,
+            )
             if item.craft_efficiency is not None and item.craft_base_stats is not None
             and crafting.next_efficiency(item.craft_efficiency) is not None else None
         ),
         "recrafts": item.craft_recrafts,
+        # Заточка (2026-11-13): цена следующей попытки и статы после неё.
+        "enchant_cost": _enchant_cost(character, item),
+        "enchant_next_stats": (
+            crafting.crafted_stats(item.craft_base_stats, item.craft_efficiency, (item.enchant_level or 0) + 1)
+            if item.craft_spec and item.craft_base_stats and item.craft_efficiency
+            and (item.enchant_level or 0) < enchant_config.MAX_LEVEL else None
+        ),
         "bound": item.bound,
         "source_id": item.craft_source_id,
         # Цена СЛЕДУЮЩЕЙ операции — считает сервер, клиент только показывает.
@@ -167,6 +188,12 @@ async def handle_get_craft(request: web.Request) -> web.Response:
             "specs_by_source": specs_by_source,
             # Цена первой ковки и без руды в сумке (было «нужно undefined шт.»).
             "craft_cost": craft_service.first_craft_cost(character),
+            "star_dust": character.star_dust or 0,
+            "enchant": {
+                "max": enchant_config.MAX_LEVEL,
+                "per_level": round(enchant_config.STAT_PER_LEVEL * 100),
+                "rollback": {grade: round(p * 100) for grade, p in enchant_config.ROLLBACK.items()},
+            },
             "efficiency": {
                 "min": cc.EFFICIENCY_MIN,
                 "craft_max": cc.EFFICIENCY_CRAFT_MAX,
@@ -263,8 +290,35 @@ async def handle_post_upgrade(request: web.Request) -> web.Response:
         })
 
 
+async def handle_post_enchant(request: web.Request) -> web.Response:
+    """Попытка заточки (2026-11-13): {item_id, grade} - градация руды."""
+    vk_user_id = request[VK_USER_ID_KEY]
+    body = await _body(request)
+    item_id, grade = body.get("item_id"), body.get("grade")
+    if not isinstance(item_id, int) or not isinstance(grade, str):
+        return _error("bad_request")
+
+    async with request.app[SESSION_FACTORY_KEY]() as db:
+        character = await onboarding_svc.get_character(db, vk_user_id)
+        if character is None:
+            return _error("character_not_found", 404)
+        try:
+            result = await craft_service.enchant(db, character, item_id, grade, _rng)
+        except craft_service.CraftError as exc:
+            await db.rollback()
+            return _error(str(exc), 409)
+        await db.commit()
+        return web.json_response({
+            "item": _item_payload(character, result.item),
+            "enchant_success": result.success,
+            "enchant_before": result.level_before,
+            "enchant_after": result.level_after,
+        })
+
+
 def register_routes(app: web.Application) -> None:
     app.router.add_get("/api/miniapp/craft", handle_get_craft)
     app.router.add_post("/api/miniapp/craft", handle_post_craft)
     app.router.add_post("/api/miniapp/craft/tool", handle_post_tool)
     app.router.add_post("/api/miniapp/craft/upgrade", handle_post_upgrade)
+    app.router.add_post("/api/miniapp/craft/enchant", handle_post_enchant)

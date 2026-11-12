@@ -242,11 +242,6 @@ SUBCLASS_UNLOCK_MIN_LEVEL = 30
 #: первопроходцев» (game/economy/prerelease_config.FREE_PATH_REPICK). Первый
 #: выбор подкласса платный всегда.
 
-# --- Заточка и пробуждение ---
-ENCHANT_MAX_LEVEL = 20
-ENCHANT_SUCCESS_CHANCE = 0.5        # заточка не подключена к игре (upgrade_service, 2026-10-22)
-AWAKENING_DESTRUCTION_CHANCE = 0.30
-AWAKENING_REFUND_RATIO = 0.5        # частичный возврат ресурсов; не подключено (2026-10-22)
 
 # --- Биржа (игра — дилер) ---
 # Самоцветы торгуются только лотами по EXCHANGE_BLOCK_SIZE. Курс - в

@@ -3,7 +3,7 @@ import {
   Button, Div, Group, Header, Placeholder, TabsItem,
 } from '@vkontakte/vkui';
 import Tabs from './ScrollTabs.jsx';
-import { craftItem, craftTool, getCraft, upgradeCraft } from '../api.js';
+import { craftItem, craftTool, enchantCraft, getCraft, upgradeCraft } from '../api.js';
 import ItemIcon from './ItemIcon.jsx';
 import Skeleton from './Skeleton.jsx';
 import Sparks from './Sparks.jsx';
@@ -30,10 +30,12 @@ const STAT_TITLES = {
 const SUBTABS = [
   { id: 'craft', label: 'Крафт' },
   { id: 'upgrade', label: 'Улучшение' },
+  { id: 'enchant', label: 'Заточка' },
 ];
 
 // Порядок тот же, что в game/economy/mining_config.GRADES - от худшей к лучшей.
 const GRADE_ORDER = ['common', 'rare', 'epic', 'legendary'];
+const GRADE_NAMES = { common: 'обычная', rare: 'редкая', epic: 'эпическая', legendary: 'легендарная' };
 
 function statLine(stats) {
   const entries = Object.entries(stats || {}).sort((a, b) => b[1] - a[1]);
@@ -139,7 +141,11 @@ function ResultSheet({ result, onClose }) {
         <Sparks burst={1} instant />
       </div>
       {item && <b className={nameClass}>{item.name}</b>}
-      {result.efficiency_after ? (
+      {result.enchant_after !== undefined ? (
+        <p className="forge-result__big">
+          {result.enchant_success ? '' : 'Откат: '}+{result.enchant_before} → +{result.enchant_after}
+        </p>
+      ) : result.efficiency_after ? (
         <p className="forge-result__big">{result.efficiency_before}% → {result.efficiency_after}%</p>
       ) : item ? (
         <p className="forge-result__big">{item.efficiency}%</p>
@@ -559,6 +565,157 @@ function Upgrade({ data, busy, run, strike }) {
   );
 }
 
+// --- Заточка (2026-11-13): кованая вещь + руда, пыль уходит сама. Попытка -
+// либо +1, либо откат на ступень; шанс отката - от градации руды. ---
+
+function EnchantLadder({ max, now }) {
+  const steps = [];
+  for (let v = 0; v <= max; v += 1) steps.push(v);
+  return (
+    <div className="eff-ladder">
+      {steps.map((v) => (
+        <span key={v}
+          className={`eff-ladder__step${v <= now ? ' eff-ladder__step--done' : ''}${v === now + 1 ? ' eff-ladder__step--next' : ''}`}>
+          +{v}
+        </span>
+      ))}
+    </div>
+  );
+}
+
+function Enchant({ data, busy, run, strike }) {
+  const [itemId, setItemId] = useState(null);
+  const [grade, setGrade] = useState(null);
+  const [picker, setPicker] = useState(null); // 'item' | 'ore'
+  const [confirming, setConfirming] = useState(false);
+
+  const info = data.enchant || { max: 10, per_level: 2, rollback: {} };
+  const forged = data.items.filter((i) => i.spec);
+  const item = forged.find((i) => i.id === itemId) || null;
+  const cost = item?.enchant_cost || null;
+  const rows = cost
+    ? GRADE_ORDER.map((g) => data.ore.find((o) => o.id === cost.ore_id && o.grade === g)
+      || { id: cost.ore_id, grade: g, grade_name: GRADE_NAMES[g], name: cost.ore_name, count: 0 })
+    : [];
+  const oreRow = rows.find((o) => o.grade === grade) || null;
+  const dust = data.star_dust || 0;
+  const reset = () => setConfirming(false);
+
+  let blocker = null;
+  if (!item) blocker = 'Выберите вещь';
+  else if (!cost) blocker = `Уже +${info.max}`;
+  else if (!oreRow) blocker = 'Выберите руду';
+  else if (oreRow.count < cost.ore) blocker = `Не хватает руды: ${oreRow.count} из ${cost.ore}`;
+  else if (dust < cost.dust) blocker = `Не хватает пыли: ${dust} из ${cost.dust}`;
+
+  return (
+    <>
+      <Group header={<Header>Заточка</Header>}>
+        <Div>
+          <div className="forge-slots">
+            <ForgeSlot label="Вещь" filled={!!item} onClick={() => { setPicker('item'); reset(); }}>
+              <ItemIcon icon={item?.icon} rarity={item?.rarity} alt={item?.name} />
+              <span className="forge-slot__name">{item?.name}</span>
+              {item && <span className="forge-slot__sub">{item.spec_title} · +{item.enchant}</span>}
+            </ForgeSlot>
+            <Anvil hot={Boolean(item && !blocker)} strike={strike} />
+            <ForgeSlot label="Руда" filled={!!oreRow} onClick={() => { if (cost) { setPicker('ore'); reset(); } }}>
+              <ItemIcon icon={oreRow ? `ore:${oreRow.id}` : null} rarity={oreRow?.grade} alt={oreRow?.name} />
+              <span className="forge-slot__name">{oreRow?.name}</span>
+              {oreRow && <span className="forge-slot__sub">{oreRow.grade_name} · {oreRow.count} / {cost.ore}</span>}
+              {!oreRow && cost && <span className="forge-slot__sub">{cost.ore_name} ×{cost.ore}</span>}
+            </ForgeSlot>
+          </div>
+          <p className="craft-hint">
+            Каждая ступень даёт +{info.per_level}% ко всем характеристикам вещи, до +{info.max}. Попытка тратит
+            звёздную пыль и руду: до +5 Багряный сросток, с +6 Живой камень. Вещь получает ступень или теряет
+            одну - шанс отката зависит от градации руды.
+          </p>
+        </Div>
+      </Group>
+
+      <Group header={<Header>Что получится</Header>}>
+        <Div>
+          {!item && <p className="craft-hint">Выберите выкованную вещь.</p>}
+          {item && <EnchantLadder max={info.max} now={item.enchant} />}
+          {item && !cost && <p className="craft-hint">«{item.name}» уже на +{info.max}.</p>}
+          {item && cost && (
+            <>
+              <p className="guild-line"><b>+{item.enchant} → +{item.enchant + 1}</b></p>
+              <p className="craft-hint">Сейчас: {statLine(item.stats)}</p>
+              <p className="craft-hint">Станет: {statLine(item.enchant_next_stats)}</p>
+              <p className="craft-hint">
+                Цена попытки: ✨ {cost.dust} пыли (у вас {dust}) и {cost.ore_name} ×{cost.ore}.
+                {oreRow ? ` Шанс отката с руды «${oreRow.grade_name}» - ${info.rollback[oreRow.grade]}%.` : ''}
+              </p>
+            </>
+          )}
+        </Div>
+      </Group>
+
+      <Div>
+        {confirming ? (
+          <div className="forge-confirm">
+            <p className="guild-line">
+              Заточить «{item.name}» на +{item.enchant + 1}? Уйдёт ✨ {cost.dust} пыли и {cost.ore} × {oreRow.name}
+              ({oreRow.grade_name}). Шанс отката {info.rollback[oreRow.grade]}%.
+            </p>
+            <div className="guild-row">
+              <Button size="m" disabled={busy}
+                onClick={() => { setConfirming(false); run(() => enchantCraft(item.id, oreRow.grade)); }}>
+                Да, заточить
+              </Button>
+              <Button size="m" mode="secondary" disabled={busy} onClick={reset}>Отмена</Button>
+            </div>
+          </div>
+        ) : (
+          <Button size="l" stretched mode="primary" disabled={busy || !!blocker} onClick={() => setConfirming(true)}>
+            {blocker || 'Заточить'}
+          </Button>
+        )}
+      </Div>
+
+      {picker === 'item' && (
+        <PickSheet title="Вещь для заточки" onClose={() => setPicker(null)}>
+          <p className="craft-hint forge-sheet__hint">Затачиваются только выкованные вещи - сначала выкуйте вещь с рейд-босса во вкладке «Крафт».</p>
+          {forged.length === 0 && <p className="craft-hint">Выкованных вещей нет.</p>}
+          {forged.map((row) => (
+            <button key={row.id} type="button"
+              className={`crown-sheet__item${row.id === itemId ? ' crown-sheet__item--active' : ''}`}
+              onClick={() => { setItemId(row.id); setGrade(null); setPicker(null); }}>
+              <ItemIcon icon={row.icon} rarity={row.rarity} alt={row.name} />
+              <span className="crown-sheet__text">
+                <b>{row.name}</b>
+                <small>{row.spec_title} · {row.efficiency}% · {statLine(row.stats)}</small>
+              </span>
+            </button>
+          ))}
+        </PickSheet>
+      )}
+
+      {picker === 'ore' && cost && (
+        <PickSheet title={`${cost.ore_name} (нужно ${cost.ore} шт.)`} onClose={() => setPicker(null)}>
+          <p className="craft-hint forge-sheet__hint">Чем выше градация, тем реже откат. Градации не смешиваются.</p>
+          {rows.map((row) => {
+            const enough = row.count >= cost.ore;
+            return (
+              <button key={row.grade} type="button" disabled={!enough}
+                className={`crown-sheet__item${row.grade === grade ? ' crown-sheet__item--active' : ''}`}
+                onClick={() => { setGrade(row.grade); setPicker(null); }}>
+                <ItemIcon icon={`ore:${row.id}`} rarity={row.grade} alt={row.name} />
+                <span className="crown-sheet__text">
+                  <b>{row.name} · {row.grade_name}</b>
+                  <small>откат {info.rollback[row.grade]}% · у вас {row.count}{enough ? '' : ` - не хватает, нужно ${cost.ore}`}</small>
+                </span>
+              </button>
+            );
+          })}
+        </PickSheet>
+      )}
+    </>
+  );
+}
+
 export default function CraftTab() {
   const [data, setData] = useState(null);
   const [status, setStatus] = useState('loading');
@@ -634,11 +791,9 @@ export default function CraftTab() {
         </Div>
       )}
 
-      {subtab === 'craft' ? (
-        <Forge data={data} busy={busy} run={run} strike={strike} />
-      ) : (
-        <Upgrade data={data} busy={busy} run={run} strike={strike} />
-      )}
+      {subtab === 'craft' && <Forge data={data} busy={busy} run={run} strike={strike} />}
+      {subtab === 'upgrade' && <Upgrade data={data} busy={busy} run={run} strike={strike} />}
+      {subtab === 'enchant' && <Enchant data={data} busy={busy} run={run} strike={strike} />}
 
       {stock.length > 0 && (
         <Group header={<Header>Запас руды</Header>}>

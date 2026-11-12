@@ -521,6 +521,14 @@ export const upgradeCraft = (itemId, ceiling) =>
     body: JSON.stringify({ item_id: itemId, ceiling }),
   });
 
+// Заточка кованой вещи (2026-11-13): grade - градация руды попытки.
+export const enchantCraft = (itemId, grade) =>
+  request('/craft/enchant', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ item_id: itemId, grade }),
+  });
+
 // --- Гильдии ---
 
 export const getGuild = () => request('/guild');

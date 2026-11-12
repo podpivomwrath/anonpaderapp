@@ -564,6 +564,12 @@ def level_note(item: Item) -> str:
     return f" (ур. {item.ilvl})" if item.ilvl is not None else ""
 
 
+def display_name(item: Item) -> str:
+    """Название со ступенью заточки: «Игла Хирурга +3» (2026-11-13)."""
+    level = getattr(item, "enchant_level", 0) or 0
+    return f"{item.name} +{level}" if level > 0 else item.name
+
+
 def format_drop_announcement(item: Item) -> str:
     emoji = rarity_def(item.rarity).emoji
     # Безлично: вещь приходит и с боя, и с этапа рейда, и из события.
@@ -572,7 +578,7 @@ def format_drop_announcement(item: Item) -> str:
 
 def format_item_label(item: Item) -> str:
     emoji = rarity_def(item.rarity).emoji
-    return f"{emoji} {item.name}{level_note(item)}"
+    return f"{emoji} {display_name(item)}{level_note(item)}"
 
 
 def _arrow(before: int, after: int) -> str:

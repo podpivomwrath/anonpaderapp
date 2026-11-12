@@ -119,6 +119,7 @@ function detailRows(entry) {
     rows.push(['Слот', data.slot_title]);
     if (data.ilvl) rows.push(['Уровень', data.ilvl]);
     if (data.craft_efficiency) rows.push(['Эффективность', `${data.craft_efficiency}%`]);
+    if (data.enchant) rows.push(['Заточка', `+${data.enchant}`]);
     if (data.resist) rows.push(['Сопротивление', `${data.resist_chip?.emoji || ''} ${data.resist}`.trim()]);
     Object.entries(data.base_stats || {})
       .sort((a, b) => b[1] - a[1])

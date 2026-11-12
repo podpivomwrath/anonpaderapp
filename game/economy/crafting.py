@@ -190,8 +190,18 @@ def stats_at_efficiency(base_stats: dict[str, int], efficiency: int) -> dict[str
     ролла и текущего процента, а не от того, какой дорогой игрок до него
     дошёл.
     """
+    return crafted_stats(base_stats, efficiency, 0)
+
+
+def crafted_stats(base_stats: dict[str, int], efficiency: int, enchant: int) -> dict[str, int]:
+    """Статы кованой вещи: базовый ролл × эффективность × заточка
+    (2026-11-13, game/economy/enchant_config). Одно округление в конце -
+    ступень заточки не теряется на округлении эффективности."""
+    from game.economy import enchant_config
+
+    mult = efficiency / 100 * enchant_config.multiplier(enchant)
     return {
-        stat: max(round(amount * efficiency / 100), 1)
+        stat: max(round(amount * mult), 1)
         for stat, amount in base_stats.items()
         if amount > 0
     }

@@ -66,7 +66,7 @@ async def _render_list(db, character, page: int = 1) -> tuple[str, list[tuple[It
             slot_title += f", ур. {item.ilvl}"
         suffix = " (надето)" if equipped else ""
         lines.append(
-            f"{rarity.emoji} {item.name} - {slot_title}{suffix}\n"
+            f"{rarity.emoji} {item_service.display_name(item)} - {slot_title}{suffix}\n"
             f"{_stats_line(item)}"
         )
     header = "🎒 Инвентарь:"

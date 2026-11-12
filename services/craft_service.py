@@ -199,7 +199,8 @@ async def craft(
         rng, spec, _source_power(item, recipe), _primary_stat(character), tier, grade,
         weights=crafting.spec_weights(source_id, spec),
     )
-    stats = crafting.stats_at_efficiency(base_stats, efficiency)
+    # Заточка (2026-11-13) переживает перековку: ступень остаётся на вещи.
+    stats = crafting.crafted_stats(base_stats, efficiency, item.enchant_level or 0)
 
     item.name = recipe.outputs[spec].name
     item.base_stats = stats
@@ -324,9 +325,91 @@ async def upgrade(
     await _spend_tool(db, character.id, ceiling)
 
     item.craft_efficiency = nxt
-    item.base_stats = crafting.stats_at_efficiency(item.craft_base_stats, nxt)
+    item.base_stats = crafting.crafted_stats(item.craft_base_stats, nxt, item.enchant_level or 0)
     await db.flush()
 
     return UpgradeResult(
         item=item, efficiency_before=before, efficiency_after=nxt, stats=item.base_stats,
+    )
+
+
+# --- Заточка (2026-11-13) --------------------------------------------------------
+
+
+@dataclass
+class EnchantResult:
+    item: Item
+    success: bool
+    level_before: int
+    level_after: int
+    dust_spent: int
+    ore_id: str
+    ore_spent: int
+
+
+def enchant_cost(character: Character, item: Item) -> tuple[int, str, int] | None:
+    """(пыль, руда, штук руды) за следующую попытку; None - уже потолок.
+    Скидка венца и гильдии - на руду, как у всей мастерской (_discounted)."""
+    from game.economy import enchant_config as ec
+
+    target = (item.enchant_level or 0) + 1
+    if target > ec.MAX_LEVEL:
+        return None
+    ore_id, amount = ec.ore_cost(target)
+    return ec.dust_cost(target), ore_id, _discounted(character, amount)
+
+
+async def _spend_dust(db: AsyncSession, character: Character, amount: int) -> None:
+    """Атомарно, как руда: порог - в том же UPDATE."""
+    result = await db.execute(
+        update(Character)
+        .where(Character.id == character.id, Character.star_dust >= amount)
+        .values(star_dust=Character.star_dust - amount)
+    )
+    await db.refresh(character, ["star_dust"])
+    if not result.rowcount:
+        raise CraftError(f"Нужно {amount} звёздной пыли, есть {character.star_dust or 0}.")
+    from services import resource_log
+
+    resource_log.add(db, character.id, "dust", None, -amount)
+
+
+async def enchant(
+    db: AsyncSession, character: Character, item_id: int, grade: str, rng: random.Random,
+) -> EnchantResult:
+    """Попытка заточки кованой вещи: +1 или откат на ступень. Шанс отката -
+    от градации руды (enchant_config.ROLLBACK). Пыль и руда уходят всегда."""
+    from game.economy import enchant_config as ec
+    from models import ItemUpgradeHistory
+
+    if grade not in ec.ROLLBACK:
+        raise CraftError("Такой градации руды нет.")
+    await _owned_item(db, character.id, item_id)
+    # Блокировка строки вещи: два быстрых нажатия не запишут ступень друг
+    # поверх друга (руда и пыль списались бы обе).
+    item = await db.scalar(
+        select(Item).where(Item.id == item_id).with_for_update().execution_options(populate_existing=True)
+    )
+    if item.craft_spec is None or item.craft_base_stats is None or item.craft_efficiency is None:
+        raise CraftError("Затачивать можно только выкованную вещь.")
+    cost = enchant_cost(character, item)
+    if cost is None:
+        raise CraftError(f"Уже +{ec.MAX_LEVEL} - выше не бывает.")
+    dust, ore_id, ore_amount_needed = cost
+
+    await _spend_ore(db, character.id, ore_id, grade, ore_amount_needed)
+    await _spend_dust(db, character, dust)
+
+    before = item.enchant_level or 0
+    success = rng.random() >= ec.ROLLBACK[grade]
+    item.enchant_level = before + 1 if success else max(before - 1, 0)
+    item.base_stats = crafting.crafted_stats(item.craft_base_stats, item.craft_efficiency, item.enchant_level)
+    db.add(ItemUpgradeHistory(
+        item_id=item.id, action="enchant", success=success,
+        level_before=before, level_after=item.enchant_level,
+    ))
+    await db.flush()
+    return EnchantResult(
+        item=item, success=success, level_before=before, level_after=item.enchant_level,
+        dust_spent=dust, ore_id=ore_id, ore_spent=ore_amount_needed,
     )

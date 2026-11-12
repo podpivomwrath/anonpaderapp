@@ -84,7 +84,8 @@ def _inventory_payload(items: list, level: int | None = None) -> dict:
         "items": [
             {
                 "id": item.id,
-                "name": item.name,
+                "name": item_service.display_name(item),
+                "enchant": item.enchant_level or 0,
                 "slot": item.slot,
                 "slot_title": item_service.SLOT_TITLES[item.slot],
                 "rarity": item.rarity,

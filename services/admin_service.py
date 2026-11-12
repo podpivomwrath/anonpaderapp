@@ -404,7 +404,7 @@ async def player_card(db: AsyncSession, character_id: int) -> dict | None:
         },
         "inventory": [
             {
-                "id": item.id, "name": item.name, "slot": item.slot, "rarity": item.rarity,
+                "id": item.id, "name": item_service.display_name(item), "slot": item.slot, "rarity": item.rarity,
                 "slot_title": naming.slot_title(item.slot),
                 "rarity_title": naming.rarity_title(item.rarity),
                 "ilvl": item.ilvl, "equipped": equipped, "stats": item.base_stats,
