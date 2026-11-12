@@ -336,7 +336,8 @@ function TradeLine({ t }) {
       <span className="market-trade__what">
         {t.side === 'buy' ? '🛒 Куплено' : '💰 Продано'}: {t.name} ×{t.qty} по {money(t.price)}
       </span>
-      <span className="market-trade__sum">{t.side === 'buy' ? '-' : '+'}{money(t.price * t.qty)}</span>
+      {/* Сумма сделки, без знака: продавцу приходит за вычетом комиссии. */}
+      <span className="market-trade__sum">{money(t.price * t.qty)}</span>
     </div>
   );
 }
