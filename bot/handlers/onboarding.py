@@ -93,7 +93,7 @@ async def _resume(message: Message, state_str: str) -> None:
     await _dispenser.set(message.peer_id, state)
     if state == CreationState.NICKNAME_INPUT:
         await message.answer(
-            KEEPER["scene_awakening"],
+            texts.awakening_text(),
             attachment=texts.scene_attachment("scene_awakening"),
             keyboard=empty_keyboard(),
         )
@@ -116,7 +116,7 @@ async def handle_start(message: Message) -> None:
             await db.commit()
             await _dispenser.set(message.peer_id, CreationState.NICKNAME_INPUT)
             await message.answer(
-                KEEPER["scene_awakening"],
+                texts.awakening_text(),
                 attachment=texts.scene_attachment("scene_awakening"),
                 keyboard=empty_keyboard(),
             )
