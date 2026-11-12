@@ -6,14 +6,14 @@ from bot.vk_media import photo_attachment
 from game import plural
 
 PHOTOS = {
-    "ferret": "",
-    "raven": "",
-    "rune": "",
-    "spider": "",
-    "hound": "",
-    "dragon_awake": "",
-    "dragon_announce": "",
-    "dragon_flight": "",
+    "ferret": "457239317",
+    "raven": "457239318",
+    "rune": "457239319",
+    "spider": "457239320",
+    "hound": "457239321",
+    "dragon_awake": "457239322",
+    "dragon_announce": "457239323",
+    "dragon_flight": "457239324",
 }
 
 
