@@ -374,3 +374,18 @@ def test_convergence_full_power_after_two_different_elements() -> None:
     assert full > plain * 1.3 * 1.4  # +30% и крит
     assert ele.convergence_elements == []
     assert hit() == plain  # счёт обнулился
+
+
+def test_block_heal_feeds_reverse_prayer() -> None:
+    """Репорт 359: лечение Глухой обороны за удар по стойке - тоже лечение
+    навыка, «Обратная молитва» бьёт с него врага."""
+    rng = NoCritRng()
+    guardian = combatant(1, side=0, subclass_id="guardian", agility=0)
+    guardian.buff_modifiers["rune:reverse_prayer"] = 0.5
+    enemy = combatant(2, side=1, vitality=500)
+    state = make_session(guardian, enemy)
+    resolve_tick(state, {1: skill("guardian_block")}, rng)  # стойка
+    before = enemy.current_hp
+    result = resolve_tick(state, {2: attack(1)}, rng)  # удар по стойке - лечение
+    assert enemy.current_hp < before
+    assert any(h.label == "обратная молитва" for h in result.hit_renders), [h.label for h in result.hit_renders]

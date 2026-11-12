@@ -269,6 +269,12 @@ def _apply_phase(
                     amount=block_heal, label="Глухая оборона гасит удар",
                 )
             )
+            # «Обратная молитва» и с этого лечения (репорт 359): оно приходит
+            # от навыка, но позже, при ударе по стойке, - rune_after_skill его
+            # не видит.
+            prayer_hit = shared_rules.prayer_hit(target, block_heal, session.combatants.values())
+            if prayer_hit is not None:
+                reflect_hits.append(prayer_hit)
         # Щиты (однотиковый + «Второе сердце») и «Токсикология» - общие с
         # дуэлью, см. game/combat/shared_rules.py.
         pierce = (

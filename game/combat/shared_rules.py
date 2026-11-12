@@ -700,6 +700,23 @@ def skill_snapshot(actor: CombatantState, combatants) -> dict:
     return {id(e): (e.remaining_ticks, e.value) for c in combatants for e in c.effects if e.source_id == actor.id}
 
 
+def prayer_hit(actor: CombatantState, healed: int, combatants):
+    """«Обратная молитва»: доля лечения навыка бьёт самого раненого врага.
+    Лечение навыка в ход применения (rune_after_skill) и лечение Глухой
+    обороны за удар по стойке (резолвер, репорт 359). None - руны нет."""
+    prayer = (actor.buff_modifiers or {}).get("rune:reverse_prayer", 0.0)
+    if not prayer or healed <= 0:
+        return None
+    enemies = [c for c in combatants if c.side != actor.side and c.alive]
+    if not enemies:
+        return None
+    from game.combat.skills import PendingHit
+
+    target = min(enemies, key=lambda c: c.current_hp)
+    return PendingHit(source_id=actor.id, target_id=target.id, amount=max(round(healed * prayer), 1),
+                      label="обратная молитва", reactive=True)
+
+
 def rune_after_skill(actor: CombatantState, skill_id: str | None, before: dict, combatants, ctx, heals_from: int) -> None:
     """После навыка: «Тягучесть» (эффекты навыка дольше), «Подпорка» (щиты и
     лечение навыка сильнее), «Обратная молитва» (часть лечения бьёт врага),
@@ -726,17 +743,9 @@ def rune_after_skill(actor: CombatantState, skill_id: str | None, before: dict, 
         for h in new_heals:
             h.amount = round(h.amount * (1 + prop))
             h.ratio *= 1 + prop
-    prayer = mods.get("rune:reverse_prayer", 0.0)
-    healed = sum(max(h.amount, 0) for h in new_heals)
-    if prayer and healed > 0:
-        enemies = [c for c in combatants if c.side != actor.side and c.alive]
-        if enemies:
-            from game.combat.skills import PendingHit
-
-            target = min(enemies, key=lambda c: c.current_hp)
-            ctx.hits.append(PendingHit(source_id=actor.id, target_id=target.id,
-                                       amount=max(round(healed * prayer), 1), label="обратная молитва",
-                                       reactive=True))
+    hit = prayer_hit(actor, sum(max(h.amount, 0) for h in new_heals), combatants)
+    if hit is not None:
+        ctx.hits.append(hit)
     ricochet = mods.get(f"rune:ricochet@{skill_id}", 0.0)
     if ricochet and rng.random() < ricochet:
         hit_ids = {h.target_id for h in ctx.hits if h.source_id == actor.id}
