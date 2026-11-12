@@ -445,7 +445,9 @@ async def test_every_unique_boss_fight_runs_to_the_end(monkeypatch) -> None:
                 await asyncio.sleep(0)
         # Бой мог уже кончиться в движке, а обработчик ещё снимает его
         # фоновой задачей - дать ей доработать (тест плавал на 35 этаже).
-        for _ in range(50):
+        # При гибели группы обработчик сперва пишет отчёт испытаний в базу -
+        # в тестах её нет, и отказ иногда дольше полсекунды (2026-11-13).
+        for _ in range(300):
             if battle_id not in raid_combat._battles:
                 break
             await asyncio.sleep(0.01)

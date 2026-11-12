@@ -204,6 +204,37 @@ def test_mute_silences_on_success() -> None:
     assert foe.has_effect(EffectKind.SILENCE)
 
 
+def test_mute_in_raids_lands_half_the_time_and_not_on_raid_bosses() -> None:
+    """2026-11-13, владелец: в рейдах, разломах и руинах Немота по мобам -
+    шанс 50%; рейдовые боссы невосприимчивы, как к любому контролю."""
+    from game.combat.rune_skills import MUTE_RAID_CHANCE
+
+    class Fixed(NoCritRng):
+        def __init__(self, value):
+            super().__init__()
+            self.value = value
+
+        def random(self) -> float:
+            return self.value
+
+    def cast(value, immune=False):
+        me = combatant(1, side=0)
+        foe = combatant(2, side=1, kind="mob", vitality=500, will=0)
+        foe.control_immune_always = immune
+        state = _session(me, foe, mode=CombatMode.PVE)
+        state.raid_stage = True
+        result = resolve_tick(state, {1: _skill("mute", 2)}, Fixed(value))
+        return foe, result
+
+    assert MUTE_RAID_CHANCE == 0.5
+    foe, result = cast(0.99)  # выше шанса - не легла
+    assert not foe.has_effect(EffectKind.SILENCE) and 2 not in result.silenced
+    foe, result = cast(0.3)
+    assert foe.has_effect(EffectKind.SILENCE) and 2 in result.silenced
+    foe, _ = cast(0.3, immune=True)
+    assert not foe.has_effect(EffectKind.SILENCE)
+
+
 def test_counter_strike_reflects() -> None:
     me, foe = combatant(1, side=0, vitality=500), combatant(2, side=1, vitality=500)
     resolve_tick(_session(me, foe), {1: _skill("counter_strike"), 2: DeclaredAction(

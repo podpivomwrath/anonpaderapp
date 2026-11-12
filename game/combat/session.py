@@ -524,6 +524,10 @@ class CombatSessionState:
     #: отправляют сорванный навык цели на перезарядку.
     turn_actions: dict = field(default_factory=dict)
     is_raid: bool = False  # влияет на точность % в логе (п.11)
+    #: бой рейда, разлома или руин (bot/handlers/raid_combat): «Немота» по
+    #: мобам ложится с шансом game.combat.rune_skills.MUTE_RAID_CHANCE
+    #: (2026-11-13, владелец)
+    raid_stage: bool = False
     #: своё окно хода вместо общего (финал Мельника: жернова ускоряются)
     turn_seconds: float | None = None
     #: групповой PvE без таймера хода: соло в руинах ждёт игрока, как бой с

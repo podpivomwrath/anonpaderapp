@@ -17,6 +17,8 @@ from game.combat.skills import (
 )
 
 #: «Прикрыть собой»: доля урона по прикрытому, что уходит прикрывающему.
+#: Немота по мобам рейдов, разломов и руин ложится с этим шансом (2026-11-13).
+MUTE_RAID_CHANCE = 0.5
 COVER_SHARE = 0.3
 #: Щиты «Прикрыть собой» и «Сомкнуть ряды» - от Выносливости того, кто их
 #: ставит (2026-11-11, владелец), с порогом характеристики. Числа - так, чтобы
@@ -135,6 +137,13 @@ def mute(ctx: SkillContext) -> None:
     if hit.missed or not target.alive:
         return
     pvp = ctx.session.mode != CombatMode.PVE
+    # Рейды, разломы и руины (2026-11-13, владелец): по мобам - шанс 50%.
+    # Там Немота глушит механику уникального босса руин (game/combat/ruins.py),
+    # рейдовые боссы невосприимчивы, как к любому контролю.
+    if (getattr(ctx.session, "raid_stage", False) and target.kind == "mob"
+            and not target.control_immune_always and ctx.rng.random() >= MUTE_RAID_CHANCE):
+        ctx.lines.append(f"🤐 {target.name} не поддаётся Немоте")
+        return
     res = control.try_apply_control(
         target, base_duration=max(skill.effect_duration, 1), source_id=actor.id, rng=ctx.rng, pvp=pvp,
         duration_bonus=ability_rules.ctrl_mobs_bonus(actor, skill.id, target),

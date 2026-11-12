@@ -340,7 +340,7 @@ def _build_player_combatants(state: CombatSessionState, member_inputs: list[Memb
 
 def _start_stage_session(battle_id: int, battle: RaidBattle) -> CombatSessionState:
     battle.stage_ticks = 0
-    state = CombatSessionState(session_id=battle_id, mode=CombatMode.PVE, is_raid=True)
+    state = CombatSessionState(session_id=battle_id, mode=CombatMode.PVE, is_raid=True, raid_stage=True)
     _build_player_combatants(state, battle.member_inputs)
     if battle.is_ruins:
         # Соло в руинах - без таймера хода: можно отойти, как в бою с тварью

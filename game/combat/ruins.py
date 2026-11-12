@@ -242,6 +242,11 @@ class RuinBoss:
         b = self.boss(session)
         return b is not None and b.alive
 
+    def muted(self, result: TickResult, cid: int | None = None) -> bool:
+        """Под «Немотой» в этот ход (2026-11-13, владелец): механика босса
+        молчит. Немота на ход снята ещё в разборе, поэтому - result.silenced."""
+        return (cid if cid is not None else self.boss_id) in getattr(result, "silenced", ())
+
     def tick(self, session: CombatSessionState, result: TickResult, rng: random.Random, out: StageTick) -> None:
         pass
 
@@ -284,7 +289,9 @@ class Gatekeeper(RuinBoss):
             elif len(alive) == 1 and self.room.ticks - self.buried[cid] >= rc.GATE_SOLO_FREE:
                 self.buried.pop(cid, None)
                 out.lines.append(f"⛏ {c.name} выбирается из-под камней")
-        if self.room.ticks % rc.GATE_EVERY == 0:
+        if self.room.ticks % rc.GATE_EVERY == 0 and self.muted(result):
+            out.lines.append("🤐 Привратник под Немотой: свод держится")
+        elif self.room.ticks % rc.GATE_EVERY == 0:
             free = [p for p in alive if p.id not in self.buried]
             if free and (len(alive) == 1 or len(free) > 1):
                 victim = rng.choice(free)
@@ -341,6 +348,9 @@ class Counter(RuinBoss):
 
     def tick(self, session, result, rng, out) -> None:
         if not self.alive(session):
+            return
+        if self.muted(result):
+            out.lines.append("🤐 Счетовод под Немотой: в книгу не пишет")
             return
         dealt: dict[int, int] = {}
         for h in result.hit_renders:
@@ -410,6 +420,9 @@ class Candlewoman(RuinBoss):
                 session.combatants[cid].current_hp = 0
             out.cleared = bool(lit)
             return
+        if self.muted(result):
+            out.lines.append("🤐 Свечница под Немотой: свечи не лечат, новой нет")
+            return
         if lit:
             heal = round(boss.max_hp * rc.CANDLE_HEAL * len(lit))
             boss.current_hp = min(boss.max_hp, boss.current_hp + heal)
@@ -435,6 +448,11 @@ class Herald(RuinBoss):
 
     def tick(self, session, result, rng, out) -> None:
         if not self.alive(session):
+            return
+        if self.muted(result):
+            # Ни отражения за этот ход, ни нового объявления на следующий.
+            self.banned = None
+            out.lines.append("🤐 Глашатай под Немотой: молчит и ничего не возвращает")
             return
         if self.banned is not None:
             from game.combat.skills import DEFENSIVE_SKILLS
@@ -490,7 +508,9 @@ class Brothers(RuinBoss):
         for c in (a, b):
             angry = (c.alive and len(share) == 2
                      and share[c.id] - min(share.values()) > rc.BROTHERS_GAP)
-            if angry and c.id not in self.raged:
+            if angry and c.id not in self.raged and self.muted(result, c.id):
+                out.lines.append(f"🤐 {c.name} под Немотой: не звереет")
+            elif angry and c.id not in self.raged:
                 c.buff_modifiers["damage_bonus"] = c.buff_modifiers.get("damage_bonus", 0.0) + rc.BROTHERS_RAGE
                 self.raged.add(c.id)
                 out.lines.append(f"⛏ {c.name} звереет: брат отстал")
@@ -535,6 +555,13 @@ class Abbot(RuinBoss):
 
     def tick(self, session, result, rng, out) -> None:
         if not self.alive(session):
+            return
+        if self.muted(result):
+            # Обет этого хода не спрашивается, нового нет.
+            self.vow = None
+            self.potions = {p.id: getattr(p, "consumables_used", 0) for p in session.combatants.values()
+                            if p.kind == "character"}
+            out.lines.append("🤐 Настоятель под Немотой: обета нет")
             return
         if self.vow is not None:
             broken = self._broken(session, result)

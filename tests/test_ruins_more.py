@@ -312,6 +312,23 @@ def test_counter_debt_is_cut_by_block_stance_and_defend() -> None:
     assert not any("поглощает" in x for x in out.lines), out.lines
 
 
+def test_mute_silences_ruin_boss_mechanics() -> None:
+    """2026-11-13, владелец: Немота на уникальном боссе руин глушит его приём
+    на этот ход (result.silenced - Немота к after_tick уже снята)."""
+    stage, state = _boss_room(10)
+    counter = stage.bosses[0]
+    hit = RenderedHit(1, counter.boss_id, 0, 1, "бьёт", 500, False, False, False, 9000, 8500, 9000)
+    out = stage._enemy_tick(state, TickResult(hit_renders=[hit], silenced={counter.boss_id}), random.Random(1))
+    assert counter.marks == {} and any("под Немотой" in x for x in out.lines)
+
+    stage, state = _boss_room(15)
+    witch = stage.bosses[0]
+    boss = state.combatants[witch.boss_id]
+    boss.current_hp = boss.max_hp // 2
+    stage._enemy_tick(state, TickResult(silenced={witch.boss_id}), random.Random(1))
+    assert boss.current_hp == boss.max_hp // 2
+
+
 def test_candles_heal_boss_and_go_out_with_her() -> None:
     stage, state = _boss_room(15)
     witch = stage.bosses[0]

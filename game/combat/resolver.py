@@ -210,6 +210,10 @@ class TickResult:
     hits: list[PendingHit] = field(default_factory=list)
     actions: dict[int, DeclaredAction] = field(default_factory=dict)  # только "character"
     control_landed_by: set[int] = field(default_factory=set)  # cid, успешно наложившие контроль в этот ход
+    #: Мобы под «Немотой» в фазу своего хода (2026-11-13). Немота на ход
+    #: снимается в конце разбора, а механики боссов руин (after_tick) идут
+    #: позже - они смотрят сюда.
+    silenced: set[int] = field(default_factory=set)
     # Патч 66: {id цели: кто пытался её контролить} - включая отбитые попытки.
     # Отдельно от control_landed_by: тому важен успех, этому - сам факт удара
     # контролем по конкретной цели (окно прерывания Хирурга).
@@ -585,6 +589,8 @@ def resolve_tick(
     for hit in ctx.hits:
         incoming_by_target.setdefault(hit.target_id, []).append(hit)
     for mob in [c for c in session.combatants.values() if c.kind == "mob" and c.alive]:
+        if mob.has_effect(EffectKind.SILENCE):
+            result.silenced.add(mob.id)
         if is_frozen(mob):
             mob.skipped_by_control_this_turn = True  # пропуск из-за контроля (стрик DR)
             # Патч 52, баг 1: см. комментарий у фазы 4a — единственное место
