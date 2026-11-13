@@ -233,7 +233,7 @@ def _boss_room(floor: int, party: int = 2, seed: int = 0):
 
 def test_boss_rotation_and_combos() -> None:
     names = [rcombat.bosses_for_floor(f, random.Random(0))[0].key for f in (5, 10, 15, 20, 25, 30, 35)]
-    assert names == ["gatekeeper", "counter", "candle", "herald", "brothers", "abbot", "gatekeeper"]
+    assert names == ["gatekeeper", "counter", "abbot", "herald", "brothers", "candle", "gatekeeper"]
     assert [len(rcombat.bosses_for_floor(f, random.Random(0))) for f in (30, 35, 55, 60, 90)] == [1, 2, 2, 3, 4]
     assert isinstance(rcombat.build_stage(1, rules.generate(random.Random(0), 7), rules.BOSS, 1),
                       rcombat.RoomStage), "не кратный 5 - элитный хозяин"
@@ -296,8 +296,8 @@ def test_solo_run_softens_boss_mechanics() -> None:
 
     stage, _state = _boss_room(10, party=1)
     assert "Четыре записи" in stage.bosses[0].opening()[0]
-    solo_room, _ = _boss_room(15, party=1)
-    group_room, _ = _boss_room(15, party=2)
+    solo_room, _ = _boss_room(30, party=1)
+    group_room, _ = _boss_room(30, party=2)
     assert len(solo_room.bosses[0].candles) == rc.SOLO_CANDLES_START < len(group_room.bosses[0].candles)
 
 
@@ -305,7 +305,7 @@ def test_candle_health_is_share_of_floor_mob() -> None:
     """2026-11-13, владелец: свечи были слишком крепкими (~0.76 моба и +70%
     за игрока). Теперь - четверть обычного моба этажа, +25% за игрока."""
     for party in (1, 5):
-        stage, state = _boss_room(15, party=party)
+        stage, state = _boss_room(30, party=party)
         candle = state.combatants[stage.bosses[0].candles[0]]
         mob = stage._mob(stage.name, rc.MOB_HP, rc.MOB_DMG, party_hp=False)
         share = rc.CANDLE_HP * (1 + rc.CANDLE_HP_PER_PLAYER * (party - 1))
@@ -361,7 +361,7 @@ def test_mute_silences_ruin_boss_mechanics() -> None:
     out = stage._enemy_tick(state, TickResult(hit_renders=[hit], silenced={counter.boss_id}), random.Random(1))
     assert counter.marks == {} and any("под Немотой" in x for x in out.lines)
 
-    stage, state = _boss_room(15)
+    stage, state = _boss_room(30)
     witch = stage.bosses[0]
     boss = state.combatants[witch.boss_id]
     boss.current_hp = boss.max_hp // 2
@@ -370,7 +370,7 @@ def test_mute_silences_ruin_boss_mechanics() -> None:
 
 
 def test_candles_heal_boss_and_go_out_with_her() -> None:
-    stage, state = _boss_room(15)
+    stage, state = _boss_room(30)
     witch = stage.bosses[0]
     boss = state.combatants[witch.boss_id]
     boss.current_hp = boss.max_hp // 2
@@ -423,7 +423,7 @@ def test_brothers_rage_when_uneven() -> None:
 
 
 def test_abbot_punishes_everyone() -> None:
-    stage, state = _boss_room(30)
+    stage, state = _boss_room(15)
     abbot = stage.bosses[0]
     stage._enemy_tick(state, TickResult(), random.Random(1))
     abbot.vow = "skill"

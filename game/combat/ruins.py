@@ -589,7 +589,9 @@ class Abbot(RuinBoss):
         out.lines.append(f"📿 Обет на следующий ход: {self.VOWS[self.vow]}")
 
 
-BOSSES: tuple[type[RuinBoss], ...] = (Gatekeeper, Counter, Candlewoman, Herald, Brothers, Abbot)
+#: Свечница переехала с 15 этажа на 30, Настоятель - на 15: по отзыву Есты
+#: она сложнее всех (владелец, 2026-11-13).
+BOSSES: tuple[type[RuinBoss], ...] = (Gatekeeper, Counter, Abbot, Herald, Brothers, Candlewoman)
 
 
 def bosses_for_floor(floor: int, rng: random.Random) -> list[type[RuinBoss]]:
