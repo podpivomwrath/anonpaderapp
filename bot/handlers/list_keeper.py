@@ -12,6 +12,7 @@ from vkbottle import BaseMiddleware, BaseStateGroup
 from vkbottle.bot import BotLabeler, Message
 
 from bot.keyboards.list_keeper import (
+    BTN_CANCEL_PATH,
     BTN_CHOOSE_PATH,
     BTN_CONFIRM_PATH,
     BTN_DECLINE,
@@ -20,6 +21,7 @@ from bot.keyboards.list_keeper import (
     BTN_LEAVE,
     BTN_OTHER_PATH,
     BTN_PAY,
+    BTN_PAY_OLD,
     BTN_REMAKE,
     BTN_REMAKE_CANCEL,
     BTN_REMAKE_CLASS,
@@ -43,6 +45,7 @@ from bot.onboarding_texts import CLASS_BUTTONS
 from bot.world_texts import FOREIGN_NPC_REJECTION, mentor_name
 from bot import text_match
 from game.classes.base import REGISTRY
+from game.combat import balance_config as bc
 from game.combat import display
 from game.content_loader import load_npc_texts
 from game.world import grid
@@ -81,7 +84,32 @@ STATE_OFFER = "subclass_offer"
 STATE_PATH_SELECT = "subclass_path_select"
 #: Повторный выбор пути после смены класса/подкласса (временно бесплатно).
 FREE_REPICK_LINE = "Вы уже платили за путь. После смены класса новый выбирается без платы."
+PAID_KEPT_LINE = "Плата за путь сохранится: при следующем разговоре Хранитель сразу предложит выбор."
 STATE_PATH_CONFIRM = "subclass_path_confirm"
+#: Заплатил и ушёл с выбора пути кнопкой «Отменить» (2026-11-13). Не в
+#: RESTORE_STATES: иначе после рестарта игрока снова заперло бы в выборе.
+#: Хранитель по нему сразу ведёт к выбору, без второй платы (баг 246).
+STATE_PATH_PAID = "subclass_path_paid"
+#: С 2026-11-13 (владелец) 20 000 списываются только на «Да, это мой путь».
+#: Раньше - на входе в выбор, и записанные тогда PATH_SELECT / PATH_CONFIRM
+#: в базе значат «уже заплатил»: новый поток эти строки в базу не пишет.
+PAID_STATES = (STATE_PATH_SELECT, STATE_PATH_CONFIRM, STATE_PATH_PAID)
+
+
+def _paid(character) -> bool:
+    return character.subclass_select_state in PAID_STATES
+
+
+def _can_decline(character) -> bool:
+    """Отказ от пути - пока за него не заплачено: после оплаты он сжёг бы золото."""
+    return subclass_service.free_repick(character) or not _paid(character)
+
+
+def _price_line(character) -> str:
+    if _paid(character) or subclass_service.free_repick(character):
+        return ""
+    cost = f"{bc.SUBCLASS_UNLOCK_COST:,}".replace(",", " ")
+    return f"\n\nПосле подтверждения спишется {cost} золота."
 # Отказ от подкласса (2026-10-20): подтверждение живёт в памяти, после
 # рестарта игрок вернётся на прежний шаг (предложение или выбор пути).
 STATE_DECLINE_CONFIRM = "subclass_decline_confirm"
@@ -195,14 +223,10 @@ async def open_keeper(message: Message) -> None:
         elif not subclass_service.can_offer(character):
             await message.answer(KEEPER["too_low_level"])
             return
-        elif subclass_service.free_repick(character) or character.subclass_select_state in (
-            STATE_PATH_SELECT, STATE_PATH_CONFIRM,
-        ):
+        elif subclass_service.free_repick(character) or _paid(character):
             # После смены класса/подкласса - сразу к выбору пути, без платы.
             # Уже заплатил, но путь не выбрал (ушёл, рестарт) - тоже сюда:
             # раньше Хранитель снова просил 20 000 (баг 246, 2026-10-30).
-            await _set_select_state(db, character, STATE_PATH_SELECT)
-            await db.commit()
             titles = [s.title for s in subclass_service.paths_for(character.base_class)]
             await _dispenser.set(peer_id, SubclassSelectState.PATH_SELECT)
             repick = subclass_service.free_repick(character)
@@ -226,27 +250,24 @@ async def open_keeper(message: Message) -> None:
         await _send_trials(peer_id, character)
 
 
-@labeler.message(state=SubclassSelectState.OFFER, text=[BTN_PAY])
+@labeler.message(state=SubclassSelectState.OFFER, text=[BTN_PAY, BTN_PAY_OLD])
 async def offer_pay(message: Message) -> None:
+    """К выбору пути. Золото только проверяется: списывается оно на «Да, это
+    мой путь» (2026-11-13, владелец), чтобы уйти с выбора можно было даром."""
     peer_id = message.peer_id
     async with get_session_factory()() as db:
         character = await onboarding_svc.get_character(db, message.from_id)
         if character is None or character.creation_state is not None or character.subclass is not None:
             return
-        try:
-            paid = await subclass_service.pay_unlock(db, character)
-        except NotEnoughCurrency:
+        gold = (await wallet_service.get_wallet(db, character.id)).farm_currency
+        if not subclass_service.free_repick(character) and gold < bc.SUBCLASS_UNLOCK_COST:
             await message.answer(KEEPER["not_enough_gold"], keyboard=offer_keyboard())
             return
-        await _set_select_state(db, character, STATE_PATH_SELECT)
-        total = (await wallet_service.get_wallet(db, character.id)).farm_currency
-        await db.commit()
-        base_class = character.base_class
+        titles = [s.title for s in subclass_service.paths_for(character.base_class)]
+        decline = _can_decline(character)
 
-    titles = [s.title for s in subclass_service.paths_for(base_class)]
     await _dispenser.set(peer_id, SubclassSelectState.PATH_SELECT)
-    payment_line = display.gold_delta_line(-paid, total) if paid else FREE_REPICK_LINE
-    await message.answer(f"{payment_line}\n\n{KEEPER['path_intro']}", keyboard=paths_keyboard(titles))
+    await message.answer(KEEPER["path_intro"], keyboard=paths_keyboard(titles, decline=decline))
 
 
 @labeler.message(state=SubclassSelectState.OFFER, text=[BTN_LEAVE])
@@ -260,7 +281,7 @@ async def offer_leave(message: Message) -> None:
         await db.commit()
     await _dispenser.delete(message.peer_id)
     await message.answer(
-        "Хорошо. Возвращайся, когда будешь готов.",
+        "- Хорошо. Возвращайся, когда будешь готов.",
         keyboard=tavern_keyboard(character),
     )
 
@@ -274,7 +295,7 @@ async def decline_ask(message: Message) -> None:
             return
         # После оплаты отказ сжёг бы 20 000: в выборе пути кнопка есть только
         # у бесплатного повтора после смены класса.
-        if character.subclass_select_state == STATE_PATH_SELECT and not subclass_service.free_repick(character):
+        if not _can_decline(character):
             return
     await _dispenser.set(message.peer_id, SubclassSelectState.DECLINE_CONFIRM)
     await message.answer(KEEPER["decline_question"], keyboard=decline_confirm_keyboard())
@@ -312,12 +333,12 @@ async def decline_back(message: Message) -> None:
         character = await onboarding_svc.get_character(db, message.from_id)
         if character is None:
             return
-        on_paths = character.subclass_select_state == STATE_PATH_SELECT
+        on_paths = _paid(character) or subclass_service.free_repick(character)
         titles = [s.title for s in subclass_service.paths_for(character.base_class)]
-        free = subclass_service.free_repick(character)
+        decline = _can_decline(character)
     if on_paths:
         await _dispenser.set(message.peer_id, SubclassSelectState.PATH_SELECT)
-        await message.answer(KEEPER["path_intro"], keyboard=paths_keyboard(titles, decline=free))
+        await message.answer(KEEPER["path_intro"], keyboard=paths_keyboard(titles, decline=decline))
         return
     await _dispenser.set(message.peer_id, SubclassSelectState.OFFER)
     await message.answer(KEEPER["offer"].format(nickname=character.name), keyboard=offer_keyboard())
@@ -351,6 +372,28 @@ async def path_view(message: Message) -> None:
     )
 
 
+@labeler.message(state=SubclassSelectState.PATH_SELECT, text=[BTN_CANCEL_PATH])
+async def path_cancel(message: Message) -> None:
+    """Уйти, не выбрав путь. Плата не пропадает: Хранитель при следующем
+    разговоре сразу откроет выбор."""
+    async with get_session_factory()() as db:
+        character = await onboarding_svc.get_character(db, message.from_id)
+        if character is None or character.subclass is not None:
+            await _dispenser.delete(message.peer_id)
+            return
+        # Заплатившие по старому порядку (до 2026-11-13) - плата помнится этой
+        # строкой. Остальные ещё ничего не платили: просто уходят.
+        kept = _paid(character) and not subclass_service.free_repick(character)
+        await _set_select_state(db, character, STATE_PATH_PAID if kept else None)
+        await screen_service.set_screen(db, character, "tavern")
+        await db.commit()
+    await _dispenser.delete(message.peer_id)
+    text = KEEPER["path_cancelled"]
+    if kept:
+        text += "\n\n" + PAID_KEPT_LINE
+    await message.answer(text, keyboard=tavern_keyboard(character))
+
+
 @labeler.message(state=SubclassSelectState.PATH_SELECT)
 async def path_select_fallback(message: Message) -> None:
     async with get_session_factory()() as db:
@@ -358,7 +401,15 @@ async def path_select_fallback(message: Message) -> None:
         if character is None:
             return
         titles = [s.title for s in subclass_service.paths_for(character.base_class)]
-    await message.answer(KEEPER["path_intro"], keyboard=paths_keyboard(titles))
+        decline = _can_decline(character)
+    await message.answer(KEEPER["path_intro"], keyboard=paths_keyboard(titles, decline=decline))
+
+
+async def _confirm_question(message: Message) -> str:
+    async with get_session_factory()() as db:
+        character = await onboarding_svc.get_character(db, message.from_id)
+        price = _price_line(character) if character is not None else ""
+    return KEEPER["path_confirm_question"] + price
 
 
 @labeler.message(state=SubclassSelectState.PATH_CONFIRM, text=[BTN_CHOOSE_PATH])
@@ -366,7 +417,7 @@ async def path_choose(message: Message) -> None:
     if not (message.state_peer and message.state_peer.payload.get("pending_subclass")):
         await _back_to_path_select(message)
         return
-    await message.answer(KEEPER["path_confirm_question"], keyboard=path_confirm_keyboard())
+    await message.answer(await _confirm_question(message), keyboard=path_confirm_keyboard())
 
 
 @labeler.message(state=SubclassSelectState.PATH_CONFIRM, text=[BTN_CONFIRM_PATH])
@@ -382,6 +433,19 @@ async def path_confirm(message: Message) -> None:
         character = await onboarding_svc.get_character(db, message.from_id)
         if character is None or character.subclass is not None:
             return
+        # Плата - здесь, в момент смены (2026-11-13, владелец). Заплатившие
+        # по старому порядку и бесплатный повтор второй раз не платят.
+        paid = 0
+        if not _paid(character):
+            try:
+                paid = await subclass_service.pay_unlock(db, character)
+            except NotEnoughCurrency:
+                await _set_select_state(db, character, None)
+                await screen_service.set_screen(db, character, "tavern")
+                await db.commit()
+                await _dispenser.delete(peer_id)
+                await message.answer(KEEPER["not_enough_gold"], keyboard=tavern_keyboard(character))
+                return
         subclass_service.apply_subclass(character, subclass_id)
         # Пассивка сменилась - эффекты рун заново (руны остаются на местах).
         from services import rune_service
@@ -393,11 +457,14 @@ async def path_confirm(message: Message) -> None:
             select(CharacterStats).where(CharacterStats.character_id == character.id)
         )
         story_reward_text = await story_service.advance_past_subclass_gate(db, character, stats)
+        total = (await wallet_service.get_wallet(db, character.id)).farm_currency
         await db.commit()
         title = next(s.title for s in REGISTRY.values() if s.id == subclass_id)
 
     await _dispenser.delete(peer_id)
     text = KEEPER["confirmed"].format(subclass=title)
+    if paid:
+        text = f"{display.gold_delta_line(-paid, total)}\n\n{text}"
     if story_reward_text:
         text += f"\n\n{story_reward_text}"
     await message.answer(text)
@@ -417,19 +484,19 @@ async def path_back(message: Message) -> None:
 
 @labeler.message(state=SubclassSelectState.PATH_CONFIRM)
 async def path_confirm_fallback(message: Message) -> None:
-    await message.answer(KEEPER["path_confirm_question"], keyboard=path_confirm_keyboard())
+    await message.answer(await _confirm_question(message), keyboard=path_confirm_keyboard())
 
 
 async def _back_to_path_select(message: Message) -> None:
+    # Состояние в базу не пишем: PATH_SELECT там значит «уже заплатил».
     async with get_session_factory()() as db:
         character = await onboarding_svc.get_character(db, message.from_id)
         if character is None:
             return
-        await _set_select_state(db, character, STATE_PATH_SELECT)
-        await db.commit()
         titles = [s.title for s in subclass_service.paths_for(character.base_class)]
+        decline = _can_decline(character)
     await _dispenser.set(message.peer_id, SubclassSelectState.PATH_SELECT)
-    await message.answer(KEEPER["path_relisten"], keyboard=paths_keyboard(titles))
+    await message.answer(KEEPER["path_relisten"], keyboard=paths_keyboard(titles, decline=decline))
 
 
 # --- Переделка персонажа (альфа-тест) -------------------------------------
@@ -517,7 +584,7 @@ async def remake_apply_class(message: Message) -> None:
     await _dispenser.delete(message.peer_id)
     await message.answer(
         f"- Переписано. - Перо идёт по странице. - Теперь ты {picked}.\n\n"
-        "Подкласс стёрт, характеристики ждут распределения. Руны и пресеты остались при тебе.",
+        "Подкласс стёрт, характеристики ждут распределения. Руны и пресеты остались при вас.",
         keyboard=tavern_keyboard(character), attachment=KEEPER_ATTACHMENT,
     )
 

@@ -4,7 +4,10 @@ from vkbottle import Keyboard, KeyboardButtonColor, Text
 
 from bot.keyboards.world import add_miniapp_button
 
-BTN_PAY = "Заплатить 20 000"
+#: Плата списывается на подтверждении пути (2026-11-13), кнопка только ведёт
+#: к выбору. Старая надпись осталась на клавиатурах, отправленных раньше.
+BTN_PAY = "К выбору пути"
+BTN_PAY_OLD = "Заплатить 20 000"
 BTN_LEAVE = "Уйти"
 BTN_CHOOSE_PATH = "Выбрать этот путь"
 BTN_OTHER_PATH = "Другой путь"
@@ -13,6 +16,9 @@ BTN_THINK_MORE = "Подумаю ещё"
 # Отказ от подкласса (2026-10-20): остаться базовым классом навсегда.
 BTN_DECLINE = "Отказаться от пути"
 BTN_DECLINE_CONFIRM = "Да, без пути"
+# Уйти с выбора пути, не выбрав (2026-11-13, владелец): раньше после оплаты
+# или смены класса с этого экрана не было выхода.
+BTN_CANCEL_PATH = "Отменить"
 
 # Переделка персонажа (альфа-тест): Хранитель переписывает запись в Списке.
 BTN_REMAKE = "Переделать себя"
@@ -44,6 +50,8 @@ def paths_keyboard(titles: list[str], decline: bool = False) -> str:
     if decline:
         kb.row()
         kb.add(Text(BTN_DECLINE), color=KeyboardButtonColor.NEGATIVE)
+    kb.row()
+    kb.add(Text(BTN_CANCEL_PATH), color=KeyboardButtonColor.SECONDARY)
     add_miniapp_button(kb)
     return kb.get_json()
 
