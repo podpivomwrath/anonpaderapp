@@ -53,7 +53,7 @@ def install(view) -> None:
             try:
                 await ctx_api.messages.send(peer_id=peer, message=BUSY_TEXT, random_id=0)
             except Exception:
-                logger.exception("Не удалось ответить «подожди» {}", peer)
+                logger.exception("Не удалось ответить «подождите» {}", peer)
             return None
         try:
             return await original(event, ctx_api, state_dispenser)

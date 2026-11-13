@@ -532,7 +532,7 @@ async def _act(db, character: Character, vk_user_id: int, body: dict) -> list:
         from services import death_service
 
         if death_service.is_dead(character):
-            raise GuildError("Сначала очнись.")
+            raise GuildError("Вы ещё не очнулись.")
         if in_any_battle(vk_user_id):
             raise GuildError("В бою не до казны.")
     if action == "create":

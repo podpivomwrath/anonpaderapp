@@ -91,7 +91,7 @@ async def explore(message: Message) -> None:
             return
         now = datetime.now(timezone.utc)
         if await world._check_still_dead(db, character, now):
-            await message.answer("☠ Сначала очнись.")
+            await message.answer("☠ Вы ещё не очнулись.")
             return
         if in_any_battle(peer_id):
             await message.answer("⚔️ Вы уже в бою.")
@@ -329,7 +329,7 @@ async def collect_ash_handful(message: Message) -> None:
     await dig_ash(peer_id, message.from_id, ASH_FOUND_TEXT, with_keyboard=True)
 
 
-ASH_FOUND_TEXT = "У ног - горстка пепла, слишком плотная для простой золы. В ней блестит."
+ASH_FOUND_TEXT = "Под ногами горстка пепла, слишком плотная для простой золы. Вы разгребаете её, и в ней блестит находка."
 
 
 async def dig_ash(peer_id: int, vk_id: int, intro: str, with_keyboard: bool = False) -> None:
@@ -620,7 +620,7 @@ async def event_choice(message: Message) -> None:
             # взять цену заново значило бы продать не по той, что обещали.
             if fish_multiplier is None:
                 await message.answer(
-                    "Рыбак уже ушёл - и с ним его цена."
+                    "Рыбак уже ушёл, сделка не состоялась."
                 )
                 return
             gold, grams = await fishing_service.sell_bag(

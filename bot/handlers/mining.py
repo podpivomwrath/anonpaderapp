@@ -196,7 +196,7 @@ async def _enter_mine(message: Message) -> None:
                 await message.answer(reason)
                 return
             # Экран рудника закрывал кнопки события, и оно терялось (2026-10-24).
-            event = await open_event(message.peer_id, "Сначала закончи событие - потом в забой.")
+            event = await open_event(message.peer_id, "Сначала закончите событие, потом можно в забой.")
             if event is not None:
                 await message.answer(event.text)
                 return

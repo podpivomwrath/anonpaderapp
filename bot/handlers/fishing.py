@@ -157,7 +157,7 @@ async def _enter_lake(message: Message) -> None:
             await message.answer(reason)
             return
         # Как у рудника: экран озера закрыл бы кнопки события (2026-10-24).
-        event = await open_event(message.peer_id, "Сначала закончи событие - потом к воде.")
+        event = await open_event(message.peer_id, "Сначала закончите событие, потом можно к воде.")
         if event is not None:
             await message.answer(event.text)
             return

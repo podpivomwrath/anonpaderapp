@@ -633,7 +633,7 @@ async def on_battle_finished(session_id: int, result: TickResult) -> None:
         quest_id, remaining = story_state
         await _bot_api.messages.send(
             peer_id=peer_id,
-            message="Один повержен - но погоня не отступает. Ещё один бросается наперерез.",
+            message="Одного преследователя вы свалили, но за ним бежит второй.",
             random_id=0,
         )
         dist = grid.monolith_distance(character.pos_x, character.pos_y)
@@ -674,7 +674,7 @@ async def on_battle_finished(session_id: int, result: TickResult) -> None:
         if outcome.quest_progress is not None:
             text += f"\n📜 {outcome.quest_label}: {outcome.quest_progress}/{outcome.quest_target}"
             if outcome.quest_ready:
-                text += "\nВозвращайся к наставнику."
+                text += "\nЗадание выполнено - возвращайтесь к наставнику."
         if outcome.group_kick is not None and outcome.group_kick.kicked_character_id == character.id:
             text += f"\n\n{group_texts.level_gap_kick_self_line()}"
         # лорный левелап (может быть несколько уровней за раз) + рост макс. HP
@@ -841,7 +841,7 @@ async def use_item(message: Message) -> None:
     player = state.combatants[PLAYER_ID]
     if player.has_effect(EffectKind.FREEZE):
         # Патч 30, баг 2: бой активен — без клавиатуры игрок теряет кнопки.
-        await message.answer("Скован - не до зелий сейчас. ❄️", keyboard=_combat_kb(state, peer_id))
+        await message.answer("❄️ Вы скованы и не можете выпить зелье.", keyboard=_combat_kb(state, peer_id))
         return
 
     async with get_session_factory()() as db:
@@ -887,7 +887,7 @@ async def use_combat_item(message: Message) -> None:
     player = state.combatants[PLAYER_ID]
     if player.has_effect(EffectKind.FREEZE):
         # Патч 30, баг 2: бой активен — без клавиатуры игрок теряет кнопки.
-        await message.answer("Скован - не до зелий сейчас. ❄️", keyboard=_combat_kb(state, peer_id))
+        await message.answer("❄️ Вы скованы и не можете выпить зелье.", keyboard=_combat_kb(state, peer_id))
         return
     if consumable_limit.left(player) <= 0:
         await message.answer(consumable_limit.exhausted_text(player), keyboard=_combat_kb(state, peer_id))
@@ -1027,16 +1027,16 @@ async def flee(message: Message) -> None:
         await _persist_hp(peer_id, hp)
         await _flee_breaks_streaks(peer_id)
         pos_x, pos_y, has_mount = await _get_position(peer_id)
-        text = "🏃 Вы срываетесь прочь - и темнота глотает ваш след."
+        text = "🏃 Вы убегаете, и враг остаётся позади."
         if travel_line:
             text += f"\n{travel_line}"
         await message.answer(text, keyboard=movement_keyboard(pos_x, pos_y, peer_id, has_mount=has_mount))
         return
     # Патч 30, баг 2: бой продолжается — без клавиатуры игрок теряет кнопки
     # до того, как declare_action(SKIP) ниже вызовет резолв следующего хода.
-    stronger = " Оно сильнее вас - от такого не уходят легко." if chance < FLEE_SUCCESS_CHANCE else ""
+    stronger = " Враг сильнее вас, от такого уйти труднее." if chance < FLEE_SUCCESS_CHANCE else ""
     await message.answer(
-        f"🏃 Уйти не вышло - оно снова между вами и спасением.{stronger}",
+        f"🏃 Убежать не вышло, ход потерян.{stronger}",
         keyboard=_combat_kb(_engine.sessions[peer_id], peer_id),
     )
     try:

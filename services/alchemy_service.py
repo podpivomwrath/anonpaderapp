@@ -53,7 +53,7 @@ async def start(db: AsyncSession, character: Character, elixir_id: str, now: dat
     if recipe is None or recipe.level > character.alchemy_level:
         raise AlchemyError("Этот рецепт вам пока не знаком.")
     if is_working(character):
-        raise AlchemyError("Стол занят: сначала закончи то, что уже на огне.")
+        raise AlchemyError("Стол занят: сначала доварите то, что уже на огне.")
     gold = alchemy.gold_cost(recipe, character.alchemy_level)
     if (await wallet_service.get_wallet(db, character.id)).farm_currency < gold:
         raise AlchemyError(f"Не хватает золота на склянки: нужно {gold}.")

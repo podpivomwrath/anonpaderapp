@@ -50,6 +50,22 @@ RULES = (
     Rule("remembers", "оживление вещей: «камень помнит», «дорога знает»", _r(r"\b(помн\w+|зна\w+)\s+(?:тебя|вас|всё|каждого)")),
 )
 
+#: Голос игры (жанры - SKILL.md): игра говорит игроку «вы». «Ты» законно
+#: только в реплике персонажа - текст с репликой («- ...» с начала строки
+#: или после точки) это правило пропускает. Мужской род без подлежащего
+#: («Нашёл...») правилом не ловится: слишком много ложных (Пепел, Завал,
+#: описания мобов) - он в SKILL.md, жанр «Голос».
+VOICE_RULES = (
+    Rule("ty_system", "«ты» от лица игры: «очнись», «закончи», «возвращайся»",
+         _r(r"\b(очнись|разберись|закончи|возвращайся|вернись|нажми|выбери|попробуй|подожди|зайди)\b"), hard=True),
+    Rule("ty_soft", "«тебя / твой» от лица игры (вне реплики)",
+         _r(r"\b(тебя|тебе|тобой|твой|твоя|твоё|твои|твоего|твоей|твоих|твоим)\b")),
+)
+SPEECH = re.compile(r"(?:^|[.!?:»]\s+)-\s", re.MULTILINE)
+#: Патчноуты до перехода на «вы» (2026-11-09) уже разосланы - их не правим.
+VOICE_SINCE = "2026-11-09"
+
+
 #: Короткая «ударная» фраза в конце абзаца: 1-3 слова и точка.
 PUNCH = re.compile(r"(?:^|[.!?]\s+)((?:[А-ЯЁ][^\s.!?]*)(?:\s+[^\s.!?]+){0,2})\.\s*$", re.MULTILINE)
 
@@ -126,6 +142,14 @@ def check_text(text: str, hard_only: bool = False, where: str = "текст", li
             start = max(0, m.start() - 30)
             frag = text[start:m.end() + 30].replace("\n", " ")
             hits.append((rule, where, lineno, frag))
+    old_note = where.startswith("patchnotes/") and where.split("/")[-1][:10] < VOICE_SINCE
+    if not SPEECH.search(text) and not old_note:
+        for rule in VOICE_RULES:
+            if hard_only and not rule.hard:
+                continue
+            for m in rule.pattern.finditer(text):
+                start = max(0, m.start() - 30)
+                hits.append((rule, where, lineno, text[start:m.end() + 30].replace("\n", " ")))
     if not hard_only and len(text) > 120:
         for m in PUNCH.finditer(text):
             hits.append((_PUNCH_RULE, where, lineno, m.group(1)))

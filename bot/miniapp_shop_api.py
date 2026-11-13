@@ -165,11 +165,11 @@ async def faction_blocker(peer_id: int, character) -> str | None:
     from bot.handlers import raid_combat, rift, scene_events
 
     if in_any_battle(peer_id) or raid_combat.has_active_raid(character.id):
-        return "Сначала закончи бой."
+        return "Сначала закончите бой."
     if rift.is_waiting(peer_id):
         return "Вы ждёте разлом - сначала выйдите из очереди."
     if scene_events.has_pending(peer_id):
-        return "Сначала закончи событие."
+        return "Сначала закончите событие."
     return None
 
 

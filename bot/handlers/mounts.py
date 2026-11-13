@@ -131,10 +131,10 @@ def _format_seconds(seconds: float) -> str:
 
 #: Свои тексты маунта поверх общей проверки bot/busy.py.
 _MOUNT_TEXTS = {
-    "dead": "☠ Сначала очнись.",
-    "pvp": "Сначала разберись с открытым боем.",
+    "dead": "☠ Вы ещё не очнулись.",
+    "pvp": "Сначала закончите открытый бой.",
     "battle": "В бою не до маунта.",
-    "busy": "Сначала закончи то, что начал.",
+    "busy": "Сначала закончите исследование или отдых.",
     "traveling_on_foot": "🚶 Вы уже в пути пешком.",
     "riding": "🐎 Вы уже в пути на маунте.",
 }
@@ -665,7 +665,7 @@ async def stop_and_notify(peer_id: int, travel_id: int | None = None) -> str | N
     иначе текст отказа."""
     after_ambush = travel_id is not None and _pending_continue.get(peer_id) == travel_id
     if in_any_battle(peer_id) or pvp_handlers.has_active_battle(peer_id):
-        return "Сначала разберись с боем."
+        return "Сначала закончите бой."
     async with get_session_factory()() as db:
         character = await onboarding_svc.get_character(db, peer_id)
         if character is None:

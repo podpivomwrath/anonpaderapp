@@ -130,7 +130,7 @@ async def start(
     if dish is None or dish.level > character.cooking_level:
         raise CookingError("Этот рецепт вам пока не знаком.")
     if character.house_work is not None:
-        raise CookingError("Печь занята: сначала закончи то, что уже на огне.")
+        raise CookingError("Печь занята: сначала доварите то, что уже на огне.")
     fish = fishing.fish_def(fish_id)
     if fish is None or not cooking.fish_fits(fish.tier, dish):
         raise CookingError("Эта рыба сюда не подходит.")
@@ -256,7 +256,7 @@ async def eat(db: AsyncSession, character: Character, dish_id: str, grade: str, 
 
     # Мёртвый не ест (2026-10-25, баг) - и в мини-аппе, и командой /съесть.
     if death_service.is_dead(character, now):
-        raise CookingError("Сначала очнись.")
+        raise CookingError("Вы ещё не очнулись.")
     now = now or _now()
     cap = now + timedelta(minutes=cc.FOOD_STACK_MAX_MINUTES)
     same = active(character, now) is not None and (character.food_dish, character.food_grade) == (dish_id, grade)

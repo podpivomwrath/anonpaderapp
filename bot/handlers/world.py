@@ -594,7 +594,7 @@ async def gate_exit(message: Message) -> None:
             return
         now = datetime.now(timezone.utc)
         if await _check_still_dead(db, character, now):
-            await message.answer("☠ Сначала очнись.")
+            await message.answer("☠ Вы ещё не очнулись.")
             return
         region = grid.city_region_at(character.pos_x, character.pos_y)
         if region is None:
@@ -681,10 +681,10 @@ async def _move(message: Message, direction: tuple[int, int] | None) -> None:
             return
         now = datetime.now(timezone.utc)
         if await _check_still_dead(db, character, now):
-            await message.answer("☠ Сначала очнись.")
+            await message.answer("☠ Вы ещё не очнулись.")
             return
         if in_any_battle(message.peer_id):
-            await message.answer("Сначала разберись с боем.")
+            await message.answer("Сначала закончите бой.")
             return
         if _in_mine_digging(character):
             await message.answer(

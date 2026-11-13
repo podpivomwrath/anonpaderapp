@@ -65,9 +65,10 @@ def respawn_line(city_title: str) -> str:
     return _pick("respawn").format(city=city_title)
 
 
-def levelup_line(level: int, rng: random.Random) -> str:
-    """Патч 25, п.2: левелап лечит до полного HP — отражаем в тексте."""
-    return rng.choice(_SYSTEM["levelup"]).format(level=level) + "\n(Здоровье восстановлено: 100%)"
+def levelup_line(level: int, rng: random.Random | None = None) -> str:
+    """Новый уровень - сухой строкой (2026-11-13, владелец): мистика на каждом
+    из 60 уровней приедалась. Левелап лечит до полного (патч 25, п.2)."""
+    return f"⬆️ Уровень {level}, здоровье восстановлено."
 
 
 def death_penalty_line(xp: int) -> str:

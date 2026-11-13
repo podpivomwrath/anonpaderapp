@@ -124,7 +124,7 @@ async def start(db: AsyncSession, character: Character, now: datetime | None = N
     from services import death_service, mount_service, movement_service
 
     if death_service.is_dead(character, now):
-        raise VoyageError("☠ Сначала очнись.")
+        raise VoyageError("☠ Вы ещё не очнулись.")
     if movement_service.is_traveling(character, now) or await mount_service.active_travel(db, character.id):
         raise VoyageError("Вы в дороге.")
     hours = part_value(voyage, "endurance")
@@ -396,14 +396,9 @@ async def tick(
             voyage.trip_gold += gold
             trip = vc.VOYAGES[voyage.region]
             head = f"{trip.emoji} Час {voyage.hours_done} из {hours}"
-            if tier in vc.SCENE_TIERS:
-                body = f"{head}. {vc.TIER_TITLES[tier]}{text}"
-                if lines:
-                    body += f" ({', '.join(lines)})"
-            else:
-                # Обычный час - сухая строка (2026-11-09, репорт 340): вести
-                # приходят каждый час, сценка в каждой читалась как робот.
-                body = f"{head}: {', '.join(lines) if lines else 'без находок'}."
+            body = f"{head}. {vc.TIER_TITLES[tier]}{text}"
+            if lines:
+                body += f" ({', '.join(lines)})"
             if craft_line:
                 body += f"\n{craft_line}"
             image = vc.LEGENDARY_IMAGES.get((voyage.region, index), "") if tier == "legendary" else ""

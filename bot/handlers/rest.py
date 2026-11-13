@@ -50,7 +50,7 @@ async def rest(message: Message) -> None:
             return
         now = datetime.now(timezone.utc)
         if await world._check_still_dead(db, character, now):
-            await message.answer("☠ Сначала очнись.")
+            await message.answer("☠ Вы ещё не очнулись.")
             return
         if in_any_battle(peer_id):
             await message.answer("В бою не отдохнёте.")
@@ -64,7 +64,7 @@ async def rest(message: Message) -> None:
             await message.answer("🛏️ Вы уже отдыхаете.")
             return
         if explore_rest.exploring(peer_id) or movement_service.is_traveling(character, now):
-            await message.answer("Сначала закончи то, что начал.")
+            await message.answer("Сначала закончите исследование или переход.")
             return
         if await mount_service.active_travel(db, character.id) is not None:
             await message.answer(world.MOUNT_BUSY_TEXT)

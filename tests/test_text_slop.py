@@ -20,6 +20,16 @@ def test_detector_catches_typical_slop() -> None:
     assert {"not_but", "someone", "silence", "simile", "ellipsis"} <= found
 
 
+def test_game_voice_is_vy_but_npc_may_say_ty() -> None:
+    """2026-11-13: отказы «Сначала очнись» жили в 11 местах на «ты» после
+    перехода игры на «вы». Реплика персонажа («- ...») правилом не трогается."""
+    ids = {r.id for r, *_ in text_slop.check_text("☠ Сначала очнись.")}
+    assert "ty_system" in ids
+    assert not text_slop.check_text("- Сначала закончи с этим, потом поговорим.", hard_only=True)
+    assert not text_slop.check_text("☠ Вы ещё не очнулись.", hard_only=True)
+    assert not text_slop.check_text("Нажми на кнопку.", where="patchnotes/2026-10-24-x.txt", hard_only=True)
+
+
 def test_broadcast_blocks_slop_and_passes_clean_text() -> None:
     import broadcast
 

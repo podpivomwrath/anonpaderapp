@@ -36,7 +36,7 @@ from services.db import get_session_factory
 labeler = BotLabeler()
 labeler.vbml_ignore_case = True  # команды без учёта регистра
 
-HOUSE_TEXT = "🏠 Дом\n\nТвои стены в городе. У окна печь, в углу стол с ретортами и склянками."
+HOUSE_TEXT = "🏠 Дом\n\nВаш угол в городе: у окна печь, в углу стол с ретортами и склянками."
 BUSY_TEXT = "🏠 Работа на огне. Дождитесь ее или бросьте - тогда все, что пошло в дело, пропадет."
 
 #: Картинки в альбоме группы (tools/crafts_art_prompts.md, 2026-10-21).
@@ -530,7 +530,7 @@ async def eat_command(message: Message, name: str | None = None) -> None:
             await message.answer("\n".join(lines))
             return
         if in_any_battle(message.peer_id) or world_handlers.is_busy(message.peer_id):
-            await message.answer("🍲 Сейчас не до еды: сначала закончи бой или исследование.")
+            await message.answer("🍲 Сейчас не до еды: сначала закончите бой или исследование.")
             return
         found = await cooking_service.find_food(db, character.id, name)
         names = {f[0].name for f in found}

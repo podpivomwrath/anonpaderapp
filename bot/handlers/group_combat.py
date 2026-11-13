@@ -616,7 +616,7 @@ async def group_open_items(message: Message) -> None:
         return
     battle_kb = group_combat_keyboard(combatant)
     if combatant.has_effect(EffectKind.FREEZE):
-        await message.answer("Скован - не до зелий сейчас. ❄️", keyboard=battle_kb)
+        await message.answer("❄️ Вы скованы и не можете выпить зелье.", keyboard=battle_kb)
         return
 
     async with get_session_factory()() as db:
@@ -668,7 +668,7 @@ async def group_use_item(message: Message) -> None:
         return
     battle_kb = group_combat_keyboard(combatant)
     if combatant.has_effect(EffectKind.FREEZE):
-        await message.answer("Скован - не до зелий сейчас. ❄️", keyboard=battle_kb)
+        await message.answer("❄️ Вы скованы и не можете выпить зелье.", keyboard=battle_kb)
         return
     if consumable_limit.left(combatant) <= 0:
         await message.answer(consumable_limit.exhausted_text(combatant), keyboard=battle_kb)

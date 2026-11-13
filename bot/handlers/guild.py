@@ -536,7 +536,7 @@ async def _boss_finished(result) -> None:
         }
     for peer in peers:
         got = personal.get(peer)
-        extra = f"\nТвой урон: {got.damage}, золото: +{got.gold}." if got else ""
+        extra = f"\nВаш урон: {got.damage}, золото: +{got.gold}." if got else ""
         if got and got.net_gold != got.gold:
             extra += f" После налога: {got.net_gold}."
         if got and got.xp:

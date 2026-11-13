@@ -79,7 +79,7 @@ async def _check_name(db: AsyncSession, name: str) -> str:
 
 def _home(character: Character) -> str:
     if character.region not in fc.CITIES:
-        raise TradeError("Сначала закончи создание персонажа.")
+        raise TradeError("Сначала закончите создание персонажа.")
     return character.region
 
 

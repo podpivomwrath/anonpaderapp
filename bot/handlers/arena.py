@@ -217,7 +217,7 @@ async def random_fight(message: Message) -> None:
     async with get_session_factory()() as db:
         me = await _ready(db, character.id, peer_id)
         if me is None:
-            await message.answer("Сейчас на арену не выйти: закончи текущие дела.")
+            await message.answer("Сейчас на арену не выйти: сначала закончите текущие дела.")
             return
         # Соперник снимается из очереди ДО любого ожидания: два одновременных
         # нажатия не заберут одного и того же.
@@ -305,7 +305,7 @@ async def code_input(message: Message) -> None:
         if me is None:
             _codes[code] = host
             _entering.discard(peer_id)
-            await message.answer("Сейчас на арену не выйти: закончи текущие дела.", keyboard=arena_kb.arena_keyboard())
+            await message.answer("Сейчас на арену не выйти: сначала закончите текущие дела.", keyboard=arena_kb.arena_keyboard())
             return
         if rival is None:
             _leave_all(host[1])
@@ -546,7 +546,7 @@ async def start_dummy(message: Message) -> None:
     async with get_session_factory()() as db:
         me = await _ready(db, character.id, peer_id)
         if me is None:
-            await message.answer("Сейчас на арену не выйти: закончи текущие дела.")
+            await message.answer("Сейчас на арену не выйти: сначала закончите текущие дела.")
             return
         stats = await db.scalar(select(CharacterStats).where(CharacterStats.character_id == me.id))
         gear_bonus = await item_service.compute_gear_bonus(db, me.id)

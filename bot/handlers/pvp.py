@@ -391,7 +391,7 @@ async def look_around(message: Message) -> None:
         if character is None or character.creation_state is not None:
             return
         if await _still_dead(db, character):
-            await message.answer("☠ Сначала очнись.")
+            await message.answer("☠ Вы ещё не очнулись.")
             return
         # Патч 58-59: озёра и рудники первых двух колец — мирные, как города.
         # Патч 33, ч.2: в городских клавиатурах кнопки нет - это защита от
@@ -498,7 +498,7 @@ async def attack_command(message: Message, target: str) -> None:
             await message.answer(reason)
             return
         if await _still_dead(db, character):
-            await message.answer("☠ Сначала очнись.")
+            await message.answer("☠ Вы ещё не очнулись.")
             return
         # Патч 33, ч.2: PvP запрещено во ВСЕХ городах — и в своём, и в чужом
         # (отменяет патч 26, где чужой город был ареной без защиты).
@@ -869,7 +869,7 @@ async def _handle_join_choice(message: Message, battle_id, side) -> None:
             await message.answer(reason)
             return
         if await _still_dead(db, character):
-            await message.answer("☠ Сначала очнись.")
+            await message.answer("☠ Вы ещё не очнулись.")
             return
         if (character.pos_x, character.pos_y) != battle.location:
             await message.answer("Вы уже не на той клетке.")
