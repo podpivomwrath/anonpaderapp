@@ -262,14 +262,43 @@ def test_gatekeeper_solo_skips_one_turn_per_burial() -> None:
     после второго пропуска - и сразу под новый завал, ходил 1 раз из 3.
     Теперь: засыпало - один пропущенный ход - свободен."""
     stage, state = _boss_room(5, party=1)
+    every = rc.SOLO_GATE_EVERY
     frozen_ticks = []
-    for tick in range(1, 4 * rc.GATE_EVERY + 1):
+    for tick in range(1, 4 * every + 1):
         stage.ticks = tick
         out = stage._enemy_tick(state, TickResult(), random.Random(1))
         state.combatants[1].current_hp = state.combatants[1].max_hp  # не дать погибнуть
         if 1 in out.frozen:
             frozen_ticks.append(tick + 1)  # пропускается следующий ход
-    assert frozen_ticks == [t + 1 for t in range(rc.GATE_EVERY, 4 * rc.GATE_EVERY + 1, rc.GATE_EVERY)]
+    assert frozen_ticks == [t + 1 for t in range(every, 4 * every + 1, every)]
+
+
+def test_solo_run_softens_boss_mechanics() -> None:
+    """2026-11-13, владелец: в одиночном забеге приёмы боссов мягче,
+    здоровье босса прежнее."""
+    def debt(party: int) -> tuple[int, int]:
+        stage, state = _boss_room(10, party=party)
+        boss_id = stage.bosses[0].boss_id
+        me = state.combatants[1]
+        me.current_hp = me.max_hp
+        ticks = 0
+        while me.current_hp == me.max_hp and ticks < 10:
+            ticks += 1
+            res = TickResult(hit_renders=[RenderedHit(1, boss_id, 0, 1, "бьёт", 500, False, False, False,
+                                                      9000, 8500, 9000)])
+            stage._enemy_tick(state, res, random.Random(1))
+        return ticks, me.max_hp - me.current_hp
+
+    group_ticks, group_hurt = debt(2)
+    solo_ticks, solo_hurt = debt(1)
+    assert (group_ticks, solo_ticks) == (rc.COUNTER_MARKS, rc.SOLO_COUNTER_MARKS)
+    assert solo_hurt < group_hurt
+
+    stage, _state = _boss_room(10, party=1)
+    assert "Четыре записи" in stage.bosses[0].opening()[0]
+    solo_room, _ = _boss_room(15, party=1)
+    group_room, _ = _boss_room(15, party=2)
+    assert len(solo_room.bosses[0].candles) == rc.SOLO_CANDLES_START < len(group_room.bosses[0].candles)
 
 
 def test_counter_collects_debt() -> None:

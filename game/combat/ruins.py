@@ -235,6 +235,10 @@ class RuinBoss:
     def opening(self) -> list[str]:
         return []
 
+    def pick(self, group: float, solo: float) -> float:
+        """Одиночный забег - мягче приём (2026-11-13, владелец; rc.SOLO_*)."""
+        return solo if self.room.party == 1 else group
+
     def boss(self, session: CombatSessionState) -> CombatantState | None:
         return session.combatants.get(self.boss_id)
 
@@ -289,14 +293,16 @@ class Gatekeeper(RuinBoss):
             elif len(alive) == 1 and self.room.ticks - self.buried[cid] >= rc.GATE_SOLO_FREE:
                 self.buried.pop(cid, None)
                 out.lines.append(f"⛏ {c.name} выбирается из-под камней")
-        if self.room.ticks % rc.GATE_EVERY == 0 and self.muted(result):
+        every = int(self.pick(rc.GATE_EVERY, rc.SOLO_GATE_EVERY))
+        if self.room.ticks % every == 0 and self.muted(result):
             out.lines.append("🤐 Привратник под Немотой: свод держится")
-        elif self.room.ticks % rc.GATE_EVERY == 0:
+        elif self.room.ticks % every == 0:
             free = [p for p in alive if p.id not in self.buried]
             if free and (len(alive) == 1 or len(free) > 1):
                 victim = rng.choice(free)
                 self.buried[victim.id] = self.room.ticks
-                hurt = stage_hurt(victim, round(victim.max_hp * rc.GATE_HIT), out)
+                hit = self.pick(rc.GATE_HIT, rc.SOLO_GATE_HIT)
+                hurt = stage_hurt(victim, round(victim.max_hp * hit), out)
                 out.lines.append(f"🪨 Свод рушится: {victim.name} под завалом, {hurt} урона")
         out.frozen.extend(cid for cid in self.buried if cid not in out.frozen)
 
@@ -311,7 +317,7 @@ class Gatekeeper(RuinBoss):
         return None
 
 
-def counter_hit(c: CombatantState, result: TickResult | None = None) -> int:
+def counter_hit(c: CombatantState, result: TickResult | None = None, share: float = rc.COUNTER_HIT) -> int:
     """Взыскание Счетовода (2026-11-13, владелец): 60% здоровья, но, в отличие
     от прочих механик рейдов, его срезают «Глухая оборона», «Защититься»,
     «Несокрушимый» и снижения входящего урона - те же множители, что у удара
@@ -320,7 +326,7 @@ def counter_hit(c: CombatantState, result: TickResult | None = None) -> int:
     «Защититься» берём из действия игрока за этот ход."""
     from game.combat.session import EffectKind
 
-    amount = c.max_hp * rc.COUNTER_HIT
+    amount = c.max_hp * share
     mods = c.buff_modifiers or {}
     amount *= 1.0 - mods.get("incoming_damage_reduction", 0.0)
     threshold = mods.get("low_hp_damage_reduction_threshold", bc.BLOOD_KNIGHT_SECOND_WIND_HP_THRESHOLD)
@@ -344,7 +350,9 @@ class Counter(RuinBoss):
         self.marks: dict[int, int] = {}
 
     def opening(self) -> list[str]:
-        return ["📒 Счетовод записывает, кто бьёт сильнее всех. Три записи - и он взыщет долг."]
+        need = int(self.pick(rc.COUNTER_MARKS, rc.SOLO_COUNTER_MARKS))
+        word = {3: "Три записи", 4: "Четыре записи"}.get(need, f"Записей: {need}")
+        return [f"📒 Счетовод записывает, кто бьёт сильнее всех. {word} - и он взыщет долг."]
 
     def tick(self, session, result, rng, out) -> None:
         if not self.alive(session):
@@ -363,10 +371,12 @@ class Counter(RuinBoss):
         if c is None or not c.alive:
             return
         self.marks[top] = self.marks.get(top, 0) + 1
-        if self.marks[top] >= rc.COUNTER_MARKS:
+        need = int(self.pick(rc.COUNTER_MARKS, rc.SOLO_COUNTER_MARKS))
+        if self.marks[top] >= need:
             self.marks[top] = 0
-            full = round(c.max_hp * rc.COUNTER_HIT)
-            hit = counter_hit(c, result)
+            share = self.pick(rc.COUNTER_HIT, rc.SOLO_COUNTER_HIT)
+            full = round(c.max_hp * share)
+            hit = counter_hit(c, result, share)
             hurt = stage_hurt(c, hit, out, shield_lines=False)
             # Одной строкой, как обычный удар (2026-11-13, владелец): весь урон
             # после срезок, в скобках - щит и оборона. Раньше строка щита
@@ -383,7 +393,7 @@ class Counter(RuinBoss):
                 c.current_hp = min(c.max_hp, c.current_hp + heal)
                 out.lines.append(f"🧱 Глухая оборона гасит удар: {c.name} +{heal} здоровья")
         else:
-            out.lines.append(f"📒 Долг {c.name}: {self.marks[top]} из {rc.COUNTER_MARKS}")
+            out.lines.append(f"📒 Долг {c.name}: {self.marks[top]} из {need}")
 
 
 class Candlewoman(RuinBoss):
@@ -405,7 +415,7 @@ class Candlewoman(RuinBoss):
 
     def spawn(self, session) -> list[str]:
         lines = super().spawn(session)
-        for _ in range(rc.CANDLES_START):
+        for _ in range(int(self.pick(rc.CANDLES_START, rc.SOLO_CANDLES_START))):
             self._candle(session)
         return lines
 
@@ -427,7 +437,7 @@ class Candlewoman(RuinBoss):
             heal = round(boss.max_hp * rc.CANDLE_HEAL * len(lit))
             boss.current_hp = min(boss.max_hp, boss.current_hp + heal)
             out.lines.append(f"🕯 Свечи горят ({len(lit)}) - Свечница затягивает раны: +{heal}")
-        if self.room.ticks % rc.CANDLE_RELIGHT == 0 and len(lit) < rc.CANDLES_MAX:
+        if self.room.ticks % rc.CANDLE_RELIGHT == 0 and len(lit) < self.pick(rc.CANDLES_MAX, rc.SOLO_CANDLES_MAX):
             self._candle(session)
             out.lines.append("🕯 Свечница зажигает новую свечу")
 
@@ -468,7 +478,7 @@ class Herald(RuinBoss):
                     continue
                 if action.type == ActionType.SKILL and action.skill_id in DEFENSIVE_SKILLS:
                     continue
-                hurt = stage_hurt(c, round(c.max_hp * rc.HERALD_HIT), out)
+                hurt = stage_hurt(c, round(c.max_hp * self.pick(rc.HERALD_HIT, rc.SOLO_HERALD_HIT)), out)
                 out.lines.append(f"📯 {c.name} бьёт запретным - Глашатай возвращает удар: {hurt} урона")
         self.banned = rng.choice(list(self.KINDS))
         out.lines.append(f"📯 Глашатай: «Следующий {self.KINDS[self.banned]} вернётся тому, кто ударит!»")
@@ -505,9 +515,10 @@ class Brothers(RuinBoss):
         if a is None or b is None:
             return
         share = {c.id: (c.current_hp / c.max_hp if c.max_hp else 0) for c in (a, b) if c.alive}
+        gap = self.pick(rc.BROTHERS_GAP, rc.SOLO_BROTHERS_GAP)
         for c in (a, b):
             angry = (c.alive and len(share) == 2
-                     and share[c.id] - min(share.values()) > rc.BROTHERS_GAP)
+                     and share[c.id] - min(share.values()) > gap)
             if angry and c.id not in self.raged and self.muted(result, c.id):
                 out.lines.append(f"🤐 {c.name} под Немотой: не звереет")
             elif angry and c.id not in self.raged:
@@ -568,7 +579,7 @@ class Abbot(RuinBoss):
             if broken:
                 out.lines.append(f"📿 Обет нарушен ({', '.join(sorted(set(broken)))}) - кара всем")
                 for p in _players(session):
-                    stage_hurt(p, round(p.max_hp * rc.ABBOT_HIT), out)
+                    stage_hurt(p, round(p.max_hp * self.pick(rc.ABBOT_HIT, rc.SOLO_ABBOT_HIT)), out)
         self.potions = {p.id: getattr(p, "consumables_used", 0) for p in session.combatants.values()
                         if p.kind == "character"}
         self.vow = rng.choice(list(self.VOWS))
