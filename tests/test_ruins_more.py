@@ -301,6 +301,17 @@ def test_solo_run_softens_boss_mechanics() -> None:
     assert len(solo_room.bosses[0].candles) == rc.SOLO_CANDLES_START < len(group_room.bosses[0].candles)
 
 
+def test_candle_health_is_share_of_floor_mob() -> None:
+    """2026-11-13, владелец: свечи были слишком крепкими (~0.76 моба и +70%
+    за игрока). Теперь - четверть обычного моба этажа, +25% за игрока."""
+    for party in (1, 5):
+        stage, state = _boss_room(15, party=party)
+        candle = state.combatants[stage.bosses[0].candles[0]]
+        mob = stage._mob(stage.name, rc.MOB_HP, rc.MOB_DMG, party_hp=False)
+        share = rc.CANDLE_HP * (1 + rc.CANDLE_HP_PER_PLAYER * (party - 1))
+        assert candle.max_hp == round(mob.max_hp * share)
+
+
 def test_counter_collects_debt() -> None:
     stage, state = _boss_room(10)
     boss_id = stage.bosses[0].boss_id

@@ -407,8 +407,11 @@ class Candlewoman(RuinBoss):
         self.candles: list[int] = []
 
     def _candle(self, session) -> None:
-        hp = rc.CANDLE_HP * (1 + rc.UNIQUE_HP_PER_PLAYER * (self.room.party - 1))
-        mob = self.room._mob("Свеча", hp, 0.0, party_hp=False)
+        # Здоровье - прямо долей обычного моба этажа (2026-11-13): множитель
+        # build_mob нелинеен из-за базы характеристик.
+        mob = self.room._mob("Свеча", rc.MOB_HP, 0.0, party_hp=False)
+        share = rc.CANDLE_HP * (1 + rc.CANDLE_HP_PER_PLAYER * (self.room.party - 1))
+        mob.max_hp = mob.current_hp = max(1, round(mob.max_hp * share))
         mob.scripted_hit = _idle
         self.room._add(session, mob, reward=False)
         self.candles.append(mob.id)
