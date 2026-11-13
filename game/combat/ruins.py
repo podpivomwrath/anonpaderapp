@@ -20,11 +20,13 @@ import random
 from game import ruins as rules
 from game import ruins_gifts as gifts_mod
 from game.combat import balance_config as bc
-from game.combat import shared_rules
+from game.combat import mob_abilities, shared_rules
 from game.combat.raid_field import StageTick, _idle, _players, stage_hurt
 from game.combat.resolver import TickResult
 from game.combat.rift import build_mob
 from game.combat.session import ActionType, CombatantState, CombatSessionState
+from game.content_loader import MobAbilityDef, MobTraitDef
+from game.economy import ruins_affix_config as rax
 from game.economy import ruins_config as rc
 
 
@@ -44,6 +46,9 @@ class _RuinsStage:
         self.ctx = ctx or {}
         self.gifts = self.ctx.get("gifts") or []
         self.name, self.elite_name, self.primary, self.label = rules.mob_kind(layout)
+        #: навыки мобов этажа и добавка элите/хозяину (ruins_affix_config)
+        self.affixes, self.elite_affixes = rax.for_floor(layout)
+        self.affix_tier = rax.tier(self.floor)
         self.ids: list[int] = []
         #: рядовые мобы (не элита, не хозяин, не сундук) - с них руна, rc.COMMON_RUNE_CHANCE
         self.common_ids: list[int] = []
@@ -60,8 +65,9 @@ class _RuinsStage:
         return 1.15 if gifts_mod.has(self.gifts, "heavy_bag") else 1.0
 
     def _mob(self, name: str, hp: float, dmg: float, primary: str | None = None, label: str | None = None,
-             party_hp: bool = True):
-        """party_hp=False - здоровье уже посчитано под группу (уникальные боссы)."""
+             party_hp: bool = True, affixes: list[str] | None = None):
+        """party_hp=False - здоровье уже посчитано под группу (уникальные боссы).
+        affixes - навыки руин этого моба."""
         extra = rc.party_extra(self.party)
         if party_hp:
             hp *= 1 + rc.PARTY_HP_PER_EXTRA * extra
@@ -70,12 +76,37 @@ class _RuinsStage:
                         primary or self.primary, label or self.label)
         # Этаж крепче прошлого (2026-11-11): напрямую здоровье и урон, а не
         # характеристики - у них есть база, и прирост размывался.
-        grow = rc.floor_mult(self.floor)
-        mob.max_hp = mob.current_hp = round(mob.max_hp * grow)
-        mob.buff_modifiers["damage_bonus"] = mob.buff_modifiers.get("damage_bonus", 0.0) + grow - 1.0
+        mob.max_hp = mob.current_hp = round(mob.max_hp * rc.floor_hp_mult(self.floor))
+        mob.buff_modifiers["damage_bonus"] = (
+            mob.buff_modifiers.get("damage_bonus", 0.0) + rc.floor_dmg_mult(self.floor) - 1.0
+        )
         # Разница уровней - как у мобов исследования (2026-11-05, владелец).
+        # С 2026-11-13 уровень мобов руин равен потолку, кривая сработает
+        # только против игрока ниже потолка.
         mob.steep_level_curve = True
+        if affixes:
+            ability = MobAbilityDef(
+                title="Навыки руин", hint="",
+                traits=[MobTraitDef(**t) for t in rax.traits(affixes, self.affix_tier)],
+            )
+            mob_abilities.prepare(mob, ability)
+            mob.silence_keeps_body = True
+            # Ход ведёт мозг способности (сценарий build_mob его перекрыл бы),
+            # подпись удара - своя: «бьёт киркой», «плещет воском».
+            mob.scripted_hit = None
+            mob.mob_brain.strike_label = label or self.label
         return mob
+
+    def _affix_lines(self, elite: str | None = None) -> list[str]:
+        """Подсказка перед боем: навыки мобов этажа и добавка элиты."""
+        lines = []
+        if self.affixes:
+            parts = "; ".join(rax.label(a, self.affix_tier) for a in self.affixes)
+            lines.append(f"🧿 Навыки мобов этажа: {parts}")
+        if elite and self.elite_affixes:
+            parts = "; ".join(rax.label(a, self.affix_tier) for a in self.elite_affixes)
+            lines.append(f"🧿 {elite} ещё и: {parts}")
+        return lines
 
     def _add(self, session: CombatSessionState, mob: CombatantState, reward: bool = True) -> CombatantState:
         if reward:
@@ -192,18 +223,25 @@ class RoomStage(_RuinsStage):
 
     def _setup_enemies(self, session: CombatSessionState) -> list[str]:
         count = rc.mob_count(self.party)
+        floor_set = list(self.affixes)
+        big = floor_set + list(self.elite_affixes) if floor_set else []
+        elite = None
         if self.room == rules.BOSS:
-            self._add(session, self._mob(f"{self.elite_name}, хозяин этажа", rc.BOSS_HP, rc.BOSS_DMG))
+            elite = f"{self.elite_name}, хозяин этажа"
+            self._add(session, self._mob(elite, rc.BOSS_HP, rc.BOSS_DMG, affixes=big))
             count -= 1
         elif self.room == rules.ELITE:
-            self._add(session, self._mob(self.elite_name, rc.ELITE_HP, rc.ELITE_DMG))
+            elite = self.elite_name
+            self._add(session, self._mob(elite, rc.ELITE_HP, rc.ELITE_DMG, affixes=big))
             count -= 1
         elif self.room == rules.TREASURE:
+            # Мимик - без навыков руин, он не из мобов этажа.
             self._add(session, self._mob("Сундук с зубами", rc.ELITE_HP, rc.ELITE_DMG, "agi", "кусает"))
             count -= 1
         for _ in range(count):
-            self.common_ids.append(self._add(session, self._mob(self.name, rc.MOB_HP, rc.MOB_DMG)).id)
-        return []
+            mob = self._mob(self.name, rc.MOB_HP, rc.MOB_DMG, affixes=floor_set)
+            self.common_ids.append(self._add(session, mob).id)
+        return self._affix_lines(elite)
 
 
 # --- Уникальные боссы (этажи, кратные 5) ----------------------------------------

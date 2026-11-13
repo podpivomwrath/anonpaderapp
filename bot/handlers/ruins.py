@@ -263,7 +263,7 @@ def _seen(run) -> dict[int, str]:
 
 def _view_text(run, cid: int, leader_name: str, head: str | None = None) -> str:
     lines = [head] if head else []
-    lines.append(texts.floor_line(run.floor))
+    lines.append(texts.floor_line(run.floor, run.layout))
     kind = rules.room_kind(run.layout, run.pos)
     leader = run.leader_id == cid
     if run.offer:

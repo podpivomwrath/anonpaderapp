@@ -62,6 +62,9 @@ class MobTraitDef(BaseModel):
     step: float = 0.0        # прирост за ход
     cap: float = 0.0         # потолок прироста
     effect: str = ""         # dot | weaken | vulnerability
+    #: имя механики в строках боя, если у моба их несколько со своими именами
+    #: (навыки руин, 2026-11-13); пусто - имя всей способности
+    label: str = ""
 
 
 class MobAbilityDef(BaseModel):

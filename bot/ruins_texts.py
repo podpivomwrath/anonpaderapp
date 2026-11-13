@@ -2,6 +2,7 @@
 
 from game import plural
 from game import ruins as rules
+from game.economy import ruins_affix_config as rax
 from game.economy import ruins_config as rc
 from game.economy import runes_config as runes_cfg
 
@@ -226,8 +227,14 @@ KICK_SOLO = "Вы в руинах один - выгонять некого."
 KICK_FAILED = "Голосование не прошло - {name} остаётся."
 
 
-def floor_line(floor: int) -> str:
-    return f"🕳 Этаж {floor} · мобы {rc.mob_level(floor)} ур."
+def floor_line(floor: int, layout: dict | None = None) -> str:
+    """Шапка этажа. Уровень мобов с 2026-11-13 всегда равен потолку - вместо
+    него навыки мобов этажа (ruins_affix_config)."""
+    affixes, _ = rax.for_floor({**(layout or {}), "floor": floor})
+    if not affixes:
+        return f"🕳 Этаж {floor}"
+    names = ", ".join(rax.short(a, rax.tier(floor)) for a in affixes)
+    return f"🕳 Этаж {floor} · навыки мобов: {names}"
 
 
 def exits_line(exits: dict[str, int], seen: dict[int, str]) -> str:

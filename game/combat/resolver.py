@@ -134,7 +134,9 @@ def _apply_last_breath_guard(combatant: CombatantState, result: "TickResult") ->
     if brain is not None:
         # У мобов это не эликсир, а их способность («Не уйду», «Не умер») -
         # строка про эликсир игроков тут сбивала бы с толку.
-        result.lines.append(f"✨ {combatant.name}: {brain.ability.title.lower()} - держится на 1 HP")
+        trait = (brain.traits.get("last_breath") or [None])[0]
+        name = (getattr(trait, "label", "") or brain.ability.title).lower()
+        result.lines.append(f"✨ {combatant.name}: {name} - держится на 1 HP")
     else:
         result.lines.append(f"✨ Последний вздох удерживает {combatant.name} на грани (1 HP)")
 
@@ -642,8 +644,16 @@ def resolve_tick(
             ctx.heals.extend(turn.heals)
             ctx.lines.extend(turn.lines)
             continue
+        if mob.mob_brain is not None and mob.silence_keeps_body:
+            # Навыки руин под «Немотой» (2026-11-13, владелец): ход молчит
+            # (вампиризм, яд, ярость), тело работает - как в оглушении.
+            turn = mob.mob_brain.passive(mob, None, session, rng, incoming_by_target.get(mob.id, []))
+            ctx.hits.extend(turn.hits)
+            ctx.heals.extend(turn.heals)
+            ctx.lines.extend(turn.lines)
         if target is not None:
-            ctx.hits.append(compute_hit(mob, target, rng, label="кусает"))
+            label = getattr(mob.mob_brain, "strike_label", "кусает") if mob.mob_brain is not None else "кусает"
+            ctx.hits.append(compute_hit(mob, target, rng, label=label))
 
     # --- ДоТы тикают в фазу применения (только висевшие с начала хода) ---
     for combatant in session.combatants.values():

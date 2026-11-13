@@ -7,6 +7,7 @@ import pytest
 from sqlalchemy import select
 
 from game import ruins as rules
+from game.combat import balance_config as bc
 from game.combat.ruins import RoomStage
 from game.combat.session import CombatMode, CombatSessionState
 from game.economy import ruins_config as rc
@@ -43,14 +44,16 @@ def test_prisoner_once_per_run() -> None:
 
 
 def test_numbers() -> None:
-    assert [rc.mob_level(f) for f in (1, 5, 6, 10, 11)] == [61, 61, 62, 62, 63]
+    # 2026-11-13 (идея Есты): уровень мобов - потолок, глубину дают рост и навыки
+    assert {rc.mob_level(f) for f in (1, 5, 6, 10, 11, 40)} == {bc.MAX_LEVEL}
     assert [rc.mob_count(n) for n in (1, 2, 3, 4, 5)] == [2, 3, 5, 5, 5]
     # 2026-11-11: кубик рун - на каждые 5 этажей, этажи тяжелее
     assert [rc.rune_dice(f) for f in (1, 5, 6, 10, 11, 20)] == [1, 1, 2, 2, 3, 4]
     # 2026-11-12: меньше 4 комнат не бывает - в 3 не успевали набрать даров
     assert rc.rooms_range(3) == (4, 5) and rc.rooms_range(6) == (4, 7)
     assert min(rc.rooms_range(f)[0] for f in range(1, 30)) == 4
-    assert rc.floor_mult(1) == 1.0 and rc.floor_mult(21) == 2.0
+    assert rc.floor_hp_mult(1) == 1.0 and rc.floor_dmg_mult(1) == 1.0
+    assert rc.floor_hp_mult(11) == pytest.approx((1 + rc.HP_GROWTH) ** 10)
     assert rc.rot(10) == 0.2 and rc.rot(40) == rc.ROT_MAX
     assert rc.room_loot("fight", 10) == 1 and rc.room_loot("fight", 11) == 2
 
@@ -65,9 +68,10 @@ def test_deeper_floor_mobs_are_tougher() -> None:
         RoomStage(22_000_000, layout, rules.FIGHT, 1).setup(state)
         return next(c for c in state.combatants.values() if c.side == 1)
 
-    low, high = first_mob(6), first_mob(10)  # одна ступень уровня (62)
-    assert high.max_hp / low.max_hp == pytest.approx(rc.floor_mult(10) / rc.floor_mult(6), rel=0.01)
-    assert high.buff_modifiers["damage_bonus"] - low.buff_modifiers["damage_bonus"] == pytest.approx(0.2)
+    low, high = first_mob(6), first_mob(10)  # одна ступень навыков (I)
+    assert high.max_hp / low.max_hp == pytest.approx(rc.floor_hp_mult(10) / rc.floor_hp_mult(6), rel=0.01)
+    assert high.buff_modifiers["damage_bonus"] - low.buff_modifiers["damage_bonus"] == pytest.approx(
+        rc.floor_dmg_mult(10) - rc.floor_dmg_mult(6))
 
 
 def test_rot_weakens_healing_and_enrage_after_ten_turns() -> None:
@@ -116,7 +120,7 @@ def test_room_mobs_by_party_and_elite_has_retinue() -> None:
     assert len(_stage(rules.FIGHT, 4).combatants) == 5
     elite = _stage(rules.ELITE, 1).combatants.values()
     assert len(elite) == 2 and len({c.max_hp for c in elite}) == 2, "элита + свита"
-    assert all(c.level == 62 for c in elite), "этаж 7 - 62 уровень"
+    assert all(c.level == bc.MAX_LEVEL for c in elite), "с 2026-11-13 уровень мобов руин - потолок"
 
 
 async def _party(make_character, n: int = 2):

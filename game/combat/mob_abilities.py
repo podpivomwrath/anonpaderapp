@@ -111,6 +111,8 @@ class MobBrain:
         for trait in ability.traits:
             self.traits.setdefault(trait.kind, []).append(trait)
         self.turns = 0
+        #: подпись обычного удара; мобы руин бьют «киркой», «посохом» (2026-11-13)
+        self.strike_label = "кусает"
         self.windup_tick: int | None = None
         self.diving = False
         self.shield_used = False
@@ -204,7 +206,7 @@ class MobBrain:
 
         # Обычный удар - с множителями способности.
         mult = self._multiplier(mob, target, session)
-        self._strike(mob, target, rng, turn, mult, label="кусает")
+        self._strike(mob, target, rng, turn, mult, label=getattr(self, "strike_label", "кусает"))
 
         # Дополнительные удары.
         if self.has("extra_hit"):
@@ -312,7 +314,8 @@ class MobBrain:
             # с мобом по кольцам без отдельной таблицы чисел.
             per_tick = max(round(hit.amount * trait.value), 1)
             target.apply_effect(kind, per_tick, trait.duration, mob.id)
-            turn.lines.append(f"{mob.name}: {self.ability.title.lower()} - {per_tick} урона за ход")
+            name = (trait.label or self.ability.title).lower()
+            turn.lines.append(f"{mob.name}: {name} - {per_tick} урона за ход")
         elif kind == EffectKind.WEAKEN:
             target.apply_effect(kind, trait.value, trait.duration, mob.id, decays=False)
             turn.lines.append(f"{mob.name} ослабляет вас на {trait.value:.0%}")
