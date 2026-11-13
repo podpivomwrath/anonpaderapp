@@ -229,12 +229,12 @@ KICK_FAILED = "Голосование не прошло - {name} остаётс�
 
 def floor_line(floor: int, layout: dict | None = None) -> str:
     """Шапка этажа. Уровень мобов с 2026-11-13 всегда равен потолку - вместо
-    него навыки мобов этажа (ruins_affix_config)."""
-    affixes, _ = rax.for_floor({**(layout or {}), "floor": floor})
-    if not affixes:
+    него сколько навыков у мобов и какой ступени. Сами навыки разыгрываются
+    на каждый бой (2026-11-14) и видны в подсказке перед боем."""
+    n = rax.count(floor)
+    if n <= 0:
         return f"🕳 Этаж {floor}"
-    names = ", ".join(rax.short(a, rax.tier(floor)) for a in affixes)
-    return f"🕳 Этаж {floor} · навыки мобов: {names}"
+    return f"🕳 Этаж {floor} · навыков у мобов: {n}, ступень {rax.tier_name(rax.tier(floor))}"
 
 
 def exits_line(exits: dict[str, int], seen: dict[int, str]) -> str:

@@ -37,14 +37,16 @@ def test_counts_and_tiers() -> None:
         assert a.kind in __import__("game.combat.mob_abilities", fromlist=["KINDS"]).KINDS
 
 
-def test_floor_affixes_are_stable_and_respect_min_floor() -> None:
-    layout = rules.generate(random.Random(5), 20)
-    assert rax.for_floor(layout) == rax.for_floor(dict(layout))
+def test_skills_are_rolled_per_fight_and_respect_min_floor() -> None:
+    """2026-11-14 (владелец): навык на весь этаж выходил один и тот же бой за
+    боем - теперь розыгрыш на каждый бой."""
     for seed in range(50):
-        early = rules.generate(random.Random(seed), 10)
-        common, extra = rax.for_floor(early)
+        common, extra = rax.for_fight(10, random.Random(seed))
         assert "last_breath" not in common + extra
         assert len(common) == 1 and len(extra) == 1 and not set(common) & set(extra)
+    # один этаж, разные бои - разные навыки
+    seen = {_stage(7)[0].affixes[0] for _ in range(40)}
+    assert len(seen) >= 4
 
 
 def test_level_is_cap_and_early_floors_have_no_skills() -> None:
@@ -99,6 +101,6 @@ def test_floor_line_shows_skills_instead_of_level() -> None:
 
     layout = rules.generate(random.Random(1), 16)
     line = ruins_texts.floor_line(16, layout)
-    assert line.startswith("🕳 Этаж 16 · навыки мобов: ") and "ур." not in line
+    assert line == "🕳 Этаж 16 · навыков у мобов: 2, ступень III"
     assert ruins_texts.floor_line(2, rules.generate(random.Random(1), 2)) == "🕳 Этаж 2"
     assert rc.mob_level(16) == bc.MAX_LEVEL

@@ -46,8 +46,9 @@ class _RuinsStage:
         self.ctx = ctx or {}
         self.gifts = self.ctx.get("gifts") or []
         self.name, self.elite_name, self.primary, self.label = rules.mob_kind(layout)
-        #: навыки мобов этажа и добавка элите/хозяину (ruins_affix_config)
-        self.affixes, self.elite_affixes = rax.for_floor(layout)
+        #: навыки мобов этого боя и добавка элите/хозяину (ruins_affix_config);
+        #: разыгрываются на каждый бой (2026-11-14)
+        self.affixes, self.elite_affixes = rax.for_fight(self.floor, self.ctx.get("affix_rng") or random.Random())
         self.affix_tier = rax.tier(self.floor)
         self.ids: list[int] = []
         #: рядовые мобы (не элита, не хозяин, не сундук) - с них руна, rc.COMMON_RUNE_CHANCE
