@@ -42,6 +42,17 @@ async def remember(kind: str, peer_id: int, delay_seconds: float) -> None:
     await _redis.set(_key(kind, peer_id), f"{due:.3f}", ex=int(delay_seconds) + 3600)
 
 
+async def due_at(kind: str, peer_id: int) -> float | None:
+    """Когда занятие кончится (unix-время) - для «Сейчас идёт» в мини-аппе."""
+    if _redis is None:
+        return None
+    raw = await _redis.get(_key(kind, peer_id))
+    try:
+        return float(raw) if raw is not None else None
+    except (TypeError, ValueError):
+        return None
+
+
 async def forget(kind: str, peer_id: int) -> None:
     if _redis is None:
         return

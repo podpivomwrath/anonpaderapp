@@ -365,6 +365,27 @@ def party_text(rows: list[tuple[str, int, int, bool, bool]]) -> str:
     return "\n".join(lines)
 
 
+#: Чем кончился забег для игрока - для «Моих забегов» в топе руин (2026-11-14).
+RUN_OUTCOMES = {
+    "exited": "вышли наверх",
+    "wiped": "группа погибла, мешок пропал",
+    "abandoned": "забег брошен, мешок пропал",
+    "kicked": "вас изгнали из группы",
+}
+
+
+def my_run_bag(bag: dict) -> str | None:
+    """Мешок забега одной строкой: «🔮 «Жар» ×2 · ⚪ Пепельная крошка»."""
+    runes = {r: n for r, n in (bag.get("runes") or {}).items() if n}
+    trophies = {t: n for t, n in (bag.get("trophies") or {}).items() if n}
+    parts = []
+    if runes:
+        parts.append("🔮 " + ", ".join(rune_name(r) + (f" ×{n}" if n > 1 else "") for r, n in runes.items()))
+    if trophies:
+        parts.append(trophies_line(trophies))
+    return " · ".join(parts) or None
+
+
 def exit_bag_line(bag: dict) -> str:
     """Что выдано из мешка - поимённо (2026-11-11, владелец: по одному числу
     «3 руны» не понять, какие именно)."""

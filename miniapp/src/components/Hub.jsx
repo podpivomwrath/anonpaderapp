@@ -347,6 +347,8 @@ export default function Hub() {
   const badges = {
     character: character?.unspent_points > 0 ? `+${character.unspent_points}` : null,
     dailies: character?.dailies_left > 0 ? String(character.dailies_left) : null,
+    // 2026-11-14: в сумке вещь сильнее надетой - как ▲ на окне слота у «Героя».
+    inventory: character?.better_items > 0 ? '▲' : null,
   };
   const current = activeTab === 'handbook'
     ? { id: 'handbook', label: 'Путеводитель' }

@@ -5,6 +5,7 @@ import PresetsTab from './PresetsTab.jsx';
 import TrialsTab from './TrialsTab.jsx';
 import CraftsTab from './CraftsTab.jsx';
 import HeroTab from './HeroTab.jsx';
+import NowRunning from './NowRunning.jsx';
 import { useSavedTab } from '../savedTab.js';
 
 // Патч 14, ч.1: Характеристики + Пресеты + Испытания объединены в одну
@@ -36,7 +37,9 @@ export default function CharacterTab({ character, onCharacterUpdate }) {
           </TabsItem>
         ))}
       </Tabs>
-      {section === 'hero' && <HeroTab character={character} onCharacterUpdate={onCharacterUpdate} />}
+      {/* «Сейчас идёт» (2026-11-14) - над любым подразделом, пусто - нет блока. */}
+      <NowRunning />
+      {section === 'hero' &&<HeroTab character={character} onCharacterUpdate={onCharacterUpdate} />}
       {section === 'stats' && <StatsTab character={character} onCharacterUpdate={onCharacterUpdate} />}
       {section === 'presets' && <PresetsTab character={character} />}
       {section === 'trials' && <TrialsTab />}

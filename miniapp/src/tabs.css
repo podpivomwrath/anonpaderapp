@@ -1112,7 +1112,68 @@ body.lite .eff-ladder__step--next { animation: none; }
   align-items: center;
   gap: 8px;
   min-width: 0;
+  /* Кнопка (2026-11-14: нажатие - окно игрока) без вида кнопки. */
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
 }
+
+.ruins-member:disabled { cursor: default; }
+
+.top-row--tap { cursor: pointer; }
+.top-row--tap:active { background: rgba(255, 255, 255, 0.06); }
+
+/* --- Окно игрока (2026-11-14): силуэт, надетое, руны ---------------------------- */
+
+.look-sub { margin: 0 0 6px; font-size: 13px; opacity: 0.8; }
+
+.look-stage { max-width: 340px; margin: 0 auto; }
+
+.look-skeleton { height: 280px; border-radius: 14px; }
+
+.gear-slot--picked { outline: 2px solid var(--gold); outline-offset: 2px; }
+
+.look-item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 8px 0;
+  padding: 8px 10px;
+  border-radius: 12px;
+  background: var(--card);
+  border: 1px solid var(--card-line);
+  font-size: 13px;
+}
+
+.look-item small { opacity: 0.65; }
+
+.look-hint { margin: 6px 0; font-size: 12px; opacity: 0.6; text-align: center; }
+
+.look-runes {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 10px;
+}
+
+.look-runes__title {
+  font-size: 12px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  opacity: 0.6;
+}
+
+.look-runes__row { display: flex; flex-wrap: wrap; gap: 6px 12px; }
+
+.look-rune { display: flex; align-items: center; gap: 6px; min-width: 0; }
+
+.look-rune__text { display: flex; flex-direction: column; font-size: 13px; line-height: 1.2; }
+
+.look-rune__text small { opacity: 0.6; font-size: 11px; }
 
 .ruins-member--pale { opacity: 0.45; }
 
@@ -1122,6 +1183,38 @@ body.lite .eff-ladder__step--next { animation: none; }
   font-size: 13px;
   line-height: 1.4;
 }
+
+/* Мои забеги (2026-11-14): последние свои забеги под топом. */
+.ruins-runs {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 0 12px 12px;
+}
+
+.ruins-run {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: var(--card);
+  border: 1px solid var(--card-line);
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.ruins-run__head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 8px;
+  font-size: 15px;
+}
+
+.ruins-run__when { font-size: 12px; opacity: 0.6; flex: none; }
+.ruins-run__line { opacity: 0.8; }
+.ruins-run__bag { color: var(--gold); }
 
 /* Своя строка, когда ты ниже десятки, - прилипает к низу экрана. */
 .top-mine {

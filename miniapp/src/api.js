@@ -190,6 +190,11 @@ export function getCharacter() {
   return request('/character');
 }
 
+// «Сейчас идёт» (2026-11-14): запущенные занятия и сроки.
+export function getNowRunning() {
+  return request('/now');
+}
+
 export function submitStats(increments) {
   return request('/stats', {
     method: 'POST',
@@ -375,6 +380,11 @@ export async function getLeaderboard(board) {
 // Топ руин (2026-11-13): board - ruins_solo | ruins_group.
 export async function getRuinsTop(board) {
   return request(`/ruins_top?board=${encodeURIComponent(board)}`);
+}
+
+// Окно чужого игрока (2026-11-14): только надетые вещи и руны.
+export function getPlayerLook(id) {
+  return request(`/look?id=${encodeURIComponent(id)}`);
 }
 
 // Патч 92: какую рамку венца носить. board === null - снять рамку.

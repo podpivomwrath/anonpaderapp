@@ -23,7 +23,7 @@ import { useBackClose } from '../backStack.js';
 // сверху вниз. y - высота окна в долях кадра силуэта, на уровне своей части
 // тела. Кадр у всех картинок общий: tools/silhouette_assets.py выравнивает
 // их по капюшону и подошвам.
-const SLOTS = [
+export const SLOTS = [
   { slot: 'weapon', side: 'left', y: 46 },
   { slot: 'helmet', side: 'right', y: 9 },
   { slot: 'armor', side: 'right', y: 31 },
@@ -31,12 +31,12 @@ const SLOTS = [
   { slot: 'boots', side: 'right', y: 89 },
 ];
 
-const SLOT_TITLES = {
+export const SLOT_TITLES = {
   weapon: 'Оружие', helmet: 'Шлем', armor: 'Нагрудник', legs: 'Штаны', boots: 'Сапоги',
 };
 
 export const STAT_ICONS = { str: '💪', agi: '🏃', int: '🧠', vit: '❤️', wil: '✨' };
-const STAT_NAMES = { str: 'Сила', agi: 'Ловкость', int: 'Интеллект', vit: 'Выносливость', wil: 'Воля' };
+export const STAT_NAMES = { str: 'Сила', agi: 'Ловкость', int: 'Интеллект', vit: 'Выносливость', wil: 'Воля' };
 const STAT_ORDER = ['str', 'agi', 'int', 'vit', 'wil'];
 // Значки сопротивлений - те же, что в «Характеристиках».
 const RESIST_CHIPS = [
@@ -46,7 +46,7 @@ const RESIST_CHIPS = [
 ];
 
 // Значки слотов - для пустого окна: подпись словом там была бы лишней.
-function SlotGlyph({ slot }) {
+export function SlotGlyph({ slot }) {
   const common = {
     width: 26, height: 26, viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor',
     strokeWidth: 1.6, strokeLinecap: 'round', strokeLinejoin: 'round', 'aria-hidden': true,
@@ -216,7 +216,7 @@ function Score({ trophies }) {
 // Подпись под окном надетой вещи (2026-11-12): уровень и два главных стата.
 // Раньше то же самое дублировал список под силуэтом (жалоба 2026-10-23:
 // «чтобы понять, что качать, прокликиваю каждую вещь»).
-function SlotCaption({ item }) {
+export function SlotCaption({ item }) {
   const stats = STAT_ORDER.filter((k) => item.base_stats?.[k])
     .sort((a, b) => item.base_stats[b] - item.base_stats[a]);
   return (

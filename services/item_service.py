@@ -225,6 +225,18 @@ async def get_equipped(db: AsyncSession, character_id: int) -> dict[str, Item | 
     return equipped
 
 
+def better_than_worn(items: list[tuple[Item, bool]], level: int) -> int:
+    """Сколько слотов, где в сумке лежит вещь сильнее надетой и по уровню
+    (2026-11-14, отметка у «Инвентаря» в меню мини-аппа). То же правило, что
+    зелёный ▲ на окне слота во вкладке «Герой»."""
+    worn = {item.slot: item_power(item) for item, equipped in items if equipped}
+    slots = {
+        item.slot for item, equipped in items
+        if not equipped and can_wear(item, level) and item_power(item) > worn.get(item.slot, 0)
+    }
+    return len(slots)
+
+
 async def get_inventory(db: AsyncSession, character_id: int) -> list[tuple[Item, bool]]:
     """Все предметы персонажа (item, equipped), отсортированные по слоту и силе."""
     rows = (

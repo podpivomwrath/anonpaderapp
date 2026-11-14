@@ -21,6 +21,7 @@ from bot.miniapp_admin_api import register_routes as register_miniapp_admin_rout
 from bot.miniapp_api import register_routes as register_miniapp_routes
 from bot.miniapp_craft_api import register_routes as register_craft_routes
 from bot.miniapp_gear_api import register_routes as register_gear_routes
+from bot.miniapp_look_api import register_routes as register_look_routes
 from bot.miniapp_runes_api import register_routes as register_runes_routes
 from bot.miniapp_market_api import register_routes as register_market_routes
 from bot.miniapp_guild_api import register_routes as register_guild_routes
@@ -119,6 +120,7 @@ def create_app(settings: Settings, route_event: RouteEvent, redis=None) -> web.A
     register_craft_routes(app)
     register_gear_routes(app)
     register_runes_routes(app)
+    register_look_routes(app)  # 2026-11-14: окно чужого игрока - только надетое
     register_market_routes(app)
     register_guild_routes(app)
     register_exchange_routes(app)

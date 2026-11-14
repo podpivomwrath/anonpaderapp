@@ -8,6 +8,7 @@ import ContractsSection from './ContractsSection.jsx';
 import Skeleton from './Skeleton.jsx';
 import { Bar, Empty, Podium, SectionHead } from './ui.jsx';
 import { useSavedTab } from '../savedTab.js';
+import { usePlayerLook } from './PlayerLook.jsx';
 
 /**
  * «Доска» (2026-10-15): всё PvP в одном месте - розыск (Кровавое клеймо и
@@ -33,7 +34,7 @@ function minutes(m) {
   return h ? `${h} ч ${m % 60} мин` : `${m} мин`;
 }
 
-function Wanted({ data }) {
+function Wanted({ data, onLook }) {
   const { me, rules, wanted } = data;
   return (
     <>
@@ -61,7 +62,8 @@ function Wanted({ data }) {
         {wanted.length > 0 && (
           <div className="wanted-grid">
             {wanted.map((w) => (
-              <div className="wanted-card" key={w.id}>
+              <div className="wanted-card top-row--tap" key={w.id} role="button" tabIndex={0}
+                onClick={() => onLook(w.id, w.name)} onKeyDown={(ev) => { if (ev.key === 'Enter') onLook(w.id, w.name); }}>
                 <span className="wanted-card__head">Разыскивается</span>
                 <ClassIcon subclass={w.subclass} baseClass={w.base_class} crown={w.crown_frame || null} size={56} />
                 <b className="wanted-card__name">{w.name}</b>
@@ -100,7 +102,7 @@ function Wanted({ data }) {
   );
 }
 
-function Rating({ data }) {
+function Rating({ data, onLook }) {
   const { me, rating } = data;
   return (
     <>
@@ -118,11 +120,13 @@ function Rating({ data }) {
             renderBadge={(e, place) => (
               <ClassIcon subclass={e.raw.subclass} baseClass={e.raw.base_class} crown={e.raw.crown_frame || null} size={place === 1 ? 64 : 52} />
             )}
+            onPick={(e) => onLook(e.raw.id, e.raw.name)}
           />
         )}
         <div className="top-list">
           {rating.slice(3).map((e) => (
-            <div className="stat-row top-row" key={e.rank}>
+            <div className="stat-row top-row top-row--tap" key={e.rank} role="button" tabIndex={0}
+              onClick={() => onLook(e.id, e.name)} onKeyDown={(ev) => { if (ev.key === 'Enter') onLook(e.id, e.name); }}>
               <span className="stat-row__label">
                 <span className="top-rank">{e.rank}</span>
                 {/* Рамка венца, которую носит игрок (своя у каждого). */}
@@ -205,6 +209,7 @@ export default function BoardTab() {
   const [status, setStatus] = useState('loading');
   // Итог прошлого сезона - катсцена один раз (2026-10-30).
   const [recap, setRecap] = useState(null);
+  const [look, lookSheet] = usePlayerLook();
 
   useEffect(() => {
     let cancelled = false;
@@ -239,10 +244,11 @@ export default function BoardTab() {
       {status === 'error' && (
         <Placeholder icon={<div style={{ fontSize: 48 }}>🕯️</div>}>Не удалось загрузить доску.</Placeholder>
       )}
-      {status === 'ready' && section === 'wanted' && <Wanted data={data} />}
+      {status === 'ready' && section === 'wanted' && <Wanted data={data} onLook={look} />}
       {section === 'contracts' && <ContractsSection />}
-      {status === 'ready' && section === 'rating' && <Rating data={data} />}
+      {status === 'ready' && section === 'rating' && <Rating data={data} onLook={look} />}
       {status === 'ready' && section === 'season' && <Season data={data} />}
+      {lookSheet}
     </>
   );
 }

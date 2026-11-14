@@ -274,3 +274,59 @@ def award_text(award: Award) -> str:
     if not award.worn:
         lines.append("Надеть его можно в мини-аппе: нажмите на титул в шапке.")
     return "\n".join(lines)
+
+
+# --- Мои забеги (2026-11-14, владелец) ------------------------------------------
+
+#: Сколько своих последних забегов показывать в топе руин.
+MY_RUNS_LIMIT = 10
+
+
+@dataclass
+class MyRun:
+    run_id: int
+    floors: int
+    reason: str | None
+    bag: dict
+    started_at: datetime
+    finished_at: datetime | None
+    party: list[int]
+
+
+async def my_runs(db: AsyncSession, character_id: int, limit: int = MY_RUNS_LIMIT) -> list[MyRun]:
+    """Последние законченные забеги игрока: засчитанные этажи (как в топе),
+    чем кончилось, что было в мешке, кто шёл вместе."""
+    from models import RuinRun
+
+    rows = (await db.execute(
+        select(RuinMember, RuinRun).join(RuinRun, RuinRun.id == RuinMember.run_id)
+        .where(RuinMember.character_id == character_id, RuinRun.status != "active")
+        .order_by(RuinRun.started_at.desc(), RuinRun.id.desc()).limit(limit)
+    )).all()
+    if not rows:
+        return []
+    run_ids = [run.id for _m, run in rows]
+    party: dict[int, list[int]] = {}
+    for run_id, cid in (await db.execute(
+        select(RuinMember.run_id, RuinMember.character_id)
+        .where(RuinMember.run_id.in_(run_ids)).order_by(RuinMember.id)
+    )).all():
+        party.setdefault(run_id, []).append(cid)
+    return [
+        MyRun(run.id, member.floors or 0, member.left_reason, member.bag or {},
+              run.started_at, run.finished_at, party.get(run.id, [character_id]))
+        for member, run in rows
+    ]
+
+
+def run_when(moment: datetime) -> str:
+    local = moment.astimezone(MSK) if moment.tzinfo else moment.replace(tzinfo=timezone.utc).astimezone(MSK)
+    return f"{local.day} {_MONTHS[local.month - 1]}, {local:%H:%M}"
+
+
+def run_length(start: datetime, end: datetime | None) -> str | None:
+    if end is None:
+        return None
+    minutes = max(1, round((end - start).total_seconds() / 60))
+    hours, rest = divmod(minutes, 60)
+    return f"{hours} ч {rest} мин" if hours else f"{rest} мин"

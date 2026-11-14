@@ -5,6 +5,7 @@ import { getLeaderboard } from '../api.js';
 import ClassIcon from './ClassIcon.jsx';
 import Skeleton from './Skeleton.jsx';
 import RuinsBoard from './RuinsBoard.jsx';
+import { usePlayerLook } from './PlayerLook.jsx';
 import { Empty, Podium, SectionHead } from './ui.jsx';
 import { useSavedTab } from '../savedTab.js';
 import { useBackClose } from '../backStack.js';
@@ -45,9 +46,15 @@ function Moved({ n }) {
     : <span className="top-moved top-moved--down" title="мест вниз со вчера">▼{-n}</span>;
 }
 
-function TopRow({ e }) {
+// Нажатие на строку - окно игрока: надетые вещи и руны (2026-11-14).
+function TopRow({ e, onLook }) {
+  const tap = onLook && e.id ? () => onLook(e.id, e.name) : undefined;
   return (
-    <div className={`stat-row top-row${e.me ? ' top-row--me' : ''}`}>
+    <div
+      className={`stat-row top-row${e.me ? ' top-row--me' : ''}${tap ? ' top-row--tap' : ''}`}
+      onClick={tap} role={tap ? 'button' : undefined} tabIndex={tap ? 0 : undefined}
+      onKeyDown={tap ? (ev) => { if (ev.key === 'Enter') tap(); } : undefined}
+    >
       <span className="stat-row__label">
         <span className="top-rank">{e.rank}</span>
         {/* Рамка венца - та, что игрок носит (2026-10-15): у каждого,
@@ -86,6 +93,7 @@ export default function TopsTab() {
   useBackClose(() => setHelpOpen(false), helpOpen);
   const [me, setMe] = useState(null);
   const [total, setTotal] = useState(0);
+  const [look, lookSheet] = usePlayerLook();
 
   useEffect(() => {
     if (isRuins(board)) return undefined;
@@ -166,14 +174,15 @@ export default function TopsTab() {
                   />
                 </span>
               )}
+              onPick={(e) => look(e.raw.id, e.raw.name)}
             />
             <div className="top-list">
-              {top.slice(3).map((e) => <TopRow key={e.rank} e={e} />)}
+              {top.slice(3).map((e) => <TopRow key={e.rank} e={e} onLook={look} />)}
             </div>
           </Group>
           {me && (
             <div className="top-mine">
-              <TopRow e={me} />
+              <TopRow e={me} onLook={look} />
             </div>
           )}
         </>
@@ -207,6 +216,7 @@ export default function TopsTab() {
           </div>
         </>
       )}
+      {lookSheet}
     </>
   );
 }

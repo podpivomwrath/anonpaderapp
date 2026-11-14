@@ -6,6 +6,7 @@ miniapp_auth_middleware после проверки подписи — тело 
 """
 
 import random
+from datetime import datetime, timezone
 
 from aiohttp import web
 from sqlalchemy import select
@@ -221,6 +222,9 @@ async def handle_get_character(request: web.Request) -> web.Response:
         # Отметка у «Заданий» в меню (2026-11-12): сколько ежедневных не сделано.
         overview = await daily_service.get_dailies_overview(session, character)
         payload["dailies_left"] = sum(1 for q in overview.quests if not q.completed)
+        # Отметка у «Инвентаря» (2026-11-14): в скольких слотах в сумке есть вещь сильнее надетой.
+        payload["better_items"] = item_service.better_than_worn(
+            await item_service.get_inventory(session, character.id), character.level)
         await session.commit()
         return web.json_response(payload)
 
@@ -500,6 +504,8 @@ async def handle_get_leaderboard(request: web.Request) -> web.Response:
         def row(e):
             return {
                 "rank": e.rank, "name": e.name, "value": e.value,
+                # id - для окна игрока по нажатию (2026-11-14).
+                "id": e.character_id,
                 "title": e.title, "title_tier": e.title_tier, "premium": e.premium, "badge": e.badge,
                 # Значок класса в строке. Подкласс есть не у всех (до 30
                 # уровня его нет вовсе), поэтому клиенту отдаются оба, а
@@ -572,7 +578,7 @@ async def handle_get_ruins_top(request: web.Request) -> web.Response:
             branded = c.brand_until is not None and c.brand_until > now
             premium = c.premium_until is not None and c.premium_until > now
             return {
-                "name": c.name, "best": m.best, "me": c.id == character.id,
+                "id": c.id, "name": c.name, "best": m.best, "me": c.id == character.id,
                 "base_class": c.base_class, "subclass": c.subclass,
                 "title": title_service.name_of(c.active_title_id) if c.active_title_id else None,
                 "title_tier": title_service.tier_of(c.active_title_id),
@@ -586,6 +592,27 @@ async def handle_get_ruins_top(request: web.Request) -> web.Response:
                 "members": [x for x in (who(m) for m in r.members) if x is not None],
             }
 
+        # Мои забеги (2026-11-14, владелец): последние свои, любые - соло и в группе.
+        from bot import ruins_texts
+
+        runs = await ruins_top_service.my_runs(session, character.id)
+        mates = {cid for run in runs for cid in run.party if cid != character.id}
+        names = dict((await session.execute(
+            select(Character.id, Character.name).where(Character.id.in_(mates))
+        )).all()) if mates else {}
+        my_runs = [
+            {
+                "id": run.run_id,
+                "value": ruins_top_service.floors_text(run.floors),
+                "when": ruins_top_service.run_when(run.started_at),
+                "length": ruins_top_service.run_length(run.started_at, run.finished_at),
+                "party": [names[cid] for cid in run.party if cid in names],
+                "outcome": ruins_texts.RUN_OUTCOMES.get(run.reason or ""),
+                "bag": ruins_texts.my_run_bag(run.bag) if run.reason == "exited" else None,
+            }
+            for run in runs
+        ]
+
         return web.json_response({
             "board": request.query.get("board"),
             "week": ruins_top_service.week_label(start),
@@ -596,6 +623,7 @@ async def handle_get_ruins_top(request: web.Request) -> web.Response:
             "me": row(mine) if mine is not None and mine.rank > 10 else None,
             "my_rank": mine.rank if mine is not None else None,
             "total": len(rows),
+            "my_runs": my_runs,
         })
 
 
@@ -748,8 +776,22 @@ async def handle_get_dailies(request: web.Request) -> web.Response:
         )
 
 
+async def handle_get_now(request: web.Request) -> web.Response:
+    """«Сейчас идёт» (2026-11-14): запущенные занятия и когда кончатся."""
+    from bot import now_running
+
+    vk_user_id = request[VK_USER_ID_KEY]
+    async with request.app[SESSION_FACTORY_KEY]() as session:
+        character = await _load_character(session, vk_user_id)
+        if character is None:
+            return web.json_response({"error": "character_not_found"}, status=404)
+        rows = await now_running.collect(session, character, vk_user_id)
+    return web.json_response({"now": datetime.now(timezone.utc).timestamp(), "items": rows})
+
+
 def register_routes(app: web.Application) -> None:
     app.router.add_get("/api/miniapp/character", handle_get_character)
+    app.router.add_get("/api/miniapp/now", handle_get_now)
     app.router.add_post("/api/miniapp/stats", handle_post_stats)
     app.router.add_post("/api/miniapp/crown-frame", handle_post_crown_frame)
     app.router.add_post("/api/miniapp/glance", handle_post_glance)
