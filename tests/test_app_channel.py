@@ -30,6 +30,14 @@ class _Api:
         return {"response": 42}
 
 
+@pytest.fixture(autouse=True)
+def _no_world_snapshots(monkeypatch):
+    """Снимок мира ходит в базу - здесь проверяем только канал."""
+    from bot import app_state
+
+    monkeypatch.setattr(app_state, "refresh_soon", lambda vk_id: None)
+
+
 @pytest.fixture
 def api():
     fake = _Api()

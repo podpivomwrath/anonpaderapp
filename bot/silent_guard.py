@@ -125,6 +125,13 @@ def install(api) -> None:
     api.request = request
 
 
+def _refresh_world(vk_id: int) -> None:
+    """После сообщения бота - снимок мира для приложения (bot/app_state.py)."""
+    from bot import app_state
+
+    app_state.refresh_soon(vk_id)
+
+
 #: Ответ _app_route «остальным - в VK»: под этим ключом урезанный запрос.
 _REST = "__vk_rest__"
 
@@ -141,6 +148,7 @@ async def _app_route(method: str, data: dict, targets: list[int]):
             owner = app_channel.owner_of(message_id)
             if app_channel.active(owner):
                 await app_channel.publish(owner, app_channel.edit_event(data))
+                _refresh_world(owner)
                 return {"response": 1}
             # Приложение закрыли, а окно было там - в VK такого сообщения нет:
             # тот же отказ, что у VK, и вызов пришлёт окно заново.
@@ -157,6 +165,7 @@ async def _app_route(method: str, data: dict, targets: list[int]):
     for p in in_app:
         ids[p] = app_channel.fake_id(p)
         await app_channel.publish(p, app_channel.message_event(data, ids[p]))
+        _refresh_world(p)
     rest = [p for p in targets if p not in ids]
     if rest:
         # Рассылка многим: остальным - в VK обычным путём (повтор, отметка
