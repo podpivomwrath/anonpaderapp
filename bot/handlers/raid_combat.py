@@ -172,6 +172,9 @@ class RaidBattle:
     ruin_used: dict = field(default_factory=dict)
     #: почему зелья закрыты с начала боя (засада, обет, лимит этажа)
     ruin_potions_note: dict = field(default_factory=dict)
+    #: счёт зелий этажа на входе: cid -> (лимит этажа, сколько осталось) -
+    #: для шапки окна зелий (репорт 364: «Лишний пузырёк» был не виден)
+    ruin_floor_potions: dict = field(default_factory=dict)
 
     @property
     def is_ruins(self) -> bool:
@@ -360,6 +363,9 @@ def _start_stage_session(battle_id: int, battle: RaidBattle) -> CombatSessionSta
                 c.current_hp = max(0, min(int(hp), c.max_hp))
                 c.consumables_used = int(battle.ruin_used.get(cid, 0))
                 c.potions_closed_text = battle.ruin_potions_note.get(cid)
+                if cid in battle.ruin_floor_potions:
+                    limit, left = battle.ruin_floor_potions[cid]
+                    c.floor_potions = (limit, left, c.consumables_used)
 
     if battle.is_field or battle.is_archive or battle.is_rift or battle.is_mill or battle.is_trail or battle.is_ruins:
         _build_field_stage(battle, state)
@@ -632,7 +638,8 @@ async def start_raid(
 
 async def start_ruins_room(run_id: int, stage, member_inputs: list[MemberCombatInput], hp: dict[int, int],
                            used: dict[int, int], opening: str, attachment: str | None = None,
-                           potions_note: dict[int, str] | None = None) -> int:
+                           potions_note: dict[int, str] | None = None,
+                           floor_potions: dict[int, tuple[int, int]] | None = None) -> int:
     """Руины: бой одной комнаты тем же путём, что этапы рейда. Итог боя -
     bot/handlers/ruins.py (on_room_won / on_wipe) через raid_results."""
     global _next_battle_id
@@ -650,6 +657,7 @@ async def start_ruins_room(run_id: int, stage, member_inputs: list[MemberCombatI
     battle.ruin_run_id, battle.ruin_stage = run_id, stage
     battle.ruin_hp, battle.ruin_used = dict(hp), dict(used)
     battle.ruin_potions_note = dict(potions_note or {})
+    battle.ruin_floor_potions = dict(floor_potions or {})
     _battles[battle_id] = battle
     for cid, p in participants.items():
         _peer_battle[p.peer_id] = battle_id

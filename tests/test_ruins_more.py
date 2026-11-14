@@ -184,6 +184,24 @@ async def test_closed_potions_name_the_real_reason(db_session, make_character) -
     assert consumable_limit.EXHAUSTED_TEXT in consumable_limit.items_header(_C())
 
 
+def test_potion_window_shows_floor_count_with_spare_vial() -> None:
+    """Репорт 364: с «Лишним пузырьком» в бою было видно только «5 из 5» -
+    дар казался нерабочим. Теперь в шапке и счёт этажа."""
+    from game.combat import consumable_limit
+
+    class _C:
+        consumables_used = 0
+        floor_potions = (6, 6, 0)          # этаж 6, осталось 6, на входе выпито 0
+
+    head = consumable_limit.items_header(_C())
+    assert "5 в этом бою" in head and "На этаж: 6 из 6" in head
+    _C.consumables_used = 2                # выпил два в этом бою
+    assert "На этаж: 4 из 6" in consumable_limit.items_header(_C())
+    _C.consumables_used, _C.floor_potions = 4, (6, 1, 4)  # следующий бой: на этаже остался 1
+    head = consumable_limit.items_header(_C())
+    assert "1 в этом бою" in head and "На этаж: 1 из 6" in head
+
+
 # --- Первая победа над уникальным - ларцы рун --------------------------------------
 
 

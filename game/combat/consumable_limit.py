@@ -46,6 +46,14 @@ def items_header(combatant) -> str:
     if n <= 0:
         return f"🎒 Что использовать?\n{exhausted_text(combatant)}"
     text = f"🎒 Что использовать?\nОсталось зелий: {n} из {LIMIT}"
+    # Руины (репорт 364): у этажа свой счёт, «Лишний пузырёк» делает его 6.
+    # Без этой строки в бою было видно только «5 из 5», и дар казался мёртвым.
+    floor = getattr(combatant, "floor_potions", None)
+    if floor:
+        limit, left_at_start, used_at_start = floor
+        now = max(left_at_start - (getattr(combatant, "consumables_used", 0) - used_at_start), 0)
+        text = (f"🎒 Что использовать?\nОсталось зелий: {n} в этом бою (не больше {LIMIT} за бой)\n"
+                f"🧪 На этаж: {now} из {limit}")
     if heal_taken(combatant):
         text += "\n" + HEAL_TAKEN_TEXT
     return text

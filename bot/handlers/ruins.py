@@ -554,6 +554,8 @@ async def _start_fight(run_id: int, note: str | None = None) -> None:
         hp = {m.character_id: (0 if m.dead else m.hp) for m in members}
         start = {m.character_id: ruins_service.battle_potions_start(run, m.consumables_used) for m in members}
         floor_used = {m.character_id: m.consumables_used for m in members}
+        per_floor = ruins_service.floor_potions(run)
+        floor_left = {m.character_id: (per_floor, max(per_floor - m.consumables_used, 0)) for m in members}
         potions_note = {m.character_id: why for m in members
                         if (why := ruins_service.potions_closed_text(run, m.consumables_used))}
         layout = dict(run.layout)
@@ -574,7 +576,7 @@ async def _start_fight(run_id: int, note: str | None = None) -> None:
     try:
         await raid_combat.start_ruins_room(run_id, stage, inputs, hp, start, opening,
                                            attachment=_pic(_fight_photo(stage, kind, layout)),
-                                           potions_note=potions_note)
+                                           potions_note=potions_note, floor_potions=floor_left)
     except Exception:
         logger.exception("Руины {}: бой не начался", run_id)
         async with get_session_factory()() as db:
