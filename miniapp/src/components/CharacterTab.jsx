@@ -25,7 +25,7 @@ const SECTIONS = [
   { id: 'crafts', label: 'Ремесла' },
 ];
 
-export default function CharacterTab({ character, onCharacterUpdate }) {
+export default function CharacterTab({ character, onCharacterUpdate, onGo }) {
   const [section, setSection] = useSavedTab('character', SECTIONS.map((s) => s.id), 'hero');
 
   return (
@@ -38,8 +38,8 @@ export default function CharacterTab({ character, onCharacterUpdate }) {
         ))}
       </Tabs>
       {/* «Сейчас идёт» (2026-11-14) - над любым подразделом, пусто - нет блока. */}
-      <NowRunning />
-      {section === 'hero' &&<HeroTab character={character} onCharacterUpdate={onCharacterUpdate} />}
+      <NowRunning onGo={onGo} />
+      {section === 'hero' && <HeroTab character={character} onCharacterUpdate={onCharacterUpdate} />}
       {section === 'stats' && <StatsTab character={character} onCharacterUpdate={onCharacterUpdate} />}
       {section === 'presets' && <PresetsTab character={character} />}
       {section === 'trials' && <TrialsTab />}

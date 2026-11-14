@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import {
   Button, Div, Group, Header, Placeholder, SimpleCell, TabsItem,
 } from '@vkontakte/vkui';
+import { usePlayerLook } from './PlayerLook.jsx';
 import Tabs from './ScrollTabs.jsx';
 import { getGuild, getGuildLog, guildAction } from '../api.js';
 import GuildTree from './GuildTree.jsx';
@@ -400,6 +401,7 @@ function Members({ state, run, busy }) {
   const [invite, setInvite] = useState('');
   const [open, setOpen] = useState(null);
   const [topMode, setTopMode] = useState('week');
+  const [look, lookSheet] = usePlayerLook();
   return (
     <>
       {me.perms.invite && (
@@ -447,6 +449,11 @@ function Members({ state, run, busy }) {
                 <small>{m.id === me.id ? 'вы' : 'за неделю'}</small>
               </span>
             </button>
+            {open === m.id && m.id !== me.id && (
+              <Div className="guild-member-actions">
+                <button type="button" className="pill-btn" onClick={() => look(m.id, m.name)}>Снаряжение и руны</button>
+              </Div>
+            )}
             {open === m.id && m.id !== me.id && (m.controls?.ranks.length > 0 || m.controls?.kick || me.perms.leader) && (
               <Div className="guild-member-actions">
                 {m.controls.ranks.length > 0 && (
@@ -483,6 +490,7 @@ function Members({ state, run, busy }) {
           </div>
         ))}
       </Group>
+      {lookSheet}
     </>
   );
 }

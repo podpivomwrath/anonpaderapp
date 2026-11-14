@@ -14,7 +14,7 @@ function left(seconds) {
   return `${m}:${String(s).padStart(2, '0')}`;
 }
 
-export default function NowRunning() {
+export default function NowRunning({ onGo }) {
   const [data, setData] = useState(null);
   const [tick, setTick] = useState(0);
   const loadedAt = useRef(0);
@@ -48,16 +48,23 @@ export default function NowRunning() {
   return (
     <div className="now-running" data-tick={tick}>
       <span className="now-running__title">Сейчас идёт</span>
-      {data.items.map((item) => (
-        <div className="now-running__row" key={item.id}>
+      {data.items.map((item) => {
+        // Нажатие ведёт туда, где этим управляют (2026-11-14): поездка и босс - на карту, повозка - во фракцию.
+        const go = item.go && onGo ? () => onGo(item.go) : undefined;
+        return (
+        <div className={`now-running__row${go ? ' now-running__row--go' : ''}`} key={item.id}
+          onClick={go} role={go ? 'button' : undefined} tabIndex={go ? 0 : undefined}
+          onKeyDown={go ? (ev) => { if (ev.key === 'Enter') go(); } : undefined}>
           <span className="now-running__icon" aria-hidden="true">{item.icon}</span>
           <span className="now-running__name">
             {item.title}
             {item.note && <small className="now-running__note"> · {item.note}</small>}
           </span>
           {item.ends_at && <span className="now-running__left">{left(item.ends_at - nowServer)}</span>}
+          {go && <span className="now-running__arrow" aria-hidden="true">›</span>}
         </div>
-      ))}
+        );
+      })}
     </div>
   );
 }

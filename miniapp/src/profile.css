@@ -1419,3 +1419,7 @@ body.lite .sparks {
   font-variant-numeric: tabular-nums;
   color: var(--gold, #e0a64a);
 }
+
+.now-running__row--go { cursor: pointer; }
+.now-running__row--go:active { opacity: 0.7; }
+.now-running__arrow { flex: none; opacity: 0.5; font-size: 18px; line-height: 1; }

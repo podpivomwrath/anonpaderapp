@@ -695,7 +695,8 @@ export default function Hub() {
         <div key={activeTab} className={`tab-enter tab-enter--${direction}`}>
         <Suspense fallback={<Skeleton />}>
         {activeTab === 'character' && (
-          <CharacterTab character={character} onCharacterUpdate={setCharacter} />
+          <CharacterTab character={character} onCharacterUpdate={setCharacter}
+            onGo={(go) => { if (go.cell) setMapFocus(go.cell); openTab(go.tab); }} />
         )}
         {activeTab === 'dailies' && (
           <DailiesTab onShowOnMap={(cell) => { setMapFocus(cell); openTab('map'); }} />

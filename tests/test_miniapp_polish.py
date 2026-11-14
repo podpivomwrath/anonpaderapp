@@ -46,6 +46,9 @@ async def test_now_running_lists_brewing_and_mount_with_end_times(db_session, ma
     rows = {r["id"]: r for r in await now_running.collect(db_session, c, 987654321, now)}
     assert rows["brew"]["title"].startswith("Варка") and abs(rows["brew"]["ends_at"] - (now.timestamp() + 300)) < 2
     assert rows["ride"]["title"] == "Верхом в (3; 0)" and rows["ride"]["ends_at"] > now.timestamp()
+    # нажатие на поездку - на карту к цели, на варку - никуда (2026-11-14)
+    assert rows["ride"]["go"] == {"tab": "map", "cell": {"x": 3, "y": 0, "label": None}}
+    assert rows["brew"]["go"] is None
     assert "dead" not in rows and "battle" not in rows
 
 

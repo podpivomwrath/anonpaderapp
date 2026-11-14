@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Button, Div, Group, Header, Placeholder } from '@vkontakte/vkui';
+import { usePlayerLook } from './PlayerLook.jsx';
 import { contractAction, getContracts } from '../api.js';
 import { appHidden } from '../appVisibility.js';
 import ClassIcon from './ClassIcon.jsx';
@@ -100,6 +101,7 @@ export default function ContractsSection() {
   const [status, setStatus] = useState('loading');
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState(null);
+  const [look, lookSheet] = usePlayerLook();
 
   useEffect(() => {
     getContracts().then((d) => { setData(d); setStatus('ready'); }).catch(() => setStatus('error'));
@@ -153,9 +155,11 @@ export default function ContractsSection() {
         <div className="card-list">
           {data.contracts.map((c) => (
             <div className={`contract-card${c.on_me ? ' contract-card--me' : ''}`} key={c.id}>
-              <ClassIcon subclass={c.subclass} baseClass={c.base_class} crown={c.crown_frame || null} size={48} />
+              <button type="button" className="look-open" onClick={() => look(c.target_id, c.name)} aria-label={`Снаряжение: ${c.name}`}>
+                <ClassIcon subclass={c.subclass} baseClass={c.base_class} crown={c.crown_frame || null} size={48} />
+              </button>
               <div className="contract-card__body">
-                <b className="contract-card__name">{c.name}</b>
+                <button type="button" className="look-open contract-card__name" onClick={() => look(c.target_id, c.name)}>{c.name}</button>
                 <small className="contract-card__meta">{c.level} ур. · ещё {left(c.minutes_left)}</small>
                 {c.where && <small className="contract-card__meta">📍 {c.where}</small>}
                 <span className="daily-card__progress">
@@ -187,6 +191,7 @@ export default function ContractsSection() {
         </Div>
       </Group>
       <OrderForm data={data} busy={busy} act={act} />
+      {lookSheet}
     </>
   );
 }

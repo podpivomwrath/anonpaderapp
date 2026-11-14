@@ -22,10 +22,16 @@ def _aware(moment: datetime | None) -> datetime | None:
     return moment if moment.tzinfo else moment.replace(tzinfo=timezone.utc)
 
 
-def _row(kind: str, icon: str, title: str, ends: datetime | float | None = None, note: str | None = None) -> dict:
+def _row(kind: str, icon: str, title: str, ends: datetime | float | None = None, note: str | None = None,
+         go: dict | None = None) -> dict:
+    """go - куда ведёт нажатие (2026-11-14): {"tab": раздел, "cell": клетка на карте}."""
     if isinstance(ends, datetime):
         ends = _aware(ends).timestamp()
-    return {"id": kind, "icon": icon, "title": title, "ends_at": ends, "note": note}
+    return {"id": kind, "icon": icon, "title": title, "ends_at": ends, "note": note, "go": go}
+
+
+def _map(x: int, y: int, label: str | None = None) -> dict:
+    return {"tab": "map", "cell": {"x": x, "y": y, "label": label}}
 
 
 async def collect(db, character, peer_id: int, now: datetime | None = None) -> list[dict]:
@@ -66,9 +72,11 @@ async def collect(db, character, peer_id: int, now: datetime | None = None) -> l
         rows.append(_row("walk", "🚶", "Переход пешком", ts + movement_service.remaining_seconds(character, now)))
     travel = await mount_service.active_travel(db, character.id)
     if travel is not None and travel.status == "traveling":
-        rows.append(_row("ride", "🐎", f"Верхом в ({travel.to_x}; {travel.to_y})", travel.arrives_at))
+        rows.append(_row("ride", "🐎", f"Верхом в ({travel.to_x}; {travel.to_y})", travel.arrives_at,
+                         go=_map(travel.to_x, travel.to_y)))
     elif travel is not None and travel.status == "ambushed":
-        rows.append(_row("ride", "🐎", f"Верхом в ({travel.to_x}; {travel.to_y})", note="напали в пути"))
+        rows.append(_row("ride", "🐎", f"Верхом в ({travel.to_x}; {travel.to_y})", note="напали в пути",
+                         go=_map(travel.to_x, travel.to_y)))
 
     voyage = await voyage_service.get(db, character.id)
     if voyage is not None and voyage.status == "away":
@@ -93,11 +101,12 @@ async def collect(db, character, peer_id: int, now: datetime | None = None) -> l
         # Город отдельно от слова «в»: «в Шепчущие Пущи» не склеивать (CLAUDE.md).
         city = trade_service.city_title(cart.to_city) if cart.to_city else None
         rows.append(_row(f"cart{cart.slot}", "🛒", "Повозка обоза", cart.arrives_at,
-                         note=f"→ {city}" if city else None))
+                         note=f"→ {city}" if city else None, go={"tab": "trade"}))
 
     boss = await world_boss_service.active_boss(db, now)
     if boss is not None:
         wait = await world_boss_service.cooldown_minutes(db, boss, character.id, now)
         rows.append(_row("boss", "🐲", "Мировой босс жив", boss.expires_at,
-                         note=f"заход через {wait} мин." if wait else "можно идти"))
+                         note=f"заход через {wait} мин." if wait else "можно идти",
+                         go=_map(boss.x, boss.y, "Мировой босс")))
     return rows

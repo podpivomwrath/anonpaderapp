@@ -1124,6 +1124,18 @@ body.lite .eff-ladder__step--next { animation: none; }
 
 .ruins-member:disabled { cursor: default; }
 
+/* Имя или значок, открывающие окно игрока, - без вида кнопки (2026-11-14). */
+.look-open {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  font-weight: 700;
+  text-align: left;
+  cursor: pointer;
+}
+
 .top-row--tap { cursor: pointer; }
 .top-row--tap:active { background: rgba(255, 255, 255, 0.06); }
 

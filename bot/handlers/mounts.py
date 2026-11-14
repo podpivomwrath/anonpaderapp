@@ -372,7 +372,8 @@ async def coord_input(message: Message) -> None:
 
 #: «/маунт 12 -20», «/mount 12:-20» - сразу в путь (репорт 304, 2026-11-05:
 #: с телефона без карты кнопки «Маунт» и потом координаты - лишний шаг).
-_MOUNT_CMD_RE = re.compile(r"^\s*/(маунт|mount)\b\s*(.*)$", re.IGNORECASE)
+#: «/верхом» - то же (2026-11-14: так говорят игроки).
+_MOUNT_CMD_RE = re.compile(r"^\s*/(маунт|mount|верхом)\b\s*(.*)$", re.IGNORECASE)
 
 
 @labeler.message(FuncRule(lambda m: bool(_MOUNT_CMD_RE.match(m.text or ""))))
