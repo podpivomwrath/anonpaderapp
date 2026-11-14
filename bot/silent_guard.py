@@ -64,17 +64,12 @@ def install(api) -> None:
         # «Убрать картинки в игре» (2026-10-22): фото вырезаются здесь, для всех
         # отправок разом - bot/no_images.py.
         data = no_images.strip(method, data)
+        if method == "messages.delete":
+            routed = await _app_delete(original, data, version)
+            if routed is not None:
+                return routed
         if method in ("messages.send", "messages.edit"):
-            # Закрыл сообщения сообществу (2026-11-14, владелец) - не пишем
-            # ничего и в VK не ходим: тот же отказ 901, что вернул бы сам VK,
-            # поэтому вызовы ведут себя как раньше.
             targets = no_images.peers_of(data)
-            from bot import notices
-
-            if targets and all(notices.unreachable(p) for p in targets):
-                from vkbottle.exception_factory.base_exceptions import VKAPIError
-
-                raise VKAPIError[901](error_msg="Игрок закрыл сообщения сообществу - бот ему не пишет")
             # Клавиатура вне лимитов VK - VK отбил бы сообщение целиком
             # (2026-11-14): чиним на лету и пишем в журнал, какой экран.
             if data.get("keyboard"):
@@ -83,8 +78,26 @@ def install(api) -> None:
                 data = {**data, "keyboard": keyboard_guard.checked(data["keyboard"])}
             now = time.time()
             # peer_id числом, peer_ids списком (message.answer) или строкой.
-            for p in no_images.peers_of(data):
+            for p in targets:
                 _last_out[p] = now
+            # Приложение «Монолит» открыто (2026-11-15, владелец: «бот должен
+            # молчать, работать только в одном месте») - сообщение уходит в
+            # приложение, в VK ничего. bot/app_channel.py.
+            routed = await _app_route(method, data, targets)
+            if routed is not None and _REST in routed:
+                data = routed[_REST]
+                targets = no_images.peers_of(data)
+            elif routed is not None:
+                return routed
+            # Закрыл сообщения сообществу (2026-11-14, владелец) - не пишем
+            # ничего и в VK не ходим: тот же отказ 901, что вернул бы сам VK,
+            # поэтому вызовы ведут себя как раньше.
+            from bot import notices
+
+            if targets and all(notices.unreachable(p) for p in targets):
+                from vkbottle.exception_factory.base_exceptions import VKAPIError
+
+                raise VKAPIError[901](error_msg="Игрок закрыл сообщения сообществу - бот ему не пишет")
         try:
             return await original(method, data, version)
         except Exception as exc:
@@ -110,6 +123,69 @@ def install(api) -> None:
             return await original(method, data, version)
 
     api.request = request
+
+
+#: Ответ _app_route «остальным - в VK»: под этим ключом урезанный запрос.
+_REST = "__vk_rest__"
+
+
+async def _app_route(method: str, data: dict, targets: list[int]):
+    """Отправка или правка игроку с открытым приложением - в приложение.
+    None - пусть идёт в VK как обычно. Ответ - в том же виде, что вернул бы VK."""
+    from bot import app_channel
+
+    if method == "messages.edit":
+        message_id = data.get("message_id")
+        peer = targets[0] if targets else None
+        if app_channel.is_fake(message_id):
+            owner = app_channel.owner_of(message_id)
+            if app_channel.active(owner):
+                await app_channel.publish(owner, app_channel.edit_event(data))
+                return {"response": 1}
+            # Приложение закрыли, а окно было там - в VK такого сообщения нет:
+            # тот же отказ, что у VK, и вызов пришлёт окно заново.
+            from vkbottle.exception_factory.base_exceptions import VKAPIError
+
+            raise VKAPIError[909](error_msg="Сообщение было в приложении")
+        if peer is not None and app_channel.active(peer):
+            return {"response": 1}  # правка старого окна в ВК, пока игрок в приложении - молчим
+        return None
+    in_app = [p for p in targets if app_channel.active(p)]
+    if not in_app:
+        return None
+    ids = {}
+    for p in in_app:
+        ids[p] = app_channel.fake_id(p)
+        await app_channel.publish(p, app_channel.message_event(data, ids[p]))
+    rest = [p for p in targets if p not in ids]
+    if rest:
+        # Рассылка многим: остальным - в VK обычным путём (повтор, отметка
+        # закрывших сообщения) - обёртка продолжит с урезанным списком.
+        trimmed = {k: v for k, v in data.items() if k not in ("peer_id", "peer_ids")}
+        trimmed["peer_ids"] = ",".join(str(p) for p in rest)
+        return {_REST: trimmed}
+    if data.get("peer_ids") is not None:
+        return {"response": [{"peer_id": p, "message_id": ids[p], "conversation_message_id": 0} for p in in_app]}
+    return {"response": ids[in_app[0]]}
+
+
+async def _app_delete(original, data: dict, version):
+    """Удаление окон: номера приложения - в приложение, остальные - в VK."""
+    from bot import app_channel
+
+    raw = data.get("message_ids")
+    ids = [str(i).strip() for i in (raw if isinstance(raw, (list, tuple)) else str(raw or "").split(","))]
+    fake = [i for i in ids if app_channel.is_fake(i)]
+    if not fake:
+        return None
+    for owner in {app_channel.owner_of(i) for i in fake}:
+        if app_channel.active(owner):
+            mine = [i for i in fake if app_channel.owner_of(i) == owner]
+            await app_channel.publish(owner, {"type": "delete", "ids": mine})
+    real = [i for i in ids if i and not app_channel.is_fake(i)]
+    if real:
+        return await original("messages.delete", {**data, "message_ids": ",".join(real)}, version)
+    return {"response": {i: 1 for i in fake}}
 
 
 def answered_since(peer_id: int, since: float) -> bool:

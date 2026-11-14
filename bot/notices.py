@@ -171,7 +171,17 @@ def register(bot) -> None:
         async def pre(self) -> None:
             event = self.event
             if event.from_id > 0 and event.peer_id == event.from_id:
+                # Нажатие из приложения - номер сообщения 0 (bot/app_api.py):
+                # приложение и так доставляет, отметку ВК оно не снимает.
+                if not event.id:
+                    return
                 reachable_again(event.from_id)
+                # Игра в одном месте (2026-11-15, владелец): написал в ВК при
+                # открытом приложении - приложение отпускает, бот отвечает в ВК.
+                from bot import app_channel
+
+                if app_channel.active(event.from_id):
+                    await app_channel.moved_to_vk(event.from_id)
 
     bot.labeler.message_view.register_middleware(ReachableMiddleware)
 

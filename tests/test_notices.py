@@ -148,7 +148,7 @@ async def test_player_message_clears_mark_before_any_reply() -> None:
     middleware_cls = labeler.middlewares[0]
     notices.mark_unreachable(9931)
     try:
-        event = SimpleNamespace(from_id=9931, peer_id=9931)
+        event = SimpleNamespace(from_id=9931, peer_id=9931, id=5)
         middleware = middleware_cls.__new__(middleware_cls)
         middleware.event = event
         await middleware.pre()
