@@ -32,6 +32,9 @@ _sockets: dict[int, set] = {}
 FAKE_FLAG = 1 << 62
 _VK_MASK = (1 << 34) - 1
 _ids = itertools.count(1)
+#: id персонажа -> vk_id, пока его приложение открыто: бой узнаёт игрока по
+#: бойцу (bot/app_battle.py).
+_characters: dict[int, int] = {}
 
 
 def active(vk_id) -> bool:
@@ -41,8 +44,18 @@ def active(vk_id) -> bool:
         return False
 
 
-def attach(vk_id: int, ws) -> None:
+def anyone() -> bool:
+    return bool(_sockets)
+
+
+def vk_of_character(character_id) -> int | None:
+    return _characters.get(character_id)
+
+
+def attach(vk_id: int, ws, character_id: int | None = None) -> None:
     _sockets.setdefault(int(vk_id), set()).add(ws)
+    if character_id is not None:
+        _characters[int(character_id)] = int(vk_id)
     logger.info("Приложение: канал открыт для {} (сокетов {})", vk_id, len(_sockets[int(vk_id)]))
 
 
@@ -53,6 +66,8 @@ def detach(vk_id: int, ws) -> None:
     group.discard(ws)
     if not group:
         _sockets.pop(int(vk_id), None)
+        for cid in [c for c, v in _characters.items() if v == int(vk_id)]:
+            _characters.pop(cid, None)
         logger.info("Приложение: канал закрыт для {} - бот снова пишет в ВК", vk_id)
 
 

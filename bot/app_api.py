@@ -190,7 +190,7 @@ async def handle_ws(request: web.Request) -> web.StreamResponse:
             return web.json_response({"error": "account_banned"}, status=403)
     ws = web.WebSocketResponse(heartbeat=30)
     await ws.prepare(request)
-    app_channel.attach(vk_id, ws)
+    app_channel.attach(vk_id, ws, character.id)
     route = request.app[ROUTE_EVENT_KEY]
     group_id = request.app[SETTINGS_KEY].vk_group_id
     try:

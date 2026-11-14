@@ -102,8 +102,14 @@ class TickEngine:
         on_battle_finished: BattleFinishedCallback | None = None,
         max_turns: int | None = None,
         group_pve_window_seconds: float | None = None,
+        on_snapshot: Callable[[CombatSessionState, TickResult | None], Awaitable[None]] | None = None,
     ) -> None:
         self.store = store
+        #: Снимок боя после старта и каждого хода (2026-11-15): приложение
+        #: «Монолит» рисует по нему бой (bot/app_battle.py). Ошибка или
+        #: медленный наблюдатель бой не задерживают - вызов отдельной задачей.
+        self.on_snapshot = on_snapshot
+        self._snapshot_tasks: set[asyncio.Task] = set()
         self.pvp_window_seconds = pvp_window_seconds
         # Патч 51, ч.4: групповой PvE (session.is_raid=True) — тоже таймер
         # хода 1 минута, как групповой PvP (не походил — пропуск, без
@@ -143,6 +149,7 @@ class TickEngine:
         self._generations[state.session_id] = uuid4().hex
         self._resolve_locks[state.session_id] = asyncio.Lock()
         self._open_tick(state)
+        self._emit(state, None)
 
     def restore_session(self, state: CombatSessionState) -> None:
         """Бой, сохранённый перед перезапуском (bot/restart_safety.py): ход уже
@@ -164,6 +171,26 @@ class TickEngine:
         except JobLookupError:
             pass
 
+    def _emit(self, state: CombatSessionState, result: TickResult | None) -> None:
+        observer = getattr(self, "on_snapshot", None)  # движок без __init__ в части тестов
+        if observer is None:
+            return
+        try:
+            loop = asyncio.get_running_loop()
+        except RuntimeError:
+            return  # вне цикла событий (часть тестов) - смотреть некому
+
+        async def run() -> None:
+            try:
+                await observer(state, result)
+            except Exception:  # noqa: BLE001 - наблюдатель не должен ронять бой
+                logger.exception("Сессия {}: снимок боя для приложения не собран", state.session_id)
+
+        task = loop.create_task(run())
+        tasks = self.__dict__.setdefault("_snapshot_tasks", set())
+        tasks.add(task)
+        task.add_done_callback(tasks.discard)
+
     # --- Тик ---
 
     def _job_id(self, session_id: int) -> str:
@@ -179,12 +206,14 @@ class TickEngine:
         # Патч 51, ч.4: групповой PvE (is_raid) идёт по таймеру, как групповой
         # PvP — соло PvE (is_raid=False) остаётся без таймера (см. __init__).
         window = None
+        state.turn_deadline = None
         if state.mode == CombatMode.PVP_GROUP:
             window = self.pvp_window_seconds
         elif state.mode == CombatMode.PVE and state.is_raid and not state.untimed:
             window = state.turn_seconds or self.group_pve_window_seconds
         if window is not None:
             resolve_at = datetime.now(timezone.utc) + timedelta(seconds=window)
+            state.turn_deadline = resolve_at.timestamp()
             self.scheduler.add_job(
                 self._resolve,
                 trigger=DateTrigger(run_date=resolve_at),
@@ -292,6 +321,7 @@ class TickEngine:
                 return  # callback aborted/replaced this battle (e.g. a scripted raid wipe)
 
             if result.finished:
+                self._emit(state, result)
                 self.sessions.pop(session_id, None)
                 self._generations.pop(session_id, None)
                 self._resolve_locks.pop(session_id, None)
@@ -307,3 +337,4 @@ class TickEngine:
                         logger.exception("Сессия {}: итог боя упал", session_id)
             else:
                 self._open_tick(state)
+                self._emit(state, result)

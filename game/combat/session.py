@@ -539,6 +539,10 @@ class CombatSessionState:
     #: не объявивший действие бьёт обычной атакой, а не пропускает ход
     #: (руины в группе, 2026-11-11)
     idle_attack: bool = False
+    #: Когда ход разрешится сам (Unix-время), None - ждём игрока. Ставит
+    #: TickEngine._open_tick; читает снимок боя для приложения (2026-11-15).
+    #: Старые pickle-снимки соло-боя поля не знают - читать через getattr.
+    turn_deadline: float | None = None
 
     def add(self, combatant: CombatantState) -> None:
         self.combatants[combatant.id] = combatant

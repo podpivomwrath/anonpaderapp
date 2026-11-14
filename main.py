@@ -246,11 +246,14 @@ async def run() -> None:
         settings.redis_url, decode_responses=True, max_connections=400, timeout=30,
     ))
 
+    from bot import app_battle
+
     tick_engine = TickEngine(
         RedisActionStore(redis),
         pvp_window_seconds=settings.combat_tick_window_seconds,
         on_tick_resolved=combat_handlers.on_tick_resolved,
         on_battle_finished=combat_handlers.on_battle_finished,
+        on_snapshot=app_battle.observer("solo"),  # 2026-11-15: бой в приложении
     )
     tick_engine.start()
     combat_handlers.setup(tick_engine, bot.api)
@@ -275,6 +278,7 @@ async def run() -> None:
         on_tick_resolved=pvp_handlers.on_mass_tick_resolved,
         on_battle_finished=pvp_handlers.on_mass_battle_finished,
         max_turns=bc.PVP_MAX_TURNS,
+        on_snapshot=app_battle.observer("pvp"),
     )
     pvp_tick_engine.start()
     pvp_handlers.setup(pvp_tick_engine, bot.api)
@@ -289,6 +293,7 @@ async def run() -> None:
         InMemoryActionStore(),
         on_tick_resolved=group_combat_handlers.on_group_tick_resolved,
         on_battle_finished=group_combat_handlers.on_group_battle_finished,
+        on_snapshot=app_battle.observer("group"),
     )
     group_pve_tick_engine.start()
     group_combat_handlers.setup(group_pve_tick_engine, bot.api)
@@ -302,6 +307,7 @@ async def run() -> None:
         InMemoryActionStore(),
         on_tick_resolved=raid_combat_handlers.on_raid_tick_resolved,
         on_battle_finished=raid_combat_handlers.on_raid_battle_finished,
+        on_snapshot=app_battle.observer("raid"),
     )
     raid_tick_engine.start()
     raid_combat_handlers.setup(raid_tick_engine, bot.api)
