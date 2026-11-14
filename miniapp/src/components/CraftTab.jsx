@@ -177,17 +177,47 @@ function ChanceBars({ chances }) {
   );
 }
 
+// Главная характеристика ковки (2026-11-14, владелец): билд не привязан к
+// классу, Страж на рунах Воли может ковать Волю. Последний выбор помнит
+// браузер; без него - стат класса.
+const FORGE_STAT_KEY = 'forge_stat';
+
+function savedForgeStat() {
+  try {
+    return window.localStorage.getItem(FORGE_STAT_KEY);
+  } catch {
+    return null;
+  }
+}
+
+function saveForgeStat(stat) {
+  try {
+    window.localStorage.setItem(FORGE_STAT_KEY, stat);
+  } catch {
+    // нет хранилища - выбор живёт до закрытия
+  }
+}
+
 function Forge({ data, busy, run, strike }) {
   const [itemId, setItemId] = useState(null);
   const [ore, setOre] = useState(null); // {id, grade}
   const [spec, setSpec] = useState(null);
   const [picker, setPicker] = useState(null); // 'item' | 'ore'
   const [confirming, setConfirming] = useState(false);
+  const statIds = (data.forge_stats || []).map((s) => s.id);
+  const [forgeStat, setForgeStat] = useState(() => {
+    const saved = savedForgeStat();
+    return statIds.includes(saved) ? saved : data.class_stat;
+  });
 
   const item = data.items.find((i) => i.id === itemId) || null;
   const cost = item ? item.next_craft_cost : data.craft_cost;
   const oreRow = ore ? data.ore.find((o) => o.id === ore.id && o.grade === ore.grade) : null;
-  const specs = item ? (data.specs_by_source?.[item.source_id] ?? data.specs) : data.specs;
+  const byStat = data.specs_by_stat?.[forgeStat];
+  const specs = byStat
+    ? (item ? (byStat.by_source?.[item.source_id] ?? byStat.default) : byStat.default)
+    : (item ? (data.specs_by_source?.[item.source_id] ?? data.specs) : data.specs);
+  const forgeStatTitle = (data.forge_stats || []).find((s) => s.id === forgeStat)?.title;
   const chosen = specs.find((s) => s.id === spec) || null;
   // 2026-10-17, решение владельца: в ковку - только ещё не кованые вещи.
   // Руда - все градации: тир задаёт стартовую эффективность, градация -
@@ -225,6 +255,23 @@ function Forge({ data, busy, run, strike }) {
 
       <Group header={<Header>Что получится</Header>}>
         <Div>
+          {data.forge_stats?.length > 0 && (
+            <>
+              <div className="faction-choice faction-choice--stats">
+                {data.forge_stats.map((s) => (
+                  <button key={s.id} type="button"
+                    className={`faction-choice__item${s.id === forgeStat ? ' faction-choice__item--active' : ''}`}
+                    onClick={() => { setForgeStat(s.id); saveForgeStat(s.id); reset(); }}>
+                    <b>{s.title}</b>
+                  </button>
+                ))}
+              </div>
+              <p className="craft-hint">
+                Главная характеристика вещи. Берите ту, от которой бьют ваши руны.
+                {forgeStat === data.class_stat ? ' Сейчас выбрана характеристика вашего класса.' : ''}
+              </p>
+            </>
+          )}
           <div className="faction-choice">
             {specs.map((s) => (
               <button key={s.id} type="button"
@@ -256,13 +303,13 @@ function Forge({ data, busy, run, strike }) {
         {confirming ? (
           <div className="forge-confirm">
             <p className="guild-line">
-              {item.spec ? 'Перековать' : 'Сковать'} «{item.name}» в «{chosen.name}» за {cost} × {oreRow.name} ({oreRow.grade_name})?{item.spec ? ' Эффективность сбросится, характеристики разыграются заново.' : ''}
+              {item.spec ? 'Перековать' : 'Сковать'} «{item.name}» в «{chosen.name}»{forgeStatTitle ? ` (главная характеристика - ${forgeStatTitle})` : ''} за {cost} × {oreRow.name} ({oreRow.grade_name})?{item.spec ? ' Эффективность сбросится, характеристики разыграются заново.' : ''}
             </p>
             <div className="guild-row">
               <Button size="m" disabled={busy}
                 onClick={() => {
                   setConfirming(false);
-                  run(() => craftItem(item.id, spec, ore.id, ore.grade));
+                  run(() => craftItem(item.id, spec, ore.id, ore.grade, forgeStat));
                 }}>
                 Да, создать
               </Button>

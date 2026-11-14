@@ -175,9 +175,16 @@ async def handle_get_craft(request: web.Request) -> web.Response:
         # У каждого источника свои названия результатов и свои веса (доспех
         # раскладывается только в живучесть и основной стат) - мастерская
         # показывает варианты того предмета, что выбран, а не первого в списке.
-        specs_by_source = {
-            source_id: _spec_payload(source_id, primary)
-            for source_id in {row["source_id"] for row in items if row["source_id"]}
+        sources = {row["source_id"] for row in items if row["source_id"]}
+        specs_by_source = {source_id: _spec_payload(source_id, primary) for source_id in sources}
+        # Главная характеристика ковки - выбор игрока (2026-11-14, владелец):
+        # шансы для каждой, чтобы переключатель не ходил на сервер.
+        specs_by_stat = {
+            stat: {
+                "default": _spec_payload(items[0]["source_id"] if items else "surgeon_scalpel", stat),
+                "by_source": {source_id: _spec_payload(source_id, stat) for source_id in sources},
+            }
+            for stat in cc.FORGE_STATS
         }
 
         return web.json_response({
@@ -186,6 +193,9 @@ async def handle_get_craft(request: web.Request) -> web.Response:
             "tools": tools,
             "specs": specs,
             "specs_by_source": specs_by_source,
+            "specs_by_stat": specs_by_stat,
+            "forge_stats": [{"id": s, "title": cc.FORGE_STAT_TITLES[s]} for s in cc.FORGE_STATS],
+            "class_stat": primary,
             # Цена первой ковки и без руды в сумке (было «нужно undefined шт.»).
             "craft_cost": craft_service.first_craft_cost(character),
             "star_dust": character.star_dust or 0,
@@ -226,6 +236,11 @@ async def handle_post_craft(request: web.Request) -> web.Response:
         return _error("bad_request")
     if not isinstance(ore_id, str) or not isinstance(grade, str):
         return _error("bad_request")
+    # Главная характеристика ковки (2026-11-14); старый клиент её не шлёт -
+    # тогда стат класса.
+    stat = body.get("stat")
+    if stat is not None and not isinstance(stat, str):
+        return _error("bad_request")
 
     async with request.app[SESSION_FACTORY_KEY]() as db:
         character = await onboarding_svc.get_character(db, vk_user_id)
@@ -233,7 +248,7 @@ async def handle_post_craft(request: web.Request) -> web.Response:
             return _error("character_not_found", 404)
         try:
             result = await craft_service.craft(
-                db, character, item_id, spec, ore_id, grade, _rng
+                db, character, item_id, spec, ore_id, grade, _rng, stat=stat,
             )
         except craft_service.CraftError as exc:
             await db.rollback()

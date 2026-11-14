@@ -500,11 +500,12 @@ export function stopTravel() {
 
 export const getCraft = () => request('/craft');
 
-export const craftItem = (itemId, spec, oreId, grade) =>
+// stat - главная характеристика ковки (2026-11-14); без неё сервер берёт стат класса.
+export const craftItem = (itemId, spec, oreId, grade, stat) =>
   request('/craft', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ item_id: itemId, spec, ore_id: oreId, grade }),
+    body: JSON.stringify({ item_id: itemId, spec, ore_id: oreId, grade, stat }),
   });
 
 export const craftTool = (oreId, grade) =>

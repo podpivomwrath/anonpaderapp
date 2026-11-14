@@ -2449,6 +2449,17 @@ body::before {
   cursor: pointer;
 }
 
+/* Главная характеристика ковки (2026-11-14): четыре кнопки в ряд. */
+.faction-choice--stats {
+  grid-template-columns: repeat(auto-fit, minmax(72px, 1fr));
+  margin-bottom: 8px;
+}
+
+.faction-choice--stats .faction-choice__item {
+  align-items: center;
+  text-align: center;
+}
+
 .faction-choice__item .craft-hint {
   margin: 0;
 }

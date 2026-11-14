@@ -303,3 +303,34 @@ async def test_you_cannot_craft_from_someone_elses_item(db_session, make_charact
         await craft_service.craft(
             db_session, thief, item.id, cc.SPEC_TANK, "brown_iron", "common", _rng()
         )
+
+
+# --- Главная характеристика ковки (2026-11-14, владелец) ---------------------
+
+
+async def test_warrior_can_forge_will_instead_of_strength(db_session, make_character) -> None:
+    """Билд не привязан к классу: Страж на рунах Воли кует Волю, Сила в
+    раскладку не попадает вовсе."""
+    character = await make_character(base_class="warrior")
+    await _give_ore(db_session, character.id, "brown_iron", "legendary", 5 * cc.CRAFT_ORE_COST)
+    for seed in range(5):
+        item = await _scalpel(db_session, character)
+        result = await craft_service.craft(
+            db_session, character, item.id, cc.SPEC_DPS, "brown_iron", "legendary",
+            random.Random(seed), stat="wil",
+        )
+        assert "str" not in result.stats
+        assert max(result.stats, key=result.stats.get) in {"wil", "agi"}
+
+
+async def test_forge_stat_defaults_to_class_and_rejects_unknown(db_session, make_character) -> None:
+    character = await make_character(base_class="warrior")
+    assert craft_service.forge_stat(character, None) == "str"
+    item = await _scalpel(db_session, character)
+    await _give_ore(db_session, character.id, "brown_iron", "common", 10)
+    with pytest.raises(craft_service.CraftError):
+        await craft_service.craft(
+            db_session, character, item.id, cc.SPEC_DPS, "brown_iron", "common", _rng(), stat="vit",
+        )
+    assert item.craft_spec is None
+    assert await craft_service.ore_amount(db_session, character.id, "brown_iron", "common") == 10

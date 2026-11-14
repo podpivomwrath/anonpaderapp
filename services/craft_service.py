@@ -139,6 +139,17 @@ def _primary_stat(character: Character) -> str:
     return bc.primary_stat_of(character)
 
 
+def forge_stat(character: Character, chosen: str | None) -> str:
+    """Главная характеристика ковки (2026-11-14, владелец): выбор игрока,
+    без выбора - стат класса. Только для вещей: урон обычной атаки по-прежнему
+    считает bc.primary_stat_of."""
+    if chosen is None:
+        return _primary_stat(character)
+    if chosen not in cc.FORGE_STATS:
+        raise CraftError("Такой характеристики для ковки нет.")
+    return chosen
+
+
 def source_of(item: Item) -> str | None:
     """Из чего этот предмет куётся (или уже скован).
 
@@ -164,7 +175,7 @@ class CraftResult:
 
 async def craft(
     db: AsyncSession, character: Character, item_id: int, spec: str,
-    ore_id: str, grade: str, rng: random.Random,
+    ore_id: str, grade: str, rng: random.Random, stat: str | None = None,
 ) -> CraftResult:
     """Кует оружие из боссовой вещи либо перековывает уже скованное.
 
@@ -174,6 +185,7 @@ async def craft(
     """
     if spec not in cc.SPECS:
         raise CraftError("Такой специализации нет.")
+    main_stat = forge_stat(character, stat)
 
     item = await _owned_item(db, character.id, item_id)
     source_id = source_of(item)
@@ -196,7 +208,7 @@ async def craft(
     await _spend_ore(db, character.id, ore_id, grade, cost)
 
     base_stats, efficiency = crafting.roll_crafted_stats(
-        rng, spec, _source_power(item, recipe), _primary_stat(character), tier, grade,
+        rng, spec, _source_power(item, recipe), main_stat, tier, grade,
         weights=crafting.spec_weights(source_id, spec),
     )
     # Заточка (2026-11-13) переживает перековку: ступень остаётся на вещи.
