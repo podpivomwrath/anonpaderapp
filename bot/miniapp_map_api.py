@@ -101,6 +101,26 @@ def _location_type_catalog() -> dict[str, list[dict]]:
     return catalog
 
 
+def _location_grid() -> dict:
+    """Тип местности каждой клетки (2026-11-15, приложение «Монолит»: тайлы
+    карты tile_<id>). Строка по рядам от bounds_min, y снизу вверх, x слева
+    направо; символ - индекс в ids (chr(48 + i)). Клиент не повторяет хеш
+    location_types у себя - копия разошлась бы с сервером."""
+    from game.world import location_types
+
+    ids: list[str] = []
+    rows = []
+    for y in range(wc.BOUNDS_MIN, wc.BOUNDS_MAX + 1):
+        row = []
+        for x in range(wc.BOUNDS_MIN, wc.BOUNDS_MAX + 1):
+            loc = location_types.location_type_at(x, y).id
+            if loc not in ids:
+                ids.append(loc)
+            row.append(chr(48 + ids.index(loc)))
+        rows.append("".join(row))
+    return {"ids": ids, "rows": rows}
+
+
 _STATIC_CATALOG = {
     "world_radius": wc.WORLD_RADIUS,
     "bounds_min": wc.BOUNDS_MIN,
@@ -112,6 +132,7 @@ _STATIC_CATALOG = {
     "mob_level_spread": wc.MOB_LEVEL_SPREAD,
     "city_safe_radius": wc.CITY_SAFE_RADIUS,
     "location_types": _location_type_catalog(),
+    "location_grid": _location_grid(),
     # Патч 58: озёра — статика (фиксированные координаты), поэтому едут
     # тем же разовым каталогом, что города и зоны, а не запросом на
     # каждое движение карты.

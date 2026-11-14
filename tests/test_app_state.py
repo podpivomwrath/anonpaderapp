@@ -84,3 +84,16 @@ async def test_party_mixes_app_and_vk_players(db_session, make_character) -> Non
     assert [m["here"] for m in party["members"]] == [True, False]
     alone = await make_character(level=5)
     assert await app_state.party_of(db_session, alone) is None
+
+
+def test_map_catalog_location_grid_matches_server() -> None:
+    """Приложение рисует тайлы по сетке каталога - она обязана совпадать с
+    location_types.location_type_at, а не с копией хеша на клиенте."""
+    from bot.miniapp_map_api import _STATIC_CATALOG
+    from game.world import location_types
+    from game.world import world_config as wc
+
+    grid = _STATIC_CATALOG["location_grid"]
+    for x, y in [(-30, 1), (0, 0), (30, 0), (12, -17), (wc.BOUNDS_MIN, wc.BOUNDS_MAX)]:
+        ch = grid["rows"][y - wc.BOUNDS_MIN][x - wc.BOUNDS_MIN]
+        assert grid["ids"][ord(ch) - 48] == location_types.location_type_at(x, y).id
