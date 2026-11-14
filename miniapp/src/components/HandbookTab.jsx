@@ -2,6 +2,7 @@ import { createContext, useContext, useEffect, useMemo, useRef, useState } from 
 import { SectionHead } from './ui.jsx';
 import data from '../handbook.json';
 import { buildRules, linkify, sectionId } from '../handbookLinks.js';
+import { buildIndex, marks, search } from '../handbookSearch.js';
 import '../handbook.css';
 
 // Путеводитель Меченого (2026-10-23): раньше - статья VK и артефакт, теперь
@@ -13,6 +14,73 @@ import '../handbook.css';
 
 const KEY = 'handbook:chapter';
 const RULES = buildRules(data.chapters);
+// Поиск (2026-11-14): индекс блоков строится при первом запросе.
+let INDEX = null;
+
+function placesWord(n) {
+  const mod10 = n % 10;
+  const mod100 = n % 100;
+  if (mod10 === 1 && mod100 !== 11) return 'место';
+  if (mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14)) return 'места';
+  return 'мест';
+}
+
+function Marked({ text, words }) {
+  return marks(text, words).map((p, i) => (p.hit ? <mark key={i}>{p.text}</mark> : <span key={i}>{p.text}</span>));
+}
+
+function SearchBox({ query, onQuery }) {
+  return (
+    <div className="hb-search">
+      <span className="hb-search__icon" aria-hidden="true">🔍</span>
+      <input
+        type="search" className="hb-search__input" value={query} placeholder="Поиск по путеводителю"
+        aria-label="Поиск по путеводителю" enterKeyHint="search"
+        onChange={(e) => onQuery(e.target.value)}
+      />
+      {query && (
+        <button type="button" className="hb-search__clear" aria-label="Очистить" onClick={() => onQuery('')}>✕</button>
+      )}
+    </div>
+  );
+}
+
+function Results({ query, onHit }) {
+  const found = useMemo(() => {
+    if (!INDEX) INDEX = buildIndex(data.chapters);
+    return search(INDEX, data.chapters, query);
+  }, [query]);
+  if (!found.words.length) {
+    return <p className="hb-search__note">Введите хотя бы две буквы.</p>;
+  }
+  if (!found.hits.length) {
+    return (
+      <p className="hb-search__note">
+        Ничего не нашлось. Попробуйте начало слова: «руд» найдёт и «руда», и «руды».
+      </p>
+    );
+  }
+  return (
+    <>
+      <p className="hb-search__note">
+        Нашлось {found.total} {placesWord(found.total)}{found.more ? `, показаны первые ${found.hits.length}` : ''}.
+      </p>
+      <div className="hb-hits">
+        {found.hits.map((h) => (
+          <button
+            key={`${h.chapter}:${h.block}`} type="button" className="hb-hit"
+            onClick={() => onHit(h.chapter, h.block)}
+          >
+            <small className="hb-hit__where">
+              Глава {h.no} · {h.title}{h.section && h.section !== h.title ? ` · ${h.section}` : ''}
+            </small>
+            <span className="hb-hit__text"><Marked text={h.snippet} words={found.words} /></span>
+          </button>
+        ))}
+      </div>
+    </>
+  );
+}
 
 // Страница: какие ссылки уже стоят, где мы сейчас, куда переходить.
 const LinkCtx = createContext(null);
@@ -92,12 +160,15 @@ function Block({ b, chapterId }) {
   }
 }
 
-function Contents({ onOpen }) {
+function Contents({ onOpen, query, onQuery, onHit }) {
+  const searching = query.trim().length > 0;
   return (
     <>
       <SectionHead kind="handbook" icon="📖" value={data.intro.title} label={`${data.chapters.length} глав`} />
-      <p className="hb-lede">{data.intro.lede}</p>
-      <nav className="hb-contents" aria-label="Главы">
+      {!searching && <p className="hb-lede">{data.intro.lede}</p>}
+      <SearchBox query={query} onQuery={onQuery} />
+      {searching && <Results query={query} onHit={onHit} />}
+      {!searching && <nav className="hb-contents" aria-label="Главы">
         {data.chapters.map((ch, i) => (
           <button key={ch.id} type="button" className="hb-chapter-btn" onClick={() => onOpen(i)}>
             <span className="hb-chapter-btn__no">{ch.no}</span>
@@ -108,7 +179,7 @@ function Contents({ onOpen }) {
             <span className="hb-chapter-btn__go" aria-hidden="true">›</span>
           </button>
         ))}
-      </nav>
+      </nav>}
     </>
   );
 }
@@ -151,7 +222,10 @@ function Chapter({ index, onOpen, onBack, onReturn, go }) {
       {ch.levels && <p className="hb-levels">{ch.levels}</p>}
       {blocks.map(({ b, section }, i) => (
         <LinkCtx.Provider key={i} value={{ go, target, link: linkFor({ chapter: index, section, block: i }) }}>
-          <Block b={b} chapterId={ch.id} />
+          {/* Обёртка - чтобы поиск мог прокрутить к блоку и подсветить его. */}
+          <div className="hb-block" data-block={i}>
+            <Block b={b} chapterId={ch.id} />
+          </div>
         </LinkCtx.Provider>
       ))}
       <div className="hb-pager">
@@ -182,13 +256,15 @@ function savedIndex() {
 
 export default function HandbookTab() {
   // Открытая глава переживает выход из раздела - вернёшься туда же.
-  const [view, setView] = useState(() => ({ index: savedIndex(), section: null, y: null, seq: 0 }));
+  const [view, setView] = useState(() => ({ index: savedIndex(), section: null, y: null, block: null, seq: 0 }));
   // Откуда пришли по ссылкам: «↩ Назад» возвращает на место.
   const [trail, setTrail] = useState([]);
+  // Запрос живёт здесь: «↩ Назад» из найденного места возвращает к тем же результатам.
+  const [query, setQuery] = useState('');
   const top = useRef(null);
 
-  const show = (index, section = null, y = null) => {
-    setView((v) => ({ index, section, y, seq: v.seq + 1 }));
+  const show = (index, section = null, y = null, block = null) => {
+    setView((v) => ({ index, section, y, block, seq: v.seq + 1 }));
     try {
       if (index === null) localStorage.removeItem(KEY); else localStorage.setItem(KEY, String(index));
     } catch { /* без памяти - просто с оглавления */ }
@@ -203,22 +279,38 @@ export default function HandbookTab() {
     setTrail((t) => t.slice(0, -1));
     show(last.index, null, last.y);
   };
+  // Найденное место: глава, прокрутка к блоку, подсветка.
+  const hit = (index, block) => {
+    setTrail((t) => [...t, { index: view.index, y: window.scrollY }]);
+    show(index, null, null, block);
+  };
 
   useEffect(() => {
     if (view.y !== null) {
       window.scrollTo(0, view.y);
-      return;
+      return undefined;
+    }
+    if (view.block !== null && top.current) {
+      const el = top.current.querySelector(`.hb-page [data-block="${view.block}"]`);
+      if (el) {
+        el.querySelectorAll('details').forEach((d) => { d.open = true; });
+        el.scrollIntoView({ block: 'center' });
+        el.classList.add('hb-block--hit');
+        const id = setTimeout(() => el.classList.remove('hb-block--hit'), 2400);
+        return () => clearTimeout(id);
+      }
     }
     const target = view.section && view.index !== null
       ? document.getElementById(sectionId(data.chapters[view.index].id, view.section))
       : null;
     (target || top.current)?.scrollIntoView({ block: 'start' });
+    return undefined;
   }, [view]);
 
   return (
     <div className="handbook" ref={top}>
       {view.index === null
-        ? <Contents onOpen={open} />
+        ? <Contents onOpen={open} query={query} onQuery={setQuery} onHit={hit} />
         : (
           <Chapter
             key={view.index} index={view.index} onOpen={open} go={go}

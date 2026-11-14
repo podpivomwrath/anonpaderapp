@@ -68,7 +68,7 @@ async def recompute_and_notify() -> None:
 
     for loss in displaced:
         peer_id = peers.get(loss.character_id)
-        if peer_id is None or notices.quiet(peer_id):
+        if peer_id is None or notices.quiet(peer_id, "crowns"):
             continue
         try:
             await _bot_api.messages.send(

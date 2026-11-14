@@ -96,7 +96,7 @@ async def announce(name: str, skip: int | None = None) -> int:
         )).all()
     text, photo = pet_texts.dragon_announce(name), pet_texts.photo("dragon_announce")
     sent = 0
-    for vk_id in notices.keep([p for p in peers if p is not None and p != skip]):
+    for vk_id in notices.keep([p for p in peers if p is not None and p != skip], "ishak"):
         try:
             await _bot_api.messages.send(peer_id=vk_id, message=text, random_id=0, attachment=photo)
             sent += 1

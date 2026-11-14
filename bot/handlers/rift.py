@@ -171,7 +171,7 @@ async def notify_brand(rift_id: int) -> None:
         return
     from bot import notices
 
-    for peer in notices.keep(peers):
+    for peer in notices.keep(peers, "rift"):
         await _send(peer, text)
 
 

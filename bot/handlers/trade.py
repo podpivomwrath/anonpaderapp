@@ -52,7 +52,7 @@ async def tick_job() -> None:
         if peer_id is None:
             continue
         try:
-            if arrival.notify and not notices.quiet(peer_id):
+            if arrival.notify and not notices.quiet(peer_id, "cart"):
                 await _bot_api.messages.send(peer_id=peer_id, message=arrival.text(), random_id=0)
             levelup = arrival.char_levelup
             if levelup is not None and levelup.levels_gained:
@@ -87,7 +87,7 @@ async def order_job() -> None:
     logger.info("Торговля: срочный заказ {} в {} ({} ящ.)", order.good_id, order.city, order.total)
     if _bot_api is None:
         return
-    for peer_id in notices.keep(peers.values()):
+    for peer_id in notices.keep(peers.values(), "orders"):
         try:
             await _bot_api.messages.send(peer_id=peer_id, message=text, random_id=0)
         except Exception:

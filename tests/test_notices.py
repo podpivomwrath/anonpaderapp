@@ -157,6 +157,78 @@ async def test_player_message_clears_mark_before_any_reply() -> None:
         notices._unreachable.discard(9931)
 
 
+def test_muted_kind_drops_only_that_kind() -> None:
+    """2026-11-14, владелец: виды оповещений выключаются по одному."""
+    notices.set_muted(141, ["guild", "boss", "нет такого"])
+    try:
+        assert notices.quiet(141, "guild") and notices.quiet(141, "boss")
+        assert not notices.quiet(141, "cart") and not notices.quiet(141)
+        assert notices.keep([141, 142], "boss") == [142]
+        assert notices.keep([141, 142], "rift") == [141, 142]
+    finally:
+        notices.set_muted(141, None)
+    assert not notices.quiet(141, "guild")
+
+
+def test_kinds_match_the_settings_screen() -> None:
+    import re
+    from pathlib import Path
+
+    jsx = Path(__file__).resolve().parents[1] / "miniapp/src/components/SettingsTab.jsx"
+    block = jsx.read_text(encoding="utf-8").split("const NOTICE_KINDS = [", 1)[1].split("];", 1)[0]
+    assert tuple(re.findall(r"id: '(\w+)'", block)) == notices.KINDS
+
+
+def test_every_notice_site_names_its_kind() -> None:
+    """Рассылки без вида слушаются только общей галки - новая должна назвать вид."""
+    import re
+    from pathlib import Path
+
+    root = Path(__file__).resolve().parents[1] / "bot"
+    for path in root.rglob("*.py"):
+        if path.name == "notices.py":
+            continue
+        for line in path.read_text(encoding="utf-8").splitlines():
+            if not re.search(r"(?:notices|notice_mute)\.(?:quiet|keep)\(", line):
+                continue
+            kinds = re.findall(r", \"(\w+)\"\)", line)
+            assert kinds and kinds[0] in notices.KINDS, (path, line)
+
+
+async def test_mute_list_saved_from_miniapp(db_session, make_character) -> None:
+    import json
+
+    from sqlalchemy.ext.asyncio import async_sessionmaker
+
+    from bot.app_keys import SESSION_FACTORY_KEY
+    from bot.miniapp_api import handle_post_ui
+    from bot.miniapp_auth import VK_USER_ID_KEY
+    from models import User
+
+    c = await make_character()
+    await db_session.commit()
+    vk_id = (await db_session.get(User, c.user_id)).vk_id
+    factory = async_sessionmaker(db_session.bind, expire_on_commit=False)
+
+    class Request:
+        def __init__(self) -> None:
+            self.app = {SESSION_FACTORY_KEY: factory}
+
+        async def json(self):
+            return {"set": {"notice_mute": ["crowns", "crowns", "чужое", 5]}}
+
+        def __getitem__(self, key):
+            assert key is VK_USER_ID_KEY
+            return vk_id
+
+    try:
+        resp = await handle_post_ui(Request())
+        assert json.loads(resp.text)["ui"]["notice_mute"] == ["crowns"]
+        assert notices.quiet(vk_id, "crowns") and not notices.quiet(vk_id, "boss")
+    finally:
+        notices.set_muted(vk_id, None)
+
+
 def test_demo_and_chats_never_get_notices() -> None:
     assert notices.quiet(900000000001)
     assert notices.keep([900000000001, 2_000_000_005, 12345]) == [12345]

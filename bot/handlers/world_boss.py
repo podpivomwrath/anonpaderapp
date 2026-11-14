@@ -94,7 +94,7 @@ async def announce(boss_pk: int) -> None:
     delivered = 0
     from bot import notices
 
-    for peer_id in notices.keep(recipients):
+    for peer_id in notices.keep(recipients, "boss"):
         try:
             await _bot_api.messages.send(
                 peer_id=peer_id, message=text, random_id=0, attachment=attachment,

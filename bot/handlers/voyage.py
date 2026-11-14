@@ -273,7 +273,7 @@ async def tick_job() -> None:
                 _away.discard(peer_id)
                 await _send_home(peer_id, notice.text)
             else:
-                if not notice_mute.quiet(peer_id):  # часовые вести - оповещение, итог похода - нет
+                if not notice_mute.quiet(peer_id, "voyage"):  # часовые вести - оповещение, итог похода - нет
                     await _bot_api.messages.send(
                         peer_id=peer_id, message=notice.text, random_id=0, keyboard=kb.voyage_keyboard(),
                         attachment=_photo(notice.image),

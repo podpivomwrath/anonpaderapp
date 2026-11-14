@@ -46,7 +46,7 @@ async def tick_job() -> None:
     from bot import notices
 
     for peer, text in sends:
-        if notices.quiet(peer):
+        if notices.quiet(peer, "buffs"):
             continue
         try:
             await _bot_api.messages.send(peer_id=peer, random_id=0, message=text)

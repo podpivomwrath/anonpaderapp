@@ -120,7 +120,7 @@ async def _news(catcher_peer: int, player: str) -> None:
     from bot import notices
 
     text = texts.CAUGHT_NEWS.format(player=player)
-    for peer_id in notices.keep(recipients):
+    for peer_id in notices.keep(recipients, "ishak"):
         if peer_id == catcher_peer:
             continue
         await _send(peer_id, text)
@@ -135,7 +135,7 @@ async def _spawn_news() -> None:
     logger.info("Турбоишак: оповещаю о выходе {}", len(recipients))
     from bot import notices
 
-    for peer_id in notices.keep(recipients):
+    for peer_id in notices.keep(recipients, "ishak"):
         await _send(peer_id, texts.SPAWN_NEWS, attachment=_photo(tc.HERE_IMAGE))
         await asyncio.sleep(0.05)  # лимит сообщений сообщества
 

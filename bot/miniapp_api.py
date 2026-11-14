@@ -432,6 +432,11 @@ async def handle_post_ui(request: web.Request) -> web.Response:
             value = updates.get(key)
             if isinstance(value, kind) and not (kind is int and isinstance(value, bool)):
                 flags[key] = value
+        # Виды оповещений по отдельности (2026-11-14): список, только известные.
+        if "notice_mute" in updates:
+            from bot import notices
+
+            flags["notice_mute"] = notices.clean_kinds(updates["notice_mute"])
         if hint and len(hint) <= 24:
             hints = list(flags.get("hints") or [])
             if hint not in hints and len(hints) < UI_HINTS_MAX:
@@ -447,6 +452,10 @@ async def handle_post_ui(request: web.Request) -> web.Response:
             from bot import notices
 
             notices.set_quiet(request[VK_USER_ID_KEY], bool(flags["no_notices"]))
+        if "notice_mute" in flags:
+            from bot import notices
+
+            notices.set_muted(request[VK_USER_ID_KEY], flags["notice_mute"])
         if "signals_out_off" in flags or "signals_in_off" in flags:
             from bot import battle_signals
 

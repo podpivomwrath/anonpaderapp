@@ -88,7 +88,7 @@ async def notify_guild(guild_id: int, text: str, min_rank: str | None = None) ->
         peers = await guild_service.peers_of(db, guild_id, min_rank=min_rank)
     from bot import notices
 
-    notify_peers(notices.keep(peers), text)
+    notify_peers(notices.keep(peers, "guild"), text)
 
 
 # --- Поле: исследование и прибытие -------------------------------------------------

@@ -358,3 +358,120 @@
   box-shadow: 0 6px 18px rgba(0, 0, 0, 0.45);
   cursor: pointer;
 }
+
+/* --- Поиск (2026-11-14) --- */
+
+.hb-search {
+  position: relative;
+  display: flex;
+  align-items: center;
+  margin: 10px 0;
+}
+
+.hb-search__icon {
+  position: absolute;
+  left: 12px;
+  font-size: 14px;
+  opacity: 0.6;
+  pointer-events: none;
+}
+
+.hb-search__input {
+  width: 100%;
+  min-width: 0;
+  padding: 11px 38px 11px 36px;
+  border: 1px solid var(--card-line);
+  border-radius: 12px;
+  background: rgba(10, 10, 13, 0.86);
+  color: #fff;
+  font: inherit;
+  font-size: 15px;
+  outline: none;
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+.hb-search__input::-webkit-search-cancel-button {
+  display: none;
+}
+
+.hb-search__input:focus {
+  border-color: rgba(224, 180, 90, 0.55);
+}
+
+.hb-search__input::placeholder {
+  color: rgba(255, 255, 255, 0.4);
+}
+
+.hb-search__clear {
+  position: absolute;
+  right: 4px;
+  padding: 8px 10px;
+  border: 0;
+  background: none;
+  color: rgba(255, 255, 255, 0.55);
+  font: inherit;
+  cursor: pointer;
+}
+
+.hb-search__note {
+  margin: 0 2px 8px;
+  color: rgba(255, 255, 255, 0.6);
+  font-size: 13px;
+}
+
+.hb-hits {
+  display: grid;
+  gap: 6px;
+}
+
+.hb-hit {
+  display: grid;
+  gap: 3px;
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--card-line);
+  border-radius: 12px;
+  background: rgba(10, 10, 13, 0.86);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  color: inherit;
+  font: inherit;
+  font-size: 14px;
+  line-height: 1.45;
+  text-align: left;
+  cursor: pointer;
+}
+
+.hb-hit:active {
+  background: rgba(40, 40, 46, 0.92);
+}
+
+.hb-hit__where {
+  color: var(--gold);
+  font-size: 12px;
+}
+
+.hb-hit__text {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.hb-hit mark,
+.hb-block--hit mark {
+  padding: 0 1px;
+  border-radius: 3px;
+  background: rgba(224, 180, 90, 0.3);
+  color: #fff;
+}
+
+/* Найденный блок вспыхивает и гаснет. */
+.hb-block--hit {
+  border-radius: 8px;
+  animation: hb-hit-flash 2.4s ease-out;
+}
+
+@keyframes hb-hit-flash {
+  0%, 35% { background: rgba(224, 180, 90, 0.18); box-shadow: 0 0 0 6px rgba(224, 180, 90, 0.18); }
+  100% { background: transparent; box-shadow: 0 0 0 6px transparent; }
+}

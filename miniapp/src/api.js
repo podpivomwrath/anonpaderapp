@@ -241,6 +241,11 @@ export function setNoNotices(on) {
   return saveUi({ set: { no_notices: on } });
 }
 
+// Выключенные виды оповещений (2026-11-14): список id из bot/notices.KINDS.
+export function setNoticeMute(kinds) {
+  return saveUi({ set: { notice_mute: kinds } });
+}
+
 // Сигналы союзникам в групповом бою (2026-11-11, bot/battle_signals.py).
 export function setSignalsOff(which, off) {
   return saveUi({ set: { [which === 'out' ? 'signals_out_off' : 'signals_in_off']: off } });

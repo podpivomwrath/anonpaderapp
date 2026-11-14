@@ -11,6 +11,10 @@
 понять, оповещение это или ответ. Каждое место рассылки спрашивает quiet().
 Настройка - в ui_flags персонажа (ключ no_notices), копия в памяти по vk_id.
 
+Виды по отдельности (2026-11-14, владелец): кроме общей галки каждый вид из
+KINDS выключается сам - ключ notice_mute в ui_flags, список видов. Место
+рассылки передаёт свой вид: quiet(peer, "boss"), keep(peers, "guild").
+
 Закрывшие сообщения (2026-11-14, владелец: «переставать отправлять вообще
 всё после того, как игрок заносит сообщество в ЧС»): после отказа VK
 (900/901/902) или события message_deny бот не шлёт такому игроку НИЧЕГО -
@@ -26,6 +30,11 @@ from loguru import logger
 from sqlalchemy import select
 
 _quiet: set[int] = set()
+#: Виды оповещений, которые выключаются по одному. Подписи - в мини-аппе
+#: (SettingsTab.jsx, NOTICE_KINDS), сверка - tests/test_notices.py.
+KINDS = ("boss", "rift", "ishak", "cart", "orders", "voyage", "guild", "buffs", "crowns")
+#: vk_id -> выключенные виды (только у тех, кто что-то выключил).
+_muted: dict[int, frozenset[str]] = {}
 #: Кому VK не даёт писать (900/901/902: бот в чёрном списке, сообщения
 #: сообществу закрыты). Не шлём ничего, пока игрок сам не напишет боту
 #: (2026-11-13: объявления мирового босса упирались в отказ VK 600 раз
@@ -80,7 +89,13 @@ async def load(session_factory) -> int:
             select(User.vk_id, Character.ui_flags).join(Character, Character.user_id == User.id)
         )).all()
     _quiet.clear()
-    _quiet.update(int(vk_id) for vk_id, flags in rows if isinstance(flags, dict) and flags.get("no_notices"))
+    _muted.clear()
+    for vk_id, flags in rows:
+        if not isinstance(flags, dict):
+            continue
+        if flags.get("no_notices"):
+            _quiet.add(int(vk_id))
+        set_muted(vk_id, flags.get("notice_mute"))
     return len(_quiet)
 
 
@@ -89,6 +104,21 @@ def set_quiet(vk_id: int, on: bool) -> None:
         _quiet.add(int(vk_id))
     else:
         _quiet.discard(int(vk_id))
+
+
+def clean_kinds(value) -> list[str]:
+    """Из присланного мини-аппом - только известные виды, без повторов."""
+    if not isinstance(value, list):
+        return []
+    return [k for k in KINDS if k in value]
+
+
+def set_muted(vk_id, kinds) -> None:
+    kinds = frozenset(clean_kinds(kinds))
+    if kinds:
+        _muted[int(vk_id)] = kinds
+    else:
+        _muted.pop(int(vk_id), None)
 
 
 def mark_unreachable(vk_id) -> None:
@@ -154,17 +184,19 @@ def register(bot) -> None:
         mark_unreachable(event.object.user_id)
 
 
-def quiet(vk_id) -> bool:
-    """True - этому игроку оповещения не слать."""
+def quiet(vk_id, kind: str | None = None) -> bool:
+    """True - этому игроку оповещения не слать (все или этого вида)."""
     try:
         vk_id = int(vk_id)
     except (TypeError, ValueError):
         return False
     if vk_id <= 0 or vk_id >= REAL_USER_LIMIT:
         return True
-    return vk_id in _quiet or vk_id in _unreachable
+    if vk_id in _quiet or vk_id in _unreachable:
+        return True
+    return kind is not None and kind in _muted.get(vk_id, ())
 
 
-def keep(peers):
-    """Отсеять из списка тех, кто выключил оповещения."""
-    return [p for p in peers if not quiet(p)]
+def keep(peers, kind: str | None = None):
+    """Отсеять из списка тех, кто выключил оповещения (все или этого вида)."""
+    return [p for p in peers if not quiet(p, kind)]
