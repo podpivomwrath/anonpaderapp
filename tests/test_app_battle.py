@@ -22,6 +22,18 @@ class _Ws:
         self.events.append(event)
 
 
+import pytest
+
+
+@pytest.fixture(autouse=True)
+def _no_db_genders(monkeypatch):
+    """Пол бойцов - запрос к базе; здесь проверяем снимок, не базу."""
+    async def genders(engine, state):
+        return {}
+
+    monkeypatch.setattr(app_battle, "_genders", genders)
+
+
 async def _settle() -> None:
     for _ in range(5):
         await asyncio.sleep(0)
@@ -85,3 +97,18 @@ async def test_nobody_in_app_nothing_built(monkeypatch) -> None:
     engine.start_session(state)
     await _settle()
     assert called == []
+
+
+def test_payload_carries_gender_and_mob_art() -> None:
+    from game.content_loader import load_bestiary
+
+    mob = next(iter(load_bestiary().values()))[0]
+    state = CombatSessionState(session_id=-9, mode=CombatMode.PVE)
+    state.add(combatant(901, side=0, name="Героиня"))
+    state.add(combatant(2, side=1, kind="mob", name=mob.name))
+    state.add(combatant(3, side=1, kind="mob", name="Именной враг сюжета"))
+    data = app_battle.payload("group", state, None, 901, {901: "f"})
+    by_id = {c["id"]: c for c in data["combatants"]}
+    assert by_id[901]["gender"] == "f" and by_id[901]["art"] is None
+    assert by_id[2]["art"] == f"mob_{mob.id}" and by_id[2]["gender"] is None
+    assert by_id[3]["art"] is None  # своя графика позже - у клиента заглушка

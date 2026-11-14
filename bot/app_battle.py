@@ -25,11 +25,30 @@ def _effects(c: CombatantState) -> list[dict]:
     ]
 
 
-def _combatant(c: CombatantState, own: bool) -> dict:
+_ART_IDS: dict[str, str] | None = None
+
+
+def art_id(name: str) -> str | None:
+    """Тварь или мировой босс по имени -> id для графики (mob_<id>, boss_<id>).
+    В бою у моба только имя; именные враги сюжета и рейдов - None (своя графика
+    позже, клиент берёт общую заглушку)."""
+    global _ART_IDS
+    if _ART_IDS is None:
+        from game.content_loader import load_bestiary, load_world_bosses
+
+        ids = {m.name: f"mob_{m.id}" for mobs in load_bestiary().values() for m in mobs}
+        ids.update({b.name: f"boss_{b.id}" for b in load_world_bosses()})
+        _ART_IDS = ids
+    return _ART_IDS.get(name)
+
+
+def _combatant(c: CombatantState, own: bool, genders: dict[int, str | None]) -> dict:
     out = {
         "id": c.id, "side": c.side, "kind": c.kind, "name": c.name, "level": c.level,
         "hp": c.current_hp, "max_hp": c.max_hp, "shield": c.shield, "alive": c.alive,
         "base_class": c.base_class, "subclass": c.subclass_id, "effects": _effects(c),
+        "gender": genders.get(c.id) if c.kind == "character" else None,
+        "art": art_id(c.name) if c.kind == "mob" else None,
     }
     if own:
         out["cooldowns"] = dict(c.cooldowns)
@@ -53,12 +72,14 @@ def _hits(result: TickResult | None) -> tuple[list[dict], list[dict]]:
     return hits, heals
 
 
-def payload(engine: str, state: CombatSessionState, result: TickResult | None, own_id: int) -> dict:
+def payload(engine: str, state: CombatSessionState, result: TickResult | None, own_id: int,
+            genders: dict[int, str | None] | None = None) -> dict:
     hits, heals = _hits(result)
+    genders = genders or {}
     return {
         "type": "battle", "engine": engine, "session": str(state.session_id), "mode": str(state.mode),
         "turn": state.tick_number, "deadline": getattr(state, "turn_deadline", None), "you": own_id,
-        "combatants": [_combatant(c, c.id == own_id) for c in state.combatants.values()],
+        "combatants": [_combatant(c, c.id == own_id, genders) for c in state.combatants.values()],
         "hits": hits, "heals": heals,
         "deaths": list(result.deaths) if result else [],
         "lines": list(result.lines) if result else [],
@@ -80,13 +101,40 @@ def recipients(engine: str, state: CombatSessionState) -> dict[int, int]:
     return out
 
 
+async def _genders(engine: str, state: CombatSessionState) -> dict[int, str | None]:
+    """Пол бойцов-игроков для фигур (hero_<класс>_<пол>): один запрос на ход.
+    В соло игрок - боец PLAYER_ID, ищем по vk_id боя."""
+    from sqlalchemy import select
+
+    from models import Character, User
+    from services.db import get_session_factory
+
+    ids = [c.id for c in state.combatants.values() if c.kind == "character"]
+    if not ids:
+        return {}
+    try:
+        async with get_session_factory()() as db:
+            if engine == "solo":
+                gender = await db.scalar(
+                    select(Character.gender).join(User).where(User.vk_id == state.session_id))
+                return {cid: gender for cid in ids}
+            rows = (await db.execute(select(Character.id, Character.gender).where(Character.id.in_(ids)))).all()
+            return dict(rows)
+    except Exception:  # noqa: BLE001 - без пола фигура мужская, бой не страдает
+        return {}
+
+
 def observer(engine: str):
     """Наблюдатель для TickEngine(on_snapshot=...): engine - solo | pvp | group | raid."""
 
     async def on_snapshot(state: CombatSessionState, result: TickResult | None) -> None:
         if not app_channel.anyone():
             return  # никто не в приложении - ничего не собираем
-        for vk_id, own_id in recipients(engine, state).items():
-            await app_channel.publish(vk_id, payload(engine, state, result, own_id))
+        targets = recipients(engine, state)
+        if not targets:
+            return
+        genders = await _genders(engine, state)
+        for vk_id, own_id in targets.items():
+            await app_channel.publish(vk_id, payload(engine, state, result, own_id, genders))
 
     return on_snapshot

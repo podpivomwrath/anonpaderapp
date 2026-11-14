@@ -138,15 +138,44 @@ async def snapshot(vk_id: int) -> dict | None:
         hp = vitals_service.current_hp(character, stats, vit) if stats is not None else None
         max_hp = vitals_service.max_hp(character, stats, vit) if stats is not None else None
         running = await now_running.collect(db, character, vk_id, now)
+        party = await party_of(db, character)
         await db.commit()
+    from game.world import location_types
+
+    loc = location_types.location_type_at(character.pos_x, character.pos_y)
     return {
         "type": "world", "state": state,
         "pos": {"x": character.pos_x, "y": character.pos_y},
         "city": grid.city_region_at(character.pos_x, character.pos_y),
         "screen": character.screen or None,
         "level": character.level, "hp": hp, "max_hp": max_hp,
+        # Тип местности - фон сцены и боя, тайл карты (графика loc_<id>, tile_<id>).
+        "location": {"id": loc.id, "region": loc.region},
+        # Облик героя - по нему клиент берёт фигуру (hero_<класс>_<пол>).
+        "hero": {"name": character.name, "base_class": character.base_class, "subclass": character.subclass,
+                 "gender": character.gender},
+        "party": party,
         "running": running,
         "actions": actions_of(keyboard),
+    }
+
+
+async def party_of(db, character) -> dict | None:
+    """Отряд (кроссплей с ВК - игроки из ВК и из приложения в одной группе):
+    кто в нём, лидер, кто на той же клетке. None - игрок один."""
+    from services import group_service
+
+    group = await group_service.get_group_snapshot(db, character.id)
+    if group is None:
+        return None
+    return {
+        "id": group.id, "leader": group.leader_character_id, "me": character.id,
+        "members": [
+            {"id": m.id, "name": m.name, "level": m.level, "base_class": m.base_class, "subclass": m.subclass,
+             "gender": m.gender, "pos": {"x": m.pos_x, "y": m.pos_y},
+             "here": (m.pos_x, m.pos_y) == (character.pos_x, character.pos_y)}
+            for m in group.members
+        ],
     }
 
 

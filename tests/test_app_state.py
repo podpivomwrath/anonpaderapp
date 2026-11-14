@@ -62,3 +62,25 @@ async def test_burst_of_messages_gives_one_snapshot(monkeypatch) -> None:
     app_state.refresh_soon(6101)
     await asyncio.sleep(0.05)
     assert sent == [6101, 6101]
+
+
+async def test_party_mixes_app_and_vk_players(db_session, make_character) -> None:
+    """Кроссплей: в отряде игроки из ВК и из приложения - снимок показывает
+    всех, лидера и кто на той же клетке."""
+    from models import Group, GroupMember
+
+    leader = await make_character(level=20)
+    mate = await make_character(level=21)
+    leader.pos_x, leader.pos_y, mate.pos_x, mate.pos_y = 3, 4, 3, 5
+    group = Group(leader_character_id=leader.id)
+    db_session.add(group)
+    await db_session.flush()
+    db_session.add_all([GroupMember(group_id=group.id, character_id=leader.id),
+                        GroupMember(group_id=group.id, character_id=mate.id)])
+    await db_session.flush()
+    party = await app_state.party_of(db_session, leader)
+    assert party["leader"] == leader.id and party["me"] == leader.id
+    assert [m["id"] for m in party["members"]] == [leader.id, mate.id]
+    assert [m["here"] for m in party["members"]] == [True, False]
+    alone = await make_character(level=5)
+    assert await app_state.party_of(db_session, alone) is None
