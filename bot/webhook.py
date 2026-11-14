@@ -32,6 +32,8 @@ from bot.miniapp_hero_api import register_routes as register_hero_routes
 from bot.miniapp_transfer_api import register_routes as register_transfer_routes
 from bot.miniapp_trade_api import register_routes as register_trade_routes
 from bot.miniapp_auth import miniapp_auth_middleware, miniapp_cors_middleware
+from bot.app_api import app_admin_guard
+from bot.app_api import register_routes as register_app_routes
 from bot.web_auth import register_routes as register_web_auth_routes
 from bot.miniapp_map_api import register_routes as register_miniapp_map_routes
 from config import Settings
@@ -107,7 +109,8 @@ async def handle_health(request: web.Request) -> web.Response:
 
 
 def create_app(settings: Settings, route_event: RouteEvent, redis=None) -> web.Application:
-    app = web.Application(middlewares=[miniapp_cors_middleware, miniapp_auth_middleware])
+    # app_admin_guard - после проверки игрока: ей нужен ключ устройства (2026-11-15).
+    app = web.Application(middlewares=[miniapp_cors_middleware, miniapp_auth_middleware, app_admin_guard])
     app[SETTINGS_KEY] = settings
     app[ROUTE_EVENT_KEY] = route_event
     app[SESSION_FACTORY_KEY] = get_session_factory()
@@ -121,6 +124,7 @@ def create_app(settings: Settings, route_event: RouteEvent, redis=None) -> web.A
     register_gear_routes(app)
     register_runes_routes(app)
     register_look_routes(app)  # 2026-11-14: окно чужого игрока - только надетое
+    register_app_routes(app)  # 2026-11-15: приложение «Монолит», привязка по коду
     register_market_routes(app)
     register_guild_routes(app)
     register_exchange_routes(app)

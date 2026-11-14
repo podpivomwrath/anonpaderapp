@@ -195,6 +195,23 @@ export function getNowRunning() {
   return request('/now');
 }
 
+// Приложение «Монолит» (2026-11-15): код привязки и подключённые устройства.
+export function createAppCode() {
+  return request('/app/code', { method: 'POST' });
+}
+
+export function getAppDevices() {
+  return request('/app/devices');
+}
+
+export function revokeAppDevice(id) {
+  return request('/app/revoke', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ id }),
+  });
+}
+
 export function submitStats(increments) {
   return request('/stats', {
     method: 'POST',

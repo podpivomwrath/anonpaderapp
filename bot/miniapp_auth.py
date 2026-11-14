@@ -24,6 +24,9 @@ from bot.app_keys import SETTINGS_KEY, SESSION_FACTORY_KEY
 from config import Settings
 
 VK_USER_ID_KEY: web.RequestKey[int] = web.RequestKey("vk_user_id")
+#: Запрос пришёл из приложения «Монолит» (2026-11-15): id устройства. В
+#: мини-аппе и на сайте ключа нет.
+APP_DEVICE_KEY: web.RequestKey[int] = web.RequestKey("app_device_id")
 
 MINIAPP_PREFIX = "/api/miniapp/"
 TERMS_PATH = "/api/miniapp/terms"
@@ -84,6 +87,22 @@ async def miniapp_auth_middleware(
     settings: Settings = request.app[SETTINGS_KEY]
     params = dict(request.query)
 
+    # Приложение «Монолит» (2026-11-15): ключ устройства из привязки по коду
+    # (services/app_link_service.py). Отключённое устройство - 403, и
+    # приложение снова просит код.
+    from services import app_link_service
+
+    auth = request.headers.get("Authorization", "")
+    app_token = auth[len("Bearer "):].strip() if auth.startswith("Bearer ") else ""
+    if "sign" not in params and app_link_service.is_app_token(app_token):
+        async with request.app[SESSION_FACTORY_KEY]() as db:
+            found = await app_link_service.device_for_token(db, app_token)
+        if found is None:
+            return web.json_response({"error": "app_device_revoked"}, status=403)
+        device, vk_user_id = found
+        request[APP_DEVICE_KEY] = device.id
+        return await _checked(request, handler, vk_user_id)
+
     # Сайт (bot/web_auth.py): ключ сессии VK ID вместо launch-параметров.
     from bot.web_auth import bearer_user
 
@@ -105,7 +124,13 @@ async def miniapp_auth_middleware(
             vk_user_id = int(params["vk_user_id"])
         except (KeyError, ValueError):
             return web.json_response({"error": "invalid_signature"}, status=403)
+    return await _checked(request, handler, vk_user_id)
 
+
+async def _checked(
+    request: web.Request, handler: Callable[[web.Request], Awaitable[web.Response]], vk_user_id: int,
+) -> web.Response:
+    """Игрок установлен: бан и соглашение - одинаково для мини-аппа, сайта и приложения."""
     request[VK_USER_ID_KEY] = vk_user_id
     from sqlalchemy import select
     from models import Character, User

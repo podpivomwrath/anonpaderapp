@@ -2,6 +2,7 @@
 (это важно для Alembic autogenerate)."""
 
 from models.admin import AdminAction, BugReport, CharacterDeath
+from models.app_device import AppDevice, AppPairCode
 from models.base import Base
 from models.character import Character, CharacterBuffPreset, CharacterStats
 from models.combat import CombatParticipant, CombatSession
@@ -69,6 +70,8 @@ from models.world_boss import WorldBoss, WorldBossContribution, WorldBossMeter
 
 __all__ = [
     "AdminAction",
+    "AppDevice",
+    "AppPairCode",
     "AshDragon",
     "Base",
     "BaseClass",

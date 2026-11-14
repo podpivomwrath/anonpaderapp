@@ -1,6 +1,11 @@
 import { useState } from 'react';
 import { Button, Div, Group, Header, SimpleCell, Switch } from '@vkontakte/vkui';
 import { setNoImages, setNoNotices, setNoticeMute, setShortLog, setSignalsOff } from '../api.js';
+import AppLink from './AppLink.jsx';
+
+// Приложение для ПК и Android (2026-11-15): пока его нет у игроков, раздел
+// видит только владелец. Выйдет приложение - поставить true.
+const APP_RELEASED = false;
 
 // Настройки (2026-11-12, владелец): свой раздел под шестерёнкой в шапке.
 // Раньше переключатели жили внизу «Героя», а звук и чат - значками в шапке.
@@ -122,6 +127,7 @@ export default function SettingsTab({ character, onCharacterUpdate, soundOn, onT
           />
         ))}
       </Group>
+      {(APP_RELEASED || character.is_admin) && <AppLink />}
       <Group header={<Header>Игроки</Header>}>
         <Div>
           <Button
