@@ -48,7 +48,10 @@ def _line_offset(x1: int, y1: int, x2: int, y2: int, x: int, y: int) -> int:
     return round(abs(dx * (y - y1) - dy * (x - x1)) / norm * 10)
 
 
-def safe_path(x1: int, y1: int, x2: int, y2: int, by_level: bool = True) -> list[tuple[int, int]]:
+def safe_path(
+    x1: int, y1: int, x2: int, y2: int, by_level: bool = True,
+    floor_level: int = 0, hazard=None,
+) -> list[tuple[int, int]]:
     """Безопасный путь: клетки без стартовой и с конечной, по 8 направлениям.
 
     by_level (2026-11-08, верхом) - не заходит на клетки, где мобы сильнее,
@@ -62,7 +65,15 @@ def safe_path(x1: int, y1: int, x2: int, y2: int, by_level: bool = True) -> list
     по порядку: меньше всего опасности сверх цели (старт внутри - выходит
     кратчайшим путём), потом короче, потом по клеткам послабее, потом ближе к
     прямой - чтобы обход шёл ровно, без зигзагов. Путь всегда находится -
-    внутри мира всё связно."""
+    внутри мира всё связно.
+
+    Верхом (2026-11-14, репорт 362: «безопасный путь совсем не безопасный»):
+    floor_level - уровень игрока: «сильнее» значит сильнее и цели, и его
+    самого. hazard(x, y) - вес нападения на клетке; среди путей без клеток
+    сильнее выбирается тот, где нападений меньше, и только потом короче.
+    Раньше обход шёл по уровню клеток, а нападения бросаются по кольцу на
+    каждой клетке: длинный обход давал 60-му уровню на Турбоишаке 43%
+    нападения против 22% по прямой."""
     import heapq
 
     start, goal = (x1, y1), (x2, y2)
@@ -75,11 +86,14 @@ def safe_path(x1: int, y1: int, x2: int, y2: int, by_level: bool = True) -> list
     else:
         danger = ring_tier
     limit = danger(x2, y2)
+    if by_level:
+        limit = max(limit, floor_level)
     straight = line_path(x1, y1, x2, y2)
-    if all(danger(*c) <= limit for c in straight):
+    if hazard is None and all(danger(*c) <= limit for c in straight):
         return straight
+    weigh = hazard or (lambda _x, _y: 0)
 
-    zero = (0, 0, 0, 0)
+    zero = (0, 0, 0, 0, 0)
     best = {start: zero}
     came: dict[tuple[int, int], tuple[int, int]] = {}
     queue = [(zero, 0, start)]
@@ -99,9 +113,12 @@ def safe_path(x1: int, y1: int, x2: int, y2: int, by_level: bool = True) -> list
                 if not in_bounds(*nxt):
                     continue
                 d = danger(*nxt)
+                # Нападение бросается при входе на клетку, кроме конечной.
                 new = (
-                    cost[0] + max(0, d - limit), cost[1] + 1, cost[2] + d,
-                    cost[3] + _line_offset(x1, y1, x2, y2, *nxt),
+                    cost[0] + max(0, d - limit),
+                    cost[1] + (weigh(*nxt) if nxt != goal else 0),
+                    cost[2] + 1, cost[3] + d,
+                    cost[4] + _line_offset(x1, y1, x2, y2, *nxt),
                 )
                 old = best.get(nxt)
                 if old is None or new < old:

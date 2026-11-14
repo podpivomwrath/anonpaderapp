@@ -53,6 +53,10 @@ def create_bot(settings: Settings) -> Bot:
     bot = Bot(token=settings.vk_token)
     for labeler in LABELERS:
         bot.labeler.load(labeler)
+    from bot import notices
+
+    # 2026-11-14: игрок написал - снять «закрыл сообщения» раньше любых ответов
+    notices.register(bot)
     moderation_handlers.setup_middleware(bot)  # патч 27: бан-гейт РАНЬШЕ всех остальных middleware
     # 2026-10-21: набранный текст без кнопки и без «/» бот не читает
     from bot import button_gate
@@ -344,6 +348,11 @@ async def run() -> None:
     quiet_count = await notices.load(get_session_factory())
     if quiet_count:
         logger.info("Без оповещений: {} игроков", quiet_count)
+    # 2026-11-14: закрывшие сообщения - в Redis, переживают выкатку
+    notices.setup(redis)
+    closed_count = await notices.load_unreachable()
+    if closed_count:
+        logger.info("Закрыли сообщения сообществу: {} игроков - бот им не пишет", closed_count)
     from bot import short_log
 
     # 2026-10-22: короткий боевой лог по выбору игрока

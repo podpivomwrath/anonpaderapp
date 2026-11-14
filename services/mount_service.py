@@ -154,11 +154,23 @@ def total_travel_seconds(mount_id: str, cells: int, character: Character | None 
     return seconds
 
 
-def route(from_x: int, from_y: int, to_x: int, to_y: int, safe: bool = False) -> list[tuple[int, int]]:
-    """Клетки пути без стартовой: прямая или безопасный обход (не заходит в
-    кольца опаснее кольца цели)."""
+def _ambush_weight(x: int, y: int) -> int:
+    """Вес нападения на клетке для безопасного пути: множитель кольца (x10),
+    на мирных клетках 0. Не зависит от маунта: шанс на клетке у всех - шанс
+    маунта, умноженный на кольцо."""
+    if _is_safe_cell(x, y):
+        return 0
+    return round(10 * mc.RING_AMBUSH_MULT[grid.ring_tier(x, y)])
+
+
+def route(
+    from_x: int, from_y: int, to_x: int, to_y: int, safe: bool = False, level: int = 0,
+) -> list[tuple[int, int]]:
+    """Клетки пути без стартовой: прямая или безопасный обход. Безопасный
+    (2026-11-14, репорт 362) не заходит на клетки с мобами сильнее и цели, и
+    игрока (level), а из таких путей берёт тот, где меньше нападений."""
     if safe:
-        return grid.safe_path(from_x, from_y, to_x, to_y)
+        return grid.safe_path(from_x, from_y, to_x, to_y, floor_level=level, hazard=_ambush_weight)
     return grid.line_path(from_x, from_y, to_x, to_y)
 
 
@@ -210,7 +222,7 @@ async def start_travel(
     safe - безопасный путь в обход колец опаснее цели (дольше прямой)."""
     now = now or datetime.now(timezone.utc)
     safe = safe and not flies(mount_id)
-    path = route(character.pos_x, character.pos_y, to_x, to_y, safe) if safe else None
+    path = route(character.pos_x, character.pos_y, to_x, to_y, safe, character.level) if safe else None
     cells = len(path) if path is not None else grid.cells_between(character.pos_x, character.pos_y, to_x, to_y)
     if step_seconds is not None:
         seconds = cells * step_seconds

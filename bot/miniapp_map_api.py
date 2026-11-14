@@ -404,7 +404,7 @@ async def handle_get_route(request: web.Request) -> web.Response:
         if not grid.in_bounds(x, y) or (x, y) == (character.pos_x, character.pos_y):
             return web.json_response({"error": "bad_request"}, status=400)
         fx, fy = character.pos_x, character.pos_y
-        path = mount_service.route(fx, fy, x, y, safe)
+        path = mount_service.route(fx, fy, x, y, safe, character.level)
         direct = mount_service.route(fx, fy, x, y, False) if safe else path
         owned = await mount_service.owned_mounts(db, character.id)
     return web.json_response({

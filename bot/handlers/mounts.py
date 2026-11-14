@@ -259,7 +259,7 @@ async def _quick_targets(db, character) -> list[tuple[str, int, int]]:
 
 def _route_line(safe: bool) -> str:
     return (
-        "🛡 Путь: безопасный - мимо клеток, где мобы сильнее, чем у цели. Бывает дольше."
+        "🛡 Путь: безопасный - мимо мобов сильнее вас и цели, где меньше нападений. Бывает дольше."
         if safe else "➡️ Путь: прямой - кратчайший, через любые кольца."
     )
 
@@ -464,7 +464,7 @@ async def start_travel_and_notify(
         fishing_handlers.cancel_bite(peer_id)
         fishing_service.clear_cast(character)
     safe = safe and not mount_service.flies(mount_id)
-    path = mount_service.route(from_x, from_y, to_x, to_y, safe)
+    path = mount_service.route(from_x, from_y, to_x, to_y, safe, character.level)
     travel = await mount_service.start_travel(db, character, mount_id, to_x, to_y, _rng, now, safe=safe)
     from bot.handlers import guild as guild_handlers
 

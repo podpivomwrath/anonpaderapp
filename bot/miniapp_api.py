@@ -621,9 +621,12 @@ async def _story_payload(session: AsyncSession, character: Character) -> dict:
                    else "now" if act.act == current_act else "todo")}
         for act in line.acts
     ]
+    # Линия пройдена целиком (2026-11-14, репорт 361: «задания исчезли» -
+    # пустой раздел читался как пропажа).
+    done = bool(row is not None and row.completed)
     quest = await story_service.current_quest_def(session, character)
     if quest is None:
-        return {"active_quest": None, "passed_acts": passed_acts, "acts": acts}
+        return {"active_quest": None, "passed_acts": passed_acts, "acts": acts, "completed": done}
 
     if quest.kind == "first_quest":
         peek = await quest_service.peek_progress(session, character)
@@ -639,7 +642,7 @@ async def _story_payload(session: AsyncSession, character: Character) -> dict:
                 "target": None,
                 "ready": peek.status == "ready",
             }
-        return {"active_quest": active_quest, "passed_acts": passed_acts, "acts": acts}
+        return {"active_quest": active_quest, "passed_acts": passed_acts, "acts": acts, "completed": done}
 
     target = None
     if quest.target_x is not None and quest.target_y is not None:
@@ -654,6 +657,7 @@ async def _story_payload(session: AsyncSession, character: Character) -> dict:
         },
         "passed_acts": passed_acts,
         "acts": acts,
+        "completed": done,
     }
 
 

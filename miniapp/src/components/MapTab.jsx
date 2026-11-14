@@ -947,7 +947,7 @@ export default function MapTab({ focus = null }) {
             >
               {safeRoute ? '✓ 🛡 Безопасный путь' : '🛡 Безопасный путь'}
               <span className="map-safe-toggle__hint">
-                {safeRoute ? `мимо мобов сильнее, чем у цели${detourNote ? ` - ${detourNote}` : ''}` : 'напрямую, через любые кольца'}
+                {safeRoute ? `мимо мобов сильнее вас и цели, где меньше нападений${detourNote ? ` - ${detourNote}` : ''}` : 'напрямую, через любые кольца'}
               </span>
             </button>
           )}

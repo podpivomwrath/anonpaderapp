@@ -65,6 +65,22 @@ def install(api) -> None:
         # отправок разом - bot/no_images.py.
         data = no_images.strip(method, data)
         if method in ("messages.send", "messages.edit"):
+            # Закрыл сообщения сообществу (2026-11-14, владелец) - не пишем
+            # ничего и в VK не ходим: тот же отказ 901, что вернул бы сам VK,
+            # поэтому вызовы ведут себя как раньше.
+            targets = no_images.peers_of(data)
+            from bot import notices
+
+            if targets and all(notices.unreachable(p) for p in targets):
+                from vkbottle.exception_factory.base_exceptions import VKAPIError
+
+                raise VKAPIError[901](error_msg="Игрок закрыл сообщения сообществу - бот ему не пишет")
+            # Клавиатура вне лимитов VK - VK отбил бы сообщение целиком
+            # (2026-11-14): чиним на лету и пишем в журнал, какой экран.
+            if data.get("keyboard"):
+                from bot import keyboard_guard
+
+                data = {**data, "keyboard": keyboard_guard.checked(data["keyboard"])}
             now = time.time()
             # peer_id числом, peer_ids списком (message.answer) или строкой.
             for p in no_images.peers_of(data):
@@ -139,9 +155,6 @@ class SilentGuardMiddleware(BaseMiddleware[Message]):
         # Только личный диалог с игроком: в беседах бот молчит на чужие реплики.
         if event.from_id <= 0 or event.peer_id != event.from_id:
             return
-        from bot import notices
-
-        notices.reachable_again(event.peer_id)
         started = float(getattr(event, "date", 0) or 0) or time.time()
         background.spawn(_check_later(event.peer_id, event.from_id, started))
 

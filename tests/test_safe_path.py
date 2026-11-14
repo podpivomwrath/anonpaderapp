@@ -84,3 +84,38 @@ def test_city_heals_silently() -> None:
     field = SimpleNamespace(pos_x=10, pos_y=10, current_hp=12)
     vitals_service.heal_in_city(field)
     assert field.current_hp == 12
+
+
+# --- Безопасный путь верхом от числа нападений (2026-11-14, репорт 362) ------
+
+
+def test_mounted_safe_route_is_never_riskier_than_direct_for_a_capped_hero() -> None:
+    """«Безопасный путь какой-то совсем не безопасный»: обход по уровню клеток
+    шёл длиннее прямой и давал 60-му на Турбоишаке 43% нападения против 22%."""
+    import random
+
+    from services import mount_service as ms
+
+    rng = random.Random(5)
+    for _ in range(60):
+        a = (rng.randint(-25, 25), rng.randint(-25, 25))
+        b = (rng.randint(-25, 25), rng.randint(-25, 25))
+        if a == b or not grid.in_bounds(*a) or not grid.in_bounds(*b):
+            continue
+        safe = ms.route(*a, *b, True, 60)
+        _check(safe, *a, *b)
+        direct = grid.line_path(*a, *b)
+        assert (ms.trip_ambush_chance("turbo_ishak", *a, *b, path=safe)
+                <= ms.trip_ambush_chance("turbo_ishak", *a, *b, path=direct) + 1e-9)
+    assert ms.trip_ambush_chance("turbo_ishak", 2, 1, -1, -4, path=ms.route(2, 1, -1, -4, True, 60)) < 0.22
+
+
+def test_mounted_safe_route_still_avoids_cells_stronger_than_hero_and_goal() -> None:
+    from services import mount_service as ms
+
+    x1, y1, x2, y2 = -20, 0, 20, 0
+    for level in (10, 25):
+        path = ms.route(x1, y1, x2, y2, True, level)
+        _check(path, x1, y1, x2, y2)
+        limit = max(_lvl((x2, y2)), level)
+        assert all(_lvl(c) <= limit for c in path)

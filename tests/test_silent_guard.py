@@ -126,9 +126,16 @@ async def test_unexpected_send_error_is_logged_closed_dm_is_not(monkeypatch) -> 
 
     logged = []
     monkeypatch.setattr(silent_guard.logger, "error", lambda *a, **k: logged.append(a))
+    from bot import notices
+
+    # Разные игроки: после 901 игрок помечен «закрыл сообщения», и бот ему
+    # больше не пишет вовсе (2026-11-14) - второй запрос ушёл бы в отказ сам.
     for code, expect_log in ((901, False), (911, True)):
         api = FailingApi(code)
         silent_guard.install(api)
-        with pytest.raises(VkError):
-            await api.request("messages.send", {"peer_id": 1, "message": "x"})
+        try:
+            with pytest.raises(VkError):
+                await api.request("messages.send", {"peer_id": code, "message": "x"})
+        finally:
+            notices.reachable_again(code)
         assert bool(logged) == expect_log
