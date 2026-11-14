@@ -54,8 +54,13 @@ def _label_intents() -> dict[str, str]:
 
 
 _LABELS: dict[str, str] | None = None
-#: Стрелки и подписи-названия городов несут payload move - направление по dx/dy.
-_DIRECTIONS = {(0, -1): "up", (0, 1): "down", (-1, 0): "left", (1, 0): "right"}
+def _directions() -> dict[tuple[int, int], str]:
+    """Стрелки и подписи-названия городов несут payload move - направление по
+    dx/dy из той же таблицы, что у клавиатуры: «вверх» в мире - это +y."""
+    from bot.keyboards import world as kw
+
+    names = {kw.BTN_UP: "up", kw.BTN_DOWN: "down", kw.BTN_LEFT: "left", kw.BTN_RIGHT: "right"}
+    return {delta: names[arrow] for arrow, delta in kw._DIRECTION_DELTAS.items()}
 
 
 def classify(button: dict) -> dict:
@@ -71,7 +76,7 @@ def classify(button: dict) -> dict:
         return {**out, "intent": "open_link", "link": button.get("link")}
     kind = payload.get("type") if isinstance(payload, dict) else None
     if kind == "move":
-        direction = _DIRECTIONS.get((payload.get("dx"), payload.get("dy")))
+        direction = _directions().get((payload.get("dx"), payload.get("dy")))
         return {**out, "intent": "move", "dir": direction, "dx": payload.get("dx"), "dy": payload.get("dy")}
     if kind:
         return {**out, "intent": str(kind)}

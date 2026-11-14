@@ -18,7 +18,10 @@ def test_field_keyboard_becomes_scene_actions() -> None:
     explore = next(a for a in actions if a["intent"] == "explore")
     assert explore["label"] == kw.BTN_EXPLORE  # клиент шлёт обратно ту же кнопку
     up = next(a for a in actions if a.get("dir") == "up")
-    assert up["payload"]["type"] == "move" and (up["dx"], up["dy"]) == (0, -1)
+    # «вверх» в мире - +y (bot/keyboards/world._DIRECTION_DELTAS), живая проверка 2026-11-15
+    assert up["payload"]["type"] == "move" and (up["dx"], up["dy"]) == kw._DIRECTION_DELTAS[kw.BTN_UP] == (0, 1)
+    first_row = app_state.actions_of(kw.movement_keyboard(5, 5))[0]
+    assert first_row["dir"] == "up"  # первая кнопка клавиатуры - стрелка вверх
 
 
 def test_payload_type_is_the_intent_and_unknown_is_other() -> None:
