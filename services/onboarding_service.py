@@ -54,7 +54,7 @@ def _banned_words() -> tuple[str, ...]:
         return ()
     words = []
     for line in BANNED_WORDS_PATH.read_text(encoding="utf-8").splitlines():
-        word = line.strip().lower()
+        word = line.strip().lower().replace("ё", "е")
         if word and not word.startswith("#"):
             words.append(word)
     return tuple(words)
@@ -151,9 +151,28 @@ def nickname_skeleton(nickname: str) -> str:
     return nickname.lower().translate(_LOOKALIKE)
 
 
+#: Для фильтра мата (2026-11-14: прошли «ХУИЩЕ» и «Ёбаныйрот»): латиница,
+#: похожая на кириллицу, и цифры-двойники - в кириллицу. «XУЙ» латиницей и
+#: «ХУ0» читаются как кириллица. Отдельно от _LOOKALIKE: там i -> l.
+_BANNED_LOOKALIKE = str.maketrans({
+    "a": "а", "b": "в", "c": "с", "e": "е", "h": "н", "k": "к", "m": "м", "o": "о", "p": "р",
+    "t": "т", "x": "х", "y": "у", "ё": "е", "0": "о", "3": "з", "4": "ч", "6": "б",
+})
+
+
+def _banned_forms(text: str) -> set[str]:
+    """Как ник может читаться: как есть, без «_» и цифр-разделителей
+    («х_у_й»), с ё -> е, латиница-двойник -> кириллица."""
+    lowered = text.lower()
+    bare = lowered.replace("_", "")
+    forms = {lowered, bare, bare.replace("ё", "е"), bare.translate(_BANNED_LOOKALIKE),
+             re.sub(r"\d", "", bare).replace("ё", "е")}
+    return {f for f in forms if f}
+
+
 def contains_banned_word(nickname: str) -> bool:
-    lowered = nickname.lower()
-    return any(word in lowered for word in _banned_words())
+    forms = _banned_forms(nickname)
+    return any(word in form for word in _banned_words() for form in forms)
 
 
 async def is_nickname_taken(
