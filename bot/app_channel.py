@@ -103,7 +103,24 @@ async def moved_to_vk(vk_id: int) -> None:
         return
     await publish(vk_id, {"type": "moved", "to": "vk"})
     for ws in group:
-        detach(vk_id, ws)
+        detach(vk_id, ws)  # сразу: ответ на это сообщение уже должен уйти в ВК
+    # Закрыть - чуть позже: Godot, прочитав кадр закрытия, выбрасывает
+    # непрочитанное, и moved терялся бы - приложение переподключалось и
+    # забирало игру обратно.
+    from bot import background
+
+    background.spawn(_close_later(group), name="app-moved-close")
+
+
+#: Пауза между moved и закрытием сокета.
+MOVED_CLOSE_DELAY = 1.0
+
+
+async def _close_later(group: list) -> None:
+    import asyncio
+
+    await asyncio.sleep(MOVED_CLOSE_DELAY)
+    for ws in group:
         try:
             await ws.close()
         except Exception:  # noqa: BLE001, S110 - уже закрыт

@@ -101,8 +101,12 @@ async def test_after_app_closed_vk_works_and_app_window_edit_fails(api) -> None:
     assert api.calls[-1][1]["message"] == "снова в ВК"
 
 
-async def test_writing_in_vk_releases_the_app(ws) -> None:
+async def test_writing_in_vk_releases_the_app(ws, monkeypatch) -> None:
+    import asyncio
+
     from bot import notices
+
+    monkeypatch.setattr(app_channel, "MOVED_CLOSE_DELAY", 0)
 
     class _Labeler:
         def __init__(self) -> None:
@@ -123,7 +127,9 @@ async def test_writing_in_vk_releases_the_app(ws) -> None:
     middleware.event = SimpleNamespace(from_id=5101, peer_id=5101, id=123456)  # настоящее из ВК
     await middleware.pre()
     assert not app_channel.active(5101)
-    assert ws.events[-1]["type"] == "moved" and ws.closed
+    assert ws.events[-1]["type"] == "moved" and not ws.closed  # закрытие - чуть позже, чтобы moved дошёл
+    await asyncio.sleep(0.05)
+    assert ws.closed
 
 
 async def test_ws_hello_and_act_routes_button_press(monkeypatch) -> None:
