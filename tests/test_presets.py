@@ -230,6 +230,29 @@ async def test_reset_stats_returns_points_and_keeps_subclass(
     assert stats.unspent_points == bc.STAT_POINTS_PER_LEVEL * 9
 
 
+async def test_first_stat_reset_at_cap_is_free_once(db_session, make_character, monkeypatch) -> None:
+    """2026-11-15, владелец: на 60 уровне первый сброс характеристик бесплатный,
+    второй - снова за золото. Ниже 60 - за золото."""
+    from game.economy import prerelease_config
+    from services import respec_service
+    from services.wallet_service import NotEnoughCurrency
+
+    monkeypatch.setattr(prerelease_config, "ACTIVE", False)
+    young = await make_character(level=59, farm=0)
+    assert respec_service.stats_reset_cost(young) == bc.STATS_RESET_COST_FARM
+    with pytest.raises(NotEnoughCurrency):
+        await respec_service.reset_stats(db_session, young)
+
+    capped = await make_character(level=60, farm=bc.STATS_RESET_COST_FARM)
+    assert respec_service.stats_reset_cost(capped) == 0
+    await respec_service.reset_stats(db_session, capped)
+    assert capped.cap_respec_used
+    assert (await get_wallet(db_session, capped.id)).farm_currency == bc.STATS_RESET_COST_FARM
+    assert respec_service.stats_reset_cost(capped) == bc.STATS_RESET_COST_FARM
+    await respec_service.reset_stats(db_session, capped)
+    assert (await get_wallet(db_session, capped.id)).farm_currency == 0
+
+
 async def test_editing_existing_preset_is_free(db_session, make_character) -> None:
     """2026-10-16: пересбор уже созданного пресета бесплатный, создание - платное."""
     character = await make_character(farm=bc.PRESET_CHANGE_COST_FARM, subclass="guardian")

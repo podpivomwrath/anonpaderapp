@@ -90,13 +90,31 @@ async def reset_subclass(db: AsyncSession, character: Character) -> Character:
     return character
 
 
+def cap_respec_ready(character: Character) -> bool:
+    """Бесплатный сброс характеристик на 60 уровне ещё не потрачен (2026-11-15,
+    владелец по предложению Есты: на капе игроки пересобираются под итоговый
+    билд). Один раз на персонажа."""
+    return character.level >= bc.MAX_LEVEL and not character.cap_respec_used
+
+
+def stats_reset_cost(character: Character) -> int:
+    """Сколько золота спишет сброс характеристик сейчас: 0 - бесплатно."""
+    if prerelease_config.free_respec() or cap_respec_ready(character):
+        return 0
+    return bc.STATS_RESET_COST_FARM
+
+
 async def reset_stats(db: AsyncSession, character: Character) -> Character:
     """Сброс характеристик: класс и подкласс остаются, очки возвращаются.
 
-    Пресеты не трогаем — они от статов не зависят.
+    Пресеты не трогаем — они от статов не зависят. Первый сброс на 60 уровне
+    бесплатный; пока действует Дар первопроходцев, его не тратят.
     """
     if not prerelease_config.free_respec():
-        await charge(db, character.id, "farm", bc.STATS_RESET_COST_FARM)
+        if cap_respec_ready(character):
+            character.cap_respec_used = True
+        else:
+            await charge(db, character.id, "farm", bc.STATS_RESET_COST_FARM)
 
     await _reset_stats_rows(db, character, character.base_class)
     return character

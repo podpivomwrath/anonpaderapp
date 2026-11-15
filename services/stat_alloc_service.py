@@ -60,7 +60,14 @@ def snapshot(stats: CharacterStats) -> dict[str, int]:
 
 
 def levelup_header(level: int) -> str:
-    return f"✨ Метка окрепла. Уровень {level}."
+    from game.combat import balance_config as bc
+    from game.economy import prerelease_config
+
+    header = f"✨ Метка окрепла. Уровень {level}."
+    # Бесплатный сброс на 60 (2026-11-15): пока сброс и так бесплатен, не пишем.
+    if level == bc.MAX_LEVEL and not prerelease_config.free_respec():
+        header += "\nПервый сброс характеристик у Хранителя Списков - бесплатно."
+    return header
 
 
 def render_window(header: str, unspent: int, char_stats: dict[str, int], pending: dict[str, int]) -> str:

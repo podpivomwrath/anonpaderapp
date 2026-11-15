@@ -48,6 +48,7 @@ from game.classes.base import REGISTRY
 from game.combat import balance_config as bc
 from game.combat import display
 from game.content_loader import load_npc_texts
+from game.economy import prerelease_config
 from game.world import grid
 from models import CharacterStats
 from services import onboarding_service as onboarding_svc
@@ -527,6 +528,16 @@ _REMAKE_WARNINGS = {
 }
 
 
+def _stats_price_line(character) -> str:
+    """Цена сброса характеристик: на 60 уровне первый - бесплатно."""
+    if prerelease_config.free_respec():
+        return ""
+    if respec_service.cap_respec_ready(character):
+        return "\n\nНа 60 уровне первый сброс бесплатный."
+    cost = f"{respec_service.stats_reset_cost(character):,}".replace(",", " ")
+    return f"\n\nСпишется {cost} золота."
+
+
 async def _open_remake_menu(message: Message) -> None:
     async with get_session_factory()() as db:
         character = await onboarding_svc.get_character(db, message.from_id)
@@ -596,11 +607,18 @@ async def remake_confirm_ask(message: Message) -> None:
     action = text_match.canonical([BTN_REMAKE_SUBCLASS, BTN_REMAKE_STATS], message.text)
     if action is None:
         return
+    price = ""
+    if action == BTN_REMAKE_STATS:
+        async with get_session_factory()() as db:
+            character = await onboarding_svc.get_character(db, message.from_id)
+            if character is None:
+                return
+            price = _stats_price_line(character)
     await _dispenser.set(
         message.peer_id, SubclassSelectState.REMAKE_CONFIRM, pending_action=action
     )
     await message.answer(
-        f"{_REMAKE_WARNINGS[action]}\n\nПереписываем?",
+        f"{_REMAKE_WARNINGS[action]}{price}\n\nПереписываем?",
         keyboard=remake_confirm_keyboard(),
     )
 

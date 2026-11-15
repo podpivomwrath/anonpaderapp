@@ -147,12 +147,37 @@ async def record_exploration(
     return boss
 
 
+async def live_hp(db: AsyncSession, ring: int, now: datetime | None = None) -> int:
+    """Здоровье нового босса кольца по живым заходам (wbc.LIVE_HP_*):
+    ATTEMPTS_TO_KILL медианных заходов игроков уровня кольца за последние дни."""
+    now = now or _now()
+    rows = (await db.execute(
+        select(WorldBossContribution.damage, WorldBossContribution.attempts)
+        .join(WorldBoss, WorldBoss.id == WorldBossContribution.world_boss_id)
+        .join(Character, Character.id == WorldBossContribution.character_id)
+        .where(
+            WorldBoss.ring == ring,
+            WorldBoss.spawned_at >= now - timedelta(days=wbc.LIVE_HP_DAYS),
+            WorldBossContribution.attempts > 0,
+            Character.level >= world_boss.boss_level(ring) - wbc.LIVE_HP_LEVEL_GAP,
+        )
+    )).all()
+    floor = wbc.BOSS_HP[ring]
+    if len(rows) < wbc.LIVE_HP_MIN_SAMPLES:
+        return floor
+    per_attempt = sorted(damage / attempts for damage, attempts in rows)
+    mid = len(per_attempt) // 2
+    median = per_attempt[mid] if len(per_attempt) % 2 else (per_attempt[mid - 1] + per_attempt[mid]) / 2
+    hp = round(median * wbc.ATTEMPTS_TO_KILL, -2)
+    return int(min(max(hp, floor), floor * wbc.LIVE_HP_MAX_MULT))
+
+
 async def spawn(db: AsyncSession, rng: random.Random, now: datetime | None = None) -> WorldBoss:
     """Ставит нового босса на карту. Отдельно от счётчика - для админки и тестов."""
     now = now or _now()
     ring = world_boss.pick_ring(rng, await _players_by_ring(db, now))
     x, y = world_boss.pick_cell(ring, rng)
-    hp = wbc.BOSS_HP[ring]
+    hp = await live_hp(db, ring, now)
     boss = WorldBoss(
         boss_id=rng.choice(sorted(world_boss.boss_defs())),
         ring=ring, level=world_boss.boss_level(ring), x=x, y=y,

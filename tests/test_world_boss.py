@@ -28,6 +28,7 @@ from models import (
     CharacterTrophy,
     Inventory,
     WorldBoss,
+    WorldBossContribution,
     WorldBossMeter,
 )
 from services import world_boss_service as svc
@@ -376,3 +377,25 @@ def test_kill_bonus_adds_loot_rolls_but_not_xp() -> None:
     assert bonus.xp == plain.xp
     assert len(bonus.items) == round(wbc.ITEMS_BY_RING[4] * wbc.KILL_LOOT_MULT)
     assert bonus.trophies["heart_spike"] == round(wbc.TROPHIES_BY_RING[4]["heart_spike"] * wbc.KILL_LOOT_MULT)
+
+
+async def test_hp_follows_live_attempts_of_the_ring(db_session, make_character) -> None:
+    """Здоровье нового босса - десять медианных заходов игроков его кольца
+    (2026-11-15: босс IV кольца падал за минуту). Мало заходов - нижняя
+    граница BOSS_HP; низкоуровневые гости кольца медиану не тянут вниз."""
+    assert await svc.live_hp(db_session, 4, NOW) == wbc.BOSS_HP[4]
+    boss = await _boss(db_session, ring=4)
+    boss.status = svc.KILLED
+    for i in range(wbc.LIVE_HP_MIN_SAMPLES):
+        fighter = await make_character(level=60)
+        db_session.add(WorldBossContribution(world_boss_id=boss.id, character_id=fighter.id,
+                                             damage=(7000 + i * 100) * 2, attempts=2))
+    for _ in range(5):
+        guest = await make_character(level=20)
+        db_session.add(WorldBossContribution(world_boss_id=boss.id, character_id=guest.id,
+                                             damage=300, attempts=1))
+    await db_session.flush()
+    # медиана 7 450 x 10 заходов
+    assert await svc.live_hp(db_session, 4, NOW + timedelta(hours=1)) == 74_500
+    # через неделю заходы устарели - снова нижняя граница
+    assert await svc.live_hp(db_session, 4, NOW + timedelta(days=8)) == wbc.BOSS_HP[4]

@@ -119,6 +119,12 @@ function RuneSheet({ rune, busy, onAbsorb, onClose }) {
   return (
     <Sheet title={rune.name} icon={<RuneIcon rune={rune} size={28} />} onClose={onClose}>
       <RuneInfo rune={rune} />
+      {rune.steps && (
+        <>
+          <p className="rune-sheet__sub">Ступени навыка. Мастерство: {gold(rune.absorbed)} {copiesWord(rune.absorbed)}.</p>
+          <StepsList steps={rune.steps} absorbed={rune.absorbed} />
+        </>
+      )}
       <p className="rune-sheet__have">В сумке: {rune.count}</p>
       {max > 0 && (
         <div className="rune-absorb">
@@ -163,31 +169,39 @@ function StepsSheet({ ability, data, busy, onFork, onClose }) {
     <Sheet title={ability.skill.name} icon={<RuneIcon rune={ability.rune} size={28} />} onClose={onClose}>
       <p className="rune-info__text">{ability.summary}</p>
       <p className="rune-sheet__sub">Ступени навыка. Мастерство: {gold(absorbed)} {copiesWord(absorbed)}.</p>
-      <ol className="rune-steps">
-        {ability.steps.map((st) => (
-          <li key={st.n} className={`rune-step${st.done ? ' rune-step--done' : ''}`}>
-            <div className="rune-step__head">
-              <b>Ступень {STEP_NAMES[st.n]}{st.n === 4 ? ' - пробуждение' : ''}</b>
-              <small>{st.done ? 'открыта' : `ещё ${gold(Math.max(st.need - absorbed, 0))} ${copiesWord(Math.max(st.need - absorbed, 0))}`}</small>
-            </div>
-            {st.text && <p>{st.text}</p>}
-            {st.fork && (
-              <div className="rune-fork">
-                {st.fork.map((text, i) => (
-                  <button key={text} type="button" disabled={busy || !st.done || !data.home}
-                    className={`rune-fork__opt${st.chosen === i + 1 ? ' rune-fork__opt--chosen' : ''}`}
-                    onClick={() => onFork(i + 1)}>
-                    <b>{i === 0 ? 'а' : 'б'}</b> {text}
-                  </button>
-                ))}
-                {st.done && !st.chosen && <small>Выберите одно - менять можно дома, бесплатно.</small>}
-              </div>
-            )}
-            {st.pvp_note && <small>{st.pvp_note}</small>}
-          </li>
-        ))}
-      </ol>
+      <StepsList steps={ability.steps} absorbed={absorbed} data={data} busy={busy} onFork={onFork} />
     </Sheet>
+  );
+}
+
+/** Список ступеней. Без onFork - только посмотреть (навык в сумке, 2026-11-15). */
+function StepsList({ steps, absorbed, data, busy, onFork }) {
+  return (
+    <ol className="rune-steps">
+      {steps.map((st) => (
+        <li key={st.n} className={`rune-step${st.done ? ' rune-step--done' : ''}`}>
+          <div className="rune-step__head">
+            <b>Ступень {STEP_NAMES[st.n]}{st.n === 4 ? ' - пробуждение' : ''}</b>
+            <small>{st.done ? 'открыта' : `ещё ${gold(Math.max(st.need - absorbed, 0))} ${copiesWord(Math.max(st.need - absorbed, 0))}`}</small>
+          </div>
+          {st.text && <p>{st.text}</p>}
+          {st.fork && (
+            <div className="rune-fork">
+              {st.fork.map((text, i) => (
+                <button key={text} type="button" disabled={!onFork || busy || !st.done || !data?.home}
+                  className={`rune-fork__opt${st.chosen === i + 1 ? ' rune-fork__opt--chosen' : ''}`}
+                  onClick={() => onFork?.(i + 1)}>
+                  <b>{i === 0 ? 'а' : 'б'}</b> {text}
+                </button>
+              ))}
+              {onFork && st.done && !st.chosen && <small>Выберите одно - менять можно дома, бесплатно.</small>}
+              {!onFork && <small>Одно на выбор - выбирается, когда навык стоит в слоте.</small>}
+            </div>
+          )}
+          {st.pvp_note && <small>{st.pvp_note}</small>}
+        </li>
+      ))}
+    </ol>
   );
 }
 

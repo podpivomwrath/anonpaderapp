@@ -267,7 +267,11 @@ async def _payload(db, character) -> dict:
     owned = [
         {**_rune(r, known.get(r.id, 0), bag.get(r.id, 0)), "equipped": r.id in worn,
          "effect": (_effect_text(r.id, fighter, hero_stats, known.get(r.id, 0),
-                                 (character.skill_forks or {}).get(r.id)) if r.kind == rc.ABILITY else None)}
+                                 (character.skill_forks or {}).get(r.id)) if r.kind == rc.ABILITY else None),
+         # Ступени и у навыка в сумке (2026-11-15, Еста): видно, что даст
+         # мастерство, до того как вставить руну в слот.
+         "steps": (_ability_info(r.id, known.get(r.id, 0), (character.skill_forks or {}).get(r.id))["steps"]
+                   if r.kind == rc.ABILITY and r.id in ac.BY_ID else None)}
         for r in rc.RUNES if bag.get(r.id) or known.get(r.id) or r.id in worn
     ]
     wallet = await wallet_service.get_wallet(db, character.id)
