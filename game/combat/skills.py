@@ -89,14 +89,15 @@ class SkillContext:
     lines: list[str] = field(default_factory=list)
 
     def resolve_target(self) -> CombatantState | None:
-        """Цель действия: указанная живая, иначе случайный живой враг."""
+        """Цель действия: указанная живая, иначе случайный живой враг. В PvP
+        цель может перехватить Страж её группы (атака и навыки по одной цели)."""
         target_id = self.action.target_id
         if target_id is not None:
             target = self.session.combatants.get(target_id)
             if target is not None and target.alive:
-                return target
+                return _guardian_taunt(self, target)
         enemies = self.session.alive_enemies_of(self.actor)
-        return self.rng.choice(enemies) if enemies else None
+        return _guardian_taunt(self, self.rng.choice(enemies)) if enemies else None
 
 
 SkillHandler = Callable[[SkillContext], None]
@@ -559,10 +560,12 @@ def riposte_active(actor: CombatantState) -> bool:
 
 
 def _guardian_taunt(ctx: SkillContext, target: CombatantState) -> CombatantState:
-    """Страж (2026-11-15): в PvP обычная атака игрока по союзнику Стража с
-    шансом достаётся самому Стражу."""
+    """Страж (2026-11-15): в PvP атака или навык игрока по одной цели - союзнику
+    Стража - с шансом достаётся самому Стражу. Сначала было только для обычной
+    атаки, но её жмут лишь в перезарядке навыков (Еста, владелец, 2026-11-15).
+    Удары по всем врагам и цепи берут цели сами, мимо resolve_target."""
     actor = ctx.actor
-    if actor.kind != "character" or target.kind != "character":
+    if actor.kind != "character" or target.kind != "character" or target.side == actor.side:
         return target
     for guard in ctx.session.alive_allies_of(target):
         chance = (guard.buff_modifiers or {}).get("pvp_taunt_chance", 0.0)
@@ -578,7 +581,6 @@ def basic_attack(ctx: SkillContext) -> None:
     target = ctx.resolve_target()
     if target is None:
         return
-    target = _guardian_taunt(ctx, target)
     ctx.hits.append(compute_hit(ctx.actor, target, ctx.rng))
     # Патч 56, Клинок теней, «Пометка добычи+»: обычная атака с шансом вешает
     # стак Метки добычи. У остальных подклассов ключа нет - нет-оп.

@@ -159,6 +159,33 @@ def test_guardian_takes_a_basic_attack_in_pvp() -> None:
     assert all(h.target_id == 3 for h in result.hits if h.source_id == 1)
 
 
+def test_guardian_takes_a_single_target_skill_in_pvp() -> None:
+    """Еста, 2026-11-15: обычную атаку жмут только в перезарядке - перехват
+    должен работать и на навыки по одной цели."""
+    enemy = combatant(1, 0, subclass_id="shadow_blade", agility=60)
+    ally = combatant(2, 1)
+    guard = combatant(3, 1)
+    guard.buff_modifiers["pvp_taunt_chance"] = 1.0
+    session = _session(enemy, ally, guard, mode=CombatMode.PVP_GROUP)
+    session.tick_number = 1
+    result = resolve_tick(session, {1: DeclaredAction(type=ActionType.SKILL, skill_id="shadow_blade_marked_strike",
+                                                      target_id=2)}, random.Random(1))
+    hits = [h for h in result.hits if h.source_id == 1]
+    assert hits and all(h.target_id == 3 for h in hits)
+    assert any("принимает удар" in line for line in result.lines)
+
+
+def test_guardian_does_not_take_hits_from_mobs() -> None:
+    mob = combatant(1, 0, kind="mob", strength=60)
+    ally = combatant(2, 1)
+    guard = combatant(3, 1)
+    guard.buff_modifiers["pvp_taunt_chance"] = 1.0
+    session = _session(mob, ally, guard)
+    session.tick_number = 1
+    result = resolve_tick(session, {1: _attack(2)}, random.Random(1))
+    assert all(h.target_id == 2 for h in result.hits if h.source_id == 1)
+
+
 def test_guardian_defense_can_last_longer() -> None:
     from types import SimpleNamespace
 
