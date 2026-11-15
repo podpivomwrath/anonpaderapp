@@ -182,3 +182,37 @@ def test_group_pve_multi_player_sections() -> None:
     own_section = text.split("👥 ВАША СТОРОНА")[1].split("💀 ПРОТИВНИК")[0]
     assert "Гостус →" in own_section
     assert "Кирамус →" in own_section
+
+
+def test_same_hits_of_a_tick_fold_into_one_line() -> None:
+    """2026-11-15, владелец: лог Есты на 80 строк - обратная молитва, шипы,
+    удары одноимённых мобов и лечение блока шли по строке на каждый удар."""
+    from game.combat.resolver import RenderedHeal, RenderedHit, TickResult
+
+    esta = combatant(1, side=0, name="Еста")
+    mobs = [combatant(10 + i, side=1, name="Послушник культа", kind="mob") for i in range(3)]
+    elder = combatant(20, side=1, name="Старший послушник", kind="mob")
+    state = make_session(CombatMode.PVE, esta, *mobs, elder)
+
+    def hit(src, dst, label, amount, before, crit=False, tick=False, blocked=0):
+        s, t = state.combatants[src], state.combatants[dst]
+        return RenderedHit(src, dst, s.side, t.side, label, amount, crit, False, tick, before,
+                           max(before - amount, 0), 5000, is_tick=tick, blocked=blocked)
+
+    result = TickResult()
+    result.hit_renders = [
+        hit(1, 20, "Удар щитом", 552, 600),
+        hit(1, 20, "Удар щитом", 552, 0),
+        *[hit(1, 10, "обратная молитва", 20, 5000 - 20 * i) for i in range(5)],
+        *[hit(m.id, 1, "бьёт посохом", 136, 2800 - 136 * i, blocked=73) for i, m in enumerate(mobs)],
+        *[hit(10, 1, "яд", 39, 2400, tick=True) for _ in range(4)],
+    ]
+    result.heal_renders = [RenderedHeal(1, 1, 0, 0, "Глухая оборона гасит удар", 101, 2000 + 101 * i,
+                                        2101 + 101 * i, 5000) for i in range(3)]
+    text = render_tick(state, result, viewer_side=0)
+    assert "Еста → обратная молитва ×5 по Послушник культа - 100 урона (Послушник культа: 5000 → 4900)" in text
+    assert "Послушник культа → бьёт посохом ×3 по Еста - 408 урона (🛡 блок срезал 219)" in text
+    assert "Еста теряет 156 HP от эффекта «яд» (×4)" in text
+    assert "Еста → Глухая оборона гасит удар ×3 - восполнено 303 HP (2000 → 2303)" in text
+    assert "Удар щитом ×2 по Старший послушник - 1104 урона (Старший послушник: 600 → 0)" in text
+    assert text.count("обратная молитва") == 1

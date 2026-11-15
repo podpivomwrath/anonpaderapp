@@ -63,6 +63,92 @@ def _heal_line(heal: RenderedHeal, source_name: str, target_name: str, mode: str
     return f"{source_name} → {heal.label} - восполнено {heal.amount} HP ({who}{before} → {after})"
 
 
+def _grouped(items, key) -> list[list]:
+    """Одинаковые записи хода - в одну группу, в порядке первой из них."""
+    groups: dict = {}
+    for item in items:
+        groups.setdefault(key(item), []).append(item)
+    return list(groups.values())
+
+
+def _times(group) -> str:
+    return f" ×{len(group)}" if len(group) > 1 else ""
+
+
+def _hit_key(session: CombatSessionState, hit: RenderedHit):
+    # По имени, а не по id: четыре «Послушника культа» бьют посохом одной
+    # строкой. Криты и усиленные удары - отдельной, их видно.
+    return (hit.source_side, session.combatants[hit.source_id].name, hit.label, hit.missed, hit.crit,
+            getattr(hit, "riposte", False), getattr(hit, "heavy", False))
+
+
+def _hits_line(session: CombatSessionState, group: list[RenderedHit], mode: str) -> str:
+    """Свёрнутые одинаковые удары хода (2026-11-15, владелец: лог Есты на
+    80 строк - обратная молитва, шипы и блок по строке на каждый удар).
+    Один удар - прежняя строка _hit_line."""
+    first, last = group[0], group[-1]
+    source_name = session.combatants[first.source_id].name
+    targets = list(dict.fromkeys(h.target_id for h in group))
+    target_name = session.combatants[targets[0]].name
+    if len(group) == 1:
+        if first.hp_before <= 0 and not first.missed:
+            # Ход одновременный: удар заявлен по живой цели, а дошёл до павшей.
+            return _hit_line(first, source_name, target_name, mode).rsplit(" (", 1)[0] + " (цель уже пала)"
+        return _hit_line(first, source_name, target_name, mode)
+    word = _action_word(first.label)
+    where = f" по {target_name}" if len(targets) == 1 else f" (целей: {len(targets)})"
+    head = f"{source_name} → {word}{_times(group)}{where}"
+    if first.missed:
+        dodger = f", {target_name} уклоняется" if len(targets) == 1 else ""
+        mark = f" 🎯 Метка добычи ×{last.marked}" if last.marked else ""
+        return f"{head} - промах{dodger}{mark}"
+    shielded = sum(max(getattr(h, "shielded", 0), 0) for h in group)
+    blocked = sum(getattr(h, "blocked", 0) for h in group)
+    amount = sum(h.amount for h in group) + shielded
+    flags = (" (крит!)" if first.crit else "") + (
+        f" ({combat_flavor.RIPOSTE_MARK})" if getattr(first, "riposte", False) else "") + (
+        f" ({combat_flavor.HEAVY_MARK})" if getattr(first, "heavy", False) else "")
+    shield = f" (щит поглотил {shielded})" if shielded > 0 else ""
+    block = f" (🛡 блок срезал {blocked})" if blocked > 0 else ""
+    line = f"{head} - {amount} урона{flags}{shield}{block}"
+    if len(targets) > 1:
+        return line
+    if first.hp_before <= 0:
+        return f"{line} (цель уже пала)"
+    before = display.hp_text(first.hp_before, first.max_hp, mode)
+    after = display.hp_text(last.hp_after, last.max_hp, mode)
+    return f"{line} ({target_name}: {before} → {after})"
+
+
+def _dots_line(session: CombatSessionState, group: list[RenderedHit]) -> str:
+    first = group[0]
+    target_name = session.combatants[first.target_id].name
+    if len(group) == 1:
+        return _dot_line(first, target_name)
+    shielded = sum(max(getattr(h, "shielded", 0), 0) for h in group)
+    amount = sum(h.amount for h in group) + shielded
+    shield = f", щит поглотил {shielded}" if shielded > 0 else ""
+    return f"{target_name} теряет {amount} HP от эффекта «{first.label}» (×{len(group)}{shield})"
+
+
+def _heals_line(session: CombatSessionState, group: list[RenderedHeal], mode: str) -> str:
+    first, last = group[0], group[-1]
+    source_name = session.combatants[first.source_id].name
+    target_name = session.combatants[first.target_id].name
+    if len(group) == 1:
+        return _heal_line(first, source_name, target_name, mode)
+    before = display.hp_text(first.hp_before, first.max_hp, mode)
+    after = display.hp_text(last.hp_after, last.max_hp, mode)
+    who = "" if source_name == target_name else f"{target_name}: "
+    return (f"{source_name} → {first.label}{_times(group)} - восполнено {sum(h.amount for h in group)} HP "
+            f"({who}{before} → {after})")
+
+
+def _collapse_text(lines: list[str]) -> list[str]:
+    """Одинаковые готовые строки (яд у четырёх одноимённых мобов) - одной с ×N."""
+    return [g[0] if len(g) == 1 else f"{g[0]} (×{len(g)})" for g in _grouped(lines, lambda s: s)]
+
+
 def _guess_side(session: CombatSessionState, line: str) -> int | None:
     """Строка уже называет участника по имени (control_line и т.п.) —
     сопоставляем по вхождению имени. None — общее сообщение без привязки
@@ -349,38 +435,35 @@ def render_tick(
     non_dot = [h for h in result.hit_renders if not h.is_tick]
     dot_hits = [h for h in result.hit_renders if h.is_tick]
 
-    for hit in non_dot:
-        source_name = session.combatants[hit.source_id].name
-        target_name = session.combatants[hit.target_id].name
-        bucket(hit.source_side).append(_hit_line(hit, source_name, target_name, mode))
+    for group in _grouped(non_dot, lambda h: _hit_key(session, h)):
+        bucket(group[0].source_side).append(_hits_line(session, group, mode))
 
     # Лечение против мобов доходит в конце хода, после их ударов (resolver),
     # поэтому и в логе оно в итоге: цифры читаются сверху вниз.
     heal_lines = []
-    for heal in result.heal_renders:
-        source_name = session.combatants[heal.source_id].name
-        target_name = session.combatants[heal.target_id].name
-        line = _heal_line(heal, source_name, target_name, mode)
+    heal_key = (lambda h: (h.source_side, h.source_id, h.target_id, h.label))
+    for group in _grouped(result.heal_renders, heal_key):
+        line = _heals_line(session, group, mode)
         if summary is not None:
             heal_lines.append(line)
         else:
-            bucket(heal.source_side).append(line)
+            bucket(group[0].source_side).append(line)
 
     hit_heal_span = len(result.hit_renders) + len(result.heal_renders)
     other_lines = (
         result.lines[: result.prelude_line_count]
         + result.lines[result.prelude_line_count + hit_heal_span :]
     )
-    for line in other_lines:
+    for line in _collapse_text(other_lines):
         if summary is not None and line.startswith("☠"):
             summary.append(line)
             continue
         side = _guess_side(session, line)
         bucket(side if side is not None else 1 - viewer_side).append(line)
 
-    for hit in dot_hits:
-        target_name = session.combatants[hit.target_id].name
-        (summary if summary is not None else bucket(hit.target_side)).append(_dot_line(hit, target_name))
+    for group in _grouped(dot_hits, lambda h: (h.target_side, session.combatants[h.target_id].name, h.label)):
+        line = _dots_line(session, group)
+        (summary if summary is not None else bucket(group[0].target_side)).append(line)
     if summary is not None:
         # Порядок как в движке: яды, лечение, потом смерти.
         deaths = [line for line in summary if line.startswith("☠")]
