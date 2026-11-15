@@ -55,6 +55,27 @@ def _apply_vulnerability(target, skill: SubclassSkillDef, value: float, source_i
     ))
 
 
+def _ice_second_target(ctx: SkillContext, skill, target, multiplier: float,
+                       duration_bonus: int, chance_bonus: float) -> None:
+    """Пассивка Элементалиста (2026-11-15): Оковы по мобам бьют и морозят
+    ещё одного врага."""
+    actor = ctx.actor
+    if actor.buff_modifiers.get("ice_extra_target", 0.0) <= 0:
+        return
+    others = [e for e in ctx.session.alive_enemies_of(actor) if e.id != target.id]
+    if not others:
+        return
+    extra = ctx.rng.choice(others)
+    if multiplier > 0:
+        ctx.hits.append(compute_hit(actor, extra, ctx.rng, skill.name, multiplier, is_ability=True))
+    res = control.try_apply_control(
+        extra, base_duration=bc.CONTROL_BASE_DURATION_TICKS, source_id=actor.id, rng=ctx.rng, pvp=False,
+        duration_bonus=duration_bonus, chance_bonus=chance_bonus,
+    )
+    if res.applied:
+        ctx.lines.append(f"❄️ Ледяные оковы достают ещё одного врага: {extra.name}")
+
+
 def _make_handler(base_skill: SubclassSkillDef):
     def handler(ctx: SkillContext) -> None:
         from game.combat.skill_catalog import tuned  # цикл: каталог импортирует этот модуль
@@ -86,10 +107,19 @@ def _make_handler(base_skill: SubclassSkillDef):
 
                 chance_bonus += ability_rules.mod(actor, "skill_ctrl_pierce", skill.id)
                 duration_bonus += ability_rules.ctrl_mobs_bonus(actor, skill.id, target)
+                base_duration = bc.CONTROL_BASE_DURATION_TICKS
+                # Пассивка Элементалиста (2026-11-15): в PvP Оковы с шансом
+                # морозят на 2 хода (база, а не прибавка - прибавку PvP режет).
+                long_ice = actor.buff_modifiers.get("ice_pvp_long_chance", 0.0)
+                if pvp and skill.id == "elementalist_ice" and long_ice and ctx.rng.random() < long_ice:
+                    base_duration = 2
                 res = control.try_apply_control(
-                    target, base_duration=bc.CONTROL_BASE_DURATION_TICKS, source_id=actor.id, rng=ctx.rng, pvp=pvp,
+                    target, base_duration=base_duration, source_id=actor.id, rng=ctx.rng, pvp=pvp,
                     duration_bonus=duration_bonus, chance_bonus=chance_bonus,
                 )
+                if not pvp and skill.id == "elementalist_ice":
+                    _ice_second_target(ctx, skill, target, multiplier if skill.multiplier > 0 else 0.0,
+                                       duration_bonus, chance_bonus)
                 # Патч 49: «Ледяное поле» — заморозка основной цели слегка чилит
                 # соседних (только при нескольких противниках — иначе нет-оп).
                 # Интерпретация неоднозначной формулировки "снижение скорости

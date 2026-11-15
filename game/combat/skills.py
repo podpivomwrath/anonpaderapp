@@ -59,6 +59,8 @@ class PendingHit:
     #: Ответный удар (шипы, отражение, «Обратная молитва»): его не отражают,
     #: на него не отвечают и боссы его не копируют (владелец, 2026-11-07).
     reactive: bool = False
+    #: Пассивка Клинка теней: удар прошёл мимо защиты от Выносливости (2026-11-15).
+    pierced: bool = False
 
 
 @dataclass
@@ -364,6 +366,15 @@ def compute_hit(
     потолок DODGE_HARD_CAP (не DODGE_STAT_CAP — тот лимитирует только вклад
     самого стата)."""
     stat_dodge = stat_model.ACTIVE.dodge(target.stats, is_ability)
+    # Пассивки (2026-11-15): уклонение и от Ловкости (Клинок теней - треть
+    # силы Воли, путь разбойника - половина); путь разбойника от навыков
+    # уклоняется на 3/4, а не на 1/4.
+    target_mods = target.buff_modifiers or {}
+    agi_share = target_mods.get("agi_dodge_share", 0.0)
+    own_ratio = target_mods.get("ability_dodge_ratio", 0.0) if target.kind == "character" else 0.0
+    if agi_share or own_ratio:
+        full = stat_model.ACTIVE.dodge(target.stats, False) + agi_share * stat_model.agi_dodge(target.stats)
+        stat_dodge = full * (own_ratio or bc.ABILITY_DODGE_RATIO) if is_ability else full
     stat_dodge += stat_model.subclass_dodge_bonus(target.subclass_id)
     # Патч 56, Клинок теней: «Тень» (пассивный уворот), «Ускользание» (после
     # удачного уворота по нему сложнее попасть в следующий ход), «Второй шанс»
@@ -385,10 +396,11 @@ def compute_hit(
     # Клинок теней под танцем уклонялся от навыков в ~70% случаев. Механики
     # уворота мобов («уходит в камень» и т.п.) не трогаем.
     scale_vs_ability = is_ability and target.kind == "character"
+    effect_ratio = own_ratio or bc.EFFECT_ABILITY_DODGE_RATIO
     if scale_vs_ability:
-        effect_dodge *= bc.EFFECT_ABILITY_DODGE_RATIO
-        extra_dodge *= bc.EFFECT_ABILITY_DODGE_RATIO
-        strongest_effect *= bc.EFFECT_ABILITY_DODGE_RATIO
+        effect_dodge *= effect_ratio
+        extra_dodge *= effect_ratio
+        strongest_effect *= effect_ratio
     total_dodge = min(
         stat_dodge + effect_dodge + extra_dodge,
         max(bc.DODGE_HARD_CAP, min(strongest_effect, bc.DODGE_EFFECT_CAP)),
@@ -402,7 +414,7 @@ def compute_hit(
         total_dodge = 0.0
     # «Второй шанс» против навыка - с тем же коэффициентом, а не наверняка.
     second_chance = target.second_chance_active and (
-        not scale_vs_ability or rng.random() < bc.EFFECT_ABILITY_DODGE_RATIO
+        not scale_vs_ability or rng.random() < effect_ratio
     )
     dodges = (not ignore_dodge and second_chance) or (
         total_dodge > 0 and rng.random() < total_dodge
@@ -459,6 +471,11 @@ def compute_hit(
         for mark in target.effects_of(EffectKind.MARK):
             crit_chance += actor.buff_modifiers.get("mark_ally_crit_bonus", 0.0) if mark.source_id != actor.id else 0.0
     crit = True if (force_crit or actor.guaranteed_crit_next) else rng.random() < crit_chance
+    # Клинок теней (2026-11-15): по игрокам с шансом удар идёт мимо защиты от
+    # Выносливости и стойкости к криту. Потолок «Несокрушимого» остаётся.
+    pierce = actor.buff_modifiers.get("pvp_pierce_chance", 0.0)
+    pierced = bool(pierce) and actor.kind == "character" and target.kind == "character" \
+        and target.side != actor.side and rng.random() < pierce
     if actor.guaranteed_crit_next:
         actor.guaranteed_crit_next = False
     if crit:
@@ -471,6 +488,8 @@ def compute_hit(
         resist = target.buff_modifiers.get("resist_crit", 0.0)
         if target.kind == "character":
             resist += stat_model.ACTIVE.crit_resist(target.stats)
+        if pierced:
+            resist = 0.0
         base *= 1.0 + max(mult - 1.0, 0.0) * max(1.0 - resist, 0.0)
         # Кровавый рыцарь, «Стойкий к боли» (патч 47, ч.2): свой крит-урон не
         # трогает, только входящий по себе.
@@ -490,7 +509,8 @@ def compute_hit(
     # Руна «Литая кираса» (2026-10-31): уязвимость на цели слабее.
     base *= 1.0 + target.effect_total(EffectKind.VULNERABILITY) * max(
         1.0 - target.buff_modifiers.get("rune:cast_cuirass", 0.0), 0.0)
-    base *= 1.0 - effective_mitigation(target)
+    if not pierced:
+        base *= 1.0 - effective_mitigation(target)
     # Кровавый рыцарь, «Кровавый доспех»/«Второе дыхание» (патч 47, ч.2) —
     # безусловное и низко-HP-условное снижение входящего урона.
     base *= 1.0 - target.buff_modifiers.get("incoming_damage_reduction", 0.0)
@@ -528,6 +548,7 @@ def compute_hit(
         skill_id=getattr(actor, "current_skill", None),
         riposte=riposte_active(actor),
         heavy=heavy,
+        pierced=pierced,
     )
 
 
@@ -537,12 +558,27 @@ def riposte_active(actor: CombatantState) -> bool:
     return bool(actor.dodged_last_tick) and actor.buff_modifiers.get("rune:riposte", 0.0) > 0
 
 
+def _guardian_taunt(ctx: SkillContext, target: CombatantState) -> CombatantState:
+    """Страж (2026-11-15): в PvP обычная атака игрока по союзнику Стража с
+    шансом достаётся самому Стражу."""
+    actor = ctx.actor
+    if actor.kind != "character" or target.kind != "character":
+        return target
+    for guard in ctx.session.alive_allies_of(target):
+        chance = (guard.buff_modifiers or {}).get("pvp_taunt_chance", 0.0)
+        if chance and guard.kind == "character" and guard.side != actor.side and ctx.rng.random() < chance:
+            ctx.lines.append(f"🛡 {guard.name} принимает удар {actor.name} на себя")
+            return guard
+    return target
+
+
 @offensive_skill("attack")
 def basic_attack(ctx: SkillContext) -> None:
     """Базовая атака — доступна всем."""
     target = ctx.resolve_target()
     if target is None:
         return
+    target = _guardian_taunt(ctx, target)
     ctx.hits.append(compute_hit(ctx.actor, target, ctx.rng))
     # Патч 56, Клинок теней, «Пометка добычи+»: обычная атака с шансом вешает
     # стак Метки добычи. У остальных подклассов ключа нет - нет-оп.

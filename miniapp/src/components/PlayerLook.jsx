@@ -57,12 +57,32 @@ function LookBody({ data }) {
     );
   };
 
+  const sub = (
+    <p className="look-sub">
+      {data.class_title} · {data.level} ур.
+      {data.title && <span className={`title-tier title-tier--${data.title_tier || 'common'}`}> · «{data.title}»</span>}
+    </p>
+  );
+  // Сборка скрыта Клеймом Хранителя (2026-11-15): только имя, класс и силуэт.
+  if (data.hidden) {
+    return (
+      <>
+        {sub}
+        <div className="hero-stage look-stage">
+          <div className="hero-row">
+            <div className="hero-figure">
+              <img className="hero-figure__img" src={url} alt="" draggable="false" />
+            </div>
+          </div>
+        </div>
+        <p className="look-hint">Игрок скрыл свою сборку.</p>
+      </>
+    );
+  }
+
   return (
     <>
-      <p className="look-sub">
-        {data.class_title} · {data.level} ур.
-        {data.title && <span className={`title-tier title-tier--${data.title_tier || 'common'}`}> · «{data.title}»</span>}
-      </p>
+      {sub}
       <div className="hero-stage look-stage">
         <div className="hero-row">
           <div className="hero-col hero-col--left">

@@ -188,6 +188,15 @@ def use(model: StatModel) -> None:
     ACTIVE = model
 
 
+def agi_dodge(stats) -> float:
+    """Уклонение от Ловкости по той же кривой, что у Воли (пассивки Клинка
+    теней и пути разбойника берут от него долю, 2026-11-15)."""
+    model = ACTIVE
+    if isinstance(model, HyperModel):
+        return hyper(stats.agility, model.dodge_cap, model.dodge_k)
+    return formulas.dodge_chance(stats.agility)
+
+
 def subclass_crit_bonus(subclass_id: str | None) -> float:
     model = ACTIVE
     return (getattr(model, "base_crit", None) or {}).get(subclass_id or "", 0.0)

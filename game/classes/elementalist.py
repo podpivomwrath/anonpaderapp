@@ -63,8 +63,17 @@ def fire_whip(ctx: SkillContext) -> None:
     # Патч 49, ч.2: «Огненный дождь» — Горение распространяется на других
     # живых противников с пониженной силой; нет-оп в бою 1×1 (нет "соседей").
     spread_pct = actor.buff_modifiers.get("burn_spread_pct", 0.0)
+    others = [e for e in ctx.session.alive_enemies_of(actor) if e.id != target.id]
+    # Пассивка Элементалиста (2026-11-15): без ступени - ещё двое вполсилы,
+    # со ступенью «перекидывается» - все в полную силу.
+    whip = int(actor.buff_modifiers.get("whip_extra_targets", 0))
+    if whip and spread_pct > 0:
+        spread_pct = 1.0
+    elif whip:
+        ctx.rng.shuffle(others)
+        others = others[:whip]
+        spread_pct = 0.5
     if spread_pct > 0:
-        others = [e for e in ctx.session.alive_enemies_of(actor) if e.id != target.id]
         for other in others:
             other.apply_effect(
                 EffectKind.DOT, burn_value * spread_pct, skill.effect_duration, actor.id, tag=BURN_TAG,
@@ -87,11 +96,13 @@ def chain_lightning(ctx: SkillContext) -> None:
 
     # Патч 49, ч.2: «Цепная молния» — на 1 дополнительную цель.
     extra_targets = 2 + int(actor.buff_modifiers.get("chain_lightning_extra_targets", 0))
+    # Пассивка Элементалиста (2026-11-15): остальные цели - 80% от удара по цели.
+    ratio = max(skill.effect_value, actor.buff_modifiers.get("chain_extra_ratio", 0.0))
     others = [e for e in ctx.session.alive_enemies_of(actor) if e.id != target.id]
     ctx.rng.shuffle(others)
     for extra in others[:extra_targets]:
         ctx.hits.append(
-            compute_hit(actor, extra, ctx.rng, skill.name, multiplier * skill.effect_value, is_ability=True)
+            compute_hit(actor, extra, ctx.rng, skill.name, multiplier * ratio, is_ability=True)
         )
 
 

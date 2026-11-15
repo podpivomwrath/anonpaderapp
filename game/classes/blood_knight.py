@@ -53,6 +53,11 @@ def _lifesteal_heal(ctx: SkillContext, hit, ratio: float) -> None:
     actor = ctx.actor
     target = ctx.session.combatants.get(hit.target_id)
     seal = target.effect_from(EffectKind.BLOOD_SEAL, actor.id) if target is not None else None
+    # Пассивка (2026-11-15): печать союзника тоже усиливает вампиризм.
+    if seal is None and target is not None and actor.buff_modifiers.get("any_seal_lifesteal", 0.0) > 0:
+        seal = max((e for e in target.effects_of(EffectKind.BLOOD_SEAL)
+                    if (src := ctx.session.combatants.get(e.source_id)) is not None and src.side == actor.side),
+                   key=lambda e: e.value, default=None)
     if seal is not None:
         # Сила печати - в самом эффекте: ступень руны-навыка её поднимает (2026-11-10).
         ratio *= max(seal.value, bc.BLOOD_KNIGHT_BLOOD_SEAL_MULT)

@@ -1,7 +1,8 @@
 """Окно чужого игрока (2026-11-14, владелец): нажал на имя в топе или на
 доске - небольшое окно с силуэтом, надетыми вещами и рунами.
 
-Только то, что на нём надето. Владелец отдельно: «никакой лишней информации
+Только то, что на нём надето. Носитель Клейма может скрыть сборку
+(настройка hide_build) - тогда только имя, класс и силуэт. Владелец отдельно: «никакой лишней информации
 по типу инвентаря игрока или его страницы» - поэтому здесь нет сумки, рун в
 сумке, золота, места на карте, vk id и ссылки на страницу. Питомца тоже нет:
 он не вещь и не руна. Новые поля сюда - только с тем же правилом.
@@ -21,6 +22,7 @@ from services import (
     admin_service,
     item_service,
     naming,
+    premium_service,
     ring_slot_service,
     rune_service,
     title_service,
@@ -39,7 +41,26 @@ def _rune(rune_id: str | None, known: dict[str, int]) -> dict | None:
     }
 
 
+def build_hidden(target: Character) -> bool:
+    """Сборка скрыта (2026-11-15, владелец по предложению Есты): настройка
+    носителя Клейма Хранителя. Кончилось Клеймо - сборку снова видно."""
+    return bool((target.ui_flags or {}).get("hide_build")) and premium_service.is_brand(target)
+
+
+def _identity(target: Character) -> dict:
+    return {
+        "name": target.name, "level": target.level,
+        "base_class": target.base_class, "subclass": target.subclass, "gender": target.gender,
+        "class_title": admin_service.class_title(target),
+        "title": title_service.name_of(target.active_title_id) if target.active_title_id else None,
+        "title_tier": title_service.tier_of(target.active_title_id),
+    }
+
+
 async def look_payload(db, target: Character) -> dict:
+    if build_hidden(target):
+        return {**_identity(target), "hidden": True, "items": [], "ring": None,
+                "runes": {"hero": [], "abilities": [], "gear": []}}
     rows = (await db.execute(
         select(Item).join(Inventory, Inventory.item_id == Item.id)
         .where(Inventory.character_id == target.id, Inventory.equipped.is_(True))
@@ -76,11 +97,7 @@ async def look_payload(db, target: Character) -> dict:
             gear.append({"title": PLACE_TITLES[place], "runes": worn})
 
     return {
-        "name": target.name, "level": target.level,
-        "base_class": target.base_class, "subclass": target.subclass, "gender": target.gender,
-        "class_title": admin_service.class_title(target),
-        "title": title_service.name_of(target.active_title_id) if target.active_title_id else None,
-        "title_tier": title_service.tier_of(target.active_title_id),
+        **_identity(target), "hidden": False,
         "items": items, "ring": ring_info,
         "runes": {"hero": [r for r in hero if r], "abilities": abilities, "gear": gear},
     }

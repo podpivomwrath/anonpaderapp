@@ -405,7 +405,10 @@ UI_FLAGS = {"intro": int, "tour": int, "sound": bool, "safe_route": bool, "fish_
             # «Без оповещений» (2026-11-09): bot/notices.py.
             "no_notices": bool,
             # Сигналы союзникам в групповом бою (2026-11-11): bot/battle_signals.py.
-            "signals_out_off": bool, "signals_in_off": bool}
+            "signals_out_off": bool, "signals_in_off": bool,
+            # Скрыть сборку в окне игрока (2026-11-15): действует с Клеймом,
+            # bot/miniapp_look_api.build_hidden.
+            "hide_build": bool}
 UI_HINTS_MAX = 32
 
 

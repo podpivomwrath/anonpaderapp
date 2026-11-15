@@ -249,6 +249,11 @@ export function setNoImages(on) {
 }
 
 // Короткий боевой лог (2026-10-22): полоски и значки вместо полного лога.
+// Скрыть сборку в окне игрока (2026-11-15): действует с Клеймом Хранителя.
+export function setHideBuild(on) {
+  return saveUi({ set: { hide_build: on } });
+}
+
 export function setShortLog(on) {
   return saveUi({ set: { short_log: on } });
 }

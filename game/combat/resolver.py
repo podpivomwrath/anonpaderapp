@@ -243,6 +243,7 @@ class TickResult:
 def _apply_phase(
     session: CombatSessionState, hits: list, heals: list, ctx, rng,
     applied_by_hit: dict[int, int], shielded_by_hit: dict[int, int], result: "TickResult",
+    late_freezes: set | None = None,
 ) -> list:
     """Применить одну фазу хода: удары и лечение суммируются в net-дельту
     по каждому участнику (внутри фазы всё одновременно). Возвращает удары
@@ -254,6 +255,8 @@ def _apply_phase(
         target = session.combatants[hit.target_id]
         amount = hit.amount
         shared_rules.passive_mark(session.combatants.get(hit.source_id), target, hit, rng, ctx.lines)
+        shared_rules.passive_on_hit(session.combatants.get(hit.source_id), target, hit, session, rng,
+                                    ctx.lines, late_freezes)
         # Рейд «Безмогильное поле»: купол и стойки генерала (session.py).
         if target.incoming_hit_hook is not None and amount > 0:
             amount = max(target.incoming_hit_hook(hit, session.combatants.get(hit.source_id), amount), 0)
@@ -753,7 +756,8 @@ def resolve_tick(
                 and (h.is_tick or session.combatants[h.source_id].alive)
             ]
             heals = [h for h in heals if session.combatants[h.target_id].alive]
-        reflects = _apply_phase(session, hits, heals, ctx, rng, applied_by_hit, shielded_by_hit, result)
+        reflects = _apply_phase(session, hits, heals, ctx, rng, applied_by_hit, shielded_by_hit, result,
+                                deferred_freezes)
         log_phases.append((hits + reflects, heals))
     ctx.hits = [h for hits, _ in log_phases for h in hits]
     ctx.heals = [h for _, heals in log_phases for h in heals]

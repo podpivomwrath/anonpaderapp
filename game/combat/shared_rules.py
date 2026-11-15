@@ -57,6 +57,11 @@ def poison_tick_damage(effect: Effect, source: CombatantState | None,
         # Руна «Литая кираса» ослабляет уязвимость и для яда, как для ударов.
         multiplier *= 1.0 + target.effect_total(EffectKind.VULNERABILITY) * max(
             1.0 - target.buff_modifiers.get("rune:cast_cuirass", 0.0), 0.0)
+        # Отравитель (2026-11-15): Выносливость защищает и от яда - долей
+        # обычной защиты. Горение не трогаем.
+        share = (target.buff_modifiers or {}).get("poison_resist_share", 0.0)
+        if share and target.kind == "character" and getattr(effect, "tag", None) != BURN_TAG:
+            multiplier *= 1.0 - share * stat_model.ACTIVE.mitigation(target.stats)
     multiplier *= rune_dot_mult(effect, source, target)  # руны (2026-10-31)
     return max(round(effect.value * effect.stacks * multiplier), 1)
 
@@ -254,8 +259,12 @@ def recovered(target: CombatantState, amount: int) -> int:
     reduction = target.heal_reduction() if hasattr(target, "heal_reduction") else 0.0
     mult *= 1.0 - reduction
     # «Порча руин» (2026-11-11): чем глубже этаж, тем слабее лечение и щиты.
-    mult *= 1.0 - (getattr(target, "buff_modifiers", None) or {}).get("ruins_rot", 0.0)
-    return amount if mult >= 1.0 else round(amount * mult)
+    mods = getattr(target, "buff_modifiers", None) or {}
+    mult *= 1.0 - mods.get("ruins_rot", 0.0)
+    out = amount if mult >= 1.0 else round(amount * mult)
+    # Тёмный мистик (2026-11-15): входящее лечение сильнее.
+    bonus = mods.get("heal_received_bonus", 0.0)
+    return round(out * (1.0 + bonus)) if bonus and out > 0 else out
 
 
 def bitter_backlash(target: CombatantState, healed: int) -> int:
@@ -370,6 +379,58 @@ def passive_mark(actor: CombatantState | None, target: CombatantState, hit, rng,
         return
     add_mark(actor, target)
     lines.append(f"{target.name} помечен добычей ({actor.name}) 🎯")
+
+
+#: Ослабления Отравителя от удара (2026-11-15): вид, сила, строка.
+POISONER_HIT_DEBUFFS = (
+    (EffectKind.WEAKEN, 0.15, "бьёт слабее"),
+    (EffectKind.VULNERABILITY, 0.10, "получает больше урона"),
+    (EffectKind.HEAL_REDUCTION, 0.30, "хуже лечится"),
+)
+
+
+def passive_on_hit(attacker: CombatantState | None, target: CombatantState, hit, session, rng,
+                   lines: list[str], late_freezes: set | None = None) -> None:
+    """Пассивки от прямого удара (2026-11-15): путь воина оглушает, Отравитель
+    ослабляет на ход, путь мага сбивает полезный эффект. Яд, горение, шипы и
+    прочий ответный урон не в счёт. Вызывает резолвер, когда удары уже
+    посчитаны, - свежий контроль переносится на следующий ход (late_freezes)."""
+    if attacker is None or attacker.kind != "character":
+        return
+    if hit.missed or hit.is_dot or hit.reactive or hit.amount <= 0 or attacker.id == target.id:
+        return
+    if not target.alive or target.side == attacker.side:
+        return
+    mods = attacker.buff_modifiers or {}
+    if hit.pierced:
+        lines.append(f"🗡 {attacker.name} бьёт {target.name} мимо защиты")
+    stun = mods.get("stun_on_hit_chance", 0.0)
+    if stun and rng.random() < stun:
+        from game.combat import control
+        from game.combat.session import CombatMode
+
+        before = {id(e) for e in target.effects_of(EffectKind.FREEZE)}
+        res = control.try_apply_control(target, base_duration=bc.CONTROL_BASE_DURATION_TICKS,
+                                        source_id=attacker.id, rng=rng, pvp=session.mode != CombatMode.PVE)
+        if res.applied:
+            fresh = {id(e) for e in target.effects_of(EffectKind.FREEZE)} - before
+            if late_freezes is not None:
+                late_freezes.update(fresh)
+            lines.append(f"💫 {attacker.name} оглушает {target.name} ударом")
+    debuff = mods.get("debuff_on_hit_chance", 0.0)
+    if debuff and rng.random() < debuff:
+        kind, value, text = rng.choice(POISONER_HIT_DEBUFFS)
+        target.apply_effect(kind, value, 1, attacker.id)
+        lines.append(f"🧪 {target.name} {text} - ход ({attacker.name})")
+    dispel = mods.get("dispel_on_hit_chance", 0.0)
+    if dispel and rng.random() < dispel:
+        from game.combat import ability_rules
+
+        shielded = any(e.kind == EffectKind.SHIELD_POOL and e.value > 0 for e in target.effects)
+        good = [e for e in target.effects if e.kind in ability_rules.GOOD and e.kind != EffectKind.SHIELD_POOL]
+        if good and not shielded:
+            target.effects.remove(rng.choice(good))
+            lines.append(f"✨ {attacker.name} сбивает с {target.name} полезный эффект")
 
 
 # --- Руны (2026-10-31) --------------------------------------------------------
@@ -695,6 +756,27 @@ def _passive_recovery(actor: CombatantState, ctx, heals_from: int) -> None:
                 h.ratio *= 1 + ally
 
 
+#: Защитные навыки, чьи эффекты Страж с шансом продлевает (2026-11-15).
+GUARDIAN_EXTEND_SKILLS = ("guardian_block", "guardian_unbreakable", "cover_ally")
+
+
+def _passive_extend(actor: CombatantState, skill_id: str, fresh: list, ctx) -> None:
+    """Пассивки (2026-11-15): Страж - эффекты Глухой обороны, Несокрушимого и
+    «Прикрыть собой» на ход дольше; путь разбойника - уклонение от своих навыков."""
+    mods = actor.buff_modifiers or {}
+    guard = mods.get("defense_extend_chance", 0.0)
+    if guard and skill_id in GUARDIAN_EXTEND_SKILLS and fresh and ctx.rng.random() < guard:
+        for effect in fresh:
+            effect.remaining_ticks += 1
+        ctx.lines.append(f"🛡 {actor.name}: «{skill_id_name(skill_id)}» продержится на ход дольше")
+    dodge = mods.get("dodge_extend_chance", 0.0)
+    dodges = [e for e in fresh if e.kind == EffectKind.DODGE]
+    if dodge and dodges and ctx.rng.random() < dodge:
+        for effect in dodges:
+            effect.remaining_ticks += 1
+        ctx.lines.append(f"💨 {actor.name}: уклонение продержится на ход дольше")
+
+
 def skill_snapshot(actor: CombatantState, combatants) -> dict:
     """Что висело от бойца до навыка: для рун «Тягучесть» и «Подпорка»."""
     return {id(e): (e.remaining_ticks, e.value) for c in combatants for e in c.effects if e.source_id == actor.id}
@@ -727,6 +809,7 @@ def rune_after_skill(actor: CombatantState, skill_id: str | None, before: dict, 
     fresh = [e for c in combatants for e in c.effects
              if e.source_id == actor.id and (id(e) not in before or e.remaining_ticks > before[id(e)][0])]
     _passive_recovery(actor, ctx, heals_from)
+    _passive_extend(actor, skill_id, fresh, ctx)
     if not any(key.startswith("rune:") for key in mods):
         return
     rng = ctx.rng

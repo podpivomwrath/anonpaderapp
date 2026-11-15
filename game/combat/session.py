@@ -446,8 +446,11 @@ class CombatantState:
 
     def heal_reduction(self) -> float:
         """Насколько слабее входящее лечение и новые щиты (Горькая рана)."""
-        return min(max((e.value for e in self.effects
-                        if e.kind == EffectKind.HEAL_REDUCTION and e.remaining_ticks > 0), default=0.0), 0.9)
+        cut = min(max((e.value for e in self.effects
+                       if e.kind == EffectKind.HEAL_REDUCTION and e.remaining_ticks > 0), default=0.0), 0.9)
+        # Кровавый рыцарь (2026-11-15): срезы лечения по нему слабее.
+        resist = (getattr(self, "buff_modifiers", None) or {}).get("heal_reduction_resist", 0.0)
+        return cut * (1.0 - resist) if cut else 0.0
 
     def is_on_cooldown(self, skill_id: str) -> bool:
         return self.cooldowns.get(skill_id, 0) > 0

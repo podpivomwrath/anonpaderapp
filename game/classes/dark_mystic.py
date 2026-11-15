@@ -69,6 +69,9 @@ def _pay_hp(actor, pct: float, lines: list[str], *, from_max: bool = False) -> i
 def _solo_heal_penalty(ctx: SkillContext) -> float:
     """Вне группы лечение мистика слабее: он командный хилер, и его сила
     обязана расти от числа союзников, а не работать как личный сустейн."""
+    # Пассивка Тёмного мистика (2026-11-15): соло навыки не слабеют.
+    if ctx.actor.buff_modifiers.get("no_solo_heal_penalty", 0.0) > 0:
+        return 1.0
     return 1.0 if ctx.session.alive_allies_of(ctx.actor) else bc.DARK_MYSTIC_SOLO_HEAL_PENALTY
 
 

@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Button, Div, Group, Header, SimpleCell, Switch } from '@vkontakte/vkui';
-import { setNoImages, setNoNotices, setNoticeMute, setShortLog, setSignalsOff } from '../api.js';
+import { setHideBuild, setNoImages, setNoNotices, setNoticeMute, setShortLog, setSignalsOff } from '../api.js';
 import AppLink from './AppLink.jsx';
 
 // Приложение для ПК и Android (2026-11-15): пока его нет у игроков, раздел
@@ -75,6 +75,8 @@ export default function SettingsTab({ character, onCharacterUpdate, soundOn, onT
   // «Без оповещений» (2026-11-09, репорт 340, bot/notices.py).
   const [quiet, toggleQuiet] = useFlag(character, onCharacterUpdate, 'no_notices', setNoNotices);
   const [muted, toggleKind] = useMuted(character, onCharacterUpdate);
+  // Скрыть сборку (2026-11-15, владелец): платная настройка Клейма Хранителя.
+  const [hidden, toggleHidden] = useFlag(character, onCharacterUpdate, 'hide_build', setHideBuild);
   // Сигналы союзникам (2026-11-11, bot/battle_signals.py): флаг - «выключено».
   const [sigOut, toggleOut] = useFlag(
     character, onCharacterUpdate, 'signals_out_off', (off) => setSignalsOff('out', off), true,
@@ -126,6 +128,15 @@ export default function SettingsTab({ character, onCharacterUpdate, soundOn, onT
             checked={!quiet && !muted.has(k.id)} onChange={(on) => toggleKind(k.id, on)}
           />
         ))}
+      </Group>
+      <Group header={<Header>Другие игроки</Header>}>
+        <Row
+          title="Скрыть сборку"
+          subtitle={character.brand
+            ? 'В окне игрока из топов и доски другие увидят только имя, класс и силуэт - без вещей и рун.'
+            : 'Доступно с Клеймом Хранителя: другие игроки не увидят ваши вещи и руны.'}
+          checked={hidden && Boolean(character.brand)} disabled={!character.brand} onChange={toggleHidden}
+        />
       </Group>
       {(APP_RELEASED || character.is_admin) && <AppLink />}
       <Group header={<Header>Игроки</Header>}>

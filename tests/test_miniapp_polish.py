@@ -71,12 +71,28 @@ async def test_look_shows_only_worn_things(db_session, make_character) -> None:
     assert [i["name"] for i in data["items"]] == [worn.name]
     assert set(data) == {
         "name", "level", "base_class", "subclass", "gender", "class_title", "title", "title_tier",
-        "items", "ring", "runes",
+        "items", "ring", "runes", "hidden",
     }
     assert set(data["runes"]) == {"hero", "abilities", "gear"}
     text = repr(data)
     for leak in ("vk_id", "pos_x", "gold", "farm_currency", "bag", "user_id"):
         assert leak not in text
+
+
+async def test_brand_holder_can_hide_the_build(db_session, make_character) -> None:
+    """2026-11-15, владелец: скрыть сборку - настройка Клейма Хранителя.
+    Без Клейма настройка не действует."""
+    from bot.miniapp_look_api import look_payload
+
+    c = await make_character(level=60)
+    await _item(db_session, c, "weapon", {"str": 7}, True)
+    c.ui_flags = {"hide_build": True}
+    assert (await look_payload(db_session, c))["items"]  # Клейма нет - видно
+    c.brand_until = datetime.now(timezone.utc) + timedelta(days=3)
+    data = await look_payload(db_session, c)
+    assert data["hidden"] and not data["items"] and data["ring"] is None
+    assert data["runes"] == {"hero": [], "abilities": [], "gear": []}
+    assert data["name"] == c.name
 
 
 async def test_my_runs_newest_first_with_party_and_bag(db_session, make_character) -> None:
